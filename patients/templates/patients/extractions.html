@@ -1,7 +1,47 @@
 {% extends menu_patients_base %}
+{% load ui_help %}
 {% block title %}Extractions{% endblock title %}
 
+{% block css %}
+{{ block.super }}
+#extraction-header {
+    margin-bottom: 10px;
+}
+
+#extraction-header .header-links a + a:before {
+    content: '|';
+    padding: 0 10px;
+    color: gray;
+}
+{% endblock css %}
+
 {% block submenu_page_content %}
-    <h3>Extractions</h3>
+    {% page_help 'patients/extractions_help' 'Extractions' %}
+    <div id="extraction-header">
+        <div>
+            Extractions are created for a specimen by patient record import, which also matches them
+            to samples.
+            {% if url_name_visible.upload %}
+                Go to the <a class="hover-link" href="{% url 'upload' %}">Upload</a> page to import a patient CSV.
+            {% endif %}
+        </div>
+        <div>
+            The DNA and RNA arms of one specimen are separate extractions
+            {% if url_name_visible.specimens %}
+                - add the others from the <a class="hover-link" href="{% url 'specimens' %}">specimen</a>'s own page.
+            {% endif %}
+        </div>
+        <div class="header-links">
+            {% if url_name_visible.import_patient_records_details %}
+                <a class="hover-link" href="{% url 'import_patient_records_details' %}">Patient CSV columns</a>
+            {% endif %}
+            {% if url_name_visible.unmatched_extractions %}
+                <a class="hover-link" href="{% url 'unmatched_extractions' %}">{% if needs_attention_count %}<i class="fas fa-exclamation-triangle text-warning"></i> {% endif %}Unmatched extractions{% if needs_attention_count %} ({{ needs_attention_count }}){% endif %}</a>
+            {% endif %}
+            {% if url_name_visible.patient_imports %}
+                <a class="hover-link" href="{% url 'patient_imports' %}">Previous patient imports</a>
+            {% endif %}
+        </div>
+    </div>
     <table id="extraction-datatable" data-datatable-url="{% url 'extraction_datatables' %}" class="sticky-header"></table>
 {% endblock submenu_page_content %}

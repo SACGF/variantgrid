@@ -10,6 +10,8 @@ from patients.grids import (
     PatientRecordColumns,
     PatientRecordsColumns,
     SpecimenColumns,
+    UnmatchedExtractionSampleColumns,
+    UnmatchedExtractionSequencingSampleColumns,
 )
 from patients.views_rest import (
     ExtractionViewSet,
@@ -41,6 +43,7 @@ urlpatterns = [
     path('view_specimen/<int:specimen_id>', views.view_specimen, name='view_specimen'),
     path('view_extraction/<int:extraction_id>', views.view_extraction, name='view_extraction'),
     path('extraction/<int:extraction_id>/samples', views.extraction_samples, name='extraction_samples'),
+    path('unmatched_extractions', views.unmatched_extractions, name='unmatched_extractions'),
     path('view_patient/genes/<int:patient_id>', views.view_patient_genes, name='view_patient_genes'),
     path('view_patient/modifications/<int:patient_id>', views.view_patient_modifications, name='view_patient_modifications'),
 
@@ -68,6 +71,12 @@ urlpatterns = [
          name='specimen_datatables'),
     path('extraction/datatables/', DatabaseTableView.as_view(column_class=ExtractionColumns),
          name='extraction_datatables'),
+    path('unmatched_extraction/sample/datatables/',
+         DatabaseTableView.as_view(column_class=UnmatchedExtractionSampleColumns),
+         name='unmatched_extraction_sample_datatables'),
+    path('unmatched_extraction/sequencing_sample/datatables/',
+         DatabaseTableView.as_view(column_class=UnmatchedExtractionSequencingSampleColumns),
+         name='unmatched_extraction_sequencing_sample_datatables'),
     path('patient/ontology/genes/grid/<int:patient_id>/<slug:op>/', JQGridView.as_view(grid=PatientOntologyGenesGrid),
          name='patient_ontology_genes_grid'),
 

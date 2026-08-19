@@ -14,6 +14,7 @@ from classification.autopopulate_evidence_keys.evidence_from_sample_and_patient 
 )
 from classification.enums import SpecialEKeys
 from library.guardian_utils import assign_permission_to_user_and_groups
+from patients.forms import ExtractionForm
 from patients.import_records import process_record
 from patients.models import (
     Extraction,
@@ -27,8 +28,10 @@ from patients.models import (
     Specimen,
 )
 from patients.models_enums import NucleicAcid, TissueStatus
+from patients.views import CREATE_EXTRACTION
 from patients.views_autocomplete import ExtractionAutocompleteView, SpecimenAutocompleteView
 from snpdb.models import VCF, GenomeBuild, ImportSource, ImportStatus, Sample
+from snpdb.search import SearchResultMatchStrength, search_data
 from snpdb.models.models_enums import VariantsType
 from upload.models import FileUpload, UploadedFileTypes, UploadedPatientRecords
 
@@ -287,6 +290,22 @@ class TestPatientCSVExtractionRoundTrip(TestCase):
         self.assertEqual(extractions.count(), 1)
         self.assertEqual(extractions.get().nucleic_acid_source, NucleicAcid.RNA)
 
+    def test_a_second_sample_gets_its_own_extraction(self):
+        """ The DNA and RNA arms of one specimen are different samples, so the second row must not
+            repurpose the first sample's extraction """
+        self._import_row()
+        rna_sample = Sample.objects.create(name="csv_sample_rna", vcf=self.sample.vcf,
+                                           import_status=ImportStatus.SUCCESS)
+        assign_permission_to_user_and_groups(self.user, rna_sample)
+        self._import_row(**{PatientColumns.SAMPLE_NAME: "csv_sample_rna",
+                            PatientColumns.SPECIMEN_NUCLEIC_ACID_SOURCE: "RNA"})
+
+        self.assertEqual(Extraction.objects.filter(specimen__reference_id="CSVSPEC001").count(), 2)
+        self.sample.refresh_from_db()
+        rna_sample.refresh_from_db()
+        self.assertEqual(self.sample.extraction.nucleic_acid_source, NucleicAcid.DNA)
+        self.assertEqual(rna_sample.extraction.nucleic_acid_source, NucleicAcid.RNA)
+
     def test_blank_nucleic_acid_source_still_links_sample(self):
         self._import_row(**{PatientColumns.SPECIMEN_NUCLEIC_ACID_SOURCE: None})
 
@@ -439,3 +458,162 @@ class TestSpecimenExtractionGrids(TestCase):
         unnamed = Extraction.objects.create(specimen=self.specimen)
         rows = self._grid_rows("extraction_datatables")
         self.assertEqual(rows[unnamed.pk]["reference_id"]["text"], f"({unnamed.pk})")
+
+
+class TestGetOrCreateExtraction(TestCase):
+    """ The patient CSV names one extraction per specimen, so it has to fill in the right one without
+        repurposing an arm somebody else named """
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.patient = Patient.objects.create(first_name="GOC", last_name="PATIENT")
+        cls.specimen = Specimen.objects.create(reference_id="2600000010", patient=cls.patient)
+
+    def test_names_an_extraction_that_has_no_source_yet(self):
+        unnamed = Extraction.objects.create(specimen=self.specimen)
+        self.assertEqual(self.specimen.get_or_create_extraction(NucleicAcid.DNA), unnamed)
+        unnamed.refresh_from_db()
+        self.assertEqual(unnamed.nucleic_acid_source, NucleicAcid.DNA)
+        self.assertEqual(self.specimen.extraction_set.count(), 1)
+
+    def test_leaves_another_arm_alone(self):
+        """ An RNA extraction added by hand must not become the CSV's DNA one """
+        rna = Extraction.objects.create(specimen=self.specimen, nucleic_acid_source=NucleicAcid.RNA)
+        dna = self.specimen.get_or_create_extraction(NucleicAcid.DNA)
+
+        self.assertNotEqual(dna, rna)
+        rna.refresh_from_db()
+        self.assertEqual(rna.nucleic_acid_source, NucleicAcid.RNA)
+        self.assertEqual(self.specimen.extraction_set.count(), 2)
+
+    def test_no_source_reuses_whatever_is_there(self):
+        """ A CSV with a blank nucleic acid column describes the extraction already on the specimen """
+        dna = Extraction.objects.create(specimen=self.specimen, nucleic_acid_source=NucleicAcid.DNA)
+        self.assertEqual(self.specimen.get_or_create_extraction(), dna)
+        self.assertEqual(self.specimen.extraction_set.count(), 1)
+
+
+class TestExtractionForm(TestCase):
+    """ The specimen is fixed by the page rather than posted, so the form carries the checks Django
+        skips when a unique_together field is left out """
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.patient = Patient.objects.create(first_name="FORM", last_name="PATIENT")
+        cls.specimen = Specimen.objects.create(reference_id="2600000020", patient=cls.patient)
+        cls.dna = Extraction.objects.create(specimen=cls.specimen, reference_id="2600000020C",
+                                            nucleic_acid_source=NucleicAcid.DNA)
+
+    def _form(self, reference_id, instance=None):
+        data = {"reference_id": reference_id, "nucleic_acid_source": NucleicAcid.RNA}
+        return ExtractionForm(data, instance=instance or Extraction(specimen=self.specimen))
+
+    def test_blank_reference_saves_as_null(self):
+        """ Postgres treats NULLs as distinct, which is what lets a specimen hold several unnamed
+            extractions - an empty box means unnamed rather than named "" """
+        form = self._form("")
+        self.assertTrue(form.is_valid(), form.errors)
+        extraction = form.save()
+        self.assertIsNone(extraction.reference_id)
+
+    def test_reference_already_on_this_specimen_is_rejected(self):
+        form = self._form("2600000020C")
+        self.assertFalse(form.is_valid())
+        self.assertIn("reference_id", form.errors)
+
+    def test_same_reference_on_another_specimen_is_fine(self):
+        other = Specimen.objects.create(reference_id="2600000021", patient=self.patient)
+        form = ExtractionForm({"reference_id": "2600000020C", "nucleic_acid_source": NucleicAcid.RNA},
+                              instance=Extraction(specimen=other))
+        self.assertTrue(form.is_valid(), form.errors)
+
+    def test_editing_keeps_its_own_reference(self):
+        form = self._form("2600000020C", instance=self.dna)
+        self.assertTrue(form.is_valid(), form.errors)
+
+
+class TestCreateExtractionFromSpecimenPage(TestCase):
+    """ #1747 - the specimen page is where you are when you find an arm is missing """
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.user = User.objects.create_user("create_extraction_user", password="x")
+        cls.patient = Patient.objects.create(first_name="CREATE", last_name="PATIENT")
+        assign_permission_to_user_and_groups(cls.user, cls.patient)
+        cls.specimen = Specimen.objects.create(reference_id="2600000030", patient=cls.patient)
+
+    def _post(self, **overrides):
+        self.client.force_login(self.user)
+        data = {CREATE_EXTRACTION: "", "reference_id": "2600000030B",
+                "nucleic_acid_source": NucleicAcid.RNA, "extraction_date": ""}
+        data.update(overrides)
+        return self.client.post(reverse("view_specimen", kwargs={"specimen_id": self.specimen.pk}), data)
+
+    def test_creates_extraction_on_this_specimen(self):
+        response = self._post()
+        extraction = self.specimen.extraction_set.get()
+        self.assertRedirects(response, extraction.get_absolute_url())
+        self.assertEqual(extraction.reference_id, "2600000030B")
+        self.assertEqual(extraction.nucleic_acid_source, NucleicAcid.RNA)
+
+    def test_specimen_fields_are_left_alone(self):
+        """ Both forms post to the same view, so the specimen's own form must sit out this one """
+        self._post()
+        self.specimen.refresh_from_db()
+        self.assertEqual(self.specimen.reference_id, "2600000030")
+
+    def test_an_externally_managed_specimen_creates_nothing(self):
+        """ can_write is the external manager's answer as much as guardian's """
+        manager = ExternalModelManager.objects.create(name="read_only_lims")
+        self.specimen.external_pk = ExternalPK.objects.create(code="RO-1", external_type="specimen",
+                                                              external_manager=manager)
+        self.specimen.save()
+
+        self._post()
+        self.assertEqual(self.specimen.extraction_set.count(), 0)
+
+
+class TestSpecimenExtractionSearch(TestCase):
+    """ Searching a specimen reference also turns up the extractions hanging off it, which used to
+        leave 2 results and nowhere to jump to """
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.user = User.objects.create_user("search_user", password="x")
+        cls.patient = Patient.objects.create(first_name="SEARCH", last_name="PATIENT")
+        assign_permission_to_user_and_groups(cls.user, cls.patient)
+        cls.specimen = Specimen.objects.create(reference_id="SPECIMEN1", patient=cls.patient)
+        # One arm built its reference off the specimen's, the other is named by the lab that took it
+        cls.dna = Extraction.objects.create(specimen=cls.specimen, reference_id="SPECIMEN1C",
+                                            nucleic_acid_source=NucleicAcid.DNA)
+        cls.rna = Extraction.objects.create(specimen=cls.specimen, reference_id="LAB-77",
+                                            nucleic_acid_source=NucleicAcid.RNA)
+
+    def _strengths(self, search_string) -> dict:
+        results = search_data(self.user, search_string, False).results
+        return {r.preview.internal_url: r.match_strength for r in results}
+
+    def test_the_specimen_reference_names_the_specimen(self):
+        strengths = self._strengths("SPECIMEN1")
+        self.assertEqual(strengths[self.specimen.get_absolute_url()], SearchResultMatchStrength.ID_MATCH)
+
+    def test_an_extraction_reached_through_its_specimen_is_fuzzy(self):
+        strengths = self._strengths("SPECIMEN1")
+        self.assertEqual(strengths[self.rna.get_absolute_url()], SearchResultMatchStrength.FUZZY_MATCH)
+
+    def test_an_extraction_partly_naming_itself_is_not_an_id_match(self):
+        strengths = self._strengths("SPECIMEN1")
+        self.assertEqual(strengths[self.dna.get_absolute_url()], SearchResultMatchStrength.STRONG_MATCH)
+
+    def test_the_extraction_reference_names_the_extraction(self):
+        strengths = self._strengths("SPECIMEN1C")
+        self.assertEqual(strengths[self.dna.get_absolute_url()], SearchResultMatchStrength.ID_MATCH)
+
+    def test_jumps_to_the_specimen(self):
+        preferred = search_data(self.user, "SPECIMEN1", False).single_preferred_result()
+        self.assertIsNotNone(preferred, "A whole specimen reference has somewhere to jump to")
+        self.assertEqual(preferred.preview.internal_url, self.specimen.get_absolute_url())

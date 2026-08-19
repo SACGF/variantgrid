@@ -2,9 +2,9 @@ import mimetypes
 
 import pandas as pd
 from django.conf import settings
-from django.db.models import Prefetch
+from django.db.models import Prefetch, Q
 from django.http.response import HttpResponse, JsonResponse
-from django.shortcuts import get_object_or_404, render
+from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_http_methods, require_POST
 
 from annotation.models.models_phenotype_match import TextPhenotypeMatch
@@ -28,7 +28,9 @@ from patients.models import (
     PatientRecords,
     Specimen,
 )
+from patients.models_enums import MatchStatus
 from patients.sample_grouping import get_extraction_sample_group, sample_group_as_json
+from seqauto.models import SequencingSample
 from snpdb.models import GenomeBuild, Sample
 from uicore.utils.form_helpers import form_helper_horizontal
 
@@ -124,33 +126,74 @@ def view_patient_extractions(request, patient_id):
     return render(request, 'patients/view_patient_extractions.html', context)
 
 
+_NEEDS_ATTENTION_Q = Q(extraction__isnull=True, extraction_reference__isnull=False,
+                       extraction_match_status=MatchStatus.NEEDS_ATTENTION)
+
+
 def specimens(request):
     return render(request, 'patients/specimens.html')
 
 
 def extractions(request):
-    return render(request, 'patients/extractions.html')
+    return render(request, 'patients/extractions.html',
+                  {"needs_attention_count": _extraction_needs_attention_count(request.user)})
+
+
+def _extraction_needs_attention_count(user) -> int:
+    """ Pending is the load race and clears on its own, so only what has stopped clearing is worth
+        putting a number against (@see patients.signals.extraction_match_health_check) """
+    count = Sample.filter_for_user(user).filter(_NEEDS_ATTENTION_Q).count()
+    if settings.SEQAUTO_ENABLED:
+        count += SequencingSample.objects.filter(_NEEDS_ATTENTION_Q).count()
+    return count
+
+
+def unmatched_extractions(request):
+    """ Rows naming an extraction that hasn't resolved - the user-facing side of the health check """
+    context = {"seqauto_enabled": settings.SEQAUTO_ENABLED,
+               "pending_days": settings.PATIENT_EXTRACTION_MATCH_PENDING_DAYS}
+    return render(request, 'patients/unmatched_extractions.html', context)
+
+
+# Names the submit button that tells view_specimen's two forms apart
+CREATE_EXTRACTION = "create-extraction"
 
 
 def view_specimen(request, specimen_id):
     specimen = Specimen.get_for_user(request.user, specimen_id)
-    form = forms.SpecimenForm(request.POST or None, instance=specimen)
-    form.helper = form_helper_horizontal()
-
     has_write_permission = specimen.can_write(request.user)
+    # The page carries the specimen's own form and a create form for a new extraction off it, so the
+    # submit button says which one was posted
+    creating_extraction = CREATE_EXTRACTION in request.POST
+
+    form = forms.SpecimenForm(None if creating_extraction else request.POST or None, instance=specimen)
+    form.helper = form_helper_horizontal()
+    new_extraction_form = forms.ExtractionForm(request.POST if creating_extraction else None,
+                                              instance=Extraction(specimen=specimen))
+
     if not has_write_permission:
         set_form_read_only(form)
 
     if request.method == "POST":
-        valid = form.is_valid()
-        if valid:
-            specimen = form.save()
-        add_save_message(request, valid, "Specimen")
+        if creating_extraction:
+            valid = has_write_permission and new_extraction_form.is_valid()
+            if valid:
+                extraction = new_extraction_form.save()
+                add_save_message(request, valid, f"Extraction {extraction}", created=True)
+                return redirect(extraction)
+            add_save_message(request, valid, "Extraction", created=True)
+        else:
+            valid = form.is_valid()
+            if valid:
+                specimen = form.save()
+            add_save_message(request, valid, "Specimen")
 
     # Samples carry their VCF's permissions, so they're filtered separately to the specimen's own
     visible_samples = Prefetch("sample_set", queryset=Sample.filter_for_user(request.user).order_by("pk"))
     context = {"specimen": specimen,
                "form": form,
+               "new_extraction_form": new_extraction_form,
+               "create_extraction_field": CREATE_EXTRACTION,
                "extractions": specimen.extraction_set.order_by("pk").prefetch_related(visible_samples),
                "measures": specimen.specimenmeasure_set.order_by("measure_type", "-measured_date"),
                "has_write_permission": has_write_permission}

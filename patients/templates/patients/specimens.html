@@ -1,7 +1,43 @@
 {% extends menu_patients_base %}
+{% load ui_help %}
 {% block title %}Specimens{% endblock title %}
 
+{% block css %}
+{{ block.super }}
+#specimen-header {
+    margin-bottom: 10px;
+}
+
+#specimen-header .header-links a + a:before {
+    content: '|';
+    padding: 0 10px;
+    color: gray;
+}
+{% endblock css %}
+
 {% block submenu_page_content %}
-    <h3>Specimens</h3>
+    {% page_help 'patients/specimens_help' 'Specimens' %}
+    <div id="specimen-header">
+        <div>
+            Specimens are created for a patient by patient record import, which also creates their
+            extractions and matches them to samples.
+            {% if url_name_visible.upload %}
+                Go to the <a class="hover-link" href="{% url 'upload' %}">Upload</a> page to import a patient CSV.
+            {% endif %}
+        </div>
+        {% if url_name_visible.patients %}
+            <div>
+                A single specimen can be added by hand on a <a class="hover-link" href="{% url 'patients' %}">patient</a>'s Specimens tab.
+            </div>
+        {% endif %}
+        <div class="header-links">
+            {% if url_name_visible.import_patient_records_details %}
+                <a class="hover-link" href="{% url 'import_patient_records_details' %}">Patient CSV columns</a>
+            {% endif %}
+            {% if url_name_visible.patient_imports %}
+                <a class="hover-link" href="{% url 'patient_imports' %}">Previous patient imports</a>
+            {% endif %}
+        </div>
+    </div>
     <table id="specimen-datatable" data-datatable-url="{% url 'specimen_datatables' %}" class="sticky-header"></table>
 {% endblock submenu_page_content %}

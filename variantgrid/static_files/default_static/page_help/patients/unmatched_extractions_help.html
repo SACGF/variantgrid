@@ -1,0 +1,13 @@
+A sample or a sequencing sample can name the extraction it came from before that extraction exists in
+VG - the run is posted before the specimen is accessioned, or the patient CSV lands a day later. The
+reference is parked on the row rather than rejected, and re-resolved whenever new extractions arrive.
+
+<p>
+<b>Pending</b> means nothing matched the reference yet, which is the ordinary load race and clears on
+its own. <b>Needs attention</b> means it has stopped clearing: the reference matched more than one
+extraction, or each half of it named a different one, or it has been pending long enough that the
+extraction is not simply late.
+
+<p>
+To clear one, import the patient record that creates the specimen and its extraction, or correct the
+reference on whichever side has it wrong.

@@ -389,20 +389,38 @@ class Specimen(GuardianPermissionsMixin, ExternallyManagedModel, PreviewModelMix
 
         return age
 
-    def get_or_create_extraction(self, nucleic_acid_source=None) -> 'Extraction':
-        """ The patient CSV describes a single extraction per specimen, so an existing extraction is
-            updated rather than a second one created """
+    def get_or_create_extraction(self, nucleic_acid_source=None, sample=None) -> 'Extraction':
+        """ The patient CSV describes a single extraction per specimen - the one the row's sample came
+            off. Re-importing that row corrects that extraction in place, so the sample is what says
+            which extraction the row is talking about.
+
+            Without it, a row for a second sample would repurpose the first sample's extraction, and
+            both arms of a TSO 500 specimen would end up on one. """
         extractions = self.extraction_set.order_by("pk")
+        if sample and sample.extraction_id:
+            if extraction := extractions.filter(pk=sample.extraction_id).first():
+                if nucleic_acid_source and extraction.nucleic_acid_source != nucleic_acid_source:
+                    extraction.nucleic_acid_source = nucleic_acid_source
+                    extraction.save()
+                return extraction
+
         if extraction := extractions.filter(nucleic_acid_source=nucleic_acid_source).first():
             return extraction
 
-        extraction = extractions.first()
-        if extraction is None:
-            extraction = Extraction.objects.create(specimen=self, nucleic_acid_source=nucleic_acid_source)
-        elif nucleic_acid_source:
-            extraction.nucleic_acid_source = nucleic_acid_source
-            extraction.save()
-        return extraction
+        if not nucleic_acid_source:
+            # The CSV didn't say, so whatever is already there answers for it
+            if extraction := extractions.first():
+                return extraction
+        else:
+            # An extraction nobody has named an acid for is the CSV's to fill in; one already naming
+            # a different acid is somebody else's arm
+            unnamed_source = Q(nucleic_acid_source__isnull=True) | Q(nucleic_acid_source="")
+            if extraction := extractions.filter(unnamed_source).first():
+                extraction.nucleic_acid_source = nucleic_acid_source
+                extraction.save()
+                return extraction
+
+        return Extraction.objects.create(specimen=self, nucleic_acid_source=nucleic_acid_source)
 
     def __str__(self):
         s = self.reference_id

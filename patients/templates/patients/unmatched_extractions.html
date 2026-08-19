@@ -1,0 +1,20 @@
+{% extends menu_patients_base %}
+{% load ui_help %}
+{% block title %}Unmatched Extractions{% endblock title %}
+
+{% block submenu_page_content %}
+    {% page_help 'patients/unmatched_extractions_help' 'Unmatched Extractions' %}
+    <div class="mb-3">
+        These rows name an extraction that hasn't resolved yet. Independent feeds arrive in any order,
+        so a reference VG can't place is parked rather than rejected, and re-resolved as extractions
+        land. <b>Pending</b> is that race; after {{ pending_days }} day{{ pending_days|pluralize }} it
+        becomes <b>Needs attention</b>, which wants a human - usually the specimen was never accessioned,
+        or its reference is spelled differently on each side.
+    </div>
+    <h4>Samples</h4>
+    <table id="unmatched-sample-datatable" data-datatable-url="{% url 'unmatched_extraction_sample_datatables' %}" class="sticky-header"></table>
+    {% if seqauto_enabled %}
+        <h4 class="mt-4">Sequencing samples</h4>
+        <table id="unmatched-sequencing-sample-datatable" data-datatable-url="{% url 'unmatched_extraction_sequencing_sample_datatables' %}" class="sticky-header"></table>
+    {% endif %}
+{% endblock submenu_page_content %}

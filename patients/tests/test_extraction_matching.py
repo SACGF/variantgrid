@@ -8,6 +8,7 @@ import cyvcf2
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
+from django.urls import reverse
 from django.utils import timezone
 
 from annotation.fake_annotation import get_fake_annotation_version
@@ -274,3 +275,29 @@ class ExtractionMatchHealthCheckTest(ExtractionMatchingTestBase):
     def test_registered_on_the_overall_stats_signal(self):
         receivers = [r[1]() for r in health_check_overall_stats_signal.receivers]
         self.assertIn(extraction_match_health_check, receivers)
+
+
+class UnmatchedExtractionGridTest(ExtractionMatchingTestBase):
+    """ The page the health check number points at """
+
+    def _rows(self):
+        self.client.force_login(self.user)
+        response = self.client.get(reverse("unmatched_extraction_sample_datatables"))
+        self.assertEqual(200, response.status_code)
+        return {row["id"]: row for row in response.json()["data"]}
+
+    def _visible_sample(self, vcf) -> Sample:
+        sample = self._sample(vcf)
+        assign_permission_to_user_and_groups(self.user, sample)
+        return sample
+
+    def test_lists_a_sample_whose_reference_has_not_resolved(self):
+        sample = self._visible_sample(self._import_vcf({"extraction": "2600000001C"}))
+        row = self._rows()[sample.pk]
+        self.assertIn("2600000001C", row["extraction_reference"])
+        self.assertEqual(row["extraction_match_status"], MatchStatus.PENDING)
+
+    def test_a_matched_sample_is_left_off(self):
+        self._create_extraction()
+        sample = self._visible_sample(self._import_vcf({"extraction": "2600000001C"}))
+        self.assertNotIn(sample.pk, self._rows())

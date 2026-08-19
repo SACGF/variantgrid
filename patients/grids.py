@@ -12,8 +12,10 @@ from library.jqgrid.jqgrid_user_row_config import JqGridUserRowConfig
 from library.utils import JsonDataType
 from ontology.grids import AbstractOntologyGenesGrid
 from ontology.models import OntologyService, OntologyTerm
+from patients.external_references import ExternalReference
 from patients.models import Extraction, Patient, PatientRecord, PatientRecords, Specimen
-from patients.models_enums import NucleicAcid, PatientRecordMatchType, TissueStatus
+from patients.models_enums import MatchStatus, NucleicAcid, PatientRecordMatchType, TissueStatus
+from seqauto.models import SequencingSample
 from snpdb.models import Sample
 from snpdb.views.datatable_view import CellData, DatatableConfig, RichColumn, SortOrder
 
@@ -250,6 +252,86 @@ class ExtractionColumns(DatatableConfig[Extraction]):
         qs = Extraction.filter_for_user(self.user)
         visible_samples_q = Q(sample__in=Sample.filter_for_user(self.user))
         return qs.annotate(sample_count=Count("sample", filter=visible_samples_q, distinct=True))
+
+
+def _render_extraction_reference(row: CellData) -> JsonDataType:
+    """ The claim as the client posted it - a bare reference or the ExternalPK form """
+    try:
+        return str(ExternalReference.from_data(row.value))
+    except ValueError:
+        return str(row.value)
+
+
+def _unmatched_extraction_columns() -> list[RichColumn]:
+    """ The parked claim and how long it has been parked - shared by everything that can name an
+        extraction before the extraction exists """
+    return [
+        RichColumn('extraction_reference', label='Claimed reference', orderable=False, search=False,
+                   renderer=_render_extraction_reference),
+        RichColumn('extraction_match_status', label='Status', orderable=True, search=False,
+                   client_renderer=RichColumn.choices_client_renderer(MatchStatus.choices)),
+        RichColumn('extraction_match_error', label='Problem', orderable=False),
+        RichColumn('extraction_match_date', label='Waiting since', orderable=True, search=False,
+                   default_sort=SortOrder.ASC, client_renderer='TableFormat.timestamp'),
+    ]
+
+
+class UnmatchedExtractionSampleColumns(DatatableConfig[Sample]):
+    def __init__(self, request: HttpRequest):
+        super().__init__(request)
+        self.search_box_enabled = True
+        self.download_csv_button_enabled = True
+
+        self.rich_columns = [
+            RichColumn('id', visible=False),
+            RichColumn('name', label='Sample', orderable=True,
+                       renderer=self.view_primary_key, client_renderer='TableFormat.linkUrl'),
+            RichColumn('vcf__name', label='VCF', orderable=True,
+                       extra_columns=['vcf_id'], renderer=self.render_vcf_link,
+                       client_renderer='TableFormat.linkUrl'),
+            *_unmatched_extraction_columns(),
+        ]
+
+    @staticmethod
+    def render_vcf_link(row: CellData) -> JsonDataType:
+        vcf_id = row["vcf_id"]
+        return {
+            "text": row.value or f"({vcf_id})",
+            "url": reverse('view_vcf', kwargs={"vcf_id": vcf_id}),
+        }
+
+    def get_initial_queryset(self) -> QuerySet[Sample]:
+        return Sample.filter_for_user(self.user).filter(extraction__isnull=True,
+                                                        extraction_reference__isnull=False)
+
+
+class UnmatchedExtractionSequencingSampleColumns(DatatableConfig[SequencingSample]):
+    """ The seqauto half - a run's sample sheet can name an extraction before it is accessioned """
+
+    def __init__(self, request: HttpRequest):
+        super().__init__(request)
+        self.search_box_enabled = True
+        self.download_csv_button_enabled = True
+
+        self.rich_columns = [
+            RichColumn('id', visible=False),
+            RichColumn('sample_name', label='Sequencing sample', orderable=True),
+            RichColumn('sample_sheet__sequencing_run__name', label='Sequencing run', orderable=True,
+                       renderer=self.render_sequencing_run_link, client_renderer='TableFormat.linkUrl'),
+            *_unmatched_extraction_columns(),
+        ]
+
+    @staticmethod
+    def render_sequencing_run_link(row: CellData) -> JsonDataType:
+        sequencing_run_id = row.value
+        return {
+            "text": sequencing_run_id,
+            "url": reverse('view_sequencing_run', kwargs={"sequencing_run_id": sequencing_run_id}),
+        }
+
+    def get_initial_queryset(self) -> QuerySet[SequencingSample]:
+        return SequencingSample.objects.filter(extraction__isnull=True,
+                                               extraction_reference__isnull=False)
 
 
 class PatientOntologyGenesGrid(AbstractOntologyGenesGrid):

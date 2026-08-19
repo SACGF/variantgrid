@@ -377,7 +377,8 @@ def process_record(patient_records, record_id, row):
             specimen.save()
 
         # The CSV has one nucleic acid source column, so it describes a single extraction per specimen
-        extraction = specimen.get_or_create_extraction(specimen_nucleic_acid_source)
+        # - the sample says which one, so re-importing a row corrects it rather than adding another
+        extraction = specimen.get_or_create_extraction(specimen_nucleic_acid_source, sample=sample)
     else:
         specimen_match_type = None
 

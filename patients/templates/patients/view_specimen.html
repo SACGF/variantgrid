@@ -36,6 +36,25 @@
 
         <hr/>
         <h4>Extractions</h4>
+        {% if has_write_permission %}
+            <div class="mb-3">
+                <button class="btn btn-primary" type="button" data-toggle="collapse" data-target="#new-extraction">
+                    <i class="fas fa-plus-circle"></i> New Extraction
+                </button>
+            </div>
+            <div class="collapse {% if new_extraction_form.errors %}show{% endif %}" id="new-extraction">
+                <form method="post" id="new-extraction-form">
+                    {% csrf_token %}
+                    <fieldset class="form-fields">
+                        <legend>New extraction for {{ specimen.reference_id }}</legend>
+                        {% crispy new_extraction_form form_helper.horizontal %}
+                        <div class="buttons">
+                            <button name="{{ create_extraction_field }}" class="btn btn-primary">Create Extraction</button>
+                        </div>
+                    </fieldset>
+                </form>
+            </div>
+        {% endif %}
         {% if extractions %}
             <table class="table">
                 <thead>

@@ -144,10 +144,33 @@ SpecimenForm = modelform_factory(Specimen,
                                           'collection_date': TextInput(attrs={'class': 'date-picker'}),
                                           'received_date': TextInput(attrs={'class': 'date-picker'})})
 
-ExtractionForm = modelform_factory(Extraction,
-                                   fields=['reference_id', 'nucleic_acid_source', 'extraction_date'],
-                                   widgets={'reference_id': TextInput(),
-                                            'extraction_date': TextInput(attrs={'class': 'date-picker'})})
+
+class ExtractionForm(forms.ModelForm):
+    """ The specimen page and the extraction page both work on a specimen you already have in hand, so
+        it isn't a field here - which is why the unique_together it takes part in is checked below """
+
+    class Meta:
+        model = Extraction
+        fields = ['reference_id', 'nucleic_acid_source', 'extraction_date']
+        widgets = {'reference_id': TextInput(),
+                   'extraction_date': TextInput(attrs={'class': 'date-picker'})}
+
+    def clean_reference_id(self):
+        # Unnamed extractions are all distinct under Postgres (@see Extraction.Meta), so an empty box
+        # means unnamed rather than named ""
+        return self.cleaned_data['reference_id'] or None
+
+    def clean(self):
+        cleaned_data = super().clean()
+        # Django skips a unique_together whose fields the form leaves out, so a clash would otherwise
+        # only surface as an IntegrityError
+        reference_id = cleaned_data.get('reference_id')
+        if reference_id and self.instance.specimen_id:
+            clash = Extraction.objects.filter(specimen_id=self.instance.specimen_id,
+                                              reference_id=reference_id).exclude(pk=self.instance.pk)
+            if clash.exists():
+                self.add_error('reference_id', "This specimen already has an extraction with this reference.")
+        return cleaned_data
 
 
 def patient_extraction_formset_factory(patient):
@@ -158,6 +181,7 @@ def patient_extraction_formset_factory(patient):
                                    forward=(forward.Const(patient.pk, 'patient'),),
                                    attrs={'data-placeholder': 'Specimen...'})
     return modelformset_factory(Extraction,
+                                form=ExtractionForm,
                                 can_delete=True,
                                 fields=['specimen', 'reference_id', 'nucleic_acid_source', 'extraction_date'],
                                 widgets={'specimen': specimen_widget,

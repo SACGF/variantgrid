@@ -198,6 +198,7 @@ URLS_NAME_REGISTER.update({  # Disable selected snpdb urls
     "extractions": False,
     "view_specimen": False,
     "view_extraction": False,
+    "unmatched_extractions": False,
 
     # Shariant has no patients menu and should not grow a patient API (#1707)
     "api_patient-list": False,
