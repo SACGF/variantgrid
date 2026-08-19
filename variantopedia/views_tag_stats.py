@@ -39,6 +39,7 @@ from variantopedia.forms import TagStatsGenesForm, TagStatsTagForm, TagStatsTags
 TAG_STATS_CACHE_TIMEOUT = DAY_SECS
 DEFAULT_TOP_TAGS = 8
 DEFAULT_TOP_GENES = 10
+TOP_USERS = 10
 MEGA_ARTEFACT_VARIANTS = 40
 OTHER = "other"
 GENE_SYMBOL_FIELD = "variant__variantannotation__transcript_version__gene_version__gene_symbol_id"
@@ -190,6 +191,9 @@ def tag_stats_by_lab(request):
     def calculate():
         qs = _tags_qs(request.user)
         user_counts = qs.values("user_id", "user__username").annotate(count=Count("pk")).order_by("-count")
+        thirty_days_ago = now() - timedelta(days=30)
+        recent_counts = (qs.filter(created__gte=thirty_days_ago)
+                         .values("user_id", "user__username").annotate(count=Count("pk")).order_by("-count"))
 
         labs_by_group_name = {lab.group_name: lab for lab in Lab.objects.exclude(group_name__isnull=True)}
         lab_names_by_user_id = defaultdict(list)
@@ -198,20 +202,24 @@ def tag_stats_by_lab(request):
             if lab := labs_by_group_name.get(group_name):
                 lab_names_by_user_id[user_id].append(str(lab))
 
-        users = []
+        def user_rows(counts) -> list[dict]:
+            return [{"user": row["user__username"],
+                     "labs": lab_names_by_user_id.get(row["user_id"], []),
+                     "count": row["count"]} for row in counts]
+
+        # Lab totals still count everyone - only the user tables are capped
         lab_counts = Counter()
         for row in user_counts:
-            lab_names = lab_names_by_user_id.get(row["user_id"], [])
-            users.append({"user": row["user__username"], "labs": lab_names, "count": row["count"]})
-            for lab_name in lab_names:
+            for lab_name in lab_names_by_user_id.get(row["user_id"], []):
                 lab_counts[lab_name] += row["count"]
 
         return {
-            "users": users,
+            "top_users": user_rows(user_counts[:TOP_USERS]),
+            "top_users_recent": user_rows(recent_counts[:TOP_USERS]),
             "labs": [{"lab": lab_name, "count": count} for lab_name, count in lab_counts.most_common()],
         }
 
-    return _cached_json("by_lab", request.user, {}, calculate)
+    return _cached_json("by_lab", request.user, {"top_users": TOP_USERS}, calculate)
 
 
 def _with_gene_symbol(tags_qs: QuerySet[VariantTag]) -> QuerySet[VariantTag]:

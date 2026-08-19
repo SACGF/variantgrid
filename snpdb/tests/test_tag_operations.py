@@ -206,6 +206,23 @@ class TagOperationLogTest(VariantTagTestCase):
         self.assertEqual(operations, [TagOperation.REINSTATE, TagOperation.RETIRE])
 
 
+class MergeCaseCollisionsCommandTest(VariantTagTestCase):
+    def test_command_still_reruns_nodes(self):
+        """ The command defers node dirtying until after all the merges, so the nodes still have to
+            come out of it re-run """
+        self._create_variant_tag(self.surviving_tag)
+        self._create_variant_tag(self.surviving_tag, variant=self.other_variant)
+        node = TagNode.objects.create(analysis=self.analysis, version=1)
+        TagNodeTag.objects.create(tag_node=node, tag=self.dying_tag)
+        version_before = node.version
+
+        call_command("variant_tags", "merge-case-collisions")
+
+        self.assertEqual(Tag.objects.get(pk="artefact").merged_into_id, "Artefact")
+        node.refresh_from_db()
+        self.assertGreater(node.version, version_before, "Node using the merged tag re-runs")
+
+
 class DeleteDuplicateVariantTagsTest(VariantTagTestCase):
     def test_keeps_earliest_of_a_repeat(self):
         earliest = self._create_variant_tag(self.surviving_tag)

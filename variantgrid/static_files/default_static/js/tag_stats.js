@@ -81,8 +81,23 @@ function renderTagStatsOverTime(data, $content) {
     Plotly.newPlot('tags-over-time-graph', traces,
                    tagStatsLayout("Tag events per month", {barmode: 'stack'}), {responsive: true});
 
-    const labels = Object.keys(data.totals);
-    const values = labels.map((l) => data.totals[l]);
+    // Deployments have a long tail of one-off tags - collapse anything under 1% into "other"
+    const total = Object.values(data.totals).reduce((a, b) => a + b, 0);
+    const labels = [];
+    const values = [];
+    let other = 0;
+    for (const [label, count] of Object.entries(data.totals)) {
+        if (count < total * 0.01) {
+            other += count;
+        } else {
+            labels.push(label);
+            values.push(count);
+        }
+    }
+    if (other) {
+        labels.push("other");
+        values.push(other);
+    }
     Plotly.newPlot('tags-proportion-graph', [{labels: labels, values: values, type: 'pie'}],
                    tagStatsLayout("Share of all tag events"), {responsive: true});
 }
@@ -102,16 +117,22 @@ function renderTagStatsUser(data, $content) {
 }
 
 function renderTagStatsByLab(data, $content) {
-    const userRows = data.users.map((u) =>
-        `<tr><td>${u.user}</td><td>${u.labs.join(", ")}</td><td>${u.count.toLocaleString()}</td></tr>`).join("");
+    const userTable = (users) => {
+        if (!users.length) {
+            return '<p class="text-muted">No tag events.</p>';
+        }
+        const rows = users.map((u) =>
+            `<tr><td>${u.user}</td><td>${u.labs.join(", ")}</td><td>${u.count.toLocaleString()}</td></tr>`).join("");
+        return `<table class="table table-sm"><thead><tr><th>User</th><th>Labs</th><th>Tag events</th></tr></thead>
+                <tbody>${rows}</tbody></table>`;
+    };
     const labRows = data.labs.map((l) =>
         `<tr><td>${l.lab}</td><td>${l.count.toLocaleString()}</td></tr>`).join("");
 
     $content.html(
-        `<h5>By user</h5>
-         <table class="table table-sm"><thead><tr><th>User</th><th>Labs</th><th>Tag events</th></tr></thead>
-         <tbody>${userRows}</tbody></table>
-         <h5>By lab</h5>
+        `<h5>Top users - all time</h5>` + userTable(data.top_users) +
+        `<h5>Top users - last 30 days</h5>` + userTable(data.top_users_recent) +
+        `<h5>By lab</h5>
          <p class="text-muted small">A user in more than one lab counts into each, so lab totals can add up to
          more than the number of tag events.</p>
          <table class="table table-sm"><thead><tr><th>Lab</th><th>Tag events</th></tr></thead>

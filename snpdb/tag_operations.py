@@ -15,6 +15,7 @@ passed in because a queryset .update() fires no signals for auditlog to see.
 """
 import logging
 from collections import defaultdict
+from collections.abc import Iterable
 from dataclasses import asdict, dataclass, field
 
 from Levenshtein import distance
@@ -172,9 +173,11 @@ def _repoint_tag(fk: TagForeignKey, dying_tag: Tag, surviving_tag: Tag) -> TagMe
     return counts
 
 
-def _set_tag_nodes_dirty(tag: Tag):
-    """ Nodes filtering on either side of a merge return different variants afterwards """
-    for node in TagNode.objects.filter(tagnodetag__tag=tag).distinct():
+def set_tag_nodes_dirty(tags: Iterable[Tag]):
+    """ Nodes filtering on any of these tags return different variants after a merge/retire/reinstate.
+        Each save cascades a version bump through the node's descendants, so a caller doing several
+        operations should make one call at the end with every affected tag - each node then re-runs once """
+    for node in TagNode.objects.filter(tagnodetag__tag__in=tags).distinct():
         node.queryset_dirty = True
         node.save()
 
@@ -224,11 +227,13 @@ def get_tag_operations(tag: Tag = None) -> QuerySet[LogEntry]:
     return qs.filter(additional_data__has_key="operation").order_by("-timestamp")
 
 
-def merge_tag(dying_tag: Tag, surviving_tag: Tag, user: User) -> TagMergeResult:
+def merge_tag(dying_tag: Tag, surviving_tag: Tag, user: User, set_nodes_dirty: bool = True) -> TagMergeResult:
     """ Repoint everything using dying_tag at surviving_tag, then retire dying_tag. The repointing cannot
         be undone - reinstating the tag afterwards gets the name back, not the rows.
         Repeated variant tags this leaves behind are indistinguishable from ones that were already there
-        - @see the variant_tags delete-duplicates management command """
+        - @see the variant_tags delete-duplicates management command.
+        A caller doing several merges passes set_nodes_dirty=False and calls set_tag_nodes_dirty() itself
+        with all the surviving tags at the end, so each affected node only re-runs once """
     if dying_tag.pk == surviving_tag.pk:
         raise ValueError("Cannot merge a tag into itself")
     if not surviving_tag.active:
@@ -238,8 +243,9 @@ def merge_tag(dying_tag: Tag, surviving_tag: Tag, user: User) -> TagMergeResult:
     with transaction.atomic():
         for fk in TAG_FOREIGN_KEYS:
             result.counts.append(_repoint_tag(fk, dying_tag, surviving_tag))
-        # Everything now points at the surviving tag, so this catches nodes that used either side
-        _set_tag_nodes_dirty(surviving_tag)
+        if set_nodes_dirty:
+            # Everything now points at the surviving tag, so this catches nodes that used either side
+            set_tag_nodes_dirty([surviving_tag])
         dying_tag.merged_into = surviving_tag
         dying_tag.retired = timezone.now()
         dying_tag.save()
@@ -262,7 +268,7 @@ def retire_tag(tag: Tag, user: User, reason: str = None) -> Tag:
         tag.retired = timezone.now()
         tag.save()
         # Nodes offering this tag return the same variants, but the tag is no longer selectable
-        _set_tag_nodes_dirty(tag)
+        set_tag_nodes_dirty([tag])
         log_tag_operation(tag, TagOperation.RETIRE, user,
                           reason=reason,
                           still_used_by=usage.description())
@@ -282,7 +288,7 @@ def reinstate_tag(tag: Tag, user: User) -> Tag:
         tag.retired = None
         tag.merged_into = None
         tag.save()
-        _set_tag_nodes_dirty(tag)
+        set_tag_nodes_dirty([tag])
         log_tag_operation(tag, TagOperation.REINSTATE, user, was_merged_into=merged_into_id)
 
     logging.info("Reinstated tag '%s'", tag)
