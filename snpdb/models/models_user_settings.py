@@ -22,7 +22,7 @@ from library.django_utils import thread_safe_unique_together_get_or_create
 from library.django_utils.avatar import SpaceThemedAvatarProvider
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsAutoInitialSaveMixin
 from library.preview_request import PreviewData, PreviewKeyValue, PreviewModelMixin
-from library.utils import rgb_invert, string_deterministic_hash
+from library.utils import rgb_contrasting_text, string_deterministic_hash
 from snpdb.models import AlleleOriginFilterDefault, UserAwards
 from snpdb.models.models import Lab, Organization, Tag
 from snpdb.models.models_columns import CustomColumn, CustomColumnsCollection
@@ -69,7 +69,7 @@ class TagColorsCollection(GuardianPermissionsAutoInitialSaveMixin, TimeStampedMo
         for tag_id, rgb in self.tagcolor_set.exclude(rgb='').values_list('tag', 'rgb'):
             user_colors_by_tag[tag_id] = {
                 "background-color": rgb,
-                "color": rgb_invert(rgb)
+                "color": rgb_contrasting_text(rgb)
             }
         return user_colors_by_tag
 

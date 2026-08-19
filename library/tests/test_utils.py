@@ -17,6 +17,7 @@ from library.unit_percent import (
     convert_from_unit_to_percent,
     server_side_format_percent,
 )
+from library.utils.color_utils import rgb_contrasting_text, rgb_relative_luminance
 from library.utils.collection_utils import (
     IterableStitcher,
     LimitedCollection,
@@ -486,3 +487,23 @@ class TestTimedCache(TestCase):
         fn(3)  # evicts key=1
         fn(1)  # 1 was evicted, must recalculate
         self.assertEqual(call_tracker.count(1), 2)
+
+
+class TestRgbContrastingText(TestCase):
+    """ Tag colors pick black/white text via luminance - see rgb_contrasting_text """
+
+    @staticmethod
+    def _contrast_ratio(rgb: str, other: str) -> float:
+        luminances = sorted([rgb_relative_luminance(rgb), rgb_relative_luminance(other)])
+        return (luminances[1] + 0.05) / (luminances[0] + 0.05)
+
+    def test_readable_on_mid_tones(self):
+        """ Mid-tone tag colors are where inverting the background used to fail """
+        for rgb in ["#808080", "#4488cc", "#cc8844", "#996699", "#888844", "#556b7f"]:
+            with self.subTest(rgb=rgb):
+                ratio = self._contrast_ratio(rgb, rgb_contrasting_text(rgb))
+                self.assertGreaterEqual(ratio, 4.5, f"{rgb} text fails WCAG AA")
+
+    def test_picks_white_on_dark_black_on_light(self):
+        self.assertEqual(rgb_contrasting_text("#000080"), "#ffffff")
+        self.assertEqual(rgb_contrasting_text("#ffff00"), "#000000")

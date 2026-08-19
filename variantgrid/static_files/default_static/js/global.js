@@ -849,16 +849,16 @@ function format(str, col) {
 }
 
 
-// From https://jsfiddle.net/salman/f9Re3/
-function invertColor(hexTripletColor) {
-    let color = hexTripletColor;
-    color = color.substring(1); // remove #
-    color = parseInt(color, 16); // convert to integer
-    color = 0xFFFFFF ^ color; // invert three bytes
-    color = color.toString(16); // convert to hex
-    color = ("000000" + color).slice(-6); // pad with leading zeros
-    color = "#" + color; // prepend #
-    return color;
+// Black or white text - whichever is more readable on a background. Matches rgb_contrasting_text() in Python
+function contrastingTextColor(hexTripletColor) {
+    const color = parseInt(hexTripletColor.substring(1), 16);
+    const linear = [(color >> 16) & 0xFF, (color >> 8) & 0xFF, color & 0xFF].map(function(channel) {
+        const c = channel / 255;
+        return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+    });
+    // WCAG relative luminance, at the point where black and white text contrast equally
+    const luminance = 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2];
+    return luminance > 0.1791 ? "#000000" : "#ffffff";
 }
 
 function removeItemFromArray(item, array) {

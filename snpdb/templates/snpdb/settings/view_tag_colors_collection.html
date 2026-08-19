@@ -44,7 +44,7 @@
             const changeTagColor = function () {
                 const t = $(".user-tag-colored", ".tagged-" + tagId);
                 let manualStyle = "background-color: " + rgb + " !important;";
-                manualStyle += "color: " + invertColor(rgb) + " !important;";
+                manualStyle += "color: " + contrastingTextColor(rgb) + " !important;";
                 t.attr("style", manualStyle);
             };
 
