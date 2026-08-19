@@ -13,7 +13,7 @@ from library.django_utils.jqgrid_view import EXPORT_ROWS_PER_CHUNK, grid_export_
 from library.genomics.vcf_writer import VCFWriter
 from library.utils import StashFile, iter_fixed_chunks
 from patients.models_enums import Zygosity
-from snpdb.models import Sample, UserSettings, VariantGridColumn
+from snpdb.models import Sample, VariantGridColumn
 from snpdb.vcf_export_columns import COLUMN_VCF_INFO
 from snpdb.vcf_export_utils import get_vcf_header_from_contigs
 
@@ -47,7 +47,7 @@ def node_grid_get_export_iterator(request, node, export_type, canonical_transcri
         basename += f"_{canonical_transcript_collection}"
         items = _replace_transcripts_iterator(grid, canonical_transcript_collection, items)
 
-    tag_stale_date = UserSettings.get_for_user(request.user).variant_tag_stale_date
+    tag_stale_date = node.analysis.variant_tag_stale_date
     items = format_items_iterator(items, variant_tags_dict, tag_stale_date=tag_stale_date)
     if row_wrapper:
         items = row_wrapper(items)
@@ -239,7 +239,7 @@ def format_items_iterator(items, variant_tags_dict: Optional[dict] = None, tag_s
         tacked on zygosity columns etc not being in GROUP BY or aggregate func. So, just patch items via iterator
 
         variant_tags_dict: key = variant_id, value = tags (for this analysis)
-        tag_stale_date: the user's variant_tag_stale_date - when set, tags_global gains fresh counts,
+        tag_stale_date: the analysis' variant_tag_stale_date - when set, tags_global gains fresh counts,
                         e.g. 'Artefact x 5 (2 fresh)' """
 
     if variant_tags_dict is None:

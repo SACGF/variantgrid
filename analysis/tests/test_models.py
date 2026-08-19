@@ -15,6 +15,7 @@ from snpdb.models import (
     GenomeBuild,
     ImportStatus,
     Sample,
+    UserSettingsOverride,
 )
 
 
@@ -42,6 +43,17 @@ class AnalysisModelTestCase(TestCase):
         self.assertTrue(analysis.can_write(self.owner_user))
         self.assertTrue(analysis.can_write(self.admin_user))
         self.assertFalse(analysis.can_write(self.non_owner_user))
+
+    def test_defaults_from_user_settings(self):
+        """ variant_tag_stale_days is copied from user settings on creation, so the analysis
+            renders consistently for all users - #1433 """
+        user_settings_override = UserSettingsOverride.objects.get_or_create(user=self.owner_user)[0]
+        user_settings_override.variant_tag_stale_days = 730
+        user_settings_override.save()
+
+        analysis = Analysis(genome_build=self.grch37)
+        analysis.set_defaults_and_save(self.owner_user)
+        self.assertEqual(analysis.variant_tag_stale_days, 730)
 
     def test_locking(self):
         analysis = Analysis(genome_build=self.grch37)

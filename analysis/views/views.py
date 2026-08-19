@@ -185,6 +185,7 @@ def get_analysis_settings(user, analysis):
         "node_count_types": analysis.get_node_count_types(),
         "canonical_transcript_collection": canonical_transcript_collection,
         "grid_sample_label_template": analysis.grid_sample_label_template,
+        "variant_tag_stale_days": analysis.variant_tag_stale_days,
         "show_igv_links": analysis.show_igv_links,
         "igv_data": igv_data,
         "open_variant_details_in_new_window": user_settings.variant_link_in_analysis_opens_new_tab,
@@ -222,7 +223,6 @@ def view_analysis(request, analysis_id, active_node_id=0):
         "has_write_permission": analysis.can_write(request.user),
         "warnings": analysis.get_toolbar_warnings(request.user),
         "loading_animations": user_settings.grid_loading_animations,
-        "variant_tag_stale_days": user_settings.variant_tag_stale_days,
     }
     return render(request, 'analysis/analysis.html', context)
 

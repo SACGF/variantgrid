@@ -855,6 +855,7 @@ function get_array_element_keys(array, key_id) {
 
 function changeAnalysisSettings(oldAnalysisSettings) {
 	let requireReload = false;
+	variantTagStaleDays = ANALYSIS_SETTINGS.variant_tag_stale_days;
 	const oldAnnotationVersion = oldAnalysisSettings.annotation_version;
 	const newAnnotationVersion = ANALYSIS_SETTINGS.annotation_version;
 	requireReload = oldAnnotationVersion != newAnnotationVersion;

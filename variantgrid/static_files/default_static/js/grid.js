@@ -533,7 +533,7 @@ function tagsGlobalFormatter(value, a, rowData) {
     }
     const variantId = rowData['id'];
     const aWin = getAnalysisWindow();
-    // In an analysis this is the user's variant_tag_stale_days setting (null/undefined = staleness off)
+    // In an analysis this is the analysis variant_tag_stale_days setting (null/undefined = staleness off)
     const staleDays = aWin.variantTagStaleDays;
     let staleCutoff = null;  // ISO date - payload dates compare lexically
     if (staleDays) {
