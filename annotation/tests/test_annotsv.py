@@ -455,6 +455,19 @@ class TestImportAnnotsvTsv(TestCase):
         self.assertIs(va_205.annotsv_omim_morbid, False)
         self.assertIsNone(va_205.annotsv_pathogenic_overlaps)
 
+    def test_has_annotsv_only_once_the_tsv_is_imported(self):
+        """ Gates the AnnotSV section of the variant details page - SVs annotated before AnnotSV was
+            enabled have VEP rows with none of its columns filled in. """
+        va = VariantAnnotation.objects.get(variant_id=203)
+        self.assertFalse(va.has_annotsv)
+
+        self.annotation_run.vcf_annotated_filename = TEST_ANNOTSV_TSV
+        self.annotation_run.save()
+        import_annotsv_tsv(self.annotation_run)
+
+        va.refresh_from_db()
+        self.assertTrue(va.has_annotsv)
+
     def test_no_op_when_no_tsv_filename(self):
         self.annotation_run.vcf_annotated_filename = None
         self.annotation_run.save()

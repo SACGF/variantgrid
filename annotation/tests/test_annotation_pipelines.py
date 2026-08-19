@@ -157,6 +157,7 @@ class AnnotSVPipelineTestCase(TestCase):
         self.assertFalse(AnnotationRun.objects.filter(annotation_range_lock=lock,
                                                       pipeline_type=ANNOTSV).exists())
 
+    @override_settings(ANNOTATION_ANNOTSV_ENABLED=False)
     def test_annotsv_runs_not_created_while_disabled(self):
         self.assertNotIn(ANNOTSV, enabled_pipeline_types())
         lock = self._make_lock()

@@ -1928,6 +1928,10 @@ class VariantAnnotation(AbstractVariantAnnotation):
         return self.annotation_run.pipeline_type == VariantAnnotationPipelineType.STANDARD
 
     @cached_property
+    def is_structural_variant_annotation(self) -> bool:
+        return self.annotation_run.pipeline_type == VariantAnnotationPipelineType.STRUCTURAL_VARIANT
+
+    @cached_property
     def repeat_masker_summary(self) -> RepeatMaskerSummary:
         """ Group the (possibly '&'-joined) RepeatMasker value by repeat class - see #1580 """
         return RepeatMaskerSummary.from_value(self.repeat_masker)
@@ -1979,6 +1983,14 @@ class VariantAnnotation(AbstractVariantAnnotation):
     @property
     def has_gnomad(self) -> bool:
         return bool(self.gnomad_af or self.gnomad2_liftover_af)
+
+    @property
+    def has_annotsv(self) -> bool:
+        """ AnnotSV is opt-in and its own pipeline run (#720), so an SV can have VEP annotation with
+            none of these columns filled in - annotated before it was enabled, or its run is yet to
+            finish. Checks every annotsv_ column so it can't drift as fields are added. """
+        return any(getattr(self, f.name) is not None
+                   for f in self._meta.fields if f.name.startswith("annotsv_"))
 
     @cached_property
     def visible_columns(self) -> frozenset[str]:
