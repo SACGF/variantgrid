@@ -5,8 +5,15 @@ The page is a skeleton of cards, each lazy loading its own JSON endpoint so firs
 endpoint caches its response in Redis keyed by a hash of its parameters, and reports when it was calculated
 so users can see how stale a card is.
 
+Everything counts on allele, so the numbers don't depend on which builds a tag happens to have been lifted
+over to - there's no genome build switch here. Tags that failed liftover have no allele at all, and are
+reported as a separate count rather than being silently dropped.
+
+Every card counts only the tags the requesting user can see, so the cache is keyed by user as well as by
+the card's parameters.
+
 Counts are labelled by what they count. Tagging repeats a lot (a known artefact gets re-tagged in every
-analysis it turns up in) so "tag events", "distinct (variant, tag)" and "distinct variants" are all very
+analysis it turns up in) so "tag events", "distinct (allele, tag)" and "distinct alleles" are all very
 different numbers.
 """
 import hashlib
@@ -26,7 +33,7 @@ from django.utils.timezone import localtime, now
 from analysis.models import VariantTag
 from annotation.models import VariantAnnotationVersion
 from library.constants import DAY_SECS
-from snpdb.models import GenomeBuild, Lab, Tag, UserSettings, Variant
+from snpdb.models import GenomeBuild, Lab, Tag, UserSettings, Variant, VariantAllele
 from variantopedia.forms import TagStatsGenesForm, TagStatsTagForm, TagStatsTagsForm
 
 TAG_STATS_CACHE_TIMEOUT = DAY_SECS
@@ -37,13 +44,13 @@ OTHER = "other"
 GENE_SYMBOL_FIELD = "variant__variantannotation__transcript_version__gene_version__gene_symbol_id"
 
 
-def _cache_key(card: str, genome_build: GenomeBuild, params: dict) -> str:
+def _cache_key(card: str, user: User, params: dict) -> str:
     params_hash = hashlib.sha256(json.dumps(params, sort_keys=True, default=str).encode()).hexdigest()[:16]
-    return f"tag_stats/{settings.CACHE_VERSION}/{card}/{genome_build.name}/{params_hash}"
+    return f"tag_stats/{settings.CACHE_VERSION}/{card}/{user.pk}/{params_hash}"
 
 
-def _cached_json(card: str, genome_build: GenomeBuild, params: dict, calculate) -> JsonResponse:
-    cache_key = _cache_key(card, genome_build, params)
+def _cached_json(card: str, user: User, params: dict, calculate) -> JsonResponse:
+    cache_key = _cache_key(card, user, params)
     data = cache.get(cache_key)
     if data is None:
         data = calculate()
@@ -52,8 +59,15 @@ def _cached_json(card: str, genome_build: GenomeBuild, params: dict, calculate) 
     return JsonResponse(data)
 
 
-def _tags_qs(genome_build: GenomeBuild) -> QuerySet[VariantTag]:
-    return VariantTag.get_for_build(genome_build)
+def _tags_qs(user: User) -> QuerySet[VariantTag]:
+    """ Tags in analyses the user can't see are left out of every card, the same way the grids do it """
+    return VariantTag.filter_for_user(user)
+
+
+def _with_allele(tags_qs: QuerySet[VariantTag]) -> QuerySet[VariantTag]:
+    """ Alleles are assigned asynchronously (@see analysis.tasks.variant_tag_tasks._liftover_variant_tag) so a
+        tag has none if that's still to run, or if liftover failed """
+    return tags_qs.exclude(allele__isnull=True)
 
 
 def _top_names(counter: Counter, top_n: int) -> list[str]:
@@ -77,56 +91,55 @@ def _grouped_series(counts: dict[tuple, int], buckets: list, top_n: int) -> list
     return [{"name": name, "counts": [series_counts[name].get(b, 0) for b in buckets]} for name in names]
 
 
-def tag_stats(request, genome_build_name=None):
-    genome_build = UserSettings.get_genome_build_or_default(request.user, genome_build_name)
-    artefact_tag = _default_artefact_tag(genome_build)
+def tag_stats(request):
+    artefact_tag = _default_artefact_tag(request.user)
     context = {
-        "genome_build": genome_build,
+        # Only used to link out to the tagged variants grid, which shows coordinates so is build specific
+        "genome_build": UserSettings.get_genome_build_or_default(request.user),
         "genes_form": TagStatsGenesForm(prefix="genes"),
         "co_occurrence_form": TagStatsTagsForm(prefix="co-occurrence"),
         "re_tagged_form": TagStatsTagForm(prefix="re-tagged", initial={"tag": artefact_tag}),
-        "gene_time_form": TagStatsTagForm(prefix="gene-time", initial={"tag": _most_used_tag(genome_build)}),
+        "gene_time_form": TagStatsTagForm(prefix="gene-time", initial={"tag": _most_used_tag(request.user)}),
     }
     return render(request, 'variantopedia/tag_stats.html', context)
 
 
-def _default_artefact_tag(genome_build: GenomeBuild) -> str:
+def _default_artefact_tag(user: User) -> str:
     """ Artefact tagging is what drives the re-tagging numbers - fall back to the most used tag """
     if artefact := Tag.objects.filter(pk__iexact="artefact").first():
         return artefact.pk
-    return _most_used_tag(genome_build)
+    return _most_used_tag(user)
 
 
-def _most_used_tag(genome_build: GenomeBuild) -> str:
-    qs = _tags_qs(genome_build).values("tag_id").annotate(count=Count("pk")).order_by("-count")
+def _most_used_tag(user: User) -> str:
+    qs = _tags_qs(user).values("tag_id").annotate(count=Count("pk")).order_by("-count")
     if top := qs.first():
         return top["tag_id"]
     return ""
 
 
-def tag_stats_headline(request, genome_build_name):
-    genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
-
+def tag_stats_headline(request):
     def calculate():
-        qs = _tags_qs(genome_build)
+        qs = _tags_qs(request.user)
+        with_allele_qs = _with_allele(qs)
         year_ago = now() - timedelta(days=365)
         return {
             "tag_events": qs.count(),
-            "distinct_variant_tags": qs.values("variant_id", "tag_id").distinct().count(),
-            "distinct_variants": qs.values("variant_id").distinct().count(),
+            "distinct_allele_tags": with_allele_qs.values("allele_id", "tag_id").distinct().count(),
+            "distinct_alleles": with_allele_qs.values("allele_id").distinct().count(),
+            "no_allele": qs.filter(allele__isnull=True).count(),
             "analyses": qs.exclude(analysis__isnull=True).values("analysis_id").distinct().count(),
             "taggers_this_year": qs.filter(created__gte=year_ago).values("user_id").distinct().count(),
         }
 
-    return _cached_json("headline", genome_build, {}, calculate)
+    return _cached_json("headline", request.user, {}, calculate)
 
 
-def tag_stats_over_time(request, genome_build_name):
-    genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
+def tag_stats_over_time(request):
     top_n = _get_int(request, "top_n", DEFAULT_TOP_TAGS)
 
     def calculate():
-        qs = _tags_qs(genome_build).annotate(month=TruncMonth("created"))
+        qs = _tags_qs(request.user).annotate(month=TruncMonth("created"))
         counts = {}
         totals = Counter()
         months = set()
@@ -143,16 +156,15 @@ def tag_stats_over_time(request, genome_build_name):
             "totals": dict(totals.most_common()),
         }
 
-    return _cached_json("over_time", genome_build, {"top_n": top_n}, calculate)
+    return _cached_json("over_time", request.user, {"top_n": top_n}, calculate)
 
 
-def tag_stats_for_user(request, genome_build_name, user_id=None):
+def tag_stats_for_user(request, user_id=None):
     """ Shared by the stats page's "Your tagging" card and the user page section """
-    genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
     user = get_object_or_404(User, pk=user_id) if user_id else request.user
 
     def calculate():
-        qs = _tags_qs(genome_build).filter(user=user)
+        qs = _tags_qs(request.user).filter(user=user)
         tag_counts = qs.values("tag_id").annotate(count=Count("pk")).order_by("-count")
 
         thirty_days_ago = (now() - timedelta(days=30)).date()
@@ -164,20 +176,19 @@ def tag_stats_for_user(request, genome_build_name, user_id=None):
         return {
             "username": str(user),
             "tag_events": qs.count(),
-            "distinct_variants": qs.values("variant_id").distinct().count(),
+            "distinct_alleles": _with_allele(qs).values("allele_id").distinct().count(),
+            "no_allele": qs.filter(allele__isnull=True).count(),
             "top_tags": [{"tag": r["tag_id"], "count": r["count"]} for r in tag_counts[:DEFAULT_TOP_TAGS]],
             "recent_days": [d.isoformat() for d in days],
             "recent_counts": [daily.get(d, 0) for d in days],
         }
 
-    return _cached_json("user", genome_build, {"user_id": user.pk}, calculate)
+    return _cached_json("user", request.user, {"user_id": user.pk}, calculate)
 
 
-def tag_stats_by_lab(request, genome_build_name):
-    genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
-
+def tag_stats_by_lab(request):
     def calculate():
-        qs = _tags_qs(genome_build)
+        qs = _tags_qs(request.user)
         user_counts = qs.values("user_id", "user__username").annotate(count=Count("pk")).order_by("-count")
 
         labs_by_group_name = {lab.group_name: lab for lab in Lab.objects.exclude(group_name__isnull=True)}
@@ -200,28 +211,29 @@ def tag_stats_by_lab(request, genome_build_name):
             "labs": [{"lab": lab_name, "count": count} for lab_name, count in lab_counts.most_common()],
         }
 
-    return _cached_json("by_lab", genome_build, {}, calculate)
+    return _cached_json("by_lab", request.user, {}, calculate)
 
 
-def _with_gene_symbol(genome_build: GenomeBuild, tags_qs: QuerySet[VariantTag]) -> QuerySet[VariantTag]:
-    """ Restrict to tags whose variant has a representative transcript in the latest annotation, so
-        GENE_SYMBOL_FIELD can be grouped on """
-    vav = VariantAnnotationVersion.latest(genome_build)
-    return tags_qs.filter(variant__variantannotation__version=vav,
+def _with_gene_symbol(tags_qs: QuerySet[VariantTag]) -> QuerySet[VariantTag]:
+    """ Restrict to tags whose variant has a representative transcript in the latest annotation for the build it
+        was tagged in, so GENE_SYMBOL_FIELD can be grouped on without counting a lifted over tag twice """
+    latest_versions = list(VariantAnnotationVersion.latest_for_all_builds())
+    # A variant on a contig shared between builds has annotation in both, so pin the join to the tag's own build
+    return tags_qs.filter(variant__variantannotation__version__in=latest_versions,
+                          variant__variantannotation__version__genome_build=F("genome_build"),
                           variant__variantannotation__transcript_version__isnull=False)
 
 
-def tag_stats_genes(request, genome_build_name):
-    genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
+def tag_stats_genes(request):
     gene_symbols = _get_list(request, "gene_symbols")
     tag_ids = _get_list(request, "tags")
     top_n = _get_int(request, "top_n", DEFAULT_TOP_GENES)
 
     def calculate():
-        tags_qs = _tags_qs(genome_build)
+        tags_qs = _tags_qs(request.user)
         if tag_ids:
             tags_qs = tags_qs.filter(tag__in=tag_ids)
-        qs = _with_gene_symbol(genome_build, tags_qs)
+        qs = _with_gene_symbol(tags_qs)
 
         counts = {}
         gene_totals = Counter()
@@ -240,14 +252,12 @@ def tag_stats_genes(request, genome_build_name):
         }
 
     params = {"gene_symbols": sorted(gene_symbols), "tags": sorted(tag_ids), "top_n": top_n}
-    return _cached_json("genes", genome_build, params, calculate)
+    return _cached_json("genes", request.user, params, calculate)
 
 
-def tag_stats_co_occurrence(request, genome_build_name):
-    genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
-
+def tag_stats_co_occurrence(request):
     def calculate():
-        qs = _tags_qs(genome_build).filter(allele__isnull=False)
+        qs = _with_allele(_tags_qs(request.user))
         # Self join on allele - tag_id__gt gives each unordered pair once, and keeps a tag off its own diagonal.
         # Both conditions are in the one filter() so they apply to the same joined tag
         pairs_qs = (qs.filter(allele__varianttag__in=qs, allele__varianttag__tag_id__gt=F("tag_id"))
@@ -269,50 +279,57 @@ def tag_stats_co_occurrence(request, genome_build_name):
             "top_pairs": [{"tags": list(pair), "alleles": count} for pair, count in pair_counts.most_common(20)],
         }
 
-    return _cached_json("co_occurrence", genome_build, {}, calculate)
+    return _cached_json("co_occurrence", request.user, {}, calculate)
 
 
-def tag_stats_re_tagged(request, genome_build_name):
-    """ Variants that get tagged over and over - the case for excluding them in analysis templates """
-    genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
-    tag_id = request.GET.get("tag") or _default_artefact_tag(genome_build)
+def _variants_by_allele_id(allele_ids: list[int], genome_build: GenomeBuild) -> dict[int, Variant]:
+    """ A variant to show per allele - the user's build where it's been lifted over, otherwise whatever we have """
+    variants_by_allele_id = {}
+    va_qs = VariantAllele.objects.filter(allele_id__in=allele_ids)
+    for variant_allele in va_qs.select_related("variant__locus__contig", "variant__locus__ref", "variant__alt"):
+        if variant_allele.allele_id not in variants_by_allele_id or variant_allele.genome_build_id == genome_build.pk:
+            variants_by_allele_id[variant_allele.allele_id] = variant_allele.variant
+    return variants_by_allele_id
+
+
+def tag_stats_re_tagged(request):
+    """ Alleles that get tagged over and over - the case for excluding them in analysis templates """
+    tag_id = request.GET.get("tag") or _default_artefact_tag(request.user)
+    genome_build = UserSettings.get_genome_build_or_default(request.user)
 
     def calculate():
-        qs = _tags_qs(genome_build).filter(tag=tag_id)
-        top_qs = qs.values("variant_id").annotate(count=Count("pk")).order_by("-count")[:MEGA_ARTEFACT_VARIANTS]
-        top = list(top_qs)
-        variant_qs = Variant.objects.filter(pk__in=[r["variant_id"] for r in top])
-        variants_by_id = {v.pk: v for v in variant_qs.select_related("locus__contig", "locus__ref", "alt")}
+        qs = _with_allele(_tags_qs(request.user)).filter(tag=tag_id)
+        top = list(qs.values("allele_id").annotate(count=Count("pk")).order_by("-count")[:MEGA_ARTEFACT_VARIANTS])
+        variants_by_allele_id = _variants_by_allele_id([r["allele_id"] for r in top], genome_build)
 
-        variants = []
+        alleles = []
         for row in top:
-            variant = variants_by_id[row["variant_id"]]
-            variants.append({
-                "variant_id": variant.pk,
-                "variant": str(variant),
+            allele_id = row["allele_id"]
+            variant = variants_by_allele_id.get(allele_id)
+            alleles.append({
+                "allele_id": allele_id,
+                "variant": str(variant) if variant else f"Allele {allele_id}",
                 "count": row["count"],
             })
 
-        tag_events = qs.count()
-        top_events = sum(r["count"] for r in top)
         return {
             "tag": tag_id,
-            "variants": variants,
-            "tag_events": tag_events,
-            "distinct_variants": qs.values("variant_id").distinct().count(),
-            "top_events": top_events,
+            "alleles": alleles,
+            "tag_events": _tags_qs(request.user).filter(tag=tag_id).count(),
+            "distinct_alleles": qs.values("allele_id").distinct().count(),
+            "top_events": sum(r["count"] for r in top),
         }
 
-    return _cached_json("re_tagged", genome_build, {"tag": tag_id}, calculate)
+    return _cached_json("re_tagged", request.user, {"tag": tag_id, "genome_build": genome_build.name},
+                        calculate)
 
 
-def tag_stats_tag_genes_over_time(request, genome_build_name):
-    genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
-    tag_id = request.GET.get("tag") or _most_used_tag(genome_build)
+def tag_stats_tag_genes_over_time(request):
+    tag_id = request.GET.get("tag") or _most_used_tag(request.user)
     top_n = _get_int(request, "top_n", DEFAULT_TOP_GENES)
 
     def calculate():
-        qs = _with_gene_symbol(genome_build, _tags_qs(genome_build).filter(tag=tag_id))
+        qs = _with_gene_symbol(_tags_qs(request.user).filter(tag=tag_id))
         qs = qs.annotate(quarter=TruncQuarter("created"))
 
         counts = {}
@@ -329,7 +346,7 @@ def tag_stats_tag_genes_over_time(request, genome_build_name):
             "series": _grouped_series(counts, sorted_quarters, top_n),
         }
 
-    return _cached_json("tag_genes_over_time", genome_build, {"tag": tag_id, "top_n": top_n}, calculate)
+    return _cached_json("tag_genes_over_time", request.user, {"tag": tag_id, "top_n": top_n}, calculate)
 
 
 def _quarter_label(quarter_start) -> str:

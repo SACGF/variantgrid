@@ -49,11 +49,20 @@ function loadTagStatsCard(cardId, url, render) {
     });
 }
 
+/** Tags that failed liftover have no allele, so they sit outside every allele based count */
+function noAlleleWarning(count) {
+    if (!count) {
+        return "";
+    }
+    return `<p class="text-muted small mt-2">${count.toLocaleString()} tag
+            ${count === 1 ? "event is" : "events are"} not included - liftover failed, so they have no allele.</p>`;
+}
+
 function renderTagStatsHeadline(data, $content) {
     const stats = [
         ["Tag events", data.tag_events, "Every time someone applied a tag"],
-        ["Distinct (variant, tag)", data.distinct_variant_tags, "Ignoring who tagged it, and when"],
-        ["Tagged variants", data.distinct_variants, "Variants carrying at least one tag"],
+        ["Distinct (allele, tag)", data.distinct_allele_tags, "Ignoring who tagged it, and when"],
+        ["Tagged alleles", data.distinct_alleles, "Alleles carrying at least one tag"],
         ["Analyses", data.analyses, "Analyses tags were applied in"],
         ["Taggers this year", data.taggers_this_year, "Users who tagged in the last 365 days"],
     ];
@@ -62,7 +71,7 @@ function renderTagStatsHeadline(data, $content) {
             <div class="h3 mb-0">${value.toLocaleString()}</div>
             <div class="text-muted small">${label}</div>
          </div>`);
-    $content.html('<div class="row">' + cells.join("") + '</div>');
+    $content.html('<div class="row">' + cells.join("") + '</div>' + noAlleleWarning(data.no_allele));
 }
 
 function renderTagStatsOverTime(data, $content) {
@@ -82,8 +91,9 @@ function renderTagStatsUser(data, $content) {
     const topTags = data.top_tags.map((t) => `<li>${t.tag} &times; ${t.count.toLocaleString()}</li>`).join("");
     $content.html(
         `<p><strong>${data.tag_events.toLocaleString()}</strong> tag events on
-         <strong>${data.distinct_variants.toLocaleString()}</strong> variants</p>
+         <strong>${data.distinct_alleles.toLocaleString()}</strong> alleles</p>
          <ul>${topTags || "<li>No tags yet</li>"}</ul>
+         ${noAlleleWarning(data.no_allele)}
          <div id="user-tags-sparkline"></div>`);
 
     Plotly.newPlot('user-tags-sparkline',
@@ -139,21 +149,21 @@ function renderTagStatsCoOccurrence(data, $content, tagsUrlFunc) {
                    {responsive: true});
 }
 
-function renderTagStatsReTagged(data, $content, variantUrlFunc) {
-    if (!data.variants.length) {
-        $content.html(`<p>No variants tagged '${data.tag}'.</p>`);
+function renderTagStatsReTagged(data, $content, alleleUrlFunc) {
+    if (!data.alleles.length) {
+        $content.html(`<p>Nothing tagged '${data.tag}'.</p>`);
         return;
     }
-    const rows = data.variants.map((v) =>
-        `<tr><td><a href="${variantUrlFunc(v.variant_id)}">${v.variant}</a></td>
-         <td>${v.count.toLocaleString()}</td></tr>`).join("");
+    const rows = data.alleles.map((a) =>
+        `<tr><td><a href="${alleleUrlFunc(a.allele_id)}">${a.variant}</a></td>
+         <td>${a.count.toLocaleString()}</td></tr>`).join("");
     const percent = Math.round(100 * data.top_events / data.tag_events);
 
     $content.html(
-        `<p>These ${data.variants.length} variants account for
+        `<p>These ${data.alleles.length} alleles account for
          <strong>${data.top_events.toLocaleString()}</strong> of the
          ${data.tag_events.toLocaleString()} '${data.tag}' tag events (${percent}%), spread over
-         ${data.distinct_variants.toLocaleString()} distinct variants.</p>
+         ${data.distinct_alleles.toLocaleString()} distinct alleles.</p>
          <p class="text-muted">A Tags node set to "Exclude" filters these out of an analysis, so known
          artefacts don't need re-confirming case by case.</p>
          <table class="table table-sm"><thead><tr><th>Variant</th><th>Tag events</th></tr></thead>

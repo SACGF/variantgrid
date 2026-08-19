@@ -45,7 +45,7 @@ class TagStatsTest(TestCase):
 
     def _get_json(self, url_name, **kwargs) -> dict:
         params = kwargs.pop("params", None)
-        url = reverse(url_name, kwargs={"genome_build_name": self.genome_build.name, **kwargs})
+        url = reverse(url_name, kwargs=kwargs)
         response = self.client.get(url, data=params)
         self.assertEqual(response.status_code, 200)
         return json.loads(response.content)
@@ -53,15 +53,15 @@ class TagStatsTest(TestCase):
     def test_headline_counts_each_identity(self):
         data = self._get_json("tag_stats_headline")
         self.assertEqual(data["tag_events"], 4)
-        self.assertEqual(data["distinct_variant_tags"], 3)
-        self.assertEqual(data["distinct_variants"], 2)
+        self.assertEqual(data["distinct_allele_tags"], 3)
+        self.assertEqual(data["distinct_alleles"], 2)
         self.assertEqual(data["analyses"], 1)
 
     def test_re_tagged_ranks_by_events(self):
         data = self._get_json("tag_stats_re_tagged", params={"tag": "Artefact"})
-        self.assertEqual([v["count"] for v in data["variants"]], [2, 1])
+        self.assertEqual([a["count"] for a in data["alleles"]], [2, 1])
         self.assertEqual(data["tag_events"], 3)
-        self.assertEqual(data["distinct_variants"], 2)
+        self.assertEqual(data["distinct_alleles"], 2)
         self.assertEqual(data["top_events"], 3)
 
     def test_co_occurrence_counts_alleles_with_both_tags(self):
@@ -76,10 +76,23 @@ class TagStatsTest(TestCase):
         self.assertEqual(data["username"], str(other_user))
         self.assertEqual(data["tag_events"], 0)
 
+    def test_only_counts_tags_the_requesting_user_can_see(self):
+        stranger = User.objects.create(username='tag_stats_stranger')
+        self.client.force_login(stranger)
+        data = self._get_json("tag_stats_headline")
+        self.assertEqual(data["tag_events"], 0)
+        self.assertEqual(data["distinct_alleles"], 0)
+
     def test_response_is_cached(self):
         first = self._get_json("tag_stats_headline")
         self._create_variant_tag(self.artefact, self.other_variant)
         self.assertEqual(self._get_json("tag_stats_headline")["calculated"], first["calculated"])
+
+    def test_cache_is_not_shared_between_users(self):
+        """ Cards are permission filtered, so one user's numbers must not be served to another """
+        self.assertEqual(self._get_json("tag_stats_headline")["tag_events"], 4)
+        self.client.force_login(User.objects.create(username='tag_stats_cache_stranger'))
+        self.assertEqual(self._get_json("tag_stats_headline")["tag_events"], 0)
 
 
 @override_settings(CACHES=LOCMEM_CACHE)
@@ -104,7 +117,7 @@ class TagStatsCoOccurrenceOrderingTest(TestCase):
         self.client.force_login(self.user)
 
     def test_matrix_finds_pairs_the_db_ordered_the_other_way(self):
-        url = reverse("tag_stats_co_occurrence", kwargs={"genome_build_name": self.genome_build.name})
+        url = reverse("tag_stats_co_occurrence")
         data = json.loads(self.client.get(url).content)
         self.assertEqual(data["tags"], ["Benign", "artefact"])
         self.assertEqual(data["matrix"], [[None, 1], [1, None]])
