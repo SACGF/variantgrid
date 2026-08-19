@@ -2,18 +2,24 @@ from django.contrib.auth.models import User
 from django.core.management import call_command
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
 
+from analysis.forms.forms_nodes import TagNodeForm
 from analysis.models import Analysis, VariantTag
 from analysis.models.nodes.filters.tag_node import TagNode, TagNodeTag
 from annotation.fake_annotation import create_fake_variants
 from library.django_utils.unittest_utils import prevent_request_warnings
 from snpdb.forms import CreateTagForm
 from snpdb.models import GenomeBuild, Tag, TagColor, TagColorsCollection, Variant
-from snpdb.tag_merge import (
+from snpdb.tag_operations import (
+    TagOperation,
     get_case_collision_groups,
     get_merge_suggestions,
+    get_tag_operations,
     get_tag_usage,
     merge_tag,
+    reinstate_tag,
+    retire_tag,
 )
 
 
@@ -41,9 +47,11 @@ class TagMergeTest(VariantTagTestCase):
         self._create_variant_tag(self.dying_tag)
         self._create_variant_tag(self.dying_tag, variant=self.other_variant)
 
-        merge_tag(self.dying_tag, self.surviving_tag)
+        merge_tag(self.dying_tag, self.surviving_tag, self.user)
 
-        self.assertFalse(Tag.objects.filter(pk="artefact").exists())
+        self.dying_tag.refresh_from_db()
+        self.assertFalse(self.dying_tag.active, "Merged tag is retired, not deleted")
+        self.assertEqual(self.dying_tag.merged_into, self.surviving_tag)
         self.assertEqual(VariantTag.objects.filter(tag=self.surviving_tag).count(), 2)
 
     def test_merge_keeps_variant_tags_that_repeat(self):
@@ -52,7 +60,7 @@ class TagMergeTest(VariantTagTestCase):
         self._create_variant_tag(self.surviving_tag)
         self._create_variant_tag(self.dying_tag)
 
-        result = merge_tag(self.dying_tag, self.surviving_tag)
+        result = merge_tag(self.dying_tag, self.surviving_tag, self.user)
 
         self.assertEqual(VariantTag.objects.filter(tag=self.surviving_tag).count(), 2)
         variant_tag_counts = result.counts[0]
@@ -67,7 +75,7 @@ class TagMergeTest(VariantTagTestCase):
         TagNodeTag.objects.create(tag_node=other_node, tag=self.dying_tag)
         version_before = other_node.version
 
-        merge_tag(self.dying_tag, self.surviving_tag)
+        merge_tag(self.dying_tag, self.surviving_tag, self.user)
 
         self.assertEqual(list(TagNodeTag.objects.filter(tag_node=tag_node).values_list("tag_id", flat=True)),
                          ["Artefact"])
@@ -81,7 +89,7 @@ class TagMergeTest(VariantTagTestCase):
         TagColor.objects.create(collection=collection, tag=self.surviving_tag, rgb="#ff0000")
         TagColor.objects.create(collection=collection, tag=self.dying_tag, rgb="#00ff00")
 
-        merge_tag(self.dying_tag, self.surviving_tag)
+        merge_tag(self.dying_tag, self.surviving_tag, self.user)
 
         tag_colors = TagColor.objects.filter(collection=collection)
         self.assertEqual(tag_colors.count(), 1)
@@ -89,7 +97,7 @@ class TagMergeTest(VariantTagTestCase):
 
     def test_merge_into_self_raises(self):
         with self.assertRaises(ValueError):
-            merge_tag(self.dying_tag, self.dying_tag)
+            merge_tag(self.dying_tag, self.dying_tag, self.user)
 
     def test_tag_usage_description(self):
         self._create_variant_tag(self.dying_tag)
@@ -105,6 +113,97 @@ class TagMergeTest(VariantTagTestCase):
         suggestions = get_merge_suggestions()
         self.assertIn("Aretefact", suggestions["Artefact"])
         self.assertIn("Artefact", suggestions["Aretefact"])
+
+
+class TagRetireTest(VariantTagTestCase):
+    def test_retired_tag_is_not_offered(self):
+        retire_tag(self.dying_tag, self.user)
+
+        self.assertTrue(Tag.objects.filter(pk="artefact").exists())
+        self.assertFalse(Tag.live_qs().filter(pk="artefact").exists())
+
+    def test_retire_leaves_existing_tagging_alone(self):
+        variant_tag = self._create_variant_tag(self.dying_tag)
+
+        retire_tag(self.dying_tag, self.user)
+
+        variant_tag.refresh_from_db()
+        self.assertEqual(variant_tag.tag_id, "artefact")
+
+    def test_retired_tag_is_not_a_case_collision_candidate(self):
+        """ Merging is done on live tags, or re-running the command would keep re-finding the same pairs """
+        retire_tag(self.dying_tag, self.user)
+        self.assertEqual(get_case_collision_groups(), [])
+
+    def test_retire_twice_raises(self):
+        retire_tag(self.dying_tag, self.user)
+        with self.assertRaises(ValueError):
+            retire_tag(self.dying_tag, self.user)
+
+    def test_reinstate_clears_merged_into(self):
+        """ The rows went to the surviving tag and stay there, so the tag comes back standing on its own """
+        merge_tag(self.dying_tag, self.surviving_tag, self.user)
+
+        reinstate_tag(self.dying_tag, self.user)
+
+        self.dying_tag.refresh_from_db()
+        self.assertTrue(self.dying_tag.active)
+        self.assertIsNone(self.dying_tag.merged_into)
+
+    def test_reinstate_live_tag_raises(self):
+        with self.assertRaises(ValueError):
+            reinstate_tag(self.surviving_tag, self.user)
+
+    def test_merge_into_retired_tag_raises(self):
+        retire_tag(self.surviving_tag, self.user)
+        with self.assertRaises(ValueError):
+            merge_tag(self.dying_tag, self.surviving_tag, self.user)
+
+
+class RetiredTagNodeFormTest(VariantTagTestCase):
+    def _tags_offered(self, node) -> list[str]:
+        return sorted(tag.pk for tag in TagNodeForm(instance=node).fields["tags"].queryset)
+
+    def test_node_already_filtering_on_a_retired_tag_still_validates(self):
+        """ Otherwise retiring a tag breaks editing every node that filters on it """
+        node = TagNode.objects.create(analysis=self.analysis, version=1)
+        TagNodeTag.objects.create(tag_node=node, tag=self.dying_tag)
+        retire_tag(self.dying_tag, self.user)
+
+        self.assertIn("artefact", self._tags_offered(node))
+        form = TagNodeForm({"tags": ["artefact"], "mode": node.mode, "node_input": node.node_input},
+                           instance=node)
+        self.assertTrue(form.is_valid(), form.errors)
+
+    def test_new_node_is_not_offered_retired_tags(self):
+        retire_tag(self.dying_tag, self.user)
+        node = TagNode.objects.create(analysis=self.analysis, version=1)
+        tags_offered = self._tags_offered(node)
+        self.assertIn("Artefact", tags_offered)
+        self.assertNotIn("artefact", tags_offered)
+
+
+class TagOperationLogTest(VariantTagTestCase):
+    def test_merge_records_what_moved(self):
+        """ The repointing is a bulk UPDATE that fires no signals, so the counts only exist if we log them """
+        self._create_variant_tag(self.dying_tag)
+        self._create_variant_tag(self.dying_tag, variant=self.other_variant)
+
+        merge_tag(self.dying_tag, self.surviving_tag, self.user)
+
+        log_entry = get_tag_operations(self.dying_tag).get()
+        self.assertEqual(log_entry.actor, self.user)
+        self.assertEqual(log_entry.additional_data["operation"], TagOperation.MERGE)
+        self.assertEqual(log_entry.additional_data["into"], "Artefact")
+        variant_tag_counts = log_entry.additional_data["counts"][0]
+        self.assertEqual(variant_tag_counts["moved"], 2)
+
+    def test_log_survives_operations_on_the_same_tag(self):
+        retire_tag(self.dying_tag, self.user, reason="no longer used")
+        reinstate_tag(self.dying_tag, self.user)
+
+        operations = [le.additional_data["operation"] for le in get_tag_operations(self.dying_tag)]
+        self.assertEqual(operations, [TagOperation.REINSTATE, TagOperation.RETIRE])
 
 
 class DeleteDuplicateVariantTagsTest(VariantTagTestCase):
@@ -154,6 +253,16 @@ class CreateTagFormTest(TestCase):
         self.assertTrue(form.is_valid())
         self.assertEqual(form.save().pk, "SomaticReportable")
 
+    def test_rejects_retired_name_and_says_where_it_went(self):
+        """ A retired tag keeps its name, so re-creating it would be an IntegrityError """
+        surviving_tag = Tag.objects.create(pk="Artefacts")
+        Tag.objects.filter(pk="Artefact").update(retired=timezone.now(), merged_into=surviving_tag)
+
+        form = CreateTagForm({"tag": "Artefact"})
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("Artefacts", str(form.errors))
+
 
 class TagMergeViewTest(TestCase):
     @classmethod
@@ -176,11 +285,20 @@ class TagMergeViewTest(TestCase):
         self.client.force_login(self.admin_user)
         response = self.client.post(self.url, {"surviving_tag": "Artefact", "confirm_tag_name": "Artefact"})
         self.assertEqual(response.status_code, 200)
-        self.assertTrue(Tag.objects.filter(pk="artefact").exists())
+        self.assertTrue(Tag.live_qs().filter(pk="artefact").exists())
+
+    def test_retire_and_reinstate(self):
+        self.client.force_login(self.admin_user)
+
+        self.client.post(reverse('tag_retire', kwargs={"tag_id": "artefact"}))
+        self.assertFalse(Tag.live_qs().filter(pk="artefact").exists())
+
+        self.client.post(reverse('tag_reinstate', kwargs={"tag_id": "artefact"}))
+        self.assertTrue(Tag.live_qs().filter(pk="artefact").exists())
 
     def test_merges_when_confirmed(self):
         self.client.force_login(self.admin_user)
         response = self.client.post(self.url, {"surviving_tag": "Artefact", "confirm_tag_name": "artefact"})
         self.assertEqual(response.status_code, 302)
-        self.assertFalse(Tag.objects.filter(pk="artefact").exists())
-        self.assertTrue(Tag.objects.filter(pk="Artefact").exists())
+        self.assertEqual(Tag.objects.get(pk="artefact").merged_into_id, "Artefact")
+        self.assertFalse(Tag.live_qs().filter(pk="artefact").exists())

@@ -51,6 +51,18 @@ from user_messages.models import Message
 
 class Tag(models.Model):
     id = models.CharField(max_length=50, primary_key=True)
+    # Retired tags are kept rather than deleted so old names still resolve, and so merges leave a trail.
+    # They're hidden from anywhere you pick a tag, but rows already pointing at them keep working
+    retired = models.DateTimeField(null=True, blank=True)
+    merged_into = models.ForeignKey('self', null=True, blank=True, on_delete=SET_NULL)
+
+    @classmethod
+    def live_qs(cls) -> QuerySet['Tag']:
+        return cls.objects.filter(retired__isnull=True)
+
+    @property
+    def active(self) -> bool:
+        return self.retired is None
 
     def __str__(self):
         return self.id

@@ -224,6 +224,8 @@ URLS_NAME_REGISTER.update({  # Disable selected snpdb urls
     "custom_columns": False,
     "tag_settings": False,
     "tag_merge": False,
+    "tag_retire": False,
+    "tag_reinstate": False,
     "igv_integration": False,
     "sequencing_software_versions": False,
     "classification_dashboard": True,

@@ -44,7 +44,7 @@ from snpdb.models import (
 )
 from snpdb.models.models import Lab, Organization
 from snpdb.models.models_genome import GenomeBuild
-from snpdb.tag_merge import get_case_collision
+from snpdb.tag_operations import get_case_collision
 from uicore.utils.form_helpers import FormHelperHelper, form_helper_horizontal
 from variantgrid.perm_path import get_visible_url_names
 
@@ -158,7 +158,7 @@ class LabMultiSelectForm(forms.Form):
 
 
 class TagForm(forms.Form):
-    tag = forms.ModelChoiceField(queryset=Tag.objects.all(),
+    tag = forms.ModelChoiceField(queryset=Tag.live_qs(),
                                  widget=ModelSelect2(url='tag_autocomplete',
                                                      attrs={'data-placeholder': 'Tag...'}))
 
@@ -741,6 +741,15 @@ class UserCohortForm(forms.Form):
                                                         attrs={'data-placeholder': 'Cohort...'}))
 
 
+def _tag_state_description(tag: Tag) -> str:
+    """ Why a tag name is unavailable - a retired one still holds its name """
+    if tag.active:
+        return "already exists"
+    if tag.merged_into_id:
+        return f"was merged into '{tag.merged_into_id}'"
+    return "was retired"
+
+
 class CreateTagForm(forms.Form):
     tag = forms.CharField(widget=forms.TextInput(attrs={'placeholder': 'New Tag Name...'}), required=True)
 
@@ -757,11 +766,11 @@ class CreateTagForm(forms.Form):
         tag_name = self.cleaned_data['tag']
         if not tag_name.isalnum():
             raise ValidationError("Tag names must be alphanumeric (no spaces or special characters)")
-        if Tag.objects.filter(pk=tag_name).exists():
-            raise ValidationError(f"Tag '{tag_name}' already exists")
+        if existing := Tag.objects.filter(pk=tag_name).first():
+            raise ValidationError(f"Tag '{tag_name}' {_tag_state_description(existing)}")
         if existing := get_case_collision(tag_name):
-            raise ValidationError(f"Tag '{existing}' already exists, and only differs by case. "
-                                  f"Use it, or ask an admin to merge the tags")
+            raise ValidationError(f"Tag '{existing}' {_tag_state_description(existing)}, and only differs "
+                                  f"by case. Use it, or ask an admin to merge the tags")
         return tag_name
 
     def save(self) -> Tag:

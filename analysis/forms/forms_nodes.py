@@ -2,6 +2,7 @@ import json
 
 from dal import forward
 from django import forms
+from django.db.models import Q
 from django.forms.models import fields_for_model
 from django.forms.widgets import HiddenInput, TextInput
 from django.utils.text import slugify
@@ -871,7 +872,7 @@ class SelectedInParentNodeForm(BaseNodeForm):
 
 class TagNodeForm(BaseNodeForm):
     tags = forms.ModelMultipleChoiceField(required=False,
-                                          queryset=Tag.objects.all(),
+                                          queryset=Tag.objects.none(),
                                           widget=ModelSelect2Multiple(url='tag_autocomplete',
                                                                       attrs={'data-placeholder': 'Tags...'}))
 
@@ -885,6 +886,12 @@ class TagNodeForm(BaseNodeForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        # Retired tags aren't offered, but a node already filtering on one has to keep validating
+        q_selectable = Q(retired__isnull=True)
+        if self.instance.pk:
+            q_selectable |= Q(tagnodetag__tag_node=self.instance)
+        self.fields["tags"].queryset = Tag.objects.filter(q_selectable).distinct()
+
         if not self.instance.visible:
             # Hide in special all tags node (tags button) - it's always all of this analysis' tags, no parent
             for field_name in ("mode", "node_input"):

@@ -164,11 +164,16 @@ from snpdb.models.models_enums import (
     ProcessingStatus,
 )
 from snpdb.sample_file_path import get_example_replacements
-from snpdb.tag_merge import (
+from snpdb.tag_operations import (
+    TagOperation,
+    describe_tag_operation,
     get_merge_suggestions,
+    get_tag_operations,
     get_tag_usage,
     get_tag_usage_by_tag_id,
     merge_tag,
+    reinstate_tag,
+    retire_tag,
 )
 from snpdb.tasks.liftover_tasks import liftover_alleles
 from snpdb.tasks.soft_delete_tasks import soft_delete_vcfs
@@ -1337,6 +1342,20 @@ def view_custom_columns(request, custom_columns_collection_id):
     return render(request, 'snpdb/settings/view_custom_columns.html', context_dict)
 
 
+TAG_OPERATION_HISTORY_LIMIT = 50
+
+
+def _get_tag_operation_history() -> list[dict]:
+    """ Recent operations on the tag vocabulary, for the tag settings page """
+    return [{
+        "tag_id": log_entry.object_pk,
+        "operation": TagOperation(log_entry.additional_data["operation"]).label,
+        "detail": describe_tag_operation(log_entry),
+        "user": log_entry.actor,
+        "timestamp": log_entry.timestamp,
+    } for log_entry in get_tag_operations()[:TAG_OPERATION_HISTORY_LIMIT]]
+
+
 def _get_tag_summaries() -> list[dict]:
     """ Per-tag usage counts + possible typo twins, for the tag settings table """
     usage_by_tag_id = get_tag_usage_by_tag_id()
@@ -1368,6 +1387,8 @@ def tag_settings(request):
         'user_tag_styles': user_tag_styles,
         'user_tag_colors': user_tag_colors,
         'tag_summaries': _get_tag_summaries(),
+        'retired_tags': Tag.objects.filter(retired__isnull=False).order_by("-retired"),
+        'tag_operations': _get_tag_operation_history(),
     }
     return render(request, 'snpdb/settings/tag_settings.html', context_dict)
 
@@ -1375,10 +1396,10 @@ def tag_settings(request):
 @require_superuser
 def tag_merge(request, tag_id):
     """ Merges the tag in the URL into another - always stated from the dying tag's side """
-    dying_tag = get_object_or_404(Tag, pk=tag_id)
+    dying_tag = get_object_or_404(Tag, pk=tag_id, retired__isnull=True)
     surviving_tag = None
     if surviving_tag_id := request.GET.get("into") or request.POST.get("surviving_tag"):
-        surviving_tag = Tag.objects.filter(pk=surviving_tag_id).exclude(pk=dying_tag.pk).first()
+        surviving_tag = Tag.live_qs().filter(pk=surviving_tag_id).exclude(pk=dying_tag.pk).first()
 
     if request.method == "POST":
         confirm = request.POST.get("confirm_tag_name", "")
@@ -1388,7 +1409,7 @@ def tag_merge(request, tag_id):
             messages.add_message(request, messages.ERROR,
                                  f"Type '{dying_tag}' exactly to confirm the merge")
         else:
-            result = merge_tag(dying_tag, surviving_tag)
+            result = merge_tag(dying_tag, surviving_tag, request.user)
             messages.add_message(request, messages.INFO, result.description())
             return redirect('tag_settings')
 
@@ -1396,10 +1417,37 @@ def tag_merge(request, tag_id):
         "dying_tag": dying_tag,
         "surviving_tag": surviving_tag,
         "usage": get_tag_usage(dying_tag),
-        "other_tags": Tag.objects.exclude(pk=dying_tag.pk).order_by("pk"),
+        "other_tags": Tag.live_qs().exclude(pk=dying_tag.pk).order_by("pk"),
         "suggestions": get_merge_suggestions().get(dying_tag.pk, []),
     }
     return render(request, 'snpdb/settings/tag_merge.html', context)
+
+
+@require_superuser
+@require_POST
+def tag_retire(request, tag_id):
+    """ Stop offering a tag - what already uses it is left alone """
+    tag = get_object_or_404(Tag, pk=tag_id)
+    try:
+        retire_tag(tag, request.user, reason=request.POST.get("reason") or None)
+        messages.add_message(request, messages.INFO,
+                             f"Retired '{tag}' - it's no longer offered, existing tagging is unchanged")
+    except ValueError as ve:
+        messages.add_message(request, messages.ERROR, str(ve))
+    return redirect('tag_settings')
+
+
+@require_superuser
+@require_POST
+def tag_reinstate(request, tag_id):
+    """ Put a retired tag back into circulation """
+    tag = get_object_or_404(Tag, pk=tag_id)
+    try:
+        reinstate_tag(tag, request.user)
+        messages.add_message(request, messages.INFO, f"Reinstated '{tag}'")
+    except ValueError as ve:
+        messages.add_message(request, messages.ERROR, str(ve))
+    return redirect('tag_settings')
 
 
 def view_tag_colors_collection(request, tag_colors_collection_id):
