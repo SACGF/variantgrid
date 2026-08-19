@@ -9,8 +9,12 @@
     <div class="container">
         <h3>Changelog</h3>
 
+    <!-- Style hint: keep bullets short - entries from 2025 and earlier average 77 chars (median 67).
+         One line per feature: "#issue - what changed". -->
+
     {% if sapath_enabled %}
         <!-- Do all as 1 big change -->
+        <!-- Last audited/updated: 19 August 2026 (includes features up to the 19 August 2026 deploy) -->
 
         <div class="card mt-4">
             <div class="card-header">VariantGrid 4.0</div>
@@ -86,7 +90,7 @@
                     <li>New columns - hgvs_g, svlen (Structural Variant length), total_db_ref (global variant zygosity count),
                         total_db_unk, predictions_num_benign, predictions_num_pathogenic</li>
                     <li>dbNSFP 5.3.1 - new columns, and VEP 116 plugin columns (eg Promoter AI) shown on variant details</li>
-                    <li>denovoDB, and AnnotSV for structural variants</li>
+                    <li>denovoDB, and AnnotSV for structural variants (own pipeline - upgrade without re-running VEP)</li>
                     <li>SpliceAI is now run as a command so indels are scored. Raw (rather than masked) scores are flagged with a warning</li>
                     <li>Annotation pipeline - runs are merged into larger batches, new runs pause when the annotation disk is low,
                         and temporary files are cleaned up once a run has imported. The VCF/Sample page shows any variants that couldn't be annotated</li>
@@ -142,6 +146,7 @@
                 <ul>
                     <li>bcftools +liftover handles anything the ClinGen Allele Registry can't lift over, and an event is raised
                         when the registry is unavailable</li>
+                    <li>Liftover runs in parallel batches - faster, a failure only loses its batch</li>
                 </ul>
 
                 <h4>Ontology</h4>
@@ -158,6 +163,7 @@
                         shown, auto-matched terms can be skipped or disabled, and bulk matching is much faster</li>
                     <li>Patient imports - improved grids showing more info, and the original CSV can be downloaded</li>
                     <li>Patient graphs only count patients you have permission to see</li>
+                    <li>New Specimen and Extraction records - pages, grids and an API</li>
                 </ul>
 
                 <h4>Search</h4>
@@ -178,12 +184,16 @@
                         symbolic INV, and VCF export includes SVLEN</li>
                     <li>Gene overlaps calculated for structural variants</li>
                     <li>Variant page works correctly for very long variants</li>
+                    <li>Gene fusions imported as variants (VICC nomenclature)</li>
                 </ul>
 
                 <h4>Tagging</h4>
                 <ul>
                     <li>VGP#2439 - Tag Colors used to be 1 per user, can now have multiple which can be shared/set globally (so all lab members can share colors)</li>
                     <li>Tags for Variants grid - grid showing all tags per variant has been put back (was disabled for performance reasons)</li>
+                    <li>Tag stats page - counts, over time, by user / lab / gene, co-occurrence</li>
+                    <li>Merge duplicate tags, tag operations logged</li>
+                    <li>Tag sort order set on tag colors page, old tags marked stale</li>
                 </ul>
 
                 <h4>User Interface</h4>
@@ -232,6 +242,49 @@
 
 
     {% else %}
+       <div class="card mt-4">
+            <div class="card-header">19 August 2026</div>
+            <div class="card-body">
+                <h4>Analysis</h4>
+                <ul>
+                    <li>#789 - Grid export / node info handle stale nodes (eg tag deleted mid-session)</li>
+                    <li>private#223 - Sample node can pull in every sample from an extraction</li>
+                </ul>
+                <h4>Annotation</h4>
+                <ul>
+                    <li>#720 - AnnotSV is its own pipeline - upgrade without re-running VEP, T2T support</li>
+                    <li>#1710 - VEP memory capped per run</li>
+                </ul>
+                <h4>Liftover</h4>
+                <ul>
+                    <li>#1764 - Liftover runs in parallel batches - faster, a failure only loses its batch</li>
+                </ul>
+                <h4>Patients / Samples</h4>
+                <ul>
+                    <li>#1704, #1706 - New Specimen and Extraction records - pages, grids, tissue status</li>
+                    <li>#1707 - Patient / specimen / extraction API</li>
+                    <li>private#2837 - Variant page samples grid - expandable patient / specimen detail</li>
+                    <li>#1746 - VCF/sample form warns about unsaved changes</li>
+                </ul>
+                <h4>Somatic</h4>
+                <ul>
+                    <li>#1506 - Gene fusions (TSO 500) imported as variants, VICC nomenclature</li>
+                </ul>
+                <h4>Tagging</h4>
+                <ul>
+                    <li>#1751 - Tag stats page - counts, over time, by user / lab / gene, co-occurrence</li>
+                    <li>#1751 - Merge duplicate tags (retired, not deleted), tag operations logged</li>
+                    <li>#343 - Tag sort order set on tag colors page (artifact last by default)</li>
+                    <li>#1433 - Tag node "tagged within days" filter, old tags marked stale</li>
+                </ul>
+                <h4>User Interface</h4>
+                <ul>
+                    <li>#1174 - User page shows your tags and classifications</li>
+                    <li>#1722 - Faster variant details page and grids</li>
+                </ul>
+            </div>
+       </div>
+
        <div class="card mt-4">
             <div class="card-header">10 August 2026</div>
             <div class="card-body">
