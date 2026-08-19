@@ -294,7 +294,7 @@ def clinical_significance_values(vcm: ClassificationModification, show_pending: 
 
 
 @register.inclusion_tag("classification/tags/clinical_significance.html")
-def clinical_significance(value, evidence_key=SpecialEKeys.CLINICAL_SIGNIFICANCE, show_if_none=True, extra_css: str = ""):
+def clinical_significance(value, evidence_key=SpecialEKeys.CLINICAL_SIGNIFICANCE, show_if_none=True, extra_css: str = "", pending_from: Optional[str] = None):
     if isinstance(value, EvidenceMixin):
         value = value.get(evidence_key)
     if value is None and not show_if_none:
@@ -304,9 +304,13 @@ def clinical_significance(value, evidence_key=SpecialEKeys.CLINICAL_SIGNIFICANCE
 
     key = EvidenceKeyMap.cached_key(evidence_key)
     label = key.option_dictionary.get(value, value) or "No Data"
+
     title = key.pretty_label
     if value == "withdrawn":
         label = "Withdrawn"
+
+    if value == "in-review":
+        label = "In-Review"
 
     #prefix = "cs" if key.key == SpecialEKeys.CLINICAL_SIGNIFICANCE else "scs"
     prefix = "cs"
@@ -316,7 +320,8 @@ def clinical_significance(value, evidence_key=SpecialEKeys.CLINICAL_SIGNIFICANCE
     return {
         "css_class": css_class,
         "label": label,
-        "title": title
+        "title": title,
+        "pending_from": pending_from
     }
 
 

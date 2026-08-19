@@ -125,6 +125,10 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
                 #     if discordance_status := self.pending_conflict_labs_clin_sig.get((row["pk"], row["lab_id"])):
                 #         somatic_dict["conflict_status"] = discordance_status
 
+                if triage_status := self.overlap_pending_clin_sig.get(row["pk"]):
+                    somatic_dict["pending"] = triage_status.amend_value or "in-review"
+                somatic_dict["pending"] = "in-review"
+
                 return somatic_dict
         return None
 
@@ -141,11 +145,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
         result_dict["triage"] = True
 
         if triage_status := self.overlap_pending.get(row["pk"]):
-            result_dict["pending"] = triage_status.amend_value
-
-        # if ShareLevel(row["share_level"]).is_discordant_level:
-        #     if discordance_status := self.pending_conflict_labs_onc_path.get((row["pk"], row["lab_id"])):
-        #         result_dict["conflict_status"] = discordance_status
+            result_dict["pending"] = triage_status.amend_value or "in-review"
 
         return result_dict
 
@@ -205,9 +205,15 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
         super().pre_render(qs)
 
         overlap_pending: dict[int, TriageState] = {}
-        for overlap in OverlapContribution.objects.filter(classification_grouping__in=qs, triage_state__status=TriageStatus.REVIEWED_WILL_FIX).only('triage_state', 'classification_grouping_id'):
-            overlap_pending[overlap.classification_grouping_id] = overlap.triage_state_obj
+        overlap_pending_clin_sig: dict[int, TriageState] = {}
+        for overlap in OverlapContribution.objects.filter(classification_grouping__in=qs, triage_state__status=TriageStatus.REVIEWED_WILL_FIX).only('triage_state', 'value_type', 'classification_grouping_id'):
+            if overlap.value_type == ClassificationResultValue.ONC_PATH:
+                overlap_pending[overlap.classification_grouping_id] = overlap.triage_state_obj
+            else:
+                overlap_pending_clin_sig[overlap.classification_grouping_id] = overlap.triage_state_obj
+
         self.overlap_pending = overlap_pending
+        self.overlap_pending_clin_sig = overlap_pending_clin_sig
 
         # grouping_value_type_overlaps = defaultdict(lambda: defaultdict(list))
         # for contribution in ClassificationGroupingOverlapContribution.objects.filter(classification_grouping__in=qs).select_related("overlap")\

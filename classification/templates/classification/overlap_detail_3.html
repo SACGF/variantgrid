@@ -126,9 +126,9 @@
                         </td>
                         <td>
                             <div id="triage-{{ overlap_entry.overlap_contribution.pk }}-value">
-                            {% if overlap_entry.overlap_contribution.effective_value != overlap_entry.overlap_contribution.value %}
+                            {% if overlap_entry.overlap_contribution.is_amending %}
                                 <div>{% clinical_significance overlap_entry.overlap_contribution.value extra_css="strike"%}</div>
-                                <div>{% clinical_significance overlap_entry.overlap_contribution.effective_value %}</div>
+                                <div>{% clinical_significance overlap_entry.overlap_contribution.pending_value %}</div>
                             {% else %}
                                 <div>{% clinical_significance overlap_entry.overlap_contribution.value %}</div>
                             {% endif %}

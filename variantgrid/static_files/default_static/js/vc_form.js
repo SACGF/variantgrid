@@ -2512,8 +2512,9 @@ VCTable.somatic_clinical_significance = (data, type, row) => {
     } else {
         value = data;
     }
-
+    let pendingVal = value["pending"]
     let scs = value["clinical_significance"];
+
     let diff = value["diff"];
     let diffHtml = "";
     if (diff) {
@@ -2523,7 +2524,11 @@ VCTable.somatic_clinical_significance = (data, type, row) => {
     if (scs) {
         let scsKey = EKeys.cachedKeys.key(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE);
         let scsLabel = scsKey.prettyValue(scs);
-        let dom = ($('<span>', {text: scsLabel.val, 'class': `c-pill scs scs-${scs}`}));
+        let pendingClass = '';
+        if (pendingVal) {
+            pendingClass = 'strike'
+        }
+        let dom = ($('<span>', {text: scsLabel.val, 'class': `c-pill cs cs-${scs} ${pendingClass}`}));
 
         let highest_level = value["amp_level"];
         if (highest_level) {
@@ -2532,19 +2537,22 @@ VCTable.somatic_clinical_significance = (data, type, row) => {
         if (value["diff"]) {
             dom.append('<i class="fa-solid fa-asterisk ml-1" title="Multiple values have been recorded - showing latest"></i>');
         }
-
-        if (value.overlaps) {
-            dom.append('<i class="fa-solid fa-arrow-down-up-across-line ml-1" title="This value is in conflict with another lab"></i>');
+        if (pendingVal) {
+            let domParts = [dom];
+            if (pendingVal == 'in-review') {
+                domParts.push($('<div>', {
+                    class: `cs c-pill cs-in-review`,
+                    html: "In-Review"
+                }));
+            } else {
+                domParts.push($('<div>', {
+                    class: `cs c-pill cs-${pendingVal.toLowerCase()}`,
+                    html: csKey.prettyValue(pendingVal).val
+                }));
+            }
+            return $('<div>', {html: domParts});
         }
 
-        // if (value.conflict_status) {
-        //     if (value.conflict_status == "F") {
-        //         dom.addClass("strike");
-        //         dom.append('<i class="fa-solid fa-arrow-down-up-across-line ml-1" title="This value is in conflict with another lab but has been marked as pending a change"></i>');
-        //     } else {
-        //         dom.append('<i class="fa-solid fa-arrow-down-up-across-line ml-1" title="This value is in conflict with another lab"></i>');
-        //     }
-        // }
         return dom;
     } else {
         // FIXME can still have different values with no-value
@@ -2584,16 +2592,18 @@ VCTable.classification = (data, type, row) => {
         dom.append(' <i class="fa-solid fa-asterisk ml-1" title="Multiple values have been recorded - showing latest"></i>');
     }
     if (pendingVal) {
-        domParts.push($('<div>', {class: `cs c-pill cs-${pendingVal.toLowerCase()}`, html: csKey.prettyValue(pendingVal).val}));
+        if (pendingVal == 'in-review') {
+            domParts.push($('<div>', {
+                class: `cs c-pill cs-in-review`,
+                html: "In-Review"
+            }));
+        } else {
+            domParts.push($('<div>', {
+                class: `cs c-pill cs-${pendingVal.toLowerCase()}`,
+                html: csKey.prettyValue(pendingVal).val
+            }));
+        }
     }
-
-    // if (is_pending) {
-    //     pendingHtml = ' <i class="fa-solid fa-clock" title="Some or all of these classifications have been marked as having pending changes to classification to the value shown"></i>';
-    // }
-    // if (value.overlaps) {
-    //     dom.append('<i class="fa-solid fa-arrow-down-up-across-line ml-1" title="This value is in conflict with another lab"></i>');
-    // }
-
     return $('<div>', {html: domParts});
 };
 

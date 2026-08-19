@@ -120,6 +120,12 @@ class OverlapContribution(TimeStampedModel):
         return self.triage_state_obj.amend_value or self.value
 
     @property
+    def pending_value(self) -> Optional[str]:
+        if self.is_amending:
+            return self.triage_state_obj.amend_value or "in-review"
+        return None
+
+    @property
     def is_amending(self):
         return self.triage_state_obj.status == TriageStatus.REVIEWED_WILL_FIX
 
