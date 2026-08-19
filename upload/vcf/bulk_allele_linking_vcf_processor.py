@@ -103,7 +103,8 @@ class BulkAlleleLinkingVCFProcessor(BulkMinimalVCFProcessor):
             al.status = ProcessingStatus.SUCCESS
 
         if updated_allele_liftovers:
-            AlleleLiftover.objects.bulk_update(updated_allele_liftovers, fields=["status", "data", "error"])
+            AlleleLiftover.objects.bulk_update(updated_allele_liftovers, fields=["status", "data", "error"],
+                                              batch_size=AlleleLiftover.BULK_UPDATE_BATCH_SIZE)
 
         if variant_alleles:
             logging.info("Inserting %d variant_alleles", len(variant_alleles))
@@ -149,5 +150,6 @@ class FailedLiftoverVCFProcessor(BulkMinimalVCFProcessor):
             allele_liftover.error = {"message": f"BCFTools +liftover rejected variant: {reject_reason}"}
             records.append(allele_liftover)
 
-        AlleleLiftover.objects.bulk_update(records, fields=["status", "error"])
+        AlleleLiftover.objects.bulk_update(records, fields=["status", "error"],
+                                           batch_size=AlleleLiftover.BULK_UPDATE_BATCH_SIZE)
         self.rows_processed = len(records)
