@@ -153,10 +153,10 @@
                                         Register the installed tool below, or with:
                                         <div><code>{{ panel.register_command }}</code></div>
                                     </div>
+                                    <button name="{{ panel.register_name }}" class="btn btn-primary">
+                                        Register installed tool
+                                    </button>
                                 {% endif %}
-                                <button name="{{ panel.register_name }}" class="btn btn-primary">
-                                    Register installed tool
-                                </button>
                             {% endif %}
                             {% if panel.new %}
                                 {% labelled label="New" %}{{ panel.new }}{% endlabelled %}
