@@ -1,0 +1,7 @@
+{% extends menu_patients_base %}
+{% block title %}Extractions{% endblock title %}
+
+{% block submenu_page_content %}
+    <h3>Extractions</h3>
+    <table id="extraction-datatable" data-datatable-url="{% url 'extraction_datatables' %}" class="sticky-header"></table>
+{% endblock submenu_page_content %}

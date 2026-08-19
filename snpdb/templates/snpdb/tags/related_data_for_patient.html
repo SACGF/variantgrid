@@ -13,7 +13,7 @@
             <th>Sample Name
             <th>VCF
             <th>VCF date
-            <th>Tissue
+            <th>Specimen
             </tr>
             </thead>
             <tbody>
@@ -23,7 +23,7 @@
             <td>{{ sample.name }}
             <td><a href="{% url 'view_vcf' sample.vcf.pk %}">{{ sample.vcf.name }}</a>
             <td>{{ sample.vcf.date }}
-            <td>{{ sample.tissue }}
+            <td>{% if sample.specimen %}<a href="{{ sample.specimen.get_absolute_url }}">{{ sample.specimen }}</a>{% endif %}
             </tr>
         {% endfor %}
         </tbody>

@@ -6,6 +6,7 @@ from datetime import datetime
 
 from django.contrib.auth.models import User
 from django.test import TestCase
+from django.urls import reverse
 from django.utils import timezone
 
 from classification.autopopulate_evidence_keys.evidence_from_sample_and_patient import (
@@ -377,3 +378,64 @@ class TestAutocompleteForwarding(TestCase):
     def test_nothing_forwarded_returns_all_visible(self):
         self.assertEqual(self._queryset(SpecimenAutocompleteView).count(), 3)
         self.assertEqual(self._queryset(ExtractionAutocompleteView).count(), 4)
+
+
+class TestSpecimenExtractionGrids(TestCase):
+    """ The top level Specimen / Extraction grids off the patients menu (#1706) """
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.user = User.objects.create_user("grid_user", password="x")
+        cls.patient = Patient.objects.create(first_name="GRID", last_name="PATIENT", patient_code="GRIDCODE")
+        assign_permission_to_user_and_groups(cls.user, cls.patient)
+        cls.specimen = Specimen.objects.create(reference_id="2600000002", patient=cls.patient)
+        cls.dna = Extraction.objects.create(specimen=cls.specimen, reference_id="2600000002C",
+                                            nucleic_acid_source=NucleicAcid.DNA)
+        cls.rna = Extraction.objects.create(specimen=cls.specimen, reference_id="2600000002B",
+                                            nucleic_acid_source=NucleicAcid.RNA)
+
+        genome_build = GenomeBuild.get_name_or_alias("GRCh37")
+        vcf = VCF.objects.create(name="grid_test.vcf", genotype_samples=1, genome_build=genome_build,
+                                 import_status=ImportStatus.SUCCESS, user=cls.user, date=timezone.now())
+        cls.dna_sample = Sample.objects.create(name="grid_dna_arm", vcf=vcf, patient=cls.patient,
+                                               extraction=cls.dna)
+        assign_permission_to_user_and_groups(cls.user, cls.dna_sample)
+
+    def _grid_rows(self, url_name, search=None):
+        self.client.force_login(self.user)
+        params = {"search[value]": search} if search else {}
+        response = self.client.get(reverse(url_name), params)
+        self.assertEqual(200, response.status_code)
+        return {row["id"]: row for row in response.json()["data"]}
+
+    def test_specimen_grid_counts_extractions(self):
+        rows = self._grid_rows("specimen_datatables")
+        self.assertEqual(rows[self.specimen.pk]["extraction_count"], 2)
+
+    def test_extraction_grid_counts_samples_the_user_can_see(self):
+        """ A sample carries its VCF's permissions rather than its patient's """
+        rows = self._grid_rows("extraction_datatables")
+        self.assertEqual(rows[self.dna.pk]["sample_count"], 1)
+        self.assertEqual(rows[self.rna.pk]["sample_count"], 0)
+
+        other_user = User.objects.create_user("grid_other_user", password="x")
+        assign_permission_to_user_and_groups(other_user, self.patient)
+        self.client.force_login(other_user)
+        response = self.client.get(reverse("extraction_datatables"))
+        rows = {row["id"]: row for row in response.json()["data"]}
+        self.assertEqual(rows[self.dna.pk]["sample_count"], 0)
+
+    def test_search_finds_one_arm_by_its_own_reference(self):
+        rows = self._grid_rows("extraction_datatables", search="2600000002C")
+        self.assertEqual(list(rows), [self.dna.pk])
+
+    def test_search_by_patient_code(self):
+        rows = self._grid_rows("specimen_datatables", search="GRIDCODE")
+        self.assertEqual(list(rows), [self.specimen.pk])
+
+    def test_unnamed_extraction_links_by_pk(self):
+        """ An extraction's own reference is optional, so the link falls back to the pk """
+        unnamed = Extraction.objects.create(specimen=self.specimen)
+        rows = self._grid_rows("extraction_datatables")
+        self.assertEqual(rows[unnamed.pk]["reference_id"]["text"], f"({unnamed.pk})")

@@ -5,14 +5,17 @@ from django.db.models.aggregates import Count
 from django.db.models.query_utils import Q
 from django.http import HttpRequest
 from django.shortcuts import get_object_or_404
+from django.urls import reverse
 
 from annotation.models.models_phenotype_match import PATIENT_ONTOLOGY_TERM_PATH
 from library.jqgrid.jqgrid_user_row_config import JqGridUserRowConfig
+from library.utils import JsonDataType
 from ontology.grids import AbstractOntologyGenesGrid
 from ontology.models import OntologyService, OntologyTerm
-from patients.models import Patient, PatientRecord, PatientRecords
-from patients.models_enums import PatientRecordMatchType
-from snpdb.views.datatable_view import CellData, DatatableConfig, RichColumn
+from patients.models import Extraction, Patient, PatientRecord, PatientRecords, Specimen
+from patients.models_enums import NucleicAcid, PatientRecordMatchType, TissueStatus
+from snpdb.models import Sample
+from snpdb.views.datatable_view import CellData, DatatableConfig, RichColumn, SortOrder
 
 
 class PatientListGrid(JqGridUserRowConfig):
@@ -153,6 +156,98 @@ class PatientRecordColumns(DatatableConfig[PatientRecord]):
         patient_records = get_object_or_404(PatientRecords, pk=patient_records_id)
         patient_records.check_can_view(self.user)
         return PatientRecord.objects.filter(patient_records=patient_records)
+
+
+def _render_patient_link(row: CellData, patient_id_column: str) -> JsonDataType:
+    """ The de-identified patient_code is the text, the same as the patient grid shows """
+    patient_id = row[patient_id_column]
+    return {
+        "text": row.value or f"({patient_id})",
+        "url": reverse('view_patient', kwargs={"patient_id": patient_id}),
+    }
+
+
+class SpecimenColumns(DatatableConfig[Specimen]):
+    def __init__(self, request: HttpRequest):
+        super().__init__(request)
+        self.search_box_enabled = True
+
+        self.rich_columns = [
+            RichColumn('id', visible=False),
+            RichColumn('reference_id', label='Reference ID', orderable=True,
+                       renderer=self.view_primary_key, client_renderer='TableFormat.linkUrl'),
+            RichColumn('patient__patient_code', label='Patient', orderable=True,
+                       extra_columns=['patient_id'],
+                       renderer=partial(_render_patient_link, patient_id_column='patient_id'),
+                       client_renderer='TableFormat.linkUrl'),
+            RichColumn('tissue__name', label='Tissue', orderable=True),
+            RichColumn('tissue_status', label='Tissue Status', orderable=True, search=False,
+                       client_renderer=RichColumn.choices_client_renderer(TissueStatus.choices)),
+            RichColumn('collection_date', label='Collected', orderable=True,
+                       client_renderer='TableFormat.timestamp'),
+            RichColumn('received_date', label='Received', orderable=True,
+                       client_renderer='TableFormat.timestamp'),
+            RichColumn('external_pk__code', label='External ID', orderable=True),
+            RichColumn('extraction_count', label='# Extractions', orderable=True, search=False,
+                       css_class='num'),
+            RichColumn('modified', orderable=True, search=False, default_sort=SortOrder.DESC,
+                       client_renderer='TableFormat.timestamp'),
+        ]
+
+    def get_initial_queryset(self) -> QuerySet[Specimen]:
+        qs = Specimen.filter_for_user(self.user)
+        return qs.annotate(extraction_count=Count("extraction", distinct=True))
+
+
+class ExtractionColumns(DatatableConfig[Extraction]):
+    def __init__(self, request: HttpRequest):
+        super().__init__(request)
+        self.search_box_enabled = True
+
+        self.rich_columns = [
+            RichColumn('id', visible=False),
+            RichColumn('reference_id', label='Reference ID', orderable=True,
+                       renderer=self.render_reference_id, client_renderer='TableFormat.linkUrl'),
+            RichColumn('specimen__reference_id', label='Specimen', orderable=True,
+                       extra_columns=['specimen_id'],
+                       renderer=self.render_specimen_link, client_renderer='TableFormat.linkUrl'),
+            RichColumn('specimen__patient__patient_code', label='Patient', orderable=True,
+                       extra_columns=['specimen__patient_id'],
+                       renderer=partial(_render_patient_link, patient_id_column='specimen__patient_id'),
+                       client_renderer='TableFormat.linkUrl'),
+            RichColumn('nucleic_acid_source', label='Nucleic Acid', orderable=True, search=False,
+                       client_renderer=RichColumn.choices_client_renderer(NucleicAcid.choices)),
+            RichColumn('extraction_date', label='Extracted', orderable=True,
+                       client_renderer='TableFormat.timestamp'),
+            RichColumn('external_pk__code', label='External ID', orderable=True),
+            RichColumn('sample_count', label='# Samples', orderable=True, search=False, css_class='num'),
+            RichColumn('modified', orderable=True, search=False, default_sort=SortOrder.DESC,
+                       client_renderer='TableFormat.timestamp'),
+        ]
+
+    @staticmethod
+    def render_reference_id(row: CellData) -> JsonDataType:
+        """ An extraction's own reference is optional - fall back to the pk, as the preview does """
+        extraction_id = row["id"]
+        return {
+            "text": row.value or f"({extraction_id})",
+            "url": reverse('view_extraction', kwargs={"extraction_id": extraction_id}),
+        }
+
+    @staticmethod
+    def render_specimen_link(row: CellData) -> JsonDataType:
+        specimen_id = row["specimen_id"]
+        return {
+            "text": row.value or f"({specimen_id})",
+            "url": reverse('view_specimen', kwargs={"specimen_id": specimen_id}),
+        }
+
+    def get_initial_queryset(self) -> QuerySet[Extraction]:
+        """ Samples carry their VCF's permissions rather than their patient's, so the count is of the
+            samples this user can see rather than of every sample off the extraction """
+        qs = Extraction.filter_for_user(self.user)
+        visible_samples_q = Q(sample__in=Sample.filter_for_user(self.user))
+        return qs.annotate(sample_count=Count("sample", filter=visible_samples_q, distinct=True))
 
 
 class PatientOntologyGenesGrid(AbstractOntologyGenesGrid):

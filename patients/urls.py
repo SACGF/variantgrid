@@ -4,10 +4,12 @@ from rest_framework import routers
 from library.django_utils.jqgrid_view import JQGridView
 from patients import views, views_autocomplete
 from patients.grids import (
+    ExtractionColumns,
     PatientListGrid,
     PatientOntologyGenesGrid,
     PatientRecordColumns,
     PatientRecordsColumns,
+    SpecimenColumns,
 )
 from patients.views_rest import (
     ExtractionViewSet,
@@ -34,6 +36,8 @@ urlpatterns = [
     path('view_patient/contact/<int:patient_id>', views.view_patient_contact_tab, name='view_patient_contact_tab'),
     path('view_patient/patient_specimens/<int:patient_id>', views.view_patient_specimens, name='view_patient_specimens'),
     path('view_patient/patient_extractions/<int:patient_id>', views.view_patient_extractions, name='view_patient_extractions'),
+    path('specimens', views.specimens, name='specimens'),
+    path('extractions', views.extractions, name='extractions'),
     path('view_specimen/<int:specimen_id>', views.view_specimen, name='view_specimen'),
     path('view_extraction/<int:extraction_id>', views.view_extraction, name='view_extraction'),
     path('extraction/<int:extraction_id>/samples', views.extraction_samples, name='extraction_samples'),
@@ -60,6 +64,10 @@ urlpatterns = [
          name='patient_records_datatables'),
     path('patient_record/datatables/', DatabaseTableView.as_view(column_class=PatientRecordColumns),
          name='patient_record_datatables'),
+    path('specimen/datatables/', DatabaseTableView.as_view(column_class=SpecimenColumns),
+         name='specimen_datatables'),
+    path('extraction/datatables/', DatabaseTableView.as_view(column_class=ExtractionColumns),
+         name='extraction_datatables'),
     path('patient/ontology/genes/grid/<int:patient_id>/<slug:op>/', JQGridView.as_view(grid=PatientOntologyGenesGrid),
          name='patient_ontology_genes_grid'),
 

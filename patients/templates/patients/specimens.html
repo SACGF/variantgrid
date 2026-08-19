@@ -1,0 +1,7 @@
+{% extends menu_patients_base %}
+{% block title %}Specimens{% endblock title %}
+
+{% block submenu_page_content %}
+    <h3>Specimens</h3>
+    <table id="specimen-datatable" data-datatable-url="{% url 'specimen_datatables' %}" class="sticky-header"></table>
+{% endblock submenu_page_content %}
