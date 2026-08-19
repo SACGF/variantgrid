@@ -35,7 +35,7 @@ from termsandconditions.decorators import terms_required
 
 from analysis.analysis_templates import get_sample_analysis
 from analysis.forms import AnalysisOutputNodeChoiceForm
-from analysis.models import AnalysisTemplate
+from analysis.models import Analysis, AnalysisTemplate
 from analysis.tasks.analysis_grid_export_tasks import get_annotated_download_files_cgf
 from annotation.forms import GeneCountTypeChoiceForm
 from annotation.manual_variant_entry import can_create_variants, create_manual_variants
@@ -1068,13 +1068,19 @@ def view_user(request, pk):
     user = get_object_or_404(User, pk=pk)
     user_contact = UserContact.get_for_user(user)
     common_groups = Group.objects.filter(user=user.pk).filter(user=request.user.pk).order_by("name")
+    all_groups = user.groups.order_by("name") if request.user.is_superuser else None
 
     context = {
         "other_user": user,
         'user_contact': user_contact,
         'common_groups': common_groups,
+        'all_groups': all_groups,
         'genome_build': UserSettings.get_genome_build_or_default(request.user),
         'classifications_count': Classification.filter_for_user(request.user).filter(user=user).count(),
+        'vcfs_count': VCF.filter_for_user(request.user).filter(user=user).count(),
+        'samples_count': Sample.filter_for_user(request.user).filter(vcf__user=user).count(),
+        'analyses_count': Analysis.filter_for_user(request.user).filter(template_type__isnull=True,
+                                                                        user=user).count(),
     }
     return render(request, 'snpdb/settings/view_user.html', context)
 

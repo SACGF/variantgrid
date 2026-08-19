@@ -241,6 +241,7 @@ class VariantTagsGrid(JqGridUserRowConfig):
         self.genome_build_name = genome_build.name
         queryset = VariantTag.get_for_build(genome_build)
 
+        filter_user_id = None
         if extra_filters:
             analysis_ids = extra_filters.get("analysis_ids")
             if analysis_ids is not None:
@@ -259,8 +260,12 @@ class VariantTagsGrid(JqGridUserRowConfig):
             if tag_ids := extra_filters.get("tags"):
                 queryset = queryset.filter(tag__in=tag_ids)
 
+            if filter_user_id := extra_filters.get("user"):
+                queryset = queryset.filter(user_id=filter_user_id)
+
         user_grid_config = UserGridConfig.get(user, self.caption)
-        if user_grid_config.show_group_data:
+        if user_grid_config.show_group_data or filter_user_id:
+            # An explicit user filter overrides show_group_data - still permission checked
             queryset = VariantTag.filter_for_user(user, queryset=queryset)
         else:
             queryset = queryset.filter(user=user)
@@ -307,6 +312,7 @@ class TaggedVariantGrid(AbstractVariantGrid):
         self.genome_build = genome_build
         tag_ids = []
         require_all_tags = False
+        filter_user_id = None
         if extra_filters:
             if tag_id := extra_filters.get("tag"):
                 tag_ids.append(tag_id)
@@ -314,8 +320,10 @@ class TaggedVariantGrid(AbstractVariantGrid):
             if all_tag_ids := extra_filters.get("tags"):
                 tag_ids.extend(all_tag_ids)
                 require_all_tags = True
+            filter_user_id = extra_filters.get("user")
         self.tag_ids = tag_ids
         self.require_all_tags = require_all_tags
+        self.filter_user_id = filter_user_id
 
         user_settings = UserSettings.get_for_user(user)
         self.annotation_version = AnnotationVersion.latest(genome_build)
@@ -351,7 +359,10 @@ class TaggedVariantGrid(AbstractVariantGrid):
         genome_build = self.annotation_version.genome_build
         user_grid_config = UserGridConfig.get(self.user, self.caption)
         tags_qs = VariantTag.filter_for_user(self.user)
-        if not user_grid_config.show_group_data:
+        if self.filter_user_id:
+            # An explicit user filter overrides show_group_data - still permission checked
+            tags_qs = tags_qs.filter(user_id=self.filter_user_id)
+        elif not user_grid_config.show_group_data:
             tags_qs = tags_qs.filter(user=self.user)
         if self.require_all_tags:
             q_list = [VariantTag.variants_for_build_q(genome_build, tags_qs, [tag_id]) for tag_id in self.tag_ids]

@@ -42,19 +42,45 @@
                 <a href="{% url 'activity_user' user_id=other_user.pk %}">View classification record edits</a>
             </div>
         </div>
+        <div class="card mt-4">
+            <div class="card-header">Data</div>
+            <div class="card-body">
+                <p class="text-muted">Showing only data you have permission to see.</p>
+                {% labelled label="VCFs" %}{{ vcfs_count }}{% endlabelled %}
+                {% labelled label="Samples" %}{{ samples_count }}{% endlabelled %}
+                {% labelled label="Analyses" %}{{ analyses_count }}{% endlabelled %}
+                {% labelled label="Classifications" %}{{ classifications_count }}{% endlabelled %}
+            </div>
+        </div>
         {% if url_name_visible.genome_build_tag_stats %}
         <div class="card mt-4" id="user-tagging">
             <div class="card-header">
-                Tags &amp; classifications ({{ genome_build }})
+                Tags ({{ genome_build }})
                 <span class="text-muted small float-right">calculated <span class="card-calculated"></span></span>
             </div>
             <div class="card-body">
-                {% labelled label="Classifications" %}{{ classifications_count }}{% endlabelled %}
                 <div class="card-spinner"><i class="fas fa-spinner fa-spin"></i> Loading...</div>
                 <div class="card-content"></div>
             </div>
             <div class="card-footer link-toolbar">
+                <a href="{% url 'genome_build_variant_tags' genome_build.name %}?user={{ other_user.pk }}">View tags by this user</a>
                 <a href="{% url 'genome_build_tag_stats' genome_build.name %}">View tag stats</a>
+            </div>
+        </div>
+        {% endif %}
+        {% if user.is_superuser %}
+        <div class="card mt-4">
+            <div class="card-header">All Groups <span class="text-muted small">(admins only)</span></div>
+            <div class="card-body">
+                {% if all_groups %}
+                    <ul>
+                    {% for g in all_groups %}
+                        <li><a href="{% url 'view_group' g.pk %}">{{ g }}</a></li>
+                    {% endfor %}
+                    </ul>
+                {% else %}
+                    This user is not in any groups.
+                {% endif %}
             </div>
         </div>
         {% endif %}
