@@ -2,6 +2,7 @@ import json
 from collections import defaultdict
 
 from django import template
+from django.utils.safestring import mark_safe
 
 from analysis.models import VariantTag
 from analysis.models.nodes.node_counts import get_node_count_colors
@@ -9,7 +10,7 @@ from annotation.models import AnnotationVersion
 from library import tag_utils
 from library.django_utils import get_field_counts
 from snpdb.models import GenomeBuild
-from snpdb.utils import get_tag_styles_and_colors
+from snpdb.utils import get_tag_sort_order_by_tag, get_tag_styles_and_colors
 from snpdb.variant_queries import get_variant_queryset_for_gene_symbol
 
 register = template.Library()
@@ -88,6 +89,12 @@ def render_node_count_colors_css(_parser, _token):
 @register.tag
 def render_variant_tags_dict(_parser, token):
     return VariantTagsJSNode(tag_utils.get_passed_object(token))
+
+
+@register.simple_tag(takes_context=True)
+def render_variant_tag_order(context):
+    """ {tag_id: sort_order} for JS tag sorting - see sortVariantTags in grid.js """
+    return mark_safe(json.dumps(get_tag_sort_order_by_tag(context["user"])))
 
 
 @register.inclusion_tag("analysis/tags/render_tag_styles_and_formatter.html", takes_context=True)

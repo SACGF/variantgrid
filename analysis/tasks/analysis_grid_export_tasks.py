@@ -3,6 +3,7 @@ import json
 import logging
 import os
 import zipfile
+from collections import defaultdict
 from datetime import timedelta
 from typing import Optional
 
@@ -10,12 +11,11 @@ import celery
 from celery.exceptions import Retry
 from django.conf import settings
 from django.contrib.auth.models import User
-from django.db.models import StringAgg, Value
 from django.utils import timezone
 
 from analysis.analysis_templates import get_cohort_analysis, get_sample_analysis
 from analysis.grid_export import get_node_export_basename, node_grid_get_export_iterator
-from analysis.models import AnalysisTemplate, CohortNode, NodeStatus, SampleNode
+from analysis.models import AnalysisTemplate, CohortNode, NodeStatus, SampleNode, VariantTag
 from analysis.views.analysis_permissions import get_node_subclass_or_non_fatal_exception
 from genes.models import CanonicalTranscriptCollection
 from library.constants import MINUTE_SECS
@@ -24,7 +24,7 @@ from library.guardian_utils import admin_bot
 from library.log_utils import log_traceback
 from library.utils import mk_path_for_file, name_from_filename, sha256sum_str
 from snpdb.models import CachedGeneratedFile, Cohort, Sample
-from snpdb.models.models_variant import Variant
+from snpdb.utils import get_tag_sort_order_by_tag
 
 # How long (secs) to wait between checks that an export's output node has finished loading.
 # We re-queue the export task (Celery retry) between checks rather than sleeping, so the worker
@@ -213,9 +213,14 @@ def export_node_to_downloadable_file(self, node_id, node_version, user_id, expor
             canonical_transcript_collection = CanonicalTranscriptCollection.objects.get(
                 pk=canonical_transcript_collection_id)
 
-        variant_tags_qs = Variant.objects.filter(varianttag__analysis=node.analysis)
-        variant_tags_qs = variant_tags_qs.annotate(tags=StringAgg("varianttag__tag", delimiter=Value(', '), distinct=True))
-        variant_tags_dict = dict(variant_tags_qs.values_list("id", "tags"))
+        sort_order_by_tag = get_tag_sort_order_by_tag(user)
+        variant_tag_ids = defaultdict(set)
+        for variant_id, tag_id in VariantTag.objects.filter(analysis=node.analysis).values_list("variant_id", "tag_id"):
+            variant_tag_ids[variant_id].add(tag_id)
+        variant_tags_dict = {
+            variant_id: ", ".join(sorted(tag_ids, key=lambda t: (sort_order_by_tag.get(t, 0), t)))
+            for variant_id, tag_ids in variant_tag_ids.items()
+        }
 
         request = FakeRequest(user=user)
         request.GET = grid_params

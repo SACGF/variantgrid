@@ -87,20 +87,36 @@ class LabNotificationBuilder(NotificationBuilder):
         return self.lab.slack_webhook
 
 
+def _resolve_tag_colors_collection(user, tag_colors_collection=None) -> Optional[TagColorsCollection]:
+    if tag_colors_collection is None:
+        user_settings = UserSettings.get_for_user(user)
+        tag_colors_collection = user_settings.tag_colors
+    return tag_colors_collection
+
+
+def get_tag_sort_order_by_tag(user, tag_colors_collection=None) -> dict[str, int]:
+    """ Custom tag ordering from the tag colors page (issue #343). Tags without an entry sort as 0 """
+    tag_colors_collection = _resolve_tag_colors_collection(user, tag_colors_collection)
+    sort_order_by_tag = {}
+    if tag_colors_collection:
+        sort_order_by_tag = tag_colors_collection.get_sort_order_by_tag()
+    return sort_order_by_tag
+
+
 def get_all_tags_and_user_colors(user, tag_colors_collection=None):
     """ Returns Hash of { tag_name : color }
         with color being None if not set for user """
 
-    if tag_colors_collection is None:
-        user_settings = UserSettings.get_for_user(user)
-        tag_colors_collection = user_settings.tag_colors
+    tag_colors_collection = _resolve_tag_colors_collection(user, tag_colors_collection)
 
     user_colors_by_tag = {}
+    sort_order_by_tag = {}
     if tag_colors_collection:
         user_colors_by_tag = tag_colors_collection.get_user_colors_by_tag()
+        sort_order_by_tag = tag_colors_collection.get_sort_order_by_tag()
 
     user_tag_colors = {}
-    for tag in Tag.objects.all().order_by("pk"):
+    for tag in sorted(Tag.objects.all(), key=lambda t: (sort_order_by_tag.get(t.pk, 0), t.pk)):
         user_tag_colors[tag] = user_colors_by_tag.get(tag.id)
     return user_tag_colors
 

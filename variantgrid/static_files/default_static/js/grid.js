@@ -489,8 +489,22 @@ function getVariantTagHtml(variantId, tag, readOnly, tagLabel, extraClasses, tit
 }
 
 
+// Tags with no entry in variantTagOrder sort as 0, ties broken alphabetically.
+// Customised per-collection on the tag colors page - see issue #343
+function sortVariantTags(aWin, tagList) {
+    const tagOrder = aWin.variantTagOrder || {};
+    return tagList.slice().sort(function(a, b) {
+        const diff = (tagOrder[a] || 0) - (tagOrder[b] || 0);
+        if (diff) {
+            return diff;
+        }
+        return a.localeCompare(b);
+    });
+}
+
+
 // This is driven entirely off variantTags (not passed through SQL->JQGrid)
-// This is so we can add/remove tags without wrecking cache  
+// This is so we can add/remove tags without wrecking cache
 function tagsFormatter(tagsCellValue, a, rowData) {
     const variantId = rowData['id'];
     let tagHtml = "";
@@ -503,10 +517,11 @@ function tagsFormatter(tagsCellValue, a, rowData) {
 
     const tagList = aWin.variantTags[variantId];
     if (tagList) {
-        for (let i=0 ; i<tagList.length ; ++i) {
-            const tag = tagList[i];
+        const sortedTags = sortVariantTags(aWin, tagList);
+        for (let i=0 ; i<sortedTags.length ; ++i) {
+            const tag = sortedTags[i];
             tagHtml += getVariantTagHtml(variantId, tag, aWin.variantTagsReadOnly);
-        }        
+        }
     }
     return tagHtml;
 }
@@ -517,8 +532,9 @@ function tagsGlobalFormatter(value, a, rowData) {
         return "";
     }
     const variantId = rowData['id'];
+    const aWin = getAnalysisWindow();
     // In an analysis this is the user's variant_tag_stale_days setting (null/undefined = staleness off)
-    const staleDays = getAnalysisWindow().variantTagStaleDays;
+    const staleDays = aWin.variantTagStaleDays;
     let staleCutoff = null;  // ISO date - payload dates compare lexically
     if (staleDays) {
         staleCutoff = new Date(Date.now() - staleDays * 86400 * 1000).toISOString().slice(0, 10);
@@ -547,7 +563,7 @@ function tagsGlobalFormatter(value, a, rowData) {
     }
 
     let tagGlobalHtml = "";
-    const sortedKeys = Object.keys(tagStats).sort();
+    const sortedKeys = sortVariantTags(aWin, Object.keys(tagStats));
     for (let i=0 ; i<sortedKeys.length ; ++i) {
         const tag = sortedKeys[i];
         const stats = tagStats[tag];

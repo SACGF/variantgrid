@@ -65,12 +65,16 @@ class TagColorsCollection(GuardianPermissionsAutoInitialSaveMixin, TimeStampedMo
 
     def get_user_colors_by_tag(self) -> dict[str, dict]:
         user_colors_by_tag = {}
-        for tag_id, rgb in self.tagcolor_set.all().values_list('tag', 'rgb'):
+        # Rows can exist purely to store sort_order - they have no color set
+        for tag_id, rgb in self.tagcolor_set.exclude(rgb='').values_list('tag', 'rgb'):
             user_colors_by_tag[tag_id] = {
                 "background-color": rgb,
                 "color": rgb_invert(rgb)
             }
         return user_colors_by_tag
+
+    def get_sort_order_by_tag(self) -> dict[str, int]:
+        return dict(self.tagcolor_set.filter(sort_order__isnull=False).values_list('tag', 'sort_order'))
 
     def clone_for_user(self, user):
         name = f"{user}'s copy of {self.name}"
@@ -96,6 +100,7 @@ class TagColor(TimeStampedModel):
     collection = models.ForeignKey(TagColorsCollection, null=True, on_delete=CASCADE)
     tag = models.ForeignKey(Tag, on_delete=CASCADE)
     rgb = models.CharField(max_length=7)  # '#rrggbb'
+    sort_order = models.IntegerField(null=True, blank=True)  # Tags w/o value sort as 0, ties broken by tag name
 
     class Meta:
         unique_together = ('collection', 'tag')

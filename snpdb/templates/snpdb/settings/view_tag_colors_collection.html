@@ -9,6 +9,12 @@
 <script type="text/javascript" src="{% static 'js/lib/jquery.xcolor.min.js' %}"></script>
 <script type="text/javascript" src="{% static 'js/lib/jquery.colorPicker.min.js' %}"></script>
 <style>
+	.sort_placeholder {height: 15px; border: red 3px solid;}
+{% if has_write_permission %}
+	#tag-colors-sortable tr.tag-color-row {
+		cursor: move;
+	}
+{% endif %}
 </style>
 <script>
 	function cloneTagColorsCollection() {
@@ -52,6 +58,20 @@
         });
 
 		$("#tag-colors-collection-tabs").tabs({cache: true});
+
+		$("#tag-colors-sortable").sortable({
+		    items: "tr.tag-color-row",
+		    placeholder: "sort_placeholder",
+		}).bind("sortupdate", function(event, ui) {
+		    const tagOrder = [];
+		    $("#tag-colors-sortable tr.tag-color-row").each(function() { tagOrder.push($(this).attr("tag_id")) });
+
+		    $.ajax({
+		        type: "POST",
+		        data: 'tag_order=' + tagOrder.toString(),
+		        url: "{{ request.path }}",
+		    });
+		});
 
         $("button#change-name-button").click(function() {
             let nameInput = $("#tag-colors-collection-name");
@@ -111,7 +131,10 @@
 
     <h3>Tag Colors</h3>
     <p>
-    Click the colored box on the right to change background color
+    Click the colored box on the right to change background color.
+{% if has_write_permission %}
+    Drag rows to change the order tags appear in grid columns (top row shows first).
+{% endif %}
     </p>
 
     <div class="row">
@@ -123,12 +146,14 @@
                        <th>Color</th>
                    </tr>
                </thead>
+               <tbody id="tag-colors-sortable">
             {% for tag_id, rgb in user_tag_colors.items %}
-                <tr>
+                <tr class="tag-color-row" tag_id="{{ tag_id }}">
                     <td><span class='grid-tag tagged-{{ tag_id }}'><span class='user-tag-colored'> {{ tag_id }}</span></span></td>
                     <td><input class="tag-colorpicker" tag_id='{{ tag_id }}' name='tag-{{ tag_id }}-colorpicker' type="text" value="{{ rgb }}"/></td>
                 </tr>
             {% endfor %}
+               </tbody>
             </table>
         </div>
     </div>

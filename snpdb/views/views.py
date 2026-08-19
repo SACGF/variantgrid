@@ -1458,6 +1458,19 @@ def view_tag_colors_collection(request, tag_colors_collection_id):
               "If you wish to customise them, click 'clone' and modify the copy"
         messages.add_message(request, messages.WARNING, msg)
 
+    if request.method == "POST":
+        tag_colors_collection.check_can_write(request.user)
+        if name := request.POST.get("name"):
+            tag_colors_collection.name = name
+            tag_colors_collection.save()
+        elif tag_order_str := request.POST.get("tag_order"):
+            valid_tag_ids = set(Tag.objects.values_list("pk", flat=True))
+            for i, tag_id in enumerate(tag_order_str.split(",")):
+                if tag_id in valid_tag_ids:
+                    tag_colors_collection.tagcolor_set.update_or_create(tag_id=tag_id,
+                                                                        defaults={"sort_order": i})
+        return HttpResponse()  # Nobody ever looks at this
+
     user_tag_styles, user_tag_colors = get_tag_styles_and_colors(request.user, tag_colors_collection)
     context = {
         "tag_colors_collection": tag_colors_collection,
