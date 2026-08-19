@@ -171,6 +171,7 @@ class SpecimenColumns(DatatableConfig[Specimen]):
     def __init__(self, request: HttpRequest):
         super().__init__(request)
         self.search_box_enabled = True
+        self.download_csv_button_enabled = True
 
         self.rich_columns = [
             RichColumn('id', visible=False),
@@ -203,6 +204,7 @@ class ExtractionColumns(DatatableConfig[Extraction]):
     def __init__(self, request: HttpRequest):
         super().__init__(request)
         self.search_box_enabled = True
+        self.download_csv_button_enabled = True
 
         self.rich_columns = [
             RichColumn('id', visible=False),
