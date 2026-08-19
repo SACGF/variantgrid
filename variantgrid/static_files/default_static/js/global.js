@@ -794,10 +794,6 @@ function dictFromLabelsAndValues(labels, values) {
     return dict;
 }
 
-function getVariantTagHtml(variantId, tag) {
-    return "<span class='grid-tag tagged-" + tag + "' title='Tagged as " + tag + "' variant_id='" + variantId + "' tag_id='" + tag + "'><span class='user-tag-colored'>" + tag + "</span></span>";
-}
-
 function deleteItemClickHandler(outerElement, innerSpan, deleteClickHandler) {
     const isExpanded = innerSpan.attr("original_width");
     let completeFunc;
