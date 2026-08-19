@@ -105,6 +105,27 @@ class TestGeneSymbolResolution(TestCase):
         self.assertEqual(len(mane_queries), 1,
                          f"Expected a single MANE query, got {len(mane_queries)}")
 
+    def test_get_transcripts_batches_in_one_query(self):
+        """ Gene-symbol resolution retrieves every transcript of the gene (hundreds, for a gene
+            like BRCA1) - cdot's default is a query each, @see #3898. It asks versionless when
+            ranking by length, then versioned (cdot's canonical id) for the tags. """
+        dp = self._bare_data_provider()
+        versionless_acs = dp._get_transcript_ids_for_gene("BRCA2")
+        self.assertEqual(4, len(versionless_acs))
+        versioned_acs = ["NM_000059.4", "ENST00000380152.8", "NM_111111.1", "NM_222222.1"]
+
+        for tx_acs in [versionless_acs, versioned_acs]:
+            with CaptureQueriesContext(connection) as ctx:
+                transcripts = dp._get_transcripts(tx_acs)
+
+            self.assertEqual(1, len(ctx), f"Expected a single query for {tx_acs}")
+            self.assertEqual(set(tx_acs), set(transcripts))
+
+        # Versionless resolves to the version we have
+        self.assertEqual("NM_000059.4", dp._get_transcripts(["NM_000059"])["NM_000059"]["id"])
+        # A version we don't have falls back, @see TranscriptVersion.get_transcript_version
+        self.assertEqual("NM_000059.4", dp._get_transcripts(["NM_000059.1"])["NM_000059.1"]["id"])
+
     def _matcher_with_bare_dp(self) -> HGVSMatcher:
         # HGVSMatcher whose gene-symbol data provider is the bare (no-FASTA) provider,
         # so rank_gene_symbol_transcripts works without constructing a real converter.

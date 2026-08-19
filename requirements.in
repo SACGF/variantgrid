@@ -3,7 +3,7 @@ more-itertools
 beautifulsoup4
 bgzip>=0.5.0
 biopython>=1.81
-cdot>=0.2.30
+cdot>=0.2.31
 celery
 ConfigArgParse
 crispy-bootstrap4

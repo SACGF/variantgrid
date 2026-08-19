@@ -1,3 +1,4 @@
+from collections import defaultdict
 from typing import Optional
 
 from cdot.hgvs.dataproviders import ChainedSeqFetcher, FastaSeqFetcher, LocalDataProvider
@@ -69,6 +70,19 @@ class SingleBuildFastaSeqFetcher(FastaSeqFetcher):
         return super().fetch_seq(ac, start_i=start_i, end_i=end_i)
 
 
+def _closest_version(versions: list[int], version: Optional[int]) -> int:
+    """ Which of the versions we hold answers a request for `version` (None = versionless).
+        @see TranscriptVersion.get_transcript_version best_attempt - the exact version if we
+        have it, otherwise the next one up, otherwise the highest. Versions are ascending. """
+    if version in versions:
+        return version
+    if version is not None:
+        for possible_version in versions:
+            if possible_version > version:
+                return possible_version
+    return versions[-1]
+
+
 class DjangoTranscriptDataProvider(LocalDataProvider):
 
     def __init__(self, genome_build, retrieve_transcripts: Optional[bool] = None):
@@ -83,7 +97,7 @@ class DjangoTranscriptDataProvider(LocalDataProvider):
     def _get_transcript_ids_for_gene(self, gene):
         tv_qs = TranscriptVersion.objects.filter(genome_build=self.genome_build,
                                                  gene_version__gene_symbol__symbol=gene)
-        return list(tv_qs.values_list("transcript", flat=True))
+        return list(tv_qs.values_list("transcript", flat=True).distinct())
 
     def _get_contig_interval_tree(self, alt_ac):
         raise NotImplementedError()
@@ -91,6 +105,32 @@ class DjangoTranscriptDataProvider(LocalDataProvider):
     def _get_transcript(self, tx_ac):
         tv = TranscriptVersion.get_transcript_version(self.genome_build, tx_ac)
         return tv.data
+
+    def _get_transcripts(self, tx_acs) -> dict:
+        """ Retrieve many transcripts in one query, rather than cdot's default of one each.
+
+            Gene-symbol resolution walks every transcript of a gene - hundreds for something
+            like BRCA1 - and each _get_transcript() is a query pulling down a whole JSON blob.
+            Accessions arrive both versionless (ranking by length) and versioned (tag lookup,
+            using cdot's canonical id) and are resolved to a version the same way
+            TranscriptVersion.get_transcript_version() does. """
+        requested = [(ac, TranscriptVersion.get_transcript_id_and_version(ac)) for ac in tx_acs]
+        tv_qs = TranscriptVersion.objects.filter(genome_build=self.genome_build,
+                                                 transcript_id__in={tp.identifier for _, tp in requested})
+
+        data_by_version_by_transcript = defaultdict(dict)
+        for transcript_id, version, data in tv_qs.values_list("transcript_id", "version", "data"):
+            # Legacy rows imported before cdot have no coordinates for the build - skipping them
+            # leaves the rest of the gene's transcripts usable
+            if data.get("genome_builds", {}).get(self.genome_build.name):
+                data_by_version_by_transcript[transcript_id][version] = data
+
+        transcripts = {}
+        for ac, transcript_parts in requested:
+            if data_by_version := data_by_version_by_transcript.get(transcript_parts.identifier):
+                version = _closest_version(sorted(data_by_version), transcript_parts.version)
+                transcripts[ac] = data_by_version[version]
+        return transcripts
 
     def _get_tags_by_tx_ac(self, tx_acs: list[str], genome_build: str) -> dict[str, list[str]]:
         """ Batch tag lookup for gene-symbol resolution.
