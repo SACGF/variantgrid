@@ -28,7 +28,7 @@ from library.guardian_utils import DjangoPermission
 from library.log_utils import log_traceback
 from library.preview_request import PreviewKeyValue, PreviewModelMixin
 from patients.models import ExtractionMatchMixin, FakeData, Patient, Specimen
-from snpdb.models.models import LabProject, Tag
+from snpdb.models.models import LabProject
 from snpdb.models.models_enums import (
     ImportStatus,
     ProcessingStatus,
@@ -319,15 +319,6 @@ class VCFFilter(models.Model):
         return filter_string_formatter
 
 
-class VCFTag(models.Model):
-    # Is this being used?
-    tag = models.ForeignKey(Tag, on_delete=CASCADE)
-    vcf = models.ForeignKey(VCF, on_delete=CASCADE)
-
-    def __str__(self):
-        return f"{self.tag}:{self.vcf}"
-
-
 class Sample(GuardianPermissionsMixin, SortByPKMixin, PreviewModelMixin, ExtractionMatchMixin, models.Model):
     """ A VCF sample storing genotype information
         Sample data is stored as packed fields in CohortGenotype (via vcf.cohort.cohortgenotypecollection) """
@@ -588,14 +579,6 @@ class SampleFilePath(models.Model):
         else:
             label = ''
         return f"{self.sample}: {label}{self.file_path}"
-
-
-class SampleTag(models.Model):
-    tag = models.ForeignKey(Tag, on_delete=CASCADE)
-    sample = models.ForeignKey(Sample, on_delete=CASCADE)
-
-    def __str__(self):
-        return f"{self.tag}:{self.sample}"
 
 
 class VCFAlleleSource(AlleleSource):

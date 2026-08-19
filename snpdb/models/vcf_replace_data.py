@@ -46,9 +46,6 @@ def vcf_replace_data(old_vcf, new_vcf):
                     old_val.sample = new_sample
                     old_val.save()
 
-    ## VCF stuff
-    old_vcf.vcftag_set.update(vcf=new_vcf)
-
     # Core cohort (based off VCF)
     logging.info("VCF Cohort")
     num_old = len(old_vcf_samples)
@@ -152,8 +149,6 @@ def vcf_replace_data(old_vcf, new_vcf):
                 setattr(new_sample, mf, v)
                 new_sample.save()
 
-        old_sample.sampletag_set.update(sample=new_sample)
-        # Don't need to do anything else here
         old_sample.classification_set.update(sample=new_sample)
 
         for related_field in ["genelistnode_set", "samplenode_set", "zygositynode_set"]:
