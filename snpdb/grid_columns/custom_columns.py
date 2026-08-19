@@ -1,6 +1,6 @@
 from django.contrib.auth.models import User
-from django.db.models import Max, OuterRef, Q, StringAgg, Subquery, Value
-from django.db.models.functions import Coalesce
+from django.db.models import Max, OuterRef, Q, StringAgg, Subquery, TextField, Value
+from django.db.models.functions import Cast, Coalesce, Concat, TruncDate
 
 from analysis.models import VariantTag
 from annotation import vep_columns
@@ -75,7 +75,10 @@ def get_variantgrid_extra_annotate(user: User, exclude_analysis=None) -> dict:
     tags_qs = VariantTag.filter_for_user(user).filter(allele__variantallele__variant_id=OuterRef("id"))
     if exclude_analysis:
         tags_qs = tags_qs.filter(Q(analysis__isnull=True) | Q(analysis__id__ne=exclude_analysis.pk))
-    tags_global = tags_qs.values("allele").annotate(tags=StringAgg("tag_id", delimiter=Value('|'))).values_list("tags")
+    # "tag_id:date" entries, e.g. "Artefact:2024-03-01|SomaticReportable:2023-05-06" - the date lets
+    # formatters show fresh vs total counts (see tagsGlobalFormatter / format_items_iterator)
+    tag_and_date = Concat("tag_id", Value(":"), Cast(TruncDate("created"), TextField()), output_field=TextField())
+    tags_global = tags_qs.values("allele").annotate(tags=StringAgg(tag_and_date, delimiter=Value('|'))).values_list("tags")
 
     return {
         "internally_classified": Subquery(internally_classified[:1]),

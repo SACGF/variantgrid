@@ -554,6 +554,7 @@ class SettingsOverrideForm(BaseModelForm):
             "grid_sample_label_template": "Grid Sample Label Template",
             "initially_show_zygosity_table": "Initially Show Trio/Quad Zygosity Table",
             "node_grid_auto_load_max_variants": "Node Grid Auto Load Max Variants",
+            "variant_tag_stale_days": "Variant Tags Stale After",
         }
 
     def __init__(self, *args, **kwargs):
@@ -610,6 +611,7 @@ class SettingsOverrideForm(BaseModelForm):
             "show_candidates_classification_evidence_update": settings_config.classification_evidence_update_enabled,
             "initially_show_zygosity_table": settings_config.analysis_enabled,
             "node_grid_auto_load_max_variants": settings_config.analysis_enabled,
+            "variant_tag_stale_days": settings_config.analysis_enabled,
         }
 
         for f, visible in field_visibility.items():

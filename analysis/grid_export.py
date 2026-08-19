@@ -13,7 +13,7 @@ from library.django_utils.jqgrid_view import EXPORT_ROWS_PER_CHUNK, grid_export_
 from library.genomics.vcf_writer import VCFWriter
 from library.utils import StashFile, iter_fixed_chunks
 from patients.models_enums import Zygosity
-from snpdb.models import Sample, VariantGridColumn
+from snpdb.models import Sample, UserSettings, VariantGridColumn
 from snpdb.vcf_export_columns import COLUMN_VCF_INFO
 from snpdb.vcf_export_utils import get_vcf_header_from_contigs
 
@@ -47,7 +47,8 @@ def node_grid_get_export_iterator(request, node, export_type, canonical_transcri
         basename += f"_{canonical_transcript_collection}"
         items = _replace_transcripts_iterator(grid, canonical_transcript_collection, items)
 
-    items = format_items_iterator(items, variant_tags_dict)
+    tag_stale_date = UserSettings.get_for_user(request.user).variant_tag_stale_date
+    items = format_items_iterator(items, variant_tags_dict, tag_stale_date=tag_stale_date)
     if row_wrapper:
         items = row_wrapper(items)
 
@@ -210,27 +211,44 @@ def _grid_item_to_vcf_row(info_dict, obj, sample_ids, sample_names, use_accessio
     return chrom, pos, vcf_id, ref, alt, info or None, fmt, sample_calls
 
 
-def format_items_iterator(items, variant_tags_dict: Optional[dict] = None):
+def _summarise_tags_global(tags_global: str, stale_cutoff: Optional[str]) -> str:
+    """ tags_global entries are 'tag:date' - see get_variantgrid_extra_annotate.
+        stale_cutoff: ISO date - events on/after it count as fresh (None = no fresh counts) """
+    totals = Counter()
+    fresh = Counter()
+    for entry in tags_global.split("|"):
+        tag, sep, entry_date = entry.rpartition(":")
+        if not sep:  # rpartition puts a separator-less entry in the tail
+            tag, entry_date = entry_date, ""
+        totals[tag] += 1
+        if entry_date and (stale_cutoff is None or entry_date >= stale_cutoff):
+            fresh[tag] += 1
+
+    summarised_tags = []
+    for tag, count in sorted(totals.items(), key=operator.itemgetter(1), reverse=True):
+        summary = f"{tag} x {count}" if count > 1 else tag
+        if stale_cutoff is not None and (count > 1 or fresh[tag] < count):
+            summary += f" ({fresh[tag]} fresh)"
+        summarised_tags.append(summary)
+    return ", ".join(summarised_tags)
+
+
+def format_items_iterator(items, variant_tags_dict: Optional[dict] = None, tag_stale_date=None):
     """ A few things are done in JS formatters, e.g. tags
         We can't just add tags via node queryset (in monkey patch func above) as we'll get an issue with
         tacked on zygosity columns etc not being in GROUP BY or aggregate func. So, just patch items via iterator
 
-        variant_tags_dict: key = variant_id, value = tags (for this analysis) """
+        variant_tags_dict: key = variant_id, value = tags (for this analysis)
+        tag_stale_date: the user's variant_tag_stale_date - when set, tags_global gains fresh counts,
+                        e.g. 'Artefact x 5 (2 fresh)' """
 
     if variant_tags_dict is None:
         variant_tags_dict = {}
 
+    stale_cutoff = tag_stale_date.date().isoformat() if tag_stale_date else None
     for item in items:
         if tags_global := item["tags_global"]:
-            tag_counts = Counter(tags_global.split("|"))
-            summarised_tags = []
-            for tag, count in sorted(tag_counts.items(), key=operator.itemgetter(1), reverse=True):
-                if count > 1:
-                    summarised_tags.append(f"{tag} x {count}")
-                else:
-                    summarised_tags.append(tag)
-
-            item["tags_global"] = ", ".join(summarised_tags)
+            item["tags_global"] = _summarise_tags_global(tags_global, stale_cutoff)
 
         variant_id = item["id"]
         if tags := variant_tags_dict.get(variant_id):

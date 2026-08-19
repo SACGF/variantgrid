@@ -222,6 +222,7 @@ def view_analysis(request, analysis_id, active_node_id=0):
         "has_write_permission": analysis.can_write(request.user),
         "warnings": analysis.get_toolbar_warnings(request.user),
         "loading_animations": user_settings.grid_loading_animations,
+        "variant_tag_stale_days": user_settings.variant_tag_stale_days,
     }
     return render(request, 'analysis/analysis.html', context)
 

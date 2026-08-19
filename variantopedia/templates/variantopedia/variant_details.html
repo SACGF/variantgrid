@@ -34,8 +34,23 @@ function analysisLinkRenderer(data, type, row) {
     return data;
 }
 
+// User's variant_tag_stale_days setting (null = staleness off)
+const VARIANT_TAG_STALE_DAYS = {{ variant_tag_stale_days|jsonify }};
+
 function tagRenderer(data, type, row) {
-    let variantTagHtml = `<span class='grid-tag tagged-${row.tag}' title='Tagged as ${row.tag}' id="variant-tag-${row.id}" variant_tag_id='${row.id}' tag_id='${row.tag}'><span class='user-tag-colored'>${row.tag}</span></span>`;
+    let tagLabel = row.tag;
+    let title = `Tagged as ${row.tag}`;
+    let classes = `grid-tag tagged-${row.tag}`;
+    if (VARIANT_TAG_STALE_DAYS && row.last_created) {
+        const staleCutoff = Date.now() / 1000 - VARIANT_TAG_STALE_DAYS * 86400;
+        if (row.last_created < staleCutoff) {
+            classes += " grid-tag-stale";
+            tagLabel += " <i class='fas fa-clock'></i>";
+            const mostRecent = new Date(row.last_created * 1000).toISOString().slice(0, 10);
+            title = `Tagged as ${row.tag} - no events within the last ${VARIANT_TAG_STALE_DAYS} days, most recent ${mostRecent}`;
+        }
+    }
+    let variantTagHtml = `<span class='${classes}' title='${title}' id="variant-tag-${row.id}" variant_tag_id='${row.id}' tag_id='${row.tag}'><span class='user-tag-colored'>${tagLabel}</span></span>`;
     return $(variantTagHtml).prop('outerHTML');
 }
 

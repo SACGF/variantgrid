@@ -164,6 +164,7 @@
 
     variantTags = {% render_variant_tags_dict analysis %};
     variantTagsReadOnly = !{{ has_write_permission|jsonify }};
+    variantTagStaleDays = {{ variant_tag_stale_days|jsonify }};
     selectedVariants = {% render_node_variant_dict analysis %};
     analysisNodeVariables = {}; // { node_id: fields: Set()}
 

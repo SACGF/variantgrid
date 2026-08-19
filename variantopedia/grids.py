@@ -364,10 +364,15 @@ class VariantTagCountsColumns(DatatableConfig[VariantTag]):
     def __init__(self, request: HttpRequest):
         super().__init__(request)
         self.expand_client_renderer = DatatableConfig._row_expand_ajax('viewTagDetail', id_field="tag")
+        self.tag_stale_date = UserSettings.get_for_user(self.user).variant_tag_stale_date
 
         self.rich_columns = [
             RichColumn('tag', client_renderer='tagRenderer', orderable=True),
             RichColumn('count', orderable=True),
+        ]
+        if self.tag_stale_date:
+            self.rich_columns.append(RichColumn('fresh_count', label='Fresh', orderable=True))
+        self.rich_columns += [
             RichColumn('last_created', client_renderer='TableFormat.timestamp', orderable=True,
                        default_sort=SortOrder.DESC),
             RichColumn('last_created', name='time_ago', client_renderer='TableFormat.timeAgo'),
@@ -379,7 +384,10 @@ class VariantTagCountsColumns(DatatableConfig[VariantTag]):
     def get_initial_queryset(self) -> QuerySet[VariantTag]:
         variant_id = self.get_query_param('variant_id')
         variant = Variant.objects.get(pk=variant_id)
-        return VariantTag.get_variant_tag_counts_qs(variant)
+        qs = VariantTag.get_variant_tag_counts_qs(variant)
+        if self.tag_stale_date:
+            qs = qs.annotate(fresh_count=Count("id", filter=Q(created__gte=self.tag_stale_date)))
+        return qs
 
 
 class VariantTagDetailColumns(DatatableConfig[VariantTag]):

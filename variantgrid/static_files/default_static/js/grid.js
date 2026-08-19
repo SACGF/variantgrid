@@ -471,15 +471,21 @@ function showTagAutocomplete(variantId) {
 }
 
 
-function getVariantTagHtml(variantId, tag, readOnly, tagLabel) {
+function getVariantTagHtml(variantId, tag, readOnly, tagLabel, extraClasses, title) {
     if (typeof(tagLabel) === 'undefined') {
         tagLabel = tag;
+    }
+    if (typeof(title) === 'undefined') {
+        title = `Tagged as ${tag}`;
     }
     const outerClasses = ["grid-tag", "tagged-" + tag];
     if (!readOnly) {
         outerClasses.push("grid-tag-deletable");
     }
-    return `<span class='${outerClasses.join(' ')}' title='Tagged as ${tag}' variant_id='${variantId}' tag_id='${tag}'><span class='user-tag-colored'>${tagLabel}</span></span>`;
+    if (extraClasses) {
+        outerClasses.push(...extraClasses);
+    }
+    return `<span class='${outerClasses.join(' ')}' title='${title}' variant_id='${variantId}' tag_id='${tag}'><span class='user-tag-colored'>${tagLabel}</span></span>`;
 }
 
 
@@ -511,24 +517,57 @@ function tagsGlobalFormatter(value, a, rowData) {
         return "";
     }
     const variantId = rowData['id'];
-    const tags = value.split("|");
-    const tagCounts = {};
-    for (let i=0 ; i<tags.length ; ++i) {
-        const tag = tags[i];
-        const count = tagCounts[tag] || 0;
-        tagCounts[tag] = count + 1;
+    // In an analysis this is the user's variant_tag_stale_days setting (null/undefined = staleness off)
+    const staleDays = getAnalysisWindow().variantTagStaleDays;
+    let staleCutoff = null;  // ISO date - payload dates compare lexically
+    if (staleDays) {
+        staleCutoff = new Date(Date.now() - staleDays * 86400 * 1000).toISOString().slice(0, 10);
+    }
+
+    // Entries are "tag:date" - see get_variantgrid_extra_annotate
+    const tagStats = {};
+    const entries = value.split("|");
+    for (let i=0 ; i<entries.length ; ++i) {
+        const entry = entries[i];
+        const sep = entry.lastIndexOf(":");
+        const tag = sep >= 0 ? entry.slice(0, sep) : entry;
+        const date = sep >= 0 ? entry.slice(sep + 1) : null;
+        let stats = tagStats[tag];
+        if (!stats) {
+            stats = {total: 0, fresh: 0, mostRecent: null};
+            tagStats[tag] = stats;
+        }
+        stats.total += 1;
+        if (date && (!staleCutoff || date >= staleCutoff)) {
+            stats.fresh += 1;
+        }
+        if (date && (!stats.mostRecent || date > stats.mostRecent)) {
+            stats.mostRecent = date;
+        }
     }
 
     let tagGlobalHtml = "";
-    const sortedKeys = Object.keys(tagCounts).sort();
+    const sortedKeys = Object.keys(tagStats).sort();
     for (let i=0 ; i<sortedKeys.length ; ++i) {
         const tag = sortedKeys[i];
-        const tagCount = tagCounts[tag];
+        const stats = tagStats[tag];
         let tagLabel = tag;
-        if (tagCount > 1) {
-            tagLabel = `${tag} x ${tagCount}`;
+        if (stats.total > 1) {
+            tagLabel = `${tag} x ${stats.total}`;
         }
-        tagGlobalHtml += getVariantTagHtml(variantId, tag, true, tagLabel);
+        let title;
+        const extraClasses = [];
+        if (staleCutoff) {
+            if (stats.fresh === 0) {  // Most recent event is older than the cutoff
+                extraClasses.push("grid-tag-stale");
+                tagLabel += " <i class='fas fa-clock'></i>";
+                title = `Tagged as ${tag} - no events within the last ${staleDays} days, most recent ${stats.mostRecent}`;
+            } else if (stats.total > 1) {
+                tagLabel = `${tag} x ${stats.total} (${stats.fresh} fresh)`;
+                title = `${stats.fresh} of ${stats.total} tag events within the last ${staleDays} days, most recent ${stats.mostRecent}`;
+            }
+        }
+        tagGlobalHtml += getVariantTagHtml(variantId, tag, true, tagLabel, extraClasses, title);
     }
     return tagGlobalHtml;
 }

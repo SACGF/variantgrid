@@ -70,6 +70,10 @@ $(document).ready(function() {
                 <label>Variants:</label>
                 {{ form.node_input }}
             </div>
+            <div>
+                <label for="id_tagged_within_days">{{ form.tagged_within_days.label }}:</label>
+                {{ form.tagged_within_days }}
+            </div>
         {% else %}
             <div><b>All tags for analysis</b></div>
         {% endif %}

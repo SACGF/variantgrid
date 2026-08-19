@@ -2,6 +2,7 @@ import dataclasses
 from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 from functools import cached_property
 from typing import Any, Optional
 
@@ -13,6 +14,7 @@ from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models.deletion import CASCADE, SET_NULL
 from django.urls import reverse
+from django.utils import timezone
 from django_extensions.db.models import TimeStampedModel
 from model_utils.managers import InheritanceManager
 
@@ -242,6 +244,20 @@ class SettingsOverride(models.Model):
         help_text="Analysis nodes with at least this many variants don't auto-load "
                   "their grid — the user clicks 'Load variants' to run the row query. "
                   "Blank inherits the next level up.")
+    # Preset windows (stored in days) rather than a free integer - staleness is fuzzy, and shared
+    # values mean users share warm cache entries wherever the window keys a cache
+    VARIANT_TAG_STALE_DAYS_CHOICES = [
+        (180, "6 months"),
+        (365, "1 year"),
+        (545, "18 months"),
+        (730, "2 years"),
+        (1825, "5 years"),
+    ]
+    variant_tag_stale_days = models.IntegerField(
+        null=True, blank=True, choices=VARIANT_TAG_STALE_DAYS_CHOICES,
+        help_text="Tag events older than this are considered stale: grids show "
+                  "fresh vs total counts and mark tags whose most recent event is older. "
+                  "Blank inherits the next level up / disables.")
 
 
 class GlobalSettings(SettingsOverride):
@@ -424,6 +440,14 @@ class UserSettings:
     show_candidates_classification_evidence_update: bool
     initially_show_zygosity_table: bool
     node_grid_auto_load_max_variants: Optional[int]
+    variant_tag_stale_days: Optional[int]
+
+    @property
+    def variant_tag_stale_date(self) -> Optional[datetime]:
+        """ Tag events before this are considered stale (None = staleness disabled) """
+        if self.variant_tag_stale_days is None:
+            return None
+        return timezone.now() - timedelta(days=self.variant_tag_stale_days)
 
     @staticmethod
     def parse_value(field_name: str, value: Any) -> Any:
