@@ -77,6 +77,11 @@ class Test(URLTestCase):
             ("patient_grid", {}, cls.patient)
         ]
 
+        cls.PRIVATE_DATATABLES_GRID_LIST_URLS = [
+            ("specimen_datatables", {}, cls.specimen),
+            ("extraction_datatables", {}, cls.extraction),
+        ]
+
     def testUrls(self):
         """ No permissions on any objects """
         URL_NAMES_AND_KWARGS = [
@@ -86,6 +91,8 @@ class Test(URLTestCase):
             ("example_upload_csv_all", {}, 200),
             ("example_upload_csv_no_patients", {}, 200),
             ("patients", {}, 200),
+            ("specimens", {}, 200),
+            ("extractions", {}, 200),
             ("patient_term_matches", {}, 200),
             ("bulk_patient_term", {}, 200),
             ("patient_term_approvals", {}, 200),
@@ -149,6 +156,13 @@ class Test(URLTestCase):
     @prevent_request_warnings
     def testJqGridListNoPermission(self):
         self._test_jqgrid_urls_contains_objs(self.PRIVATE_GRID_LIST_URLS, self.user_non_owner, False)
+
+    def testDatatableListPermission(self):
+        self._test_datatables_grid_urls_contains_objs(self.PRIVATE_DATATABLES_GRID_LIST_URLS, self.user_owner, True)
+
+    @prevent_request_warnings
+    def testDatatableListNoPermission(self):
+        self._test_datatables_grid_urls_contains_objs(self.PRIVATE_DATATABLES_GRID_LIST_URLS, self.user_non_owner, False)
 
 if __name__ == "__main__":
     unittest.main()

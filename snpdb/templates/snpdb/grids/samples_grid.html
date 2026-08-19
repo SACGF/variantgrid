@@ -26,6 +26,15 @@
 
     	return "<div class='sample_id-container'>" + sample_selector + view_details_link + "</div>";
 	},
+    optionalLinkFormatter : function(cellvalue, options, rowObject) {
+        // A sample doesn't have to have come through an extraction, and an extraction's own
+        // reference is optional - so only draw a link when there's something to link to
+        const pk = rowObject[options.colModel.formatter_kwargs.url_object_column];
+        if (!pk) {
+            return cellvalue || "";
+        }
+        return linkFormatter(cellvalue || `(${pk})`, options, rowObject);
+    },
     viewImportStatus : function(importStatus) {
         if (importStatus == 'Annotation Required') { 
             importStatus = "<a href='{% url "variant_annotation_runs" %}'>" + importStatus + "</a>";

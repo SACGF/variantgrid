@@ -124,6 +124,14 @@ def view_patient_extractions(request, patient_id):
     return render(request, 'patients/view_patient_extractions.html', context)
 
 
+def specimens(request):
+    return render(request, 'patients/specimens.html')
+
+
+def extractions(request):
+    return render(request, 'patients/extractions.html')
+
+
 def view_specimen(request, specimen_id):
     specimen = Specimen.get_for_user(request.user, specimen_id)
     form = forms.SpecimenForm(request.POST or None, instance=specimen)

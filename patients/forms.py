@@ -119,10 +119,12 @@ class PatientSearchForm(forms.Form):
     phenotype = forms.CharField(widget=TextInput(attrs={'placeholder': 'Phenotype text'}))
 
 
+# Tissue has no way to be created yet (#1747), so both editors here leave out a dropdown that
+# could only ever be empty
 PatientSpecimenFormSet = inlineformset_factory(Patient,
                                                Specimen,
                                                can_delete=True,
-                                               exclude=['external_pk'],
+                                               exclude=['external_pk', 'tissue'],
                                                widgets={'name': TextInput(),
                                                         'description': TextInput(),
                                                         'reference_id': TextInput(),
@@ -135,7 +137,7 @@ PatientSpecimenFormSet = inlineformset_factory(Patient,
 # The specimen/extraction pages edit the same fields as the patient tabs' formsets - the tabs stay the
 # bulk editor, external_pk is the tracking system's identity so both show it read only beside the form
 SpecimenForm = modelform_factory(Specimen,
-                                 exclude=['external_pk', 'patient'],
+                                 exclude=['external_pk', 'patient', 'tissue'],
                                  widgets={'description': TextInput(),
                                           'reference_id': TextInput(),
                                           'collected_by': TextInput(),

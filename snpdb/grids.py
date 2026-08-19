@@ -123,8 +123,9 @@ class SamplesListGrid(JqGridUserRowConfig):
               "somaliersampleextract__somalierancestry__predicted_ancestry",
               "patient__patient_code", "patient__first_name", "patient__last_name", "patient__sex",
               "patient__date_of_birth", "patient__date_of_death",
-              "extraction__specimen__reference_id", "extraction__specimen__tissue__name",
-              "extraction__specimen__collection_date", "vcf__id"]
+              "extraction__specimen__id", "extraction__specimen__reference_id",
+              "extraction__id", "extraction__reference_id",
+              "extraction__specimen__tissue__name", "extraction__specimen__collection_date", "vcf__id"]
     colmodel_overrides = {
         'id': {"hidden": True},
         "name": {"width": 400,
@@ -158,7 +159,22 @@ class SamplesListGrid(JqGridUserRowConfig):
         'patient__date_of_death': {'hidden': True},
         'het_hom_count': {'name': 'het_hom_count', "model_field": False, 'sorttype': 'int',
                           'label': 'Het/Hom Count'},
-        "extraction__specimen__reference_id": {'label': 'Specimen'},
+        'extraction__specimen__id': {'hidden': True},
+        "extraction__specimen__reference_id": {
+            'label': 'Specimen',
+            'formatter': 'optionalLinkFormatter',
+            'formatter_kwargs': {"url_name": "view_specimen",
+                                 "url_object_column": "extraction__specimen__id"}},
+        'extraction__id': {'hidden': True},
+        # The DNA and RNA arms of one block share a specimen, so the specimen reference alone can't
+        # tell those rows apart
+        "extraction__reference_id": {
+            'label': 'Extraction',
+            'formatter': 'optionalLinkFormatter',
+            'formatter_kwargs': {"url_name": "view_extraction",
+                                 "url_object_column": "extraction__id"}},
+        "extraction__specimen__tissue__name": {'label': 'Tissue'},
+        "extraction__specimen__collection_date": {'label': 'Collected'},
         # These urls are only there for CSV export
         "sample_url": {'name': 'sample_url', 'label': 'Sample URL', "model_field": False, 'hidden': True},
         "vcf_url": {'name': 'vcf_url', 'label': 'VCF URL', "model_field": False, 'hidden': True},
