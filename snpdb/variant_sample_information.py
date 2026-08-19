@@ -14,7 +14,8 @@ from classification.models.evidence_mixin_summary_cache import clinical_signific
 from library.log_utils import log_traceback
 from library.unit_percent import format_af
 from ontology.models import OntologyService
-from patients.models_enums import Zygosity
+from patients.models import Patient
+from patients.models_enums import NucleicAcid, TissueStatus, Zygosity
 from snpdb.models import (
     CohortGenotype,
     CohortGenotypeCollection,
@@ -27,10 +28,36 @@ from snpdb.models import (
     VCFFilter,
 )
 from upload.models import ModifiedImportedVariant
+from variantgrid.perm_path import get_visible_url_names
 
 SAMPLE_ENRICHMENT_KIT_PATH = "samplefromsequencingsample__sequencing_sample__enrichment_kit__name"
 # Sample fields a row copies across under a "sample__" prefix
 COPY_SAMPLE_FIELDS = ["id", "name", "patient", "patient__patient_code", SAMPLE_ENRICHMENT_KIT_PATH]
+# Patient / specimen / extraction identifiers behind the grid's expandable row detail (private#2837).
+# Copied across under their own names, and only shown for patients the user can view
+SAMPLE_DETAIL_FIELDS = [
+    "patient__external_pk__code",
+    "extraction",
+    "extraction__reference_id",
+    "extraction__external_pk__code",
+    "extraction__nucleic_acid_source",
+    "extraction__specimen",
+    "extraction__specimen__patient",
+    "extraction__specimen__patient__patient_code",
+    "extraction__specimen__patient__external_pk__code",
+    "extraction__specimen__reference_id",
+    "extraction__specimen__external_pk__code",
+    "extraction__specimen__tissue__name",
+    "extraction__specimen__tissue_status",
+    "extraction__specimen__collection_date",
+]
+# Where a row's patient comes from, in order of preference - the sequencing pipeline links a sample to
+# an Extraction without touching Sample.patient, so the specimen's patient is often the only one there
+PATIENT_DETAIL_PATHS = [
+    ("sample__patient", "sample__patient__patient_code", "patient__external_pk__code"),
+    ("extraction__specimen__patient", "extraction__specimen__patient__patient_code",
+     "extraction__specimen__patient__external_pk__code"),
+]
 # CohortGenotype rows are streamed in chunks, so an early stop leaves the rest of a common variant's
 # VCFs unfetched. Collections are bulk loaded per chunk, so this also sets the queries-per-scan rate.
 COHORT_GENOTYPE_CHUNK_SIZE = 100
@@ -275,7 +302,7 @@ class VariantZygosityCounts:
                                                         distinct=True, output_field=TextField())}
         samples_qs = Sample.objects.filter(pk__in=sample_ids).order_by("pk").annotate(**annotation_kwargs)
         sample_values = samples_qs.values("vcf__allele_frequency_percent", *COPY_SAMPLE_FIELDS,
-                                          *list(annotation_kwargs.keys()))
+                                          *SAMPLE_DETAIL_FIELDS, *list(annotation_kwargs.keys()))
         return {s_values["id"]: s_values for s_values in sample_values}
 
     @staticmethod
@@ -410,8 +437,56 @@ class VariantSampleGenotypes(VariantZygosityCounts):
             log_traceback()
             return None
 
+    @cached_property
+    def _visible_patient_ids(self) -> set[int]:
+        """ A sample carries its VCF's permissions while a patient carries its own, so the identifying
+            detail is only given for patients the user may view (private#2837) """
+        patient_ids = {row["sample__patient"] for row in self.visible_rows}
+        patient_ids |= {row["extraction__specimen__patient"] for row in self.visible_rows}
+        patient_ids.discard(None)
+        if not patient_ids:
+            return set()
+        visible_qs = Patient.filter_for_user(self.user).filter(pk__in=patient_ids)
+        return set(visible_qs.values_list("pk", flat=True))
+
     @staticmethod
-    def _row_to_json(row: dict) -> dict:
+    def _url_if_visible(url_name: str, **kwargs) -> Optional[str]:
+        """ A deployment without patients (eg Shariant) unregisters these urls entirely """
+        if get_visible_url_names().get(url_name):
+            return reverse(url_name, kwargs=kwargs)
+        return None
+
+    def _get_patient_detail(self, row: dict) -> dict:
+        for patient_path, code_path, external_pk_path in PATIENT_DETAIL_PATHS:
+            if (patient_id := row[patient_path]) in self._visible_patient_ids:
+                return {
+                    "patient_code": row[code_path] or row[external_pk_path],
+                    "patient_url": self._url_if_visible("view_patient", patient_id=patient_id),
+                }
+        return {}
+
+    def _get_sample_details(self, row: dict) -> dict:
+        """ Patient/specimen/extraction identifiers, drawn in the grid's expandable row detail """
+        details = self._get_patient_detail(row)
+        if row["extraction__specimen__patient"] in self._visible_patient_ids:
+            details["specimen"] = (row["extraction__specimen__reference_id"]
+                                   or row["extraction__specimen__external_pk__code"])
+            details["specimen_url"] = self._url_if_visible("view_specimen",
+                                                           specimen_id=row["extraction__specimen"])
+            details["specimen_tissue"] = row["extraction__specimen__tissue__name"]
+            # Unknown is the default for a specimen nobody has said anything about, so it's not worth a line
+            tissue_status = row["extraction__specimen__tissue_status"]
+            if tissue_status and tissue_status != TissueStatus.UNKNOWN:
+                details["specimen_tissue_status"] = TissueStatus(tissue_status).label
+            if collection_date := row["extraction__specimen__collection_date"]:
+                details["specimen_collection_date"] = collection_date.strftime(settings.DATE_FORMAT)
+            details["extraction"] = row["extraction__reference_id"] or row["extraction__external_pk__code"]
+            details["extraction_url"] = self._url_if_visible("view_extraction", extraction_id=row["extraction"])
+            if nucleic_acid := row["extraction__nucleic_acid_source"]:
+                details["nucleic_acid"] = NucleicAcid(nucleic_acid).label
+        return {k: v for k, v in details.items() if v}
+
+    def _row_to_json(self, row: dict) -> dict:
         sample_id = row["sample"]
         allele_frequency_unit = row["allele_frequency_unit"]
         if allele_frequency_unit == CohortGenotype.MISSING_NUMBER_VALUE:
@@ -435,7 +510,7 @@ class VariantSampleGenotypes(VariantZygosityCounts):
             "patient_hpo": row["patient_hpo"],
             "patient_omim": row["patient_omim"],
             "patient_mondo": row["patient_mondo"],
-        }
+        } | self._get_sample_details(row)
 
     def _get_locus_counts(self) -> list[dict]:
         """ Zygosity counts for every variant at this locus, this variant first """
