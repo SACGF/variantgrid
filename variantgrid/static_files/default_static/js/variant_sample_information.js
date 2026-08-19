@@ -29,6 +29,17 @@ const VariantSampleInformation = (function () {
     // Graphs share a line, sizing themselves to their flex column - see .graph-row
     const RESPONSIVE = {responsive: true};
     const MAX_GRAPH_TERMS = 20;
+    // The expandable row detail - patient/specimen/extraction identifiers that would make an
+    // already wide grid wider (private#2837). The server leaves out anything it has no value for
+    const DETAIL_FIELDS = [
+        {key: 'patient_code', label: 'Patient', urlKey: 'patient_url'},
+        {key: 'specimen', label: 'Specimen', urlKey: 'specimen_url'},
+        {key: 'specimen_tissue', label: 'Tissue'},
+        {key: 'specimen_tissue_status', label: 'Tissue Status'},
+        {key: 'specimen_collection_date', label: 'Collected'},
+        {key: 'extraction', label: 'Extraction', urlKey: 'extraction_url'},
+        {key: 'nucleic_acid', label: 'Nucleic Acid'},
+    ];
     const GRAPH_HEIGHT = 384;
     const ALLELE_VARIANTS_EVENT = "allele-variants-loaded";
 
@@ -144,8 +155,50 @@ const VariantSampleInformation = (function () {
         return MISSING_FORMAT_VALUES.has(data) ? '.' : data;
     }
 
+    function hasDetails(row) {
+        return DETAIL_FIELDS.some(field => row[field.key]);
+    }
+
+    function renderDetailsControl(data, type, row) {
+        if (type !== 'display' || !hasDetails(row)) {
+            return '';
+        }
+        return $('<i>', {class: 'fas fa-plus-circle', title: 'Patient / specimen details'}).prop('outerHTML');
+    }
+
+    function detailsList(row) {
+        const list = $('<dl>', {class: 'row sample-details'});
+        for (const field of DETAIL_FIELDS) {
+            const value = row[field.key];
+            if (!value) {
+                continue;
+            }
+            const url = field.urlKey && row[field.urlKey];
+            const dd = $('<dd>', {class: 'col-sm-9'});
+            dd.append(url ? $('<a>', {href: url, text: value}) : document.createTextNode(value));
+            list.append($('<dt>', {class: 'col-sm-3', text: field.label}), dd);
+        }
+        return list;
+    }
+
+    function toggleDetails() {
+        const tr = $(this).closest('tr');
+        const row = dataTable.row(tr);
+        if (!row.data() || !hasDetails(row.data())) {
+            return;
+        }
+        if (row.child.isShown()) {
+            row.child.hide();
+        } else {
+            row.child(detailsList(row.data())).show();
+        }
+        $(this).find('i').toggleClass('fa-plus-circle fa-minus-circle');
+    }
+
     function columns() {
         return [
+            {data: null, name: 'details', title: '', className: 'details-control',
+                orderable: false, searchable: false, render: renderDetailsControl},
             {data: 'sample_name', title: 'Sample Name', render: renderSampleLink},
             {data: 'genome_build', name: 'genome_build', title: 'Genome Build', visible: false},
             {data: 'zygosity', title: 'Zygosity', render: renderZygosity},
@@ -162,6 +215,11 @@ const VariantSampleInformation = (function () {
             {data: 'patient_omim', title: 'Patient OMIM', className: 'no-word-wrap', render: ontologyRenderer('OMIM')},
             {data: 'patient_mondo', title: 'Patient MONDO', className: 'no-word-wrap', render: ontologyRenderer('MONDO')},
             {data: 'vcf', title: 'VCF', defaultContent: ''},
+            // Drawn in the row detail rather than taking up width, but still columns so that the
+            // search box and the CSV reach them - that's how you spot rows sharing a patient
+            {data: 'patient_code', title: 'Patient', visible: false, defaultContent: ''},
+            {data: 'specimen', title: 'Specimen', visible: false, defaultContent: ''},
+            {data: 'extraction', title: 'Extraction', visible: false, defaultContent: ''},
         ];
     }
 
@@ -205,11 +263,14 @@ const VariantSampleInformation = (function () {
             buttons: [{
                 extend: 'csv',
                 text: 'CSV',
-                exportOptions: {orthogonal: 'export'},
+                // Everything but the expand control, so the detail columns are in the download too
+                exportOptions: {orthogonal: 'export', columns: ':not(.details-control)'},
                 filename: csvFilename,
                 action: exportCsv,
             }],
         });
+
+        $("#genotype-grid tbody").on('click', 'td.details-control', toggleDetails);
 
         $.fn.dataTable.ext.search.push(function (settings, searchData, dataIndex, rowData) {
             if (settings.nTable.id !== 'genotype-grid') {
@@ -572,6 +633,7 @@ const VariantSampleInformation = (function () {
             dataTable.column('genome_build:name').visible(Object.keys(genomeBuildCounts()).length > 1, false);
             const hasClassifications = allRows.some(row => row.classifications && row.classifications.length);
             dataTable.column('classifications:name').visible(hasClassifications, false);
+            dataTable.column('details:name').visible(allRows.some(hasDetails), false);
             dataTable.rows.add(allRows);
             graphedFilter = null;  // The rows changed, so the graphs have to follow
             dataTable.draw();  // 'draw' redraws the graphs

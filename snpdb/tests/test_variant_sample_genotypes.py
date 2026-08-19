@@ -1,13 +1,15 @@
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.test import TestCase
+from django.utils import timezone
 
 from annotation.fake_annotation import get_fake_annotation_version
 from classification.enums import ShareLevel, SpecialEKeys, SubmissionSource
 from classification.models import Classification
 from classification.tests.models.test_utils import ClassificationTestUtils
 from library.guardian_utils import all_users_group, assign_permission_to_user_and_groups
-from patients.models_enums import Zygosity
+from patients.models import Extraction, Patient, Specimen, Tissue
+from patients.models_enums import NucleicAcid, TissueStatus, Zygosity
 from snpdb.models import (
     CohortGenotype,
     CohortGenotypeCollection,
@@ -288,3 +290,81 @@ class VariantSampleGenotypesClassificationsTest(TestCase):
         self.assertEqual([], by_sample_name["proband"], "Not shared outside the lab's organisation")
         lab_by_sample_name = self._classifications_by_sample_name(self.lab_user)
         self.assertEqual(1, len(lab_by_sample_name["proband"]), "Visible to the lab that curated it")
+
+
+class VariantSampleGenotypesSampleDetailsTest(TestCase):
+    """ The patient/specimen/extraction detail behind the grid's expandable row (private#2837) """
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.grch37 = GenomeBuild.get_name_or_alias("GRCh37")
+        get_fake_annotation_version(cls.grch37)
+
+        cls.user = User.objects.get_or_create(username='vsg_details_user')[0]
+        cls.user.groups.add(all_users_group())
+        cls.cohort = create_fake_cohort(cls.user, cls.grch37)
+        cls.samples = {s.name: s for s in cls.cohort.get_samples()}
+        for sample in cls.samples.values():
+            assign_permission_to_user_and_groups(cls.user, sample)
+
+        cls.patient = Patient.objects.create(patient_code="PAT-1")
+        cls.tissue = Tissue.objects.create(name="Blood", description="Whole blood")
+        cls.specimen = Specimen.objects.create(patient=cls.patient, reference_id="SPEC-1", tissue=cls.tissue,
+                                               tissue_status=TissueStatus.AFFECTED,
+                                               collection_date=timezone.now())
+        cls.extraction = Extraction.objects.create(specimen=cls.specimen, reference_id="EXT-1",
+                                                   nucleic_acid_source=NucleicAcid.DNA)
+        proband = cls.samples["proband"]
+        proband.patient = cls.patient
+        proband.extraction = cls.extraction
+        proband.save()
+
+        cls.variant = slowly_create_test_variant("3", 7000, "A", "T", cls.grch37)
+        cgc = CohortGenotypeCollection.objects.get(cohort=cls.cohort)
+        CohortGenotype.objects.create(collection=cgc, variant=cls.variant,
+                                      samples_zygosity=Zygosity.HET * 3,
+                                      samples_allele_depth=[20] * 3, samples_allele_frequency=[100] * 3,
+                                      samples_read_depth=[30] * 3, samples_genotype_quality=[30] * 3,
+                                      samples_phred_likelihood=[0] * 3)
+
+    def _rows_by_sample_name(self, user) -> dict:
+        data = VariantSampleGenotypes(user, self.variant).to_json()
+        return {row["sample_name"]: row for row in data["rows"]}
+
+    def test_details_for_visible_patient(self):
+        assign_permission_to_user_and_groups(self.user, self.patient)
+
+        rows = self._rows_by_sample_name(self.user)
+        proband = rows["proband"]
+        self.assertEqual("PAT-1", proband["patient_code"])
+        self.assertEqual("SPEC-1", proband["specimen"])
+        self.assertEqual("Blood", proband["specimen_tissue"])
+        self.assertEqual(TissueStatus.AFFECTED.label, proband["specimen_tissue_status"])
+        self.assertEqual("EXT-1", proband["extraction"])
+        self.assertEqual(NucleicAcid.DNA.label, proband["nucleic_acid"])
+        self.assertNotIn("patient_code", rows["mother"], "Sample with no patient has no detail")
+
+    def test_details_hidden_for_patient_user_cannot_view(self):
+        rows = self._rows_by_sample_name(self.user)
+        proband = rows["proband"]
+        self.assertNotIn("patient_code", proband, "Sample is visible but its patient isn't")
+        self.assertNotIn("specimen", proband)
+        self.assertNotIn("extraction", proband)
+
+    def test_patient_falls_back_to_specimen_patient(self):
+        assign_permission_to_user_and_groups(self.user, self.patient)
+        proband = self.samples["proband"]
+        proband.patient = None  # Linked to an extraction by the pipeline, never matched to a patient
+        proband.save()
+
+        row = self._rows_by_sample_name(self.user)["proband"]
+        self.assertEqual("PAT-1", row["patient_code"], "Patient came via the specimen")
+
+    def test_unknown_tissue_status_omitted(self):
+        assign_permission_to_user_and_groups(self.user, self.patient)
+        self.specimen.tissue_status = TissueStatus.UNKNOWN
+        self.specimen.save()
+
+        proband = self._rows_by_sample_name(self.user)["proband"]
+        self.assertNotIn("specimen_tissue_status", proband, "Unknown is the default, not an answer")
