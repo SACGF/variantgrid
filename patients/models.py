@@ -285,7 +285,7 @@ class Patient(GuardianPermissionsMixin, HasPhenotypeDescriptionMixin, Externally
         HasPhenotypeDescriptionMixin.save_phenotype(self, pheno_kwargs)
 
     def get_samples(self):
-        return self.sample_set.all().order_by("vcf__date")
+        return self.sample_set.all().select_related("vcf", "extraction__specimen").order_by("vcf__date")
 
     def __str__(self):
         # De-identified patients have no name, so fall back to the code they're known by
