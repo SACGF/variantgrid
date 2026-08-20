@@ -315,6 +315,7 @@ def clinical_significance(value, evidence_key=SpecialEKeys.CLINICAL_SIGNIFICANCE
     if value == IN_REVIEW_VALUE:
         label = "In-Review"
 
+    #prefix = "cs" if key.key == SpecialEKeys.CLINICAL_SIGNIFICANCE else "scs"
     prefix = "cs"
     css_value = value.lower() if value else "none"
     css_class = f"{prefix} {prefix}-{css_value} {extra_css}"
