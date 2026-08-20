@@ -4,6 +4,7 @@ import logging
 import operator
 from collections import defaultdict
 from collections.abc import Sequence
+from datetime import timedelta
 from functools import cached_property, reduce
 from random import random
 from time import time
@@ -71,6 +72,10 @@ from snpdb.models import (
     Wiki,
 )
 from snpdb.variant_collection import write_sql_to_variant_collection
+
+# How long a node's lease is good for. The window is (re)started when a worker claims the node for
+# loading, so it measures actual load time rather than how long the task sat in the queue.
+LEASE_SECONDS = MINUTE_SECS * 10
 
 
 def queryset_to_pk_in_q(qs: QuerySet) -> Q:
@@ -1162,8 +1167,12 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
         self.status = NodeStatus.LOADING
         with connection.cursor() as cursor:
             db_pid = get_backend_pid(cursor)
+        # Restart the lease window now the load is actually starting - a node dispatched into a
+        # backlog would otherwise spend most of its lease queued, and be perma-failed as a lost
+        # worker part way through a perfectly healthy load
         NodeTask.objects.filter(node_version__node=self, node_version__version=self.version) \
-            .update(celery_task=celery_task, db_pid=db_pid)
+            .update(celery_task=celery_task, db_pid=db_pid,
+                    lease_expires=timezone.now() + timedelta(seconds=LEASE_SECONDS))
         return True
 
     def adjust_cloned_parents(self, old_new_map):

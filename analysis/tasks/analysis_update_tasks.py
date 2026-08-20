@@ -11,17 +11,12 @@ from django.db import transaction
 from django.utils import timezone
 
 from analysis.models import AnalysisEdge, AnalysisNode, NodeColors, NodeStatus, NodeTask
-from analysis.models.nodes.analysis_node import NodeCache, NodeVersion
+from analysis.models.nodes.analysis_node import LEASE_SECONDS, NodeCache, NodeVersion
 from analysis.models.nodes.node_utils import get_nodes_by_id
 from analysis.tasks.node_update_tasks import MAX_NODE_ATTEMPTS
-from library.constants import MINUTE_SECS
 from library.log_utils import log_traceback, report_message
 from snpdb.clingen_allele import populate_clingen_alleles_for_variants
 from snpdb.models import JobsControl, ProcessingStatus
-
-# A node load that exceeds this is already a problem; reclaiming it (risking duplicate work)
-# is acceptable. There is no heartbeat - the lease is a flat window.
-LEASE_SECONDS = MINUTE_SECS * 10
 
 
 @celery.shared_task

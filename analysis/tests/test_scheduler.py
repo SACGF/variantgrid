@@ -575,6 +575,19 @@ class TestDuplicateDispatchClaim(AnalysisSetupMixin, TestCase):
         self.assertIsNotNone(node_task.lease_expires)
         self.assertEqual(node_task.celery_task, "winner")
 
+    def test_claim_restarts_lease_window(self):
+        """Lease measures load time, not queue wait - a node dispatched into a backlog must not
+        start loading with an already-expired lease and be perma-failed as a lost worker."""
+        node = AllVariantsNode.objects.create(analysis=self.analysis)
+        lease_ready_nodes(self.analysis.pk, "worker")
+        NodeTask.objects.filter(node_version__node=node).update(
+            lease_expires=timezone.now() - timedelta(seconds=1))  # sat in the queue past its lease
+
+        self.assertTrue(node.claim_for_load("worker"))
+
+        node_task = NodeTask.objects.get(node_version__node=node)
+        self.assertGreater(node_task.lease_expires, timezone.now())
+
     def test_settled_node_is_not_claimable(self):
         node = AllVariantsNode.objects.create(analysis=self.analysis)
         AllVariantsNode.objects.filter(pk=node.pk).update(status=NodeStatus.READY)
