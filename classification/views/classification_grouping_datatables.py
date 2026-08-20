@@ -331,9 +331,10 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
         return ["share_level"]
 
     def row_css(self, row: CellData) -> Optional[str]:
-        share_level = ShareLevel(row["share_level"])
-        if not share_level.is_discordant_level:
-            return "unshared"
+        if settings.CLASSIFICATION_GRID_FADE_NON_SHARED:
+            share_level = ShareLevel(row["share_level"])
+            if not share_level.is_discordant_level:
+                return "unshared"
         return None
 
     def __init__(self, request: HttpRequest):
