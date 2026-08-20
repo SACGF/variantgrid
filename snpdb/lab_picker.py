@@ -144,7 +144,7 @@ class LabPickerData:
     multi_select: bool = True  # can we select multiple labs on this page
 
     @property
-    def selection(self):
+    def selection(self) -> str:
         return self.lab_selection.selection
 
     @property

@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 from cdot.hgvs import HGVSFixSeverity
-from cdot.hgvs import clean_hgvs as cdot_clean_hgvs
+from cdot.hgvs import clean_hgvs as cdot_clean_hgvs, HGVSFixSeverity
 from django import forms
 from django.http import HttpRequest
 from django.shortcuts import render

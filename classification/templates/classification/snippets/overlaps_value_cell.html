@@ -1,0 +1,18 @@
+{% load js_tags %}
+{% if values.skew %}
+    {% if triage_filter and values.skew.skew_perspective not in triage_filter %}
+        <span style="font-style:italic; color:#ccc">{{ values.skew.get_skew_perspective_display }}</span>
+    {% else %}
+        <span style="font-style:italic; color:#888">{{ values.skew.get_skew_perspective_display }}</span>
+    {% endif %}<br/>
+    {% if values.overlap_status.is_attention %}<span class="text-danger">{{ values.overlap_status.label }}</span>{% else %}
+    <span>{{ values.overlap_status.label }}</span>{% endif %}
+    {% if values.status_date %} - {% timestamp values.status_date time_ago=True %}{% endif %}
+{% endif %}
+{% for c_value in values.sorted %}
+    <span class="cs cs-dot cs-{{ c_value.value }}">
+    {% if c_value.your_contribution %}<b class="hover-detail" title="{{ c_value.lab_title }}">{% if pretty_value %}{{ c_value.pretty_value }}{% else %}{{ c_value.short_value }}{% endif %}</b>
+    {% elif not c_value.your_context %}<span class="no-value" title="Cross Context">{% if pretty_value %}{{ c_value.pretty_value }}{% else %}{{ c_value.short_value }}{% endif %}</span>
+    {% else %}<span title="{{ c_value.lab_title }}">{% if pretty_value %}{{ c_value.pretty_value }}{% else %}{{ c_value.short_value }}{% endif %}</span>{% endif %}
+    </span>
+{% endfor %}

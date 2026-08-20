@@ -92,6 +92,8 @@ pydantic>=2.4.0
 deepdiff
 
 # --- linting & type checking (dev only) ---
+dataclasses-json==0.6.7
+# required for omniimporter
 # Run: mypy --config-file mypy.ini snpdb   (or any app)
 # Lint: ./scripts/linting/run_pylint.sh   |   ruff check
 ruff
@@ -100,3 +102,4 @@ django-stubs
 djangorestframework-stubs
 pylint
 pylint-django
+openpyxl

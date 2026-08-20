@@ -82,7 +82,7 @@ class Migration(migrations.Migration):
                 ('user', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, to=settings.AUTH_USER_MODEL)),
                 ('variant', models.ForeignKey(null=True, on_delete=django.db.models.deletion.PROTECT, to='snpdb.variant')),
             ],
-            bases=(library.django_utils.guardian_permissions_mixin.GuardianPermissionsMixin, classification.models.evidence_mixin.EvidenceMixin, models.Model),
+            bases=(library.django_utils.guardian_permissions_mixin.GuardianPermissionsMixin, classification.models.EvidenceMixin, models.Model),
         ),
         migrations.CreateModel(
             name='VariantClassificationImport',
@@ -110,7 +110,7 @@ class Migration(migrations.Migration):
                 ('user', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, to=settings.AUTH_USER_MODEL)),
                 ('variant_classification', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='classification.variantclassification')),
             ],
-            bases=(library.django_utils.guardian_permissions_mixin.GuardianPermissionsMixin, classification.models.evidence_mixin.EvidenceMixin, models.Model),
+            bases=(library.django_utils.guardian_permissions_mixin.GuardianPermissionsMixin, classification.models.EvidenceMixin, models.Model),
         ),
         migrations.CreateModel(
             name='VariantClassificationImportAlleleSource',

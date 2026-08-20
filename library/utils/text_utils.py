@@ -17,7 +17,7 @@ def pretty_label(label: str) -> str:
         if last_space:
             char = char.upper()
             last_space = False
-        if char == ' ':
+        if char == ' ' or char == '-':
             last_space = True
         tidied += char
     return tidied
@@ -111,16 +111,19 @@ class VCFDialect(csv.Dialect):
     quoting = csv.QUOTE_NONE
 
 
-def delimited_row(data: list, delimiter: str = ',', dialect=None) -> str:
-    kwargs = {}
-    if dialect is not None:
-        kwargs["dialect"] = dialect
+def delimited_row(data: list, delimiter: str = ',', include_new_line=True, **kwargs) -> str:
     # https://docs.python.org/3/library/csv.html#csv.writer
     # If csvfile is a file object, it should be opened with newline=''
     out = io.StringIO(newline='')
-    writer = csv.writer(out, delimiter=delimiter, **kwargs)
+    if delimiter == '\t':
+        writer = csv.writer(out, delimiter=delimiter, **kwargs)
+    else:
+        writer = csv.writer(out, delimiter=delimiter, **kwargs)
     writer.writerow(data)
-    return out.getvalue()
+    text = out.getvalue()
+    if not include_new_line:
+        text = text.rstrip()
+    return text
 
 
 def clean_string(input_string: str) -> str:

@@ -786,7 +786,7 @@ class Trio(GuardianPermissionsAutoInitialSaveMixin, PreviewModelMixin, SortByPKM
 
     @classmethod
     def preview_if_url_visible(cls) -> str:
-        return "trios"
+        return "pedigree"
 
     @property
     def preview(self) -> 'PreviewData':
@@ -862,7 +862,7 @@ class Quad(GuardianPermissionsAutoInitialSaveMixin, PreviewModelMixin, SortByPKM
 
     @classmethod
     def preview_if_url_visible(cls) -> str:
-        return "quads"
+        return "pedigree"
 
     @property
     def preview(self) -> 'PreviewData':

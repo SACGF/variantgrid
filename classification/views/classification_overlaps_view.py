@@ -38,52 +38,52 @@ def view_overlaps_detail(request: HttpRequest, lab_id: Optional[Union[str, int]]
 
 
 # POST only
-
-@transaction.atomic()
-def post_clinical_context(request: HttpRequest) -> HttpResponseBase:
-
-    came_from_variant_id = request.POST.get('variant')
-    came_from_allele_id = request.POST.get('allele')
-    came_from_obj: Model
-    if came_from_variant_id:
-        came_from_obj = Variant.objects.get(pk=came_from_variant_id)
-    else:
-        came_from_obj = Allele.objects.get(pk=came_from_allele_id)
-
-    ccre = re.compile('cc_([0-9]+)')
-    affected_ccs = set()
-    for key, cc_name in request.POST.items():
-        match = ccre.match(key)
-        if match:
-            cc_name = cc_name.strip()
-            vcid = int(match[1])
-            vc = Classification.objects.get(pk=vcid)
-            old_cc = vc.clinical_context
-
-            if old_cc is None or old_cc.name != cc_name:
-                if old_cc:
-                    affected_ccs.add(old_cc)
-                updated_cc, _ = ClinicalContext.objects.get_or_create(allele=vc.variant.allele, name=cc_name)
-                affected_ccs.add(updated_cc)
-                vc.clinical_context = updated_cc
-                vc.save()
-
-                old_cc_name = None
-                if old_cc:
-                    old_cc_name = old_cc.name
-
-                vc.flag_collection_safe.add_flag(
-                    flag_type=classification_flag_types.classification_clinical_context_changed,
-                    user=request.user,
-                    comment=f'Clinical grouping changed from "{old_cc_name}" to "{cc_name}"',
-                    permission_check=False
-                )
-
-    for cc in affected_ccs:
-        cc.recalc_and_save(cause='Record(s) moved between clinical groupings', cause_code=ClinicalContextRecalcTrigger.CLINICAL_GROUPING_SET)
-
-    #pretend to do something
-    return redirect(came_from_obj)
+#
+# @transaction.atomic()
+# def post_clinical_context(request: HttpRequest) -> HttpResponseBase:
+#
+#     came_from_variant_id = request.POST.get('variant')
+#     came_from_allele_id = request.POST.get('allele')
+#     came_from_obj: Model
+#     if came_from_variant_id:
+#         came_from_obj = Variant.objects.get(pk=came_from_variant_id)
+#     else:
+#         came_from_obj = Allele.objects.get(pk=came_from_allele_id)
+#
+#     ccre = re.compile('cc_([0-9]+)')
+#     affected_ccs = set()
+#     for key, cc_name in request.POST.items():
+#         match = ccre.match(key)
+#         if match:
+#             cc_name = cc_name.strip()
+#             vcid = int(match[1])
+#             vc = Classification.objects.get(pk=vcid)
+#             old_cc = vc.clinical_context
+#
+#             if old_cc is None or old_cc.name != cc_name:
+#                 if old_cc:
+#                     affected_ccs.add(old_cc)
+#                 updated_cc, _ = ClinicalContext.objects.get_or_create(allele=vc.variant.allele, name=cc_name)
+#                 affected_ccs.add(updated_cc)
+#                 vc.clinical_context = updated_cc
+#                 vc.save()
+#
+#                 old_cc_name = None
+#                 if old_cc:
+#                     old_cc_name = old_cc.name
+#
+#                 vc.flag_collection_safe.add_flag(
+#                     flag_type=classification_flag_types.classification_clinical_context_changed,
+#                     user=request.user,
+#                     comment=f'Clinical grouping changed from "{old_cc_name}" to "{cc_name}"',
+#                     permission_check=False
+#                 )
+#
+#     for cc in affected_ccs:
+#         cc.recalc_and_save(cause='Record(s) moved between clinical groupings', cause_code=ClinicalContextRecalcTrigger.CLINICAL_GROUPING_SET)
+#
+#     #pretend to do something
+#     return redirect(came_from_obj)
 
 
 @require_superuser

@@ -8,7 +8,7 @@ from classification.models import (
     ClassificationJsonParams,
     ClassificationModification,
     EvidenceKeyMap,
-    ImportedAlleleInfo,
+    ImportedAlleleInfo, ClassificationGroupingEntry, OverlapContribution,
 )
 from classification.models.classification_json_definitions import (
     ClassificationJsonAlleleDict,
@@ -114,6 +114,12 @@ def populate_classification_json(classification: Classification, params: Classif
     if classification.clinical_context:
         clinical_context = classification.clinical_context.name
 
+    triages_json = {}
+    grouping = ClassificationGroupingEntry.grouping_for(classification)
+    for contribution in OverlapContribution.objects.filter(classification_grouping=grouping):
+        triages_json[contribution.value_type] = contribution.triage_state_obj.to_dict()
+    # attach this directly to the record for now, might make it part of the default generation
+
     content = {
         'id': classification.id,
         'lab_record_id': classification.lab_record_id,
@@ -135,7 +141,8 @@ def populate_classification_json(classification: Classification, params: Classif
         'resolved_condition': classification.condition_resolution_dict,
         'withdrawn': classification.withdrawn,
         'allele_origin_bucket': classification.allele_origin_bucket,
-        'condition_text_match': classification.condition_text_record.pk if classification.condition_text_record else None
+        'condition_text_match': classification.condition_text_record.pk if classification.condition_text_record else None,
+        'triages': triages_json
     }
     if latest_modification:
         content['version'] = latest_modification.created.timestamp()

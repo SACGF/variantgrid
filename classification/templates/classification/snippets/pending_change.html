@@ -1,4 +1,5 @@
 {% load classification_tags %}
+{% for change in changes %}
 <div class="row">
     <div class="col-12 col-md-3 text-md-right">
         {% lab change.lab %}
@@ -7,3 +8,13 @@
         {% clinical_significance_inline change.from_cs %} to {% clinical_significance_inline change.to_cs %}
     </div>
 </div>
+{% endfor %}
+{% if overlap_status %}
+    <div class="row mt-2">
+        <div class="col-12 col-md-3 text-md-right">
+            Status At End of Discussion
+        </div><div class="col-12 col-md-9">
+            {{ overlap_status.label }}
+        </div>
+    </div>
+{% endif %}

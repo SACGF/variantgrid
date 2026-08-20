@@ -2,8 +2,7 @@ import enum
 import re
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Optional
-
+from typing import Optional, Self, Union
 from genes.transcript_parts import TranscriptParts, get_transcript_id_and_version
 from genes.transcripts_utils import clean_transcript_accession
 from snpdb.models.models_genome import GenomeBuild
@@ -262,6 +261,11 @@ class HGVSDisplay:
         """ The build breaks ties only between otherwise identical HGVS - appending it to sort_str
             instead would let a longer key win wherever a shorter one is a prefix of it """
         return self.sort_str, self.genome_build.pk if self.genome_build else "", self.full_hgvs
+
+    def diff(self, other: Union[Self, HGVSComponents]) -> HGVSDiff:
+        if isinstance(other, HGVSDisplay):
+            other = other.components
+        return self.components.diff(other)
 
     def __lt__(self, other):
         return self.sort_key < other.sort_key

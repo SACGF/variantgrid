@@ -105,6 +105,7 @@ urlpatterns = [
 
     path('user/<pk>', views.view_user, name='view_user'),
     path('group/<pk>', views.view_group, name='view_group'),
+    path('lab/<int:lab_id>/contact', views.lab_contact_details, name='lab_contact_details'),
     path('lab/<int:lab_id>', views.view_lab, name='view_lab'),
     path('lab/members_tab/<int:pk>', views.lab_members_tab, name='lab_members_tab'),
     path('lab/members/add/<int:pk>', views.lab_add_member, name='lab_add_member'),

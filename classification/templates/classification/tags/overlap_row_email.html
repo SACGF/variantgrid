@@ -1,0 +1,28 @@
+{% load classification_tags %}
+{% load ui_menus %}
+<tr>
+    <td style="border-top: 1px solid #cccccc"><a href="{% absolute_url 'overlap_3' overlap.pk %}">Overlap-{{ overlap.pk }}</a></td>
+    <td style="border-top: 1px solid #cccccc; font-family:monospace">{{ date_str }}</td>
+    <td style="border-top: 1px solid #cccccc;" >{% c_hgvs c_hgvs inline=True %}<br/>
+    <span style="color:{{overlap.testing_context_full.inline_color_rgb}}; font-family: monospace">{{ overlap.testing_context_full }}</span>
+    </td>
+    <td style="border-top: 1px solid #cccccc;">
+        <table>
+        {% for contribution in overlap.contributions_list %}
+            <tr>
+                <td style="text-align:right; padding-right: 20px; padding-bottom:8px; min-width: 200px">
+                {% if contribution.classification_grouping.lab %}
+                    {% lab contribution.classification_grouping.lab %}
+                {% elif contribution.scv %}
+                    ClinVar Expert Panel<br/>{{ contribution.scv }}
+                {% endif %}
+                </td>
+                <td style="padding-bottom:8px">
+                {% clinical_significance_inline contribution.value %}
+                    <span style="{% if contribution.triage_state_obj.status.is_default %}color:#888{% else %}color:#444{% endif %}"> - {{ contribution.triage_state_obj }}</span>
+                </td>
+            </tr>
+        {% endfor %}
+        </table>
+    </td>
+</tr>

@@ -223,6 +223,7 @@ URLS_NAME_REGISTER.update({  # Disable selected snpdb urls
     "tag_stats": False,
     "manual_variant_entry": False,
     "variantopedia_wiki": False,
+    "variant_wiki": False,
 
     # Annotation
     "version_diffs": False,

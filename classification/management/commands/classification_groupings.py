@@ -1,4 +1,5 @@
 from django.core.management import BaseCommand
+from django.db.models import Subquery, Exists
 
 from classification.models import (
     Classification,
@@ -28,7 +29,7 @@ class Command(BaseCommand):
         if not any((summary, all, dirty, refresh)):
             raise ValueError("Must provide one or more of summary, all, dirty, refresh")
 
-        if summary:
+        if all or summary:
             for index, cm in enumerate(ClassificationModification.objects.filter(is_last_published=True).select_related("classification").iterator()):
                 classification = cm.classification
                 classification.summary = ClassificationSummaryCalculator(cm).cache_dict()
@@ -56,8 +57,3 @@ class Command(BaseCommand):
                     print(f"Updating {index} classification groupings")
             print(f"Updated {index+1} classification groupings")
 
-            for index, dirty in enumerate(AlleleOriginGrouping.objects.filter(dirty=True).iterator()):
-                dirty.update()
-                if index % 1000 == 0 and index:
-                    print(f"Updating {index} allele groupings")
-            print(f"Updated {index+1} allele groupings")

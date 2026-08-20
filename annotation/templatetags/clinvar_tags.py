@@ -50,6 +50,7 @@ class ClinVarDetails(pydantic.BaseModel):
             variant: Optional[Union[int, Variant]] = None,
             genome_build: Optional[GenomeBuild] = None,
             annotation_version: Optional[AnnotationVersion] = None) -> Optional['ClinVarDetails']:
+        # FIXME need to start handling somatic vs germline
 
         if not allele and not variant:
             raise ValueError("One of allele or variant must be provided")

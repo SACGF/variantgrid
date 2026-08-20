@@ -31,6 +31,7 @@ from library.django_utils.django_object_managers import ObjectManagerCachingRequ
 from library.log_utils import report_exc_info
 from library.utils import IconWithTooltip, md5sum_str, pretty_label
 from library.utils.django_utils import get_cached_project_git_hash
+from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import Allele, GenomeBuild, GenomeBuildPatchVersion, Variant, VariantCoordinate
 from snpdb.models.models_variant import HGVS_UNCLEANED_PATTERN
 
@@ -557,7 +558,7 @@ class ImportedAlleleInfo(TimeStampedModel):
         return {GenomeBuild.grch37(), GenomeBuild.grch38()}
 
     @staticmethod
-    def column_name_for_build(genome_build: GenomeBuild, prefix: str = "", suffix: str = 'c_hgvs'):
+    def column_name_for_build(genome_build: GenomeBuild, prefix: str = "", suffix: str = 'c_hgvs'): #
         build_str: str
         if genome_build.is_equivalent(GenomeBuild.grch37()):
             build_str = 'grch37'
@@ -578,11 +579,11 @@ class ImportedAlleleInfo(TimeStampedModel):
 
         return imported_vc, resolved_vc
 
-    def save(self, *args, **kwargs):
+    def save(self, force_insert=False, force_update=False, using=None, update_fields=None, **kwargs):
         if not self.imported_md5_hash:
             self.imported_md5_hash = md5sum_str(self.imported_hgvs)
 
-        super().save(*args, **kwargs)
+        super().save(force_insert=force_insert, force_update=force_update, using=using, update_fields=update_fields, **kwargs)
 
     def _calculate_validation(self) -> ImportedAlleleInfoValidationTags:
 
@@ -698,6 +699,34 @@ class ImportedAlleleInfo(TimeStampedModel):
         if g_hgvs := self.imported_g_hgvs_obj:
             return g_hgvs
         return None
+
+    @property
+    def imported_c_hgvs_obj(self) -> Optional[HGVSDisplay]:
+        # TODO - deprecate this in favour of imported hgvs (which handles g.HGVS imports)
+        if imported_c_hgvs := self.imported_c_hgvs:
+            c_hgvs = HGVSComponents(imported_c_hgvs)
+            if imported_genome_build := self.imported_genome_build:
+                return HGVSDisplay(c_hgvs, genome_build=imported_genome_build)
+            return HGVSDisplay(c_hgvs)
+        else:
+            return None
+
+    def preferred_c_hgvs_obj(self, genome_build: Optional[GenomeBuild] = None) -> HGVSDisplay:
+        if genome_build is None:
+            genome_build = GenomeBuildManager.get_current_genome_build()
+
+        if preferred := self[genome_build]:
+            return HGVSDisplay(preferred.c_hgvs_obj)
+        else:
+            for genome_build in GenomeBuild.builds_with_annotation_cached():
+                if alternative := self[genome_build]:
+                    if c_hgvs_obj := HGVSComponents(alternative.c_hgvs_obj):
+                        return HGVSDisplay(
+                            c_hgvs_obj,
+                            is_desired_build=False,
+                            genome_build=genome_build
+                        )
+        return self.imported_hgvs_obj()
 
     @staticmethod
     def all_chgvs(allele: Allele) -> list[HGVSDisplay]:

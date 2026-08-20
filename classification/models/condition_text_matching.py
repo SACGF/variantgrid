@@ -458,7 +458,10 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
         """
         if terms := self.condition_xref_terms:
 
-            condition_resolved_obj = ConditionResolved(terms=_sort_terms(terms), join=None if len(terms) <= 1 else MultiCondition(self.condition_multi_operation))
+            condition_resolved_obj = ConditionResolved(
+                references=[ConditionReference(term) for term in _sort_terms(terms)],
+                join=None if len(terms) <= 1 else MultiCondition(self.condition_multi_operation)
+            )
             return condition_resolved_obj.to_json()
 
         return None

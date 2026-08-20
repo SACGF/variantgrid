@@ -408,7 +408,7 @@ def slack_bot_username():
 
 
 # message limit is actually 4000, but this gives us a lot of leway
-SLACK_CHARACTER_LIMIT = 3500
+SLACK_CHARACTER_LIMIT = 2000
 
 
 def send_notification(

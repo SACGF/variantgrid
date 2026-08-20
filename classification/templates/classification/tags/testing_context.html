@@ -1,0 +1,6 @@
+{% load ui_utils %}
+{% if style == "subtle" %}
+    <span class="testing-context-text-{{ testing_context_bucket.value }}">{{ testing_context_bucket.name | pretty_label:"lower" }}</span>
+{% else %}
+<span class="testing-context-box testing-context-{{ testing_context_bucket.value }}">{{ testing_context_bucket.name | pretty_label:"lower" }}</span>
+{% endif %}

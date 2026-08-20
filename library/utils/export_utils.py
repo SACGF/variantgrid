@@ -190,6 +190,9 @@ def get_decorated_methods(cls, categories: Optional[dict[Any, Any]], attribute: 
         def passes_filter(export_method) -> bool:
             nonlocal categories
             # FIXME, some non-NONE but falsey values could get confused here, e.g. 0 and False
+            if not export_method.categories:
+                return True
+
             decorated_values = export_method.categories or {}
             # for every requirement of categories
             for key, value in categories.items():
@@ -238,14 +241,14 @@ class ExportRow:
             yield row_data
 
     @classmethod
-    def csv_generator(cls, data: Iterable[Any], delimiter=',', include_header=True, export_tweak: ExportTweak = ExportTweak.DEFAULT, export_settings: Optional[ExportSettings] = None) -> Iterator[str]:
+    def csv_generator(cls, data: Iterable[Any], delimiter=',', include_header=True, export_tweak: ExportTweak = ExportTweak.DEFAULT, export_settings: Optional[ExportSettings] = None, **kwargs) -> Iterator[str]:
         if not export_settings:
             export_settings = ExportSettings.get_for_request()
         try:
             if include_header:
-                yield delimited_row(cls.csv_header(export_tweak=export_tweak, export_settings=export_settings), delimiter=delimiter)
+                yield delimited_row(cls.csv_header(export_tweak=export_tweak, export_settings=export_settings), delimiter=delimiter, **kwargs)
             for row_data in cls._data_generator(data):
-                yield delimited_row(row_data.to_csv(export_tweak=export_tweak, export_settings=export_settings), delimiter=delimiter)
+                yield delimited_row(row_data.to_csv(export_tweak=export_tweak, export_settings=export_settings), delimiter=delimiter, **kwargs)
         except:
             from library.log_utils import report_exc_info
             report_exc_info(extra_data={"activity": "Exporting"})

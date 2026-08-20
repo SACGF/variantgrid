@@ -30,13 +30,7 @@
 </style>
 <script>
     function filterGrid() {
-        // The grid is initialized asynchronously (after its column definition AJAX completes).
-        // If a filter is changed before that, calling .DataTable() would initialize an empty
-        // table and crash with "Cannot read properties of undefined (reading 'aDataSort')" (#1629).
-        let table = $('#vc-datatable');
-        if ($.fn.dataTable.isDataTable(table)) {
-            table.DataTable().ajax.reload();
-        }
+        $('#vc-datatable').DataTable().ajax.reload();
     }
 
     function checkIfAllChecked(toggle, array) {

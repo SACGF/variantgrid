@@ -112,6 +112,30 @@
         {% endlabelled %}
     {% endif %}
 
+    {% if 'overlaps_3'|is_view_enabled %}
+        {% page_help_embedded title="Discordant Overlaps Awaiting Triage" %}
+            <p>Below are the overlaps where your lab has a triage pending.</p>
+        {% end_page_help_embedded %}
+        <p><a href="{% url 'overlaps_3' %}" class="hover-link">Click here</a> to see all overlaps your lab is involved in.</p>
+
+        <script>
+        function overlapsGroupingFilter(data) {
+            data.skew_status = 'TT';
+            data.lab_selection = {{ dlab.lab_picker.selection | jsonify }};
+        }
+        </script>
+
+        <table
+           data-datatable-data='overlapsGroupingFilter'
+           data-datatable-url="{% url 'overlaps_3_datatables' %}"
+           class="sticky-header thick-border"
+           id="overlaps-table"
+           data-adjust-columns="false">
+        </table>
+        
+    {% endif %}
+
+    {% comment %}
     {% if 'discordance_report'|is_view_enabled %}
         {% page_help_embedded title="Discordance Reports Awaiting Triage" %}
             <p>Below is a sample of discordances where your lab has a triage pending.</p>
@@ -120,7 +144,7 @@
             <div class="loading-message" style="height:381px">Loading...</div>
         </div>
     {% endif %}
-
+    {% endcomment %}
 
     {% page_help_embedded title="Flagged Classification Records" %}
         <p>

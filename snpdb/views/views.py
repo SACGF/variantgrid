@@ -29,6 +29,7 @@ from django.utils.html import escape, format_html
 from django.views.decorators.cache import cache_page
 from django.views.decorators.http import require_POST
 from django.views.decorators.vary import vary_on_cookie
+from user_messages.models import Message
 from global_login_required import login_not_required
 from guardian.shortcuts import get_objects_for_group, get_objects_for_user
 from termsandconditions.decorators import terms_required
@@ -80,6 +81,7 @@ from library.django_utils.guardian_permissions_mixin import GuardianPermissionsM
 from library.guardian_utils import DjangoPermission
 from library.keycloak import Keycloak
 from library.utils import full_class_name, import_class, rgb_invert
+from library.utils.django_utils import render_ajax_view
 from ontology.models import OntologyTerm
 from patients.forms import PatientForm
 from patients.models import Patient
@@ -1114,6 +1116,19 @@ def _add_read_only_settings_message(request, lab_list: Iterable[Lab]):
         lab_head_msg = ""
     read_only_message = f"Only administrators{lab_head_msg} can modify these settings"
     messages.add_message(request, messages.INFO, read_only_message)
+
+
+def lab_contact_details(request, lab_id: int):
+    lab = get_object_or_404(Lab, pk=lab_id)
+    subject = request.GET.get("subject") or ""
+    return render_ajax_view(
+        request,
+        'snpdb/lab_contact_details.html',
+        {
+            "lab": lab,
+            "subject": subject
+        }
+    )
 
 
 def view_lab(request, lab_id: int):
