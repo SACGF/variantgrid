@@ -812,15 +812,14 @@ def evidence_key_input(key: str):
 
 
 @register.inclusion_tag("classification/tags/overlap.html")
-def overlap(overlap: Overlap, admin_link: bool = True, show_value_type: bool = True, versus: Optional[Overlap] = None):
+def overlap(overlap: Overlap, show_value_type: bool = True, show_link: bool = False):
     return {
         "overlap": overlap,
-        "admin_link": admin_link,
-        "show_value_type": show_value_type
+        "show_value_type": show_value_type,
+        "show_link": show_link
     }
 
 
-# FIXME rename to OverlapContribution
 @register.inclusion_tag("classification/tags/overlap_contribution.html")
 def overlap_contribution(overlap_entry: OverlapContribution | OverlapEntryCompare, show_lab: bool = False, show_context: bool = True):
     compare_overlap_status = None

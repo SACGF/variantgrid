@@ -16,23 +16,6 @@ CRITERIA_NOT_APPLICABLE = 'NA'
 CRITERIA_NEUTRAL = 'N'
 
 
-class ConflictType(TextChoices):
-    # Rename to ClassificationResultType
-    CLIN_SIG = "S", "ClinSig"
-    ONCPATH = "P", "OncPath"
-
-    def label_for_context(self, allele_origin_bucket: 'AlleleOriginBucket'):
-        if self == ConflictType.ONCPATH:
-            if allele_origin_bucket == AlleleOriginBucket.GERMLINE:
-                return "Pathogenicity"
-            elif allele_origin_bucket == AlleleOriginBucket.SOMATIC:
-                return "Oncogenicity"
-            else:
-                return "Onco-Path"
-        else:
-            return "Clin-Sig"
-
-
 class OverlapOverrideStatus(IntegerChoices):
     # TODO resolution might be a better term, or ongoing
     NO_OVERRIDE = 0, "No override"

@@ -27,6 +27,18 @@
                  {% timestamp overlap.overlap_status_change_timestamp time_ago=True %}
                 {% endlabelled %}
             {% endif %}
+            {% labelled label="Context" %}
+                {% for testing_context in overlap.testing_contexts_objs %}{% if not forloop.first %}/{% endif %}<span class="testing-context-box testing-context-{{ testing_context.value }}">{{ testing_context.name | pretty_label:"lower" }}</span>{% endfor %}
+                {{ overlap.value_type_label }}
+                {% if overlap_grouping.other_relevant_overlaps %}
+                    <div class="mt-2"><a class="toggle-link" href="#other-overlaps" data-toggle="collapse">Toggle Other Relevant Overlaps</a></div>
+                <div id="other-overlaps" class="collapse">
+                    {% for other_overlap in overlap_grouping.other_relevant_overlaps %}
+                        <div class="my-1">{% overlap other_overlap show_link=True %}</div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            {% endlabelled %}
             {% labelled label="c.HGVS" %}
                 {% for c_hgvs in overlap.c_hgvses %}
                     <div>
@@ -40,6 +52,9 @@
             {% endlabelled %}
         {% endwith %}
     {% endif %}
+    {% labelled label="Allele" %}
+        <a class="hover-link" href="{{ overlap_grouping.overlap.allele.get_absolute_url }}">{{ overlap_grouping.overlap.allele }}</a>
+    {% endlabelled %}
     {% labelled label="Involved Labs" %}
         {% for lab_contact in overlap_grouping.involved_labs %}
             <div>{% lab lab_contact.lab show_contact_link=True contact_subject=lab_contact.email_subject %}</div>

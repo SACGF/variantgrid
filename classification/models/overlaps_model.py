@@ -368,6 +368,10 @@ class Overlap(TimeStampedModel, ReviewableModelMixin, PreviewModelMixin):
         if value_type == ClassificationResultValue.ONC_PATH:
             if self.testing_contexts_objs == [TestingContextBucket.GERMLINE]:
                 return "Pathogenicity"
+            elif TestingContextBucket.GERMLINE not in self.testing_contexts_objs:
+                return "Oncogenicity"
+        else:
+            return "Clinical Significance"
         return value_type.label
 
     @property

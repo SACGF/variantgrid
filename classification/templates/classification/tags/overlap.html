@@ -11,9 +11,8 @@
     {% if not forloop.first %}, {% endif %}{{ value }}
     {% empty %}<span class="no-value">No values</span>
     {% endfor %}
-
-    | <span class="{% if overlap.overlap_status.is_attention %}text-danger{% else %}text-success{% endif %}">{{ overlap.get_overlap_status_display }}</span>
-    {% if admin_link %}
-        {% admin_link overlap %}
-    {% endif %}
+    |
+    {% if show_link %}<a href="{{ overlap.get_absolute_url }}" class="hover-link">{% endif %}
+    <span class="{% if overlap.overlap_status.is_attention %}text-danger{% else %}text-success{% endif %}">{{ overlap.overlap_status_label }}</span>
+    {% if show_link %}</a>{% endif %}
 </span>

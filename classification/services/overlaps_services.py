@@ -452,6 +452,12 @@ class OverlapGrouping3:
     user: User
 
     @cached_property
+    def other_relevant_overlaps(self) -> list[Overlap]:
+        if allele_id := self.overlap.allele_id:
+            return list(sorted(Overlap.objects.filter(allele_id=allele_id, valid=True, overlap_status__gte=OverlapStatus.SINGLE_SUBMITTER).exclude(pk=self.overlap.pk).all()))
+        return []
+
+    @cached_property
     def involved_labs(self) -> list[LabContext]:
         labs: set[LabContext] = set()
         for overlap_contribution in self.overlap.contributions:

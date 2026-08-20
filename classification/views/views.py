@@ -47,7 +47,7 @@ from classification.enums import (
     ShareLevel,
     SpecialEKeys,
     SubmissionSource,
-    WithdrawReason, OverlapStatus,
+    WithdrawReason, OverlapStatus, OverlapType,
 )
 from classification.forms import ClassificationAlleleOriginForm
 from classification.models import (
@@ -1027,15 +1027,16 @@ def view_classification_grouping_detail(request, classification_grouping_id: int
                                  pk=classification_grouping_id)
     grouping.check_can_view(request.user)
 
-    # TODO should we pass in the contributions rather than the overlaps?
-    # overlaps_qs = ClassificationGroupingOverlapContribution.objects.filter(classification_grouping=grouping).filter(overlap__valid=True)
-    # overlaps = list(sorted(contribution.overlap for contribution in overlaps_qs))
     contributions = OverlapContribution.objects.filter(classification_grouping=grouping)
     skews = OverlapContributionSkew.objects.filter(contribution__in=contributions)
-    overlaps = Overlap.objects.filter(valid=True, overlap_status__gt=OverlapStatus.SINGLE_SUBMITTER, pk__in=skews.values_list('overlap'))
+    # not showing cross context overlaps as that's just confusing
+    overlaps = list(sorted(Overlap.objects.filter(
+        valid=True,
+        overlap_status__gt=OverlapStatus.SINGLE_SUBMITTER,
+        overlap_type=OverlapType.SINGLE_CONTEXT,
+        pk__in=skews.values_list('overlap')
+    )))
 
-    # overlaps = Overlap.objects.filter(valid=True, overlap_status__gt=OverlapStatus.SINGLE_SUBMITTER, contributions__classification_grouping=grouping)
-     # TODO sort to have single context first
     return render_ajax_view(request, 'classification/classification_grouping_detail.html', {
         "classification_grouping": grouping,
         "overlaps": overlaps

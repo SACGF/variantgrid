@@ -14,7 +14,7 @@
     {% for zygosity in classification_grouping.zygosity_values %}{% if not forloop.first %}, {% endif %}{{ zygosity|ekey:"zygosity" }}{% endfor %}
 {% endlabelled %}
 {% labelled label="Overlaps" %}
-    {% for overlap in overlaps %}<div class="my-1">{% overlap overlap %}</div>{% endfor %}
+    {% for overlap in overlaps %}<div class="my-1">{% overlap overlap show_link=True %}</div>{% endfor %}
 {% endlabelled %}
 {% comment %}
 {% labelled label="Triages" %}
