@@ -123,6 +123,7 @@ ALLOWED_HOSTS = ['*']
 CSRF_TRUSTED_ORIGINS=['https://test.shariant.org.au', 'https://test2.shariant.org.au', 'https://shariant.org.au', 'https://www.shariant.org.au', 'https://demo.shariant.org.au']
 
 ANNOTATION_GENE_ANNOTATION_VERSION_ENABLED = False  # Only used for analysis optimisation
+ANNOTATION_GENE_LEVEL_ENABLED = False  # No fusions here - Shariant imports classifications, not VCFs
 _ANNOTATION_BASE_DIR = "/data/annotation"  # Set this to where you downloaded annotation (${ANNOTATION_BASE_DIR} from wiki)
 ANNOTATION_VCF_DUMP_DIR = os.path.join(_ANNOTATION_BASE_DIR, 'annotation_scratch')
 ANNOTATION_VEP_PERLBREW_RUNNER_SCRIPT = os.path.join(BASE_DIR, "scripts", "perlbrew_runner.sh")

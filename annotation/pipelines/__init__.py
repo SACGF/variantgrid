@@ -15,7 +15,7 @@ from annotation.pipelines.vep import VEPRunner
 PIPELINES: dict[VariantAnnotationPipelineType, PipelineDef] = {p.pipeline_type: p for p in [
     PipelineDef(VEPRunner(VariantAnnotationPipelineType.STANDARD)),
     PipelineDef(VEPRunner(VariantAnnotationPipelineType.STRUCTURAL_VARIANT)),
-    PipelineDef(GeneLevelRunner()),
+    PipelineDef(GeneLevelRunner(), enabled_setting="ANNOTATION_GENE_LEVEL_ENABLED"),
     PipelineDef(AnnotSVRunner(),
                 depends_on=VariantAnnotationPipelineType.STRUCTURAL_VARIANT,
                 blocks_vcf_import=False,
@@ -37,8 +37,9 @@ def enabled_pipeline_types() -> list[VariantAnnotationPipelineType]:
 
 
 def blocking_pipeline_types() -> list[VariantAnnotationPipelineType]:
-    """ Types a VCF import waits on - @see UploadedVCF.is_fully_annotated (#1656). """
-    return [pt for pt, p in PIPELINES.items() if p.blocks_vcf_import]
+    """ Types a VCF import waits on - @see UploadedVCF.is_fully_annotated (#1656). A disabled type has
+        no runs to wait for, so it can only be a type this deployment actually schedules. """
+    return [pt for pt, p in PIPELINES.items() if p.blocks_vcf_import and p.enabled]
 
 
 def versioned_pipeline_types() -> list[VariantAnnotationPipelineType]:
