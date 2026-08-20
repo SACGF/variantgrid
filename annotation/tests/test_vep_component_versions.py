@@ -6,7 +6,7 @@ from django.test.utils import override_settings
 
 from annotation.fake_annotation import get_fake_annotation_settings_dict, get_fake_vep_version
 from annotation.models import VariantAnnotationVersion
-from annotation.vep_config import vep_component_version_kwargs
+from annotation.vep_config import parse_cosmic_version_from_filename, vep_component_version_kwargs
 from genes.models_enums import AnnotationConsortium
 from snpdb.models import GenomeBuild
 
@@ -128,6 +128,25 @@ class VEPComponentVersionKwargsTests(TestCase):
         kwargs = vep_component_version_kwargs(GRCH38_SETTINGS)
         self.assertIsNone(kwargs["vep_args"])
         self.assertIsNone(kwargs["pick_order"])
+
+
+class ParseCosmicVersionTests(TestCase):
+    """ #1673 - the release drives which INFO field carries the sample count, and it's only ever
+        written down in the distributed VCF's name. """
+
+    def test_release_parsed_from_distributed_names(self):
+        expected = {
+            "annotation_data/GRCh37/CosmicCodingMuts_v95_20211101_grch37.normal.vcf.gz": 95,
+            "annotation_data/GRCh38/Cosmic_GenomeScreensMutant_v99_GRCh38.vcf.gz": 99,
+            "annotation_data/GRCh37/Cosmic_GenomeScreensMutant_Normal_v101_GRCh37.vcf.gz": 101,
+        }
+        for path, cosmic_version in expected.items():
+            with self.subTest(path=path):
+                self.assertEqual(parse_cosmic_version_from_filename(path), cosmic_version)
+
+    def test_unversioned_name_is_none(self):
+        self.assertIsNone(
+            parse_cosmic_version_from_filename("annotation_data/GRCh37/CosmicCodingMuts.normal.grch37.vcf.gz"))
 
 
 @override_settings(**get_fake_annotation_settings_dict(columns_version=2))
