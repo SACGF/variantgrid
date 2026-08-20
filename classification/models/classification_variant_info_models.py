@@ -716,7 +716,7 @@ class ImportedAlleleInfo(TimeStampedModel):
             genome_build = GenomeBuildManager.get_current_genome_build()
 
         if preferred := self[genome_build]:
-            return preferred.c_hgvs_obj
+            return HGVSDisplay(preferred.c_hgvs_obj)
         else:
             for genome_build in GenomeBuild.builds_with_annotation_cached():
                 if alternative := self[genome_build]:
