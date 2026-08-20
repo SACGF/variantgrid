@@ -103,6 +103,12 @@ def update_node_task(node_id, version):
             # Node was deleted or version bumped - this task is obsolete, nothing to re-trigger
             return
 
+        if not node.claim_for_load(update_node_task.request.id):
+            # Another worker owns this node/version (or it has already settled) - exit without
+            # touching its status or clearing its lease, and leave the re-trigger to it
+            logging.info("Node %d/%d already claimed - exiting", node_id, version)
+            return
+
         try:
             errors = None
             node_errors = node.get_errors()
@@ -110,7 +116,6 @@ def update_node_task(node_id, version):
                 try:
                     # Even if no errors now, parent nodes can be removed on us during load causing failure
                     # Also will throw NodeOutOfDateException if node already bumped (before calling expensive load())
-                    node.set_node_task_and_status(update_node_task.request.id, NodeStatus.LOADING)
                     node.load()
                     # Check if we need to clear shadow color
                     if node.shadow_color == NodeColors.ERROR and node.is_valid:
@@ -223,18 +228,17 @@ def node_cache_task(node_id, version):
         try:
             node.write_cache(variant_collection)
             processing_status = ProcessingStatus.SUCCESS
-            status = NodeStatus.LOADING
         except:
             log_traceback()
             processing_status = ProcessingStatus.ERROR
-            status = NodeStatus.ERROR
 
         variant_collection.status = processing_status
         variant_collection.save()
 
-        if node.status != NodeStatus.READY:
+        # On success the node stays LOADING_CACHE, for the chained update_node_task to claim
+        if processing_status == ProcessingStatus.ERROR and node.status != NodeStatus.READY:
             with disable_auditlog():
-                node.status = status
+                node.status = NodeStatus.ERROR
                 node.save()
     finally:
         if analysis_id is not None:

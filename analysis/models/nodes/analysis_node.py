@@ -1020,7 +1020,11 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
         for label, count in label_counts.items():
             node_counts.append(NodeCount(node_version=self.node_version, label=label, count=count))
         if node_counts:
-            NodeCount.objects.bulk_create(node_counts)
+            # Counts are a cache of a deterministic query against an immutable node_version, so a
+            # re-load (eg after a backoff retry that failed once these were already written) can
+            # safely overwrite them
+            NodeCount.objects.bulk_create(node_counts, update_conflicts=True, update_fields=["count"],
+                                          unique_fields=["node_version", "label"])
 
         total_count = label_counts[BuiltInFilters.TOTAL]
 
@@ -1141,6 +1145,26 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
 
         NodeTask.objects.filter(node_version__node=self, node_version__version=self.version) \
             .update(celery_task=celery_task, db_pid=db_pid)
+
+    def claim_for_load(self, celery_task) -> bool:
+        """ Take ownership of loading this node/version, returning False if someone else has it.
+
+            A lease that expires while its update task is still sitting in the analysis_workers
+            queue is reclaimed and re-dispatched, so two update tasks can exist for the same
+            node/version. The conditional UPDATE is the arbiter - only one of them moves the node
+            out of CLAIMABLE_STATUSES, and the loser leaves the winner's status/lease alone. """
+
+        claimed = AnalysisNode.objects.filter(pk=self.pk, version=self.version,
+                                              status__in=NodeStatus.CLAIMABLE_STATUSES) \
+            .update(status=NodeStatus.LOADING)
+        if not claimed:
+            return False
+        self.status = NodeStatus.LOADING
+        with connection.cursor() as cursor:
+            db_pid = get_backend_pid(cursor)
+        NodeTask.objects.filter(node_version__node=self, node_version__version=self.version) \
+            .update(celery_task=celery_task, db_pid=db_pid)
+        return True
 
     def adjust_cloned_parents(self, old_new_map):
         """ If you need to do something with old/new parents """

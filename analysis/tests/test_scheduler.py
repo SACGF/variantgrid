@@ -552,6 +552,36 @@ class TestTransientErrorBackoff(AnalysisSetupMixin, TestCase):
             self.assertFalse(_backoff_node(node.pk, node.version, self.analysis.pk))
 
 
+@override_settings(ANALYSIS_NODE_CACHE_Q=False)
+class TestDuplicateDispatchClaim(AnalysisSetupMixin, TestCase):
+    """A lease that expires while its task is still queued gets re-dispatched, leaving two
+    update tasks for the same node/version - only one may load it."""
+
+    def test_duplicate_neither_loads_nor_clears_the_winners_lease(self):
+        """The loser must not load, nor clear the winner's lease - the dispatcher would read a
+        cleared lease as a dead worker and perma-fail a node that is loading fine."""
+        node = AllVariantsNode.objects.create(analysis=self.analysis)
+        lease_ready_nodes(self.analysis.pk, "worker")
+        self.assertTrue(node.claim_for_load("winner"))  # winner is now LOADING
+
+        with mock.patch.object(Signature, "apply_async"):
+            with mock.patch.object(AllVariantsNode, "load") as mock_load:
+                update_node_task(node.pk, node.version)
+        self.assertFalse(mock_load.called, "second task must not re-load the node")
+
+        node.refresh_from_db()
+        node_task = NodeTask.objects.get(node_version__node=node)
+        self.assertEqual(node.status, NodeStatus.LOADING)
+        self.assertIsNotNone(node_task.lease_expires)
+        self.assertEqual(node_task.celery_task, "winner")
+
+    def test_settled_node_is_not_claimable(self):
+        node = AllVariantsNode.objects.create(analysis=self.analysis)
+        AllVariantsNode.objects.filter(pk=node.pk).update(status=NodeStatus.READY)
+        node.refresh_from_db()
+        self.assertFalse(node.claim_for_load("worker"))
+
+
 class TestSingleWorkerInvariant(TestCase):
     """All node assignment/leasing happens only in lease_ready_nodes, reached only from
     create_and_launch_analysis_tasks. Worker tasks never call it."""

@@ -114,6 +114,8 @@ class NodeStatus(models.TextChoices):
     LOADING = 'L', 'Loading'
 
     LOADING_STATUSES = Constant([e[0] for e in (DIRTY, QUEUED, LOADING_CACHE, LOADING)])
+    # Waiting to be worked on - ie LOADING_STATUSES before a worker has taken ownership of the load
+    CLAIMABLE_STATUSES = Constant([e[0] for e in (DIRTY, QUEUED, LOADING_CACHE)])
     ERROR_STATUSES = Constant([e[0] for e in (ERROR, ERROR_CONFIGURATION, ERROR_WITH_PARENT, CANCELLED)])
     READY_STATUSES = Constant([e[0] for e in (ERROR, ERROR_CONFIGURATION, ERROR_WITH_PARENT, CANCELLED, READY)])
 
