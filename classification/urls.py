@@ -31,6 +31,7 @@ from classification.views.classification_view import (
     ClassificationView,
     LabGeneClassificationCountsView,
 )
+from classification.views.classification_reclassification_view import view_reclassification_analytics
 from classification.views.classification_view_metrics import (
     view_classification_metrics,
     view_page_metrics_detail,
@@ -105,6 +106,7 @@ urlpatterns = [
     path('create_for_variant/<int:variant_id>/<genome_build_name>', views.CreateClassificationForVariantView.as_view(),
          name='create_classification_for_variant'),
 
+    path('classification/reclassification_analytics', view_reclassification_analytics, name="classification_reclassification_analytics"),
     path('classification/view_metrics', view_classification_metrics, name="classification_view_metrics"),
     path('classification/view_metrics/detail', view_page_metrics_detail, name="classification_view_metrics_detail"),
 

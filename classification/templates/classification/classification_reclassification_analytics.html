@@ -1,0 +1,365 @@
+{% extends "uicore/page/base.html" %}
+{% load static %}
+{% load js_tags %}
+{% load ui_help %}
+{% load ui_utils %}
+{% load ui_menu_bars %}
+{% block title %}Reclassification Analytics{% endblock %}
+{% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
+{% block content %}
+<script type="text/javascript" src="{% static 'js/lib/plotly-latest.min.js' %}"></script>
+<script type="text/javascript" src="{% static 'js/plotly_helper.js' %}"></script>
+<style>
+    .reclassification-analytics .chart { min-height: 420px; }
+    .reclassification-analytics .significance-swatch {
+        display: inline-block; width: 0.8rem; height: 0.8rem; border-radius: 2px; margin-right: 0.35rem;
+    }
+    .reclassification-analytics table.summary { font-size: 0.9rem; }
+    .reclassification-analytics table.summary td.numeric, .reclassification-analytics table.summary th.numeric {
+        text-align: right;
+    }
+</style>
+
+<div class="container-table reclassification-analytics">
+    <h3>Reclassification Analytics</h3>
+
+    {% page_help_embedded title="Reclassification Analytics" %}
+        <p>
+            How clinical significance has moved over time, mined from every published version of every
+            classification record. Each record contributes an initial classification, then one event per
+            time its clinical significance changed.
+        </p>
+        <p>
+            Synced labs are shown separately because their event dates are the date the record arrived here,
+            not the date the other lab curated it - which is why the time based charts default to local labs.
+        </p>
+    {% end_page_help_embedded %}
+
+    <form method="get" class="form-inline mb-4 p-3 border rounded">
+        <label class="mr-2" for="organization">Organisation</label>
+        <select class="form-control mr-3" id="organization" name="organization">
+            <option value="">All</option>
+            {% for organization in analytics.organizations %}
+                <option value="{{ organization.pk }}" {% if analytics.organization.pk == organization.pk and not analytics.lab %}selected{% endif %}>{{ organization.name }}</option>
+            {% endfor %}
+        </select>
+
+        <label class="mr-2" for="lab">Lab</label>
+        <select class="form-control mr-3" id="lab" name="lab">
+            <option value="">All</option>
+            {% for lab in analytics.labs %}
+                <option value="{{ lab.pk }}" {% if analytics.lab.pk == lab.pk %}selected{% endif %}>{{ lab.name }}</option>
+            {% endfor %}
+        </select>
+
+        <label class="mr-2" for="provenance">Labs</label>
+        <select class="form-control mr-3" id="provenance" name="provenance">
+            {% for value, label in provenance_choices %}
+                <option value="{{ value }}" {% if analytics.provenance == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+        </select>
+
+        <label class="mr-2" for="date_from">From</label>
+        <input class="form-control mr-3" type="date" id="date_from" name="date_from" value="{{ analytics.date_from|date:'Y-m-d' }}" />
+
+        <label class="mr-2" for="date_to">To</label>
+        <input class="form-control mr-3" type="date" id="date_to" name="date_to" value="{{ analytics.date_to|date:'Y-m-d' }}" />
+
+        <button type="submit" class="btn btn-primary">Apply</button>
+    </form>
+
+    <div class="row mb-4">
+        {% labelled hint="tiny" label="Records with a Timeline" %}{{ analytics.classification_count | number:'S' }}{% endlabelled %}
+        {% labelled hint="tiny" label="Reclassifications" %}{{ analytics.reclassification_count | number:'S' }}{% endlabelled %}
+    </div>
+
+    <div class="mb-4">
+        {% for entry in analytics.significance_legend %}
+            <span class="mr-3"><span class="significance-swatch" style="background-color: {{ entry.colour }}"></span>{{ entry.label }}</span>
+        {% endfor %}
+    </div>
+
+    <h4>Time to Reclassification</h4>
+    <p class="text-muted">How long a record sits at its starting significance before it first moves.</p>
+    {% if analytics.time_to_reclassification %}
+        <div id="time-to-reclassification" class="chart"></div>
+        <table class="table table-sm summary">
+            <thead>
+                <tr>
+                    <th>Started as</th>
+                    <th class="numeric">Reclassifications</th>
+                    <th class="numeric">Median days</th>
+                    <th class="numeric">25th percentile</th>
+                    <th class="numeric">75th percentile</th>
+                    <th class="numeric">Longest</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for distribution in analytics.time_to_reclassification %}
+                    <tr>
+                        <td><span class="significance-swatch" style="background-color: {{ distribution.colour }}"></span>{{ distribution.label }}</td>
+                        <td class="numeric">{{ distribution.count | number:'S' }}</td>
+                        <td class="numeric">{{ distribution.median | number:'S' }}</td>
+                        <td class="numeric">{{ distribution.p25 | number:'S' }}</td>
+                        <td class="numeric">{{ distribution.p75 | number:'S' }}</td>
+                        <td class="numeric">{{ distribution.longest | number:'S' }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p class="no-value">No reclassifications match these filters.</p>
+    {% endif %}
+
+    <h4 class="mt-5">How Significance Flows</h4>
+    <p class="text-muted">Every reclassification, from the significance it left to the significance it landed on.</p>
+    {% if analytics.reclassification_count %}
+        <div id="significance-flow" class="chart"></div>
+        <table class="table table-sm summary">
+            <thead><tr><th>From</th><th>To</th><th class="numeric">Reclassifications</th></tr></thead>
+            <tbody>
+                {% for transition in analytics.significance_transitions %}
+                    <tr>
+                        <td><span class="significance-swatch" style="background-color: {{ transition.from_colour }}"></span>{{ transition.from_label }}</td>
+                        <td><span class="significance-swatch" style="background-color: {{ transition.to_colour }}"></span>{{ transition.to_label }}</td>
+                        <td class="numeric">{{ transition.count | number:'S' }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p class="no-value">No reclassifications match these filters.</p>
+    {% endif %}
+
+    <h4 class="mt-5">VUS Reclassification Rate</h4>
+    <p class="text-muted">Records that left VUS during the year, over the number sitting at VUS when the year began.</p>
+    {% if analytics.vus_rates %}
+        <div id="vus-rate" class="chart"></div>
+        <table class="table table-sm summary">
+            <thead>
+                <tr><th>Year</th><th class="numeric">VUS at start of year</th><th class="numeric">Reclassified</th><th class="numeric">Rate</th></tr>
+            </thead>
+            <tbody>
+                {% for rate in analytics.vus_rates %}
+                    <tr>
+                        <td>{{ rate.year }}</td>
+                        <td class="numeric">{{ rate.population | number:'S' }}</td>
+                        <td class="numeric">{{ rate.reclassified | number:'S' }}</td>
+                        <td class="numeric">{{ rate.percent_display }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p class="no-value">No VUS timeline to report on with these filters.</p>
+    {% endif %}
+
+    <h4 class="mt-5">Direction of Travel</h4>
+    <p class="text-muted">Reclassifications each month, split by whether they moved towards benign or towards pathogenic, with a 12 month rolling average.</p>
+    {% if analytics.reclassification_count %}
+        <div id="direction-trend" class="chart"></div>
+        <table class="table table-sm summary">
+            <thead><tr><th>Year</th><th class="numeric">Towards benign</th><th class="numeric">Towards pathogenic</th></tr></thead>
+            <tbody>
+                {% for year in analytics.yearly_direction %}
+                    <tr>
+                        <td>{{ year.year }}</td>
+                        <td class="numeric">{{ year.benign | number:'S' }}</td>
+                        <td class="numeric">{{ year.pathogenic | number:'S' }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p class="no-value">No reclassifications match these filters.</p>
+    {% endif %}
+
+    <h4 class="mt-5">VUS Burden by Gene</h4>
+    <p class="text-muted">Records currently sitting at VUS, by gene, and what share of that gene's records they are.</p>
+    {% if analytics.gene_burden %}
+        <div id="gene-burden" class="chart"></div>
+        <table class="table table-sm summary">
+            <thead>
+                <tr><th>Gene</th><th class="numeric">VUS</th><th class="numeric">All records</th><th class="numeric">VUS share</th></tr>
+            </thead>
+            <tbody>
+                {% for burden in analytics.gene_burden %}
+                    <tr>
+                        <td><a class="hover-link" href="{% url 'view_gene_symbol' burden.gene_symbol %}">{{ burden.gene_symbol }}</a></td>
+                        <td class="numeric">{{ burden.vus_count | number:'S' }}</td>
+                        <td class="numeric">{{ burden.total_count | number:'S' }}</td>
+                        <td class="numeric">{{ burden.percent }}%</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p class="no-value">No gene symbols resolved for these records.</p>
+    {% endif %}
+
+    <h4 class="mt-5">Evidence Keys Driving Reclassification</h4>
+    <p class="text-muted">Which fields changed in the edit that moved the significance.</p>
+    {% if analytics.evidence_key_changes %}
+        <div id="evidence-keys" class="chart"></div>
+        <table class="table table-sm summary">
+            <thead><tr><th>Evidence Key</th><th class="numeric">Reclassifications where it changed</th></tr></thead>
+            <tbody>
+                {% for change in analytics.evidence_key_changes %}
+                    <tr><td>{{ change.label }}</td><td class="numeric">{{ change.count | number:'S' }}</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p class="no-value">No evidence to diff for these filters.</p>
+    {% endif %}
+</div>
+
+<script>
+    const reclassificationCharts = {{ analytics.chart_data | jsonify }};
+    const AXIS_COLOUR = "#52514e";
+    const GRID_COLOUR = "#e6e5e1";
+
+    function chartLayout(extra) {
+        return Object.assign({
+            height: 420,
+            margin: {t: 20, r: 20, b: 60, l: 70},
+            paper_bgcolor: "#fcfcfb",
+            plot_bgcolor: "#fcfcfb",
+            font: {color: AXIS_COLOUR},
+            xaxis: {gridcolor: GRID_COLOUR, zeroline: false},
+            yaxis: {gridcolor: GRID_COLOUR, zeroline: false}
+        }, extra || {});
+    }
+
+    const plotConfig = {responsive: true, displayModeBar: false};
+
+    /** Where to stop the axis so a handful of very old records don't flatten the bulk of the
+     *  distribution - the longest column in the table below still reports the true maximum. */
+    function percentile(values, fraction) {
+        const ordered = values.slice().sort((a, b) => a - b);
+        return ordered[Math.min(Math.floor(fraction * ordered.length), ordered.length - 1)];
+    }
+
+    const timeToReclassification = reclassificationCharts.time_to_reclassification;
+    if (timeToReclassification.length) {
+        const allDays = [].concat(...timeToReclassification.map(series => series.days));
+        const axisEnd = Math.max(365, Math.ceil(percentile(allDays, 0.99) / 365) * 365);
+        const traces = timeToReclassification.map(series => ({
+            x: series.days,
+            name: series.label,
+            type: 'histogram',
+            marker: {color: series.colour, line: {color: "#fcfcfb", width: 2}},
+            xbins: {start: 0, end: axisEnd, size: Math.round(axisEnd / 20)},
+            hovertemplate: '%{y} records ' + series.label + '<br>%{x} days<extra></extra>'
+        }));
+        Plotly.newPlot('time-to-reclassification', traces, chartLayout({
+            barmode: 'stack',
+            legend: {traceorder: 'normal'},
+            xaxis: {title: 'Days at the starting significance', range: [0, axisEnd],
+                    gridcolor: GRID_COLOUR, zeroline: false},
+            yaxis: {title: 'Reclassifications', gridcolor: GRID_COLOUR, zeroline: false}
+        }), plotConfig);
+    }
+
+    const flow = reclassificationCharts.flow;
+    if (flow.values.length) {
+        Plotly.newPlot('significance-flow', [{
+            type: 'sankey',
+            orientation: 'h',
+            node: {
+                label: flow.labels,
+                color: flow.node_colours,
+                pad: 18,
+                thickness: 16,
+                line: {color: "#fcfcfb", width: 2}
+            },
+            link: {
+                source: flow.sources,
+                target: flow.targets,
+                value: flow.values,
+                color: flow.link_colours
+            }
+        }], chartLayout({margin: {t: 20, r: 20, b: 20, l: 20}}), plotConfig);
+    }
+
+    const vusRates = reclassificationCharts.vus_rates;
+    if (vusRates.years.length) {
+        Plotly.newPlot('vus-rate', [{
+            x: vusRates.years,
+            y: vusRates.percents,
+            type: 'bar',
+            marker: {color: vusRates.colour},
+            customdata: vusRates.years.map((year, index) => [vusRates.reclassified[index], vusRates.populations[index]]),
+            hovertemplate: '%{customdata[0]} of %{customdata[1]} VUSes reclassified in %{x}<extra></extra>'
+        }], chartLayout({
+            xaxis: {title: 'Year', tickmode: 'linear', gridcolor: GRID_COLOUR, zeroline: false},
+            yaxis: {title: '% of VUSes reclassified', gridcolor: GRID_COLOUR, zeroline: false}
+        }), plotConfig);
+    }
+
+    const monthly = reclassificationCharts.monthly;
+    if (monthly.months.length) {
+        // years of monthly bars turn into noise, so the months are markers and the trend is the line
+        const traces = [
+            {
+                x: monthly.months, y: monthly.benign, name: 'Towards benign', type: 'scatter', mode: 'markers',
+                marker: {color: monthly.benign_colour, size: 8, opacity: 0.4,
+                         line: {color: "#fcfcfb", width: 2}}
+            },
+            {
+                x: monthly.months, y: monthly.pathogenic, name: 'Towards pathogenic', type: 'scatter',
+                mode: 'markers', marker: {color: monthly.pathogenic_colour, size: 8, opacity: 0.4,
+                                          symbol: 'diamond', line: {color: "#fcfcfb", width: 2}}
+            },
+            {
+                x: monthly.months, y: monthly.benign_rolling, name: 'Towards benign, 12 month average',
+                type: 'scatter', mode: 'lines', line: {color: monthly.benign_colour, width: 2}
+            },
+            {
+                x: monthly.months, y: monthly.pathogenic_rolling, name: 'Towards pathogenic, 12 month average',
+                type: 'scatter', mode: 'lines', line: {color: monthly.pathogenic_colour, width: 2, dash: 'dot'}
+            }
+        ];
+        Plotly.newPlot('direction-trend', traces, chartLayout({
+            hovermode: 'x unified',
+            xaxis: {title: 'Month', gridcolor: GRID_COLOUR, zeroline: false},
+            yaxis: {title: 'Reclassifications', gridcolor: GRID_COLOUR, zeroline: false}
+        }), plotConfig);
+    }
+
+    const geneBurden = reclassificationCharts.gene_burden;
+    if (geneBurden.symbols.length) {
+        Plotly.newPlot('gene-burden', [{
+            x: geneBurden.vus_counts.slice().reverse(),
+            y: geneBurden.symbols.slice().reverse(),
+            type: 'bar',
+            orientation: 'h',
+            marker: {color: geneBurden.colour},
+            customdata: geneBurden.percents.slice().reverse(),
+            hovertemplate: '%{y}: %{x} VUS records, %{customdata}% of the gene<extra></extra>'
+        }], chartLayout({
+            height: 700,
+            margin: {t: 20, r: 20, b: 60, l: 120},
+            xaxis: {title: 'Records currently at VUS', gridcolor: GRID_COLOUR, zeroline: false},
+            yaxis: {gridcolor: GRID_COLOUR, zeroline: false, automargin: true}
+        }), plotConfig);
+    }
+
+    const evidenceKeys = reclassificationCharts.evidence_keys;
+    if (evidenceKeys.labels.length) {
+        Plotly.newPlot('evidence-keys', [{
+            x: evidenceKeys.counts.slice().reverse(),
+            y: evidenceKeys.labels.slice().reverse(),
+            type: 'bar',
+            orientation: 'h',
+            marker: {color: evidenceKeys.colour},
+            hovertemplate: '%{y} changed in %{x} reclassifications<extra></extra>'
+        }], chartLayout({
+            height: 600,
+            margin: {t: 20, r: 20, b: 60, l: 220},
+            xaxis: {title: 'Reclassifications where the key changed', gridcolor: GRID_COLOUR, zeroline: false},
+            yaxis: {gridcolor: GRID_COLOUR, zeroline: false, automargin: true}
+        }), plotConfig);
+    }
+</script>
+{% endblock content %}
