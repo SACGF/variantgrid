@@ -62,6 +62,7 @@ CLASSIFICATION_NON_ACMG_ASSERTION_METHOD = [
 INSTALLED_APPS = ["oidc_auth"] + INSTALLED_APPS
 
 AUTHENTICATION_BACKENDS = (
+    'axes.backends.AxesStandaloneBackend',  # Must be first
     'oidc_auth.backend.VariantGridOIDCAuthenticationBackend',
     'django.contrib.auth.backends.ModelBackend',  # default
     'guardian.backends.ObjectPermissionBackend',
