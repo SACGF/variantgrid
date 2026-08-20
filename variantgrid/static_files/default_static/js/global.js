@@ -236,7 +236,8 @@ function enhanceAndMonitor() {
             }
         },
 
-        {test: '.nav-tabs a',
+        // This was breaking hand-rolled bootstrap tabs, should only be for uicore tab (see ui_tabs_builder)
+        {test: '.nav-tabs a[data-tab-set][id]',
             func: (node) => {node.on('shown.bs.tab', function(e) {
                 const $this = $(this);
                 const url = new URL(window.location);
