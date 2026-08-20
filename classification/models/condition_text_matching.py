@@ -28,7 +28,7 @@ from classification.models import (
     EvidenceKeyMap,
     classification_flag_types,
     classification_post_publish_signal,
-    flag_types,
+    flag_types, ConditionReference,
 )
 from classification.models.condition_text_search import condition_text_search
 from flags.models import Flag, FlagComment, FlagResolution, flag_comment_action
