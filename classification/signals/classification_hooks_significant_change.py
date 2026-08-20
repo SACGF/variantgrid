@@ -45,7 +45,7 @@ def summary_changed(sender, instance: ClassificationGrouping, old_summary: Class
 
     for value_type in (ClassificationResultValue.ONC_PATH, ClassificationResultValue.SOMATIC_CLINICAL_SIGNIFICANCE):
         if old_summary.value_for_value_type(value_type) != new_summary.value_for_value_type(value_type):
-            if oc := OverlapContribution.objects.filter(classification_grouping=instance, value_type=ClassificationResultValue.ONC_PATH).first():
+            if oc := OverlapContribution.objects.filter(classification_grouping=instance, value_type=value_type).first():
                 if oc.triage_state_obj.status == TriageStatus.REVIEWED_WILL_FIX:
                     # Note any value change will cause AMENDED, even if it wasn't on the agreed upon value
                     with set_extra_data({
