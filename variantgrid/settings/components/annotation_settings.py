@@ -356,6 +356,11 @@ ANNOTATION_DELETE_TEMP_FILES_ON_SUCCESS = True
 # #1670: don't dispatch new VEP runs below this free space on ANNOTATION_VCF_DUMP_DIR (None = no limit)
 ANNOTATION_MIN_FREE_DISK_GIGS = 1
 
+# Gene-level variants (gene fusions) - @see snpdb.gene_level_variants. Only deployments importing
+# fusions (TSO 500) ever create one, and a deployment with none still gets an always-empty Gene Level
+# AnnotationRun per range lock, so this is off in settings files where fusions can't arrive.
+ANNOTATION_GENE_LEVEL_ENABLED = True
+
 # AnnotSV, its own annotation pipeline type since #720. Strictly opt-in: leaving this False means the
 # scheduler creates no ANNOTSV AnnotationRuns at all. Deployments enable it in their per-host settings
 # file once the binary + bundle are installed.

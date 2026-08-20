@@ -111,6 +111,9 @@ def get_fake_annotation_settings_dict(columns_version: int) -> dict:
         # AnnotSV is off in the shipped defaults - pin it so a developer who enables it locally doesn't
         # trip the SV guards. Tests that want it on override at the method level.
         "ANNOTATION_ANNOTSV_ENABLED": False,
+        # Gene level is on in the shipped defaults - pin it so a developer on settings that turn it
+        # off still exercises the pipeline.
+        "ANNOTATION_GENE_LEVEL_ENABLED": True,
         "ANNOTATION": ANNOTATION_COLUMNS,
     }
 
