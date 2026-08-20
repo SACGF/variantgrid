@@ -176,6 +176,9 @@ class ObsoleteSubMigration(SubMigration):
 
 
 class GitSubMigration(SubMigration):
+    """ Pulls, then installs any dependency changes that came down with it. These are one step as
+        the migrator calls manage.py between steps (which imports every 3rd party package), so the
+        new requirements have to be in place before we hand back. """
 
     def __init__(self, args: list[str]):
         super().__init__()
@@ -186,14 +189,15 @@ class GitSubMigration(SubMigration):
         return substitute_aliases(self.args)
 
     def __str__(self):
-        return "git " + " ".join(self.effective_args)
+        return "git " + " ".join(self.effective_args) + " + install requirements"
 
     def run(self) -> MigrationResult:
         print_cyan(str(self))
-        completed_process = subprocess.run("git pull", shell=True, check=False)
-        if completed_process.returncode != 0:
-            return MigrationResult(status=MigrationStatus.FAILURE,
-                                   note=f"Subprocess failed with error code {completed_process.returncode}")
+        for command in ["git pull", "./scripts/install_requirements.sh"]:
+            completed_process = subprocess.run(command, shell=True, check=False)
+            if completed_process.returncode != 0:
+                return MigrationResult(status=MigrationStatus.FAILURE,
+                                       note=f"'{command}' failed with error code {completed_process.returncode}")
         return MigrationResult(status=MigrationStatus.SUCCESS)
 
 
@@ -448,7 +452,7 @@ class Migrator:
             self.refresh_migrations()
         keys = []
         print_purple("-- Welcome to variantgrid upgrader --")
-        print("a: automate standard steps (runs git, migrate, collectstatic_js_reverse, collectstatic, deployment_check, deployed)")
+        print("a: automate standard steps (runs git + install requirements, migrate, collectstatic_js_reverse, collectstatic, deployment_check, deployed)")
         print("am: auto-run all unblocked manage.py steps (skips gated + non-manage manual steps)")
         for migration in self.migrations:
             if migration.key == "1":
@@ -538,14 +542,20 @@ Usage: ./scripts/upgrade.sh [MODE]
 Modes:
   (no argument)    Interactive menu (also offers 'a' and 'am' below).
   --quick          Run the standard steps and quit if nothing else is outstanding:
-                   git pull, migrate, collectstatic_js_reverse, collectstatic,
-                   deployment_check, deployed.
+                   git pull + install requirements, migrate, collectstatic_js_reverse,
+                   collectstatic, deployment_check, deployed.
   --auto-manage    Plough through all outstanding manual steps automatically: run every
                    unblocked 'manage' step (re-evaluating between passes so ordering gates
                    release as prerequisites finish), stopping on the first failure. Gated,
                    obsolete, and non-manage human steps are reported, not run. Select an
                    obsolete step in the interactive menu to mark it complete.
   --help, -h       Show this help.
+
+Environment:
+  VG_INSTALL_REQUIREMENTS=0    Skip installing requirements, so an install that won't work
+                               (no network, a package that won't build) can't hold up the
+                               rest of the upgrade. Dependency changes in this upgrade will
+                               be missing, so migrate/collectstatic may fail.
 """
 
 
