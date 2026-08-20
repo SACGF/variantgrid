@@ -45,7 +45,7 @@ TAG_STATS_CACHE_TIMEOUT = DAY_SECS
 DEFAULT_TOP_TAGS = 8
 DEFAULT_TOP_GENES = 10
 TOP_USERS = 10
-MEGA_ARTEFACT_VARIANTS = 40
+MEGA_ARTEFACT_VARIANTS = 20
 OTHER = "other"
 GENE_SYMBOL_FIELD = "variant__variantannotation__transcript_version__gene_version__gene_symbol_id"
 
