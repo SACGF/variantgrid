@@ -8,13 +8,25 @@ from genes.models import GeneCoverageCollection, GeneSymbol
 
 class GeneCoverageMixin:
     def _load(self):
+        update_kwargs = super()._load() or {}
         if settings.SEQAUTO_ENABLED:
             self.has_gene_coverage = self.calculate_if_has_gene_coverage()
             logging.debug("has_gene_coverage = %s", self.has_gene_coverage)
-            if not self.has_gene_coverage:
-                self.shadow_color = NodeColors.WARNING
-            else:
-                self.shadow_color = None
+            update_kwargs["has_gene_coverage"] = self.has_gene_coverage
+        # Keep self in sync - update_node_task clears a stale ERROR shadow after load() based on this
+        self.shadow_color = NodeColors.WARNING if self.get_warnings() else NodeColors.VALID
+        update_kwargs["shadow_color"] = self.shadow_color
+        return update_kwargs
+
+    def get_warnings(self) -> list[str]:
+        warnings = super().get_warnings()
+        if self.has_gene_coverage is False:
+            warnings.append("Genes of interest have incomplete coverage (see genes tab)")
+        if self.modifies_parents():
+            for gene_list in self.get_gene_lists():
+                if gene_list_warnings := gene_list.get_warnings(self.analysis.gene_annotation_release):
+                    warnings.append(f"{gene_list}: {', '.join(gene_list_warnings)} (see genes tab)")
+        return warnings
 
     def calculate_if_has_gene_coverage(self):
         """ True/False/None (unknown) """
