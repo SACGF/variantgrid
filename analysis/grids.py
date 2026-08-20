@@ -32,8 +32,10 @@ from analysis.models.nodes.analysis_node import (
     NodeColumnSummaryCacheCollection,
     get_extra_filters_q,
 )
+from analysis.variant_tag_operations import VARIANT_TAG_CLASSIFIED
 from analysis.views.analysis_permissions import get_node_subclass_or_404
 from annotation.models import HumanProteinAtlasAnnotation
+from classification.models import Classification
 from genes.grids import GeneListGenesColumns
 from genes.models import HGNC, GeneList
 from library.jqgrid.jqgrid_sql import get_overrides
@@ -741,6 +743,12 @@ def get_analysis_log_entry_summary(action, content_type_model, changes, addition
         else:
             raise ValueError("Don't know how to handle analysisedge UPDATE")
         return f"{op} Parent: {parent_desc} {desc} Child: {child_desc}"
+
+    if content_type_model == "varianttag":
+        if additional_data.get("operation") == VARIANT_TAG_CLASSIFIED:
+            classification_id = additional_data["classification_id"]
+            url = Classification.get_url_for_pk(classification_id)
+            return f"Retired - classified as <a href='{url}'>{classification_id}</a>"
 
     if action == LogEntry.Action.CREATE:
         return "Created"

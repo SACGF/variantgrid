@@ -50,6 +50,12 @@ class VariantTag(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
     node = models.ForeignKey(AnalysisNode, null=True, on_delete=SET_NULL)  # Keep even if node deleted
     user = models.ForeignKey(User, on_delete=CASCADE)
 
+    def __str__(self):
+        description = f"{self.tag_id}: {self.variant} ({self.genome_build})"
+        if self.analysis_id:
+            description += f" in analysis {self.analysis_id}"
+        return description
+
     def can_view(self, user_or_group: Union[User, Group]) -> bool:
         """ Delegate to Analysis if set """
         if self.analysis:

@@ -84,6 +84,7 @@ from analysis.models.nodes.sources.cohort_node import (
     CohortNodeZygosityFiltersCollection,
 )
 from analysis.serializers import AnalysisNodeSerializer
+from analysis.variant_tag_operations import retire_requires_classification_tags
 from analysis.views.analysis_permissions import (
     get_analysis_or_404,
     get_node_subclass_or_404,
@@ -1299,8 +1300,5 @@ def create_classification_for_analysis(request, analysis_id):
 
     if analysis.can_write(request.user):
         AnalysisClassification.objects.create(analysis=analysis, classification=classification)
-
-        # Remove "Requires classification" tag
-        VariantTag.objects.filter(variant=classification.variant, analysis=analysis,
-                                  tag_id=settings.TAG_REQUIRES_CLASSIFICATION).delete()
+        retire_requires_classification_tags(classification, analysis, request.user)
     return redirect(classification.get_edit_url())

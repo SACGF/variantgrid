@@ -1,13 +1,19 @@
 from datetime import timedelta
 
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.test import TestCase
 from django.utils import timezone
 
+from analysis.grids import get_analysis_log_entry_summary
 from analysis.models import Analysis, TagNode, VariantTag, TagNodeInput
 from analysis.models.enums import TagNodeMode
 from analysis.models.nodes.analysis_node import NodeVersion
+from analysis.variant_tag_operations import retire_requires_classification_tags
 from annotation.fake_annotation import create_fake_variants, get_fake_annotation_version
+from classification.enums import SubmissionSource
+from classification.models.classification import Classification
+from classification.tests.models.test_utils import ClassificationTestUtils
 from snpdb.models import GenomeBuild, Tag, Variant
 from snpdb.tests.utils.vcf_testing_utils import create_mock_allele
 
@@ -157,3 +163,65 @@ class TestTagNodeTaggedWithinDays(TestCase):
         NodeVersion.objects.filter(node=node, version=node.version).update(
             created=timezone.now() - timedelta(days=40))
         self.assertIn(self.old_variant.pk, self._node_variant_ids(node))
+
+
+class TestRetireRequiresClassificationTags(TestCase):
+    """ Classifying the variant completes the to-do, deleting the tagging - the audit log entry is
+        then the only record it was ever there """
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+
+        ClassificationTestUtils.setUp()
+        cls.lab, cls.user = ClassificationTestUtils.lab_and_user()
+        cls.grch37 = GenomeBuild.get_name_or_alias("GRCh37")
+        get_fake_annotation_version(cls.grch37)
+        create_fake_variants(cls.grch37)
+
+        cls.analysis = Analysis(genome_build=cls.grch37)
+        cls.analysis.set_defaults_and_save(cls.user)
+
+        no_ref_qs = Variant.objects.filter(Variant.get_no_reference_q()).order_by("pk")
+        cls.variant, cls.other_variant = no_ref_qs[:2]
+        cls.requires_classification_tag = Tag.objects.get_or_create(pk=settings.TAG_REQUIRES_CLASSIFICATION)[0]
+        cls.other_tag = Tag.objects.get_or_create(pk="artefact")[0]
+
+        cls.classification = Classification.create(user=cls.user, lab=cls.lab, lab_record_id=None, data={},
+                                                   save=True, source=SubmissionSource.API,
+                                                   make_fields_immutable=False)
+        Classification.objects.filter(pk=cls.classification.pk).update(variant=cls.variant)
+        cls.classification.refresh_from_db()
+
+    def _tag_variant(self, variant, tag) -> VariantTag:
+        return VariantTag.objects.create(genome_build=self.grch37, analysis=self.analysis,
+                                         variant=variant, tag=tag, user=self.user)
+
+    def test_retires_every_tagging_of_the_classified_variant(self):
+        retired = self._tag_variant(self.variant, self.requires_classification_tag)
+        also_retired = self._tag_variant(self.variant, self.requires_classification_tag)
+        other_tag = self._tag_variant(self.variant, self.other_tag)
+        other_variant = self._tag_variant(self.other_variant, self.requires_classification_tag)
+
+        num_retired = retire_requires_classification_tags(self.classification, self.analysis, self.user)
+        self.assertEqual(num_retired, 2)
+
+        remaining = set(VariantTag.objects.values_list("pk", flat=True))
+        self.assertEqual(remaining, {other_tag.pk, other_variant.pk})
+        self.assertNotIn(retired.pk, remaining)
+        self.assertNotIn(also_retired.pk, remaining)
+
+    def test_logs_classification_in_analysis_audit_log(self):
+        variant_tag = self._tag_variant(self.variant, self.requires_classification_tag)
+
+        retire_requires_classification_tags(self.classification, self.analysis, self.user)
+
+        log_entry = self.analysis.log_entry_qs().get()
+        self.assertEqual(log_entry.object_pk, str(variant_tag.pk))
+        self.assertEqual(log_entry.actor, self.user)
+        self.assertEqual(log_entry.additional_data["classification_id"], self.classification.pk)
+        self.assertEqual(log_entry.additional_data["tag_id"], settings.TAG_REQUIRES_CLASSIFICATION)
+
+        summary = get_analysis_log_entry_summary(log_entry.action, log_entry.content_type.model,
+                                                 log_entry.changes, log_entry.additional_data)
+        self.assertIn(str(self.classification.pk), summary)
