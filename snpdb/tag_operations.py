@@ -23,11 +23,10 @@ from auditlog.models import LogEntry
 from django.contrib.auth.models import User
 from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
-from django.db.models import Count, F, Model, QuerySet, TextChoices
+from django.db.models import Count, Model, QuerySet, TextChoices
 from django.utils import timezone
 
-from analysis.models import Analysis, NodeStatus, VariantTag
-from analysis.models.nodes.analysis_node import AnalysisEdge, AnalysisNode, NodeVersion
+from analysis.models import VariantTag
 from analysis.models.nodes.filters.tag_node import TagNode, TagNodeTag
 from classification.enums import AlleleOriginBucket
 from snpdb.models import TAG_ALLELE_ORIGIN_CHOICES, Tag, TagColor
@@ -176,40 +175,15 @@ def _repoint_tag(fk: TagForeignKey, dying_tag: Tag, surviving_tag: Tag) -> TagMe
     return counts
 
 
-def set_tag_nodes_dirty(tags: Iterable[Tag]):
-    """ Nodes filtering on any of these tags return different variants after a merge/retire/reinstate,
-        and everything downstream of them re-runs too. Saving a node cascades version-bump saves through
-        its descendants a row at a time, so this bumps everything in bulk the way reload_analysis_nodes
-        does - the periodic scheduler picks the dirty nodes up from there """
-    tag_nodes = list(TagNode.objects.filter(tagnodetag__tag__in=tags).distinct())
-    if not tag_nodes:
-        return
+def refresh_tag_node_names(tags: Iterable[Tag]):
+    """ Tag names appear in auto generated node names, so a merge leaves nodes labelled with a tag that
+        no longer exists.
 
-    analysis_ids = {node.analysis_id for node in tag_nodes}
-    children_by_parent = defaultdict(list)
-    edges_qs = AnalysisEdge.objects.filter(parent__analysis_id__in=analysis_ids)
-    for parent_id, child_id in edges_qs.values_list("parent_id", "child_id"):
-        children_by_parent[parent_id].append(child_id)
-
-    dirty_node_ids = {node.pk for node in tag_nodes}
-    queue = list(dirty_node_ids)
-    while queue:
-        for child_id in children_by_parent.get(queue.pop(), []):
-            if child_id not in dirty_node_ids:
-                dirty_node_ids.add(child_id)
-                queue.append(child_id)
-
-    nodes_qs = AnalysisNode.objects.filter(pk__in=dirty_node_ids)
-    nodes_qs.update(version=F("version") + 1, status=NodeStatus.DIRTY,
-                    count=None, errors=None, cloned_from=None)
-    NodeVersion.objects.bulk_create([NodeVersion(node_id=node_id, version=version)
-                                     for node_id, version in nodes_qs.values_list("pk", "version")],
-                                    ignore_conflicts=True)
-    Analysis.objects.filter(pk__in=analysis_ids).update(modified=timezone.now())
-
-    # Tag names appear in auto generated node names, so refresh the tag nodes' labels
+        Only the label is touched: a tag node's variants are a snapshot of the tags as they were when it
+        was last saved (@see TagNode.get_warnings) and people reload one when they want it current, so a
+        vocabulary change leaves historical results - and the audit work done against them - alone """
     renamed = []
-    for node in tag_nodes:
+    for node in TagNode.objects.filter(tagnodetag__tag__in=tags).distinct():
         if node.auto_node_name and (name := node.get_node_name()) != node.name:
             node.name = name
             renamed.append(node)
@@ -268,13 +242,11 @@ def get_tag_operations(tag: Tag = None) -> QuerySet[LogEntry]:
     return qs.filter(additional_data__has_key="operation").order_by("-timestamp")
 
 
-def merge_tag(dying_tag: Tag, surviving_tag: Tag, user: User, set_nodes_dirty: bool = True) -> TagMergeResult:
+def merge_tag(dying_tag: Tag, surviving_tag: Tag, user: User) -> TagMergeResult:
     """ Repoint everything using dying_tag at surviving_tag, then retire dying_tag. The repointing cannot
         be undone - reinstating the tag afterwards gets the name back, not the rows.
         Repeated variant tags this leaves behind are indistinguishable from ones that were already there
-        - @see the variant_tags delete-duplicates management command.
-        A caller doing several merges passes set_nodes_dirty=False and calls set_tag_nodes_dirty() itself
-        with all the surviving tags at the end, so each affected node only re-runs once """
+        - @see the variant_tags delete-duplicates management command. """
     if dying_tag.pk == surviving_tag.pk:
         raise ValueError("Cannot merge a tag into itself")
     if not surviving_tag.active:
@@ -284,9 +256,8 @@ def merge_tag(dying_tag: Tag, surviving_tag: Tag, user: User, set_nodes_dirty: b
     with transaction.atomic():
         for fk in TAG_FOREIGN_KEYS:
             result.counts.append(_repoint_tag(fk, dying_tag, surviving_tag))
-        if set_nodes_dirty:
-            # Everything now points at the surviving tag, so this catches nodes that used either side
-            set_tag_nodes_dirty([surviving_tag])
+        # Everything now points at the surviving tag, so this catches nodes that used either side
+        refresh_tag_node_names([surviving_tag])
         dying_tag.merged_into = surviving_tag
         dying_tag.retired = timezone.now()
         dying_tag.save()
@@ -308,8 +279,6 @@ def retire_tag(tag: Tag, user: User, reason: str = None) -> Tag:
     with transaction.atomic():
         tag.retired = timezone.now()
         tag.save()
-        # Nodes offering this tag return the same variants, but the tag is no longer selectable
-        set_tag_nodes_dirty([tag])
         log_tag_operation(tag, TagOperation.RETIRE, user,
                           reason=reason,
                           still_used_by=usage.description())
@@ -329,7 +298,6 @@ def reinstate_tag(tag: Tag, user: User) -> Tag:
         tag.retired = None
         tag.merged_into = None
         tag.save()
-        set_tag_nodes_dirty([tag])
         log_tag_operation(tag, TagOperation.REINSTATE, user, was_merged_into=merged_into_id)
 
     logging.info("Reinstated tag '%s'", tag)

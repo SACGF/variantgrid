@@ -19,7 +19,7 @@ from analysis.signals.signal_handlers import variant_tag_delete
 from eventlog.models import create_event
 from library.guardian_utils import admin_bot
 from snpdb.models import Tag
-from snpdb.tag_operations import get_case_collision_groups, get_tag_usage, merge_tag, set_tag_nodes_dirty
+from snpdb.tag_operations import get_case_collision_groups, get_tag_usage, merge_tag
 
 MERGE_CASE_COLLISIONS = "merge-case-collisions"
 DELETE_DUPLICATES = "delete-duplicates"
@@ -66,7 +66,6 @@ class Command(BaseCommand):
 
     @staticmethod
     def _merge_case_collisions(dry_run: bool):
-        surviving_tags = []
         for tag_ids in get_case_collision_groups():
             tags = sorted((Tag.objects.get(pk=t) for t in tag_ids),
                           key=lambda t: get_tag_usage(t).total, reverse=True)
@@ -76,13 +75,7 @@ class Command(BaseCommand):
                     logging.info("Would merge '%s' (%s) into '%s'",
                                  dying_tag, get_tag_usage(dying_tag).description(), surviving_tag)
                 else:
-                    merge_tag(dying_tag, surviving_tag, admin_bot(), set_nodes_dirty=False)
-            if not dry_run:
-                surviving_tags.append(surviving_tag)
-        if surviving_tags:
-            # One bulk pass over every affected node after all the merges, rather than per merge
-            logging.info("Setting analysis nodes that use the merged tags dirty")
-            set_tag_nodes_dirty(surviving_tags)
+                    merge_tag(dying_tag, surviving_tag, admin_bot())
 
     @staticmethod
     def _delete_duplicates(dry_run: bool):

@@ -6,7 +6,6 @@ from django.utils import timezone
 
 from analysis.forms.forms_nodes import TagNodeForm
 from analysis.models import Analysis, VariantTag
-from analysis.models.nodes.analysis_node import AnalysisEdge
 from analysis.models.nodes.filters.tag_node import TagNode, TagNodeTag
 from annotation.fake_annotation import create_fake_variants
 from classification.enums import AlleleOriginBucket
@@ -76,7 +75,6 @@ class TagMergeTest(VariantTagTestCase):
         TagNodeTag.objects.create(tag_node=tag_node, tag=self.surviving_tag)
         other_node = TagNode.objects.create(analysis=self.analysis, version=1)
         TagNodeTag.objects.create(tag_node=other_node, tag=self.dying_tag)
-        version_before = other_node.version
 
         merge_tag(self.dying_tag, self.surviving_tag, self.user)
 
@@ -84,20 +82,6 @@ class TagMergeTest(VariantTagTestCase):
                          ["Artefact"])
         self.assertEqual(list(TagNodeTag.objects.filter(tag_node=other_node).values_list("tag_id", flat=True)),
                          ["Artefact"])
-        other_node.refresh_from_db()
-        self.assertGreater(other_node.version, version_before, "Nodes using the merged tag re-run")
-
-    def test_merge_reruns_tag_node_descendants(self):
-        """ A tag node returning different variants changes everything downstream of it """
-        tag_node = TagNode.objects.create(analysis=self.analysis, version=1)
-        TagNodeTag.objects.create(tag_node=tag_node, tag=self.dying_tag)
-        child = TagNode.objects.create(analysis=self.analysis, version=1)
-        AnalysisEdge.objects.create(parent=tag_node, child=child)
-
-        merge_tag(self.dying_tag, self.surviving_tag, self.user)
-
-        child.refresh_from_db()
-        self.assertGreater(child.version, 1, "Downstream nodes re-run")
 
     def test_merge_refreshes_auto_node_names(self):
         """ The merged tag's name appears in auto generated node labels """
@@ -232,20 +216,17 @@ class TagOperationLogTest(VariantTagTestCase):
 
 
 class MergeCaseCollisionsCommandTest(VariantTagTestCase):
-    def test_command_still_reruns_nodes(self):
-        """ The command defers node dirtying until after all the merges, so the nodes still have to
-            come out of it re-run """
+    def test_command_merges_the_less_used_tag_into_the_most_used(self):
         self._create_variant_tag(self.surviving_tag)
         self._create_variant_tag(self.surviving_tag, variant=self.other_variant)
         node = TagNode.objects.create(analysis=self.analysis, version=1)
         TagNodeTag.objects.create(tag_node=node, tag=self.dying_tag)
-        version_before = node.version
 
         call_command("variant_tags", "merge-case-collisions")
 
         self.assertEqual(Tag.objects.get(pk="artefact").merged_into_id, "Artefact")
         node.refresh_from_db()
-        self.assertGreater(node.version, version_before, "Node using the merged tag re-runs")
+        self.assertIn("Artefact", node.name)
 
 
 class DeleteDuplicateVariantTagsTest(VariantTagTestCase):
