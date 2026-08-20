@@ -40,6 +40,13 @@
 {% block content %}
     <div class="container">
         {% page_help page_id='settings/tags_help' title='Tags' %}
+
+        {% if url_name_visible.variant_tags %}
+            <p>
+                <a class="btn btn-outline-secondary fas fa-tags" href="{% url 'variant_tags' %}">Variant Tags</a>
+            </p>
+        {% endif %}
+
         <div class="card">
             <div class="card-header">Create Tag</div>
             <div class="card-body">
@@ -60,6 +67,11 @@
                     <a href="{{ user_settings_tag_colors.get_absolute_url }}">{{ user_settings_tag_colors }}</a>
                 {% endif %}
                 set in your <a href="{% url 'view_user_settings' %}">User Settings</a>
+            </p>
+
+            <p class="text-muted small">
+                Allele origin is used on {% if url_name_visible.tag_stats %}<a href="{% url 'tag_stats' %}">tag stats</a>{% else %}tag stats{% endif %}
+                Only admins can change existing tags.
             </p>
 
             <table class="table">

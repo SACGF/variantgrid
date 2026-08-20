@@ -45,7 +45,7 @@ TAG_STATS_CACHE_TIMEOUT = DAY_SECS
 DEFAULT_TOP_TAGS = 8
 DEFAULT_TOP_GENES = 10
 TOP_USERS = 10
-MEGA_ARTEFACT_VARIANTS = 20
+TOP_RE_TAGGED_ALLELES = 20
 OTHER = "other"
 GENE_SYMBOL_FIELD = "variant__variantannotation__transcript_version__gene_version__gene_symbol_id"
 
@@ -357,7 +357,7 @@ def tag_stats_re_tagged(request):
 
     def calculate():
         qs = _with_allele(_tags_qs(request.user, allele_origin_filter)).filter(tag=tag_id)
-        top = list(qs.values("allele_id").annotate(count=Count("pk")).order_by("-count")[:MEGA_ARTEFACT_VARIANTS])
+        top = list(qs.values("allele_id").annotate(count=Count("pk")).order_by("-count")[:TOP_RE_TAGGED_ALLELES])
         variants_by_allele_id = _variants_by_allele_id([r["allele_id"] for r in top], genome_build)
 
         alleles = []
