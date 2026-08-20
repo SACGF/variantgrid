@@ -419,6 +419,12 @@ class ClinVarRecordCollection(TimeStampedModel):
         self.clinvarrecord_set.exclude(record_id__in={r.record_id for r in records}).delete()
         for record in records:
             record.clinvar_record_collection = self
+
+        # since the primary key of a ClinVarRecord is the record_id, we should just be able to upsert
+        # If these newly created "ClinVarRecord"s have a record_id that matches a record already in the DB
+        # it should just update anyway
+        all_field_names = [field.name for field in ClinVarRecord._meta.concrete_fields if field.name != "record_id"]
+
         ClinVarRecord.objects.bulk_create(records, update_conflicts=True, unique_fields=["record_id"], update_fields=all_field_names)
         self.expert_panel = None
         self.max_stars = None
