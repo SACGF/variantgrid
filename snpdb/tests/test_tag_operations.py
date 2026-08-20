@@ -9,6 +9,7 @@ from analysis.models import Analysis, VariantTag
 from analysis.models.nodes.analysis_node import AnalysisEdge
 from analysis.models.nodes.filters.tag_node import TagNode, TagNodeTag
 from annotation.fake_annotation import create_fake_variants
+from classification.enums import AlleleOriginBucket
 from library.django_utils.unittest_utils import prevent_request_warnings
 from snpdb.forms import CreateTagForm
 from snpdb.models import GenomeBuild, Tag, TagColor, TagColorsCollection, Variant
@@ -21,6 +22,7 @@ from snpdb.tag_operations import (
     merge_tag,
     reinstate_tag,
     retire_tag,
+    set_tag_allele_origin,
 )
 
 
@@ -281,24 +283,27 @@ class CreateTagFormTest(TestCase):
         Tag.objects.create(pk="Artefact")
 
     def test_rejects_case_collision(self):
-        form = CreateTagForm({"tag": "artefact"})
+        form = CreateTagForm({"tag": "artefact", "allele_origin_bucket": AlleleOriginBucket.UNKNOWN})
         self.assertFalse(form.is_valid())
         self.assertIn("Artefact", str(form.errors))
 
     def test_rejects_non_alphanumeric(self):
-        self.assertFalse(CreateTagForm({"tag": "not a tag"}).is_valid())
+        self.assertFalse(CreateTagForm({"tag": "not a tag",
+                                        "allele_origin_bucket": AlleleOriginBucket.UNKNOWN}).is_valid())
 
-    def test_creates_new_tag(self):
-        form = CreateTagForm({"tag": "SomaticReportable"})
-        self.assertTrue(form.is_valid())
-        self.assertEqual(form.save().pk, "SomaticReportable")
+    def test_creates_new_tag_with_its_allele_origin(self):
+        form = CreateTagForm({"tag": "SomaticReportable", "allele_origin_bucket": AlleleOriginBucket.SOMATIC})
+        self.assertTrue(form.is_valid(), form.errors)
+        tag = form.save()
+        self.assertEqual(tag.pk, "SomaticReportable")
+        self.assertEqual(tag.allele_origin_bucket, AlleleOriginBucket.SOMATIC)
 
     def test_rejects_retired_name_and_says_where_it_went(self):
         """ A retired tag keeps its name, so re-creating it would be an IntegrityError """
         surviving_tag = Tag.objects.create(pk="Artefacts")
         Tag.objects.filter(pk="Artefact").update(retired=timezone.now(), merged_into=surviving_tag)
 
-        form = CreateTagForm({"tag": "Artefact"})
+        form = CreateTagForm({"tag": "Artefact", "allele_origin_bucket": AlleleOriginBucket.UNKNOWN})
 
         self.assertFalse(form.is_valid())
         self.assertIn("Artefacts", str(form.errors))
@@ -342,3 +347,44 @@ class TagMergeViewTest(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertEqual(Tag.objects.get(pk="artefact").merged_into_id, "Artefact")
         self.assertFalse(Tag.live_qs().filter(pk="artefact").exists())
+
+
+class TagAlleleOriginTest(VariantTagTestCase):
+    def test_change_is_recorded_in_the_operation_history(self):
+        set_tag_allele_origin(self.surviving_tag, AlleleOriginBucket.SOMATIC, self.user)
+
+        self.surviving_tag.refresh_from_db()
+        self.assertEqual(self.surviving_tag.allele_origin_bucket, AlleleOriginBucket.SOMATIC)
+        log_entry = get_tag_operations(self.surviving_tag).get()
+        self.assertEqual(log_entry.additional_data["operation"], TagOperation.SET_ALLELE_ORIGIN)
+        self.assertEqual(log_entry.additional_data["from"], AlleleOriginBucket.UNKNOWN)
+        self.assertEqual(log_entry.additional_data["to"], AlleleOriginBucket.SOMATIC)
+
+    def test_setting_what_it_already_is_logs_nothing(self):
+        set_tag_allele_origin(self.surviving_tag, AlleleOriginBucket.UNKNOWN, self.user)
+        self.assertFalse(get_tag_operations(self.surviving_tag).exists())
+
+
+class TagAlleleOriginViewTest(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.admin_user = User.objects.create_superuser('tag_allele_origin_test_admin')
+        cls.normal_user = User.objects.create_user('tag_allele_origin_test_normal')
+
+    def setUp(self):
+        Tag.objects.create(pk="Artefact")
+        self.url = reverse('tag_set_allele_origin', kwargs={"tag_id": "Artefact"})
+
+    @prevent_request_warnings
+    def test_non_superuser_cannot_change_allele_origin(self):
+        self.client.force_login(self.normal_user)
+        response = self.client.post(self.url, {"allele_origin_bucket": AlleleOriginBucket.SOMATIC})
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(Tag.objects.get(pk="Artefact").allele_origin_bucket, AlleleOriginBucket.UNKNOWN)
+
+    def test_superuser_sets_allele_origin(self):
+        self.client.force_login(self.admin_user)
+        response = self.client.post(self.url, {"allele_origin_bucket": AlleleOriginBucket.GERMLINE})
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(Tag.objects.get(pk="Artefact").allele_origin_bucket, AlleleOriginBucket.GERMLINE)

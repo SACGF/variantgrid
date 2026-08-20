@@ -36,7 +36,7 @@ from django_extensions.db.models import TimeStampedModel
 from model_utils.managers import InheritanceManager
 from more_itertools import first
 
-from classification.enums.classification_enums import ShareLevel
+from classification.enums.classification_enums import AlleleOriginBucket, ShareLevel
 from eventlog.models import create_event
 from library.django_utils import get_url_from_media_root_filename
 from library.django_utils.django_object_managers import ObjectManagerCachingRequest
@@ -49,12 +49,23 @@ from snpdb.models.models_enums import UserAwardLevel
 from user_messages.models import Message
 
 
+# A tag used for both origins is stored as UNKNOWN so AlleleOriginFilterDefault.buckets works verbatim.
+# On a tag that means "applies to both", which is what people see
+TAG_ALLELE_ORIGIN_CHOICES = [
+    (AlleleOriginBucket.UNKNOWN, "Both"),
+    (AlleleOriginBucket.GERMLINE, "Germline only"),
+    (AlleleOriginBucket.SOMATIC, "Somatic only"),
+]
+
+
 class Tag(models.Model):
     id = models.CharField(max_length=50, primary_key=True)
     # Retired tags are kept rather than deleted so old names still resolve, and so merges leave a trail.
     # They're hidden from anywhere you pick a tag, but rows already pointing at them keep working
     retired = models.DateTimeField(null=True, blank=True)
     merged_into = models.ForeignKey('self', null=True, blank=True, on_delete=SET_NULL)
+    allele_origin_bucket = models.CharField(max_length=1, choices=TAG_ALLELE_ORIGIN_CHOICES,
+                                            default=AlleleOriginBucket.UNKNOWN)
 
     @classmethod
     def live_qs(cls) -> QuerySet['Tag']:

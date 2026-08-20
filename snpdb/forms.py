@@ -16,6 +16,7 @@ from guardian.shortcuts import assign_perm, remove_perm
 
 from annotation.models import ManualVariantEntry
 from annotation.models.models_enums import ManualVariantEntryType
+from classification.enums import AlleleOriginBucket
 from library.cache import timed_cache
 from library.django_utils.autocomplete_utils import ModelSelect2, ModelSelect2Multiple
 from library.forms import ROFormMixin
@@ -24,6 +25,7 @@ from patients.models import Extraction, Patient, Specimen
 from snpdb import models
 from snpdb.models import (
     DEFAULT_GRID_LOADING_ANIMATIONS,
+    TAG_ALLELE_ORIGIN_CHOICES,
     VCF,
     Cohort,
     CustomColumnsCollection,
@@ -754,13 +756,16 @@ def _tag_state_description(tag: Tag) -> str:
 
 class CreateTagForm(forms.Form):
     tag = forms.CharField(widget=forms.TextInput(attrs={'placeholder': 'New Tag Name...'}), required=True)
+    allele_origin_bucket = forms.ChoiceField(choices=TAG_ALLELE_ORIGIN_CHOICES, label="Allele origin",
+                                             initial=AlleleOriginBucket.UNKNOWN, required=True)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
         helper = FormHelperHelper.instance.horizontal
         helper.layout = Layout(
-            FieldWithButtons('tag', Submit(name="Create", value="create", css_class="btn btn-primary"))
+            FieldWithButtons('tag', Submit(name="Create", value="create", css_class="btn btn-primary")),
+            Field('allele_origin_bucket'),
         )
         self.helper = helper
 
@@ -776,7 +781,8 @@ class CreateTagForm(forms.Form):
         return tag_name
 
     def save(self) -> Tag:
-        return Tag.objects.create(pk=self.cleaned_data['tag'])
+        return Tag.objects.create(pk=self.cleaned_data['tag'],
+                                  allele_origin_bucket=self.cleaned_data['allele_origin_bucket'])
 
 
 class UserSettingsGenomeBuildMixin:

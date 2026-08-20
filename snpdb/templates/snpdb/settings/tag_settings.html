@@ -9,6 +9,10 @@
     {{ block.super }}
     <script>
         $(document).ready(() => {
+            $(".allele-origin-select").change(function() {
+                $(this).closest("form").submit();
+            });
+
             // Only allow alphanumeric entry
             $('#id_tag').keypress(function(e){
                 const code = e.which;
@@ -62,6 +66,7 @@
                 <thead>
                     <tr>
                         <th>Tag</th>
+                        <th>Allele origin</th>
                         <th>Used by</th>
                         <th>Similar tags</th>
                         {% if user.is_superuser %}<th></th>{% endif %}
@@ -71,6 +76,20 @@
                 {% for ts in tag_summaries %}
                     <tr>
                         <td><span class='grid-tag tagged-{{ ts.tag_id }}'><span class='user-tag-colored'> {{ ts.tag_id }}</span></span></td>
+                        <td>
+                            {% if user.is_superuser %}
+                                <form method="post" action="{% url 'tag_set_allele_origin' ts.tag_id %}">
+                                    {% csrf_token %}
+                                    <select name="allele_origin_bucket" class="form-control form-control-sm allele-origin-select">
+                                        {% for value, label in allele_origin_choices %}
+                                            <option value="{{ value }}" {% if value == ts.tag.allele_origin_bucket %}selected{% endif %}>{{ label }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </form>
+                            {% else %}
+                                {{ ts.tag.get_allele_origin_bucket_display }}
+                            {% endif %}
+                        </td>
                         <td>{{ ts.usage.description }}</td>
                         <td>
                             {% for suggestion in ts.suggestions %}

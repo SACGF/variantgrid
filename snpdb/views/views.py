@@ -113,6 +113,7 @@ from snpdb.graphs.chromosome_intervals_graph import ChromosomeIntervalsGraph
 from snpdb.graphs.homozygosity_percent_graph import HomozygosityPercentGraph
 from snpdb.import_status import set_vcf_and_samples_import_status
 from snpdb.models import (
+    TAG_ALLELE_ORIGIN_CHOICES,
     VCF,
     AbstractNodeCountSettings,
     Allele,
@@ -174,6 +175,7 @@ from snpdb.tag_operations import (
     merge_tag,
     reinstate_tag,
     retire_tag,
+    set_tag_allele_origin,
 )
 from snpdb.tasks.liftover_tasks import liftover_alleles
 from snpdb.tasks.soft_delete_tasks import soft_delete_vcfs
@@ -1366,7 +1368,9 @@ def _get_tag_summaries() -> list[dict]:
     """ Per-tag usage counts + possible typo twins, for the tag settings table """
     usage_by_tag_id = get_tag_usage_by_tag_id()
     merge_suggestions = get_merge_suggestions()
+    tags_by_id = Tag.live_qs().in_bulk()
     return [{
+        "tag": tags_by_id[tag_id],
         "tag_id": tag_id,
         "usage": usage,
         "suggestions": merge_suggestions.get(tag_id, []),
@@ -1393,6 +1397,7 @@ def tag_settings(request):
         'user_tag_styles': user_tag_styles,
         'user_tag_colors': user_tag_colors,
         'tag_summaries': _get_tag_summaries(),
+        'allele_origin_choices': TAG_ALLELE_ORIGIN_CHOICES,
         'retired_tags': Tag.objects.filter(retired__isnull=False).order_by("-retired"),
         'tag_operations': _get_tag_operation_history(),
     }
@@ -1438,6 +1443,20 @@ def tag_retire(request, tag_id):
         retire_tag(tag, request.user, reason=request.POST.get("reason") or None)
         messages.add_message(request, messages.INFO,
                              f"Retired '{tag}' - it's no longer offered, existing tagging is unchanged")
+    except ValueError as ve:
+        messages.add_message(request, messages.ERROR, str(ve))
+    return redirect('tag_settings')
+
+
+@require_superuser
+@require_POST
+def tag_set_allele_origin(request, tag_id):
+    """ Which side of the house a tag belongs to - the tag stats page filters on it """
+    tag = get_object_or_404(Tag, pk=tag_id)
+    try:
+        set_tag_allele_origin(tag, request.POST.get("allele_origin_bucket"), request.user)
+        messages.add_message(request, messages.INFO,
+                             f"'{tag}' allele origin is now {tag.get_allele_origin_bucket_display()}")
     except ValueError as ve:
         messages.add_message(request, messages.ERROR, str(ve))
     return redirect('tag_settings')

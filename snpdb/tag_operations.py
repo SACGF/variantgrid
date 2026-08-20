@@ -1,6 +1,6 @@
 """
-Admin operations on the tag vocabulary - merging, retiring, reinstating - and the case-collision checks
-that stop confusable tags being created in the first place.
+Admin operations on the tag vocabulary - merging, retiring, reinstating, setting allele origin - and the
+case-collision checks that stop confusable tags being created in the first place.
 
 Tag.id is the tag name (CharField primary key) so a merge repoints every foreign key at the surviving tag
 then retires the dying one. Variant tags have no unique constraint involving tag so they move in a single
@@ -29,7 +29,8 @@ from django.utils import timezone
 from analysis.models import Analysis, NodeStatus, VariantTag
 from analysis.models.nodes.analysis_node import AnalysisEdge, AnalysisNode, NodeVersion
 from analysis.models.nodes.filters.tag_node import TagNode, TagNodeTag
-from snpdb.models import Tag, TagColor
+from classification.enums import AlleleOriginBucket
+from snpdb.models import TAG_ALLELE_ORIGIN_CHOICES, Tag, TagColor
 
 MERGE_SUGGESTION_MAX_DISTANCE = 1
 
@@ -39,6 +40,7 @@ class TagOperation(TextChoices):
     MERGE = "merge", "Merged"
     RETIRE = "retire", "Retired"
     REINSTATE = "reinstate", "Reinstated"
+    SET_ALLELE_ORIGIN = "allele_origin", "Allele origin"
 
 
 @dataclass(frozen=True)
@@ -227,6 +229,10 @@ def log_tag_operation(tag: Tag, operation: TagOperation, user: User, **details) 
     )
 
 
+def _allele_origin_label(bucket: str) -> str:
+    return dict(TAG_ALLELE_ORIGIN_CHOICES).get(bucket, bucket or "")
+
+
 def describe_tag_operation(log_entry: LogEntry) -> str:
     """ Human readable summary of one operation, from the details stashed at the time """
     data = log_entry.additional_data or {}
@@ -247,6 +253,8 @@ def describe_tag_operation(log_entry: LogEntry) -> str:
         if was_merged_into := data.get("was_merged_into"):
             return f"was merged into '{was_merged_into}' - those rows stay where they went"
         return ""
+    if operation == TagOperation.SET_ALLELE_ORIGIN:
+        return f"{_allele_origin_label(data.get('from'))} -> {_allele_origin_label(data.get('to'))}"
     return ""
 
 
@@ -325,4 +333,21 @@ def reinstate_tag(tag: Tag, user: User) -> Tag:
         log_tag_operation(tag, TagOperation.REINSTATE, user, was_merged_into=merged_into_id)
 
     logging.info("Reinstated tag '%s'", tag)
+    return tag
+
+
+def set_tag_allele_origin(tag: Tag, allele_origin_bucket: str, user: User) -> Tag:
+    """ Which side of the house a tag belongs to - it's what the tag stats page filters on. Tags stay
+        offered everywhere regardless, so nothing already tagged or filtering on the tag changes """
+    bucket = AlleleOriginBucket(allele_origin_bucket)
+    previous = tag.allele_origin_bucket
+    if previous == bucket:
+        return tag
+
+    with transaction.atomic():
+        tag.allele_origin_bucket = bucket
+        tag.save()
+        log_tag_operation(tag, TagOperation.SET_ALLELE_ORIGIN, user, **{"from": previous, "to": bucket.value})
+
+    logging.info("Tag '%s' allele origin %s -> %s", tag, previous, bucket.value)
     return tag

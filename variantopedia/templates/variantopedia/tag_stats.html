@@ -19,27 +19,31 @@
         return $(selector).val() || [];
     }
 
+    function alleleOriginParam() {
+        return "allele_origin=" + encodeURIComponent($("input[name=allele_origin]:checked").val());
+    }
+
     function loadGenesCard() {
         const params = $.param({
             gene_symbols: selectedValues("#id_genes-gene_symbols"),
             tags: selectedValues("#id_genes-tags"),
         }, true);
         loadTagStatsCard("tag-stats-genes",
-                         "{% url 'tag_stats_genes' %}?" + params,
+                         "{% url 'tag_stats_genes' %}?" + alleleOriginParam() + "&" + params,
                          renderTagStatsGenes);
     }
 
     function loadReTaggedCard() {
         const tag = $("#id_re-tagged-tag").val() || "";
         loadTagStatsCard("tag-stats-re-tagged",
-                         "{% url 'tag_stats_re_tagged' %}?tag=" + encodeURIComponent(tag),
+                         "{% url 'tag_stats_re_tagged' %}?" + alleleOriginParam() + "&tag=" + encodeURIComponent(tag),
                          (data, $content) => renderTagStatsReTagged(data, $content, Urls.view_allele));
     }
 
     function loadTagGenesOverTimeCard() {
         const tag = $("#id_gene-time-tag").val() || "";
         loadTagStatsCard("tag-stats-tag-genes-over-time",
-                         "{% url 'tag_stats_tag_genes_over_time' %}?tag=" + encodeURIComponent(tag),
+                         "{% url 'tag_stats_tag_genes_over_time' %}?" + alleleOriginParam() + "&tag=" + encodeURIComponent(tag),
                          renderTagStatsTagGenesOverTime);
     }
 
@@ -50,21 +54,31 @@
         }
     }
 
-    $(document).ready(() => {
-        loadTagStatsCard("tag-stats-headline", "{% url 'tag_stats_headline' %}",
+    function loadAllTagStatsCards() {
+        const alleleOrigin = "?" + alleleOriginParam();
+        loadTagStatsCard("tag-stats-headline", "{% url 'tag_stats_headline' %}" + alleleOrigin,
                          renderTagStatsHeadline);
-        loadTagStatsCard("tag-stats-over-time", "{% url 'tag_stats_over_time' %}",
+        loadTagStatsCard("tag-stats-over-time", "{% url 'tag_stats_over_time' %}" + alleleOrigin,
                          renderTagStatsOverTime);
-        loadTagStatsCard("tag-stats-your-tagging", "{% url 'tag_stats_for_user' %}",
+        loadTagStatsCard("tag-stats-your-tagging", "{% url 'tag_stats_for_user' %}" + alleleOrigin,
                          renderTagStatsUser);
-        loadTagStatsCard("tag-stats-by-lab", "{% url 'tag_stats_by_lab' %}",
+        loadTagStatsCard("tag-stats-by-lab", "{% url 'tag_stats_by_lab' %}" + alleleOrigin,
                          renderTagStatsByLab);
-        loadTagStatsCard("tag-stats-co-occurrence", "{% url 'tag_stats_co_occurrence' %}",
+        loadTagStatsCard("tag-stats-co-occurrence", "{% url 'tag_stats_co_occurrence' %}" + alleleOrigin,
                          (data, $content) => renderTagStatsCoOccurrence(data, $content, taggedVariantsUrl));
         loadGenesCard();
         loadReTaggedCard();
         loadTagGenesOverTimeCard();
+    }
 
+    $(document).ready(() => {
+        loadAllTagStatsCards();
+
+        $("input[name=allele_origin]").change(() => {
+            // Keep the selection in the URL so a refresh or a shared link stays on this origin
+            history.replaceState(null, "", "?" + alleleOriginParam());
+            loadAllTagStatsCards();
+        });
         $("#genes-recalculate").click(loadGenesCard);
         $("#re-tagged-recalculate").click(loadReTaggedCard);
         $("#gene-time-recalculate").click(loadTagGenesOverTimeCard);
@@ -88,6 +102,19 @@
     <p class="text-muted">
         Counted on allele, so these numbers are the same whichever genome build a variant was tagged in.
     </p>
+
+    <div class="form-group">
+        {% for value, label in allele_origin_choices %}
+            <div class="form-check form-check-inline">
+                <input class="form-check-input" type="radio" name="allele_origin" id="allele-origin-{{ value }}"
+                       value="{{ value }}" {% if value == allele_origin_filter %}checked{% endif %}>
+                <label class="form-check-label" for="allele-origin-{{ value }}">{{ label }}</label>
+            </div>
+        {% endfor %}
+        <p class="text-muted small mb-0">
+            Germline and Somatic also include tags that apply to both, such as Artefact and PopFreqTooCommon.
+        </p>
+    </div>
 
     <p>
         <a href="{% url 'genome_build_variant_tags' genome_build.name %}">Back to variant tags</a>

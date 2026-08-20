@@ -7,7 +7,8 @@ from django.urls import reverse
 
 from analysis.models import Analysis, VariantTag
 from annotation.fake_annotation import create_fake_variants
-from snpdb.models import Allele, GenomeBuild, Tag, Variant
+from classification.enums import AlleleOriginBucket
+from snpdb.models import Allele, AlleleOriginFilterDefault, GenomeBuild, Tag, UserSettingsOverride, Variant
 from variantopedia.views_tag_stats import _grouped_series
 
 LOCMEM_CACHE = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
@@ -23,8 +24,11 @@ class TagStatsTest(TestCase):
         create_fake_variants(cls.genome_build)
         cls.variant, cls.other_variant = list(Variant.objects.order_by("pk")[:2])
         cls.analysis = Analysis.objects.create(genome_build=cls.genome_build, user=cls.user)
+        # Artefact means the same thing to both sides of the house, so it stays in every origin's numbers
         cls.artefact = Tag.objects.create(pk="Artefact")
-        cls.reportable = Tag.objects.create(pk="SomaticReportable")
+        cls.reportable = Tag.objects.create(pk="SomaticReportable",
+                                            allele_origin_bucket=AlleleOriginBucket.SOMATIC)
+        cls.inherited = Tag.objects.create(pk="Inherited", allele_origin_bucket=AlleleOriginBucket.GERMLINE)
         cls.allele = Allele.objects.create()
         cls.other_allele = Allele.objects.create()
 
@@ -33,6 +37,7 @@ class TagStatsTest(TestCase):
             cls._create_variant_tag(cls.artefact, cls.variant, cls.allele)
         cls._create_variant_tag(cls.artefact, cls.other_variant, cls.other_allele)
         cls._create_variant_tag(cls.reportable, cls.variant, cls.allele)
+        cls._create_variant_tag(cls.inherited, cls.variant, cls.allele)
 
     @classmethod
     def _create_variant_tag(cls, tag: Tag, variant: Variant, allele: Allele = None) -> VariantTag:
@@ -52,8 +57,8 @@ class TagStatsTest(TestCase):
 
     def test_headline_counts_each_identity(self):
         data = self._get_json("tag_stats_headline")
-        self.assertEqual(data["tag_events"], 4)
-        self.assertEqual(data["distinct_allele_tags"], 3)
+        self.assertEqual(data["tag_events"], 5)
+        self.assertEqual(data["distinct_allele_tags"], 4)
         self.assertEqual(data["distinct_alleles"], 2)
         self.assertEqual(data["analyses"], 1)
 
@@ -66,9 +71,8 @@ class TagStatsTest(TestCase):
 
     def test_co_occurrence_counts_alleles_with_both_tags(self):
         data = self._get_json("tag_stats_co_occurrence")
-        self.assertEqual(data["tags"], ["Artefact", "SomaticReportable"])
-        self.assertEqual(data["top_pairs"],
-                         [{"tags": ["Artefact", "SomaticReportable"], "alleles": 1}])
+        self.assertEqual(data["tags"], ["Artefact", "Inherited", "SomaticReportable"])
+        self.assertIn({"tags": ["Artefact", "SomaticReportable"], "alleles": 1}, data["top_pairs"])
 
     def test_user_card_is_for_the_requested_user(self):
         other_user = User.objects.create(username='tag_stats_other_user')
@@ -90,9 +94,52 @@ class TagStatsTest(TestCase):
 
     def test_cache_is_not_shared_between_users(self):
         """ Cards are permission filtered, so one user's numbers must not be served to another """
-        self.assertEqual(self._get_json("tag_stats_headline")["tag_events"], 4)
+        self.assertEqual(self._get_json("tag_stats_headline")["tag_events"], 5)
         self.client.force_login(User.objects.create(username='tag_stats_cache_stranger'))
         self.assertEqual(self._get_json("tag_stats_headline")["tag_events"], 0)
+
+    def test_each_origin_keeps_its_own_tags_and_the_ones_marked_both(self):
+        """ Of the 5 events, 3 are Artefact (both), 1 SomaticReportable and 1 Inherited """
+        somatic = self._get_json("tag_stats_headline",
+                                 params={"allele_origin": AlleleOriginFilterDefault.SOMATIC})
+        self.assertEqual(somatic["tag_events"], 4)
+        germline = self._get_json("tag_stats_headline",
+                                  params={"allele_origin": AlleleOriginFilterDefault.GERMLINE})
+        self.assertEqual(germline["tag_events"], 4)
+
+    def test_cache_is_not_shared_between_allele_origins(self):
+        """ Every card is origin filtered, so one origin's numbers must not be served to another """
+        self.assertEqual(self._get_json("tag_stats_over_time")["totals"],
+                         {"Artefact": 3, "SomaticReportable": 1, "Inherited": 1})
+        germline = self._get_json("tag_stats_over_time",
+                                  params={"allele_origin": AlleleOriginFilterDefault.GERMLINE})
+        self.assertEqual(germline["totals"], {"Artefact": 3, "Inherited": 1})
+
+    def test_page_starts_on_the_users_allele_origin_focus(self):
+        """ Only when they asked for it to be applied automatically - the same two settings classifications use """
+        overrides, _ = UserSettingsOverride.objects.get_or_create(user=self.user)
+        overrides.allele_origin_focus = AlleleOriginFilterDefault.SOMATIC
+        overrides.save()
+
+        response = self.client.get(reverse("tag_stats"))
+        self.assertEqual(response.context["allele_origin_filter"], AlleleOriginFilterDefault.SHOW_ALL)
+
+        overrides.allele_origin_exclude_filter = True
+        overrides.save()
+
+        response = self.client.get(reverse("tag_stats"))
+        self.assertEqual(response.context["allele_origin_filter"], AlleleOriginFilterDefault.SOMATIC)
+
+    def test_somatic_page_defaults_its_tag_pickers_to_a_somatic_visible_tag(self):
+        """ A germline only tag being the most used would otherwise land on a card with nothing in it """
+        Tag.objects.filter(pk="Artefact").update(allele_origin_bucket=AlleleOriginBucket.GERMLINE)
+        overrides, _ = UserSettingsOverride.objects.get_or_create(user=self.user)
+        overrides.allele_origin_focus = AlleleOriginFilterDefault.SOMATIC
+        overrides.allele_origin_exclude_filter = True
+        overrides.save()
+
+        response = self.client.get(reverse("tag_stats"))
+        self.assertEqual(response.context["re_tagged_form"].initial["tag"], "SomaticReportable")
 
 
 @override_settings(CACHES=LOCMEM_CACHE)

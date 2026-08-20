@@ -85,6 +85,7 @@ urlpatterns = [
     path('settings/tags/merge/<tag_id>', views.tag_merge, name='tag_merge'),
     path('settings/tags/retire/<tag_id>', views.tag_retire, name='tag_retire'),
     path('settings/tags/reinstate/<tag_id>', views.tag_reinstate, name='tag_reinstate'),
+    path('settings/tags/allele_origin/<tag_id>', views.tag_set_allele_origin, name='tag_set_allele_origin'),
     path('settings/tags/collection/datatable', DatabaseTableView.as_view(column_class=TagColorsCollectionColumns),
          name='tag_color_collections_datatable'),
     path('settings/tags/collection/view/<int:tag_colors_collection_id>', views.view_tag_colors_collection,

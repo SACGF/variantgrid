@@ -129,10 +129,26 @@ function renderTagStatsByLab(data, $content) {
     const labRows = data.labs.map((l) =>
         `<tr><td>${l.lab}</td><td>${l.count.toLocaleString()}</td></tr>`).join("");
 
+    // Recent tagging is the more useful of the two, so it leads unless nobody has tagged in the last 30 days
+    const recentActive = data.top_users_recent.length > 0;
+    const navLink = (id, label, active) =>
+        `<li class="nav-item">
+            <a class="nav-link ${active ? "active" : ""}" data-toggle="tab" href="#${id}">${label}</a>
+         </li>`;
+    const tabPane = (id, users, active) =>
+        `<div class="tab-pane fade ${active ? "show active" : ""}" id="${id}">${userTable(users)}</div>`;
+
     $content.html(
-        `<h5>Top users - all time</h5>` + userTable(data.top_users) +
-        `<h5>Top users - last 30 days</h5>` + userTable(data.top_users_recent) +
-        `<h5>By lab</h5>
+        `<h5>Top users</h5>
+         <ul class="nav nav-tabs">
+            ${navLink("top-users-recent", "Last 30 days", recentActive)}
+            ${navLink("top-users-all-time", "All time", !recentActive)}
+         </ul>
+         <div class="tab-content pt-2">
+            ${tabPane("top-users-recent", data.top_users_recent, recentActive)}
+            ${tabPane("top-users-all-time", data.top_users, !recentActive)}
+         </div>
+         <h5>By lab</h5>
          <p class="text-muted small">A user in more than one lab counts into each, so lab totals can add up to
          more than the number of tag events.</p>
          <table class="table table-sm"><thead><tr><th>Lab</th><th>Tag events</th></tr></thead>

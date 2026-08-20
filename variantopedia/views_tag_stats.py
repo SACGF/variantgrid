@@ -15,6 +15,11 @@ the card's parameters.
 Counts are labelled by what they count. Tagging repeats a lot (a known artefact gets re-tagged in every
 analysis it turns up in) so "tag events", "distinct (allele, tag)" and "distinct alleles" are all very
 different numbers.
+
+An allele origin filter narrows every card to germline or somatic tags, so a curator can drop the half of
+the vocabulary that isn't theirs. Tags marked as applying to both stay in either view, which is most of the
+tagging. The filter is part of each card's cache key, and the page picks its starting value from the user's
+allele origin settings.
 """
 import hashlib
 import json
@@ -33,7 +38,7 @@ from django.utils.timezone import localtime, now
 from analysis.models import VariantTag
 from annotation.models import VariantAnnotationVersion
 from library.constants import DAY_SECS
-from snpdb.models import GenomeBuild, Lab, Tag, UserSettings, Variant, VariantAllele
+from snpdb.models import AlleleOriginFilterDefault, GenomeBuild, Lab, Tag, UserSettings, Variant, VariantAllele
 from variantopedia.forms import TagStatsGenesForm, TagStatsTagForm, TagStatsTagsForm
 
 TAG_STATS_CACHE_TIMEOUT = DAY_SECS
@@ -50,8 +55,11 @@ def _cache_key(card: str, user: User, params: dict) -> str:
     return f"tag_stats/{settings.CACHE_VERSION}/{card}/{user.pk}/{params_hash}"
 
 
-def _cached_json(card: str, user: User, params: dict, calculate) -> JsonResponse:
-    cache_key = _cache_key(card, user, params)
+def _cached_json(card: str, user: User, allele_origin_filter: AlleleOriginFilterDefault, params: dict,
+                 calculate) -> JsonResponse:
+    """ The origin filter is folded in here rather than by each card, so no card can serve one origin's
+        numbers to another origin's request """
+    cache_key = _cache_key(card, user, {**params, "allele_origin": allele_origin_filter.value})
     data = cache.get(cache_key)
     if data is None:
         data = calculate()
@@ -60,9 +68,29 @@ def _cached_json(card: str, user: User, params: dict, calculate) -> JsonResponse
     return JsonResponse(data)
 
 
-def _tags_qs(user: User) -> QuerySet[VariantTag]:
+def _get_allele_origin_filter(request) -> AlleleOriginFilterDefault:
+    """ The page always sends its radio, having resolved the initial value server side. Elsewhere (the user
+        page's tagging section) there's nothing to widen the filter back out with, so absent means all """
+    try:
+        return AlleleOriginFilterDefault(request.GET["allele_origin"])
+    except (KeyError, ValueError):
+        return AlleleOriginFilterDefault.SHOW_ALL
+
+
+def _tags_qs(user: User, allele_origin_filter: AlleleOriginFilterDefault) -> QuerySet[VariantTag]:
     """ Tags in analyses the user can't see are left out of every card, the same way the grids do it """
-    return VariantTag.filter_for_user(user)
+    qs = VariantTag.filter_for_user(user)
+    if allele_origin_filter != AlleleOriginFilterDefault.SHOW_ALL:
+        qs = qs.filter(tag__allele_origin_bucket__in=allele_origin_filter.buckets)
+    return qs
+
+
+def _tag_qs(allele_origin_filter: AlleleOriginFilterDefault) -> QuerySet[Tag]:
+    """ Germline and Somatic each keep the tags marked as applying to both """
+    qs = Tag.objects.all()
+    if allele_origin_filter != AlleleOriginFilterDefault.SHOW_ALL:
+        qs = qs.filter(allele_origin_bucket__in=allele_origin_filter.buckets)
+    return qs
 
 
 def _with_allele(tags_qs: QuerySet[VariantTag]) -> QuerySet[VariantTag]:
@@ -93,35 +121,49 @@ def _grouped_series(counts: dict[tuple, int], buckets: list, top_n: int) -> list
 
 
 def tag_stats(request):
-    artefact_tag = _default_artefact_tag(request.user)
+    allele_origin_filter = _initial_allele_origin_filter(request.user)
+    artefact_tag = _default_artefact_tag(request.user, allele_origin_filter)
     context = {
         # Only used to link out to the tagged variants grid, which shows coordinates so is build specific
         "genome_build": UserSettings.get_genome_build_or_default(request.user),
+        "allele_origin_filter": allele_origin_filter.value,
+        "allele_origin_choices": AlleleOriginFilterDefault.choices,
         "genes_form": TagStatsGenesForm(prefix="genes"),
         "co_occurrence_form": TagStatsTagsForm(prefix="co-occurrence"),
         "re_tagged_form": TagStatsTagForm(prefix="re-tagged", initial={"tag": artefact_tag}),
-        "gene_time_form": TagStatsTagForm(prefix="gene-time", initial={"tag": _most_used_tag(request.user)}),
+        "gene_time_form": TagStatsTagForm(prefix="gene-time",
+                                          initial={"tag": _most_used_tag(request.user, allele_origin_filter)}),
     }
     return render(request, 'variantopedia/tag_stats.html', context)
 
 
-def _default_artefact_tag(user: User) -> str:
+def _initial_allele_origin_filter(user: User) -> AlleleOriginFilterDefault:
+    """ Somebody who set an origin focus and asked for it to be applied automatically starts there - the same
+        bargain classifications offer, driven by the same two settings """
+    if allele_origin := UserSettings.get_for_user(user).default_allele_origin:
+        return AlleleOriginFilterDefault(allele_origin)
+    return AlleleOriginFilterDefault.SHOW_ALL
+
+
+def _default_artefact_tag(user: User, allele_origin_filter: AlleleOriginFilterDefault) -> str:
     """ Artefact tagging is what drives the re-tagging numbers - fall back to the most used tag """
-    if artefact := Tag.objects.filter(pk__iexact="artefact").first():
+    if artefact := _tag_qs(allele_origin_filter).filter(pk__iexact="artefact").first():
         return artefact.pk
-    return _most_used_tag(user)
+    return _most_used_tag(user, allele_origin_filter)
 
 
-def _most_used_tag(user: User) -> str:
-    qs = _tags_qs(user).values("tag_id").annotate(count=Count("pk")).order_by("-count")
+def _most_used_tag(user: User, allele_origin_filter: AlleleOriginFilterDefault) -> str:
+    qs = _tags_qs(user, allele_origin_filter).values("tag_id").annotate(count=Count("pk")).order_by("-count")
     if top := qs.first():
         return top["tag_id"]
     return ""
 
 
 def tag_stats_headline(request):
+    allele_origin_filter = _get_allele_origin_filter(request)
+
     def calculate():
-        qs = _tags_qs(request.user)
+        qs = _tags_qs(request.user, allele_origin_filter)
         with_allele_qs = _with_allele(qs)
         year_ago = now() - timedelta(days=365)
         return {
@@ -133,14 +175,15 @@ def tag_stats_headline(request):
             "taggers_this_year": qs.filter(created__gte=year_ago).values("user_id").distinct().count(),
         }
 
-    return _cached_json("headline", request.user, {}, calculate)
+    return _cached_json("headline", request.user, allele_origin_filter, {}, calculate)
 
 
 def tag_stats_over_time(request):
     top_n = _get_int(request, "top_n", DEFAULT_TOP_TAGS)
+    allele_origin_filter = _get_allele_origin_filter(request)
 
     def calculate():
-        qs = _tags_qs(request.user).annotate(month=TruncMonth("created"))
+        qs = _tags_qs(request.user, allele_origin_filter).annotate(month=TruncMonth("created"))
         counts = {}
         totals = Counter()
         months = set()
@@ -157,15 +200,16 @@ def tag_stats_over_time(request):
             "totals": dict(totals.most_common()),
         }
 
-    return _cached_json("over_time", request.user, {"top_n": top_n}, calculate)
+    return _cached_json("over_time", request.user, allele_origin_filter, {"top_n": top_n}, calculate)
 
 
 def tag_stats_for_user(request, user_id=None):
     """ Shared by the stats page's "Your tagging" card and the user page section """
     user = get_object_or_404(User, pk=user_id) if user_id else request.user
+    allele_origin_filter = _get_allele_origin_filter(request)
 
     def calculate():
-        qs = _tags_qs(request.user).filter(user=user)
+        qs = _tags_qs(request.user, allele_origin_filter).filter(user=user)
         tag_counts = qs.values("tag_id").annotate(count=Count("pk")).order_by("-count")
 
         thirty_days_ago = (now() - timedelta(days=30)).date()
@@ -184,12 +228,14 @@ def tag_stats_for_user(request, user_id=None):
             "recent_counts": [daily.get(d, 0) for d in days],
         }
 
-    return _cached_json("user", request.user, {"user_id": user.pk}, calculate)
+    return _cached_json("user", request.user, allele_origin_filter, {"user_id": user.pk}, calculate)
 
 
 def tag_stats_by_lab(request):
+    allele_origin_filter = _get_allele_origin_filter(request)
+
     def calculate():
-        qs = _tags_qs(request.user)
+        qs = _tags_qs(request.user, allele_origin_filter)
         user_counts = qs.values("user_id", "user__username").annotate(count=Count("pk")).order_by("-count")
         thirty_days_ago = now() - timedelta(days=30)
         recent_counts = (qs.filter(created__gte=thirty_days_ago)
@@ -219,7 +265,7 @@ def tag_stats_by_lab(request):
             "labs": [{"lab": lab_name, "count": count} for lab_name, count in lab_counts.most_common()],
         }
 
-    return _cached_json("by_lab", request.user, {"top_users": TOP_USERS}, calculate)
+    return _cached_json("by_lab", request.user, allele_origin_filter, {"top_users": TOP_USERS}, calculate)
 
 
 def _with_gene_symbol(tags_qs: QuerySet[VariantTag]) -> QuerySet[VariantTag]:
@@ -236,9 +282,10 @@ def tag_stats_genes(request):
     gene_symbols = _get_list(request, "gene_symbols")
     tag_ids = _get_list(request, "tags")
     top_n = _get_int(request, "top_n", DEFAULT_TOP_GENES)
+    allele_origin_filter = _get_allele_origin_filter(request)
 
     def calculate():
-        tags_qs = _tags_qs(request.user)
+        tags_qs = _tags_qs(request.user, allele_origin_filter)
         if tag_ids:
             tags_qs = tags_qs.filter(tag__in=tag_ids)
         qs = _with_gene_symbol(tags_qs)
@@ -260,12 +307,14 @@ def tag_stats_genes(request):
         }
 
     params = {"gene_symbols": sorted(gene_symbols), "tags": sorted(tag_ids), "top_n": top_n}
-    return _cached_json("genes", request.user, params, calculate)
+    return _cached_json("genes", request.user, allele_origin_filter, params, calculate)
 
 
 def tag_stats_co_occurrence(request):
+    allele_origin_filter = _get_allele_origin_filter(request)
+
     def calculate():
-        qs = _with_allele(_tags_qs(request.user))
+        qs = _with_allele(_tags_qs(request.user, allele_origin_filter))
         # Self join on allele - tag_id__gt gives each unordered pair once, and keeps a tag off its own diagonal.
         # Both conditions are in the one filter() so they apply to the same joined tag
         pairs_qs = (qs.filter(allele__varianttag__in=qs, allele__varianttag__tag_id__gt=F("tag_id"))
@@ -287,7 +336,7 @@ def tag_stats_co_occurrence(request):
             "top_pairs": [{"tags": list(pair), "alleles": count} for pair, count in pair_counts.most_common(20)],
         }
 
-    return _cached_json("co_occurrence", request.user, {}, calculate)
+    return _cached_json("co_occurrence", request.user, allele_origin_filter, {}, calculate)
 
 
 def _variants_by_allele_id(allele_ids: list[int], genome_build: GenomeBuild) -> dict[int, Variant]:
@@ -302,11 +351,12 @@ def _variants_by_allele_id(allele_ids: list[int], genome_build: GenomeBuild) -> 
 
 def tag_stats_re_tagged(request):
     """ Alleles that get tagged over and over - the case for excluding them in analysis templates """
-    tag_id = request.GET.get("tag") or _default_artefact_tag(request.user)
+    allele_origin_filter = _get_allele_origin_filter(request)
+    tag_id = request.GET.get("tag") or _default_artefact_tag(request.user, allele_origin_filter)
     genome_build = UserSettings.get_genome_build_or_default(request.user)
 
     def calculate():
-        qs = _with_allele(_tags_qs(request.user)).filter(tag=tag_id)
+        qs = _with_allele(_tags_qs(request.user, allele_origin_filter)).filter(tag=tag_id)
         top = list(qs.values("allele_id").annotate(count=Count("pk")).order_by("-count")[:MEGA_ARTEFACT_VARIANTS])
         variants_by_allele_id = _variants_by_allele_id([r["allele_id"] for r in top], genome_build)
 
@@ -323,21 +373,22 @@ def tag_stats_re_tagged(request):
         return {
             "tag": tag_id,
             "alleles": alleles,
-            "tag_events": _tags_qs(request.user).filter(tag=tag_id).count(),
+            "tag_events": _tags_qs(request.user, allele_origin_filter).filter(tag=tag_id).count(),
             "distinct_alleles": qs.values("allele_id").distinct().count(),
             "top_events": sum(r["count"] for r in top),
         }
 
-    return _cached_json("re_tagged", request.user, {"tag": tag_id, "genome_build": genome_build.name},
-                        calculate)
+    return _cached_json("re_tagged", request.user, allele_origin_filter,
+                        {"tag": tag_id, "genome_build": genome_build.name}, calculate)
 
 
 def tag_stats_tag_genes_over_time(request):
-    tag_id = request.GET.get("tag") or _most_used_tag(request.user)
+    allele_origin_filter = _get_allele_origin_filter(request)
+    tag_id = request.GET.get("tag") or _most_used_tag(request.user, allele_origin_filter)
     top_n = _get_int(request, "top_n", DEFAULT_TOP_GENES)
 
     def calculate():
-        qs = _with_gene_symbol(_tags_qs(request.user).filter(tag=tag_id))
+        qs = _with_gene_symbol(_tags_qs(request.user, allele_origin_filter).filter(tag=tag_id))
         qs = qs.annotate(quarter=TruncQuarter("created"))
 
         counts = {}
@@ -354,7 +405,8 @@ def tag_stats_tag_genes_over_time(request):
             "series": _grouped_series(counts, sorted_quarters, top_n),
         }
 
-    return _cached_json("tag_genes_over_time", request.user, {"tag": tag_id, "top_n": top_n}, calculate)
+    return _cached_json("tag_genes_over_time", request.user, allele_origin_filter,
+                        {"tag": tag_id, "top_n": top_n}, calculate)
 
 
 def _quarter_label(quarter_start) -> str:
