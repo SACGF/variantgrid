@@ -14,6 +14,7 @@ from annotation.models.models_enums import VariantAnnotationPipelineType, VEPCus
 from annotation.vep_columns import VEPColumnDef
 from annotation.vep_config import (
     VEPConfig,
+    parse_cosmic_version_from_filename,
     parse_gnomad_version_from_filename,
     vep_component_version_kwargs,
 )
@@ -462,9 +463,8 @@ def vep_dict_to_variant_annotation_version_kwargs(vep_config, vep_version_dict: 
         # COSMIC isn't in T2T
         cosmic_filename = vep_config["cosmic"]
         if os.path.exists(cosmic_filename):
-            cosmic_basename = os.path.basename(cosmic_filename)
-            if m := re.match(r"^Cosmic.*_v(\d{2,})_.*.vcf.gz", cosmic_basename):
-                kwargs["cosmic"] = int(m.group(1))
+            if cosmic_version := parse_cosmic_version_from_filename(cosmic_filename):
+                kwargs["cosmic"] = cosmic_version
     except KeyError:
         pass
 

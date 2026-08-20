@@ -2030,6 +2030,7 @@ class VariantAnnotation(AbstractVariantAnnotation):
             pipeline_type=self.annotation_run.pipeline_type,
             columns_version=self.version.columns_version,
             vep_version=self.version.vep,
+            cosmic_version=self.version.cosmic,
             gnomad4_minor_version=self.version.gnomad,
         )
 

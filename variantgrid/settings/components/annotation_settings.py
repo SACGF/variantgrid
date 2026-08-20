@@ -145,7 +145,7 @@ ANNOTATION = {
         # The names correspond to VEPPlugin or VEPCustom entries (but lower case)
         "vep_config": {
             "sift": True,
-            "cosmic": "annotation_data/GRCh37/Cosmic_GenomeScreensMutant_v99_GRCh37.vcf.gz",
+            "cosmic": "annotation_data/GRCh37/Cosmic_GenomeScreensMutant_Normal_v101_GRCh37.vcf.gz",
             "dbnsfp": "annotation_data/GRCh37/dbNSFP5.3.1a.grch37.stripped.gz",
             "dbscsnv": "annotation_data/GRCh37/dbscSNV1.1_GRCh37.txt.gz",
             "denovo_db": "annotation_data/GRCh37/denovo-db.variants.v.1.6.1.GRCh37.vcf.gz",
@@ -197,7 +197,7 @@ ANNOTATION = {
         # The names correspond to VEPPlugin or VEPCustom entries (but lower case)
         "vep_config": {
             "sift": True,
-            "cosmic": "annotation_data/GRCh38/Cosmic_GenomeScreensMutant_v99_GRCh38.vcf.gz",
+            "cosmic": "annotation_data/GRCh38/Cosmic_GenomeScreensMutant_Normal_v101_GRCh38.vcf.gz",
             "dbnsfp": "annotation_data/GRCh38/dbNSFP5.3.1a.grch38.stripped.gz",
             "dbscsnv": "annotation_data/GRCh38/dbscSNV1.1_GRCh38.txt.gz",
             "denovo_db": "annotation_data/GRCh38/denovo-db.variants.v.1.6.1.GRCh38.vcf.gz",
@@ -295,6 +295,19 @@ def _disable_columns_version_5_plugins(annotation):
                 vep_config[plugin_key] = None
 
 
+def _use_cosmic_v99(annotation):
+    """Restore the COSMIC v99 VCFs the package default shipped before #1673.
+
+    The default now points at the v101 release, whose sample count arrives in a different INFO field
+    (see the cosmic_count VEPColumnDefs). Deployments pinned to an older columns_version haven't
+    downloaded v101, so put them back on the release they have.
+    """
+    annotation[BUILD_GRCH37]["vep_config"]["cosmic"] = \
+        "annotation_data/GRCh37/Cosmic_GenomeScreensMutant_v99_GRCh37.vcf.gz"
+    annotation[BUILD_GRCH38]["vep_config"]["cosmic"] = \
+        "annotation_data/GRCh38/Cosmic_GenomeScreensMutant_v99_GRCh38.vcf.gz"
+
+
 def pin_annotation_to_columns_version_4(annotation):
     """Restore the columns_version 4 annotation config (pre-#1638, no VEP 116 plugins).
 
@@ -307,6 +320,7 @@ def pin_annotation_to_columns_version_4(annotation):
     annotation[BUILD_GRCH37]["columns_version"] = 4
     annotation[BUILD_GRCH38]["columns_version"] = 4
     _disable_columns_version_5_plugins(annotation)
+    _use_cosmic_v99(annotation)
 
 
 def use_pre_vep112_fasta(annotation):
@@ -331,6 +345,7 @@ def pin_annotation_to_columns_version_3(annotation):
     Note the caller is also responsible for keeping ANNOTATION_VEP_VERSION on its historical value.
     """
     _disable_columns_version_5_plugins(annotation)
+    _use_cosmic_v99(annotation)
     annotation[BUILD_GRCH37]["columns_version"] = 3
     annotation[BUILD_GRCH37]["vep_config"].update({
         "denovo_db": None,

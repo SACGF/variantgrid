@@ -25,6 +25,7 @@ from annotation.models.models import (
     VariantAnnotationVersion,
 )
 from annotation.models.models_citations import CitationIdNormalized, CitationSource
+from annotation.vep_config import VEPConfig
 from genes.hgvs import HGVSMatcher
 from genes.models import GeneAnnotationImport
 from genes.models_enums import AnnotationConsortium
@@ -86,6 +87,22 @@ def get_fake_annotation_settings_dict(columns_version: int) -> dict:
 
     # Pin gnomAD so a developer's local override doesn't shift VEP CSQ fields and break fixture parsing.
     TEST_ANNOTATION[settings.BUILD_GRCH38]["vep_config"]["gnomad4"] = gnomad4_path
+
+    # COSMIC names the sample count INFO field differently per release (#1673) and the fixtures carry
+    # whichever CSQ column the release they were generated against produced - CNT for v1/v2,
+    # SAMPLE_COUNT from v3. Pin the release so the columns the importer expects match the fixture.
+    if columns_version < 3:
+        cosmic_paths = {
+            settings.BUILD_GRCH37: "annotation_data/GRCh37/CosmicCodingMuts_v95_20211101_grch37.normal.vcf.gz",
+            settings.BUILD_GRCH38: "annotation_data/GRCh38/CosmicCodingMuts_v95_20211101_grch38.normal.vcf.gz",
+        }
+    else:
+        cosmic_paths = {
+            settings.BUILD_GRCH37: "annotation_data/GRCh37/Cosmic_GenomeScreensMutant_v99_GRCh37.vcf.gz",
+            settings.BUILD_GRCH38: "annotation_data/GRCh38/Cosmic_GenomeScreensMutant_v99_GRCh38.vcf.gz",
+        }
+    for build_name, cosmic_path in cosmic_paths.items():
+        TEST_ANNOTATION[build_name]["vep_config"]["cosmic"] = cosmic_path
 
     # Same for the columns_version 5 plugin data (#1638) - a deployment pinned below cv5 calls
     # _disable_columns_version_5_plugins(), which nulls these and would drop the columns entirely.
@@ -149,6 +166,9 @@ def get_fake_vep_version(genome_build: GenomeBuild, annotation_consortium, colum
         else:
             continue
         fake_version[f.name] = value
+    # Real COSMIC release from the (test-pinned) vep_config, as the sample count INFO field is
+    # gated on it - see the cosmic_count VEPColumnDefs
+    fake_version["cosmic"] = VEPConfig(genome_build).cosmic_version
     return fake_version
 
 
