@@ -5,9 +5,10 @@ Split out of annotation.tasks.annotate_variants so the pipeline runners (annotat
 cleanup receiver (annotation.signals.annotation_run_cleanup) can share it without importing the celery
 tasks - the tasks import the runners, so the dependency has to run the other way.
 """
-import gzip
+import io
 import os
 
+from bgzip import BGZipWriter
 from django.conf import settings
 
 from library.utils.file_utils import name_from_filename
@@ -43,14 +44,28 @@ def write_qs_to_vcf(vcf_filename, genome_build, qs, info_dict=VARIANT_GRID_INFO_
     else:
         chrom_key = "locus__contig__name"
 
+    # Streamed (server side cursor) rather than materialised - a whole-version dump (#1675) is millions
+    # of rows, and each is written and forgotten
     sorted_values = qs.values("id", chrom_key, "locus__position",
-                              "locus__ref__seq", "alt__seq", "end", "svlen")
+                              "locus__ref__seq", "alt__seq", "end", "svlen").iterator(chunk_size=10_000)
 
-    # External dumps are written .vcf.gz (see AnnotationRun.get_dump_filename) - gzip on the way out
+    # External dumps are written .vcf.gz (see AnnotationRun.get_dump_filename). bgzip rather than plain
+    # gzip - reads anywhere gzip did, and tabix can index it, which is what lets a dump be the target of
+    # a `bcftools annotate` (@see annotation.backfill_columns)
     if vcf_filename.endswith(".gz"):
-        f = gzip.open(vcf_filename, "wt", compresslevel=6)
-    else:
-        f = open(vcf_filename, "w")
-    with f:
+        with open(vcf_filename, "wb") as raw:
+            with BGZipWriter(raw) as bgzip_f:
+                # bgzip is binary; wrap as text so VCFWriter only ever deals with str
+                f = io.TextIOWrapper(bgzip_f, encoding="utf-8", write_through=True)
+                try:
+                    return write_contig_sorted_values_to_vcf_file(genome_build, sorted_values, f,
+                                                                  info_dict=info_dict,
+                                                                  use_accession=use_accession, samples=samples)
+                finally:
+                    # flush + detach so the BGZipWriter (closed by its 'with') is closed exactly once
+                    f.flush()
+                    f.detach()
+
+    with open(vcf_filename, "w") as f:
         return write_contig_sorted_values_to_vcf_file(genome_build, sorted_values, f, info_dict=info_dict,
                                                       use_accession=use_accession, samples=samples)
