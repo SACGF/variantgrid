@@ -541,6 +541,16 @@ ANALYSIS_TEMPLATES_AUTO_SAMPLE = "Sample tab auto analysis"
 ANALYSIS_TEMPLATES_AUTO_COHORT_EXPORT = "Cohort VCF Export auto analysis"
 ANALYSIS_WARN_IF_NO_QC_GENE_LIST_MESSAGE = None  # disabled by default
 ANALYSIS_NODE_CACHE_Q = True
+# Node dispatch throttles (see analysis.tasks.analysis_update_tasks). A single dispatch leases at
+# most this many nodes for one analysis - a node finishing re-triggers the dispatcher, so a wide
+# graph flows through in waves rather than flooding analysis_workers in one go
+ANALYSIS_NODE_DISPATCH_MAX_NODES_PER_ANALYSIS = 50
+# Backlog drain target: the periodic sweep tops the number of nodes actively being worked up to
+# this, and does nothing while live work already fills it, so a big backlog (eg nodes bulk-set to
+# DIRTY) never competes with analyses people are waiting on. 1 = only drain when completely idle
+ANALYSIS_NODE_DISPATCH_BACKLOG_IN_FLIGHT_TARGET = 10
+# How many backlog analyses one sweep will look at (each is a lease query, so bound the tick)
+ANALYSIS_NODE_DISPATCH_BACKLOG_MAX_ANALYSES = 20
 # #546: when a parent node's count is <= this, substitute its contribution to a child/sibling's
 # query with a literal Q(pk__in=[...]) instead of re-running its full filter chain. Applies to all
 # single-parent nodes and MergeNode inputs. 0 disables the substitution.

@@ -6,7 +6,7 @@ from auditlog.context import disable_auditlog
 from celery.canvas import Signature
 from celery.contrib.abortable import AbortableTask
 from celery.result import AsyncResult
-from django.db.models import F, OuterRef, Q, Subquery
+from django.db.models import F, OuterRef, Subquery
 from django.db.utils import IntegrityError, OperationalError
 from django.utils import timezone
 
@@ -29,7 +29,7 @@ from eventlog.models import create_event
 from library.constants import MINUTE_SECS
 from library.enums.log_level import LogLevel
 from library.log_utils import get_traceback, log_traceback
-from snpdb.models import JobsControl, ProcessingStatus
+from snpdb.models import ProcessingStatus
 
 CREATE_AND_LAUNCH_TASK = "analysis.tasks.analysis_update_tasks.create_and_launch_analysis_tasks"
 
@@ -243,32 +243,6 @@ def node_cache_task(node_id, version):
     finally:
         if analysis_id is not None:
             _trigger_rescheduling(analysis_id)
-
-
-@celery.shared_task
-def reschedule_stalled_analyses():
-    """ mocha's periodic dispatch loop (Celery beat). Discovery only - finds analyses with work
-        that isn't being actively worked: a DIRTY node (waiting to be dispatched) or a node whose
-        lease has expired (abandoned by a dead worker), and kicks the single-worker dispatcher.
-        This is what makes lease-expiry self-heal after a worker is killed.
-
-        It does NO assignment and makes no timing decisions: backoff (run_after) and the
-        reclaim / re-lease / terminal-fail decisions are all enforced authoritatively in
-        lease_ready_nodes. This query is deliberately over-inclusive - a kick with nothing ready
-        fast-exits in the single worker - so it never misses stalled work. """
-    if JobsControl.is_paused():
-        return  # operational brake (e.g. crash safety auto-pause) - don't kick the dispatcher
-    now = timezone.now()
-    stalled_lease = Q(nodeversion__nodetask__lease_expires__lt=now)  # abandoned by a dead worker
-    dirty = Q(status=NodeStatus.DIRTY)  # waiting to be dispatched (run_after honoured at lease time)
-    analysis_ids = (AnalysisNode.objects
-                    .filter(status__in=NodeStatus.LOADING_STATUSES)
-                    .filter(stalled_lease | dirty)
-                    .values_list("analysis_id", flat=True).distinct())
-
-    for analysis_id in analysis_ids:
-        # -> scheduling_single_worker (fast-exit if nothing ready)
-        Signature(CREATE_AND_LAUNCH_TASK, args=(analysis_id,)).apply_async()
 
 
 @celery.shared_task

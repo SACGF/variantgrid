@@ -14,7 +14,7 @@ from django.conf import settings
 from django.test import TestCase, override_settings
 from django.utils import timezone
 
-from analysis.models import AllVariantsNode, NodeTask
+from analysis.models import AllVariantsNode, AnalysisNode, NodeTask
 from analysis.models.enums import NodeStatus, SetOperations
 from analysis.models.nodes.analysis_node import NodeCache
 from analysis.models.nodes.filters.gene_list_node import GeneListNode
@@ -24,6 +24,7 @@ from analysis.tasks.analysis_update_tasks import (
     _node_launch_signature,
     _node_ready_to_lease,
     create_and_launch_analysis_tasks,
+    dispatch_analysis_backlog,
     lease_ready_nodes,
 )
 from analysis.tasks.node_update_tasks import (
@@ -31,7 +32,6 @@ from analysis.tasks.node_update_tasks import (
     _backoff_node,
     next_backoff,
     node_cache_task,
-    reschedule_stalled_analyses,
     update_node_task,
 )
 from analysis.tests.utils import AnalysisSetupMixin
@@ -376,13 +376,52 @@ class TestDeadWorkerReclamation(AnalysisSetupMixin, TestCase):
         lease_ready_nodes(self.analysis.pk, "worker")
         self.assertTrue(NodeTask.objects.filter(node_version__node=child).exists())
 
-    def test_reschedule_stalled_analyses_discovers_expired_lease(self):
+    def test_backlog_dispatch_reclaims_expired_lease(self):
         node = AllVariantsNode.objects.create(analysis=self.analysis)
         lease_ready_nodes(self.analysis.pk, "worker-1")
         self._expire_lease(node)
-        with mock.patch.object(Signature, "apply_async") as m:
-            reschedule_stalled_analyses()
-        self.assertTrue(m.called, "stalled analysis should kick the dispatcher")
+        with mock.patch.object(Signature, "apply_async"):
+            dispatch_analysis_backlog()
+        self.assertEqual(NodeTask.objects.get(node_version__node=node).attempt_count, 2)
+
+
+@override_settings(ANALYSIS_NODE_CACHE_Q=False)
+class TestDispatchThrottling(AnalysisSetupMixin, TestCase):
+    """Dispatch is bounded: one dispatch only leases so many nodes, and the periodic backlog drain
+    spends only the capacity that analyses people are actively using leave spare."""
+
+    def _dirty_nodes(self, count):
+        return [AllVariantsNode.objects.create(analysis=self.analysis) for _ in range(count)]
+
+    def _start_one_node(self):
+        """Put a node in flight: leased with a live lease, and a worker running it."""
+        self._dirty_nodes(1)
+        (node_id, _), = lease_ready_nodes(self.analysis.pk, "busy-worker", max_nodes=1)
+        AllVariantsNode.objects.filter(pk=node_id).update(status=NodeStatus.LOADING)
+
+    def test_max_nodes_caps_a_single_lease(self):
+        self._dirty_nodes(5)
+        self.assertEqual(len(lease_ready_nodes(self.analysis.pk, "worker", max_nodes=2)), 2)
+
+    def test_remaining_nodes_stay_dirty_for_the_next_dispatch(self):
+        self._dirty_nodes(5)
+        lease_ready_nodes(self.analysis.pk, "worker", max_nodes=2)
+        self.assertEqual(len(lease_ready_nodes(self.analysis.pk, "worker", max_nodes=2)), 2)
+
+    @override_settings(ANALYSIS_NODE_DISPATCH_BACKLOG_IN_FLIGHT_TARGET=2)
+    def test_backlog_only_fills_up_to_the_in_flight_target(self):
+        self._dirty_nodes(5)
+        with mock.patch.object(Signature, "apply_async"):
+            dispatch_analysis_backlog()
+        self.assertEqual(AnalysisNode.objects.filter(status=NodeStatus.QUEUED).count(), 2)
+
+    @override_settings(ANALYSIS_NODE_DISPATCH_BACKLOG_IN_FLIGHT_TARGET=1)
+    def test_backlog_leaves_the_workers_alone_while_they_are_busy(self):
+        self._start_one_node()
+        self._dirty_nodes(2)
+        with mock.patch.object(Signature, "apply_async"):
+            dispatch_analysis_backlog()
+        self.assertEqual(AnalysisNode.objects.filter(status=NodeStatus.DIRTY).count(), 2)
 
 
 VENN_CACHE_COUNT_TASK = "analysis.models.nodes.filters.venn_node.venn_cache_count"
@@ -607,7 +646,7 @@ class TestSingleWorkerInvariant(TestCase):
     def test_only_dispatcher_calls_lease_ready_nodes(self):
         # Check for an actual call site ("lease_ready_nodes("), not mentions in docstrings.
         self.assertIn("lease_ready_nodes(", self._task_source(create_and_launch_analysis_tasks))
-        for task in (update_node_task, node_cache_task, reschedule_stalled_analyses):
+        for task in (update_node_task, node_cache_task):
             src = self._task_source(task)
             self.assertNotIn("lease_ready_nodes(", src,
                              f"{task.name} must not lease nodes — assignment is single-worker only")

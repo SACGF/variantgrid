@@ -58,12 +58,12 @@ app.conf.beat_schedule['notify-server-status'] = {
     'schedule': crontab(hour=19, minute=0),
 }
 
-# Analysis node scheduler safety-net (issue #346): reclaims leases abandoned by dead workers
-# and re-dispatches DIRTY nodes whose backoff window has elapsed. Discovery only - it kicks the
-# single-worker dispatcher, which does the actual reclaim / re-lease / terminal-fail.
+# Analysis node backlog drain + scheduler safety-net (issue #346): reclaims leases abandoned by
+# dead workers and dispatches DIRTY nodes nobody has kicked off, throttled to whatever capacity
+# the analyses people are actively using leave spare.
 # Note (see comment above): crontab has timezone issues here, raw seconds works.
-app.conf.beat_schedule['reschedule-stalled-analyses'] = {
-    'task': 'analysis.tasks.node_update_tasks.reschedule_stalled_analyses',
+app.conf.beat_schedule['dispatch-analysis-backlog'] = {
+    'task': 'analysis.tasks.analysis_update_tasks.dispatch_analysis_backlog',
     'schedule': MINUTE_SECS,
 }
 

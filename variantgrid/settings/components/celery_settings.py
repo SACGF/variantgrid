@@ -62,13 +62,6 @@ CELERY_TASK_ROUTES = {
     "analysis.tasks.node_update_tasks.wait_for_cache_task": ANALYSIS_WORKERS,
     "analysis.tasks.node_update_tasks.delete_analysis_old_node_versions": ANALYSIS_WORKERS,
     "analysis.tasks.node_update_tasks.wait_for_node": ANALYSIS_WORKERS,
-    # Periodic safety-net sweep (issue #346). Deliberately NOT on ANALYSIS_WORKERS: it exists to
-    # recover stuck/dead node-load workers, so it must not queue behind the very backlog it's meant
-    # to rescue - it would be starved exactly when needed. It's also not node work: it only runs a
-    # discovery query and enqueues create_and_launch_analysis_tasks (which lands on the single
-    # worker, where the actual reclaim/lease happens). DB_WORKERS is a separate pool that keeps
-    # ticking when analysis_workers are saturated.
-    "analysis.tasks.node_update_tasks.reschedule_stalled_analyses": DB_WORKERS,
     # Annotation
     "annotation.tasks.annotate_variants.delete_annotation_run": ANNOTATION_WORKERS,
     "annotation.tasks.annotate_variants.delete_annotation_run_uploaded_data": ANNOTATION_WORKERS,
@@ -113,6 +106,11 @@ CELERY_TASK_ROUTES = {
 
     # Scheduling single worker
     'analysis.tasks.analysis_update_tasks.create_and_launch_analysis_tasks': SCHEDULING_SINGLE_WORKER,
+    # Periodic backlog drain (issue #346). Leases inline rather than fanning out a dispatch task
+    # per analysis, so it belongs on the single worker where all leasing serialises. It's bounded
+    # per tick and exits immediately when the analysis workers are already busy, so it can't
+    # crowd out the interactive dispatches sharing this queue.
+    'analysis.tasks.analysis_update_tasks.dispatch_analysis_backlog': SCHEDULING_SINGLE_WORKER,
     # #2667: single-authority annotation dispatcher - all run leasing/merge serialises here
     'annotation.tasks.annotation_scheduler_task.dispatch_annotation_runs': SCHEDULING_SINGLE_WORKER,
     'upload.tasks.vcf.import_vcf_step_task.schedule_pipeline_stage_steps': SCHEDULING_SINGLE_WORKER,

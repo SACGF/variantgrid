@@ -7,7 +7,9 @@ from typing import Optional
 import celery
 from auditlog.context import disable_auditlog
 from celery.canvas import Signature, chain
+from django.conf import settings
 from django.db import transaction
+from django.db.models import F, Q
 from django.utils import timezone
 
 from analysis.models import AnalysisEdge, AnalysisNode, NodeColors, NodeStatus, NodeTask
@@ -20,21 +22,28 @@ from snpdb.models import JobsControl, ProcessingStatus
 
 
 @celery.shared_task
-def create_and_launch_analysis_tasks(analysis_id, run_async=True):
+def create_and_launch_analysis_tasks(analysis_id, run_async=True, max_nodes=None):
     """ Routed to scheduling_single_worker (the only caller of lease_ready_nodes).
 
-        mocha dispatch_pending_actions(): lease every node that is ready right now, then fan
+        mocha dispatch_pending_actions(): lease the nodes that are ready right now, then fan
         out one task per leased node so analysis_workers pick them up in parallel. A node
-        finishing re-triggers this dispatcher, which leases whatever just became ready. """
+        finishing re-triggers this dispatcher, which leases whatever just became ready.
+
+        max_nodes bounds one dispatch (default ANALYSIS_NODE_DISPATCH_MAX_NODES_PER_ANALYSIS): a
+        graph with hundreds of simultaneously-ready nodes goes out in waves, each wave's
+        completions pulling through the next. Returns how many node tasks were launched. """
+    if max_nodes is None:
+        max_nodes = settings.ANALYSIS_NODE_DISPATCH_MAX_NODES_PER_ANALYSIS
     try:
         worker_id = f"dispatch:{create_and_launch_analysis_tasks.request.id or 'sync'}"
-        leased = lease_ready_nodes(analysis_id, worker_id)
+        leased = lease_ready_nodes(analysis_id, worker_id, max_nodes=max_nodes)
     except Exception:
         log_traceback()
         raise
 
     logging.info("create_and_launch_analysis_tasks(%s): leased %d node(s): %s",
                  analysis_id, len(leased), leased)
+    launched = 0
     for node_id, version in leased:
         try:
             sig = _node_launch_signature(node_id, version)
@@ -42,12 +51,71 @@ def create_and_launch_analysis_tasks(analysis_id, run_async=True):
             # Version bumped (user edit) or node deleted between leasing and dispatch. The new
             # version is DIRTY and will be re-dispatched; skip so the other leased nodes still launch.
             continue
+        launched += 1
         if run_async:
             sig.apply_async()
         else:
             result = sig.apply()
             if not result.successful():
                 raise Exception(result.result)
+    return launched
+
+
+def _live_lease_q(now) -> Q:
+    """ Node is being actively worked: its CURRENT version holds a lease that hasn't lapsed.
+        Leases on superseded versions say nothing about the node's current state. """
+    return Q(nodeversion__version=F("version"), nodeversion__nodetask__lease_expires__gte=now)
+
+
+def _in_flight_node_count(now, limit) -> int:
+    """ Nodes a worker is actively working (or about to), counted with a LIMIT - we only ever
+        compare against the target, so stop as soon as we reach it. """
+    qs = (AnalysisNode.objects
+          .filter(status__in=NodeStatus.LOADING_STATUSES)
+          .exclude(status=NodeStatus.DIRTY)
+          .filter(_live_lease_q(now))
+          .values_list("pk", flat=True)[:limit])
+    return len(qs)
+
+
+@celery.shared_task
+def dispatch_analysis_backlog():
+    """ Periodic backlog drain + dead-worker self-heal (issue #346), routed to
+        scheduling_single_worker so it leases inline rather than fanning out a dispatch task per
+        analysis.
+
+        Analyses someone is working on dispatch themselves (update_analysis, and each node
+        completion re-triggering its own analysis), so this only ever spends capacity that live
+        work is not using: it tops the in-flight node count up to
+        ANALYSIS_NODE_DISPATCH_BACKLOG_IN_FLIGHT_TARGET and exits immediately once that is met.
+        Work waiting on a lapsed lease is not in flight, so reclaiming a dead worker's node still
+        happens here.
+
+        Candidates are deliberately over-inclusive (backoff windows and the reclaim / re-lease /
+        terminal-fail decisions are all enforced in lease_ready_nodes) but bounded per tick. """
+    if JobsControl.is_paused():
+        return  # operational brake (e.g. crash safety auto-pause) - dispatch nothing
+    now = timezone.now()
+    target = settings.ANALYSIS_NODE_DISPATCH_BACKLOG_IN_FLIGHT_TARGET
+    budget = target - _in_flight_node_count(now, target)
+    if budget <= 0:
+        logging.debug("dispatch_analysis_backlog: %d node(s) in flight - leaving the workers alone", target)
+        return
+
+    analysis_ids = (AnalysisNode.objects
+                    .filter(status__in=NodeStatus.LOADING_STATUSES)
+                    .exclude(_live_lease_q(now))
+                    .order_by("analysis_id")
+                    .values_list("analysis_id", flat=True)
+                    .distinct()[:settings.ANALYSIS_NODE_DISPATCH_BACKLOG_MAX_ANALYSES])
+
+    launched = 0
+    for analysis_id in analysis_ids:
+        launched += create_and_launch_analysis_tasks(analysis_id, max_nodes=budget - launched)
+        if launched >= budget:
+            break
+    if launched:
+        logging.info("dispatch_analysis_backlog: launched %d node task(s) of a %d budget", launched, budget)
 
 
 def _load_graph(analysis_id):
@@ -109,12 +177,15 @@ def _node_ready_to_lease(node, parents_by_child, nodes_by_id) -> bool:
     return _node_cache_ready(node)
 
 
-def lease_ready_nodes(analysis_id, worker_id, lease_seconds=LEASE_SECONDS):
+def lease_ready_nodes(analysis_id, worker_id, lease_seconds=LEASE_SECONDS, max_nodes=None):
     """ mocha lease_action() + dispatch, batched per analysis. SINGLE-WORKER ONLY (called only
         from create_and_launch_analysis_tasks on scheduling_single_worker).
 
         Claims fresh work, reclaims expired leases, and gives up (terminal fail) past
-        MAX_NODE_ATTEMPTS. Returns the (node_id, version) tuples now owned by this run. """
+        MAX_NODE_ATTEMPTS. max_nodes caps how many are claimed - the rest stay DIRTY for the next
+        dispatch. Returns the (node_id, version) tuples now owned by this run. """
+    if max_nodes is not None and max_nodes <= 0:
+        return []
     if JobsControl.is_paused():
         return []  # operational brake (e.g. crash safety auto-pause) - lease nothing
     now = timezone.now()
@@ -198,6 +269,8 @@ def lease_ready_nodes(analysis_id, worker_id, lease_seconds=LEASE_SECONDS):
             leased.append((node.pk, node.version))
             if cache_target is not None:
                 leased_cache_targets.add(cache_target)
+            if max_nodes is not None and len(leased) >= max_nodes:
+                break
     return leased
 
 
