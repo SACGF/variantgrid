@@ -27,7 +27,7 @@ from classification.models.evidence_mixin import (
     VCPatchValue,
 )
 from library.cache import timed_cache
-from library.utils import empty_to_none, first, strip_json
+from library.utils import empty_to_none, first, strip_json, pretty_label
 from snpdb.models import VariantGridColumn
 
 CLASSIFICATION_VALUE_TOLERANCE = 0.00000001
@@ -412,7 +412,7 @@ class EvidenceKey(TimeStampedModel):
             return empty_value
         return self.pretty_value(raw_value)
 
-    def pretty_value(self, normal_value_obj: Any, dash_for_none: bool = False) -> Optional[str]:
+    def pretty_value(self, normal_value_obj: Any, dash_for_none: bool = False, pretty_unknown: bool = False) -> Optional[str]:
         """
         :param normal_value_obj: The blob for the evidence key, e.g. {"value":x} or just x
         :param dash_for_none: If the value obj doesn't contain a value, return "-" if no value is selected
@@ -439,6 +439,9 @@ class EvidenceKey(TimeStampedModel):
                     part_value = matched_option.get('label') or EvidenceKey.pretty_label_from_string(matched_option.get('key'))
                 else:
                     part_value = val
+                    if part_value and pretty_unknown:
+                        part_value = pretty_label(part_value)
+
                 if part_value is not None:
                     str_values.append(part_value)
 

@@ -3081,14 +3081,29 @@ a.clinical-context {
 .testing-context-G {
 	background-color: #ddeedd;
 }
+
 .testing-context-S {
-	background-color: #ffe8ff;
+	background-color: #ffc6ff;
 }
 .testing-context-H {
-	background-color: #ffddff;
+	background-color: #ffccff;
 }
 .testing-context-N {
-	background-color: #ffccff;
+	background-color: #ffbbff;
+}
+
+.testing-context-table {
+	.testing-context-S {
+		background-color: #ffe8ff;
+	}
+
+	.testing-context-H {
+		background-color: #ffddff;
+	}
+
+	.testing-context-N {
+		background-color: #ffccff;
+	}
 }
 td.allele-origin-G {
 	background-color: #ddffdd;

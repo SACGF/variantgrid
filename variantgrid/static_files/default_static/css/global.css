@@ -2702,14 +2702,24 @@ a.clinical-context {
 }
 
 .testing-context-S {
-  background-color: #ffe8ff;
+  background-color: #ffc6ff;
 }
 
 .testing-context-H {
-  background-color: #ffddff;
+  background-color: #ffccff;
 }
 
 .testing-context-N {
+  background-color: #ffbbff;
+}
+
+.testing-context-table .testing-context-S {
+  background-color: #ffe8ff;
+}
+.testing-context-table .testing-context-H {
+  background-color: #ffddff;
+}
+.testing-context-table .testing-context-N {
   background-color: #ffccff;
 }
 
