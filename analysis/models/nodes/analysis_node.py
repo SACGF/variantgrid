@@ -1049,16 +1049,18 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
         return NodeStatus.READY, total_count
 
     def _load(self):
-        """ Override to do anything interesting """
+        """ Override to do anything interesting.
+            Return a dict of node fields to write as part of the load - setting them on self isn't
+            enough, as load() persists via update() (see #431 - no save() in celery tasks) """
 
     def load(self):
         """ load is called after parents are run """
         # logging.debug("node %d (%d) load()", self.id, self.version)
         start = time()
-        self._load()  # Do before counts in case it affects anything
+        load_update_kwargs = self._load() or {}  # Do before counts in case it affects anything
         status, count = self.node_counts()
         load_seconds = time() - start
-        self.update(status=status, count=count, load_seconds=load_seconds)
+        self.update(status=status, count=count, load_seconds=load_seconds, **load_update_kwargs)
 
     def add_parent(self, parent, *args, **kwargs):
         if not parent.visible:
@@ -1084,7 +1086,8 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
 
     def update(self, **kwargs):
         """ Updates Node if self.version matches DB - otherwise throws NodeOutOfDateException """
-        self_qs = AnalysisNode.objects.filter(pk=self.pk, version=self.version)
+        # Subclass queryset so node subclass fields (eg has_gene_coverage) can be written as well as base ones
+        self_qs = type(self).objects.filter(pk=self.pk, version=self.version)
         updated = self_qs.update(**kwargs)
         if not updated:
             raise NodeOutOfDateException()

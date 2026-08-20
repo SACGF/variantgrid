@@ -14,16 +14,6 @@ class GeneCoverageNodeView(NodeView):
         gene_lists = self.object.get_gene_lists()
         context['gene_lists'] = gene_lists
         context['gene_list_id_list'] = "/".join([str(gl.pk) for gl in gene_lists])
-        gene_lists_errors = {}
-        gene_lists_warnings = {}
-
-        for gl in gene_lists:
-            if gl.error_message:
-                gene_lists_errors[gl] = gl.error_message
-            if warnings := gl.get_warnings(self.object.analysis.gene_annotation_release):
-                gene_lists_warnings[gl] = ", ".join(warnings)
-        context["gene_lists_errors"] = gene_lists_errors
-        context["gene_lists_warnings"] = gene_lists_warnings
 
         sample_coverage_and_uncovered = self.object.get_sample_coverage_and_uncovered()
         incomplete_gene_coverage = []

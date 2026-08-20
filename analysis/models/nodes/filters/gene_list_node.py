@@ -231,7 +231,7 @@ class GeneListNode(AncestorSampleMixin, GeneCoverageMixin, AnalysisNode):
         if self.use_custom_gene_list:
             create_custom_text_gene_list(self.custom_text_gene_list, self.analysis.user.username, hidden=True)
 
-        super()._load()
+        return super()._load()
 
     def _get_configuration_errors(self) -> list:
         errors = super()._get_configuration_errors()
