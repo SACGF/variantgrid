@@ -41,6 +41,16 @@ python3 manage.py migrate
 python3 manage.py shell
 ```
 
+### Python packages
+This project uses **uv** — the `.venv` is uv-created and `requirements.txt` is compiled from
+`requirements.in`. Check for uv (`which uv`) and use it rather than plain pip:
+
+```bash
+uv pip install <package>          # instead of: pip install
+uv pip compile requirements.in -o requirements.txt
+uv pip sync requirements.txt
+```
+
 ## Settings Architecture
 
 Settings use a **hostname-based split-settings pattern**. `variantgrid/settings/__init__.py` auto-detects the hostname and loads the matching settings file:
