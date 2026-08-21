@@ -184,7 +184,7 @@ class ClinicalSignificanceCssClassTestCase(TestCase):
 
 
 class ReclassificationAnalyticsViewTestCase(TestCase):
-    """ The page's numbers, and its raw SQL evidence key diff, over a record that moved twice """
+    """ The page's numbers, and its raw SQL evidence diff, over a record that moved twice """
 
     @classmethod
     def setUpTestData(cls):
@@ -196,13 +196,16 @@ class ReclassificationAnalyticsViewTestCase(TestCase):
             lab=lab,
             lab_record_id=None,
             data={SpecialEKeys.C_HGVS: {'value': 'c.301A>C'},
-                  SpecialEKeys.CLINICAL_SIGNIFICANCE: {'value': 'VUS'}},
+                  SpecialEKeys.CLINICAL_SIGNIFICANCE: {'value': 'VUS'},
+                  'pm2': {'value': 'PM'}},
             save=True,
             source=SubmissionSource.API,
             make_fields_immutable=False)
         classification.publish_latest(user=user)
         for patch in [{SpecialEKeys.CLINICAL_SIGNIFICANCE: {'value': 'LB'},
-                       SpecialEKeys.LITERATURE: {'value': 'gnomAD says common'}},
+                       SpecialEKeys.LITERATURE: {'value': 'gnomAD says common'},
+                       'pm2': {'value': 'NM'},
+                       'bp4': {'value': 'BP'}},
                       {SpecialEKeys.CLINICAL_SIGNIFICANCE: {'value': 'B'}}]:
             classification.patch_value(patch=patch, clear_all_fields=False, user=user,
                                        source=SubmissionSource.API, save=True)
@@ -251,9 +254,19 @@ class ReclassificationAnalyticsViewTestCase(TestCase):
         self.assertEqual(0, rates[0].population)
         self.assertIsNone(rates[0].percent)
 
-    def test_evidence_key_diff_finds_the_keys_that_changed(self):
-        changed = {change.key for change in self._analytics().evidence_key_changes}
-        self.assertIn(SpecialEKeys.LITERATURE, changed)
-        # the significance moving is what defines the event, so it tells us nothing about why
-        self.assertNotIn(SpecialEKeys.CLINICAL_SIGNIFICANCE, changed)
-        self.assertNotIn(SpecialEKeys.C_HGVS, changed)
+    def test_evidence_movement_splits_criteria_on_off_from_plain_changes(self):
+        analytics = self._analytics()
+        movements = {movement.key: movement for movement in analytics.evidence_towards_benign}
+        self.assertEqual((0, 1, 0), self._counts(movements["acmg:pm2"]))
+        self.assertEqual((1, 0, 0), self._counts(movements["acmg:bp4"]))
+        self.assertEqual((0, 0, 1), self._counts(movements[SpecialEKeys.LITERATURE]))
+        self.assertNotIn(SpecialEKeys.CLINICAL_SIGNIFICANCE, movements)
+        # criteria lead, in ACMG strength order
+        self.assertEqual(["acmg:pm2", "acmg:bp4"],
+                         [movement.key for movement in analytics.evidence_towards_benign
+                          if movement.key.startswith("acmg:")])
+        self.assertEqual([], analytics.evidence_towards_pathogenic)
+
+    @staticmethod
+    def _counts(movement) -> tuple[int, int, int]:
+        return movement.applied, movement.unapplied, movement.changed

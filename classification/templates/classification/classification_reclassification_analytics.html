@@ -78,14 +78,14 @@
     </form>
 
     {% if build_result.outstanding %}
-        <p class="text-info">Timelines are being built for {{ build_result.outstanding | number:'S' }} records - refresh shortly to see them.</p>
+        <p class="text-info">Timelines are being built for {{ build_result.outstanding | number }} records - refresh shortly to see them.</p>
     {% elif build_result.last_run %}
         <p class="text-muted">Timelines current as of {% timestamp build_result.last_run %}</p>
     {% endif %}
 
     <div class="row mb-4">
-        {% labelled hint="tiny" label="Records with a Timeline" %}{{ analytics.classification_count | number:'S' }}{% endlabelled %}
-        {% labelled hint="tiny" label="Reclassifications" %}{{ analytics.reclassification_count | number:'S' }}{% endlabelled %}
+        {% labelled hint="tiny" label="Records with a Timeline" %}{{ analytics.classification_count | number }}{% endlabelled %}
+        {% labelled hint="tiny" label="Reclassifications" %}{{ analytics.reclassification_count | number }}{% endlabelled %}
     </div>
 
     <div class="mb-4">
@@ -113,11 +113,11 @@
                 {% for distribution in analytics.time_to_reclassification %}
                     <tr>
                         <td><span class="c-pill {{ distribution.css_class }}">{{ distribution.label }}</span></td>
-                        <td class="numeric">{{ distribution.count | number:'S' }}</td>
-                        <td class="numeric">{{ distribution.median | number:'S' }}</td>
-                        <td class="numeric">{{ distribution.p25 | number:'S' }}</td>
-                        <td class="numeric">{{ distribution.p75 | number:'S' }}</td>
-                        <td class="numeric">{{ distribution.longest | number:'S' }}</td>
+                        <td class="numeric">{{ distribution.count | number }}</td>
+                        <td class="numeric">{{ distribution.median | number }}</td>
+                        <td class="numeric">{{ distribution.p25 | number }}</td>
+                        <td class="numeric">{{ distribution.p75 | number }}</td>
+                        <td class="numeric">{{ distribution.longest | number }}</td>
                     </tr>
                 {% endfor %}
             </tbody>
@@ -145,11 +145,11 @@
                     <tr>
                         <th><span class="c-pill {{ row.css_class }}">{{ row.label }}</span></th>
                         {% for cell in row.cells %}
-                            <td class="numeric {% if cell.is_self %}table-active{% endif %}">
-                                {% if cell.count %}{{ cell.count | number:'S' }}{% else %}<span class="no-value">-</span>{% endif %}
+                            <td class="numeric {% if cell.is_self %}table-active{% endif %}" {% if cell.background %}style="background-color: {{ cell.background }}"{% endif %}>
+                                {% if cell.count %}{{ cell.count | number }}{% else %}<span class="no-value">-</span>{% endif %}
                             </td>
                         {% endfor %}
-                        <td class="numeric">{{ row.total | number:'S' }}</td>
+                        <td class="numeric">{{ row.total | number }}</td>
                     </tr>
                 {% endfor %}
             </tbody>
@@ -157,9 +157,9 @@
                 <tr>
                     <th>Total</th>
                     {% for total in analytics.significance_matrix_totals %}
-                        <td class="numeric">{{ total | number:'S' }}</td>
+                        <td class="numeric">{{ total | number }}</td>
                     {% endfor %}
-                    <td class="numeric">{{ analytics.significance_matrix_total | number:'S' }}</td>
+                    <td class="numeric">{{ analytics.significance_matrix_total | number }}</td>
                 </tr>
             </tfoot>
         </table>
@@ -191,12 +191,24 @@
         <p class="no-value">No gene symbols resolved for these records.</p>
     {% endif %}
 
-    <h4 class="mt-5">Evidence Keys Driving Reclassification</h4>
-    <p class="text-muted">Which fields changed in the edit that moved the significance.</p>
-    {% if analytics.evidence_key_changes %}
-        <div id="evidence-keys" class="chart"></div>
+    <h4 class="mt-5">Evidence Driving Reclassification</h4>
+    <p class="text-muted">
+        What changed in the edit that moved the significance. Criteria coming on or coming off are split
+        out, everything else - including a criterion only shifting strength - counts as a plain change.
+        Criteria lead in ACMG strength order, then the rest in the order they appear on a classification.
+    </p>
+    <h5 class="mt-4">Reclassifications towards pathogenic</h5>
+    {% if analytics.evidence_towards_pathogenic %}
+        <div id="evidence-towards-pathogenic" class="chart"></div>
     {% else %}
-        <p class="no-value">No evidence to diff for these filters.</p>
+        <p class="no-value">No evidence moved on these reclassifications.</p>
+    {% endif %}
+
+    <h5 class="mt-4">Reclassifications towards benign</h5>
+    {% if analytics.evidence_towards_benign %}
+        <div id="evidence-towards-benign" class="chart"></div>
+    {% else %}
+        <p class="no-value">No evidence moved on these reclassifications.</p>
     {% endif %}
 </div>
 
@@ -219,46 +231,66 @@
 
     const plotConfig = {responsive: true, displayModeBar: false};
 
-    /** Where to stop the axis so a handful of very old records don't flatten the bulk of the
-     *  distribution - the longest column in the table below still reports the true maximum. */
-    function percentile(values, fraction) {
-        const ordered = values.slice().sort((a, b) => a - b);
-        return ordered[Math.min(Math.floor(fraction * ordered.length), ordered.length - 1)];
-    }
-
     const timeToReclassification = reclassificationCharts.time_to_reclassification;
-    if (timeToReclassification.length) {
-        const allDays = [].concat(...timeToReclassification.map(series => series.days));
-        const axisEnd = Math.max(365, Math.ceil(percentile(allDays, 0.99) / 365) * 365);
-        const traces = timeToReclassification.map(series => ({
-            x: series.days,
+    if (timeToReclassification.series.length) {
+        const edges = timeToReclassification.edges;
+        const centres = edges.slice(0, -1).map((edge, index) => (edge + edges[index + 1]) / 2);
+        const barWidth = (edges[1] - edges[0]) * 0.94;
+        const traces = timeToReclassification.series.map(series => ({
+            x: centres,
+            y: series.counts,
+            width: barWidth,
             name: series.label,
-            type: 'histogram',
-            marker: {color: series.colour, line: {color: "#fcfcfb", width: 2}},
-            xbins: {start: 0, end: axisEnd, size: Math.round(axisEnd / 20)},
-            hovertemplate: '%{y} records ' + series.label + '<br>%{x} days<extra></extra>'
+            type: 'bar',
+            marker: {color: series.colour, line: {color: "#fcfcfb", width: 1}},
+            customdata: series.counts.map((count, index) =>
+                [Math.round(Math.pow(10, edges[index]) - 1), Math.round(Math.pow(10, edges[index + 1]) - 1)]),
+            hovertemplate: '%{y} records ' + series.label +
+                           '<br>%{customdata[0]} to %{customdata[1]} days<extra></extra>'
         }));
         Plotly.newPlot('time-to-reclassification', traces, chartLayout({
             barmode: 'stack',
+            bargap: 0,
             legend: {traceorder: 'normal'},
-            xaxis: {title: 'Days at the starting significance', range: [0, axisEnd],
+            xaxis: {title: 'Days at the starting significance', range: [0, edges[edges.length - 1]],
+                    tickmode: 'array', tickvals: timeToReclassification.tick_values,
+                    ticktext: timeToReclassification.tick_labels,
                     gridcolor: GRID_COLOUR, zeroline: false},
             yaxis: {title: 'Reclassifications', gridcolor: GRID_COLOUR, zeroline: false}
         }), plotConfig);
     }
 
+    const SANKEY_HEIGHT = 520, SANKEY_MARGIN = 25, SANKEY_PAD = 16;
+
+    /** Stacks a column of nodes top to bottom in the order given, sized by its share of the flow,
+     *  so a significance sits at the same depth on both sides and a downgrade always reads downwards. */
+    function sankeyColumnTops(totals, grandTotal, plotHeight) {
+        const usable = plotHeight - SANKEY_PAD * (totals.length - 1);
+        let cursor = 0;
+        return totals.map(total => {
+            const top = cursor / plotHeight;
+            cursor += (total / grandTotal) * usable + SANKEY_PAD;
+            return top;
+        });
+    }
+
     const flow = reclassificationCharts.flow;
     if (flow.values.length) {
+        const columnSize = flow.node_totals.length / 2;
+        const grandTotal = flow.values.reduce((running, value) => running + value, 0);
+        const plotHeight = SANKEY_HEIGHT - SANKEY_MARGIN * 2;
+        const tops = sankeyColumnTops(flow.node_totals.slice(0, columnSize), grandTotal, plotHeight)
+            .concat(sankeyColumnTops(flow.node_totals.slice(columnSize), grandTotal, plotHeight));
         Plotly.newPlot('significance-flow', [{
             type: 'sankey',
             orientation: 'h',
-            arrangement: 'snap',
+            arrangement: 'fixed',
             node: {
                 label: flow.labels,
                 color: flow.node_colours,
-                x: flow.node_x,
-                y: flow.node_y,
-                pad: 18,
+                x: flow.node_totals.map((total, index) => index < columnSize ? 0.001 : 0.999),
+                y: tops,
+                pad: SANKEY_PAD,
                 thickness: 16,
                 line: {color: "#fcfcfb", width: 2}
             },
@@ -268,7 +300,10 @@
                 value: flow.values,
                 color: flow.link_colours
             }
-        }], chartLayout({margin: {t: 20, r: 20, b: 20, l: 20}}), plotConfig);
+        }], chartLayout({
+            height: SANKEY_HEIGHT,
+            margin: {t: SANKEY_MARGIN, r: SANKEY_MARGIN, b: SANKEY_MARGIN, l: SANKEY_MARGIN}
+        }), plotConfig);
     }
 
     const vusRates = reclassificationCharts.vus_rates;
@@ -334,21 +369,42 @@
         }), plotConfig);
     }
 
-    const evidenceKeys = reclassificationCharts.evidence_keys;
-    if (evidenceKeys.labels.length) {
-        Plotly.newPlot('evidence-keys', [{
-            x: evidenceKeys.counts.slice().reverse(),
-            y: evidenceKeys.labels.slice().reverse(),
-            type: 'bar',
-            orientation: 'h',
-            marker: {color: evidenceKeys.colour},
-            hovertemplate: '%{y} changed in %{x} reclassifications<extra></extra>'
-        }], chartLayout({
-            height: 600,
+    /** Unapplied to the left, applied and plain changes to the right, keys running down in the
+     *  order the view put them in */
+    function plotEvidenceMovement(selector, evidence) {
+        if (!evidence.labels.length) {
+            return;
+        }
+        const labels = evidence.labels.slice().reverse();
+        const traces = [
+            {
+                x: evidence.unapplied.slice().reverse(), y: labels, name: 'Unapplied', type: 'bar',
+                orientation: 'h', marker: {color: evidence.unapplied_colour},
+                hovertemplate: '%{y} unapplied in %{x} reclassifications<extra></extra>'
+            },
+            {
+                x: evidence.applied.slice().reverse(), y: labels, name: 'Applied', type: 'bar',
+                orientation: 'h', marker: {color: evidence.applied_colour},
+                hovertemplate: '%{y} applied in %{x} reclassifications<extra></extra>'
+            },
+            {
+                x: evidence.changed.slice().reverse(), y: labels, name: 'Changed', type: 'bar',
+                orientation: 'h', marker: {color: evidence.changed_colour},
+                hovertemplate: '%{y} changed in %{x} reclassifications<extra></extra>'
+            }
+        ];
+        Plotly.newPlot(selector, traces, chartLayout({
+            height: Math.max(320, 26 * labels.length + 120),
+            barmode: 'relative',
             margin: {t: 20, r: 20, b: 60, l: 220},
-            xaxis: {title: 'Reclassifications where the key changed', gridcolor: GRID_COLOUR, zeroline: false},
+            legend: {traceorder: 'normal'},
+            xaxis: {title: 'Unapplied \u2190  reclassifications  \u2192 applied or changed',
+                    tickformat: 'd', gridcolor: GRID_COLOUR, zeroline: true, zerolinecolor: AXIS_COLOUR},
             yaxis: {gridcolor: GRID_COLOUR, zeroline: false, automargin: true}
         }), plotConfig);
     }
+
+    plotEvidenceMovement('evidence-towards-pathogenic', reclassificationCharts.evidence_towards_pathogenic);
+    plotEvidenceMovement('evidence-towards-benign', reclassificationCharts.evidence_towards_benign);
 </script>
 {% endblock content %}
