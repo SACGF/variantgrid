@@ -30,7 +30,8 @@
         <p>
             How clinical significance has moved over time, mined from every published version of every
             classification record. Each record contributes an initial classification, then one event per
-            time its clinical significance changed.
+            time a curator revisited it - a re-evaluation where the curation dates advanced and the call
+            held, a reclassification where the call moved.
         </p>
         <p>
             An external lab's event dates are the date the record synced in, not the date that lab curated it,
@@ -75,6 +76,18 @@
         <input class="form-control mr-3" type="date" id="date_to" name="date_to" value="{{ analytics.date_to|date:'Y-m-d' }}" />
 
         <button type="submit" class="btn btn-primary">Apply</button>
+
+        <div class="w-100 mt-3 d-flex align-items-center">
+            <label class="mr-2" for="origin">Survival cohort taken on</label>
+            <input class="form-control mr-3" type="date" id="origin" name="origin" value="{{ analytics.origin|date:'Y-m-d' }}" />
+
+            <label class="mr-2" for="origin_significance">sitting at</label>
+            <select class="form-control" id="origin_significance" name="origin_significance">
+                {% for value, label in significance_choices %}
+                    <option value="{{ value }}" {% if analytics.origin_significance == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
     </form>
 
     {% if build_result.outstanding %}
@@ -85,6 +98,7 @@
 
     <div class="row mb-4">
         {% labelled hint="tiny" label="Records with a Timeline" %}{{ analytics.classification_count | number }}{% endlabelled %}
+        {% labelled hint="tiny" label="Re-evaluations" %}{{ analytics.reevaluation_count | number }}{% endlabelled %}
         {% labelled hint="tiny" label="Reclassifications" %}{{ analytics.reclassification_count | number }}{% endlabelled %}
     </div>
 
@@ -94,7 +108,55 @@
         {% endfor %}
     </div>
 
-    <h4>Time to Reclassification</h4>
+    <h4>Waiting for a Second Look</h4>
+    <p class="text-muted">
+        Of the records sitting at one significance on a chosen date, the share still waiting to be
+        re-evaluated and the share still waiting to be reclassified. The gap between the two curves is
+        reanalysis that left the call where it was. Records that were withdrawn leave the curve at that
+        point rather than counting as never having moved, and event times are read to the nearest year.
+    </p>
+    {% if analytics.survival %}
+        <div class="row mb-2">
+            {% labelled hint="tiny" label="Cohort" %}{{ analytics.survival.cohort_size | number }} records at <span class="c-pill {{ analytics.survival.css_class }}">{{ analytics.survival.significance_label }}</span> on {{ analytics.survival.origin }}{% endlabelled %}
+            {% labelled hint="tiny" label="Followed for" %}{{ analytics.survival.span_years }} years, to {{ analytics.survival.window_end }}{% endlabelled %}
+        </div>
+        <div id="survival" class="chart"></div>
+        <table class="table table-sm summary w-auto">
+            <thead>
+                <tr>
+                    <th>Outcome</th>
+                    <th class="numeric">Records</th>
+                    <th class="numeric">Share of cohort</th>
+                    <th class="numeric">Half life</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for curve in analytics.survival_summary %}
+                    <tr>
+                        <td>{{ curve.event_label }}</td>
+                        <td class="numeric">{{ curve.events | number }}</td>
+                        <td class="numeric">{{ curve.ever_percent }}%</td>
+                        <td class="numeric">
+                            {% if curve.half_life_years %}{{ curve.half_life_years }} years{% else %}&gt; {{ analytics.survival.span_years }} years{% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% if analytics.survival.resolved %}
+            <h5 class="mt-4">Where the resolved records went</h5>
+            <div id="survival-resolution" class="chart"></div>
+            <p class="text-muted">
+                {{ analytics.survival.towards_benign | number }} moved towards benign and
+                {{ analytics.survival.towards_pathogenic | number }} towards pathogenic
+                - {{ analytics.survival.benign_share }}% of the resolved records went benign.
+            </p>
+        {% endif %}
+    {% else %}
+        <p class="no-value">No cohort to follow - pick an origin date at least a year inside the window.</p>
+    {% endif %}
+
+    <h4 class="mt-5">Time to Reclassification</h4>
     <p class="text-muted">How long a record sits at its starting significance before it first moves.</p>
     {% if analytics.time_to_reclassification %}
         <div id="time-to-reclassification" class="chart"></div>
@@ -167,12 +229,46 @@
         <p class="no-value">No reclassifications match these filters.</p>
     {% endif %}
 
-    <h4 class="mt-5">VUS Reclassification Rate</h4>
-    <p class="text-muted">Records that left VUS during the year, over the number sitting at VUS when the year began.</p>
-    {% if analytics.vus_rates %}
-        <div id="vus-rate" class="chart"></div>
+    <h4 class="mt-5">Re-evaluation against Reclassification</h4>
+    <p class="text-muted">
+        Records revisited during each year and records whose call moved, each over the catalogue as it
+        stood when the year began. The ratio between them is how many records a curator looked at for
+        each one that changed.
+    </p>
+    {% if analytics.yearly_activity %}
+        <div id="curation-activity" class="chart"></div>
+        <table class="table table-sm summary">
+            <thead>
+                <tr>
+                    <th class="numeric">Year</th>
+                    <th class="numeric">Records held at 1 Jan</th>
+                    <th class="numeric">Re-evaluated</th>
+                    <th class="numeric">Re-evaluation rate</th>
+                    <th class="numeric">Reclassified</th>
+                    <th class="numeric">Reclassification rate</th>
+                    <th class="numeric">Records reviewed per change</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for year in analytics.yearly_activity %}
+                    <tr>
+                        <td class="numeric">{{ year.year }}</td>
+                        <td class="numeric">{{ year.population | number }}</td>
+                        <td class="numeric">{{ year.reviewed | number }}</td>
+                        <td class="numeric">{% if year.reviewed_percent != None %}{{ year.reviewed_percent }}%{% else %}<span class="no-value">-</span>{% endif %}</td>
+                        <td class="numeric">{{ year.reclassified | number }}</td>
+                        <td class="numeric">{% if year.reclassified_percent != None %}{{ year.reclassified_percent }}%{% else %}<span class="no-value">-</span>{% endif %}</td>
+                        <td class="numeric">{% if year.reviews_per_change %}{{ year.reviews_per_change }}&times;{% else %}<span class="no-value">-</span>{% endif %}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <h5 class="mt-4">How Often the Same Record Comes Back</h5>
+        <p class="text-muted">The number of distinct years each record was touched in, so the effort that concentrates on a few records reads differently from the effort that spreads.</p>
+        <div id="serial-activity" class="chart"></div>
     {% else %}
-        <p class="no-value">No VUS timeline to report on with these filters.</p>
+        <p class="no-value">No timeline to report on with these filters.</p>
     {% endif %}
 
     <h4 class="mt-5">Direction of Travel</h4>
@@ -181,6 +277,62 @@
         <div id="direction-trend" class="chart"></div>
     {% else %}
         <p class="no-value">No reclassifications match these filters.</p>
+    {% endif %}
+
+    <h4 class="mt-5">Maintenance by Lab</h4>
+    <p class="text-muted">
+        What each lab holds, how much of it the lab has revisited, and how much of it has changed. Records
+        held is every record with a timeline by the end of the window, so a lab that joined part way through
+        is measured on the records it actually had. The baseline is what a lab of that size would reclassify
+        at the median per record rate across labs with any activity, so a positive residual means the lab
+        reanalyses more than its size predicts.
+    </p>
+    {% if analytics.lab_activity %}
+        <p class="text-muted">
+            {{ analytics.labs_with_no_reclassification | number }} of {{ analytics.lab_activity | length | number }}
+            labs reclassified nothing in this window.
+        </p>
+        <table id="lab-league" class="table table-sm summary">
+            <thead>
+                <tr>
+                    <th>Lab</th>
+                    <th>Organisation</th>
+                    <th class="numeric">Records held</th>
+                    <th class="numeric">Re-evaluated</th>
+                    <th class="numeric">Re-eval rate</th>
+                    <th class="numeric">Reclassified</th>
+                    <th class="numeric">Reclass rate</th>
+                    <th class="numeric">Reviewed per change</th>
+                    <th class="numeric">Residual vs baseline</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in analytics.lab_activity %}
+                    <tr {% if row.is_selected %}class="table-active font-weight-bold"{% endif %}>
+                        <td>{{ row.lab_name }}</td>
+                        <td>{{ row.organization_name }}</td>
+                        <td class="numeric" data-order="{{ row.held }}">{{ row.held | number }}</td>
+                        <td class="numeric" data-order="{{ row.reviewed }}">{{ row.reviewed | number }}</td>
+                        <td class="numeric" data-order="{{ row.reviewed_percent | default_if_none:-1 }}">{% if row.reviewed_percent != None %}{{ row.reviewed_percent }}%{% else %}<span class="no-value">-</span>{% endif %}</td>
+                        <td class="numeric" data-order="{{ row.reclassified }}">{{ row.reclassified | number }}</td>
+                        <td class="numeric" data-order="{{ row.reclassified_percent | default_if_none:-1 }}">{% if row.reclassified_percent != None %}{{ row.reclassified_percent }}%{% else %}<span class="no-value">-</span>{% endif %}</td>
+                        <td class="numeric" data-order="{{ row.reviews_per_change | default_if_none:-1 }}">{% if row.reviews_per_change %}{{ row.reviews_per_change }}&times;{% else %}<span class="no-value">-</span>{% endif %}</td>
+                        <td class="numeric" data-order="{{ row.residual }}">{{ row.residual }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <div id="lab-rates" class="chart"></div>
+
+        <h5 class="mt-4">How Concentrated the Effort Is</h5>
+        <p class="text-muted">
+            Cumulative share of records held, re-evaluations and reclassifications against the cumulative
+            share of labs, smallest first. The further a curve sits below the diagonal, the more the work
+            sits with a few labs.
+        </p>
+        <div id="lab-concentration" class="chart"></div>
+    {% else %}
+        <p class="no-value">No lab holds a timeline with these filters.</p>
     {% endif %}
 
     <h4 class="mt-5">VUS Burden by Gene</h4>
@@ -193,9 +345,10 @@
 
     <h4 class="mt-5">Evidence Driving Reclassification</h4>
     <p class="text-muted">
-        What changed in the edit that moved the significance. Criteria coming on or coming off are split
-        out, everything else - including a criterion only shifting strength - counts as a plain change.
-        Criteria lead in ACMG strength order, then the rest in the order they appear on a classification.
+        What changed in the edit that moved the significance. Criteria coming on, coming off, or shifting
+        strength are split out, everything else counts as a plain change. Criteria lead in ACMG strength
+        order, then the rest in the order they appear on a classification. Across labs each lab's version
+        of a criterion is folded together; select a single lab to see that lab's own keys.
     </p>
     <h5 class="mt-4">Reclassifications towards pathogenic</h5>
     {% if analytics.evidence_towards_pathogenic %}
@@ -209,6 +362,35 @@
         <div id="evidence-towards-benign" class="chart"></div>
     {% else %}
         <p class="no-value">No evidence moved on these reclassifications.</p>
+    {% endif %}
+
+    <h4 class="mt-5">Points Travelled to Cross a Boundary</h4>
+    <p class="text-muted">
+        ACMG points met before and after each reclassification, so each move between two significances
+        shows how far the evidence actually had to travel. Records carrying no criteria at all are left out.
+    </p>
+    {% if analytics.points_transitions %}
+        <div id="points-transitions" class="chart"></div>
+        <table class="table table-sm summary w-auto">
+            <thead>
+                <tr>
+                    <th>Move</th>
+                    <th class="numeric">Reclassifications</th>
+                    <th class="numeric">Median points travelled</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for transition in analytics.points_transitions %}
+                    <tr>
+                        <td>{{ transition.label }}</td>
+                        <td class="numeric">{{ transition.count | number }}</td>
+                        <td class="numeric">{{ transition.median }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p class="no-value">No reclassification carries ACMG criteria on both sides.</p>
     {% endif %}
 </div>
 
@@ -312,18 +494,106 @@
         }), plotConfig);
     }
 
-    const vusRates = reclassificationCharts.vus_rates;
-    if (vusRates.years.length) {
-        Plotly.newPlot('vus-rate', [{
-            x: vusRates.years,
-            y: vusRates.percents,
-            type: 'bar',
-            marker: {color: vusRates.colour},
-            customdata: vusRates.years.map((year, index) => [vusRates.reclassified[index], vusRates.populations[index]]),
-            hovertemplate: '%{customdata[0]} of %{customdata[1]} VUSes reclassified in %{x}<extra></extra>'
-        }], chartLayout({
+    const survival = reclassificationCharts.survival;
+    if (survival.years.length) {
+        const traces = survival.curves.map(curve => ({
+            x: survival.years,
+            y: curve.survival.map(remaining => remaining * 100),
+            name: curve.label,
+            type: 'scatter',
+            mode: 'lines+markers',
+            line: {color: curve.colour, width: 2, shape: 'hv'},
+            marker: {color: curve.colour, size: 6},
+            hovertemplate: '%{y:.1f}% ' + curve.label.toLowerCase() + ' after %{x} years<extra></extra>'
+        }));
+        Plotly.newPlot('survival', traces, chartLayout({
+            hovermode: 'x unified',
+            legend: {traceorder: 'normal'},
+            xaxis: {title: 'Years since the cohort was taken', tickmode: 'linear',
+                    gridcolor: GRID_COLOUR, zeroline: false},
+            yaxis: {title: '% of the cohort still waiting', range: [0, 100],
+                    gridcolor: GRID_COLOUR, zeroline: false}
+        }), plotConfig);
+
+        if (survival.resolution_counts.some(count => count)) {
+            Plotly.newPlot('survival-resolution', [{
+                x: survival.resolution_counts,
+                y: survival.resolution_labels,
+                type: 'bar',
+                orientation: 'h',
+                marker: {color: survival.resolution_colours},
+                hovertemplate: '%{y}: %{x} records<extra></extra>'
+            }], chartLayout({
+                height: 260,
+                margin: {t: 20, r: 20, b: 60, l: 160},
+                xaxis: {title: 'Records resolved', gridcolor: GRID_COLOUR, zeroline: false},
+                yaxis: {gridcolor: GRID_COLOUR, zeroline: false, automargin: true}
+            }), plotConfig);
+        }
+    }
+
+    const activity = reclassificationCharts.activity;
+    if (activity.years.length) {
+        // the two rates share a left axis, the ratio between them needs its own
+        const traces = [
+            {
+                x: activity.years, y: activity.reviewed, name: 'Records re-evaluated', type: 'bar',
+                marker: {color: activity.review_colour, opacity: 0.35},
+                hovertemplate: '%{y} records re-evaluated in %{x}<extra></extra>', yaxis: 'y3'
+            },
+            {
+                x: activity.years, y: activity.reclassified, name: 'Records reclassified', type: 'bar',
+                marker: {color: activity.change_colour, opacity: 0.35},
+                hovertemplate: '%{y} records reclassified in %{x}<extra></extra>', yaxis: 'y3'
+            },
+            {
+                x: activity.years, y: activity.reviewed_percents, name: 'Re-evaluation rate',
+                type: 'scatter', mode: 'lines+markers', line: {color: activity.review_colour, width: 2},
+                customdata: activity.populations,
+                hovertemplate: '%{y}% of %{customdata} records re-evaluated<extra></extra>'
+            },
+            {
+                x: activity.years, y: activity.reclassified_percents, name: 'Reclassification rate',
+                type: 'scatter', mode: 'lines+markers',
+                line: {color: activity.change_colour, width: 2, dash: 'dot'},
+                customdata: activity.populations,
+                hovertemplate: '%{y}% of %{customdata} records reclassified<extra></extra>'
+            },
+            {
+                x: activity.years, y: activity.reviews_per_change, name: 'Records reviewed per change',
+                type: 'scatter', mode: 'lines', line: {color: AXIS_COLOUR, width: 1, dash: 'dash'},
+                yaxis: 'y2', hovertemplate: '%{y} reviewed per change<extra></extra>'
+            }
+        ];
+        Plotly.newPlot('curation-activity', traces, chartLayout({
+            height: 480,
+            barmode: 'group',
+            hovermode: 'x unified',
+            legend: {orientation: 'h', y: -0.2},
+            margin: {t: 20, r: 70, b: 80, l: 70},
             xaxis: {title: 'Year', tickmode: 'linear', gridcolor: GRID_COLOUR, zeroline: false},
-            yaxis: {title: '% of VUSes reclassified', gridcolor: GRID_COLOUR, zeroline: false}
+            yaxis: {title: '% of the catalogue', gridcolor: GRID_COLOUR, zeroline: false},
+            yaxis2: {title: 'Reviewed per change', overlaying: 'y', side: 'right', showgrid: false,
+                     zeroline: false, rangemode: 'tozero'},
+            yaxis3: {overlaying: 'y', side: 'right', showgrid: false, zeroline: false, visible: false,
+                     rangemode: 'tozero'}
+        }), plotConfig);
+
+        Plotly.newPlot('serial-activity', [
+            {
+                x: activity.serial_labels, y: activity.serial_reviewed, name: 'Re-evaluated', type: 'bar',
+                marker: {color: activity.review_colour},
+                hovertemplate: '%{y} records re-evaluated in %{x}<extra></extra>'
+            },
+            {
+                x: activity.serial_labels, y: activity.serial_reclassified, name: 'Reclassified',
+                type: 'bar', marker: {color: activity.change_colour},
+                hovertemplate: '%{y} records reclassified in %{x}<extra></extra>'
+            }
+        ], chartLayout({
+            barmode: 'group',
+            xaxis: {title: 'Distinct years the record was touched in', gridcolor: GRID_COLOUR, zeroline: false},
+            yaxis: {title: 'Records', type: 'log', gridcolor: GRID_COLOUR, zeroline: false}
         }), plotConfig);
     }
 
@@ -375,8 +645,81 @@
         }), plotConfig);
     }
 
-    /** Unapplied to the left, applied and plain changes to the right, keys running down in the
-     *  order the view put them in */
+    const labs = reclassificationCharts.labs;
+    if (labs.labs.length) {
+        $('#lab-league').dataTable({
+            paginate: false,
+            searching: false,
+            info: false,
+            order: [[2, 'desc']]
+        });
+
+        Plotly.newPlot('lab-rates', [
+            {
+                x: labs.labs, y: labs.reviewed_percents, name: 'Re-evaluation rate', type: 'bar',
+                marker: {color: labs.review_colour}, customdata: labs.held,
+                hovertemplate: '%{x}: %{y}% of %{customdata} records re-evaluated<extra></extra>'
+            },
+            {
+                x: labs.labs, y: labs.reclassified_percents, name: 'Reclassification rate', type: 'bar',
+                marker: {color: labs.change_colour}, customdata: labs.held,
+                hovertemplate: '%{x}: %{y}% of %{customdata} records reclassified<extra></extra>'
+            }
+        ], chartLayout({
+            height: 480,
+            barmode: 'group',
+            margin: {t: 20, r: 20, b: 160, l: 70},
+            xaxis: {gridcolor: GRID_COLOUR, zeroline: false, automargin: true, tickangle: -40},
+            yaxis: {title: '% of records held', gridcolor: GRID_COLOUR, zeroline: false}
+        }), plotConfig);
+
+        const concentration = labs.concentration;
+        const lorenzTrace = (curve, name, colour, dash) => ({
+            x: curve.x, y: curve.y, name: name + (curve.gini === null ? '' : ' (Gini ' + curve.gini + ')'),
+            type: 'scatter', mode: 'lines', line: {color: colour, width: 2, dash: dash},
+            hovertemplate: '%{y:.0%} of ' + name.toLowerCase() + ' held by %{x:.0%} of labs<extra></extra>'
+        });
+        const lorenzTraces = [
+            {
+                x: [0, 1], y: [0, 1], name: 'Even across labs', type: 'scatter', mode: 'lines',
+                line: {color: GRID_COLOUR, width: 2, dash: 'dot'}, hoverinfo: 'skip'
+            },
+            lorenzTrace(concentration.held, 'Records held', concentration.held_colour, 'solid'),
+            lorenzTrace(concentration.reviewed, 'Re-evaluations', concentration.reviewed_colour, 'solid'),
+            lorenzTrace(concentration.reclassified, 'Reclassifications', concentration.reclassified_colour, 'solid')
+        ].filter(trace => trace.x.length);
+        Plotly.newPlot('lab-concentration', lorenzTraces, chartLayout({
+            legend: {traceorder: 'normal'},
+            xaxis: {title: 'Cumulative share of labs, smallest first', tickformat: '.0%',
+                    gridcolor: GRID_COLOUR, zeroline: false},
+            yaxis: {title: 'Cumulative share', tickformat: '.0%', gridcolor: GRID_COLOUR, zeroline: false}
+        }), plotConfig);
+    }
+
+    const points = reclassificationCharts.points;
+    if (points.labels.length) {
+        const traces = points.labels.map((label, index) => ({
+            x: points.deltas[index],
+            name: label,
+            type: 'box',
+            orientation: 'h',
+            boxpoints: false,
+            marker: {color: points.colours[index]},
+            line: {color: points.colours[index]},
+            hovertemplate: label + ': %{x} points<extra></extra>'
+        }));
+        Plotly.newPlot('points-transitions', traces, chartLayout({
+            height: Math.max(320, 44 * traces.length + 120),
+            showlegend: false,
+            margin: {t: 20, r: 20, b: 60, l: 120},
+            xaxis: {title: 'ACMG points travelled, positive towards pathogenic',
+                    gridcolor: GRID_COLOUR, zeroline: true, zerolinecolor: AXIS_COLOUR},
+            yaxis: {gridcolor: GRID_COLOUR, zeroline: false, automargin: true}
+        }), plotConfig);
+    }
+
+    /** Unapplied and weakened to the left, applied, strengthened and plain changes to the right, keys
+     *  running down in the order the view put them in */
     function plotEvidenceMovement(selector, evidence) {
         if (!evidence.labels.length) {
             return;
@@ -389,9 +732,19 @@
                 hovertemplate: '%{y} unapplied in %{x} reclassifications<extra></extra>'
             },
             {
+                x: evidence.weakened.slice().reverse(), y: labels, name: 'Weakened', type: 'bar',
+                orientation: 'h', marker: {color: evidence.weakened_colour},
+                hovertemplate: '%{y} weakened in %{x} reclassifications<extra></extra>'
+            },
+            {
                 x: evidence.applied.slice().reverse(), y: labels, name: 'Applied', type: 'bar',
                 orientation: 'h', marker: {color: evidence.applied_colour},
                 hovertemplate: '%{y} applied in %{x} reclassifications<extra></extra>'
+            },
+            {
+                x: evidence.strengthened.slice().reverse(), y: labels, name: 'Strengthened', type: 'bar',
+                orientation: 'h', marker: {color: evidence.strengthened_colour},
+                hovertemplate: '%{y} strengthened in %{x} reclassifications<extra></extra>'
             },
             {
                 x: evidence.changed.slice().reverse(), y: labels, name: 'Changed', type: 'bar',
@@ -404,7 +757,7 @@
             barmode: 'relative',
             margin: {t: 20, r: 20, b: 60, l: 220},
             legend: {traceorder: 'normal'},
-            xaxis: {title: 'Unapplied \u2190  reclassifications  \u2192 applied or changed',
+            xaxis: {title: 'Unapplied or weakened \u2190  reclassifications  \u2192 applied, strengthened or changed',
                     tickformat: 'd', gridcolor: GRID_COLOUR, zeroline: true, zerolinecolor: AXIS_COLOUR},
             yaxis: {gridcolor: GRID_COLOUR, zeroline: false, automargin: true}
         }), plotConfig);

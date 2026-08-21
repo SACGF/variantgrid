@@ -40,6 +40,18 @@ class AlleleOriginBucket(TextChoices):
             return AlleleOriginBucket.UNKNOWN
 
 
+class ReclassificationEventType(TextChoices):
+    """ What one row of a classification's significance timeline records @see ReclassificationEvent """
+    INITIAL = "I", "Initial Classification"
+    RECLASSIFICATION = "R", "Reclassification"
+    REEVALUATION = "E", "Re-evaluation"
+
+    @staticmethod
+    def review_types() -> list[str]:
+        """ A curator looked at the record - a reclassification is a review that moved the call """
+        return [ReclassificationEventType.RECLASSIFICATION, ReclassificationEventType.REEVALUATION]
+
+
 class LabExternalFilter(TextChoices):
     """ Classification grid filter for labs whose records came from elsewhere, e.g. synced down from Shariant """
     ALL = "A", "All"
