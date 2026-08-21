@@ -1,14 +1,14 @@
-from collections.abc import Iterable, Iterator
+from collections.abc import Iterable
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 from itertools import groupby
 from typing import Optional
 
-from django.db import models
-from django.db.models import CASCADE, SET_NULL, F, OuterRef, Q, QuerySet, Subquery, Window
+from django.db import models, transaction
+from django.db.models import CASCADE, SET_NULL, F, QuerySet, Window
 from django.db.models.fields.json import KeyTextTransform
 from django.db.models.functions import Coalesce, RowNumber
-from django.utils.timezone import localdate
+from django.utils.timezone import localdate, now
 
 from classification.enums import AlleleOriginBucket, ClinicalSignificance, SpecialEKeys
 from classification.models import Classification, ClassificationModification, EvidenceKeyMap
@@ -23,9 +23,9 @@ class ReclassificationEvent(models.Model):
     subsequent row is a reclassification. Records curated on the somatic axis are left out - see
     ReclassificationEventBuilder.tracked_classifications_qs.
 
-    Populated by a classification_post_publish_signal receiver, backfilled by the
-    reclassification_events_backfill command and reconciled nightly by
-    reclassification_events_reconcile. @see /classification/reclassification_analytics
+    Derived from published modification history by ReclassificationEventBuilder.bring_up_to_date,
+    which the analytics page and a nightly task both call.
+    @see /classification/reclassification_analytics
     """
 
     classification = models.ForeignKey(Classification, on_delete=CASCADE)
@@ -106,6 +106,36 @@ class ReclassificationEvent(models.Model):
         ).filter(_step_from_latest=1).values('pk')
         # pinned by pk so callers can keep filtering without the extra criteria folding into the window
         return ReclassificationEvent.objects.filter(pk__in=latest_pks)
+
+
+class ReclassificationEventBuildState(models.Model):
+    """ How far through classification history the timelines have been built. @see ReclassificationEvent """
+
+    built_to = models.DateTimeField(null=True, blank=True)
+    """ Timelines are current for every classification modified at or before this """
+
+    last_run = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self):
+        return f"Reclassification timelines built to {self.built_to}"
+
+    @staticmethod
+    def instance() -> 'ReclassificationEventBuildState':
+        state, _ = ReclassificationEventBuildState.objects.get_or_create(pk=1)
+        return state
+
+
+@dataclass(frozen=True)
+class ReclassificationBuildResult:
+    """ What one call to ReclassificationEventBuilder.bring_up_to_date got through """
+    classifications: int
+    """ Timelines rebuilt this run """
+    events: int
+    """ Event rows written """
+    outstanding: int
+    """ Classifications still waiting, 0 once caught up """
+    built_to: Optional[datetime]
+    last_run: Optional[datetime]
 
 
 @dataclass(frozen=True)
@@ -201,8 +231,10 @@ class ReclassificationEventBuilder:
 
     @staticmethod
     def denormalised_columns(classification_ids: list[int]) -> dict[int, dict]:
+        """ Only the tracked classifications come back, so callers can hand in a plain "touched" set """
         columns = {}
-        for pk, lab_id, allele_origin_bucket, gene_symbol_38, gene_symbol_37 in Classification.objects \
+        for pk, lab_id, allele_origin_bucket, gene_symbol_38, gene_symbol_37 in \
+                ReclassificationEventBuilder.tracked_classifications_qs() \
                 .filter(pk__in=classification_ids) \
                 .values_list('pk', 'lab_id', 'allele_origin_bucket',
                              'allele_info__grch38__gene_symbol_id', 'allele_info__grch37__gene_symbol_id'):
@@ -230,11 +262,12 @@ class ReclassificationEventBuilder:
         ]
 
     @staticmethod
-    def rebuild(classification_qs: QuerySet[Classification], progress: Optional[Iterator] = None) -> int:
+    def rebuild(classification_qs: QuerySet[Classification]) -> int:
         """
-        Deletes and recreates the timeline of every classification in the queryset. Modifications stream out
-        of a single query, and each batch is deleted only as it is rewritten, so the queryset can be one
-        that the rewrite itself would otherwise change the answer to.
+        Deletes the timeline of every classification in the queryset and rebuilds it for those still on the
+        germline axis, so a record that turns somatic loses its timeline. Modifications stream out of a
+        single query, and each batch is deleted only as it is rewritten, so the queryset can be one that the
+        rewrite itself would otherwise change the answer to.
         :return: the number of event rows written
         """
         rows_written = 0
@@ -261,8 +294,6 @@ class ReclassificationEventBuilder:
             classification_ids.append(classification_id)
             if steps := ReclassificationTimeline.steps_for(rows):
                 steps_by_classification[classification_id] = steps
-            if progress:
-                next(progress, None)
             if len(classification_ids) >= ReclassificationEventBuilder.BATCH_SIZE:
                 rows_written += flush()
 
@@ -270,21 +301,41 @@ class ReclassificationEventBuilder:
         return rows_written
 
     @staticmethod
-    def classifications_needing_reconcile() -> QuerySet[Classification]:
+    def bring_up_to_date(max_classifications: Optional[int] = None) -> ReclassificationBuildResult:
         """
-        Classifications whose last published significance no longer agrees with the end of their timeline -
-        i.e. a publish the post-publish receiver didn't get to.
+        Rebuilds the timeline of every classification touched since the last run, then advances the
+        watermark. Safe to call from any view that reads ReclassificationEvent, and from the nightly task.
+        :param max_classifications: hand the batch to the nightly run rather than build more than this now
         """
-        last_published_significance = ClassificationModification.objects \
-            .filter(classification=OuterRef('pk'), published=True, is_last_published=True) \
-            .values('clinical_significance')[:1]
-        latest_event_significance = ReclassificationEvent.objects \
-            .filter(classification=OuterRef('pk')) \
-            .order_by('-step') \
-            .values('to_clinical_significance')[:1]
+        started_at = now()
+        ReclassificationEventBuildState.instance()
 
-        return ReclassificationEventBuilder.tracked_classifications_qs() \
-            .annotate(_published_significance=Subquery(last_published_significance),
-                      _event_significance=Subquery(latest_event_significance)) \
-            .filter(_published_significance__isnull=False) \
-            .filter(Q(_event_significance__isnull=True) | ~Q(_event_significance=F('_published_significance')))
+        with transaction.atomic():
+            state = ReclassificationEventBuildState.objects \
+                .select_for_update(skip_locked=True).filter(pk=1).first()
+            if not state:
+                # another build holds the row, so report the watermark it started from
+                return ReclassificationEventBuilder._result_for(
+                    ReclassificationEventBuildState.instance(), outstanding=0)
+
+            touched_qs = Classification.objects.all()
+            if state.built_to:
+                touched_qs = touched_qs.filter(modified__gt=state.built_to)
+
+            classification_count = touched_qs.count()
+            if max_classifications is not None and classification_count > max_classifications:
+                return ReclassificationEventBuilder._result_for(state, outstanding=classification_count)
+
+            events = ReclassificationEventBuilder.rebuild(touched_qs)
+            state.built_to = started_at
+            state.last_run = now()
+            state.save()
+            return ReclassificationEventBuilder._result_for(
+                state, outstanding=0, classifications=classification_count, events=events)
+
+    @staticmethod
+    def _result_for(state: ReclassificationEventBuildState, outstanding: int,
+                    classifications: int = 0, events: int = 0) -> ReclassificationBuildResult:
+        return ReclassificationBuildResult(classifications=classifications, events=events,
+                                           outstanding=outstanding, built_to=state.built_to,
+                                           last_run=state.last_run)

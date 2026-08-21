@@ -46,6 +46,8 @@ from classification.models import (
     EvidenceKeyMap,
     ImportedAlleleInfo,
     ImportedAlleleInfoStatus,
+    ReclassificationEvent,
+    ReclassificationEventBuildState,
     UploadedClassificationsUnmapped,
     classification_flag_types,
     ensure_discordance_report_triages_bulk, OverlapDiscordanceNotification, ClassificationSummaryCalculator,
@@ -69,6 +71,7 @@ from classification.signals import send_prepared_discordance_notifications
 from classification.tasks.classification_import_map_and_insert_task import (
     ClassificationImportMapInsertTask,
 )
+from classification.tasks.classification_reclassification_tasks import reclassification_events_update
 from library.cache import timed_cache
 from library.django_utils import get_url_from_view_path
 from library.guardian_utils import admin_bot
@@ -1487,3 +1490,43 @@ class ClassificationGroupingTabularAdmin(TabularInline):
 
     def has_change_permission(self, request, obj=None):
         return False
+
+
+@admin.register(AlleleOriginGrouping)
+class AlleleOriginGroupingAdmin(ModelAdminBasics):
+    list_display = ("allele_grouping", "dirty")
+    inlines = (ClassificationGroupingTabularAdmin,)
+
+    @admin_model_action(url_slug="refresh_all/", short_description="Refresh All", icon="fa-solid fa-arrows-rotate")
+    def refresh_all(self, request):
+        AlleleOriginGrouping.objects.update(dirty=True)
+        ClassificationGrouping.update_all_dirty()
+
+
+class AlleleOriginGroupingTabularAdmin(TabularInline):
+    model = AlleleOriginGrouping
+
+    def has_add_permission(self, request, obj):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(AlleleGrouping)
+class AlleleGroupingAdmin(ModelAdminBasics):
+    inlines = (AlleleOriginGroupingTabularAdmin,)
+
+
+@admin.register(ReclassificationEventBuildState)
+class ReclassificationEventBuildStateAdmin(ModelAdminBasics):
+    list_display = ("built_to", "last_run")
+
+    @admin_model_action(url_slug="rebuild_all/", short_description="Rebuild All", icon="fa-solid fa-arrows-rotate")
+    def rebuild_all(self, request):
+        ReclassificationEventBuildState.objects.update(built_to=None)
+        ReclassificationEvent.objects.all().delete()
+        reclassification_events_update.delay()

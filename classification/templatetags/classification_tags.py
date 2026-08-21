@@ -18,7 +18,7 @@ from django.utils.timezone import localtime
 from classification.criteria_strengths import AcmgPointScore, CriteriaStrength
 from classification.enums import SpecialEKeys, ClassificationResultValue, TestingContextFull, TestingContextBucket, \
     TriageStatus, OverlapStatus
-from classification.enums.classification_enums import ShareLevel
+from classification.enums.classification_enums import ClinicalSignificance, ShareLevel
 from classification.models import (
     ClassificationLabSummary,
     ConditionResolved,
@@ -330,16 +330,9 @@ def clinical_significance(value, evidence_key=SpecialEKeys.CLINICAL_SIGNIFICANCE
 @register.inclusion_tag("classification/tags/clinical_significance_inline.html")
 def clinical_significance_inline(value):
     key = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE)
-    colors = {
-        "B": "#44d",
-        "LB": "#88d",
-        "VUS": "#666",
-        "LP": "#d88",
-        "P": "#d44"
-    }
     return {
         "key": value.lower(),
-        "color": colors.get(value) or "#aaa",
+        "color": ClinicalSignificance.CHART_COLOURS.get(value, ClinicalSignificance.DEFAULT_CHART_COLOUR),
         "label": key.option_dictionary.get(value, value) or "Unclassified"
     }
 
