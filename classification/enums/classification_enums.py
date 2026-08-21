@@ -24,6 +24,10 @@ class OverlapOverrideStatus(IntegerChoices):
     CONFIDENT_VS_CLINVAR = 30, "Confident vs ClinVar"
     IGNORING_OLD_CLINVAR = 40, "Ignoring older ClinVar records"
 
+    @property
+    def is_auto_review(self):
+        return self == OverlapOverrideStatus.IGNORING_OLD_CLINVAR
+
 
 class OverlapStatus(IntegerChoices):
     NO_CONTRIBUTIONS = 0, "No contributions"

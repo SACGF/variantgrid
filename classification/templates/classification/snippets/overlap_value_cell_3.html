@@ -17,7 +17,7 @@
         </span>
     {% endfor %}
     {% if overlap.overlap_override_status %}
-        <div>Reviewed as : <span style="font-weight:500">{{ overlap.overlap_override_status.label }}</span></div>
+        <div>{% if overlap.overlap_override_status.is_auto %}Auto-{% endif %}Reviewed as : <span style="font-weight:500">{{ overlap.overlap_override_status.label }}</span></div>
     {% endif %}
 </div>
 {% if overlap.has_pending_values %}<div class="mt-1" style="color:#888">Includes Pending Updates</div>{% endif %}
