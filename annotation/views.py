@@ -722,7 +722,9 @@ def view_annotation_descriptions(request, genome_build_name=None):
 
     def _first_for_build(vgc_id, build_name):
         for c in vep_columns.for_variant_grid_column(vgc_id, vep_config=vep_config):
-            if c.applies_to(genome_build_name=build_name):
+            # cosmic_version so cosmic_count describes the INFO field the installed COSMIC release
+            # actually carries the count in (#1673)
+            if c.applies_to(genome_build_name=build_name, cosmic_version=vep_config.cosmic_version):
                 return c
         return None
 

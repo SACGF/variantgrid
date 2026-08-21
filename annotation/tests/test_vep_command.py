@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.test import TestCase
 from django.test.utils import override_settings
 
@@ -132,3 +133,42 @@ class GetVepCommandColumnsVersion5Tests(TestCase):
         self.assertTrue(any(p.startswith("OpenTargets,file=") for p in plugins))
         self.assertFalse(any(p.startswith("EVE,file=") for p in plugins))
         self.assertFalse(any(p.startswith("PromoterAI,file=") for p in plugins))
+
+
+def _cosmic_settings(cosmic_basename: str) -> dict:
+    """ columns_version 5, with the COSMIC custom VCF swapped for a given release. """
+    d = get_fake_annotation_settings_dict(columns_version=5)
+    d["ANNOTATION"][settings.BUILD_GRCH38]["vep_config"]["cosmic"] = \
+        f"annotation_data/GRCh38/{cosmic_basename}"
+    return d
+
+
+class GetVepCommandCosmicTests(TestCase):
+    """ #1673 - COSMIC renames the sample count INFO field per release, and VEP silently writes an
+        empty CSQ column for a --custom field the file doesn't have, so asking for the wrong name
+        leaves cosmic_count null rather than failing. """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.grch38 = GenomeBuild.get_name_or_alias("GRCh38")
+
+    def _cosmic_custom_fields(self) -> list[str]:
+        cmd = get_vep_command(
+            "in.vcf", "out.vcf", self.grch38, AnnotationConsortium.ENSEMBL,
+            VariantAnnotationPipelineType.STANDARD,
+        )
+        customs = [cmd[i + 1] for i, x in enumerate(cmd) if x == "--custom"]
+        cosmic = [c for c in customs if "short_name=COSMIC," in c]
+        self.assertEqual(len(cosmic), 1)
+        params = dict(p.split("=", 1) for p in cosmic[0].split(","))
+        return params["fields"].split("%")
+
+    def test_v99_asks_for_sample_count(self):
+        with override_settings(**_cosmic_settings("Cosmic_GenomeScreensMutant_v99_GRCh38.vcf.gz")):
+            fields = self._cosmic_custom_fields()
+        self.assertEqual(sorted(fields), ["LEGACY_ID", "SAMPLE_COUNT"])
+
+    def test_v101_asks_for_genome_screen_sample_count(self):
+        with override_settings(**_cosmic_settings("Cosmic_GenomeScreensMutant_Normal_v101_GRCh38.vcf.gz")):
+            fields = self._cosmic_custom_fields()
+        self.assertEqual(sorted(fields), ["GENOME_SCREEN_SAMPLE_COUNT", "LEGACY_ID"])

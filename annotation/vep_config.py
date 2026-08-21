@@ -16,6 +16,16 @@ def parse_gnomad_version_from_filename(path: str) -> Optional[str]:
     return None
 
 
+def parse_cosmic_version_from_filename(path: str) -> Optional[int]:
+    """ COSMIC release from the distributed VCF name, e.g.
+        CosmicCodingMuts_v95_20211101_grch37.normal.vcf.gz -> 95
+        Cosmic_GenomeScreensMutant_Normal_v101_GRCh37.vcf.gz -> 101 """
+    basename = os.path.basename(path)
+    if m := re.match(r"^Cosmic.*_v(\d{2,})_.*.vcf.gz", basename):
+        return int(m.group(1))
+    return None
+
+
 # vep_config data files whose name carries no version - we pin the basename, so swapping the installed
 # file registers as a change, as does removing it (which drops that data's columns via has_data_files)
 _BASENAME_PIN_FIELDS = {
@@ -117,3 +127,14 @@ class VEPConfig:
         if version is None:
             return "4.0"
         return version
+
+    @property
+    def cosmic_version(self) -> Optional[int]:
+        """ COSMIC release of the configured VCF - gates which INFO field carries the sample count
+            (see the cosmic_count VEPColumnDefs). None where COSMIC isn't configured (T2T) or the
+            release can't be read off the filename, which leaves the count columns ungated. """
+        try:
+            cosmic_path = self["cosmic"]
+        except KeyError:
+            return None
+        return parse_cosmic_version_from_filename(cosmic_path)

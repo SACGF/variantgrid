@@ -40,6 +40,8 @@ class VEPColumnDef:
     max_columns_version: Optional[int] = None
     min_vep_version: Optional[int] = None
     max_vep_version: Optional[int] = None
+    min_cosmic_version: Optional[int] = None
+    max_cosmic_version: Optional[int] = None
     gnomad4_minor_version: Optional[str] = None
     summary_stats: Optional[str] = None
     source_field_processing_description: Optional[str] = None
@@ -70,6 +72,7 @@ class VEPColumnDef:
         pipeline_type: Optional[VariantAnnotationPipelineType] = None,
         columns_version: Optional[int] = None,
         vep_version: Optional[int] = None,
+        cosmic_version: Optional[int] = None,
         gnomad4_minor_version: Optional[str] = None,
     ) -> bool:
         if genome_build_name is not None and self.genome_builds and genome_build_name not in self.genome_builds:
@@ -85,6 +88,11 @@ class VEPColumnDef:
             if self.min_vep_version is not None and vep_version < self.min_vep_version:
                 return False
             if self.max_vep_version is not None and vep_version > self.max_vep_version:
+                return False
+        if cosmic_version is not None:
+            if self.min_cosmic_version is not None and cosmic_version < self.min_cosmic_version:
+                return False
+            if self.max_cosmic_version is not None and cosmic_version > self.max_cosmic_version:
                 return False
         if gnomad4_minor_version is not None and self.gnomad4_minor_version is not None \
                 and gnomad4_minor_version != self.gnomad4_minor_version:
@@ -834,8 +842,12 @@ VEP_COLUMNS: tuple[VEPColumnDef, ...] = (
         pipeline_types=STANDARD,
         formatter=fmt.format_pick_highest_float,
     ),
-    # COSMIC renamed the sample count INFO field from CNT to SAMPLE_COUNT when we moved from
-    # CosmicCodingMuts (v97) to Cosmic_GenomeScreensMutant (v99) in columns version 3
+    # COSMIC keeps renaming the INFO field carrying the sample count (#1673), so which one to read is a
+    # function of the installed release rather than our columns version: CNT in CosmicCodingMuts (<= v97),
+    # SAMPLE_COUNT in Cosmic_GenomeScreensMutant (v99), GENOME_SCREEN_SAMPLE_COUNT from v101. VEP silently
+    # emits an empty CSQ column for a --custom field the file doesn't have, so asking for the wrong name
+    # writes nulls rather than failing. The release comes off the configured filename
+    # (VEPConfig.cosmic_version) and is stored on the version as VariantAnnotationVersion.cosmic.
     VEPColumnDef(
         source_field='CNT',
         variant_grid_columns=('cosmic_count',),
@@ -843,7 +855,7 @@ VEP_COLUMNS: tuple[VEPColumnDef, ...] = (
         vep_custom=VEPCustom.COSMIC,
         source_field_has_custom_prefix=True,
         pipeline_types=STANDARD,
-        max_columns_version=2,
+        max_cosmic_version=98,
         formatter=fmt.format_pick_highest_int,
     ),
     VEPColumnDef(
@@ -853,7 +865,18 @@ VEP_COLUMNS: tuple[VEPColumnDef, ...] = (
         vep_custom=VEPCustom.COSMIC,
         source_field_has_custom_prefix=True,
         pipeline_types=STANDARD,
-        min_columns_version=3,
+        min_cosmic_version=99,
+        max_cosmic_version=100,
+        formatter=fmt.format_pick_highest_int,
+    ),
+    VEPColumnDef(
+        source_field='GENOME_SCREEN_SAMPLE_COUNT',
+        variant_grid_columns=('cosmic_count',),
+        category=ColumnAnnotationCategory.FREQUENCY_DATA,
+        vep_custom=VEPCustom.COSMIC,
+        source_field_has_custom_prefix=True,
+        pipeline_types=STANDARD,
+        min_cosmic_version=101,
         formatter=fmt.format_pick_highest_int,
     ),
     VEPColumnDef(
@@ -1243,6 +1266,7 @@ def filter_for(
     pipeline_type: Optional[VariantAnnotationPipelineType] = None,
     columns_version: Optional[int] = None,
     vep_version: Optional[int] = None,
+    cosmic_version: Optional[int] = None,
     gnomad4_minor_version: Optional[str] = None,
     vep_plugin: Optional[VEPPlugin] = None,
     vep_custom: Optional[VEPCustom] = None,
@@ -1256,6 +1280,8 @@ def filter_for(
             columns_version = vep_config.columns_version
         if vep_version is None:
             vep_version = vep_config.vep_version
+        if cosmic_version is None:
+            cosmic_version = vep_config.cosmic_version
         if gnomad4_minor_version is None:
             gnomad4_minor_version = vep_config.gnomad4_minor_version
 
@@ -1266,6 +1292,7 @@ def filter_for(
             pipeline_type=pipeline_type,
             columns_version=columns_version,
             vep_version=vep_version,
+            cosmic_version=cosmic_version,
             gnomad4_minor_version=gnomad4_minor_version,
         )
         and (vep_plugin is None or c.vep_plugin == vep_plugin)

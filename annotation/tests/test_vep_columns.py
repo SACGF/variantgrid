@@ -49,6 +49,7 @@ class VepColumnsRegistryTest(TestCase):
             k = (c.source_field, c.vep_plugin, c.vep_custom,
                  c.min_columns_version, c.max_columns_version,
                  c.min_vep_version, c.max_vep_version,
+                 c.min_cosmic_version, c.max_cosmic_version,
                  c.genome_builds, c.pipeline_types,
                  c.variant_grid_columns)
             if k in seen:
@@ -77,6 +78,27 @@ class VepColumnsRegistryTest(TestCase):
         self.assertEqual(rows_40[0].source_field, "gnomad_filtered")
         self.assertEqual(len(rows_41), 1)
         self.assertEqual(rows_41[0].source_field, "FILTER")
+
+    def test_cosmic_count_source_field_per_release(self):
+        """ #1673: COSMIC renames the sample count INFO field, so the release picks the field - and
+            with it the CSQ column the inserter reads. """
+        expected_source_fields = {
+            95: "CNT",
+            97: "CNT",
+            99: "SAMPLE_COUNT",
+            101: "GENOME_SCREEN_SAMPLE_COUNT",
+        }
+        for cosmic_version, source_field in expected_source_fields.items():
+            with self.subTest(cosmic_version=cosmic_version):
+                rows = [c for c in filter_for(genome_build_name="GRCh37",
+                                              pipeline_type=VariantAnnotationPipelineType.STANDARD,
+                                              columns_version=5,
+                                              vep_custom=VEPCustom.COSMIC,
+                                              cosmic_version=cosmic_version)
+                        if "cosmic_count" in c.variant_grid_columns]
+                self.assertEqual(len(rows), 1)
+                self.assertEqual(rows[0].source_field, source_field)
+                self.assertEqual(rows[0].vep_info_field, f"COSMIC_{source_field}")
 
     def test_gnomad4_helper_defaults(self):
         c = _gnomad4('AF_afr', 'gnomad_afr_af')
