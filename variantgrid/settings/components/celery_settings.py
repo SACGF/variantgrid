@@ -151,6 +151,7 @@ CELERY_IMPORTS = (
     'snpdb.tasks.vcf_zygosity_count_tasks',
     'sync.tasks.sync_tasks',
     'upload.tasks.import_bedfile_task',
+    'upload.tasks.import_dragen_tso500_all_fusions_task',
     'upload.tasks.import_gene_coverage_task',
     'upload.tasks.import_gene_list_task',
     'upload.tasks.import_patient_records_task',
