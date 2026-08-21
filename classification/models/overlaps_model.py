@@ -26,6 +26,8 @@ from ontology.models import OntologyTerm
 from review.models import ReviewableModelMixin, Review, review_detail_signal
 from snpdb.models import Allele, Lab, GenomeBuild, LabLike, CLINVAR_EXPERT_PANEL_LAB
 
+IN_REVIEW_VALUE = "in-review"
+
 
 class OverlapContribution(TimeStampedModel):
     history = AuditlogHistoryField()
@@ -122,7 +124,7 @@ class OverlapContribution(TimeStampedModel):
     @property
     def pending_value(self) -> Optional[str]:
         if self.is_amending:
-            return self.triage_state_obj.amend_value or "in-review"
+            return self.triage_state_obj.amend_value or IN_REVIEW_VALUE
         return None
 
     @property

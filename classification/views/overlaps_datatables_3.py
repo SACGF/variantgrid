@@ -12,7 +12,7 @@ from django.utils.safestring import SafeString
 from classification.enums import OverlapStatus, SpecialEKeys, OverlapOverrideStatus
 from classification.models import ClassificationGrouping, Overlap, OverlapType, \
     ClassificationResultValue, OverlapContributionStatus, OverlapContributionSkew, TriageNextStep, EvidenceKey, \
-    EvidenceKeyMap
+    EvidenceKeyMap, IN_REVIEW_VALUE
 from classification.services.overlap_calculator import OVERLAP_CLIN_SIG_ENABLED
 from genes.hgvs import HGVSDisplay
 from snpdb.genome_build_manager import GenomeBuildManager
@@ -33,6 +33,11 @@ class ContributionValueSource:
     """
     Indicates if at least one entry with this value came from the same testing context as the user's skew
     """
+    in_review: bool = False
+    """
+    If one or more labs that has this value have marked as being "in-review", currently does not distinguish between
+    if all values are in-review or if there is an in-review and a non in-review for the value
+    """
     labs: set[Lab] = field(default_factory=set)
     clinvar: bool = False
 
@@ -46,6 +51,9 @@ class ContributionValueSource:
     def short_value(self):
         if self.value is None:
             return "No Data"
+        if self.e_key.key == SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE:
+            # Tier I, Tier II, etc is short enough compared to Likely-Pathogenic
+            return self.pretty_value
         return self.value.replace("_", "-")
 
     @property
@@ -64,6 +72,9 @@ class ContributionValueSource:
 class ContributionValues:
 
     def __init__(self, e_key: EvidenceKey):
+        """
+        :param e_key: Purely used for formatting
+        """
         self.e_key = e_key
         self._values: dict[str, ContributionValueSource] = {}
 
@@ -218,20 +229,23 @@ class OverlapColumns(DatatableConfig[ClassificationGrouping]):
         return SafeString(result)
 
     def render_summary(self, cell: CellData[Overlap]):
-        # FIXME - check for other valueType
-        values = ContributionValues(EvidenceKeyMap.cached_key(SpecialEKeys.ONC_PATH))
+        overlap = cell.obj
+        values = ContributionValues(EvidenceKeyMap.cached_key(overlap.value_type.evidence_key_str))
 
-        skew_qs = cell.obj.overlapcontributionskew_set
+        skew_qs = overlap.overlapcontributionskew_set
         if not self.lab_picker.is_admin_mode:
             skew_qs = skew_qs.filter(contribution__classification_grouping__lab__in=self.lab_picker.lab_ids)
 
-        if cell.obj.is_active_discordance:
+        if overlap.is_active_discordance:
             max_triage_status = TriageNextStep(skew_qs.aggregate(max_status=Max('next_step'))["max_status"])
         else:
             max_triage_status = None
 
-        for contribution in cell.obj.contributions:
+        for contribution in overlap.contributions:
             value = values[contribution.effective_value]
+            if contribution.pending_value == IN_REVIEW_VALUE:
+                value.in_review = True
+
             value.your_context = True  # need to check cross context overlap for other values
             if cg := contribution.classification_grouping:
                 lab = cg.lab
@@ -253,7 +267,6 @@ class OverlapColumns(DatatableConfig[ClassificationGrouping]):
                     elif cross_contribution.scv:
                         value.clinvar = True
 
-        overlap = cell.obj
         max_overlap_status = None
         if self.get_query_param("skew_status") == "S":  # solved overlaps
             if not overlap.overlap_override_status and overlap.overlap_max_ever_status > overlap.overlap_status:

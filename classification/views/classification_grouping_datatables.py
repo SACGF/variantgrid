@@ -24,7 +24,7 @@ from classification.models import (
     DiscordanceReport,
     DiscordanceReportClassification,
     EvidenceKeyMap,
-    ImportedAlleleInfo, OverlapContribution,
+    ImportedAlleleInfo, OverlapContribution, IN_REVIEW_VALUE,
 )
 from genes.hgvs import HGVSDisplay
 from genes.models import GeneSymbol, TranscriptVersion
@@ -121,7 +121,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
             if somatic_dict := row["latest_classification_modification__classification__summary__somatic"]:
                 somatic_dict["diff"] = diff_value
                 if triage_status := self.overlap_pending.get((ClassificationResultValue.SOMATIC_CLINICAL_SIGNIFICANCE, row["pk"])):
-                    somatic_dict["pending"] = triage_status.amend_value or "in-review"
+                    somatic_dict["pending"] = triage_status.amend_value or IN_REVIEW_VALUE
 
                 return somatic_dict
         return None
@@ -139,7 +139,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
         result_dict["triage"] = True
 
         if triage_status := self.overlap_pending.get((ClassificationResultValue.ONC_PATH, row["pk"])):
-            result_dict["pending"] = triage_status.amend_value or "in-review"
+            result_dict["pending"] = triage_status.amend_value or IN_REVIEW_VALUE
 
         return result_dict
 

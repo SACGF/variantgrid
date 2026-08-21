@@ -25,7 +25,7 @@ from classification.models import (
     ConditionTextMatch,
     EvidenceMixin,
     ImportedAlleleInfo, OverlapContribution, ClassificationGroupingEntry, ClassificationGrouping, ConditionReference,
-    Overlap,
+    Overlap, IN_REVIEW_VALUE,
 )
 from classification.models.classification import Classification, ClassificationModification
 from classification.models.classification_groups import (
@@ -311,7 +311,7 @@ def clinical_significance(value, evidence_key=SpecialEKeys.CLINICAL_SIGNIFICANCE
     if value == "withdrawn":
         label = "Withdrawn"
 
-    if value == "in-review":
+    if value == IN_REVIEW_VALUE:
         label = "In-Review"
 
     #prefix = "cs" if key.key == SpecialEKeys.CLINICAL_SIGNIFICANCE else "scs"

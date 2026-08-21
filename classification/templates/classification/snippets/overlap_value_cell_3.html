@@ -13,6 +13,7 @@
         {% if c_value.your_contribution %}<b class="hover-detail" title="{{ c_value.lab_title }}">{% if pretty_value %}{{ c_value.pretty_value }}{% else %}{{ c_value.short_value }}{% endif %}</b>
         {% elif not c_value.your_context %}<span class="no-value" title="Cross Context">{% if pretty_value %}{{ c_value.pretty_value }}{% else %}{{ c_value.short_value }}{% endif %}</span>
         {% else %}<span title="{{ c_value.lab_title }}">{% if pretty_value %}{{ c_value.pretty_value }}{% else %}{{ c_value.short_value }}{% endif %}</span>{% endif %}
+        {% if c_value.in_review %}<span title="This value is In-Review and may change"><i style="font-size:0.7rem" class="fa-solid fa-asterisk"></i></span>{% endif %}
         </span>
     {% endfor %}
     {% if overlap.overlap_override_status %}
