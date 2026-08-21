@@ -255,6 +255,8 @@ class Command(BaseCommand):
                     skipped += 1
                     logging.warning("fix_variant_matching --extra: skipping classification %s: %s", pk, e)
             print(f"[shard {shard_index}/{shard_count}] finished {total} ({skipped} skipped)", flush=True)
+            print("Gene symbols on reclassification events follow the admin's ReclassificationEventBuildState "
+                  "> Rebuild All, since these saves leave the modified watermark alone", flush=True)
         finally:
             if not sharded:
                 # Single batch grouping update via classification_imports_complete_signal.

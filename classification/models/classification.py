@@ -556,6 +556,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             models.Index(fields=["share_level"]),
             models.Index(fields=["withdrawn"]),
             models.Index(fields=["allele_origin_bucket"]),
+            models.Index(fields=["modified"]),
             models.Index(models.F("summary__pathogenicity__sort"), name="summary__p_sort_idx"),
             models.Index(models.F("summary__somatic__sort"), name="summary__s_sort_idx"),
             models.Index(models.F("summary__date__value"), name="summary__d_sort_idx")

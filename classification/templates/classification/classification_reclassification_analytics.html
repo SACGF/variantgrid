@@ -4,16 +4,16 @@
 {% load ui_help %}
 {% load ui_utils %}
 {% load ui_menu_bars %}
+{% load settings_tags %}
 {% block title %}Reclassification Analytics{% endblock %}
 {% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
 {% block content %}
+{% settings_value 'CLASSIFICATION_GRID_EXTERNAL_LAB_FILTER' as CLASSIFICATION_GRID_EXTERNAL_LAB_FILTER %}
 <script type="text/javascript" src="{% static 'js/lib/plotly-latest.min.js' %}"></script>
 <script type="text/javascript" src="{% static 'js/plotly_helper.js' %}"></script>
 <style>
     .reclassification-analytics .chart { min-height: 420px; }
-    .reclassification-analytics .significance-swatch {
-        display: inline-block; width: 0.8rem; height: 0.8rem; border-radius: 2px; margin-right: 0.35rem;
-    }
+    .reclassification-analytics .c-pill { width: 60px; padding: 2px 4px; }
     .reclassification-analytics table.summary { font-size: 0.9rem; }
     .reclassification-analytics table.summary td.numeric, .reclassification-analytics table.summary th.numeric {
         text-align: right;
@@ -30,8 +30,8 @@
             time its clinical significance changed.
         </p>
         <p>
-            Synced labs are shown separately because their event dates are the date the record arrived here,
-            not the date the other lab curated it - which is why the time based charts default to local labs.
+            An external lab's event dates are the date the record synced in, not the date that lab curated it,
+            so narrow the Labs filter to internal labs to read the time based charts as curation dates.
         </p>
     {% end_page_help_embedded %}
 
@@ -52,12 +52,18 @@
             {% endfor %}
         </select>
 
-        <label class="mr-2" for="provenance">Labs</label>
-        <select class="form-control mr-3" id="provenance" name="provenance">
-            {% for value, label in provenance_choices %}
-                <option value="{{ value }}" {% if analytics.provenance == value %}selected{% endif %}>{{ label }}</option>
-            {% endfor %}
-        </select>
+        {% if CLASSIFICATION_GRID_EXTERNAL_LAB_FILTER %}
+        <div class="mr-3">
+            <label class="mr-2">Labs</label>
+            <div id="lab-external-toggle" class="btn-group btn-group-toggle" data-toggle="buttons">
+                {% for value, label in lab_external_choices %}
+                <label class="btn btn-sm btn-outline-secondary {% if value == lab_external_default %}focus active{% endif %}">
+                    <input type="radio" name="lab_external" value="{{ value }}" {% if value == lab_external_default %}checked="checked"{% endif %} onchange="this.form.submit()"> {{ label }}
+                </label>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
 
         <label class="mr-2" for="date_from">From</label>
         <input class="form-control mr-3" type="date" id="date_from" name="date_from" value="{{ analytics.date_from|date:'Y-m-d' }}" />
@@ -68,6 +74,12 @@
         <button type="submit" class="btn btn-primary">Apply</button>
     </form>
 
+    {% if build_result.outstanding %}
+        <p class="text-info">Timelines are being built for {{ build_result.outstanding | number:'S' }} records - refresh shortly to see them.</p>
+    {% elif build_result.last_run %}
+        <p class="text-muted">Timelines current as of {% timestamp build_result.last_run %}</p>
+    {% endif %}
+
     <div class="row mb-4">
         {% labelled hint="tiny" label="Records with a Timeline" %}{{ analytics.classification_count | number:'S' }}{% endlabelled %}
         {% labelled hint="tiny" label="Reclassifications" %}{{ analytics.reclassification_count | number:'S' }}{% endlabelled %}
@@ -75,7 +87,7 @@
 
     <div class="mb-4">
         {% for entry in analytics.significance_legend %}
-            <span class="mr-3"><span class="significance-swatch" style="background-color: {{ entry.colour }}"></span>{{ entry.label }}</span>
+            <span class="mr-2 c-pill {{ entry.css_class }}">{{ entry.label }}</span>
         {% endfor %}
     </div>
 
@@ -97,7 +109,7 @@
             <tbody>
                 {% for distribution in analytics.time_to_reclassification %}
                     <tr>
-                        <td><span class="significance-swatch" style="background-color: {{ distribution.colour }}"></span>{{ distribution.label }}</td>
+                        <td><span class="c-pill {{ distribution.css_class }}">{{ distribution.label }}</span></td>
                         <td class="numeric">{{ distribution.count | number:'S' }}</td>
                         <td class="numeric">{{ distribution.median | number:'S' }}</td>
                         <td class="numeric">{{ distribution.p25 | number:'S' }}</td>
@@ -120,8 +132,8 @@
             <tbody>
                 {% for transition in analytics.significance_transitions %}
                     <tr>
-                        <td><span class="significance-swatch" style="background-color: {{ transition.from_colour }}"></span>{{ transition.from_label }}</td>
-                        <td><span class="significance-swatch" style="background-color: {{ transition.to_colour }}"></span>{{ transition.to_label }}</td>
+                        <td><span class="c-pill {{ transition.from_css_class }}">{{ transition.from_label }}</span></td>
+                        <td><span class="c-pill {{ transition.to_css_class }}">{{ transition.to_label }}</span></td>
                         <td class="numeric">{{ transition.count | number:'S' }}</td>
                     </tr>
                 {% endfor %}
@@ -186,7 +198,7 @@
                 {% for burden in analytics.gene_burden %}
                     <tr>
                         <td><a class="hover-link" href="{% url 'view_gene_symbol' burden.gene_symbol %}">{{ burden.gene_symbol }}</a></td>
-                        <td class="numeric">{{ burden.vus_count | number:'S' }}</td>
+                        <td class="numeric"><span class="c-pill {{ burden.css_class }}">{{ burden.vus_count | number:'S' }}</span></td>
                         <td class="numeric">{{ burden.total_count | number:'S' }}</td>
                         <td class="numeric">{{ burden.percent }}%</td>
                     </tr>

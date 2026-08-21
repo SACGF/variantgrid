@@ -53,10 +53,10 @@ if SAPATH_ENABLED:
             'schedule': HOUR_SECS,  # Check every hour, only update if hash changed
         }
 
-# Reclassification timeline safety-net (issue #1523): the post-publish receiver keeps
-# ReclassificationEvent up to date, this catches classifications it missed.
-app.conf.beat_schedule['reclassification-events-reconcile'] = {
-    'task': 'classification.tasks.classification_reclassification_tasks.reclassification_events_reconcile',
+# Reclassification timelines (issue #1523): the analytics page builds what it can in the request,
+# this picks up anything left over, e.g. the morning after a large sync.
+app.conf.beat_schedule['reclassification-events-update'] = {
+    'task': 'classification.tasks.classification_reclassification_tasks.reclassification_events_update',
     'schedule': crontab(hour=3, minute=30),
 }
 

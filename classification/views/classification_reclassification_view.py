@@ -14,8 +14,15 @@ from django.http.response import HttpResponseBase
 from django.shortcuts import render
 from django.utils.timezone import localdate
 
-from classification.enums import ClinicalSignificance
-from classification.models import ClassificationModification, EvidenceKeyMap, ReclassificationEvent
+from classification.enums import ClinicalSignificance, LabExternalFilter
+from classification.models import (
+    ClassificationModification,
+    EvidenceKeyMap,
+    ReclassificationBuildResult,
+    ReclassificationEvent,
+    ReclassificationEventBuilder,
+)
+from classification.tasks.classification_reclassification_tasks import reclassification_events_update
 from library.django_utils import require_superuser
 from snpdb.models import Lab, Organization
 
@@ -27,20 +34,12 @@ SIGNIFICANCE_ORDER = [
     ClinicalSignificance.PATHOGENIC,
 ]
 
-# Diverging benign (blue) - VUS (neutral) - pathogenic (red), matching the .cs- cell colours in global.scss
-SIGNIFICANCE_COLOURS = {
-    ClinicalSignificance.BENIGN: "#1c5cab",
-    ClinicalSignificance.LIKELY_BENIGN: "#5598e7",
-    ClinicalSignificance.VUS: "#6f6e6a",
-    ClinicalSignificance.LIKELY_PATHOGENIC: "#e8735c",
-    ClinicalSignificance.PATHOGENIC: "#b02b2b",
-    ClinicalSignificance.OTHER: "#b8b7b2",
-}
+BENIGN_DIRECTION_COLOUR = ClinicalSignificance.chart_colour(ClinicalSignificance.BENIGN)
+PATHOGENIC_DIRECTION_COLOUR = ClinicalSignificance.chart_colour(ClinicalSignificance.PATHOGENIC)
+# counts that carry no benign/pathogenic meaning stay outside the significance language
+NEUTRAL_COUNT_COLOUR = "#6c757d"
 
-BENIGN_DIRECTION_COLOUR = "#2a78d6"
-PATHOGENIC_DIRECTION_COLOUR = "#b02b2b"
-# counts that carry no benign/pathogenic meaning take a hue outside the significance language
-NEUTRAL_COUNT_COLOUR = "#4a3aa7"
+RECLASSIFICATION_PAGE_BUILD_LIMIT = 5000
 
 TOP_GENE_COUNT = 30
 TOP_EVIDENCE_KEY_COUNT = 25
@@ -85,8 +84,12 @@ class Distribution:
         return ordered[min(int(fraction * len(ordered)), len(ordered) - 1)]
 
     @property
+    def css_class(self) -> str:
+        return ClinicalSignificance.css_class(self.clinical_significance)
+
+    @property
     def colour(self) -> str:
-        return SIGNIFICANCE_COLOURS.get(self.clinical_significance)
+        return ClinicalSignificance.chart_colour(self.clinical_significance)
 
 
 @dataclass(frozen=True)
@@ -104,12 +107,20 @@ class SignificanceTransition:
         return significance_label(self.to_clinical_significance)
 
     @property
+    def from_css_class(self) -> str:
+        return ClinicalSignificance.css_class(self.from_clinical_significance)
+
+    @property
+    def to_css_class(self) -> str:
+        return ClinicalSignificance.css_class(self.to_clinical_significance)
+
+    @property
     def from_colour(self) -> str:
-        return SIGNIFICANCE_COLOURS.get(self.from_clinical_significance)
+        return ClinicalSignificance.chart_colour(self.from_clinical_significance)
 
     @property
     def to_colour(self) -> str:
-        return SIGNIFICANCE_COLOURS.get(self.to_clinical_significance)
+        return ClinicalSignificance.chart_colour(self.to_clinical_significance)
 
 
 @dataclass(frozen=True)
@@ -144,6 +155,10 @@ class GeneBurden:
     def percent(self) -> float:
         return round(100 * self.vus_count / self.total_count, 1) if self.total_count else 0.0
 
+    @property
+    def css_class(self) -> str:
+        return ClinicalSignificance.css_class(ClinicalSignificance.VUS)
+
 
 @dataclass(frozen=True)
 class EvidenceKeyChange:
@@ -155,25 +170,16 @@ class EvidenceKeyChange:
 class ReclassificationAnalytics:
     """
     Every chart on /classification/reclassification_analytics reads from here, so they all share the
-    organisation / lab / date / provenance filters the user picked. @see ReclassificationEvent
+    organisation / lab / date filters the user picked. @see ReclassificationEvent
     """
 
-    PROVENANCE_LOCAL = "local"
-    PROVENANCE_SYNCED = "synced"
-    PROVENANCE_ALL = "all"
-    PROVENANCE_CHOICES = [
-        (PROVENANCE_LOCAL, "Local labs"),
-        (PROVENANCE_SYNCED, "Synced labs"),
-        (PROVENANCE_ALL, "All labs"),
-    ]
-
     def __init__(self, organization: Optional[Organization], lab: Optional[Lab],
-                 date_from: Optional[date], date_to: Optional[date], provenance: str):
+                 date_from: Optional[date], date_to: Optional[date], lab_external: LabExternalFilter):
         self.organization = organization
         self.lab = lab
         self.date_from = date_from
         self.date_to = date_to
-        self.provenance = provenance
+        self.lab_external = lab_external
 
     @staticmethod
     def from_request(request: HttpRequest) -> 'ReclassificationAnalytics':
@@ -194,16 +200,17 @@ class ReclassificationAnalytics:
             if lab:
                 organization = lab.organization
 
-        provenance = request.GET.get('provenance') or ReclassificationAnalytics.PROVENANCE_LOCAL
-        if provenance not in dict(ReclassificationAnalytics.PROVENANCE_CHOICES):
-            provenance = ReclassificationAnalytics.PROVENANCE_LOCAL
+        lab_external = LabExternalFilter.ALL
+        if raw_lab_external := request.GET.get('lab_external'):
+            if raw_lab_external in LabExternalFilter.values:
+                lab_external = LabExternalFilter(raw_lab_external)
 
         return ReclassificationAnalytics(
             organization=organization,
             lab=lab,
             date_from=get_date('date_from'),
             date_to=get_date('date_to'),
-            provenance=provenance)
+            lab_external=lab_external)
 
     # -- querysets every chart builds on --------------------------------------------------------
 
@@ -215,10 +222,8 @@ class ReclassificationAnalytics:
             qs = qs.filter(lab=self.lab)
         elif self.organization:
             qs = qs.filter(lab__organization=self.organization)
-        if self.provenance == ReclassificationAnalytics.PROVENANCE_LOCAL:
-            qs = qs.filter(lab__external=False)
-        elif self.provenance == ReclassificationAnalytics.PROVENANCE_SYNCED:
-            qs = qs.filter(lab__external=True)
+        if lab_external_q := self.lab_external.filter_q("lab"):
+            qs = qs.filter(lab_external_q)
         return qs
 
     @cached_property
@@ -285,7 +290,7 @@ class ReclassificationAnalytics:
         return {
             "labels": [f"{significance_label(cs)} from" for cs in SIGNIFICANCE_ORDER] +
                       [f"{significance_label(cs)} to" for cs in SIGNIFICANCE_ORDER],
-            "node_colours": [SIGNIFICANCE_COLOURS[cs] for cs in SIGNIFICANCE_ORDER] * 2,
+            "node_colours": [ClinicalSignificance.chart_colour(cs) for cs in SIGNIFICANCE_ORDER] * 2,
             "sources": sources,
             "targets": targets,
             "values": values,
@@ -294,7 +299,11 @@ class ReclassificationAnalytics:
 
     @staticmethod
     def _translucent(colour: str) -> str:
-        r, g, b = (int(colour[index:index + 2], 16) for index in (1, 3, 5))
+        """ Expands the 4 digit chart colours so the sankey bands can be laid over each other """
+        digits = colour.lstrip("#")
+        if len(digits) == 3:
+            digits = "".join(digit * 2 for digit in digits)
+        r, g, b = (int(digits[index:index + 2], 16) for index in (0, 2, 4))
         return f"rgba({r},{g},{b},0.45)"
 
     # -- 2. Trend over time ---------------------------------------------------------------------
@@ -422,7 +431,7 @@ class ReclassificationAnalytics:
         if not event_ids:
             return []
 
-        cache_key = f"reclassification_evidence_key_changes:{self.filter_query}:{len(event_ids)}"
+        cache_key = f"reclassification_evidence_key_changes:{self.query_string}:{len(event_ids)}"
         counts = cache.get(cache_key)
         if counts is None:
             counts = self._count_changed_evidence_keys(event_ids)
@@ -479,7 +488,7 @@ class ReclassificationAnalytics:
             "percents": [rate.percent for rate in rates],
             "reclassified": [rate.reclassified for rate in rates],
             "populations": [rate.population for rate in rates],
-            "colour": SIGNIFICANCE_COLOURS[ClinicalSignificance.VUS],
+            "colour": NEUTRAL_COUNT_COLOUR,
         }
 
     @cached_property
@@ -497,7 +506,7 @@ class ReclassificationAnalytics:
                 "symbols": [burden.gene_symbol for burden in self.gene_burden],
                 "vus_counts": [burden.vus_count for burden in self.gene_burden],
                 "percents": [burden.percent for burden in self.gene_burden],
-                "colour": SIGNIFICANCE_COLOURS[ClinicalSignificance.VUS],
+                "colour": NEUTRAL_COUNT_COLOUR,
             },
             "evidence_keys": {
                 "labels": [change.label for change in self.evidence_key_changes],
@@ -506,14 +515,13 @@ class ReclassificationAnalytics:
             },
         }
 
-
     @property
     def significance_legend(self) -> list[dict[str, str]]:
-        return [{"label": significance_label(cs), "colour": SIGNIFICANCE_COLOURS[cs]}
+        return [{"label": significance_label(cs), "css_class": ClinicalSignificance.css_class(cs)}
                 for cs in SIGNIFICANCE_ORDER]
 
     @property
-    def filter_query(self) -> str:
+    def query_string(self) -> str:
         parts = []
         if self.lab:
             parts.append(f"lab={self.lab.pk}")
@@ -523,14 +531,27 @@ class ReclassificationAnalytics:
             parts.append(f"date_from={self.date_from.isoformat()}")
         if self.date_to:
             parts.append(f"date_to={self.date_to.isoformat()}")
-        parts.append(f"provenance={self.provenance}")
+        parts.append(f"lab_external={self.lab_external.value}")
         return "&".join(parts)
+
+
+def _timelines_up_to_date() -> ReclassificationBuildResult:
+    """ Opening the page is what keeps the timelines current, unless there's more waiting than a
+        web worker should take on - then the nightly task's queue picks the batch up. """
+    build_result = ReclassificationEventBuilder.bring_up_to_date(
+        max_classifications=RECLASSIFICATION_PAGE_BUILD_LIMIT)
+    if build_result.outstanding:
+        reclassification_events_update.delay()
+    return build_result
 
 
 @require_superuser
 def view_reclassification_analytics(request: HttpRequest) -> HttpResponseBase:
+    build_result = _timelines_up_to_date()
     analytics = ReclassificationAnalytics.from_request(request)
     return render(request, "classification/classification_reclassification_analytics.html", {
         "analytics": analytics,
-        "provenance_choices": ReclassificationAnalytics.PROVENANCE_CHOICES,
+        "build_result": build_result,
+        "lab_external_choices": LabExternalFilter.choices,
+        "lab_external_default": analytics.lab_external,
     })

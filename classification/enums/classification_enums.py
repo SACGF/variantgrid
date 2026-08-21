@@ -428,6 +428,26 @@ class ClinicalSignificance:
     ]
     SHORT_LABELS = dict(SHORT_CHOICES + [(None, "U")])
 
+    CHART_COLOURS = {
+        'B': "#44d", 'LB': "#88d", 'VUS': "#666", 'LP': "#d88", 'P': "#d44", 'O': "#aaa",
+    }
+    """ Saturated equivalents of the pale .c-pill.cs- fills in global.scss, keyed by SHORT_LABELS """
+
+    DEFAULT_CHART_COLOUR = "#aaa"
+
+    @staticmethod
+    def css_class(clinical_significance: Optional[str]) -> str:
+        """ Class for the .c-pill.cs-* rules in global.scss, from a CHOICES value """
+        if clinical_significance and (short_label := ClinicalSignificance.SHORT_LABELS.get(clinical_significance)):
+            return f"cs-{short_label.lower()}"
+        return "cs-none"
+
+    @staticmethod
+    def chart_colour(clinical_significance: Optional[str]) -> str:
+        """ Saturated equivalent of the .cs- fill, for chart marks and swatches """
+        short_label = ClinicalSignificance.SHORT_LABELS.get(clinical_significance)
+        return ClinicalSignificance.CHART_COLOURS.get(short_label, ClinicalSignificance.DEFAULT_CHART_COLOUR)
+
     @staticmethod
     def is_significant_change(old_classification: str, new_classification: str) -> bool:
         was_vus_change = old_classification and new_classification and old_classification == 'VUS' and new_classification.startswith('VUS')
