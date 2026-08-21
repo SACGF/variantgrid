@@ -1514,3 +1514,14 @@ class AlleleOriginGroupingTabularAdmin(TabularInline):
 
     def has_change_permission(self, request, obj=None):
         return False
+
+
+@admin.register(ReclassificationEventBuildState)
+class ReclassificationEventBuildStateAdmin(ModelAdminBasics):
+    list_display = ("built_to", "last_run")
+
+    @admin_model_action(url_slug="rebuild_all/", short_description="Rebuild All", icon="fa-solid fa-arrows-rotate")
+    def rebuild_all(self, request):
+        ReclassificationEventBuildState.objects.update(built_to=None)
+        ReclassificationEvent.objects.all().delete()
+        reclassification_events_update.delay()
