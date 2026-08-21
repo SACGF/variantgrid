@@ -162,11 +162,15 @@ img.thumbnail {
     const MAX_UPDATE_SECS = 16;
     let update_secs = INITIAL_UPDATE_SECS;
 
+	// Files uploaded on this page always show, whatever file types the filters are set to
+	const sessionFileUploadIds = new Set();
+
 	function update_uploads() {
 		// console.log("update_uploads()");
 		$.ajax({
 		    url: "{% url 'upload_poll' %}",
             dataType: 'json',
+            data: {always_show_file_upload_ids: Array.from(sessionFileUploadIds).join(",")},
 		    success: process_upload_status,
             error: function(jqXHR, textStatus, errorThrown) {
                 checkLoggedIn(null, function() {
@@ -521,6 +525,9 @@ img.thumbnail {
 			pond.on('processfile', (error, file) => {
 				$('#' + stubRowId(file.id)).remove();
 				if (!error) {
+					if (file.serverId) {
+						sessionFileUploadIds.add(file.serverId);
+					}
 					pond.removeFile(file.id);
 					update_uploads();
 				}

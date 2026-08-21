@@ -4,6 +4,7 @@ import operator
 import os
 from datetime import date, timedelta
 from functools import cached_property, reduce
+from typing import Optional
 
 from django.conf import settings
 from django.contrib import messages
@@ -281,7 +282,9 @@ def upload_file_delete(request, pk):
     return HttpResponse(status=200)
 
 
-def get_file_dicts_list(upload_settings):
+def get_file_dicts_list(upload_settings, always_show_file_upload_ids=None):
+    """ always_show_file_upload_ids: files uploaded during this page session, shown whatever the
+        filters say - a file whose type the user isn't showing would otherwise vanish on upload """
     file_types = upload_settings.uploadsettingsfiletype_set.values_list("file_type", flat=True)
     filters = [Q(file_type__in=file_types)]
     if not upload_settings.user.is_superuser:
@@ -296,9 +299,16 @@ def get_file_dicts_list(upload_settings):
     if upload_settings.time_filter_method == TimeFilterMethod.RECORDS:
         qs = qs[:upload_settings.time_filter_value]
 
-    file_dicts = []
-    for file_upload in qs:
-        file_dicts.append(uploadedfile_dict(file_upload))
+    file_uploads = list(qs)
+    if always_show_file_upload_ids:
+        extra_ids = set(always_show_file_upload_ids) - {fu.pk for fu in file_uploads}
+        extra_qs = FileUpload.objects.filter(pk__in=extra_ids)
+        if not upload_settings.user.is_superuser:
+            extra_qs = extra_qs.filter(user=upload_settings.user)
+        file_uploads.extend(extra_qs)
+        file_uploads.sort(key=lambda fu: fu.created, reverse=True)
+
+    file_dicts = [uploadedfile_dict(file_upload) for file_upload in file_uploads]
     file_dicts = list(reversed(file_dicts))  # render newest-first
     return file_dicts
 
@@ -306,7 +316,16 @@ def get_file_dicts_list(upload_settings):
 @never_cache
 def upload_poll(request):
     upload_settings, _ = UploadSettings.objects.get_or_create(user=request.user)
-    return JsonResponse(get_file_dicts_list(upload_settings), safe=False)
+    always_show = _get_int_list(request.GET.get("always_show_file_upload_ids"))
+    return JsonResponse(get_file_dicts_list(upload_settings, always_show), safe=False)
+
+
+def _get_int_list(csv_ids: Optional[str]) -> list[int]:
+    ids = []
+    for value in (csv_ids or "").split(","):
+        if value.strip().isdigit():
+            ids.append(int(value))
+    return ids
 
 
 def upload(request):

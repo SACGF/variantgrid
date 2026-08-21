@@ -867,7 +867,8 @@ class UploadSettings(models.Model):
     time_filter_method = models.CharField(max_length=1, choices=TimeFilterMethod.choices, default=TimeFilterMethod.RECORDS)
     time_filter_value = models.IntegerField(default=5)
 
-    INTERNAL_TYPES = {UploadedFileTypes.LIFTOVER, UploadedFileTypes.VCF_INSERT_VARIANTS_ONLY}
+    INTERNAL_TYPES = {UploadedFileTypes.LIFTOVER, UploadedFileTypes.VCF_INSERT_VARIANTS_ONLY,
+                      UploadedFileTypes.GENE_LEVEL_INSERT_VARIANTS_ONLY}
 
     @cached_property
     def file_types(self) -> set:
