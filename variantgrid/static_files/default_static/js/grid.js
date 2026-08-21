@@ -261,7 +261,16 @@ function showGridCell(gridColumn) {
     }
 }
 
+function inAnalysis() {
+    // Variant selection and filter child links are wired up by the analysis page - other pages showing
+    // the same grids (sample variants tab, variantopedia) render them read only
+    return typeof ANALYSIS_ID !== "undefined";
+}
+
 function isNodeVisible(options) {
+    if (!inAnalysis()) {
+        return false;
+    }
     // Default to True so that any cached grid data won't be missing new field
     let nodeVisible = true;
     const analysisNode = options.colModel.analysisNode;
@@ -509,18 +518,19 @@ function tagsFormatter(tagsCellValue, a, rowData) {
     const variantId = rowData['id'];
     let tagHtml = "";
     const aWin = getAnalysisWindow();
+    const readOnly = aWin.variantTagsReadOnly || !inAnalysis();
 
-    if (!aWin.variantTagsReadOnly) {
+    if (!readOnly) {
         tagHtml += "<a class='show-tag-autocomplete' href='javascript:showTagAutocomplete(" + variantId + ")'><span class='add-variant-tag' title='Tag variant..'></span></a>";
         tagHtml += "<span id='tag-entry-container-" + variantId + "'></span>";
     }
 
-    const tagList = aWin.variantTags[variantId];
+    const tagList = (aWin.variantTags || {})[variantId];
     if (tagList) {
         const sortedTags = sortVariantTags(aWin, tagList);
         for (let i=0 ; i<sortedTags.length ; ++i) {
             const tag = sortedTags[i];
-            tagHtml += getVariantTagHtml(variantId, tag, aWin.variantTagsReadOnly);
+            tagHtml += getVariantTagHtml(variantId, tag, readOnly);
         }
     }
     return tagHtml;
