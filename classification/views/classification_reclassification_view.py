@@ -2,6 +2,7 @@ import statistics
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import date
+from math import ceil, log10
 from functools import cached_property
 from typing import Any, Optional
 
@@ -14,9 +15,10 @@ from django.http.response import HttpResponseBase
 from django.shortcuts import render
 from django.utils.timezone import localdate
 
-from classification.enums import ClinicalSignificance, LabExternalFilter, SpecialEKeys
+from classification.enums import ClinicalSignificance, CriteriaEvaluation, LabExternalFilter, SpecialEKeys
 from classification.models import (
     ClassificationModification,
+    EvidenceKey,
     EvidenceKeyMap,
     ReclassificationBuildResult,
     ReclassificationEvent,
@@ -43,14 +45,25 @@ NEUTRAL_COUNT_COLOUR = "#6c757d"
 RECLASSIFICATION_PAGE_BUILD_LIMIT = 5000
 
 TOP_GENE_COUNT = 30
-TOP_EVIDENCE_KEY_COUNT = 25
+EVIDENCE_MOVEMENT_CACHE_SECONDS = 60 * 60
 # the significance itself changes by definition, and the dates get stamped alongside it
 EVIDENCE_KEYS_ALWAYS_CHANGED = {
     SpecialEKeys.CLINICAL_SIGNIFICANCE,
     SpecialEKeys.CURATION_DATE,
     SpecialEKeys.CURATION_VERIFIED_DATE,
 }
-EVIDENCE_KEY_DIFF_CACHE_SECONDS = 60 * 60
+# everything else in a criteria dropdown means the criterion is applied at some strength
+CRITERIA_UNMET_VALUES = [CriteriaEvaluation.NOT_MET, CriteriaEvaluation.NOT_APPLICABLE,
+                         CriteriaEvaluation.NEUTRAL, ""]
+EVIDENCE_APPLIED_COLOUR = "#4a8f5b"
+EVIDENCE_UNAPPLIED_COLOUR = "#b5564e"
+EVIDENCE_CHANGED_COLOUR = "#4f7ca6"
+
+# the days axis is logarithmic - most records move within a few months, and a year either side of the
+# two year mark is not a distinction anybody reads off a chart
+LOG_BINS_PER_DECADE = 8
+DAY_TICKS = [(0, "same day"), (7, "1w"), (30, "1m"), (90, "3m"), (182, "6m"), (365, "1y"),
+             (730, "2y"), (1826, "5y"), (3652, "10y")]
 
 
 def significance_label(clinical_significance: Optional[str]) -> str:
@@ -110,6 +123,7 @@ class SignificanceTransition:
 class SignificanceMatrixCell:
     count: int
     is_self: bool
+    background: str
 
 
 @dataclass(frozen=True)
@@ -153,10 +167,17 @@ class GeneBurden:
 
 
 @dataclass(frozen=True)
-class EvidenceKeyChange:
+class EvidenceMovement:
+    """
+    How often one evidence key moved across a set of reclassifications. Criteria coming on or coming
+    off are counted separately, everything else - including a criterion only shifting strength - is
+    a plain change.
+    """
     key: str
     label: str
-    count: int
+    applied: int
+    unapplied: int
+    changed: int
 
 
 class ReclassificationAnalytics:
@@ -267,6 +288,8 @@ class ReclassificationAnalytics:
         target_index = {cs: index + len(SIGNIFICANCE_ORDER) for index, cs in enumerate(SIGNIFICANCE_ORDER)}
 
         sources, targets, values, link_colours = [], [], [], []
+        source_totals = defaultdict(int)
+        target_totals = defaultdict(int)
         for transition in self.significance_transitions:
             from_cs = transition.from_clinical_significance
             to_cs = transition.to_clinical_significance
@@ -275,18 +298,19 @@ class ReclassificationAnalytics:
             sources.append(source_index[from_cs])
             targets.append(target_index[to_cs])
             values.append(transition.count)
+            source_totals[from_cs] += transition.count
+            target_totals[to_cs] += transition.count
             moved_benign = ClinicalSignificance.distance(from_cs, to_cs) or 0
             link_colours.append(self._translucent(
                 BENIGN_DIRECTION_COLOUR if moved_benign > 0 else PATHOGENIC_DIRECTION_COLOUR))
 
-        # both columns are pinned so they read pathogenic down to benign rather than by band size
-        rows = [(index + 0.5) / len(SIGNIFICANCE_ORDER) for index in range(len(SIGNIFICANCE_ORDER))]
         return {
             "labels": [f"{significance_label(cs)} from" for cs in SIGNIFICANCE_ORDER] +
                       [f"{significance_label(cs)} to" for cs in SIGNIFICANCE_ORDER],
             "node_colours": [ClinicalSignificance.chart_colour(cs) for cs in SIGNIFICANCE_ORDER] * 2,
-            "node_x": [0.01] * len(SIGNIFICANCE_ORDER) + [0.99] * len(SIGNIFICANCE_ORDER),
-            "node_y": rows * 2,
+            # the template stacks these into node positions, so both columns run pathogenic to benign
+            "node_totals": [source_totals[cs] for cs in SIGNIFICANCE_ORDER] +
+                           [target_totals[cs] for cs in SIGNIFICANCE_ORDER],
             "sources": sources,
             "targets": targets,
             "values": values,
@@ -297,13 +321,28 @@ class ReclassificationAnalytics:
     def significance_matrix(self) -> list[SignificanceMatrixRow]:
         counts = {(transition.from_clinical_significance, transition.to_clinical_significance): transition.count
                   for transition in self.significance_transitions}
+        busiest = max([counts.get((from_cs, to_cs), 0)
+                       for from_cs in SIGNIFICANCE_ORDER for to_cs in SIGNIFICANCE_ORDER] or [0])
         return [
             SignificanceMatrixRow(
                 clinical_significance=from_cs,
-                cells=[SignificanceMatrixCell(count=counts.get((from_cs, to_cs), 0), is_self=from_cs == to_cs)
-                       for to_cs in SIGNIFICANCE_ORDER])
+                cells=[SignificanceMatrixCell(
+                    count=counts.get((from_cs, to_cs), 0),
+                    is_self=from_cs == to_cs,
+                    background=self._heat(counts.get((from_cs, to_cs), 0), busiest, from_cs, to_cs))
+                    for to_cs in SIGNIFICANCE_ORDER])
             for from_cs in SIGNIFICANCE_ORDER
         ]
+
+    @staticmethod
+    def _heat(count: int, busiest: int, from_cs: str, to_cs: str) -> str:
+        """ Square rooted so the quiet cells still read, and capped well short of the pill colours """
+        if not count or not busiest:
+            return ""
+        moved_benign = ClinicalSignificance.distance(from_cs, to_cs) or 0
+        colour = BENIGN_DIRECTION_COLOUR if moved_benign > 0 else PATHOGENIC_DIRECTION_COLOUR
+        alpha = round(0.06 + 0.34 * (count / busiest) ** 0.5, 3)
+        return ReclassificationAnalytics._translucent(colour, alpha)
 
     @property
     def significance_matrix_totals(self) -> list[int]:
@@ -315,13 +354,13 @@ class ReclassificationAnalytics:
         return sum(self.significance_matrix_totals)
 
     @staticmethod
-    def _translucent(colour: str) -> str:
+    def _translucent(colour: str, alpha: float = 0.45) -> str:
         """ Expands the 4 digit chart colours so the sankey bands can be laid over each other """
         digits = colour.lstrip("#")
         if len(digits) == 3:
             digits = "".join(digit * 2 for digit in digits)
         r, g, b = (int(digits[index:index + 2], 16) for index in (0, 2, 4))
-        return f"rgba({r},{g},{b},0.45)"
+        return f"rgba({r},{g},{b},{alpha})"
 
     # -- 2. Trend over time ---------------------------------------------------------------------
 
@@ -405,6 +444,38 @@ class ReclassificationAnalytics:
             for cs in SIGNIFICANCE_ORDER if days_by_significance[cs]
         ]
 
+    @cached_property
+    def time_to_reclassification_bins(self) -> dict[str, Any]:
+        """
+        Counts per log spaced bucket of days+1, so the first few months get the room they deserve.
+        Positions are log10 so the template can plot them against a plain linear axis.
+        """
+        distributions = self.time_to_reclassification
+        longest = max((max(distribution.days) for distribution in distributions), default=0)
+        if not distributions:
+            return {"edges": [], "series": [], "tick_values": [], "tick_labels": []}
+
+        span = log10(longest + 2)
+        bin_count = max(1, ceil(span * LOG_BINS_PER_DECADE))
+        width = span / bin_count
+        edges = [index * width for index in range(bin_count + 1)]
+
+        series = []
+        for distribution in distributions:
+            counts = [0] * bin_count
+            for days in distribution.days:
+                counts[min(int(log10(days + 1) / width), bin_count - 1)] += 1
+            series.append({"label": f"from {distribution.label}", "colour": distribution.colour,
+                           "counts": counts})
+
+        ticks = [(days, label) for days, label in DAY_TICKS if days <= longest] or [DAY_TICKS[0]]
+        return {
+            "edges": edges,
+            "series": series,
+            "tick_values": [log10(days + 1) for days, _ in ticks],
+            "tick_labels": [label for _, label in ticks],
+        }
+
     # -- 5. VUS burden by gene ------------------------------------------------------------------
 
     @cached_property
@@ -423,40 +494,84 @@ class ReclassificationAnalytics:
             for row in vus_counts
         ]
 
-    # -- 6. Evidence keys driving reclassification ----------------------------------------------
+    # -- 6. Evidence driving reclassification ---------------------------------------------------
 
     @cached_property
-    def evidence_key_changes(self) -> list[EvidenceKeyChange]:
+    def evidence_key_order(self) -> list[EvidenceKey]:
+        """ Criteria lead in ACMG strength order, then the rest as they appear on a classification """
+        evidence_keys = EvidenceKeyMap.cached()
+        criteria = sorted(evidence_keys.criteria(),
+                          key=lambda e_key: (-CriteriaEvaluation.POINTS.get(e_key.default_crit_evaluation, 0),
+                                             e_key.pretty_label.lower()))
+        criteria_keys = {e_key.key for e_key in criteria}
+        return criteria + [e_key for e_key in evidence_keys.all_keys
+                           if e_key.key not in criteria_keys
+                           and e_key.key not in EVIDENCE_KEYS_ALWAYS_CHANGED]
+
+    @cached_property
+    def evidence_towards_pathogenic(self) -> list[EvidenceMovement]:
+        return self._evidence_movements(towards_benign=False)
+
+    @cached_property
+    def evidence_towards_benign(self) -> list[EvidenceMovement]:
+        return self._evidence_movements(towards_benign=True)
+
+    def _evidence_movements(self, towards_benign: bool) -> list[EvidenceMovement]:
+        criteria_keys = {e_key.key for e_key in EvidenceKeyMap.cached().criteria()}
+        applied = defaultdict(int)
+        unapplied = defaultdict(int)
+        changed = defaultdict(int)
+
+        for key, row_towards_benign, old_met, new_met, total in self._evidence_movement_counts:
+            if row_towards_benign != towards_benign:
+                continue
+            if key in criteria_keys and old_met != new_met:
+                (applied if new_met else unapplied)[key] += total
+            else:
+                changed[key] += total
+
+        moved = set(applied) | set(unapplied) | set(changed)
+        return [EvidenceMovement(key=e_key.key, label=e_key.pretty_label, applied=applied[e_key.key],
+                                 unapplied=unapplied[e_key.key], changed=changed[e_key.key])
+                for e_key in self.evidence_key_order if e_key.key in moved]
+
+    @cached_property
+    def _evidence_movement_counts(self) -> list[tuple[str, bool, bool, bool, int]]:
         event_ids = list(self.reclassifications_qs.filter(from_modification__isnull=False)
                          .values_list('pk', flat=True))
         if not event_ids:
             return []
 
-        cache_key = f"reclassification_evidence_key_changes:{self.query_string}:{len(event_ids)}"
+        cache_key = f"reclassification_evidence_movements:{self.query_string}:{len(event_ids)}"
         counts = cache.get(cache_key)
         if counts is None:
-            counts = self._count_changed_evidence_keys(event_ids)
-            cache.set(cache_key, counts, EVIDENCE_KEY_DIFF_CACHE_SECONDS)
-
-        evidence_keys = EvidenceKeyMap.cached()
-        interesting = [(key, count) for key, count in counts if key not in EVIDENCE_KEYS_ALWAYS_CHANGED]
-        return [
-            EvidenceKeyChange(key=key, label=evidence_keys.get(key).pretty_label, count=count)
-            for key, count in interesting[:TOP_EVIDENCE_KEY_COUNT]
-        ]
+            counts = self._count_evidence_movements(event_ids)
+            cache.set(cache_key, counts, EVIDENCE_MOVEMENT_CACHE_SECONDS)
+        return counts
 
     @staticmethod
-    def _count_changed_evidence_keys(event_ids: list[int]) -> list[tuple[str, int]]:
+    def _count_evidence_movements(event_ids: list[int]) -> list[tuple[str, bool, bool, bool, int]]:
         """
         Diffs each event's two published_evidence blobs in the database - shipping thousands of whole
-        evidence documents back to python to compare them would be far more expensive.
+        evidence documents back to python to compare them would be far more expensive. Criteria carry
+        whether each side was met so the caller can tell an on/off from a strength shift.
         """
         event_table = ReclassificationEvent._meta.db_table
         modification_table = ClassificationModification._meta.db_table
         sql = f"""
-            SELECT changed.key, COUNT(*) AS total
+            SELECT movement.key,
+                   movement.towards_benign,
+                   COALESCE(movement.old_value <> ALL(%s), FALSE) AS old_met,
+                   COALESCE(movement.new_value <> ALL(%s), FALSE) AS new_met,
+                   COUNT(*) AS total
             FROM (
-                SELECT event.id, entry.key
+                SELECT event.id,
+                       entry.key,
+                       event.significance_delta > 0 AS towards_benign,
+                       COALESCE(old_version.published_evidence -> entry.key -> 'value',
+                                old_version.published_evidence -> entry.key) #>> '{{}}' AS old_value,
+                       COALESCE(new_version.published_evidence -> entry.key -> 'value',
+                                new_version.published_evidence -> entry.key) #>> '{{}}' AS new_value
                 FROM {event_table} event
                 JOIN {modification_table} old_version ON old_version.id = event.from_modification_id
                 JOIN {modification_table} new_version ON new_version.id = event.to_modification_id
@@ -466,18 +581,19 @@ class ReclassificationAnalytics:
                     SELECT key FROM jsonb_object_keys(COALESCE(new_version.published_evidence, '{{}}'::jsonb)) AS key
                 ) entry
                 WHERE event.id = ANY(%s)
+                  AND event.significance_delta <> 0
                   AND COALESCE(old_version.published_evidence -> entry.key -> 'value',
                                old_version.published_evidence -> entry.key)
                       IS DISTINCT FROM
                       COALESCE(new_version.published_evidence -> entry.key -> 'value',
                                new_version.published_evidence -> entry.key)
-            ) changed
-            GROUP BY changed.key
-            ORDER BY total DESC
+            ) movement
+            GROUP BY 1, 2, 3, 4
         """
         with connection.cursor() as cursor:
-            cursor.execute(sql, [event_ids])
-            return [(key, total) for key, total in cursor.fetchall()]
+            cursor.execute(sql, [CRITERIA_UNMET_VALUES, CRITERIA_UNMET_VALUES, event_ids])
+            return [(key, towards_benign, old_met, new_met, total)
+                    for key, towards_benign, old_met, new_met, total in cursor.fetchall()]
 
     # -- page furniture -------------------------------------------------------------------------
 
@@ -500,21 +616,27 @@ class ReclassificationAnalytics:
             "flow": self.significance_flow,
             "monthly": self.monthly_direction,
             "vus_rates": self._vus_rate_chart,
-            "time_to_reclassification": [
-                {"label": f"from {distribution.label}", "colour": distribution.colour, "days": distribution.days}
-                for distribution in self.time_to_reclassification
-            ],
+            "time_to_reclassification": self.time_to_reclassification_bins,
             "gene_burden": {
                 "symbols": [burden.gene_symbol for burden in self.gene_burden],
                 "vus_counts": [burden.vus_count for burden in self.gene_burden],
                 "percents": [burden.percent for burden in self.gene_burden],
                 "colour": NEUTRAL_COUNT_COLOUR,
             },
-            "evidence_keys": {
-                "labels": [change.label for change in self.evidence_key_changes],
-                "counts": [change.count for change in self.evidence_key_changes],
-                "colour": NEUTRAL_COUNT_COLOUR,
-            },
+            "evidence_towards_pathogenic": self._evidence_chart(self.evidence_towards_pathogenic),
+            "evidence_towards_benign": self._evidence_chart(self.evidence_towards_benign),
+        }
+
+    @staticmethod
+    def _evidence_chart(movements: list[EvidenceMovement]) -> dict[str, Any]:
+        return {
+            "labels": [movement.label for movement in movements],
+            "applied": [movement.applied for movement in movements],
+            "unapplied": [-movement.unapplied for movement in movements],
+            "changed": [movement.changed for movement in movements],
+            "applied_colour": EVIDENCE_APPLIED_COLOUR,
+            "unapplied_colour": EVIDENCE_UNAPPLIED_COLOUR,
+            "changed_colour": EVIDENCE_CHANGED_COLOUR,
         }
 
     @property
