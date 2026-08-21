@@ -111,7 +111,7 @@ class ClassificationSummaryCacheObj(DataClassJsonMixin):
     @staticmethod
     def from_dict_safe(data: dict):
         # is there a way we can do this with schema?
-        # the problem is we don't want to subsitute with None, but empty objects
+        # the problem is we don't want to substitute with None, but empty objects
         data_copy = dict(data)
         for man_sub_field in ["pathogenicity", "somatic", "date"]:
             if man_sub_field not in data_copy:
@@ -129,7 +129,7 @@ class SomaticClinicalSignificanceValue:
         return SomaticClinicalSignificanceValue(tier_level=self.tier_level)
 
     @property
-    def sort_value(self) -> Optional[int]:
+    def sort_value(self) -> int:
         if sort_value := _SOMATIC_CLINICAL_SIGNIFICANCE_SORT_VALUES.get(self):
             return sort_value
         elif self.amp_level:
@@ -299,7 +299,7 @@ class ClassificationSummaryCalculator:
         return list(str(x) for x in sorted(strengths))
 
 
-#F FIXME underlying code should change due to overlaps
+# FIXME underlying code should change due to overlaps
 def clinical_significance_pills(summary: ClassificationSummaryCacheDict, allele_origin_bucket: str) -> list[dict]:
     from classification.models import EvidenceKeyMap
     """ Label/CSS class for the c-pill spans - rendered server side by the clinical_significance_values

@@ -3,9 +3,8 @@ from django.db.models import Q, QuerySet
 from django.db.models.aggregates import Count
 from django.utils.timezone import now
 
-from classification.enums import ShareLevel, AlleleOriginBucket
-from classification.enums.discordance_enums import DiscordanceReportResolution
-from classification.models import DiscordanceReport, Classification, ClinVarExport, ClinVarExportStatus
+from classification.enums import ShareLevel
+from classification.models import DiscordanceReport, Classification, ClinVarExport
 from snpdb.models import Lab, Allele, Organization
 
 

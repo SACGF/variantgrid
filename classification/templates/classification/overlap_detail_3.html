@@ -158,7 +158,7 @@
 
                         <td>
                             {% if not overlap_entry.is_cross_context %}
-                                <div style="display:inline-block; width:100%" id="triage-{{ overlap_entry.overlap_contribution.pk }}-status">{% triage overlap_entry.overlap_contribution show_icon=True show_label=True show_link=overlap_entry.is_editable style="long" %}</div>
+                                <div style="display:inline-block; width:100%" id="triage-{{ overlap_entry.overlap_contribution.pk }}-status">{% triage overlap_entry.overlap_contribution show_icon=True show_label=True show_link=overlap_entry.is_editable style="long" overlap=overlap_entry.overlap %}</div>
                             {% else %}
                                 <div class="no-value">Cross Context</div>
                             {% endif %}

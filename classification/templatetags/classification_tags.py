@@ -93,6 +93,7 @@ def classification_groups(
         allele_origin_filter_enabled: bool = True
     ):
     """
+    DEPRECATED - only still here for support of Discordance Reports (which will be removed in a future release)
     :param context: Auto included
     :param classification_modifications: The classification modifications to render
     :param show_diffs: Should a link to show diffs be shown
@@ -163,7 +164,7 @@ def classification_groups(
 
     if link_discordance_reports:
         clinical_grouping_list = list({cm.classification.clinical_context for cm in ordered_classifications if cm.classification.clinical_context})
-        clinical_grouping_list.sort(key=lambda cg:(not cg.is_default if cg else False, cg.name if cg else 'No Allele'))
+        clinical_grouping_list.sort(key=lambda cg: (not cg.is_default if cg else False, cg.name if cg else 'No Allele'))
         tag_context["clinical_contexts"] = clinical_grouping_list
 
     tag_context["paging"] = len(groups) > 10
@@ -314,7 +315,6 @@ def clinical_significance(value, evidence_key=SpecialEKeys.CLINICAL_SIGNIFICANCE
     if value == IN_REVIEW_VALUE:
         label = "In-Review"
 
-    #prefix = "cs" if key.key == SpecialEKeys.CLINICAL_SIGNIFICANCE else "scs"
     prefix = "cs"
     css_value = value.lower() if value else "none"
     css_class = f"{prefix} {prefix}-{css_value} {extra_css}"
@@ -343,6 +343,7 @@ def clinical_significance_inline(value):
         "label": key.option_dictionary.get(value, value) or "Unclassified"
     }
 
+
 @register.inclusion_tag("classification/tags/lab.html")
 def lab(lab: LabLike, is_your_lab: Optional[bool] = None, lab_css: Optional[str] = None, show_contact_link: bool = False, contact_subject: Optional[str] = None, contact_body: Optional[str] = None):
     return {
@@ -365,8 +366,8 @@ def clinical_significance_select(name, value):
     }
 
 
-@register.inclusion_tag("classification/tags/clinical_context.html", takes_context=True)
-def clinical_context(context, cc: ClinicalContext, orientation: str = 'horizontal'):
+@register.inclusion_tag("classification/tags/clinical_context.html")
+def clinical_context(cc: ClinicalContext, orientation: str = 'horizontal'):
     return {"cc": cc, "orientation": orientation}
 
 
@@ -854,7 +855,8 @@ def triage(context,
            show_label: bool = False,
            show_link: bool = False,
            show_icon: bool = False,
-           style: str = "compact"
+           style: str = "compact",
+           overlap: Optional[Overlap] = None
            ):
     new_value = None
     # if show_link and isinstance(triage, ClassificationGroupingValueTriageHistory):
@@ -875,10 +877,15 @@ def triage(context,
     if last_comment and triage.triage_state_obj.status == TriageStatus.AMENDED:
         last_comment = None  # TODO, would be good to see the date of the amend
 
+    label = triage.triage_state_obj.status.label
+    if triage.triage_state_obj.status == TriageStatus.PENDING and overlap and not overlap.is_active_supported_discordance:
+        label = "Not Triaged"
+
     return {
         "triage": triage,
         "new_value": new_value,
         "show_label": show_label,
+        "label": label,
         "show_link": show_link,
         "show_icon": show_icon,
         "style": style,

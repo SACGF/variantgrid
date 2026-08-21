@@ -14,5 +14,5 @@
 {% endif %}
 {% if show_link %}</a>{% endif %}
 {% if overlap.overlap_override_status %}
-    <div class="my-1">{% if overlap.overlap_override_status.is_auto %}Auto-{% endif %}Reviewed as : <b>{{ overlap.get_overlap_override_status_display }}</b></div>
+    <div class="my-1">{% if overlap.overlap_override_status.is_auto_review %}Auto-{% endif %}Reviewed as : <b>{{ overlap.get_overlap_override_status_display }}</b></div>
 {% endif %}

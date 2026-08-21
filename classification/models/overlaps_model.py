@@ -243,6 +243,16 @@ class Overlap(TimeStampedModel, ReviewableModelMixin, PreviewModelMixin):
     def is_active_discordance(self):
         return self.overlap_status.is_discordant and not self.overlap_override_status
 
+    @property
+    def is_active_supported_discordance(self) -> bool:
+        # TODO move OVERLAP_CLIN_SIG_ENABLED to a more core location
+        from classification.services.overlap_calculator import OVERLAP_CLIN_SIG_ENABLED
+        if self.overlap_type == OverlapType.CROSS_CONTEXT:
+            return False
+        if self.value_type == ClassificationResultValue.SOMATIC_CLINICAL_SIGNIFICANCE and not OVERLAP_CLIN_SIG_ENABLED:
+            return False
+        return self.is_active_discordance
+
     def get_absolute_url(self):
         return reverse('overlap_3', kwargs={"overlap_id": self.pk})
 
