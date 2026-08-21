@@ -491,12 +491,3 @@ class SurvivalMathsTestCase(TestCase):
     def test_an_event_after_the_record_left_observation_is_censored_instead(self):
         members = [(700, 100)] * 10
         self.assertEqual([1.0, 1.0, 1.0], ReclassificationAnalytics._life_table(members, self.GRID))
-
-    def test_gini_is_zero_when_every_lab_does_the_same_amount(self):
-        self.assertEqual(0.0, ReclassificationAnalytics._lorenz([5, 5, 5, 5])["gini"])
-
-    def test_gini_rises_as_the_work_concentrates(self):
-        self.assertEqual(0.75, ReclassificationAnalytics._lorenz([0, 0, 0, 10])["gini"])
-
-    def test_nothing_to_share_out_has_no_gini(self):
-        self.assertIsNone(ReclassificationAnalytics._lorenz([0, 0])["gini"])

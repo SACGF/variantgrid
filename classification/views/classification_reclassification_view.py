@@ -801,38 +801,6 @@ class ReclassificationAnalytics:
     def labs_with_no_reclassification(self) -> int:
         return len([row for row in self.lab_activity if not row.reclassified])
 
-    @cached_property
-    def concentration(self) -> dict[str, Any]:
-        """ Lorenz curves for what the labs hold against what they reclassify, so the two Ginis sit together """
-        return {
-            "held": self._lorenz([row.held for row in self.lab_activity]),
-            "reclassified": self._lorenz([row.reclassified for row in self.lab_activity]),
-            "reviewed": self._lorenz([row.reviewed for row in self.lab_activity]),
-            "held_colour": NEUTRAL_COUNT_COLOUR,
-            "reviewed_colour": REVIEW_COLOUR,
-            "reclassified_colour": CHANGE_COLOUR,
-        }
-
-    @staticmethod
-    def _lorenz(values: list[int]) -> dict[str, Any]:
-        total = sum(values)
-        if not values or not total:
-            return {"x": [], "y": [], "gini": None}
-        ordered = sorted(values)
-        share_per_lab = 1 / len(ordered)
-        cumulative = [0.0]
-        running = 0
-        for value in ordered:
-            running += value
-            cumulative.append(round(running / total, 4))
-        area = sum((cumulative[index] + cumulative[index + 1]) / 2 * share_per_lab
-                   for index in range(len(ordered)))
-        return {
-            "x": [round(index * share_per_lab, 4) for index in range(len(ordered) + 1)],
-            "y": cumulative,
-            "gini": round(1 - 2 * area, 3),
-        }
-
     # -- 4. Time to reclassification ------------------------------------------------------------
 
     @cached_property
@@ -1133,7 +1101,6 @@ class ReclassificationAnalytics:
             "held": [row.held for row in self.lab_activity],
             "review_colour": REVIEW_COLOUR,
             "change_colour": CHANGE_COLOUR,
-            "concentration": self.concentration,
         }
 
     @property
