@@ -261,16 +261,18 @@
     }
 
     const SANKEY_HEIGHT = 520, SANKEY_MARGIN = 25, SANKEY_PAD = 16;
+    // plotly places a node around the centre of node.y, and skips any node whose y is a falsy zero
+    const SANKEY_MIN_Y = 1e-4;
 
     /** Stacks a column of nodes top to bottom in the order given, sized by its share of the flow,
      *  so a significance sits at the same depth on both sides and a downgrade always reads downwards. */
-    function sankeyColumnTops(totals, grandTotal, plotHeight) {
-        const usable = plotHeight - SANKEY_PAD * (totals.length - 1);
+    function sankeyColumnCentres(totals, grandTotal, usable, plotHeight) {
         let cursor = 0;
         return totals.map(total => {
-            const top = cursor / plotHeight;
-            cursor += (total / grandTotal) * usable + SANKEY_PAD;
-            return top;
+            const height = (total / grandTotal) * usable;
+            const centre = (cursor + height / 2) / plotHeight;
+            cursor += height + SANKEY_PAD;
+            return Math.max(centre, SANKEY_MIN_Y);
         });
     }
 
@@ -279,8 +281,12 @@
         const columnSize = flow.node_totals.length / 2;
         const grandTotal = flow.values.reduce((running, value) => running + value, 0);
         const plotHeight = SANKEY_HEIGHT - SANKEY_MARGIN * 2;
-        const tops = sankeyColumnTops(flow.node_totals.slice(0, columnSize), grandTotal, plotHeight)
-            .concat(sankeyColumnTops(flow.node_totals.slice(columnSize), grandTotal, plotHeight));
+        // a significance with nothing flowing through it is unlinked, so plotly heaps it in with the
+        // first column - leave room for that or the bands it does draw run past the bottom
+        const unlinked = flow.node_totals.filter(total => !total).length;
+        const usable = plotHeight - SANKEY_PAD * (columnSize + unlinked - 1);
+        const centres = sankeyColumnCentres(flow.node_totals.slice(0, columnSize), grandTotal, usable, plotHeight)
+            .concat(sankeyColumnCentres(flow.node_totals.slice(columnSize), grandTotal, usable, plotHeight));
         Plotly.newPlot('significance-flow', [{
             type: 'sankey',
             orientation: 'h',
@@ -289,7 +295,7 @@
                 label: flow.labels,
                 color: flow.node_colours,
                 x: flow.node_totals.map((total, index) => index < columnSize ? 0.001 : 0.999),
-                y: tops,
+                y: centres,
                 pad: SANKEY_PAD,
                 thickness: 16,
                 line: {color: "#fcfcfb", width: 2}
