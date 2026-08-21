@@ -1,5 +1,8 @@
 def get_month_and_year(run_date):
-    run_date_str = "%d" % int(run_date)
+    """ Parse a 4-digit YYMM value (e.g. 2201 for January 2022) into (month, year). """
+    run_date_str = "%04d" % int(run_date)
+    if len(run_date_str) != 4:
+        raise ValueError("Expected 4-digit YYMM, got %r" % run_date_str)
     parts = [run_date_str[i:i + 2] for i in range(0, len(run_date_str), 2)]
     return int(parts[1]), int(parts[0])
 

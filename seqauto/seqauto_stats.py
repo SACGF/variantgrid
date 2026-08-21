@@ -11,7 +11,8 @@ from django.conf import settings
 from library.date_utils import get_month_and_year, get_months_since, month_range
 from seqauto.models import SequencingSample, SequencingRun
 
-SEQUENCING_RUN_DATE_PATTERN = re.compile(r"^(\d{4})\d{2}[_-]")
+# YYMMDD - month/day must be valid, so placeholder names like "000000_M01234_..." aren't read as dates
+SEQUENCING_RUN_DATE_PATTERN = re.compile(r"^(\d{2}(?:0[1-9]|1[0-2]))(?:0[1-9]|[12]\d|3[01])[_-]")
 
 
 def get_sequencing_run_yymm(sequencing_run_name) -> Optional[str]:
