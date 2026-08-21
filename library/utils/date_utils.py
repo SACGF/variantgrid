@@ -37,8 +37,10 @@ def parse_yymm(run_date) -> tuple[int, int]:
     run_date_str = f"{int(run_date):d}"
     if len(run_date_str) != 4:
         raise ValueError(f"Expected 4-digit YYMM, got {run_date_str!r}")
-    parts = [run_date_str[i:i + 2] for i in range(0, len(run_date_str), 2)]
-    return int(parts[1]), int(parts[0])
+    year, month = int(run_date_str[:2]), int(run_date_str[2:])
+    if not 1 <= month <= 12:
+        raise ValueError(f"Expected 4-digit YYMM, got month {month} in {run_date_str!r}")
+    return month, year
 
 
 def year_month_string(y, m) -> str:

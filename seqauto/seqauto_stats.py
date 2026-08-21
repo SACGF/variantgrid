@@ -40,11 +40,17 @@ def get_sample_enrichment_kits_df():
     years = {}
     year_months = {}
     for i, sequencing_run_name in df[SEQUENCING_RUN_COL].items():
-        if yymm := get_sequencing_run_yymm(sequencing_run_name):
-            years[i] = int(yymm[:2])
-            year_months[i] = int(yymm)
-        else:
+        yymm = get_sequencing_run_yymm(sequencing_run_name)
+        if yymm is None:
             logging.warning("Skipping sequencing run %s - no YYMMDD date at start of name", sequencing_run_name)
+            continue
+        try:
+            parse_yymm(yymm)
+        except ValueError as ve:
+            logging.warning("Skipping sequencing run %s - %s", sequencing_run_name, ve)
+            continue
+        years[i] = int(yymm[:2])
+        year_months[i] = int(yymm)
 
     # Only keep rows we could date, so callers always see year/year_month/month_offset columns
     df = df.loc[list(year_months)].copy()
