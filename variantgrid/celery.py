@@ -53,6 +53,13 @@ if SAPATH_ENABLED:
             'schedule': HOUR_SECS,  # Check every hour, only update if hash changed
         }
 
+# Reclassification timelines (issue #1523): the analytics page builds what it can in the request,
+# this picks up anything left over, e.g. the morning after a large sync.
+app.conf.beat_schedule['reclassification-events-update'] = {
+    'task': 'classification.tasks.classification_reclassification_tasks.reclassification_events_update',
+    'schedule': crontab(hour=3, minute=30),
+}
+
 app.conf.beat_schedule['notify-server-status'] = {
     'task': 'variantopedia.tasks.server_status_tasks.notify_server_status',
     'schedule': crontab(hour=19, minute=0),

@@ -47,6 +47,8 @@ from classification.models import (
     EvidenceKeyMap,
     ImportedAlleleInfo,
     ImportedAlleleInfoStatus,
+    ReclassificationEvent,
+    ReclassificationEventBuildState,
     UploadedClassificationsUnmapped,
     classification_flag_types,
     ensure_discordance_report_triages_bulk,
@@ -71,6 +73,7 @@ from classification.signals import send_prepared_discordance_notifications
 from classification.tasks.classification_import_map_and_insert_task import (
     ClassificationImportMapInsertTask,
 )
+from classification.tasks.classification_reclassification_tasks import reclassification_events_update
 from library.cache import timed_cache
 from library.django_utils import get_url_from_view_path
 from library.guardian_utils import admin_bot
@@ -1481,3 +1484,14 @@ class AlleleOriginGroupingTabularAdmin(TabularInline):
 @admin.register(AlleleGrouping)
 class AlleleGroupingAdmin(ModelAdminBasics):
     inlines = (AlleleOriginGroupingTabularAdmin,)
+
+
+@admin.register(ReclassificationEventBuildState)
+class ReclassificationEventBuildStateAdmin(ModelAdminBasics):
+    list_display = ("built_to", "last_run")
+
+    @admin_model_action(url_slug="rebuild_all/", short_description="Rebuild All", icon="fa-solid fa-arrows-rotate")
+    def rebuild_all(self, request):
+        ReclassificationEventBuildState.objects.update(built_to=None)
+        ReclassificationEvent.objects.all().delete()
+        reclassification_events_update.delay()
