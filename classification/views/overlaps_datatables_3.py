@@ -10,21 +10,21 @@ from django.utils import html
 from django.utils.safestring import SafeString
 
 from classification.enums import OverlapStatus, SpecialEKeys, OverlapOverrideStatus
-from classification.models import ClassificationGrouping, Overlap, OverlapType, OverlapContribution, \
+from classification.models import ClassificationGrouping, Overlap, OverlapType, \
     ClassificationResultValue, OverlapContributionStatus, OverlapContributionSkew, TriageNextStep, EvidenceKey, \
     EvidenceKeyMap
 from classification.services.overlap_calculator import OVERLAP_CLIN_SIG_ENABLED
 from genes.hgvs import HGVSDisplay
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.lab_picker import LabPickerData
-from snpdb.models import Organization, Lab
+from snpdb.models import Lab
 from snpdb.views.datatable_view import DatatableConfig, DatatableConfigQuerySetMode, RichColumn, CellData, SortOrder, DC
 
 
 @dataclass
 class ContributionValueSource:
     e_key: EvidenceKey
-    value: str
+    value: Optional[str]
     your_contribution: bool = False
     """
     Indicates if the user's skew provided this value (other labs may have also provided the value)
@@ -91,7 +91,7 @@ class OverlapColumns(DatatableConfig[ClassificationGrouping]):
     def triage_next_step_filter(self) -> Set[TriageNextStep]:
         if triage_status_str := self.get_query_param("skew_status"):
             if triage_status_str == "S":
-                return None # shouldn't be checking status for solved overlaps
+                return None  # shouldn't be checking status for solved overlaps
             if triage_status_str == "TT":  # special code for meaning both awaiting and awaiting others have triaged
                 return {TriageNextStep.AWAITING_YOUR_TRIAGE, TriageNextStep.AWAITING_YOUR_TRIAGE_OTHERS_TRIAGED}
             else:
@@ -113,7 +113,6 @@ class OverlapColumns(DatatableConfig[ClassificationGrouping]):
         else:
             lab_picker = LabPickerData.for_user(self.user)
         return lab_picker
-
 
     def get_initial_queryset(self) -> QuerySet[Overlap]:
         qs = Overlap.objects.filter(valid=True)
@@ -248,7 +247,7 @@ class OverlapColumns(DatatableConfig[ClassificationGrouping]):
                 value = values[cross_contribution.effective_value]
                 # only show cross context values if there was no
                 if not value.your_context:
-                    if cg := contribution.classification_grouping:
+                    if cg := cross_contribution.classification_grouping:
                         lab = cg.lab
                         value.labs.add(lab)
                     elif cross_contribution.scv:
@@ -317,27 +316,5 @@ class OverlapColumns(DatatableConfig[ClassificationGrouping]):
                 renderer=lambda x: x.obj.pk,
                 visible=False,
                 sort_keys=["pk"]
-            ),
-
-            # RichColumn(
-            #     name="status_changed",
-            #     label="Overlap Status Changed",
-            #     render=lambda cell: cell.obj.testing_context
-            # )
+            )
         ]
-
-        # if OVERLAP_CLIN_SIG_ENABLED:
-        #     self.rich_columns += [RichColumn(
-        #         name="clin_sig",
-        #         label="Somatic Clin Sig",
-        #         renderer=self.render_clin_sig
-        #     )]
-
-            #
-            # RichColumn(
-            #     name="overlaps",
-            #     label="Overlaps",
-            #     renderer=self.render_overlaps,
-            #     sort_keys=["max_status"],
-            #     default_sort=SortOrder.DESC
-            # )
