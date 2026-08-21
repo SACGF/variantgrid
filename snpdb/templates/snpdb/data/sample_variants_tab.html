@@ -1,10 +1,26 @@
 {% load static %}
+{% load user_tag_color_tags %}
+{% render_tag_styles_and_formatter %}
+<style>
+    {% render_node_count_colors_css %}
+
+    #sample-variants-downloads {
+        display: none;
+        margin-bottom: 5px;
+        border-radius: 4px;
+    }
+</style>
 <script type="text/javascript" src="{% static 'js/analysis_updates.js' %}"></script>
 <div id='sample-variants-container'>
     {% include "messages/messages.html" %}
 
     {% if analysis %}
         <script>
+        // Tags are shown read only here - they are added/removed in the analysis itself
+        variantTags = {% render_variant_tags_dict analysis %};
+        variantTagOrder = {% render_variant_tag_order %};
+        variantTagsReadOnly = true;
+
         function gridLoadError() {
             console.log("gridLoadError");
         }
@@ -26,6 +42,9 @@
         }
 
         $(document).ready(function() {
+            // The CSV/VCF exports run as Celery jobs then hand back a file - see analysis_downloads.js
+            analysisDownloadTracker = new AnalysisDownloadTracker({{ analysis.pk }}, "#sample-variants-downloads");
+
             let messagePoller = new AnalysisMessagePoller(Urls.nodes_status({{ analysis.pk }}));
             let gridContainer = $("#node-data-grid");
 
@@ -47,6 +66,7 @@
         <h3>Analysis: {{ analysis }}</h3>
         {{ output_node_form.as_p }}
 
+        <div id="sample-variants-downloads"></div>
         <div id="sample-variants-grid">
             <div id='node-data-grid' class='node-data'></div>
         </div>
