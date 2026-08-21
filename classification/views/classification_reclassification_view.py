@@ -14,7 +14,7 @@ from django.http.response import HttpResponseBase
 from django.shortcuts import render
 from django.utils.timezone import localdate
 
-from classification.enums import ClinicalSignificance, LabExternalFilter
+from classification.enums import ClinicalSignificance, LabExternalFilter, SpecialEKeys
 from classification.models import (
     ClassificationModification,
     EvidenceKeyMap,
@@ -26,12 +26,13 @@ from classification.tasks.classification_reclassification_tasks import reclassif
 from library.django_utils import require_superuser
 from snpdb.models import Lab, Organization
 
+# top to bottom / left to right on every chart and table
 SIGNIFICANCE_ORDER = [
-    ClinicalSignificance.BENIGN,
-    ClinicalSignificance.LIKELY_BENIGN,
-    ClinicalSignificance.VUS,
-    ClinicalSignificance.LIKELY_PATHOGENIC,
     ClinicalSignificance.PATHOGENIC,
+    ClinicalSignificance.LIKELY_PATHOGENIC,
+    ClinicalSignificance.VUS,
+    ClinicalSignificance.LIKELY_BENIGN,
+    ClinicalSignificance.BENIGN,
 ]
 
 BENIGN_DIRECTION_COLOUR = ClinicalSignificance.chart_colour(ClinicalSignificance.BENIGN)
@@ -43,6 +44,12 @@ RECLASSIFICATION_PAGE_BUILD_LIMIT = 5000
 
 TOP_GENE_COUNT = 30
 TOP_EVIDENCE_KEY_COUNT = 25
+# the significance itself changes by definition, and the dates get stamped alongside it
+EVIDENCE_KEYS_ALWAYS_CHANGED = {
+    SpecialEKeys.CLINICAL_SIGNIFICANCE,
+    SpecialEKeys.CURATION_DATE,
+    SpecialEKeys.CURATION_VERIFIED_DATE,
+}
 EVIDENCE_KEY_DIFF_CACHE_SECONDS = 60 * 60
 
 
@@ -98,36 +105,29 @@ class SignificanceTransition:
     to_clinical_significance: str
     count: int
 
-    @property
-    def from_label(self) -> str:
-        return significance_label(self.from_clinical_significance)
 
-    @property
-    def to_label(self) -> str:
-        return significance_label(self.to_clinical_significance)
-
-    @property
-    def from_css_class(self) -> str:
-        return ClinicalSignificance.css_class(self.from_clinical_significance)
-
-    @property
-    def to_css_class(self) -> str:
-        return ClinicalSignificance.css_class(self.to_clinical_significance)
-
-    @property
-    def from_colour(self) -> str:
-        return ClinicalSignificance.chart_colour(self.from_clinical_significance)
-
-    @property
-    def to_colour(self) -> str:
-        return ClinicalSignificance.chart_colour(self.to_clinical_significance)
+@dataclass(frozen=True)
+class SignificanceMatrixCell:
+    count: int
+    is_self: bool
 
 
 @dataclass(frozen=True)
-class YearlyDirection:
-    year: int
-    benign: int
-    pathogenic: int
+class SignificanceMatrixRow:
+    clinical_significance: str
+    cells: list[SignificanceMatrixCell]
+
+    @property
+    def label(self) -> str:
+        return significance_label(self.clinical_significance)
+
+    @property
+    def css_class(self) -> str:
+        return ClinicalSignificance.css_class(self.clinical_significance)
+
+    @property
+    def total(self) -> int:
+        return sum(cell.count for cell in self.cells)
 
 
 @dataclass(frozen=True)
@@ -140,10 +140,6 @@ class YearlyRate:
     def percent(self) -> Optional[float]:
         return round(100 * self.reclassified / self.population, 2) if self.population else None
 
-    @property
-    def percent_display(self) -> str:
-        return f"{self.percent}%" if self.percent is not None else "-"
-
 
 @dataclass(frozen=True)
 class GeneBurden:
@@ -154,10 +150,6 @@ class GeneBurden:
     @property
     def percent(self) -> float:
         return round(100 * self.vus_count / self.total_count, 1) if self.total_count else 0.0
-
-    @property
-    def css_class(self) -> str:
-        return ClinicalSignificance.css_class(ClinicalSignificance.VUS)
 
 
 @dataclass(frozen=True)
@@ -287,15 +279,40 @@ class ReclassificationAnalytics:
             link_colours.append(self._translucent(
                 BENIGN_DIRECTION_COLOUR if moved_benign > 0 else PATHOGENIC_DIRECTION_COLOUR))
 
+        # both columns are pinned so they read pathogenic down to benign rather than by band size
+        rows = [(index + 0.5) / len(SIGNIFICANCE_ORDER) for index in range(len(SIGNIFICANCE_ORDER))]
         return {
             "labels": [f"{significance_label(cs)} from" for cs in SIGNIFICANCE_ORDER] +
                       [f"{significance_label(cs)} to" for cs in SIGNIFICANCE_ORDER],
             "node_colours": [ClinicalSignificance.chart_colour(cs) for cs in SIGNIFICANCE_ORDER] * 2,
+            "node_x": [0.01] * len(SIGNIFICANCE_ORDER) + [0.99] * len(SIGNIFICANCE_ORDER),
+            "node_y": rows * 2,
             "sources": sources,
             "targets": targets,
             "values": values,
             "link_colours": link_colours,
         }
+
+    @cached_property
+    def significance_matrix(self) -> list[SignificanceMatrixRow]:
+        counts = {(transition.from_clinical_significance, transition.to_clinical_significance): transition.count
+                  for transition in self.significance_transitions}
+        return [
+            SignificanceMatrixRow(
+                clinical_significance=from_cs,
+                cells=[SignificanceMatrixCell(count=counts.get((from_cs, to_cs), 0), is_self=from_cs == to_cs)
+                       for to_cs in SIGNIFICANCE_ORDER])
+            for from_cs in SIGNIFICANCE_ORDER
+        ]
+
+    @property
+    def significance_matrix_totals(self) -> list[int]:
+        return [sum(row.cells[index].count for row in self.significance_matrix)
+                for index in range(len(SIGNIFICANCE_ORDER))]
+
+    @property
+    def significance_matrix_total(self) -> int:
+        return sum(self.significance_matrix_totals)
 
     @staticmethod
     def _translucent(colour: str) -> str:
@@ -335,22 +352,6 @@ class ReclassificationAnalytics:
             "benign_colour": BENIGN_DIRECTION_COLOUR,
             "pathogenic_colour": PATHOGENIC_DIRECTION_COLOUR,
         }
-
-    @cached_property
-    def yearly_direction(self) -> list[YearlyDirection]:
-        benign_by_year = defaultdict(int)
-        pathogenic_by_year = defaultdict(int)
-        for row in self.reclassifications_qs \
-                .values('reclassified_date__year', 'significance_delta') \
-                .annotate(total=Count('pk')).order_by():
-            delta = row['significance_delta']
-            if not delta:
-                continue
-            by_year = benign_by_year if delta > 0 else pathogenic_by_year
-            by_year[row['reclassified_date__year']] += row['total']
-
-        return [YearlyDirection(year=year, benign=benign_by_year[year], pathogenic=pathogenic_by_year[year])
-                for year in sorted(set(benign_by_year) | set(pathogenic_by_year))]
 
     @staticmethod
     def _rolling_average(values: list[int], window: int = 12) -> list[Optional[float]]:
@@ -438,9 +439,10 @@ class ReclassificationAnalytics:
             cache.set(cache_key, counts, EVIDENCE_KEY_DIFF_CACHE_SECONDS)
 
         evidence_keys = EvidenceKeyMap.cached()
+        interesting = [(key, count) for key, count in counts if key not in EVIDENCE_KEYS_ALWAYS_CHANGED]
         return [
             EvidenceKeyChange(key=key, label=evidence_keys.get(key).pretty_label, count=count)
-            for key, count in counts[:TOP_EVIDENCE_KEY_COUNT]
+            for key, count in interesting[:TOP_EVIDENCE_KEY_COUNT]
         ]
 
     @staticmethod

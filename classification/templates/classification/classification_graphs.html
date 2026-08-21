@@ -110,6 +110,10 @@
 
         {% if user.is_superuser %}
             <div class="my-4">
+                <a class="d-block my-1" href="{% url 'classification_reclassification_analytics' %}"><i class="fas fa-chart-line"></i> Reclassification Analytics</a>
+            </div>
+
+            <div class="my-4">
                 <p class="text-info">Admin classification data downloads.</p>
                 <a class="download-link admin-only d-block my-1" href="{% url 'classification_accumulation_data' %}" class="hover-link download-link">Status over time Weekly (Classification Record)</a>
                 <a class="download-link admin-only d-block my-1" href="{% url 'classification_accumulation_data' %}?frequency=1" class="hover-link download-link">Status over time Daily (Classification Record)</a>
