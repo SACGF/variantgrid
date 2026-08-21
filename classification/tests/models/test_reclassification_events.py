@@ -22,7 +22,12 @@ from classification.models import (
 from classification.models import classification_flag_types
 from classification.tests.models.test_utils import ClassificationTestUtils
 from flags.models import Flag
-from classification.views.classification_reclassification_view import ReclassificationAnalytics
+from classification.views.classification_reclassification_view import (
+    OTHER_EVIDENCE_GROUP,
+    TOP_NON_CRITERIA_EVIDENCE_KEY_COUNT,
+    EvidenceMovement,
+    ReclassificationAnalytics,
+)
 
 
 class ReclassificationEventTestCase(TestCase):
@@ -318,6 +323,11 @@ class ReclassificationAnalyticsViewTestCase(TestCase):
         self.assertEqual({(2, 8, 1), (3, 9, 1)},
                          set(zip(flow["sources"], flow["targets"], flow["values"])))
 
+    def test_direction_totals_summarise_the_matrix(self):
+        analytics = self._analytics()
+        self.assertEqual((2, 0), (analytics.towards_benign, analytics.towards_pathogenic))
+        self.assertEqual(100.0, analytics.benign_share)
+
     def test_significance_matrix_is_square_and_in_significance_order(self):
         matrix = self._analytics().significance_matrix
         self.assertEqual(["P", "LP", "VUS", "LB", "B"], [row.label for row in matrix])
@@ -367,6 +377,22 @@ class ReclassificationAnalyticsViewTestCase(TestCase):
         analytics = self._analytics(lab=self.classification.lab_id)
         self.assertIn("acmg:pm2", {movement.key for movement in analytics.evidence_towards_benign})
 
+    def test_evidence_collapse_keeps_criteria_and_folds_the_quiet_keys(self):
+        def movement(key: str, changed: int, is_criteria: bool = False) -> EvidenceMovement:
+            return EvidenceMovement(key=key, label=key, applied=0, unapplied=0, strengthened=0,
+                                    weakened=0, changed=changed, is_criteria=is_criteria)
+
+        movements = [movement("pm2", 1, is_criteria=True)] + \
+                    [movement(f"key_{index}", 100 - index) for index in range(TOP_NON_CRITERIA_EVIDENCE_KEY_COUNT)] + \
+                    [movement("quiet_a", 2), movement("quiet_b", 3)]
+        rows, folded_count = ReclassificationAnalytics._collapse_evidence(movements)
+
+        self.assertEqual(2, folded_count)
+        self.assertEqual(TOP_NON_CRITERIA_EVIDENCE_KEY_COUNT + 2, len(rows))
+        self.assertEqual("pm2", rows[0].key)
+        self.assertEqual(OTHER_EVIDENCE_GROUP, rows[-1].key)
+        self.assertEqual(5, rows[-1].changed)
+
     @staticmethod
     def _counts(movement) -> tuple[int, int, int, int, int]:
         return (movement.applied, movement.unapplied, movement.strengthened, movement.weakened,
@@ -414,17 +440,15 @@ class ReclassificationSurvivalViewTestCase(TestCase):
     def test_the_cohort_is_everything_sitting_at_the_significance_on_the_origin_date(self):
         survival = self._analytics().survival
         self.assertEqual(2, survival.cohort_size)
-        self.assertEqual(4, survival.span_years)
+        self.assertEqual(4.5, survival.span_years)
 
-    def test_the_curve_steps_down_in_the_year_the_record_moved(self):
+    def test_the_curve_steps_down_in_the_six_months_the_record_moved(self):
         survival = self._analytics().survival
-        self.assertEqual([1.0, 1.0, 1.0, 0.5, 0.5], survival.reclassified.survival)
-        self.assertEqual(3, survival.reclassified.half_life_years)
+        # the mover went 3 years in, which is the sixth six month step
+        self.assertEqual([1.0, 1.0, 1.0, 1.0, 1.0, 0.5, 0.5, 0.5, 0.5, 0.5],
+                         survival.reclassified.survival)
+        self.assertEqual(2.5, survival.reclassified.half_life_years)
         self.assertEqual(50.0, survival.reclassified.ever_percent)
-
-    def test_the_resolved_records_split_by_direction(self):
-        survival = self._analytics().survival
-        self.assertEqual((1, 0), (survival.towards_benign, survival.towards_pathogenic))
 
     def test_a_withdrawn_record_leaves_the_curve_when_its_flag_went_up(self):
         self.stayer.set_withdrawn(user=self.admin, withdraw=True)
@@ -434,7 +458,8 @@ class ReclassificationSurvivalViewTestCase(TestCase):
 
         survival = self._analytics().survival
         # the record that left in year one is out of the risk set, so the mover is the whole cohort
-        self.assertEqual([1.0, 1.0, 1.0, 0.0, 0.0], survival.reclassified.survival)
+        self.assertEqual([1.0, 1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                         survival.reclassified.survival)
 
     def test_the_page_renders_the_survival_section(self):
         self.client.force_login(self.admin)

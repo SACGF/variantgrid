@@ -12,7 +12,7 @@ from dateutil.relativedelta import relativedelta
 from django.core.cache import cache
 from django.db import connection
 from django.db.models import Count, Min, OuterRef, QuerySet, Subquery
-from django.db.models.functions import ExtractYear, TruncMonth
+from django.db.models.functions import ExtractYear
 from django.http import HttpRequest
 from django.http.response import HttpResponseBase
 from django.shortcuts import render
@@ -48,17 +48,28 @@ BENIGN_DIRECTION_COLOUR = ClinicalSignificance.chart_colour(ClinicalSignificance
 PATHOGENIC_DIRECTION_COLOUR = ClinicalSignificance.chart_colour(ClinicalSignificance.PATHOGENIC)
 # counts that carry no benign/pathogenic meaning stay outside the significance language
 NEUTRAL_COUNT_COLOUR = "#6c757d"
+# the matrix shades by how busy a cell is, which is a different thing from significance, so it gets
+# its own single hue rather than borrowing the pill colours
+MATRIX_HEAT_COLOUR = "#4a6f8a"
 
 RECLASSIFICATION_PAGE_BUILD_LIMIT = 5000
 
 TOP_GENE_COUNT = 30
 EVIDENCE_MOVEMENT_CACHE_SECONDS = 60 * 60
-# the significance itself changes by definition, and the dates get stamped alongside it
-EVIDENCE_KEYS_ALWAYS_CHANGED = {
+# the significance itself changes by definition, the dates get stamped alongside it, and the report and
+# internal notes keys track a record's paperwork rather than the evidence behind the call
+EVIDENCE_KEYS_EXCLUDED = {
     SpecialEKeys.CLINICAL_SIGNIFICANCE,
     SpecialEKeys.CURATION_DATE,
     SpecialEKeys.CURATION_VERIFIED_DATE,
+    "internal_use",
+    "report_date",
+    "report_id",
+    "report_type",
 }
+# criteria always stand on their own, the busiest few other keys join them, and the tail folds into one row
+TOP_NON_CRITERIA_EVIDENCE_KEY_COUNT = 8
+OTHER_EVIDENCE_GROUP = "__other__"
 EVIDENCE_APPLIED_COLOUR = "#4a8f5b"
 EVIDENCE_UNAPPLIED_COLOUR = "#b5564e"
 EVIDENCE_STRENGTHENED_COLOUR = "#84b590"
@@ -72,6 +83,8 @@ CHANGE_COLOUR = "#a8743f"
 
 SURVIVAL_ORIGIN_YEARS_BACK = 5
 DAYS_PER_YEAR = 365.25
+# most records that move do it inside the first couple of years, so the life table steps every 6 months
+SURVIVAL_INTERVAL_YEARS = 0.5
 SERIAL_YEAR_CAP = 4
 
 # the days axis is logarithmic - most records move within a few months, and a year either side of the
@@ -204,10 +217,10 @@ class SurvivalCurve:
     censored: int
 
     @property
-    def half_life_years(self) -> Optional[int]:
-        for years, remaining in enumerate(self.survival):
+    def half_life_years(self) -> Optional[float]:
+        for interval, remaining in enumerate(self.survival):
             if remaining <= 0.5:
-                return years
+                return round(interval * SURVIVAL_INTERVAL_YEARS, 1)
         return None
 
     @property
@@ -252,11 +265,10 @@ class SurvivalAnalysis:
     origin: date
     window_end: date
     origin_significance: str
-    years: list[int]
+    intervals: list[float]
+    """ Years since the origin at each life table step """
     reviewed: SurvivalCurve
     reclassified: SurvivalCurve
-    towards_benign: int
-    towards_pathogenic: int
 
     @property
     def significance_label(self) -> str:
@@ -267,16 +279,8 @@ class SurvivalAnalysis:
         return ClinicalSignificance.css_class(self.origin_significance)
 
     @property
-    def span_years(self) -> int:
-        return self.years[-1] if self.years else 0
-
-    @property
-    def resolved(self) -> int:
-        return self.towards_benign + self.towards_pathogenic
-
-    @property
-    def benign_share(self) -> Optional[float]:
-        return round(100 * self.towards_benign / self.resolved, 1) if self.resolved else None
+    def span_years(self) -> float:
+        return self.intervals[-1] if self.intervals else 0
 
 
 @dataclass(frozen=True)
@@ -332,6 +336,11 @@ class EvidenceMovement:
     strengthened: int
     weakened: int
     changed: int
+    is_criteria: bool
+
+    @property
+    def total(self) -> int:
+        return self.applied + self.unapplied + self.strengthened + self.weakened + self.changed
 
 
 class ReclassificationAnalytics:
@@ -453,6 +462,13 @@ class ReclassificationAnalytics:
         return qs.order_by('organization__name', 'name')
 
     @cached_property
+    def selected_labs(self) -> list[Lab]:
+        """ The labs the organisation / lab / internal filters leave holding a timeline """
+        lab_ids = self.timeline_qs.values_list('lab', flat=True).distinct()
+        return list(Lab.objects.filter(pk__in=lab_ids).select_related('organization')
+                    .order_by('organization__name', 'name'))
+
+    @cached_property
     def organizations(self) -> QuerySet[Organization]:
         return Organization.objects.filter(active=True).order_by('name')
 
@@ -516,20 +532,46 @@ class ReclassificationAnalytics:
                 cells=[SignificanceMatrixCell(
                     count=counts.get((from_cs, to_cs), 0),
                     is_self=from_cs == to_cs,
-                    background=self._heat(counts.get((from_cs, to_cs), 0), busiest, from_cs, to_cs))
+                    background=self._heat(counts.get((from_cs, to_cs), 0), busiest))
                     for to_cs in SIGNIFICANCE_ORDER])
             for from_cs in SIGNIFICANCE_ORDER
         ]
 
     @staticmethod
-    def _heat(count: int, busiest: int, from_cs: str, to_cs: str) -> str:
+    def _heat(count: int, busiest: int) -> str:
         """ Square rooted so the quiet cells still read, and capped well short of the pill colours """
         if not count or not busiest:
             return ""
-        moved_benign = ClinicalSignificance.distance(from_cs, to_cs) or 0
-        colour = BENIGN_DIRECTION_COLOUR if moved_benign > 0 else PATHOGENIC_DIRECTION_COLOUR
-        alpha = round(0.06 + 0.34 * (count / busiest) ** 0.5, 3)
-        return ReclassificationAnalytics._translucent(colour, alpha)
+        alpha = round(0.06 + 0.44 * (count / busiest) ** 0.5, 3)
+        return ReclassificationAnalytics._translucent(MATRIX_HEAT_COLOUR, alpha)
+
+    @cached_property
+    def direction_totals(self) -> tuple[int, int]:
+        """ (towards benign, towards pathogenic) over every reclassification in the window """
+        towards_benign = 0
+        towards_pathogenic = 0
+        for transition in self.significance_transitions:
+            moved_benign = ClinicalSignificance.distance(transition.from_clinical_significance,
+                                                         transition.to_clinical_significance)
+            if moved_benign:
+                if moved_benign > 0:
+                    towards_benign += transition.count
+                else:
+                    towards_pathogenic += transition.count
+        return towards_benign, towards_pathogenic
+
+    @property
+    def towards_benign(self) -> int:
+        return self.direction_totals[0]
+
+    @property
+    def towards_pathogenic(self) -> int:
+        return self.direction_totals[1]
+
+    @property
+    def benign_share(self) -> Optional[float]:
+        moved = self.towards_benign + self.towards_pathogenic
+        return round(100 * self.towards_benign / moved, 1) if moved else None
 
     @property
     def significance_matrix_totals(self) -> list[int]:
@@ -548,46 +590,6 @@ class ReclassificationAnalytics:
             digits = "".join(digit * 2 for digit in digits)
         r, g, b = (int(digits[index:index + 2], 16) for index in (0, 2, 4))
         return f"rgba({r},{g},{b},{alpha})"
-
-    # -- 2. Trend over time ---------------------------------------------------------------------
-
-    @cached_property
-    def monthly_direction(self) -> dict[str, Any]:
-        benign_by_month = defaultdict(int)
-        pathogenic_by_month = defaultdict(int)
-        for row in self.reclassifications_qs \
-                .annotate(month=TruncMonth('reclassified_date')) \
-                .values('month', 'significance_delta') \
-                .annotate(total=Count('pk')).order_by('month'):
-            delta = row['significance_delta']
-            if delta is None or delta == 0:
-                continue
-            by_month = benign_by_month if delta > 0 else pathogenic_by_month
-            by_month[row['month']] += row['total']
-
-        months = sorted(set(benign_by_month) | set(pathogenic_by_month))
-        benign = [benign_by_month[month] for month in months]
-        pathogenic = [pathogenic_by_month[month] for month in months]
-
-        return {
-            "months": [month.isoformat() for month in months],
-            "benign": benign,
-            "pathogenic": pathogenic,
-            "benign_rolling": self._rolling_average(benign),
-            "pathogenic_rolling": self._rolling_average(pathogenic),
-            "benign_colour": BENIGN_DIRECTION_COLOUR,
-            "pathogenic_colour": PATHOGENIC_DIRECTION_COLOUR,
-        }
-
-    @staticmethod
-    def _rolling_average(values: list[int], window: int = 12) -> list[Optional[float]]:
-        averages: list[Optional[float]] = []
-        for index in range(len(values)):
-            if index + 1 < window:
-                averages.append(None)
-            else:
-                averages.append(round(sum(values[index + 1 - window:index + 1]) / window, 2))
-        return averages
 
     # -- 3. Re-evaluation against reclassification, year by year ---------------------------------
 
@@ -678,7 +680,8 @@ class ReclassificationAnalytics:
         if not observed_days:
             return None
 
-        grid = [round(year * DAYS_PER_YEAR) for year in range(int(span_days / DAYS_PER_YEAR) + 1)]
+        interval_days = DAYS_PER_YEAR * SURVIVAL_INTERVAL_YEARS
+        grid = [round(index * interval_days) for index in range(int(span_days / interval_days) + 1)]
 
         def members(event_dates: dict[int, date]) -> list[tuple[Optional[int], int]]:
             return [((event_dates[classification_id] - self.origin).days
@@ -693,14 +696,13 @@ class ReclassificationAnalytics:
         reviewed_members = members(first_review)
         reclassified_members = members({classification_id: moved_on for classification_id, (moved_on, _)
                                         in first_reclassification.items()})
-        directions = [delta for _, delta in first_reclassification.values() if delta]
 
         return SurvivalAnalysis(
             cohort_size=len(observed_days),
             origin=self.origin,
             window_end=self.window_end,
             origin_significance=self.origin_significance,
-            years=list(range(len(grid))),
+            intervals=[round(index * SURVIVAL_INTERVAL_YEARS, 1) for index in range(len(grid))],
             reviewed=SurvivalCurve(label="Not yet re-evaluated", event_label="Re-evaluated",
                                    colour=REVIEW_COLOUR,
                                    survival=self._life_table(reviewed_members, grid),
@@ -708,9 +710,7 @@ class ReclassificationAnalytics:
             reclassified=SurvivalCurve(label="Not yet reclassified", event_label="Reclassified",
                                        colour=CHANGE_COLOUR,
                                        survival=self._life_table(reclassified_members, grid),
-                                       events=len(first_reclassification), censored=len(withdrawn_on)),
-            towards_benign=len([delta for delta in directions if delta > 0]),
-            towards_pathogenic=len([delta for delta in directions if delta < 0]))
+                                       events=len(first_reclassification), censored=len(withdrawn_on)))
 
     @property
     def survival_summary(self) -> list[SurvivalCurve]:
@@ -916,7 +916,7 @@ class ReclassificationAnalytics:
         criteria_keys = {e_key.key for e_key in criteria}
         return criteria + [e_key for e_key in evidence_keys.all_keys
                            if e_key.key not in criteria_keys
-                           and e_key.key not in EVIDENCE_KEYS_ALWAYS_CHANGED]
+                           and e_key.key not in EVIDENCE_KEYS_EXCLUDED]
 
     @cached_property
     def criteria_keys(self) -> set[str]:
@@ -985,10 +985,31 @@ class ReclassificationAnalytics:
                     changed[group] += total
 
         moved = set(applied) | set(unapplied) | set(strengthened) | set(weakened) | set(changed)
+        criteria_groups = {self.evidence_group(key) for key in self.criteria_keys}
         return [EvidenceMovement(key=group, label=label, applied=applied[group], unapplied=unapplied[group],
                                  strengthened=strengthened[group], weakened=weakened[group],
-                                 changed=changed[group])
+                                 changed=changed[group], is_criteria=group in criteria_groups)
                 for group, label in self.evidence_group_order if group in moved]
+
+    @staticmethod
+    def _collapse_evidence(movements: list[EvidenceMovement]) -> tuple[list[EvidenceMovement], int]:
+        """ Criteria and the busiest few other keys keep their own row, the long tail folds into one """
+        others = sorted((movement for movement in movements if not movement.is_criteria),
+                        key=lambda movement: -movement.total)
+        kept = {movement.key for movement in others[:TOP_NON_CRITERIA_EVIDENCE_KEY_COUNT]}
+        folded = others[TOP_NON_CRITERIA_EVIDENCE_KEY_COUNT:]
+        rows = [movement for movement in movements if movement.is_criteria or movement.key in kept]
+        if folded:
+            rows.append(EvidenceMovement(
+                key=OTHER_EVIDENCE_GROUP,
+                label=f"Other ({len(folded)} keys)",
+                applied=sum(movement.applied for movement in folded),
+                unapplied=sum(movement.unapplied for movement in folded),
+                strengthened=sum(movement.strengthened for movement in folded),
+                weakened=sum(movement.weakened for movement in folded),
+                changed=sum(movement.changed for movement in folded),
+                is_criteria=False))
+        return rows, len(folded)
 
     @cached_property
     def _evidence_movement_counts(self) -> list[tuple[str, bool, Optional[str], Optional[str], int]]:
@@ -1096,14 +1117,11 @@ class ReclassificationAnalytics:
     def _survival_chart(self) -> dict[str, Any]:
         survival = self.survival
         if not survival:
-            return {"years": []}
+            return {"intervals": []}
         return {
-            "years": survival.years,
+            "intervals": survival.intervals,
             "curves": [{"label": curve.label, "colour": curve.colour, "survival": curve.survival}
                        for curve in (survival.reviewed, survival.reclassified)],
-            "resolution_labels": ["Towards benign", "Towards pathogenic"],
-            "resolution_counts": [survival.towards_benign, survival.towards_pathogenic],
-            "resolution_colours": [BENIGN_DIRECTION_COLOUR, PATHOGENIC_DIRECTION_COLOUR],
         }
 
     @property
@@ -1131,7 +1149,6 @@ class ReclassificationAnalytics:
         """ Everything the plotly calls need, in one JSON blob """
         return {
             "flow": self.significance_flow,
-            "monthly": self.monthly_direction,
             "activity": self._activity_chart,
             "survival": self._survival_chart,
             "labs": self._lab_chart,
@@ -1147,20 +1164,31 @@ class ReclassificationAnalytics:
             "evidence_towards_benign": self._evidence_chart(self.evidence_towards_benign),
         }
 
-    @staticmethod
-    def _evidence_chart(movements: list[EvidenceMovement]) -> dict[str, Any]:
+    def _evidence_chart(self, movements: list[EvidenceMovement]) -> dict[str, Any]:
+        """ The collapsed rows are what's drawn, the expanded rows are what the other row opens up to """
+        collapsed, folded_count = self._collapse_evidence(movements)
         return {
+            "collapsed": self._evidence_series(collapsed),
+            "expanded": self._evidence_series(movements),
+            "other_key": OTHER_EVIDENCE_GROUP,
+            "folded_count": folded_count,
+            "applied_colour": EVIDENCE_APPLIED_COLOUR,
+            "unapplied_colour": EVIDENCE_UNAPPLIED_COLOUR,
+            "strengthened_colour": EVIDENCE_STRENGTHENED_COLOUR,
+            "weakened_colour": EVIDENCE_WEAKENED_COLOUR,
+            "changed_colour": EVIDENCE_CHANGED_COLOUR,
+        }
+
+    @staticmethod
+    def _evidence_series(movements: list[EvidenceMovement]) -> dict[str, Any]:
+        return {
+            "keys": [movement.key for movement in movements],
             "labels": [movement.label for movement in movements],
             "applied": [movement.applied for movement in movements],
             "unapplied": [-movement.unapplied for movement in movements],
             "strengthened": [movement.strengthened for movement in movements],
             "weakened": [-movement.weakened for movement in movements],
             "changed": [movement.changed for movement in movements],
-            "applied_colour": EVIDENCE_APPLIED_COLOUR,
-            "unapplied_colour": EVIDENCE_UNAPPLIED_COLOUR,
-            "strengthened_colour": EVIDENCE_STRENGTHENED_COLOUR,
-            "weakened_colour": EVIDENCE_WEAKENED_COLOUR,
-            "changed_colour": EVIDENCE_CHANGED_COLOUR,
         }
 
     @property
