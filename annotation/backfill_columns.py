@@ -86,6 +86,7 @@ def _version_column_defs(variant_annotation_version: VariantAnnotationVersion) -
         genome_build_name=variant_annotation_version.genome_build.name,
         columns_version=variant_annotation_version.columns_version,
         vep_version=variant_annotation_version.vep,
+        cosmic_version=variant_annotation_version.cosmic,
         gnomad4_minor_version=variant_annotation_version.gnomad,
     )
 

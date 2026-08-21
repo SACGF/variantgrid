@@ -25,6 +25,7 @@ from library.django_utils.django_partition import temporary_db_table
 from snpdb.models import GenomeBuild
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
 
+COSMIC_V99 = 99
 COSMIC_V101_SAMPLE_COUNT = "GENOME_SCREEN_SAMPLE_COUNT"
 
 
@@ -35,12 +36,13 @@ class BackfillColumnResolutionTests(TestCase):
         super().setUpTestData()
         cls.genome_build = GenomeBuild.get_name_or_alias("GRCh37")
         kwargs = get_fake_vep_version(cls.genome_build, AnnotationConsortium.ENSEMBL, 3)
+        kwargs["cosmic"] = COSMIC_V99
         cls.vav = VariantAnnotationVersion.objects.create(**kwargs,
                                                           status=VariantAnnotationVersion.Status.ACTIVE)
 
     def test_registry_supplies_source_field_and_formatter(self):
         target, = resolve_backfill_columns(self.vav, ["cosmic_count"])
-        # columns_version 3 reads COSMIC's v99 SAMPLE_COUNT, under the --custom label prefix
+        # COSMIC v99 writes the count as SAMPLE_COUNT, under the --custom label prefix
         self.assertEqual(target.source_field, "COSMIC_SAMPLE_COUNT")
         self.assertFalse(target.from_csq)
         self.assertEqual(target.formatter, format_pick_highest_int)
