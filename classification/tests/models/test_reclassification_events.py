@@ -1,3 +1,5 @@
+from datetime import date, datetime, timezone
+
 from django.contrib.auth.models import User
 from django.test import RequestFactory, TestCase
 from django.urls import reverse
@@ -7,6 +9,7 @@ from classification.enums import (
     AlleleOriginBucket,
     ClinicalSignificance,
     LabExternalFilter,
+    ReclassificationEventType,
     SpecialEKeys,
     SubmissionSource,
 )
@@ -16,7 +19,9 @@ from classification.models import (
     ReclassificationEventBuilder,
     ReclassificationEventBuildState,
 )
+from classification.models import classification_flag_types
 from classification.tests.models.test_utils import ClassificationTestUtils
+from flags.models import Flag
 from classification.views.classification_reclassification_view import ReclassificationAnalytics
 
 
@@ -139,6 +144,85 @@ class ReclassificationEventTestCase(TestCase):
                           ClinicalSignificance.VUS],
                          [event.to_clinical_significance for event in self._timeline()])
 
+    def _curated_on(self, curation_date: str):
+        self._patch_and_publish({SpecialEKeys.CURATION_DATE: {'value': curation_date}})
+
+    def test_the_first_curation_date_only_sets_the_baseline(self):
+        self._significance('VUS')
+        self._curated_on('2020-01-01')
+        ReclassificationEventBuilder.bring_up_to_date()
+
+        self.assertEqual([ReclassificationEventType.INITIAL],
+                         [event.event_type for event in self._timeline()])
+
+    def test_curation_date_advancing_records_a_reevaluation(self):
+        self._patch_and_publish({SpecialEKeys.CLINICAL_SIGNIFICANCE: {'value': 'VUS'},
+                                 SpecialEKeys.CURATION_DATE: {'value': '2020-01-01'}})
+        self._curated_on('2021-06-01')
+        ReclassificationEventBuilder.bring_up_to_date()
+
+        events = self._timeline()
+        self.assertEqual([ReclassificationEventType.INITIAL, ReclassificationEventType.REEVALUATION],
+                         [event.event_type for event in events])
+        reevaluation = events[1]
+        self.assertEqual(ClinicalSignificance.VUS, reevaluation.from_clinical_significance)
+        self.assertEqual(ClinicalSignificance.VUS, reevaluation.to_clinical_significance)
+        self.assertEqual(0, reevaluation.significance_delta)
+        self.assertFalse(reevaluation.is_reclassification)
+
+    def test_the_verified_date_counts_as_a_review(self):
+        self._patch_and_publish({SpecialEKeys.CLINICAL_SIGNIFICANCE: {'value': 'VUS'},
+                                 SpecialEKeys.CURATION_DATE: {'value': '2020-01-01'}})
+        self._patch_and_publish({SpecialEKeys.CURATION_VERIFIED_DATE: {'value': '2022-03-04'}})
+        ReclassificationEventBuilder.bring_up_to_date()
+
+        self.assertEqual([ReclassificationEventType.INITIAL, ReclassificationEventType.REEVALUATION],
+                         [event.event_type for event in self._timeline()])
+
+    def test_a_curation_date_going_backwards_is_not_a_review(self):
+        self._patch_and_publish({SpecialEKeys.CLINICAL_SIGNIFICANCE: {'value': 'VUS'},
+                                 SpecialEKeys.CURATION_DATE: {'value': '2021-01-01'}})
+        self._curated_on('2019-01-01')
+        ReclassificationEventBuilder.bring_up_to_date()
+
+        self.assertEqual([ReclassificationEventType.INITIAL],
+                         [event.event_type for event in self._timeline()])
+
+    def test_a_reclassification_carries_its_own_review_rather_than_two_rows(self):
+        self._patch_and_publish({SpecialEKeys.CLINICAL_SIGNIFICANCE: {'value': 'VUS'},
+                                 SpecialEKeys.CURATION_DATE: {'value': '2020-01-01'}})
+        self._patch_and_publish({SpecialEKeys.CLINICAL_SIGNIFICANCE: {'value': 'LB'},
+                                 SpecialEKeys.CURATION_DATE: {'value': '2022-02-02'}})
+        ReclassificationEventBuilder.bring_up_to_date()
+
+        self.assertEqual([ReclassificationEventType.INITIAL, ReclassificationEventType.RECLASSIFICATION],
+                         [event.event_type for event in self._timeline()])
+
+    def test_a_reevaluation_carries_the_significance_forward(self):
+        self._patch_and_publish({SpecialEKeys.CLINICAL_SIGNIFICANCE: {'value': 'VUS'},
+                                 SpecialEKeys.CURATION_DATE: {'value': '2020-01-01'}})
+        self._curated_on('2021-06-01')
+        ReclassificationEventBuilder.bring_up_to_date()
+
+        latest = list(ReclassificationEvent.latest_state_qs())
+        self.assertEqual(ClinicalSignificance.VUS, latest[0].to_clinical_significance)
+        self.assertFalse(ReclassificationEvent.reclassifications_qs().exists())
+        self.assertEqual(1, ReclassificationEvent.reviews_qs().count())
+
+    def test_lab_activity_handles_a_lab_that_reviews_but_never_reclassifies(self):
+        self._patch_and_publish({SpecialEKeys.CLINICAL_SIGNIFICANCE: {'value': 'VUS'},
+                                 SpecialEKeys.CURATION_DATE: {'value': '2020-01-01'}})
+        self._curated_on('2021-06-01')
+        ReclassificationEventBuilder.bring_up_to_date()
+
+        analytics = ReclassificationAnalytics(
+            organization=None, lab=None, date_from=None, date_to=None,
+            lab_external=LabExternalFilter.ALL, origin=None,
+            origin_significance=ClinicalSignificance.VUS)
+        rows = analytics.lab_activity
+        self.assertEqual([(1, 1, 0)], [(row.held, row.reviewed, row.reclassified) for row in rows])
+        self.assertEqual(1, analytics.labs_with_no_reclassification)
+
     def test_a_record_that_turns_somatic_drops_its_timeline(self):
         self._significance('VUS')
         ReclassificationEventBuilder.bring_up_to_date()
@@ -246,27 +330,148 @@ class ReclassificationAnalyticsViewTestCase(TestCase):
         self.assertEqual(["VUS", "LB"], [d.label for d in distributions])
         self.assertEqual([1, 1], [d.count for d in distributions])
 
-    def test_vus_rate_counts_the_population_at_the_start_of_the_year(self):
+    def test_yearly_activity_counts_the_population_at_the_start_of_the_year(self):
         # everything happened today, so the year opened with nothing in the timeline to be a denominator
-        rates = self._analytics().vus_rates
-        self.assertEqual([localdate().year], [rate.year for rate in rates])
-        self.assertEqual(1, rates[0].reclassified)
-        self.assertEqual(0, rates[0].population)
-        self.assertIsNone(rates[0].percent)
+        activity = self._analytics().yearly_activity
+        self.assertEqual([localdate().year], [year.year for year in activity])
+        self.assertEqual(1, activity[0].reclassified)
+        self.assertEqual(0, activity[0].population)
+        self.assertIsNone(activity[0].reclassified_percent)
+
+    def test_lab_activity_measures_each_lab_on_what_it_holds(self):
+        rows = self._analytics().lab_activity
+        self.assertEqual(1, len(rows))
+        self.assertEqual(1, rows[0].held)
+        self.assertEqual(1, rows[0].reclassified)
+        self.assertEqual(0, self._analytics().labs_with_no_reclassification)
+
+    def test_points_transitions_read_the_criteria_totals_off_the_event(self):
+        transitions = {transition.label: transition for transition in self._analytics().points_transitions}
+        # pm2 comes off and bp4 goes on, so the record travels from +2 points to -1
+        self.assertEqual([-3], transitions["VUS \u2192 LB"].deltas)
 
     def test_evidence_movement_splits_criteria_on_off_from_plain_changes(self):
         analytics = self._analytics()
         movements = {movement.key: movement for movement in analytics.evidence_towards_benign}
-        self.assertEqual((0, 1, 0), self._counts(movements["acmg:pm2"]))
-        self.assertEqual((1, 0, 0), self._counts(movements["acmg:bp4"]))
-        self.assertEqual((0, 0, 1), self._counts(movements[SpecialEKeys.LITERATURE]))
+        self.assertEqual((0, 1, 0, 0, 0), self._counts(movements["pm2"]))
+        self.assertEqual((1, 0, 0, 0, 0), self._counts(movements["bp4"]))
+        self.assertEqual((0, 0, 0, 0, 1), self._counts(movements[SpecialEKeys.LITERATURE]))
         self.assertNotIn(SpecialEKeys.CLINICAL_SIGNIFICANCE, movements)
         # criteria lead, in ACMG strength order
-        self.assertEqual(["acmg:pm2", "acmg:bp4"],
+        self.assertEqual(["pm2", "bp4"],
                          [movement.key for movement in analytics.evidence_towards_benign
-                          if movement.key.startswith("acmg:")])
+                          if movement.key in {"pm2", "bp4"}])
         self.assertEqual([], analytics.evidence_towards_pathogenic)
 
+    def test_evidence_movement_keeps_namespaced_keys_for_a_single_lab(self):
+        analytics = self._analytics(lab=self.classification.lab_id)
+        self.assertIn("acmg:pm2", {movement.key for movement in analytics.evidence_towards_benign})
+
     @staticmethod
-    def _counts(movement) -> tuple[int, int, int]:
-        return movement.applied, movement.unapplied, movement.changed
+    def _counts(movement) -> tuple[int, int, int, int, int]:
+        return (movement.applied, movement.unapplied, movement.strengthened, movement.weakened,
+                movement.changed)
+
+
+class ReclassificationSurvivalViewTestCase(TestCase):
+    """ The cohort and censoring queries need events spread over years, so the dates are pushed back """
+
+    ORIGIN = date(2019, 1, 1)
+    WINDOW_END = date(2024, 1, 1)
+
+    @classmethod
+    def setUpTestData(cls):
+        ClassificationTestUtils.setUp()
+        lab, user = ClassificationTestUtils.lab_and_user()
+        cls.admin = User.objects.create_superuser("survival_admin", "survival@test.com", "password")
+
+        def create(significances: list[str]) -> Classification:
+            classification = Classification.create(
+                user=user, lab=lab, lab_record_id=None,
+                data={SpecialEKeys.C_HGVS: {'value': 'c.301A>C'}},
+                save=True, source=SubmissionSource.API, make_fields_immutable=False)
+            for significance in significances:
+                classification.patch_value(
+                    patch={SpecialEKeys.CLINICAL_SIGNIFICANCE: {'value': significance}},
+                    clear_all_fields=False, user=user, source=SubmissionSource.API, save=True)
+                classification.publish_latest(user=user)
+            return classification
+
+        cls.mover = create(['VUS', 'LB'])
+        cls.stayer = create(['VUS'])
+        ReclassificationEventBuilder.bring_up_to_date()
+        ReclassificationEvent.objects.update(reclassified_date=date(2018, 1, 1))
+        ReclassificationEvent.objects.filter(classification=cls.mover, step=2) \
+            .update(reclassified_date=date(2021, 1, 1))
+
+    def _analytics(self, **params) -> ReclassificationAnalytics:
+        params.setdefault('origin', self.ORIGIN.isoformat())
+        params.setdefault('date_to', self.WINDOW_END.isoformat())
+        request = RequestFactory().get(reverse('classification_reclassification_analytics'), params)
+        request.user = self.admin
+        return ReclassificationAnalytics.from_request(request)
+
+    def test_the_cohort_is_everything_sitting_at_the_significance_on_the_origin_date(self):
+        survival = self._analytics().survival
+        self.assertEqual(2, survival.cohort_size)
+        self.assertEqual(4, survival.span_years)
+
+    def test_the_curve_steps_down_in_the_year_the_record_moved(self):
+        survival = self._analytics().survival
+        self.assertEqual([1.0, 1.0, 1.0, 0.5, 0.5], survival.reclassified.survival)
+        self.assertEqual(3, survival.reclassified.half_life_years)
+        self.assertEqual(50.0, survival.reclassified.ever_percent)
+
+    def test_the_resolved_records_split_by_direction(self):
+        survival = self._analytics().survival
+        self.assertEqual((1, 0), (survival.towards_benign, survival.towards_pathogenic))
+
+    def test_a_withdrawn_record_leaves_the_curve_when_its_flag_went_up(self):
+        self.stayer.set_withdrawn(user=self.admin, withdraw=True)
+        Flag.objects.filter(collection_id=self.stayer.flag_collection_id,
+                            flag_type=classification_flag_types.classification_withdrawn) \
+            .update(created=datetime(2020, 1, 1, tzinfo=timezone.utc))
+
+        survival = self._analytics().survival
+        # the record that left in year one is out of the risk set, so the mover is the whole cohort
+        self.assertEqual([1.0, 1.0, 1.0, 0.0, 0.0], survival.reclassified.survival)
+
+    def test_the_page_renders_the_survival_section(self):
+        self.client.force_login(self.admin)
+        response = self.client.get(reverse('classification_reclassification_analytics'),
+                                   {'origin': self.ORIGIN.isoformat(),
+                                    'date_to': self.WINDOW_END.isoformat()})
+        self.assertEqual(200, response.status_code)
+        self.assertContains(response, "Waiting for a Second Look")
+
+
+class SurvivalMathsTestCase(TestCase):
+    """ The life table and the Lorenz curve are ours rather than a library's """
+
+    GRID = [0, 365, 730]
+
+    def test_a_cohort_with_no_events_never_drops(self):
+        members = [(None, 730)] * 10
+        self.assertEqual([1.0, 1.0, 1.0], ReclassificationAnalytics._life_table(members, self.GRID))
+
+    def test_events_in_the_first_year_drop_the_curve_and_it_stays_there(self):
+        members = [(100, 730)] * 5 + [(None, 730)] * 5
+        self.assertEqual([1.0, 0.5, 0.5], ReclassificationAnalytics._life_table(members, self.GRID))
+
+    def test_a_record_leaving_observation_counts_as_half_exposed_in_its_interval(self):
+        members = [(100, 730)] * 4 + [(None, 200)] * 2 + [(None, 730)] * 4
+        survival = ReclassificationAnalytics._life_table(members, self.GRID)
+        self.assertEqual(round(1 - 4 / 9, 4), survival[1])
+
+    def test_an_event_after_the_record_left_observation_is_censored_instead(self):
+        members = [(700, 100)] * 10
+        self.assertEqual([1.0, 1.0, 1.0], ReclassificationAnalytics._life_table(members, self.GRID))
+
+    def test_gini_is_zero_when_every_lab_does_the_same_amount(self):
+        self.assertEqual(0.0, ReclassificationAnalytics._lorenz([5, 5, 5, 5])["gini"])
+
+    def test_gini_rises_as_the_work_concentrates(self):
+        self.assertEqual(0.75, ReclassificationAnalytics._lorenz([0, 0, 0, 10])["gini"])
+
+    def test_nothing_to_share_out_has_no_gini(self):
+        self.assertIsNone(ReclassificationAnalytics._lorenz([0, 0])["gini"])
