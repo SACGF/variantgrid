@@ -111,12 +111,17 @@
         </ul>
     </div>
 
-    {% if build_result.in_progress %}
+    {% if build_result.building %}
+        <p class="text-info">
+            Timelines are being built right now, so the charts below cover only part of the catalogue -
+            refresh for the rest.
+        </p>
+    {% elif build_result.outstanding %}
         {% with progress=build_result.progress %}
             <p class="text-info">
                 Timelines are being built - {{ progress.built | number }} of
                 {{ progress.tracked | number }} records done ({{ progress.percent }}%),
-                {{ progress.remaining | number }} to go. The charts below cover the records built so far,
+                {{ progress.outstanding | number }} to go. The charts below cover the records built so far,
                 so refresh for the rest.
             </p>
         {% endwith %}
