@@ -11,8 +11,7 @@ from django.conf import settings
 from library.date_utils import get_month_and_year, get_months_since, month_range
 from seqauto.models import SequencingSample, SequencingRun
 
-# YYMMDD - month/day must be valid, so placeholder names like "000000_M01234_..." aren't read as dates
-SEQUENCING_RUN_DATE_PATTERN = re.compile(r"^(\d{2}(?:0[1-9]|1[0-2]))(?:0[1-9]|[12]\d|3[01])[_-]")
+SEQUENCING_RUN_DATE_PATTERN = re.compile(r"^(\d{4})\d{2}[_-]")
 
 
 def get_sequencing_run_yymm(sequencing_run_name) -> Optional[str]:
@@ -41,11 +40,17 @@ def get_sample_enrichment_kits_df():
     years = {}
     year_months = {}
     for i, sequencing_run_name in df[SEQUENCING_RUN_COL].items():
-        if yymm := get_sequencing_run_yymm(sequencing_run_name):
-            years[i] = int(yymm[:2])
-            year_months[i] = int(yymm)
-        else:
+        yymm = get_sequencing_run_yymm(sequencing_run_name)
+        if yymm is None:
             logging.warning("Skipping sequencing run %s - no YYMMDD date at start of name", sequencing_run_name)
+            continue
+        try:
+            get_month_and_year(yymm)
+        except ValueError as ve:
+            logging.warning("Skipping sequencing run %s - %s", sequencing_run_name, ve)
+            continue
+        years[i] = int(yymm[:2])
+        year_months[i] = int(yymm)
 
     # Only keep rows we could date, so callers always see year/year_month/month_offset columns
     df = df.loc[list(year_months)].copy()
