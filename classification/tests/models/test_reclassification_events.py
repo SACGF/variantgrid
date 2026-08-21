@@ -228,12 +228,19 @@ class ReclassificationAnalyticsViewTestCase(TestCase):
     def test_significance_flow_moves_towards_benign(self):
         flow = self._analytics().significance_flow
         # sources are the first five node indexes, targets the next five - VUS -> LB then LB -> B
-        self.assertEqual({(2, 6, 1), (1, 5, 1)},
+        self.assertEqual({(2, 8, 1), (3, 9, 1)},
                          set(zip(flow["sources"], flow["targets"], flow["values"])))
+
+    def test_significance_matrix_is_square_and_in_significance_order(self):
+        matrix = self._analytics().significance_matrix
+        self.assertEqual(["P", "LP", "VUS", "LB", "B"], [row.label for row in matrix])
+        vus_row = matrix[2]
+        self.assertEqual([0, 0, 0, 1, 0], [cell.count for cell in vus_row.cells])
+        self.assertTrue(vus_row.cells[2].is_self)
 
     def test_time_to_reclassification_series_per_starting_significance(self):
         distributions = self._analytics().time_to_reclassification
-        self.assertEqual(["LB", "VUS"], [d.label for d in distributions])
+        self.assertEqual(["VUS", "LB"], [d.label for d in distributions])
         self.assertEqual([1, 1], [d.count for d in distributions])
 
     def test_vus_rate_counts_the_population_at_the_start_of_the_year(self):
@@ -243,10 +250,10 @@ class ReclassificationAnalyticsViewTestCase(TestCase):
         self.assertEqual(1, rates[0].reclassified)
         self.assertEqual(0, rates[0].population)
         self.assertIsNone(rates[0].percent)
-        self.assertEqual("-", rates[0].percent_display)
 
     def test_evidence_key_diff_finds_the_keys_that_changed(self):
         changed = {change.key for change in self._analytics().evidence_key_changes}
-        self.assertIn(SpecialEKeys.CLINICAL_SIGNIFICANCE, changed)
         self.assertIn(SpecialEKeys.LITERATURE, changed)
+        # the significance moving is what defines the event, so it tells us nothing about why
+        self.assertNotIn(SpecialEKeys.CLINICAL_SIGNIFICANCE, changed)
         self.assertNotIn(SpecialEKeys.C_HGVS, changed)

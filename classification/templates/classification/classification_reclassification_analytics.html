@@ -18,6 +18,9 @@
     .reclassification-analytics table.summary td.numeric, .reclassification-analytics table.summary th.numeric {
         text-align: right;
     }
+    .reclassification-analytics table.matrix th, .reclassification-analytics table.matrix td {
+        min-width: 90px;
+    }
 </style>
 
 <div class="container-table reclassification-analytics">
@@ -127,17 +130,38 @@
     <p class="text-muted">Every reclassification, from the significance it left to the significance it landed on.</p>
     {% if analytics.reclassification_count %}
         <div id="significance-flow" class="chart"></div>
-        <table class="table table-sm summary">
-            <thead><tr><th>From</th><th>To</th><th class="numeric">Reclassifications</th></tr></thead>
+        <table class="table table-sm summary matrix w-auto">
+            <thead>
+                <tr>
+                    <th class="text-muted">From \ To</th>
+                    {% for entry in analytics.significance_legend %}
+                        <th class="numeric"><span class="c-pill {{ entry.css_class }}">{{ entry.label }}</span></th>
+                    {% endfor %}
+                    <th class="numeric">Total</th>
+                </tr>
+            </thead>
             <tbody>
-                {% for transition in analytics.significance_transitions %}
+                {% for row in analytics.significance_matrix %}
                     <tr>
-                        <td><span class="c-pill {{ transition.from_css_class }}">{{ transition.from_label }}</span></td>
-                        <td><span class="c-pill {{ transition.to_css_class }}">{{ transition.to_label }}</span></td>
-                        <td class="numeric">{{ transition.count | number:'S' }}</td>
+                        <th><span class="c-pill {{ row.css_class }}">{{ row.label }}</span></th>
+                        {% for cell in row.cells %}
+                            <td class="numeric {% if cell.is_self %}table-active{% endif %}">
+                                {% if cell.count %}{{ cell.count | number:'S' }}{% else %}<span class="no-value">-</span>{% endif %}
+                            </td>
+                        {% endfor %}
+                        <td class="numeric">{{ row.total | number:'S' }}</td>
                     </tr>
                 {% endfor %}
             </tbody>
+            <tfoot>
+                <tr>
+                    <th>Total</th>
+                    {% for total in analytics.significance_matrix_totals %}
+                        <td class="numeric">{{ total | number:'S' }}</td>
+                    {% endfor %}
+                    <td class="numeric">{{ analytics.significance_matrix_total | number:'S' }}</td>
+                </tr>
+            </tfoot>
         </table>
     {% else %}
         <p class="no-value">No reclassifications match these filters.</p>
@@ -147,21 +171,6 @@
     <p class="text-muted">Records that left VUS during the year, over the number sitting at VUS when the year began.</p>
     {% if analytics.vus_rates %}
         <div id="vus-rate" class="chart"></div>
-        <table class="table table-sm summary">
-            <thead>
-                <tr><th>Year</th><th class="numeric">VUS at start of year</th><th class="numeric">Reclassified</th><th class="numeric">Rate</th></tr>
-            </thead>
-            <tbody>
-                {% for rate in analytics.vus_rates %}
-                    <tr>
-                        <td>{{ rate.year }}</td>
-                        <td class="numeric">{{ rate.population | number:'S' }}</td>
-                        <td class="numeric">{{ rate.reclassified | number:'S' }}</td>
-                        <td class="numeric">{{ rate.percent_display }}</td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        </table>
     {% else %}
         <p class="no-value">No VUS timeline to report on with these filters.</p>
     {% endif %}
@@ -170,18 +179,6 @@
     <p class="text-muted">Reclassifications each month, split by whether they moved towards benign or towards pathogenic, with a 12 month rolling average.</p>
     {% if analytics.reclassification_count %}
         <div id="direction-trend" class="chart"></div>
-        <table class="table table-sm summary">
-            <thead><tr><th>Year</th><th class="numeric">Towards benign</th><th class="numeric">Towards pathogenic</th></tr></thead>
-            <tbody>
-                {% for year in analytics.yearly_direction %}
-                    <tr>
-                        <td>{{ year.year }}</td>
-                        <td class="numeric">{{ year.benign | number:'S' }}</td>
-                        <td class="numeric">{{ year.pathogenic | number:'S' }}</td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        </table>
     {% else %}
         <p class="no-value">No reclassifications match these filters.</p>
     {% endif %}
@@ -190,21 +187,6 @@
     <p class="text-muted">Records currently sitting at VUS, by gene, and what share of that gene's records they are.</p>
     {% if analytics.gene_burden %}
         <div id="gene-burden" class="chart"></div>
-        <table class="table table-sm summary">
-            <thead>
-                <tr><th>Gene</th><th class="numeric">VUS</th><th class="numeric">All records</th><th class="numeric">VUS share</th></tr>
-            </thead>
-            <tbody>
-                {% for burden in analytics.gene_burden %}
-                    <tr>
-                        <td><a class="hover-link" href="{% url 'view_gene_symbol' burden.gene_symbol %}">{{ burden.gene_symbol }}</a></td>
-                        <td class="numeric"><span class="c-pill {{ burden.css_class }}">{{ burden.vus_count | number:'S' }}</span></td>
-                        <td class="numeric">{{ burden.total_count | number:'S' }}</td>
-                        <td class="numeric">{{ burden.percent }}%</td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        </table>
     {% else %}
         <p class="no-value">No gene symbols resolved for these records.</p>
     {% endif %}
@@ -213,14 +195,6 @@
     <p class="text-muted">Which fields changed in the edit that moved the significance.</p>
     {% if analytics.evidence_key_changes %}
         <div id="evidence-keys" class="chart"></div>
-        <table class="table table-sm summary">
-            <thead><tr><th>Evidence Key</th><th class="numeric">Reclassifications where it changed</th></tr></thead>
-            <tbody>
-                {% for change in analytics.evidence_key_changes %}
-                    <tr><td>{{ change.label }}</td><td class="numeric">{{ change.count | number:'S' }}</td></tr>
-                {% endfor %}
-            </tbody>
-        </table>
     {% else %}
         <p class="no-value">No evidence to diff for these filters.</p>
     {% endif %}
@@ -278,9 +252,12 @@
         Plotly.newPlot('significance-flow', [{
             type: 'sankey',
             orientation: 'h',
+            arrangement: 'snap',
             node: {
                 label: flow.labels,
                 color: flow.node_colours,
+                x: flow.node_x,
+                y: flow.node_y,
                 pad: 18,
                 thickness: 16,
                 line: {color: "#fcfcfb", width: 2}
