@@ -58,6 +58,7 @@ from upload.upload_metadata import (
 )
 
 UPLOADED_FILE_CONTEXT = {UploadedFileTypes.VCF: "uploaded_vcf",
+                         UploadedFileTypes.DRAGEN_TSO500_ALL_FUSIONS: "uploaded_vcf",
                          UploadedFileTypes.GENE_LIST: "uploaded_gene_list"}
 
 

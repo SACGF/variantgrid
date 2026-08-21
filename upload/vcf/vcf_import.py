@@ -278,12 +278,20 @@ def _get_file_upload(vcf) -> Optional[FileUpload]:
         return None
 
 
-def resolve_genome_build(vcf_reader, file_upload) -> Optional[GenomeBuild]:
-    """ Header detection first, then whatever the submitter declared at upload.
+def get_vcf_source(vcf_reader, file_upload) -> str:
+    """ A client-declared source wins over '##source' - it's the only way to reach a file that declares
+        none. The header text stays in vcf.header either way """
+    return get_metadata_source(file_upload) or cyvcf2_header_get(vcf_reader, "source", "")
 
-        Where both are present and disagree we fail rather than pick a winner - differing contigs mean
-        the coordinates aren't what the submitter thinks they are. Returns None if nothing resolves,
-        which the caller turns into REQUIRES_USER_INPUT. """
+
+def resolve_genome_build(vcf_reader, file_upload) -> Optional[GenomeBuild]:
+    """ Header detection first, then whatever the submitter declared at upload, then the build the
+        VCF's source is called against (@see VCFSourceSettings) - which is how a file whose header has
+        no contigs to detect from gets one, eg gene-level variants written from a fusion caller's csv.
+
+        Where detected and declared are both present and disagree we fail rather than pick a winner -
+        differing contigs mean the coordinates aren't what the submitter thinks they are. Returns None
+        if nothing resolves, which the caller turns into REQUIRES_USER_INPUT. """
 
     detected_genome_build = None
     try:
@@ -299,6 +307,10 @@ def resolve_genome_build(vcf_reader, file_upload) -> Optional[GenomeBuild]:
 
     if genome_build := detected_genome_build or declared_genome_build:
         return genome_build
+
+    for vss in VCFSourceSettings.get_for_source(get_vcf_source(vcf_reader, file_upload)):
+        if vss.genome_build:
+            return vss.genome_build
 
     # Nothing to disambiguate on a single-build server - same fallback ImportBedFileTask already applies
     genome_builds = list(GenomeBuild.builds_with_annotation())
@@ -324,9 +336,7 @@ def configure_vcf_from_header(vcf, vcf_reader):
     create_vcf_filters(vcf, header_types.get("FILTER", {}))
     create_vcf_format(vcf, header_types.get("FORMAT", {}))
     vcf_formats = set(header_types["FORMAT"])
-    # A client-declared source wins over '##source' - it's the only way to reach a file that declares
-    # none. The header text stays in vcf.header either way
-    source = get_metadata_source(_get_file_upload(vcf)) or cyvcf2_header_get(vcf_reader, "source", "")
+    source = get_vcf_source(vcf_reader, _get_file_upload(vcf))
     vcf.source = source
     if vcf.genotype_samples:  # Has sample format fields
         set_allele_depth_format_fields(vcf, vcf_formats, source, VCFConstant.DEFAULT_ALLELE_FIELD)
@@ -363,14 +373,12 @@ def configure_vcf_from_header(vcf, vcf_reader):
 
 
 def handle_vcf_source(vcf):
-    if vcf.source:
-        for vss in VCFSourceSettings.objects.all():
-            if re.match(vss.source_regex, vcf.source):
-                vcf.sample_set.all().update(variants_type=vss.sample_variants_type)
-                vcf.variant_zygosity_count = vss.variant_zygosity_count
-                # Runs last in configure_vcf_from_header, so this lands on top of the by-name defaults
-                vss.apply_sample_field_overrides(vcf)
-                vcf.save()
+    for vss in VCFSourceSettings.get_for_source(vcf.source):
+        vcf.sample_set.all().update(variants_type=vss.sample_variants_type)
+        vcf.variant_zygosity_count = vss.variant_zygosity_count
+        # Runs last in configure_vcf_from_header, so this lands on top of the by-name defaults
+        vss.apply_sample_field_overrides(vcf)
+        vcf.save()
 
 
 def genotype_vcf_processor_factory(upload_step, cohort_genotype_collection, uploaded_vcf, preprocess_vcf_import_info):

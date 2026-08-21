@@ -269,12 +269,13 @@ class UploadPipeline(models.Model):
 
     @property
     def vcf(self):
-        if self.file_upload.file_type == UploadedFileTypes.VCF:
-            try:
-                return self.file_upload.uploadedvcf.vcf
-            except (UploadedVCF.DoesNotExist, VCF.DoesNotExist) as _:
-                pass
-        return None
+        """ The VCF this pipeline loads, for every file type that loads one - which is more than the
+            '.vcf' ones (@see upload.uploaded_file_type.reloads_vcf_in_place). None for the
+            insert-variants-only types, whose UploadedVCF has no VCF. """
+        try:
+            return self.file_upload.uploadedvcf.vcf
+        except (UploadedVCF.DoesNotExist, VCF.DoesNotExist) as _:
+            return None
 
     def get_errors(self, hide_accepted=True) -> list:
         errors = []

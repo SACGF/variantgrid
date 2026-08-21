@@ -1,5 +1,6 @@
 import logging
 import operator
+import re
 from collections import namedtuple
 from functools import cached_property, reduce
 from typing import Optional, Union
@@ -665,9 +666,19 @@ class VCFSourceSettings(models.Model):
     source_regex = models.TextField()
     sample_variants_type = models.CharField(max_length=1, choices=VariantsType.choices, default=VariantsType.UNKNOWN)
     variant_zygosity_count = models.BooleanField(default=True)
+    # The build a source's files are called against - used when nothing else resolves one, ie the header
+    # has no contigs/reference to detect from and the submitter declared none (@see resolve_genome_build)
+    genome_build = models.ForeignKey(GenomeBuild, null=True, blank=True, on_delete=CASCADE)
     # A key present sets that field, including to null - which is how you clear a by-name default. A JSON
     # blob rather than nullable columns because null can't tell "no override" from "clear this field"
     sample_field_overrides = models.JSONField(default=dict, blank=True)
+
+    @staticmethod
+    def get_for_source(source: str) -> list['VCFSourceSettings']:
+        """ Every setting whose regex matches the VCF's source, in the order they'll be applied """
+        if not source:
+            return []
+        return [vss for vss in VCFSourceSettings.objects.all() if re.match(vss.source_regex, source)]
 
     def clean(self):
         super().clean()

@@ -6,7 +6,9 @@ here that reads a named column belongs to that format; the fusion identity it re
 The rows become a VCF of gene-level variants which goes through the normal VCF import pipeline, so
 the VCF/Sample/Cohort come from the header the way every other import's do, and the CohortGenotype
 rows are written by the same SQL COPY path. Only the bcftools stages are skipped, since they all
-need a reference base a gene-level locus does not have.
+need a reference base a gene-level locus does not have. Nothing here names a genome build - the
+file's '# Source =' line becomes '##source' and VCFSourceSettings says what that caller is run
+against (@see upload.vcf.vcf_import.resolve_genome_build).
 @see snpdb.gene_level_variants for why these are Variants at all, and
 upload.vcf.gene_level_vcf_preprocess for exactly what is skipped and why.
 

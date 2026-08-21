@@ -33,6 +33,7 @@ from upload.tasks.import_dragen_tso500_all_fusions_task import (
     NO_GENOTYPE_CALL,
     DragenTSO500AllFusionsCreateVCFTask,
 )
+from upload.vcf.vcf_import import resolve_genome_build
 from upload.models import UploadStep
 
 TSO500_RNA_DIR = os.path.join(settings.BASE_DIR, "upload", "test_data", "tso500",
@@ -86,8 +87,6 @@ class TestGeneFusionVCF(GeneFusionTestCase):
                                                      user=user,
                                                      name="ExampleSample_RNA_2600000001B_AllFusions.csv",
                                                      file_type=UploadedFileTypes.DRAGEN_TSO500_ALL_FUSIONS,
-                                                     # The file's breakpoints are chrN:pos with nothing
-                                                     # to detect a build from, so it has to be declared
                                                      metadata={"genome_build": "GRCh37"})
         self.upload_pipeline = UploadPipeline.objects.create(file_upload=self.file_upload)
         self.vcf_filename = os.path.join(settings.PRIVATE_DATA_ROOT, "gene_fusion_variants.vcf")
@@ -106,6 +105,13 @@ class TestGeneFusionVCF(GeneFusionTestCase):
         """ What ImportCreateVCFModelForGenotypeVCFTask makes the VCF and Sample from """
         self.assertEqual([self.file_upload.name], self.reader.samples)
         self.assertIn("FusionProcessor 1.0.0.614", self.reader.raw_header)
+
+    def test_genome_build_comes_from_the_source(self):
+        """ Neither the csv nor the VCF written from it names a build, and the gene-level contig
+            matches every one - the ^FusionProcessor VCFSourceSettings row says which build TSO500
+            is run against, so the import doesn't stop at REQUIRES_USER_INPUT """
+        self.file_upload.metadata = {}
+        self.assertEqual(GenomeBuild.grch37(), resolve_genome_build(self.reader, self.file_upload))
 
     def test_records_are_on_the_gene_level_contig(self):
         self.assertTrue(self.records)
