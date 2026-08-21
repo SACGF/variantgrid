@@ -160,6 +160,36 @@ class ReclassificationBuildResult:
     """ Classifications still waiting, 0 once caught up """
     built_to: Optional[datetime]
     last_run: Optional[datetime]
+    building: bool = False
+    """ Another build holds the state row, so the timelines are being written as we read them """
+
+    @property
+    def in_progress(self) -> bool:
+        return self.building or bool(self.outstanding)
+
+    @property
+    def progress(self) -> 'ReclassificationBuildProgress':
+        """ Counted on demand, for the progress message while a build is running """
+        return ReclassificationBuildProgress(
+            built=ReclassificationEvent.objects.filter(step=1).count(),
+            tracked=ReclassificationEventBuilder.tracked_classifications_qs().count(),
+            outstanding=self.outstanding)
+
+
+@dataclass(frozen=True)
+class ReclassificationBuildProgress:
+    """ How much of the catalogue has a timeline, while a build is still running """
+    built: int
+    tracked: int
+    outstanding: int
+
+    @property
+    def remaining(self) -> int:
+        return max(self.tracked - self.built, self.outstanding)
+
+    @property
+    def percent(self) -> float:
+        return round(100 * self.built / self.tracked, 1) if self.tracked else 0.0
 
 
 @dataclass(frozen=True)
@@ -430,9 +460,10 @@ class ReclassificationEventBuilder:
             state = ReclassificationEventBuildState.objects \
                 .select_for_update(skip_locked=True).filter(pk=1).first()
             if not state:
-                # another build holds the row, so report the watermark it started from
+                # another build holds the row, so report the watermark it started from and say so - the
+                # timelines it is writing are only partly there
                 return ReclassificationEventBuilder._result_for(
-                    ReclassificationEventBuildState.instance(), outstanding=0)
+                    ReclassificationEventBuildState.instance(), outstanding=0, building=True)
 
             touched_qs = Classification.objects.all()
             if state.built_to:
@@ -451,7 +482,8 @@ class ReclassificationEventBuilder:
 
     @staticmethod
     def _result_for(state: ReclassificationEventBuildState, outstanding: int,
-                    classifications: int = 0, events: int = 0) -> ReclassificationBuildResult:
+                    classifications: int = 0, events: int = 0,
+                    building: bool = False) -> ReclassificationBuildResult:
         return ReclassificationBuildResult(classifications=classifications, events=events,
                                            outstanding=outstanding, built_to=state.built_to,
-                                           last_run=state.last_run)
+                                           last_run=state.last_run, building=building)
