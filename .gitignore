@@ -3,14 +3,49 @@
 vcf_reader
 *~
 data/*
-media_root/*
 /.settings/
+### Django ###
 __pycache__/
+media_root/*
+
 LabNameLocations.csv
 /jshintrc
 dump.rdb
 watcherTasks.xml
 /sapath
-env/
-env_sapath/
-variantgrid/settings/env_developers/
+lint.txt
+/.idea/csv-plugin.xml
+/bin/
+/env/
+/env_sapath/
+/.venv/
+/.venv_django5/
+/pyvenv.cfg
+/variantgrid/static_files/default_static/django_js_reverse/reverse.js
+**/.sass-cache/
+/source_id_migration.log
+csv-editor.xml
+
+#ignore developers env settings, but keep the template they copy
+/variantgrid/settings/env_developers/*
+!/variantgrid/settings/env_developers/_settings_template.py
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+.coverage
+.coverage.*
+.cache
+.pytest_cache/
+cover/
+/variant_symbolic_alt_changes.csv
+/.idea/dataSources.local.xml
+/.idea/dataSources.xml
+/.idea/dataSources
+node_modules/
+eslint.txt
+/.idea/pyLspTools.xml
+/.claude/scheduled_tasks.lock
+/.idea/pyProjectModel.xml
