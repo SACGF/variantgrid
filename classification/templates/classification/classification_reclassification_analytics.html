@@ -14,6 +14,7 @@
 <style>
     .reclassification-analytics .chart { min-height: 420px; }
     .reclassification-analytics .c-pill { width: 60px; padding: 2px 4px; }
+    .reclassification-analytics .stat { font-size: 1.5rem; line-height: 1.2; }
     .reclassification-analytics table.summary { font-size: 0.9rem; }
     .reclassification-analytics table.summary td.numeric, .reclassification-analytics table.summary th.numeric {
         text-align: right;
@@ -124,9 +125,18 @@
     {% endif %}
 
     <div class="row mb-4">
-        {% labelled hint="tiny" label="Records with a Timeline" %}{{ analytics.classification_count | number }}{% endlabelled %}
-        {% labelled hint="tiny" label="Re-evaluations" %}{{ analytics.reevaluation_count | number }}{% endlabelled %}
-        {% labelled hint="tiny" label="Reclassifications" %}{{ analytics.reclassification_count | number }}{% endlabelled %}
+        <div class="col-12 col-sm-4 mb-2">
+            <div class="text-muted">Records with a timeline</div>
+            <div class="stat">{{ analytics.classification_count | number }}</div>
+        </div>
+        <div class="col-12 col-sm-4 mb-2">
+            <div class="text-muted">Re-evaluations</div>
+            <div class="stat">{{ analytics.reevaluation_count | number }}</div>
+        </div>
+        <div class="col-12 col-sm-4 mb-2">
+            <div class="text-muted">Reclassifications</div>
+            <div class="stat">{{ analytics.reclassification_count | number }}</div>
+        </div>
     </div>
 
     <div class="mb-4">
@@ -190,8 +200,14 @@
     </p>
     {% if analytics.survival %}
         <div class="row mb-2">
-            {% labelled hint="tiny" label="Cohort" %}{{ analytics.survival.cohort_size | number }} records at <span class="c-pill {{ analytics.survival.css_class }}">{{ analytics.survival.significance_label }}</span> on {{ analytics.survival.origin }}{% endlabelled %}
-            {% labelled hint="tiny" label="Followed for" %}{{ analytics.survival.span_years }} years, to {{ analytics.survival.window_end }}{% endlabelled %}
+            <div class="col-12 col-sm-6 mb-2">
+                <div class="text-muted">Cohort</div>
+                <div>{{ analytics.survival.cohort_size | number }} records at <span class="c-pill {{ analytics.survival.css_class }}">{{ analytics.survival.significance_label }}</span> on {{ analytics.survival.origin }}</div>
+            </div>
+            <div class="col-12 col-sm-6 mb-2">
+                <div class="text-muted">Followed for</div>
+                <div>{{ analytics.survival.span_years }} years, to {{ analytics.survival.window_end }}</div>
+            </div>
         </div>
         <div id="survival" class="chart"></div>
         <table class="table table-sm summary w-auto">
@@ -338,14 +354,6 @@
             </tbody>
         </table>
         <div id="lab-rates" class="chart"></div>
-
-        <h5 class="mt-4">How Concentrated the Effort Is</h5>
-        <p class="text-muted">
-            Cumulative share of records held, re-evaluations and reclassifications against the cumulative
-            share of labs, smallest first. The further a curve sits below the diagonal, the more the work
-            sits with a few labs.
-        </p>
-        <div id="lab-concentration" class="chart"></div>
     {% else %}
         <p class="no-value">No lab holds a timeline with these filters.</p>
     {% endif %}
@@ -643,28 +651,6 @@
             margin: {t: 20, r: 20, b: 160, l: 70},
             xaxis: {gridcolor: GRID_COLOUR, zeroline: false, automargin: true, tickangle: -40},
             yaxis: {title: '% of records held', gridcolor: GRID_COLOUR, zeroline: false}
-        }), plotConfig);
-
-        const concentration = labs.concentration;
-        const lorenzTrace = (curve, name, colour, dash) => ({
-            x: curve.x, y: curve.y, name: name + (curve.gini === null ? '' : ' (Gini ' + curve.gini + ')'),
-            type: 'scatter', mode: 'lines', line: {color: colour, width: 2, dash: dash},
-            hovertemplate: '%{y:.0%} of ' + name.toLowerCase() + ' held by %{x:.0%} of labs<extra></extra>'
-        });
-        const lorenzTraces = [
-            {
-                x: [0, 1], y: [0, 1], name: 'Even across labs', type: 'scatter', mode: 'lines',
-                line: {color: GRID_COLOUR, width: 2, dash: 'dot'}, hoverinfo: 'skip'
-            },
-            lorenzTrace(concentration.held, 'Records held', concentration.held_colour, 'solid'),
-            lorenzTrace(concentration.reviewed, 'Re-evaluations', concentration.reviewed_colour, 'solid'),
-            lorenzTrace(concentration.reclassified, 'Reclassifications', concentration.reclassified_colour, 'solid')
-        ].filter(trace => trace.x.length);
-        Plotly.newPlot('lab-concentration', lorenzTraces, chartLayout({
-            legend: {traceorder: 'normal'},
-            xaxis: {title: 'Cumulative share of labs, smallest first', tickformat: '.0%',
-                    gridcolor: GRID_COLOUR, zeroline: false},
-            yaxis: {title: 'Cumulative share', tickformat: '.0%', gridcolor: GRID_COLOUR, zeroline: false}
         }), plotConfig);
     }
 
