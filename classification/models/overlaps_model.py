@@ -323,6 +323,12 @@ class Overlap(TimeStampedModel, ReviewableModelMixin, PreviewModelMixin):
         else:
             return lab_classification_grouping.classification_grouping.latest_allele_info.imported_c_hgvs_obj
 
+    def c_hgvs_all(self, genome_build: GenomeBuild) -> list[HGVSDisplay]:
+        results = set()
+        for contribution in self.contributions_list:
+            if classification_grouping := contribution.classification_grouping:
+                results.add(classification_grouping.latest_allele_info.preferred_c_hgvs_obj(genome_build))
+        return list(sorted(results))
 
     # have to cache the values
     # contributions = models.ManyToManyField(OverlapContribution)

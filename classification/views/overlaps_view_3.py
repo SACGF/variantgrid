@@ -1,23 +1,30 @@
-from typing import Optional, Any
+from typing import Optional
 from django.contrib import messages
 from django import forms
 from django.core.exceptions import ValidationError
+from django.db.models.aggregates import Max
+from django.db.models.expressions import Subquery, OuterRef
+from django.db.models.query_utils import Q
 from django.http import HttpRequest, HttpResponseBase
 from django.shortcuts import render, redirect
 from django.urls import reverse
 from django.utils.safestring import mark_safe
-from classification.enums import SpecialEKeys, OverlapStatus
+from classification.enums import SpecialEKeys, OverlapStatus, OverlapType, OverlapContributionStatus, \
+    OverlapOverrideStatus
 from classification.models import ClassificationResultValue, \
-    EvidenceKey, EvidenceKeyMap, OverlapContribution, Overlap, TriageNextStep
+    EvidenceKey, EvidenceKeyMap, OverlapContribution, Overlap, TriageNextStep, OverlapContributionSkew
 from classification.enums.overlaps_enums import TriageState, TriageStatus
-from classification.services.overlap_calculator import calculator_for_value_type
+from classification.services.overlap_calculator import calculator_for_value_type, OVERLAP_CLIN_SIG_ENABLED
 from classification.services.overlaps_services import OverlapServices, OverlapGrouping3
 from classification.views.overlaps_datatables_3 import OverlapColumns
+from library.django_utils import get_url_from_view_path
 from library.log_utils import log_admin_change
-from library.utils import empty_to_none
+from library.utils import empty_to_none, ExportRow, export_column, ExportDataType
 from library.utils.django_utils import render_ajax_view
 from review.models import Review
+from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.lab_picker import LabPickerData
+from snpdb.models import GenomeBuild
 from uicore.views.ajax_form_view import AjaxFormView, LazyRender
 
 
@@ -70,7 +77,6 @@ class ClassificationGroupingValueTriageOncPathForm(ClassificationGroupingValueTr
             [(m.get("key"), m.get("label")) for m in EvidenceKeyMap.cached_key(SpecialEKeys.ONC_PATH).virtual_options],
         help_text="New Onc/Path value if you have agreed to change"
     )
-
 
 
 class ClassificationGroupingValueTriageClinSigForm(ClassificationGroupingValueTriageForm):
@@ -322,3 +328,93 @@ def action_overlap_review(request: HttpRequest, review_id: int) -> HttpResponseB
             "evidence_key": evidence_key
         }
         return render(request, "classification/overlap_action.html", context)
+
+
+class OverlapDownloadRow(ExportRow):
+
+    def __init__(self, overlap: Overlap, lab_picker: LabPickerData):
+        self.overlap = overlap
+        self.lab_picker = lab_picker
+
+    @export_column("ID")
+    def overlap_id(self):
+        return self.overlap.pk
+
+    @export_column("URL")
+    def url(self):
+        return get_url_from_view_path(self.overlap.get_absolute_url())
+
+    @export_column("c.HGVS")
+    def c_hgvs(self):
+        return "\n".join([str(chgvs) for chgvs in self.overlap.c_hgvs_all(GenomeBuildManager.get_current_genome_build())])
+
+    @export_column("Status")
+    def overlap_status(self):
+        return self.overlap.overlap_status.label
+
+    @export_column("Last Status Update", data_type=ExportDataType.date)
+    def last_status_update(self):
+        return self.overlap.overlap_status_change_timestamp
+
+    @export_column("Reviewed-as")
+    def reviewed_as(self):
+        if override := self.overlap.overlap_override_status:
+            return override.label
+        return None
+
+    @export_column("Values")
+    def values(self):
+        return ", ".join(self.overlap.relevant_values())
+
+    @export_column("Next Step")
+    def next_step(self):
+        relevant = [x for x in self.overlap.contributions_list if x.classification_grouping and x.classification_grouping.lab_id in self.lab_picker.lab_ids]
+        skews = list(self.overlap.overlapcontributionskew_set.filter(contribution__in=relevant).all())
+        if skews:
+            return max(x.next_step for x in skews).label
+        return ""
+
+    @export_column("Detail")
+    def detail(self):
+        rows = []
+        for cont in self.overlap.contributions_list:
+            rows.append(f"{cont.lab_like} : {cont.pretty_effective_value}")
+        return "\n".join(rows)
+
+
+def download_overlaps(request, lab_id: str):
+    lab_picker = LabPickerData.from_request(request, lab_id, 'overlaps_3')
+    if redirect_response := lab_picker.check_redirect():
+        return redirect_response
+
+    qs = Overlap.objects.filter()
+    # only display single context overlaps, but later we merge with cross context data
+    qs = qs.filter(overlap_type=OverlapType.SINGLE_CONTEXT)
+
+    # only ONC PATH for now
+    if not OVERLAP_CLIN_SIG_ENABLED:
+        qs = qs.filter(value_type=ClassificationResultValue.ONC_PATH)
+
+    lab_filter_q = Q()
+    if not lab_picker.is_admin_mode:
+        lab_filter_q = Q(contribution__classification_grouping__lab__in=lab_picker.lab_ids) & Q(
+            contribution__contribution_status=OverlapContributionStatus.CONTRIBUTING)
+
+    # only look at discordant overlaps
+    qs = qs.filter(overlap_status__gte=OverlapStatus.TIER_1_VS_TIER_2_DIFFERENCES).filter(
+        overlap_override_status=OverlapOverrideStatus.NO_OVERRIDE)
+
+    # filter based on overlap skew
+    qs = qs.annotate(skew_status=Subquery(
+        OverlapContributionSkew.objects.filter(lab_filter_q).filter(
+            overlap=OuterRef('pk')
+        ).annotate(max_status=Max('next_step')).values_list('max_status')[:1]
+    ))
+
+    qs = qs.prefetch_related("overlapcontributionskew_set")
+
+    return OverlapDownloadRow.streaming_csv(
+        data=qs.iterator(chunk_size=1000),
+        filename="discordance_reports",
+        transformer=lambda x: OverlapDownloadRow(x, lab_picker)
+    )

@@ -169,6 +169,7 @@ class OverlapColumns(DatatableConfig[ClassificationGrouping]):
 
         # Make sure the skews exist
         qs = qs.filter(skew_status__isnull=False)
+        qs = qs.prefetch_related("overlapcontributionskew_set")
         return qs
 
     def pre_render(self, qs: QuerySet[DC]):

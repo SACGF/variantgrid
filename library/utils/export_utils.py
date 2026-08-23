@@ -231,23 +231,31 @@ class ExportRow:
         return get_decorated_methods(cls, categories=export_tweak.categories, attribute="is_export")
 
     @classmethod
-    def _data_generator(cls: type, data: Iterable[Any]) -> Iterator[Any]:
+    def _data_generator(cls: type, data: Iterable[Any], transformer: Optional[Callable] = None) -> Iterator[Any]:
         for row_data in data:
             if row_data is None:
                 continue
-            if not isinstance(row_data, cls):
+            if transformer:
+                row_data = transformer(row_data)
+            elif not isinstance(row_data, cls):
                 # it's expected that the class can be initiated with each "row" in data
                 row_data = cls(row_data)
             yield row_data
 
     @classmethod
-    def csv_generator(cls, data: Iterable[Any], delimiter=',', include_header=True, export_tweak: ExportTweak = ExportTweak.DEFAULT, export_settings: Optional[ExportSettings] = None, **kwargs) -> Iterator[str]:
+    def csv_generator(cls,
+                      data: Iterable[Any],
+                      delimiter=',', include_header=True,
+                      export_tweak: ExportTweak = ExportTweak.DEFAULT,
+                      export_settings: Optional[ExportSettings] = None,
+                      transformer: Optional[Callable] = None,
+                      **kwargs) -> Iterator[str]:
         if not export_settings:
             export_settings = ExportSettings.get_for_request()
         try:
             if include_header:
                 yield delimited_row(cls.csv_header(export_tweak=export_tweak, export_settings=export_settings), delimiter=delimiter, **kwargs)
-            for row_data in cls._data_generator(data):
+            for row_data in cls._data_generator(data, transformer=transformer):
                 yield delimited_row(row_data.to_csv(export_tweak=export_tweak, export_settings=export_settings), delimiter=delimiter, **kwargs)
         except:
             from library.log_utils import report_exc_info
@@ -317,7 +325,7 @@ class ExportRow:
                 row.add_cell(label)
         return row.get_row()
 
-    def to_csv(self, export_tweak: ExportTweak = ExportTweak.DEFAULT, export_settings: Optional[ExportSettings] = None) -> list[str]:
+    def to_csv(self,export_tweak: ExportTweak = ExportTweak.DEFAULT, export_settings: Optional[ExportSettings] = None) -> list[str]:
         if not export_settings:
             export_settings = ExportSettings.get_for_request()
 
@@ -368,10 +376,10 @@ class ExportRow:
             return cls.streaming_csv(data, filename, export_tweak=export_tweak)
 
     @classmethod
-    def streaming_csv(cls, data: Iterable[Any], filename: str, export_tweak: ExportTweak = ExportTweak.DEFAULT):
+    def streaming_csv(cls, data: Iterable[Any], filename: str, export_tweak: ExportTweak = ExportTweak.DEFAULT, transformer: Optional[Callable] = None):
         date_str = local_date_string()
 
-        response = StreamingHttpResponse(cls.csv_generator(data, export_tweak=export_tweak), content_type='text/csv')
+        response = StreamingHttpResponse(cls.csv_generator(data, export_tweak=export_tweak, transformer=transformer), content_type='text/csv')
         response['Content-Disposition'] = f'attachment; filename="{filename}_{settings.SITE_NAME}_{date_str}.csv"'
         return response
 

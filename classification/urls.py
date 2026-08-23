@@ -71,7 +71,7 @@ from classification.views.imported_allele_info_view import (
 )
 from classification.views.overlaps_datatables_3 import OverlapColumns
 from classification.views.overlaps_view_3 import view_overlaps_3, view_overlap_history, overlap_report_review, \
-    action_overlap_review, discordance_calculator, TriageView3, view_overlap_3
+    action_overlap_review, discordance_calculator, TriageView3, view_overlap_3, download_overlaps
 from classification.views.views import AutopopulateView, classification_import_tool
 from classification.views.views_hgvs_resolution_tool import hgvs_resolution_tool
 from classification.views.views_uploaded_classifications_unmapped import (
@@ -236,6 +236,7 @@ urlpatterns = [
     path('overlaps3/overlap/<int:overlap_id>', view_overlap_3, name='overlap_3'),
     path('overlaps3/datatables', DatabaseTableView.as_view(column_class=OverlapColumns), name='overlaps_3_datatables'),
     path('overlaps3/<str:lab_id>', view_overlaps_3, name='overlaps_3'),
+    path('overlaps3/<str:lab_id>/download', download_overlaps, name='overlaps_3_download'),
     path('overlaps3', view_overlaps_3, name='overlaps_3'),
 
     path('overlaps3/overlap/<int:overlap_id>/review', overlap_report_review, name='overlap_report_review'),
