@@ -50,6 +50,27 @@ class IntegrationStatusCollectionTest(TestCase):
         self.assertEqual(["Alpha", "Beta", "Gamma"], _test_status_names(statuses))
         self.assertEqual([], messages)
 
+    def test_a_registered_status_supersedes_the_fallback_for_its_key(self):
+        def shipped_fallback(sender, **kwargs):
+            return IntegrationStatus(name="Alpha", key="alpha", fallback=True)
+
+        def richer_provider(sender, **kwargs):
+            return IntegrationStatus(name="Beta", key="alpha", record_count=7)
+
+        with temporarily_connected(shipped_fallback, richer_provider):
+            statuses, _ = get_integration_statuses()
+
+        self.assertEqual(["Beta"], _test_status_names(statuses))
+
+    def test_fallback_kept_when_nothing_claims_its_key(self):
+        def shipped_fallback(sender, **kwargs):
+            return IntegrationStatus(name="Alpha", key="alpha", fallback=True)
+
+        with temporarily_connected(shipped_fallback):
+            statuses, _ = get_integration_statuses()
+
+        self.assertEqual(["Alpha"], _test_status_names(statuses))
+
     def test_raising_receiver_becomes_a_message(self):
         def broken(sender, **kwargs):
             raise ValueError("provider blew up")

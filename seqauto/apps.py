@@ -14,6 +14,7 @@ class SeqautoConfig(AppConfig):
         from seqauto.signals import (  # noqa: F401
             enrichment_kit_search,
             experiment_search,
+            seqauto_integration_status,
             sequencing_run_search,
         )
         # pylint: enable=import-outside-toplevel,unused-import

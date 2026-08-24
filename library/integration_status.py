@@ -48,6 +48,7 @@ class IntegrationTrigger:
 class IntegrationStatus:
     name: str  # "Helix NGS Database"
     details: list[IntegrationDetail] = field(default_factory=list)
+    key: Optional[str] = None  # identifies the same integration across providers - see fallback
     direction: IntegrationDirection = IntegrationDirection.INBOUND
     description: Optional[str] = None  # one line under the title
     url: Optional[str] = None  # link to the records this integration writes
@@ -56,6 +57,9 @@ class IntegrationStatus:
     warning_age: Optional[timedelta] = None  # feeds the nightly Slack digest
     enabled: bool = True  # renders greyed with a "disabled" badge
     sort_order: int = 0
+    fallback: bool = False
+    """ A shipped default row, superseded when an app registers a richer status for the same key -
+        that's how IntegrationActivity rows appear unaided but still let their app dress them up """
 
     @property
     def slug(self) -> str:
@@ -95,6 +99,8 @@ def get_integration_statuses() -> tuple[list[IntegrationStatus], list[str]]:
             results.append(result)
 
     statuses: list[IntegrationStatus] = flatten_nested_lists(results)
+    claimed_keys = {status.key for status in statuses if status.key and not status.fallback}
+    statuses = [status for status in statuses if not (status.fallback and status.key in claimed_keys)]
     statuses.sort(key=lambda status: (status.sort_order, status.name))
     return statuses, messages
 
