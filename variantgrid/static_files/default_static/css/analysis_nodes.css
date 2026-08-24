@@ -555,6 +555,11 @@ span.gene-list-security {
 	display: none;
 }
 
+.node-count .live-data-marker {
+	font-size: 0.8em;
+	opacity: 0.7;
+}
+
 .grid-tag .user-tag-colored {
     margin: 2px;
     padding: 2px;

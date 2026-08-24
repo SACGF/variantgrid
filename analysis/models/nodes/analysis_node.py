@@ -16,6 +16,7 @@ from auditlog.registry import auditlog
 from cache_memoize import cache_memoize
 from celery.canvas import Signature
 from django.conf import settings
+from django.contrib.postgres.fields import ArrayField
 from django.core.cache import cache
 from django.core.exceptions import FieldError
 from django.db import connection, models, transaction
@@ -383,6 +384,40 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
             non_empty_parents.append(p)
         return non_empty_parents
 
+    def _get_live_data_sources(self) -> dict[str, int]:
+        """ Mutable tables this node's own query reads, keyed by a stable source key, with the source's
+            version at the time of the call. Empty means the node's query is a pure function of versioned
+            inputs (annotation version, node settings, parents) """
+        return {}
+
+    def get_live_data_sources(self) -> dict[str, int]:
+        sources = dict(self._get_live_data_sources())
+        for parent in self.get_non_empty_parents():
+            sources.update(parent.get_live_data_sources())
+        return sources
+
+    @property
+    def live_data_sources(self) -> dict[str, int]:
+        """ The live sources recorded when this node version was loaded """
+        return self.node_version.live_data_sources
+
+    @property
+    def count_is_deterministic(self) -> bool:
+        """ False means the count is advisory - the node reads tables that change under it """
+        return not self.live_data_sources
+
+    def get_live_data_notes(self) -> list[str]:
+        """ Editor notes explaining a node's live data sources - unlike get_warnings() these aren't faults """
+        return []
+
+    def _raise_or_warn_count_mismatch(self, detail: str):
+        """ A deterministic node re-running the same query must give the same answer, so a mismatch is a
+            query bug. A live-source node's data moves under it, so it's expected drift """
+        msg = f"Node {self}(pk={self.pk}) count mismatch: {detail}"
+        if self.count_is_deterministic:
+            raise ValueError(msg)
+        logging.warning("%s (live sources: %s)", msg, self.live_data_sources)
+
     def get_single_parent(self):
         if self.min_inputs != 1:
             msg = "get_single_parent() should only be called for single parent nodes"
@@ -603,37 +638,25 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
         return arg_q_dict
 
     @staticmethod
-    @cache_memoize(15 * MINUTE_SECS, args_rewrite=lambda n: (n.pk, n.version))
-    def get_cached_node_pks(node) -> list:
-        """ Materialised variant PKs for a node small enough to hold them - the source for explicit-PK
-            substitution (@see get_small_parent_arg_q_dict) and the grid export """
-        max_size = settings.ANALYSIS_NODE_STORE_ID_SIZE_MAX
-        if node.count is None or node.count > max_size:
-            raise ValueError(
-                f"get_cached_node_pks: refusing to cache {node} PKs "
-                f"(count={node.count}, max={max_size})"
-            )
-        # count can come from a stats cache that doesn't match the live query, so take one more than it
-        # claims - that bounds what a bad count can pull into RAM and tells us the list can't be trusted
-        pks = list(node.get_queryset().values_list("pk", flat=True)[:node.count + 1])
-        if len(pks) > node.count:
-            raise ValueError(
-                f"get_cached_node_pks: {node}(pk={node.pk}) query returned more than count={node.count}"
-            )
-        return pks
+    def get_cached_node_pks(node) -> Optional[list[int]]:
+        """ The exact PK set stored at load for nodes <= ANALYSIS_NODE_STORE_ID_SIZE_MAX (@see node_counts),
+            or None for a large node - or one loaded before the PKs were stored with the count """
+        try:
+            node_count = NodeCount.load_for_node(node, BuiltInFilters.TOTAL)
+        except (NodeCount.DoesNotExist, NodeVersion.DoesNotExist):
+            return None
+        return node_count.variant_ids
 
     @staticmethod
     def get_small_parent_arg_q_dict(parent) -> Optional[dict[Optional[str], dict[str, Q]]]:
-        """ Issue #546 explicit-PK substitution. When the parent holds only a small number of
-            variants, materialise its PKs once (cached) and substitute its contribution with a
-            literal Q(pk__in=[...]) so Postgres plans a tight bitmap-or over the variant PK index
-            instead of re-running the parent's full filter chain wrapped in pk IN (subquery).
+        """ Issue #546 explicit-PK substitution. When the parent holds only a small number of variants,
+            substitute its contribution with a literal Q(pk__in=[...]) of the PKs it stored at load, so
+            Postgres plans a tight bitmap-or over the variant PK index instead of re-running the parent's
+            full filter chain wrapped in pk IN (subquery).
 
-            Returns None when the parent is not eligible (count unknown or above the ceiling), in
-            which case callers fall back to parent.get_arg_q_dict(). """
-        max_size = settings.ANALYSIS_NODE_STORE_ID_SIZE_MAX
-        if max_size and parent.count is not None and parent.count <= max_size:
-            variant_ids = AnalysisNode.get_cached_node_pks(parent)
+            Returns None when the parent has no stored PKs, in which case callers fall back to
+            parent.get_arg_q_dict() - a subquery, which is always self-consistent. """
+        if (variant_ids := AnalysisNode.get_cached_node_pks(parent)) is not None:
             q = Q(pk__in=variant_ids)
             return {None: {q: q}}
         return None
@@ -1004,6 +1027,11 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
         """ This is inside Celery task """
 
         self.count = None
+        # Record provenance first, so the checks below know whether this node's data can move under it
+        live_data_sources = self.get_live_data_sources()
+        NodeVersion.objects.filter(pk=self.node_version.pk).update(live_data_sources=live_data_sources)
+        self.node_version.live_data_sources = live_data_sources
+
         counts_to_get = {BuiltInFilters.TOTAL}
         counts_to_get.update([i[0] for i in self.analysis.get_node_count_types()])
         label_counts = {}
@@ -1021,22 +1049,29 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
             retrieved_label_counts = get_node_counts_and_labels_dict(self, counts_to_get)
             label_counts.update(retrieved_label_counts)
 
+        total_count = label_counts[BuiltInFilters.TOTAL]
+        variant_ids = self._get_variant_ids_to_store(total_count)
+        if variant_ids is not None:
+            # For a small node the PK list is the truth - it and the count came from the same load
+            total_count = len(variant_ids)
+
         node_counts = []
         for label, count in label_counts.items():
             node_counts.append(NodeCount(node_version=self.node_version, label=label, count=count))
         if node_counts:
-            # Counts are a cache of a deterministic query against an immutable node_version, so a
-            # re-load (eg after a backoff retry that failed once these were already written) can
-            # safely overwrite them
-            NodeCount.objects.bulk_create(node_counts, update_conflicts=True, update_fields=["count"],
+            total_node_count = next(nc for nc in node_counts if nc.label == BuiltInFilters.TOTAL)
+            total_node_count.count = total_count
+            total_node_count.variant_ids = variant_ids
+            # Counts are a cache of a query against an immutable node_version, so a re-load (eg after a
+            # backoff retry that failed once these were already written) can safely overwrite them
+            NodeCount.objects.bulk_create(node_counts, update_conflicts=True,
+                                          update_fields=["count", "variant_ids"],
                                           unique_fields=["node_version", "label"])
-
-        total_count = label_counts[BuiltInFilters.TOTAL]
 
         # Every label count is a subset of the total - a bigger one means the query fanned out over a
         # multi-valued join, or a cached count is out of sync with the live query
         if bigger_than_total := {l: c for l, c in label_counts.items() if c > total_count}:
-            raise ValueError(f"Node {self}(pk={self.pk}) label counts {bigger_than_total} > total count={total_count}")
+            self._raise_or_warn_count_mismatch(f"label counts {bigger_than_total} > total count={total_count}")
 
         # Single parent nodes should always reduce the number of variants - run a check to make sure the
         # query wasn't bad and returned more results than it should have
@@ -1044,9 +1079,22 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
         if len(parents) == 1:
             parent = parents[0]
             if parent.count < total_count:
-                raise ValueError(f"Single parent node {self}(pk={self.pk}) had count={total_count} > {parent=}(pk={parent.pk}) count={parent.count=}")
+                self._raise_or_warn_count_mismatch(f"count={total_count} > {parent=}(pk={parent.pk}) count={parent.count}")
 
         return NodeStatus.READY, total_count
+
+    def _get_variant_ids_to_store(self, total_count: int) -> Optional[list[int]]:
+        """ The node's exact PK set, for nodes small enough to hold it - taken after the count so a node
+            whose data moved between the two is caught here rather than storing a silently short list """
+        max_size = settings.ANALYSIS_NODE_STORE_ID_SIZE_MAX
+        if not (max_size and total_count <= max_size):
+            return None
+
+        variant_ids = list(self.get_queryset().values_list("pk", flat=True)[:max_size + 1])
+        if len(variant_ids) > max_size:
+            self._raise_or_warn_count_mismatch(f"{len(variant_ids)} pks > max_size={max_size}")
+            return None
+        return variant_ids
 
     def _load(self):
         """ Override to do anything interesting.
@@ -1312,6 +1360,8 @@ class NodeVersion(TimeStampedModel):
     """ This will be deleted once a node updates, so make all version specific caches cascade delete from this """
     node = models.ForeignKey(AnalysisNode, on_delete=CASCADE)
     version = models.IntegerField(null=False)
+    # {source_key: data_version} of the mutable tables this node read at load. Empty = deterministic
+    live_data_sources = models.JSONField(default=dict)
 
     class Meta:
         unique_together = ("node", "version")
@@ -1363,6 +1413,9 @@ class NodeCount(TimeStampedModel):
     node_version = models.ForeignKey(NodeVersion, on_delete=CASCADE)
     label = models.CharField(max_length=100)
     count = models.IntegerField(null=False)
+    # Only on the TOTAL row, and only for nodes <= ANALYSIS_NODE_STORE_ID_SIZE_MAX. When present,
+    # count == len(variant_ids) and this is the exact set the node held at load
+    variant_ids = ArrayField(models.IntegerField(), null=True)
 
     class Meta:
         unique_together = ("node_version", "label")

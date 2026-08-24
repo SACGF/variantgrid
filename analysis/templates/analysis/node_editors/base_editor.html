@@ -242,6 +242,13 @@
 
 				{% endblock node_filter_info %}
 				{% block content %}{% endblock content %}
+                {% if node_live_data_notes %}
+                    <div>
+                    {% for note in node_live_data_notes %}
+                        <div class='live-data-note'>&#9889; {{ note }}</div>
+                    {% endfor %}
+                    </div>
+                {% endif %}
                 {% if node_warnings %}
                     <div>
                     {% for w in node_warnings %}

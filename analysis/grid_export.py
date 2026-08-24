@@ -86,6 +86,10 @@ def get_node_export_basename(node: AnalysisNode) -> str:
         name_underscores = re.sub(r"\s", "_", node.name)
         name_parts.append(name_underscores)
     name_parts.append(f"v{node.version}")
+    # A live-source node's rows depend on data that changes under it - say which version this file reflects
+    if live_data_sources := node.live_data_sources:
+        sources = "_".join(f"{k}.{v}" for k, v in sorted(live_data_sources.items()))
+        name_parts.append(re.sub(r"\W", "_", sources))
     return "_".join(name_parts)
 
 

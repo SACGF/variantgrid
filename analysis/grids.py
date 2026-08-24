@@ -182,7 +182,15 @@ class VariantGrid(AbstractVariantGrid):
             have to count the annotated grid queryset again """
         if self.get_filters(request):
             return None  # jqGrid column filters narrow the rows the stored count was taken over
-        return self._grid_row_count()
+        count = self._grid_row_count()
+        if self.node.count_is_deterministic:
+            return count
+        # A live-source node's data moves under the stored count. Small nodes are where people curate,
+        # and an exact recount at that size is cheap - above it the count stays advisory and the last
+        # page may come up short, which beats re-counting millions of rows on every page request
+        if count is not None and count <= settings.ANALYSIS_NODE_STORE_ID_SIZE_MAX:
+            return None
+        return count
 
     def get_column_colmodel(self, column_name):
         for cm in self.get_colmodels():

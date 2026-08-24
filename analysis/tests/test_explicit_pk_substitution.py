@@ -20,7 +20,7 @@ from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 
 from analysis.models import Analysis
-from analysis.models.enums import NodeStatus, ZygosityNodeZygosity
+from analysis.models.enums import ZygosityNodeZygosity
 from analysis.models.nodes.filters.allele_frequency_node import AlleleFrequencyNode
 from analysis.models.nodes.filters.merge_node import MergeNode
 from analysis.models.nodes.filters.population_node import PopulationNode
@@ -115,11 +115,12 @@ class TestExplicitPkSubstitution(TestCase):
 
     @staticmethod
     def _ready(node):
-        """ Make a node 'ready' with its count set, as the load pipeline would, so child
-            nodes can compose it (and so the future pk-substitution path can read count). """
-        node.count = node.get_queryset().count()
-        node.status = NodeStatus.READY
-        node.save()
+        """ Run the node's counts as the load pipeline would, so children can compose it - and so the
+            TOTAL NodeCount holds the PK set the substitution path reads. """
+        status, count = node.node_counts()
+        node.update(status=status, count=count)
+        node.status = status
+        node.count = count
         return node
 
     def _source_node(self):
@@ -242,7 +243,7 @@ class TestRarePopulationNodePruningEquivalence(TestCase):
         chain, so the parent's join only spans the UNCOMMON partition - the COMMON variant never
         enters the query.
 
-        With substitution (gate on): get_cached_node_pks materialises the parent standalone with
+        With substitution (gate on): the parent stored its PKs at load, queried standalone with
         common_variants=True (BOTH partitions), so the COMMON variant IS in the literal pk__in list -
         but the downstream rare gnomAD filter then removes it via VariantAnnotation (common-partition
         variants are common in gnomAD, so their AF is above the rare cutoff). The final PK set matches.
@@ -325,9 +326,10 @@ class TestRarePopulationNodePruningEquivalence(TestCase):
 
     def _ready_source(self):
         node = SampleNode.objects.create(analysis=self.analysis, sample=self.proband)
-        node.count = node.get_queryset().count()
-        node.status = NodeStatus.READY
-        node.save()
+        status, count = node.node_counts()
+        node.update(status=status, count=count)
+        node.status = status
+        node.count = count
         return node
 
     def _rare_population_child(self):

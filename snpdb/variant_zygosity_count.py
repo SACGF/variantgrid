@@ -4,6 +4,7 @@ import re
 
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
+from django.db import transaction
 from django.db.models import Max
 from django.utils import timezone
 
@@ -165,14 +166,15 @@ def update_variant_zygosity_count_for_vcf(collection: VariantZygosityCountCollec
         if use_cohort_genotype_collection:
             logging.info("Updating from Cohort Zygosity Collection %d", cohort_genotype_collection.pk)
             sql, params = _get_update_sql_and_params(collection, vcf, operation)
-            run_sql(sql, params)
-
             now = timezone.now()
-            if operation == '+':
-                vzcv.count_complete = now
-            else:
-                vzcv.deleted = now
-            vzcv.save()
+            with transaction.atomic():
+                run_sql(sql, params)
+                if operation == '+':
+                    vzcv.count_complete = now
+                else:
+                    vzcv.deleted = now
+                vzcv.save()
+                collection.bump_data_version()
         else:
             logging.info("Updating from sample...")
 
@@ -223,14 +225,15 @@ def update_variant_zygosity_count_for_sample(collection: VariantZygosityCountCol
 
         logging.info("Updating from single sample %s...", sample)
         sql, params = _get_update_sql_and_params(collection, sample.vcf, operation, sample=sample)
-        run_sql(sql, params)
-
         now = timezone.now()
-        if operation == '+':
-            gvzcs.count_complete = now
-        else:
-            gvzcs.deleted = now
-        gvzcs.save()
+        with transaction.atomic():
+            run_sql(sql, params)
+            if operation == '+':
+                gvzcs.count_complete = now
+            else:
+                gvzcs.deleted = now
+            gvzcs.save()
+            collection.bump_data_version()
 
     except:
         tb = get_traceback()

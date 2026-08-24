@@ -23,6 +23,16 @@ class VariantZygosityCountCollection(DataArchiveMixin, RelatedModelsPartitionMod
 
     name = models.TextField(unique=True)
     description = models.TextField()
+    # Bumped in the same transaction as the last write of an import/delete, so a reader sees either the
+    # old or the new state. Nodes filtering on these counts record it as their live data source version
+    data_version = models.IntegerField(default=0)
+
+    @property
+    def live_source_key(self) -> str:
+        return f"vzcc:{self.pk}"
+
+    def bump_data_version(self):
+        VariantZygosityCountCollection.objects.filter(pk=self.pk).update(data_version=F("data_version") + 1)
 
     @cached_property
     def alias(self) -> str:

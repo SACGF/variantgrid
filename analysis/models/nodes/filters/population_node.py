@@ -70,6 +70,20 @@ class PopulationNode(AnalysisNode):
             node_kwargs["common_variants"] = False
         return node_kwargs
 
+    def _get_live_data_sources(self) -> dict[str, int]:
+        """ The internal counts are the global zygosity collection, which every VCF import/delete rewrites.
+            The gnomAD/annotation filters are pinned to the annotation version so contribute nothing """
+        if self.use_internal_counts:
+            vzcc = VariantZygosityCountCollection.get_global_germline_counts()
+            return {vzcc.live_source_key: vzcc.data_version}
+        return {}
+
+    def get_live_data_notes(self) -> list[str]:
+        notes = super().get_live_data_notes()
+        if self.use_internal_counts:
+            notes.append("Uses live internal frequency counts (updated with each VCF import)")
+        return notes
+
     def _get_annotation_kwargs_for_node(self, **kwargs) -> dict:
         annotation_kwargs = super()._get_annotation_kwargs_for_node(**kwargs)
         if self.use_internal_counts:

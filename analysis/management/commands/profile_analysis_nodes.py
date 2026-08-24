@@ -134,10 +134,10 @@ class Command(BaseCommand):
 
         subst_modes = {"on": ["on"], "off": ["off"], "both": ["on", "off"]}[options["pk_substitution"]]
 
-        # Issue #546 explicit-PK substitution is gated on ANALYSIS_NODE_STORE_ID_SIZE_MAX
-        # (read live by AnalysisNode.get_small_parent_arg_q_dict). "on" uses the configured
-        # threshold (falling back to 1000 if it's unset/0 so "on" is genuinely enabled); "off"
-        # forces it to 0 so every parent runs as a full subquery.
+        # Issue #546 explicit-PK substitution is gated on ANALYSIS_NODE_STORE_ID_SIZE_MAX, which a node
+        # reads when it loads and stores its PKs with its count - so use --rerun for the mode to take
+        # effect. "on" uses the configured threshold (falling back to 1000 if it's unset/0 so "on" is
+        # genuinely enabled); "off" forces it to 0 so every parent runs as a full subquery.
         original_threshold = getattr(settings, "ANALYSIS_NODE_STORE_ID_SIZE_MAX", 1000)
         subst_threshold = {"on": original_threshold or 1000, "off": 0}
 
@@ -258,9 +258,8 @@ class Command(BaseCommand):
         Path A (literal IN) is taken when count <= threshold; otherwise path C (subquery form).
         Parents in (threshold_current, threshold_bumped] are the experiment candidates.
 
-        Backwards-compat: only touches stable APIs (parent.count, get_non_empty_parents).
-        Doesn't reference get_cached_node_pks / cache_memoize / the substitution helper, which
-        only exist on post-#546 code.
+        Backwards-compat: only touches stable APIs (parent.count, get_non_empty_parents), so it
+        also runs against pre-#546 code.
         """
         rows = []
         try:

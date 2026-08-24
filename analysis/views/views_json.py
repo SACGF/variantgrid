@@ -22,7 +22,7 @@ from analysis.models import (
 )
 from analysis.models.enums import TagLocation
 from analysis.models.nodes import node_utils
-from analysis.models.nodes.analysis_node import AnalysisEdge, AnalysisNode, NodeStatus, NodeTask
+from analysis.models.nodes.analysis_node import AnalysisEdge, AnalysisNode, NodeStatus, NodeTask, NodeVersion
 from analysis.models.nodes.filter_child import create_filter_child_node
 from analysis.models.nodes.filters.built_in_filter_node import BuiltInFilterNode
 from analysis.models.nodes.filters.selected_in_parent_node import NodeVariant, SelectedInParentNode
@@ -229,6 +229,11 @@ def set_variant_tag(request, location):
                                                                     analysis=analysis, user=request.user)
             if node_id:
                 variant_tag.node_id = node_id
+                # Stamp what the node was showing, so a reviewer can later tell why the variant was in it
+                node_version = NodeVersion.objects.filter(node_id=node_id,
+                                                          version=F("node__version")).first()
+                variant_tag.node_version = node_version
+                variant_tag.node_live_data_sources = node_version.live_data_sources if node_version else {}
                 variant_tag.save()
         else:
             if genome_build_name is None:
@@ -366,6 +371,11 @@ def nodes_status(request, analysis_id):
                                                                      "label", "count"):
         node_counts[f"{node_id}_{version}"][label] = count
 
+    node_version_qs = NodeVersion.objects.filter(node__in=nodes)
+    live_data_sources = {f"{node_id}_{version}": sources
+                         for node_id, version, sources in node_version_qs.values_list("node_id", "version",
+                                                                                      "live_data_sources")}
+
     qs = analysis.analysisnode_set.filter(id__in=nodes)
     node_status_list = []
     for data in qs.values("id", "version", "status", "count", "shadow_color"):
@@ -378,6 +388,10 @@ def nodes_status(request, analysis_id):
         counts = node_counts.get(f"{node_id}_{version}", {})
         counts[BuiltInFilters.TOTAL] = data["count"]
         data["counts"] = counts
+        # A node reading mutable tables has an advisory count - the client shows it abbreviated (#235)
+        sources = live_data_sources.get(f"{node_id}_{version}") or {}
+        data["deterministic"] = not sources
+        data["live_data_sources"] = sources
         node_status_list.append(data)
     return JsonResponse({"node_status": node_status_list})
 

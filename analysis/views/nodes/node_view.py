@@ -39,6 +39,7 @@ class NodeView(UpdateView):
             "extra_filters_label": dict(BuiltInFilters.CHOICES).get(extra_filters),
             'has_write_permission': self.object.analysis.can_write(self.request.user),
             "node_warnings": self.object.get_warnings(),
+            "node_live_data_notes": self.object.get_live_data_notes(),
         })
 
         if configuration_errors := self.object._get_configuration_errors():

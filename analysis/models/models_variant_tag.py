@@ -7,7 +7,7 @@ from django_extensions.db.models import TimeStampedModel
 
 from analysis.models.enums import TagLocation
 from analysis.models.models_analysis import Analysis
-from analysis.models.nodes.analysis_node import AnalysisNode
+from analysis.models.nodes.analysis_node import AnalysisNode, NodeVersion
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsAutoInitialSaveMixin
 from snpdb.models import Allele, GenomeBuild, Tag, Variant, VariantAllele
 
@@ -48,6 +48,10 @@ class VariantTag(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
     imported_variant_tag = models.ForeignKey(ImportedVariantTag, null=True, on_delete=CASCADE)
     # Most recent node where it was added
     node = models.ForeignKey(AnalysisNode, null=True, on_delete=SET_NULL)  # Keep even if node deleted
+    node_version = models.ForeignKey(NodeVersion, null=True, on_delete=SET_NULL)
+    # NodeVersion rows are deleted when a node reloads, so the sources the node was showing when this tag
+    # was made are copied here - the tag is the audit record of what the tagger actually saw
+    node_live_data_sources = models.JSONField(default=dict)
     user = models.ForeignKey(User, on_delete=CASCADE)
 
     def __str__(self):

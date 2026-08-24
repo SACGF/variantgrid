@@ -1,6 +1,7 @@
 const endpointColor = "#121212";
 const ACTIVE_CLASS = "ui-selected";
 const ACTIVE_NODE_COUNT_CLASS = "node-counts-selected"; // Needs to be different so not grabbed with multi-draggable
+const NODE_COUNT_TOTAL = "T";  // snpdb.models.models_enums.BuiltInFilters.TOTAL
 const SHOW_NODE_IDS_IN_TOOLTIPS = true;
 
 function getNode(nodeId) {
@@ -400,6 +401,31 @@ function setVariantCount(variant_count_selector, count) {
 	variant_count_selector.show();
 }
 
+// A node reading mutable tables (eg internal frequency counts) has an advisory count - a handful of
+// variants cross the filter threshold with every import, so show the magnitude rather than a number
+// that implies more precision than we have (#235)
+function formatNodeCount(count, deterministic) {
+	if (deterministic || count < 10000) {
+		return intWithCommas(count);
+	}
+	const abbreviated = count >= 1e6 ? (count / 1e6).toFixed(1) + 'M' : Math.round(count / 1e3) + 'K';
+	return '~' + abbreviated;
+}
+
+function markLiveDataCount(node_counts, deterministic, liveDataSources) {
+	const totalCount = $(".node-count-" + NODE_COUNT_TOTAL, node_counts);
+	totalCount.toggleClass("live-data-count", !deterministic);
+	if (deterministic) {
+		totalCount.removeAttr("title");
+		return;
+	}
+	const sources = Object.keys(liveDataSources || {}).map(function(k) {
+		return k + " #" + liveDataSources[k];
+	}).join(", ");
+	totalCount.attr("title", "Count reflects live data - " + sources + ". May differ slightly from the grid.");
+	$(".count-value", totalCount).append(" <span class='live-data-marker'>&#9889;</span>");
+}
+
 function updateDirtyNode(node, refresh) {
 	const node_id = node.attr("node_id");
 
@@ -479,15 +505,17 @@ function updateDirtyNode(node, refresh) {
 
 		if (data.valid) {
 			const counts = data.counts;
+			const deterministic = data.deterministic !== false;
 			for (const c in counts) {
 				const vc = $(".node-count-" + c, node_counts);
 				const count = counts[c];
 				if (count > 0 || vc.hasClass("show-zero")) {
-					setVariantCount(vc, intWithCommas(counts[c]));
+					setVariantCount(vc, formatNodeCount(count, deterministic));
 				} else {
 					vc.hide();
 				}
 			}
+			markLiveDataCount(node_counts, deterministic, data.live_data_sources);
 		} else {
 			setVariantCount(variant_count, "");
 		}
