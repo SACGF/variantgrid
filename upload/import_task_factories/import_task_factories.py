@@ -62,7 +62,6 @@ from upload.tasks.vcf.import_vcf_tasks import (
     ProcessVCFLinkAllelesSetMaxVariantTask,
     ProcessVCFLinkManualVariantEntrySetMaxVariantTask,
     ProcessVCFSetMaxVariantTask,
-    UploadPipelineFinishedTask,
 )
 from upload.upload_metadata import VCF_METADATA_KEYS
 
@@ -162,7 +161,9 @@ class DragenTSO500AllFusionsImportTaskFactory(AbstractVCFImportTaskFactory):
         return [DragenTSO500AllFusionsInsertTask, VCFCheckAnnotationTask]
 
     def get_finish_task_classes(self):
-        return [UploadPipelineFinishedTask, ImportGenotypeVCFSuccessTask]
+        # pipeline_success_task closes the pipeline off the end of the FINISH chain, so nothing here
+        # takes it out of PROCESSING before ImportGenotypeVCFSuccessTask releases the VCF
+        return [ImportGenotypeVCFSuccessTask]
 
 
 class GeneCoverageImportTaskFactory(ImportTaskFactory):
