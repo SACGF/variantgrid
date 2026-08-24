@@ -11,15 +11,19 @@
         <span class="text-info">{{ c_hgvs.genome_build }}</span>&#32;
     {% endif %}
     <span class="c-hgvs-body">
-        <span class="c-hgvs-transcript">{{ c_hgvs.transcript }}</span>
-        {% if c_hgvs.gene_symbol %}
-            <span class="c-hgvs-gene-symbol-b">
-                <span class="bracket">(</span><span class="c-hgvs-gene-symbol">{{ c_hgvs.gene_symbol }}</span><span class="bracket bracket-close">)</span>
-            </span>
-            <span class="colon">:</span>
-        {% else %}<span class="colon-no-gene-symbol">:</span>{% endif %}
+        {% if c_hgvs.transcript %}
+            <span class="c-hgvs-transcript">{{ c_hgvs.transcript }}</span>
+            {% if c_hgvs.gene_symbol %}
+                <span class="c-hgvs-gene-symbol-b">
+                    <span class="bracket">(</span><span class="c-hgvs-gene-symbol">{{ c_hgvs.gene_symbol }}</span><span class="bracket bracket-close">)</span>
+                </span>
+                <span class="colon">:</span>
+            {% else %}<span class="colon-no-gene-symbol">:</span>{% endif %}
 
-        <span class="c-hgvs-nomen">{{ c_hgvs.nomen }}</span>
+            <span class="c-hgvs-nomen">{{ c_hgvs.nomen }}</span>
+        {% else %}{% comment %}Anything we couldn't split (gene fusions, legacy junk) - show it as it came in{% endcomment %}
+            <span class="c-hgvs-nomen">{{ c_hgvs.full_hgvs }}</span>
+        {% endif %}
     </span>
 {% endif %}
 {% endspaceless %}
