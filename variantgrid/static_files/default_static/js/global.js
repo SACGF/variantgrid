@@ -108,7 +108,6 @@ function enhanceAndMonitor() {
 
         {test: '[data-replace]', func: (node) => {
             const selector = node.attr('data-replace');
-            console.log(`Found replace for ${selector}`);
             node.detach();
            $(selector).html(node);
            node.fadeIn();
@@ -557,9 +556,7 @@ function enhanceAndMonitor() {
 function cardToModal(content) {
     const modalContentDiv = content.closest('.modal-content');
     if (modalContentDiv.length) {
-        console.log("Looking to convert card to modal");
         if (content.find('.card .modalable')) {
-            console.log("Converting to card to modal");
             content.find('.card').removeClass('card');
             const cardHeader = content.find(".card-header");
             const h5 = $("<h5>", {"class": "modal-title"}).append(cardHeader.contents());
@@ -1024,7 +1021,7 @@ function convertTimestampDom(elem) {
             case 0: finalText = "Today"; break;
             case 1: finalText = "Tomorrow"; break;
             case 2: finalText = "2 days from now"; break;
-            default: console.log(`Date Diff = ${daysDiff}`);
+            // default: console.log(`Date Diff = ${daysDiff}`);
         }
         if (finalText) {
             let text = m.format("YYYY-MM-DD");
