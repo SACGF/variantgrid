@@ -6,6 +6,7 @@ from annotation.annotation_version_querysets import (
     pipeline_type_variant_q,
 )
 from annotation.fake_annotation import get_fake_annotation_version
+from annotation.models.damage_enums import PathogenicityImpact
 from annotation.gene_level_annotation import annotate_gene_level_run
 from annotation.models import (
     AnnotationRangeLock,
@@ -27,6 +28,7 @@ from genes.models import (
     ReleaseTranscriptVersion,
 )
 from genes.models_enums import AnnotationConsortium, HGNCStatus
+from library.genomics.vcf_enums import VariantClass
 from classification.models.classification_variant_info_models import ImportedAlleleInfo
 from snpdb.models import GenomeBuild, GenomeBuildPatchVersion, Variant
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
@@ -205,6 +207,32 @@ class GeneLevelAnnotationTest(TestCase):
         self.assertEqual(self.cd74_gene.pk, variant_annotation.gene_id)
         self.assertEqual(self.cd74_transcript_version, variant_annotation.transcript_version)
         self.assertEqual(self.cd74_transcript_version.transcript_id, variant_annotation.transcript_id)
+
+    def test_sets_the_columns_vep_always_fills(self):
+        """ consequence/impact/variant_class are non-null on every VEP row, and code downstream
+            assumes it - eg gene damage counts does `'missense_variant' in consequence` """
+        self._run_annotation()
+        variant_annotation = VariantAnnotation.objects.get(version=self.vav,
+                                                           variant=self.gene_fusion.variant)
+        self.assertEqual("gene_fusion", variant_annotation.consequence)
+        self.assertEqual(PathogenicityImpact.HIGH, variant_annotation.impact)
+        self.assertEqual(VariantClass.GENE_FUSION, variant_annotation.variant_class)
+        self.assertEqual(0, variant_annotation.predictions_num_pathogenic)
+        self.assertEqual(0, variant_annotation.predictions_num_benign)
+
+    def test_impact_keeps_fusions_through_a_damage_filter(self):
+        """ A null impact drops out of PathogenicityImpact.get_q entirely, so a DamageNode would
+            silently lose every fusion """
+        self._run_annotation()
+        q = PathogenicityImpact.get_q(PathogenicityImpact.MODERATE)
+        self.assertIn(self.gene_fusion.variant, list(Variant.objects.filter(q)))
+
+    def test_canonical_says_whether_the_pick_is_tagged(self):
+        """ Our transcripts carry no MANE/RefSeq Select tag, so the pick is a fallback, not canonical """
+        self._run_annotation()
+        variant_annotation = VariantAnnotation.objects.get(version=self.vav,
+                                                           variant=self.gene_fusion.variant)
+        self.assertFalse(variant_annotation.canonical)
 
     def test_writes_transcript_annotation_for_both_partners(self):
         """ What the grid export swaps in when an analysis knows its enrichment kit's transcripts """

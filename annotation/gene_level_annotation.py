@@ -40,11 +40,20 @@ from annotation.models.models import (
     VariantGeneOverlap,
     VariantTranscriptAnnotation,
 )
+from annotation.models.damage_enums import PathogenicityImpact
 from annotation.signals.manual_signals import annotation_run_complete_signal
 from genes.models import FusionGeneId, GeneAnnotationRelease, GeneFusion, TranscriptVersion
 from library.django_utils.django_partition import temporary_db_table
+from library.genomics.vcf_enums import VariantClass
 
 BULK_INSERT_BATCH_SIZE = 2000
+
+# The columns VEP fills for every variant it sees, so a fusion is not the one row where they are blank.
+# SO:0001565 - VEP has no fusion consequence, and the impact matches what it gives transcript_ablation.
+# variant_class is variant-level, so it goes on the representative annotation only
+GENE_FUSION_CONSEQUENCE = "gene_fusion"
+GENE_FUSION_IMPACT = PathogenicityImpact.HIGH
+GENE_FUSION_VARIANT_CLASS = VariantClass.GENE_FUSION
 
 
 @dataclass(frozen=True)
@@ -87,6 +96,14 @@ class FusionGeneIdResolver:
             representative_transcript_version=_representative_transcript_version(transcript_versions, gene_id))
         self._cache[fusion_gene_id.pk] = result
         return result
+
+
+def _is_canonical(transcript_version: Optional[TranscriptVersion]) -> Optional[bool]:
+    """ VEP's CANONICAL flag on the transcript a row is about - here, whether it carries a
+        MANE Select / RefSeq Select tag rather than being the highest version we happen to hold """
+    if transcript_version is None:
+        return None
+    return bool(transcript_version.canonical_score)
 
 
 def _representative_transcript_version(transcript_versions: list[TranscriptVersion],
@@ -215,6 +232,10 @@ def _build_gene_fusion_annotation(annotation_run, resolver: FusionGeneIdResolver
         gene_id=anchor.gene_id,
         transcript_id=representative_transcript_version.transcript_id if representative_transcript_version else None,
         transcript_version=representative_transcript_version,
+        canonical=_is_canonical(representative_transcript_version),
+        consequence=GENE_FUSION_CONSEQUENCE,
+        impact=GENE_FUSION_IMPACT,
+        variant_class=GENE_FUSION_VARIANT_CLASS,
         hgvs_c=canonical_str,
         hgvs_g=canonical_str,
     )
@@ -237,6 +258,9 @@ def _build_gene_fusion_annotation(annotation_run, resolver: FusionGeneIdResolver
                 gene_id=transcript_version.gene_version.gene_id,
                 transcript_id=transcript_version.transcript_id,
                 transcript_version=transcript_version,
+                canonical=_is_canonical(transcript_version),
+                consequence=GENE_FUSION_CONSEQUENCE,
+                impact=GENE_FUSION_IMPACT,
                 hgvs_c=canonical_str,
             ))
 

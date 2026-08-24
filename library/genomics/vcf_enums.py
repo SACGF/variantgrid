@@ -145,6 +145,9 @@ class VariantClass(models.TextChoices):
     INSERTION = 'IS', "insertion"
     SEQUENCE_ALTERATION = 'SA', "sequence_alteration"
     PROBE = 'PR', "probe"
+    # Not an Ensembl class - VEP has none for a fusion, and a gene-level variant never reaches it anyway.
+    # SO:0001565, the term SnpEff emits. @see snpdb.gene_level_variants
+    GENE_FUSION = 'GF', "gene_fusion"
 
 
 INFO_LIFTOVER_SWAPPED_REF_ALT = "VG_LIFTOVER_SWAPPED_REF_ALT"
