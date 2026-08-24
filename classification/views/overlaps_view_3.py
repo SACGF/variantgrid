@@ -352,6 +352,13 @@ class OverlapDownloadRow(ExportRow):
     def overlap_status(self):
         return f"{self.overlap.overlap_status.value} {self.overlap.overlap_status.label}"
 
+    @export_column("Reviewed-as", categories={"solved": True})
+    def reviewed_as(self):
+        if override := self.overlap.overlap_override_status:
+            return override.label
+        else:
+            return "Now Concordant"
+
     @export_column("Max Ever Priority & Status", categories={"solved": True})
     def max_overlap_status(self):
         return f"{self.overlap.overlap_max_ever_status.value} {self.overlap.overlap_max_ever_status.label}"
@@ -359,13 +366,6 @@ class OverlapDownloadRow(ExportRow):
     @export_column("Last Status Update", data_type=ExportDataType.date)
     def last_status_update(self):
         return self.overlap.overlap_status_change_timestamp
-
-    @export_column("Reviewed-as", categories={"solved": True})
-    def reviewed_as(self):
-        if override := self.overlap.overlap_override_status:
-            return override.label
-        else:
-            return "Now Concordant"
 
     @export_column("Values")
     def values(self):
@@ -420,6 +420,8 @@ def download_overlaps(request, lab_id: str):
             overlap=OuterRef('pk')
         ).annotate(max_status=Max('next_step')).values_list('max_status')[:1]
     ))
+
+    qs = qs.order_by("-overlap_status", "-skew_status", "-overlap_status_change_timestamp", "-overlap_override_status")
 
     qs = qs.prefetch_related("overlapcontributionskew_set")
 
