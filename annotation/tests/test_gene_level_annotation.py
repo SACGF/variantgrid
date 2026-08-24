@@ -1,7 +1,10 @@
 """The GENE_LEVEL annotation pipeline - what makes gene lists and comp-het find a fusion."""
 from django.test import TestCase
 
-from annotation.annotation_version_querysets import pipeline_type_variant_q
+from annotation.annotation_version_querysets import (
+    get_queryset_for_annotation_version,
+    pipeline_type_variant_q,
+)
 from annotation.fake_annotation import get_fake_annotation_version
 from annotation.gene_level_annotation import annotate_gene_level_run
 from annotation.models import (
@@ -55,7 +58,7 @@ def _make_gene(genome_build, release, gene_id, gene_symbol, transcript_id, conti
                                                                      gene_symbol_id=gene_symbol)
     ReleaseGeneSymbolGene.objects.get_or_create(release_gene_symbol=release_gene_symbol,
                                                 gene_id=gene_id)
-    return gene_version.gene
+    return gene_version.gene, transcript_version
 
 
 class GeneLevelAnnotationTest(TestCase):
@@ -78,10 +81,10 @@ class GeneLevelAnnotationTest(TestCase):
 
         # Deliberately on different contigs - an inter-chromosomal fusion is the case that breaks
         # anchoring on a real chromosome
-        cls.cd74_gene = _make_gene(cls.genome_build, release, "ENSG00000000001", "CD74",
-                                   "ENST00000000001.1", "5", 149_784_000)
-        cls.ros1_gene = _make_gene(cls.genome_build, release, "ENSG00000000002", "ROS1",
-                                   "ENST00000000002.1", "6", 117_645_000)
+        cls.cd74_gene, cls.cd74_transcript_version = _make_gene(
+            cls.genome_build, release, "ENSG00000000001", "CD74", "ENST00000000001.1", "5", 149_784_000)
+        cls.ros1_gene, cls.ros1_transcript_version = _make_gene(
+            cls.genome_build, release, "ENSG00000000002", "ROS1", "ENST00000000002.1", "6", 117_645_000)
 
         cls.gene_fusion = create_gene_fusion("CD74", "ROS1")
 
@@ -115,8 +118,8 @@ class GeneLevelAnnotationTest(TestCase):
         self.assertEqual({self.cd74_gene.pk, self.ros1_gene.pk}, gene_ids)
 
     def test_canonical_c_hgvs_falls_back_to_the_representative_annotation(self):
-        """ There is no VariantTranscriptAnnotation to read, so what the detail page loads comes from
-            the representative annotation instead """
+        """ canonical is VEP's flag, and nothing here sets it - so what the detail page loads comes
+            from the representative annotation rather than a transcript row """
         self._run_annotation()
         variant = self.gene_fusion.variant
         self.assertIsNone(variant.get_canonical_transcript_annotation(self.genome_build))
@@ -174,16 +177,47 @@ class GeneLevelAnnotationTest(TestCase):
         self.assertEqual(0, annotation_run.dump_count)
 
     def test_rerunnable(self):
-        """ Overlaps are rebuilt per annotation version, so running twice is not an error """
+        """ A second run over the same range finds the variants already annotated, so it writes nothing """
+        first_run = self._run_annotation()
         self._run_annotation()
-        annotation_run = self._run_annotation()
         self.assertEqual(1, VariantAnnotation.objects.filter(version=self.vav,
                                                              variant=self.gene_fusion.variant).count())
         self.assertEqual(2, VariantGeneOverlap.objects.filter(version=self.vav,
                                                               variant=self.gene_fusion.variant).count(),
                          "one row per partner, not one per run")
-        self.assertEqual(annotation_run, VariantAnnotation.objects.get(
+        self.assertEqual(first_run, VariantAnnotation.objects.get(
             version=self.vav, variant=self.gene_fusion.variant).annotation_run)
+
+    def test_rows_go_into_the_version_partition(self):
+        """ Written to the base table they inherit from, they are invisible to every annotation
+            queryset - which is how the analysis grid lost its annotation columns """
+        self._run_annotation()
+        annotation_version = self.vav.get_any_annotation_version()
+        for klass in (VariantAnnotation, VariantTranscriptAnnotation, VariantGeneOverlap):
+            qs = get_queryset_for_annotation_version(klass, annotation_version)
+            self.assertTrue(qs.filter(variant=self.gene_fusion.variant).exists(), klass.__name__)
+
+    def test_representative_gene_and_transcript(self):
+        """ No VEP 'pick' to inherit, so the anchor gene and its best transcript stand in """
+        self._run_annotation()
+        variant_annotation = VariantAnnotation.objects.get(version=self.vav,
+                                                           variant=self.gene_fusion.variant)
+        self.assertEqual(self.cd74_gene.pk, variant_annotation.gene_id)
+        self.assertEqual(self.cd74_transcript_version, variant_annotation.transcript_version)
+        self.assertEqual(self.cd74_transcript_version.transcript_id, variant_annotation.transcript_id)
+
+    def test_writes_transcript_annotation_for_both_partners(self):
+        """ What the grid export swaps in when an analysis knows its enrichment kit's transcripts """
+        annotation_run = self._run_annotation()
+        vta_qs = VariantTranscriptAnnotation.objects.filter(annotation_run=annotation_run)
+        by_transcript_version = {vta.transcript_version_id: vta for vta in vta_qs}
+        self.assertEqual({self.cd74_transcript_version.pk, self.ros1_transcript_version.pk},
+                         set(by_transcript_version))
+        ros1 = by_transcript_version[self.ros1_transcript_version.pk]
+        self.assertEqual("ROS1", ros1.symbol)
+        self.assertEqual(self.ros1_gene.pk, ros1.gene_id)
+        self.assertEqual("CD74::ROS1", ros1.hgvs_c,
+                         "the c.HGVS column keeps its value when a kit's transcript is swapped in")
 
 
 class GeneLevelVariantContainmentTest(TestCase):
