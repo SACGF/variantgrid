@@ -1056,6 +1056,12 @@ LOGGING = {
         'hgvs': {
             'level': 'WARNING',
         },
+        # Named here so dictConfig spares celery's loggers (and its children) from
+        # disable_existing_loggers - celery is imported before django.setup() runs.
+        # Handlers are left to celery, which hijacks the root logger to honour --logfile
+        'celery': {
+            'level': LOG_LEVEL,
+        },
         #        'django.request': {
         #            'handlers': ['mail_admins'],
         #            'level': 'ERROR',

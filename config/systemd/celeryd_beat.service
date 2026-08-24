@@ -9,7 +9,7 @@ ExecStartPre=/bin/mkdir -p /var/log/variantgrid
 Restart=always
 EnvironmentFile=/etc/variantgrid/variantgrid.env
 EnvironmentFile=/etc/variantgrid/celery/celeryd_beat.env
-ExecStart=/bin/sh -c 'cd "${VG_INSTALL_DIR}" && ${CELERY_BIN} -A ${CELERY_APP} beat \
+ExecStart=/bin/sh -c 'cd "${VG_INSTALL_DIR}" && exec ${CELERY_BIN} -A ${CELERY_APP} beat \
   --logfile=${CELERYD_LOG_FILE} --loglevel=${CELERYD_LOG_LEVEL} ${CELERYD_OPTS}'
 
 [Install]
