@@ -45,13 +45,11 @@ if SYNC_DETAILS and any(sd["enabled"] for sd in SYNC_DETAILS.values()):
     }
 
 SAPATH_ENABLED = any(a.startswith("sapath") for a in settings.INSTALLED_APPS)
-if SAPATH_ENABLED:
-    helix_user = getattr(settings, "SAPATH_HELIX_USER", None)
-    if helix_user:
-        app.conf.beat_schedule['sapath-helix-load-if-changed'] = {
-            'task': 'sapath.tasks.import_helix_task.sapath_helix_load_if_changed',
-            'schedule': HOUR_SECS,  # Check every hour, only update if hash changed
-        }
+if SAPATH_ENABLED and getattr(settings, "SAPATH_HELIX_SHARED_FILE", None):
+    app.conf.beat_schedule['sapath-helix-load-if-changed'] = {
+        'task': 'sapath.tasks.import_helix_task.sapath_helix_load_if_changed',
+        'schedule': HOUR_SECS,  # Check every hour, only update if hash changed
+    }
 
 # Reclassification timelines (issue #1523): the analytics page builds what it can in the request,
 # this picks up anything left over, e.g. the morning after a large sync.

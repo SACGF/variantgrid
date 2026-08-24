@@ -33,10 +33,7 @@
     "email": null
   },
   "SAPATH": {
-    "HELIX": {
-      "user": null,
-      "password": null
-    }
+    "MOCHA_TOKEN": null
   },
   "SECURITY": {
     "maintenance_mode": false
