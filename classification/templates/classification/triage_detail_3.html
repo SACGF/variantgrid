@@ -37,9 +37,9 @@
         $('input[name="triage_status"]').change(() => {
             triage_status_updated();
         });
-        $(document).ready(() => {
+        window.setTimeout(() => {
             triage_status_updated();
-        });
+        }, 50);
     </script>
 
 {% else %}
