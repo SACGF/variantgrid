@@ -58,3 +58,4 @@ class ModifiedImportedVariantOperation(models.TextChoices):
     NORMALIZATION = 'N', "Normalisation"
     RMDUP = 'R', "Removed Duplicate"
     SHARED_LOCUS = 'L', "Shared Locus - allele depths summed"
+    MERGED_RECORDS = 'M', "Merged Records - multiple VCF records became one variant"

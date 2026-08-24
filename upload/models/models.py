@@ -711,6 +711,9 @@ class ModifiedImportedVariants(VCFImportInfo):
         if num_shared_locus := miv_qs.filter(operation=ModifiedImportedVariantOperation.SHARED_LOCUS).count():
             messages.append(f"{num_shared_locus} allele frequencies summed across a shared locus")
 
+        if num_merged := miv_qs.filter(operation=ModifiedImportedVariantOperation.MERGED_RECORDS).count():
+            messages.append(f"{num_merged} variants from multiple merged records")
+
         return ", ".join(messages)
 
 
@@ -734,7 +737,8 @@ class ModifiedImportedVariant(models.Model):
     old_variant = models.TextField(null=True)
     old_variant_formatted = models.TextField(null=True)  # consistently format for retrieval
     # What the operation did, where the old_* fields (which are bcftools-shaped) can't say it. Used by
-    # SHARED_LOCUS to record the depths that were summed, so the per-record VAF stays reconstructable
+    # SHARED_LOCUS to record the depths that were summed (so the per-record VAF stays reconstructable)
+    # and by MERGED_RECORDS to list the records that were merged
     operation_detail = models.TextField(null=True)
 
     @property

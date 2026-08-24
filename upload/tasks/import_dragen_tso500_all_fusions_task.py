@@ -136,8 +136,7 @@ class DragenTSO500AllFusionsInsertTask(ImportVCFStepTask):
 
 def _record_merged_rows(upload_step, variant_qs):
     """ Several rows can share one gene pair and become one Variant, so one CohortGenotype. Every
-        row's data is kept in the info blob; this records that the merge happened, the way
-        SHARED_LOCUS does for VCF rows whose depths were summed. """
+        row's data is kept in the info blob; this records that the merge happened. """
 
     cgc = upload_step.upload_pipeline.uploadedvcf.vcf.cohort.cohort_genotype_collection
     info_alias = f"{cgc.cohortgenotype_alias}__info"
@@ -158,7 +157,7 @@ def _record_merged_rows(upload_step, variant_qs):
     ModifiedImportedVariant.objects.bulk_create([
         ModifiedImportedVariant(import_info=import_info,
                                 variant_id=variant_id,
-                                operation=ModifiedImportedVariantOperation.SHARED_LOCUS,
+                                operation=ModifiedImportedVariantOperation.MERGED_RECORDS,
                                 operation_detail=f"{count} calls merged onto one gene pair: {calls}")
         for variant_id, count, calls in merged
     ])
