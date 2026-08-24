@@ -1107,12 +1107,15 @@ class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
 
     @cached_property
     def tags(self) -> list[str]:
-        """ 'tag' has been in cdot since 0.2.12 """
+        """ 'tag' has been in cdot since 0.2.12. A record with no data for this build has no tags -
+            that's a missing annotation rather than a broken record, so read it without raising
+            (@see genome_build_data) """
         REMOVE_TAGS = {"basic"}  # This is on pretty much every Ensembl transcript
         tag_list = []
         # 'tag' was in the transcript in versions 0.2.12 - 0.2.13
         # It is inside genome build data after 0.2.14
-        if tag_list_str := self.genome_build_data.get("tag") or self.data.get("tag"):
+        build_data = self.data.get("genome_builds", {}).get(self.genome_build.name) or {}
+        if tag_list_str := build_data.get("tag") or self.data.get("tag"):
             tag_list = sorted(tag.strip() for tag in tag_list_str.split(",") if tag.strip() not in REMOVE_TAGS)
         return tag_list
 

@@ -561,7 +561,10 @@ class TestTranscriptVersionTags(TestCase):
     """
 
     def _get_tags(self, genome_build_data, data=None):
+        # tags reads the cdot data itself, so build the nesting it expects
         tv = _tv(genome_build_data, data)
+        tv.genome_build = types.SimpleNamespace(name="GRCh38")
+        tv.data = dict(tv.data, genome_builds={"GRCh38": genome_build_data})
         return TranscriptVersion.tags.func(tv)
 
     def _get_canonical_tag(self, tags_list):

@@ -26,6 +26,8 @@ from genes.models import (
     ReleaseGeneSymbol,
     ReleaseGeneSymbolGene,
     ReleaseTranscriptVersion,
+    Transcript,
+    TranscriptVersion,
 )
 from genes.models_enums import AnnotationConsortium, HGNCStatus
 from library.genomics.vcf_enums import VariantClass
@@ -233,6 +235,23 @@ class GeneLevelAnnotationTest(TestCase):
         variant_annotation = VariantAnnotation.objects.get(version=self.vav,
                                                            variant=self.gene_fusion.variant)
         self.assertFalse(variant_annotation.canonical)
+
+    def test_transcript_version_without_cdot_build_data(self):
+        """ Pre-cdot rows have no per-build data - they rank as untagged rather than breaking the run """
+        legacy_transcript = Transcript.objects.create(identifier="ENST00000000003",
+                                                     annotation_consortium=AnnotationConsortium.ENSEMBL)
+        legacy = TranscriptVersion.objects.create(transcript=legacy_transcript, version=1,
+                                                 gene_version=self.cd74_transcript_version.gene_version,
+                                                 genome_build=self.genome_build,
+                                                 contig=self.cd74_transcript_version.contig,
+                                                 import_source=self.cd74_transcript_version.import_source,
+                                                 data={})
+        ReleaseTranscriptVersion.objects.create(release=self.vav.gene_annotation_release,
+                                                transcript_version=legacy)
+        annotation_run = self._run_annotation()
+        transcript_version_ids = set(VariantTranscriptAnnotation.objects.filter(annotation_run=annotation_run)
+                                     .values_list("transcript_version_id", flat=True))
+        self.assertIn(legacy.pk, transcript_version_ids)
 
     def test_writes_transcript_annotation_for_both_partners(self):
         """ What the grid export swaps in when an analysis knows its enrichment kit's transcripts """
