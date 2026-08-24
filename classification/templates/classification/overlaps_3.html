@@ -37,7 +37,10 @@
 
     {% lab_picker data=lab_picker_data %}
 
-    <a class="hover-link download-link" href="{% url 'overlaps_3_download' lab_picker_data.selection %}">Download All</a>
+    <div>
+    <a class="hover-link download-link pipe-sep" href="{% url 'overlaps_3_download' lab_picker_data.selection %}">Download Outstanding</a>
+    <a class="hover-link download-link pipe-sep" href="{% url 'overlaps_3_download' lab_picker_data.selection %}?mode=solved">Download Solved</a>
+    </div>
 
     <div id="triage_status_filter" class="my-4">
         <div class="btn-group btn-group-toggle" data-toggle="buttons">

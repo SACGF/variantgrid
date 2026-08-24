@@ -19,7 +19,7 @@ from classification.services.overlaps_services import OverlapServices, OverlapGr
 from classification.views.overlaps_datatables_3 import OverlapColumns
 from library.django_utils import get_url_from_view_path
 from library.log_utils import log_admin_change
-from library.utils import empty_to_none, ExportRow, export_column, ExportDataType
+from library.utils import empty_to_none, ExportRow, export_column, ExportDataType, ExportTweak
 from library.utils.django_utils import render_ajax_view
 from review.models import Review
 from snpdb.genome_build_manager import GenomeBuildManager
@@ -348,25 +348,30 @@ class OverlapDownloadRow(ExportRow):
     def c_hgvs(self):
         return "\n".join([str(chgvs) for chgvs in self.overlap.c_hgvs_all(GenomeBuildManager.get_current_genome_build())])
 
-    @export_column("Status")
+    @export_column("Priority & Status")
     def overlap_status(self):
-        return self.overlap.overlap_status.label
+        return f"{self.overlap.overlap_status.value} {self.overlap.overlap_status.label}"
+
+    @export_column("Max Ever Priority & Status", categories={"solved": True})
+    def max_overlap_status(self):
+        return f"{self.overlap.overlap_max_ever_status.value} {self.overlap.overlap_max_ever_status.label}"
 
     @export_column("Last Status Update", data_type=ExportDataType.date)
     def last_status_update(self):
         return self.overlap.overlap_status_change_timestamp
 
-    @export_column("Reviewed-as")
+    @export_column("Reviewed-as", categories={"solved": True})
     def reviewed_as(self):
         if override := self.overlap.overlap_override_status:
             return override.label
-        return None
+        else:
+            return "Now Concordant"
 
     @export_column("Values")
     def values(self):
         return ", ".join(self.overlap.relevant_values())
 
-    @export_column("Next Step")
+    @export_column("Next Step", categories={"solved": False})
     def next_step(self):
         relevant = [x for x in self.overlap.contributions_list if x.classification_grouping and x.classification_grouping.lab_id in self.lab_picker.lab_ids]
         skews = list(self.overlap.overlapcontributionskew_set.filter(contribution__in=relevant).all())
@@ -383,6 +388,7 @@ class OverlapDownloadRow(ExportRow):
 
 
 def download_overlaps(request, lab_id: str):
+    solved_mode = request.GET.get("mode") == "solved"
     lab_picker = LabPickerData.from_request(request, lab_id, 'overlaps_3')
     if redirect_response := lab_picker.check_redirect():
         return redirect_response
@@ -401,8 +407,12 @@ def download_overlaps(request, lab_id: str):
             contribution__contribution_status=OverlapContributionStatus.CONTRIBUTING)
 
     # only look at discordant overlaps
-    qs = qs.filter(overlap_status__gte=OverlapStatus.TIER_1_VS_TIER_2_DIFFERENCES).filter(
-        overlap_override_status=OverlapOverrideStatus.NO_OVERRIDE)
+    if solved_mode:
+        qs = qs.filter(Q(overlap_override_status__ne=OverlapOverrideStatus.NO_OVERRIDE) | Q(overlap_max_ever_status__gte=OverlapStatus.TIER_1_VS_TIER_2_DIFFERENCES))
+        qs = qs.filter(overlap_status__gte=OverlapStatus.SINGLE_SUBMITTER)  # don't show overlaps that everyone withdrew from
+    else:
+        qs = qs.filter(overlap_status__gte=OverlapStatus.TIER_1_VS_TIER_2_DIFFERENCES).filter(
+            overlap_override_status=OverlapOverrideStatus.NO_OVERRIDE)
 
     # filter based on overlap skew
     qs = qs.annotate(skew_status=Subquery(
@@ -416,5 +426,6 @@ def download_overlaps(request, lab_id: str):
     return OverlapDownloadRow.streaming_csv(
         data=qs.iterator(chunk_size=1000),
         filename="discordance_reports",
+        export_tweak=ExportTweak(categories={"solved": solved_mode}),
         transformer=lambda x: OverlapDownloadRow(x, lab_picker)
     )
