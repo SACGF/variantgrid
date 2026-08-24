@@ -1,4 +1,5 @@
 from collections import defaultdict
+from dataclasses import asdict
 
 from django.db import models
 
@@ -48,7 +49,16 @@ def get_nodes_by_classification() -> dict[str, list]:
         data = {
             "class_name": node.get_class_name(),
             "class_label": node_class_label,
+            "class_label_short": node_class.get_node_class_label_short(),
+            "icon": asdict(node_class.get_node_class_icon()),
         }
         nodes[classification].append(data)
 
     return nodes
+
+
+def get_node_display_data_by_class_name() -> dict[str, dict]:
+    """ Icons/labels for the add node dropdown, keyed by the <select> option values """
+    return {data["class_name"]: data
+            for nodes in get_nodes_by_classification().values()
+            for data in nodes}

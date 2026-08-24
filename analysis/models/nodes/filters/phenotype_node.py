@@ -11,6 +11,7 @@ from django.db.models.deletion import CASCADE, SET_NULL
 from django.db.models.query_utils import Q
 
 from analysis.models.nodes.analysis_node import AnalysisNode, NodeAuditLogMixin
+from analysis.models.nodes.node_display import NodeIcon
 from annotation.models import OntologyTerm, VariantTranscriptAnnotation
 from genes.models import GeneSymbol
 from library.constants import DAY_SECS
@@ -231,6 +232,10 @@ class PhenotypeNode(AnalysisNode):
     @staticmethod
     def get_node_class_label():
         return "Phenotype"
+
+    @classmethod
+    def get_node_class_icon(cls) -> NodeIcon:
+        return NodeIcon(fa="fa-solid fa-stethoscope")
 
 
 class PhenotypeNodeOntologyTerm(NodeAuditLogMixin, models.Model):

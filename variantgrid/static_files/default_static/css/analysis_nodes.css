@@ -30,15 +30,6 @@
 	cursor:pointer;
 }
 
-.default-node-container {
-    background-color:white;
-    text-align:center;
-	box-shadow: 2px 2px 19px;
-   -o-box-shadow: 2px 2px 19px;
-   -webkit-box-shadow: 2px 2px 19px;
-   -moz-box-shadow: 2px 2px 19px;
-}
-
 path, ._jsPlumb_endpoint { cursor:pointer; }
 
 /* z index stuff. windows are at z-index 24. */
@@ -127,132 +118,45 @@ button.add-analysis-variable-button {
 	margin: 5px;
 }
 
-/* Icons in select */
+/* Add node dropdown */
 #id_node_types-button {
     padding: 0.1em;
 }
 
-/* select with custom icons */
-.ui-selectmenu-menu .ui-menu.customicons .ui-menu-item-wrapper {
-  padding: 0.1em 0 0.1em 3em;
-}
-.ui-selectmenu-menu .ui-menu.customicons .ui-menu-item .ui-icon {
-  height: 24px;
-  width: 24px;
-  top: 0.1em;
+.node-type-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
 }
 
-ul.customicons .ui-icon {
-    background-size: 24px 24px;
+.node-type-item .node-icon {
+    width: 20px;
+    height: 20px;
+    font-size: 16px;
+    text-align: center;
+    flex-shrink: 0;
 }
 
-.ui-icon.AlleleFrequencyNode { 
-    background-image: url(/static/images/node_icons/variant_allele_frequency.png);
+/* Analysis grid create gene list child icon */
+.gene-list-node-icon {
+    font-size: 16px;
+    vertical-align: middle;
 }
-
-.ui-icon.PedigreeNode {
-    background-image: url(/static/images/node_icons/pedigree.png);
-}
-
-.ui-icon.TrioNode { 
-    background-image: url(/static/images/node_icons/trio.png);
-}
-
-.ui-icon.QuadNode {
-    background-image: url(/static/images/node_icons/quad.png);
-}
-
-.ui-icon.FilterNode { 
-    background-image: url(/static/images/node_icons/filter.png);
-}
-
-.ui-icon.IntersectionNode { 
-    background-image: url(/static/images/node_icons/intersection.png);
-}
-
-.ui-icon.GeneListNode { 
-    background-image: url(/static/images/node_icons/filter_list.png);
-}
-
-.ui-icon.AnalysisNode { 
-    background-image: url(/static/images/node_icons/analysis_node.png);
-}
-
-.ui-icon.CohortNode { 
-    background-image: url(/static/images/node_icons/cohort.png);
-}
-
-.ui-icon.ConservationNode {
-    background-image: url(/static/images/node_icons/conservation_node.png);
-}
-
-.ui-icon.SelectedInParentNode {
-    background-image: url(/static/images/node_icons/checklist_icon.png);
-}
-
-.ui-icon.MOINode {
-    background-image: url(/static/images/node_icons/moi.svg);
-}
-
-.ui-icon.PopulationNode { 
-    background-image: url(/static/images/node_icons/population_node.png);
-}
-
-.ui-icon.PhenotypeNode { 
-    background-image: url(/static/images/node_icons/phenotype_node.png);
-}
-
-.ui-icon.ZygosityNode { 
-    background-image: url(/static/images/node_icons/punnet_square.png);
-}
-
-.ui-icon.DamageNode { 
-    background-image: url(/static/images/node_icons/damage_node.png);
-}
-
-.ui-icon.TissueNode { 
-    background-image: url(/static/images/node_icons/tissue_node.jpg);
-}
-
-.ui-icon.ClassificationsNode { 
-    background-image: url(/static/images/diagnose_icon.png);
-}
-
-.ui-icon.SampleNode { 
-    background-image: url(/static/images/node_icons/sample_icon_24.png);
-}
-
-.ui-icon.BuiltInFilterNode { 
-    background-image: url(/static/images/node_icons/built_in_filter_icon_24.png);
-}
-
-.ui-icon.AllVariantsNode { 
-    background-image: url(/static/icons/database-1-1.png);
-}
-
-.ui-icon.VennNode { 
-    background-image: url(/static/images/node_icons/venn_icon_24.png);
-}
-
-.ui-icon.TagNode { 
-    background-image: url(/static/icons/tags_colored.png);
-}
-
-
-.ui-icon.MergeNode { 
-    background-image: url(/static/images/node_icons/merge.png);
-}
-
 
 /*
-	AnalysisNodes have an outer div with classes ".ClassName" and ".window" (from jsPlumb)
-	So set size off that, and then
+	AnalysisNodes are a "Design A" card - an outer div with classes ".window .design-a-node .ClassName"
+	(.window is jsPlumb's) containing:
 
-	Stacked on top of that is:
-		.node-overlay (which also has .ClassName and other classes set from node) - cleared each appearance change
-		.node-color-overlay
-		.count-overlay
+		.node-overlay (also has .ClassName and the classes from get_css_classes()) - class attribute is
+		               replaced wholesale on each appearance change, so state lives on its children:
+			.node-badge		- corner circle, icon from NodeIcon
+			.node-klass		- class strip, text from get_node_class_label_short()
+			.node-name-holder > .node-name
+			.node-chips		- pills from get_node_chips()
+			.node-color-overlay - analysis variable / output node tint
+		.node-counts-strip > .node-counts > .node-count-<type>
 
+	Everything on the card is data driven from the rendering dict - see node_display.py
 */
 
 .window {
@@ -261,121 +165,115 @@ ul.customicons .ui-icon {
 	box-sizing: unset;
 }
 
-.window.AlleleFrequencyNode {
-	width: 50px;
-	height: 40px;
+.window.design-a-node {
+	width: 128px;
+	height: auto;
+	background-color: white;
+	/* border-color is currentColor, which updateDirtyNode animates to flash node status */
+	border: 1px solid;
+	border-radius: 8px;
+	box-shadow: 2px 2px 8px rgba(0, 0, 0, .25);
+	font-family: -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+	font-style: normal;
+	font-size: 12px;
+	text-align: left;
 }
 
-.node-overlay.AlleleFrequencyNode {
-    background-image: url(/static/images/node_icons/variant_allele_frequency.png);
-    background-size: 50px 40px;
+.design-a-node .node-badge {
+	position: absolute;
+	top: -10px;
+	left: -10px;
+	width: 26px;
+	height: 26px;
+	border-radius: 50%;
+	color: white;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 13px;
+	box-shadow: 0 1px 3px rgba(0, 0, 0, .35);
+	z-index: 3;
 }
 
-.node-overlay.AllVariantsNode {
-    background-image: url(/static/icons/database-1-1.png);
+.design-a-node .node-klass {
+	display: block;
+	font-size: 9px;
+	font-weight: 700;
+	letter-spacing: .06em;
+	text-transform: uppercase;
+	color: white;
+	padding: 3px 6px 2px 20px;
+	border-radius: 7px 7px 0 0;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
 }
 
-.node-overlay.MOINode {
-    background-image: url(/static/images/node_icons/moi.svg);
+.design-a-node[node_classification="source"] .node-badge,
+.design-a-node[node_classification="source"] .node-klass {
+	background-color: #0e7a4a;
 }
 
-.node-overlay.PedigreeNode {
-	background-image: url(/static/images/node_icons/pedigree.png);
+.design-a-node[node_classification="filter"] .node-badge,
+.design-a-node[node_classification="filter"] .node-klass {
+	background-color: #3455a4;
 }
 
-.TrioNode { width: 64px; height: 50px; }
-.QuadNode { width: 80px; height: 55px; }
-
-.node-overlay.FilterNode {
-	background-image: url(/static/images/node_icons/filter.png);
+.design-a-node .node-name-holder {
+	padding: 6px 8px;
+	min-height: 2.4em;
 }
 
-.node-overlay.IntersectionNode {
-	background-image: url(/static/images/node_icons/intersection.png);
+.design-a-node .node-name {
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+	color: #24292f;
+	font-weight: 600;
 }
 
-.node-overlay.GeneListNode {
-	background-image: url(/static/images/node_icons/filter_list.png);
+.design-a-node .node-chips {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 3px;
+	padding: 0 6px 6px;
 }
 
-.node-overlay.AnalysisNode {
-	background-image: url(/static/images/node_icons/analysis_node.png);
+.design-a-node .node-chips:empty {
+	display: none;
 }
 
-.window.CohortNode {
-	width: 70px;
-	height: 70px;
+.node-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 3px;
+	max-width: 100%;
+	font-size: 9px;
+	font-weight: 600;
+	border: 1px solid #c6cdd6;
+	border-radius: 99px;
+	padding: 1px 6px;
+	background-color: #f4f6f8;
+	color: #3d4550;
+	/* .node-overlay is pointer-events: none, but chips need hover for their title */
+	pointer-events: auto;
 }
 
-.node-overlay.CohortNode {
-    background-size: 70px 70px;
-	background-image: url(/static/images/node_icons/cohort.png);
+.node-chip .node-chip-text {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
-.node-overlay.ConservationNode {
-	background-image: url(/static/images/node_icons/conservation_node.png);
+.design-a-node .node-venn {
+	display: flex;
+	justify-content: center;
 }
 
-.window.SelectedInParentNode {
-	width: 40px;
-	height: 40px;
-}
-
-.node-overlay.SelectedInParentNode {
-	background-size: 40px 40px;
-	background-image: url(/static/images/node_icons/checklist_icon.png);
-}
-
-.node-overlay.PopulationNode {
-	background-image: url(/static/images/node_icons/population_node.png);
-}
-
-.window.PhenotypeNode {
-	width: 50px;
-	height: 60px;
-}
-
-.node-overlay.PhenotypeNode {
-	background-image: url(/static/images/node_icons/phenotype_node.png);
-	background-size: 50px 60px;
-}
-
-
-.window.SampleNode {
-	width: 60px;
-	height: 60px;
-}
-
-.window.ZygosityNode {
-	width: 53px;
-	height: 39px;
-}
-
-.node-overlay.ZygosityNode {
-	background-image: url(/static/images/node_icons/punnet_square_30_perc_opacity.png);
-	background-size: 53px 39px;
-}
-
-.node-overlay.DamageNode {
-	background-image: url(/static/images/node_icons/damage_node.png);
-}
-
-.node-overlay.DamageNode.EffectNodeSplicing {
-	background-image: url(/static/images/node_icons/effect_node_splicing.png);
-}
-
-
-.node-overlay.TissueNode {
-	background-image: url(/static/images/node_icons/tissue_node.jpg);
-}
-
-.node-overlay.ClassificationsNode {
-    background-image: url(/static/images/diagnose_icon.png);
-}
-
-/* Analysis grid create gene list child icon */
-.grid-link-icon.GeneListNode {
-    background-image: url(/static/images/node_icons/filter_list.png);
+svg.node-icon {
+	width: 16px;
+	height: 16px;
 }
 
 #analysis-toolbar {
@@ -438,20 +336,13 @@ ul.customicons .ui-icon {
 	width: 200px;
 }
 
-.default-node-container {
-	border: 1px dotted gray;
-}
-
 .node-editor-description #node-name {
 	font-weight: bold;
 }
- 
-.ui-selected.default-node-container {
-	border: 1px solid red;
-}
 
-.ui-selected .sample-node {
-	stroke: #ff0000;
+.ui-selected.design-a-node {
+	border-color: red;
+	box-shadow: 0 0 0 2px rgba(255, 0, 0, .35), 2px 2px 8px rgba(0, 0, 0, .25);
 }
 
 #node-size-slider {
@@ -494,6 +385,8 @@ div.node-color-overlay {
 	pointer-events: none;
 	width: 100%;
 	height: 100%;
+	border-radius: 8px;
+	z-index: 1;
 }
 
 .variable-node .node-color-overlay {
@@ -506,44 +399,29 @@ div.node-color-overlay {
 
 
 div.node-overlay {
-	color: black; 
+	color: black;
 	pointer-events: none;
-	width: inherit;
-	height: inherit;
-	background-size: inherit;
-	background-repeat: no-repeat;
 }
 
-div.count-overlay {
-	z-index: 40;
-	position: absolute;
-	top: 0px;
-	left: 0px;
-	pointer-events: none;
+.design-a-node .node-counts-strip {
+	border-top: 1px solid #e4e7ec;
+}
+
+.design-a-node .node-counts-strip:empty {
+	border-top: none;
 }
 
 span.node-counts {
-	bottom: 0px;
-	right: 0px;
-	position: absolute;
+	display: flex;
 }
 
 .node-counts .clickable-count {
 	pointer-events: auto;
+	cursor: pointer;
 }
 
 .node-counts .node-counts-selected  {
-	border: 1px solid red;
-}
-
-span.gene-list-security {
-	bottom: 0px;
-	position: absolute;
-    width: 20px;
-    height: 20px;
-    background-size: 20px 20px;
-	background-image: url(/static/icons/lock.gif);
-	pointer-events: auto;
+	outline: 1px solid red;
 }
 
 .autocomplete-light-widget {
@@ -551,8 +429,13 @@ span.gene-list-security {
 }
 
 .node-count {
-	clear: both;
+	flex: 1;
 	display: none;
+	text-align: center;
+	font-size: 10px;
+	font-weight: 700;
+	padding: 1px 0px;
+	overflow: hidden;
 }
 
 .node-count .live-data-marker {

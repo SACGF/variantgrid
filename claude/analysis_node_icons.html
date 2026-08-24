@@ -1,0 +1,989 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Analysis Node Icons — audit &amp; redesign ideas</title>
+<!-- Font Awesome 6.4.0 is already shipped with the project (fontawesomefree pip package) -->
+<link rel="stylesheet" href="../variantgrid/sitestatic/static/fontawesomefree/css/all.min.css">
+<style>
+    :root {
+        --source-color: #0e7a4a;      /* sources: green   */
+        --filter-color: #3455a4;      /* filters: blue    */
+        --util-color:   #7a5195;      /* merge/venn etc: purple */
+        --variable-color: #fcbe67;    /* existing analysis-variable orange */
+        --output-color: #0E9A00;      /* existing output-node green */
+        --card-border: #d8dce3;
+        --muted: #6a7280;
+        font-family: -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
+    body { margin: 0 auto; max-width: 1100px; padding: 2em 1.5em 6em; color: #24292f; background: #fafbfc; }
+    h1 { font-size: 1.7em; }
+    h2 { border-bottom: 2px solid var(--card-border); padding-bottom: .3em; margin-top: 2.2em; }
+    h3 { margin-top: 1.6em; }
+    p.lede { font-size: 1.05em; color: #444; max-width: 60em; }
+    code { background: #eef1f4; padding: .1em .35em; border-radius: 4px; font-size: .92em; }
+    .muted { color: var(--muted); }
+    .small { font-size: .85em; }
+
+    /* ============ catalog cards ============ */
+    .node-card {
+        border: 1px solid var(--card-border); border-radius: 10px; background: #fff;
+        padding: 1em 1.2em; margin: 1.1em 0;
+        box-shadow: 0 1px 3px rgba(0,0,0,.06);
+    }
+    .node-card h3 { margin: 0 0 .2em; font-size: 1.15em; }
+    .node-card .classname { font-weight: normal; color: var(--muted); font-size: .8em; margin-left: .6em; }
+    .kind { display: inline-block; font-size: .7em; font-weight: 700; letter-spacing: .05em;
+            padding: .15em .55em; border-radius: 99px; color: #fff; vertical-align: middle; margin-left: .6em; }
+    .kind.source { background: var(--source-color); }
+    .kind.filter { background: var(--filter-color); }
+    .cols { display: flex; gap: 1.5em; flex-wrap: wrap; align-items: flex-start; margin-top: .6em; }
+    .current { flex: 0 0 130px; text-align: center; }
+    .current img { max-width: 80px; max-height: 80px; background: #fff;
+                   border: 1px dashed #ccc; padding: 6px; border-radius: 6px; }
+    .current .cap { font-size: .72em; color: var(--muted); margin-top: .3em; word-break: break-all; }
+    .candidates { flex: 1 1 420px; }
+    .cand-row { margin: .35em 0; display: flex; align-items: center; gap: .7em; flex-wrap: wrap; }
+    .cand-row .rowlabel { flex: 0 0 5.5em; font-size: .75em; font-weight: 700; color: var(--muted);
+                          text-transform: uppercase; letter-spacing: .04em; }
+    .emoji { font-size: 26px; font-family: "Noto Color Emoji", "Apple Color Emoji", "Segoe UI Emoji", sans-serif;
+             line-height: 1; cursor: default; }
+    .fa-cand { font-size: 24px; width: 34px; text-align: center; color: #333; }
+    .fa-cand small { display: none; }
+    .cand i[title]:hover, .svg-cand:hover { color: var(--filter-color); }
+    .svg-cand { display: inline-flex; width: 34px; height: 30px; align-items: center; justify-content: center; color: #333; }
+    .svg-cand svg { width: 28px; height: 28px; }
+    .pick { outline: 2px solid #e6a817; outline-offset: 3px; border-radius: 4px; position: relative; }
+    .verdict { margin-top: .6em; padding: .5em .8em; border-left: 4px solid #e6a817; background: #fdf6e6;
+               border-radius: 0 6px 6px 0; font-size: .9em; }
+    .verdict.keep { border-left-color: var(--source-color); background: #eaf6ef; }
+    .verdict b:first-child { text-transform: uppercase; font-size: .8em; letter-spacing: .05em; }
+
+    /* ============ mockup styles ============ */
+    .mock-strip { display: flex; gap: 2.5em; align-items: flex-start; flex-wrap: wrap;
+                  padding: 1.4em; background: #eef1f5;
+                  background-image: radial-gradient(#c9cfd8 1px, transparent 1px); background-size: 18px 18px;
+                  border-radius: 10px; margin: .8em 0 1.6em; }
+
+    /* --- Design A: corner badge + class chip (the user's suggestion) --- */
+    .mockA { position: relative; width: 128px; background: #fff; border: 1px solid #aab2bf; border-radius: 8px;
+             box-shadow: 2px 2px 8px rgba(0,0,0,.25); font-size: 12px; cursor: pointer; }
+    .mockA .badge { position: absolute; top: -10px; left: -10px; width: 26px; height: 26px; border-radius: 50%;
+                    color: #fff; display: flex; align-items: center; justify-content: center; font-size: 13px;
+                    box-shadow: 0 1px 3px rgba(0,0,0,.35); }
+    .mockA .klass { display: block; font-size: 9px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+                    color: #fff; padding: 3px 6px 2px 20px; border-radius: 7px 7px 0 0; }
+    .mockA.src  .badge, .mockA.src  .klass { background: var(--source-color); }
+    .mockA.flt  .badge, .mockA.flt  .klass { background: var(--filter-color); }
+    .mockA .name { display: block; padding: 6px 8px; font-weight: 600; min-height: 2.4em;
+                   overflow: hidden; text-overflow: ellipsis; }
+    .mockA .counts { display: flex; border-top: 1px solid #e4e7ec; font-size: 10px; }
+    .mockA .counts span { flex: 1; text-align: center; padding: 2px 0; font-weight: 700; }
+
+    /* --- Design B: header bar --- */
+    .mockB { width: 140px; background: #fff; border: 1px solid #aab2bf; border-radius: 6px;
+             box-shadow: 2px 2px 8px rgba(0,0,0,.25); font-size: 12px; overflow: hidden; cursor: pointer; }
+    .mockB .hdr { display: flex; align-items: center; gap: 6px; padding: 4px 7px; color: #fff; font-size: 10px;
+                  font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
+    .mockB.src .hdr { background: var(--source-color); } .mockB.flt .hdr { background: var(--filter-color); }
+    .mockB .body { padding: 7px 8px; font-weight: 600; min-height: 2.2em; }
+    .mockB .ftr { display: flex; justify-content: flex-end; gap: 4px; padding: 3px 5px; background: #f4f6f8;
+                  border-top: 1px solid #e4e7ec; }
+    .count-pill { font-size: 10px; font-weight: 700; padding: 0 6px; border-radius: 99px; border: 1px solid; background: #fff; }
+    .count-pill.total { color: #000; border-color: #000; }
+    .count-pill.clinvar { color: #ff0000; border-color: #ff0000; }
+    .count-pill.impact { color: #a35c00; border-color: #a35c00; }
+
+    /* --- Design C: big icon (modernised current look) --- */
+    .mockC { position: relative; width: 74px; text-align: center; cursor: pointer; }
+    .mockC .disc { width: 58px; height: 58px; margin: 0 auto; border-radius: 14px; background: #fff;
+                   border: 1px solid #aab2bf; box-shadow: 2px 2px 8px rgba(0,0,0,.25);
+                   display: flex; align-items: center; justify-content: center; font-size: 26px; }
+    .mockC.src .disc { color: var(--source-color); } .mockC.flt .disc { color: var(--filter-color); }
+    .mockC .name { font-size: 10px; font-weight: 600; margin-top: 3px; background: rgba(255,255,255,.85);
+                   border-radius: 4px; padding: 1px 2px; }
+    .mockC .cnt { position: absolute; top: -7px; right: -4px; }
+
+    /* --- Design D: left rail --- */
+    .mockD { display: flex; width: 150px; background: #fff; border: 1px solid #aab2bf; border-radius: 6px;
+             box-shadow: 2px 2px 8px rgba(0,0,0,.25); overflow: hidden; font-size: 12px; cursor: pointer; }
+    .mockD .rail { width: 26px; display: flex; flex-direction: column; align-items: center; justify-content: center;
+                   gap: 4px; color: #fff; font-size: 13px; }
+    .mockD.src .rail { background: var(--source-color); } .mockD.flt .rail { background: var(--filter-color); }
+    .mockD .rail .kshort { writing-mode: vertical-rl; transform: rotate(180deg); font-size: 8px;
+                           font-weight: 700; letter-spacing: .09em; text-transform: uppercase; }
+    .mockD .main { flex: 1; display: flex; flex-direction: column; }
+    .mockD .name { padding: 6px 7px; font-weight: 600; flex: 1; }
+    .mockD .ftr { display: flex; justify-content: flex-end; gap: 4px; padding: 3px 5px; background: #f4f6f8; }
+
+    /* flag decorations shared by mockups */
+    .deco { position: absolute; bottom: -8px; left: -8px; width: 20px; height: 20px; border-radius: 50%;
+            background: var(--variable-color); border: 1px solid #d99a2b; font-size: 10px;
+            display: flex; align-items: center; justify-content: center; }
+
+    table.compare { border-collapse: collapse; width: 100%; font-size: .9em; }
+    table.compare th, table.compare td { border: 1px solid var(--card-border); padding: .5em .7em; text-align: left; }
+    table.compare th { background: #eef1f4; }
+    .toc { columns: 2; font-size: .92em; }
+</style>
+</head>
+<body>
+
+<h1>Analysis node icons — audit &amp; redesign ideas</h1>
+<p class="lede">
+    One entry per <code>AnalysisNode</code> subclass. For each: the current icon, a verdict, and candidate
+    replacements as <b>emoji</b>, <b>Font Awesome 6.4</b> (already shipped via the <code>fontawesomefree</code>
+    package — zero new assets) and <b>hand-rolled inline SVG</b> where nothing off-the-shelf says it better.
+    The recommended pick has an <span style="outline:2px solid #e6a817; outline-offset:2px; border-radius:3px;">amber outline</span>.
+    Hover any candidate for its name. The last section riffs on whole-node layouts
+    (corner type-badge, short class label, short/long text, count strip).
+</p>
+<p class="small muted">Open this file directly in a browser from the repo — the Font Awesome CSS and current
+icon images are referenced relative to <code>claude/</code>. Emoji render with your OS emoji font, which is
+exactly the point of the emoji caveat below.</p>
+
+<h2>Emoji vs Font Awesome vs SVG — the trade</h2>
+<table class="compare">
+    <tr><th></th><th>Pros</th><th>Cons</th></tr>
+    <tr><td><b>Font Awesome</b></td>
+        <td>Already shipped (6.4.0); one visual style across all nodes; colourable via CSS (so category
+            colour-coding is free); crisp at any size; trivially used in the jQuery-UI select menu too.</td>
+        <td>Monochrome by default; a few concepts (Punnett square, intervals, pedigree) have no good glyph.</td></tr>
+    <tr><td><b>Emoji</b></td>
+        <td>Zero assets, colourful, instantly recognisable.</td>
+        <td>Renders differently on every OS (Noto vs Apple vs Segoe) — clinical users on Windows/Linux see
+            different art than screenshots/docs; no CSS colour control; some suggestions below are multi-person
+            ZWJ sequences that fall apart on older fonts. Fine for docs/menus, risky as the primary node identity.</td></tr>
+    <tr><td><b>Inline SVG</b></td>
+        <td>Full control, can be two-tone, themable with <code>currentColor</code>, matches the FA style if drawn
+            on the same grid. Best for domain glyphs FA lacks.</td>
+        <td>Hand-drawn assets to maintain — worth it only for the handful of genetics-specific concepts.</td></tr>
+</table>
+<p><b>Recommendation:</b> Font Awesome as the base system + ~6 custom SVGs drawn on the same 512-grid
+(Punnett square, intervals, trio/quad pedigree, splice, Venn). Emoji kept as a fun option for docs.</p>
+
+<h2>Sources</h2>
+
+<!-- ===================== AllVariantsNode ===================== -->
+<div class="node-card">
+    <h3>All Variants <span class="kind source">source</span><span class="classname">AllVariantsNode</span></h3>
+    <div class="cols">
+        <div class="current">
+            <img src="../variantgrid/sitestatic/static/icons/database-1-1.png" alt="current">
+            <div class="cap">icons/database-1-1.png</div>
+        </div>
+        <div class="candidates">
+            <div class="cand-row"><span class="rowlabel">Emoji</span>
+                <span class="emoji" title="card file box">🗃️</span>
+                <span class="emoji" title="globe">🌐</span>
+                <span class="emoji" title="dna">🧬</span>
+                <span class="emoji" title="infinity">♾️</span>
+            </div>
+            <div class="cand-row"><span class="rowlabel">Font Awesome</span>
+                <i class="fa-solid fa-database fa-cand pick" title="fa-database — same concept, crisp and colourable"></i>
+                <i class="fa-solid fa-server fa-cand" title="fa-server"></i>
+                <i class="fa-solid fa-globe fa-cand" title="fa-globe"></i>
+                <i class="fa-solid fa-asterisk fa-cand" title="fa-asterisk — 'everything'"></i>
+            </div>
+            <div class="verdict"><b>Replace (like-for-like).</b> The database metaphor is right; the PNG is just
+                dated. <code>fa-database</code> is a pixel-perfect conceptual swap.</div>
+        </div>
+    </div>
+</div>
+
+<!-- ===================== SampleNode ===================== -->
+<div class="node-card">
+    <h3>Sample <span class="kind source">source</span><span class="classname">SampleNode</span></h3>
+    <div class="cols">
+        <div class="current">
+            <img src="../variantgrid/static_files/default_static/images/node_icons/sample_icon_24.png" alt="current">
+            <div class="cap">menu icon; node itself is a D3-drawn pedigree shape (□ male / ○ female / diagonal = deceased)</div>
+        </div>
+        <div class="candidates">
+            <div class="cand-row"><span class="rowlabel">Emoji</span>
+                <span class="emoji" title="test tube">🧪</span>
+                <span class="emoji" title="drop of blood">🩸</span>
+                <span class="emoji" title="petri dish">🧫</span>
+                <span class="emoji" title="bust">👤</span>
+            </div>
+            <div class="cand-row"><span class="rowlabel">Font Awesome</span>
+                <i class="fa-solid fa-vial fa-cand pick" title="fa-vial — good menu/badge icon"></i>
+                <i class="fa-solid fa-user fa-cand" title="fa-user"></i>
+                <i class="fa-solid fa-fingerprint fa-cand" title="fa-fingerprint — one genome"></i>
+            </div>
+            <div class="verdict keep"><b>Keep the node rendering.</b> The sex-shaped pedigree symbol on the canvas is
+                <i>information</i>, not decoration — don't lose it. But the washed-out circle menu icon should become
+                <code>fa-vial</code>, and <code>fa-vial</code> works as the corner type-badge in the redesigns below.</div>
+        </div>
+    </div>
+</div>
+
+<!-- ===================== CohortNode ===================== -->
+<div class="node-card">
+    <h3>Cohort <span class="kind source">source</span><span class="classname">CohortNode</span></h3>
+    <div class="cols">
+        <div class="current">
+            <img src="../variantgrid/static_files/default_static/images/node_icons/cohort.png" alt="current">
+            <div class="cap">node_icons/cohort.png</div>
+        </div>
+        <div class="candidates">
+            <div class="cand-row"><span class="rowlabel">Emoji</span>
+                <span class="emoji" title="busts in silhouette">👥</span>
+                <span class="emoji" title="three people">🧑‍🤝‍🧑</span>
+                <span class="emoji" title="family">👨‍👩‍👧‍👦</span>
+            </div>
+            <div class="cand-row"><span class="rowlabel">Font Awesome</span>
+                <i class="fa-solid fa-users fa-cand pick" title="fa-users — clearly 'several samples'"></i>
+                <i class="fa-solid fa-people-group fa-cand" title="fa-people-group"></i>
+                <i class="fa-solid fa-user-group fa-cand" title="fa-user-group"></i>
+                <i class="fa-solid fa-table-cells fa-cand" title="fa-table-cells — the sample×variant matrix"></i>
+            </div>
+            <div class="verdict"><b>Replace.</b> The current spreadsheet-of-scribbles PNG reads as "illegible table"
+                even at full size. <code>fa-users</code> says "group of samples" instantly and pairs naturally with
+                <code>fa-user</code>/<code>fa-vial</code> for Sample.</div>
+        </div>
+    </div>
+</div>
+
+<!-- ===================== TrioNode ===================== -->
+<div class="node-card">
+    <h3>Trio <span class="kind source">source</span><span class="classname">TrioNode</span></h3>
+    <div class="cols">
+        <div class="current">
+            <img src="../variantgrid/static_files/default_static/images/node_icons/trio.png" alt="current">
+            <div class="cap">node_icons/trio.png (also drawn in JS on canvas)</div>
+        </div>
+        <div class="candidates">
+            <div class="cand-row"><span class="rowlabel">Emoji</span>
+                <span class="emoji" title="family: man woman girl">👨‍👩‍👧</span>
+                <span class="emoji" title="family silhouette">👪</span>
+            </div>
+            <div class="cand-row"><span class="rowlabel">Font Awesome</span>
+                <i class="fa-solid fa-children fa-cand" title="fa-children"></i>
+                <i class="fa-solid fa-diagram-project fa-cand" title="fa-diagram-project"></i>
+            </div>
+            <div class="cand-row"><span class="rowlabel">Custom SVG</span>
+                <span class="svg-cand pick" title="pedigree trio — standard genetics notation">
+                    <svg viewBox="0 0 32 26" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="2" y="2" width="8" height="8"/><circle cx="26" cy="6" r="4.5"/>
+                        <path d="M10 6 H21.5 M16 6 V15"/><circle cx="16" cy="20" r="4.5" fill="currentColor"/>
+                    </svg>
+                </span>
+            </div>
+            <div class="verdict keep"><b>Keep the concept, redraw as SVG.</b> The pedigree-notation trio is the
+                correct, domain-standard symbol — geneticists read it at a glance. A crisp inline SVG (above)
+                replaces the fuzzy PNG and can tint the affected child with the category colour. No emoji/FA
+                glyph beats real pedigree notation here.</div>
+        </div>
+    </div>
+</div>
+
+<!-- ===================== QuadNode ===================== -->
+<div class="node-card">
+    <h3>Quad <span class="kind source">source</span><span class="classname">QuadNode</span></h3>
+    <div class="cols">
+        <div class="current">
+            <img src="../variantgrid/static_files/default_static/images/node_icons/quad.png" alt="current">
+            <div class="cap">node_icons/quad.png</div>
+        </div>
+        <div class="candidates">
+            <div class="cand-row"><span class="rowlabel">Emoji</span>
+                <span class="emoji" title="family of four">👨‍👩‍👧‍👦</span>
+            </div>
+            <div class="cand-row"><span class="rowlabel">Custom SVG</span>
+                <span class="svg-cand pick" title="pedigree quad — parents + affected & unaffected sibs">
+                    <svg viewBox="0 0 36 26" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="2" y="2" width="8" height="8"/><circle cx="30" cy="6" r="4.5"/>
+                        <path d="M10 6 H25.5 M18 6 V13 M10 13 H26 M10 13 V16 M26 13 V16"/>
+                        <circle cx="10" cy="20" r="4.5" fill="currentColor"/><rect x="21.5" y="15.5" width="9" height="9"/>
+                    </svg>
+                </span>
+            </div>
+            <div class="verdict keep"><b>Keep the concept, redraw as SVG</b> — same reasoning as Trio.</div>
+        </div>
+    </div>
+</div>
+
+<!-- ===================== PedigreeNode ===================== -->
+<div class="node-card">
+    <h3>Pedigree <span class="kind source">source</span><span class="classname">PedigreeNode</span></h3>
+    <div class="cols">
+        <div class="current">
+            <img src="../variantgrid/static_files/default_static/images/node_icons/pedigree.png" alt="current">
+            <div class="cap">node_icons/pedigree.png</div>
+        </div>
+        <div class="candidates">
+            <div class="cand-row"><span class="rowlabel">Emoji</span>
+                <span class="emoji" title="deciduous tree (family tree)">🌳</span>
+            </div>
+            <div class="cand-row"><span class="rowlabel">Font Awesome</span>
+                <i class="fa-solid fa-sitemap fa-cand" title="fa-sitemap"></i>
+                <i class="fa-solid fa-network-wired fa-cand" title="fa-network-wired"></i>
+            </div>
+            <div class="cand-row"><span class="rowlabel">Custom SVG</span>
+                <span class="svg-cand pick" title="three-generation pedigree">
+                    <svg viewBox="0 0 36 30" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="6" y="2" width="7" height="7"/><circle cx="27" cy="5.5" r="4"/>
+                        <path d="M13 5.5 H23 M18 5.5 V12 M8 12 H28 M8 12 V15 M18 12 V15 M28 12 V15"/>
+                        <circle cx="8" cy="19" r="4"/><rect x="14.5" y="15" width="7" height="7" fill="currentColor"/><circle cx="28" cy="19" r="4"/>
+                    </svg>
+                </span>
+            </div>
+            <div class="verdict keep"><b>Keep the concept, redraw as SVG.</b> Current PNG is the right idea but fuzzy;
+                a 3-generation inline pedigree stays legible at 24px.</div>
+        </div>
+    </div>
+</div>
+
+<!-- ===================== ClassificationsNode ===================== -->
+<div class="node-card">
+    <h3>Classifications <span class="kind source">source</span><span class="classname">ClassificationsNode</span></h3>
+    <div class="cols">
+        <div class="current">
+            <img src="../variantgrid/sitestatic/static/images/diagnose_icon.png" alt="current">
+            <div class="cap">images/diagnose_icon.png</div>
+        </div>
+        <div class="candidates">
+            <div class="cand-row"><span class="rowlabel">Emoji</span>
+                <span class="emoji" title="stethoscope">🩺</span>
+                <span class="emoji" title="clipboard">📋</span>
+                <span class="emoji" title="white check mark">✅</span>
+                <span class="emoji" title="medal">🏅</span>
+            </div>
+            <div class="cand-row"><span class="rowlabel">Font Awesome</span>
+                <i class="fa-solid fa-clipboard-check fa-cand pick" title="fa-clipboard-check — curated & signed off"></i>
+                <i class="fa-solid fa-stamp fa-cand" title="fa-stamp — 'classified/approved'"></i>
+                <i class="fa-solid fa-certificate fa-cand" title="fa-certificate"></i>
+                <i class="fa-solid fa-file-medical fa-cand" title="fa-file-medical"></i>
+            </div>
+            <div class="verdict"><b>Replace.</b> <code>fa-clipboard-check</code> matches how classifications are
+                shown elsewhere in VariantGrid's UI and reads as "expert-reviewed records".</div>
+        </div>
+    </div>
+</div>
+
+<h2>Filters</h2>
+
+<!-- ===================== FilterNode ===================== -->
+<div class="node-card">
+    <h3>Filter <span class="kind filter">filter</span><span class="classname">FilterNode</span></h3>
+    <div class="cols">
+        <div class="current">
+            <img src="../variantgrid/static_files/default_static/images/node_icons/filter.png" alt="current">
+            <div class="cap">node_icons/filter.png</div>
+        </div>
+        <div class="candidates">
+            <div class="cand-row"><span class="rowlabel">Emoji</span>
+                <span class="emoji" title="no true funnel emoji — magnifier is the nearest">🔍</span>
+            </div>
+            <div class="cand-row"><span class="rowlabel">Font Awesome</span>
+                <i class="fa-solid fa-filter fa-cand pick" title="fa-filter — the canonical funnel"></i>
+                <i class="fa-solid fa-sliders fa-cand" title="fa-sliders"></i>
+            </div>
+            <div class="verdict"><b>Replace (like-for-like).</b> Same funnel, but flat and colourable instead of
+                the grey 3D clip-art. Trivial swap.</div>
+        </div>
+    </div>
+</div>
+
+<!-- ===================== GeneListNode ===================== -->
+<div class="node-card">
+    <h3>Gene List <span class="kind filter">filter</span><span class="classname">GeneListNode</span></h3>
+    <div class="cols">
+        <div class="current">
+            <img src="../variantgrid/static_files/default_static/images/node_icons/filter_list.png" alt="current">
+            <div class="cap">node_icons/filter_list.png</div>
+        </div>
+        <div class="candidates">
+            <div class="cand-row"><span class="rowlabel">Emoji</span>
+                <span class="emoji" title="dna">🧬</span>
+                <span class="emoji" title="memo">📝</span>
+                <span class="emoji" title="clipboard">📋</span>
+            </div>
+            <div class="cand-row"><span class="rowlabel">Font Awesome</span>
+                <i class="fa-solid fa-list-check fa-cand pick" title="fa-list-check — a curated list"></i>
+                <i class="fa-solid fa-dna fa-cand" title="fa-dna"></i>
+                <i class="fa-solid fa-list-ul fa-cand" title="fa-list-ul"></i>
+                <i class="fa-solid fa-rectangle-list fa-cand" title="fa-rectangle-list"></i>
+            </div>
+            <div class="verdict"><b>Replace.</b> Current icon tries to say "list + funnel" and ends up saying
+                neither at node size. <code>fa-list-check</code> (or <code>fa-dna</code> if you'd rather lead with
+                "gene") is cleaner; the funnel half is redundant once every filter node carries the filter category colour.</div>
+        </div>
+    </div>
+</div>
+
+<!-- ===================== DamageNode / EffectNode ===================== -->
+<div class="node-card">
+    <h3>Effect / Damage <span class="kind filter">filter</span><span class="classname">DamageNode (label "EffectNode")</span></h3>
+    <div class="cols">
+        <div class="current">
+            <img src="../variantgrid/static_files/default_static/images/node_icons/damage_node.png" alt="current">
+            <div class="cap">node_icons/damage_node.png, + effect_node_splicing.png variant</div>
+        </div>
+        <div class="candidates">
+            <div class="cand-row"><span class="rowlabel">Emoji</span>
+                <span class="emoji" title="high voltage">⚡</span>
+                <span class="emoji" title="collision">💥</span>
+                <span class="emoji" title="skull and crossbones">☠️</span>
+                <span class="emoji" title="scissors (splicing)">✂️</span>
+            </div>
+            <div class="cand-row"><span class="rowlabel">Font Awesome</span>
+                <i class="fa-solid fa-bolt fa-cand pick" title="fa-bolt — keeps the existing lightning identity"></i>
+                <i class="fa-solid fa-burst fa-cand" title="fa-burst"></i>
+                <i class="fa-solid fa-triangle-exclamation fa-cand" title="fa-triangle-exclamation"></i>
+                <i class="fa-solid fa-scissors fa-cand" title="fa-scissors — splicing sub-mode"></i>
+            </div>
+            <div class="cand-row"><span class="rowlabel">Custom SVG</span>
+                <span class="svg-cand" title="splice: exons + skipping arc">
+                    <svg viewBox="0 0 36 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M2 17 H34" stroke-width="1.5"/>
+                        <rect x="3" y="13" width="7" height="8" fill="currentColor" stroke="none"/>
+                        <rect x="15" y="13" width="7" height="8" fill="currentColor" stroke="none" opacity=".35"/>
+                        <rect x="27" y="13" width="7" height="8" fill="currentColor" stroke="none"/>
+                        <path d="M6 13 Q18 1 30 13" stroke-dasharray="3 2"/>
+                    </svg>
+                </span>
+            </div>
+            <div class="verdict keep"><b>Keep the bolt, modernise it.</b> Users already associate ⚡ with this node —
+                <code>fa-bolt</code> preserves that. The splicing variant currently swaps in a whole different picture;
+                an exon-skipping SVG (above) or <code>fa-scissors</code> as a small secondary badge is clearer.</div>
+        </div>
+    </div>
+</div>
+
+<!-- ===================== AlleleFrequencyNode ===================== -->
+<div class="node-card">
+    <h3>Allele Frequency <span class="kind filter">filter</span><span class="classname">AlleleFrequencyNode</span></h3>
+    <div class="cols">
+        <div class="current">
+            <img src="../variantgrid/static_files/default_static/images/node_icons/variant_allele_frequency.png" alt="current">
+            <div class="cap">node_icons/variant_allele_frequency.png</div>
+        </div>
+        <div class="candidates">
+            <div class="cand-row"><span class="rowlabel">Emoji</span>
+                <span class="emoji" title="bar chart">📊</span>
+                <span class="emoji" title="input percent — no single glyph; percent sign">💯</span>
+            </div>
+            <div class="cand-row"><span class="rowlabel">Font Awesome</span>
+                <i class="fa-solid fa-chart-column fa-cand pick" title="fa-chart-column — keeps the histogram identity"></i>
+                <i class="fa-solid fa-percent fa-cand" title="fa-percent"></i>
+                <i class="fa-solid fa-chart-simple fa-cand" title="fa-chart-simple"></i>
+            </div>
+            <div class="verdict keep"><b>Keep concept.</b> The VAF histogram is a decent identity; the blue chart PNG is
+                actually one of the better current icons. <code>fa-chart-column</code> is the flat equivalent, or
+                <code>fa-percent</code> if you want to say "frequency" rather than "distribution".</div>
+        </div>
+    </div>
+</div>
+
+<!-- ===================== PopulationNode ===================== -->
+<div class="node-card">
+    <h3>Population <span class="kind filter">filter</span><span class="classname">PopulationNode</span></h3>
+    <div class="cols">
+        <div class="current">
+            <img src="../variantgrid/static_files/default_static/images/node_icons/population_node.png" alt="current">
+            <div class="cap">node_icons/population_node.png</div>
+        </div>
+        <div class="candidates">
+            <div class="cand-row"><span class="rowlabel">Emoji</span>
+                <span class="emoji" title="globe showing Asia-Australia">🌏</span>
+                <span class="emoji" title="busts">👥</span>
+                <span class="emoji" title="world map">🗺️</span>
+            </div>
+            <div class="cand-row"><span class="rowlabel">Font Awesome</span>
+                <i class="fa-solid fa-earth-oceania fa-cand pick" title="fa-earth-oceania — gnomAD-scale populations (and the right hemisphere for SA Path!)"></i>
+                <i class="fa-solid fa-people-group fa-cand" title="fa-people-group"></i>
+                <i class="fa-solid fa-globe fa-cand" title="fa-globe"></i>
+            </div>
+            <div class="verdict"><b>Replace.</b> The crowd-of-stick-figures PNG collides conceptually with Cohort.
+                A globe (<code>fa-earth-oceania</code>) separates "world populations / gnomAD" from "my samples",
+                which is the actual semantic difference.</div>
+        </div>
+    </div>
+</div>
+
+<!-- ===================== PhenotypeNode ===================== -->
+<div class="node-card">
+    <h3>Phenotype <span class="kind filter">filter</span><span class="classname">PhenotypeNode</span></h3>
+    <div class="cols">
+        <div class="current">
+            <img src="../variantgrid/static_files/default_static/images/node_icons/phenotype_node.png" alt="current">
+            <div class="cap">node_icons/phenotype_node.png</div>
+        </div>
+        <div class="candidates">
+            <div class="cand-row"><span class="rowlabel">Emoji</span>
+                <span class="emoji" title="stethoscope">🩺</span>
+                <span class="emoji" title="person standing">🧍</span>
+                <span class="emoji" title="hospital">🏥</span>
+            </div>
+            <div class="cand-row"><span class="rowlabel">Font Awesome</span>
+                <i class="fa-solid fa-stethoscope fa-cand pick" title="fa-stethoscope — clinical features"></i>
+                <i class="fa-solid fa-notes-medical fa-cand" title="fa-notes-medical — HPO terms as notes"></i>
+                <i class="fa-solid fa-person fa-cand" title="fa-person"></i>
+                <i class="fa-solid fa-user-doctor fa-cand" title="fa-user-doctor"></i>
+            </div>
+            <div class="verdict"><b>Replace.</b> The anatomical-figures drawing is unrecognisable at 50px and vaguely
+                NSFW at full size. <code>fa-stethoscope</code> (or <code>fa-notes-medical</code>) says "clinical
+                phenotype / HPO" much faster.</div>
+        </div>
+    </div>
+</div>
+
+<!-- ===================== ZygosityNode ===================== -->
+<div class="node-card">
+    <h3>Zygosity <span class="kind filter">filter</span><span class="classname">ZygosityNode</span></h3>
+    <div class="cols">
+        <div class="current">
+            <img src="../variantgrid/static_files/default_static/images/node_icons/punnet_square.png" alt="current">
+            <div class="cap">node_icons/punnet_square.png (30% opacity version on canvas)</div>
+        </div>
+        <div class="candidates">
+            <div class="cand-row"><span class="rowlabel">Emoji</span>
+                <span class="emoji" title="input latin letters">🔡</span>
+                <span class="emoji" title="game die">🎲</span>
+            </div>
+            <div class="cand-row"><span class="rowlabel">Font Awesome</span>
+                <i class="fa-solid fa-table-cells-large fa-cand" title="fa-table-cells-large — 2×2 grid, but loses the letters"></i>
+            </div>
+            <div class="cand-row"><span class="rowlabel">Custom SVG</span>
+                <span class="svg-cand pick" title="Punnett square with Aa labels">
+                    <svg viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="1.6">
+                        <rect x="2" y="2" width="24" height="24" rx="2"/>
+                        <path d="M14 2 V26 M2 14 H26"/>
+                        <text x="8" y="11" font-size="8" font-family="sans-serif" fill="currentColor" stroke="none" text-anchor="middle">AA</text>
+                        <text x="20" y="11" font-size="8" font-family="sans-serif" fill="currentColor" stroke="none" text-anchor="middle">Aa</text>
+                        <text x="8" y="23" font-size="8" font-family="sans-serif" fill="currentColor" stroke="none" text-anchor="middle">Aa</text>
+                        <text x="20" y="23" font-size="8" font-family="sans-serif" fill="currentColor" stroke="none" text-anchor="middle">aa</text>
+                    </svg>
+                </span>
+            </div>
+            <div class="verdict keep"><b>Keep concept, redraw.</b> The Punnett square is genuinely the right symbol
+                for zygosity and geneticists get it instantly. It just needs to be an SVG so the letters stay sharp.</div>
+        </div>
+    </div>
+</div>
+
+<!-- ===================== MOINode ===================== -->
+<div class="node-card">
+    <h3>Mode of Inheritance <span class="kind filter">filter</span><span class="classname">MOINode</span></h3>
+    <div class="cols">
+        <div class="current">
+            <img src="../variantgrid/static_files/default_static/images/node_icons/moi.svg" alt="current" style="max-width:60px">
+            <div class="cap">node_icons/moi.svg (Inkscape, A4 viewBox)</div>
+        </div>
+        <div class="candidates">
+            <div class="cand-row"><span class="rowlabel">Emoji</span>
+                <span class="emoji" title="family">👪</span>
+                <span class="emoji" title="dna">🧬</span>
+            </div>
+            <div class="cand-row"><span class="rowlabel">Font Awesome</span>
+                <i class="fa-solid fa-arrow-down-long fa-cand" title="fa-arrow-down-long — passed down"></i>
+                <i class="fa-solid fa-diagram-project fa-cand" title="fa-diagram-project"></i>
+            </div>
+            <div class="cand-row"><span class="rowlabel">Custom SVG</span>
+                <span class="svg-cand pick" title="inheritance: parent shapes flowing down to affected child">
+                    <svg viewBox="0 0 32 30" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="2" width="8" height="8"/><circle cx="25" cy="6" r="4.5" fill="currentColor" opacity=".4"/>
+                        <path d="M11 6 H20.5 M16 6 V13 M16 13 L16 17" />
+                        <path d="M13 15 L16 19 L19 15" fill="none"/>
+                        <circle cx="16" cy="24" r="4.5" fill="currentColor"/>
+                    </svg>
+                </span>
+            </div>
+            <div class="verdict keep"><b>Keep concept, clean up the asset.</b> Already an SVG, but it's an Inkscape
+                page with an A4 viewBox — re-export on a tight square viewBox (or use the minimal glyph above:
+                carrier parent, arrow of transmission, affected child).</div>
+        </div>
+    </div>
+</div>
+
+<!-- ===================== IntersectionNode ===================== -->
+<div class="node-card">
+    <h3>Intervals Intersection <span class="kind filter">filter</span><span class="classname">IntersectionNode</span></h3>
+    <div class="cols">
+        <div class="current">
+            <img src="../variantgrid/static_files/default_static/images/node_icons/intersection.png" alt="current">
+            <div class="cap">node_icons/intersection.png</div>
+        </div>
+        <div class="candidates">
+            <div class="cand-row"><span class="rowlabel">Emoji</span>
+                <span class="emoji" title="intersection symbol (math, renders as text on most platforms)">∩</span>
+                <span class="emoji" title="straight ruler">📏</span>
+            </div>
+            <div class="cand-row"><span class="rowlabel">Font Awesome</span>
+                <i class="fa-solid fa-object-group fa-cand" title="fa-object-group"></i>
+                <i class="fa-solid fa-arrows-left-right-to-line fa-cand" title="fa-arrows-left-right-to-line — a genomic range"></i>
+            </div>
+            <div class="cand-row"><span class="rowlabel">Custom SVG</span>
+                <span class="svg-cand pick" title="two interval tracks, overlap emphasised — genome-browser style">
+                    <svg viewBox="0 0 32 24" fill="none">
+                        <rect x="2"  y="4"  width="18" height="6" rx="1" fill="currentColor" opacity=".35"/>
+                        <rect x="12" y="14" width="18" height="6" rx="1" fill="currentColor" opacity=".35"/>
+                        <rect x="12" y="4"  width="8"  height="16" rx="1" fill="currentColor"/>
+                    </svg>
+                </span>
+            </div>
+            <div class="verdict"><b>Replace.</b> The current dashes are cryptic. A BED-tracks-with-overlap glyph
+                (above) is exactly what the node does; anyone who has used a genome browser reads it immediately.</div>
+        </div>
+    </div>
+</div>
+
+<!-- ===================== ConservationNode ===================== -->
+<div class="node-card">
+    <h3>Conservation <span class="kind filter">filter</span><span class="classname">ConservationNode</span></h3>
+    <div class="cols">
+        <div class="current">
+            <img src="../variantgrid/static_files/default_static/images/node_icons/conservation_node.png" alt="current">
+            <div class="cap">node_icons/conservation_node.png</div>
+        </div>
+        <div class="candidates">
+            <div class="cand-row"><span class="rowlabel">Emoji</span>
+                <span class="emoji" title="turtle">🐢</span>
+                <span class="emoji" title="monkey">🐒</span>
+                <span class="emoji" title="mouse">🐭</span>
+                <span class="emoji" title="evergreen tree">🌲</span>
+            </div>
+            <div class="cand-row"><span class="rowlabel">Font Awesome</span>
+                <i class="fa-solid fa-code-branch fa-cand" title="fa-code-branch — phylogeny-ish"></i>
+                <i class="fa-solid fa-shield-halved fa-cand" title="fa-shield-halved — 'conserved/protected'"></i>
+            </div>
+            <div class="cand-row"><span class="rowlabel">Custom SVG</span>
+                <span class="svg-cand pick" title="phylogenetic tree">
+                    <svg viewBox="0 0 30 26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                        <path d="M3 22 H10 M10 22 V8 M10 8 H16 M10 15 H20 M20 15 V11 M20 11 H26 M20 19 H26 M16 8 V5 M16 5 H26"/>
+                        <circle cx="27" cy="5" r="1.6" fill="currentColor"/><circle cx="27" cy="11" r="1.6" fill="currentColor"/>
+                        <circle cx="27" cy="19" r="1.6" fill="currentColor"/>
+                    </svg>
+                </span>
+            </div>
+            <div class="verdict keep"><b>Keep concept — the animals are charming but noisy.</b> The species-tree idea
+                is right; at node size the turtle/bird/shark silhouettes become smudge. A clean cladogram SVG keeps
+                the meaning and scales down; <code>fa-code-branch</code> is the lazy-but-fine fallback.</div>
+        </div>
+    </div>
+</div>
+
+<!-- ===================== TissueNode ===================== -->
+<div class="node-card">
+    <h3>Tissue Expression <span class="kind filter">filter</span><span class="classname">TissueNode</span></h3>
+    <div class="cols">
+        <div class="current">
+            <img src="../variantgrid/static_files/default_static/images/node_icons/tissue_node.jpg" alt="current">
+            <div class="cap">node_icons/tissue_node.jpg — an actual histology photo</div>
+        </div>
+        <div class="candidates">
+            <div class="cand-row"><span class="rowlabel">Emoji</span>
+                <span class="emoji" title="lungs">🫁</span>
+                <span class="emoji" title="brain">🧠</span>
+                <span class="emoji" title="anatomical heart">🫀</span>
+                <span class="emoji" title="microscope">🔬</span>
+            </div>
+            <div class="cand-row"><span class="rowlabel">Font Awesome</span>
+                <i class="fa-solid fa-lungs fa-cand pick" title="fa-lungs — organ = tissue expression"></i>
+                <i class="fa-solid fa-brain fa-cand" title="fa-brain"></i>
+                <i class="fa-solid fa-heart-pulse fa-cand" title="fa-heart-pulse"></i>
+                <i class="fa-solid fa-microscope fa-cand" title="fa-microscope"></i>
+            </div>
+            <div class="verdict"><b>Replace — the only JPEG photo in the node set.</b> A photo can't work as an icon:
+                it's a beige rectangle at 50px. Any organ glyph (<code>fa-lungs</code>, <code>fa-brain</code>) says
+                "tissue-specific expression" clearly.</div>
+        </div>
+    </div>
+</div>
+
+<!-- ===================== BuiltInFilterNode ===================== -->
+<div class="node-card">
+    <h3>Built-In Filter <span class="kind filter">filter</span><span class="classname">BuiltInFilterNode</span></h3>
+    <div class="cols">
+        <div class="current">
+            <img src="../variantgrid/static_files/default_static/images/node_icons/built_in_filter_icon_24.png" alt="current">
+            <div class="cap">node_icons/built_in_filter_icon_24.png — the node-count colour swatches</div>
+        </div>
+        <div class="candidates">
+            <div class="cand-row"><span class="rowlabel">Emoji</span>
+                <span class="emoji" title="vertical traffic light">🚦</span>
+                <span class="emoji" title="artist palette">🎨</span>
+                <span class="emoji" title="level slider">🎚️</span>
+            </div>
+            <div class="cand-row"><span class="rowlabel">Font Awesome</span>
+                <i class="fa-solid fa-sliders fa-cand pick" title="fa-sliders — preset filters"></i>
+                <i class="fa-solid fa-swatchbook fa-cand" title="fa-swatchbook — matches the count-colour identity"></i>
+                <i class="fa-solid fa-wand-magic-sparkles fa-cand" title="fa-wand-magic-sparkles — 'canned magic'"></i>
+            </div>
+            <div class="verdict keep"><b>Keep the idea (colour swatches = count colours) or go <code>fa-sliders</code>.</b>
+                The swatch icon is actually meaningful — it mirrors the count-legend colours the node filters by.
+                If it stays, redraw as SVG rectangles using the real <code>BuiltInFilters.COLORS</code> values so it
+                stays in sync.</div>
+        </div>
+    </div>
+</div>
+
+<!-- ===================== TagNode ===================== -->
+<div class="node-card">
+    <h3>Tags <span class="kind filter">filter</span><span class="classname">TagNode</span></h3>
+    <div class="cols">
+        <div class="current">
+            <img src="../variantgrid/sitestatic/static/icons/tags_colored.png" alt="current">
+            <div class="cap">icons/tags_colored.png (shared with toolbar)</div>
+        </div>
+        <div class="candidates">
+            <div class="cand-row"><span class="rowlabel">Emoji</span>
+                <span class="emoji" title="label">🏷️</span>
+                <span class="emoji" title="bookmark">🔖</span>
+            </div>
+            <div class="cand-row"><span class="rowlabel">Font Awesome</span>
+                <i class="fa-solid fa-tags fa-cand pick" title="fa-tags — exact same metaphor"></i>
+                <i class="fa-solid fa-tag fa-cand" title="fa-tag"></i>
+                <i class="fa-solid fa-bookmark fa-cand" title="fa-bookmark"></i>
+            </div>
+            <div class="verdict"><b>Replace (like-for-like).</b> <code>fa-tags</code> is the identical concept, flat
+                and scalable. Also fixes the toolbar button at the same time since the asset is shared.</div>
+        </div>
+    </div>
+</div>
+
+<!-- ===================== MergeNode ===================== -->
+<div class="node-card">
+    <h3>Merge <span class="kind filter">filter</span><span class="classname">MergeNode</span></h3>
+    <div class="cols">
+        <div class="current">
+            <img src="../variantgrid/static_files/default_static/images/node_icons/merge.png" alt="current">
+            <div class="cap">node_icons/merge.png</div>
+        </div>
+        <div class="candidates">
+            <div class="cand-row"><span class="rowlabel">Emoji</span>
+                <span class="emoji" title="shuffle tracks">🔀</span>
+            </div>
+            <div class="cand-row"><span class="rowlabel">Font Awesome</span>
+                <i class="fa-solid fa-code-merge fa-cand pick" title="fa-code-merge — devs & the DAG metaphor both get it"></i>
+                <i class="fa-solid fa-arrows-to-dot fa-cand" title="fa-arrows-to-dot"></i>
+                <i class="fa-solid fa-compress fa-cand" title="fa-compress"></i>
+            </div>
+            <div class="verdict"><b>Replace.</b> The wispy converging-lines PNG looks like a plant. In a DAG editor,
+                <code>fa-code-merge</code> is the natural "many inputs → one output" glyph.</div>
+        </div>
+    </div>
+</div>
+
+<!-- ===================== VennNode ===================== -->
+<div class="node-card">
+    <h3>Venn <span class="kind filter">filter</span><span class="classname">VennNode</span></h3>
+    <div class="cols">
+        <div class="current">
+            <img src="../variantgrid/static_files/default_static/images/node_icons/venn_icon_24.png" alt="current">
+            <div class="cap">menu icon; node itself is a live clickable SVG venn diagram</div>
+        </div>
+        <div class="candidates">
+            <div class="cand-row"><span class="rowlabel">Emoji</span>
+                <span class="emoji" title="no venn emoji; interlocked rings nearest">⚭</span>
+            </div>
+            <div class="cand-row"><span class="rowlabel">Font Awesome</span>
+                <i class="fa-brands fa-codepen fa-cand" title="(nothing good in solid set)"></i>
+            </div>
+            <div class="cand-row"><span class="rowlabel">Custom SVG</span>
+                <span class="svg-cand pick" title="two-set venn, intersection filled">
+                    <svg viewBox="0 0 34 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="13" cy="12" r="9"/><circle cx="21" cy="12" r="9"/>
+                        <path d="M17 4.2 A9 9 0 0 1 17 19.8 A9 9 0 0 1 17 4.2" fill="currentColor" stroke="none" opacity=".8"/>
+                    </svg>
+                </span>
+            </div>
+            <div class="verdict keep"><b>Keep the live node</b> — the clickable venn IS the node's UI, don't touch it.
+                Only the fuzzy menu PNG needs replacing with the crisp SVG above.</div>
+        </div>
+    </div>
+</div>
+
+<!-- ===================== SelectedInParentNode ===================== -->
+<div class="node-card">
+    <h3>Selected In Parent <span class="kind filter">filter</span><span class="classname">SelectedInParentNode <span class="muted">(disabled = True)</span></span></h3>
+    <div class="cols">
+        <div class="current">
+            <img src="../variantgrid/static_files/default_static/images/node_icons/checklist_icon.png" alt="current">
+            <div class="cap">node_icons/checklist_icon.png</div>
+        </div>
+        <div class="candidates">
+            <div class="cand-row"><span class="rowlabel">Font Awesome</span>
+                <i class="fa-solid fa-square-check fa-cand pick" title="fa-square-check"></i>
+                <i class="fa-solid fa-hand-pointer fa-cand" title="fa-hand-pointer — user-selected rows"></i>
+            </div>
+            <div class="verdict keep"><b>Low priority</b> — the class ships <code>disabled&nbsp;=&nbsp;True</code>.
+                If it ever comes back: <code>fa-square-check</code>.</div>
+        </div>
+    </div>
+</div>
+
+<h2>Riffs: what the node itself could look like</h2>
+<p class="lede">
+    Today a node is its icon: a PNG background with the user's name overlaid wherever it fits, counts floating
+    bottom-right. The mockups below explore the layout you described — <b>type badge in a corner, a short class
+    label, real space for text, counts in their own section</b>. All are plain CSS + FA and hover to show the
+    long name (<code>title</code> attribute — try it). Category colour: <span style="color:var(--source-color)">
+    <b>green = source</b></span>, <span style="color:var(--filter-color)"><b>blue = filter</b></span>, matching
+    the existing source/filter split in <code>get_node_classification()</code>.
+</p>
+
+<h3>Design A — corner badge + class strip <span class="muted small">(your suggestion)</span></h3>
+<p class="small">Round type-badge overhangs the top-left corner (reads even when nodes overlap); a thin coloured
+strip carries the short class name; the body is all text; counts get a dedicated bottom strip. Short text on the
+node, long text on hover.</p>
+<div class="mock-strip">
+    <div class="mockA src" title="Cohort: Family WGS batch 2024-11 (proband + parents + 2 sibs)">
+        <span class="badge"><i class="fa-solid fa-users"></i></span>
+        <span class="klass">Cohort</span>
+        <span class="name">Family WGS b24-11</span>
+        <div class="counts"><span style="color:#000">14,203</span><span style="color:#f00">12</span></div>
+    </div>
+    <div class="mockA flt" title="Gene list: Cardiac arrhythmia panel v6 (112 genes)">
+        <span class="badge"><i class="fa-solid fa-list-check"></i></span>
+        <span class="klass">Gene list</span>
+        <span class="name">Cardiac panel v6</span>
+        <div class="counts"><span style="color:#000">311</span><span style="color:#f00">4</span></div>
+    </div>
+    <div class="mockA flt" title="Effect: HIGH + MODERATE impact, splicing ±8bp">
+        <span class="badge"><i class="fa-solid fa-bolt"></i></span>
+        <span class="klass">Effect</span>
+        <span class="name">High/Mod + splice</span>
+        <div class="counts"><span style="color:#000">27</span><span style="color:#f00">3</span></div>
+        <span class="deco" title="analysis variable"><i class="fa-solid fa-sliders"></i></span>
+    </div>
+    <div class="mockA flt" style="box-shadow: 0 0 0 3px #d33, 2px 2px 8px rgba(0,0,0,.25);" title="selected node">
+        <span class="badge"><i class="fa-solid fa-earth-oceania"></i></span>
+        <span class="klass">Population</span>
+        <span class="name">gnomAD &lt; 0.1%</span>
+        <div class="counts"><span style="color:#000">9</span><span style="color:#f00">2</span></div>
+    </div>
+</div>
+
+<h3>Design B — header bar</h3>
+<p class="small">Same information, but badge and class name share one solid header; feels like a small window/card.
+The footer uses count "pills" in the legend colours (black = total, red = ClinVar LP/P, amber = high/mod impact).</p>
+<div class="mock-strip">
+    <div class="mockB src" title="Sample: 24RG-183-HiSeq proband, affected male">
+        <div class="hdr"><i class="fa-solid fa-vial"></i> Sample</div>
+        <div class="body">24RG-183 proband</div>
+        <div class="ftr"><span class="count-pill total">18,344</span><span class="count-pill clinvar">9</span></div>
+    </div>
+    <div class="mockB flt" title="Phenotype: HPO — Hypertrophic cardiomyopathy, long QT">
+        <div class="hdr"><i class="fa-solid fa-stethoscope"></i> Phenotype</div>
+        <div class="body">HCM + long QT</div>
+        <div class="ftr"><span class="count-pill total">122</span><span class="count-pill impact">37</span></div>
+    </div>
+    <div class="mockB flt" title="Zygosity: recessive — hom or compound het">
+        <div class="hdr">
+            <svg viewBox="0 0 28 28" width="13" height="13" fill="none" stroke="#fff" stroke-width="2.4">
+                <rect x="2" y="2" width="24" height="24" rx="2"/><path d="M14 2 V26 M2 14 H26"/></svg>
+            Zygosity</div>
+        <div class="body">Recessive (hom/CH)</div>
+        <div class="ftr"><span class="count-pill total">14</span><span class="count-pill clinvar">1</span></div>
+    </div>
+</div>
+
+<h3>Design C — icon-dominant (modernised current look)</h3>
+<p class="small">Closest to today: the icon is still the hero, but flat/colour-coded in a rounded tile, with the
+type badge implied by colour, name underneath, count as a corner pill. Smallest footprint — good if canvases get
+crowded.</p>
+<div class="mock-strip">
+    <div class="mockC src" title="All variants in GRCh38 database">
+        <div class="disc"><i class="fa-solid fa-database"></i></div>
+        <div class="name">All GRCh38</div>
+        <span class="cnt count-pill total">2.1M</span>
+    </div>
+    <div class="mockC flt" title="Filter: read depth ≥ 20, QUAL ≥ 50">
+        <div class="disc"><i class="fa-solid fa-filter"></i></div>
+        <div class="name">DP≥20 Q≥50</div>
+        <span class="cnt count-pill total">88k</span>
+    </div>
+    <div class="mockC flt" title="Conservation: phyloP > 2">
+        <div class="disc">
+            <svg viewBox="0 0 30 26" width="30" height="26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                <path d="M3 22 H10 M10 22 V8 M10 8 H16 M10 15 H20 M20 15 V11 M20 11 H26 M20 19 H26 M16 8 V5 M16 5 H26"/>
+                <circle cx="27" cy="5" r="1.6" fill="currentColor"/><circle cx="27" cy="11" r="1.6" fill="currentColor"/>
+                <circle cx="27" cy="19" r="1.6" fill="currentColor"/></svg>
+        </div>
+        <div class="name">phyloP &gt; 2</div>
+        <span class="cnt count-pill clinvar">6</span>
+    </div>
+    <div class="mockC flt" title="Tags: RequiresReview from any analysis">
+        <div class="disc"><i class="fa-solid fa-tags"></i></div>
+        <div class="name">Review tags</div>
+        <span class="cnt count-pill total">3</span>
+    </div>
+</div>
+
+<h3>Design D — left rail</h3>
+<p class="small">Type icon + rotated class name in a coloured rail; widest text area of the four. Reads well
+left-to-right but the vertical text is small — better for wide/short nodes.</p>
+<div class="mock-strip">
+    <div class="mockD src" title="Trio: proband-affected, parents unaffected (24RG-183 family)">
+        <div class="rail"><i class="fa-solid fa-diagram-project" style="font-size:11px"></i><span class="kshort">Trio</span></div>
+        <div class="main">
+            <div class="name">183 fam — de novo candidates</div>
+            <div class="ftr"><span class="count-pill total">61</span><span class="count-pill clinvar">2</span></div>
+        </div>
+    </div>
+    <div class="mockD flt" title="Allele frequency: max VAF 0.45–0.55 (germline het band)">
+        <div class="rail"><i class="fa-solid fa-chart-column" style="font-size:11px"></i><span class="kshort">Freq</span></div>
+        <div class="main">
+            <div class="name">Het band 45–55%</div>
+            <div class="ftr"><span class="count-pill total">48</span></div>
+        </div>
+    </div>
+</div>
+
+<h3>Short vs long text</h3>
+<p>All mockups above assume the split you described:</p>
+<ul>
+    <li><b>Class label (fixed, short)</b> — "Cohort", "Effect", "Freq" — from a new
+        <code>get_node_class_label_short()</code>, shown on the badge strip/rail. Frees the name field from having
+        to identify the node type at all.</li>
+    <li><b>Node text (user/auto, short)</b> — what fits in ~2 lines; today's auto-generated names are often long
+        (<code>name</code> already exists). A <code>short_name</code> (user-editable, else auto-truncated) fits the card.</li>
+    <li><b>Long text (hover)</b> — full description via <code>title</code>/tooltip: the complete gene list name,
+        HPO terms, filter expression. Already available server-side; just needs plumbing into the overlay's
+        <code>title</code>.</li>
+    <li><b>Counts</b> — move out of the floating overlay into a dedicated strip (A/B/D) or corner pill (C); keep the
+        legend colours so the existing count-type toggle keeps working. The "which count is shown" red outline can
+        become a filled vs outlined pill.</li>
+    <li><b>Existing decorations</b> map cleanly: analysis-variable orange → small orange corner chip (shown on the
+        Effect card in Design A); output-node green tint → green header/rail; selected → red ring (shown on the
+        Population card in Design A); node-count-legend colours unchanged.</li>
+</ul>
+
+<h2>Summary of verdicts</h2>
+<table class="compare">
+    <tr><th>Node</th><th>Verdict</th><th>Pick</th></tr>
+    <tr><td>AllVariantsNode</td><td>Swap like-for-like</td><td><code>fa-database</code></td></tr>
+    <tr><td>SampleNode</td><td>Keep canvas SVG (sex shapes)</td><td>menu/badge: <code>fa-vial</code></td></tr>
+    <tr><td>CohortNode</td><td>Replace</td><td><code>fa-users</code></td></tr>
+    <tr><td>TrioNode / QuadNode / PedigreeNode</td><td>Keep concept</td><td>redraw pedigree glyphs as inline SVG</td></tr>
+    <tr><td>ClassificationsNode</td><td>Replace</td><td><code>fa-clipboard-check</code></td></tr>
+    <tr><td>FilterNode</td><td>Swap like-for-like</td><td><code>fa-filter</code></td></tr>
+    <tr><td>GeneListNode</td><td>Replace</td><td><code>fa-list-check</code> (or <code>fa-dna</code>)</td></tr>
+    <tr><td>DamageNode (Effect)</td><td>Keep bolt identity</td><td><code>fa-bolt</code>; splice = custom SVG / <code>fa-scissors</code></td></tr>
+    <tr><td>AlleleFrequencyNode</td><td>Keep concept</td><td><code>fa-chart-column</code></td></tr>
+    <tr><td>PopulationNode</td><td>Replace (clashes with Cohort)</td><td><code>fa-earth-oceania</code></td></tr>
+    <tr><td>PhenotypeNode</td><td>Replace</td><td><code>fa-stethoscope</code></td></tr>
+    <tr><td>ZygosityNode</td><td>Keep concept</td><td>Punnett square inline SVG</td></tr>
+    <tr><td>MOINode</td><td>Keep concept</td><td>re-export SVG on tight viewBox</td></tr>
+    <tr><td>IntersectionNode</td><td>Replace</td><td>interval-overlap inline SVG</td></tr>
+    <tr><td>ConservationNode</td><td>Keep concept, simplify</td><td>cladogram inline SVG</td></tr>
+    <tr><td>TissueNode</td><td>Replace (it's a photo!)</td><td><code>fa-lungs</code></td></tr>
+    <tr><td>BuiltInFilterNode</td><td>Keep swatch idea</td><td>SVG from <code>BuiltInFilters.COLORS</code>, or <code>fa-sliders</code></td></tr>
+    <tr><td>TagNode</td><td>Swap like-for-like</td><td><code>fa-tags</code></td></tr>
+    <tr><td>MergeNode</td><td>Replace</td><td><code>fa-code-merge</code></td></tr>
+    <tr><td>VennNode</td><td>Keep live venn widget</td><td>menu icon = inline SVG venn</td></tr>
+    <tr><td>SelectedInParentNode</td><td>Disabled — skip</td><td>(<code>fa-square-check</code> if revived)</td></tr>
+</table>
+
+<p class="small muted" style="margin-top:2em">
+    Implementation note: because <code>updateNodeFromData()</code> already swaps
+    <code>overlay_css_classes</code> per node, the badge/strip designs drop in by extending
+    <code>createDefaultNode()</code>'s overlay markup + a per-class FA icon map — no per-node factories needed
+    except the ones that already exist (Sample/Trio/Quad/Venn keep their bespoke renderers).
+</p>
+
+</body>
+</html>

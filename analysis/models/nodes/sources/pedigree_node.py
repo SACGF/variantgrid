@@ -11,6 +11,7 @@ from analysis.models.nodes.sources._stats_cache import (
     get_cached_label_count_for_cohort,
     get_handler_for_node,
 )
+from analysis.models.nodes.node_display import NodeIcon
 from patients.models_enums import Zygosity
 from pedigree.models import CohortSamplePedFileRecord, Pedigree, PedigreeInheritance
 
@@ -120,6 +121,10 @@ class PedigreeNode(AbstractCohortBasedNode):
     @staticmethod
     def get_node_class_label():
         return "Pedigree"
+
+    @classmethod
+    def get_node_class_icon(cls) -> NodeIcon:
+        return NodeIcon(symbol="node-icon-pedigree")
 
     def _get_configuration_errors(self) -> list:
         errors = super()._get_configuration_errors()

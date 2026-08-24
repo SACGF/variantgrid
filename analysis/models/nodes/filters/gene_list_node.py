@@ -14,6 +14,7 @@ from analysis.exceptions import NodeConfigurationException
 from analysis.models.nodes.analysis_node import AnalysisNode, NodeAuditLogMixin
 from analysis.models.nodes.cohort_mixin import AncestorSampleMixin
 from analysis.models.nodes.gene_coverage_mixin import GeneCoverageMixin
+from analysis.models.nodes.node_display import NodeIcon
 from annotation.models import VariantTranscriptAnnotation
 from genes.custom_text_gene_list import create_custom_text_gene_list
 from genes.models import (
@@ -262,6 +263,10 @@ class GeneListNode(AncestorSampleMixin, GeneCoverageMixin, AnalysisNode):
     @staticmethod
     def get_node_class_label():
         return "Gene list"
+
+    @classmethod
+    def get_node_class_icon(cls) -> NodeIcon:
+        return NodeIcon(symbol="node-icon-gene-list")
 
 
 @receiver(post_delete, sender=GeneListNode)

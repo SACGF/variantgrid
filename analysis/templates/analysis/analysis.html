@@ -14,8 +14,6 @@
 
 {% include "analysis/analysis_includes.html" %}
 
-<script type="text/javascript" src="{% static 'js/samplenode.js' %}"></script>
-<script type="text/javascript" src="{% static 'js/pedigree_node.js' %}"></script>
 <script type="text/javascript" src="{% static 'js/analysis_updates.js' %}"></script>
 <script type="text/javascript" src="{% static 'js/analysis_nodes.js' %}"></script>
 <script type="text/javascript" src="{% static 'js/cached_generated_files.js' %}"></script>
@@ -148,6 +146,9 @@
     const ANALYSIS_TAGS_NODE_ID = {{ analysis_tags_node.pk }};
     // noinspection JSAnnotator
 	const NODE_HELP = {{ node_help | jsonify }};
+	// Icons/labels for the add-node dropdown - see node_display.py
+	// noinspection JSAnnotator
+	const NODE_TYPES = {{ node_types_display | jsonify }};
 	ANALYSIS_SETTINGS = {{ analysis_settings | jsonify }};
 
 	// Panel resize timeouts function added in analysis.js
@@ -231,6 +232,7 @@
 {% endblock head %}
 
 {% block content %}
+    {% include "analysis/tags/node_icon_sprite.html" %}
     <div id="analysis-outer-container" class="d-flex flex-column split-container">
     {% if analysis.template %}
         <div id="analysis-variables" class="hidden split-element">
@@ -332,9 +334,6 @@
                     </div>
 
                 <div id="analysis-container">
-                    <div>
-                        {% include "analysis/svg_dropshadow.html" %}
-                    </div>
                     <div id="overscroll" class='overlay'>
                         <div id="analysis"></div>
                     </div>

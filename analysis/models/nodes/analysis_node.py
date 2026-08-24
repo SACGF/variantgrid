@@ -49,6 +49,7 @@ from analysis.models.enums import (
 )
 from analysis.models.models_analysis import Analysis
 from analysis.models.nodes.node_counts import get_extra_filters_q, get_node_counts_and_labels_dict
+from analysis.models.nodes.node_display import NodeChip, NodeIcon
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
 from classification.models import Classification
 from library.constants import DAY_SECS, MINUTE_SECS
@@ -794,6 +795,25 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
     def get_node_class_label():
         """ Used in create node dropdown """
         raise NotImplementedError("get_node_class_label not implemented - this is probably due to a new class, or a reverse migration wiping out the subclass leaving just the AnalysisNode")
+
+    @classmethod
+    def get_node_class_label_short(cls) -> str:
+        """ Class strip on the node card - override where the long label doesn't fit 128px """
+        return cls.get_node_class_label()
+
+    @classmethod
+    def get_node_class_icon(cls) -> NodeIcon:
+        """ Badge icon for a node of this class - also what the create node dropdown shows """
+        return NodeIcon(fa="fa-solid fa-circle-nodes")
+
+    def get_node_icon(self) -> NodeIcon:
+        """ Badge icon for this node - the class default unless config changes it (eg SampleNode
+            draws the patient's pedigree shape) """
+        return self.get_node_class_icon()
+
+    def get_node_chips(self) -> list[NodeChip]:
+        """ Pills under the node name - what this node is reading, from its saved config """
+        return []
 
     def _get_genome_build_errors(self, field_name, field_genome_build: GenomeBuild) -> list:
         """ Used to quickly add errors about genome build mismatches

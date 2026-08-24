@@ -330,11 +330,19 @@ class TestSampleNodeExtraction(ExtractionNodeTestCase):
         self.assertIn(str(self.snv_sample.vcf), method_summary)
         self.assertIn(str(self.cnv_sample.vcf), method_summary)
 
-    def test_badge_shows_how_many_vcfs(self):
+    def test_chips_show_extraction_and_vcfs(self):
         node = self._extraction_node()
-        source = node.get_rendering_args()["source"]
-        self.assertEqual(source["vcf_count"], 2)
-        self.assertEqual(source["level"], "Extraction")
+        chips = node.get_node_chips()
+        self.assertEqual([c.text for c in chips],
+                         [self.extraction.reference_id, "VCF", "VCF"])
+        self.assertEqual([c.title for c in chips[1:]],
+                         [str(self.snv_sample.vcf), str(self.cnv_sample.vcf)])
+
+    def test_vcf_chips_collapse_when_there_are_too_many(self):
+        node = self._extraction_node()
+        node.get_source_vcf_names = lambda: [f"vcf_{i}" for i in range(SampleNode.MAX_VCF_CHIPS + 1)]
+        vcf_chips = [c for c in node.get_node_chips() if c.icon == "fa-solid fa-file-lines"]
+        self.assertEqual([c.text for c in vcf_chips], [f"VCF x{SampleNode.MAX_VCF_CHIPS + 1}"])
 
     # ── Which VCF a row came from ────────────────────────────────────────────
 

@@ -9,6 +9,7 @@ from django.db import models
 from django.db.models.query_utils import Q
 
 from analysis.models.nodes.analysis_node import AnalysisNode
+from analysis.models.nodes.node_display import NodeChip, NodeIcon
 from annotation.models.damage_enums import (
     ALoFTPrediction,
     AlphaMissensePrediction,
@@ -522,15 +523,24 @@ class DamageNode(AnalysisNode):
     def get_help_text() -> str:
         return "Impact, damage predictions, conservation and splicing filter"
 
-    def get_css_classes(self):
-        css_classes = super().get_css_classes()
+    def get_node_chips(self) -> list[NodeChip]:
+        chips = super().get_node_chips()
         if self.splice_min is not None:
-            css_classes.append("EffectNodeSplicing")
-        return css_classes
+            chips.append(NodeChip(text="splice", icon="fa-solid fa-scissors",
+                                  title=f"Splicing prediction score >= {self.splice_min}"))
+        return chips
 
     @staticmethod
     def get_node_class_label():
         return "EffectNode"
+
+    @classmethod
+    def get_node_class_icon(cls) -> NodeIcon:
+        return NodeIcon(fa="fa-solid fa-bolt")
+
+    @classmethod
+    def get_node_class_label_short(cls) -> str:
+        return "Effect"
 
 
 auditlog.register(DamageNode)

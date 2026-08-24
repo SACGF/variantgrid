@@ -7,6 +7,7 @@ from django.db.models.deletion import SET_NULL
 
 from analysis.models.nodes.analysis_node import AnalysisNode, NodeAlleleFrequencyFilter
 from analysis.models.nodes.cohort_mixin import AncestorSampleMixin
+from analysis.models.nodes.node_display import NodeIcon
 from snpdb.models import Sample
 
 
@@ -58,6 +59,14 @@ class AlleleFrequencyNode(AncestorSampleMixin, AnalysisNode):
     @staticmethod
     def get_node_class_label():
         return "Allele Frequency"
+
+    @classmethod
+    def get_node_class_icon(cls) -> NodeIcon:
+        return NodeIcon(fa="fa-solid fa-chart-simple")
+
+    @classmethod
+    def get_node_class_label_short(cls) -> str:
+        return "AF%"
 
 
 auditlog.register(AlleleFrequencyNode)

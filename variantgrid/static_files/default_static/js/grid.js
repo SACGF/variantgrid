@@ -396,7 +396,7 @@ function _geneSymbolLink(geneSymbolColumn, filterChildLink) {
             let geneLinkString = '';
             if (filterChildLink) {
                 const filterGeneLink = "javascript:createFilterChild(\"gene_symbol\", \"" + geneSymbol + "\");";
-                geneLinkString = "<a class='grid-link' title='Filter to " + geneSymbol + "' href='" + filterGeneLink + "'><div class='grid-link-icon GeneListNode'></div></a>";
+                geneLinkString = "<a class='grid-link' title='Filter to " + geneSymbol + "' href='" + filterGeneLink + "'><i class='fa-solid fa-list-check gene-list-node-icon'></i></a>";
                 geneLinkString += " <a class='left' target='_blank' title='View gene in new window' href='" + Urls.view_gene_symbol(geneSymbol) + "'>" + geneSymbol + "</a> ";
             } else {
                 // not left

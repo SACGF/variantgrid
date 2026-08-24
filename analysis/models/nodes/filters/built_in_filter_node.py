@@ -6,6 +6,7 @@ from django.db.models import Q
 
 from analysis.models.nodes.analysis_node import AnalysisNode, NodeCount
 from analysis.models.nodes.node_counts import get_extra_filters_q
+from analysis.models.nodes.node_display import NodeIcon
 from annotation.models import ClinVarReviewStatus
 from snpdb.models.models_enums import BuiltInFilters
 
@@ -87,6 +88,14 @@ class BuiltInFilterNode(AnalysisNode):
     @staticmethod
     def get_node_class_label():
         return "Built In Filter"
+
+    @classmethod
+    def get_node_class_icon(cls) -> NodeIcon:
+        return NodeIcon(fa="fa-solid fa-sliders")
+
+    @classmethod
+    def get_node_class_label_short(cls) -> str:
+        return "Built-in"
 
 
 auditlog.register(BuiltInFilterNode)

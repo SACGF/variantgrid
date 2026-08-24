@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Analysis Node Icons v2 — Design A + reworked icons</title>
+<!-- Font Awesome 6.4.0 is already shipped with the project (fontawesomefree pip package) -->
+<link rel="stylesheet" href="../variantgrid/sitestatic/static/fontawesomefree/css/all.min.css">
+<style>
+    :root {
+        --source-color: #0e7a4a;      /* sources: green */
+        --filter-color: #3455a4;      /* filters: blue  */
+        --variable-color: #fcbe67;    /* existing analysis-variable orange */
+        --output-color: #0E9A00;      /* existing output-node green */
+        --card-border: #d8dce3;
+        --muted: #6a7280;
+        font-family: -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
+    body { margin: 0 auto; max-width: 1100px; padding: 2em 1.5em 6em; color: #24292f; background: #fafbfc; }
+    h1 { font-size: 1.7em; }
+    h2 { border-bottom: 2px solid var(--card-border); padding-bottom: .3em; margin-top: 2.4em; }
+    h3 { margin-top: 1.6em; }
+    p.lede { font-size: 1.05em; color: #444; max-width: 60em; }
+    code { background: #eef1f4; padding: .1em .35em; border-radius: 4px; font-size: .92em; }
+    .muted { color: var(--muted); }
+    .small { font-size: .85em; }
+
+    .idea-card { border: 1px solid var(--card-border); border-radius: 10px; background: #fff;
+                 padding: 1em 1.2em; margin: 1.1em 0; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+    .idea-card h3 { margin: 0 0 .4em; font-size: 1.1em; }
+    .cand-row { margin: .6em 0; display: flex; align-items: center; gap: 1.4em; flex-wrap: wrap; }
+    .cand { text-align: center; }
+    .cand .art { display: flex; align-items: center; justify-content: center; min-width: 56px; height: 48px;
+                 color: #333; font-size: 30px; }
+    .cand .cap { font-size: .7em; color: var(--muted); max-width: 9em; margin-top: .2em; }
+    .cand svg { color: #333; }
+    .pick .art { outline: 2px solid #e6a817; outline-offset: 3px; border-radius: 6px; }
+    .verdict { margin-top: .6em; padding: .5em .8em; border-left: 4px solid #e6a817; background: #fdf6e6;
+               border-radius: 0 6px 6px 0; font-size: .9em; }
+
+    /* ============ canvas strips ============ */
+    .mock-strip { display: flex; gap: 2.6em; align-items: flex-start; flex-wrap: wrap;
+                  padding: 1.6em 1.4em 1.4em; background: #eef1f5;
+                  background-image: radial-gradient(#c9cfd8 1px, transparent 1px); background-size: 18px 18px;
+                  border-radius: 10px; margin: .8em 0 1.6em; }
+
+    /* ============ Design A node card ============ */
+    .nodeA { position: relative; width: 128px; background: #fff; border: 1px solid #aab2bf; border-radius: 8px;
+             box-shadow: 2px 2px 8px rgba(0,0,0,.25); font-size: 12px; cursor: pointer; }
+    .nodeA .badge { position: absolute; top: -10px; left: -10px; width: 26px; height: 26px; border-radius: 50%;
+                    color: #fff; display: flex; align-items: center; justify-content: center; font-size: 13px;
+                    box-shadow: 0 1px 3px rgba(0,0,0,.35); z-index: 2; }
+    .nodeA .badge svg { width: 16px; height: 16px; }
+    .nodeA .klass { display: block; font-size: 9px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+                    color: #fff; padding: 3px 6px 2px 20px; border-radius: 7px 7px 0 0; }
+    .nodeA.src .badge, .nodeA.src .klass { background: var(--source-color); }
+    .nodeA.flt .badge, .nodeA.flt .klass { background: var(--filter-color); }
+    .nodeA .name { display: block; padding: 6px 8px; font-weight: 600; min-height: 2.4em; overflow: hidden; }
+    .nodeA .counts { display: flex; border-top: 1px solid #e4e7ec; font-size: 10px; }
+    .nodeA .counts span { flex: 1; text-align: center; padding: 2px 0; font-weight: 700; }
+    .nodeA .media { display: flex; gap: 4px; padding: 0 6px 6px; flex-wrap: wrap; }
+    .chip { display: inline-flex; align-items: center; gap: 3px; font-size: 9px; font-weight: 600;
+            border: 1px solid #c6cdd6; border-radius: 99px; padding: 1px 6px; background: #f4f6f8; color: #3d4550; }
+    .chip i, .chip svg { font-size: 9px; }
+    .deco { position: absolute; bottom: -8px; left: -8px; width: 20px; height: 20px; border-radius: 50%;
+            background: var(--variable-color); border: 1px solid #d99a2b; font-size: 10px;
+            display: flex; align-items: center; justify-content: center; z-index: 2; }
+
+    /* population grid */
+    .pop-grid { display: grid; grid-template-columns: repeat(3, 13px); justify-content: center; gap: 1px;
+                font-size: 12px; line-height: 13px; color: #333; }
+    .pop-grid .f { color: #666; }
+    button.shuffle { font-size: .8em; padding: .25em .8em; border-radius: 6px; border: 1px solid #aab2bf;
+                     background: #fff; cursor: pointer; }
+    button.shuffle:hover { background: #eef1f4; }
+
+    table.compare { border-collapse: collapse; width: 100%; font-size: .9em; }
+    table.compare th, table.compare td { border: 1px solid var(--card-border); padding: .5em .7em; text-align: left; }
+    table.compare th { background: #eef1f4; }
+</style>
+</head>
+<body>
+
+<h1>Analysis node icons v2 — Design A locked in</h1>
+<p class="lede">
+    Round 2, incorporating feedback on <code>analysis_node_icons.html</code>: <b>Design A</b> (corner type-badge +
+    class strip + text body + count strip) is the layout. This file reworks the icons that missed —
+    Pedigree, Gene List, Allele Frequency, Population, MOI, Intervals, Merge — shows the richer Sample node
+    (patient shape / extraction / VCFs), and finishes with the whole node palette rendered in Design A.
+    Recommended picks have the amber outline; hover anything for its name.
+</p>
+
+<h2>Sample node — patient / extraction / VCF layers</h2>
+<div class="idea-card">
+    <p class="small" style="margin-top:0">The canvas keeps the pedigree shape (□ male / ○ female /
+        diagonal&nbsp;=&nbsp;deceased) — it carries real information. The dropdown/menu mini-icon becomes a plain
+        square SVG. On the node itself we can then layer <i>what the sample actually is</i>:
+        shape&nbsp;=&nbsp;patient, test tube&nbsp;=&nbsp;extraction (when applicable), file chip(s)&nbsp;=&nbsp;the
+        VCF(s) — with multiples shown when a patient/extraction has several VCFs.</p>
+    <div class="cand-row">
+        <div class="cand pick"><div class="art">
+            <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="#333" stroke-width="2">
+                <rect x="3" y="3" width="18" height="18"/></svg>
+        </div><div class="cap">menu mini-icon: plain square</div></div>
+        <div class="cand"><div class="art">
+            <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="#333" stroke-width="2">
+                <circle cx="12" cy="12" r="9.5"/></svg>
+        </div><div class="cap">female</div></div>
+        <div class="cand"><div class="art">
+            <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="#333" stroke-width="2">
+                <rect x="3" y="3" width="18" height="18"/><path d="M22 2 L2 22"/></svg>
+        </div><div class="cap">deceased</div></div>
+        <div class="cand"><div class="art"><i class="fa-solid fa-vial" style="font-size:24px"></i></div>
+            <div class="cap">extraction layer</div></div>
+        <div class="cand"><div class="art">
+            <span class="chip" style="font-size:12px; padding:3px 9px"><i class="fa-solid fa-file-lines"></i> VCF</span>
+        </div><div class="cap">VCF layer (chip)</div></div>
+    </div>
+    <p class="small">As Design A cards — same sample at increasing levels of attached detail. The badge stays the
+        patient shape; extraction and VCFs appear as chips in a media row (hover them for the full
+        filename/extraction id):</p>
+    <div class="mock-strip">
+        <div class="nodeA src" title="Sample 24RG-183: male proband, affected">
+            <span class="badge"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3">
+                <rect x="4" y="4" width="16" height="16"/></svg></span>
+            <span class="klass">Sample</span>
+            <span class="name">24RG-183 proband</span>
+            <div class="counts"><span style="color:#000">18,344</span><span style="color:#f00">9</span></div>
+        </div>
+        <div class="nodeA src" title="Sample 24RG-183: DNA extraction E-9917 (blood), one VCF">
+            <span class="badge"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3">
+                <rect x="4" y="4" width="16" height="16"/></svg></span>
+            <span class="klass">Sample</span>
+            <span class="name">24RG-183 proband</span>
+            <div class="media">
+                <span class="chip" title="DNA extraction E-9917 (blood, 2024-11-02)"><i class="fa-solid fa-vial"></i> E-9917</span>
+                <span class="chip" title="24RG-183.hiseq.vcf.gz"><i class="fa-solid fa-file-lines"></i> VCF</span>
+            </div>
+            <div class="counts"><span style="color:#000">18,344</span><span style="color:#f00">9</span></div>
+        </div>
+        <div class="nodeA src" title="Sample 24RG-201: female, deceased; extraction E-9922; 2 VCFs (HiSeq + NovaSeq re-run)">
+            <span class="badge"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3">
+                <circle cx="12" cy="12" r="8.5"/><path d="M21 3 L3 21"/></svg></span>
+            <span class="klass">Sample</span>
+            <span class="name">24RG-201 aunt</span>
+            <div class="media">
+                <span class="chip" title="DNA extraction E-9922 (FFPE)"><i class="fa-solid fa-vial"></i> E-9922</span>
+                <span class="chip" title="24RG-201.hiseq.vcf.gz"><i class="fa-solid fa-file-lines"></i> VCF</span>
+                <span class="chip" title="24RG-201.novaseq.vcf.gz"><i class="fa-solid fa-file-lines"></i> VCF</span>
+            </div>
+            <div class="counts"><span style="color:#000">17,902</span><span style="color:#f00">7</span></div>
+        </div>
+    </div>
+    <p class="small muted">Multiple patients per node aren't supported yet, so one shape-badge suffices; if that ever
+        changes the badge can become a small row of shapes.</p>
+</div>
+
+<h2>Reworked icons</h2>
+
+<!-- ===================== Pedigree ===================== -->
+<div class="idea-card">
+    <h3>Pedigree — needs to not look like a Quad</h3>
+    <div class="cand-row">
+        <div class="cand"><div class="art">
+            <svg viewBox="0 0 36 26" width="46" height="34" fill="none" stroke="#333" stroke-width="2">
+                <rect x="2" y="2" width="8" height="8"/><circle cx="30" cy="6" r="4.5"/>
+                <path d="M10 6 H25.5 M18 6 V13 M10 13 H26 M10 13 V16 M26 13 V16"/>
+                <circle cx="10" cy="20" r="4.5" fill="#333"/><rect x="21.5" y="15.5" width="9" height="9"/></svg>
+        </div><div class="cap">v1 attempt — yes, it's just the Quad</div></div>
+        <div class="cand pick"><div class="art">
+            <svg viewBox="0 0 50 36" width="62" height="45" fill="none" stroke="#333" stroke-width="1.8">
+                <rect x="8" y="2" width="6.5" height="6.5"/><circle cx="24" cy="5.2" r="3.5"/>
+                <path d="M14.5 5.2 H20.5 M17.5 5.2 V12 M8 12 H36 M8 12 V15.5 M22 12 V15.5 M36 12 V15.5"/>
+                <circle cx="8" cy="19" r="3.5"/>
+                <rect x="18.8" y="15.5" width="6.5" height="6.5"/><circle cx="36" cy="19" r="3.5"/>
+                <path d="M25.3 19 H32.5 M29 19 V25 M18 25 H40 M18 25 V28.5 M29 25 V28.5 M40 25 V28.5"/>
+                <rect x="14.8" y="28.5" width="6.5" height="6.5" fill="#333"/>
+                <circle cx="29" cy="32" r="3.5"/>
+                <rect x="36.8" y="28.5" width="6.5" height="6.5"/></svg>
+        </div><div class="cap">3 generations, 8 people — unmistakably a pedigree</div></div>
+        <div class="cand"><div class="art">
+            <svg viewBox="0 0 44 30" width="56" height="40" fill="none" stroke="#333" stroke-width="1.8">
+                <rect x="6" y="2" width="6" height="6"/><circle cx="20" cy="5" r="3.2"/>
+                <rect x="30" y="2" width="6" height="6"/>
+                <path d="M12 5 H16.8 M14.5 5 V11 M6 11 H33 M6 11 V14 M14.5 11 V14 M23 11 V14 M33 11 V14"/>
+                <circle cx="6" cy="17" r="3.2" fill="#333"/><rect x="11.3" y="14" width="6" height="6"/>
+                <circle cx="23" cy="17" r="3.2"/><rect x="29.8" y="14" width="6" height="6" fill="#333"/></svg>
+        </div><div class="cap">wide sibship variant (2 gens, 4 sibs)</div></div>
+    </div>
+    <div class="verdict">The 3-generation glyph wins: depth is what distinguishes a pedigree from Trio/Quad.
+        At badge size (16px) it simplifies to the same shape with dots for the bottom row.</div>
+</div>
+
+<!-- ===================== Gene List ===================== -->
+<div class="idea-card">
+    <h3>Gene List — "a list of gene names"</h3>
+    <div class="cand-row">
+        <div class="cand pick"><div class="art">
+            <svg viewBox="0 0 28 28" width="40" height="40" fill="none">
+                <text x="2" y="9.5" font-size="9" font-weight="bold" font-family="ui-monospace, monospace" fill="#333">G</text>
+                <path d="M10 6.5 H25" stroke="#333" stroke-width="2.4" stroke-linecap="round"/>
+                <text x="2" y="19" font-size="9" font-weight="bold" font-family="ui-monospace, monospace" fill="#333">G</text>
+                <path d="M10 16 H21" stroke="#333" stroke-width="2.4" stroke-linecap="round"/>
+                <text x="2" y="28.5" font-size="9" font-weight="bold" font-family="ui-monospace, monospace" fill="#333">G</text>
+                <path d="M10 25.5 H24" stroke="#333" stroke-width="2.4" stroke-linecap="round"/></svg>
+        </div><div class="cap">your "G--" idea: G + name bars</div></div>
+        <div class="cand"><div class="art">
+            <svg viewBox="0 0 34 28" width="44" height="38" fill="none">
+                <text x="2" y="9" font-size="7.5" font-weight="bold" font-family="ui-monospace, monospace" fill="#333">MYH7</text>
+                <text x="2" y="18" font-size="7.5" font-weight="bold" font-family="ui-monospace, monospace" fill="#333">TP53</text>
+                <text x="2" y="27" font-size="7.5" font-weight="bold" font-family="ui-monospace, monospace" fill="#333">PKP2</text></svg>
+        </div><div class="cap">real gene names (blurs below ~28px)</div></div>
+        <div class="cand"><div class="art">
+            <svg viewBox="0 0 30 28" width="42" height="38" fill="none">
+                <circle cx="4.5" cy="6" r="2" fill="#333"/><path d="M10 6 H26" stroke="#333" stroke-width="2.4" stroke-linecap="round"/>
+                <circle cx="4.5" cy="15" r="2" fill="#333"/><path d="M10 15 H22" stroke="#333" stroke-width="2.4" stroke-linecap="round"/>
+                <circle cx="4.5" cy="24" r="2" fill="#333"/><path d="M10 24 H25" stroke="#333" stroke-width="2.4" stroke-linecap="round"/></svg>
+        </div><div class="cap">plain bullet list (generic)</div></div>
+        <div class="cand"><div class="art">
+            <svg viewBox="0 0 32 28" width="42" height="38" fill="none">
+                <path d="M4 3 C 10 8, 10 12, 4 17 M4 3 C -2 8, -2 12, 4 17 M4 17 C 10 22, 10 26, 4 31" transform="translate(3,-2) scale(0.9)" stroke="#333" stroke-width="1.8"/>
+                <path d="M14 6.5 H28" stroke="#333" stroke-width="2.4" stroke-linecap="round"/>
+                <path d="M14 15 H24" stroke="#333" stroke-width="2.4" stroke-linecap="round"/>
+                <path d="M14 23.5 H27" stroke="#333" stroke-width="2.4" stroke-linecap="round"/></svg>
+        </div><div class="cap">helix + list rows</div></div>
+    </div>
+    <div class="verdict">The <b>G-column</b> version reads as "list of things that all start like gene symbols" and
+        survives small sizes because the G is the only letterform. At 16px badge size the G stays legible where
+        full gene names don't.</div>
+</div>
+
+<!-- ===================== Allele Frequency ===================== -->
+<div class="idea-card">
+    <h3>Allele Frequency</h3>
+    <div class="cand-row">
+        <div class="cand pick"><div class="art"><i class="fa-solid fa-chart-simple"></i></div>
+            <div class="cap">fa-chart-simple — minimalist, no axis</div></div>
+        <div class="cand pick"><div class="art">
+            <svg viewBox="0 0 34 20" width="52" height="30">
+                <text x="1" y="16" font-size="14" font-weight="800" font-family="ui-monospace, monospace" fill="#333">AF%</text></svg>
+        </div><div class="cap">text badge "AF%"</div></div>
+    </div>
+    <div class="verdict"><b>Decided: both, in different slots</b> — <code>fa-chart-simple</code> as the badge icon,
+        and "AF%" as the class-strip label (instead of spelling out "Allele Freq"). See it in the palette below.</div>
+</div>
+
+<!-- ===================== Population ===================== -->
+<div class="idea-card">
+    <h3>Population — globe it is</h3>
+    <div class="cand-row">
+        <div class="cand pick"><div class="art"><i class="fa-solid fa-earth-oceania"></i></div>
+            <div class="cap">fa-earth-oceania — decided</div></div>
+        <div class="cand"><div class="art"><div class="pop-grid" id="pop-demo-1"></div></div>
+            <div class="cap">the 3×3 crowd — considered, not taken</div></div>
+    </div>
+    <div class="verdict"><b>Decided: globe.</b> Works at every size including the 26px badge, and cleanly separates
+        "world populations / gnomAD" from Cohort's people. (Randomised crowd kept above for posterity —
+        <button class="shuffle" onclick="shufflePopulation()">🎲</button> still works.)</div>
+</div>
+
+<!-- ===================== MOI ===================== -->
+<div class="idea-card">
+    <h3>Mode of Inheritance — needs to not look like a Trio</h3>
+    <div class="cand-row">
+        <div class="cand pick"><div class="art">
+            <svg viewBox="0 0 26 34" width="34" height="46" fill="none">
+                <text x="13" y="11" font-size="11" font-weight="800" font-family="ui-monospace, monospace" fill="#333" text-anchor="middle">Aa</text>
+                <path d="M13 14 V24 M9 20.5 L13 25 L17 20.5" stroke="#333" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <text x="13" y="33.5" font-size="11" font-weight="800" font-family="ui-monospace, monospace" fill="#333" text-anchor="middle">aa</text></svg>
+        </div><div class="cap">allele transmission: Aa ↓ aa</div></div>
+        <div class="cand"><div class="art">
+            <svg viewBox="0 0 30 30" width="40" height="40" fill="none">
+                <text x="15" y="9" font-size="8.5" font-weight="800" font-family="ui-monospace, monospace" fill="#333" text-anchor="middle">AD</text>
+                <text x="15" y="19" font-size="8.5" font-weight="800" font-family="ui-monospace, monospace" fill="#333" text-anchor="middle" opacity=".65">AR</text>
+                <text x="15" y="29" font-size="8.5" font-weight="800" font-family="ui-monospace, monospace" fill="#333" text-anchor="middle" opacity=".4">XL</text></svg>
+        </div><div class="cap">the modes themselves: AD/AR/XL</div></div>
+        <div class="cand"><div class="art">
+            <svg viewBox="0 0 30 32" width="38" height="42" fill="none" stroke="#333" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M6 4 L15 10 L24 4" opacity=".35"/>
+                <path d="M6 13 L15 19 L24 13" opacity=".65"/>
+                <path d="M6 22 L15 28 L24 22"/></svg>
+        </div><div class="cap">generations cascading down</div></div>
+        <div class="cand"><div class="art">
+            <svg viewBox="0 0 30 32" width="38" height="42" fill="none" stroke="#333" stroke-width="2">
+                <path d="M8 3 C 13 8, 13 12, 8 17 M8 3 C 3 8, 3 12, 8 17" />
+                <path d="M20 3 C 25 8, 25 12, 20 17 M20 3 C 15 8, 15 12, 20 17" opacity=".45"/>
+                <path d="M14 20 V27 M10.5 24 L14 28 L17.5 24" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div><div class="cap">chromosome pair, one passed down</div></div>
+    </div>
+    <div class="verdict">No people-shapes at all, so no Trio confusion. <b>Aa&nbsp;↓&nbsp;aa</b> is the pick — it's
+        the textbook notation for transmission and pairs beautifully with the Punnett-square Zygosity icon
+        (same monospace letterform family). AD/AR/XL is the runner-up if you'd rather name the modes.</div>
+</div>
+
+<!-- ===================== Intervals ===================== -->
+<div class="idea-card">
+    <h3>Intervals Intersection — a BED file on a chromosome</h3>
+    <div class="cand-row">
+        <div class="cand pick"><div class="art">
+            <svg viewBox="0 0 44 28" width="70" height="44" fill="none">
+                <path d="M8 10 L8 3.5 M8 10 L5.8 7.3 M8 10 L10.2 7.3" stroke="#333" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M27 10 L27 3.5 M27 10 L24.8 7.3 M27 10 L29.2 7.3" stroke="#333" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M35.5 10 L35.5 3.5 M35.5 10 L33.3 7.3 M35.5 10 L37.7 7.3" stroke="#333" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                <rect x="2" y="13" width="15" height="8" rx="4" stroke="#333" stroke-width="1.8" fill="none"/>
+                <rect x="19" y="13" width="23" height="8" rx="4" stroke="#333" stroke-width="1.8" fill="none"/>
+                <rect x="6" y="14.5" width="4" height="5" fill="#333"/>
+                <rect x="24.5" y="14.5" width="5" height="5" fill="#333"/>
+                <rect x="33.5" y="14.5" width="4" height="5" fill="#333"/></svg>
+        </div><div class="cap">bands + arrows pointing at them</div></div>
+        <div class="cand"><div class="art">
+            <svg viewBox="0 0 44 26" width="66" height="40" fill="none">
+                <path d="M9 9.5 L9 4 M9 9.5 L6.8 6.8 M9 9.5 L11.2 6.8" stroke="#333" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M22 9.5 L22 4 M22 9.5 L19.8 6.8 M22 9.5 L24.2 6.8" stroke="#333" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M35 9.5 L35 4 M35 9.5 L32.8 6.8 M35 9.5 L37.2 6.8" stroke="#333" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                <rect x="2" y="12" width="15" height="8" rx="4" stroke="#333" stroke-width="1.8" fill="#333" fill-opacity=".18"/>
+                <rect x="19" y="12" width="23" height="8" rx="4" stroke="#333" stroke-width="1.8" fill="#333" fill-opacity=".18"/></svg>
+        </div><div class="cap">arrows only (plain chromosome)</div></div>
+        <div class="cand"><div class="art">
+            <svg viewBox="0 0 44 22" width="66" height="34" fill="none">
+                <rect x="2" y="8" width="15" height="8" rx="4" stroke="#333" stroke-width="1.8" fill="none"/>
+                <rect x="19" y="8" width="23" height="8" rx="4" stroke="#333" stroke-width="1.8" fill="none"/>
+                <rect x="6" y="9.5" width="4" height="5" fill="#333"/>
+                <rect x="24" y="9.5" width="6" height="5" fill="#333"/>
+                <rect x="34" y="9.5" width="3" height="5" fill="#333"/></svg>
+        </div><div class="cap">bands only</div></div>
+    </div>
+    <div class="verdict"><b>Bands + arrows</b> (left): each arrow lands on a filled band, so arrows say "look here"
+        and bands say "these regions" — the fullest picture of a BED file and still clean, because arrows and bands
+        share the same three x-positions. Badge-size (16px) drops the arrows and keeps chromosome + one band.</div>
+</div>
+
+<!-- ===================== Merge ===================== -->
+<div class="idea-card">
+    <h3>Merge — three lanes into one</h3>
+    <p class="small" style="margin-top:0">Icon only — the node's top surface / drop-target mechanics stay as they
+        are. A downward merge-road-sign with three lanes:</p>
+    <div class="cand-row">
+        <div class="cand pick"><div class="art">
+            <svg viewBox="0 0 32 30" width="42" height="40" fill="none" stroke="#333" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M5 3 C5 11, 9 14.5, 14.5 17.5"/>
+                <path d="M27 3 C27 11, 23 14.5, 17.5 17.5"/>
+                <path d="M16 3 V17"/>
+                <path d="M16 17.5 V26 M11.8 22 L16 26.5 L20.2 22"/></svg>
+        </div><div class="cap">3 lanes merging into one arrow</div></div>
+        <div class="cand"><div class="art">
+            <svg viewBox="0 0 32 30" width="42" height="40" fill="none" stroke="#333" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M5 4 L13 14 M13 14 L11.8 9.4 M13 14 L8.3 12.9"/>
+                <path d="M27 4 L19 14 M19 14 L20.2 9.4 M19 14 L23.7 12.9"/>
+                <path d="M16 4 L16 14.5 M16 14.5 L13 11.2 M16 14.5 L19 11.2"/>
+                <circle cx="16" cy="22" r="4.5" fill="#333" stroke="none"/></svg>
+        </div><div class="cap">3 separate arrows converging on a point</div></div>
+        <div class="cand"><div class="art"><i class="fa-solid fa-code-merge"></i></div>
+            <div class="cap">fa-code-merge (v1 pick, for comparison)</div></div>
+    </div>
+    <div class="verdict"><b>Three-lanes-into-one</b> (left) — the road-sign metaphor everyone knows, turned
+        downward to match the DAG's flow, and the three lanes hint at "many parents" better than git's two-branch
+        glyph. Reads at badge size because it's just four strokes.</div>
+</div>
+
+<!-- ===================== SelectedInParent ===================== -->
+<div class="idea-card">
+    <h3>Selected In Parent</h3>
+    <div class="cand-row">
+        <div class="cand pick"><div class="art"><i class="fa-solid fa-square-check"></i></div>
+            <div class="cap">fa-square-check</div></div>
+    </div>
+    <div class="verdict">Created from the grid's tick-box rather than the dropdown, so it only needs a canvas badge —
+        the tick-box glyph is self-describing. Settled.</div>
+</div>
+
+<h2>The full palette in Design A</h2>
+<p class="small">Every node type with its final pick as the corner badge. Hover for the long text.</p>
+
+<h3 class="small" style="margin-bottom:0">Sources</h3>
+<div class="mock-strip">
+    <div class="nodeA src" title="All variants in the GRCh38 database">
+        <span class="badge"><i class="fa-solid fa-database"></i></span>
+        <span class="klass">All Variants</span><span class="name">All GRCh38</span>
+        <div class="counts"><span style="color:#000">2.1M</span></div>
+    </div>
+    <div class="nodeA src" title="Sample 24RG-183: male proband, affected — extraction E-9917, 1 VCF">
+        <span class="badge"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3">
+            <rect x="4" y="4" width="16" height="16"/></svg></span>
+        <span class="klass">Sample</span><span class="name">24RG-183 proband</span>
+        <div class="media"><span class="chip"><i class="fa-solid fa-vial"></i> E-9917</span>
+            <span class="chip"><i class="fa-solid fa-file-lines"></i> VCF</span></div>
+        <div class="counts"><span style="color:#000">18,344</span><span style="color:#f00">9</span></div>
+    </div>
+    <div class="nodeA src" title="Cohort: Family WGS batch 2024-11 (5 samples)">
+        <span class="badge"><i class="fa-solid fa-users"></i></span>
+        <span class="klass">Cohort</span><span class="name">Family WGS b24-11</span>
+        <div class="counts"><span style="color:#000">14,203</span><span style="color:#f00">12</span></div>
+    </div>
+    <div class="nodeA src" title="Trio: 183 family — proband affected, parents unaffected">
+        <span class="badge"><svg viewBox="0 0 32 26" fill="none" stroke="#fff" stroke-width="2.6">
+            <rect x="2" y="2" width="8" height="8"/><circle cx="26" cy="6" r="4.5"/>
+            <path d="M10 6 H21.5 M16 6 V15"/><circle cx="16" cy="20" r="4.5" fill="#fff"/></svg></span>
+        <span class="klass">Trio</span><span class="name">183 fam de novo</span>
+        <div class="counts"><span style="color:#000">61</span><span style="color:#f00">2</span></div>
+    </div>
+    <div class="nodeA src" title="Quad: 183 family + unaffected sib">
+        <span class="badge"><svg viewBox="0 0 36 26" fill="none" stroke="#fff" stroke-width="2.6">
+            <rect x="2" y="2" width="8" height="8"/><circle cx="30" cy="6" r="4.5"/>
+            <path d="M10 6 H25.5 M18 6 V13 M10 13 H26 M10 13 V16 M26 13 V16"/>
+            <circle cx="10" cy="20" r="4.5" fill="#fff"/><rect x="21.5" y="15.5" width="9" height="9"/></svg></span>
+        <span class="klass">Quad</span><span class="name">183 fam + sib</span>
+        <div class="counts"><span style="color:#000">44</span><span style="color:#f00">1</span></div>
+    </div>
+    <div class="nodeA src" title="Pedigree: extended 183 kindred, 8 genotyped">
+        <span class="badge"><svg viewBox="0 0 50 36" fill="none" stroke="#fff" stroke-width="2.4">
+            <rect x="8" y="2" width="6.5" height="6.5"/><circle cx="24" cy="5.2" r="3.5"/>
+            <path d="M14.5 5.2 H20.5 M17.5 5.2 V12 M8 12 H36 M8 12 V15.5 M22 12 V15.5 M36 12 V15.5"/>
+            <circle cx="8" cy="19" r="3.5"/><rect x="18.8" y="15.5" width="6.5" height="6.5"/><circle cx="36" cy="19" r="3.5"/>
+            <path d="M25.3 19 H32.5 M29 19 V25 M18 25 H40 M18 25 V28.5 M29 25 V28.5 M40 25 V28.5"/>
+            <rect x="14.8" y="28.5" width="6.5" height="6.5" fill="#fff"/><circle cx="29" cy="32" r="3.5"/>
+            <rect x="36.8" y="28.5" width="6.5" height="6.5"/></svg></span>
+        <span class="klass">Pedigree</span><span class="name">183 kindred</span>
+        <div class="counts"><span style="color:#000">37</span><span style="color:#f00">1</span></div>
+    </div>
+    <div class="nodeA src" title="Classifications: internal LP/P classified variants">
+        <span class="badge"><i class="fa-solid fa-clipboard-check"></i></span>
+        <span class="klass">Classifications</span><span class="name">Lab LP/P</span>
+        <div class="counts"><span style="color:#000">812</span><span style="color:#f00">790</span></div>
+    </div>
+</div>
+
+<h3 class="small" style="margin-bottom:0">Filters</h3>
+<div class="mock-strip">
+    <div class="nodeA flt" title="Filter: DP ≥ 20 AND QUAL ≥ 50">
+        <span class="badge"><i class="fa-solid fa-filter"></i></span>
+        <span class="klass">Filter</span><span class="name">DP≥20 Q≥50</span>
+        <div class="counts"><span style="color:#000">88k</span></div>
+    </div>
+    <div class="nodeA flt" title="Gene list: Cardiac arrhythmia panel v6 (112 genes)">
+        <span class="badge"><svg viewBox="0 0 28 28" fill="none">
+            <text x="2" y="10" font-size="10" font-weight="bold" font-family="ui-monospace, monospace" fill="#fff">G</text>
+            <path d="M11 6.5 H25" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+            <text x="2" y="20" font-size="10" font-weight="bold" font-family="ui-monospace, monospace" fill="#fff">G</text>
+            <path d="M11 16 H21" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+            <text x="2" y="30" font-size="10" font-weight="bold" font-family="ui-monospace, monospace" fill="#fff">G</text>
+            <path d="M11 25.5 H24" stroke="#fff" stroke-width="3" stroke-linecap="round"/></svg></span>
+        <span class="klass">Gene list</span><span class="name">Cardiac panel v6</span>
+        <div class="counts"><span style="color:#000">311</span><span style="color:#f00">4</span></div>
+    </div>
+    <div class="nodeA flt" title="Effect: HIGH + MODERATE impact, splicing ±8bp">
+        <span class="badge"><i class="fa-solid fa-bolt"></i></span>
+        <span class="klass">Effect</span><span class="name">High/Mod + splice</span>
+        <div class="counts"><span style="color:#000">27</span><span style="color:#f00">3</span></div>
+        <span class="deco" title="analysis variable"><i class="fa-solid fa-sliders"></i></span>
+    </div>
+    <div class="nodeA flt" title="Allele frequency: het band 45–55%">
+        <span class="badge"><i class="fa-solid fa-chart-simple"></i></span>
+        <span class="klass">AF%</span><span class="name">Het band 45–55%</span>
+        <div class="counts"><span style="color:#000">48</span></div>
+    </div>
+    <div class="nodeA flt" title="Population: gnomAD popmax < 0.1%">
+        <span class="badge"><i class="fa-solid fa-earth-oceania"></i></span>
+        <span class="klass">Population</span>
+        <span class="name">gnomAD &lt; 0.1%</span>
+        <div class="counts"><span style="color:#000">9</span><span style="color:#f00">2</span></div>
+    </div>
+    <div class="nodeA flt" title="Phenotype: HPO — Hypertrophic cardiomyopathy, long QT">
+        <span class="badge"><i class="fa-solid fa-stethoscope"></i></span>
+        <span class="klass">Phenotype</span><span class="name">HCM + long QT</span>
+        <div class="counts"><span style="color:#000">122</span><span style="color:#f00">37</span></div>
+    </div>
+    <div class="nodeA flt" title="Zygosity: recessive — hom or compound het">
+        <span class="badge"><svg viewBox="0 0 28 28" fill="none" stroke="#fff" stroke-width="2.6">
+            <rect x="3" y="3" width="22" height="22" rx="2"/><path d="M14 3 V25 M3 14 H25"/></svg></span>
+        <span class="klass">Zygosity</span><span class="name">Recessive (hom/CH)</span>
+        <div class="counts"><span style="color:#000">14</span><span style="color:#f00">1</span></div>
+    </div>
+    <div class="nodeA flt" title="Mode of inheritance: autosomal dominant, gene–disease from OMIM/MONDO">
+        <span class="badge"><svg viewBox="0 0 26 34" fill="none">
+            <text x="13" y="11" font-size="12" font-weight="800" font-family="ui-monospace, monospace" fill="#fff" text-anchor="middle">Aa</text>
+            <path d="M13 14 V23 M9.5 19.5 L13 24 L16.5 19.5" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+            <text x="13" y="33.5" font-size="12" font-weight="800" font-family="ui-monospace, monospace" fill="#fff" text-anchor="middle">aa</text></svg></span>
+        <span class="klass">MOI</span><span class="name">AD (OMIM)</span>
+        <div class="counts"><span style="color:#000">19</span><span style="color:#f00">2</span></div>
+    </div>
+    <div class="nodeA flt" title="Intervals: MYH7 hotspot regions (BED)">
+        <span class="badge"><svg viewBox="0 0 44 24" fill="none">
+            <rect x="2" y="8" width="15" height="8" rx="4" stroke="#fff" stroke-width="2.4" fill="none"/>
+            <rect x="19" y="8" width="23" height="8" rx="4" stroke="#fff" stroke-width="2.4" fill="none"/>
+            <rect x="25" y="9.5" width="6" height="5" fill="#fff"/></svg></span>
+        <span class="klass">Intervals</span><span class="name">MYH7 hotspots</span>
+        <div class="counts"><span style="color:#000">6</span></div>
+    </div>
+    <div class="nodeA flt" title="Conservation: phyloP > 2">
+        <span class="badge"><svg viewBox="0 0 30 26" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round">
+            <path d="M3 22 H10 M10 22 V8 M10 8 H16 M10 15 H20 M20 15 V11 M20 11 H26 M20 19 H26 M16 8 V5 M16 5 H26"/></svg></span>
+        <span class="klass">Conservation</span><span class="name">phyloP &gt; 2</span>
+        <div class="counts"><span style="color:#000">21</span><span style="color:#f00">6</span></div>
+    </div>
+    <div class="nodeA flt" title="Tissue expression: heart — left ventricle (GTEx)">
+        <span class="badge"><i class="fa-solid fa-lungs"></i></span>
+        <span class="klass">Tissue</span><span class="name">Heart LV (GTEx)</span>
+        <div class="counts"><span style="color:#000">84</span><span style="color:#f00">5</span></div>
+    </div>
+    <div class="nodeA flt" title="Built-in filter: ClinVar LP/P">
+        <span class="badge"><i class="fa-solid fa-sliders"></i></span>
+        <span class="klass">Built-in</span><span class="name">ClinVar LP/P</span>
+        <div class="counts"><span style="color:#f00">12</span></div>
+    </div>
+    <div class="nodeA flt" title="Tags: RequiresReview from any analysis">
+        <span class="badge"><i class="fa-solid fa-tags"></i></span>
+        <span class="klass">Tags</span><span class="name">Review tags</span>
+        <div class="counts"><span style="color:#000">3</span></div>
+    </div>
+    <div class="nodeA flt" title="Merge: union of 4 branches">
+        <span class="badge"><svg viewBox="0 0 32 30" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M5 3 C5 11, 9 14.5, 14.5 17.5"/>
+            <path d="M27 3 C27 11, 23 14.5, 17.5 17.5"/>
+            <path d="M16 3 V17"/>
+            <path d="M16 17.5 V26 M11.8 22 L16 26.5 L20.2 22"/></svg></span>
+        <span class="klass">Merge</span><span class="name">Union of 4 branches</span>
+        <div class="counts"><span style="color:#000">402</span><span style="color:#f00">11</span></div>
+    </div>
+    <div class="nodeA flt" title="Venn: mother ∩ father — live widget keeps living in the body">
+        <span class="badge"><svg viewBox="0 0 34 24" fill="none" stroke="#fff" stroke-width="2.4">
+            <circle cx="13" cy="12" r="9"/><circle cx="21" cy="12" r="9"/></svg></span>
+        <span class="klass">Venn</span><span class="name">Mum ∩ Dad</span>
+        <div class="counts"><span style="color:#000">512</span><span style="color:#f00">3</span></div>
+    </div>
+    <div class="nodeA flt" title="Selected in parent: rows ticked in the Effect node grid">
+        <span class="badge"><i class="fa-solid fa-square-check"></i></span>
+        <span class="klass">Selected</span><span class="name">Picks from #12</span>
+        <div class="counts"><span style="color:#000">5</span></div>
+    </div>
+</div>
+
+<h2>Changes from v1</h2>
+<table class="compare">
+    <tr><th>Node</th><th>v1</th><th>v2</th></tr>
+    <tr><td>SampleNode</td><td><code>fa-vial</code> menu icon</td><td>plain □ SVG menu icon; canvas keeps sex shapes;
+        vial = <i>extraction</i> chip; VCF file chips, multiple when present</td></tr>
+    <tr><td>PedigreeNode</td><td>2-gen glyph (looked like Quad)</td><td>3-generation, 8-person glyph</td></tr>
+    <tr><td>GeneListNode</td><td><code>fa-list-check</code></td><td>"G——" list SVG</td></tr>
+    <tr><td>AlleleFrequencyNode</td><td><code>fa-chart-column</code></td><td><code>fa-chart-simple</code> badge + "AF%" as the class-strip label</td></tr>
+    <tr><td>PopulationNode</td><td><code>fa-earth-oceania</code></td><td>globe confirmed (3×3 crowd considered, not taken)</td></tr>
+    <tr><td>MOINode</td><td>pedigree-ish glyph (looked like Trio)</td><td><b>Aa ↓ aa</b> allele transmission (no people shapes)</td></tr>
+    <tr><td>IntersectionNode</td><td>overlap tracks</td><td>chromosome ideogram: bands + arrows pointing at them</td></tr>
+    <tr><td>MergeNode</td><td><code>fa-code-merge</code></td><td>3-lane downward merge-road-sign glyph (node top surface unchanged)</td></tr>
+    <tr><td>SelectedInParentNode</td><td>"disabled, skip"</td><td>created via grid tick-box; <code>fa-square-check</code> badge</td></tr>
+</table>
+
+<script>
+    function crowd(el, n) {
+        el.innerHTML = "";
+        for (let i = 0; i < n; i++) {
+            const female = Math.random() < 0.5;
+            const icon = document.createElement("i");
+            icon.className = "fa-solid " + (female ? "fa-person-dress f" : "fa-person");
+            el.appendChild(icon);
+        }
+    }
+    function shufflePopulation() {
+        document.querySelectorAll(".pop-grid").forEach(function(g) { crowd(g, 9); });
+    }
+    document.addEventListener("DOMContentLoaded", shufflePopulation);
+</script>
+
+</body>
+</html>

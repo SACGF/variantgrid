@@ -17,6 +17,7 @@ from analysis.models.nodes.sources._stats_cache import (
     get_cached_label_count_for_cohort,
     get_handler_for_node,
 )
+from analysis.models.nodes.node_display import NodeIcon
 from annotation.models.models import VariantTranscriptAnnotation
 from library.constants import DAY_SECS
 from patients.models_enums import Sex, Zygosity
@@ -526,6 +527,10 @@ class TrioNode(AbstractCohortBasedNode):
     @staticmethod
     def get_node_class_label():
         return 'Trio'
+
+    @classmethod
+    def get_node_class_icon(cls) -> NodeIcon:
+        return NodeIcon(symbol="node-icon-trio")
 
     def _get_configuration_errors(self) -> list:
         errors = super()._get_configuration_errors()

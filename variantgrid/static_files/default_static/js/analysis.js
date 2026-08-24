@@ -215,17 +215,15 @@ function setupNodeTypeSelect() {
     $.widget( "custom.iconselectmenu", $.ui.selectmenu, {
       _renderItem: function( ul, item ) {
         const li = $( "<li>" ),
-          wrapper = $( "<div>", { text: item.label } );
+          wrapper = $( "<div>", {"class": "node-type-item"} );
 
         if ( item.disabled ) {
           li.addClass( "ui-state-disabled" );
         }
 
-        $( "<span>", {
-          style: item.element.attr( "data-style" ),
-          "class": "ui-icon " + item.element.attr( "value" )
-        })
-          .appendTo( wrapper );
+        const nodeType = NODE_TYPES[item.element.attr("value")];
+        renderNodeIcon(nodeType && nodeType.icon).appendTo( wrapper );
+        $( "<span>", { text: item.label } ).appendTo( wrapper );
 
         return li.append( wrapper ).appendTo( ul );
       }
@@ -233,7 +231,7 @@ function setupNodeTypeSelect() {
 
     $("#id_node_types").iconselectmenu()
         .iconselectmenu( "menuWidget" )
-        .addClass( "ui-menu-icons customicons" );
+        .addClass( "node-type-menu" );
 
 }
 

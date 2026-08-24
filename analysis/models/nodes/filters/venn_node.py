@@ -14,6 +14,7 @@ from django.dispatch import receiver
 
 from analysis.models.enums import SetOperations
 from analysis.models.nodes.analysis_node import AnalysisNode, NodeStatus, NodeVersion
+from analysis.models.nodes.node_display import NodeIcon
 from library.django_utils.django_partition import temporary_db_table
 from snpdb.models import ProcessingStatus, VariantCollection, VariantCollectionRecord
 
@@ -218,6 +219,10 @@ class VennNode(AnalysisNode):
     @staticmethod
     def get_node_class_label():
         return "Venn"
+
+    @classmethod
+    def get_node_class_icon(cls) -> NodeIcon:
+        return NodeIcon(symbol="node-icon-venn")
 
 
 class VennNodeCache(models.Model):

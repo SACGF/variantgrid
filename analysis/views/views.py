@@ -78,7 +78,7 @@ from analysis.models.nodes.node_counts import (
     get_node_count_colors,
     get_node_counts_mine_and_available,
 )
-from analysis.models.nodes.node_types import get_node_types_hash
+from analysis.models.nodes.node_types import get_node_display_data_by_class_name, get_node_types_hash
 from analysis.models.nodes.sources.cohort_node import (
     CohortNodeZygosityFilter,
     CohortNodeZygosityFiltersCollection,
@@ -220,6 +220,7 @@ def view_analysis(request, analysis_id, active_node_id=0):
         "analysis_tags_node": analysis_tags_node,
         "active_node_id": active_node_id,
         "node_help": node_help_dict,
+        "node_types_display": get_node_display_data_by_class_name(),
         "analysis_variables": analysis_variables,
         "has_write_permission": analysis.can_write(request.user),
         "warnings": analysis.get_toolbar_warnings(request.user),
