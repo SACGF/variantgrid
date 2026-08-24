@@ -206,15 +206,6 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
 
         self.overlap_pending = overlap_pending
 
-
-    #def get_grouped_conflict_data(self):
-        # if allele_id := self.get_query_param('allele_id'):
-        #     o = Overlap()
-        #     o.classificationgroupingoverlapcontribution_set
-        #     Overlap.objects.filter(allele_id=allele_id).prefetch_related()
-
-        grouped_conflict_data = []
-
     def get_initial_queryset(self) -> QuerySet[DC]:
         qs = ClassificationGrouping.filter_for_user(self.user, ClassificationGrouping.objects.all())
         qs = qs.exclude(classification_count=0)
@@ -224,14 +215,6 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
         filters: list[Q] = []
 
         # run the filters that are perma-applied on certain pages
-
-        # if conflict_id := self.get_query_param('conflict_id'):
-        #     conflict = Conflict.objects.get(pk=conflict_id)
-        #     filters.append(Q(allele_origin_grouping__allele_grouping__allele_id=int(conflict.allele.id)))
-        #     filters.append(Q(allele_origin_grouping__allele_origin_bucket=conflict.allele_origin_bucket))
-        #     filters.append(Q(allele_origin_grouping__testing_context_bucket=conflict.testing_context_bucket))
-        #     if tumor_type_category := conflict.tumor_type_category:
-        #         filters.append(Q(allele_origin_grouping__tumor_type_category=tumor_type_category))
 
         if allele_id := self.get_query_param('allele_id'):
             filters.append(Q(allele_origin_grouping__allele_id=int(allele_id)))
@@ -268,7 +251,11 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
 
         if allele_origin := self.get_query_param("allele_origin"):
             if allele_origin != "A":
-                filters.append(Q(allele_origin_grouping__allele_origin_bucket__in=[allele_origin, AlleleOriginBucket.UNKNOWN]))
+                if bool(self.get_query_param('allele_id')):
+                    # on allele page, don't show "UNKNOWN" when filtering on Germline vs Somatic
+                    filters.append(Q(allele_origin_grouping__allele_origin_bucket=allele_origin))
+                else:
+                    filters.append(Q(allele_origin_grouping__allele_origin_bucket__in=[allele_origin, AlleleOriginBucket.UNKNOWN]))
 
         if testing_context := self.get_query_param("testing_context"):
             filters.append(Q(allele_origin_grouping__testing_context_bucket=testing_context))

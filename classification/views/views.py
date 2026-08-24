@@ -47,7 +47,7 @@ from classification.enums import (
     ShareLevel,
     SpecialEKeys,
     SubmissionSource,
-    WithdrawReason, OverlapStatus, OverlapType,
+    WithdrawReason, OverlapStatus, OverlapType, TestingContextBucket,
 )
 from classification.forms import ClassificationAlleleOriginForm
 from classification.models import (
@@ -586,9 +586,14 @@ def view_classification_diff(request):
 
     elif allele_id_str := request.GET.get('allele'):
         allele_id = int(allele_id_str)
+        allele_origin_grouping = ClassificationGrouping.objects.filter(allele_origin_grouping__allele=allele_id)
+        if allele_origin_str := request.GET.get('allele_origin'):
+            allele_origin_grouping = allele_origin_grouping.filter(allele_origin_grouping__allele_origin_bucket=AlleleOriginBucket(allele_origin_str))
+        if testing_context_str := request.GET.get('testing_context'):
+            allele_origin_grouping = allele_origin_grouping.filter(allele_origin_grouping__testing_context_bucket=TestingContextBucket(testing_context_str))
+
+        allele_origin_grouping = ClassificationGrouping.filter_for_user(user=request.user, qs=allele_origin_grouping)
         if request.GET.get('latest'):
-            allele_origin_grouping = ClassificationGrouping.objects.filter(allele_origin_grouping__allele=allele_id)
-            allele_origin_grouping = ClassificationGrouping.filter_for_user(user=request.user, qs=allele_origin_grouping)
             record_ids = allele_origin_grouping.values_list(
                 "latest_classification_modification", flat=True
             )
@@ -596,9 +601,10 @@ def view_classification_diff(request):
             records.sort(key=lambda cm: cm.curated_date_check, reverse=True)  # probably sorting by lab or allele origin makes more sense here
 
         else:
-            compare_all = list(ClassificationModification.latest_for_user(user=request.user, allele=Allele.objects.get(pk=allele_id), published=True))
-            compare_all.sort(key=lambda cm: cm.curated_date_check, reverse=True)
-            records = compare_all
+            records = []
+            for allele_origin_group in allele_origin_grouping:
+                records.extend(allele_origin_group.classification_modifications)
+            records.sort(key=lambda cm: cm.curated_date_check, reverse=True)
 
     elif allele_origin_grouping_str := request.GET.get("allele_origin_grouping"):
         allele_origin_grouping = AlleleOriginGrouping.objects.get(pk=int(allele_origin_grouping_str))

@@ -287,32 +287,52 @@
         function makeFilterBox(text) {
             $('#classificationFilterBox').empty();
             let box = $('<a>', {class: 'filter-item', text: text, onclick:"clearFilterBox()"});
-            $('#classificationFilterBox').append(box);
+            $('#classificationFilterBox').addClass('mr-3').append(box);
         }
         function clearFilterBox() {
             alleleOriginFilter = null;
             testingContextFilter = null;
-            $('#classificationFilterBox').empty();
+            updateDiff();
+            $('#classificationFilterBox').empty().removeClass('mr-3');
             classificationGroupingRedraw();
         }
 
         function filterAlleleOrigin(alleleOrigin, label) {
             testingContextFilter = null;
             alleleOriginFilter = alleleOrigin;
+            updateDiff();
             makeFilterBox(label);
             classificationGroupingRedraw();
         }
+
         function filterTestingContext(testingContext, label) {
             testingContextFilter = testingContext;
             alleleOriginFilter = null;
+            updateDiff();
             makeFilterBox(label);
             classificationGroupingRedraw();
         }
+
         function classificationGroupingFilterExtra(data) {
             data.allele_id = {{ allele.pk }};
             data.allele_origin = alleleOriginFilter;
             data.testing_context = testingContextFilter;
         }
+
+        function updateDiff() {
+            let href = "{% url 'classification_diff' %}?allele={{ allele.id }}&latest=true";
+            if (alleleOriginFilter != null) {
+                href += `&allele_origin=${alleleOriginFilter}`;
+            }
+            if (testingContextFilter != null) {
+                href += `&testing_context=${testingContextFilter}`;
+            }
+            $('#showDiffLink').attr('href', href);
+        }
+
+        $(document).ready(function() {
+            updateDiff();
+        })
     </script>
     <table class="table testing-context-table">
         <thead>
@@ -353,15 +373,10 @@
             {% endfor %}
         </tbody>
     </table>
-    <div id="classificationFilterBox" class="filter-box"></div>
-
-    {% if show_overall_diff %}
-        <div>
-            <span class="allele-origin-box horizontal allele-origin-A">
-                <div class="allele-origin-text">All</div>
-            </span>
-            <a class="hover-link" href="{% url 'classification_diff' %}?allele={{ allele.id }}&latest=true" title="Show differences between labs latest classifications across all allele origins">Show Diffs</a></div>
-    {% endif %}
+    <div class="display-flex align-column-center">
+        <div id="classificationFilterBox" class="filter-box"></div>
+        <a id="showDiffLink" class="hover-link" href="#" style="align-content: center;">Show Diffs</a>
+    </div>
 
     {% classification_groupings show_allele_origin_filter=False %}
 

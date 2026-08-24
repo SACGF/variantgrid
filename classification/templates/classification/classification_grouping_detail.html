@@ -13,9 +13,11 @@
 {% labelled label="Zygosities" %}
     {% for zygosity in classification_grouping.zygosity_values %}{% if not forloop.first %}, {% endif %}{{ zygosity|ekey:"zygosity" }}{% endfor %}
 {% endlabelled %}
-{% labelled label="Overlaps" %}
-    {% for overlap in overlaps %}<div class="my-1">{% overlap overlap show_link=True %}</div>{% endfor %}
-{% endlabelled %}
+{% if overlaps %}
+    {% labelled label="Overlaps w Other Labs" %}
+        {% for overlap in overlaps %}<div class="my-1">{% overlap overlap show_link=True %}</div>{% endfor %}
+    {% endlabelled %}
+{% endif %}
 {% comment %}
 {% labelled label="Triages" %}
     <a class="my-1" data-href="{% url 'triage' classification_grouping.pk 'O' %}?edit=true" data-toggle="ajax-modal">Onco-Path Triage</a><br/>
