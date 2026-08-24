@@ -983,6 +983,8 @@ class VariantAllele(TimeStampedModel):
 
     def needs_clingen_call(self):
         if settings.CLINGEN_ALLELE_REGISTRY_LOGIN and self.allele.clingen_allele is None:
+            if not self.variant.can_have_clingen_allele:
+                return False  # eg gene-level - @see clingen_allele_skip_reason
             if self.clingen_error:
                 # Retry if server was down
                 return self.clingen_error.get("errorType") == ClinGenAllele.CLINGEN_ALLELE_SERVER_ERROR_TYPE
