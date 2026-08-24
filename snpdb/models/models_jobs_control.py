@@ -1,8 +1,18 @@
+from typing import NamedTuple, Optional
+
 from django.db import models, transaction
 from django.utils import timezone
 from django_extensions.db.models import TimeStampedModel
 
-__all__ = ["JobsControl"]
+__all__ = ["JobsControl", "BootRegistration"]
+
+
+class BootRegistration(NamedTuple):
+    """ new_boot is False when this host boot was already recorded (concurrent workers / later
+        worker restarts within the one boot). previous_boot_time is the boot before this one, or
+        None if this is the first boot we've recorded. """
+    new_boot: bool
+    previous_boot_time: Optional[int]
 
 
 class JobsControl(TimeStampedModel):
@@ -13,20 +23,22 @@ class JobsControl(TimeStampedModel):
         leased or launched. In-flight node/run statuses are left untouched - resuming lets the
         existing reclaim logic pick work back up where it left off.
 
-        Primary use is a crash safety brake: on a long-lived host a low system uptime means the box
-        rebooted (a normal deploy restarts the worker process but leaves uptime high), so the worker
-        auto-pauses once per boot (see snpdb.signals.jobs_autopause) - the jobs that may have crashed
-        the machine don't immediately re-launch and crash it again. An admin inspects, then resumes
-        via the 'jobs_control' management command. """
+        Primary use is a crash safety brake: the worker records each host boot it starts under, and
+        auto-pauses when two boots land close together (see snpdb.signals.jobs_autopause) - a box
+        that reboots, comes up and then goes down again is likely being crashed by the jobs it
+        relaunches, so we hold them until an admin inspects and resumes via the 'jobs_control'
+        management command. A single reboot the box survives keeps running. """
     SINGLETON_PK = 1
 
     paused = models.BooleanField(default=False)
     reason = models.TextField(blank=True)
     paused_by = models.TextField(blank=True)
     paused_at = models.DateTimeField(null=True, blank=True)
-    # /proc/stat btime (epoch secs) we last auto-paused for, so the reboot auto-pause fires exactly
-    # once per boot and doesn't re-trip after an admin resume while uptime is still low.
-    last_autopause_boot_time = models.BigIntegerField(null=True, blank=True)
+    # The two most recent /proc/stat btime values (epoch secs) a worker has started under. The gap
+    # between them is what tells a one-off reboot from a crash loop, and keying on the latest means
+    # each boot is judged exactly once - later worker restarts don't re-trip after an admin resume.
+    last_boot_time = models.BigIntegerField(null=True, blank=True)
+    previous_boot_time = models.BigIntegerField(null=True, blank=True)
 
     def save(self, *args, **kwargs):
         self.pk = self.SINGLETON_PK  # enforce a single row
@@ -66,21 +78,18 @@ class JobsControl(TimeStampedModel):
         return obj
 
     @classmethod
-    def autopause_for_boot(cls, boot_time: int, reason: str, by: str) -> bool:
-        """ Pause once per boot, keyed on the host boot time. Returns True if it paused now, False
-            if this boot was already handled (so concurrent workers / restarts don't re-trip it). """
+    def register_boot(cls, boot_time: int) -> BootRegistration:
+        """ Record the host boot this worker started under, shuffling the previous one down. """
         with transaction.atomic():
             cls.objects.get_or_create(pk=cls.SINGLETON_PK)
             obj = cls.objects.select_for_update().get(pk=cls.SINGLETON_PK)
-            if obj.last_autopause_boot_time == boot_time:
-                return False
-            obj.last_autopause_boot_time = boot_time
-            obj.paused = True
-            obj.paused_at = timezone.now()
-            obj.reason = reason
-            obj.paused_by = by
+            if obj.last_boot_time == boot_time:
+                return BootRegistration(new_boot=False, previous_boot_time=obj.previous_boot_time)
+            previous_boot_time = obj.last_boot_time
+            obj.previous_boot_time = previous_boot_time
+            obj.last_boot_time = boot_time
             obj.save()
-        return True
+        return BootRegistration(new_boot=True, previous_boot_time=previous_boot_time)
 
     def __str__(self):
         if self.paused:

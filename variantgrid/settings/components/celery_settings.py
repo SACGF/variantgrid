@@ -180,9 +180,12 @@ CELERY_WORKER_ADDRESS_SPACE_LIMIT_GB = {
     "analysis_workers": 8,
 }
 
-# Crash safety brake: after a host reboot (low /proc/uptime) the worker auto-pauses the analysis +
-# annotation job dispatchers once per boot, so jobs that may have crashed the box don't immediately
-# re-launch and crash it again. An admin resumes with 'manage.py jobs_control resume'. Turn this OFF
-# on ephemeral / autoscaled hosts, where a fresh boot is routine rather than a crash signal.
+# Crash safety brake: the worker records each host boot, and when two land close together (a box
+# that came up then went down again - a likely crash loop) it auto-pauses the analysis + annotation
+# job dispatchers, so the jobs that may have crashed the box don't immediately re-launch and crash
+# it again. A single reboot the box survives starts up as normal. An admin resumes a paused
+# deployment with 'manage.py jobs_control resume'. Turn this OFF on ephemeral / autoscaled hosts,
+# where a fresh boot is routine rather than a crash signal.
 JOBS_AUTOPAUSE_ON_REBOOT = True
 JOBS_AUTOPAUSE_ON_REBOOT_UPTIME_SECS = 600  # uptime under this on worker start => treat as a reboot
+JOBS_AUTOPAUSE_ON_REBOOT_WINDOW_SECS = 3600  # 2nd boot this soon after the previous => crash loop
