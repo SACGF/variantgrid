@@ -482,15 +482,24 @@ function enhanceAndMonitor() {
 
     // run the processors, and check recursively
     function checkNode(node, recursive) {
+        if (node.attr('data-p')) {
+            return;
+        }
+        let matched = false;
         for (const processor of processors) {
             if (node.is(processor.test)) {
                 if (processor.func) {
                     const element = node[0];
                     processor.func(node);
+                    matched = true;
                 } else {
                     return; // no function means it's some weird element type we should stay away from
                 }
             }
+        }
+        if (matched) {
+            // only add data-p to elements that matched a test (as adding them to all elements would be messy)
+            node.attr('data-p', '1');
         }
         // check recursively
         if (recursive) {
@@ -598,7 +607,7 @@ function setupModalAnimationForWebTesting(modalContent) {
 
 function loadAjaxModal(linkDom, size) {
     const url = linkDom.attr('data-href') || linkDom.attr('href');
-    const useId = url.replace('/', '_');
+    const useId = url.replaceAll(/[^a-zA-Z0-9]/g, '');
     const modalContent = createModalShell(useId, linkDom.attr('data-title') || linkDom.text(), size);
     const modalContentDiv = modalContent.find('.modal-content');
     const body = modalContent.find('.modal-body');

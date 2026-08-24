@@ -37,7 +37,9 @@
         $('input[name="triage_status"]').change(() => {
             triage_status_updated();
         });
-        triage_status_updated();
+        $(document).ready(() => {
+            triage_status_updated();
+        });
     </script>
 
 {% else %}
@@ -45,7 +47,7 @@
         <div class="container">{% include "uicore/messages/messages.html" %}</div>
 
         {% comment %}Put these in the card body so they get attached to the DOM{% endcomment %}
-        <div data-replace="#triage-{{ triage.pk }}-status">{% triage triage show_label=True%}</div>
+        <div data-replace="#triage-{{ triage.pk }}-status">{% triage triage show_label=True show_link=True %}</div>
         <div data-replace="#triage-{{ triage.pk }}-value">
             {% if triage.effective_value != triage.value %}
                 <div>{% clinical_significance triage.value extra_css="strike"%}</div>
