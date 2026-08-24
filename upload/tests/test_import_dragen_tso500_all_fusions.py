@@ -1,5 +1,6 @@
 """Import of AllFusions.csv - the VCF the loader writes, and the GeneFusions made from it."""
 import os
+import tempfile
 
 import cyvcf2
 import simplejson
@@ -14,10 +15,11 @@ from library.genomics.vcf_utils import vcf_get_ref_alt_svlen_and_modification
 from library.genomics.vcf_writer import percent_decode_info_value
 from snpdb.gene_level_variants import GENE_LEVEL_CONTIG_NAME
 from genes.models import GeneFusion, FusionGeneId
-from genes.gene_fusions import create_gene_fusions_for_variants
+from genes.gene_fusions import GeneFusionResolver, create_gene_fusions_for_variants
 from genes.tests.gene_fusion_test_utils import create_gene_fusion
 from genes.tests.test_gene_fusions import GeneFusionTestCase
 from snpdb.models import GenomeBuild, ImportSource, Variant
+from snpdb.variant_pk_lookup import VariantPKLookup
 from upload.tso500.dragen_all_fusions_parser import can_process_file, read_all_fusions
 from upload.import_task_factories.import_task_factory import get_import_task_factories
 from upload.models import (
@@ -142,6 +144,22 @@ class TestGeneFusionVCF(GeneFusionTestCase):
 
 class TestGeneFusionInsert(GeneFusionTestCase):
     """ The post-insert step - GeneFusion rows read off the variants the pipeline inserted """
+
+    def test_variant_inserted_with_zero_svlen(self):
+        """ The pipeline inserts through VariantPKLookup - gene-level variants must land with
+            svlen=0, as unique_together does nothing on null @see snpdb.gene_level_variants """
+        resolver = GeneFusionResolver()
+        resolved_fusion = resolver.resolve_fusion(resolver.resolve_side("BCR"),
+                                                  resolver.resolve_side("ABL1"), True)
+        variant_coordinate = resolved_fusion.variant_coordinate
+        genome_build = GenomeBuild.grch37()
+        with tempfile.TemporaryDirectory() as working_dir:
+            variant_pk_lookup = VariantPKLookup(genome_build, working_dir=working_dir)
+            variant_pk_lookup.add(variant_coordinate)
+            variant_pk_lookup.batch_check(insert_unknown=True)
+
+        variant = Variant.get_from_variant_coordinate(variant_coordinate, genome_build)
+        self.assertEqual(0, variant.svlen)
 
     def test_creates_a_gene_fusion_per_gene_level_variant(self):
         gene_fusion = create_gene_fusion("BCR", "ABL1")

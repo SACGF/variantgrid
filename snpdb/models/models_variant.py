@@ -318,7 +318,8 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
 
     def format(self):
         if Sequence.allele_is_symbolic(self.alt):
-            range_end = self.position + abs(self.svlen)
+            # Formatting is used in error messages, so tolerate a missing svlen
+            range_end = self.position + abs(self.svlen or 0)
             return f"{self.chrom}:{self.position}-{range_end} {self.alt}"
         else:
             return f"{self.chrom}:{self.position} {self.ref}>{self.alt}"

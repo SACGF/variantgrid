@@ -7,7 +7,7 @@ import logging
 import os
 from collections import defaultdict
 from collections.abc import Callable, Collection, Iterable
-from typing import Any, TypeAlias
+from typing import Any, Optional, TypeAlias
 
 from django.db.models import Q, QuerySet, TextField, Value
 from django.db.models.aggregates import Max
@@ -49,8 +49,11 @@ class VariantPKLookup:
     def _get_locus_hash(self, contig_id, position, ref_id):
         return contig_id, position, ref_id
 
-    def _get_variant_hash(self, contig_id: int, position: int, ref_id: int, alt_id: int, svlen: int) -> VariantHash:
-        return contig_id, position, ref_id, alt_id, svlen or ''
+    def _get_variant_hash(self, contig_id: int, position: int, ref_id: int, alt_id: int,
+                          svlen: Optional[int]) -> VariantHash:
+        # Only null means "no svlen" - 0 is a real value gene-level variants rely on
+        # @see snpdb.gene_level_variants
+        return contig_id, position, ref_id, alt_id, '' if svlen is None else svlen
 
     def _get_ids_for_hashes(self, hashes: Iterable[AnyHash], get_queryset: Callable[[int, Collection[int]], QuerySet]) -> list[int]:
         """ hashes tuples 1st 2 elements should be contig_id, position """

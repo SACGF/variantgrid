@@ -242,6 +242,11 @@ class VariantTranscriptSelections:
             Whichever one is used will have molecular consequences etc.
 
             We may have transcripts from consortium not used, so can add those. """
+        if variant.is_gene_level:
+            # No coordinate, so nothing to convert into the other consortium's transcripts
+            # @see snpdb.gene_level_variants
+            return
+
         ac_key = self._ac_key(self.annotation_consortium)
         other_ac_key = self._ac_key(self.other_annotation_consortium)
 
