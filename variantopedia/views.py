@@ -55,6 +55,7 @@ from library.django_utils.jqgrid_view import JQGridView
 from library.git import Git
 from library.guardian_utils import admin_bot
 from library.health_check import HealthCheckRequest, health_check_overall_stats_signal
+from library.integration_status import get_integration_statuses, run_integration_trigger
 from library.log_utils import (
     AdminNotificationBuilder,
     log_traceback,
@@ -182,6 +183,14 @@ def server_status(request):
             messages.warning(request, "Warning message")
             messages.error(request, "Error message")
 
+        elif action == 'run-integration':
+            action_id = request.POST.get('action_id')
+            if integration := run_integration_trigger(action_id):
+                messages.add_message(request, level=messages.INFO,
+                                     message=f"Started {integration.trigger.label} for {integration.name}.")
+            else:
+                messages.add_message(request, level=messages.ERROR,
+                                     message=f"No integration is registered against '{action_id}'.")
         elif action == 'kill-pid':
             pid = int(request.POST.get('pid'))
             with connection.cursor() as cursor:
@@ -289,9 +298,6 @@ def server_status(request):
         highest_variant_annotated["status"] = "danger"
         highest_variant_annotated["message"] = str(e)
 
-    sample_enrichment_kits_df = None
-    if settings.SEQAUTO_ENABLED:
-        sample_enrichment_kits_df = get_sample_enrichment_kits_df()
     disk_messages = get_disk_messages(info_messages=True)
     disk_free = {"status": "info", "messages": []}
     for status, message in disk_messages:
@@ -299,12 +305,18 @@ def server_status(request):
             disk_free["status"] = "warning"
         disk_free["messages"].append(message)
 
+    integrations = []
+    integration_messages = []
+    if settings.INTEGRATION_STATUS_ENABLED:
+        integrations, integration_messages = get_integration_statuses()
+
     context = {
         "celery_workers": celery_workers,
         "queries": long_running_sql(0),
         "can_access_reference": can_access_reference,
         "highest_variant_annotated": highest_variant_annotated,
-        "sample_enrichment_kits_df": sample_enrichment_kits_df
+        "integrations": integrations,
+        "integration_messages": integration_messages,
     }
     return render(request, "variantopedia/server_status.html", context)
 

@@ -9,7 +9,6 @@
 {% load english_tags %}
 {% load jqgrid_tags %}
 {% load js_tags %}
-{% load seqauto_graph_tags %}
 {% load static %}
 {% block title %}Server Status{% endblock %}
 {% block submenu %}{% menu_bar_settings %}{% endblock submenu %}
@@ -63,20 +62,9 @@
 
             {% labelled id="highest_variant" label="Highest Variant Annotated w/latest" %}<div class="alert alert-{{ highest_variant_annotated.status }}">{{ highest_variant_annotated.message }}</div>{% endlabelled %}
 
-            {% if seqauto_enabled or not can_access_reference %}
-                <a class='toggle-link' data-toggle="collapse" href="#sequencing">Toggle Sequencing Stats</a>
-                <div id="sequencing" class="collapse">
-                    {% if seqauto_enabled %}
-                        <div>
-                        {% sample_enrichment_kits_graph sample_enrichment_kits_df 'Sequencing Samples By Month' "month_offset" %}
-                        </div>
-                    {% endif %}
-
-                    {% if not can_access_reference %}
-                        <div id="reference-check">
-                            <b>Reference:</b> <span class="status-check error">Can't access reference directory.</span>
-                        </div>
-                    {% endif %}
+            {% if not can_access_reference %}
+                <div id="reference-check">
+                    <b>Reference:</b> <span class="status-check error">Can't access reference directory.</span>
                 </div>
             {% endif %}
 
@@ -127,6 +115,54 @@
                                 {% endif %}
                                 Total workers: {{ worker_info.num_workers }}
 
+                            {% endif %}
+                        </div>
+                    {% endlabelled %}
+
+                {% endfor %}
+            {% endif %}
+
+            {% if integrations or integration_messages %}
+                <h4>Integrations</h4>
+                {% for message in integration_messages %}
+                    <div class="alert alert-danger">{{ message }}</div>
+                {% endfor %}
+                {% for integration in integrations %}
+
+                    {% labelled id=integration.slug label=integration.name %}
+                        <div class="alert {% if not integration.enabled %}alert-secondary{% elif integration.ok %}alert-primary{% else %}alert-danger{% endif %}">
+                            {% if not integration.enabled %}<span class="badge badge-secondary">disabled</span>{% endif %}
+                            {% if integration.description %}{{ integration.description }}{% endif %}
+                            {% if integration.has_run %}
+                                {% for detail in integration.details %}
+                                    <span class="text-{{ detail.status }}">
+                                        {{ detail.label }}:
+                                        {% if detail.timestamp %}
+                                            {% timestamp detail.timestamp time_ago=True %}
+                                        {% elif detail.extra %}
+                                            {{ detail.extra }}
+                                        {% else %}
+                                            never
+                                        {% endif %}
+                                        {% if detail.timestamp and detail.extra %}{{ detail.extra }}{% endif %}
+                                    </span>
+                                {% endfor %}
+                            {% else %}
+                                Never run
+                            {% endif %}
+                            {% if integration.record_count is not None %}
+                                Records:
+                                {% if integration.url %}<a href="{{ integration.url }}">{{ integration.record_count | intcomma }}</a>{% else %}{{ integration.record_count | intcomma }}{% endif %}
+                            {% elif integration.url %}
+                                <a href="{{ integration.url }}">Records</a>
+                            {% endif %}
+                            {% if integration.trigger %}
+                                <form method="POST" class="d-inline">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="action" value="run-integration" />
+                                    <input type="hidden" name="action_id" value="{{ integration.trigger.action_id }}" />
+                                    <button type="submit" class="btn btn-sm btn-warning">{{ integration.trigger.label }}</button>
+                                </form>
                             {% endif %}
                         </div>
                     {% endlabelled %}

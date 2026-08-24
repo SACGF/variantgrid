@@ -3,9 +3,14 @@ from typing import Any, Optional
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.http.response import HttpResponseRedirectBase
-from django.urls import resolve
+from django.urls import Resolver404, resolve
 
-from eventlog.models import ViewEvent
+from eventlog.models import (
+    IntegrationActivity,
+    IntegrationActivityStatus,
+    ViewEvent,
+)
+from library.integration_status import IntegrationDirection
 from oidc_auth.session_refresh import VariantGridSessionRefresh
 
 IGNORE_SEGMENTS = {"api", "datatable", "citations_json"}  # this should be mostly redundant to is_ajax call
@@ -140,3 +145,54 @@ class PageViewsMiddleware:
                                 method=request.method,
                                 referer=request.headers.get('Referer')
                             )
+
+
+class IntegrationApiMiddleware:
+    """
+    Records when each external client last called us - the API equivalent of a "last run" log,
+    for endpoints that would otherwise leave nothing behind but the records they wrote.
+
+    Driven by settings.INTEGRATION_API_TRACKING - {url path prefix: display name} - so a
+    deployment only pays for the endpoints it names.
+    """
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        response = self.get_response(request)
+
+        tracking = settings.INTEGRATION_API_TRACKING
+        if not tracking:
+            return response
+
+        for prefix, display_name in tracking.items():
+            if request.path_info.startswith(prefix):
+                self._record(request, response, display_name)
+                break
+
+        return response
+
+    @staticmethod
+    def _record(request, response, display_name: str):
+        try:
+            view_name = resolve(request.path_info).view_name
+        except Resolver404:
+            return
+
+        status_code = response.status_code
+        if status_code >= 400:
+            status = IntegrationActivityStatus.ERROR
+            message = f"HTTP {status_code} from {request.path_info}"
+        else:
+            status = IntegrationActivityStatus.SUCCESS
+            message = None
+
+        IntegrationActivity.record(
+            key=f"api:{view_name}",
+            name=f"{display_name} ({view_name})",
+            direction=IntegrationDirection.INBOUND,
+            status=status,
+            changed=status == IntegrationActivityStatus.SUCCESS and request.method != "GET",
+            message=message
+        )

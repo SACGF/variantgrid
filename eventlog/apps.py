@@ -11,5 +11,6 @@ class OntologyConfig(AppConfig):
         # silently unregistering them
         from eventlog.signals import (
             active_users_health_check,  # noqa: F401  # pylint: disable=unused-import
+            integration_activity_status,  # noqa: F401  # pylint: disable=unused-import
         )
         # pylint: enable=import-outside-toplevel
