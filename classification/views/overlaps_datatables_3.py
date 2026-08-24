@@ -144,6 +144,7 @@ class OverlapColumns(DatatableConfig[ClassificationGrouping]):
             qs = qs.filter(
                 Q(overlap_max_ever_status__gte=OverlapStatus.MAJOR_DIFFERENCES, overlap_status__lt=OverlapStatus.MAJOR_DIFFERENCES) |
                 Q(overlap_override_status__ne=OverlapOverrideStatus.NO_OVERRIDE))
+            qs = qs.filter(overlap_status__gte=OverlapStatus.SINGLE_SUBMITTER)
             qs = qs.annotate(skew_status=Subquery(
                 OverlapContributionSkew.objects.filter(lab_filter_q).filter(
                     overlap=OuterRef('pk')
