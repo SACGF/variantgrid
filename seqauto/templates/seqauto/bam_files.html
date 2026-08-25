@@ -1,6 +1,4 @@
 <div>
-	{% load jqgrid_tags %}
-	{% user_data_grid_filter 'BamFiles' 'BamFiles' group_data=False incomplete_data=True %}
-
-	{% jqgrid 'bam_file_grid' 'BamFiles' False None 'seqauto/grids/bam_file_grid.html' delete=False %}
+	<table id="bam-files-datatable" class="sticky-header"
+	       data-datatable-url="{% url 'bam_file_datatable' %}"></table>
 </div>

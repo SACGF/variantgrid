@@ -16,13 +16,13 @@ from seqauto.grids.seqauto_grids import (
     SequencingSamplesHistoricalGrid,
 )
 from seqauto.grids.sequencing_data_grids import (
-    BamFileListGrid,
+    BamFileColumns,
     EnrichmentKitColumns,
     ExperimentColumns,
-    QCFileListGrid,
-    SequencingRunListGrid,
-    SingleSampleVCFListGrid,
-    UnalignedReadsListGrid,
+    QCColumns,
+    SequencingRunColumns,
+    SingleSampleVCFColumns,
+    UnalignedReadsColumns,
 )
 from seqauto.grids.sequencing_software_versions_grids import (
     AlignerColumns,
@@ -115,11 +115,14 @@ urlpatterns = [
     # Grids
     path('experiments/grid/', DatabaseTableView.as_view(column_class=ExperimentColumns),
          name='experiments_datatable'),
-    path('sequencing_run/grid/<slug:op>/', JQGridView.as_view(grid=SequencingRunListGrid), name='sequencing_run_grid'),
-    path('unaligned_reads/grid/<slug:op>/', JQGridView.as_view(grid=UnalignedReadsListGrid), name='unaligned_reads_grid'),
-    path('bam_file/grid/<slug:op>/', JQGridView.as_view(grid=BamFileListGrid), name='bam_file_grid'),
-    path('vcf_file/grid/<slug:op>/', JQGridView.as_view(grid=SingleSampleVCFListGrid), name='vcf_file_grid'),
-    path('qc/grid/<slug:op>/', JQGridView.as_view(grid=QCFileListGrid), name='qc_grid'),
+    path('sequencing_run/datatable/', DatabaseTableView.as_view(column_class=SequencingRunColumns),
+         name='sequencing_run_datatable'),
+    path('unaligned_reads/datatable/', DatabaseTableView.as_view(column_class=UnalignedReadsColumns),
+         name='unaligned_reads_datatable'),
+    path('bam_file/datatable/', DatabaseTableView.as_view(column_class=BamFileColumns), name='bam_file_datatable'),
+    path('vcf_file/datatable/', DatabaseTableView.as_view(column_class=SingleSampleVCFColumns),
+         name='vcf_file_datatable'),
+    path('qc/datatable/', DatabaseTableView.as_view(column_class=QCColumns), name='qc_datatable'),
     path('enrichment_kit/grid/', DatabaseTableView.as_view(column_class=EnrichmentKitColumns), name='enrichment_kit_datatable'),
     path('enrichment_kit/gene/grid/<int:enrichment_kit_id>/<genome_build_name>/<gene_symbol>/<slug:op>/', JQGridView.as_view(grid=EnrichmentKitGeneCoverageGrid), name='enrichment_kit_gene_coverage_grid'),
     path('gold_coverage_summary/grid/<pk>/<slug:op>/', JQGridView.as_view(grid=GoldCoverageSummaryGrid), name='gold_coverage_summary_grid'),

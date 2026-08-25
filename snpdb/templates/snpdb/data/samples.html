@@ -23,7 +23,7 @@ $(document).ready(function() {
     {% vcf_grid_filter 'samples-datatable' variants_type=True %}
 </form>
 
-{% datatable_group_data_filter 'samples-datatable' 'Samples' %}
+{% datatable_user_data_filter 'samples-datatable' 'Samples' %}
 <table id="samples-datatable" class="sticky-header"
        data-datatable-url="{% url 'samples_list_datatable' %}"
        data-datatable-data="vcfGridDatatableFilter"></table>

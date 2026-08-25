@@ -41,6 +41,11 @@ class Test(URLTestCase):
 
         GRID_LIST_URLS = [
             ("experiments_datatable", {}, 200),
+            ("sequencing_run_datatable", {}, 200),
+            ("unaligned_reads_datatable", {}, 200),
+            ("bam_file_datatable", {}, 200),
+            ("vcf_file_datatable", {}, 200),
+            ("qc_datatable", {}, 200),
             ("enrichment_kit_datatable", {}, 200),
             ("library_datatable", {}, 200),
             ("sequencer_datatable", {}, 200),

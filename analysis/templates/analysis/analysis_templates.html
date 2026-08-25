@@ -39,7 +39,7 @@
     <a class='hover-link' id="show-form-link" title="See which templates will auto-run on which samples" href="{% url 'analysis_templates_auto_launch' %}">Analysis templates Auto Launch</a>
 </div>
 <div class="container-table">
-    {% datatable_group_data_filter 'analysis-templates-datatable' 'Analysis Templates' %}
+    {% datatable_user_data_filter 'analysis-templates-datatable' 'Analysis Templates' %}
     <table id="analysis-templates-datatable" class="sticky-header"
            data-datatable-url="{% url 'analysis_templates_datatable' %}"></table>
 </div>

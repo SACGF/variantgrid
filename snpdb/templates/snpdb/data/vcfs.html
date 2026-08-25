@@ -24,7 +24,7 @@ $(document).ready(function() {
 
 
 <div>
-{% datatable_group_data_filter 'vcfs-datatable' 'VCFs' %}
+{% datatable_user_data_filter 'vcfs-datatable' 'VCFs' %}
 <table id="vcfs-datatable" class="sticky-header"
        data-datatable-url="{% url 'vcfs_datatable' %}"
        data-datatable-data="vcfGridDatatableFilter"></table>

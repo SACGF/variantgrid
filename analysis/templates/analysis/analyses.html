@@ -75,7 +75,7 @@
     </div>
 
     <div class="container-table">
-        {% datatable_group_data_filter 'analyses-datatable' 'Analyses' %}
+        {% datatable_user_data_filter 'analyses-datatable' 'Analyses' %}
         <table id="analyses-datatable" class="sticky-header" data-datatable-url="{% url 'analyses_list_datatable' %}"></table>
     </div>
 {% endblock content %}

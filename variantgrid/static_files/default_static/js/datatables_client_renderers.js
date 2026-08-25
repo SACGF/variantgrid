@@ -147,3 +147,51 @@ $(document).on('click', closeRowActionsMenus);
 $(window).on('resize', closeRowActionsMenus);
 // scroll doesn't bubble, so capture it to catch the DataTables scroll body as well as the window
 document.addEventListener('scroll', closeRowActionsMenus, true);
+
+
+// Server sends a boolean - only draw an icon when it's set, so the grid stays sparse
+function renderIconFlag(settings, data, type, row) {
+    if (!data) {
+        return '';
+    }
+    return $('<div>', {class: settings.cssClass, title: settings.title}).prop('outerHTML');
+}
+
+
+// Server sends a list of {label, url}
+function renderExternalLinks(data, type, row) {
+    if (!data || !data.length) {
+        return '';
+    }
+    const dom = $('<div>');
+    data.forEach((link, index) => {
+        if (index) {
+            dom.append(' | ');
+        }
+        $('<a>', {href: link.url, target: '_blank', rel: 'noopener', text: link.label}).appendTo(dom);
+    });
+    return dom.prop('outerHTML');
+}
+
+
+// Server sends one entry per VCF loaded from the run - {id, url, import_status, variant_caller}
+function renderSequencingRunVCFs(data, type, row) {
+    if (!data || !data.length) {
+        return '';
+    }
+    const dom = $('<div>');
+    for (const vcf of data) {
+        let icon;
+        if (vcf.import_status === 'S') {
+            icon = $('<div>', {class: 'left grid-link-icon vcf-icon', title: vcf.variant_caller});
+        } else if (vcf.import_status === 'E') {
+            icon = $('<i>', {class: 'fas fa-times-circle text-danger', title: vcf.variant_caller});
+        } else if (vcf.import_status === 'C' || vcf.import_status === 'I') {
+            icon = $('<i>', {class: 'fas fa-spinner fa-spin', title: vcf.variant_caller});
+        } else {
+            icon = $('<span>', {text: `VCF ${vcf.id} (${vcf.import_status})`});
+        }
+        $('<a>', {href: vcf.url, html: icon}).appendTo(dom);
+    }
+    return dom.prop('outerHTML');
+}

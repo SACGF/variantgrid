@@ -29,7 +29,7 @@ class JQGridView(View):
     """ Convenience view to quickly create JQGrids. Called in 4 different ways
         depending on the op (see enum above). Add to urls.py like:
 
-        perm_path('vcf_file/grid/<slug:op>/', JQGridView.as_view(grid=SingleSampleVCFListGrid), name='vcf_file_grid'),
+        perm_path('qc_exec_summary/grid/<slug:op>/', JQGridView.as_view(grid=QCExecSummaryGrid), name='qc_exec_summary_grid'),
     """
 
     grid: Optional[type[Any]] = None  # JqGridUserRowConfig (or grid initialised w/user, has delete_row method)

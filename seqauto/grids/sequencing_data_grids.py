@@ -1,12 +1,13 @@
+import json
 from typing import Any
 
 from django.conf import settings
 from django.db.models import QuerySet, StringAgg, TextField, Value
 from django.db.models.aggregates import Count
 from django.db.models.functions import Cast
-from django.utils.html import format_html_join, mark_safe
+from django.http import HttpRequest
+from django.urls.base import reverse
 
-from library.jqgrid.jqgrid_user_row_config import JqGridUserRowConfig
 from library.utils import JsonDataType
 from seqauto.models import (
     QC,
@@ -19,7 +20,12 @@ from seqauto.models import (
     UnalignedReads,
 )
 from snpdb.models import UserGridConfig
-from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
+from snpdb.views.datatable_view import CellData, DatatableConfig, RichColumn, SortOrder
+
+
+def _icon_flag_renderer(css_class: str, title: str) -> str:
+    """ Client renderer that only draws an icon when the flag is set, so the grid stays sparse """
+    return f'renderIconFlag.bind(null, {json.dumps({"cssClass": css_class, "title": title})})'
 
 
 class ExperimentColumns(DatatableConfig[Experiment]):
@@ -41,162 +47,170 @@ class ExperimentColumns(DatatableConfig[Experiment]):
         return queryset.annotate(sequencing_runs=StringAgg("sequencingrun", Value(','), output_field=TextField()))
 
 
-class SequencingRunListGrid(JqGridUserRowConfig):
-    model = SequencingRun
-    caption = 'SequencingRuns'
-    fields = ["date", "name", "sequencer__sequencer_model__model", "sequencer__name",
-              "experiment__name", "enrichment_kit__name", "enrichment_kit__version",
-              "gold_standard", "legacy", "hidden", "bad", "path"]
-    colmodel_overrides = {
-        'name': {'width': 260, 'formatter': 'viewSequencingRunLink'},
-        'sequencer__name': {'width': 60, 'label': 'Sequencer'},
-        'sequencer__sequencer_model__model': {'width': 70, 'label': 'Model'},
-        'experiment__name': {'label': 'Experiment', 'width': 120},
-        "enrichment_kit__name": {"label": "EnrichmentKit"},
-        "enrichment_kit__version": {"label": "Kit version", 'width': 20},
-        "gold_standard": {'label': 'Gold', 'width': 20, 'formatter': 'showGoldStandardIcon'},
-        "legacy": {'label': 'Legacy', 'width': 20},
-        "hidden": {'label': 'Hidden', 'width': 20, 'formatter': 'showHiddenIcon'},
-        "bad": {'label': 'Bad', 'width': 20, 'formatter': 'showBadIcon'}
-    }
+class SequencingRunColumns(DatatableConfig[SequencingRun]):
+    def __init__(self, request: HttpRequest):
+        super().__init__(request)
+        self.scroll_x = True
 
-    def __init__(self, user, **kwargs):
-        extra_filters = kwargs.get("extra_filters")
-        super().__init__(user)
-        queryset = self.model.objects.all()
-
-        if extra_filters:
-            if enrichment_kit_id := extra_filters.get("enrichment_kit_id"):
-                queryset = queryset.filter(enrichment_kit_id=enrichment_kit_id)
-
-        user_grid_config = UserGridConfig.get(user, self.caption)
-        if not user_grid_config.show_hidden_data:
-            queryset = queryset.filter(hidden=False)
-
-        annotate = {
-            "sample_count": Count("sequencingruncurrentsamplesheet__sample_sheet__sequencingsample"),
-            "vcf_ids": StringAgg(Cast("vcffromsequencingrun__vcf__pk", TextField()), Value(','),
-                                 output_field=TextField(), order_by="vcffromsequencingrun"),
-            "vcf_variant_caller": StringAgg("vcffromsequencingrun__variant_caller__name", Value(','),
-                                            output_field=TextField(), order_by="vcffromsequencingrun"),
-            "vcf_import_status": StringAgg("vcffromsequencingrun__vcf__import_status", Value(','),
-                                           order_by="vcffromsequencingrun"),
-        }
-
-        # Add sample_count to queryset
-        queryset = queryset.annotate(**annotate)
-        field_names = self.get_field_names() + list(annotate.keys())
-        self.queryset = queryset.values(*field_names)
-        self.extra_config.update({'sortname': 'date',
-                                  'sortorder': 'desc'})
-
-    def get_colmodels(self, *args, **kwargs):
-        colmodels = super().get_colmodels(*args, **kwargs)
-        extra = {'index': 'sample_count', 'name': 'sample_count',
-                 'label': 'Sample Count', 'sorttype': 'int', 'width': 20}
-        insert_pos = 2
-        colmodels = colmodels[:insert_pos] + [extra] + colmodels[insert_pos:]
-        vcf_extra = [
-            {'index': 'vcf_ids', 'name': 'vcf_ids', 'label': 'VCF', 'formatter': 'formatSequencingRunVCF',
-             'sorttype': 'int', 'width': 80},
-            {'index': 'vcf_variant_caller', 'hidden': True},
-            {'index': 'vcf_import_status', 'hidden': True},
+        self.rich_columns = [
+            RichColumn(key="date", label="Date", orderable=True, default_sort=SortOrder.DESC,
+                       css_class="text-nowrap", client_renderer='TableFormat.timestamp'),
+            RichColumn(key="name", label="Name", orderable=True,
+                       renderer=self.view_primary_key, client_renderer='TableFormat.linkUrl'),
+            RichColumn(key="sample_count", label="Sample Count", orderable=True),
+            RichColumn(key="sequencer__sequencer_model__model", label="Model", orderable=True),
+            RichColumn(key="sequencer__name", label="Sequencer", orderable=True),
+            RichColumn(key="experiment__name", label="Experiment", orderable=True),
+            RichColumn(key="enrichment_kit__name", label="EnrichmentKit", orderable=True),
+            RichColumn(key="enrichment_kit__version", label="Kit version", orderable=True),
+            RichColumn(key="gold_standard", label="Gold", orderable=True,
+                       client_renderer=_icon_flag_renderer("grid-link-icon gold-standard-icon", "Gold Standard")),
+            RichColumn(key="legacy", label="Legacy", orderable=True,
+                       client_renderer='TableFormat.boolean.bind(null, "standard")'),
+            RichColumn(key="hidden", label="Hidden", orderable=True,
+                       client_renderer=_icon_flag_renderer("grid-link-icon hidden-eye-icon", "Hidden")),
+            RichColumn(key="bad", label="Bad", orderable=True,
+                       client_renderer=_icon_flag_renderer("fas fa-times-circle text-danger",
+                                                           "Run marked as bad")),
+            RichColumn(key="vcf_ids", label="VCF",
+                       extra_columns=["vcf_variant_caller", "vcf_import_status"],
+                       renderer=self._render_vcfs, client_renderer='renderSequencingRunVCFs'),
+            RichColumn(key="name", name="external_links", label="External Links",
+                       extra_columns=["date", "enrichment_kit__name"],
+                       enabled=bool(settings.SEQAUTO_SEQUENCING_RUN_EXTERNAL_LINKS),
+                       renderer=self._render_external_links, client_renderer='renderExternalLinks'),
+            RichColumn(key="path", label="Path", orderable=True),
         ]
-        # Insert second to last
-        colmodels = colmodels[:-1] + vcf_extra + colmodels[-1:]
-        if settings.SEQAUTO_SEQUENCING_RUN_EXTERNAL_LINKS:
-            colmodels.append({'index': 'external_links', 'name': 'external_links',
-                              'label': 'External Links', 'sortable': False, 'width': 80})
-        return colmodels
-
-    def iter_format_items(self, items):
-        items = super().iter_format_items(items)
-        if settings.SEQAUTO_SEQUENCING_RUN_EXTERNAL_LINKS:
-            items = (self._add_external_links(row) for row in items)
-        return items
 
     @staticmethod
-    def _add_external_links(row: dict) -> dict:
-        links = SequencingRun.get_external_links_for(
-            row["name"], row.get("date"), row.get("enrichment_kit__name"))
-        if links:
-            row["external_links"] = format_html_join(
-                mark_safe(" | "), '<a href="{}" target="_blank" rel="noopener">{}</a>',
-                ((url, label) for label, url in links))
-        else:
-            row["external_links"] = ""
-        return row
+    def _render_vcfs(cell: CellData) -> JsonDataType:
+        """ The StringAggs are parallel lists - one entry per VCFFromSequencingRun, so a VCF made from
+            multiple runs appears more than once """
+        if not (vcf_ids := cell.value):
+            return []
+        variant_callers = (cell["vcf_variant_caller"] or "").split(",")
+        import_statuses = (cell["vcf_import_status"] or "").split(",")
+        vcfs = {}
+        for i, vcf_id in enumerate(vcf_ids.split(",")):
+            if vcf_id in vcfs:
+                continue
+            vcfs[vcf_id] = {
+                "id": vcf_id,
+                "url": reverse("view_vcf", kwargs={"vcf_id": vcf_id}),
+                "variant_caller": variant_callers[i] if i < len(variant_callers) else None,
+                "import_status": import_statuses[i] if i < len(import_statuses) else None,
+            }
+        return list(vcfs.values())
+
+    @staticmethod
+    def _render_external_links(cell: CellData) -> JsonDataType:
+        links = SequencingRun.get_external_links_for(cell.value, cell["date"], cell["enrichment_kit__name"])
+        return [{"label": label, "url": url} for label, url in links]
+
+    def get_initial_queryset(self) -> QuerySet[SequencingRun]:
+        return SequencingRun.objects.all().annotate(
+            sample_count=Count("sequencingruncurrentsamplesheet__sample_sheet__sequencingsample", distinct=True),
+            vcf_ids=StringAgg(Cast("vcffromsequencingrun__vcf__pk", TextField()), Value(','),
+                              output_field=TextField(), order_by="vcffromsequencingrun"),
+            vcf_variant_caller=StringAgg("vcffromsequencingrun__variant_caller__name", Value(','),
+                                         output_field=TextField(), order_by="vcffromsequencingrun"),
+            vcf_import_status=StringAgg("vcffromsequencingrun__vcf__import_status", Value(','),
+                                        order_by="vcffromsequencingrun"))
+
+    def filter_queryset(self, qs: QuerySet[SequencingRun]) -> QuerySet[SequencingRun]:
+        if enrichment_kit_id := self.get_query_param("enrichment_kit_id"):
+            qs = qs.filter(enrichment_kit_id=enrichment_kit_id)
+        user_grid_config = UserGridConfig.get(self.user, 'SequencingRuns')
+        if not user_grid_config.show_hidden_data:
+            qs = qs.filter(hidden=False)
+        return qs
 
 
-class UnalignedReadsListGrid(JqGridUserRowConfig):
-    model = UnalignedReads
-    caption = 'UnalignedReads'
-    fields = ["id", "sequencing_sample__sample_sheet__sequencing_run__name", "sequencing_sample__sample_id"]
-    colmodel_overrides = {'id': {'width': 20, 'formatter': 'viewUnalignedReadsLink'},
-                          'sequencing_sample__sample_sheet__sequencing_run__name': {'label': 'Sequencing Run'}}
+class UnalignedReadsColumns(DatatableConfig[UnalignedReads]):
+    def __init__(self, request: HttpRequest):
+        super().__init__(request)
 
-    def __init__(self, user, **kwargs):
-        super().__init__(user)
-        queryset = self.model.objects.all()
-        self.queryset = queryset.values(*self.get_field_names())
-        self.extra_config.update({'sortname': 'id',
-                                  'sortorder': 'desc'})
+        self.rich_columns = [
+            RichColumn(key="id", label="ID", orderable=True, default_sort=SortOrder.DESC,
+                       renderer=self._render_unaligned_reads, client_renderer='TableFormat.linkUrl'),
+            RichColumn(key="sequencing_sample__sample_sheet__sequencing_run__name",
+                       label="Sequencing Run", orderable=True),
+            RichColumn(key="sequencing_sample__sample_id", label="Sample", orderable=True),
+        ]
 
+    @staticmethod
+    def _render_unaligned_reads(cell: CellData) -> JsonDataType:
+        return {"text": cell.value,
+                "url": reverse("view_unaligned_reads", kwargs={"unaligned_reads_id": cell.value})}
 
-class BamFileListGrid(JqGridUserRowConfig):
-    model = BamFile
-    caption = 'BamFiles'
-    fields = [
-        "id", "sequencing_sample__sample_sheet__sequencing_run__name",
-        "sequencing_sample__sample_id", "path", "aligner__name"]
-    colmodel_overrides = {
-        'id': {'width': 20, 'formatter': 'viewBamFileLink'},
-        'sequencing_sample__sample_sheet__sequencing_run__name': {'label': 'Sequencing Run'},
-        'aligner__name': {'label': 'Aligner', "hidden": True}  # Hide as always "Fake Aligner" currently
-    }
-
-    def __init__(self, user, **kwargs):
-        super().__init__(user)
-        queryset = self.model.objects.all()
-        self.queryset = queryset.values(*self.get_field_names())
-        self.extra_config.update({'sortname': 'id',
-                                  'sortorder': 'desc'})
+    def get_initial_queryset(self) -> QuerySet[UnalignedReads]:
+        return UnalignedReads.objects.all()
 
 
-class SingleSampleVCFListGrid(JqGridUserRowConfig):
-    model = SingleSampleVCF
-    caption = 'SingleSampleVCFs'
-    fields = ["id", "bam_file__sequencing_sample__sample_sheet__sequencing_run__name",
-              "bam_file__sequencing_sample__sample_id", "path", "variant_caller"]
-    colmodel_overrides = {
-        'id': {'width': 20, 'formatter': 'viewVCFFileLink'},
-        'bam_file__sequencing_sample__sample_sheet__sequencing_run__name': {'label': 'Sequencing Run'}
-    }
+class BamFileColumns(DatatableConfig[BamFile]):
+    def __init__(self, request: HttpRequest):
+        super().__init__(request)
 
-    def __init__(self, user, **kwargs):
-        super().__init__(user)
-        queryset = self.model.objects.all()
-        self.queryset = queryset.values(*self.get_field_names())
-        self.extra_config.update({'sortname': 'id',
-                                  'sortorder': 'desc'})
+        self.rich_columns = [
+            RichColumn(key="id", label="ID", orderable=True, default_sort=SortOrder.DESC,
+                       renderer=self._render_bam_file, client_renderer='TableFormat.linkUrl'),
+            RichColumn(key="sequencing_sample__sample_sheet__sequencing_run__name",
+                       label="Sequencing Run", orderable=True),
+            RichColumn(key="sequencing_sample__sample_id", label="Sample", orderable=True),
+            RichColumn(key="path", label="Path", orderable=True),
+            # Hidden as it's always "Fake Aligner" currently
+            RichColumn(key="aligner__name", label="Aligner", orderable=True, visible=False),
+        ]
+
+    @staticmethod
+    def _render_bam_file(cell: CellData) -> JsonDataType:
+        return {"text": cell.value, "url": reverse("view_bam_file", kwargs={"bam_file_id": cell.value})}
+
+    def get_initial_queryset(self) -> QuerySet[BamFile]:
+        return BamFile.objects.all()
 
 
-class QCFileListGrid(JqGridUserRowConfig):
-    model = QC
-    caption = 'QC'
-    fields = ["id", "bam_file__sequencing_sample__sample_sheet__sequencing_run__name",
-              "bam_file__sequencing_sample__sample_id", "path"]
-    colmodel_overrides = {
-        'id': {'width': 20, 'formatter': 'viewQCLink'},
-        'bam_file__sequencing_sample__sample_sheet__sequencing_run__name': {'label': 'Sequencing Run'}
-    }
+class SingleSampleVCFColumns(DatatableConfig[SingleSampleVCF]):
+    def __init__(self, request: HttpRequest):
+        super().__init__(request)
 
-    def __init__(self, user, **kwargs):
-        super().__init__(user)
-        queryset = self.model.objects.all()
-        self.queryset = queryset.values(*self.get_field_names())
-        self.extra_config.update({'sortname': 'id',
-                                  'sortorder': 'desc'})
+        self.rich_columns = [
+            RichColumn(key="id", label="ID", orderable=True, default_sort=SortOrder.DESC,
+                       renderer=self._render_vcf_file, client_renderer='TableFormat.linkUrl'),
+            RichColumn(key="bam_file__sequencing_sample__sample_sheet__sequencing_run__name",
+                       label="Sequencing Run", orderable=True),
+            RichColumn(key="bam_file__sequencing_sample__sample_id", label="Sample", orderable=True),
+            RichColumn(key="path", label="Path", orderable=True),
+            RichColumn(key="variant_caller__name", label="Variant Caller", orderable=True),
+        ]
+
+    @staticmethod
+    def _render_vcf_file(cell: CellData) -> JsonDataType:
+        return {"text": cell.value, "url": reverse("view_vcf_file", kwargs={"vcf_file_id": cell.value})}
+
+    def get_initial_queryset(self) -> QuerySet[SingleSampleVCF]:
+        return SingleSampleVCF.objects.all()
+
+
+class QCColumns(DatatableConfig[QC]):
+    def __init__(self, request: HttpRequest):
+        super().__init__(request)
+
+        self.rich_columns = [
+            RichColumn(key="id", label="ID", orderable=True, default_sort=SortOrder.DESC,
+                       renderer=self._render_qc, client_renderer='TableFormat.linkUrl'),
+            RichColumn(key="bam_file__sequencing_sample__sample_sheet__sequencing_run__name",
+                       label="Sequencing Run", orderable=True),
+            RichColumn(key="bam_file__sequencing_sample__sample_id", label="Sample", orderable=True),
+            RichColumn(key="path", label="Path", orderable=True),
+        ]
+
+    @staticmethod
+    def _render_qc(cell: CellData) -> JsonDataType:
+        return {"text": cell.value, "url": reverse("view_qc", kwargs={"qc_id": cell.value})}
+
+    def get_initial_queryset(self) -> QuerySet[QC]:
+        return QC.objects.all()
 
 
 class EnrichmentKitColumns(DatatableConfig[EnrichmentKit]):
