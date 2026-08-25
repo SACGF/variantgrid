@@ -14,8 +14,6 @@
 
 {% include "analysis/analysis_includes.html" %}
 
-<script type="text/javascript" src="{% static 'js/samplenode.js' %}"></script>
-<script type="text/javascript" src="{% static 'js/pedigree_node.js' %}"></script>
 <script type="text/javascript" src="{% static 'js/analysis_updates.js' %}"></script>
 <script type="text/javascript" src="{% static 'js/analysis_nodes.js' %}"></script>
 <script type="text/javascript" src="{% static 'js/cached_generated_files.js' %}"></script>
@@ -148,6 +146,9 @@
     const ANALYSIS_TAGS_NODE_ID = {{ analysis_tags_node.pk }};
     // noinspection JSAnnotator
 	const NODE_HELP = {{ node_help | jsonify }};
+	// Icons/labels for the add-node dropdown - see node_display.py
+	// noinspection JSAnnotator
+	const NODE_TYPES = {{ node_types_display | jsonify }};
 	ANALYSIS_SETTINGS = {{ analysis_settings | jsonify }};
 
 	// Panel resize timeouts function added in analysis.js
@@ -231,6 +232,7 @@
 {% endblock head %}
 
 {% block content %}
+    {% include "analysis/tags/node_icon_sprite.html" %}
     <div id="analysis-outer-container" class="d-flex flex-column split-container">
     {% if analysis.template %}
         <div id="analysis-variables" class="hidden split-element">
@@ -265,7 +267,7 @@
                             <button id="analysis-template-save-version" class="btn btn-outline-primary btn-sm">save version</button>
                             {% endif %}
                             <a href="{%  url 'analysis_template_settings' analysis.template.pk %}" target="_blank">
-                                <span class="toolbar-button settings-icon"></span>
+                                <span class="toolbar-button"><i class="fa-solid fa-gear"></i></span>
                                 Template settings
                             </a>
                         </div>
@@ -291,32 +293,33 @@
                 {% endif %}
                     <div id="toolbar-buttons">
                     {% if analysis.is_locked %}
-                        <i title='Locked by: {{ analysis.last_lock.user }} on {{ analysis.last_lock.date|localtime }} ({{ analysis.last_lock.date|timesince }} ago)' class="left fa fa-lock fa-lg toolbar-button"></i>
+                        <span class="toolbar-status" title='Locked by: {{ analysis.last_lock.user }} on {{ analysis.last_lock.date|localtime }} ({{ analysis.last_lock.date|timesince }} ago)'><i class="fa-solid fa-lock"></i></span>
                     {% endif %}
 
                     {% if warnings %}
-                        <i id='lock-input-sources-warning-icon' class="fas fa-exclamation-triangle text-warning toolbar-button"
+                        <span id='lock-input-sources-warning-icon' class="toolbar-status text-warning"
                              title="<ul style='background-color: #FEBC00;'>{% for w in warnings %}<li>{{ w }}{% endfor %}}</ul>"
                              data-toggle="tooltip"
                              data-placement="bottom"
                              data-html="true"
-                        ></i>
+                        ><i class="fa-solid fa-triangle-exclamation"></i></span>
                     {% endif %}
 
                     {% if has_write_permission %}
-                        <a id="add-node-button" class="toolbar-button" href="javascript:addNode()" title="Add node"></a>
-                        <a id="copy-node-button" class="toolbar-button" href="javascript:copyNode()" title="Copy node"></a>
-                        <a id="del-node-button" class="toolbar-button" href="javascript:deleteActiveNodes()" title="Delete Node"></a>
+                        <a id="add-node-button" class="toolbar-button" href="javascript:addNode()" title="Add node"><i class="fa-solid fa-circle-plus"></i></a>
+                        <a id="copy-node-button" class="toolbar-button" href="javascript:copyNode()" title="Copy node"><i class="fa-regular fa-clone"></i></a>
+                        <a id="del-node-button" class="toolbar-button" href="javascript:deleteActiveNodes()" title="Delete Node"><i class="fa-regular fa-trash-can"></i></a>
+                        <span class="toolbar-separator"></span>
                     {% endif %}
-                        <a class="toolbar-button settings-icon" href="javascript:analysisSettings()" title="Analysis Settings"></a>
-                        <a href="javascript:viewTags()" class='left no-link-style' title="Tags">
-                            <span id="view-tags-button" class="toolbar-button"></span>
+                        <a class="toolbar-button" href="javascript:analysisSettings()" title="Analysis Settings"><i class="fa-solid fa-gear"></i></a>
+                        <a id="view-tags-button" class="toolbar-button" href="javascript:viewTags()" title="Tags">
+                            <i class="fa-solid fa-tags"></i>
                             <span id="number-of-tags"></span>
                         </a>
-                        <a id="input-samples-button" class="toolbar-button" href="javascript:inputSamples()" title="Show Input Samples"></a>
+                        <a id="input-samples-button" class="toolbar-button" href="javascript:inputSamples()" title="Show Input Samples"><svg class="toolbar-icon"><use href="#node-icon-samples"></use></svg></a>
                         {% settings_value 'ANALYSIS_DUAL_SCREEN_MODE_FEATURE_ENABLED' as analysis_dual_screen_mode_feature_enabled %}
                         {% if analysis_dual_screen_mode_feature_enabled %}
-                        <a id="dual-screen-button" class="toolbar-button" href="javascript:startDualScreenMode()" title="Dual Screen Mode"></a>
+                        <a id="dual-screen-button" class="toolbar-button" href="javascript:startDualScreenMode()" title="Dual Screen Mode"><i class="fa-solid fa-table-columns"></i></a>
                         {% endif %}
                         </div>
                         <span id="analysis-info">
@@ -332,9 +335,6 @@
                     </div>
 
                 <div id="analysis-container">
-                    <div>
-                        {% include "analysis/svg_dropshadow.html" %}
-                    </div>
                     <div id="overscroll" class='overlay'>
                         <div id="analysis"></div>
                     </div>

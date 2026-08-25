@@ -13,6 +13,7 @@ from django.utils.timezone import localtime
 from analysis.models.enums import TagNodeInput, TagNodeMode
 from analysis.models.models_variant_tag import VariantTag
 from analysis.models.nodes.analysis_node import AnalysisNode, NodeAuditLogMixin, NodeVersion
+from analysis.models.nodes.node_display import NodeIcon
 from snpdb.models import Tag
 
 
@@ -122,6 +123,10 @@ class TagNode(AnalysisNode):
     @staticmethod
     def get_node_class_label():
         return "Tags"
+
+    @classmethod
+    def get_node_class_icon(cls) -> NodeIcon:
+        return NodeIcon(fa="fa-solid fa-tags")
 
     def _get_method_summary(self):
         summary = f"Tagged {', '.join(self.tag_ids)} ({self.get_mode_display()})"

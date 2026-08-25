@@ -1,0 +1,10 @@
+{% comment %}
+Coloured circle with the node's icon - the same badge the node card wears, see analysis_nodes.css
+{% endcomment %}
+<span class="node-icon-badge" node_classification="{{ node_classification }}">
+    {% if icon.symbol %}
+        <svg class="node-icon"><use href="#{{ icon.symbol }}"></use></svg>
+    {% else %}
+        <i class="node-icon {{ icon.fa }}"></i>
+    {% endif %}
+</span>

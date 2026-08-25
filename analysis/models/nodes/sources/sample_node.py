@@ -19,6 +19,7 @@ from analysis.models.nodes.analysis_node import (
     queryset_to_pk_in_q,
 )
 from analysis.models.nodes.cohort_mixin import SampleMixin
+from analysis.models.nodes.node_display import NodeChip, NodeIcon
 from analysis.models.nodes.sources._stats_cache import (
     get_cached_label_count_for_cohort,
     get_handler_for_node,
@@ -26,7 +27,7 @@ from analysis.models.nodes.sources._stats_cache import (
 from genes.models import SampleGeneList
 from library.constants import DAY_SECS
 from patients.models import Extraction, Patient, Specimen
-from patients.models_enums import NucleicAcid, Zygosity
+from patients.models_enums import NucleicAcid, Sex, Zygosity
 from patients.sample_grouping import SampleGroup, get_extraction_sample_group
 from snpdb.models import Sample
 
@@ -71,6 +72,8 @@ class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
         SampleNodeSourceLevel.PATIENT: "patient",
     }
     IMPLEMENTED_SOURCE_LEVELS = {SampleNodeSourceLevel.SAMPLE, SampleNodeSourceLevel.EXTRACTION}
+    # Above this the individual VCF chips stop fitting on the card, so collapse them into a count
+    MAX_VCF_CHIPS = 3
     min_inputs = 0
     max_inputs = 0
 
@@ -101,7 +104,7 @@ class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
 
     @cache_memoize(DAY_SECS, args_rewrite=lambda s: (s.pk, s.version))
     def get_source_vcf_names(self) -> list[str]:
-        """ For the canvas badge - get_rendering_args runs for every node on every analysis render """
+        """ For the canvas chips - get_node_chips runs for every node on every analysis render """
         return [str(vcf) for vcf in self.get_sample_group().vcfs]
 
     def _get_sample(self) -> Optional[Sample]:
@@ -406,6 +409,39 @@ class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
     def get_node_class_label():
         return "Sample"
 
+    @classmethod
+    def get_node_class_icon(cls) -> NodeIcon:
+        return NodeIcon(symbol="node-icon-sample")
+
+    def get_node_icon(self) -> NodeIcon:
+        """ Pedigree notation on the badge - square/circle for sex, struck through if deceased """
+        patient = self.sample.patient if self.sample else None
+        if patient is None:
+            return self.get_node_class_icon()
+        sex = "female" if patient.sex == Sex.FEMALE else "male"
+        deceased = "-deceased" if patient.deceased else ""
+        return NodeIcon(symbol=f"node-icon-sample-{sex}{deceased}")
+
+    def get_node_chips(self) -> list[NodeChip]:
+        """ Why a group node returns fewer rows than it used to - a VCF was archived - is a question
+            only the canvas can answer, so show what the node is actually reading """
+        chips = super().get_node_chips()
+        if not self.is_group_level:
+            return chips
+
+        if self.source_level == SampleNodeSourceLevel.EXTRACTION and self.extraction:
+            extraction_id = self.extraction.reference_id or self.extraction.external_pk or f"({self.extraction.pk})"
+            chips.append(NodeChip(text=extraction_id, icon="fa-solid fa-vial", title=str(self.extraction)))
+
+        vcf_names = self.get_source_vcf_names()
+        if len(vcf_names) > self.MAX_VCF_CHIPS:
+            chips.append(NodeChip(text=f"VCF x{len(vcf_names)}", icon="fa-solid fa-file-lines",
+                                  title="\n".join(vcf_names)))
+        else:
+            for vcf_name in vcf_names:
+                chips.append(NodeChip(text="VCF", icon="fa-solid fa-file-lines", title=vcf_name))
+        return chips
+
     def _get_configuration_check_cohorts(self) -> list:
         if self.is_group_level:
             cohorts, _ = self._get_cohorts_and_sample_visibility_for_node()
@@ -442,20 +478,6 @@ class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
             threshold.save()
         return copy
 
-    def get_rendering_args(self):
-        patient_args = {}
-        if self.sample and self.sample.patient:
-            patient_args = self.sample.patient.get_json_dict()
-
-        rendering_args = {"patient": patient_args}
-        if self.is_group_level:
-            vcf_names = self.get_source_vcf_names()
-            rendering_args["source"] = {
-                "level": self.get_source_level_display(),
-                "vcf_count": len(vcf_names),
-                "vcf_names": vcf_names,
-            }
-        return rendering_args
 
 
 class SampleNodeSampleThreshold(NodeAuditLogMixin, models.Model):

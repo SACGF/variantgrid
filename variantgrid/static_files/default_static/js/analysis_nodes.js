@@ -10,37 +10,59 @@ function getNode(nodeId) {
 
 // Nodes should have a div of class "node-overlay" that has its CSS set by nodeData.overlay_css_classes
 // Nodes should also create a "updateState(args)" method, this will be called after creation
+//
+// Everything else on the card - badge icon, class strip, chips - comes from the rendering dict, see
+// analysis/models/nodes/node_display.py
+
+// icon is a NodeIcon dict: FontAwesome classes, or a symbol id in node_icon_sprite.html
+function renderNodeIcon(icon) {
+	if (icon && icon.symbol) {
+		const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+		svg.setAttribute("class", "node-icon");
+		const use = document.createElementNS("http://www.w3.org/2000/svg", "use");
+		use.setAttribute("href", "#" + icon.symbol);
+		svg.appendChild(use);
+		return $(svg);
+	}
+	return $("<i/>", {class: "node-icon " + ((icon && icon.fa) || "")});
+}
+
+function renderChip(chip) {
+	const span = $("<span/>", {class: "node-chip"});
+	if (chip.css_class) {
+		span.addClass(chip.css_class);
+	}
+	if (chip.title) {
+		span.attr("title", chip.title);
+	}
+	if (chip.icon) {
+		$("<i/>", {class: chip.icon}).appendTo(span);
+	}
+	$("<span/>", {class: "node-chip-text", text: chip.text}).appendTo(span);
+	return span;
+}
 
 function createDefaultNode() {
-	const div = $('<div/>').addClass("window default-node-container");
+	const div = $('<div/>').addClass("window design-a-node");
 	const nodeOverlay = $('<div/>').addClass("node-overlay");
-	nodeOverlay.append("<div class='user-tag-colored'><span class='node-name'></span></div>");
+	$("<span/>", {class: "node-badge node-icon-badge"}).appendTo(nodeOverlay);
+	$("<span/>", {class: "node-klass"}).appendTo(nodeOverlay);
+	$("<div/>", {class: "node-name-holder"}).append($("<span/>", {class: "node-name"})).appendTo(nodeOverlay);
+	$("<div/>", {class: "node-chips"}).appendTo(nodeOverlay);
 	$("<div />", {class: "node-color-overlay"}).appendTo(nodeOverlay);
 	div.append(nodeOverlay);
+	$("<div/>", {class: "node-counts-strip"}).appendTo(div);
 	div[0].updateState = function(args) { };
 	return div;
 }
 
 function createVennNode() {
-	const div = $('<div/>').addClass("window default-node-container");;
-	venn2(div[0], 64, 45);
+	// Design A card with the live venn widget sitting between the name and the counts strip
+	const div = createDefaultNode();
+	const vennHolder = $('<div/>', {class: "node-venn"});
+	venn2(vennHolder[0], 56, 40);
+	vennHolder.insertBefore($(".node-counts-strip", div));
 
-	const overlayStyle = {
-		width: '100%',
-		height: '100%',
-		position: 'absolute',
-		top: 0,
-		left: 0,
-	};
-	$('.' + VENN_TOGGLE_WIDGET_CLASS, div[0]).css(overlayStyle);
-
-	const nodeOverlay = $('<div/>').addClass("node-overlay");
-	nodeOverlay.css(overlayStyle);
-	nodeOverlay.css("z-index", 30);
-	const span = $("<span class='node-name'></span>");
-	nodeOverlay.append(span);
-	$("<div />", {class: "node-color-overlay"}).appendTo(nodeOverlay);
-	div.append(nodeOverlay);
 	div[0].updateState = function(args) {
 		venn_select(this, args['venn_flag']);
 	};
@@ -49,10 +71,7 @@ function createVennNode() {
 
 function createNodeFromData(nodeData) {
 	const NODE_FACTORIES = {
-		"SampleNode" : createSampleNode,
 		"VennNode" : createVennNode,
-		"TrioNode" : createTrioNode,
-		"QuadNode" : createQuadNode,
 	};
 
 	const nodeClass = nodeData['node_class'];
@@ -66,6 +85,27 @@ function createNodeFromData(nodeData) {
 	return node;
 }
 
+// The name is clamped to 3 lines on the card, so hovering has to give the whole thing
+function updateNodeTitle(node) {
+	const parts = [$(".node-name", node).text()];
+	let nodeHelp = NODE_HELP[node.attr("node_class")];
+	if (nodeHelp) {
+		if (SHOW_NODE_IDS_IN_TOOLTIPS) {
+			nodeHelp += " (node #" + node.attr("node_id") + ")";
+		}
+		parts.push(nodeHelp);
+	}
+	node.attr("title", parts.filter(Boolean).join("\n\n"));
+}
+
+// Chips and count rows change the card height, so jsPlumb needs fresh offsets for the Top/BottomCenter anchors
+function repaintNode(node) {
+	node.each(function() {
+		if ($.contains(document.body, this)) {
+			jsPlumb.repaint(this);
+		}
+	});
+}
 
 function updateNodeFromData(node, nodeData) {
 	node.addClass(nodeData.node_class);
@@ -73,7 +113,17 @@ function updateNodeFromData(node, nodeData) {
 	const nodeOverlay = $(".node-overlay", node);
 	nodeOverlay.attr("class", nodeData.overlay_css_classes);
 	$(".node-name", node).text(nodeData.name);
+	$(".node-klass", node).text(nodeData.class_label_short);
+	$(".node-badge", node).empty().append(renderNodeIcon(nodeData.icon));
+
+	const chipsHolder = $(".node-chips", node).empty();
+	$.each(nodeData.chips || [], function() {
+		chipsHolder.append(renderChip(this));
+	});
+
+	updateNodeTitle(node);
 	node.each(function() { this.updateState(nodeData['args']); });
+	repaintNode(node);
 }
 
 // Wait for previous update to come back (so we don't end up with race conditions on the server)
@@ -340,6 +390,19 @@ function copyNode() {
 }
 
 
+// Endpoints are their own absolutely positioned elements, so they have to fade along with the card
+function fadeOutAndRemoveNode(node) {
+	const DELETE_FADE_MS = 150;
+	const endpointElements = $.map(jsPlumb.getEndpoints(node) || [], function(ep) {
+		return ep.canvas;
+	});
+	$(endpointElements).fadeOut(DELETE_FADE_MS);
+	node.fadeOut(DELETE_FADE_MS, function() {
+		jsPlumb.remove(node);
+	});
+}
+
+
 function deleteNodesFromDOM(nodes, data) {
     for (let i=0 ; i<nodes.length ; ++i) {
 		const nodeId = nodes[i];
@@ -354,7 +417,7 @@ function deleteNodesFromDOM(nodes, data) {
 
         // Detatch connections first (without triggering events) so we don't send anything to server upon deletion
         jsPlumb.detachAllConnections(node, {fireEvent: false});
-        jsPlumb.remove(node);
+        fadeOutAndRemoveNode(node);
 
         messagePoller.delete_node(nodeId);
 
@@ -437,14 +500,12 @@ function updateDirtyNode(node, refresh) {
     node.attr("loading", "true"); // #616 - Don't flash red when loading - this will stop next cycle of shadow setting
 
 	const asyncUpdateNode = function (data) {
-		const DEBUG = 0;
-		// Flash between normal shadow and shadowColor
+		// Flash the card border between its normal colour and shadowColor. The border is currentColor,
+		// so animating the node's colour drives it - see .window.design-a-node
 		const DEFAULT_COLOR = "#aaa";
 
 		// Stopping animation ended up breaking "new node flash" so just let it time out
 		//node.stop(); // any previous colours
-		const shadow = $(".sample-shadow", node);
-		shadow.css({"fill": DEFAULT_COLOR});
 
 		const nodeVersion = data["version"];
 		node.attr("version_id", nodeVersion);
@@ -452,55 +513,18 @@ function updateDirtyNode(node, refresh) {
 		const shadowColor = data["shadow_color"];
 
 		if (shadowColor) {
-			if (node.hasClass("default-node-container")) {
-				function defaultRunIt() {
-					if (DEBUG) {
-						console.log("defaultRunIt()");
-					}
-					const myNode = getNode(node_id); // get latest version
-					const version_id = myNode.attr("version_id");
-					const loading = myNode.attr("loading");
+			function flashShadowColor() {
+				const myNode = getNode(node_id); // get latest version
+				const version_id = myNode.attr("version_id");
+				const loading = myNode.attr("loading");
 
-					if (version_id == nodeVersion && !loading) {
-						if (DEBUG) {
-							console.log(".animate()");
-						}
-						myNode.animate({color: shadowColor}, 1000)
-							.animate({color: DEFAULT_COLOR}, 1000, defaultRunIt);
-					}
-					if (DEBUG) {
-						console.log("end defaultRunIt()");
-					}
-
+				if (version_id == nodeVersion && !loading) {
+					myNode.animate({color: shadowColor}, 1000)
+						.animate({color: DEFAULT_COLOR}, 1000, flashShadowColor);
 				}
-
-				defaultRunIt();
-			} else if (node.hasClass("SampleNode")) {
-				function sampleRunIt(i) {
-					if (DEBUG) {
-						console.log("sampleRunIt()");
-					}
-					const SHADOW_COLORS = [shadowColor, DEFAULT_COLOR];
-					const myNode = getNode(node_id); // get latest version
-					const version_id = myNode.attr("version_id");
-					const loading = myNode.attr("loading");
-					if (version_id == nodeVersion && !loading) {
-						setTimeout(function () {
-							shadow.css({
-								"fill": SHADOW_COLORS[i % 2],
-								"transition": '1.0s'
-							});
-							sampleRunIt(i + 1);
-						}, 1000);
-					}
-				}
-
-				sampleRunIt(0);
 			}
-		}
 
-		if (DEBUG) {
-			console.log("done setting shadowColor");
+			flashShadowColor();
 		}
 
 		if (data.valid) {
@@ -519,6 +543,7 @@ function updateDirtyNode(node, refresh) {
 		} else {
 			setVariantCount(variant_count, "");
 		}
+		repaintNode(node);
 	};
 	messagePoller.observe_node(node_id, "count", asyncUpdateNode);
 }
@@ -538,21 +563,10 @@ function clickCounter(evt) {
 
 function attachVariantCounters(nodes_selector, nodeCountTypes) {
     drawCountLegend(nodeCountTypes);
-	const COUNTER_SIZE = 20;
-	const LOCK_SIZE = 16;
-	
-	nodes_selector.filter("[output_endpoint=true]").each(function() {
-		const jsplumb_attachment_height = 12;
-		const horizontal_padding = 6;
-		const counts_size = COUNTER_SIZE * nodeCountTypes.length;
 
-		const node_width = $(this).width();
-		const count_overlay = $("<div class='count-overlay'><span class='node-counts'></span></div>");
-		const counts_containment_height = counts_size + jsplumb_attachment_height;
-		count_overlay.css({width: node_width + COUNTER_SIZE + horizontal_padding, height: $(this).height() + counts_containment_height});
-		count_overlay.appendTo(this);
-		const node_counts = $(".node-counts", count_overlay);
-		node_counts.css({height: counts_size});
+	nodes_selector.filter("[output_endpoint=true]").each(function() {
+		const strip = $(".node-counts-strip", this).empty();
+		const node_counts = $("<span class='node-counts'></span>").appendTo(strip);
 
 		for (let i=0 ; i<nodeCountTypes.length ; ++i) {
 			const node_count_type = nodeCountTypes[i];
@@ -687,20 +701,6 @@ function setupNodes(nodes_selector, readOnly) {
 		attachVariantCounters(nodes_selector, nodeCountTypes);
 	}
 	
-	if (Object.keys(NODE_HELP).length) { // Empty if no tooltips
-		nodes_selector.each(function () {
-			// test global if we should assign
-			const nodeClass = $(this).attr("node_class");
-			let node_help = NODE_HELP[nodeClass];
-
-			if (SHOW_NODE_IDS_IN_TOOLTIPS) {
-				const nodeId = $(this).attr('node_id');
-				node_help += " (node #" + nodeId + ")";
-			}
-			$(this).attr('title', node_help);
-		});
-	}
-
 	if (!readOnly) {
 		setupNodeModifications(nodes_selector);
 	}
@@ -907,7 +907,6 @@ function changeAnalysisSettings(oldAnalysisSettings) {
             }
         }
 
-        $(".count-overlay").remove();
 		const nodes_selector = $(".window");
 		attachVariantCounters(nodes_selector, newNodeCountTypes);
     }

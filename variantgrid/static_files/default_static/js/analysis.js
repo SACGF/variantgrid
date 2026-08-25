@@ -212,28 +212,36 @@ function setupErrorHandlers() {
 }
 
 function setupNodeTypeSelect() {
+    // Icon and source/filter colour come from NODE_TYPES - see node_types.get_node_display_data_by_class_name()
+    function renderNodeTypeItem(className, label) {
+        const wrapper = $("<div>", {"class": "node-type-item"});
+        const nodeType = NODE_TYPES[className];
+        if (nodeType) {
+            wrapper.attr("node_classification", nodeType.classification);
+        }
+        renderNodeIcon(nodeType && nodeType.icon).appendTo(wrapper);
+        $("<span>", {text: label}).appendTo(wrapper);
+        return wrapper;
+    }
+
     $.widget( "custom.iconselectmenu", $.ui.selectmenu, {
       _renderItem: function( ul, item ) {
-        const li = $( "<li>" ),
-          wrapper = $( "<div>", { text: item.label } );
-
+        const li = $( "<li>" );
         if ( item.disabled ) {
           li.addClass( "ui-state-disabled" );
         }
+        return li.append(renderNodeTypeItem(item.element.attr("value"), item.label)).appendTo( ul );
+      },
 
-        $( "<span>", {
-          style: item.element.attr( "data-style" ),
-          "class": "ui-icon " + item.element.attr( "value" )
-        })
-          .appendTo( wrapper );
-
-        return li.append( wrapper ).appendTo( ul );
+      _renderButtonItem: function( item ) {
+        return renderNodeTypeItem(item.element.attr("value"), item.label)
+            .addClass("ui-selectmenu-text");
       }
     });
 
-    $("#id_node_types").iconselectmenu()
+    $("#id_node_types").iconselectmenu({width: false})
         .iconselectmenu( "menuWidget" )
-        .addClass( "ui-menu-icons customicons" );
+        .addClass( "node-type-menu" );
 
 }
 
@@ -251,7 +259,7 @@ function setNumVariantTags(pulseLabel) {
     const numTags = Object.keys(variantTags).length;
     let label = "";
     if (numTags) {
-        label = "x" + numTags;
+        label = numTags;
         if (pulseLabel) {
             numberOfTags.addClass("red-pulse");
             setTimeout(function() {

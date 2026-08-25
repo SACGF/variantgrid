@@ -16,6 +16,7 @@ from django.db.models.signals import post_delete
 from django.dispatch.dispatcher import receiver
 
 from analysis.models.nodes.analysis_node import AnalysisNode, NodeAuditLogMixin
+from analysis.models.nodes.node_display import NodeIcon
 from genes.hgvs import get_hgvs_variant
 from snpdb.models import (
     Cohort,
@@ -239,6 +240,14 @@ class IntersectionNode(AnalysisNode):
     @staticmethod
     def get_node_class_label():
         return "Intervals intersection"
+
+    @classmethod
+    def get_node_class_icon(cls) -> NodeIcon:
+        return NodeIcon(symbol="node-icon-intervals")
+
+    @classmethod
+    def get_node_class_label_short(cls) -> str:
+        return "Intervals"
 
 
 class IntersectionNodeContig(NodeAuditLogMixin, models.Model):

@@ -7,6 +7,7 @@ from django.db.models import Q
 from django.db.models.deletion import CASCADE
 
 from analysis.models.nodes.analysis_node import AnalysisNode, NodeAuditLogMixin
+from analysis.models.nodes.node_display import NodeIcon
 from library.jqgrid.jqgrid import JqGrid, format_operation
 from snpdb.models import Variant, VariantGridColumn
 
@@ -96,6 +97,10 @@ class FilterNode(AnalysisNode):
     @staticmethod
     def get_node_class_label():
         return "Filter"
+
+    @classmethod
+    def get_node_class_icon(cls) -> NodeIcon:
+        return NodeIcon(fa="fa-solid fa-filter")
 
     def save_clone(self):
         filter_items = list(self.filternodeitem_set.all())

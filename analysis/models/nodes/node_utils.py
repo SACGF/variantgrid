@@ -1,6 +1,7 @@
 import logging
 import time
 from collections import defaultdict
+from dataclasses import asdict
 
 from auditlog.context import disable_auditlog
 from celery.canvas import Signature
@@ -144,6 +145,7 @@ def get_rendering_dict(node):
     attributes = {
         "node_id": node_id,
         "node_class": node_class_label,
+        "node_classification": node.get_node_classification(),  # Card colour - see analysis_nodes.css
         "version_id": node.version,
         "appearance_version_id": node.appearance_version,
         "id": node.get_css_id(),
@@ -158,5 +160,8 @@ def get_rendering_dict(node):
         "node_class": node_class,
         "overlay_css_classes": " ".join(css_classes),
         "name": node.name,
+        "icon": asdict(node.get_node_icon()),
+        "class_label_short": node.get_node_class_label_short(),
+        "chips": [asdict(chip) for chip in node.get_node_chips()],
         "args": node_args
     }

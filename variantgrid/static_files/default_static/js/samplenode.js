@@ -1,3 +1,5 @@
+// Patient pedigree shape used by the patient form's example node and the upload page.
+// The analysis canvas draws its own badge from NodeIcon - see node_icon_sprite.html
 SIDE_LENGTH = 60;
 DEFAULT_SHADOW_COLOR = "#aaa";
 
@@ -79,38 +81,10 @@ function createSampleNode() {
 }
 
 
-function sourceBadge(node, source) {
-	// Why a specimen node returns fewer rows than it used to - a VCF was archived - is a question
-	// only the canvas can answer, so show how many VCFs the node is actually reading
-	const badge = $("<div class='source-badge'/>");
-	badge.attr("title", source['level'] + ": " + source['vcf_names'].join(", "));
-	badge.css({
-		position: 'absolute',
-		bottom: 0,
-		right: 0,
-		'z-index': 40,
-		'font-size': '10px',
-		'line-height': '12px',
-		background: '#ffffff',
-		border: '1px solid #888',
-		'border-radius': '3px',
-		padding: '0px 2px',
-	});
-	badge.html("<i class='fas fa-file-alt'></i>&times;" + source['vcf_count']);
-	badge.appendTo(node);
-}
-
-
 function sampleNodeUpdateState(args) {
 	// remove existing SVG
 	$('svg', this).remove();
-	$('.source-badge', this).remove();
 	const sideLength = SIDE_LENGTH;
-
-	const source = args['source'];
-	if (source && source['vcf_count']) {
-		sourceBadge(this, source);
-	}
 
 	const patient = args['patient'];
 	if (patient) {

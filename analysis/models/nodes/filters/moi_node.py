@@ -11,6 +11,7 @@ from django.db.models.query_utils import Q
 
 from analysis.models.nodes.analysis_node import AnalysisNode, NodeAuditLogMixin
 from analysis.models.nodes.cohort_mixin import AncestorSampleMixin
+from analysis.models.nodes.node_display import NodeIcon
 from annotation.models import OntologyTerm, VariantTranscriptAnnotation
 from genes.models import GeneSymbol
 from ontology.models import GeneDiseaseClassification, OntologyTermRelation
@@ -234,6 +235,14 @@ class MOINode(AncestorSampleMixin, AnalysisNode):
     @staticmethod
     def get_node_class_label():
         return "Mode of Inheritance"
+
+    @classmethod
+    def get_node_class_icon(cls) -> NodeIcon:
+        return NodeIcon(symbol="node-icon-moi")
+
+    @classmethod
+    def get_node_class_label_short(cls) -> str:
+        return "MOI"
 
 
 class MOINodeOntologyTerm(NodeAuditLogMixin, models.Model):

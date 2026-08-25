@@ -7,6 +7,7 @@ from auditlog.registry import auditlog
 from django.db.models import Q
 
 from analysis.models.nodes.analysis_node import AnalysisNode, queryset_to_pk_in_q
+from analysis.models.nodes.node_display import NodeIcon
 
 
 class MergeNode(AnalysisNode):
@@ -154,6 +155,10 @@ class MergeNode(AnalysisNode):
     @staticmethod
     def get_node_class_label():
         return "Merge"
+
+    @classmethod
+    def get_node_class_icon(cls) -> NodeIcon:
+        return NodeIcon(symbol="node-icon-merge")
 
 
 auditlog.register(MergeNode)

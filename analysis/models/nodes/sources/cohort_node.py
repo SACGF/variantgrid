@@ -16,6 +16,7 @@ from analysis.models.nodes.sources._stats_cache import (
     get_handler_for_node,
 )
 from analysis.models.nodes.zygosity_count_node import AbstractZygosityCountNode
+from analysis.models.nodes.node_display import NodeIcon
 from patients.models_enums import SimpleZygosity, Zygosity
 from snpdb.models import Cohort, CohortGenotypeCollection, CohortSample, VariantsType
 
@@ -288,6 +289,10 @@ class CohortNode(AbstractCohortBasedNode, AbstractZygosityCountNode):
     @staticmethod
     def get_node_class_label():
         return "Cohort"
+
+    @classmethod
+    def get_node_class_icon(cls) -> NodeIcon:
+        return NodeIcon(fa="fa-solid fa-users")
 
     def _get_configuration_errors(self) -> list:
         errors = super()._get_configuration_errors()

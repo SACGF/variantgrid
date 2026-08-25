@@ -10,6 +10,7 @@ from django.db.models.query_utils import Q
 
 from analysis.models.enums import GroupOperation
 from analysis.models.nodes.analysis_node import AnalysisNode, NodeAuditLogMixin
+from analysis.models.nodes.node_display import NodeIcon
 from annotation.models.models import VariantAnnotation
 from classification.enums import ClinicalSignificance
 from classification.models.classification import Classification
@@ -281,6 +282,10 @@ class PopulationNode(AnalysisNode):
     @staticmethod
     def get_node_class_label():
         return "Population"
+
+    @classmethod
+    def get_node_class_icon(cls) -> NodeIcon:
+        return NodeIcon(fa="fa-solid fa-earth-oceania")
 
 
 class PopulationNodeGnomADPopulation(NodeAuditLogMixin, models.Model):

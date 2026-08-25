@@ -18,6 +18,7 @@ from analysis.models.nodes.sources.trio_node import (
     _dominant_requires_affected_parent_error,
     _xlinked_recessive_errors,
 )
+from analysis.models.nodes.node_display import NodeIcon
 from annotation.models.models import VariantTranscriptAnnotation
 from library.constants import DAY_SECS
 from patients.models_enums import Zygosity
@@ -477,6 +478,10 @@ class QuadNode(AbstractCohortBasedNode):
     @staticmethod
     def get_node_class_label():
         return 'Quad'
+
+    @classmethod
+    def get_node_class_icon(cls) -> NodeIcon:
+        return NodeIcon(symbol="node-icon-quad")
 
     def __str__(self):
         return f"QuadNode: {self.pk}"

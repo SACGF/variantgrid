@@ -16,6 +16,15 @@ def get_class(value):
     return value.get_class_name()
 
 
+@register.inclusion_tag("analysis/tags/node_icon_badge.html")
+def render_node_icon_badge(node):
+    """ Node card badge, re-used in the node editor title - see node_display.py """
+    return {
+        "icon": node.get_node_icon(),
+        "node_classification": node.get_node_classification(),
+    }
+
+
 class AnalysisNodesTemplateNode(template.Node):
 
     def __init__(self, nodes):

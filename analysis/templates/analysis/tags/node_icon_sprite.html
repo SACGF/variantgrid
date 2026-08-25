@@ -1,0 +1,140 @@
+{% comment %}
+Node icons that FontAwesome doesn't have - referenced by id from NodeIcon(symbol=...) - see node_display.py
+
+Strokes and fills are currentColor so the same symbol draws white on the node's coloured badge and
+dark in the add-node dropdown. Symbols carry their own viewBox, so <use> scales them to whatever
+width/height the <svg class="node-icon"> is given.
+{% endcomment %}
+<svg xmlns="http://www.w3.org/2000/svg" style="display: none" aria-hidden="true" id="node-icon-sprite">
+    {# Sample - pedigree notation: square male, circle female, struck through if deceased #}
+    <symbol id="node-icon-sample" viewBox="0 0 24 24">
+        <rect x="4" y="4" width="16" height="16" fill="none" stroke="currentColor" stroke-width="3"/>
+    </symbol>
+    <symbol id="node-icon-sample-male" viewBox="0 0 24 24">
+        <rect x="4" y="4" width="16" height="16" fill="none" stroke="currentColor" stroke-width="3"/>
+    </symbol>
+    <symbol id="node-icon-sample-female" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="3"/>
+    </symbol>
+    <symbol id="node-icon-sample-male-deceased" viewBox="0 0 24 24">
+        <g fill="none" stroke="currentColor" stroke-width="3">
+            <rect x="4" y="4" width="16" height="16"/>
+            <path d="M21 3 L3 21"/>
+        </g>
+    </symbol>
+    <symbol id="node-icon-sample-female-deceased" viewBox="0 0 24 24">
+        <g fill="none" stroke="currentColor" stroke-width="3">
+            <circle cx="12" cy="12" r="8.5"/>
+            <path d="M21 3 L3 21"/>
+        </g>
+    </symbol>
+
+    {# Input samples - the pedigree square and circle, overlapped to say "more than one" #}
+    <symbol id="node-icon-samples" viewBox="0 0 27 27">
+        <g fill="none" stroke="currentColor" stroke-width="2.4">
+            <rect x="1.5" y="1.5" width="15.5" height="15.5"/>
+            <circle cx="18.3" cy="18.3" r="7.5"/>
+        </g>
+    </symbol>
+
+    {# Trio - two parents and an affected proband #}
+    <symbol id="node-icon-trio" viewBox="0 0 32 26">
+        <g fill="none" stroke="currentColor" stroke-width="2.6">
+            <rect x="2" y="2" width="8" height="8"/>
+            <circle cx="26" cy="6" r="4.5"/>
+            <path d="M10 6 H21.5 M16 6 V15"/>
+            <circle cx="16" cy="20" r="4.5" fill="currentColor"/>
+        </g>
+    </symbol>
+
+    {# Quad - trio plus a sibling #}
+    <symbol id="node-icon-quad" viewBox="0 0 36 26">
+        <g fill="none" stroke="currentColor" stroke-width="2.6">
+            <rect x="2" y="2" width="8" height="8"/>
+            <circle cx="30" cy="6" r="4.5"/>
+            <path d="M10 6 H25.5 M18 6 V13 M10 13 H26 M10 13 V16 M26 13 V16"/>
+            <circle cx="10" cy="20" r="4.5" fill="currentColor"/>
+            <rect x="21.5" y="15.5" width="9" height="9"/>
+        </g>
+    </symbol>
+
+    {# Pedigree - three generations, which is what tells it apart from Trio/Quad #}
+    <symbol id="node-icon-pedigree" viewBox="0 0 50 36">
+        <g fill="none" stroke="currentColor" stroke-width="2.4">
+            <rect x="8" y="2" width="6.5" height="6.5"/>
+            <circle cx="24" cy="5.2" r="3.5"/>
+            <path d="M14.5 5.2 H20.5 M17.5 5.2 V12 M8 12 H36 M8 12 V15.5 M22 12 V15.5 M36 12 V15.5"/>
+            <circle cx="8" cy="19" r="3.5"/>
+            <rect x="18.8" y="15.5" width="6.5" height="6.5"/>
+            <circle cx="36" cy="19" r="3.5"/>
+            <path d="M25.3 19 H32.5 M29 19 V25 M18 25 H40 M18 25 V28.5 M29 25 V28.5 M40 25 V28.5"/>
+            <rect x="14.8" y="28.5" width="6.5" height="6.5" fill="currentColor"/>
+            <circle cx="29" cy="32" r="3.5"/>
+            <rect x="36.8" y="28.5" width="6.5" height="6.5"/>
+        </g>
+    </symbol>
+
+    {# Venn - two overlapping sets #}
+    <symbol id="node-icon-venn" viewBox="0 0 34 24">
+        <g fill="none" stroke="currentColor" stroke-width="2.4">
+            <circle cx="13" cy="12" r="9"/>
+            <circle cx="21" cy="12" r="9"/>
+        </g>
+    </symbol>
+
+    {# Gene list - a column of gene symbols. The G is the only letterform, so it survives badge size #}
+    <symbol id="node-icon-gene-list" viewBox="0 0 28 32">
+        <g fill="currentColor" font-family="ui-monospace, monospace" font-size="10" font-weight="bold">
+            <text x="2" y="10">G</text>
+            <text x="2" y="20">G</text>
+            <text x="2" y="30">G</text>
+        </g>
+        <g stroke="currentColor" stroke-width="3" stroke-linecap="round">
+            <path d="M11 6.5 H25"/>
+            <path d="M11 16 H21"/>
+            <path d="M11 25.5 H24"/>
+        </g>
+    </symbol>
+
+    {# Zygosity - Punnett square #}
+    <symbol id="node-icon-zygosity" viewBox="0 0 28 28">
+        <g fill="none" stroke="currentColor" stroke-width="2.6">
+            <rect x="3" y="3" width="22" height="22" rx="2"/>
+            <path d="M14 3 V25 M3 14 H25"/>
+        </g>
+    </symbol>
+
+    {# Mode of inheritance - allele transmission, deliberately no people shapes (Trio owns those) #}
+    <symbol id="node-icon-moi" viewBox="0 0 24 26">
+        <g fill="currentColor" font-family="ui-monospace, monospace" font-size="11" font-weight="800"
+           text-anchor="middle">
+            <text x="12" y="9">Aa</text>
+            <text x="12" y="25">aa</text>
+        </g>
+        <path d="M12 11.5 V18 M9 15 L12 19 L15 15" fill="none" stroke="currentColor" stroke-width="2.2"
+              stroke-linecap="round" stroke-linejoin="round"/>
+    </symbol>
+
+    {# Intervals intersection - a chromosome ideogram with a banded region #}
+    <symbol id="node-icon-intervals" viewBox="0 0 44 24">
+        <rect x="2" y="8" width="15" height="8" rx="4" fill="none" stroke="currentColor" stroke-width="2.4"/>
+        <rect x="19" y="8" width="23" height="8" rx="4" fill="none" stroke="currentColor" stroke-width="2.4"/>
+        <rect x="25" y="9.5" width="6" height="5" fill="currentColor"/>
+    </symbol>
+
+    {# Conservation - an alignment stepping through conserved blocks #}
+    <symbol id="node-icon-conservation" viewBox="0 0 30 26">
+        <path d="M3 22 H10 M10 22 V8 M10 8 H16 M10 15 H20 M20 15 V11 M20 11 H26 M20 19 H26 M16 8 V5 M16 5 H26"
+              fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/>
+    </symbol>
+
+    {# Merge - three lanes joining into one, turned downward to match the DAG's flow #}
+    <symbol id="node-icon-merge" viewBox="0 0 32 30">
+        <g fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M5 3 C5 11, 9 14.5, 14.5 17.5"/>
+            <path d="M27 3 C27 11, 23 14.5, 17.5 17.5"/>
+            <path d="M16 3 V17"/>
+            <path d="M16 17.5 V26 M11.8 22 L16 26.5 L20.2 22"/>
+        </g>
+    </symbol>
+</svg>

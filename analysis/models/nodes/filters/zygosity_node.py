@@ -9,6 +9,7 @@ from analysis.models.enums import ZygosityNodeZygosity
 from analysis.models.gene_counts import NodeGenesCountCollection
 from analysis.models.nodes.analysis_node import AnalysisNode
 from analysis.models.nodes.cohort_mixin import AncestorSampleMixin
+from analysis.models.nodes.node_display import NodeIcon
 from annotation.models.models import VariantAnnotation
 from snpdb.models import Sample
 
@@ -70,6 +71,10 @@ class ZygosityNode(AncestorSampleMixin, AnalysisNode):
     @staticmethod
     def get_node_class_label():
         return "Zygosity"
+
+    @classmethod
+    def get_node_class_icon(cls) -> NodeIcon:
+        return NodeIcon(symbol="node-icon-zygosity")
 
 
 auditlog.register(ZygosityNode)

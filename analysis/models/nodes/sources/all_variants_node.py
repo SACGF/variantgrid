@@ -7,6 +7,7 @@ from django.db.models import CASCADE, SET_NULL, Q
 
 from analysis.models.nodes.analysis_node import AnalysisNode, NodeAuditLogMixin
 from analysis.models.nodes.zygosity_count_node import AbstractZygosityCountNode
+from analysis.models.nodes.node_display import NodeIcon
 from genes.models import GeneSymbol
 from snpdb.models import Variant, VariantZygosityCountCollection
 from snpdb.models.models_genome import Contig
@@ -125,6 +126,10 @@ class AllVariantsNode(AnalysisNode, AbstractZygosityCountNode):
     @staticmethod
     def get_node_class_label():
         return "All Variants"
+
+    @classmethod
+    def get_node_class_icon(cls) -> NodeIcon:
+        return NodeIcon(fa="fa-solid fa-database")
 
     def _get_method_summary(self):
         class_name = AllVariantsNode.get_node_class_label()

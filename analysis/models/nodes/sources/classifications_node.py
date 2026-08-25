@@ -5,6 +5,7 @@ from django.db import models
 from django.db.models import CASCADE, Q
 
 from analysis.models.nodes.analysis_node import AnalysisNode
+from analysis.models.nodes.node_display import NodeIcon
 from classification.enums import ClinicalSignificance
 from classification.models.classification import Classification
 from snpdb.models import Lab
@@ -51,6 +52,10 @@ class ClassificationsNode(AnalysisNode):
     @staticmethod
     def get_node_class_label():
         return "Classifications"
+
+    @classmethod
+    def get_node_class_icon(cls) -> NodeIcon:
+        return NodeIcon(fa="fa-solid fa-clipboard-check")
 
     def _get_method_summary(self):
         class_name = ClassificationsNode.get_node_class_label()
