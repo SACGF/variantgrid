@@ -57,11 +57,17 @@ function createDefaultNode() {
 	return div;
 }
 
+const VENN_WIDTH = 56;
+const VENN_HEIGHT = 40;
+
 function createVennNode() {
-	// Design A card with the live venn widget sitting between the name and the counts strip
+	// The rings say "venn" better than a badge and class strip can, so the card carries neither
 	const div = createDefaultNode();
+	$(".node-badge, .node-klass", div).remove();
 	const vennHolder = $('<div/>', {class: "node-venn"});
-	venn2(vennHolder[0], 56, 40);
+	venn2(vennHolder[0], VENN_WIDTH, VENN_HEIGHT);
+	// venn2 leaves a wide margin around the rings - crop to them so the card can shrink to the widget
+	$("svg", vennHolder).attr("viewBox", "4 4 44 32");
 	vennHolder.insertBefore($(".node-counts-strip", div));
 
 	div[0].updateState = function(args) {
@@ -70,9 +76,20 @@ function createVennNode() {
 	return div;
 }
 
+function createMergeNode() {
+	// Merging is all the node does, so the glyph in the middle says it better than a name and class strip
+	const div = createDefaultNode();
+	$(".node-badge, .node-klass", div).remove();
+	const graphic = $('<div/>', {class: "node-graphic"});
+	graphic.html('<svg viewBox="0 0 32 30"><use href="#node-icon-merge"></use></svg>');
+	graphic.insertBefore($(".node-counts-strip", div));
+	return div;
+}
+
 function createNodeFromData(nodeData) {
 	const NODE_FACTORIES = {
 		"VennNode" : createVennNode,
+		"MergeNode" : createMergeNode,
 	};
 
 	const nodeClass = nodeData['node_class'];

@@ -146,7 +146,7 @@ class MergeNode(AnalysisNode):
         return f"Merged from parents: {parent_names}"
 
     def get_node_name(self):
-        return "Merge"
+        return ""  # The card draws the merge glyph instead - see createMergeNode() in analysis_nodes.js
 
     @staticmethod
     def get_help_text() -> str:

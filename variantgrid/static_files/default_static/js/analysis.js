@@ -214,7 +214,8 @@ function setupErrorHandlers() {
 function setupNodeTypeSelect() {
     // Icon and source/filter colour come from NODE_TYPES - see node_types.get_node_display_data_by_class_name()
     function renderNodeTypeItem(className, label) {
-        const wrapper = $("<div>", {"class": "node-type-item"});
+        // Class name on the row picks up the node's accent colour - see analysis_nodes.css
+        const wrapper = $("<div>", {"class": "node-type-item " + className});
         const nodeType = NODE_TYPES[className];
         if (nodeType) {
             wrapper.attr("node_classification", nodeType.classification);

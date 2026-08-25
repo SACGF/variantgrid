@@ -1,4 +1,5 @@
 VENN_TOGGLE_WIDGET_CLASS = "venn_toggle_widget";
+// Rings draw in currentColor, so they match whatever the container is coloured - see analysis_nodes.css
 
 function venn_select(selector, venn_flag) {
 		$('.' + VENN_TOGGLE_WIDGET_CLASS, selector).each(function() {
@@ -105,14 +106,14 @@ function venn2(selector, w, h) {
 	    .attr("toggled", false)
 	    .attr("width", w)
 	    .attr("height", h)
-	    .style("stroke", "gray")
+	    .style("stroke", "currentColor")
 	    .style("stroke-width", 2)
 	    .style("fill", "#ffffff");
 
 	const setRing = function(selector) {
 		return selector.style("stroke-width", 2)
 			.style("fill-opacity", 0)
-			.style("stroke", "gray")
+			.style("stroke", "currentColor")
 			.style("pointer-events", 'none');
 	};
 

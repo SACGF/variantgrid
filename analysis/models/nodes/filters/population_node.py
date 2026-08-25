@@ -285,7 +285,7 @@ class PopulationNode(AnalysisNode):
 
     @classmethod
     def get_node_class_icon(cls) -> NodeIcon:
-        return NodeIcon(fa="fa-solid fa-earth-oceania")
+        return NodeIcon(symbol="node-icon-population")
 
 
 class PopulationNodeGnomADPopulation(NodeAuditLogMixin, models.Model):

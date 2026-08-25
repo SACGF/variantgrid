@@ -242,6 +242,20 @@ button.add-analysis-variable-button {
 	--node-classification-color: #3455a4;
 }
 
+/* Per-node accent - the glyph colour on the white badge. Nodes without one draw in their
+   classification colour. Kept to a similar mid-darkness so a canvas of them stays calm */
+.DamageNode { --node-accent-color: #f2b705; }
+.GeneListNode { --node-accent-color: #6b3fa0; }
+.PopulationNode { --node-accent-color: #1e88a8; }
+.AlleleFrequencyNode { --node-accent-color: #e07a2f; }
+.PhenotypeNode { --node-accent-color: #c2185b; }
+.TissueNode { --node-accent-color: #d1566e; }
+.ZygosityNode { --node-accent-color: #4a5fd0; }
+.MOINode { --node-accent-color: #2f7d4f; }
+.IntersectionNode { --node-accent-color: #8a6d3b; }
+.ConservationNode { --node-accent-color: #2e7d8f; }
+.MergeNode { --node-accent-color: #5c6bc0; }
+
 .window.design-a-node {
 	width: 64px;
 	height: auto;
@@ -256,18 +270,19 @@ button.add-analysis-variable-button {
 	text-align: left;
 }
 
-/* Circular badge carrying the node's icon - on the card corner, and in the node editor title */
+/* Circular badge carrying the node's icon - on the card corner, and in the node editor title.
+   White disc so the glyph can carry the node's own colour, ring keeps the source/filter signal */
 .node-icon-badge {
 	width: 22px;
 	height: 22px;
 	border-radius: 50%;
-	color: white;
+	color: var(--node-accent-color, var(--node-classification-color));
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
-	font-size: 11px;
-	box-shadow: 0 1px 3px rgba(0, 0, 0, .35);
-	background-color: var(--node-classification-color);
+	font-size: 12px;
+	box-shadow: 0 0 0 2px var(--node-classification-color), 0 1px 3px rgba(0, 0, 0, .3);
+	background-color: white;
 }
 
 .design-a-node .node-badge {
@@ -344,11 +359,49 @@ button.add-analysis-variable-button {
 	display: flex;
 	justify-content: center;
 	overflow: hidden;
+	color: var(--node-classification-color);
+}
+
+/* Venn and the node editor's widget draw their rings in currentColor - see venn_intersect.js */
+[id^="vennnode-"] {
+	color: var(--node-classification-color, #3455a4);
+}
+
+/* Merge - the glyph sits in the middle of the card in place of a name and class strip */
+.design-a-node .node-graphic {
+	display: flex;
+	justify-content: center;
+	padding: 5px 0 3px;
+	color: var(--node-classification-color);
+}
+
+.design-a-node .node-graphic svg {
+	width: 30px;
+	height: 28px;
+}
+
+/* Venn and Merge have no class strip, so the card gives their first row the rounded top */
+.VennNode .node-name-holder,
+.MergeNode .node-name-holder {
+	padding-top: 6px;
+	border-radius: 8px 8px 0 0;
+}
+
+/* Both are named by their picture - collapse the row when the name is the automatic (empty) one */
+.MergeNode .node-name-holder:not(:has(.node-name:not(:empty))),
+.VennNode .node-name-holder:not(:has(.node-name:not(:empty))) {
+	min-height: 0;
+	padding: 3px 5px 0;
+}
+
+/* The venn widget is the card - no room left over either side of it */
+.window.design-a-node.VennNode {
+	width: 56px;
 }
 
 svg.node-icon {
-	width: 14px;
-	height: 14px;
+	width: 15.4px;
+	height: 15.4px;
 }
 
 #analysis-toolbar {

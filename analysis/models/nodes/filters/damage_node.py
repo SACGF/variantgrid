@@ -536,7 +536,7 @@ class DamageNode(AnalysisNode):
 
     @classmethod
     def get_node_class_icon(cls) -> NodeIcon:
-        return NodeIcon(fa="fa-solid fa-bolt")
+        return NodeIcon(symbol="node-icon-effect")
 
     @classmethod
     def get_node_class_label_short(cls) -> str:

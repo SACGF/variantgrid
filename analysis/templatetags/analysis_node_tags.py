@@ -21,6 +21,7 @@ def render_node_icon_badge(node):
     """ Node card badge, re-used in the node editor title - see node_display.py """
     return {
         "icon": node.get_node_icon(),
+        "node_class": node.get_class_name(),  # accent colour - see analysis_nodes.css
         "node_classification": node.get_node_classification(),
     }
 
