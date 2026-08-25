@@ -1,0 +1,21 @@
+<div class="form-check m-2">
+    <label class="form-check-label">
+        <input class="form-check-input" type="checkbox" id="group-data-{{ table_id }}" {% if show_group_data %}checked{% endif %} />
+        Show Group Data
+    </label>
+</div>
+<script>
+    $(document).ready(function() {
+        $("#group-data-{{ table_id }}").change(function() {
+            $.ajax({
+                type: "POST",
+                data: {grid_name: "{{ grid_name }}", filter_level: "groups", checked: $(this).is(":checked")},
+                url: "{% url 'set_user_data_grid_config' %}",
+                headers: {"X-CSRFToken": Cookies.get("csrftoken")},
+                success: function() {
+                    $("#{{ table_id }}").DataTable().ajax.reload(null, false);
+                }
+            });
+        });
+    });
+</script>

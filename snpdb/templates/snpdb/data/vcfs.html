@@ -1,4 +1,4 @@
-{% load jqgrid_tags %}
+{% load datatable_tags %}
 {% load vcf_grid_filter_tags %}
 <script>
 $(document).ready(function() {
@@ -19,11 +19,13 @@ $(document).ready(function() {
             <span>{{ form.vcf }} {{ form.media }}</span>
         </p>
     </div>
-    {% vcf_grid_filter 'vcf' %}
+    {% vcf_grid_filter 'vcfs-datatable' %}
 </form>
 
 
 <div>
-{% user_data_grid_filter 'vcf' 'VCFs' %}
-{% jqgrid 'vcfs_grid' 'vcf' search=False delete=True download_grid_json_as_csv=True template_name='snpdb/grids/vcfs_grid.html' init_func='vcfInitFunc' %}
+{% datatable_group_data_filter 'vcfs-datatable' 'VCFs' %}
+<table id="vcfs-datatable" class="sticky-header"
+       data-datatable-url="{% url 'vcfs_datatable' %}"
+       data-datatable-data="vcfGridDatatableFilter"></table>
 </div>

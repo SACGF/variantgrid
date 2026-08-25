@@ -405,6 +405,11 @@ class Sample(GuardianPermissionsMixin, SortByPKMixin, PreviewModelMixin, Extract
     def allow_group_permission_delete(cls) -> bool:
         return True  # User data; deletable via the group_permissions delete view
 
+    @classmethod
+    def get_instance_for_permission_check(cls, pk):
+        # can_write() falls back to the Sample's VCF, so a pk-only stub isn't enough
+        return cls.objects.select_related("vcf").get(pk=pk)
+
     def delete_internal_data(self):
         """ for reloading in place """
         # Only the per-sample (sample IS NOT NULL) CohortGenotype*Stats rows belong to this Sample -

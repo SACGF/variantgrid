@@ -3,9 +3,9 @@ from functools import reduce
 from typing import Any, Optional
 
 from django.conf import settings
-from django.db.models import F, Func, IntegerField, OuterRef, QuerySet, StringAgg, Subquery, Value
+from django.db.models import F, IntegerField, OuterRef, QuerySet, StringAgg, Subquery, Value
 from django.db.models.aggregates import Count, Max
-from django.db.models.fields import CharField, TextField
+from django.db.models.fields import TextField
 from django.db.models.query_utils import Q
 from django.http import HttpRequest
 from django.shortcuts import get_object_or_404
@@ -14,12 +14,12 @@ from guardian.shortcuts import get_objects_for_user
 
 from annotation.annotation_version_querysets import get_queryset_for_latest_annotation_version
 from annotation.models import PATIENT_ONTOLOGY_TERM_PATH, ManualVariantEntryCollection
-from library.django_utils import get_url_from_view_path
 from library.genomics.vcf_enums import INFO_LIFTOVER_SWAPPED_REF_ALT
 from library.jqgrid.jqgrid_user_row_config import JqGridUserRowConfig
 from library.unit_percent import get_allele_frequency_formatter
 from library.utils import JsonDataType, calculate_age
 from ontology.models import OntologyService
+from patients.models_enums import Sex
 from snpdb.grid_columns.custom_columns import get_variantgrid_extra_annotate
 from snpdb.models import (
     VCF,
@@ -32,203 +32,192 @@ from snpdb.models import (
     CustomColumnsCollection,
     GenomeBuild,
     GenomicIntervalsCollection,
+    ImportSource,
     ImportStatus,
     LiftoverRun,
     ProcessingStatus,
     Quad,
     Sample,
+    SuperPopulationCode,
     TagColorsCollection,
     Trio,
     UserGridConfig,
     Variant,
+    VariantsType,
     VariantZygosityCountCollection,
 )
 from snpdb.sample_filters import get_sample_ontology_q, get_sample_qc_gene_list_gene_symbol_q
-from snpdb.tasks.soft_delete_tasks import remove_soft_deleted_vcfs_task, soft_delete_vcfs
-from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
+from snpdb.views.datatable_view import CellData, DatatableConfig, RichColumn, SortOrder
 from uicore.templatetags.js_tags import jsonify_for_js
+from variantgrid.perm_path import get_visible_url_names
 
 
-class VCFListGrid(JqGridUserRowConfig):
-    model = VCF
-    caption = 'VCFs'
-    fields = ["id", "name", "vcf_url", "date", "import_status", "data_archived_date", "genome_build__name",
-              "user__username", "source",
-              "uploadedvcf__file_upload__import_source", "genotype_samples", "project__name", "cohort__import_status",
-              "uploadedvcf__vcf_importer__name", 'uploadedvcf__vcf_importer__version']
-    colmodel_overrides = {
-        'id': {"hidden": True},
-        "name": {'width': 550,
-                 'formatter': 'viewVCFLink',
-                 'formatter_kwargs': {"icon_css_class": "vcf-icon",
-                                      "url_name": "view_vcf",
-                                      "url_object_column": "id"}},
-        "vcf_url": {'name': 'vcf_url', 'label': 'VCF URL', "model_field": False, 'hidden': True},
-        'import_status': {'formatter': 'viewImportStatus'},
-        'data_archived_date': {'label': 'Archived'},
-        "genome_build__name": {"label": "Genome Build"},
-        'user__username': {'label': 'Uploaded by', 'width': 60},
-        'source': {'label': 'VCF source'},
-        "project__name": {'label': "Project"},
-        'cohort__import_status': {'hidden': True},
-        'uploadedvcf__vcf_importer__name': {"label": 'VCF Importer', "hide_non_admin": True},
-        'uploadedvcf__vcf_importer__version': {"label": 'VCF Importer Version', "hide_non_admin": True},
-    }
-
-    def __init__(self, user, **kwargs):
-        extra_filters = kwargs.get("extra_filters")
-        super().__init__(user)
-        user_grid_config = UserGridConfig.get(user, self.caption)
-        queryset = VCF.filter_for_user(user, group_data=user_grid_config.show_group_data)
-
-        # Set via vcf_grid_filter_tags
-        if extra_filters:
-            if project := extra_filters.get("project"):
-                queryset = queryset.filter(project=project)
-            if genome_build_name := extra_filters.get("genome_build_name"):
-                genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
-                queryset = queryset.filter(genome_build=genome_build)
-
-        fake_number = "1234567890"
-        view_vcf_url = reverse('view_vcf', kwargs={"vcf_id": fake_number}).rstrip(fake_number)
-        view_vcf_url_prefix = get_url_from_view_path(view_vcf_url)
-        annotation_kwargs = {
-            "vcf_url": Func(
-                Value(view_vcf_url_prefix),
-                F("pk"),
-                function="CONCAT",
-                output_field=CharField(),
-            ),
-        }
-        queryset = queryset.annotate(**annotation_kwargs)
-        self.queryset = queryset.order_by("-pk").values(*self.get_field_names())
-        self.extra_config.update({'shrinkToFit': False,
-                                  'sortname': 'id',
-                                  'sortorder': 'desc'})
-
-    def delete_row(self, pk):
-        """ Do async as it may be slow """
-        soft_delete_vcfs(self.user, pk)
+def _url_if_visible(url_name: str, **kwargs) -> Optional[str]:
+    """ Deployments without patients (eg Shariant) unregister these urls entirely """
+    if get_visible_url_names().get(url_name):
+        return reverse(url_name, kwargs=kwargs)
+    return None
 
 
-# TODO: Merge this an cohort grid below into 1
-class SamplesListGrid(JqGridUserRowConfig):
-    model = Sample
-    caption = 'Samples'
-    fields = ["id", "name", "sample_url", "het_hom_count", "vcf__date", "import_status",
-              "vcf__genome_build__name", "variants_type", "vcf__user__username", "vcf__source", "vcf__name", "vcf_url",
-              "vcf__project__name", "vcf__uploadedvcf__file_upload__import_source",
-              "sample_gene_list_count", "activesamplegenelist__id",
-              "mutationalsignature__id", "mutationalsignature__summary",
-              "somaliersampleextract__somalierancestry__predicted_ancestry",
-              "patient__patient_code", "patient__first_name", "patient__last_name", "patient__sex",
-              "patient__date_of_birth", "patient__date_of_death",
-              "extraction__specimen__id", "extraction__specimen__reference_id",
-              "extraction__id", "extraction__reference_id",
-              "extraction__specimen__tissue__name", "extraction__specimen__collection_date", "vcf__id"]
-    colmodel_overrides = {
-        'id': {"hidden": True},
-        "name": {"width": 400,
-                 'formatter': 'viewSampleLink',
-                 'formatter_kwargs': {"icon_css_class": "sample-icon",
-                                      "url_name": "view_sample",
-                                      "url_object_column": "id"}},
-        'import_status': {'formatter': 'viewImportStatus'},
-        'vcf__id': {"hidden": True},
-        "vcf__genome_build__name": {"label": "Genome Build"},
-        'vcf__source': {'label': 'VCF source'},
-        'vcf__name': {
-            'label': 'VCF Name', "width": 600,
-            "formatter": 'linkFormatter',
-            'formatter_kwargs': {"icon_css_class": "vcf-icon",
-                                 "url_name": "view_vcf",
-                                 "url_object_column": "vcf__id"}
-        },
-        "vcf__project__name": {'label': "Project"},
-        "sample_gene_list_count": {'name': 'sample_gene_list_count', 'label': '# Sample GeneLists',
-                                   "model_field": False, "formatter": "viewSampleGeneList", 'sorttype': 'int'},
-        'activesamplegenelist__id': {'hidden': True},
-        'mutationalsignature__id': {'hidden': True},
-        'mutationalsignature__summary': {'label': 'Mutational Signature',
-                                         'formatter': 'viewMutationalSignature'},
-        "somaliersampleextract__somalierancestry__predicted_ancestry": {"label": "Predicted Ancestry"},
-        'patient__patient_code': {'label': 'Patient Code'},
-        'patient__last_name': {'label': 'Last Name'},
-        'patient__sex': {'label': 'Sex'},
-        'patient__date_of_birth': {'label': 'D.O.B.'},
-        'patient__date_of_death': {'hidden': True},
-        'het_hom_count': {'name': 'het_hom_count', "model_field": False, 'sorttype': 'int',
-                          'label': 'Het/Hom Count'},
-        'extraction__specimen__id': {'hidden': True},
-        "extraction__specimen__reference_id": {
-            'label': 'Specimen',
-            'formatter': 'optionalLinkFormatter',
-            'formatter_kwargs': {"url_name": "view_specimen",
-                                 "url_object_column": "extraction__specimen__id"}},
-        'extraction__id': {'hidden': True},
-        # The DNA and RNA arms of one block share a specimen, so the specimen reference alone can't
-        # tell those rows apart
-        "extraction__reference_id": {
-            'label': 'Extraction',
-            'formatter': 'optionalLinkFormatter',
-            'formatter_kwargs': {"url_name": "view_extraction",
-                                 "url_object_column": "extraction__id"}},
-        "extraction__specimen__tissue__name": {'label': 'Tissue'},
-        "extraction__specimen__collection_date": {'label': 'Collected'},
-        # These urls are only there for CSV export
-        "sample_url": {'name': 'sample_url', 'label': 'Sample URL', "model_field": False, 'hidden': True},
-        "vcf_url": {'name': 'vcf_url', 'label': 'VCF URL', "model_field": False, 'hidden': True},
-    }
+class VCFListColumns(DatatableConfig[VCF]):
+    def __init__(self, request: HttpRequest):
+        super().__init__(request)
+        self.download_csv_button_enabled = True
+        self.scroll_x = True
 
-    def __init__(self, user, **kwargs):
-        extra_filters = kwargs.get("extra_filters")
-        super().__init__(user)
+        self.rich_columns = [
+            RichColumn(key="id", visible=False),
+            RichColumn(key="name", label="Name", orderable=True,
+                       renderer=self.view_primary_key, client_renderer='TableFormat.linkUrl'),
+            RichColumn(key="date", label="Date", orderable=True, default_sort=SortOrder.DESC,
+                       css_class="text-nowrap", client_renderer='TableFormat.timestamp'),
+            RichColumn(key="import_status", label="Import Status", orderable=True,
+                       client_renderer=RichColumn.choices_client_renderer(ImportStatus.choices)),
+            RichColumn(key="data_archived_date", label="Archived", orderable=True,
+                       css_class="text-nowrap", client_renderer='TableFormat.timestamp'),
+            RichColumn(key="genome_build__name", label="Genome Build", orderable=True),
+            RichColumn(key="user__username", label="Uploaded by", orderable=True),
+            RichColumn(key="source", label="VCF source", orderable=True),
+            RichColumn(key="uploadedvcf__file_upload__import_source", label="Import Source", orderable=True,
+                       client_renderer=RichColumn.choices_client_renderer(ImportSource.choices)),
+            RichColumn(key="genotype_samples", label="Genotype Samples", orderable=True),
+            RichColumn(key="project__name", label="Project", orderable=True),
+            RichColumn(key="uploadedvcf__vcf_importer__name", label="VCF Importer", orderable=True,
+                       enabled=self.user.is_superuser),
+            RichColumn(key="uploadedvcf__vcf_importer__version", label="VCF Importer Version", orderable=True,
+                       enabled=self.user.is_superuser),
+            RichColumn(key="id", name="delete", label="", orderable=False,
+                       renderer=self.render_delete, client_renderer='TableFormat.deleteRow'),
+        ]
 
-        user_grid_config = UserGridConfig.get(user, self.caption)
-        queryset = Sample.filter_for_user(user, group_data=user_grid_config.show_group_data)
+    def get_initial_queryset(self) -> QuerySet[VCF]:
+        user_grid_config = UserGridConfig.get(self.user, 'VCFs')
+        return VCF.filter_for_user(self.user, group_data=user_grid_config.show_group_data)
 
-        # Set via vcf_grid_filter_tags
-        if extra_filters:
-            if project := extra_filters.get("project"):
-                queryset = queryset.filter(vcf__project=project)
-            if genome_build_name := extra_filters.get("genome_build_name"):
-                genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
-                queryset = queryset.filter(vcf__genome_build=genome_build)
-            variants_type = extra_filters.get("variants_type")
-            if variants_type is not None:
-                queryset = queryset.filter(variants_type__in=variants_type)
+    def filter_queryset(self, qs: QuerySet[VCF]) -> QuerySet[VCF]:
+        if project := self.get_query_param("project"):
+            qs = qs.filter(project=project)
+        if genome_build_name := self.get_query_param("genome_build_name"):
+            genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
+            qs = qs.filter(genome_build=genome_build)
+        return qs
 
-        # If you don't have permission to view a patient - blank it out
-        # If you have read only and
-        # TODO: We need to pass whole row in - as we need date of death to display age
+
+class SamplesListColumns(DatatableConfig[Sample]):
+    def __init__(self, request: HttpRequest):
+        super().__init__(request)
+        self.download_csv_button_enabled = True
+        self.scroll_x = True
+
+        # Only show columns that have data somewhere in what this user can see
+        qs = self._sample_queryset()
+        has_mutational_signature = qs.filter(mutationalsignature__isnull=False).exists()
+        has_somalier_ancestry = qs.filter(somaliersampleextract__somalierancestry__isnull=False).exists()
+        has_sample_gene_lists = qs.filter(samplegenelist__isnull=False).exists()
+
         if settings.PATIENTS_READ_ONLY_SHOW_AGE_NOT_DOB:
-            dob_colmodel = self._overrides.get('patient__date_of_birth', {})
-            dob_colmodel['label'] = "Age"
-            dob_colmodel['server_side_formatter'] = lambda row, field: calculate_age(row[field])
-            self._overrides['patient__date_of_birth'] = dob_colmodel
+            dob_label = "Age"
+            dob_renderer = self._render_age
+            dob_client_renderer = None
+        else:
+            dob_label = "D.O.B."
+            dob_renderer = None
+            dob_client_renderer = 'TableFormat.timestamp'
 
-        # Only show mut sig column if we have any
-        if not queryset.filter(mutationalsignature__isnull=False).exists():
-            mut_sig_colmodel = self._overrides.get('mutationalsignature__summary', {})
-            mut_sig_colmodel['hidden'] = True
-            self._overrides['mutationalsignature__summary'] = mut_sig_colmodel
+        self.rich_columns = [
+            RichColumn(key="id", visible=False),
+            RichColumn(key="name", label="Name", orderable=True,
+                       renderer=self.view_primary_key, client_renderer='TableFormat.linkUrl'),
+            RichColumn(key="het_hom_count", label="Het/Hom Count", orderable=True),
+            RichColumn(key="vcf__date", label="Date", orderable=True, default_sort=SortOrder.DESC,
+                       css_class="text-nowrap", client_renderer='TableFormat.timestamp'),
+            RichColumn(key="import_status", label="Import Status", orderable=True,
+                       client_renderer=RichColumn.choices_client_renderer(ImportStatus.choices)),
+            RichColumn(key="vcf__genome_build__name", label="Genome Build", orderable=True),
+            RichColumn(key="variants_type", label="Variants Type", orderable=True,
+                       client_renderer=RichColumn.choices_client_renderer(VariantsType.choices)),
+            RichColumn(key="vcf__user__username", label="Uploaded by", orderable=True),
+            RichColumn(key="vcf__source", label="VCF source", orderable=True),
+            RichColumn(key="vcf__name", label="VCF Name", orderable=True, extra_columns=["vcf__id"],
+                       renderer=self._render_vcf, client_renderer='renderOptionalLink'),
+            RichColumn(key="vcf__project__name", label="Project", orderable=True),
+            RichColumn(key="vcf__uploadedvcf__file_upload__import_source", label="Import Source", orderable=True,
+                       client_renderer=RichColumn.choices_client_renderer(ImportSource.choices)),
+            RichColumn(key="sample_gene_list_count", label="# Sample GeneLists", orderable=True,
+                       extra_columns=["activesamplegenelist__id"], enabled=has_sample_gene_lists,
+                       renderer=self._render_sample_gene_list_count,
+                       client_renderer='renderSampleGeneListCount'),
+            RichColumn(key="mutationalsignature__summary", label="Mutational Signature", orderable=True,
+                       extra_columns=["mutationalsignature__id"], enabled=has_mutational_signature,
+                       renderer=self._render_mutational_signature, client_renderer='renderOptionalLink'),
+            RichColumn(key="somaliersampleextract__somalierancestry__predicted_ancestry",
+                       label="Predicted Ancestry", orderable=True, enabled=has_somalier_ancestry,
+                       client_renderer=RichColumn.choices_client_renderer(SuperPopulationCode.choices)),
+            RichColumn(key="patient__patient_code", label="Patient Code", orderable=True),
+            RichColumn(key="patient__first_name", label="First Name", orderable=True),
+            RichColumn(key="patient__last_name", label="Last Name", orderable=True),
+            RichColumn(key="patient__sex", label="Sex", orderable=True,
+                       client_renderer=RichColumn.choices_client_renderer(Sex.choices)),
+            RichColumn(key="patient__date_of_birth", label=dob_label, orderable=True,
+                       renderer=dob_renderer, client_renderer=dob_client_renderer),
+            RichColumn(key="extraction__specimen__reference_id", label="Specimen", orderable=True,
+                       extra_columns=["extraction__specimen__id"],
+                       renderer=self._render_specimen, client_renderer='renderOptionalLink'),
+            # The DNA and RNA arms of one block share a specimen, so the specimen reference alone can't
+            # tell those rows apart
+            RichColumn(key="extraction__reference_id", label="Extraction", orderable=True,
+                       extra_columns=["extraction__id"],
+                       renderer=self._render_extraction, client_renderer='renderOptionalLink'),
+            RichColumn(key="extraction__specimen__tissue__name", label="Tissue", orderable=True),
+            RichColumn(key="extraction__specimen__collection_date", label="Collected", orderable=True,
+                       css_class="text-nowrap", client_renderer='TableFormat.timestamp'),
+            RichColumn(key="id", name="delete", label="", orderable=False,
+                       renderer=self.render_delete, client_renderer='TableFormat.deleteRow'),
+        ]
 
-        if not queryset.filter(somaliersampleextract__somalierancestry__isnull=False).exists():
-            somalier_ancestry_colmodel = self._overrides.get('somaliersampleextract__somalierancestry__predicted_ancestry', {})
-            somalier_ancestry_colmodel['hidden'] = True
-            self._overrides['somaliersampleextract__somalierancestry__predicted_ancestry'] = somalier_ancestry_colmodel
+    @staticmethod
+    def _render_age(cell: CellData) -> JsonDataType:
+        return calculate_age(cell.value)
 
-        if not queryset.filter(samplegenelist__isnull=False).exists():
-            sample_gene_list_count = self._overrides.get('sample_gene_list_count', {})
-            sample_gene_list_count['hidden'] = True
-            self._overrides['sample_gene_list_count'] = sample_gene_list_count
+    @staticmethod
+    def _render_vcf(cell: CellData) -> JsonDataType:
+        return {"text": cell.value, "url": _url_if_visible("view_vcf", vcf_id=cell["vcf__id"])}
 
-        fake_number = "1234567890"
-        view_sample_url = reverse('view_sample', kwargs={"sample_id": fake_number}).rstrip(fake_number)
-        view_vcf_url = reverse('view_vcf', kwargs={"vcf_id": fake_number}).rstrip(fake_number)
-        view_sample_url_prefix = get_url_from_view_path(view_sample_url)
-        view_vcf_url_prefix = get_url_from_view_path(view_vcf_url)
+    @staticmethod
+    def _render_sample_gene_list_count(cell: CellData) -> JsonDataType:
+        return {"count": cell.value, "active": bool(cell["activesamplegenelist__id"])}
 
+    @staticmethod
+    def _render_mutational_signature(cell: CellData) -> JsonDataType:
+        url = None
+        if mutational_signature_id := cell["mutationalsignature__id"]:
+            url = _url_if_visible("view_mutational_signature",
+                                  mutational_signature_id=mutational_signature_id)
+        return {"text": cell.value, "url": url}
+
+    @staticmethod
+    def _render_specimen(cell: CellData) -> JsonDataType:
+        return SamplesListColumns._optional_link(cell, "view_specimen", "extraction__specimen__id",
+                                                 "specimen_id")
+
+    @staticmethod
+    def _render_extraction(cell: CellData) -> JsonDataType:
+        return SamplesListColumns._optional_link(cell, "view_extraction", "extraction__id", "extraction_id")
+
+    @staticmethod
+    def _optional_link(cell: CellData, url_name: str, pk_column: str, url_kwarg: str) -> JsonDataType:
+        """ A sample doesn't have to have come through an extraction, and an extraction's own
+            reference is optional - so only draw a link when there's something to link to """
+        pk = cell[pk_column]
+        if not pk:
+            return {"text": cell.value}
+        return {"text": cell.value or f"({pk})", "url": _url_if_visible(url_name, **{url_kwarg: pk})}
+
+    def _sample_queryset(self) -> QuerySet[Sample]:
+        user_grid_config = UserGridConfig.get(self.user, 'Samples')
+        return Sample.filter_for_user(self.user, group_data=user_grid_config.show_group_data)
+
+    def get_initial_queryset(self) -> QuerySet[Sample]:
         # het_hom_count comes from the per-sample CohortGenotypeStats row
         # (sample IS NOT NULL, filter_key NULL, passing_filter=False).
         cgs_subquery = (CohortGenotypeStats.objects
@@ -236,36 +225,19 @@ class SamplesListGrid(JqGridUserRowConfig):
                                 filter_key__isnull=True, passing_filter=False)
                         .annotate(het_plus_hom=F("het_count") + F("hom_count"))
                         .values("het_plus_hom")[:1])
-        annotation_kwargs = {
-            "sample_gene_list_count": Count("samplegenelist", distinct=True),
-            "het_hom_count": Subquery(cgs_subquery, output_field=IntegerField()),
-            "sample_url": Func(
-                Value(view_sample_url_prefix),
-                F("pk"),
-                function="CONCAT",
-                output_field=CharField(),
-            ),
-            "vcf_url": Func(
-                Value(view_vcf_url_prefix),
-                F("vcf_id"),
-                function="CONCAT",
-                output_field=CharField(),
-            ),
-        }
-        queryset = queryset.annotate(**annotation_kwargs)
-        self.queryset = queryset.order_by("-pk").values(*self.get_field_names())
-        self.extra_config.update({'shrinkToFit': False,
-                                  'sortname': 'id',
-                                  'sortorder': 'desc'})
+        return self._sample_queryset().annotate(
+            sample_gene_list_count=Count("samplegenelist", distinct=True),
+            het_hom_count=Subquery(cgs_subquery, output_field=IntegerField()))
 
-    def delete_row(self, pk):
-        """ Do async as it may take a few secs to delete """
-
-        sample = Sample.get_for_user(self.user, pk)
-        sample.check_can_write(self.user)
-        Sample.objects.filter(pk=sample.pk).update(import_status=ImportStatus.MARKED_FOR_DELETION)
-        task = remove_soft_deleted_vcfs_task.si()  # @UndefinedVariable
-        task.apply_async()
+    def filter_queryset(self, qs: QuerySet[Sample]) -> QuerySet[Sample]:
+        if project := self.get_query_param("project"):
+            qs = qs.filter(vcf__project=project)
+        if genome_build_name := self.get_query_param("genome_build_name"):
+            genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
+            qs = qs.filter(vcf__genome_build=genome_build)
+        if (variants_type := self.get_query_json("variants_type")) is not None:
+            qs = qs.filter(variants_type__in=variants_type)
+        return qs
 
 
 class AbstractSkippedAnnotationGrid(JqGridUserRowConfig):

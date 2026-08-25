@@ -1,9 +1,9 @@
 from analysis.grids import (
     AnalysesColumns,
-    AnalysesGrid,
+    AnalysesListColumns,
     AnalysisLogEntryColumns,
     AnalysisNodeIssuesColumns,
-    AnalysisTemplatesGrid,
+    AnalysisTemplatesColumns,
     CandidateColumns,
     CandidateSearchRunColumns,
     KaryomappingAnalysesColumns,
@@ -135,9 +135,9 @@ urlpatterns = [
     path('<int:analysis_id>/node_grid/handler/', views_grid.NodeGridHandler.as_view(), name='node_grid_handler'),
 
     path('<int:analysis_id>/node_column_summary/grid/<int:node_id>/<int:node_version>/<slug:extra_filters>/<slug:variant_column>/<int:significant_figures>/<slug:op>/', JQGridView.as_view(grid=NodeColumnSummaryGrid, csv_download=True), name='node_column_summary_grid'),
-    path('analyses/grid/<slug:op>/', JQGridView.as_view(grid=AnalysesGrid, delete_row=True), name='analyses_grid'),
-
-    path('analysis_templates/grid/<slug:op>/', JQGridView.as_view(grid=AnalysisTemplatesGrid, delete_row=True), name='analysis_templates_grid'),
+    path('analyses/datatable/', DatabaseTableView.as_view(column_class=AnalysesListColumns), name='analyses_list_datatable'),
+    path('analysis_templates/datatable/', DatabaseTableView.as_view(column_class=AnalysisTemplatesColumns),
+         name='analysis_templates_datatable'),
     path('analysis_issues/datatables/',
          DatabaseTableView.as_view(column_class=AnalysisNodeIssuesColumns), name='analysis_node_issues_datatable'),
 

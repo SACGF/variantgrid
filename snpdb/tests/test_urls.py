@@ -95,12 +95,9 @@ class Test(URLTestCase):
             ('trio_autocomplete', cls.trio, {"q": cls.trio.name}),
         ]
 
-        cls.PRIVATE_GRID_LIST_URLS = [
-            ("vcfs_grid", {}, cls.vcf),
-            ("samples_grid", {}, cls.sample),
-        ]
-
         cls.PRIVATE_DATATABLES_GRID_LIST_URLS = [
+            ("vcfs_datatable", {}, cls.vcf),
+            ("samples_list_datatable", {}, cls.sample),
             ("tag_color_collections_datatable", {}, cls.test_tag),
             ("custom_columns_collections_datatable", {}, cls.custom_columns_collection),
             ("cohort_datatable", {}, cls.cohort2),
@@ -154,13 +151,6 @@ class Test(URLTestCase):
     @prevent_request_warnings
     def testAutocompleteNoPermission(self):
         self._test_autocomplete_urls(self.PRIVATE_AUTOCOMPLETE_URLS, self.user_non_owner, False)
-
-    def testJqGridListPermission(self):
-        self._test_jqgrid_urls_contains_objs(self.PRIVATE_GRID_LIST_URLS, self.user_owner, True)
-
-    @prevent_request_warnings
-    def testJqGridListNoPermission(self):
-        self._test_jqgrid_urls_contains_objs(self.PRIVATE_GRID_LIST_URLS, self.user_non_owner, False)
 
     def testDataTablesGridListPermission(self):
         self._test_datatables_grid_urls_contains_objs(self.PRIVATE_DATATABLES_GRID_LIST_URLS, self.user_owner, True)

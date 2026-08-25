@@ -4,6 +4,7 @@
 {% load ui_utils %}
 {% load crispy_forms_field %}
 {% load crispy_forms_tags %}
+{% load datatable_tags %}
 {% load user_tag_color_tags %}
 
 {% block submenu %}{% menu_bar_analysis %}{% endblock %}
@@ -12,65 +13,25 @@
     {{ block.super }}
     {% render_tag_styles_and_formatter %}
     <script type="text/javascript" src="{% static 'js/grid.js' %}"></script>
-    <style>
-        .settings-button {
-            display: block;
-            float: right;
-            width: 16px;
-            height: 16px;
-            margin: 2px;
-            background-image: url({% static 'icons/settings-icon.png' %});
-        }
-    </style>
     <script>
-        function grid_init_func(grid, pagerId) {
-            function copy_analysis(a) {
-                let analysisId = grid.getGridParam('selrow');
-                if (analysisId) {
-                    $.ajax({
-                        type: "POST",
-                        url: Urls.clone_analysis(analysisId),
-                        success: function(data) {
-                            grid.jqGrid('setGridParam', {page: 1, sortname: 'id', sortorder: "desc"}).trigger('reloadGrid');
-                        },
-                    });
-                }
+        function renderAnalysisLink(data, type, row) {
+            const dom = $('<span>');
+            if (data.locked) {
+                $('<i>', {class: 'fa fa-lock fa-lg mr-1', title: 'Locked'}).appendTo(dom);
             }
-
-            grid.jqGrid(
-                'navButtonAdd', pagerId, {
-                caption : "Clone",
-                buttonicon : "ui-icon-copy",
-                onClickButton : copy_analysis,
-                position : "last",
-                title : "Clone Analysis",
-                cursor : "pointer"
-            });
+            $('<a>', {href: data.url, class: 'hover-link', text: data.text}).appendTo(dom);
+            return dom.prop('outerHTML');
         }
 
+        $(document).on('click', '.dt-analysis-settings', function() {
+            $("#node-editor-container").load($(this).data('url'));
+        });
 
-        function analysisSettings(analysisId) {
-            $("#node-editor-container").load(Urls.analysis_settings(analysisId));
+        function renderAnalysisTags(data, type, row) {
+            return tagsGlobalFormatter(data, null, {id: row.id.text});
         }
 
         $(document).ready(() => {
-            jQuery.extend($.fn.fmatter, {
-                analysisLink: function (cellvalue, options, rowObject) {
-                    let analysisId = rowObject.id;
-                    let iconCssClassList = []
-                    if (rowObject.analysislock__locked) {
-                        iconCssClassList.push("fa fa-lock fa-lg");
-                    }
-                    let analysisLink = linkFormatter(analysisId, options, rowObject, iconCssClassList);
-                    let settingsLink = "<a class='settings-button' href='javascript:analysisSettings(" + analysisId + ")' title='Open Settings'></a>";
-                    return "<span>" + analysisLink + settingsLink + "</span>";
-                },
-                "tagsFormatter": function(cellValue, options, rowObject) {
-                    cellValue = rowObject.tags; // I don't know why cellValue is undefined
-                    return tagsGlobalFormatter(cellValue, options, rowObject);
-                }
-            });
-
             $('#id_analysis').change(function () {
                 const analysisId = $("#id_analysis").val();
                 window.location = Urls.analysis(analysisId);
@@ -114,10 +75,7 @@
     </div>
 
     <div class="container-table">
-        {% load jqgrid_tags %}
-        {% user_data_grid_filter 'analyses' 'Analyses' %}
-        {% jqgrid 'analyses_grid' 'analyses' search=False delete=True download_grid_json_as_csv=True init_func='grid_init_func' %}
+        {% datatable_group_data_filter 'analyses-datatable' 'Analyses' %}
+        <table id="analyses-datatable" class="sticky-header" data-datatable-url="{% url 'analyses_list_datatable' %}"></table>
     </div>
 {% endblock content %}
-
-

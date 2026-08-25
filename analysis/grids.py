@@ -10,6 +10,7 @@ from django.conf import settings
 from django.core.exceptions import PermissionDenied
 from django.db.models import F, Max, Q, QuerySet, StringAgg, Value
 from django.db.models.functions import Substr
+from django.http import HttpRequest
 from django.shortcuts import get_object_or_404
 from django.urls.base import reverse
 from django.utils.functional import SimpleLazyObject
@@ -39,7 +40,6 @@ from classification.models import Classification
 from genes.grids import GeneListGenesColumns
 from genes.models import HGNC, GeneList
 from library.jqgrid.jqgrid_sql import get_overrides
-from library.jqgrid.jqgrid_user_row_config import JqGridUserRowConfig
 from library.pandas_jqgrid import DataFrameJqGrid
 from library.unit_percent import get_allele_frequency_formatter
 from library.utils import (
@@ -431,89 +431,111 @@ class ExportVariantGrid(VariantGrid):
         return None, None, self._iter_by_pk_batches(items)
 
 
-class AnalysesGrid(JqGridUserRowConfig):
-    model = Analysis
-    caption = 'Analyses'
-    fields = ["id", "name", "created", "modified", "genome_build__name", "analysis_type", "description",
-              "user__username", "tags", "analysislock__locked"]
-    colmodel_overrides = {
-        'id': {'formatter': 'analysisLink',
-               'formatter_kwargs': {"icon_css_class": "analysis-icon",
-                                    "url_name": "analysis"}},
-        "name": {"width": 500},
-        "genome_build__name": {"label": "Genome Build"},
-        "analysis_type": {"label": "Type"},
-        "user__username": {'label': 'Created by'},
-        "tags": {"label": "Tags", "model_field": False,
-                 "name": "tags", "formatter": "tagsFormatter"},  # This formatter counts multiple tags
-        "analysislock__locked": {"hidden": True},
-    }
-
-    def __init__(self, **kwargs):
-        user = kwargs.get("user")
-        super().__init__(user)
-        fields = self.get_field_names()
+class AnalysesListColumns(DatatableConfig[Analysis]):
+    def __init__(self, request: HttpRequest):
+        super().__init__(request)
+        self.download_csv_button_enabled = True
+        self.scroll_x = True
 
         self.genome_builds = list(GenomeBuild.builds_with_annotation())
-        if len(self.genome_builds) == 1:  # No need to show
-            genome_build_colmodel = self._overrides.get('genome_build__name', {})
-            genome_build_colmodel['hidden'] = True
-            self._overrides['genome_build__name'] = genome_build_colmodel
-        user_grid_config = UserGridConfig.get(user, self.caption)
-        qs = Analysis.filter_for_user(user)
-        if not user_grid_config.show_group_data:
-            qs = qs.filter(user=user)
+        self.rich_columns = [
+            RichColumn(key="id", label="ID", orderable=True, extra_columns=["analysislock__locked"],
+                       renderer=self._render_analysis, client_renderer='renderAnalysisLink'),
+            RichColumn(key="name", label="Name", orderable=True),
+            RichColumn(key="created", label="Created", orderable=True,
+                       client_renderer='TableFormat.timestamp'),
+            RichColumn(key="modified", label="Modified", orderable=True, default_sort=SortOrder.DESC,
+                       client_renderer='TableFormat.timestamp'),
+            RichColumn(key="genome_build__name", label="Genome Build", orderable=True,
+                       enabled=len(self.genome_builds) > 1),
+            RichColumn(key="analysis_type", label="Type", orderable=True,
+                       client_renderer=RichColumn.choices_client_renderer(AnalysisType.choices)),
+            RichColumn(key="description", label="Description", orderable=True),
+            RichColumn(key="user__username", label="Created by", orderable=True),
+            RichColumn(key="tags", label="Tags", client_renderer='renderAnalysisTags'),
+            RichColumn(key="id", name="actions", label="", orderable=False,
+                       renderer=self._render_actions, client_renderer='renderRowActions'),
+        ]
+
+    def _render_analysis(self, cell: CellData) -> JsonDataType:
+        analysis_id = cell.value
+        return {
+            "text": analysis_id,
+            "url": reverse("analysis", kwargs={"analysis_id": analysis_id}),
+            "locked": bool(cell["analysislock__locked"]),
+        }
+
+    def _render_actions(self, cell: CellData) -> JsonDataType:
+        analysis_id = cell.value
+        actions = [
+            {"label": "Settings", "icon": "fas fa-cog", "css_class": "dt-analysis-settings",
+             "url": reverse("analysis_settings", kwargs={"analysis_id": analysis_id})},
+            {"label": "Clone", "icon": "fas fa-copy", "css_class": "dt-clone-row",
+             "url": reverse("clone_analysis", kwargs={"analysis_id": analysis_id})},
+        ]
+        if delete_url := self.render_delete(cell):
+            actions.append({"label": "Delete", "icon": "fas fa-trash", "css_class": "dt-delete-row text-danger",
+                            "url": delete_url})
+        return actions
+
+    def get_initial_queryset(self) -> QuerySet[Analysis]:
+        qs = Analysis.filter_for_user(self.user)
         qs = qs.filter(genome_build__in=self.genome_builds)
         qs = qs.filter(visible=True, template_type__isnull=True)  # Hide templates
         q_last_lock = Q(analysislock=F("last_lock")) | Q(analysislock__isnull=True)
         qs = qs.annotate(last_lock=Max("analysislock__pk")).filter(q_last_lock)
-        qs = qs.annotate(tags=StringAgg("varianttag__tag", delimiter=Value('|')))
-        self.queryset = qs.values(*fields)
-        self.extra_config.update({'sortname': 'modified',
-                                  'sortorder': 'desc'})
+        return qs.annotate(tags=StringAgg("varianttag__tag", delimiter=Value('|')))
 
-
-class AnalysisTemplatesGrid(JqGridUserRowConfig):
-    model = AnalysisTemplate
-    caption = 'Analysis Templates'
-    fields = ["id", "analysis__id", "name", "created", "modified",
-              "analysis__genome_build__name", "analysis__description", "user__username"]
-
-    colmodel_overrides = {
-        "id": {"hidden": True},  # Need an ID row so we can delete
-        'analysis__id': {'formatter': 'analysisLink',
-                         'formatter_kwargs': {"icon_css_class": "analysis-icon",
-                                              "url_name": "analysis"}},
-        "name": {"width": 500},
-        "analysis": {"hidden": True},
-        "modified": {'label': 'Modified'},
-        "user__username": {'label': 'Created by'},
-    }
-
-    def __init__(self, **kwargs):
-        user = kwargs.get("user")
-        super().__init__(user)
-
-        user_grid_config = UserGridConfig.get(user, self.caption)
-        queryset = AnalysisTemplate.filter_for_user(user)
+    def filter_queryset(self, qs: QuerySet[Analysis]) -> QuerySet[Analysis]:
+        user_grid_config = UserGridConfig.get(self.user, 'Analyses')
         if not user_grid_config.show_group_data:
-            queryset = queryset.filter(user=user)
-        queryset = queryset.annotate(latest_version=Max("analysistemplateversion__version")).values("latest_version")
-        fields = self.get_field_names() + ["latest_version"]
-        self.queryset = queryset.values(*fields)
-        self.extra_config.update({'sortname': 'modified',
-                                  'sortorder': 'desc'})
+            qs = qs.filter(user=self.user)
+        return qs
 
-    def get_colmodels(self, remove_server_side_only=False):
-        colmodels = super().get_colmodels(remove_server_side_only=remove_server_side_only)
-        extra = {'index': 'latest_version', 'name': 'latest_version', 'label': 'Latest version', 'sorttype': 'int'}
-        colmodels.append(extra)
-        return colmodels
 
-    def delete_row(self, pk):
-        analysis_template = AnalysisTemplate.get_for_user(self.user, pk)
-        analysis_template.check_can_write(self.user)
-        analysis_template.delete_or_soft_delete()
+class AnalysisTemplatesColumns(DatatableConfig[AnalysisTemplate]):
+    def __init__(self, request: HttpRequest):
+        super().__init__(request)
+        self.download_csv_button_enabled = True
+
+        self.rich_columns = [
+            RichColumn(key="id", visible=False),
+            RichColumn(key="name", label="Name", orderable=True, extra_columns=["analysis__id"],
+                       renderer=self._render_analysis, client_renderer='renderOptionalLink'),
+            RichColumn(key="created", label="Created", orderable=True,
+                       client_renderer='TableFormat.timestamp'),
+            RichColumn(key="modified", label="Modified", orderable=True, default_sort=SortOrder.DESC,
+                       client_renderer='TableFormat.timestamp'),
+            RichColumn(key="analysis__genome_build__name", label="Genome Build", orderable=True),
+            RichColumn(key="analysis__description", label="Description", orderable=True),
+            RichColumn(key="user__username", label="Created by", orderable=True),
+            RichColumn(key="latest_version", label="Latest version", orderable=True),
+            RichColumn(key="id", name="clone", label="", orderable=False,
+                       renderer=self._render_clone, client_renderer='renderCloneRow'),
+            RichColumn(key="id", name="delete", label="", orderable=False,
+                       renderer=self.render_delete, client_renderer='TableFormat.deleteRow'),
+        ]
+
+    @staticmethod
+    def _render_analysis(cell: CellData) -> JsonDataType:
+        return {
+            "text": cell.value,
+            "url": reverse("analysis", kwargs={"analysis_id": cell["analysis__id"]}),
+        }
+
+    @staticmethod
+    def _render_clone(cell: CellData) -> JsonDataType:
+        return reverse("analysis_template_clone", kwargs={"pk": cell.value})
+
+    def get_initial_queryset(self) -> QuerySet[AnalysisTemplate]:
+        qs = AnalysisTemplate.filter_for_user(self.user)
+        return qs.annotate(latest_version=Max("analysistemplateversion__version"))
+
+    def filter_queryset(self, qs: QuerySet[AnalysisTemplate]) -> QuerySet[AnalysisTemplate]:
+        user_grid_config = UserGridConfig.get(self.user, 'Analysis Templates')
+        if not user_grid_config.show_group_data:
+            qs = qs.filter(user=self.user)
+        return qs
 
 
 class NodeColumnSummaryGrid(DataFrameJqGrid):

@@ -178,7 +178,7 @@ from snpdb.tag_operations import (
     set_tag_allele_origin,
 )
 from snpdb.tasks.liftover_tasks import liftover_alleles
-from snpdb.tasks.soft_delete_tasks import soft_delete_vcfs
+from snpdb.tasks.soft_delete_tasks import soft_delete_samples, soft_delete_vcfs
 from snpdb.tasks.vcf_archive_tasks import archive_vcf_task
 from snpdb.utils import LabNotificationBuilder, get_tag_styles_and_colors
 from upload.models import UploadedVCF
@@ -282,12 +282,19 @@ def group_permissions(request, class_name, primary_key):
     return render(request, 'snpdb/data/group_permissions.html', context)
 
 
+SOFT_DELETE_FUNCS = {
+    VCF: soft_delete_vcfs,
+    Sample: soft_delete_samples,
+}
+
+
 @require_POST
 def group_permissions_object_delete(request, class_name, primary_key):
-    if class_name == 'snpdb.models.VCF':  # TODO: Hack? Make some class object?
-        soft_delete_vcfs(request.user, primary_key)
+    klass = _import_permission_class(class_name)
+    if soft_delete := SOFT_DELETE_FUNCS.get(klass):
+        # These cascade into a lot of data, so are marked for deletion then removed by a Celery task
+        soft_delete(request.user, primary_key)
     else:
-        klass = _import_permission_class(class_name)
         # Deletion via this generic endpoint is opt-in per class - having WRITE permission isn't
         # enough (e.g. ClassificationModification audit records must never be deletable here).
         allow_delete = getattr(klass, "allow_group_permission_delete", None)
@@ -295,7 +302,9 @@ def group_permissions_object_delete(request, class_name, primary_key):
             raise PermissionDenied(f"'{class_name}' does not allow deletion via group permissions")
         obj, _ = _get_writable_object(request.user, klass, primary_key)
         try:
-            obj.delete()
+            # Some objects can't be removed once they've been used (eg AnalysisTemplate) so soft delete instead
+            delete = getattr(obj, "delete_or_soft_delete", obj.delete)
+            delete()
         except IntegrityError as ie:
             pks = ", ".join(str(o.pk) for o in ie.args[1])
             error_message = f"{ie.args[0]}: {pks}"

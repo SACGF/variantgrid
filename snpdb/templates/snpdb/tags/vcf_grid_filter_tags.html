@@ -1,6 +1,6 @@
 {% load js_tags %}
 {% load ui_utils %}
-<div class="vcf-grid-filter-tags-{{ grid_id }}">
+<div class="vcf-grid-filter-tags-{{ table_id }}">
     <style>
     fieldset.grid-filter-container {
         margin-left: 0px;
@@ -27,18 +27,17 @@
     </style>
     <script>
         // Use vars as may be reloaded multiple times in tabs
-        var ignoreFilterGrid = false;
+        var ignoreFilterTable = false;
         var vcfGridParams = {};
-        var tagContainer = $(".vcf-grid-filter-tags-{{ grid_id }}");
+        var tagContainer = $(".vcf-grid-filter-tags-{{ table_id }}");
 
         function vcfShowAll() {
-            let grid = $("#{{ grid_id }}");
-            ignoreFilterGrid = true;
+            ignoreFilterTable = true;
             $("input:radio[name=genome_build_filter]:first", tagContainer).click();  // reset radio to "All"
             vcfClearAutoCompletes();
-            ignoreFilterGrid = false;
+            ignoreFilterTable = false;
             vcfGridParams = {};
-            filterGrid(grid);
+            filterTable();
         }
 
         function vcfClearAutoCompletes() {
@@ -47,21 +46,15 @@
             });
         }
 
-        // This is called when refreshing the grid
-        function vcfGetExtraFilters() {
-            let extraFilters = '';
-            if (!$.isEmptyObject(vcfGridParams)) {
-                extraFilters = JSON.stringify(vcfGridParams);
+        // This is called by DataTables before each ajax call
+        function vcfGridDatatableFilter(data) {
+            for (const [key, value] of Object.entries(vcfGridParams)) {
+                data[key] = Array.isArray(value) ? JSON.stringify(value) : value;
             }
-            return extraFilters;
         }
 
-        function vcfInitFunc(grid, pagerId) {
-            grid[0].p.postData["extra_filters"] = vcfGetExtraFilters;
-        }
-
-        function filterGrid(grid) {
-            if (ignoreFilterGrid) {
+        function filterTable() {
+            if (ignoreFilterTable) {
                 return;
             }
 
@@ -101,16 +94,14 @@
                 descriptionContainer.hide();
             }
 
-            grid.trigger("reloadGrid");
+            $("#{{ table_id }}").DataTable().ajax.reload();
         }
 
 
     $(document).ready(function() {
-        let grid = $("#{{ grid_id }}");
-
-        $('#id_project_{{ grid_id }}', tagContainer).change(function() {
+        $('#id_project_{{ table_id }}', tagContainer).change(function() {
             vcfGridParams["project"] = $(this).val();
-            filterGrid(grid);
+            filterTable();
         });
 
         $("input[name=genome_build_filter]", tagContainer).change(function() {
@@ -120,7 +111,7 @@
             } else {
                 delete vcfGridParams["genome_build_name"];
             }
-            filterGrid(grid);
+            filterTable();
         });
 
         $("input[type=checkbox]", "#id_variants_type").change(function() {
@@ -129,7 +120,7 @@
                 variantsTypeList.push($(this).val());
             });
             vcfGridParams["variants_type"] = variantsTypeList;
-            filterGrid(grid);
+            filterTable();
         });
 
         $("#vcf-grid-filter-description", tagContainer).hide();

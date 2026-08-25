@@ -17,10 +17,10 @@ from snpdb.grids import (
     QuadsListColumns,
     SampleColumns,
     SampleSkippedAnnotationGrid,
-    SamplesListGrid,
+    SamplesListColumns,
     TagColorsCollectionColumns,
     TriosListColumns,
-    VCFListGrid,
+    VCFListColumns,
     VCFSkippedAnnotationGrid,
 )
 from snpdb.views import views, views_autocomplete, views_json, views_rest
@@ -137,7 +137,8 @@ urlpatterns = [
     # Grids
     path('cohort/datatable/', DatabaseTableView.as_view(column_class=CohortListColumns), name='cohort_datatable'),
     path('cohort_sample/grid/<int:cohort_id>/<slug:op>/', JQGridView.as_view(grid=CohortSampleListGrid), name='cohort_sample_grid'),
-    path('sample/grid/<slug:op>/', JQGridView.as_view(grid=SamplesListGrid, delete_row=True), name='samples_grid'),
+    path('sample/list/datatable/', DatabaseTableView.as_view(column_class=SamplesListColumns),
+         name='samples_list_datatable'),
     path('sample/skipped_annotation/grid/<int:sample_id>/<slug:op>/',
          JQGridView.as_view(grid=SampleSkippedAnnotationGrid), name='sample_skipped_annotation_grid'),
     path('genomic_intervals/datatable/', DatabaseTableView.as_view(column_class=GenomicIntervalsListColumns), name='genomic_intervals_datatable'),
@@ -159,7 +160,7 @@ urlpatterns = [
          name='samples_datatable'),
     path('trio/datatable/', DatabaseTableView.as_view(column_class=TriosListColumns), name='trio_datatable'),
     path('quad/datatable/', DatabaseTableView.as_view(column_class=QuadsListColumns), name='quad_datatable'),
-    path('vcfs/grid/<slug:op>/', JQGridView.as_view(grid=VCFListGrid, delete_row=True), name='vcfs_grid'),
+    path('vcfs/datatable/', DatabaseTableView.as_view(column_class=VCFListColumns), name='vcfs_datatable'),
     path('vcf/skipped_annotation/grid/<int:vcf_id>/<slug:op>/',
          JQGridView.as_view(grid=VCFSkippedAnnotationGrid), name='vcf_skipped_annotation_grid'),
 

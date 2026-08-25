@@ -41,3 +41,109 @@ function renderExpandAnalysisAuditLogEntry(x) {
         "additional_data": x["additional_data"],
     });
 }
+
+
+// Server sends {text, url} - url is null where there's nothing to link to
+function renderOptionalLink(data, type, row) {
+    if (!data || !data.text) {
+        return '<span class="no-value">-</span>';
+    }
+    if (!data.url) {
+        return $('<span>', {text: data.text}).prop('outerHTML');
+    }
+    return $('<a>', {href: data.url, class: 'hover-link', text: data.text}).prop('outerHTML');
+}
+
+
+function renderSampleGeneListCount(data, type, row) {
+    const dom = $('<span>');
+    if (data.active) {
+        $('<div>', {class: 'left icon16 check-mark-green', title: 'Active GeneList'}).appendTo(dom);
+    }
+    $('<span>', {text: data.count}).appendTo(dom);
+    return dom.prop('outerHTML');
+}
+
+
+// Server sends the URL to POST to, or null where the user can't clone
+function renderCloneRow(data, type, row) {
+    if (!data) {
+        return '';
+    }
+    return $('<button>', {
+        type: 'button',
+        class: 'btn btn-sm btn-outline-primary dt-clone-row',
+        title: 'Clone',
+        'data-url': data,
+        html: $('<i>', {class: 'fas fa-copy'})
+    }).prop('outerHTML');
+}
+
+
+$(document).on('click', '.dt-clone-row', function() {
+    const btn = $(this);
+    $.ajax({
+        type: 'POST',
+        url: btn.data('url'),
+        headers: {'X-CSRFToken': Cookies.get('csrftoken')},
+        success: function() {
+            btn.closest('table').DataTable().ajax.reload(null, false);
+        },
+        error: function(xhr) {
+            alert('Error: ' + (xhr.responseText || 'Failed to clone'));
+        }
+    });
+});
+
+
+// Server sends a list of {label, icon, url, css_class} - hidden behind a per-row toggle so the grid
+// isn't cluttered with buttons. The menu is positioned fixed so it escapes the scrollX overflow clip.
+function renderRowActions(data, type, row) {
+    if (!data || !data.length) {
+        return '';
+    }
+    const menu = $('<div>', {class: 'dropdown-menu dt-row-actions-menu'});
+    for (const action of data) {
+        $('<a>', {
+            href: 'javascript:void(0)',
+            class: `dropdown-item ${action.css_class || ''}`,
+            'data-url': action.url,
+            html: [
+                $('<i>', {class: `${action.icon} fa-fw mr-2`}),
+                $('<span>', {text: action.label})
+            ]
+        }).appendTo(menu);
+    }
+    return $('<div>', {
+        class: 'dt-row-actions', html: [
+            $('<button>', {
+                type: 'button',
+                class: 'btn btn-sm btn-outline-secondary dt-row-actions-toggle',
+                title: 'Actions',
+                html: $('<i>', {class: 'fas fa-ellipsis-v'})
+            }),
+            menu
+        ]
+    }).prop('outerHTML');
+}
+
+function closeRowActionsMenus() {
+    $('.dt-row-actions-menu.show').removeClass('show');
+}
+
+$(document).on('click', '.dt-row-actions-toggle', function(event) {
+    event.stopPropagation();
+    const menu = $(this).siblings('.dt-row-actions-menu');
+    const wasOpen = menu.hasClass('show');
+    closeRowActionsMenus();
+    if (!wasOpen) {
+        const toggleRect = this.getBoundingClientRect();
+        menu.css({position: 'fixed', margin: 0, top: `${toggleRect.bottom}px`, left: 'auto',
+                  right: `${window.innerWidth - toggleRect.right}px`}).addClass('show');
+    }
+});
+
+$(document).on('click', closeRowActionsMenus);
+$(window).on('resize', closeRowActionsMenus);
+// scroll doesn't bubble, so capture it to catch the DataTables scroll body as well as the window
+document.addEventListener('scroll', closeRowActionsMenus, true);

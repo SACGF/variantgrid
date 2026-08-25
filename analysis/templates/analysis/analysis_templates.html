@@ -1,48 +1,14 @@
 {% extends menu_analysis_base %}
-{% load static %}
 {% load ui_help %}
 {% load ui_utils %}
 {% load crispy_forms_field %}
 {% load crispy_forms_tags %}
-{% load jqgrid_tags %}
+{% load datatable_tags %}
 {% block title %}VariantGrid: Analysis templates{% endblock title %}
 
 {% block submenu_page_content %}
 <script>
-    function grid_init_func(grid, pagerId) {
-        function copy_analysis_template(a) {
-            let analysisTemplateId = grid.getGridParam('selrow');
-            if (analysisTemplateId) {
-                $.ajax({
-                    type: "POST",
-                    url: Urls.analysis_template_clone(analysisTemplateId),
-                    success: function(data) {
-                        grid.jqGrid('setGridParam', {page: 1, sortname: 'id', sortorder: "desc"}).trigger('reloadGrid');
-                    },
-                });
-            }
-        }
-
-        grid.jqGrid(
-            'navButtonAdd', pagerId, {
-            caption : "Clone",
-            buttonicon : "ui-icon-copy",
-            onClickButton : copy_analysis_template,
-            position : "last",
-            title : "Clone Analysis Template",
-            cursor : "pointer"
-        });
-    }
-
-
     $(document).ready(() => {
-        jQuery.extend($.fn.fmatter , {
-            analysisLink : function(cellvalue, options, rowObject) {
-                let analysisLink = linkFormatter(cellvalue, options, rowObject);
-                return "<span>" + analysisLink + "</span>";
-            }
-        });
-
         $('#id_analysis').change(function () {
             const analysisId = $("#id_analysis").val();
             window.location = Urls.analysis(analysisId);
@@ -73,9 +39,9 @@
     <a class='hover-link' id="show-form-link" title="See which templates will auto-run on which samples" href="{% url 'analysis_templates_auto_launch' %}">Analysis templates Auto Launch</a>
 </div>
 <div class="container-table">
-    {% user_data_grid_filter 'analysis_templates' 'Analysis Templates' %}
-    {% jqgrid 'analysis_templates_grid' 'analysis_templates' search=False delete=True  download_grid_json_as_csv=True init_func='grid_init_func' %}
+    {% datatable_group_data_filter 'analysis-templates-datatable' 'Analysis Templates' %}
+    <table id="analysis-templates-datatable" class="sticky-header"
+           data-datatable-url="{% url 'analysis_templates_datatable' %}"></table>
 </div>
 
 {% endblock submenu_page_content %}
-

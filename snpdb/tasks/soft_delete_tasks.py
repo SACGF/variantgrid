@@ -29,6 +29,18 @@ def soft_delete_vcfs(user, *vcf_ids):
     remove_soft_deleted_vcfs_task.apply_async(countdown=1)  # To make sure that vcfs have been set to deleted
 
 
+def soft_delete_samples(user, *sample_ids):
+    """ Soft-delete samples (hide from grids/lists) then delete async, as it may take a few secs """
+
+    for sample_id in sample_ids:
+        sample = Sample.get_for_user(user, sample_id)
+        check_can_write(sample, user)
+
+    samples_marked_for_deletion = Sample.objects.filter(pk__in=sample_ids).update(import_status=ImportStatus.MARKED_FOR_DELETION)
+    logging.info("Marked %d samples for deletion", samples_marked_for_deletion)
+    remove_soft_deleted_vcfs_task.apply_async(countdown=1)
+
+
 @celery.shared_task(ignore_result=True)
 def remove_soft_deleted_vcfs_task():
     """ This is a clean up job so only want to run 1 copy - ie on schedule_single_worker queue

@@ -1,6 +1,5 @@
-{% load static %}
+{% load datatable_tags %}
 {% load vcf_grid_filter_tags %}
-{% load jqgrid_tags %}
 <script>
 $(document).ready(function() {
 	$('#id_sample').change(function() {
@@ -21,9 +20,11 @@ $(document).ready(function() {
             <span>{{ form.sample }} {{ form.media }}</span>
         </p>
     </div>
-    {% vcf_grid_filter 'samples' variants_type=True %}
+    {% vcf_grid_filter 'samples-datatable' variants_type=True %}
 </form>
 
-{% user_data_grid_filter 'samples' 'Samples' %}
-{% jqgrid 'samples_grid' 'samples' search=False delete=True download_grid_json_as_csv=True template_name='snpdb/grids/samples_grid.html' init_func='vcfInitFunc' %}
+{% datatable_group_data_filter 'samples-datatable' 'Samples' %}
+<table id="samples-datatable" class="sticky-header"
+       data-datatable-url="{% url 'samples_list_datatable' %}"
+       data-datatable-data="vcfGridDatatableFilter"></table>
 </div>
