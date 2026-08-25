@@ -359,6 +359,7 @@ button.add-analysis-variable-button {
 	display: flex;
 	justify-content: center;
 	overflow: hidden;
+	padding-top: 3px;
 	color: var(--node-classification-color);
 }
 
@@ -380,18 +381,10 @@ button.add-analysis-variable-button {
 	height: 28px;
 }
 
-/* Venn and Merge have no class strip, so the card gives their first row the rounded top */
+/* Venn and Merge are all picture - the name stays off the card and only shows in the hover title */
 .VennNode .node-name-holder,
 .MergeNode .node-name-holder {
-	padding-top: 6px;
-	border-radius: 8px 8px 0 0;
-}
-
-/* Both are named by their picture - collapse the row when the name is the automatic (empty) one */
-.MergeNode .node-name-holder:not(:has(.node-name:not(:empty))),
-.VennNode .node-name-holder:not(:has(.node-name:not(:empty))) {
-	min-height: 0;
-	padding: 3px 5px 0;
+	display: none;
 }
 
 /* The venn widget is the card - no room left over either side of it */
