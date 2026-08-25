@@ -69,10 +69,6 @@
     display: none;
 {% endif %}
 }
-
-.gene-list-icon {
-    float: left;
-}
 </style>
 {% endif %}
 
@@ -88,11 +84,8 @@
                 <li>
                 <h3>Named Gene Lists</h3>
                 <div>
-                    <div class='gene-list-icon icon48'></div>
                     <div><b>Gene List:</b> {{ form.gene_list }}</div>
                     <div><b>Exclude:</b> {{ form.exclude }} (filter OUT these genes)</div>
-                    <div class='clear'></div>
-
                 </div>
                 </li>
                 <li>

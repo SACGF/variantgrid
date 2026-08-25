@@ -1,5 +1,6 @@
 {% load static %}
 {% load js_tags %}
+{% load analysis_node_tags %}
 {% if errors %}
 	<script type="text/javascript">
 		$(document).ready(function() {
@@ -233,7 +234,8 @@
 						<b>Analysis locked</b> - you cannot change samples.</div>
 					{% endif %}
 
-					<h4>
+					<h4 class="node-editor-title">
+						{% render_node_icon_badge node %}
 						{{ node.get_node_class_label }}
 						<a target="_blank" href="{{ help_url }}analysis/nodes.html#{{ node.get_node_class_label|slugify }}">
 							<i title="Help docs on this node" class="fas fa-book"></i>

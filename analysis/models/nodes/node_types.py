@@ -50,6 +50,7 @@ def get_nodes_by_classification() -> dict[str, list]:
             "class_name": node.get_class_name(),
             "class_label": node_class_label,
             "class_label_short": node_class.get_node_class_label_short(),
+            "classification": classification,  # add node dropdown colours icons like the cards
             "icon": asdict(node_class.get_node_class_icon()),
         }
         nodes[classification].append(data)

@@ -45,7 +45,7 @@ function renderChip(chip) {
 function createDefaultNode() {
 	const div = $('<div/>').addClass("window design-a-node");
 	const nodeOverlay = $('<div/>').addClass("node-overlay");
-	$("<span/>", {class: "node-badge"}).appendTo(nodeOverlay);
+	$("<span/>", {class: "node-badge node-icon-badge"}).appendTo(nodeOverlay);
 	$("<span/>", {class: "node-klass"}).appendTo(nodeOverlay);
 	$("<div/>", {class: "node-name-holder"}).append($("<span/>", {class: "node-name"})).appendTo(nodeOverlay);
 	$("<div/>", {class: "node-chips"}).appendTo(nodeOverlay);
@@ -60,7 +60,7 @@ function createVennNode() {
 	// Design A card with the live venn widget sitting between the name and the counts strip
 	const div = createDefaultNode();
 	const vennHolder = $('<div/>', {class: "node-venn"});
-	venn2(vennHolder[0], 64, 45);
+	venn2(vennHolder[0], 56, 40);
 	vennHolder.insertBefore($(".node-counts-strip", div));
 
 	div[0].updateState = function(args) {
@@ -85,7 +85,7 @@ function createNodeFromData(nodeData) {
 	return node;
 }
 
-// The name is clamped to 2 lines on the card, so hovering has to give the whole thing
+// The name is clamped to 3 lines on the card, so hovering has to give the whole thing
 function updateNodeTitle(node) {
 	const parts = [$(".node-name", node).text()];
 	let nodeHelp = NODE_HELP[node.attr("node_class")];
@@ -390,6 +390,19 @@ function copyNode() {
 }
 
 
+// Endpoints are their own absolutely positioned elements, so they have to fade along with the card
+function fadeOutAndRemoveNode(node) {
+	const DELETE_FADE_MS = 150;
+	const endpointElements = $.map(jsPlumb.getEndpoints(node) || [], function(ep) {
+		return ep.canvas;
+	});
+	$(endpointElements).fadeOut(DELETE_FADE_MS);
+	node.fadeOut(DELETE_FADE_MS, function() {
+		jsPlumb.remove(node);
+	});
+}
+
+
 function deleteNodesFromDOM(nodes, data) {
     for (let i=0 ; i<nodes.length ; ++i) {
 		const nodeId = nodes[i];
@@ -404,7 +417,7 @@ function deleteNodesFromDOM(nodes, data) {
 
         // Detatch connections first (without triggering events) so we don't send anything to server upon deletion
         jsPlumb.detachAllConnections(node, {fireEvent: false});
-        jsPlumb.remove(node);
+        fadeOutAndRemoveNode(node);
 
         messagePoller.delete_node(nodeId);
 

@@ -118,23 +118,90 @@ button.add-analysis-variable-button {
 	margin: 5px;
 }
 
-/* Add node dropdown */
+/* Add node dropdown - jQuery UI selectmenu, see setupNodeTypeSelect() */
 #id_node_types-button {
-    padding: 0.1em;
+    display: flex;
+    align-items: center;
+    width: 180px;
+    padding: 3px 6px;
+    border: 1px solid #c6cdd6;
+    border-radius: 6px;
+    background: white;
+    font-family: -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-size: 12px;
+    line-height: 20px;
+    color: #24292f;
+}
+
+#id_node_types-button:hover,
+#id_node_types-button.ui-state-active {
+    border-color: #3455a4;
+    background: #f4f6f8;
+}
+
+#id_node_types-button .ui-selectmenu-text {
+    flex: 1;
+    margin-right: 0;
+}
+
+#id_node_types-button .ui-selectmenu-icon {
+    margin-top: 3px;
+}
+
+.node-type-menu {
+    max-height: 60vh;
+    padding: 3px;
+    border: 1px solid #c6cdd6;
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, .18);
+    font-size: 12px;
+}
+
+.node-type-menu .ui-menu-item-wrapper {
+    padding: 2px 6px;
+    border: none;
+    border-radius: 4px;
+}
+
+.node-type-menu .ui-state-active {
+    /* The theme gives .ui-state-active a border and margin: -1px to absorb it - we draw no border,
+       so the negative margin would grow the row as you mouse down the list */
+    margin: 0;
+    background: #eef2fb;
+    color: #24292f;
+}
+
+.node-type-menu .ui-selectmenu-optgroup {
+    margin-top: 4px;
+    padding: 2px 6px;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: #6b7280;
+    border-bottom: 1px solid #e4e7ec;
 }
 
 .node-type-item {
     display: flex;
     align-items: center;
     gap: 0.5em;
+    overflow: hidden;
+}
+
+.node-type-item > span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .node-type-item .node-icon {
-    width: 20px;
-    height: 20px;
-    font-size: 16px;
+    width: 18px;
+    height: 18px;
+    font-size: 14px;
     text-align: center;
     flex-shrink: 0;
+    color: var(--node-classification-color);
 }
 
 /* Analysis grid create gene list child icon */
@@ -165,8 +232,18 @@ button.add-analysis-variable-button {
 	box-sizing: unset;
 }
 
+/* Source/filter colour scheme - anything carrying node_classification (the card, the node editor
+   title badge, the add-node dropdown rows) picks up the matching colour */
+[node_classification="source"] {
+	--node-classification-color: #0e7a4a;
+}
+
+[node_classification="filter"] {
+	--node-classification-color: #3455a4;
+}
+
 .window.design-a-node {
-	width: 128px;
+	width: 64px;
 	height: auto;
 	background-color: white;
 	/* border-color is currentColor, which updateDirtyNode animates to flash node status */
@@ -175,60 +252,57 @@ button.add-analysis-variable-button {
 	box-shadow: 2px 2px 8px rgba(0, 0, 0, .25);
 	font-family: -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 	font-style: normal;
-	font-size: 12px;
+	font-size: 10px;
 	text-align: left;
+}
+
+/* Circular badge carrying the node's icon - on the card corner, and in the node editor title */
+.node-icon-badge {
+	width: 22px;
+	height: 22px;
+	border-radius: 50%;
+	color: white;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 11px;
+	box-shadow: 0 1px 3px rgba(0, 0, 0, .35);
+	background-color: var(--node-classification-color);
 }
 
 .design-a-node .node-badge {
 	position: absolute;
-	top: -10px;
-	left: -10px;
-	width: 26px;
-	height: 26px;
-	border-radius: 50%;
-	color: white;
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	font-size: 13px;
-	box-shadow: 0 1px 3px rgba(0, 0, 0, .35);
+	top: -9px;
+	left: -9px;
 	z-index: 3;
 }
 
 .design-a-node .node-klass {
 	display: block;
-	font-size: 9px;
+	font-size: 7px;
 	font-weight: 700;
-	letter-spacing: .06em;
+	letter-spacing: .04em;
 	text-transform: uppercase;
 	color: white;
-	padding: 3px 6px 2px 20px;
+	background-color: var(--node-classification-color);
+	padding: 2px 4px 1px 15px;
 	border-radius: 7px 7px 0 0;
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
 }
 
-.design-a-node[node_classification="source"] .node-badge,
-.design-a-node[node_classification="source"] .node-klass {
-	background-color: #0e7a4a;
-}
-
-.design-a-node[node_classification="filter"] .node-badge,
-.design-a-node[node_classification="filter"] .node-klass {
-	background-color: #3455a4;
-}
-
 .design-a-node .node-name-holder {
-	padding: 6px 8px;
+	padding: 4px 5px;
 	min-height: 2.4em;
 }
 
 .design-a-node .node-name {
 	display: -webkit-box;
-	-webkit-line-clamp: 2;
+	-webkit-line-clamp: 3;
 	-webkit-box-orient: vertical;
 	overflow: hidden;
+	overflow-wrap: anywhere;
 	color: #24292f;
 	font-weight: 600;
 }
@@ -236,8 +310,8 @@ button.add-analysis-variable-button {
 .design-a-node .node-chips {
 	display: flex;
 	flex-wrap: wrap;
-	gap: 3px;
-	padding: 0 6px 6px;
+	gap: 2px;
+	padding: 0 4px 4px;
 }
 
 .design-a-node .node-chips:empty {
@@ -247,13 +321,13 @@ button.add-analysis-variable-button {
 .node-chip {
 	display: inline-flex;
 	align-items: center;
-	gap: 3px;
+	gap: 2px;
 	max-width: 100%;
-	font-size: 9px;
+	font-size: 8px;
 	font-weight: 600;
 	border: 1px solid #c6cdd6;
 	border-radius: 99px;
-	padding: 1px 6px;
+	padding: 0 4px;
 	background-color: #f4f6f8;
 	color: #3d4550;
 	/* .node-overlay is pointer-events: none, but chips need hover for their title */
@@ -269,11 +343,12 @@ button.add-analysis-variable-button {
 .design-a-node .node-venn {
 	display: flex;
 	justify-content: center;
+	overflow: hidden;
 }
 
 svg.node-icon {
-	width: 16px;
-	height: 16px;
+	width: 14px;
+	height: 14px;
 }
 
 #analysis-toolbar {
@@ -285,50 +360,69 @@ svg.node-icon {
 	clear: none;
 }
 
-.toolbar-buttons {
-	float: right;
-	height: 20px;
+#toolbar-buttons {
+	display: flex;
+	align-items: center;
+	gap: 2px;
 }
 
 .toolbar-button {
-	display: block;
-	float: left;
-	width: 16px;
-	height: 16px;
-	margin: 2px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	position: relative;
+	width: 26px;
+	height: 26px;
+	border-radius: 5px;
+	color: #3d4550;
+	font-size: 15px;
+	line-height: 1;
 }
 
-#add-node-button {
-	background-image: url(/static/icons/add-icon.png);
+.toolbar-icon {
+	width: 17px;
+	height: 17px;
 }
 
-#copy-node-button {
-	background-image: url(/static/icons/copy.png);
+.toolbar-button:hover {
+	background-color: #eef1f4;
+	color: #111;
+	text-decoration: none;
 }
 
-#del-node-button {
-	background-image: url(/static/icons/delete-icon.png);
+.toolbar-status {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 26px;
+	height: 26px;
+	font-size: 15px;
 }
 
-#settings-button {
-	background-image: url(/static/icons/settings-icon.png);
+.toolbar-separator {
+	width: 1px;
+	height: 18px;
+	background-color: #d8dce3;
+	margin: 0 5px;
 }
 
-#view-tags-button {
-	background-image: url(/static/icons/tags_colored.png);
-	width: 22px;
-	height: 19px;
+#number-of-tags {
+	position: absolute;
+	top: -1px;
+	right: -2px;
+	min-width: 14px;
+	padding: 0 3px;
+	border-radius: 99px;
+	background-color: #b42318;
+	color: white;
+	font-size: 9px;
+	font-weight: 700;
+	line-height: 14px;
+	text-align: center;
 }
 
-#dual-screen-button {
-	background-image: url(/static/icons/multiple_monitors.png);
-}
-
-
-#input-samples-button {
-    background-image: url(/static/icons/samples_icon_small.png);
-    width: 21px;
-    height: 19px;
+#number-of-tags:empty {
+	display: none;
 }
 
 
@@ -338,6 +432,62 @@ svg.node-icon {
 
 .node-editor-description #node-name {
 	font-weight: bold;
+}
+
+.node-editor-title {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+/* Node editor selects - same chrome as the add-node dropdown. Select2 hides its original select
+   off-screen and draws its own box, so leave those alone and style the box instead */
+#node-editor-wrapper select:not(.select2-hidden-accessible) {
+	appearance: none;
+	max-width: 100%;
+	padding: 4px 26px 4px 8px;
+	border: 1px solid #c6cdd6;
+	border-radius: 6px;
+	background-color: white;
+	background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%233d4550' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+	background-repeat: no-repeat;
+	background-position: right 8px center;
+	background-size: 10px 6px;
+	font-family: inherit;
+	font-size: 13px;
+	line-height: 20px;
+	color: #24292f;
+	cursor: pointer;
+}
+
+#node-editor-wrapper select:not(.select2-hidden-accessible):hover {
+	border-color: #3455a4;
+}
+
+#node-editor-wrapper select:not(.select2-hidden-accessible):focus {
+	outline: none;
+	border-color: #3455a4;
+	box-shadow: 0 0 0 3px rgba(52, 85, 164, .15);
+}
+
+/* List boxes have no collapsed value to point a chevron at */
+#node-editor-wrapper select[multiple],
+#node-editor-wrapper select[size]:not([size="1"]) {
+	padding-right: 8px;
+	background-image: none;
+	cursor: default;
+}
+
+#node-editor-wrapper select:disabled {
+	background-color: #f4f6f8;
+	color: #6b7280;
+	cursor: default;
+}
+
+#node-editor-wrapper .select2-container--default .select2-selection--single,
+#node-editor-wrapper .select2-container--default .select2-selection--multiple {
+	border-color: #c6cdd6;
+	border-radius: 6px;
 }
 
 .ui-selected.design-a-node {
@@ -404,15 +554,22 @@ div.node-overlay {
 }
 
 .design-a-node .node-counts-strip {
+	position: relative;
+	/* One count row, reserved whether the node is loading, invalid or showing counts, so the card
+	   doesn't resize (and drag jsPlumb connections around) when the update lands */
+	min-height: 14px;
 	border-top: 1px solid #e4e7ec;
 }
 
 .design-a-node .node-counts-strip:empty {
+	min-height: 0;
 	border-top: none;
 }
 
 span.node-counts {
 	display: flex;
+	/* Narrow cards can't fit 4 counts across, so wrap at 2 per row rather than clipping the numbers */
+	flex-wrap: wrap;
 }
 
 .node-counts .clickable-count {
@@ -429,13 +586,40 @@ span.node-counts {
 }
 
 .node-count {
-	flex: 1;
+	flex: 1 0 45%;
 	display: none;
+	height: 14px;
+	line-height: 12px;
 	text-align: center;
-	font-size: 10px;
+	font-size: 8px;
 	font-weight: 700;
 	padding: 1px 0px;
 	overflow: hidden;
+}
+
+/* Counts are unknown until the node update comes back (updateDirtyNode sets loading), so spin
+   where the total will land rather than showing a row of question marks */
+.design-a-node[loading] .node-counts {
+	visibility: hidden;
+}
+
+.design-a-node[loading] .node-counts-strip::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	margin: auto;
+	width: 10px;
+	height: 10px;
+	border: 2px solid #e4e7ec;
+	border-top-color: var(--node-classification-color);
+	border-radius: 50%;
+	animation: node-count-spin .7s linear infinite;
+}
+
+@keyframes node-count-spin {
+	to {
+		transform: rotate(360deg);
+	}
 }
 
 .node-count .live-data-marker {
