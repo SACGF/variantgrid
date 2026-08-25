@@ -512,7 +512,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
                 key="latest_classification_modification__classification__summary__date",
                 name="latest_curation_date",
                 label='<span class="text-secondary">Latest</span><br/>Curated',
-                sort_keys=["latest_classification_modification__classification__summary__date__value"],
+                sort_keys=["latest_classification_modification__classification__summary__date__date"],
                 client_renderer="VCTable.latest_curation_and_link",
                 renderer=self._render_date,
                 extra_columns=[
