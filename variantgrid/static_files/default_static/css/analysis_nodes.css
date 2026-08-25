@@ -715,3 +715,10 @@ span.node-counts {
     padding: 20px;
     margin: 10px;
 }
+
+/* Deleted nodes fade out together with their endpoints/connectors - see fadeOutAndRemoveNode() */
+.node-deleting {
+	opacity: 0;
+	pointer-events: none;
+	transition: opacity 300ms ease-out;
+}

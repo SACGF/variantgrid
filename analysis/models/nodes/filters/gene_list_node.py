@@ -63,7 +63,7 @@ class GeneListNode(AncestorSampleMixin, GeneCoverageMixin, AnalysisNode):
         # These are functions so they are only called when valid
         GENE_LISTS = [
             lambda: [gln_gl.gene_list for gln_gl in self.genelistnodegenelist_set.all()],
-            lambda: [self.custom_text_gene_list.gene_list],
+            lambda: [self.custom_text_gene_list.gene_list] if self.custom_text_gene_list else [],
             lambda: [self.sample_gene_list.gene_list] if self.sample_gene_list else [],
             lambda: [self.pathology_test_version.gene_list] if self.pathology_test_version else [],
             # Skip soft-deleted PanelApp panels (issue #405) — they have no cache and
@@ -229,7 +229,7 @@ class GeneListNode(AncestorSampleMixin, GeneCoverageMixin, AnalysisNode):
         if deleted_panels:
             raise NodeConfigurationException()
 
-        if self.use_custom_gene_list:
+        if self.use_custom_gene_list and self.custom_text_gene_list:
             create_custom_text_gene_list(self.custom_text_gene_list, self.analysis.user.username, hidden=True)
 
         return super()._load()

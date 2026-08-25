@@ -1135,23 +1135,27 @@ def analysis_input_samples(request, analysis_id):
     input_nodes = input_nodes.select_subclasses()
 
     node_inputs = []
+    all_samples = set()
     for node in input_nodes:
         if samples := node.get_samples_from_node_only_not_ancestors():
+            all_samples.update(samples)
             node_input_data = {
-                "class": node.get_class_name(),
-                "name": node.name,
+                "node": node,
+                "class_label": node.get_node_class_label(),
+                "name": node.name or node.get_name_or_identifier(),
                 "samples": samples,
             }
             for field in ["trio", "pedigree", "cohort"]:
-                try:
-                    node_input_data[field] = getattr(node, field)
-                except AttributeError:
-                    pass
+                if source := getattr(node, field, None):
+                    node_input_data["source"] = source
+                    node_input_data["source_label"] = field.title()
+                    break
 
             node_inputs.append(node_input_data)
 
     context = {"analysis": analysis,
-               "node_inputs": node_inputs}
+               "node_inputs": node_inputs,
+               "num_samples": len(all_samples)}
     return render(request, 'analysis/analysis_input_samples.html', context)
 
 

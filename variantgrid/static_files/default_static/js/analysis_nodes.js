@@ -1,5 +1,6 @@
 const endpointColor = "#121212";
 const ACTIVE_CLASS = "ui-selected";
+const DELETING_CLASS = "node-deleting";  // fade out transition, see analysis_nodes.css
 const ACTIVE_NODE_COUNT_CLASS = "node-counts-selected"; // Needs to be different so not grabbed with multi-draggable
 const NODE_COUNT_TOTAL = "T";  // snpdb.models.models_enums.BuiltInFilters.TOTAL
 const SHOW_NODE_IDS_IN_TOOLTIPS = true;
@@ -390,35 +391,63 @@ function copyNode() {
 }
 
 
-// Endpoints are their own absolutely positioned elements, so they have to fade along with the card
+// Overlays (the '+' and '-' handles) are separate absolutely positioned elements to the connector canvas
+function getJsPlumbElements(component) {
+	const elements = [];
+	if (component.canvas) {
+		elements.push(component.canvas);
+	}
+	const overlays = component.getOverlays ? component.getOverlays() : {};
+	for (let key in overlays) {
+		const overlay = overlays[key];
+		if (overlay.getElement) {  // Arrows are drawn into the connector canvas and don't have one
+			$.merge(elements, $(overlay.getElement()).get());
+		}
+	}
+	return elements;
+}
+
+
+// Endpoints and connections are their own absolutely positioned elements, so they have to fade along with the card
 function fadeOutAndRemoveNode(node) {
-	const DELETE_FADE_MS = 150;
-	const endpointElements = $.map(jsPlumb.getEndpoints(node) || [], function(ep) {
-		return ep.canvas;
+	const DELETE_FADE_MS = 300;
+	if (node.hasClass(DELETING_CLASS)) {
+		return;  // already on its way out
+	}
+
+	let fadingElements = node.get();
+	$.each(jsPlumb.getEndpoints(node) || [], function(_, endpoint) {
+		fadingElements = fadingElements.concat(getJsPlumbElements(endpoint));
+		$.each(endpoint.connections || [], function(_, connection) {
+			fadingElements = fadingElements.concat(getJsPlumbElements(connection));
+		});
 	});
-	$(endpointElements).fadeOut(DELETE_FADE_MS);
-	node.fadeOut(DELETE_FADE_MS, function() {
+
+	// CSS transition rather than jQuery animation - jsPlumb's teardown blocks the main thread
+	$(fadingElements).addClass(DELETING_CLASS);
+	setTimeout(function() {
+		// Detach without events so we don't tell the server about connections going away with the node
+		jsPlumb.detachAllConnections(node, {fireEvent: false});
 		jsPlumb.remove(node);
-	});
+	}, DELETE_FADE_MS);
 }
 
 
 function deleteNodesFromDOM(nodes, data) {
+    let clearGridAndEditor = false;
+
+    // Start every fade before anything else, so the transition isn't held up by the tear down below
     for (let i=0 ; i<nodes.length ; ++i) {
 		const nodeId = nodes[i];
 		const node = getNode(nodeId);
 
-		// Delete grid and editor if it's open
 		const node_version_select = "#" + nodeId + "_" + node.attr("version_id");
 		const loadedNode = $(node_version_select);
 		if (node.hasClass(ACTIVE_CLASS) || loadedNode.length) {
-            loadNodeData(); // empty
+            clearGridAndEditor = true;
         }
 
-        // Detatch connections first (without triggering events) so we don't send anything to server upon deletion
-        jsPlumb.detachAllConnections(node, {fireEvent: false});
         fadeOutAndRemoveNode(node);
-
         messagePoller.delete_node(nodeId);
 
         // remove AnalysisVariable if exists
@@ -426,21 +455,28 @@ function deleteNodesFromDOM(nodes, data) {
         	delete analysisNodeVariables[nodeId];
         	$(".analysis-variable-node[node-id=" + nodeId + "]").remove();
 		}
-
     }
-    update_dirty_nodes(data);
+
+    // Emptying a loaded grid is slow enough to be seen - let the browser paint the fade first
+    setTimeout(function() {
+        if (clearGridAndEditor) {
+            loadNodeData(); // empty
+        }
+        update_dirty_nodes(data);
+    }, 0);
 }
 
 
 function deleteNodes(nodes) {
+	// Remove from the page straight away - the server call only tells us which other nodes became dirty
+	deleteNodesFromDOM(nodes, []);
+
 	const data = 'nodes=' + encodeURIComponent(JSON.stringify(nodes));
 	$.ajax({
 	    type: "POST",
 	    data: data,
 	    url: Urls.nodes_delete(ANALYSIS_ID),
-	    success: function(data) {
-	        deleteNodesFromDOM(nodes, data);
-	    },
+	    success: update_dirty_nodes,
 	});
 }
 

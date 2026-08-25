@@ -1,33 +1,91 @@
 {% load static %}
+{% load analysis_node_tags %}
 <div id='analysis-input-samples'>
-    <h3>Samples used in analysis</h3>
-    
-    {% if node_inputs %}
-        <table>
-        <tr>
-            <th>Node
-            <th>Name
-            <th>Cohort / Pedigree / Trio
-            <th>Samples
+    <style>
+        #analysis-input-samples .input-node-card {
+            border: 1px solid #dde2e8;
+            border-radius: 6px;
+            margin-bottom: 12px;
+            background-color: #fff;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, .06);
+        }
+        #analysis-input-samples .input-node-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-bottom: 1px solid #eef1f4;
+            background-color: #f7f9fb;
+            border-radius: 6px 6px 0 0;
+        }
+        #analysis-input-samples .input-node-name {
+            font-weight: 600;
+            color: #24292f;
+        }
+        #analysis-input-samples .input-node-class {
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: .04em;
+            text-transform: uppercase;
+            color: #6a737d;
+        }
+        #analysis-input-samples .input-node-source {
+            margin-left: auto;
+        }
+        #analysis-input-samples .input-node-samples {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            padding: 10px 12px;
+        }
+        #analysis-input-samples .sample-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            border: 1px solid #c6cdd6;
+            border-radius: 99px;
+            padding: 2px 10px;
+            background-color: #f4f6f8;
+            color: #3d4550;
+            font-size: 13px;
+        }
+        #analysis-input-samples .sample-pill:hover {
+            background-color: #e9eef4;
+            border-color: #9fb0c3;
+            text-decoration: none;
+        }
+    </style>
+
+    <h3>
+        <i class="fa-solid fa-microscope"></i> Samples used in analysis
+        {% if num_samples %}<span class="badge badge-secondary">{{ num_samples }}</span>{% endif %}
+    </h3>
+
     {% for ni in node_inputs %}
-        <tr>
-            <td>{{ ni.class }}
-            <td>{{ ni.name }}
-            <td>{% if ni.trio %}
-                    <b>Trio: </b><a target="_blank" href="{{ ni.trio.get_absolute_url }}">{{ ni.trio }}</a>
-                {% elif ni.pedigree %}
-                    <b>Pedigree: </b><a target="_blank" href="{{ ni.pedigree.get_absolute_url }}">{{ ni.pedigree }}</a>
-                {% elif ni.cohort %}
-                    <b>Cohort: </b><a target="_blank" href="{{ ni.cohort.get_absolute_url }}">{{ ni.cohort }}</a>
+        <div class="input-node-card">
+            <div class="input-node-header">
+                {% render_node_icon_badge ni.node %}
+                <span class="input-node-name">{{ ni.name }}</span>
+                <span class="input-node-class">{{ ni.class_label }}</span>
+                {% if ni.source %}
+                    <span class="input-node-source">
+                        <i class="{{ ni.source.preview_icon }}"></i>
+                        <span class="input-node-class">{{ ni.source_label }}</span>
+                        <a target="_blank" href="{{ ni.source.get_absolute_url }}">{{ ni.source }}</a>
+                    </span>
                 {% endif %}
-            <td>
-                <ul>
+            </div>
+            <div class="input-node-samples">
                 {% for s in ni.samples %}
-                <li><a target="_blank" href="{{ s.get_absolute_url }}">{{ s.name }}</a>
+                    <a class="sample-pill" target="_blank" href="{{ s.get_absolute_url }}">
+                        <i class="fa-solid fa-microscope"></i>{{ s.name }}
+                    </a>
                 {% endfor %}
-                </ul>
-                
+            </div>
+        </div>
+    {% empty %}
+        <div class="text-muted">
+            <i class="fas fa-info-circle"></i> This analysis has no sample sources.
+        </div>
     {% endfor %}
-    {% endif %}
-    
 </div>

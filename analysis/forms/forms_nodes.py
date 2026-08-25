@@ -437,8 +437,8 @@ class GeneListNodeForm(BaseNodeForm):
 
     def save(self, commit=True):
         node = super().save(commit=False)
-        custom_gene_list_text = self.cleaned_data["custom_gene_list_text"]
-        if custom_gene_list_text is not None:
+        custom_gene_list_text = self.cleaned_data["custom_gene_list_text"].strip()
+        if custom_gene_list_text:
             sha256_hash = sha256sum_str(custom_gene_list_text)
             if node.custom_text_gene_list:
                 custom_text_gene_list = node.custom_text_gene_list
@@ -458,6 +458,13 @@ class GeneListNodeForm(BaseNodeForm):
             create_custom_text_gene_list(custom_text_gene_list, self.instance.analysis.user.username,
                                          GeneListCategory.NODE_CUSTOM_TEXT, hidden=True)
             node.custom_text_gene_list = custom_text_gene_list
+        elif node.custom_text_gene_list:
+            # Cleared the text - remove the gene list rather than filtering against an empty one
+            custom_text_gene_list = node.custom_text_gene_list
+            node.custom_text_gene_list = None
+            if custom_text_gene_list.gene_list:
+                custom_text_gene_list.gene_list.delete()
+            custom_text_gene_list.delete()
 
         # TODO: I'm sure there's a way to get Django to handle this via save_m2m()
         gl_set = node.genelistnodegenelist_set
