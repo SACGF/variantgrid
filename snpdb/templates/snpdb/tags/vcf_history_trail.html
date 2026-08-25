@@ -1,4 +1,3 @@
-{% load static %}
 <style>
 .vcf-history-trail {
     height: 45px;
@@ -15,7 +14,9 @@
 }
 
 .web-upload {
-    background-image: url({% static 'icons/web_upload.png' %});
+    color: #6c757d;
+    font-size: 24px;
+    line-height: 24px;
     margin: 5px 5px 0px 5px;
 }
 
@@ -48,7 +49,7 @@
         <a class='centre-flex' href="{% url 'view_upload_pipeline' vcf.uploadedvcf.file_upload.uploadpipeline.pk %}">
     {% endif %}
         <div class='centre-text'>
-            <div title='Web Upload' class='web-upload icon24'></div>
+            <i title='Web Upload' class='fas fa-cloud-arrow-up web-upload'></i>
             <span class='sequencer-name-text'>Web Upload</span>
         </div>
     {% if url_name_visible.view_upload_pipeline %}              
