@@ -36,6 +36,7 @@ ANNOTATION_VEP_PERLBREW_RUNNER_SCRIPT = os.path.expanduser("~/perlbrew_runner.sh
 ANNOTATION[BUILD_GRCH38]["enabled"] = True
 ANNOTATION[BUILD_T2TV2]["enabled"] = True
 ANNOTATION_VCF_DUMP_DIR = os.path.join(_BIG_DISK_BASE_DIR, 'annotation_scratch')
+ANNOTATION_ANNOTSV_ENABLED = True
 
 GENES_DEFAULT_CANONICAL_TRANSCRIPT_COLLECTION_ID = 1  # MedEx
 DEFAULT_FROM_EMAIL = 'noreply@variantgrid.com'

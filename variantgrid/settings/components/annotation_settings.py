@@ -402,7 +402,7 @@ ANNOTATION_ANNOTSV_GENOME_BUILD = {
 # Annotations bundle has no version stamp file; admin sets this to the bundle release string they
 # installed (eg "3.5.8"). Becomes AnnotationPipelineVersion.data_version, so a new bundle is registered
 # and promoted the same way a new binary is - @see AnnotationPipelineVersion.
-ANNOTATION_ANNOTSV_BUNDLE_VERSION = None
+ANNOTATION_ANNOTSV_BUNDLE_VERSION = "3.5"  # Annotations_Human_3.5.tar.gz
 ANNOTATION_ANNOTSV_EXTRA_ARGS: list[str] = []
 ANNOTATION_ANNOTSV_TIMEOUT_SECONDS = 60 * 60
 # Admin email used in PubMed queries to contact before throttling/banning

@@ -88,9 +88,4 @@ USER_CREATE_ORG_MESSAGE = {
 
 # Latest annotation (VEP 115, columns_version 4, dbNSFP 5.x, gnomAD 4.1, ...) is the package default now (#1625)
 
-# AnnotSV 3.5.10 - installed under vg_data (variantgrid-owned) rather than the package-default
-# /data/annotation/AnnotSV, which is root-owned on this box
 ANNOTATION_ANNOTSV_ENABLED = True
-ANNOTATION_ANNOTSV_BIN = "/data/annotation/vg_data/AnnotSV/bin/AnnotSV"
-ANNOTATION_ANNOTSV_ANNOTATIONS_DIR = "/data/annotation/vg_data/AnnotSV/share/AnnotSV"
-ANNOTATION_ANNOTSV_BUNDLE_VERSION = "3.5"  # Annotations_Human_3.5.tar.gz
