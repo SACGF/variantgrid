@@ -5,6 +5,15 @@ const ACTIVE_NODE_COUNT_CLASS = "node-counts-selected"; // Needs to be different
 const NODE_COUNT_TOTAL = "T";  // snpdb.models.models_enums.BuiltInFilters.TOTAL
 const SHOW_NODE_IDS_IN_TOOLTIPS = true;
 
+// Connector/endpoint look - shared between the instance defaults and the per-node endpoints below
+const CONNECTOR_STYLE = {stroke: endpointColor, strokeWidth: 3};
+const CONNECTOR_SPEC = {type: "Bezier", options: {curviness: 63}};
+const ENDPOINT_STYLE = {fill: endpointColor};
+const DOT_ENDPOINT = {type: "Dot", options: {radius: 11}};
+
+// @jsplumb/browser-ui instance, created in variantgridPipeline.init once #analysis is in the DOM
+let jsPlumbInstance = null;
+
 function getNode(nodeId) {
 	return $("#analysis-node-" + nodeId);
 }
@@ -116,11 +125,15 @@ function updateNodeTitle(node) {
 	node.attr("title", parts.filter(Boolean).join("\n\n"));
 }
 
-// Chips and count rows change the card height, so jsPlumb needs fresh offsets for the Top/BottomCenter anchors
+function isManagedByJsPlumb(el) {
+	return jsPlumbInstance !== null && el.hasAttribute(jsPlumb.ATTRIBUTE_MANAGED);
+}
+
+// Chips and count rows change the card height, so jsPlumb needs fresh offsets for the Top/Bottom anchors
 function repaintNode(node) {
 	node.each(function() {
-		if ($.contains(document.body, this)) {
-			jsPlumb.repaint(this);
+		if (isManagedByJsPlumb(this)) {
+			jsPlumbInstance.revalidate(this);
 		}
 	});
 }
@@ -198,8 +211,11 @@ function addNodesToDOM(selector, nodeDataArray, readOnly) {
 
 
 function getEndpoint(id, endpoint_type, side) {
-	const selector = '#' + id;
-	const endpoints = jsPlumb.getEndpoints($(selector));
+	const el = document.getElementById(id);
+	if (!el)
+		return null;
+
+	const endpoints = jsPlumbInstance.getEndpoints(el);
 	if (!endpoints)
         return null;    
 
@@ -223,23 +239,26 @@ function getEndpoint(id, endpoint_type, side) {
 }
 
 function setupHideInvalidConnectionsOnDrag() {
-		// TODO: could possibly use endpointDropForbiddenClass etc to do this rather than switching fill styles
+		// Endpoints we turned red for the connection drag currently in progress
+		const invalidEndpoints = [];
+
 		function setFillStyle(endpoint, color) {
-			const paintStyle = endpoint.getPaintStyle();
-			paintStyle.fillStyle = color;
-			endpoint.setPaintStyle(paintStyle);
-		}
-		function setEndpointInvalid(endpoint) {
-		    endpoint.setEnabled(false);
-		    setFillStyle(endpoint, "#FF0000");
+			endpoint.setPaintStyle(Object.assign({}, endpoint.getPaintStyle(), {fill: color}));
+			jsPlumbInstance.revalidate(endpoint.element);
 		}
 
-		// Returns true if endpoint was "dirty"
-		function resetEndpoint(endpoint) {
-			const dirty = endpoint.isEnabled();
-			endpoint.setEnabled(true);
-			setFillStyle(endpoint, endpointColor);
-			return dirty;
+		function setEndpointInvalid(endpoint) {
+		    endpoint.enabled = false;
+		    setFillStyle(endpoint, "#FF0000");
+			invalidEndpoints.push(endpoint);
+		}
+
+		function resetInvalidEndpoints() {
+			while (invalidEndpoints.length) {
+				const endpoint = invalidEndpoints.pop();
+				endpoint.enabled = true;
+				setFillStyle(endpoint, endpointColor);
+			}
 		}
 
 		function getAncestors(id) {
@@ -247,74 +266,68 @@ function setupHideInvalidConnectionsOnDrag() {
 			const endpoint = getEndpoint(id, 'target');
 			if (endpoint) {
 				for (let i=0 ; i<endpoint.connections.length ; ++i) {
-					source = endpoint.connections[i].sourceId;
+					const source = endpoint.connections[i].sourceId;
 					ancestors = ancestors.concat(getAncestors(source));
 				}
 			}
 			return ancestors;
 		}
 
-		jsPlumb.bind("connectionDrag", function(c) {
-			let id = c.endpoints[0].elementId;
-			const ancestors = getAncestors(id);
+		jsPlumbInstance.bind("connection:drag", function(connection) {
+			const ancestors = getAncestors(connection.endpoints[0].elementId);
 
 			for (let i=0 ; i<ancestors.length ; ++i) {
-				id = ancestors[i];
-				const endpoint = getEndpoint(id, 'target');
+				const endpoint = getEndpoint(ancestors[i], 'target');
 				if (endpoint) {
 					setEndpointInvalid(endpoint);
 				}
 			}		
 		});
 
-		// Make everything visible again
-		jsPlumb.bind("connectionDragStop", function(c) {
-			$(".window").each(function() {
-				const endpoints = jsPlumb.getEndpoints($(this));
-				let dirty = false;
-				for (let i=0 ; i<endpoints.length ; ++i) {
-					const endpoint = endpoints[i];
-					dirty |= resetEndpoint(endpoint);
-				}
-				if (dirty) {
-					jsPlumb.repaint(this);
-				}
-			});
+		// There's no single "connection drag finished" event - dropping a connection back where it
+		// started fires nothing - so make everything visible again once the drop has been handled.
+		$(document).on("mouseup", function() {
+			if (invalidEndpoints.length) {
+				setTimeout(resetInvalidEndpoints, 0);
+			}
 		});
-
 }
 
 
 function add_click_overlay(endpoint) {
 	const create_overlay = function (component) {
-		return $('<span><span class="attach-label">+</span></span>');
+		return $('<span><span class="attach-label">+</span></span>')[0];
 	};
 
-	const overlay = ["Custom", {
-		create: create_overlay,
-		location: [0, 0],
-	}];
-	endpoint.addOverlay(overlay);
+	// location 0 puts the label's top left on the endpoint's, so the "+" sits over the dot
+	jsPlumbInstance.addOverlay(endpoint, {
+		type: "Custom",
+		options: {
+			create: create_overlay,
+			location: 0,
+		}
+	});
 }
 
 function add_delete_overlay(connection) {
 	const create_overlay = function (component) {
 		const overlay = $('<span><svg width=18 height=18><circle cx="9" cy="9" r="9" version="1.1" xmlns="http://www.w3.org/1999/xhtml" style="" stroke="none"></circle></svg><span class="detach-label cancel">-</span></span>');
 		$('circle', overlay).css('fill', endpointColor);
-		return overlay;
+		return overlay[0];
 	};
 
-	const overlay = ["Custom", {
-		create: create_overlay,
-		label: "-",
-		location: 0.5,
-		events: {
-			"click": function (overlay, evt) {
-				jsPlumb.detach(overlay.component);
+	jsPlumbInstance.addOverlay(connection, {
+		type: "Custom",
+		options: {
+			create: create_overlay,
+			location: 0.5,
+			events: {
+				"click": function (params) {
+					jsPlumbInstance.deleteConnection(params.overlay.component);
+				}
 			}
 		}
-	}];
-	connection.addOverlay(overlay);
+	});
 }
 
 
@@ -322,7 +335,7 @@ function addConnection(sourceId, targetId, side, readOnly) {
 	const source = getEndpoint(sourceId, 'source');
 	const target = getEndpoint(targetId, 'target', side);
 
-	const connection = jsPlumb.connect({source: source, target: target, fireEvent: false, detachable: !readOnly});
+	const connection = jsPlumbInstance.connect({source: source, target: target, fireEvent: false, detachable: !readOnly});
 	if (!readOnly) {
 		add_delete_overlay(connection);
 	}
@@ -348,7 +361,7 @@ function addNewNodeToPage(data) {
 
 function addNewNodeAndFlash(data) {
 	const newNode = addNewNodeToPage(data);
-	const endPoints = jsPlumb.getEndpoints(newNode);
+	const endPoints = jsPlumbInstance.getEndpoints(newNode[0]);
 	const endpointVis = function (visible) {
 		$.each(endPoints, function () {
 			this.setVisible(visible);
@@ -411,14 +424,16 @@ function copyNode() {
 // Overlays (the '+' and '-' handles) are separate absolutely positioned elements to the connector canvas
 function getJsPlumbElements(component) {
 	const elements = [];
-	if (component.canvas) {
-		elements.push(component.canvas);
+	// Endpoints and connections keep their element on whatever paints them
+	const painted = component.endpoint || component.connector;
+	if (painted && painted.canvas) {
+		elements.push(painted.canvas);
 	}
 	const overlays = component.getOverlays ? component.getOverlays() : {};
 	for (let key in overlays) {
 		const overlay = overlays[key];
-		if (overlay.getElement) {  // Arrows are drawn into the connector canvas and don't have one
-			$.merge(elements, $(overlay.getElement()).get());
+		if (overlay.canvas) {  // Arrows are drawn into the connector canvas and don't have one
+			elements.push(overlay.canvas);
 		}
 	}
 	return elements;
@@ -433,7 +448,7 @@ function fadeOutAndRemoveNode(node) {
 	}
 
 	let fadingElements = node.get();
-	$.each(jsPlumb.getEndpoints(node) || [], function(_, endpoint) {
+	$.each(jsPlumbInstance.getEndpoints(node[0]) || [], function(_, endpoint) {
 		fadingElements = fadingElements.concat(getJsPlumbElements(endpoint));
 		$.each(endpoint.connections || [], function(_, connection) {
 			fadingElements = fadingElements.concat(getJsPlumbElements(connection));
@@ -444,8 +459,8 @@ function fadeOutAndRemoveNode(node) {
 	$(fadingElements).addClass(DELETING_CLASS);
 	setTimeout(function() {
 		// Detach without events so we don't tell the server about connections going away with the node
-		jsPlumb.detachAllConnections(node, {fireEvent: false});
-		jsPlumb.remove(node);
+		jsPlumbInstance.deleteConnectionsForElement(node[0], {fireEvent: false});
+		jsPlumbInstance.unmanage(node[0], true);
 	}, DELETE_FADE_MS);
 }
 
@@ -644,68 +659,56 @@ function attachVariantCounters(nodes_selector, nodeCountTypes) {
 
 
 function setupConnections(nodes_selector, readOnly) {
-	// configure some drop options for use by all endpoints.
-	const exampleDropOptions = {
-		tolerance:"touch",
-		hoverClass:"dropHover",
-		activeClass:"dragActive"
-	};
-
-	const connectorStyle = {
-		lineWidth : 3,
-		strokeStyle: endpointColor,
-	};
-	
 	const inputEndpoint = {
-		endpoint: ["Dot", { radius:11 }],
-		paintStyle:{ width:25, height:21, fillStyle: endpointColor },
-		reattach:true,
-		connectorStyle : connectorStyle,
-		//maxConnections: -1,
-		isTarget:true,
-		dropOptions : exampleDropOptions
+		endpoint: DOT_ENDPOINT,
+		paintStyle: ENDPOINT_STYLE,
+		reattachConnections: true,
+		connectorStyle: CONNECTOR_STYLE,
+		target: true,
 	};
 
 	const outputEndpoint = {
-		endpoint: ["Dot", {radius: 11}],
-		paintStyle: {fillStyle: endpointColor},
-		isSource: true,
+		endpoint: DOT_ENDPOINT,
+		paintStyle: ENDPOINT_STYLE,
+		source: true,
 		enabled: !readOnly,
-		connectorStyle: connectorStyle,
-		connector: ["Bezier", {curviness: 63}],
+		connectorStyle: CONNECTOR_STYLE,
+		connector: CONNECTOR_SPEC,
 		maxConnections: -1,
-		dropOptions: exampleDropOptions
 	};
 
 	nodes_selector.each(function() {
+		// Nodes without endpoints still need to be managed, so they can be dragged
+		jsPlumbInstance.manage(this);
+
 		const uuid = "input-endpoint-" + $(this).attr("node_id");
-		const existingEndpoint = jsPlumb.getEndpoint(uuid);
+		const existingEndpoint = jsPlumbInstance.getEndpoint(uuid);
 
 		if ($(this).attr("input_endpoint") == "true") {
 			if ($(this).hasClass("VennNode")) {
 				const topLeft = uuid + "-left";
 				const topRight = uuid + "-right";
-				jsPlumb.addEndpoint(this, { anchor: [0.25, 0, 0, -1], uuid: topLeft}, inputEndpoint);
-				jsPlumb.addEndpoint(this, { anchor: [0.75, 0, 0, -1], uuid: topRight}, inputEndpoint);
+				jsPlumbInstance.addEndpoint(this, { anchor: [0.25, 0, 0, -1], uuid: topLeft}, inputEndpoint);
+				jsPlumbInstance.addEndpoint(this, { anchor: [0.75, 0, 0, -1], uuid: topRight}, inputEndpoint);
             } else if ($(this).hasClass("MergeNode")) {
 				const commonInputEndpoint = $.extend({}, inputEndpoint);
-				commonInputEndpoint["endpoint"] = ["Dot", { radius: 18 }];
+				commonInputEndpoint["endpoint"] = {type: "Dot", options: {radius: 18}};
                 commonInputEndpoint["maxConnections"] = -1;
-                jsPlumb.addEndpoint(this, { anchor:"TopCenter", uuid: uuid}, commonInputEndpoint);
+                jsPlumbInstance.addEndpoint(this, { anchor: "Top", uuid: uuid}, commonInputEndpoint);
 			} else {
 			    // Keep existing, so we don't 
 			    if (!existingEndpoint) {
-				    jsPlumb.addEndpoint(this, { anchor:"TopCenter", uuid: uuid}, inputEndpoint);
+				    jsPlumbInstance.addEndpoint(this, { anchor: "Top", uuid: uuid}, inputEndpoint);
 				}
 			}
 		} else {
             if (existingEndpoint) {
-                jsPlumb.deleteEndpoint(uuid);
+                jsPlumbInstance.deleteEndpoint(uuid);
             }
 		}
 		
 		if ($(this).attr("output_endpoint") == "true") {
-			const e = jsPlumb.addEndpoint(this, {anchor: "BottomCenter"}, outputEndpoint);
+			const e = jsPlumbInstance.addEndpoint(this, {anchor: "Bottom"}, outputEndpoint);
 			if (!readOnly) {
 				add_click_overlay(e);
 			}
@@ -755,7 +758,7 @@ function setupNodes(nodes_selector, readOnly) {
 	}
 	
 	if (!readOnly) {
-		setupNodeModifications(nodes_selector);
+		setupNodeModifications();
 	}
 }
 
@@ -774,38 +777,8 @@ function bringNodeToFront(node) {
 }
 
 
-function setupNodeModifications(nodes_selector) {
-	function dragStart(event) {
-		const node = $(this);
-		// setActiveNode(node);
-		bringNodeToFront(node);
-	}
-
-	function saveNodePosition() {
-		const nodeId = $(this).attr("node_id");
-		const position = $(this).position();
-		const params = {'x' : position.left, 'y' : position.top};
-		updateNode(nodeId, 'move', params);
-	}
-
-	function dragStop(event) {
-		saveNodePosition.call(this);
-
-		// Avoid click event at end of drag
-		// http://stackoverflow.com/questions/3486760/how-to-avoid-jquery-ui-draggable-from-also-triggering-click-event/13973319#13973319
-		$( event.toElement ).one('click', function(e){ e.stopImmediatePropagation(); } );
-	}
-
-	// Native = the node you grabbed, All = the other selected nodes dragged along with it
-	const params = {
-		activeClass: ACTIVE_CLASS,
-		startNative: dragStart,
-		startAll: dragStart,
-		stopNative: dragStop,
-		stopAll: saveNodePosition,
-	};
-	nodes_selector.multiDraggable(params);
-
+function setupNodeModifications() {
+	// The marquee only starts on empty canvas - grabbing a node hands the mouse to jsPlumb's dragging.
 	// unselectActive on start to also unselect node counts
 	$('#analysis-container').selectable({
 		filter: "div.window",
@@ -814,9 +787,21 @@ function setupNodeModifications(nodes_selector) {
 			replaceEditorWindow();
 			loadGridAndEditorForNode();
 		},
-		cancel: '.cancel'
+		cancel: '.cancel, div.window'
 	});
 }
+
+
+// jsPlumb moves everything in its drag selection, so mirror the currently selected nodes into it as
+// the drag begins - grabbing a node that isn't selected moves only that node.
+function syncDragSelection(params) {
+	jsPlumbInstance.clearDragSelection();
+	const dragElement = params.drag.getDragElement();
+	if (dragElement.classList.contains(ACTIVE_CLASS)) {
+		jsPlumbInstance.addToDragSelection.apply(jsPlumbInstance, $(".window." + ACTIVE_CLASS, "#analysis").toArray());
+	}
+}
+
 
 function getEndpointSide(ep) {
 	const uuid = ep.getUuid();
@@ -824,74 +809,79 @@ function getEndpointSide(ep) {
 }
 
 
-jsPlumb.ready(function() {
-	let _initialised = false;
+const updateConnections = function (info, remove) {
+	const sourceId = $(info.source).attr("node_id");
+	const target = $(info.target);
+	const targetId = target.attr("node_id");
+	const params = {parent_id: sourceId, remove: remove};
 
-	const updateConnections = function (info, remove) {
-		const sourceId = $("#" + info.sourceId).attr("node_id");
-		const target = $("#" + info.targetId);
-		const targetId = target.attr("node_id");
-		const params = {parent_id: sourceId, remove: remove};
+	if (!remove && target.hasClass("VennNode")) {
+		const ep = info.connection.endpoints[1];
+		params["side"] = getEndpointSide(ep);
+	}
 
-		if (!remove && target.hasClass("VennNode")) {
-			const ep = info.connection.endpoints[1];
-			params["side"] = getEndpointSide(ep);
+	const on_success_function = function () {
+		const gew = getGridAndEditorWindow();
+		if (targetId == gew.getLoadedNodeId()) {
+			loadNodeData(targetId);
 		}
-
-		const on_success_function = function () {
-			const gew = getGridAndEditorWindow();
-			if (targetId == gew.getLoadedNodeId()) {
-				loadNodeData(targetId);
-			}
-			checkAndMarkDirtyNodes();
-		};
-
-		updateNode(targetId, 'update_connection', params, on_success_function);
+		checkAndMarkDirtyNodes();
 	};
 
-	window.variantgridPipeline = {init : function(readOnly) {
-		// setup jsPlumb defaults.
-		jsPlumb.importDefaults({
-			DragOptions : { cursor: 'pointer', zIndex:2000 },
-			PaintStyle : { strokeStyle:'#666' },
-			EndpointStyle : { width:20, height:16, strokeStyle:'#666' },
-			Endpoint : "Rectangle",
-			Anchors : ["TopCenter", "TopCenter"]
-		});												
+	updateNode(targetId, 'update_connection', params, on_success_function);
+};
 
-		// bind to connection/connectionDetached events, and update the list of connections on screen.
-		jsPlumb.bind("connection", function(info, originalEvent) {
-			updateConnections(info);
-			add_delete_overlay(info.connection);
+
+function saveDraggedNodePositions(params) {
+	for (let i=0 ; i<params.elements.length ; ++i) {
+		const dragged = params.elements[i];
+		const nodeId = dragged.el.getAttribute("node_id");
+		updateNode(nodeId, 'move', {'x': dragged.pos.x, 'y': dragged.pos.y});
+	}
+
+	// Avoid click event at end of drag
+	// http://stackoverflow.com/questions/3486760/how-to-avoid-jquery-ui-draggable-from-also-triggering-click-event/13973319#13973319
+	if (params.e) {
+		$(params.e.target).one('click', function(e) { e.stopImmediatePropagation(); });
+	}
+}
+
+
+window.variantgridPipeline = {init : function(readOnly) {
+	jsPlumbInstance = jsPlumb.newInstance({
+		container: document.getElementById("analysis"),
+		elementsDraggable: !readOnly,
+		endpoint: DOT_ENDPOINT,
+		endpointStyle: ENDPOINT_STYLE,
+		connector: CONNECTOR_SPEC,
+		paintStyle: CONNECTOR_STYLE,
+		anchors: ["Bottom", "Top"],
+		dragOptions: {cursor: 'pointer', zIndex: 2000, beforeStart: syncDragSelection},
+	});
+
+	// bind to connection/detach events, and update the list of connections on screen.
+	jsPlumbInstance.bind("connection", function(info, originalEvent) {
+		updateConnections(info);
+		add_delete_overlay(info.connection);
+	});
+	jsPlumbInstance.bind("connection:detach", function(info, originalEvent) {
+		updateConnections(info, true);
+	});
+
+	// The dragged node - and anything dragged along with it - sits above the rest of the graph
+	jsPlumbInstance.bind("drag:start", function(params) {
+		bringNodeToFront($(params.el));
+		$(".window." + ACTIVE_CLASS, "#analysis").each(function() {
+			bringNodeToFront($(this));
 		});
-		jsPlumb.bind("connectionDetached", function(info, originalEvent) {
-			updateConnections(info, true);
-		});
+	});
+	jsPlumbInstance.bind("drag:stop", saveDraggedNodePositions);
 
-		setupHideInvalidConnectionsOnDrag();
+	setupHideInvalidConnectionsOnDrag();
 
-		const nodes_selector = $(".window");
-		setupNodes(nodes_selector, readOnly);
-		
-		if (!_initialised) {
-			$(".drag").click(function() {
-				const s = jsPlumb.toggleDraggable($(this).attr("rel"));
-				$(this).html(s ? 'disable dragging' : 'enable dragging');
-				if (!s)
-					$("#" + $(this).attr("rel")).addClass('drag-locked');
-				else
-					$("#" + $(this).attr("rel")).removeClass('drag-locked');
-				$("#" + $(this).attr("rel")).css("cursor", s ? "pointer" : "default");
-			});
-
-			$(".detach").click(function() {
-				jsPlumb.detachAllConnections($(this).attr("rel"));
-			});
-
-			_initialised = true;
-		}
-	}};
-});
+	const nodes_selector = $(".window");
+	setupNodes(nodes_selector, readOnly);
+}};
 
 
 function drawCountLegend(nodeCountTypes) {

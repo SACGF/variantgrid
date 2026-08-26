@@ -25,28 +25,34 @@
     user-select: none;
 }
 
+/* jsPlumb positions endpoints/connectors/overlays absolutely inside its container, so the
+   container has to be the coordinate system the nodes are laid out in */
+#analysis {
+	position: relative;
+}
+
 .window, .label { 
     z-index:24;
 	cursor:pointer;
 }
 
-path, ._jsPlumb_endpoint { cursor:pointer; }
+path, .jtk-endpoint { cursor:pointer; }
 
 /* z index stuff. windows are at z-index 24. */
 
-._jsPlumb_connector { z-index:18; }
-._jsPlumb_endpoint { z-index:19; }
-._jsPlumb_overlay { z-index:20; }
+.jtk-connector { z-index:18; }
+.jtk-endpoint { z-index:19; }
+.jtk-overlay { z-index:20; }
 
-._jsPlumb_connector._jsPlumb_hover {
+.jtk-connector.jtk-hover {
     z-index:21 !important;
 }
 
-._jsPlumb_endpoint._jsPlumb_hover {
+.jtk-endpoint.jtk-hover {
     z-index:22 !important;
 }
 
-._jsPlumb_overlay._jsPlumb_hover {
+.jtk-overlay.jtk-hover {
     z-index:23 !important;
 }
 
