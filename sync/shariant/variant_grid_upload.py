@@ -1,5 +1,7 @@
 import copy
+import logging
 import socket
+import time
 from collections.abc import Iterable
 from typing import Any, Optional, TypeVar, Union
 from urllib.parse import quote, urljoin
@@ -225,32 +227,38 @@ class VariantGridUploadSyncer(ClassificationUploadSyncRunner):
         qs = self.records_to_sync(full_sync=sync_run_instance.full_sync)
 
         rows_uploaded = 0
+        record_count = qs.count()
+        logging.info("%s: %d record(s) to upload", sync_run_instance.sync_destination, record_count)
 
-        if not qs.exists():
+        if not record_count:
             sync_run_instance.run_completed(had_records=False)
         else:
             if max_rows := sync_run_instance.max_rows:
                 qs = qs[:max_rows]
+                record_count = min(record_count, max_rows)
 
             site_name = socket.gethostname().lower().split('.')[0].replace('-', '')
             for batch, finished in batch_iterator_end(qs, batch_size=50):
                 # providing import_id and status:complete when we're done lets Shariant know
                 # when the upload has been completed
+                json_start = time.time()
                 json_to_send = {
                     "records": [self.classification_to_json(vcm) for vcm in batch],
                     "import_id": site_name
                 }
                 if finished:
                     json_to_send["status"] = "complete"
-                # print(json.dumps(json_to_send))
+                json_duration = time.time() - json_start
                 other_variant_grid = sync_run_instance.server_auth()
 
+                post_start = time.time()
                 response = other_variant_grid.post(
                     url_suffix='classification/api/classifications/v2/record/',
                     json=json_to_send,
                     timeout=MINUTE_SECS,
                 )
                 response.raise_for_status()
+                post_duration = time.time() - post_start
                 # results are sent back in an array in the same order they were sent up
                 results = response.json().get('results')
 
@@ -261,4 +269,7 @@ class VariantGridUploadSyncer(ClassificationUploadSyncRunner):
                         classification_modification=record,
                         meta=result
                     )
+                logging.info("%s: uploaded %d/%d records (batch of %d: JSON build %.1fs, POST %.1fs)",
+                             sync_run_instance.sync_destination, rows_uploaded, record_count,
+                             len(batch), json_duration, post_duration)
             sync_run_instance.run_completed(had_records=True)

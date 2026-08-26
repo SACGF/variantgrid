@@ -1,3 +1,4 @@
+import logging
 import time
 from typing import Optional
 
@@ -111,12 +112,14 @@ class VariantGridDownloadSyncer(SyncRunner):
             return data
 
         sync_run_instance.run_start()
+        download_start = time.time()
         response = other_variant_grid.get(
             url_suffix='classification/api/classifications/export',
             params=params,
             stream=False,
             timeout=MINUTE_SECS
         )
+        logging.info("%s: downloaded export in %.1fs", sync_destination, time.time() - download_start)
 
         last_modified = response.headers.get('Last-Modified')
         evidence_keys = EvidenceKeyMap.instance()
@@ -149,6 +152,7 @@ class VariantGridDownloadSyncer(SyncRunner):
                     count = count + 1
             finally:
                 inserter.finish()
+            logging.info("%s: upserted %d record(s) so far (%d skipped)", sync_destination, count, skipped)
 
         sync_run_instance.run_completed(
             had_records=bool(count),

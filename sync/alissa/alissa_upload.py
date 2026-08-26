@@ -1,4 +1,6 @@
 import json
+import logging
+import time
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
@@ -115,6 +117,7 @@ class AlissaUploadSyncer(SyncRunner):
                 }
                 import_option = AlissaImportOption.CONTRIBUTE
 
+                post_start = time.time()
                 response = alissa.post(
                     url_suffix=f'managedvariantlists/{mvl_id}/import',
                     params=params,
@@ -122,6 +125,9 @@ class AlissaUploadSyncer(SyncRunner):
                     timeout=MINUTE_SECS,
                 )
                 response.raise_for_status()
+                logging.info("%s: posted file to MVL %d, %d row(s) exported so far (POST %.1fs)",
+                             sync_run_instance.sync_destination, mvl_id, exporter.row_count,
+                             time.time() - post_start)
 
                 try:
                     if response_json := response.json():
