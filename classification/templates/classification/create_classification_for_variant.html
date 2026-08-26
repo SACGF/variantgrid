@@ -33,6 +33,9 @@
     }
 </style>
 <script>
+    const VARIANT_ID = {{ variant.pk|default:"null" }};
+    let createClassificationButton = null;
+
     function transcriptFunc(transcriptId, data) {
         let TRANSCRIPTS_TYPES = ["refseq_transcript_accession", "ensembl_transcript_accession"];
         for (let i=0 ; i < TRANSCRIPTS_TYPES.length ; ++i) {
@@ -168,8 +171,7 @@
     }
 
     $(document).ready(() => {
-        const VARIANT_ID = {{ variant.pk }};
-        let createClassificationButton = $("button#create-variant-classification");
+        createClassificationButton = $("button#create-variant-classification");
         createClassificationButton.button();
 
         let sampleForm = $("#{{ variant_sample_autocomplete_form.sample.auto_id }}");
