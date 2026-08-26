@@ -905,7 +905,16 @@ li.error::before {
 	background-size: 16px 16px;
 }
 
-.grid-link-icon.scs-tier_1_or_2 {
+// The analysis grid internal classification boxes - standard germline/somatic colours
+.grid-link-icon.allele-origin-G {
+	background-color: #88cc88;
+}
+
+.grid-link-icon.allele-origin-S {
+	background-color: #cc99cc;
+}
+
+.grid-link-icon.grid-link-small-text {
 	font-size: 10px;
 	letter-spacing: -0.5px;
 }
@@ -3068,9 +3077,8 @@ a .c-hgvs-body {
 	}
 }
 
-// Clinical significance colours - shared by classification pills, analysis node chips and the
-// analysis grid classification boxes
-.c-pill, .node-chip, .grid-link-icon {
+// Clinical significance colours - shared by classification pills and analysis node chips
+.c-pill, .node-chip {
 	&.scs-none, &.cs-none {
 		border: none !important;
 		background-color: #eeeeee;

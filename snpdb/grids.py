@@ -485,7 +485,9 @@ class AbstractVariantGrid(JqGridUserRowConfig):
         overrides = {
             # Note:     client side formatters should only be used for adding links etc, never conversion of data, such as
             #           unit to percent, as the CSV downloads (w/o JS formatters) won't match the grid.
-            'id': {'editable': False, 'width': 90, 'fixed': True, 'formatter': 'detailsLink', 'sorttype': 'int'},
+            # Width fits detailsLink()'s boxes: select checkbox, details, ClinVar, germline + somatic
+            # internal classifications, IGV
+            'id': {'editable': False, 'width': 110, 'fixed': True, 'formatter': 'detailsLink', 'sorttype': 'int'},
             'tags_global': {
                 'model_field': False, 'queryset_field': False,
                 'name': 'tags_global', 'index': 'tags_global',

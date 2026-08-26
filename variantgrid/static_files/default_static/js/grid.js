@@ -282,32 +282,32 @@ function isNodeVisible(options) {
 
 
 // Keys are Classification.clinical_significance codes / somatic summary tiers - values give the box
-// contents, pill CSS class (see .grid-link-icon.cs-* / .scs-* in global.scss) and tooltip label
+// contents and tooltip label
 const GERMLINE_CLASSIFICATION_BOXES = {
-    '0': {display: 'O', cssClass: 'cs-none', label: 'Other'},
-    '1': {display: '1', cssClass: 'cs-b', label: 'Benign'},
-    '2': {display: '2', cssClass: 'cs-lb', label: 'Likely Benign'},
-    '3': {display: '3', cssClass: 'cs-vus', label: 'VUS'},
-    '4': {display: '4', cssClass: 'cs-lp', label: 'Likely Pathogenic'},
-    '5': {display: '5', cssClass: 'cs-p', label: 'Pathogenic'},
-    'U': {display: '', cssClass: 'cs-none', label: 'Unclassified'},
+    '0': {display: 'O', label: 'Other'},
+    '1': {display: '1', label: 'Benign'},
+    '2': {display: '2', label: 'Likely Benign'},
+    '3': {display: '3', label: 'VUS'},
+    '4': {display: '4', label: 'Likely Pathogenic'},
+    '5': {display: '5', label: 'Pathogenic'},
+    'U': {display: '', label: 'Unclassified'},
 };
 
 const SOMATIC_CLASSIFICATION_BOXES = {
-    'tier_1': {display: '1', cssClass: 'scs-tier_1', label: 'Tier I'},
-    'tier_1_or_2': {display: '1/2', cssClass: 'scs-tier_1_or_2', label: 'Tier I/II'},
-    'tier_2': {display: '2', cssClass: 'scs-tier_2', label: 'Tier II'},
-    'tier_3': {display: '3', cssClass: 'scs-tier_3', label: 'Tier III'},
-    'tier_4': {display: '4', cssClass: 'scs-tier_4', label: 'Tier IV'},
-    'U': {display: '', cssClass: 'scs-none', label: 'No tier'},
+    'tier_1': {display: '1', label: 'Tier I'},
+    'tier_1_or_2': {display: '1/2', label: 'Tier I/II'},
+    'tier_2': {display: '2', label: 'Tier II'},
+    'tier_3': {display: '3', label: 'Tier III'},
+    'tier_4': {display: '4', label: 'Tier IV'},
+    'U': {display: '', label: 'No tier'},
 };
 
-function internalClassificationBox(title, maxClassification, classifiedSummary, gridColumn, boxLookup) {
+function internalClassificationBox(title, maxClassification, classifiedSummary, gridColumn, boxLookup, originCssClass) {
     let linkUrl = null;
     let contents = '';
-    const extraIconClasses = [];
+    const extraIconClasses = [originCssClass];  // Standard germline/somatic colour, see global.scss
     if (maxClassification != null) {  // != also catches undefined (cached grid data w/o new fields)
-        const box = boxLookup[maxClassification] || {display: maxClassification, cssClass: 'cs-none', label: maxClassification};
+        const box = boxLookup[maxClassification] || {display: maxClassification, label: maxClassification};
         // classifiedSummary is every record's value joined by '|' - show the pretty labels
         const summaryLabels = (classifiedSummary || '').split('|').map(function(cs) {
             const summaryBox = boxLookup[cs];
@@ -316,10 +316,12 @@ function internalClassificationBox(title, maxClassification, classifiedSummary, 
         title += ": " + summaryLabels.join('|');
         linkUrl = 'javascript:showGridCell("' + gridColumn + '")';
         contents = box.display;
-        extraIconClasses.push(box.cssClass);
+        if (contents.length > 1) {  // e.g. Tier "1/2" - shrink to fit the 16px box
+            extraIconClasses.push("grid-link-small-text");
+        }
     } else {
         title += ": not classified";
-        extraIconClasses.push("no-entry", boxLookup['U'].cssClass);
+        extraIconClasses.push("no-entry");
     }
     return createGridLink(title, linkUrl, contents, [], extraIconClasses);
 }
@@ -366,11 +368,11 @@ function detailsLink(variantId, options, rowData) {
     variantBoxes.push(internalClassificationBox(
         "Internally Classified (Germline)", rowData["max_internal_classification"],
         rowData["internally_classified"], "max_internal_classification",
-        GERMLINE_CLASSIFICATION_BOXES));
+        GERMLINE_CLASSIFICATION_BOXES, "allele-origin-G"));
     variantBoxes.push(internalClassificationBox(
         "Internally Classified (Somatic)", rowData["max_internal_somatic_classification"],
         rowData["internally_classified_somatic"], "max_internal_somatic_classification",
-        SOMATIC_CLASSIFICATION_BOXES));
+        SOMATIC_CLASSIFICATION_BOXES, "allele-origin-S"));
 
     const locus = rowData["locus__contig__name"] + ":" + rowData["locus__position"];
     const igvLink = create_igv_link(locus, 'getBams');
