@@ -2,6 +2,8 @@ import copy
 import logging
 import socket
 import time
+
+import requests
 from collections.abc import Iterable
 from typing import Any, Optional, TypeVar, Union
 from urllib.parse import quote, urljoin
@@ -26,6 +28,11 @@ from sync.sync_runner import ClassificationUploadSyncRunner, SyncRunInstance, re
 SHARIANT_PRIVATE_FIELDS = [
     'age_units', 'dob', 'family_id', 'internal_use', 'patient_id', 'patient_summary', 'sample_id', 'variant_type'
 ]
+
+# server-side processing of a 50 record batch can exceed the default minute
+UPLOAD_TIMEOUT_SECS = 5 * MINUTE_SECS
+UPLOAD_ATTEMPTS = 3
+UPLOAD_RETRY_DELAY_SECS = 30
 
 
 def insert_nones(data: dict) -> dict:
@@ -252,12 +259,23 @@ class VariantGridUploadSyncer(ClassificationUploadSyncRunner):
                 other_variant_grid = sync_run_instance.server_auth()
 
                 post_start = time.time()
-                response = other_variant_grid.post(
-                    url_suffix='classification/api/classifications/v2/record/',
-                    json=json_to_send,
-                    timeout=MINUTE_SECS,
-                )
-                response.raise_for_status()
+                # records are upserts keyed by lab/lab_record_id, so re-sending a batch after a
+                # timeout/connection drop is safe even if the server processed the first attempt
+                for attempt in range(UPLOAD_ATTEMPTS):
+                    try:
+                        response = other_variant_grid.post(
+                            url_suffix='classification/api/classifications/v2/record/',
+                            json=json_to_send,
+                            timeout=UPLOAD_TIMEOUT_SECS,
+                        )
+                        response.raise_for_status()
+                        break
+                    except (requests.ConnectionError, requests.Timeout) as e:
+                        retries_left = UPLOAD_ATTEMPTS - attempt - 1
+                        if not retries_left:
+                            raise
+                        logging.warning("%s: %r - %d retries left", sync_run_instance.sync_destination, e, retries_left)
+                        time.sleep(UPLOAD_RETRY_DELAY_SECS)
                 post_duration = time.time() - post_start
                 # results are sent back in an array in the same order they were sent up
                 results = response.json().get('results')
