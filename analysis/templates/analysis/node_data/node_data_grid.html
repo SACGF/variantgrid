@@ -73,6 +73,10 @@ function gridComplete() {
 
         // Clear the grid-only overlay we put up when the user clicked "Show grid" (no-op otherwise).
         hideGridLoadingOverlay();
+
+        if (typeof isHorizontalMode === "function" && isHorizontalMode()) {
+            resizeGrid();  // fill the full width bottom panel the grid landed in
+        }
     }
 }
 
@@ -99,22 +103,36 @@ $(document).ready(function() {
     const aWin = getAnalysisWindow();
     aWin.loadedGridVersions = aWin.loadedGridVersions || {};
     const alreadyLoaded = aWin.loadedGridVersions[{{ node_id }}] === {{ node_version }};
-    const autoLoad = {{ grid_auto_load|yesno:"true,false" }} || alreadyLoaded;
-    if (autoLoad) {
-        // We have retrieved it (or are about to) - show the grid, never the placeholder.
+    const wantsGrid = {{ grid_auto_load|yesno:"true,false" }} || alreadyLoaded;
+    // Nothing to show while the Editor tab is up, so don't pay for the rows - the tab-show handler
+    // in analysis.js fires the load we register below.
+    const deferredForHiddenTab = wantsGrid && typeof bottomPaneGridHidden === "function" && bottomPaneGridHidden();
+    const autoLoad = wantsGrid && !deferredForHiddenTab;
+
+    const showGrid = function() {
         $("#grid-placeholder-{{ node_id }}").hide();
         $("#node-data-grid", "#" + unique_code).show();
+    };
+
+    if (autoLoad) {
+        // We have retrieved it (or are about to) - show the grid, never the placeholder.
+        showGrid();
     }
     setupGrid(grid_url, {{ analysis_id }}, {{ node_id }}, {{ node_version }}, unique_code,
               gridComplete, gridLoadError, on_error_function, autoLoad);
-    if (!autoLoad) {
-        $("#load-variants-{{ node_id }}").click(function() {
-            $("#grid-placeholder-{{ node_id }}").hide();
-            $("#node-data-grid", "#" + unique_code).show();
-            // Double-helix over just the grid section (editor stays usable) while phase 2 runs.
-            showGridLoadingOverlay("#node-grid-container");
-            loadNodeGridData({{ node_id }}, unique_code);  // fires deferred phase 2
-        });
+
+    const loadDeferredGrid = function() {
+        showGrid();
+        // Double-helix over just the grid section (editor stays usable) while phase 2 runs.
+        showGridLoadingOverlay("#node-grid-container");
+        loadNodeGridData({{ node_id }}, unique_code);  // fires deferred phase 2
+    };
+
+    if (deferredForHiddenTab) {
+        registerDeferredGridLoad(loadDeferredGrid);
+    } else if (!autoLoad) {
+        // Over the row-count threshold - the placeholder gives the user the choice
+        $("#load-variants-{{ node_id }}").click(loadDeferredGrid);
     }
 });
 </script>

@@ -120,8 +120,13 @@ def node_create(request, analysis_id, node_type):
     analysis = get_analysis_or_404(request.user, analysis_id, write=True)
 
     node_class = NODE_TYPES_HASH[node_type]
-    x = 10 + random.random() * 50
-    y = 50 + random.random() * 20
+    # New nodes go at the start of the flow - the top in vertical mode, the left edge in horizontal
+    if analysis.analysis_horizontal_mode:
+        x = 50 + random.random() * 20
+        y = 10 + random.random() * 50
+    else:
+        x = 10 + random.random() * 50
+        y = 50 + random.random() * 20
     node = node_class.objects.create(analysis=analysis, x=x, y=y)
     update_analysis(node.analysis_id)
     return JsonResponse(get_rendering_dict(node))
@@ -139,6 +144,9 @@ def nodes_copy(request, analysis_id):
     nodes_qs = analysis.analysisnode_set.filter(id__in=node_ids).select_subclasses()
     topo_sorted = get_toposorted_nodes(nodes_qs)
 
+    # Nudge the copy clear of the original - along the flow in horizontal mode, so it reads as the next node
+    copy_x_offset = 80 if analysis.analysis_horizontal_mode else 10
+
     old_new_map = {}
     for group in topo_sorted:
         for node in group:
@@ -149,7 +157,7 @@ def nodes_copy(request, analysis_id):
             parents = template_node.analysisnode_ptr.parents().filter(id__in=old_new_map).values_list('id', flat=True)
 
             clone_node = template_node.save_clone()
-            clone_node.x += 10
+            clone_node.x += copy_x_offset
             clone_node.y += 10
             clone_node.status = NodeStatus.DIRTY
             clone_node.save()

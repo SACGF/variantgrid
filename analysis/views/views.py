@@ -963,12 +963,14 @@ def view_analysis_settings(request, analysis_id):
 def analysis_settings_details_tab(request, analysis_id):
     analysis = get_analysis_or_404(request.user, analysis_id)
     old_annotation_version = analysis.annotation_version
+    old_horizontal_mode = analysis.analysis_horizontal_mode
     form = forms.AnalysisForm(request.POST or None, user=request.user, instance=analysis)
     has_write_permission = analysis.can_write(request.user)
     if not has_write_permission:
         set_form_read_only(form)
 
     reload_analysis = False
+    reload_page = False
     if request.method == "POST":
         analysis.check_can_write(request.user)
         if form.has_changed:
@@ -978,6 +980,9 @@ def analysis_settings_details_tab(request, analysis_id):
                 analysis.save()
                 if reload_analysis := (old_annotation_version != analysis.annotation_version):
                     node_utils.reload_analysis_nodes(analysis.pk)
+                # The panel layout and node anchors are rendered per orientation, and the save
+                # transposed the node positions - the open page needs to come back as the other mode
+                reload_page = old_horizontal_mode != analysis.analysis_horizontal_mode
 
             add_save_message(request, valid, "Analysis Settings")
 
@@ -992,7 +997,8 @@ def analysis_settings_details_tab(request, analysis_id):
                "form": form,
                "new_analysis_settings": analysis_settings,
                "has_write_permission": has_write_permission,
-               "reload_analysis": reload_analysis}
+               "reload_analysis": reload_analysis,
+               "reload_page": reload_page}
     return render(request, 'analysis/analysis_settings_details_tab.html', context)
 
 

@@ -8,6 +8,7 @@ from crispy_forms.layout import Field, Layout
 from dal import forward
 from django import forms
 from django.core.exceptions import ValidationError
+from django.db import transaction
 from django.forms import inlineformset_factory
 from django.forms.widgets import TextInput
 
@@ -227,7 +228,8 @@ class AnalysisForm(forms.ModelForm, ROFormMixin):
                   "name", "description", "analysis_type",
                   "custom_columns_collection", "default_sort_by_column", "canonical_transcript_collection",
                   "grid_sample_label_template", "variant_tag_stale_days",
-                  "show_igv_links", "annotation_version", "lock_input_sources", "node_queryset_filter_contigs")
+                  "show_igv_links", "analysis_horizontal_mode", "annotation_version", "lock_input_sources",
+                  "node_queryset_filter_contigs")
         read_only = ('user', 'genome_build')
         model = Analysis
         widgets = {'name': TextInput(),
@@ -283,7 +285,10 @@ class AnalysisForm(forms.ModelForm, ROFormMixin):
             instance.version += 1
 
         if commit:
-            instance.save()
+            with transaction.atomic():
+                instance.save()
+                if "analysis_horizontal_mode" in self.changed_data:
+                    instance.transpose_node_positions()
         return instance
 
 
