@@ -1,17 +1,32 @@
 import logging
 import time
+from contextlib import contextmanager
 
 import pandas as pd
 from django.core.management import BaseCommand
 
 from classification.enums import SubmissionSource
-from classification.models import EvidenceKey
+from classification.models import ClassificationImportRun, EvidenceKey
 from classification.models.classification_inserter import BulkClassificationInserter
 from library.guardian_utils import admin_bot
 from library.log_utils import log_traceback
 from library.pandas_utils import df_nan_to_none
 from library.utils import batch_iterator
 from snpdb.models import Lab
+
+
+@contextmanager
+def _classification_import_run(identifier: str):
+    """ While a ClassificationImportRun is ongoing, the expensive classification_post_publish_signal receivers
+        (ClassificationGrouping.update_all_dirty, ClinicalContext/discordance recalc, common variant filter tasks)
+        defer their per-record work - completing the run fires classification_imports_complete_signal which
+        catches it all up in one batch. @see classification_imports_complete_signal """
+    import_run = ClassificationImportRun.record_classification_import(identifier)
+    try:
+        yield import_run
+    finally:
+        # complete even on error so records inserted before the failure still get their batch catch-up
+        ClassificationImportRun.record_classification_import(identifier, is_complete=True)
 
 
 class Command(BaseCommand):
@@ -50,35 +65,40 @@ class Command(BaseCommand):
 
         count = 0
         first_batch = False
-        for batch in batch_iterator(records, batch_size=50):
-            inserter = BulkClassificationInserter(user=user, force_publish=True)
-            try:
-                # give the process 10 seconds to breath between batches of 50 classifications
-                # in case we're downloading giant chunks of data
-                if sleep and not first_batch:
-                    logging.info("Sleeping %d secs" % sleep)
-                    time.sleep(sleep)
-                first_batch = False
+        with _classification_import_run(f"csv_classification_inserter_{lab.group_name}") as import_run:
+            for batch in batch_iterator(records, batch_size=50):
+                inserter = BulkClassificationInserter(user=user, force_publish=True)
+                try:
+                    # give the process 10 seconds to breath between batches of 50 classifications
+                    # in case we're downloading giant chunks of data
+                    if sleep and not first_batch:
+                        logging.info("Sleeping %d secs" % sleep)
+                        time.sleep(sleep)
+                    first_batch = False
 
-                for record in batch:
+                    for record in batch:
 
-                    inserter.insert(
-                        record,
-                        # record_id=record.pop("record_id"),
-                        submission_source=SubmissionSource.API,
-                    )
-                    count = count + 1
-                    if count >= max_records:
-                        break
-            except Exception:
-                log_traceback()
-                raise
-            finally:
-                logging.info("Finish")
-                inserter.finish()
+                        response = inserter.insert(
+                            record,
+                            # record_id=record.pop("record_id"),
+                            submission_source=SubmissionSource.API,
+                            import_run=import_run,
+                        )
+                        import_run.increment_status(response.status)
+                        count = count + 1
+                        if count >= max_records:
+                            break
+                except Exception:
+                    log_traceback()
+                    raise
+                finally:
+                    logging.info("Finish")
+                    inserter.finish()
+                    # bumps modified so the run isn't cleaned up as stale mid-import
+                    import_run.save()
 
-            if count >= max_records:
-                break
+                if count >= max_records:
+                    break
 
     @staticmethod
     def get_static_keys(static_ekeys_csv) -> dict[str, str]:
