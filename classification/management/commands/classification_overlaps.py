@@ -27,6 +27,7 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument('--flags', required=False, action='store_true'),
+        parser.add_argument('--cache', required=False, action='store_true'),
         parser.add_argument('--dates', required=False, action='store_true'),
         parser.add_argument('--recalc', required=False, action="store_true"),
         parser.add_argument('--full_reset', required=False, action="store_true",
@@ -46,6 +47,15 @@ class Command(BaseCommand):
 
         if options['recalc']:
             self.recalc_overlaps()
+
+        if options['cache']:
+            bulk_update = []
+            for overlap in Overlap.objects.all().iterator():
+                overlap.cached_overlap_state_obj = overlap.derived_overlap_state
+                bulk_update.append(overlap)
+            print(f"Bulk updating {len(bulk_update)}")
+            update_count = Overlap.objects.bulk_update(bulk_update, fields=["cached_overlap_state"])
+            print(f"Updated {update_count}")
 
         if options["recalc_skews"]:
             self.recalc_skews()

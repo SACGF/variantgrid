@@ -291,16 +291,17 @@ class OverlapServices:
         calculator = calculator_for_value_type(overlap.value_type)
 
         overlap_status_calculation = calculator.calculate_entries(overlap.contributions_list)
-        current_state = overlap.overlap_state
+        cached_state = overlap.cached_overlap_state_obj
 
         overlap_status_changed = False
         overlap_valid_changed = False
-        if overlap_status_calculation != current_state:
+        if overlap_status_calculation != cached_state:
             # see if either overlap status or pending overlap status are changing
             overlap.overlap_status = overlap_status_calculation.status
             overlap.has_pending_values = overlap_status_calculation.has_pending_values
             overlap.overlap_max_ever_status = max(overlap.overlap_max_ever_status, overlap_status_calculation.status)
             overlap.overlap_override_status = overlap_status_calculation.override_status
+            overlap.cached_overlap_state_obj = overlap_status_calculation
 
             overlap.overlap_status_change_timestamp = now()
             overlap_status_changed = True
@@ -321,7 +322,7 @@ class OverlapServices:
         if overlap_valid_changed or overlap_status_changed:
             overlap.save()
             if overlap_status_changed:
-                OverlapServices.overlap_status_changed(overlap, current_state, overlap_status_calculation)
+                OverlapServices.overlap_status_changed(overlap, cached_state, overlap_status_calculation)
 
     @staticmethod
     def overlap_status_changed(overlap: Overlap, old_state: OverlapState, new_state: OverlapState):
@@ -335,26 +336,28 @@ class OverlapServices:
             return  # don't notify clin sig discordances
 
         # see if it's worth notifying anyone
-        if not (old_state.is_active_discordance ^ new_state.is_active_discordance):
-            # only care if we're going from discordant to not discordant or vice versa
-            # an overlap could change from concordant to discordant back to concordant
-            # , but we just check if the notification is worth sending
-            return
+        odn: OverlapDiscordanceNotification
+        created: bool = False
+        if not OverlapState.is_notify_relevant(old_state, new_state):
+            # change isn't worth notifying, but if we were already notifying (with a previous state), update that notification
+            odn = OverlapDiscordanceNotification.objects.filter(overlap=overlap, notification_sent_date__isnull=True).first()
+        else:
+            odn, created = OverlapDiscordanceNotification.objects.get_or_create(
+                overlap=overlap,
+                notification_sent_date=None,
+                defaults={
+                    "old_state": old_state.to_dict(),
+                    "new_state": new_state.to_dict()
+                }
+            )
 
-        odn, created = OverlapDiscordanceNotification.objects.get_or_create(
-            overlap=overlap,
-            notification_sent_date=None,
-            defaults={
-                "old_state": old_state.to_dict(),
-                "new_state": new_state.to_dict()
-            }
-        )
-        if not created:
+        if odn and not created:
             odn.new_state_obj = new_state
             odn.save()
 
-        # this will send emails right away if we're no in an import, otherwise at the end of an import
-        send_prepared_discordance_notifications()
+        # this will send emails right away if we're not in an import, otherwise at the end of an import
+        if odn:
+            send_prepared_discordance_notifications()
 
 
 @dataclass
@@ -787,12 +790,22 @@ def send_prepared_discordance_notifications(
                 overlap = notification.overlap
                 discordance_status_icon = ":no_good:" if notification.new_state_obj.is_active_discordance else ":handshake:"
                 overlap_description = f"{overlap.scope_description} {overlap.value_type_label}"
-                overlap_change = f"{notification.old_state_obj.label} -> {notification.new_state_obj.label} {discordance_status_icon}"
+
+                overlap_change = []
+                if notification.old_state_obj.label != notification.new_state_obj.label:
+                    overlap_change.append(f"{notification.old_state_obj.label} -> {notification.new_state_obj.label} {discordance_status_icon}")
+                else:
+                    overlap_change.append(f"{notification.new_state_obj.label}")
+
+                if new_lab_groups := set(notification.new_state_obj.lab_groups).difference(notification.old_state_obj.lab_groups):
+                    new_labs = list(sorted(Lab.objects.filter(group_name__in=new_lab_groups).all()))
+                    for lab in new_labs:
+                        overlap_change.append(f"{lab} is now part of this overlap")
 
                 overall_admin_notification.add_field("Overlap",
                                                      f"<{_report_url_for_id(notification.overlap)}|Overlap_{notification.overlap_id}> {overlap_description}")
                 overall_admin_notification.add_field("Involved Labs", sorted_lab_str)
-                overall_admin_notification.add_field("Change", overlap_change)
+                overall_admin_notification.add_field("Change", "\n".join(overlap_change))
                 overall_admin_notification.send()
 
         for lab, notifications in notifications_by_lab.items():

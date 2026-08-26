@@ -31,25 +31,29 @@ class OverlapCalculatorBase(ABC):
     def calculate_entries(cls, entries: Iterable[OverlapContribution]) -> OverlapState:
         non_comparable_values: int = 0
         contributing: list[OverlapContribution] = []
+        involved_labs: list[str] = []
 
         for entry in entries:
 
             match entry.contribution_status:
                 case OverlapContributionStatus.CONTRIBUTING:
                     contributing.append(entry)
+                    if contributing_lab_group := entry.classification_grouping.lab.group_name:
+                        involved_labs.append(contributing_lab_group)
                 case OverlapContributionStatus.NON_COMPARABLE_VALUE:
                     non_comparable_values += 1
                 case _:
                     pass  # don't care about unshared for calculation values
 
+        involved_labs.sort()
         has_pending_values = any(con.is_amending for con in contributing)
         if len(contributing) == 0:
             if non_comparable_values > 0:
-                return OverlapState(OverlapStatus.NO_COUNTING_CONTRIBUTIONS, has_pending_values=has_pending_values)
+                return OverlapState(OverlapStatus.NO_COUNTING_CONTRIBUTIONS, has_pending_values=has_pending_values, lab_groups=involved_labs)
             else:
-                return OverlapState(OverlapStatus.NO_CONTRIBUTIONS, has_pending_values=has_pending_values)
+                return OverlapState(OverlapStatus.NO_CONTRIBUTIONS, has_pending_values=has_pending_values, lab_groups=involved_labs)
         elif len(contributing) == 1:
-            return OverlapState(OverlapStatus.SINGLE_SUBMITTER, has_pending_values=has_pending_values)
+            return OverlapState(OverlapStatus.SINGLE_SUBMITTER, has_pending_values=has_pending_values, lab_groups=involved_labs)
         else:
             override_value: OverlapOverrideStatus = OverlapOverrideStatus.NO_OVERRIDE
             all_values = set(con.effective_value for con in contributing)
@@ -85,7 +89,7 @@ class OverlapCalculatorBase(ABC):
                                 elif all(con.triage_state_obj.status == TriageStatus.REVIEWED_SATISFACTORY for con in interactive_contributors):  # all confident
                                     override_value = OverlapOverrideStatus.CONFIDENT_VS_CLINVAR
 
-            return OverlapState(base_value, has_pending_values, override_value)
+            return OverlapState(base_value, has_pending_values, override_value, lab_groups=involved_labs)
 
     @classmethod
     @abstractmethod

@@ -239,6 +239,17 @@ class Overlap(TimeStampedModel, ReviewableModelMixin, PreviewModelMixin):
     overlap_status_change_timestamp = models.DateTimeField(null=True, blank=True)
     valid = models.BooleanField(default=False)  # if it's cross context but only has contributions from 1 context, or if it's NO_SUBMITTERS it shouldn't be valid
 
+    cached_overlap_state = models.JSONField(default=OverlapState.default_json)
+
+    @property
+    def cached_overlap_state_obj(self) -> OverlapState:
+        print(self.cached_overlap_state)
+        return OverlapState.from_dict(self.cached_overlap_state)
+
+    @cached_overlap_state_obj.setter
+    def cached_overlap_state_obj(self, value: OverlapState):
+        self.cached_overlap_state = value.to_dict()
+
     @property
     def is_active_discordance(self):
         return self.overlap_status.is_discordant and not self.overlap_override_status
@@ -257,11 +268,17 @@ class Overlap(TimeStampedModel, ReviewableModelMixin, PreviewModelMixin):
         return reverse('overlap_3', kwargs={"overlap_id": self.pk})
 
     @property
-    def overlap_state(self):
+    def derived_overlap_state(self):
+        """
+        Cached overlap_state is pure JSON, but dervied does also blend key values
+        It's a bit redundant but cached is used to see if we need to send out notifications
+        whereas the database values and derived are used for rendering
+        """
         return OverlapState(
             status=self.overlap_status,
             has_pending_values=self.has_pending_values,
-            override_status=self.overlap_override_status
+            override_status=self.overlap_override_status,
+            lab_groups=list(sorted(cont.classification_grouping.lab.group_name for cont in self.contributions_list if cont.classification_grouping is not None))
         )
 
     @classmethod
@@ -565,10 +582,7 @@ class OverlapDiscordanceNotification(TimeStampedModel):
 
     @property
     def is_still_relevant(self):
-        if self.old_state_obj.is_active_discordance ^ self.new_state_obj.is_active_discordance:
-            return True
-        # TODO is going from somewhat discordant to more discordant notification worthy?
-        return False
+        return OverlapState.is_notify_relevant(self.old_state_obj, self.new_state_obj)
 
     def __lt__(self, other):
         return self.overlap_id < other.overlap_id

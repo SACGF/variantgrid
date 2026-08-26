@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional
 from dataclasses_json import DataClassJsonMixin
 from django.db.models import TextChoices
@@ -147,6 +147,7 @@ class OverlapState(DataClassJsonMixin):
     status: OverlapStatus
     has_pending_values: bool = False
     override_status: OverlapOverrideStatus = OverlapOverrideStatus.NO_OVERRIDE
+    lab_groups: list[str] = field(default_factory=list)
 
     @property
     def label(self):
@@ -162,3 +163,13 @@ class OverlapState(DataClassJsonMixin):
     @staticmethod
     def default_json():
         return OverlapState(status=OverlapStatus.NO_CONTRIBUTIONS, has_pending_values=False, override_status=OverlapOverrideStatus.NO_OVERRIDE).to_dict()
+
+    @staticmethod
+    def is_notify_relevant(old_state: 'OverlapState', new_state: 'OverlapState') -> bool:
+        if old_state.is_active_discordance ^ new_state.is_active_discordance:
+            return True
+        if new_state.is_active_discordance and set(new_state.lab_groups).difference(old_state.lab_groups):
+            # we are discordant and a new lab(s) has been added to the discordance
+            return True
+        return False
+
