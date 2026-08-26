@@ -2618,6 +2618,15 @@ a.clinical-context {
 	background-image: url(/static/icons/vcf_64.png);
 }
 
+// SequencingRun grid VCF cell - pack icons tightly so rows stay short
+.sequencing-run-vcfs {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 2px;
+	line-height: 1;
+}
+
 .sample-icon {
 	background-image: url(/static/icons/samples_icon.png);
 }

@@ -2279,6 +2279,14 @@ a.clinical-context {
   background-image: url(/static/icons/vcf_64.png);
 }
 
+.sequencing-run-vcfs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  line-height: 1;
+}
+
 .sample-icon {
   background-image: url(/static/icons/samples_icon.png);
 }

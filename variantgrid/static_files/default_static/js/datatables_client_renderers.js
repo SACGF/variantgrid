@@ -179,11 +179,11 @@ function renderSequencingRunVCFs(data, type, row) {
     if (!data || !data.length) {
         return '';
     }
-    const dom = $('<div>');
+    const dom = $('<div>', {class: 'sequencing-run-vcfs'});
     for (const vcf of data) {
         let icon;
         if (vcf.import_status === 'S') {
-            icon = $('<div>', {class: 'left grid-link-icon vcf-icon', title: vcf.variant_caller});
+            icon = $('<div>', {class: 'grid-link-icon vcf-icon', title: vcf.variant_caller});
         } else if (vcf.import_status === 'E') {
             icon = $('<i>', {class: 'fas fa-times-circle text-danger', title: vcf.variant_caller});
         } else if (vcf.import_status === 'C' || vcf.import_status === 'I') {
