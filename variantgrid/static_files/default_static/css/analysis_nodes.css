@@ -38,23 +38,19 @@
 
 path, .jtk-endpoint { cursor:pointer; }
 
-/* z index stuff. windows are at z-index 24. */
+/* z index stuff. windows are at z-index 24.
+   The +/- overlays sit on top of the endpoint dot and connector line they belong to, so they have to
+   outrank both even while those are hovered - otherwise the line covers the icon, the icon loses the
+   hover that raised the line, and the two fight over the cursor. */
 
 .jtk-connector { z-index:18; }
-.jtk-endpoint { z-index:19; }
-.jtk-overlay { z-index:20; }
+.jtk-connector.jtk-hover { z-index:19; }
 
-.jtk-connector.jtk-hover {
-    z-index:21 !important;
-}
+.jtk-endpoint { z-index:20; }
+.jtk-endpoint.jtk-hover { z-index:21; }
 
-.jtk-endpoint.jtk-hover {
-    z-index:22 !important;
-}
-
-.jtk-overlay.jtk-hover {
-    z-index:23 !important;
-}
+.jtk-overlay { z-index:22; }
+.jtk-overlay.jtk-hover { z-index:23; }
 
 
 span.attach-label {
