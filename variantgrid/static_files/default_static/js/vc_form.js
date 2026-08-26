@@ -2298,6 +2298,7 @@ VCForm.format_condition = function(condition_json) {
     if (!condition_json) {
         return $('<span>', {text: "-", class:'no-value'});
     }
+    const MAX_TERM_NAME_LENGTH = 50;
     const termDoms = [];
     if (condition_json.resolved_terms) {
         for (const term of condition_json.resolved_terms) {
@@ -2310,23 +2311,23 @@ VCForm.format_condition = function(condition_json) {
                         href: Urls.ontology_term(term.term_id.replace(':', '_'))
                     }),
                     " ",
-                    $('<span>', {text: term.name, class: 'term-name'})
+                    limitLengthSpan(term.name, MAX_TERM_NAME_LENGTH).addClass('term-name')
                 ]
             }));
         }
     }
     if (condition_json.plain_text_terms) {
         for (const term of condition_json.plain_text_terms) {
-            termDoms.push($('<div>', {text: term, class:'ontology-term free-text semicolon-sep'}));
+            termDoms.push($('<div>', {class:'ontology-term free-text semicolon-sep', html: limitLengthSpan(term, MAX_TERM_NAME_LENGTH)}));
         }
     }
 
     if (!termDoms.length) {
-        return $('<div>', {class: 'ontology-term free-text', text: condition_json.display_text});
+        return $('<div>', {class: 'ontology-term free-text', html: limitLengthSpan(condition_json.display_text, MAX_TERM_NAME_LENGTH)});
     }
 
     const dom = $('<div>');
-    const MAX_VISIBLE_CONDITIONS = 5;
+    const MAX_VISIBLE_CONDITIONS = 3;
     if (termDoms.length > MAX_VISIBLE_CONDITIONS) {
         dom.append(termDoms.slice(0, MAX_VISIBLE_CONDITIONS));
         $('<a>', {

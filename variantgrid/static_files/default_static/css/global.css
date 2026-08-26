@@ -2285,6 +2285,7 @@ a.clinical-context {
   align-items: center;
   gap: 2px;
   line-height: 1;
+  min-width: 106px;
 }
 
 .sample-icon {

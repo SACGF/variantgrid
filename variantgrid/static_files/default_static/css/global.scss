@@ -2625,6 +2625,8 @@ a.clinical-context {
 	align-items: center;
 	gap: 2px;
 	line-height: 1;
+	// stop the auto-width column collapsing to a single icon, which forced one icon per line
+	min-width: 106px;
 }
 
 .sample-icon {
