@@ -54,6 +54,7 @@ class IntegrationStatus:
     url: Optional[str] = None  # link to the records this integration writes
     record_count: Optional[int] = None
     trigger: Optional[IntegrationTrigger] = None
+    dismiss: Optional[IntegrationTrigger] = None  # acknowledges the current error as seen
     warning_age: Optional[timedelta] = None  # feeds the nightly Slack digest
     enabled: bool = True  # renders greyed with a "disabled" badge
     sort_order: int = 0
@@ -64,6 +65,10 @@ class IntegrationStatus:
     @property
     def slug(self) -> str:
         return slugify(self.name)
+
+    @property
+    def triggers(self) -> list[IntegrationTrigger]:
+        return [trigger for trigger in (self.trigger, self.dismiss) if trigger]
 
     @property
     def last_activity(self) -> Optional[datetime]:
@@ -105,11 +110,12 @@ def get_integration_statuses() -> tuple[list[IntegrationStatus], list[str]]:
     return statuses, messages
 
 
-def run_integration_trigger(action_id: str) -> Optional[IntegrationStatus]:
+def run_integration_trigger(action_id: str) -> Optional[tuple[IntegrationStatus, IntegrationTrigger]]:
     """ Re-collects the statuses, finds the one whose trigger matches, calls run() """
     statuses, _ = get_integration_statuses()
     for status in statuses:
-        if (trigger := status.trigger) and trigger.action_id == action_id:
-            trigger.run()
-            return status
+        for trigger in status.triggers:
+            if trigger.action_id == action_id:
+                trigger.run()
+                return status, trigger
     return None

@@ -1,9 +1,12 @@
+from functools import partial
+
 from django.dispatch import receiver
 
 from eventlog.models import IntegrationActivity
 from library.integration_status import (
     IntegrationDetail,
     IntegrationStatus,
+    IntegrationTrigger,
     integration_status_signal,
 )
 
@@ -17,20 +20,30 @@ def integration_status_for_activity(activity: IntegrationActivity, **overrides) 
     ]
     if activity.last_change:
         details.append(IntegrationDetail(label="Last Change", timestamp=activity.last_change))
+    dismiss = None
     if activity.last_error:
-        details.append(IntegrationDetail(
-            label="Last Failure",
-            timestamp=activity.last_error,
-            # a system failing now reads differently from one that failed once and recovered
-            status="danger" if activity.failing else "warning",
-            extra=activity.last_error_message
-        ))
+        if activity.error_acknowledged:
+            # dismissed as seen - keep the timestamp for the record but drop the noise
+            details.append(IntegrationDetail(label="Last Failure", timestamp=activity.last_error,
+                                             status="secondary"))
+        else:
+            details.append(IntegrationDetail(
+                label="Last Failure",
+                timestamp=activity.last_error,
+                # a system failing now reads differently from one that failed once and recovered
+                status="danger" if activity.failing else "warning",
+                extra=activity.last_error_message
+            ))
+            dismiss = IntegrationTrigger(action_id=f"dismiss-error:{activity.key}",
+                                         run=partial(IntegrationActivity.acknowledge_error, activity.key),
+                                         label="Dismiss error")
 
     kwargs = {
         "name": activity.name,
         "key": activity.key,
         "details": details,
         "direction": activity.direction,
+        "dismiss": dismiss,
     }
     kwargs.update(overrides)
     return IntegrationStatus(**kwargs)

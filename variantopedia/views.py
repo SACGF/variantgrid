@@ -185,9 +185,10 @@ def server_status(request):
 
         elif action == 'run-integration':
             action_id = request.POST.get('action_id')
-            if integration := run_integration_trigger(action_id):
+            if matched := run_integration_trigger(action_id):
+                integration, trigger = matched
                 messages.add_message(request, level=messages.INFO,
-                                     message=f"Started {integration.trigger.label} for {integration.name}.")
+                                     message=f"Ran '{trigger.label}' for {integration.name}.")
             else:
                 messages.add_message(request, level=messages.ERROR,
                                      message=f"No integration is registered against '{action_id}'.")

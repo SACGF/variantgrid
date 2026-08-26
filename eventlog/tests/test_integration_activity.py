@@ -82,3 +82,28 @@ class IntegrationActivityStatusReceiverTest(TestCase):
         status = integration_activity_status(sender=None)[0]
         self.assertEqual("Test Integration", status.name)
         self.assertFalse(status.ok)
+        self.assertIsNotNone(status.dismiss)
+
+    def test_dismissed_error_goes_quiet(self):
+        IntegrationActivity.record("test-integration", name="Test Integration",
+                                   status=IntegrationActivityStatus.ERROR, message="HTTP 500")
+        IntegrationActivity.acknowledge_error("test-integration")
+
+        status = integration_activity_status(sender=None)[0]
+        details = {detail.label: detail for detail in status.details}
+        failure = details["Last Failure"]
+        self.assertEqual("secondary", failure.status)
+        self.assertIsNone(failure.extra)
+        self.assertTrue(status.ok)
+        self.assertIsNone(status.dismiss)
+
+    def test_new_error_after_dismissal_shows_again(self):
+        IntegrationActivity.record("test-integration", name="Test Integration",
+                                   status=IntegrationActivityStatus.ERROR, message="HTTP 500")
+        IntegrationActivity.acknowledge_error("test-integration")
+        IntegrationActivity.record("test-integration", name="Test Integration",
+                                   status=IntegrationActivityStatus.ERROR, message="HTTP 400")
+
+        status = integration_activity_status(sender=None)[0]
+        self.assertFalse(status.ok)
+        self.assertIsNotNone(status.dismiss)

@@ -33,7 +33,11 @@ class Command(BaseCommand):
             else:
                 print(f"Created: {filename}")
 
+            hidden = analysis.name in HIDDEN_TEMPLATES
             analysis.template_type = AnalysisTemplateType.TEMPLATE
+            # Hidden templates are for internal use (auto-run for exports) - marking the analysis invisible
+            # keeps them out of AnalysisTemplate.filter_for_user() and thus the analysis templates page
+            analysis.visible = not hidden
             analysis.save()
             add_public_group_read_permission(analysis)
 
@@ -47,11 +51,10 @@ class Command(BaseCommand):
             add_public_group_read_permission(analysis_snapshot)
 
             analysis_name_template = "%(template)s for %(input)s"
-            appears_in_autocomplete = analysis.name not in HIDDEN_TEMPLATES
             AnalysisTemplateVersion.objects.create(template=analysis_template,
                                                    version=1,
                                                    analysis_name_template=analysis_name_template,
                                                    analysis_snapshot=analysis_snapshot,
-                                                   appears_in_autocomplete=appears_in_autocomplete)
+                                                   appears_in_autocomplete=not hidden)
 
             print(f"Created template: {analysis_template}")

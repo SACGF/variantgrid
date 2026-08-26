@@ -78,6 +78,8 @@ class IntegrationActivity(TimeStampedModel):
     last_change = models.DateTimeField(null=True, blank=True)  # last attempt that actually wrote something
     last_error = models.DateTimeField(null=True, blank=True)
     last_error_message = models.TextField(null=True, blank=True)
+    # "seen it" on Server Status - errors after this timestamp show again
+    last_error_acknowledged = models.DateTimeField(null=True, blank=True)
     attempt_count = models.IntegerField(default=0)
     success_count = models.IntegerField(default=0)
     error_count = models.IntegerField(default=0)
@@ -94,6 +96,16 @@ class IntegrationActivity(TimeStampedModel):
         if not self.last_error:
             return False
         return not self.last_success or self.last_error > self.last_success
+
+    @property
+    def error_acknowledged(self) -> bool:
+        if not self.last_error:
+            return False
+        return bool(self.last_error_acknowledged) and self.last_error_acknowledged >= self.last_error
+
+    @classmethod
+    def acknowledge_error(cls, key: str):
+        cls.objects.filter(key=key).update(last_error_acknowledged=timezone.now())
 
     @classmethod
     def _upsert(cls, key: str, name: Optional[str], direction: str, updates: dict):

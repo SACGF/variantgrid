@@ -92,7 +92,9 @@ class IntegrationStatusTriggerTest(TestCase):
         self.runs = []
         self.status = IntegrationStatus(
             name="Alpha",
-            trigger=IntegrationTrigger(action_id="alpha-sync", run=lambda: self.runs.append("ran"))
+            trigger=IntegrationTrigger(action_id="alpha-sync", run=lambda: self.runs.append("ran")),
+            dismiss=IntegrationTrigger(action_id="alpha-dismiss", run=lambda: self.runs.append("dismissed"),
+                                       label="Dismiss error")
         )
 
     def _provider(self, sender, **kwargs):
@@ -100,9 +102,16 @@ class IntegrationStatusTriggerTest(TestCase):
 
     def test_runs_a_registered_action_id(self):
         with temporarily_connected(self._provider):
-            triggered = run_integration_trigger("alpha-sync")
+            triggered, trigger = run_integration_trigger("alpha-sync")
         self.assertEqual(self.status.name, triggered.name)
+        self.assertEqual(self.status.trigger, trigger)
         self.assertEqual(["ran"], self.runs)
+
+    def test_runs_a_registered_dismiss_action_id(self):
+        with temporarily_connected(self._provider):
+            _, trigger = run_integration_trigger("alpha-dismiss")
+        self.assertEqual(self.status.dismiss, trigger)
+        self.assertEqual(["dismissed"], self.runs)
 
     def test_unregistered_action_id_runs_nothing(self):
         with temporarily_connected(self._provider):

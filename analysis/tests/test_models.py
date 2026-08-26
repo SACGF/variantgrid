@@ -4,7 +4,7 @@ from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 from django.utils import timezone
 
-from analysis.models import Analysis, AnalysisLock, GeneListNode, SampleNode, ZygosityNode
+from analysis.models import Analysis, AnalysisLock, AnalysisTemplate, GeneListNode, SampleNode, ZygosityNode
 from annotation.fake_annotation import get_fake_annotation_version
 from library.guardian_utils import assign_permission_to_user_and_groups
 from snpdb.models import (
@@ -54,6 +54,19 @@ class AnalysisModelTestCase(TestCase):
         analysis = Analysis(genome_build=self.grch37)
         analysis.set_defaults_and_save(self.owner_user)
         self.assertEqual(analysis.variant_tag_stale_days, 730)
+
+    def test_invisible_analysis_hides_template_from_lists(self):
+        """ Internal auto-analysis templates (eg cohort VCF export) are hidden from template lists
+            by marking their analysis invisible - permissions delegate to the analysis """
+        analysis = Analysis(genome_build=self.grch37)
+        analysis.set_defaults_and_save(self.owner_user)
+        template = AnalysisTemplate.objects.create(name="test template visibility",
+                                                   user=self.owner_user, analysis=analysis)
+        self.assertIn(template, AnalysisTemplate.filter_for_user(self.owner_user))
+
+        analysis.visible = False
+        analysis.save()
+        self.assertNotIn(template, AnalysisTemplate.filter_for_user(self.owner_user))
 
     def test_locking(self):
         analysis = Analysis(genome_build=self.grch37)

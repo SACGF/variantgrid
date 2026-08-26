@@ -164,6 +164,14 @@
                                     <button type="submit" class="btn btn-sm btn-warning">{{ integration.trigger.label }}</button>
                                 </form>
                             {% endif %}
+                            {% if integration.dismiss %}
+                                <form method="POST" class="d-inline">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="action" value="run-integration" />
+                                    <input type="hidden" name="action_id" value="{{ integration.dismiss.action_id }}" />
+                                    <button type="submit" class="btn btn-sm btn-outline-secondary">{{ integration.dismiss.label }}</button>
+                                </form>
+                            {% endif %}
                         </div>
                     {% endlabelled %}
 
