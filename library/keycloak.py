@@ -2,6 +2,7 @@ import json
 import logging
 import urllib
 from collections.abc import Callable
+from json import JSONDecodeError
 from typing import Optional
 
 import requests
@@ -11,6 +12,7 @@ from requests import Response
 
 from library.constants import MINUTE_SECS
 from library.email import Email
+from library.log_utils import report_message
 from library.oauth import ServerAuth
 from snpdb.models.models import Lab
 from snpdb.models.models_user_settings import UserSettings
@@ -134,9 +136,13 @@ class Keycloak:
             'GET',
             url=f'/admin/realms/{self.realm}/users?{params_str}',
         )
-        if json_response := response.json():
-            return json_response[0]
-        else:
+        try:
+            if json_response := response.json():
+                return json_response[0]
+            else:
+                return None
+        except JSONDecodeError:
+            report_message("KeyCloak Error", level="error", extra_data={"target": response.text})
             return None
 
     def welcome_user(self, user: KeycloakNewUser):
