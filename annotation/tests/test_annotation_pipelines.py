@@ -5,6 +5,7 @@ Covers what the split buys: a supplementary run waits for the VEP run whose rows
 hold up a VCF import, sees SVs too large for VEP, and appears for every existing range lock the moment
 the pipeline is enabled - which is the backfill the issue asked for.
 """
+from datetime import timedelta
 from unittest import mock
 
 from django.contrib.auth.models import User
@@ -20,9 +21,10 @@ from annotation.models.models import AnnotationPipelineVersion, AnnotationRangeL
 from annotation.models.models_enums import AnnotationStatus, VariantAnnotationPipelineType
 from annotation.pipelines import blocking_pipeline_types, enabled_pipeline_types, get_runner
 from annotation.tasks.annotation_scheduler_task import (
+    COUNT_LEASE_PREFIX,
     _dispatchable_runs_qs,
     _handle_variant_annotation_version,
-    count_annotation_run,
+    count_annotation_runs,
 )
 from genes.models_enums import AnnotationConsortium
 from library.utils import execute_cmd
@@ -83,7 +85,10 @@ class AnnotSVPipelineTestCase(TestCase):
         lock = self._make_lock()  # only the two SNVs from setUpTestData
         _sv_run, annotsv_run = self._make_runs(lock)
 
-        count_annotation_run(annotsv_run.pk)
+        token = f"{COUNT_LEASE_PREFIX}test"  # lease it to the count lane, as _dispatch_counts would
+        AnnotationRun.objects.filter(pk=annotsv_run.pk).update(
+            leased_by=token, lease_expires=timezone.now() + timedelta(seconds=60))
+        count_annotation_runs([annotsv_run.pk], token)
 
         annotsv_run.refresh_from_db()
         self.assertEqual(annotsv_run.count, 0)

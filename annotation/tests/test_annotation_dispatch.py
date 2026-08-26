@@ -41,11 +41,13 @@ from annotation.tasks.annotate_variants import (
 from annotation.tasks.annotation_scheduler_task import (
     _IMPORT_RUNNING_STATUSES,
     _VEP_RUNNING_STATUSES,
+    COUNT_LEASE_PREFIX,
+    _dispatch_counts,
     _handle_range_lock,
     _scheduled_pipeline_versions,
     _lane_in_flight_qs,
-    _trigger_counts_for_uncounted_runs,
-    count_annotation_run,
+    _lease_and_launch_run,
+    count_annotation_runs,
     dispatch_annotation_runs,
     reclaim_stalled_annotation_runs,
 )
@@ -71,14 +73,17 @@ class AnnotationDispatchTestCase(TestCase):
         cls.av = AnnotationVersion.objects.create(genome_build=cls.grch37, variant_annotation_version=cls.vav)
 
     # ------------------------------------------------------------------ helpers
-    def _make_lock(self, lo_idx, hi_idx, count, pipeline_types=(STANDARD,), external=False):
-        lock = AnnotationRangeLock.objects.create(version=self.vav,
+    def _make_lock(self, lo_idx, hi_idx, count, pipeline_types=(STANDARD,), external=False,
+                   counted=True, vav=None):
+        """ counted=True stamps `count` onto the runs (as the count lane would have) so the dispatcher's
+            run lanes see them as ready; counted=False leaves them as count-lane candidates. """
+        lock = AnnotationRangeLock.objects.create(version=vav or self.vav,
                                                   min_variant=self.variants[lo_idx],
                                                   max_variant=self.variants[hi_idx],
                                                   count=count)
         for pipeline_type in pipeline_types:
             AnnotationRun.objects.create(annotation_range_lock=lock, pipeline_type=pipeline_type,
-                                         external=external)
+                                         external=external, count=count if counted else None)
         return lock
 
     def _lease(self, annotation_run, attempt_count=1, expires_in=3600):
@@ -87,17 +92,25 @@ class AnnotationDispatchTestCase(TestCase):
         annotation_run.attempt_count = attempt_count
         annotation_run.save()
 
+    def _count_run(self, annotation_run):
+        """ Put a run through the count lane: null any stamped count, lease it to a count token (as
+            _dispatch_counts would) and run the batched count task on it. """
+        AnnotationRun.objects.filter(pk=annotation_run.pk).update(
+            count=None, leased_by=f"{COUNT_LEASE_PREFIX}test",
+            lease_expires=timezone.now() + timedelta(seconds=60))
+        count_annotation_runs([annotation_run.pk], f"{COUNT_LEASE_PREFIX}test")
+
     def _dispatch(self, slots, merge_noop=False):
         """ Run the dispatcher with a fixed VEP pool size; optionally stub merge to isolate leasing.
             Returns the annotate_variants.apply_async (VEP lane) mock for assertions; the
             import_annotation_run.apply_async (import lane) mock is stored on self.import_launch and the
-            count_annotation_run kick mock on self.count_kick. """
+            count_annotation_runs kick mock on self.count_kick. """
         with ExitStack() as stack:
             stack.enter_context(mock.patch.object(annotation_scheduler_task, "annotation_worker_slots",
                                                   return_value=slots))
             launch = stack.enter_context(mock.patch.object(annotate_variants, "apply_async"))
             self.import_launch = stack.enter_context(mock.patch.object(import_annotation_run, "apply_async"))
-            self.count_kick = stack.enter_context(mock.patch.object(count_annotation_run, "apply_async"))
+            self.count_kick = stack.enter_context(mock.patch.object(count_annotation_runs, "apply_async"))
             if merge_noop:
                 stack.enter_context(mock.patch.object(annotation_scheduler_task,
                                                       "merge_pending_range_locks", return_value=0))
@@ -128,7 +141,8 @@ class AnnotationDispatchTestCase(TestCase):
         leased = AnnotationRun.objects.filter(lease_expires__isnull=False)
         self.assertEqual(leased.count(), 2)
         for run in leased:
-            self.assertEqual(run.attempt_count, 1)
+            self.assertEqual(run.dispatch_count, 1)
+            self.assertEqual(run.attempt_count, 0)  # bumped at execution, not dispatch
         # Remaining 3 still pending, un-leased
         self.assertEqual(AnnotationRun.objects.filter(lease_expires__isnull=True).count(), 3)
 
@@ -143,7 +157,8 @@ class AnnotationDispatchTestCase(TestCase):
         AnnotationVersion.objects.create(genome_build=self.grch37, variant_annotation_version=new_vav)
         new_lock = AnnotationRangeLock.objects.create(version=new_vav, min_variant=self.variants[0],
                                                       max_variant=self.variants[1], count=100)
-        new_run = AnnotationRun.objects.create(annotation_range_lock=new_lock, pipeline_type=STANDARD)
+        new_run = AnnotationRun.objects.create(annotation_range_lock=new_lock, pipeline_type=STANDARD,
+                                               count=100)
 
         dispatchable_pks = {v.pk for v in
                             annotation_scheduler_task._dispatchable_variant_annotation_versions()}
@@ -154,14 +169,14 @@ class AnnotationDispatchTestCase(TestCase):
             stack.enter_context(mock.patch.object(annotation_scheduler_task, "annotation_worker_slots",
                                                   return_value=2))
             launch = stack.enter_context(mock.patch.object(annotate_variants, "apply_async"))
-            stack.enter_context(mock.patch.object(count_annotation_run, "apply_async"))
+            stack.enter_context(mock.patch.object(count_annotation_runs, "apply_async"))
             stack.enter_context(mock.patch.object(annotation_scheduler_task,
                                                   "merge_pending_range_locks", return_value=0))
             dispatch_annotation_runs()  # no arg -> beat sweep over all dispatchable versions
 
         launch.assert_any_call((new_run.pk,))
         new_run.refresh_from_db()
-        self.assertEqual(new_run.attempt_count, 1)
+        self.assertEqual(new_run.dispatch_count, 1)
         self.assertIsNotNone(new_run.lease_expires)
 
     @override_settings(ANNOTATION_UPLOAD_WORKER_SLOTS=1)
@@ -177,7 +192,8 @@ class AnnotationDispatchTestCase(TestCase):
         AnnotationVersion.objects.create(genome_build=self.grch37, variant_annotation_version=new_vav)
         created_lock = AnnotationRangeLock.objects.create(version=new_vav, min_variant=self.variants[0],
                                                           max_variant=self.variants[1], count=100)
-        created_run = AnnotationRun.objects.create(annotation_range_lock=created_lock, pipeline_type=STANDARD)
+        created_run = AnnotationRun.objects.create(annotation_range_lock=created_lock, pipeline_type=STANDARD,
+                                                   count=100)
 
         # ACTIVE version (cls.vav, iterated after NEW) carries an upload-only run (past VEP).
         upload_lock = AnnotationRangeLock.objects.create(version=self.vav, min_variant=self.variants[2],
@@ -195,7 +211,7 @@ class AnnotationDispatchTestCase(TestCase):
                                                   return_value=1))  # one VEP slot
             launch = stack.enter_context(mock.patch.object(annotate_variants, "apply_async"))
             import_launch = stack.enter_context(mock.patch.object(import_annotation_run, "apply_async"))
-            stack.enter_context(mock.patch.object(count_annotation_run, "apply_async"))
+            stack.enter_context(mock.patch.object(count_annotation_runs, "apply_async"))
             stack.enter_context(mock.patch.object(annotation_scheduler_task,
                                                   "merge_pending_range_locks", return_value=0))
             dispatch_annotation_runs()  # no arg -> global sweep
@@ -327,7 +343,8 @@ class AnnotationDispatchTestCase(TestCase):
         launch = self._dispatch(slots=2, merge_noop=True)
         launch.assert_called_once()
         run.refresh_from_db()
-        self.assertEqual(run.attempt_count, 2)  # reclaimed -> re-leased (attempt bumped)
+        self.assertEqual(run.attempt_count, 1)  # re-dispatch is not an attempt (bumped at execution)
+        self.assertEqual(run.dispatch_count, 1)
         self.assertIsNotNone(run.lease_expires)
 
     # ------------------------------------------------------------------ run completion kicks dispatcher
@@ -378,60 +395,115 @@ class AnnotationDispatchTestCase(TestCase):
     # ================================================================== #1646 Part 1: count + finish empties
     def test_count_task_finishes_empty_run(self):
         # The fixture holds only SNVs, so an SV run's range is empty - the count task finishes it (no dump).
-        sv_run = self._make_lock(0, 0, count=100, pipeline_types=(STRUCTURAL,)).annotationrun_set.first()
-        count_annotation_run(sv_run.pk)
+        sv_run = self._make_lock(0, 0, count=100, pipeline_types=(STRUCTURAL,),
+                                 counted=False).annotationrun_set.first()
+        self._count_run(sv_run)
         sv_run.refresh_from_db()
         self.assertEqual(sv_run.count, 0)
         self.assertEqual(sv_run.status, AnnotationStatus.FINISHED)
         self.assertTrue(sv_run.is_empty_finished)
+        self.assertIsNone(sv_run.leased_by)  # count lease released on the way out
 
     def test_count_task_fills_nonempty_count(self):
-        std_run = self._make_lock(0, 2, count=100, pipeline_types=(STANDARD,)).annotationrun_set.first()
-        count_annotation_run(std_run.pk)
+        std_run = self._make_lock(0, 2, count=100, pipeline_types=(STANDARD,),
+                                  counted=False).annotationrun_set.first()
+        self._count_run(std_run)
         std_run.refresh_from_db()
         self.assertEqual(std_run.count, 3)  # variants 0,1,2 in range
         self.assertEqual(std_run.status, AnnotationStatus.CREATED)  # non-empty - stays pending
+        self.assertIsNone(std_run.leased_by)  # count lease released on the way out
 
-    def test_count_task_skips_leased_run(self):
-        # Guarded update: a run the dispatcher already leased must not be touched by a late count task.
-        sv_run = self._make_lock(0, 0, count=100, pipeline_types=(STRUCTURAL,)).annotationrun_set.first()
+    def test_count_task_skips_run_leased_to_someone_else(self):
+        # Guarded update: a run the dispatcher leased (or another count batch holds) must not be touched
+        # by a count task that no longer owns it - and its lease must be left alone.
+        sv_run = self._make_lock(0, 0, count=100, pipeline_types=(STRUCTURAL,),
+                                 counted=False).annotationrun_set.first()
         self._lease(sv_run)
-        count_annotation_run(sv_run.pk)
+        count_annotation_runs([sv_run.pk], f"{COUNT_LEASE_PREFIX}stale-token")
         sv_run.refresh_from_db()
         self.assertIsNone(sv_run.count)
         self.assertEqual(sv_run.status, AnnotationStatus.CREATED)
+        self.assertEqual(sv_run.leased_by, "worker")  # not ours to clear
 
     def test_count_task_skips_run_with_no_range_lock(self):
         # #1647: the lock can be cleared after the task is kicked (reset_annotation_states, or a
         # retry-created run awaiting its lock). The count task must skip it rather than crash.
-        run = self._make_lock(0, 0, count=100, pipeline_types=(STRUCTURAL,)).annotationrun_set.first()
+        run = self._make_lock(0, 0, count=100, pipeline_types=(STRUCTURAL,),
+                              counted=False).annotationrun_set.first()
         AnnotationRun.objects.filter(pk=run.pk).update(annotation_range_lock=None)
-        count_annotation_run(run.pk)  # must not raise
+        self._count_run(run)  # must not raise
         run.refresh_from_db()
         self.assertIsNone(run.count)
         self.assertEqual(run.status, AnnotationStatus.CREATED)
+        self.assertIsNone(run.leased_by)  # lease still released
 
-    def test_count_kick_targets_uncounted_runs_only(self):
-        uncounted = self._make_lock(0, 0, count=100).annotationrun_set.first()
-        counted = self._make_lock(1, 1, count=100).annotationrun_set.first()
-        counted.count = 5
-        counted.save()
-        with mock.patch.object(count_annotation_run, "apply_async") as kick:
-            _trigger_counts_for_uncounted_runs(self.vav)
-        kicked = {c.args[0][0] for c in kick.call_args_list}
-        self.assertEqual(kicked, {uncounted.pk})
+    def test_count_lane_targets_uncounted_runs_only(self):
+        uncounted = self._make_lock(0, 0, count=100, counted=False).annotationrun_set.first()
+        self._make_lock(1, 1, count=100)  # counted - not a count-lane candidate
+        with mock.patch.object(count_annotation_runs, "apply_async") as kick:
+            _dispatch_counts(self.vav, timezone.now())
+        kick.assert_called_once()
+        run_ids, token = kick.call_args.args[0]
+        self.assertEqual(run_ids, [uncounted.pk])
+        self.assertTrue(token.startswith(COUNT_LEASE_PREFIX))
+
+    def test_count_lane_leases_batch_and_hands_out_once(self):
+        # The batch is leased before it is handed out, so a second sweep in the same window (there were
+        # ~250/minute in the #720 AnnotSV outage) hands out nothing - the flood is structurally impossible.
+        runs = [self._make_lock(i, i, count=100, counted=False).annotationrun_set.first()
+                for i in range(3)]
+        now = timezone.now()
+        with mock.patch.object(count_annotation_runs, "apply_async") as kick:
+            _dispatch_counts(self.vav, now)
+            _dispatch_counts(self.vav, now)
+        kick.assert_called_once()
+        run_ids, token = kick.call_args.args[0]
+        self.assertEqual(set(run_ids), {run.pk for run in runs})
+        for run in runs:
+            run.refresh_from_db()
+            self.assertEqual(run.leased_by, token)
+            self.assertIsNotNone(run.lease_expires)
+
+    def test_expired_count_lease_is_cleared_not_failed(self):
+        # A count lease is not a run attempt: reclaim clears an expired one even when attempt_count is
+        # exhausted, and never resets the run.
+        run = self._make_lock(0, 0, count=100, counted=False).annotationrun_set.first()
+        run.leased_by = f"{COUNT_LEASE_PREFIX}dead-worker"
+        run.lease_expires = timezone.now() - timedelta(seconds=1)
+        run.attempt_count = 3  # would be failed out if this counted as a run attempt
+        run.save()
+        reclaim_stalled_annotation_runs(self.vav)
+        run.refresh_from_db()
+        self.assertEqual(run.status, AnnotationStatus.CREATED)
+        self.assertIsNone(run.leased_by)
+        self.assertIsNone(run.lease_expires)
+        self.assertEqual(run.attempt_count, 3)  # untouched
+        self.assertIsNone(run.count)  # still a count-lane candidate
+
+    def test_count_lease_does_not_consume_vep_budget(self):
+        # A count-leased batch occupies one db_worker, not VEP slots - with a whole batch out, the VEP
+        # lane must still dispatch counted pending runs (the leased batch itself is held back).
+        counting = self._make_lock(0, 0, count=100, counted=False).annotationrun_set.first()
+        counting.leased_by = f"{COUNT_LEASE_PREFIX}in-flight"
+        counting.lease_expires = timezone.now() + timedelta(seconds=60)
+        counting.save()
+        ready = self._make_lock(1, 1, count=100).annotationrun_set.first()
+        launch = self._dispatch(slots=1, merge_noop=True)
+        launch.assert_called_once()
+        self.assertEqual(launch.call_args_list[0].args[0][0], ready.pk)
 
     def test_dispatcher_kicks_counts_even_at_zero_capacity(self):
         # The dispatcher is the reliable count driver - it must fire even when saturated (capacity 0),
         # on db_workers, so a busy system still closes empty runs.
-        uncounted = self._make_lock(0, 0, count=100).annotationrun_set.first()
+        uncounted = self._make_lock(0, 0, count=100, counted=False).annotationrun_set.first()
         self._dispatch(slots=0, merge_noop=True)
-        kicked = {c.args[0][0] for c in self.count_kick.call_args_list}
-        self.assertIn(uncounted.pk, kicked)
+        self.count_kick.assert_called_once()
+        run_ids, _token = self.count_kick.call_args.args[0]
+        self.assertIn(uncounted.pk, run_ids)
 
     def test_empty_finished_run_not_dispatched(self):
         lock = self._make_lock(0, 0, count=100, pipeline_types=(STANDARD, STRUCTURAL))
-        count_annotation_run(lock.annotationrun_set.get(pipeline_type=STRUCTURAL).pk)  # SV -> empty finished
+        self._count_run(lock.annotationrun_set.get(pipeline_type=STRUCTURAL))  # SV -> empty finished
         launch = self._dispatch(slots=4, merge_noop=True)
         launch.assert_called_once()  # only the STANDARD run launches
         self.assertEqual(launch.call_args_list[0].args[0][0],
@@ -441,7 +513,7 @@ class AnnotationDispatchTestCase(TestCase):
         # Mergeability ignores empty-finished SV runs - locks still combine on their live STANDARD runs.
         locks = [self._make_lock(i, i, count=100, pipeline_types=(STANDARD, STRUCTURAL)) for i in range(3)]
         for lock in locks:
-            count_annotation_run(lock.annotationrun_set.get(pipeline_type=STRUCTURAL).pk)
+            self._count_run(lock.annotationrun_set.get(pipeline_type=STRUCTURAL))
         merged = merge_pending_range_locks(self.vav, batch_max=1000)
         self.assertEqual(merged, 2)  # 3 -> 1
         survivor = AnnotationRangeLock.objects.get(version=self.vav)
@@ -475,7 +547,7 @@ class AnnotationDispatchTestCase(TestCase):
         std_run = survivor.annotationrun_set.get(pipeline_type=STANDARD)
         std_run.count = 1  # counted non-empty
         std_run.save()
-        count_annotation_run(survivor.annotationrun_set.get(pipeline_type=STRUCTURAL).pk)  # SV -> empty finished
+        self._count_run(survivor.annotationrun_set.get(pipeline_type=STRUCTURAL))  # SV -> empty finished
         absorbed = self._make_lock(1, 1, count=100, pipeline_types=(STANDARD, STRUCTURAL))
         _absorb_range_lock(survivor, absorbed)
         sv_run = survivor.annotationrun_set.get(pipeline_type=STRUCTURAL)
@@ -485,9 +557,9 @@ class AnnotationDispatchTestCase(TestCase):
         self.assertIsNone(std_run.count)  # stale count nulled for re-count
 
     # ================================================================== #1646 Part 2: resume upload-only
-    def _make_past_vep_run(self, lo_idx=0, annotated_filename="/tmp/fake.vep_annotated.vcf.gz"):
+    def _make_past_vep_run(self, lo_idx=0, annotated_filename="/tmp/fake.vep_annotated.vcf.gz", vav=None):
         """ A run that has completed VEP (annotated VCF present) but not yet uploaded. """
-        lock = self._make_lock(lo_idx, lo_idx, count=100)
+        lock = self._make_lock(lo_idx, lo_idx, count=100, vav=vav)
         run = lock.annotationrun_set.first()
         run.dump_start = run.dump_end = timezone.now()
         run.dump_count = 100
@@ -496,11 +568,16 @@ class AnnotationDispatchTestCase(TestCase):
         run.save()
         return run
 
-    def test_reclaim_resumes_upload_only_for_past_vep_run(self):
+    def _real_annotated_file(self):
+        """ An annotated VCF that actually exists - import_annotation_run re-checks the file on disk at
+            execution time, so tests that execute the import task need a real one. """
         with tempfile.NamedTemporaryFile(suffix=".vcf.gz", delete=False) as tf:
             annotated_filename = tf.name
         self.addCleanup(lambda: os.path.exists(annotated_filename) and os.remove(annotated_filename))
+        return annotated_filename
 
+    def test_reclaim_resumes_upload_only_for_past_vep_run(self):
+        annotated_filename = self._real_annotated_file()
         run = self._make_past_vep_run(annotated_filename=annotated_filename)
         run.upload_start = timezone.now()  # died mid-upload -> UPLOAD_STARTED
         run.save()
@@ -561,7 +638,7 @@ class AnnotationDispatchTestCase(TestCase):
 
     def test_import_annotation_run_imports_and_signals(self):
         # #1649: import_annotation_run bulk-loads the annotated VCF and sends the complete signal once.
-        run = self._make_past_vep_run()
+        run = self._make_past_vep_run(annotated_filename=self._real_annotated_file())
         self.assertEqual(run.status, AnnotationStatus.ANNOTATION_COMPLETED)
         with mock.patch.object(VEPRunner, "import_results") as import_mock, \
              mock.patch("annotation.tasks.annotate_variants.annotation_run_complete_signal") as signal, \
@@ -765,10 +842,7 @@ class AnnotationDispatchTestCase(TestCase):
     def test_reclaimed_import_run_relaunches_on_import_lane(self):
         # A stalled import-phase run is reclaimed to ANNOTATION_COMPLETED (annotated file kept) and
         # re-launched on the import lane next cycle - not the VEP lane.
-        with tempfile.NamedTemporaryFile(suffix=".vcf.gz", delete=False) as tf:
-            annotated_filename = tf.name
-        self.addCleanup(lambda: os.path.exists(annotated_filename) and os.remove(annotated_filename))
-        run = self._make_past_vep_run(annotated_filename=annotated_filename)
+        run = self._make_past_vep_run(annotated_filename=self._real_annotated_file())
         run.upload_start = timezone.now()  # died mid-import -> UPLOAD_STARTED
         run.save()
         self._lease(run, attempt_count=1, expires_in=-1)  # expired lease
@@ -779,4 +853,89 @@ class AnnotationDispatchTestCase(TestCase):
         launch.assert_not_called()  # not the VEP lane
         self.import_launch.assert_called_once()
         self.assertEqual(self.import_launch.call_args_list[0].args[0][0], run.pk)
-        self.assertEqual(run.attempt_count, 2)  # reclaimed -> re-leased
+        self.assertEqual(run.attempt_count, 1)  # re-dispatch is not an attempt (bumped at execution)
+
+    # ================================================================== over-committed dispatch fixes
+    def _make_new_vav(self):
+        """ A second dispatchable version on the same build (latest NEW, alongside the ACTIVE cls.vav). """
+        kwargs = get_fake_vep_version(self.grch37, AnnotationConsortium.REFSEQ, 2)
+        kwargs["status"] = VariantAnnotationVersion.Status.NEW
+        new_vav = VariantAnnotationVersion.objects.create(**kwargs)
+        AnnotationVersion.objects.create(genome_build=self.grch37, variant_annotation_version=new_vav)
+        return new_vav
+
+    @override_settings(ANNOTATION_UPLOAD_WORKER_SLOTS=2)
+    def test_per_vav_kick_budgets_import_capacity_globally(self):
+        # The bug behind the AnnotSV import-lane stall: the per-completion kick budgeted capacity per-VAV,
+        # so each version saw the full pool minus only its own in-flight and collectively over-committed
+        # it. With the global budget already filled by another version's in-flight imports, a kick for
+        # this version must launch nothing.
+        other_vav = self._make_new_vav()
+        for i in range(2):  # fill the whole global import budget from the other version
+            self._lease(self._make_past_vep_run(lo_idx=i, vav=other_vav))
+        self._make_past_vep_run(lo_idx=3)  # waiting on cls.vav
+        self._dispatch(slots=4, merge_noop=True)  # per-completion path: dispatch_annotation_runs(vav.pk)
+        self.import_launch.assert_not_called()
+
+    def test_lease_and_launch_run_is_atomic(self):
+        # The conditional lease loses (returns False, launches nothing) when the run was leased, locked,
+        # or changed status between the dispatcher's read and the lease write.
+        now = timezone.now()
+        with mock.patch.object(annotate_variants, "apply_async") as launch, \
+                mock.patch.object(import_annotation_run, "apply_async") as import_launch:
+            already_leased = self._make_lock(0, 0, count=100).annotationrun_set.first()
+            self._lease(already_leased)
+            self.assertFalse(_lease_and_launch_run(already_leased, "dispatch:test", now))
+
+            locked = self._make_lock(1, 1, count=100).annotationrun_set.first()
+            AnnotationRun.objects.filter(pk=locked.pk).update(task_id="some-task")
+            self.assertFalse(_lease_and_launch_run(locked, "dispatch:test", now))
+
+            moved_on = self._make_lock(2, 2, count=100).annotationrun_set.first()  # read as CREATED...
+            AnnotationRun.objects.filter(pk=moved_on.pk).update(status=AnnotationStatus.FINISHED)
+            self.assertFalse(_lease_and_launch_run(moved_on, "dispatch:test", now))
+
+            launch.assert_not_called()
+            import_launch.assert_not_called()
+
+            fresh = self._make_lock(3, 3, count=100).annotationrun_set.first()
+            self.assertTrue(_lease_and_launch_run(fresh, "dispatch:test", now))
+            launch.assert_called_once()
+        fresh.refresh_from_db()
+        self.assertEqual(fresh.dispatch_count, 1)
+        self.assertEqual(fresh.attempt_count, 0)
+
+    def test_stale_import_task_is_noop_on_finished_run(self):
+        # Shape 1 of the AnnotSV outage: the run was double-dispatched, the first import succeeded and
+        # cleanup removed the annotated file. The second, still-queued task must be a silent no-op -
+        # no FileNotFoundError, no error_exception - with the lock released.
+        run = self._make_past_vep_run(annotated_filename="/does/not/exist.vep_annotated.vcf.gz")
+        run.upload_start = run.upload_end = timezone.now()
+        run.annotated_count = 100
+        run.save()
+        self.assertEqual(run.status, AnnotationStatus.FINISHED)
+        with mock.patch.object(VEPRunner, "import_results") as import_mock, \
+             mock.patch("annotation.tasks.annotate_variants.annotation_run_complete_signal") as signal, \
+             mock.patch("annotation.tasks.annotate_variants._trigger_dispatch"):
+            import_annotation_run.apply((run.pk,)).get()
+        import_mock.assert_not_called()   # no second import
+        signal.send.assert_not_called()
+        run.refresh_from_db()
+        self.assertIsNone(run.error_exception)
+        self.assertEqual(run.status, AnnotationStatus.FINISHED)
+        self.assertIsNone(run.task_id)    # lock released
+        self.assertIsNone(run.lease_expires)
+
+    def test_attempt_count_bumped_by_execution_not_dispatch(self):
+        run = self._make_lock(0, 0, count=100).annotationrun_set.first()
+        launch = self._dispatch(slots=1, merge_noop=True)
+        launch.assert_called_once()
+        run.refresh_from_db()
+        self.assertEqual(run.dispatch_count, 1)
+        self.assertEqual(run.attempt_count, 0)  # queued, not yet executed - no retry budget burned
+        with mock.patch.object(VEPRunner, "annotate"), \
+             mock.patch.object(VariantAnnotationVersion, "get_annotation_run_blocker", return_value=None), \
+             mock.patch("annotation.tasks.annotate_variants._trigger_dispatch"):
+            annotate_variants.apply((run.pk,)).get()
+        run.refresh_from_db()
+        self.assertEqual(run.attempt_count, 1)  # bumped exactly once, when the task took its lock

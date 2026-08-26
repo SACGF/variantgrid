@@ -182,7 +182,7 @@ def dump_external_annotation_runs(variant_annotation_version: VariantAnnotationV
         annotation_run = AnnotationRun.objects.create(annotation_range_lock=range_lock,
                                                       pipeline_type=pipeline_type, external=True)
         # If already counted off-thread (AnnotationRun.count, #1646), reject a too-small run before dumping.
-        # A counted run here is always non-empty (count_annotation_run finishes count==0 runs itself).
+        # A counted run here is always non-empty (the count lane finishes count==0 runs itself).
         if annotation_run.count is not None and annotation_run.count < min_variants:
             _revert_too_small_run(annotation_run, annotation_run.count, min_variants, reverted)
             continue
@@ -268,7 +268,7 @@ def dump_existing_annotation_runs(variant_annotation_version: VariantAnnotationV
 
         annotation_run = AnnotationRun.objects.get(pk=pk)
         # If already counted off-thread (AnnotationRun.count, #1646), reject a too-small run before dumping.
-        # A counted run here is always non-empty (count_annotation_run finishes count==0 runs itself).
+        # A counted run here is always non-empty (the count lane finishes count==0 runs itself).
         if annotation_run.count is not None and annotation_run.count < min_variants:
             _revert_too_small_run(annotation_run, annotation_run.count, min_variants, reverted)
             continue

@@ -1163,7 +1163,10 @@ class AnnotationRun(TimeStampedModel):
     # worker's run be reclaimed. task_id remains the in-annotate_variants execution lock.
     leased_by = models.CharField(max_length=64, null=True)  # worker/dispatch id holding the lease
     lease_expires = models.DateTimeField(null=True)  # for dead-worker reclaim
-    attempt_count = models.IntegerField(default=0)  # bounded retries before giving up
+    attempt_count = models.IntegerField(default=0)  # executions that reached a worker; bounds retries
+    # dispatches (lease + task launch). Unbounded and diagnostic only: dispatch_count pulling far ahead
+    # of attempt_count means tasks are being queued but never consumed - a broken or starved queue.
+    dispatch_count = models.IntegerField(default=0)
     # External annotation (#1568): set by the annotation_external --dump command. The normal scheduler /
     # annotate_variants skip these so VEP is never auto-run on a run the operator is managing externally.
     external = models.BooleanField(default=False)
@@ -1191,7 +1194,7 @@ class AnnotationRun(TimeStampedModel):
     # #1701: VEP's --skipped_variants_file for this attempt - one row per record VEP deliberately dropped,
     # which the import lane counts against dump_count to catch a silently truncated annotated VCF
     vep_skipped_variants_filename = models.TextField(null=True)
-    # #1646: variants to process, pre-counted off-thread by count_annotation_run (null until counted;
+    # #1646: variants to process, pre-counted off-thread by count_annotation_runs (null until counted;
     # 0 finishes an empty run without a dump). Reset to null when a merge grows the range lock.
     count = models.IntegerField(null=True)
     dump_count = models.IntegerField(null=True)

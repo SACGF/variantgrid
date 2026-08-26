@@ -81,6 +81,12 @@ ANNOTATION_MAX_RUN_ATTEMPTS = 3
 # (~7 beats/window) so a transient DB/process stall doesn't falsely reclaim a live run.
 ANNOTATION_RUN_LEASE_SECONDS = 900
 ANNOTATION_RUN_LEASE_HEARTBEAT_SECONDS = 120
+# Lease window for the count lane (#1646): the dispatcher leases a batch of uncounted runs to one
+# count_annotation_runs task (~15s of work for a full batch, no heartbeat). Kept well under
+# ANNOTATION_RUN_LEASE_SECONDS because a live count lease briefly holds its runs out of the VEP lane -
+# a dead count worker should release them quickly. Expiry is harmless: reclaim just clears the lease
+# (a count lease is never a run attempt).
+ANNOTATION_COUNT_LEASE_SECONDS = 300
 ANNOTATION_VEP_ARGS = []
 ANNOTATION_VEP_VERSION = "116"
 ANNOTATION_VEP_BASE_DIR = os.path.join(ANNOTATION_BASE_DIR, "VEP")

@@ -37,7 +37,7 @@ from annotation.tasks.annotate_variants import (
     import_annotation_run,
 )
 from annotation.tasks.annotation_scheduler_task import (
-    count_annotation_run,
+    count_annotation_runs,
     dispatch_annotation_runs,
     has_free_disk_for_annotation,
 )
@@ -201,7 +201,8 @@ class AnnotationDiskGateTestCase(TestCase):
     def _make_run(self, lo_idx, hi_idx, status=AnnotationStatus.CREATED):
         lock = AnnotationRangeLock.objects.create(version=self.vav, min_variant=self.variants[lo_idx],
                                                   max_variant=self.variants[hi_idx], count=100)
-        run = AnnotationRun.objects.create(annotation_range_lock=lock, pipeline_type=STANDARD)
+        # count stamped as the count lane would have, so the run is ready for the run lanes
+        run = AnnotationRun.objects.create(annotation_range_lock=lock, pipeline_type=STANDARD, count=100)
         if status == AnnotationStatus.ANNOTATION_COMPLETED:
             now = timezone.now()  # past VEP, waiting on the import lane
             run.dump_start = now - timedelta(minutes=5)
@@ -225,7 +226,7 @@ class AnnotationDiskGateTestCase(TestCase):
                                   return_value=self._disk_usage(free_gigs)), \
                 mock.patch.object(annotate_variants, "apply_async") as vep_launch, \
                 mock.patch.object(import_annotation_run, "apply_async") as import_launch, \
-                mock.patch.object(count_annotation_run, "apply_async"):
+                mock.patch.object(count_annotation_runs, "apply_async"):
             dispatch_annotation_runs(self.vav.pk)
         return vep_launch, import_launch
 
