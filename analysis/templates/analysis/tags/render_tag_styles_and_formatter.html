@@ -1,7 +1,10 @@
 {% load user_tag_color_tags %}
 <style>
     .grid-tag .user-tag-colored {
+        margin: 2px;
         padding: 2px;
+        display: inline-block;
+        white-space: nowrap;
     }
 
     {% render_rgb_css 'tagged-' user_tag_styles %}

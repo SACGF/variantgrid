@@ -677,6 +677,7 @@ span.node-counts {
     margin: 2px;
     padding: 2px;
     display: inline-block;
+    white-space: nowrap;
     cursor: pointer;
 }
 
