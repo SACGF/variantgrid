@@ -787,6 +787,11 @@ li.error::before {
   background-size: 16px 16px;
 }
 
+.grid-link-icon.scs-tier_1_or_2 {
+  font-size: 10px;
+  letter-spacing: -0.5px;
+}
+
 .icon24 {
   width: 24px;
   height: 24px;
@@ -2654,47 +2659,47 @@ a .c-hgvs-body .c-hgvs-nomen {
   color: #555;
   font-weight: 600;
 }
-.c-pill.scs-none, .c-pill.cs-none {
+.c-pill.scs-none, .node-chip.scs-none, .grid-link-icon.scs-none, .c-pill.cs-none, .node-chip.cs-none, .grid-link-icon.cs-none {
   border: none !important;
   background-color: #eeeeee;
 }
-.c-pill.scs-tier_1 {
+.c-pill.scs-tier_1, .node-chip.scs-tier_1, .grid-link-icon.scs-tier_1 {
   background-color: #ffcccc;
 }
-.c-pill.scs-tier_1_or_2 {
+.c-pill.scs-tier_1_or_2, .node-chip.scs-tier_1_or_2, .grid-link-icon.scs-tier_1_or_2 {
   background-color: #ffd5d5;
 }
-.c-pill.scs-tier_2 {
+.c-pill.scs-tier_2, .node-chip.scs-tier_2, .grid-link-icon.scs-tier_2 {
   background-color: #ffdddd;
 }
-.c-pill.scs-tier_3 {
+.c-pill.scs-tier_3, .node-chip.scs-tier_3, .grid-link-icon.scs-tier_3 {
   background-color: #dddddd;
 }
-.c-pill.scs-tier_4 {
+.c-pill.scs-tier_4, .node-chip.scs-tier_4, .grid-link-icon.scs-tier_4 {
   background-color: #ccccff;
 }
-.c-pill.cs-b {
+.c-pill.cs-b, .node-chip.cs-b, .grid-link-icon.cs-b {
   background-color: #ccccff;
 }
-.c-pill.cs-lb {
+.c-pill.cs-lb, .node-chip.cs-lb, .grid-link-icon.cs-lb {
   background-color: #ddddff;
 }
-.c-pill.cs-r, .c-pill cs-dr {
+.c-pill.cs-r, .node-chip.cs-r, .grid-link-icon.cs-r, .c-pill cs-dr, .node-chip cs-dr, .grid-link-icon cs-dr {
   background-color: #eeeeee;
 }
-.c-pill.cs-vus, .c-pill.cs-vus_a, .c-pill.cs-vus_b, .c-pill.cs-vus_c {
+.c-pill.cs-vus, .node-chip.cs-vus, .grid-link-icon.cs-vus, .c-pill.cs-vus_a, .node-chip.cs-vus_a, .grid-link-icon.cs-vus_a, .c-pill.cs-vus_b, .node-chip.cs-vus_b, .grid-link-icon.cs-vus_b, .c-pill.cs-vus_c, .node-chip.cs-vus_c, .grid-link-icon.cs-vus_c {
   background-color: #dddddd;
 }
-.c-pill.cs-lp, .c-pill.cs-lo {
+.c-pill.cs-lp, .node-chip.cs-lp, .grid-link-icon.cs-lp, .c-pill.cs-lo, .node-chip.cs-lo, .grid-link-icon.cs-lo {
   background-color: #ffdddd;
 }
-.c-pill.cs-p, .c-pill.cs-o {
+.c-pill.cs-p, .node-chip.cs-p, .grid-link-icon.cs-p, .c-pill.cs-o, .node-chip.cs-o, .grid-link-icon.cs-o {
   background-color: #ffcccc;
 }
-.c-pill.cs-pending {
+.c-pill.cs-pending, .node-chip.cs-pending, .grid-link-icon.cs-pending {
   background: repeating-linear-gradient(-45deg, #ddd, #ddd 10px, #eee 10px, #eee 20px);
 }
-.c-pill.cs-withdrawn {
+.c-pill.cs-withdrawn, .node-chip.cs-withdrawn, .grid-link-icon.cs-withdrawn {
   opacity: 0.5;
 }
 

@@ -2087,10 +2087,20 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
 
     @staticmethod
     def get_classifications_qs(user: User, clinical_significance_list: Iterable[str] = None,
-                               lab_list: Iterable[Lab] = None) -> QuerySet:
-        cm_qs = ClassificationModification.latest_for_user(user, published=True)
+                               lab_list: Iterable[Lab] = None,
+                               somatic_clinical_significance_list: Iterable[str] = None,
+                               allele_origin_buckets: Optional[set[AlleleOriginBucket]] = None) -> QuerySet:
+        """ clinical_significance_list / somatic_clinical_significance_list are ORed together - a
+            record matches if either its germline or somatic clinical significance is in its list """
+        cm_qs = ClassificationModification.latest_for_user(user, published=True,
+                                                           allele_origin_buckets=allele_origin_buckets)
+        cs_q = Q()
         if clinical_significance_list:
-            cm_qs = cm_qs.filter(clinical_significance__in=clinical_significance_list)
+            cs_q |= Q(clinical_significance__in=clinical_significance_list)
+        if somatic_clinical_significance_list:
+            cs_q |= Q(classification__summary__somatic__clinical_significance__in=list(somatic_clinical_significance_list))
+        if cs_q:
+            cm_qs = cm_qs.filter(cs_q)
         qs = Classification.objects.filter(pk__in=cm_qs.values('classification'))
         if lab_list:
             qs = qs.filter(lab__in=lab_list)
@@ -2099,10 +2109,14 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
     @staticmethod
     def get_variant_q(user: User, genome_build: GenomeBuild,
                       clinical_significance_list: Iterable[str] = None,
-                      lab_list: Iterable[Lab] = None) -> Q:
+                      lab_list: Iterable[Lab] = None,
+                      somatic_clinical_significance_list: Iterable[str] = None,
+                      allele_origin_buckets: Optional[set[AlleleOriginBucket]] = None) -> Q:
         """ returns a Q object filtering variants to those with a PUBLISHED classification
             (optionally classification in clinical_significance_list """
-        vc_qs = Classification.get_classifications_qs(user, clinical_significance_list, lab_list)
+        vc_qs = Classification.get_classifications_qs(user, clinical_significance_list, lab_list,
+                                                      somatic_clinical_significance_list=somatic_clinical_significance_list,
+                                                      allele_origin_buckets=allele_origin_buckets)
         return Classification.get_variant_q_from_classification_qs(vc_qs, genome_build)
 
     @staticmethod

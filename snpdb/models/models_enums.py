@@ -82,7 +82,8 @@ class BuiltInFilters:
     OMIM = "O"
     IMPACT_HIGH_OR_MODERATE = 'I'
     CLASSIFIED = 'G'  # G = for Genomic Variant Classification
-    CLASSIFIED_PATHOGENIC = 'P'
+    CLASSIFIED_PATHOGENIC = 'P'  # Germline LP/P
+    CLASSIFIED_TIER_1_2 = 'S'  # Somatic Tier I/II
     COSMIC = 'M'  # cosMic
 
     FILTER_CHOICES = [
@@ -92,6 +93,7 @@ class BuiltInFilters:
         (IMPACT_HIGH_OR_MODERATE, 'High or Mod impact'),
         (CLASSIFIED, 'Classified'),
         (CLASSIFIED_PATHOGENIC, 'Classified Pathogenic'),
+        (CLASSIFIED_TIER_1_2, 'Classified Tier I/II'),
         (COSMIC, 'COSMIC')]
     CHOICES = [(TOTAL, 'Total')] + FILTER_CHOICES
     COLORS = [(TOTAL, "#000000"),
@@ -100,6 +102,7 @@ class BuiltInFilters:
               (IMPACT_HIGH_OR_MODERATE, "#aaaaff"),
               (CLASSIFIED, "#7c26cb"),
               (CLASSIFIED_PATHOGENIC, "#Ff008b"),
+              (CLASSIFIED_TIER_1_2, "#cc99cc"),
               (COSMIC, "#14559f")]
     DEFAULT_NODE_COUNT_FILTERS = [TOTAL, IMPACT_HIGH_OR_MODERATE, CLINVAR]
 
@@ -186,7 +189,7 @@ class AlleleOriginFilterDefault(models.TextChoices):
     @property
     def buckets(self) -> set[AlleleOriginBucket]:
         if self == AlleleOriginFilterDefault.SHOW_ALL:
-            return {AlleleOriginBucket.values}
+            return set(AlleleOriginBucket)
         elif self == AlleleOriginFilterDefault.GERMLINE:
             return {AlleleOriginBucket.GERMLINE, AlleleOriginBucket.UNKNOWN}
         elif self == AlleleOriginFilterDefault.SOMATIC:

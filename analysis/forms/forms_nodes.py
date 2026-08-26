@@ -4,7 +4,7 @@ from dal import forward
 from django import forms
 from django.db.models import Q
 from django.forms.models import fields_for_model
-from django.forms.widgets import HiddenInput, TextInput
+from django.forms.widgets import HiddenInput, RadioSelect, TextInput
 from django.utils.text import slugify
 
 from analysis import models
@@ -243,7 +243,10 @@ class ClassificationsNodeForm(BaseNodeForm):
 
     class Meta:
         model = ClassificationsNode
-        fields = ('lab', 'other', 'benign', 'likely_benign', 'vus', 'likely_pathogenic', 'pathogenic')
+        fields = ('lab', 'allele_origin',
+                  'other', 'benign', 'likely_benign', 'vus', 'likely_pathogenic', 'pathogenic',
+                  'tier_1', 'tier_2', 'tier_3', 'tier_4')
+        widgets = {'allele_origin': RadioSelect()}
 
     def save(self, commit=True):
         node = super().save(commit=False)

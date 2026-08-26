@@ -103,6 +103,8 @@ COLUMN_VCF_INFO: tuple[VCFInfoColumnDef, ...] = (
     VCFInfoColumnDef('IMPACT', 'impact', VCFInfoTypes.STRING, 'Impact'),
     VCFInfoColumnDef('INTERNAL_CLINSIG', 'internally_classified', VCFInfoTypes.STRING, 'Internally Classified'),
     VCFInfoColumnDef('INTERNAL_CLINSIG_MAX', 'max_internal_classification', VCFInfoTypes.STRING, 'Max Internal Classification'),
+    VCFInfoColumnDef('INTERNAL_SOMATIC_CLINSIG', 'internally_classified_somatic', VCFInfoTypes.STRING, 'Internally Classified (Somatic)'),
+    VCFInfoColumnDef('INTERNAL_SOMATIC_CLINSIG_MAX', 'max_internal_somatic_classification', VCFInfoTypes.STRING, 'Max Internal Somatic Classification'),
     VCFInfoColumnDef('INTERPRO_DOMAIN', 'interpro_domain', VCFInfoTypes.STRING, 'InterPro domain'),
     VCFInfoColumnDef('LOF_TOOL', 'loftool', VCFInfoTypes.FLOAT, 'LOF Tool'),
     VCFInfoColumnDef('Mastermind_MMCNT1', 'mastermind_count_1_cdna', VCFInfoTypes.INTEGER, "Count of <a href='https://www.genomenon.com/cvr/'>Mastermind</a> articles with cDNA matches for this specific variant", number=1),

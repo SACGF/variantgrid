@@ -479,6 +479,44 @@ class ClinicalSignificance:
         return d
 
 
+class SomaticClinicalSignificance:
+    """ Values of the 'somatic:clinical_significance' EvidenceKey (AMP tiers) that code needs to reference
+        directly - the authoritative option list lives on the EvidenceKey record """
+    TIER_1 = "tier_1"
+    TIER_1_OR_2 = "tier_1_or_2"
+    TIER_2 = "tier_2"
+    TIER_3 = "tier_3"
+    TIER_4 = "tier_4"
+
+    CHOICES = [
+        (TIER_1, "Tier I"),
+        (TIER_1_OR_2, "Tier I/II"),
+        (TIER_2, "Tier II"),
+        (TIER_3, "Tier III"),
+        (TIER_4, "Tier IV"),
+    ]
+    LABELS = dict(CHOICES)
+
+    SHORT_CHOICES = [
+        (TIER_1, "I"),
+        (TIER_1_OR_2, "I/II"),
+        (TIER_2, "II"),
+        (TIER_3, "III"),
+        (TIER_4, "IV"),
+    ]
+    SHORT_LABELS = dict(SHORT_CHOICES)
+
+    TIER_1_AND_2_VALUES = [TIER_1, TIER_1_OR_2, TIER_2]
+    """ Tiers of strong/potential clinical significance - the somatic analogue of germline LP/P """
+
+    @staticmethod
+    def css_class(somatic_clinical_significance: Optional[str]) -> str:
+        """ Class for the .c-pill.scs-* rules in global.scss """
+        if somatic_clinical_significance in SomaticClinicalSignificance.LABELS:
+            return f"scs-{somatic_clinical_significance}"
+        return "scs-none"
+
+
 class CriteriaEvaluation:
     NOT_MET = CRITERIA_NOT_MET
     NOT_APPLICABLE = CRITERIA_NOT_APPLICABLE

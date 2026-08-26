@@ -1,5 +1,6 @@
 from django.contrib.auth.models import User
-from django.db.models import Max, OuterRef, Q, StringAgg, Subquery, TextField, Value
+from django.db.models import F, Max, OuterRef, Q, StringAgg, Subquery, TextField, Value
+from django.db.models.fields.json import KeyTextTransform, KeyTransform
 from django.db.models.functions import Cast, Coalesce, Concat, TruncDate
 
 from analysis.models import VariantTag
@@ -56,10 +57,19 @@ def get_custom_column_fields_override_and_sample_position(custom_columns_collect
                                     "locus__position",
                                     "clinvar__highest_pathogenicity",
                                     "clinvar__clinical_significance"]
-    for field in ID_FORMATTER_REQUIRED_FIELDS:
+    # These come from get_variantgrid_extra_annotate rather than the model, so mark them as
+    # annotations so they end up in the colmodel (for detailsLink) but not the values() queryset
+    ID_FORMATTER_REQUIRED_ANNOTATIONS = ["internally_classified",
+                                         "max_internal_classification",
+                                         "internally_classified_somatic",
+                                         "max_internal_somatic_classification"]
+    for field in ID_FORMATTER_REQUIRED_FIELDS + ID_FORMATTER_REQUIRED_ANNOTATIONS:
         if field not in fields:
             fields.append(field)
-            ov = override.get(field, {})
+            if field in ID_FORMATTER_REQUIRED_ANNOTATIONS:
+                ov = get_overrides([field], [{}], model_field=False, queryset_field=False)[field]
+            else:
+                ov = override.get(field, {})
             ov["hidden"] = True
             override[field] = ov
 
@@ -67,10 +77,20 @@ def get_custom_column_fields_override_and_sample_position(custom_columns_collect
 
 
 def get_variantgrid_extra_annotate(user: User, exclude_analysis=None) -> dict:
-    classification_qs = ClassificationModification.latest_for_user(user).filter(classification__allele__variantallele__variant_id=OuterRef("id")).order_by("pk")  # So comma sep fields line up
-    internally_classified = classification_qs.annotate(cs=Coalesce("classification__clinical_significance", Value('U'))).values("classification__allele").annotate(cs_summary=StringAgg("cs", delimiter=Value('|'))).values_list("cs_summary")
-    internally_classified_labs = classification_qs.annotate(cln=Coalesce("classification__lab__name", Value(''))).values("classification__allele").annotate(c_lab=StringAgg("cln", delimiter=Value('|'))).values_list("c_lab")
-    max_internal_classification = classification_qs.annotate(cs=Coalesce("classification__clinical_significance", Value('0'))).values("classification__allele").annotate(cs_max=Max("classification__clinical_significance")).values_list("cs_max")
+    # Ordering must be cleared before the .values() grouping - ordered columns get added to GROUP BY,
+    # which would split the per-allele aggregates into one group per record. The StringAgg order_by
+    # keeps the parallel '|' separated fields lining up
+    classification_qs = ClassificationModification.latest_for_user(user).filter(classification__allele__variantallele__variant_id=OuterRef("id")).order_by()
+    by_allele = classification_qs.values("classification__allele")
+    internally_classified = by_allele.annotate(cs_summary=StringAgg(Coalesce("classification__clinical_significance", Value('U')), delimiter=Value('|'), order_by="pk")).values_list("cs_summary")
+    internally_classified_labs = by_allele.annotate(c_lab=StringAgg(Coalesce("classification__lab__name", Value('')), delimiter=Value('|'), order_by="pk")).values_list("c_lab")
+    max_internal_classification = by_allele.annotate(cs_max=Max("classification__clinical_significance")).values_list("cs_max")
+
+    somatic_cs = KeyTextTransform("clinical_significance", KeyTransform("somatic", "classification__summary"))
+    internally_classified_somatic = by_allele.annotate(scs_summary=StringAgg(Coalesce(somatic_cs, Value('U'), output_field=TextField()), delimiter=Value('|'), order_by="pk")).values_list("scs_summary")
+    # Somatic tiers don't sort lexically (tier_1_or_2 between tier_1/tier_2) so take the value of the
+    # highest summary sort score rather than Max
+    max_internal_somatic_classification = classification_qs.annotate(scs=somatic_cs).exclude(scs__isnull=True).order_by(F("classification__summary__somatic__sort").desc(nulls_last=True)).values_list("scs")
 
     tags_qs = VariantTag.filter_for_user(user).filter(allele__variantallele__variant_id=OuterRef("id"))
     if exclude_analysis:
@@ -84,5 +104,7 @@ def get_variantgrid_extra_annotate(user: User, exclude_analysis=None) -> dict:
         "internally_classified": Subquery(internally_classified[:1]),
         "internally_classified_labs": Subquery(internally_classified_labs[:1]),
         "max_internal_classification": Subquery(max_internal_classification[:1]),
+        "internally_classified_somatic": Subquery(internally_classified_somatic[:1]),
+        "max_internal_somatic_classification": Subquery(max_internal_somatic_classification[:1]),
         "tags_global": Subquery(tags_global[:1]),
     }

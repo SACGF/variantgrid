@@ -905,6 +905,11 @@ li.error::before {
 	background-size: 16px 16px;
 }
 
+.grid-link-icon.scs-tier_1_or_2 {
+	font-size: 10px;
+	letter-spacing: -0.5px;
+}
+
 .icon24 {
 	width: 24px;
 	height: 24px;
@@ -3061,7 +3066,11 @@ a .c-hgvs-body {
 		//	padding-right: 2px;
 		//}
 	}
+}
 
+// Clinical significance colours - shared by classification pills, analysis node chips and the
+// analysis grid classification boxes
+.c-pill, .node-chip, .grid-link-icon {
 	&.scs-none, &.cs-none {
 		border: none !important;
 		background-color: #eeeeee;

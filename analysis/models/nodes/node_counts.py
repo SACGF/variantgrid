@@ -6,7 +6,7 @@ from django.db.models.query_utils import Q
 
 from annotation.models import AnnotationVersion, GeneAnnotation
 from annotation.models.damage_enums import PathogenicityImpact
-from classification.enums import ClinicalSignificance
+from classification.enums import ClinicalSignificance, SomaticClinicalSignificance
 from classification.models import Classification
 from snpdb.models.models_enums import BuiltInFilters
 
@@ -25,11 +25,16 @@ def get_extra_filters_q(user: User, annotation_version: AnnotationVersion, extra
         q = Q(clinvar__highest_pathogenicity__gte=4)
     elif extra_filters == BuiltInFilters.OMIM:
         q = get_omim_q(annotation_version)
-    elif extra_filters in [BuiltInFilters.CLASSIFIED, BuiltInFilters.CLASSIFIED_PATHOGENIC]:
+    elif extra_filters in [BuiltInFilters.CLASSIFIED, BuiltInFilters.CLASSIFIED_PATHOGENIC,
+                           BuiltInFilters.CLASSIFIED_TIER_1_2]:
         clinical_significance_list = None
+        somatic_clinical_significance_list = None
         if extra_filters == BuiltInFilters.CLASSIFIED_PATHOGENIC:
             clinical_significance_list = [ClinicalSignificance.LIKELY_PATHOGENIC, ClinicalSignificance.PATHOGENIC]
-        q = Classification.get_variant_q(user, annotation_version.genome_build, clinical_significance_list)
+        elif extra_filters == BuiltInFilters.CLASSIFIED_TIER_1_2:
+            somatic_clinical_significance_list = SomaticClinicalSignificance.TIER_1_AND_2_VALUES
+        q = Classification.get_variant_q(user, annotation_version.genome_build, clinical_significance_list,
+                                         somatic_clinical_significance_list=somatic_clinical_significance_list)
     elif extra_filters == BuiltInFilters.IMPACT_HIGH_OR_MODERATE:
         q = Q(variantannotation__impact__in=(PathogenicityImpact.HIGH, PathogenicityImpact.MODERATE))
     elif extra_filters == BuiltInFilters.COSMIC:

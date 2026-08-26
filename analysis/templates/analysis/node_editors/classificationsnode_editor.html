@@ -2,29 +2,89 @@
 
 {% block docreadyjs %}
     ajaxForm($("form#classifications-node-form"));
+
+    function updatePillToggles() {
+        $("#classifications-node-form label.pill-toggle").each(function() {
+            $(this).toggleClass("unchecked", !$("input", this).prop("checked"));
+        });
+    }
+    $("#classifications-node-form label.pill-toggle input").change(updatePillToggles);
+    updatePillToggles();
+
+    function updateSignificanceRows() {
+        const alleleOrigin = $("#classifications-node-form input[name='allele_origin']:checked").val();
+        $("#germline-significances").toggle(alleleOrigin !== 'S');
+        $("#somatic-significances").toggle(alleleOrigin !== 'G');
+    }
+    $("#classifications-node-form input[name='allele_origin']").change(updateSignificanceRows);
+    updateSignificanceRows();
 {% endblock docreadyjs %}
 
 {% block content %}
 <style>
-#classifications-node-form input {
-    margin: 0px 5px 0px 5px;
+#classification-node-form-widgets .significance-pills {
+    margin: 4px 0;
+    white-space: nowrap;
 }
 
-
-#classification-node-form-widgets label:not(:first-of-type):before {
-            color: #bbbbbb;
-            content: "|";
-            margin-left: 4px;
-            margin-right: 4px;
+#classification-node-form-widgets .significance-pills .row-label {
+    display: inline-block;
+    width: 70px;
+    font-weight: 600;
+    color: #666;
 }
 
+#classification-node-form-widgets label.pill-toggle {
+    width: auto;
+    min-width: 42px;
+    padding: 2px 8px;
+    margin: 0 2px;
+    cursor: pointer;
+    user-select: none;
+}
 
+#classification-node-form-widgets label.pill-toggle input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+#classification-node-form-widgets label.pill-toggle.unchecked {
+    opacity: 0.35;
+}
 </style>
 <div>
 	<form id="classifications-node-form" method="post" action="{{ request.path }}">
         {% csrf_token %}
             <div id="classification-node-form-widgets">
-                {{ form }}
+                <div id="allele-origin-toggle" style="display: inline-block">
+                    <div class="btn-group btn-group-toggle" data-toggle="buttons">
+                        {% for radio in form.allele_origin %}
+                            <label class="btn btn-sm btn-outline-secondary allele-origin-{{ radio.data.value }}{% if radio.data.selected %} focus active{% endif %}">
+                                {{ radio.tag }} {{ radio.choice_label }}
+                            </label>
+                        {% endfor %}
+                    </div>
+                </div>
+                <div id="germline-significances" class="significance-pills">
+                    <span class="row-label">Germline:</span>
+                    <label class="c-pill pill-toggle cs-none" title="Other">{{ form.other }}O</label>
+                    <label class="c-pill pill-toggle cs-b" title="Benign">{{ form.benign }}B</label>
+                    <label class="c-pill pill-toggle cs-lb" title="Likely Benign">{{ form.likely_benign }}LB</label>
+                    <label class="c-pill pill-toggle cs-vus" title="VUS">{{ form.vus }}VUS</label>
+                    <label class="c-pill pill-toggle cs-lp" title="Likely Pathogenic">{{ form.likely_pathogenic }}LP</label>
+                    <label class="c-pill pill-toggle cs-p" title="Pathogenic">{{ form.pathogenic }}P</label>
+                </div>
+                <div id="somatic-significances" class="significance-pills">
+                    <span class="row-label">Somatic:</span>
+                    <label class="c-pill pill-toggle scs-tier_1" title="Tier I (includes Tier I/II records)">{{ form.tier_1 }}Tier I</label>
+                    <label class="c-pill pill-toggle scs-tier_2" title="Tier II (includes Tier I/II records)">{{ form.tier_2 }}Tier II</label>
+                    <label class="c-pill pill-toggle scs-tier_3" title="Tier III">{{ form.tier_3 }}Tier III</label>
+                    <label class="c-pill pill-toggle scs-tier_4" title="Tier IV">{{ form.tier_4 }}Tier IV</label>
+                </div>
+                <div>
+                    {{ form.lab }}
+                </div>
             </div>
             <div>
     		  <b>Last Saved:</b> {{ node.modified }}
