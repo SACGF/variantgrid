@@ -2,13 +2,13 @@ import json
 import logging
 import urllib
 from collections.abc import Callable
-from json import JSONDecodeError
 from typing import Optional
 
 import requests
 from django.conf import settings
 from django.contrib.auth.models import User
 from requests import Response
+from simplejson import JSONDecodeError
 
 from library.constants import MINUTE_SECS
 from library.email import Email
