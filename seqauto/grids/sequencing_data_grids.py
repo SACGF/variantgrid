@@ -44,7 +44,7 @@ class ExperimentColumns(DatatableConfig[Experiment]):
 
     def get_initial_queryset(self) -> QuerySet[Experiment]:
         queryset = Experiment.objects.all()
-        return queryset.annotate(sequencing_runs=StringAgg("sequencingrun", Value(','), output_field=TextField()))
+        return queryset.annotate(sequencing_runs=StringAgg("sequencingrun", Value(', '), output_field=TextField()))
 
 
 class SequencingRunColumns(DatatableConfig[SequencingRun]):
