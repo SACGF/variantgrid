@@ -115,6 +115,15 @@ function getOntologyTermLinks(term_type, term_list, getUrl) {
 }
 
 
+// DataTables renderer - bind the term_type, e.g. ontologyTermsRenderer.bind(null, 'HP')
+function ontologyTermsRenderer(term_type, data, type, row) {
+    if (type !== 'display') {
+        return data ? data.split('|').join(', ') : '';
+    }
+    return getOntologyTermLinks(term_type, data);
+}
+
+
 // This needs to be set in document.ready()
 // '.ontology-terms-container .collapsed-term'
 function expandCollapsedOntologyTerm() {

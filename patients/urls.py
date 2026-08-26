@@ -5,7 +5,7 @@ from library.django_utils.jqgrid_view import JQGridView
 from patients import views, views_autocomplete
 from patients.grids import (
     ExtractionColumns,
-    PatientListGrid,
+    PatientListColumns,
     PatientOntologyGenesGrid,
     PatientRecordColumns,
     PatientRecordsColumns,
@@ -62,7 +62,8 @@ urlpatterns = [
     path('phenotypes_matches', views.phenotypes_matches, name='phenotypes_matches'),
 
     # Grids
-    path('patient/grid/<slug:op>/', JQGridView.as_view(grid=PatientListGrid, delete_row=True), name='patient_grid'),
+    path('patient/datatables/', DatabaseTableView.as_view(column_class=PatientListColumns),
+         name='patient_datatables'),
     path('patient_records/datatables/', DatabaseTableView.as_view(column_class=PatientRecordsColumns),
          name='patient_records_datatables'),
     path('patient_record/datatables/', DatabaseTableView.as_view(column_class=PatientRecordColumns),

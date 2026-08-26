@@ -1,4 +1,5 @@
 from functools import partial
+from typing import Optional
 
 from django.db.models import QuerySet, StringAgg, TextField, Value
 from django.db.models.aggregates import Count
@@ -8,7 +9,6 @@ from django.shortcuts import get_object_or_404
 from django.urls import reverse
 
 from annotation.models.models_phenotype_match import PATIENT_ONTOLOGY_TERM_PATH
-from library.jqgrid.jqgrid_user_row_config import JqGridUserRowConfig
 from library.utils import JsonDataType
 from ontology.grids import AbstractOntologyGenesGrid
 from ontology.models import OntologyService, OntologyTerm
@@ -20,76 +20,91 @@ from snpdb.models import Sample
 from snpdb.views.datatable_view import CellData, DatatableConfig, RichColumn, SortOrder
 
 
-class PatientListGrid(JqGridUserRowConfig):
-    model = Patient
-    caption = 'Patients'
-    fields = ["id", "patient_code", "external_pk__code", "family_code", "phenotype", "modified",
-              "affected", "consanguineous"]
-    colmodel_overrides = {
-        'id': {'width': 20, 'formatter': 'viewPatientLink'},
-        'patient_code': {'label': 'Patient Code'},
+def _render_optional_boolean(row: CellData) -> Optional[str]:
+    """ affected/consanguineous are nullable - unknown shows as blank rather than 'no' """
+    if row.value is None:
+        return None
+    return "Yes" if row.value else "No"
+
+
+class PatientListColumns(DatatableConfig[Patient]):
+    """ The ontology term columns are aggregated per patient, so filtering to a single term still shows
+        every term that patient has """
+    search_box_enabled = True
+    download_csv_button_enabled = True
+
+    FILTER_FIELDS = {
+        "first_name": "first_name__icontains",
+        "last_name": "last_name__icontains",
+        "sex": "sex",
+        "family_code": "family_code__icontains",
+        "phenotype": "phenotype__icontains",
     }
 
-    def __init__(self, **kwargs):
-        user = kwargs.get("user")
-        extra_filters = kwargs.pop("extra_filters", {})
-        super().__init__(user)
-        queryset = Patient.filter_for_user(user)
-        if extra_filters:
-            term_type = extra_filters["term_type"]
-            value = extra_filters["value"]
+    def __init__(self, request: HttpRequest):
+        super().__init__(request)
 
-            # We need to filter to a sub patients list NOT just to certain terms, so that StringAgg will
-            # return all the terms for that person
-            if term_type in ('HP', 'OMIM', 'MONDO', 'HGNC'):
-                ontology_service = OntologyService(term_type)
-                ontology_term = OntologyTerm.objects.get(name=value, ontology_service=ontology_service)
-                patient_id_q = Q(**{PATIENT_ONTOLOGY_TERM_PATH: ontology_term})
-            else:
-                msg = f"Unknown term type '{term_type}'"
-                raise ValueError(msg)
-
-            patient_id_qs = Patient.objects.filter(patient_id_q).values_list("pk", flat=True)
-            queryset = queryset.filter(pk__in=patient_id_qs)
-
-        ontology_path = f"{PATIENT_ONTOLOGY_TERM_PATH}__name"
-        q_hpo = Q(**{f"{PATIENT_ONTOLOGY_TERM_PATH}__ontology_service": OntologyService.HPO})
-        q_omim = Q(**{f"{PATIENT_ONTOLOGY_TERM_PATH}__ontology_service": OntologyService.OMIM})
-        q_mondo = Q(**{f"{PATIENT_ONTOLOGY_TERM_PATH}__ontology_service": OntologyService.MONDO})
-        q_hgnc = Q(**{f"{PATIENT_ONTOLOGY_TERM_PATH}__ontology_service": OntologyService.HGNC})
-        # Add sample_count to queryset
-        annotation_kwargs = {"reference_id": StringAgg("specimen__reference_id", Value(','),
-                                                       distinct=True, output_field=TextField()),
-                             "hpo": StringAgg(ontology_path, Value('|'),
-                                              filter=q_hpo, distinct=True, output_field=TextField()),
-                             "omim": StringAgg(ontology_path, Value('|'),
-                                               filter=q_omim, distinct=True, output_field=TextField()),
-                             "mondo": StringAgg(ontology_path, Value('|'),
-                                                filter=q_mondo, distinct=True, output_field=TextField()),
-                             "hgnc": StringAgg(ontology_path, Value('|'),
-                                               filter=q_hgnc, distinct=True, output_field=TextField()),
-                             "sample_count": Count("sample", distinct=True),
-                             "samples": StringAgg("sample__name", Value(", "), distinct=True, output_field=TextField())}
-        queryset = queryset.annotate(**annotation_kwargs)
-        field_names = self.get_field_names() + list(annotation_kwargs.keys())
-        self.queryset = queryset.values(*field_names)
-
-        self.extra_config.update({'sortname': 'modified',
-                                  'sortorder': 'desc'})
-
-    def get_colmodels(self, remove_server_side_only=False):
-        colmodels = super().get_colmodels(remove_server_side_only=remove_server_side_only)
-        EXTRA_COLUMNS = [
-            {'index': 'reference_id', 'name': 'reference_id', 'label': 'Specimen ReferenceIDs'},
-            {'index': 'hpo', 'name': 'hpo', 'label': 'HPO', 'classes': 'no-word-wrap', 'formatter': 'hpoFormatter'},
-            {'index': 'omim', 'name': 'omim', 'label': 'OMIM', 'classes': 'no-word-wrap', 'formatter': 'omimFormatter'},
-            {'index': 'mondo', 'name': 'mondo', 'label': 'MONDO', 'classes': 'no-word-wrap', 'formatter': 'mondoFormatter'},
-            {'index': 'hgnc', 'name': 'hgnc', 'label': 'Genes', 'classes': 'no-word-wrap', 'formatter': 'hgncFormatter'},
-            {'index': 'sample_count', 'name': 'sample_count', 'label': '# samples', 'sorttype': 'int', 'width': '30px'},
-            {'index': 'samples', 'name': 'samples', 'label': 'Samples'},
+        self.rich_columns = [
+            RichColumn('id', search=False, visible=False),
+            RichColumn('patient_code', label='Patient', orderable=True, extra_columns=['id'],
+                       renderer=partial(_render_patient_link, patient_id_column='id'),
+                       client_renderer='TableFormat.linkUrl'),
+            RichColumn('external_pk__code', label='External ID', orderable=True),
+            RichColumn('family_code', label='Family Code', orderable=True),
+            RichColumn('phenotype', orderable=True, client_renderer='TableFormat.limit.bind(null, 200)'),
+            RichColumn('affected', orderable=True, search=False, renderer=_render_optional_boolean),
+            RichColumn('consanguineous', orderable=True, search=False, renderer=_render_optional_boolean),
+            RichColumn('reference_id', label='Specimen Reference IDs', orderable=True),
+            RichColumn('hpo', label='HPO', orderable=True, search=False, css_class='ontology-terms',
+                       client_renderer="ontologyTermsRenderer.bind(null, 'HP')"),
+            RichColumn('omim', label='OMIM', orderable=True, search=False, css_class='ontology-terms',
+                       client_renderer="ontologyTermsRenderer.bind(null, 'OMIM')"),
+            RichColumn('mondo', label='MONDO', orderable=True, search=False, css_class='ontology-terms',
+                       client_renderer="ontologyTermsRenderer.bind(null, 'MONDO')"),
+            RichColumn('hgnc', label='Genes', orderable=True, search=False, css_class='ontology-terms',
+                       client_renderer="ontologyTermsRenderer.bind(null, 'HGNC')"),
+            RichColumn('sample_count', label='# Samples', orderable=True, search=False, css_class='num'),
+            RichColumn('samples', orderable=True),
+            RichColumn('modified', orderable=True, search=False, default_sort=SortOrder.DESC,
+                       client_renderer='TableFormat.timestamp'),
+            RichColumn('id', name='delete', label='', orderable=False, search=False,
+                       renderer=self.render_delete, client_renderer='TableFormat.deleteRow'),
         ]
-        colmodels.extend(EXTRA_COLUMNS)
-        return colmodels
+
+    def get_initial_queryset(self) -> QuerySet[Patient]:
+        """ Samples carry their VCF's permissions rather than their patient's, so the count/names are of the
+            samples this user can see rather than of every sample linked to the patient """
+        ontology_path = f"{PATIENT_ONTOLOGY_TERM_PATH}__name"
+
+        def ontology_terms(ontology_service: OntologyService) -> StringAgg:
+            q_service = Q(**{f"{PATIENT_ONTOLOGY_TERM_PATH}__ontology_service": ontology_service})
+            return StringAgg(ontology_path, Value('|'), filter=q_service, distinct=True, output_field=TextField())
+
+        visible_samples_q = Q(sample__in=Sample.filter_for_user(self.user))
+        return Patient.filter_for_user(self.user).annotate(
+            reference_id=StringAgg("specimen__reference_id", Value(','), distinct=True, output_field=TextField()),
+            hpo=ontology_terms(OntologyService.HPO),
+            omim=ontology_terms(OntologyService.OMIM),
+            mondo=ontology_terms(OntologyService.MONDO),
+            hgnc=ontology_terms(OntologyService.HGNC),
+            sample_count=Count("sample", filter=visible_samples_q, distinct=True),
+            samples=StringAgg("sample__name", Value(", "), filter=visible_samples_q, distinct=True,
+                              output_field=TextField()),
+        )
+
+    def filter_queryset(self, qs: QuerySet[Patient]) -> QuerySet[Patient]:
+        if term_type := self.get_query_param("term_type"):
+            term_name = self.get_query_param("term")
+            ontology_term = OntologyTerm.objects.get(name=term_name, ontology_service=OntologyService(term_type))
+            # Filter to a sub patients list NOT just to certain terms, so that StringAgg will
+            # return all the terms for that person
+            patient_id_qs = Patient.objects.filter(**{PATIENT_ONTOLOGY_TERM_PATH: ontology_term})
+            qs = qs.filter(pk__in=patient_id_qs.values_list("pk", flat=True))
+
+        for param, field in self.FILTER_FIELDS.items():
+            if value := self.get_query_param(param):
+                qs = qs.filter(**{field: value})
+        return qs
 
 
 class PatientRecordsColumns(DatatableConfig[PatientRecords]):

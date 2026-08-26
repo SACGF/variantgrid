@@ -25,14 +25,6 @@
         float: left;
     }
 
-    .patient-description {
-        background-image: url({% static 'icons/typewriter.jpeg' %});
-    }
-
-    .grid-link {
-        float: left;
-    }
-
     #jump-forms {
         float: left;
         width: 350px;
@@ -54,8 +46,8 @@
         display: inline-block;
     }
 
-    td.no-word-wrap {
-        white-space: normal !important;
+    td.ontology-terms {
+        white-space: normal;
     }
     #patient-header a + a {
         padding-left: 10px;
@@ -77,35 +69,31 @@
     {% endif %}
 </style>
 <script>
-ignoreAutcompleteChangeEvent = false;
-gridExtraFilters = {};
-filterFields = {};
+const PATIENT_TABLE = "#patient-datatable";
+let ignoreAutcompleteChangeEvent = false;
+let termFilter = null;
+let filterFields = {};
 
-function changeFilter(field, op, data) {
-    let grid = $("#patient-grid");
-    if (field) {
-        filterFields[field] = {field : field, op: op, data: data};
+function patientDatatableFilter(data) {
+    if (termFilter) {
+        data.term_type = termFilter.term_type;
+        data.term = termFilter.term;
     }
-
-    let rules = []
-    for (let r in filterFields) {
-        let rule = filterFields[r];
-        let data = rule['data'];
-        if (data) {
-            rules.push(rule);
-        }
-    }
-    if (rules.length) {
-        let f = {groupOp:"AND", rules: rules};
-        $.extend(grid[0].p.postData,{filters:JSON.stringify(f)});
-        grid[0].p.search = true;
-    } else {
-        let f = {};
-        grid[0].p.search = false;
-    }
-    grid.trigger("reloadGrid",[{page:1,current:true}]);
+    Object.assign(data, filterFields);
 }
 
+function reloadPatientTable() {
+    $(PATIENT_TABLE).DataTable().ajax.reload();
+}
+
+function changeFilter(field, value) {
+    if (value) {
+        filterFields[field] = value;
+    } else {
+        delete filterFields[field];
+    }
+    reloadPatientTable();
+}
 
 function showCreatePatientForm() {
     $("#new-patient-link").hide();
@@ -116,21 +104,8 @@ function resetGrid() {
     $("#grid-filter-message").hide();
     clearAutoCompletes();
     filterFields = {};
-    gridExtraFilters = {};
-    changeFilter();
-}
-
-function getExtraFilters() {
-    let extraFilters = '';
-    if (gridExtraFilters) {
-        extraFilters = JSON.stringify(gridExtraFilters);
-    }
-    return extraFilters;
-}
-
-function filterGrid(extra_filters) {
-    gridExtraFilters = extra_filters;
-    $("#patient-grid").trigger("reloadGrid");
+    termFilter = null;
+    reloadPatientTable();
 }
 
 function clearAutoCompletes(leave_autcomplete_term_type) {
@@ -159,12 +134,12 @@ function filterPatientGrid(term_type, value, leave_autcomplete_term_type) {
         let url = Urls.ontology_term_text(term_type, value);
         msgBox.html("Filtering grid to <span class='" + term_type.toLowerCase() + "'><a href='" + url + "' target='_blank'>" + value + "</a></span>... <a href='javascript:resetGrid()'>show all</a>");
         msgBox.show();
-        filterGrid({'term_type' : term_type, 'value' : value });
+        termFilter = {term_type: term_type, term: value};
+        reloadPatientTable();
     } else {
         msgBox.html("Error: could not search on <span class='" + term_type.toLowerCase() + "'> value='" + value + "'</span>... <a href='javascript:resetGrid()'>show all</a>");
         msgBox.show();
     }
-
 
     clearAutoCompletes(leave_autcomplete_term_type);
 }
@@ -183,70 +158,12 @@ function plotlyOMIMClickHandler(data) {
     filterPatientGridFromBarClick('OMIM', data);
 }
 
-function getTermLinks(term_type, term_list) {
-    let links = '';
-    if (term_list) {
-        let terms = term_list.split('|');
-        for (let i=0 ; i<terms.length ; ++i) {
-            let term = terms[i];
-            links += "<span class='grid-term-link " + term_type + "' title='" + term + "' term='" + term + "' term_type='" + term_type + "'>" + term + "</span>";
-        }
-    }
-    return links;
-}
-
-function patients_grid_complete() {
-    let grid = $("#patient-grid");
-    grid[0].p.postData["extra_filters"] = getExtraFilters;
-
-    $(".grid-term-link:not(.collapsed-term)").each(function() {
-        $(this).click(function() {
-            console.log("clickedy clicked");
-            let term_type = $(this).attr("term_type");
-            let value = $(this).attr("term");
-            filterPatientGrid(term_type, value)
-        });
-    });
-}
-
 $(document).ready(function() {
-    jQuery.extend($.fn.fmatter, {
-        viewPatientLink: function (patientId) {
-            const VIEW_PATIENT_URL = Urls.view_patient(patientId);
-            return "<a class='grid-link' href='" + VIEW_PATIENT_URL + "'><div class='grid-link-icon view-details-link'></div></a>";
-        },
-        showDescriptionSymbol: function (description, options, rowObject) {
-            let descriptionSymbol = '';
-            if (typeof description !== 'undefined' && description && description.length > 0) {
-                const VIEW_PATIENT_URL = Urls.view_patient(rowObject.id);
-                descriptionSymbol = "<a class='grid-link' href='" + VIEW_PATIENT_URL + "'><div title='' class='grid-link-icon patient-description'></div></a>";
-            }
-            return descriptionSymbol;
-        },
-        hpoFormatter: function (phenotype_terms) {
-            return getOntologyTermLinks('HP', phenotype_terms);
-        },
-        omimFormatter: function (omim_terms) {
-            return getOntologyTermLinks('OMIM', omim_terms);
-        },
-        mondoFormatter: function (mondo_terms) {
-            return getOntologyTermLinks('MONDO', mondo_terms);
-        },
-        hgncFormatter: function (genes) {
-            return getOntologyTermLinks('HGNC', genes);
-        },
-    });
-
-    // This is made in getOntologyTermLinks
-    // have to do this on document then delegate as they won't be there until grid renders column
+    // The term links and collapsed groups are made as the table draws, so delegate from the document
     $(document).on('click', '.ontology-terms-container .collapsed-term', expandCollapsedOntologyTerm);
-
-
-    function resetForm() {
-        $("form#patient-form").each(function () {
-            this.reset()
-        });
-    }
+    $(document).on('click', '.grid-term-link:not(.collapsed-term)', function() {
+        filterPatientGrid($(this).attr("term_type"), $(this).attr("term"));
+    });
 
     function loadPatientOnSearchSelect() {
         $('#id_patient').change(function () {
@@ -297,51 +214,44 @@ $(document).ready(function() {
 
     const form = $("form#patient-form");
     $("#id_first_name", form).change(function () {
-        changeFilter('first_name', 'cn', $(this).val());
+        changeFilter('first_name', $(this).val());
     });
     $("#id_last_name", form).change(function () {
-        changeFilter('last_name', 'cn', $(this).val());
+        changeFilter('last_name', $(this).val());
     });
 
-    const sexChangeOperation = function () {
+    $("#id_sex", form).change(function () {
         let data = $(this).val();
-        if (data == 'U') {
+        if (data === 'U') {
             data = null; // Use blank to not search when unknown
         }
-        changeFilter('sex', 'eq', data);
-    };
-    $("#id_sex", form).change(sexChangeOperation);
+        changeFilter('sex', data);
+    });
     $("button#reset-form").click(function () {
         $("#patient-success").remove();
         filterFields = {};
-        changeFilter();
+        reloadPatientTable();
     });
 
-    const tabs = $("#grid-tabs");
-    tabs.tabs();
-    tabs.bind('tabsselect', function (event, ui) {
-        $(".ui-tabs-panel", this).empty();
-    });
     $('form#create-patient-form').ajaxForm({});
     setupPatientSamplenode({name: ''});
     loadPatientOnSearchSelect();
     filterGridOnTermSearchSelect();
 
-
-    patientSearchForm = $('#patient-search-form');
+    const patientSearchForm = $('#patient-search-form');
     $("#patient-grid-filter", patientSearchForm).click(function () {
         const familyCode = $("#id_family_code", patientSearchForm).val();
         const patientPhenotype = $("#id_phenotype", patientSearchForm).val();
         const filterMessages = [];
         if (familyCode) {
             filterMessages.push("FamilyCode: '" + familyCode + "'");
-            filterFields["family_code"] = {field: "family_code", op: 'cn', data: familyCode};
+            filterFields["family_code"] = familyCode;
         } else {
             delete filterFields["family_code"];
         }
         if (patientPhenotype) {
             filterMessages.push("Phenotype/Description contains: '" + patientPhenotype + "'");
-            filterFields["phenotype"] = {field: "phenotype", op: 'cn', data: patientPhenotype};
+            filterFields["phenotype"] = patientPhenotype;
         } else {
             delete filterFields["phenotype"];
         }
@@ -351,7 +261,7 @@ $(document).ready(function() {
         msgBox.html("Filtering grid to " + filterMessage + " ... <a href='javascript:resetGrid()'>show all</a>");
         msgBox.show();
 
-        changeFilter();
+        reloadPatientTable();
     });
 
     $("button#create-new-patient").click(showCreatePatientForm);
@@ -450,9 +360,8 @@ $(document).ready(function() {
         </form>
       </div>
 
-	{% load jqgrid_tags %}
 	<div id='grid-filter-message'></div>
-	{% jqgrid 'patient_grid' 'patient' search=False delete=True download_grid_json_as_csv=True grid_complete='patients_grid_complete' %}
+	<table id="patient-datatable" class="sticky-header" data-datatable-url="{% url 'patient_datatables' %}" data-datatable-data="patientDatatableFilter"></table>
 
 	</div>
 {% endblock submenu_page_content %}
