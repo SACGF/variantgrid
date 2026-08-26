@@ -47,7 +47,7 @@ class Keycloak:
     def ping(self):
         # Method does a basic request to KeyCloak, should raise an exception if anything goes wrong
         # returns nothing otherwise
-        self.request(
+        response = self.request_json(
             'GET',
             url=f'/admin/realms/{self.realm}/clients',
         )
@@ -76,7 +76,7 @@ class Keycloak:
             'GET',
             url=f'/admin/realms/{self.realm}/groups?q=*',
         )
-        group_array = json.loads(response.text)
+        group_array = response.json()
         group_dict = {}
 
         def recurse_subgroups(sub_groups: list[dict]):
@@ -128,6 +128,14 @@ class Keycloak:
         )
         response.raise_for_status()
         return response
+
+    def request_json(self, method: str, url: str, json_data=None) -> dict:
+        try:
+            response = self.request(method=method, url=url, json_data=json_data)
+            response.raise_for_status()
+            return response.json()
+        except Exception as ex:
+            raise Exception(f"Error contacting {url}") from ex
 
     def existing_user(self, email: str) -> Optional[dict]:
         params = {'email': email}
