@@ -8,7 +8,6 @@ from operator import attrgetter
 from typing import Optional
 
 import django
-from celery.canvas import Signature
 from django.contrib.auth.models import User
 from django.contrib.postgres.fields import ArrayField
 from django.db import models, transaction
@@ -30,10 +29,6 @@ from classification.models import (
     classification_flag_types,
     classification_post_publish_signal,
     flag_types,
-)
-from classification.models.classification_import_run import (
-    ClassificationImportRun,
-    classification_imports_complete_signal,
 )
 from classification.models.condition_text_search import condition_text_search
 from flags.models import Flag, FlagComment, FlagResolution, flag_comment_action
@@ -74,8 +69,8 @@ class ConditionText(TimeStampedModel, GuardianPermissionsMixin):
 
     classifications_count = models.IntegerField(default=0)
     classifications_count_outstanding = models.IntegerField(default=0)
-    # set when a new root/gene level appears, processed by condition_text_automatch_task - automatching
-    # can call the external Monarch search API so it can't run in the publishing request (#1780)
+    # set when a new root/gene level appears, drained by the condition_text_automatch_task beat sweep -
+    # automatching can call the external Monarch search API so it can't run in the publishing request (#1780)
     pending_automatch = models.BooleanField(default=False)
 
     class Meta:
@@ -675,21 +670,6 @@ class ConditionMatchingSuggestion:
         return bool(self.terms) or bool(self.messages)
 
 
-CONDITION_TEXT_AUTOMATCH_TASK_NAME = 'classification.tasks.condition_text_automatch_task.condition_text_automatch_task'
-
-
-def queue_pending_automatch():
-    """
-    Launch condition_text_automatch_task for any ConditionTexts flagged pending_automatch.
-    During a bulk import, leave them for classification_imports_complete_signal so the whole
-    batch is handled by one task.
-    """
-    if ClassificationImportRun.ongoing_imports():
-        return
-    if ConditionText.objects.filter(pending_automatch=True).exists():
-        transaction.on_commit(lambda: Signature(CONDITION_TEXT_AUTOMATCH_TASK_NAME, immutable=True).apply_async())
-
-
 @receiver(classification_post_publish_signal, sender=Classification)
 def published(sender,
               classification: Classification,
@@ -703,7 +683,6 @@ def published(sender,
     """
     get_timer().tick("Condition Text Matching - post publish")
     ConditionTextMatch.sync_condition_text_classification(newly_published, attempt_automatch=True, update_counts=True)
-    queue_pending_automatch()
 
 
 @receiver(flag_comment_action, sender=Flag)
@@ -716,16 +695,6 @@ def check_for_withdrawn(sender, flag_comment: FlagComment, old_resolution: FlagR
         cl: Classification
         if cl := Classification.objects.filter(flag_collection=flag.collection.id).first():
             ConditionTextMatch.sync_condition_text_classification(cl.last_published_version, attempt_automatch=True, update_counts=True)
-            queue_pending_automatch()
-
-
-@receiver(classification_imports_complete_signal, sender=ClassificationImportRun)
-def automatch_pending_after_import(sender, **kwargs):
-    """
-    Catch up on the automatching every publish deferred during the bulk import - the
-    pending_automatch flags dedupe it down to one automatch per ConditionText
-    """
-    queue_pending_automatch()
 
 
 # @timed_cache(size_limit=2)

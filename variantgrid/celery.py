@@ -51,6 +51,14 @@ if SAPATH_ENABLED and getattr(settings, "SAPATH_HELIX_SHARED_FILE", None):
         'schedule': HOUR_SECS,  # Check every hour, only update if hash changed
     }
 
+# Condition text automatch sweep (#1780): publishing flags ConditionTexts (pending_automatch)
+# instead of calling the external Monarch search API in the request; this drains the flags, and
+# skips while a bulk import is ongoing so a sync's worth is handled as one deduped batch afterwards.
+app.conf.beat_schedule['condition-text-automatch'] = {
+    'task': 'classification.tasks.condition_text_automatch_task.condition_text_automatch_task',
+    'schedule': MINUTE_SECS * 5,
+}
+
 # Reclassification timelines (issue #1523): the analytics page builds what it can in the request,
 # this picks up anything left over, e.g. the morning after a large sync.
 app.conf.beat_schedule['reclassification-events-update'] = {
