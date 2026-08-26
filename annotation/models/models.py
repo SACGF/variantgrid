@@ -1341,7 +1341,12 @@ class AnnotationRun(TimeStampedModel):
             # Overwrite the row in place with a fresh run carrying the same pk + range lock, so every other
             # field returns to its default (no field-by-field reset to keep in sync as the model grows).
             # pk is already set -> save() does an UPDATE of all columns; get_status() -> CREATED.
-            fresh = AnnotationRun(annotation_range_lock=self.annotation_range_lock, pipeline_type=self.pipeline_type)
+            # pipeline_version (#720) is part of what this run was scheduled against, like its lock and
+            # type - a retry has to stay on the same version or check_tool_version has nothing to compare
+            # the installed tool against.
+            fresh = AnnotationRun(annotation_range_lock=self.annotation_range_lock,
+                                  pipeline_type=self.pipeline_type,
+                                  pipeline_version=self.pipeline_version)
             fresh.pk = self.pk
             fresh.created = self.created  # auto_now_add isn't re-applied on the UPDATE below
             fresh.save()

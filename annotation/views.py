@@ -692,6 +692,7 @@ def subdivide_annotation_run(request, annotation_run_id):
 
     annotation_run = get_object_or_404(AnnotationRun, pk=annotation_run_id)
     pipeline_type = annotation_run.pipeline_type
+    pipeline_version = annotation_run.pipeline_version  # #720: the halves stay on the version this run had
     old_range_lock = annotation_run.annotation_range_lock
     version_id = old_range_lock.version_id
 
@@ -700,8 +701,10 @@ def subdivide_annotation_run(request, annotation_run_id):
     # so no rangeless run is ever committed - #1654) and hand back to the dispatcher.
     new_range_lock = subdivide_annotation_range_lock(old_range_lock)
     bottom_half_run = AnnotationRun.objects.create(annotation_range_lock=old_range_lock,
-                                                   pipeline_type=pipeline_type)
-    AnnotationRun.objects.create(annotation_range_lock=new_range_lock, pipeline_type=pipeline_type)
+                                                   pipeline_type=pipeline_type,
+                                                   pipeline_version=pipeline_version)
+    AnnotationRun.objects.create(annotation_range_lock=new_range_lock, pipeline_type=pipeline_type,
+                                 pipeline_version=pipeline_version)
     dispatch_annotation_runs.si(version_id).apply_async()
 
     # The original run was deleted by the subdivision - land on the bottom-half replacement.

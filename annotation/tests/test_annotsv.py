@@ -280,6 +280,21 @@ class TestRunAnnotsvSubprocessMocked(TestCase):
                 for record in records:
                     self.assertTrue(record.endswith("\tGT\t0/1"), record)
 
+    def test_retry_keeps_pipeline_version(self):
+        """ #720: a retry stays on the version the run was scheduled against - dropping it leaves
+            check_tool_version with nothing to compare the installed tool against, so the retried run
+            errors instead of annotating. """
+        annotation_run = self._make_annotsv_run()
+        pipeline_version = annotation_run.pipeline_version
+        annotation_run.error_exception = "boom"
+        annotation_run.save()
+
+        with mock.patch.object(AnnotationRun, "delete_related_objects"):
+            annotation_run.reset_for_retry()
+
+        self.assertEqual(annotation_run.pipeline_version, pipeline_version)
+        self.assertIsNone(annotation_run.error_exception)
+
 
 class TestDumpSamples(TestCase):
     """ dump_samples plumbs through write_qs_to_vcf - a pipeline that doesn't set it still dumps
