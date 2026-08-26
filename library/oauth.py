@@ -1,3 +1,4 @@
+import os
 from functools import cached_property
 from typing import Optional
 
@@ -10,6 +11,10 @@ from requests_oauthlib.oauth2_auth import OAuth2
 from requests_oauthlib.oauth2_session import OAuth2Session
 
 from library.constants import MINUTE_SECS
+
+# Keycloak grants its default client scopes (e.g. "email profile") on top of the requested
+# "openid" - stop oauthlib raising "Scope has changed" over the widened grant
+os.environ.setdefault("OAUTHLIB_RELAX_TOKEN_SCOPE", "1")
 
 
 class ServerAuth:
@@ -59,7 +64,10 @@ class ServerAuth:
             # scope must be set on the oauthlib client (not OAuth2Session) for it to be
             # included in the token request body - Keycloak requires "openid"
             oauth = OAuth2Session(client=LegacyApplicationClient(client_id=self.client_id, scope="openid"))
-            token = oauth.fetch_token(token_url=self.oauth_url, username=self.username, password=self.password, auth=auth_auth, client_id=self.client_id)
+            # include_client_id sends client_id in the request body (public client) - without
+            # it, requests_oauthlib fabricates a Basic auth header with an empty client_secret,
+            # which Keycloak rejects with invalid_client
+            token = oauth.fetch_token(token_url=self.oauth_url, username=self.username, password=self.password, auth=auth_auth, include_client_id=True)
             return OAuth2(client_id=self.client_id, token=token)
         else:
             # fall back to basic auth
