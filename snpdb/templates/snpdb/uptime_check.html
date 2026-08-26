@@ -23,7 +23,7 @@
             {% if uptime_response.status == 1 %}
                 <div class="alert alert-success">Everything is OKAY</div>
             {% else %}
-                <div class="alert alert-danger">{{ uptime_response.status.severity | severity_icon }}Overall Status {{ uptime_response.status.pretty_label }}</div>
+                <div class="alert alert-danger">{{ uptime_response.status.severity | severity_icon }}Overall Status {{ uptime_response.status.pretty_label }}{% if uptime_response.note %} - {{ uptime_response.note }}{% endif %}</div>
             {% endif %}
         </div>
     </div>

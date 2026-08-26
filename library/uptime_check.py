@@ -30,6 +30,7 @@ class UptimeCheckStatus(IntEnum):
             case UptimeCheckStatus.NON_CRITICAL_FAILURE: return "E"
             case _: return "C"
 
+
 @dataclass
 class UptimeCheckResponse:
     name: str
