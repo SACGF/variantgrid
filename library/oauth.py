@@ -56,7 +56,9 @@ class ServerAuth:
                     password=self.app_password
                 )
 
-            oauth = OAuth2Session(client=LegacyApplicationClient(client_id=self.client_id))
+            # scope must be set on the oauthlib client (not OAuth2Session) for it to be
+            # included in the token request body - Keycloak requires "openid"
+            oauth = OAuth2Session(client=LegacyApplicationClient(client_id=self.client_id, scope="openid"))
             token = oauth.fetch_token(token_url=self.oauth_url, username=self.username, password=self.password, auth=auth_auth, client_id=self.client_id)
             return OAuth2(client_id=self.client_id, token=token)
         else:
