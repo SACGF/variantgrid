@@ -135,7 +135,7 @@ class Keycloak:
             response.raise_for_status()
             return response.json()
         except Exception as ex:
-            raise Exception(f"Error contacting {url}") from ex
+            raise Exception(f"Error contacting {self.connector.url(url)}") from ex
 
     def existing_user(self, email: str) -> Optional[dict]:
         params = {'email': email}
