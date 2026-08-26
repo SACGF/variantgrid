@@ -2298,15 +2298,10 @@ VCForm.format_condition = function(condition_json) {
     if (!condition_json) {
         return $('<span>', {text: "-", class:'no-value'});
     }
-    const dom = $('<div>');
-    let domUsed = false;
+    const termDoms = [];
     if (condition_json.resolved_terms) {
-
-        let first = true;
         for (const term of condition_json.resolved_terms) {
-            domUsed = true;
-            first = false;
-            $('<div>', {
+            termDoms.push($('<div>', {
                 class: 'ontology-term semicolon-sep',
                 html: [
                     $('<a>', {
@@ -2317,24 +2312,44 @@ VCForm.format_condition = function(condition_json) {
                     " ",
                     $('<span>', {text: term.name, class: 'term-name'})
                 ]
-            }).appendTo(dom);
+            }));
         }
     }
     if (condition_json.plain_text_terms) {
         for (const term of condition_json.plain_text_terms) {
-            domUsed = true;
-            $('<div>', {text: term, class:'ontology-term free-text semicolon-sep'}).appendTo(dom);
+            termDoms.push($('<div>', {text: term, class:'ontology-term free-text semicolon-sep'}));
         }
     }
 
-    if (!domUsed) {
+    if (!termDoms.length) {
         return $('<div>', {class: 'ontology-term free-text', text: condition_json.display_text});
+    }
+
+    const dom = $('<div>');
+    const MAX_VISIBLE_CONDITIONS = 5;
+    if (termDoms.length > MAX_VISIBLE_CONDITIONS) {
+        dom.append(termDoms.slice(0, MAX_VISIBLE_CONDITIONS));
+        $('<a>', {
+            class: 'show-more-conditions hover-link',
+            href: '#',
+            text: `+ ${termDoms.length - MAX_VISIBLE_CONDITIONS} more conditions`,
+            title: 'click to show all conditions'
+        }).appendTo(dom);
+        $('<div>', {class: 'hidden-conditions', style: 'display:none'}).append(termDoms.slice(MAX_VISIBLE_CONDITIONS)).appendTo(dom);
+    } else {
+        dom.append(termDoms);
     }
     if (condition_json.resolved_terms && condition_json.resolved_terms.length > 1 && condition_json.resolved_join) {
         $('<div>', {class: 'font-italic', text:condition_json.resolved_join === 'C' ? ' Co-occurring' : ' Uncertain'}).appendTo(dom);
     }
     return dom;
 };
+
+// grid cells are rendered as static HTML, so the show-more toggle needs a delegated handler
+$(document).on('click', '.show-more-conditions', function() {
+    $(this).hide().siblings('.hidden-conditions').show();
+    return false;
+});
 
 const VCTable = (function() {
     const VCTable = function() {};
