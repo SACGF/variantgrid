@@ -103,6 +103,8 @@ class DataFrameJqGrid:
         items = []
         for i, row in df.iterrows():
             data = dict(iter(row.items()))
+            if isinstance(i, float) and math.isnan(i):
+                i = None  # JSON can't handle NaN - client sends back "null" for missing values
             data['ID'] = i
             items.append(data)
         return items
