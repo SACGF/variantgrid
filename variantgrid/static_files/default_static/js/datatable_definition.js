@@ -47,13 +47,31 @@ const DataTableDefinition = (function() {
     const DataTableDefinition = function(params) {
         this.dom = params.dom;
         this.url = params.url;
+        // The node grid's definition and data come from different URLs - the definition is per
+        // node version (so its columns cache with the node), the data endpoint is one URL for the
+        // whole analysis. Everything else builds both off the one url.
+        this.definitionUrl = params.definitionUrl || params.url;
         this.data = params.data;
         this.filterCount = params.filterCount;
+        /* Optional hooks, used by the analysis node grid:
+             onDefinition(definition)  return false to stop setup - the node grid's config endpoint
+                                       answers with node errors instead of a table
+             onData(json)              every data response, before its rows are handed to DataTables
+                                       (the grid engine reports a deleted/out of date node in here)
+             onBeforeSend(jqXHR)       every request as it goes out (the node grid keeps a handle on
+                                       it, so moving to another node can abort a query still running)
+             onLoadError(jqXHR, textStatus, errorThrown)  ajax failure */
+        this.onDefinition = params.onDefinition;
+        this.onData = params.onData;
+        this.onBeforeSend = params.onBeforeSend;
+        this.onLoadError = params.onLoadError;
         this.waitOn = Promise.resolve();
         this.adjustColumns = params.adjustColumns !== false;
 
         this.tableId = null;
         this.tableWidth = null;
+        this.filterBuilder = null;
+        this.filterRules = null;
         this.lengthKey = null;
         this.lastDraw = null;
         this.serverParams = null;
@@ -98,14 +116,14 @@ const DataTableDefinition = (function() {
         },
 
         loadDefinition: function() {
-            let definitionData = DataTableDefinition.definitions[this.url];
+            let definitionData = DataTableDefinition.definitions[this.definitionUrl];
             if (!definitionData) {
                 let sep = '?';
-                if (this.url.indexOf('?') !== -1) {
+                if (this.definitionUrl.indexOf('?') !== -1) {
                     sep = '&';
                 }
-                definitionData = $.getJSON(this.url + sep + 'dataTableDefinition=1');
-                DataTableDefinition.definitions[this.url] = definitionData;
+                definitionData = $.getJSON(this.definitionUrl + sep + 'dataTableDefinition=1');
+                DataTableDefinition.definitions[this.definitionUrl] = definitionData;
             }
             return definitionData.then(data => {this.serverParams = data;});
         },
@@ -137,6 +155,11 @@ const DataTableDefinition = (function() {
                 }
                 params.start = data.start;
                 params.length = data.length;
+                if (self.filterRules && self.filterRules.rules.length) {
+                    // The grid engine's own column filtering - JqGrid.get_filters reads these two
+                    params._search = 'true';
+                    params.filters = JSON.stringify(self.filterRules);
+                }
                 if (data.order && data.order.length) {
                     params['order[0][column]'] = data.order[0].column;
                     params['order[0][dir]'] = data.order[0].dir;
@@ -166,7 +189,7 @@ const DataTableDefinition = (function() {
                 lengthValue = defn.pageLength;  // this user's UserGridConfig rows beats the local default
             }
 
-            const domString = `<"top"><"toolbar"<"custom">${ defn.searchBoxEnabled ? 'f' : ''}>rt${ defn.downloadCsvButtonEnabled ? 'B' : ''}<"bottom"<"showing"il>p><"clear">`;
+            const domString = `<"top"><"toolbar"<"custom">${ defn.searchBoxEnabled ? 'f' : ''}>rt${ defn.downloadCsvButtonEnabled ? 'B' : ''}<"bottom"<"showing"il><"bottom-toolbar">p><"clear">`;
 
             const dtParams = {
                 processing: true,
@@ -183,7 +206,12 @@ const DataTableDefinition = (function() {
                 ajax: {
                     url: this.url,
                     type: defn.ajaxType || 'POST',
-                    data: this.buildAjaxData()
+                    data: this.buildAjaxData(),
+                    error: function(jqXHR, textStatus, errorThrown) {
+                        if (self.onLoadError) {
+                            self.onLoadError(jqXHR, textStatus, errorThrown);
+                        }
+                    }
                 },
                 bFilter: defn.searchBoxEnabled,
                 bAutoWidth: false,
@@ -202,12 +230,25 @@ const DataTableDefinition = (function() {
                 // Build the table now, fetch rows when the page asks for them (table.ajax.reload())
                 dtParams.deferLoading = 0;
             }
-            if (defn.cacheStableParams) {
+            if (this.onBeforeSend) {
+                dtParams.ajax.beforeSend = function(jqXHR, settings) {
+                    // A per request beforeSend replaces the global one, which is what adds the
+                    // CSRF header (@see tweakAjax) - so run that first
+                    if ($.ajaxSettings.beforeSend) {
+                        $.ajaxSettings.beforeSend.call(this, jqXHR, settings);
+                    }
+                    self.onBeforeSend(jqXHR);
+                };
+            }
+            if (defn.cacheStableParams || this.onData) {
                 dtParams.ajax.dataSrc = function(json) {
                     if (json.draw === undefined) {
                         json.draw = self.lastDraw;  // stripped from the request to keep the URL cacheable
                     }
-                    return json.data;
+                    if (self.onData) {
+                        self.onData(json);
+                    }
+                    return json.data || [];
                 };
             }
             if (defn.approximateCount) {
@@ -375,9 +416,17 @@ const DataTableDefinition = (function() {
                     });
                 }
             });
-            const toolbar = dom.closest('.dataTables_wrapper').find('.toolbar .custom');
+            const wrapper = dom.closest('.dataTables_wrapper');
+            if (this.serverParams.compactControls) {
+                wrapper.addClass('dt-compact');
+            }
+            const toolbar = wrapper.find('.toolbar .custom');
             // move any externally defined toolbar elements onto it
             $(`[data-toolbar="#${tableId}"]`).detach().appendTo(toolbar);
+            // ...and anything that belongs under the grid onto the pager's row
+            $(`[data-toolbar-bottom="#${tableId}"]`).detach().appendTo(wrapper.find('.bottom-toolbar'));
+
+            this.setupFilterBuilder(toolbar);
 
             const downloadUrl = this.serverParams.downloadUrl;
             if (downloadUrl) {
@@ -389,6 +438,56 @@ const DataTableDefinition = (function() {
                     link.attr('href', downloadUrl + '?' + $.param(dataTable.ajax.params() || {}));
                 });
             }
+        },
+
+        /* The column filter dialog, as a panel above the table. Rules go up as '_search'/'filters',
+           which the grid engine turns into a Q object - so this is the same filtering the jqGrid
+           "Filter grid..." dialog did, and page level filters (extra_filters) stack on top of it. */
+        setupFilterBuilder: function(toolbar) {
+            const defn = this.serverParams;
+            if (!defn.filterBuilder || !(defn.filterBuilder.fields || []).length) {
+                return;
+            }
+            if (defn.filterBuilderToolbar === false) {
+                return;  // the page mounts its own builder off the definition (@see the FilterNode editor)
+            }
+            const self = this;
+            const dataTable = this.dataTable;
+
+            const panel = $('<div>', {class: 'variantgrid-filter-panel card card-body p-2 mb-2',
+                                      style: 'display: none'});
+            panel.insertBefore(this.dom.closest('.dataTables_wrapper'));
+
+            const button = $('<a>', {class: 'btn btn-outline-secondary', href: 'javascript:void(0)',
+                                     html: '<i class="fas fa-filter"></i> Filter grid...'}).appendTo(toolbar);
+            const summary = $('<span>', {class: 'ml-2 text-muted variantgrid-filter-summary'}).appendTo(toolbar);
+
+            const describe = function(filters) {
+                const count = filters.rules.length;
+                if (!count) {
+                    return '';
+                }
+                return count === 1 ? 'filtered on 1 column' : `filtered on ${count} columns`;
+            };
+
+            this.filterBuilder = new VariantGridFilterBuilder({
+                container: panel,
+                filterBuilder: defn.filterBuilder,
+                onApply: function(filters) {
+                    self.filterRules = filters.rules.length ? filters : null;
+                    summary.text(describe(filters));
+                    dataTable.page(0).draw(false);  // a narrower result set invalidates the page number
+                },
+                onReset: function(filters) {
+                    self.filterRules = null;
+                    summary.text('');
+                    dataTable.page(0).draw(false);
+                }
+            }).render();
+
+            button.click(function() {
+                panel.toggle();
+            });
         },
 
         setupClientExpend: function() {
@@ -484,22 +583,29 @@ const DataTableDefinition = (function() {
             });
         },
 
+        /* Resolves with this definition once the table is built, so a caller can wire up row
+           interactions or announce itself (the analysis editor waits on its grid) */
         setup: function() {
             if (this.dom.hasClass('dataTable')) {
-                return;
+                return Promise.resolve(this);
             }
             this.ensureState();
-            this.loadDefinition().then(() => {
+            return this.loadDefinition().then(() => {
+                if (this.onDefinition && this.onDefinition(this.serverParams) === false) {
+                    return null;
+                }
                 this.convertDefinition();
-                this.waitOn.then(() => {
+                return this.waitOn.then(() => {
                     this.setupDom();
                     this.setupClientExpend();
                     this.setupResponsiveExpand();
                     // note the below causes the dataTable to re-download data from the server redundantly
-                    // not sure under what circumstances it's actually required
-                    if (this.adjustColumns) {
+                    // not sure under what circumstances it's actually required - and on a deferred table
+                    // the draw is the fetch the page is deliberately holding back
+                    if (this.adjustColumns && !this.serverParams.deferLoading) {
                         this.dataTable.columns.adjust().draw(false);
                     }
+                    return this;
                 });
             });
         }

@@ -983,10 +983,18 @@ table.variantgrid-datatable {
 
 	th,
 	td {
+		// The width the colmodel asked for is the width the column gets - content-box would add
+		// the padding and the sort gutter on top, which over 1100 columns ran 22000px wide
+		box-sizing: border-box;
 		padding: 2px 4px;
 		overflow: hidden;
 		white-space: nowrap;
 		text-overflow: ellipsis;
+	}
+
+	// Every row the same height, so the grid pane divides into a whole number of rows
+	tbody td {
+		line-height: 16px;
 	}
 
 	// detailsLink's boxes are floats, which wrap once the column is narrower than the row of them
@@ -1000,10 +1008,22 @@ table.variantgrid-datatable {
 		content: none;
 	}
 
+	// DataTables draws the row separator on every cell but the first row's, leaving row 1 a pixel
+	// short of the rest. Give it the same border, invisible, so the heights match
+	&.dataTable tbody tr:first-child td {
+		border-top: 1px solid transparent;
+	}
+
 	// DataTables reserves 26px of every header for its sort arrows, which over this many columns
 	// costs more than the labels themselves. Its stylesheet loads after ours, hence !important
 	&.dataTable thead > tr > th {
 		padding-right: 16px !important;
+	}
+
+	// Nothing to make room for where the column can't be sorted - and the genotype columns are
+	// 25px wide, so the gutter would be most of them
+	&.dataTable thead > tr > th.sorting_disabled {
+		padding-right: 4px !important;
 	}
 
 	&.dataTable thead > tr > th::before,
@@ -1200,6 +1220,59 @@ table.datatable.expandable tr {
 
 		.showing {
 			flex-grow: 1;
+		}
+
+		// Grid level actions (the analysis node grid's CSV/VCF) sit beside the pager
+		.bottom-toolbar {
+			display: flex;
+			align-items: center;
+			gap: 8px;
+			margin-right: 12px;
+		}
+	}
+
+	/* The variant grids trade control chrome for rows: default Bootstrap sizing puts ~60px under the
+	   table (the info and length lines stack, on top of 32px pager buttons), which is three rows the
+	   user can't see. @see compactControls in the definition */
+	&.dt-compact .bottom {
+		$control-height: 22px;
+
+		.showing {
+			display: flex;
+			align-items: center;
+			gap: 12px;
+		}
+
+		.dataTables_info,
+		.dataTables_length,
+		.dataTables_paginate {
+			padding: 0;
+			margin: 0;
+			line-height: $control-height;
+			white-space: nowrap;
+		}
+
+		select,
+		input {
+			height: $control-height;
+			padding-top: 0;
+			padding-bottom: 0;
+			line-height: $control-height;
+		}
+
+		// Buttons carry a 1px border top and bottom, so they line up with the rest at 20px
+		.btn {
+			padding: 0 6px;
+			line-height: $control-height - 2px;
+		}
+
+		.btn-rnd-rect {
+			width: auto;
+			min-width: $control-height;
+			height: $control-height;
+			border-radius: 6px;
+			margin-left: 2px;
+			margin-right: 2px;
 		}
 	}
 }

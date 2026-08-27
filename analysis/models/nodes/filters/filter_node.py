@@ -36,6 +36,8 @@ class FilterNode(AnalysisNode):
         existing_extra_config = super().get_extra_grid_config()
 
         if self.filternodeitem_set.exists():
+            # LEGACY-JQGRID: 'search' opened jqGrid's own filter dialog. The DataTables filter builder
+            # reads the rules off postData below - delete with the last {% jqgrid %} variant grid
             existing_extra_config['search'] = True
             post_data = existing_extra_config.get('postData', {})
             post_data.update({'filters': self.get_filters_json()})

@@ -68,6 +68,25 @@ class MajorOperationTests(TestCase):
             with major_operation("user_b", "grid"):
                 pass
 
+    def test_expired_slot_key_does_not_break_the_operation(self, _mock_timeout):
+        """ The counter's TTL is set when it's created and never extended, so an operation that is
+            still running when it lapses has no key left to decrement. Redis decr raises there, and
+            the release runs in a finally - so it used to replace the result with a 500. """
+        with major_operation(self.USER, "grid"):
+            cache.clear()  # stand in for the safety TTL lapsing mid-operation
+
+        # ...and the counter is usable again afterwards
+        with ExitStack() as stack:
+            for _ in range(3):
+                stack.enter_context(major_operation(self.USER, "grid"))
+
+    def test_expired_slot_key_does_not_mask_the_operations_own_error(self, _mock_timeout):
+        with self.assertRaises(ValueError) as cm:
+            with major_operation(self.USER, "grid"):
+                cache.clear()
+                raise ValueError("boom")
+        self.assertEqual("boom", str(cm.exception))
+
     @override_settings(MAJOR_OPERATION_LIMITS_ENABLED=False)
     def test_disabled_does_not_limit(self, _mock_timeout):
         with ExitStack() as stack:

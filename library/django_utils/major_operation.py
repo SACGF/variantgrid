@@ -38,6 +38,19 @@ def _major_operation_count_key(user) -> str:
     return sha256sum_str(f"major_operation_count_{user}")
 
 
+def _release_slot(count_key: str):
+    """ Give back a slot, tolerating the key having gone.
+
+        The counter carries a safety TTL that is set when it is first created and never extended, so
+        an operation running as it lapses finds nothing left to decrement - and that is exactly the
+        slow kind of operation this limit exists for. Redis decr raises on a missing key, and this
+        runs in a finally, so an unguarded call replaces the operation's own result with a 500. """
+    try:
+        cache.decr(count_key)
+    except ValueError:
+        logging.info("Major operation slot key had already expired - nothing to release")
+
+
 @contextmanager
 def _statement_timeout(seconds: int):
     """ Temporarily lower the Postgres statement_timeout on the current connection.
@@ -81,7 +94,7 @@ def major_operation(user, operation_name: str = "major_operation"):
         current = 1
 
     if current > limit:
-        cache.decr(count_key)
+        _release_slot(count_key)
         logging.warning("User '%s' hit major operation limit of %d (attempted '%s')",
                         user, limit, operation_name)
         raise TooManyMajorOperationsError(user, operation_name, limit)
@@ -90,4 +103,4 @@ def major_operation(user, operation_name: str = "major_operation"):
         with _statement_timeout(settings.MAJOR_OPERATION_STATEMENT_TIMEOUT_SECONDS):
             yield
     finally:
-        cache.decr(count_key)
+        _release_slot(count_key)

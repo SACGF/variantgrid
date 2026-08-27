@@ -51,26 +51,33 @@ def json_encode(data):
     return encoder.encode(data)
 
 
+# LEGACY-JQGRID-ENGINE: the filter rule vocabulary. get_q below turns these into Django lookups,
+# FilterNodeItem persists them, and the DataTables filter builder offers them - so all three stay in
+# step off this one list. 'takes_data' is False for the operations that filter on their own.
+FILTER_OPERATIONS = [
+    ("eq", "equal", True),
+    ("ne", "not equal", True),
+    ("bw", "begins with", True),
+    ("bn", "does not begin with", True),
+    ("ew", "ends with", True),
+    ("en", "does not end with", True),
+    ("cn", "contains", True),
+    ("nc", "does not contain", True),
+    ("nu", "is null", False),
+    ("nn", "is not null", False),
+    ("in", "is in", True),
+    ("ni", "is not in", True),
+    ("gt", "greater than", True),
+    ("ge", "greater than or equal to", True),
+    ("lt", "less than", True),
+    ("le", "less than or equal to", True),
+]
+
+FILTER_OPERATION_LABELS = {op: label for op, label, _takes_data in FILTER_OPERATIONS}
+
+
 def format_operation(op):
-    ops = {
-        "eq": "equal",
-        "ne": "not equal",
-        "bw": "begins with",
-        "bn": "does not begin with",
-        "ew": "ends with",
-        "en": "does not end with",
-        "cn": "contains",
-        "nc": "does not contain",
-        "nu": "is null",
-        "nn": "is not null",
-        "in": "is in",
-        "ni": "is not in",
-        'gt': "greater than",
-        'ge': "greater than or equal to",
-        'lt': "less than",
-        'le': "less than or equal to",
-    }
-    return ops[op]
+    return FILTER_OPERATION_LABELS[op]
 
 
 class KnownCountPaginator(Paginator):

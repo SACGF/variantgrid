@@ -185,7 +185,7 @@ draw-only-when-sent, `pageLength` from `UserGridConfig`. All existing grid tests
 
 **Naming**: new names spell it `variantgrid`, one word (hence `variantgrid_formats.js`).
 
-## Stage 3 — Variantopedia + gene pages
+## Stage 3 — Variantopedia + gene pages — **DONE**
 
 Convert in this order within the one Stage 3 PR (each lands as its own commit so it can be reviewed and reverted independently):
 
@@ -264,7 +264,38 @@ Also:
 - Tests: `variantopedia`/`genes` URL tests moved to the datatable harness (plus a nearby-variants
   entry); two new adapter tests cover the no-`length` default and the `downloadUrl` reversal.
 
-## Stage 4 — Analysis node grid
+**Browser harness** (`scratchpad/harness/`, throwaway) - the layout work above was measured rather
+than guessed, and Stage 4's wide-cohort prototype wants the same rig:
+
+- A static page that loads the real `variantgrid_formats.js` / `grid.js` / `datatable_definition.js`
+  / `global.css` from `static_files/default_static`, is handed a definition JSON dumped from the
+  grid class and a canned rows array, and builds a real `DataTableDefinition`. `python3 -m
+  http.server` + `google-chrome --headless=new --dump-dom --screenshot --virtual-time-budget`. No
+  server, no login. Add a `<pre>` and write `offsetWidth`/`getComputedStyle` readings into it - the
+  numbers are what found both width bugs.
+- For the real page, a session works around login: Django's session backend here is
+  `cache`, so mint one with `import_module(settings.SESSION_ENGINE).SessionStore`, then serve a
+  one-line page from the harness port that sets `document.cookie = "sessionid=..."` and redirects to
+  `localhost:8000`. Cookies ignore the port, so the two servers share it.
+
+### Stage 3 open item — the gene page hotspot graph
+
+The user reports the plotly lollipop graph on the gene page has disappeared. Investigated and
+**not reproduced**: on the dev box the container renders, `load_hotspot_graph()` fires, the ajax
+completes, and `HotspotGraphView` answers with its own "No variants" branch -
+`_pick_transcripts` returns `None` for every gene tried across both builds (a local annotation gap:
+transcript version never pairs with a Pfam accession), so this DB cannot draw the graph at all.
+`git diff | grep -i hotspot` touches nothing but the kept click handlers. Two open readings:
+
+1. The graph itself is genuinely gone on their deployment - needs a gene symbol + genome build that
+   used to draw one, then re-run the browser check above against it.
+2. What they miss is the jqGrid `searchGrid` column-filter dialog (the "Filter grid..." link), which
+   is how you would filter that grid on gnomAD AF. **Reading 2 is now addressed**: the Stage 4
+   filter-builder was built first and the gene page has its "Filter grid..." button back, offering 77
+   fields including gnomAD AF. If the graph itself is still missing on their deployment, reading 1
+   stands and wants a gene symbol + genome build that used to draw one.
+
+## Stage 4 — Analysis node grid — **DONE**
 
 The big one. All of `node_data_grid.html` + `grid.js` `setupGrid` machinery moves to DataTables:
 
@@ -279,17 +310,174 @@ The big one. All of `node_data_grid.html` + `grid.js` `setupGrid` machinery move
 
 Tests: keep `test_grid_export*`, `test_grid_known_count`, `test_node_grid_sort_limit`, `test_node_grid_auto_load` (class-level, unchanged); add endpoint tests for the definition/data envelope and the cache-key stability (no `draw` in cached URL).
 
+### Stage 4 outcome — what actually landed
+
+The node grid is a DataTable. `setupGrid`/`loadNodeGridData`/`setRowChangeCallbacks`/`deleteNdParam`
+are gone from `grid.js`; nothing on the analysis page calls jqGrid any more.
+
+**Grid CSS, measured first** (browser harness, 166 sample cohort = 1103 columns):
+
+- `box-sizing: border-box` on `.variantgrid-datatable` cells. Without it every column came out
+  **exactly 20px wider** than its colmodel (4px left + the 16px sort gutter), so the 45450px table
+  rendered at 67470px and the 110px variant column at 130px. Now all 1101 visible widths land exact.
+- The sort gutter is dropped on `th.sorting_disabled` - on the 25px per sample genotype columns it
+  was most of the column, and there is no arrow to make room for.
+- DataTables draws the row separator on every cell but the first row's, so row 1 measured 22px and
+  the rest 23px. A transparent 1px border on the first row plus `line-height: 16px` makes **every
+  row exactly 21px** - the predictable height the auto-fit follow-up needs.
+
+**Endpoints** (item 1) — `NodeGridConfig` now answers `datatable_definition(grid, defer_loading=True)`
+plus a `postData` block; `NodeGridHandler` answers `datatable_data(...)`. Both keep `@cache_page` +
+`vary_on_cookie`, the per-user lock, the shareable-node redirect and the error/non-fatal branches.
+`_NODE_GRID_ALLOWED_PARAMS` gained `start`/`length`/`order[0][column]`/`order[0][dir]` and lost
+`_filters` (only `deleteNdParam` ever set it). The adapter's definition/data/translate/row helpers
+moved to module level so these two views use them without a `JqGridDatatableView`.
+
+**Two URLs, one table** — the definition is per node version (it caches with the node), the data
+endpoint is one URL for the whole analysis, so `DataTableDefinition` gained `definitionUrl`
+(defaulting to `url`, and keyed on for the definition cache). Every other table is unchanged.
+
+**Grid setup** (item 2) — `setupNodeGrid(config_url, handler_url, ...)` in `grid.js` returns a promise
+resolving once the table is built. `DataTableDefinition` gained the hooks it needs: `onDefinition`
+(the config endpoint answers node errors instead of a table), `onData` (`non_fatal`/`deleted_nodes`
+&rarr; `deleteNodesFromDOM`), `onBeforeSend` (the single-active-request XHR handle - it chains
+`$.ajaxSettings.beforeSend` so the global CSRF header survives) and `onLoadError`.
+
+- Deferred load: `deferLoading` builds the table and holds the query; `loadNodeGridData()` is
+  `ajax.reload()`. `setup()` skips its `columns.adjust().draw()` on a deferred table - that draw *is*
+  the fetch being held back.
+- A deferred grid fires `gridComplete` once with no rows, the way the old `datatype: 'local'` init did.
+  Without it `registerComponent(unique_code, GRID)` never fires and the editor's `everythingLoaded`
+  sits behind its overlay until the user clicks "Show grid" - found by driving both paths in the harness.
+- `nodeGridHasData()` (has the table ever had an ajax response) replaces the `datatype !== 'local'` test.
+
+**Row interactions** (item 3) — `draw.dt` runs `gridComplete` + `gridCompleteExtra`, which is where
+selection checkboxes, tag click handlers and the variant-link right-click handling get rebound. The
+renderers were already ported in Stage 2, so the cells themselves needed nothing.
+
+**Sorting/pager** (item 4) — `sorting_disabled` flows through the definition as `orderable: false` on
+every column with no initial order, and known counts through the envelope (the pager reads
+"Showing 1 to 10 of 4,920 entries" off a stored `NodeCount`, no `COUNT(*)`). `resizeGrid` now sets
+`max-height` on `.dataTables_scrollBody` and calls `columns.adjust()`.
+
+**Exports** (item 5) — three toolbar buttons built by `node_data_grid.html` once the table is
+(CSV, Canonical transcript CSV where the analysis has a collection, VCF), plus the two placeholder
+links, all still through `registerNodeGridDownloadButton`. `nodeGridExportInfo` builds its params
+from `dataTable.ajax.params()`, falling back to the definition's `postData` when the grid was never
+loaded - the placeholder offers CSV/VCF on a node whose rows the user never fetched. It drops
+`start`/`order[0][*]` and sets `rows=0`/`length=0`; the server contract is unchanged.
+
+**Filter builder** (item 6, built first) — `variantgrid_filter_builder.js`, `VariantGridFilterBuilder`.
+
+- Fields, types and choices come from the definition's `filterBuilder` block
+  (`datatable_filter_fields_from_colmodels`: colmodel `search`, `stype`/`searchoptions.value`,
+  `sorttype`). Columns the engine can't filter are left out - `search=False`, and packed genotype
+  columns, whose `index` is a sample position rather than a field path. A 1103 column cohort grid
+  offers 96 fields; the gene page offers 77, gnomAD AF among them.
+- Operations come from `FILTER_OPERATIONS`, lifted out of `format_operation` in `library/jqgrid/jqgrid.py`
+  so `get_q`, `FilterNodeItem` and the builder all read one list.
+- It emits `{"groupOp": ..., "rules": [{"field", "op", "data"}]}` - byte for byte what `FakeFilterGrid`
+  parses and what `FilterNodeView.post` writes `FilterNodeItem` rows from. A saved rule on a column
+  the grid no longer offers keeps its own option, so loading and re-saving a FilterNode doesn't drop it.
+- `filternode_editor.html` mounts it against the node grid's definition and POSTs to the same URL;
+  the jqGrid `searchGrid` dialog and its `jqGridFilterSearch`/`jqGridFilterReset` bindings are gone.
+- Every adapter served grid gets a "Filter grid..." toolbar button and panel for free
+  (`JqGridDatatableView.filter_builder`, default on), which is the Stage 3 pages' column filtering back.
+- **The analysis node grid is the exception**: `filterBuilderToolbar: false` sends the fields and
+  operations down for the FilterNode editor but shows no button on the grid itself - filtering an
+  analysis is what FilterNode is for.
+
+**Toolbar placement** - `DataTableDefinition`'s dom string gained a `.bottom-toolbar` slot inside the
+existing `<"bottom">` flex row, and `setupDom` moves `[data-toolbar-bottom="#tableId"]` into it. The
+node grid's CSV / Canonical transcript CSV / VCF buttons sit under the grid on the pager's line,
+between "Showing 1 to 10 of 4,920 entries" and the page controls. `data-toolbar` (above the grid) is
+unchanged for everything else.
+
+**Compact controls** - default Bootstrap sizing put **60px** under the table: `.dataTables_info` and
+`.dataTables_length` stacked as blocks (33px + 27px) above 32px round pager buttons - nearly three
+21px rows the user couldn't see. The definition's `compactControls` puts `dt-compact` on the wrapper,
+which lays `.showing` out as a flex row and pins every control to 22px. Measured **60.3px -> 22.8px**,
+buying back about 1.7 rows. The adapter sets it for all its grids; native `DatatableConfig` tables
+don't send it and are unchanged.
+
+The node editor's tab strip was trimmed to match (`analysis_nodes.css`): `.bottom-pane-tab` (the
+horizontal mode Editor/Grid/Summary/Doc bar) **31px -> 24px**, and the vertical mode jQuery UI strip
+`#node-editor-tabs > ul.ui-tabs-nav` **42.5px -> 26px** - jQuery UI sizes its tab links in em
+(`.5em/1em`), which cost 42px of pane before any content. Together with the grid controls that is
+**~45px back in horizontal mode and ~54px in vertical**, so two to three more rows on screen.
+
+**Sample page** (item 7) — `sample_variants_tab.html` calls `setupNodeGrid` with both URLs; its
+`<div id='pager-...'>` is gone. `base_related_analyses.html` builds its export params itself and was
+already on the datatable for its tags grid, so it needed nothing.
+
+**Untouched** (item 8) — column summary, the node editor forms and `node_debug` consume `VariantGrid`
+server-side, which is unchanged. `library/jqgrid` stays as the engine.
+
+**Evidence**
+
+- Live endpoints on the dev box: the config answers 111 columns / `deferLoading: true` / postData
+  carrying node_id, version_id, ccc_id, ccc_version_id, extra_filters, zygosity_samples_hash; the
+  handler answers `recordsTotal: 4920` with no `draw`. Three identical requests returned the same
+  sha256 in ~8ms - the week-long `@cache_page` is intact.
+- The client's request URL is exactly the key-sorted param set, matching the hand-built one byte for byte:
+  `?ccc_id=1&ccc_version_id=0&extra_filters=default&length=10&node_id=238&start=0&version_id=3&zygosity_samples_hash=...`
+- A saved FilterNode (`locus__contig__name eq MT`) round trips: its rules come back on the definition,
+  the builder offers both the field and the operation, and the handler returns MT rows only.
+- Tests: `analysis/tests/test_node_grid_datatable_endpoints.py` (9 - definition shape, deferred rows,
+  postData, envelope, paging, column filters, and the cache key: every client param whitelisted,
+  identical state gives an identical URL, `draw` never reaches it) and 5 filter builder tests in
+  `test_jqgrid_datatable_adapter.py` (25 total). 1066 tests pass across analysis/snpdb/variantopedia/
+  genes/library. pylint unchanged from master.
+
+**Unrelated crash found while verifying** — `major_operation` (`library/django_utils/major_operation.py`)
+released its per-user slot with a bare `cache.decr`, which Redis raises on for a missing key. The
+counter's TTL (`MAJOR_OPERATION_SLOT_EXPIRE_SECONDS`, 10 min) is set when the key is created and never
+extended, so an operation still running as it lapses crashed on the way out — and because the release
+is in a `finally`, the 500 replaced whatever the operation had actually produced. Since a node grid
+gets a 5 minute `statement_timeout`, the slow operations this limit exists to protect are exactly the
+ones that tripped it. Now released through a `_release_slot()` helper that tolerates the key having
+gone, with two tests that fail against the old code. Predates this project — `views_grid.py`'s
+`with major_operation(...)` is untouched by the conversion.
+
+**Browser harness** (`scratchpad/harness/`, throwaway) — rebuilt for this stage. `dump_definition.py`
+writes a real definition from a `CohortNode` over the 166 sample cohort, `make_rows.py` cans matching
+rows, `index.html` builds a real `DataTableDefinition` from them and writes `offsetWidth`/computed
+style readings into a `<pre>`; `node_grid.html` does the same for `setupNodeGrid` against a live
+`node_grid_config`/`node_grid_handler` capture, with the analysis page's globals stubbed - that is
+what found the deferred-load `registerComponent` bug. `python3 -m http.server` + `google-chrome
+--headless=new --dump-dom --screenshot`. The real pages are reachable too: mint a session with
+`SessionStore` (the backend is `cache`), then `login.html?sid=...&next=...` sets the cookie and
+redirects to `localhost:8000` - cookies ignore the port.
+
 **Follow-up goal (post-conversion): auto-fit rows to the grid pane height.** Deferred until after the main conversion, but Stage 4 keeps the hooks open — nothing extra to build now:
 - Runtime page-length changes are native DataTables (`table.page.len(n).draw()`), and the adapter already passes `length` through as jqGrid `rows`, so any value works server-side.
-- The computation slots into the existing `resizeGrid` hook: `floor(paneHeight / rowHeight)` needs a predictable row height, so the Stage 4 grid CSS should keep analysis rows fixed-height (single line, ellipsis overflow — matching current behaviour).
+- The computation slots into the existing `resizeGrid` hook: `floor(paneHeight / rowHeight)` needs a predictable row height, which the Stage 4 CSS now gives it — **every analysis row is exactly 21px**, measured in the harness across a 1103 column grid.
 - **Round the fitted value to the standard buckets (10/15/20/25/50/100)** — a raw fit like 23 rows makes `length` vary per user pane size and fragments the week-long `node_grid_handler` cache.
 - Auto-fit becomes a mode alongside the `UserGridConfig` fixed value (e.g. `rows=0` or a flag meaning "auto"), decided when the feature is built.
 
 ## Stage 5 — Cleanup
 
-- Remove the ported formatters and `setupGrid` machinery from `grid.js` (keep `nodeGridExportInfo`/IGV/tag helpers that survive), `variant_details_link_grid.html`, jqGrid CSS/`include_jqgrid.js` from the converted pages, `JSON2CSV` usage, and `{% jqgrid %}` search-dialog plumbing for these pages.
-- `JQGridView` URL entries for the six grids point at the adapter view; `op=download` streaming stays.
-- `library/jqgrid`, `jqgrid.html`, and the jqGrid JS library remain for the still-unconverted grids (tracked separately — the remaining list is in issue #1462's family).
+Stages 1-4 already removed most of what this stage was written to remove — `setupGrid` and its
+machinery, `variant_details_link_grid.html`, `grids/gene_variants_grid.html`, and the FilterNode
+`searchGrid` plumbing are gone, and all six grids' URLs already point at the adapter. What is
+actually left:
+
+- **`$.fn.fmatter` shim in `grid.js`** (marked `LEGACY-JQGRID`) — the only reason the converted
+  formatters are still reachable under their jqGrid names. Delete it once no `{% jqgrid %}` page
+  renders a variant column: check `snpdb/templates/jqgrid/jqgrid.html` consumers first.
+- **`FilterNode.get_extra_grid_config`'s `search = True`** (marked `LEGACY-JQGRID`) — opened jqGrid's
+  dialog; the DataTables builder reads the rules off `postData` instead.
+- **jQuery UI / jqGrid assets on the converted pages** — `include_jqgrid.js` is now only pulled in by
+  `snpdb/templates/jqgrid/jqgrid.html` and `patients/tags/phenotype_entry_tag.html`, so the analysis
+  page no longer needs it. The node editor's own tabs are still jQuery UI (`#node-editor-tabs`), so
+  jQuery UI itself stays.
+- **`JSON2CSV` / `download_grid_json_as_csv`** — still used by seqauto, pathtests, patients and the
+  node-editor popup grids; goes when they convert.
+- `library/jqgrid`, `jqgrid.html` and the jqGrid JS library stay for the ~16 unconverted grids
+  (tracked separately — the remaining list is in issue #1462's family). `library/jqgrid` is also the
+  adapter's engine, so it outlives the client library either way.
+
+Start with `grep -rn LEGACY-JQGRID` — that is the whole worklist for the client side.
 
 ### jqGrid deprecation markers (every stage)
 

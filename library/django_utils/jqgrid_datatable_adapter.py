@@ -17,7 +17,7 @@ from django.urls.base import resolve, reverse
 from django.views.generic.base import View
 
 from library.django_utils.jqgrid_view import JQGridViewOp, grid_export_request
-from library.jqgrid.jqgrid import json_encode
+from library.jqgrid.jqgrid import FILTER_OPERATIONS, json_encode
 from library.jqgrid.jqgrid_user_row_config import JqGridUserRowConfig
 from library.utils import JsonObjType, nice_class_name
 from snpdb.views.datatable_view import DatabaseTableView
@@ -77,6 +77,39 @@ def datatable_columns_from_colmodels(colmodels: list[dict]) -> list[JsonObjType]
     return columns
 
 
+def datatable_filter_operations() -> list[JsonObjType]:
+    """ The operations the filter builder offers - the same list JqGrid.get_q turns into Django
+        lookups and FilterNodeItem persists """
+    return [{"op": op, "label": label, "takesData": takes_data} for op, label, takes_data in FILTER_OPERATIONS]
+
+
+def datatable_filter_fields_from_colmodels(colmodels: list[dict]) -> list[JsonObjType]:
+    """ The fields the filter builder offers, with enough type information to pick sensible operations
+        and an input widget. 'field' is what goes into a rule and straight into a Django lookup, so
+        columns the engine can't filter on are left out:
+         - search=False (ForeignKey colmodels, and FilterNode's inherited columns, which would join)
+         - packed genotype columns, whose 'index' encodes a sample position rather than a field path
+    """
+    fields = []
+    for cm in colmodels:
+        if not cm.get("search", True):
+            continue
+        name = cm["name"]
+        if ":" in str(cm.get("index", name)):
+            continue
+
+        field: JsonObjType = {"field": name, "label": cm.get("label", name)}
+        if choices := (cm.get("searchoptions") or {}).get("value"):
+            field["type"] = "select"
+            field["choices"] = choices
+        elif sorttype := cm.get("sorttype"):
+            field["type"] = sorttype  # 'int' / 'float' / 'date'
+        else:
+            field["type"] = "text"
+        fields.append(field)
+    return fields
+
+
 def datatable_order_from_config(config: dict, colmodels: list[dict]) -> Optional[list]:
     """ jqGrid sortname/sortorder -> DataTables 'order'. None where the grid has no sortable
         initial column (sortname defaults to 'pk', which is not a grid column) """
@@ -89,6 +122,123 @@ def datatable_order_from_config(config: dict, colmodels: list[dict]) -> Optional
                 return None
             return [[i, config.get("sortorder", "asc")]]
     return None
+
+
+def datatable_csv_name(grid) -> str:
+    try:
+        return grid.csv_name
+    except AttributeError:
+        try:
+            return nice_class_name(grid.model)
+        except AttributeError:
+            return nice_class_name(grid)
+
+
+def datatable_definition(grid, *, download_url: Optional[str] = None, scroll_x: bool = True,
+                         defer_loading: bool = False, cache_stable_params: bool = True,
+                         filter_builder: bool = True, filter_builder_toolbar: bool = True) -> JsonObjType:
+    """ The table definition DataTableDefinition builds the table from. Computed per request -
+        hide_non_admin columns and UserGridConfig rows are both per user. """
+    config = grid.get_config(as_json=False)
+    colmodels = grid.get_colmodels(remove_server_side_only=True)
+
+    data: JsonObjType = {
+        "columns": datatable_columns_from_colmodels(colmodels),
+        "order": datatable_order_from_config(config, colmodels),
+        "scrollX": scroll_x,
+        "tableClass": DATATABLE_TABLE_CLASS,
+        "searchBoxEnabled": False,
+        "downloadCsvButtonEnabled": False,  # server side streaming download instead, see downloadUrl
+        "downloadUrl": download_url,
+        "csvName": datatable_csv_name(grid),
+        "ajaxType": "GET",  # keeps @cache_page on the data endpoint working
+        "cacheStableParams": cache_stable_params,
+        "deferLoading": defer_loading,
+        "approximateCount": True,
+        # Every pixel of chrome under these grids is a row the user can't see
+        "compactControls": True,
+        "extra": grid.get_datatable_extra(),
+    }
+    if filter_builder:
+        data["filterBuilder"] = {
+            "fields": datatable_filter_fields_from_colmodels(colmodels),
+            "operations": datatable_filter_operations(),
+        }
+        # The analysis node grid wants the fields and operations (its FilterNode editor mounts its
+        # own builder off them) without the grid's own "Filter grid..." button - filtering an
+        # analysis is what FilterNode is for
+        data["filterBuilderToolbar"] = filter_builder_toolbar
+    if isinstance(grid, JqGridUserRowConfig):
+        # Rows per page persists per user - the DataTables client POSTs set_user_row_config on change
+        data["gridName"] = grid.get_caption()
+        data["pageLength"] = config["rowNum"]
+        data["lengthMenu"] = config["rowList"]
+    return data
+
+
+def translate_datatable_params(request: HttpRequest, grid) -> QueryDict:
+    """ DataTables request params -> the jqGrid ones the grid engine reads off request.GET.
+        Column filtering ('filters'/'_search') and any page specific params pass through untouched. """
+    params = request.GET.copy()
+
+    # A request with no 'length' (a bookmarked grid URL) gets the grid's own configured page size
+    if (length_param := params.get("length")) not in (None, ""):
+        length = int(length_param)
+        start = int(params.get("start") or 0)
+        params["rows"] = length  # 0 means no pagination
+        params["page"] = (start // length) + 1 if length else 1
+
+    if (column_index := params.get("order[0][column]")) not in (None, ""):
+        colmodels = grid.get_colmodels()
+        try:
+            cm = colmodels[int(column_index)]
+        except (ValueError, IndexError):
+            logger.warning("DataTables order column %s is not in %s's colmodel",
+                           column_index, nice_class_name(grid))
+        else:
+            # 'index' is the server side column name. Genotype columns pack their sort info into it
+            # (e.g. 'cohortgenotype_134:1:samples_zygosity') and VariantGrid._sort_items decodes it
+            params["sidx"] = cm.get("index", cm["name"])
+            params["sord"] = params.get("order[0][dir]", "asc")
+    return params
+
+
+def prepare_datatable_row(row: dict) -> JsonObjType:
+    """ Rows keep their .values() field name keys, so they line up with the columns' 'data' keys """
+    return {k: DatabaseTableView.limit_value_size(DatabaseTableView.sanitize_value(v))
+            for k, v in row.items()}
+
+
+def datatable_data(request: HttpRequest, grid) -> JsonObjType:
+    """ One grid page as the DataTables envelope. Both record counts come from the single paginator
+        count, so a grid's get_known_count() flows through with no COUNT(*). """
+    original_get = request.GET
+    request.GET = translate_datatable_params(request, grid)
+    try:
+        grid_data = grid.get_data(request)
+    finally:
+        request.GET = original_get
+
+    records = grid_data["records"]
+    data: JsonObjType = {
+        "recordsTotal": records,
+        "recordsFiltered": records,
+        "data": [prepare_datatable_row(row) for row in grid_data["rows"]],
+    }
+    # An estimate rather than a COUNT(*) - the pager shows it as "~N" (@see AllVariantsGrid)
+    if approximate_records := grid_data.get("approximate_records"):
+        data["approximateRecords"] = approximate_records
+    # The client strips 'draw' so the request URL stays cacheable, and restores it on the response.
+    # Echoing a 0 here would look stale to DataTables and the draw would be discarded
+    if draw := request.GET.get("draw"):
+        data["draw"] = int(draw)
+    return data
+
+
+def datatable_json_response(data: JsonObjType) -> HttpResponse:
+    # json_encode is strict (allow_nan=False) - NaN in a float annotation column would otherwise
+    # go down as a bare NaN token and blow up JSON.parse in the browser
+    return HttpResponse(json_encode(data), content_type="application/json")  # pylint: disable=http-response-with-content-type-json
 
 
 class JqGridDatatableView(View):
@@ -109,6 +259,9 @@ class JqGridDatatableView(View):
     cache_stable_params = True
     scroll_x = True
     defer_loading = False
+    # The column filter builder - the engine reads its rules off '_search'/'filters' (@see JqGrid.get_q)
+    filter_builder = True
+    filter_builder_toolbar = True
 
     @staticmethod
     def create_grid_from_request(request, grid_klass, **kwargs):
@@ -142,9 +295,7 @@ class JqGridDatatableView(View):
 
     @staticmethod
     def _json_response(data: JsonObjType) -> HttpResponse:
-        # json_encode is strict (allow_nan=False) - NaN in a float annotation column would otherwise
-        # go down as a bare NaN token and blow up JSON.parse in the browser
-        return HttpResponse(json_encode(data), content_type="application/json")  # pylint: disable=http-response-with-content-type-json
+        return datatable_json_response(data)
 
     def post(self, request, *args, **kwargs):
         """ DataTables can be configured to POST - the grid engine only ever reads request.GET """
@@ -153,13 +304,7 @@ class JqGridDatatableView(View):
 
     @staticmethod
     def _csv_name(grid) -> str:
-        try:
-            return grid.csv_name
-        except AttributeError:
-            try:
-                return nice_class_name(grid.model)
-            except AttributeError:
-                return nice_class_name(grid)
+        return datatable_csv_name(grid)
 
     def _download_url(self, request, **kwargs) -> Optional[str]:
         if not self.csv_download:
@@ -170,84 +315,20 @@ class JqGridDatatableView(View):
         return reverse(url_name, kwargs={**kwargs, "op": JQGridViewOp.DOWNLOAD})
 
     def json_definition(self, request: HttpRequest, grid, **kwargs) -> JsonObjType:
-        """ The table definition DataTableDefinition builds the table from. Computed per request -
-            hide_non_admin columns and UserGridConfig rows are both per user """
-        config = grid.get_config(as_json=False)
-        colmodels = grid.get_colmodels(remove_server_side_only=True)
-
-        data: JsonObjType = {
-            "columns": datatable_columns_from_colmodels(colmodels),
-            "order": datatable_order_from_config(config, colmodels),
-            "scrollX": self.scroll_x,
-            "tableClass": DATATABLE_TABLE_CLASS,
-            "searchBoxEnabled": False,
-            "downloadCsvButtonEnabled": False,  # server side streaming download instead, see downloadUrl
-            "downloadUrl": self._download_url(request, **kwargs),
-            "csvName": self._csv_name(grid),
-            "ajaxType": "GET",  # keeps @cache_page on the data endpoint working
-            "cacheStableParams": self.cache_stable_params,
-            "deferLoading": self.defer_loading,
-            "approximateCount": True,
-            "extra": grid.get_datatable_extra(),
-        }
-        if isinstance(grid, JqGridUserRowConfig):
-            # Rows per page persists per user - the DataTables client POSTs set_user_row_config on change
-            data["gridName"] = grid.get_caption()
-            data["pageLength"] = config["rowNum"]
-            data["lengthMenu"] = config["rowList"]
-        return data
+        return datatable_definition(grid,
+                                    download_url=self._download_url(request, **kwargs),
+                                    scroll_x=self.scroll_x,
+                                    defer_loading=self.defer_loading,
+                                    cache_stable_params=self.cache_stable_params,
+                                    filter_builder=self.filter_builder,
+                                    filter_builder_toolbar=self.filter_builder_toolbar)
 
     def translate_params(self, request: HttpRequest, grid) -> QueryDict:
-        """ DataTables request params -> the jqGrid ones the grid engine reads off request.GET.
-            Column filtering ('filters'/'_search') and any page specific params pass through untouched. """
-        params = request.GET.copy()
-
-        # A request with no 'length' (a bookmarked grid URL) gets the grid's own configured page size
-        if (length_param := params.get("length")) not in (None, ""):
-            length = int(length_param)
-            start = int(params.get("start") or 0)
-            params["rows"] = length  # 0 means no pagination
-            params["page"] = (start // length) + 1 if length else 1
-
-        if (column_index := params.get("order[0][column]")) not in (None, ""):
-            colmodels = grid.get_colmodels()
-            try:
-                cm = colmodels[int(column_index)]
-            except (ValueError, IndexError):
-                logger.warning("DataTables order column %s is not in %s's colmodel",
-                               column_index, nice_class_name(grid))
-            else:
-                # 'index' is the server side column name. Genotype columns pack their sort info into it
-                # (e.g. 'cohortgenotype_134:1:samples_zygosity') and VariantGrid._sort_items decodes it
-                params["sidx"] = cm.get("index", cm["name"])
-                params["sord"] = params.get("order[0][dir]", "asc")
-        return params
+        return translate_datatable_params(request, grid)
 
     def get_data(self, request: HttpRequest, grid) -> JsonObjType:
-        original_get = request.GET
-        request.GET = self.translate_params(request, grid)
-        try:
-            grid_data = grid.get_data(request)
-        finally:
-            request.GET = original_get
-
-        records = grid_data["records"]
-        data: JsonObjType = {
-            "recordsTotal": records,
-            "recordsFiltered": records,
-            "data": [self.prepare_row(row) for row in grid_data["rows"]],
-        }
-        # An estimate rather than a COUNT(*) - the pager shows it as "~N" (@see AllVariantsGrid)
-        if approximate_records := grid_data.get("approximate_records"):
-            data["approximateRecords"] = approximate_records
-        # The client strips 'draw' so the request URL stays cacheable, and restores it on the response.
-        # Echoing a 0 here would look stale to DataTables and the draw would be discarded
-        if draw := request.GET.get("draw"):
-            data["draw"] = int(draw)
-        return data
+        return datatable_data(request, grid)
 
     @staticmethod
     def prepare_row(row: dict) -> JsonObjType:
-        """ Rows keep their .values() field name keys, so they line up with the columns' 'data' keys """
-        return {k: DatabaseTableView.limit_value_size(DatabaseTableView.sanitize_value(v))
-                for k, v in row.items()}
+        return prepare_datatable_row(row)

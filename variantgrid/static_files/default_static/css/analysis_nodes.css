@@ -826,13 +826,15 @@ span.node-counts {
 }
 
 .bottom-pane-tab {
-	padding: 4px 16px;
+	padding: 1px 12px;
 	border: 1px solid transparent;
 	border-bottom: none;
 	border-radius: 4px 4px 0 0;
 	color: #333;
 	text-decoration: none;
 	font-weight: 600;
+	font-size: 13px;
+	line-height: 20px;
 }
 
 .bottom-pane-tab:hover {
@@ -884,6 +886,18 @@ span.node-counts {
 /* One row of tabs - the node editor's own strip is mirrored into the bar of whichever home it's in */
 .analysis-horizontal #node-editor-tabs > ul.ui-tabs-nav {
 	display: none;
+}
+
+/* jQuery UI sizes its tabs in em (.5em/1em on the links), which costs ~42px of the editor pane
+   before any content. Match the bottom pane strip instead - that height is rows on the grid. */
+#node-editor-tabs > ul.ui-tabs-nav {
+	padding: 0;
+	font-size: 13px;
+}
+
+#node-editor-tabs > ul.ui-tabs-nav li a {
+	padding: 1px 12px;
+	line-height: 20px;
 }
 
 /* Node counts legend - moved into the toolbar (see layoutAnalysisPanels), so it reads as a single row */

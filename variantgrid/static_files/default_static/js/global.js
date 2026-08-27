@@ -350,6 +350,7 @@ function enhanceAndMonitor() {
                 const data = node.attr('data-datatable-data');
                 new DataTableDefinition({
                     url: dataTableUrl,
+                    definitionUrl: node.attr('data-datatable-definition-url'),
                     data: data, // as in a function that filters the data displayed
                     filterCount: node.attr('data-datatable-filter-count'),
                     dom: node,

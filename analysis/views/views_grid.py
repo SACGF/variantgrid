@@ -27,22 +27,30 @@ from analysis.views.analysis_permissions import (
 )
 from analysis.views.node_json_view import NodeJSONGetView, NodeJSONViewMixin
 from library.constants import WEEK_SECS
+from library.django_utils.jqgrid_datatable_adapter import datatable_data, datatable_definition
 from library.django_utils.major_operation import TooManyMajorOperationsError, major_operation
 from library.utils.hash_utils import sha256sum_str
 from snpdb.models import CachedGeneratedFile, Cohort, Sample
 
+# What a node grid request may carry, so the cache key and the export params hash are built off a
+# known set. The DataTables client sends start/length/order (@see translate_datatable_params turning
+# them into rows/page/sidx/sord); the jqGrid names are still here because node_grid_export builds its
+# params from this list and the export path reads them straight off the request.
 _NODE_GRID_ALLOWED_PARAMS = {
-    '_filters',
     '_search',
     'ccc_id',
     'ccc_version_id',
     'extra_filters',
     'filters',
+    'length',
     'node_id',
+    'order[0][column]',
+    'order[0][dir]',
     'page',
     'rows',
     'sidx',
     'sord',
+    'start',
     'version_id',
     'zygosity_samples_hash',
 }
@@ -111,9 +119,9 @@ class NodeGridHandler(NodeJSONViewMixin):
     def _get_data(self, request, node, **kwargs):
         # Don't build queryset if invalid (stale q-dict cache)
         if errors := node.get_errors(flat=True):
-            return {"errors": errors, "rows": [], "records": 0, "page": 1, "total": 0}
+            return {"errors": errors, "data": [], "recordsTotal": 0, "recordsFiltered": 0}
         grid = _variant_grid_from_request(request, node)
-        return grid.get_data(request)
+        return datatable_data(request, grid)
 
 
 @method_decorator([cache_page(WEEK_SECS), vary_on_cookie], name='get')
@@ -128,7 +136,13 @@ class NodeGridConfig(NodeJSONGetView):
             ret = {"errors": errors}
         else:
             grid = grids.VariantGrid(request.user, node, kwargs["extra_filters"])
-            ret = grid.get_config(as_json=False)
+            # Always deferred: whether to fetch rows at all is the page's call (the row count
+            # placeholder, and the grid tab being hidden) - node_data_grid.html triggers the first load
+            # The fields/operations go down for the FilterNode editor's builder, but the grid
+            # itself gets no "Filter grid..." button - FilterNode is how you filter an analysis
+            ret = datatable_definition(grid, defer_loading=True, filter_builder_toolbar=False)
+            # The per-request state the data endpoint needs, which the page sends as its ajax params
+            ret["postData"] = grid.extra_config["postData"]
         return ret
 
 

@@ -18,8 +18,11 @@ from library.django_utils.jqgrid_datatable_adapter import (
     DEFAULT_COLUMN_WIDTH,
     JqGridDatatableView,
     datatable_columns_from_colmodels,
+    datatable_filter_fields_from_colmodels,
+    datatable_filter_operations,
     datatable_order_from_config,
 )
+from library.jqgrid.jqgrid import FILTER_OPERATIONS
 from library.django_utils.jqgrid_view import JQGridViewOp
 from snpdb.models import UserGridConfig
 from variantopedia.grids import AllVariantsGrid
@@ -220,3 +223,61 @@ class AdapterDefinitionTest(GridExportTestCase):
         definition = self._definition()
         self.assertEqual(15, definition["pageLength"])
         self.assertIn(15, definition["lengthMenu"])
+
+
+class AdapterFilterBuilderTest(GridExportTestCase):
+    """ The filter builder's fields and operations (plan Stage 4 item 6). The rules it emits go up
+        as '_search'/'filters' and are parsed by JqGrid.get_q - the same JSON FilterNode persists. """
+
+    def test_operations_match_the_engines(self):
+        operations = datatable_filter_operations()
+        self.assertEqual([op for op, _label, _takes in FILTER_OPERATIONS],
+                         [o["op"] for o in operations])
+        takes_data = {o["op"]: o["takesData"] for o in operations}
+        self.assertFalse(takes_data["nu"], "'is null' filters on its own")
+        self.assertTrue(takes_data["lt"])
+
+    def test_unfilterable_columns_are_left_out(self):
+        """ search=False is jqGrid's own 'don't offer this', and a packed genotype column's 'index'
+            is a sample position rather than a field path - neither is a Django lookup """
+        fields = datatable_filter_fields_from_colmodels([
+            {"name": "locus__position", "label": "Position", "sorttype": "int"},
+            {"name": "some_fk", "label": "FK", "search": False},
+            {"name": "sample_1_samples_zygosity", "label": "Zyg",
+             "index": "cohortgenotype_134:1:samples_zygosity"},
+        ])
+        self.assertEqual(["locus__position"], [f["field"] for f in fields])
+        self.assertEqual("int", fields[0]["type"])
+
+    def test_select_columns_carry_their_choices(self):
+        fields = datatable_filter_fields_from_colmodels([
+            {"name": "variantannotation__impact", "label": "Impact", "stype": "select",
+             "searchoptions": {"value": {"1": "MODIFIER", "4": "HIGH"}}},
+        ])
+        self.assertEqual("select", fields[0]["type"])
+        self.assertEqual({"1": "MODIFIER", "4": "HIGH"}, fields[0]["choices"])
+
+    def test_definition_offers_the_grids_own_columns(self):
+        request = RequestFactory().get("/grid/", {"dataTableDefinition": 1})
+        request.user = self.user
+        grid = VariantGrid(self.user, self._sample_node())
+        definition = JqGridDatatableView().json_definition(request, grid)
+
+        fields = definition["filterBuilder"]["fields"]
+        offered = {f["field"] for f in fields}
+        self.assertIn("locus__position", offered)
+        self.assertFalse([f for f in fields if ":" in f["field"]], "Packed genotype columns can't be filtered")
+
+    def test_an_emitted_rule_filters_the_grid(self):
+        """ The builder's JSON round trips through the engine that FakeFilterGrid uses """
+        node = self._sample_node()
+        grid = VariantGrid(self.user, node)
+        rules = {"groupOp": "AND",
+                 "rules": [{"field": "locus__position", "op": "lt", "data": "1500"}]}
+        request = RequestFactory().get("/grid/", {"start": 0, "length": 10,
+                                                  "_search": "true", "filters": json.dumps(rules)})
+        request.user = self.user
+
+        data = JqGridDatatableView().get_data(request, grid)
+        self.assertLess(data["recordsFiltered"], node.count)
+        self.assertTrue(all(row["locus__position"] < 1500 for row in data["data"]))

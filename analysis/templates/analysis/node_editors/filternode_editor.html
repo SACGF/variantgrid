@@ -9,55 +9,51 @@
 $(document).ready(function() {
     const unique_code = "{{ node_id }}_{{ version_id }}"; // make sure only attach editor to grid that requested
 
+    /* The rules are the node's, not the browser's - they are saved against the FilterNode and come
+       back on its grid definition as postData.filters, which the grid then sends with every request.
+       The builder emits exactly the JSON FilterNodeItem rows are written from. */
 	function connectFilterNodeEditorToGrid() {
-        const grid_id = "grid-{{ node.pk }}";
-        const grid = $("#" + grid_id, "#" + unique_code);
+        const definition = getNodeGridDefinition({{ node.pk }});
+        const container = $("div#FilterNode-editor");
+        if (!definition) {
+            container.text("Filters are unavailable while the grid is not loaded.");
+            hideLoadingOverlay();
+            return;
+        }
 
-        if (grid && grid.length > 0) {
-	        // Make search always appear
-            const searchOptions = {multipleSearch: true, overlay: false, drag: false, resize: false};
-            grid.searchGrid(searchOptions);
-			// find the div which contain the searching dialog
-            const searchDialog = $("#searchmodfbox_" + grid[0].id);
-            searchDialog.addClass("ui-jqgrid ui-widget ui-widget-content ui-corner-all");
-		    searchDialog.css({position: 'static', width: '100%'})
-            const gbox = $("div#FilterNode-editor");
-            searchDialog.appendTo(gbox);
-			// Hide close button
-			searchDialog.find(".ui-jqdialog-titlebar-close").hide();
-			searchDialog.find(".ui-jqdialog-titlebar").hide();
+        const savedFilters = definition.serverParams.postData.filters;
 
-            const save_filters = function (event) {
-                const filters = grid.getGridParam("postData")["filters"];
-                const data = 'filters=' + filters;
-                $.ajax({
-                    type: "POST",
-                    url: "{{ request.path }}",
-                    data: data,
-                    success: function () {
-                        reloadNodeAndData({{ node.pk }});
-                    }
-                });
+        const saveFilters = function(filters) {
+            $.ajax({
+                type: "POST",
+                url: "{{ request.path }}",
+                data: {filters: JSON.stringify(filters)},
+                success: function () {
+                    $("#filter-messages").empty();
+                    reloadNodeAndData({{ node.pk }});
+                }
+            });
+        };
 
-                event.preventDefault();
-            };
+        const unsavedChanges = function() {
+            $("#filter-messages").text("Warning: You have unsaved changes, press 'Find' to save");
+        };
 
+        const builder = new VariantGridFilterBuilder({
+            container: container,
+            filterBuilder: definition.serverParams.filterBuilder,
             {% if has_write_permission %}
-			grid.bind('jqGridFilterSearch', save_filters);
-			grid.bind('jqGridFilterReset', save_filters);
+            onApply: saveFilters,
+            onReset: saveFilters,
+            onChange: unsavedChanges,
+            {% else %}
+            readOnly: true,
+            {% endif %}
+        }).render();
 
-			const unsavedChanges = function() {
-                const UNSAVED_MESSAGE = "Warning: You have unsaved changes, press 'find' to save";
-                $("#filter-messages").text(UNSAVED_MESSAGE);
-			};
-			$("select", searchDialog).change(unsavedChanges);
-            $("input[type=button]", searchDialog).click(unsavedChanges);
-			$("input[type=text]", searchDialog).change(unsavedChanges);
-        {% else %}
-            $("input[type=button]", searchDialog).hide();
-            $(".EditButton", searchDialog).hide();
-        {% endif %}
-		}
+        if (savedFilters) {
+            builder.setFilters(JSON.parse(savedFilters));
+        }
 		hideLoadingOverlay();
 	}
 

@@ -1,6 +1,22 @@
-// LEGACY-JQGRID: node grid element lookup - callers move to $(...).DataTable() in plan Stage 4
+/* The node grid's <table>. One per node-version pane, so it's looked up inside the pane rather
+   than by id alone - a stale pane may still be in the DOM while the next one loads. */
 function getGrid(nodeId, unique_code) {
 	return $("#grid-" + nodeId, "#" + unique_code);
+}
+
+// The DataTableDefinition driving a node's grid, by node id - set by setupNodeGrid
+const nodeGridDefinitions = {};
+
+function getNodeGridDefinition(nodeId) {
+	return nodeGridDefinitions[nodeId];
+}
+
+function getNodeDataTable(nodeId, unique_code) {
+	const table = getGrid(nodeId, unique_code);
+	if (table.length && $.fn.DataTable.isDataTable(table)) {
+		return table.DataTable();
+	}
+	return null;
 }
 
 function getAnalysisDownloadTracker() {
@@ -8,17 +24,31 @@ function getAnalysisDownloadTracker() {
 }
 
 /* Everything a node export is identified by, plus the URL that launches it. Built off the grid's live
-   postData so the export sees whatever the user has filtered the grid down to. */
+   ajax params so the export sees whatever the user has filtered the grid down to.
+
+   Works before the rows have ever been fetched: the placeholder on a big node offers CSV/VCF without
+   the user loading the grid, so the params come from the definition's postData when the table has
+   yet to make a request. Paging and sorting are dropped - the export orders by genome position. */
 function nodeGridExportInfo(analysisId, nodeId, unique_code, export_type, use_canonical_transcripts, caption) {
-	const grid = getGrid(nodeId, unique_code);
-	const gridParams = $.extend({}, grid.jqGrid('getGridParam', 'postData'));
+	const definition = getNodeGridDefinition(nodeId);
+	const dataTable = getNodeDataTable(nodeId, unique_code);
+	let gridParams = {};
+	if (dataTable) {
+		gridParams = $.extend({}, dataTable.ajax.params());
+	} else if (definition) {
+		gridParams = $.extend({}, definition.serverParams.postData);
+	}
+	delete gridParams['start'];
+	delete gridParams['order[0][column]'];
+	delete gridParams['order[0][dir]'];
 	gridParams['rows'] = 0; // no pagination
+	gridParams['length'] = 0;
 	gridParams['export_type'] = export_type;
 	if (use_canonical_transcripts) {
 		gridParams['use_canonical_transcripts'] = true;
 	}
 
-	const gridCaption = grid.jqGrid('getGridParam', 'caption') || ("Node " + nodeId);
+	const gridCaption = (definition && definition.serverParams.gridName) || ("Node " + nodeId);
 	return {
 		nodeId: nodeId,
 		nodeVersion: gridParams['version_id'],
@@ -374,30 +404,6 @@ $(document).ready(function() {
 });
 
 
-// LEGACY-JQGRID: used by setupGrid below.
-// We need to do this, so that we don't send up a changing timestamp and thus never get cached
-function deleteNdParam(postData) {
-    const myPostData = $.extend({}, postData); // make a copy of the input parameter
-    myPostData._filters = myPostData.filters;
-    delete myPostData.nd;
-    return myPostData;
-}
-
-// LEGACY-JQGRID: DataTables persists rows per page through the definition's gridName
-// (@see DataTableDefinition.setupDom). FIXME: Duplicated in jqgrid.html
-function setRowChangeCallbacks(grid, gridName) {
-	$(".ui-pg-selbox").change(function() {
-        const gridRows = $(this).val();
-        const data = 'grid_name=' + gridName + '&grid_rows=' + gridRows;
-        $.ajax({
-		    type: "POST",
-		    data: data,
-		    url: Urls.set_user_row_config(),
-		});
-	});
-}
-
-
 function tagClickHandler() {
     const gridTag = $(this);
     const innerSpan = $(".user-tag-colored", gridTag);
@@ -414,7 +420,7 @@ function tagClickHandler() {
 }
 
 
-// This is always kicked off after grid is loaded (after passed in function gridComplete)
+// Kicked off after every grid draw, alongside the page's own gridComplete
 function gridCompleteExtra() {
     const aWin = getAnalysisWindow();
     if (!aWin.variantTagsReadOnly) {
@@ -432,138 +438,99 @@ function gridCompleteExtra() {
 }
 
 
+/* The analysis node grid. Two endpoints: config_url answers the table definition (columns, widths,
+   renderers - it varies by node version, so it caches with the node) and the handler serves the rows
+   for the whole analysis. The node's own state - node_id, version_id, ccc_id, ccc_version_id,
+   extra_filters, zygosity_samples_hash and a FilterNode's filters - comes back on the definition as
+   'postData' and goes up as the ajax params of every row request.
 
-// LEGACY-JQGRID: the analysis node grid's jqGrid setup - replaced by a DataTableDefinition build in
-// node_data_grid.html when the node grid converts (plan Stage 4)
-function setupGrid(config_url, analysisId, nodeId, versionId, unique_code, gridComplete, gridLoadError, on_error_function, autoLoad) {
+   autoLoad false builds the table but holds the row query back until loadNodeGridData() asks for it,
+   which is how a node over the auto-load row count waits behind its placeholder.
+
+   Resolves once the table is built (or the definition reported node errors), so the caller can wire
+   up its row interactions. */
+function setupNodeGrid(config_url, handler_url, analysisId, nodeId, versionId, unique_code,
+                       gridComplete, gridLoadError, on_error_function, autoLoad) {
     if (typeof autoLoad === "undefined") { autoLoad = true; }
-	$(function () {
-    	$.getJSON(config_url, function(data) {
-            const errors = data["errors"];
-            if (errors) {
-				on_error_function(errors);
-    		} else {
-                const postData = data["postData"] || {};
-                // TODO: From issue #1041 6/6/2018 - remove this when nodes config cache expires in 1 week.
-                if (typeof postData["node_id"] == "undefined") {
-                    postData["node_id"] = nodeId;
+
+    const definition = new DataTableDefinition({
+        dom: getGrid(nodeId, unique_code),
+        definitionUrl: config_url,
+        url: handler_url,
+        // The widths come from the colmodel and the CSS lays the table out table-layout: fixed, so
+        // there is nothing to measure - and on a deferred grid the adjust draw is the fetch we're holding
+        adjustColumns: false,
+        data: function(data) {
+            const postData = $.extend({}, definition.serverParams.postData);
+            // FilterNode rules are saved against the node, so they ride along with its other state
+            if (postData.filters) {
+                postData._search = 'true';
+            }
+            return postData;
+        },
+        onDefinition: function(defn) {
+            if (defn.errors) {
+                on_error_function(defn.errors);
+                return false;
+            }
+            return true;
+        },
+        onData: function(json) {
+            if (json.non_fatal && json.deleted_nodes) {
+                deleteNodesFromDOM(json.deleted_nodes, []);
+                if (json.message) {
+                    $("#node-editor-container").text(json.message);
                 }
-				// end obsolete code... 
-				
-				data["postData"] = postData;
-				data["serializeGridData"] = deleteNdParam;
-				data["shrinkToFit"] = false;
+            }
+        },
+        onBeforeSend: function(jqXHR) {
+            window.activeGridRequestXHR = jqXHR;
+        },
+        onLoadError: gridLoadError,
+    });
+    nodeGridDefinitions[nodeId] = definition;
 
-                const pagerId = '#pager-' + nodeId;
-                data["pager"] = pagerId;
-				data["gridComplete"] = function() {
-				    gridComplete();
-				    gridCompleteExtra();
-				};
-				data["loadError"] = gridLoadError;
-                data["loadComplete"] = function(data) {
-                    if (data.non_fatal) {
-                        // console.log("jQGrid: Non fatal node error...");
-                        // console.log(data);
-                        if (data.deleted_nodes) {
-                            deleteNodesFromDOM(data.deleted_nodes, []);
-                            if (data.message) {
-                                $("#node-editor-container").text(data.message);
-                            }
-                        }
-                    }
-                };
-                // height: auto screws up on firefox
-                if (typeof(data["height"]) === "undefined" || data["height"] === "auto") {
-                    data["height"] = null;
-                }
+    // Only one node grid query at a time - a user clicking through nodes would otherwise leave
+    // several multi-minute queries running against each other
+    if (window.activeGridRequestXHR) {
+        window.activeGridRequestXHR.abort();
+        window.activeGridRequestXHR = null;
+    }
 
-                // You can only have 1 active grid request
-                data["loadBeforeSend"] = function(xhr) {
-                    window.activeGridRequestXHR = xhr;
-                };
-                if (window.activeGridRequestXHR) {
-                    window.activeGridRequestXHR.abort();
-                    window.activeGridRequestXHR = null;
-                }
-
-                // Remember the server datatype so a deferred load can flip back to it.
-                window.nodeGridServerDatatype = window.nodeGridServerDatatype || {};
-                window.nodeGridServerDatatype[nodeId] = data["datatype"] || "json";
-                if (!autoLoad) {
-                    data["datatype"] = "local";  // build colModel/pager/nav, fetch no rows
-                }
-
-                const grid = getGrid(nodeId, unique_code);
-                grid.jqGrid(data).navGrid(pagerId,
-	                	{add: false, edit: false, del: false, view: false, search:false},
-			       		{}, // edit options
-			        	{}, // add options
-			       	 	{}, // del options 
-			        	{ multipleSearch:true, closeOnEscape:true }, // search options 
-			        	{} // view options 
-		        	);
-
-				setRowChangeCallbacks(grid, data["caption"]);
-
-                const csvButtonId = `node-grid-export-csv-${nodeId}`;
-                grid.jqGrid(
-		            'navButtonAdd', pagerId, {
-		            id : csvButtonId,
-		            caption : "CSV",
-		            buttonicon : "ui-icon-arrowthickstop-1-s",
-		            onClickButton : function() {
-		            	export_grid(analysisId, nodeId, unique_code, 'csv');
-		            },
-		            title : "Download as CSV",
-		            cursor : "pointer"
-		        });
-                registerNodeGridDownloadButton(`#${csvButtonId}`, analysisId, nodeId, unique_code, 'csv',
-                                               false, "CSV");
-
-                const aWin = getAnalysisWindow();
-                if (aWin.ANALYSIS_SETTINGS && aWin.ANALYSIS_SETTINGS.canonical_transcript_collection) {
-                    const ctc = aWin.ANALYSIS_SETTINGS.canonical_transcript_collection;
-                    const ctcButtonId = `node-grid-export-canonical-csv-${nodeId}`;
-                    grid.jqGrid(
-                        'navButtonAdd', pagerId, {
-                        id : ctcButtonId,
-                        caption : "Canonical transcript CSV",
-                        buttonicon : "ui-icon-arrowthickstop-1-s",
-                        onClickButton : function() {
-                            export_grid(analysisId, nodeId, unique_code, 'csv', true);
-                        },
-                        title : "Download CSV using transcripts from " + ctc,
-                        cursor : "pointer"
-                    });
-                    registerNodeGridDownloadButton(`#${ctcButtonId}`, analysisId, nodeId, unique_code, 'csv',
-                                                   true, "Canonical transcript CSV");
-                }
-
-                const vcfButtonId = `node-grid-export-vcf-${nodeId}`;
-		        grid.jqGrid(
-		            'navButtonAdd', pagerId, {
-		            id : vcfButtonId,
-		            caption : "VCF",
-		            buttonicon : "ui-icon-arrowthickstop-1-s",
-		            onClickButton : function() {
-		            	export_grid(analysisId, nodeId, unique_code, 'vcf');
-		            },
-		            title : "Download as VCF",
-		            cursor : "pointer"
-	        	});
-                registerNodeGridDownloadButton(`#${vcfButtonId}`, analysisId, nodeId, unique_code, 'vcf',
-                                               false, "VCF");
-			}
-	    });
-	});
+    return definition.setup().then(function(built) {
+        if (!built) {
+            return null;  // node errors - on_error_function has already put them on the page
+        }
+        const dataTable = built.dataTable;
+        dataTable.on('draw.dt', function() {
+            gridComplete();
+            gridCompleteExtra();
+        });
+        if (autoLoad) {
+            loadNodeGridData(nodeId, unique_code);
+        } else {
+            // The rows are being held back, but the table itself is up - say so, or the editor's
+            // everythingLoaded (which waits on both halves) sits behind its overlay until the user
+            // clicks "Show grid". gridComplete tells the two apart with nodeGridHasData()
+            gridComplete();
+            gridCompleteExtra();
+        }
+        return built;
+    });
 }
 
-// Fire the deferred row query (phase 2) for a node whose grid was config-loaded only.
+// Fire the row query for a node whose table was built but held back (@see setupNodeGrid autoLoad)
 function loadNodeGridData(nodeId, unique_code) {
-    const grid = getGrid(nodeId, unique_code);
-    const datatype = (window.nodeGridServerDatatype || {})[nodeId] || "json";
-    grid.jqGrid('setGridParam', {datatype: datatype}).trigger('reloadGrid');
+    const dataTable = getNodeDataTable(nodeId, unique_code);
+    if (dataTable) {
+        dataTable.ajax.reload();
+    }
+}
+
+// True once the grid has actually fetched rows - a built-but-deferred table has made no request
+function nodeGridHasData(nodeId, unique_code) {
+    const dataTable = getNodeDataTable(nodeId, unique_code);
+    return Boolean(dataTable && dataTable.ajax.json());
 }
 
 function gridLoadError(jqXHR, textStatus, errorThrown) {

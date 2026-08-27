@@ -49,23 +49,25 @@ const MIN_GRID_HEIGHT = 100;
 const GRID_BOTTOM_MARGIN = 10;
 
 function resizeGrid() {
-    const panelWidth = $("#right-panel").innerWidth();
-    const grid = $('.ui-jqgrid-btable:visible');
-    if (!grid.length) {
+    const wrapper = $("#node-grid-container .dataTables_wrapper:visible");
+    if (!wrapper.length) {
         return;
     }
     // The grid pane is the full window width in horizontal mode, so give the rows the pane height too -
-    // otherwise jqGrid's default keeps them in a short scrolling box with the panel empty underneath
+    // otherwise the scroll body keeps them in a short box with the panel empty underneath
     const available = isHorizontalMode() ? gridPaneAvailableHeight() : null;
 
-    grid.each(function() {
-        const gridSelector = $('#' + $(this).attr('id'));
-        gridSelector.setGridWidth(panelWidth - 2);
-        if (available) {
-            const view = gridSelector.closest(".ui-jqgrid");
-            // Everything but the rows - caption, column headers and pager
-            const chrome = view.outerHeight(true) - $(".ui-jqgrid-bdiv", view).height();
-            gridSelector.setGridHeight(Math.max(available - chrome - GRID_BOTTOM_MARGIN, MIN_GRID_HEIGHT));
+    wrapper.each(function() {
+        const scrollBody = $(".dataTables_scrollBody", this);
+        if (available && scrollBody.length) {
+            // Everything but the rows - toolbar, column headers, pager
+            const chrome = $(this).outerHeight(true) - scrollBody.height();
+            scrollBody.css("max-height", Math.max(available - chrome - GRID_BOTTOM_MARGIN, MIN_GRID_HEIGHT) + "px");
+        }
+        const table = $("table.dataTable", this).first();
+        if (table.length && $.fn.DataTable.isDataTable(table)) {
+            // The pane changed width - re-sync the cloned scroll header with the body
+            table.DataTable().columns.adjust();
         }
     });
 }

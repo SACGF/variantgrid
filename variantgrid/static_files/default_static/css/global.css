@@ -853,10 +853,14 @@ table.variantgrid-datatable {
 }
 table.variantgrid-datatable th,
 table.variantgrid-datatable td {
+  box-sizing: border-box;
   padding: 2px 4px;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+}
+table.variantgrid-datatable tbody td {
+  line-height: 16px;
 }
 table.variantgrid-datatable .variant_id-container {
   display: flex;
@@ -865,8 +869,14 @@ table.variantgrid-datatable .variant_id-container {
 table.variantgrid-datatable td .external-link::after {
   content: none;
 }
+table.variantgrid-datatable.dataTable tbody tr:first-child td {
+  border-top: 1px solid transparent;
+}
 table.variantgrid-datatable.dataTable thead > tr > th {
   padding-right: 16px !important;
+}
+table.variantgrid-datatable.dataTable thead > tr > th.sorting_disabled {
+  padding-right: 4px !important;
 }
 table.variantgrid-datatable.dataTable thead > tr > th::before,
 table.variantgrid-datatable.dataTable thead > tr > th::after {
@@ -1015,6 +1025,44 @@ table.datatable.expandable tr.even, table.datatable.expandable tr.odd {
 }
 .dataTables_wrapper .bottom .showing {
   flex-grow: 1;
+}
+.dataTables_wrapper .bottom .bottom-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-right: 12px;
+}
+.dataTables_wrapper.dt-compact .bottom .showing {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.dataTables_wrapper.dt-compact .bottom .dataTables_info,
+.dataTables_wrapper.dt-compact .bottom .dataTables_length,
+.dataTables_wrapper.dt-compact .bottom .dataTables_paginate {
+  padding: 0;
+  margin: 0;
+  line-height: 22px;
+  white-space: nowrap;
+}
+.dataTables_wrapper.dt-compact .bottom select,
+.dataTables_wrapper.dt-compact .bottom input {
+  height: 22px;
+  padding-top: 0;
+  padding-bottom: 0;
+  line-height: 22px;
+}
+.dataTables_wrapper.dt-compact .bottom .btn {
+  padding: 0 6px;
+  line-height: 20px;
+}
+.dataTables_wrapper.dt-compact .bottom .btn-rnd-rect {
+  width: auto;
+  min-width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  margin-left: 2px;
+  margin-right: 2px;
 }
 
 /* be able to show alerts in tables without them making the row giant */
