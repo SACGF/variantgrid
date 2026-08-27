@@ -6,6 +6,8 @@
 {% load user_tag_color_tags %}
 {% load settings_tags %}
 
+{% block title %}Analysis: {{ analysis.name }}{% endblock title %}
+
 {% block head %}
 <script src="{% static 'js/lib/jsplumb.browser-ui-6.2.10.umd.min.js' %}"></script>
 <script type="text/javascript" src="{% static 'js/lib/d3.v2.js' %}"></script>
