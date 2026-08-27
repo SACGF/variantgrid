@@ -3,6 +3,7 @@ function startDualScreenMode() {
     if (!secondWindow) {
         saveSettingsOnResize = false;
         secondWindow = window.open(STAND_ALONE_URL, '_blank', 'toolbar=0,location=0,menubar=0');
+        closeNodeEditorDrawer();  // the editor lives in the other window now
         $("#right-panel").empty();
         $('div#analysis-outer-container').removePane("east");
         $("#dual-screen-button").hide();
@@ -29,20 +30,56 @@ function loadNodeData(nodeId, extra_filters, fromSelectNode) {
     win.loadGridAndEditorForNode(nodeId, extra_filters, fromSelectNode);
 }
 
-function resizeGrid() {
-    const panelSize = $("#right-panel").innerWidth;
-    const grid = $('.ui-jqgrid-btable:visible');
-    if(grid.length) {
-        grid.each(function(index) {
-            const gridId = $(this).attr('id');
-            $('#' + gridId).setGridWidth(panelSize - 2);
-        });
+function isHorizontalMode() {
+    return typeof ANALYSIS_HORIZONTAL_MODE !== "undefined" && ANALYSIS_HORIZONTAL_MODE;
+}
+
+// The height available to the grid inside the bottom panel - what's left under whatever sits above it
+function gridPaneAvailableHeight() {
+    const panel = $("#right-panel");
+    const gridContainer = $("#node-grid-container");
+    if (!panel.length || !gridContainer.length) {
+        return 0;
     }
+    const offsetInPanel = gridContainer.offset().top - panel.offset().top + panel.scrollTop();
+    return panel.innerHeight() - offsetInPanel;
+}
+
+const MIN_GRID_HEIGHT = 100;
+const GRID_BOTTOM_MARGIN = 10;
+
+function resizeGrid() {
+    const panelWidth = $("#right-panel").innerWidth();
+    const grid = $('.ui-jqgrid-btable:visible');
+    if (!grid.length) {
+        return;
+    }
+    // The grid pane is the full window width in horizontal mode, so give the rows the pane height too -
+    // otherwise jqGrid's default keeps them in a short scrolling box with the panel empty underneath
+    const available = isHorizontalMode() ? gridPaneAvailableHeight() : null;
+
+    grid.each(function() {
+        const gridSelector = $('#' + $(this).attr('id'));
+        gridSelector.setGridWidth(panelWidth - 2);
+        if (available) {
+            const view = gridSelector.closest(".ui-jqgrid");
+            // Everything but the rows - caption, column headers and pager
+            const chrome = view.outerHeight(true) - $(".ui-jqgrid-bdiv", view).height();
+            gridSelector.setGridHeight(Math.max(available - chrome - GRID_BOTTOM_MARGIN, MIN_GRID_HEIGHT));
+        }
+    });
 }
 
 function savePanelWidthSettings() {
     if (saveSettingsOnResize) {
-        const analysis_panel_fraction = $("#left-panel").outerWidth() / window.innerWidth;
+        // analysis_panel_fraction is the fraction taken by the node canvas in both modes
+        const canvasPanel = $("#left-panel");
+        let analysis_panel_fraction;
+        if (isHorizontalMode()) {
+            analysis_panel_fraction = canvasPanel.outerHeight() / $("#analysis-and-toolbar-container").height();
+        } else {
+            analysis_panel_fraction = canvasPanel.outerWidth() / window.innerWidth;
+        }
         const data = 'analysis_panel_fraction=' + analysis_panel_fraction;
         $.ajax({
             type: "POST",
@@ -55,6 +92,367 @@ function savePanelWidthSettings() {
 function resizePanel() {
     clearTimeout(panelResizeTimeout);
     panelResizeTimeout = setTimeout(savePanelWidthSettings, panelResizeUpdateDelay);
+}
+
+/* Horizontal mode gives the node editor two homes: docked as a tab in the bottom panel beside the
+   grid ("Swap"), or slid in over the canvas ("Drawer"). It's one editor either way - #node-editor-container
+   is reparented between them, so everything that loads into it by id keeps working. The choice lives in
+   localStorage while both are being compared. */
+const BOTTOM_PANE_EDITOR = "editor";
+const BOTTOM_PANE_GRID = "grid";
+const BOTTOM_PANE_VARIANT = "variant";
+const EDITOR_HOME_TAB = "tab";
+const EDITOR_HOME_DRAWER = "drawer";
+const EDITOR_HOME_STORAGE_KEY = "analysisEditorHome";
+const DRAWER_MIN_WIDTH = 300;
+
+let activeBottomPaneTab = BOTTOM_PANE_GRID;
+// Which of the node editor's own tabs the strip is pointing at - 0 is the editor/grid pair
+const NODE_EDITOR_TAB_EDITOR = 0;
+let activeNodeEditorTab = NODE_EDITOR_TAB_EDITOR;
+let activeVariantTab = null;  // variant id of the details tab that's up, if any
+let paneBeforeVariantTab = BOTTOM_PANE_GRID;  // what to go back to when we leave the variant tabs
+
+function getEditorHome() {
+    if (!isHorizontalMode()) {
+        return EDITOR_HOME_TAB;
+    }
+    return localStorage.getItem(EDITOR_HOME_STORAGE_KEY) === EDITOR_HOME_DRAWER ? EDITOR_HOME_DRAWER : EDITOR_HOME_TAB;
+}
+
+function bottomPaneTabsEnabled() {
+    return isHorizontalMode() && getEditorHome() === EDITOR_HOME_TAB && $("#bottom-pane-tabs").length > 0;
+}
+
+// The grid tab defers its data fetch while hidden - editing a chain of nodes then costs no grid queries
+function bottomPaneGridHidden() {
+    return bottomPaneTabsEnabled() && activeBottomPaneTab !== BOTTOM_PANE_GRID;
+}
+
+// Set by node_data_grid.html when it built a grid whose rows we skipped because the Grid tab was hidden
+let deferredGridLoad = null;
+
+function registerDeferredGridLoad(loadFunc) {
+    deferredGridLoad = loadFunc;
+}
+
+// Editor tabs share a pane, so they're told apart by which node editor tab they point at
+function updateMirroredTabHighlight() {
+    const variantShowing = activeBottomPaneTab === BOTTOM_PANE_VARIANT;
+    $(".bottom-pane-tab, .drawer-tab").each(function() {
+        const tab = $(this);
+        const pane = tab.attr("pane");
+        let active;
+        if (pane === BOTTOM_PANE_GRID) {
+            active = activeBottomPaneTab === BOTTOM_PANE_GRID;
+        } else if (pane === BOTTOM_PANE_VARIANT) {
+            active = variantShowing && parseInt(tab.attr("variant_id")) === activeVariantTab;
+        } else {
+            // The drawer only ever shows the editor or a variant, so there's no pane to take into account
+            const editorShowing = !variantShowing &&
+                (!bottomPaneTabsEnabled() || activeBottomPaneTab === BOTTOM_PANE_EDITOR);
+            active = editorShowing && parseInt(tab.attr("editor-tab")) === activeNodeEditorTab;
+        }
+        tab.toggleClass("active", active);
+    });
+}
+
+/* The node editor's own tab strip is mirrored into whichever bar is always on screen, so horizontal
+   mode only ever has one row of tabs: the bottom pane strip while docked (Editor | Grid | Summary...),
+   or the drawer header while undocked. Rebuilt by each editor load - see base_editor.html */
+function syncNodeEditorTabs() {
+    const docked = getEditorHome() === EDITOR_HOME_TAB;
+    $("#bottom-pane-node-tabs, #drawer-node-tabs").empty();
+    const mirror = docked ? $("#bottom-pane-node-tabs") : $("#drawer-node-tabs");
+    if (!mirror.length) {
+        return;
+    }
+    activeNodeEditorTab = NODE_EDITOR_TAB_EDITOR;
+    // Docked, the strip's own Editor and Grid tabs already cover the editor's first tab
+    const firstTab = docked ? NODE_EDITOR_TAB_EDITOR + 1 : NODE_EDITOR_TAB_EDITOR;
+    $("#node-editor-tabs > ul > li > a").slice(firstTab).each(function(i) {
+        const editorTab = firstTab + i;
+        $("<a>", {
+            "class": docked ? "bottom-pane-tab" : "drawer-tab",
+            "pane": BOTTOM_PANE_EDITOR,
+            "editor-tab": editorTab,
+            href: "javascript:void(0)",
+            text: $(this).text(),
+        }).appendTo(mirror).click(function() {
+            showNodeEditorTab(editorTab);
+        });
+    });
+    // The tabs name what's showing, so the drawer's own title gives up its space to them
+    $("#node-editor-drawer").toggleClass("has-node-tabs", !docked && mirror.children().length > 0);
+    updateMirroredTabHighlight();
+}
+
+/* Variant details from the grid open as their own closable tab rather than taking over the editor,
+   so you can keep a few variants beside the node you're working on. They only ever come from the grid
+   that's showing, and go when it does - see closeAllVariantDetailsTabs(). The details page uses page level
+   ids, so only the tab being read is in the DOM - the others are remembered by url and re-loaded when
+   picked, which is all a first open does anyway. Tabs are named by the page itself once it loads,
+   see setVariantDetailsTabLabel() */
+let openVariantTabs = [];  // {variantId, url, label}
+
+function findVariantTab(variantId) {
+    return openVariantTabs.find(function(tab) { return tab.variantId === variantId; });
+}
+
+function openVariantDetailsTab(variantId, url) {
+    if (!isHorizontalMode()) {
+        return false;
+    }
+    if (!findVariantTab(variantId)) {
+        openVariantTabs.push({variantId: variantId, url: url, label: null});
+    }
+    showVariantDetailsTab(variantId);
+    return true;
+}
+
+function loadVariantDetailsPane(tab) {
+    const pane = $("<div>", {"class": "variant-details-pane"})
+        .html('<div class="editor-loading"><i class="fa fa-spinner"></i> Loading variant details...</div>');
+    $("#variant-details-container").empty().append(pane);
+    pane.load(tab.url);
+}
+
+function showVariantDetailsTab(variantId) {
+    const tab = findVariantTab(variantId);
+    if (!tab) {
+        return;
+    }
+    if (activeBottomPaneTab !== BOTTOM_PANE_VARIANT) {
+        paneBeforeVariantTab = activeBottomPaneTab;
+    }
+    // The pane is also gone if the whole panel was reloaded under us (dual screen close)
+    if (activeVariantTab !== variantId || !$(".variant-details-pane", "#variant-details-container").length) {
+        activeVariantTab = variantId;
+        loadVariantDetailsPane(tab);
+    }
+    renderVariantDetailsTabs();
+    showBottomPaneTab(BOTTOM_PANE_VARIANT);
+    openNodeEditorDrawer();
+}
+
+function closeVariantDetailsTab(variantId) {
+    openVariantTabs = openVariantTabs.filter(function(tab) { return tab.variantId !== variantId; });
+    if (activeVariantTab !== variantId) {
+        renderVariantDetailsTabs();
+        return;
+    }
+
+    activeVariantTab = null;
+    $("#variant-details-container").empty();
+    const nextTab = openVariantTabs[openVariantTabs.length - 1];
+    if (nextTab) {
+        showVariantDetailsTab(nextTab.variantId);
+    } else {
+        renderVariantDetailsTabs();
+        showBottomPaneTab(paneBeforeVariantTab);
+    }
+}
+
+/* The tabs belong to the grid they were opened from - anything that replaces it (selecting a node,
+   a save, or toolbar content taking over the editor) takes its variant tabs with it */
+function closeAllVariantDetailsTabs() {
+    openVariantTabs = [];
+    activeVariantTab = null;
+    $("#variant-details-container").empty();
+    renderVariantDetailsTabs();
+    if (activeBottomPaneTab === BOTTOM_PANE_VARIANT) {
+        showBottomPaneTab(paneBeforeVariantTab);
+    }
+}
+
+// Called by the variant details page as it loads - until then the tab shows a placeholder
+function setVariantDetailsTabLabel(variantId, label) {
+    const tab = findVariantTab(variantId);
+    if (tab) {
+        tab.label = label;
+        renderVariantDetailsTabs();
+    }
+}
+
+function renderVariantDetailsTabs() {
+    const docked = getEditorHome() === EDITOR_HOME_TAB;
+    $("#bottom-pane-variant-tabs, #drawer-variant-tabs").empty();
+    const strip = docked ? $("#bottom-pane-variant-tabs") : $("#drawer-variant-tabs");
+    if (!strip.length) {
+        return;
+    }
+    openVariantTabs.forEach(function(variantTab) {
+        const tab = $("<a>", {
+            "class": (docked ? "bottom-pane-tab" : "drawer-tab") + " variant-tab",
+            "pane": BOTTOM_PANE_VARIANT,
+            "variant_id": variantTab.variantId,
+            href: "javascript:void(0)",
+            text: variantTab.label || "Variant",
+        }).appendTo(strip).click(function() {
+            showVariantDetailsTab(variantTab.variantId);
+        });
+        $("<i>", {"class": "fa-solid fa-xmark close-variant-tab", title: "Close"}).appendTo(tab).click(function(event) {
+            event.stopPropagation();
+            closeVariantDetailsTab(variantTab.variantId);
+        });
+    });
+    updateMirroredTabHighlight();
+}
+
+// Point the node editor (and so the data container, see switch_node_data) at one of its own tabs
+function setNodeEditorTab(editorTab) {
+    activeNodeEditorTab = editorTab;
+    // ui-tabs-nav is added by the widget - the editor is only tabbed once it's finished loading
+    const tabs = $("#node-editor-tabs:has(> ul.ui-tabs-nav)");
+    if (tabs.length && tabs.tabs("option", "active") !== editorTab) {
+        tabs.tabs("option", "active", editorTab);
+    }
+}
+
+function showNodeEditorTab(editorTab) {
+    setNodeEditorTab(editorTab);
+    showBottomPaneTab(BOTTOM_PANE_EDITOR);
+}
+
+/* Which of the panes sharing the bottom panel is on screen. Docked, the panel shows exactly one of
+   editor / variant details / grid; undocked the grid keeps the whole panel and the drawer body holds
+   the editor or a variant details pane. */
+function updatePaneVisibility() {
+    const docked = bottomPaneTabsEnabled();
+    const showVariant = activeBottomPaneTab === BOTTOM_PANE_VARIANT;
+    const showEditor = docked ? activeBottomPaneTab === BOTTOM_PANE_EDITOR : !showVariant;
+
+    $("#node-editor-container").toggle(showEditor);
+    $("#variant-details-container").toggle(showVariant);
+    $("#node-grid-container").toggle(!docked || activeBottomPaneTab === BOTTOM_PANE_GRID);
+}
+
+function gridPaneShown() {
+    if (deferredGridLoad) {
+        const loadFunc = deferredGridLoad;
+        deferredGridLoad = null;
+        loadFunc();
+    }
+    resizeGrid();  // a jqGrid sized while hidden measures zero width
+}
+
+function showBottomPaneTab(name) {
+    if (!isHorizontalMode()) {
+        return;
+    }
+    activeBottomPaneTab = name;
+    updatePaneVisibility();
+    updateMirroredTabHighlight();
+    if ($("#node-grid-container").is(":visible")) {
+        gridPaneShown();
+    }
+}
+
+function openNodeEditorDrawer() {
+    if (getEditorHome() === EDITOR_HOME_DRAWER) {
+        const drawer = $("#node-editor-drawer");
+        drawer.css("top", $("#analysis-toolbar").outerHeight() + "px");  // start below the toolbar
+        drawer.show();
+    }
+}
+
+function closeNodeEditorDrawer() {
+    $("#node-editor-drawer").hide();
+}
+
+/* Moves the editor into its current home and shows/hides the tab strip and drawer to match.
+   Runs on every editor+grid load, so it also re-homes a container replaced by a panel reload. */
+function applyEditorHome() {
+    if (!isHorizontalMode()) {
+        return;
+    }
+    const editorContainer = $("#node-editor-container");
+    const variantContainer = $("#variant-details-container");
+    const drawerBody = $("#node-editor-drawer-body");
+    const tabs = $("#bottom-pane-tabs");
+
+    if (getEditorHome() === EDITOR_HOME_DRAWER) {
+        tabs.hide();
+        drawerBody.children().not(editorContainer).not(variantContainer).remove();
+        editorContainer.appendTo(drawerBody);
+        variantContainer.appendTo(drawerBody);
+    } else {
+        closeNodeEditorDrawer();
+        editorContainer.prependTo($("#grid-and-editor-container"));
+        variantContainer.insertAfter(editorContainer);
+        tabs.show();
+    }
+    updatePaneVisibility();
+    // The editor's tabs and any open variant details mirror into whichever bar its new home has
+    syncNodeEditorTabs();
+    renderVariantDetailsTabs();
+    if ($("#node-grid-container").is(":visible")) {
+        gridPaneShown();
+    }
+}
+
+function setEditorHome(home) {
+    localStorage.setItem(EDITOR_HOME_STORAGE_KEY, home);
+    applyEditorHome();
+    if (home === EDITOR_HOME_DRAWER && $(".node-editor, #node-editor-wrapper", "#node-editor-container").length) {
+        openNodeEditorDrawer();  // keep whatever the user was looking at on screen
+    }
+}
+
+function setupNodeEditorDrawer() {
+    const drawer = $("#node-editor-drawer");
+    if (!drawer.length) {
+        return;
+    }
+
+    $("#dock-editor-as-tab-button", drawer).click(function() {
+        setEditorHome(EDITOR_HOME_TAB);
+        showBottomPaneTab(BOTTOM_PANE_EDITOR);
+    });
+    $("#close-editor-drawer-button", drawer).click(closeNodeEditorDrawer);
+
+    $(document).on("keydown", function(event) {
+        const ESCAPE_KEY = 27;
+        if (event.keyCode === ESCAPE_KEY && drawer.is(":visible")) {
+            closeNodeEditorDrawer();
+        }
+    });
+
+    // Drag the left edge to resize
+    $(".drawer-resize-handle", drawer).on("mousedown", function(event) {
+        event.preventDefault();
+        const startX = event.pageX;
+        const startWidth = drawer.outerWidth();
+
+        const onMove = function(moveEvent) {
+            const width = Math.max(startWidth + startX - moveEvent.pageX, DRAWER_MIN_WIDTH);
+            drawer.css("width", width + "px");
+        };
+        const onUp = function() {
+            $(document).off("mousemove", onMove).off("mouseup", onUp);
+        };
+        $(document).on("mousemove", onMove).on("mouseup", onUp);
+    });
+}
+
+function setupBottomPaneTabs() {
+    const tabs = $("#bottom-pane-tabs");
+    if (!tabs.length) {
+        return;
+    }
+    $(".bottom-pane-tab", tabs).click(function() {
+        const pane = $(this).attr("pane");
+        if (pane === BOTTOM_PANE_EDITOR) {
+            showNodeEditorTab(NODE_EDITOR_TAB_EDITOR);
+        } else {
+            setNodeEditorTab(NODE_EDITOR_TAB_EDITOR);  // clicking Grid asks for the variant grid
+            showBottomPaneTab(pane);
+        }
+    });
+    $("#undock-editor-button", tabs).click(function() {
+        setEditorHome(EDITOR_HOME_DRAWER);
+        openNodeEditorDrawer();
+    });
 }
 
 function viewTags() {
@@ -72,8 +470,21 @@ function replaceEditorWindow(url) {
     nodeDataContainer.removeAttr("node_id");
     unselectActive();
     if (url) {
+        // Toolbar content (analysis settings, input samples) is editor-only - put it where it can be seen
+        revealNodeEditor();
         nodeEditorContainer.load(url);
+    } else {
+        closeNodeEditorDrawer();
     }
+}
+
+/* Content that only has an editor half (analysis settings, input samples, variant details) - bring
+   the editor up in whichever home it's in */
+function revealNodeEditor() {
+    closeAllVariantDetailsTabs();
+    syncNodeEditorTabs();  // what's loading has no tabs of its own
+    showBottomPaneTab(BOTTOM_PANE_EDITOR);
+    openNodeEditorDrawer();
 }
 
 function analysisSettings() {
@@ -106,7 +517,15 @@ function layoutAnalysisPanels(showAnalysisVariables, initialAnalysisPanelFractio
         expandToMin: true,
         onDragEnd: onDragEnd,
     };
+    if (isHorizontalMode()) {
+        // Canvas on top, editor/grid along the bottom - both full window width
+        splitParams.direction = 'vertical';
+        // The canvas is full width now, so the counts legend goes in the toolbar beside the genome build
+        $("#node-count-legend").insertAfter($("#analysis-genome-build"));
+    }
     Split(['#left-panel', '#right-panel'], splitParams);
+
+    setupNodeEditorDrawer();
 
     // Make clicking the background send a "click event" but not if you click on the .window
     // This is so we can make the editor switch out and then add nodes etc....
@@ -485,14 +904,20 @@ function loadGridAndEditorForNode(nodeId, extra_filters, fromSelectNode) {
 
         dataContainer.attr("node_url", load_node_url);
         removeGridLoadingOverlay();  // tear down any in-progress grid overlay from the previous node
-        $("#node-editor-container", gridAndEditorContainer).empty();
+        deferredGridLoad = null;  // the pending load belonged to the node we're leaving
+        $("#node-editor-container").empty();
+        closeAllVariantDetailsTabs();  // they belonged to the grid we're replacing
+        showNodeEditorTab(NODE_EDITOR_TAB_EDITOR);  // a node comes up on its editor, so its grid stays deferred
+        openNodeEditorDrawer();  // selecting a node is what opens the drawer
         showLoadingOverlay();
         dataContainer.load(load_node_url, function() {
             $(this).attr('node_id', nodeId);
         });
     } else {
         removeGridLoadingOverlay();
-        $("#node-editor-container", gridAndEditorContainer).html("Please select a node");
+        closeNodeEditorDrawer();
+        closeAllVariantDetailsTabs();
+        $("#node-editor-container").html("Please select a node");
         dataContainer.empty();
     }
 }
@@ -504,6 +929,9 @@ function layout_analysis_editor_and_grid() {
         //console.log("resizePanel = null");
         resizePanel = null;
     }
+
+    setupBottomPaneTabs();
+    applyEditorHome();
 }
 
 
@@ -576,7 +1004,7 @@ function showGridLoadingOverlay(container) {
     const overlay = $("<div>", {id: "grid-loading-overlay"});
     // Pin the overlay to the visible grid area (panel height minus the editor above it). A fixed
     // height keeps the centred helix from jumping down as rows load and the container grows.
-    const available = $("#right-panel").height() - $("#node-editor-container").outerHeight(true);
+    const available = gridPaneAvailableHeight();
     if (available > 200) {
         overlay.css("height", available + "px");
     }

@@ -11,6 +11,34 @@ const CONNECTOR_SPEC = {type: "Bezier", options: {curviness: 63}};
 const ENDPOINT_STYLE = {fill: endpointColor};
 const DOT_ENDPOINT = {type: "Dot", options: {radius: 11}};
 
+// Which way the graph flows. Everything else about the endpoints (uuids, styles, MergeNode multi-input,
+// invalid-target highlighting) is orientation-independent - see setupConnections
+const NODE_ORIENTATIONS = {
+	vertical: {
+		instanceAnchors: ["Bottom", "Top"],
+		input: "Top",
+		output: "Bottom",
+		// Venn takes 2 inputs, spread along the input edge
+		vennInputs: [[0.25, 0, 0, -1], [0.75, 0, 0, -1]],
+	},
+	horizontal: {
+		instanceAnchors: ["Right", "Left"],
+		input: "Left",
+		output: "Right",
+		// The card's rings are rotated anti-clockwise (see analysis_nodes.css), which puts the left
+		// ring at the bottom - so the left input takes the lower endpoint
+		vennInputs: [[0, 0.75, -1, 0], [0, 0.25, -1, 0]],
+	},
+};
+
+function isHorizontalNodeFlow() {
+	return typeof ANALYSIS_HORIZONTAL_MODE !== "undefined" && ANALYSIS_HORIZONTAL_MODE;
+}
+
+function getNodeOrientation() {
+	return NODE_ORIENTATIONS[isHorizontalNodeFlow() ? "horizontal" : "vertical"];
+}
+
 // @jsplumb/browser-ui instance, created in variantgridPipeline.init once #analysis is in the DOM
 let jsPlumbInstance = null;
 
@@ -677,6 +705,8 @@ function setupConnections(nodes_selector, readOnly) {
 		maxConnections: -1,
 	};
 
+	const orientation = getNodeOrientation();
+
 	nodes_selector.each(function() {
 		// Nodes without endpoints still need to be managed, so they can be dragged
 		jsPlumbInstance.manage(this);
@@ -686,19 +716,19 @@ function setupConnections(nodes_selector, readOnly) {
 
 		if ($(this).attr("input_endpoint") == "true") {
 			if ($(this).hasClass("VennNode")) {
-				const topLeft = uuid + "-left";
-				const topRight = uuid + "-right";
-				jsPlumbInstance.addEndpoint(this, { anchor: [0.25, 0, 0, -1], uuid: topLeft}, inputEndpoint);
-				jsPlumbInstance.addEndpoint(this, { anchor: [0.75, 0, 0, -1], uuid: topRight}, inputEndpoint);
+				const inputLeft = uuid + "-left";
+				const inputRight = uuid + "-right";
+				jsPlumbInstance.addEndpoint(this, { anchor: orientation.vennInputs[0], uuid: inputLeft}, inputEndpoint);
+				jsPlumbInstance.addEndpoint(this, { anchor: orientation.vennInputs[1], uuid: inputRight}, inputEndpoint);
             } else if ($(this).hasClass("MergeNode")) {
 				const commonInputEndpoint = $.extend({}, inputEndpoint);
 				commonInputEndpoint["endpoint"] = {type: "Dot", options: {radius: 18}};
                 commonInputEndpoint["maxConnections"] = -1;
-                jsPlumbInstance.addEndpoint(this, { anchor: "Top", uuid: uuid}, commonInputEndpoint);
+                jsPlumbInstance.addEndpoint(this, { anchor: orientation.input, uuid: uuid}, commonInputEndpoint);
 			} else {
-			    // Keep existing, so we don't 
+			    // Keep existing, so we don't
 			    if (!existingEndpoint) {
-				    jsPlumbInstance.addEndpoint(this, { anchor: "Top", uuid: uuid}, inputEndpoint);
+				    jsPlumbInstance.addEndpoint(this, { anchor: orientation.input, uuid: uuid}, inputEndpoint);
 				}
 			}
 		} else {
@@ -706,9 +736,9 @@ function setupConnections(nodes_selector, readOnly) {
                 jsPlumbInstance.deleteEndpoint(uuid);
             }
 		}
-		
+
 		if ($(this).attr("output_endpoint") == "true") {
-			const e = jsPlumbInstance.addEndpoint(this, {anchor: "Bottom"}, outputEndpoint);
+			const e = jsPlumbInstance.addEndpoint(this, {anchor: orientation.output}, outputEndpoint);
 			if (!readOnly) {
 				add_click_overlay(e);
 			}
@@ -855,7 +885,7 @@ window.variantgridPipeline = {init : function(readOnly) {
 		endpointStyle: ENDPOINT_STYLE,
 		connector: CONNECTOR_SPEC,
 		paintStyle: CONNECTOR_STYLE,
-		anchors: ["Bottom", "Top"],
+		anchors: getNodeOrientation().instanceAnchors,
 		dragOptions: {cursor: 'pointer', zIndex: 2000, beforeStart: syncDragSelection},
 	});
 
@@ -899,10 +929,12 @@ function drawCountLegend(nodeCountTypes) {
         }
     }
 
-    // Absolute positioning can sometimes get thrown off after resizing contents
-    const rowHeight = 31;
-    const numRows = 1 + nodeCountTypes.length;
-    legend.height(rowHeight * numRows);
+    if (!isHorizontalNodeFlow()) {
+        // Absolute positioning can sometimes get thrown off after resizing contents
+        const rowHeight = 31;
+        const numRows = 1 + nodeCountTypes.length;
+        legend.height(rowHeight * numRows);
+    }
 }
 
 
@@ -1046,4 +1078,8 @@ function reloadNodeAndData(node_id) {
 	const aWin = getAnalysisWindow();
 	checkAndMarkDirtyNodes(aWin);
     aWin.loadNodeData(node_id);
+    // An editor save is the one time we want to leave the editor - show the results being re-computed
+    if (typeof showBottomPaneTab === "function") {
+        showBottomPaneTab(BOTTOM_PANE_GRID);
+    }
 }

@@ -1669,6 +1669,21 @@ class AbstractVariantAnnotation(models.Model):
             hgvs_c = str(hgvs_variant)
         return hgvs_c
 
+    def get_short_label(self) -> str:
+        """ Shortest label that still tells a human which variant this is, eg "RUNX1:p.Ala547Val" -
+            for tabs and other places with no room for the transcript """
+        change = None
+        if self.hgvs_p:
+            change = self.hgvs_p.split(":", 1)[-1]
+        elif self.has_hgvs_c:
+            change = self.hgvs_c.split(":", 1)[-1]
+
+        if change is None:
+            return str(self.variant)
+        if self.symbol:
+            return f"{self.symbol}:{change}"
+        return change
+
 
 class VariantAnnotation(AbstractVariantAnnotation):
     """ This is the "representative transcript" chosen (1 per variant/annotation version) """

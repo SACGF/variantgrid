@@ -4,7 +4,16 @@ from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 from django.utils import timezone
 
-from analysis.models import Analysis, AnalysisLock, AnalysisTemplate, GeneListNode, SampleNode, ZygosityNode
+from analysis.forms.forms import AnalysisForm
+from analysis.models import (
+    AllVariantsNode,
+    Analysis,
+    AnalysisLock,
+    AnalysisTemplate,
+    GeneListNode,
+    SampleNode,
+    ZygosityNode,
+)
 from annotation.fake_annotation import get_fake_annotation_version
 from library.guardian_utils import assign_permission_to_user_and_groups
 from snpdb.models import (
@@ -54,6 +63,47 @@ class AnalysisModelTestCase(TestCase):
         analysis = Analysis(genome_build=self.grch37)
         analysis.set_defaults_and_save(self.owner_user)
         self.assertEqual(analysis.variant_tag_stale_days, 730)
+
+    def test_horizontal_mode_from_user_settings(self):
+        """ New analyses take the user's preferred orientation """
+        user_settings_override = UserSettingsOverride.objects.get_or_create(user=self.owner_user)[0]
+        user_settings_override.analysis_horizontal_mode = True
+        user_settings_override.save()
+
+        analysis = Analysis(genome_build=self.grch37)
+        analysis.set_defaults_and_save(self.owner_user)
+        self.assertTrue(analysis.analysis_horizontal_mode)
+
+    def test_transpose_node_positions(self):
+        """ Node positions are orientation specific - the swap has to be self-inverse so toggling
+            the mode back restores the original layout exactly """
+        analysis = Analysis(genome_build=self.grch37)
+        analysis.set_defaults_and_save(self.owner_user)
+        node = AllVariantsNode.objects.create(analysis=analysis, x=10, y=200)
+
+        analysis.transpose_node_positions()
+        node.refresh_from_db()
+        self.assertEqual((node.x, node.y), (200, 10))
+
+        analysis.transpose_node_positions()
+        node.refresh_from_db()
+        self.assertEqual((node.x, node.y), (10, 200))
+
+    def test_changing_horizontal_mode_transposes_nodes(self):
+        analysis = Analysis(genome_build=self.grch37, name="horizontal mode test")
+        analysis.set_defaults_and_save(self.owner_user)
+        assign_permission_to_user_and_groups(self.owner_user, analysis.custom_columns_collection)
+        node = AllVariantsNode.objects.create(analysis=analysis, x=10, y=200)
+
+        data = {k: v for k, v in AnalysisForm(instance=analysis, user=self.owner_user).initial.items()
+                if v is not None}
+        data["analysis_horizontal_mode"] = True
+        form = AnalysisForm(data, instance=analysis, user=self.owner_user)
+        self.assertTrue(form.is_valid(), form.errors)
+        form.save()
+
+        node.refresh_from_db()
+        self.assertEqual((node.x, node.y), (200, 10))
 
     def test_invisible_analysis_hides_template_from_lists(self):
         """ Internal auto-analysis templates (eg cohort VCF export) are hidden from template lists

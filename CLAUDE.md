@@ -116,6 +116,11 @@ All major models use Django Guardian for object-level permissions. The mixin `Gu
 ### Frontend
 The project uses **Bootstrap 4**. Use `data-toggle` (not `data-bs-toggle`) and `data-target` (not `data-bs-target`) for collapse, modal, and other Bootstrap JS components.
 
+### Static files
+Source JS/CSS/images live in `variantgrid/static_files/<site>_static/` (`default_static` unless the
+change is site specific) — always edit there. `variantgrid/sitestatic/static/` is the collectstatic
+output: a temporary copy, gitignored, and overwritten by the next `manage.py collectstatic`.
+
 ### SCSS / CSS
 Files like `global.css` are compiled from their `.scss` sources (e.g. `global.scss`) by a PyCharm file watcher — do not run `sassc`/`sass` yourself, as its output formatting differs and creates huge diffs. When changing styles, edit the `.scss` file, then hand-apply the same minimal change to the generated `.css` (matching its existing formatting) so the change works before PyCharm next recompiles. Leave `.css.map` files alone.
 

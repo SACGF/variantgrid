@@ -10,7 +10,7 @@ from django.apps import apps
 from django.conf import settings
 from django.contrib.auth.models import Group, User
 from django.db import models
-from django.db.models import Count, Max, Model, Q, QuerySet
+from django.db.models import Count, F, Max, Model, Q, QuerySet
 from django.db.models.deletion import CASCADE, PROTECT, SET_DEFAULT, SET_NULL, ProtectedError
 from django.db.models.signals import pre_delete
 from django.dispatch import receiver
@@ -223,6 +223,7 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel, Previe
         self.default_sort_by_column = user_settings.default_sort_by_column
         self.grid_sample_label_template = user_settings.grid_sample_label_template
         self.variant_tag_stale_days = user_settings.variant_tag_stale_days
+        self.analysis_horizontal_mode = bool(user_settings.analysis_horizontal_mode)
         self.save()
 
         default_node_count_config = user_settings.get_node_count_settings_collection()
@@ -249,6 +250,12 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel, Previe
         record_set = node_count_config.analysisnodecountconfigrecord_set
 
         AbstractNodeCountSettings.save_count_configs_from_array(record_set, node_counts_array)
+
+    def transpose_node_positions(self):
+        """ Node positions are laid out for an orientation (vertical DAGs are tall and narrow) so
+            switching analysis_horizontal_mode swaps them. Self-inverse - switching back restores the
+            original layout. Doesn't affect queries, so no version bump """
+        self.analysisnode_set.update(x=F("y"), y=F("x"))
 
     def get_samples(self) -> list[Sample]:
         samples = set()

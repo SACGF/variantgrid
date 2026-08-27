@@ -1,4 +1,5 @@
 import logging
+import random
 import time
 from collections import defaultdict
 from dataclasses import asdict
@@ -22,6 +23,17 @@ def get_nodes_by_id(nodes_qs):
     for node in nodes_qs:
         nodes_by_id[node.id] = node
     return nodes_by_id
+
+
+def get_child_position(parent):
+    """ Children go along the flow from their parent - to the right in horizontal mode, below in vertical """
+    if parent.analysis.analysis_horizontal_mode:
+        child_x_offset, child_y_offset = 100, 50
+    else:
+        child_x_offset, child_y_offset = 50, 100
+    x = parent.x + child_x_offset + random.randrange(-10, 10)
+    y = parent.y + child_y_offset + random.randrange(-10, 10)
+    return x, y
 
 
 def get_parent_value_dag_dictionary(nodes):

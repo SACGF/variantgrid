@@ -100,6 +100,19 @@
     justify-content: center;
 }
 </style>
+{% if analysis.analysis_horizontal_mode and not stand_alone %}
+{# Editor and grid share the bottom panel - the tabs only control which one is showing, see analysis.js #}
+<div id="bottom-pane-tabs" class="bottom-pane-tabs">
+	<a class="bottom-pane-tab" pane="editor" editor-tab="0" href="javascript:void(0)">Editor</a>
+	<a class="bottom-pane-tab active" pane="grid" editor-tab="0" href="javascript:void(0)">Grid</a>
+	{# The node editor's own tabs (Summary, Doc, Graphs...) are mirrored in here - see syncBottomPaneNodeTabs() #}
+	<span id="bottom-pane-node-tabs" class="bottom-pane-node-tabs"></span>
+	{# Variant details open as their own closable tabs - see renderVariantDetailsTabs() #}
+	<span id="bottom-pane-variant-tabs" class="bottom-pane-node-tabs"></span>
+	<a id="undock-editor-button" class="bottom-pane-tab-action" href="javascript:void(0)"
+	   title="Undock the editor into a drawer over the canvas"><i class="fa-solid fa-up-right-from-square"></i> undock</a>
+</div>
+{% endif %}
 <div id="grid-and-editor-container">
 	<div id="node-editor-container">
 		<div style='display: none' class='cancel-node-loading'>
@@ -109,6 +122,8 @@
 		<div class="node-editor" id="no-editor">
 		</div>
 	</div>
+	{# One pane per open variant details tab - moves between homes with the editor, see applyEditorHome() #}
+	<div id="variant-details-container" style="display: none"></div>
 	<div id="node-grid-container">
 		<div id="error-container">
 		</div>

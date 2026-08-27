@@ -481,8 +481,7 @@ class SettingsFormFeatures:
 
     @cached_property
     def analysis_horizontal_mode(self) -> bool:
-        implemented_analysis_horizontal_mode = False  # Not yet
-        return self.analysis_enabled and implemented_analysis_horizontal_mode
+        return self.analysis_enabled
 
     @cached_property
     def upload_enabled(self) -> bool:
@@ -528,6 +527,7 @@ class SettingsOverrideForm(BaseModelForm):
             "variant_link_in_analysis_opens_new_tab": BlankNullBooleanSelect(),
             "tool_tips": BlankNullBooleanSelect(),
             "node_debug_tab": BlankNullBooleanSelect(),
+            "analysis_horizontal_mode": BlankNullBooleanSelect(),
             "import_messages": BlankNullBooleanSelect(),
             'default_sort_by_column': ModelSelect2(url='custom_column_autocomplete',
                                                   forward=['columns'],
@@ -544,6 +544,7 @@ class SettingsOverrideForm(BaseModelForm):
             "tool_tips": "Tooltips",
             "tag_colors": "Tag Colours",
             "node_debug_tab": "Node Debug Tab",
+            "analysis_horizontal_mode": "Analysis Horizontal Mode",
             "import_messages": "Import Messages",
             "default_sort_by_column": "Default Sort by Column",
             "igv_port": "IGV Port",
@@ -603,7 +604,7 @@ class SettingsOverrideForm(BaseModelForm):
             "variant_link_in_analysis_opens_new_tab": settings_config.analysis_enabled,
             "tool_tips": settings_config.analysis_enabled,
             "node_debug_tab": settings_config.analysis_enabled,
-            "analysis_horizontal_mode": False,
+            "analysis_horizontal_mode": settings_config.analysis_horizontal_mode,
             "tag_colors": settings_config.analysis_enabled,
             "import_messages": settings_config.upload_enabled,
             "igv_port": settings_config.igv_links_enabled,

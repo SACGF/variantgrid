@@ -56,7 +56,9 @@
 
     #analysis-toolbar {
         width: 100%;
-        z-index: 9999;
+        /* Over the canvas (nodes are 24) but under Bootstrap's tooltips, so a hover from the
+           toolbar or the editor drawer isn't drawn behind the bar */
+        z-index: 100;
         position: absolute;
         top: 0px;
         left: 0px;
@@ -136,6 +138,10 @@
 <script>
     // noinspection JSAnnotator
     const ANALYSIS_ID = {{ analysis.pk }};
+
+    // Nodes flow left->right with the grid along the bottom - see analysis.js/analysis_nodes.js
+    // noinspection JSAnnotator
+    const ANALYSIS_HORIZONTAL_MODE = {{ analysis.analysis_horizontal_mode|jsonify }};
 
     // User-selected grid loading animations (menu ids; see showGridLoadingOverlay)
     // noinspection JSAnnotator
@@ -284,7 +290,7 @@
             <div class="clear"></div>
         </div>
     {% endif %}
-        <div id="analysis-and-toolbar-container" class="d-flex flex-row split-element">
+        <div id="analysis-and-toolbar-container" class="d-flex split-element {% if analysis.analysis_horizontal_mode %}flex-column analysis-horizontal{% else %}flex-row{% endif %}">
             <div id="left-panel" class="split-element noselect">
                 <div id="analysis-toolbar">
                 {% if has_write_permission %}
@@ -339,6 +345,23 @@
                     </div>
                 </div>
                 <div id='node-count-legend' title='Modify node counts in analysis settings (cog icon)'></div>
+            {% if analysis.analysis_horizontal_mode %}
+                {# The editor's other home - #node-editor-container is moved in here, see applyEditorHome() #}
+                <div id="node-editor-drawer" style="display: none">
+                    <div class="drawer-resize-handle" title="Drag to resize"></div>
+                    <div class="drawer-header">
+                        <span class="drawer-title">Node editor</span>
+                        {# The node editor's own tabs are mirrored in here - see syncNodeEditorTabs() #}
+                        <span id="drawer-node-tabs" class="drawer-node-tabs"></span>
+                        <span id="drawer-variant-tabs" class="drawer-node-tabs"></span>
+                        <a id="dock-editor-as-tab-button" class="toolbar-button" href="javascript:void(0)"
+                           title="Dock the editor as a tab in the bottom panel"><i class="fa-solid fa-window-maximize"></i></a>
+                        <a id="close-editor-drawer-button" class="toolbar-button" href="javascript:void(0)"
+                           title="Close (Esc)"><i class="fa-solid fa-xmark"></i></a>
+                    </div>
+                    <div id="node-editor-drawer-body"></div>
+                </div>
+            {% endif %}
             </div>
             <div id="right-panel" class="split-element">
                 <div>&nbsp;</div>

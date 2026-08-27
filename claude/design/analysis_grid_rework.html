@@ -1,0 +1,741 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Analysis Grid Rework</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root {
+    --ink: #1d242e;
+    --body-text: #3d4550;
+    --muted: #6b7583;
+    --ground: #f7f8fa;
+    --panel: #eef1f5;
+    --line: #d3d9e1;
+    --accent: #3455a4;      /* filter blue - from analysis_nodes.css */
+    --source: #0e7a4a;      /* source green - from analysis_nodes.css */
+    --good-bg: #e2f2ea;
+    --good-text: #0e6a41;
+    --warn-bg: #fdf3e0;
+    --warn-text: #8a5a10;
+    --card: #ffffff;
+    --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Consolas, monospace;
+    --sans: "IBM Plex Sans", -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+        --ink: #e8ebf0;
+        --body-text: #b8c0cc;
+        --muted: #8792a1;
+        --ground: #12161c;
+        --panel: #1b212a;
+        --line: #2e3743;
+        --accent: #7d9be0;
+        --good-bg: #12301f;
+        --good-text: #6fcf9b;
+        --warn-bg: #33270f;
+        --warn-text: #e0b568;
+        --card: #1b212a;
+    }
+}
+:root[data-theme="dark"] {
+    --ink: #e8ebf0;
+    --body-text: #b8c0cc;
+    --muted: #8792a1;
+    --ground: #12161c;
+    --panel: #1b212a;
+    --line: #2e3743;
+    --accent: #7d9be0;
+    --good-bg: #12301f;
+    --good-text: #6fcf9b;
+    --warn-bg: #33270f;
+    --warn-text: #e0b568;
+    --card: #1b212a;
+}
+
+* { box-sizing: border-box; }
+body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--body-text);
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.6;
+}
+main { max-width: 960px; margin: 0 auto; padding: 48px 24px 96px; }
+
+h1, h2, h3 { color: var(--ink); text-wrap: balance; line-height: 1.25; }
+h1 { font-size: 30px; font-weight: 700; margin: 0 0 4px; }
+h2 { font-size: 21px; font-weight: 600; margin: 56px 0 8px; }
+h3 { font-size: 16px; font-weight: 600; margin: 24px 0 6px; }
+p { max-width: 68ch; margin: 10px 0; }
+ul { max-width: 70ch; padding-left: 22px; }
+li { margin: 5px 0; }
+strong { color: var(--ink); }
+
+.eyebrow {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 2px;
+}
+.subtitle { color: var(--muted); margin-top: 0; }
+
+.verdict {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: .06em;
+    padding: 2px 10px;
+    border-radius: 99px;
+    vertical-align: 3px;
+    margin-left: 8px;
+}
+.verdict.recommended { background: var(--good-bg); color: var(--good-text); }
+.verdict.fallback { background: var(--warn-bg); color: var(--warn-text); }
+.verdict.parked { background: var(--panel); color: var(--muted); }
+
+.tldr {
+    background: var(--panel);
+    border-left: 3px solid var(--accent);
+    border-radius: 0 8px 8px 0;
+    padding: 16px 20px;
+    margin: 28px 0;
+}
+.tldr p { margin: 6px 0; }
+
+.pros-cons { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 28px; margin: 14px 0; }
+.pros-cons h4 {
+    font-family: var(--mono); font-size: 11px; letter-spacing: .1em;
+    text-transform: uppercase; margin: 0 0 4px;
+}
+.pros-cons .pro h4 { color: var(--good-text); }
+.pros-cons .con h4 { color: var(--warn-text); }
+.pros-cons ul { margin: 0; padding-left: 18px; font-size: 14px; }
+@media (max-width: 640px) { .pros-cons { grid-template-columns: 1fr; } }
+
+.seq { counter-reset: step; margin: 20px 0; padding: 0; list-style: none; max-width: 74ch; }
+.seq > li {
+    position: relative;
+    padding: 0 0 18px 44px;
+    border-left: 2px solid var(--line);
+    margin-left: 13px;
+}
+.seq > li:last-child { border-left-color: transparent; }
+.seq > li::before {
+    counter-increment: step;
+    content: counter(step);
+    position: absolute;
+    left: -15px; top: -2px;
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: var(--ground);
+    font-family: var(--mono);
+    font-weight: 500;
+    display: flex; align-items: center; justify-content: center;
+}
+.seq h3 { margin: 0 0 4px; }
+.seq p { margin: 4px 0; font-size: 14px; }
+
+/* ============ mockup frames ============ */
+/* The mock screens depict the real (light) app, so they stay light in both page themes,
+   like a screenshot. The bezel separates them from a dark ground. */
+.mock {
+    margin: 22px 0 8px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 2px 10px rgba(0,0,0,.08);
+    background: #fff;
+}
+.mock-chrome {
+    display: flex; align-items: center; gap: 6px;
+    background: #e6e9ee;
+    border-bottom: 1px solid #d0d5dc;
+    padding: 6px 10px;
+}
+.mock-chrome .dot { width: 9px; height: 9px; border-radius: 50%; background: #c3c9d2; }
+.mock-chrome .url {
+    flex: 1; margin-left: 8px;
+    background: #fff; border-radius: 5px;
+    font-family: var(--mono); font-size: 10px; color: #6b7583;
+    padding: 2px 10px;
+}
+.mock-body { display: flex; flex-direction: column; height: 420px; background: #fff; color: #3d4550; }
+.mock-body.short { height: 360px; }
+
+.mock-toolbar {
+    flex: 0 0 30px;
+    display: flex; align-items: center; gap: 10px;
+    padding: 0 10px;
+    border-bottom: 2px solid #1d242e;
+    font-size: 11px;
+    background: #fff;
+    z-index: 5;
+}
+.mock-toolbar .tool { color: #5a6472; font-size: 12px; cursor: default; }
+.mock-toolbar .select {
+    border: 1px solid #c6cdd6; border-radius: 4px;
+    padding: 1px 8px; color: #5a6472; font-size: 10px; background: #fff;
+}
+.mock-toolbar .build { margin-left: auto; font-weight: 700; color: #1d242e; font-size: 10px; }
+
+.pane-row { display: flex; flex-direction: row; flex: 1; min-height: 0; }
+.pane-col { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+
+.canvas {
+    position: relative;
+    overflow: hidden;
+    background: #fdfdfe;
+    background-image: radial-gradient(#e3e7ec 1px, transparent 1px);
+    background-size: 16px 16px;
+}
+.canvas svg.edges { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.canvas svg.edges path { fill: none; stroke: #9aa4b0; stroke-width: 1.5; }
+.canvas svg.edges circle { fill: #7c8794; }
+
+.pane-label {
+    position: absolute; right: 8px; top: 6px;
+    font-family: var(--mono); font-size: 9px; letter-spacing: .1em;
+    text-transform: uppercase; color: #9aa4b0;
+    pointer-events: none;
+    z-index: 4;
+}
+
+/* gutters (split.js) */
+.gut-v {
+    flex: 0 0 7px; cursor: col-resize;
+    background: #eef1f5 repeating-linear-gradient(180deg, transparent 0 3px, #b9c1cc 3px 5px);
+    background-size: 2px 22px; background-repeat: no-repeat; background-position: center;
+    border-left: 1px solid #dfe3e9; border-right: 1px solid #dfe3e9;
+}
+.gut-h {
+    flex: 0 0 7px; cursor: row-resize;
+    background: #eef1f5 repeating-linear-gradient(90deg, transparent 0 3px, #b9c1cc 3px 5px);
+    background-size: 22px 2px; background-repeat: no-repeat; background-position: center;
+    border-top: 1px solid #dfe3e9; border-bottom: 1px solid #dfe3e9;
+}
+.gut-v:hover, .gut-h:hover { background-color: #dce3ec; }
+
+/* mini Design-A node cards */
+.mnode {
+    position: absolute;
+    width: 76px;
+    background: #fff;
+    border: 1px solid #808080;
+    border-radius: 8px;
+    box-shadow: 2px 2px 8px rgba(0,0,0,.25);
+    font-size: 9px;
+    cursor: pointer;
+    z-index: 3;
+    user-select: none;
+}
+.mnode.active { border-color: #e6a817; box-shadow: 0 0 0 2px #e6a817, 2px 2px 8px rgba(0,0,0,.25); }
+.mnode .mbadge {
+    position: absolute; top: -8px; left: -8px;
+    width: 18px; height: 18px; border-radius: 50%;
+    color: #fff; font-size: 9px;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 1px 3px rgba(0,0,0,.35);
+}
+.mnode .mklass {
+    font-size: 7px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+    color: #fff; padding: 2px 4px 1px 13px;
+    border-radius: 7px 7px 0 0; white-space: nowrap; overflow: hidden;
+}
+.mnode.source .mklass, .mnode.source .mbadge { background: #0e7a4a; }
+.mnode.filter .mklass, .mnode.filter .mbadge { background: #3455a4; }
+.mnode .mname { padding: 3px 5px; font-weight: 600; color: #24292f; min-height: 2em; }
+.mnode .mcount {
+    border-top: 1px solid #eceff3; color: #6b7583;
+    font-family: var(--mono); font-size: 8px; text-align: right; padding: 1px 5px;
+}
+
+/* node editor pane (fake form) */
+.editor { background: #fff; overflow: auto; position: relative; }
+.ed-head {
+    display: flex; align-items: center; gap: 7px;
+    padding: 8px 10px; border-bottom: 1px solid #e3e7ec;
+}
+.ed-head .mbadge {
+    position: static;
+    width: 20px; height: 20px; border-radius: 50%; flex: 0 0 20px;
+    background: #3455a4; color: #fff; font-size: 10px;
+    display: flex; align-items: center; justify-content: center;
+}
+.ed-head .ed-title { font-weight: 600; font-size: 12px; color: #1d242e; }
+.ed-head .ed-close { margin-left: auto; color: #9aa4b0; font-size: 14px; cursor: pointer; }
+.ed-tabs { display: flex; gap: 2px; padding: 6px 10px 0; border-bottom: 1px solid #e3e7ec; font-size: 10px; }
+.ed-tabs span { padding: 3px 10px; border: 1px solid #e3e7ec; border-bottom: none; border-radius: 5px 5px 0 0; color: #6b7583; }
+.ed-tabs span.on { background: #eef1f5; color: #1d242e; font-weight: 600; }
+.ed-form { padding: 10px 12px; display: grid; grid-template-columns: 74px 1fr; gap: 7px 10px; font-size: 10px; align-items: center; }
+.ed-form label { color: #6b7583; text-align: right; }
+.ed-form .field { border: 1px solid #c6cdd6; border-radius: 4px; min-height: 17px; padding: 1px 6px; color: #3d4550; background: #fbfcfd; }
+.ed-apply {
+    margin: 2px 12px 12px; justify-self: start;
+    background: #3455a4; color: #fff; font-size: 10px; font-weight: 600;
+    border-radius: 4px; padding: 3px 14px; width: max-content;
+}
+
+/* variant grid (fake) */
+.vgrid { background: #fff; overflow: auto; position: relative; }
+.vgrid table { border-collapse: collapse; font-size: 9px; white-space: nowrap; min-width: 100%; }
+.vgrid th {
+    position: sticky; top: 0;
+    background: #eef1f5; color: #3d4550;
+    border: 1px solid #dfe3e9; border-top: none;
+    padding: 3px 7px; font-weight: 600; text-align: left;
+}
+.vgrid td { border: 1px solid #eef1f3; padding: 2px 7px; color: #4a5361; font-family: var(--mono); font-size: 8.5px; }
+.vgrid tr:nth-child(even) td { background: #f8fafb; }
+
+/* drawer (design: Drawer) */
+.drawer {
+    position: absolute; top: 0; right: 0; bottom: 0;
+    width: 300px; max-width: 65%;
+    background: #fff;
+    border-left: 1px solid #c6cdd6;
+    box-shadow: -6px 0 18px rgba(0,0,0,.15);
+    transform: translateX(103%);
+    transition: transform .25s ease;
+    z-index: 6;
+    overflow: auto;
+}
+.drawer.open { transform: translateX(0); }
+@media (prefers-reduced-motion: reduce) { .drawer { transition: none; } }
+
+/* tabbed bottom pane (design: Swap) */
+.tabbar {
+    flex: 0 0 26px;
+    display: flex; align-items: flex-end; gap: 2px;
+    background: #eef1f5;
+    border-bottom: 1px solid #c6cdd6;
+    padding: 4px 10px 0;
+    font-size: 10px;
+    z-index: 5;
+}
+.tabbar .tab {
+    padding: 3px 14px;
+    border: 1px solid #c6cdd6; border-bottom: none;
+    border-radius: 6px 6px 0 0;
+    background: #e2e6ec; color: #6b7583;
+    cursor: pointer; user-select: none;
+}
+.tabbar .tab.on {
+    background: #fff; color: #1d242e; font-weight: 600;
+    position: relative; top: 1px;
+}
+.tabbar .tab-count { font-family: var(--mono); font-size: 8.5px; color: #6b7583; margin-left: 5px; }
+.tabbar .tab.on .tab-count { color: #3455a4; }
+.tab-pane { display: none; flex: 1; min-height: 0; }
+.tab-pane.on { display: flex; flex-direction: column; }
+.tab-pane .editor, .tab-pane .vgrid { flex: 1; }
+.editor.wide .ed-form { max-width: 560px; }
+
+/* floating editor (design: Float) */
+.floated {
+    position: absolute;
+    width: 280px;
+    background: #fff;
+    border: 1px solid #b9c1cc;
+    border-radius: 8px;
+    box-shadow: 0 8px 26px rgba(0,0,0,.25);
+    z-index: 7;
+    display: none;
+    overflow: hidden;
+}
+.floated.open { display: block; }
+.floated .ed-head { cursor: grab; background: #f4f6f8; }
+
+.hint {
+    font-family: var(--mono); font-size: 10.5px; color: var(--muted);
+    margin: 6px 0 0;
+}
+figcaption { font-size: 13.5px; color: var(--muted); margin: 8px 2px 0; max-width: 74ch; }
+figure { margin: 0 0 26px; }
+
+table.plain { border-collapse: collapse; font-size: 13.5px; margin: 14px 0; }
+table.plain th, table.plain td { border: 1px solid var(--line); padding: 5px 12px; text-align: left; vertical-align: top; }
+table.plain th { background: var(--panel); color: var(--ink); font-weight: 600; }
+
+code {
+    font-family: var(--mono); font-size: .85em;
+    background: var(--panel); border-radius: 4px; padding: 1px 5px;
+}
+hr { border: none; border-top: 1px solid var(--line); margin: 48px 0; }
+</style>
+</head>
+<body>
+<main>
+
+<p class="eyebrow">VariantGrid &middot; Analysis page &middot; design exploration</p>
+<h1>Analysis Grid Rework</h1>
+<p class="subtitle">Bottom-docked variant grid, horizontal node flow, and where the node editor goes &mdash; plus sequencing against the jsPlumb and DataTables migrations.</p>
+
+<div class="tldr">
+    <p><strong>Recommendation.</strong> Bottom-docked full-width grid + horizontal node flow is the right move, and the schema is already reserved for it (<code>analysis_horizontal_mode</code> on both <code>UserSettings</code> and <code>Analysis</code>). For the editor, build <strong>Swap</strong> (tabbed bottom pane) first: it reuses the existing editor+grid container almost untouched, and since saving a node kicks off a 3&ndash;10&nbsp;s re-compute before the grid refreshes anyway, there is no tight editor-beside-grid feedback loop to preserve, and a hidden Grid tab defers the expensive grid query until it's actually wanted. <strong>Decision: build Swap and Drawer together</strong> &mdash; one editor, two homes (bottom tab, or undocked over the canvas), with a live toggle so both get real use before picking a default. <strong>Dock</strong> is parked. Implementation plan: <code>claude/plans/analysis_layout_rework_plan.md</code>.</p>
+    <p><strong>Sequencing.</strong> jsPlumb upgrade first (like-for-like), layout rework second, jqGrid&rarr;DataTables last &mdash; each on its own branch. Reasoning at the bottom.</p>
+</div>
+
+<h2>Current layout <span class="verdict parked">reference</span></h2>
+<p>Vertical node flow on the left; the right panel is split editor-over-grid. The grid inherits whatever width is left over &mdash; typically less than half the screen for a table that wants 15+ columns. Drag the splitters below; note the grid scrollbar.</p>
+
+<figure>
+    <div class="mock">
+        <div class="mock-chrome"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">variantgrid/analysis/1234</span></div>
+        <div class="mock-body short">
+            <div class="mock-toolbar"><span class="select">Add node&hellip; &#9662;</span><span class="tool">&#10133;</span><span class="tool">&#10064;</span><span class="tool">&#128465;</span><span class="tool">&#9881;</span><span class="tool">&#127991;</span><span class="build">GRCh38</span></div>
+            <div class="pane-row">
+                <div class="canvas" id="canvas-current" style="flex:0 0 34%"><span class="pane-label">node canvas</span></div>
+                <div class="gut-v" data-gutter="v"></div>
+                <div class="pane-col">
+                    <div class="editor" id="editor-current" style="flex:0 0 46%"><span class="pane-label">node editor</span></div>
+                    <div class="gut-h" data-gutter="h"></div>
+                    <div class="vgrid" id="grid-current"><span class="pane-label">variant grid</span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <figcaption>The grid is boxed into the bottom-right quadrant. Vertical node flow means the canvas wants height, the editor wants width, and the grid loses both fights.</figcaption>
+</figure>
+
+<h2>Dock <span class="verdict parked">parked</span></h2>
+<p>Horizontal node flow across the top, grid docked along the bottom at full width. The editor keeps a docked pane beside the canvas. Both splitters drag &mdash; pull the horizontal one up and the grid gets as tall as you like.</p>
+
+<figure>
+    <div class="mock">
+        <div class="mock-chrome"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">variantgrid/analysis/1234</span></div>
+        <div class="mock-body">
+            <div class="mock-toolbar"><span class="select">Add node&hellip; &#9662;</span><span class="tool">&#10133;</span><span class="tool">&#10064;</span><span class="tool">&#128465;</span><span class="tool">&#9881;</span><span class="tool">&#127991;</span><span class="build">GRCh38</span></div>
+            <div class="pane-row" style="flex:0 0 55%">
+                <div class="canvas" id="canvas-dock" style="flex:1"><span class="pane-label">node canvas &mdash; horizontal flow</span></div>
+                <div class="gut-v" data-gutter="v"></div>
+                <div class="editor" id="editor-dock" style="flex:0 0 280px"><span class="pane-label">node editor</span></div>
+            </div>
+            <div class="gut-h" data-gutter="h"></div>
+            <div class="vgrid" id="grid-dock"><span class="pane-label">variant grid &mdash; full width</span></div>
+        </div>
+    </div>
+    <figcaption>Same 15 columns as above &mdash; now they fit without a horizontal scrollbar. Horizontal node flow spreads the DAG the same way the page now spreads, so canvas and grid stop competing for the same axis.</figcaption>
+</figure>
+
+<div class="pros-cons">
+    <div class="pro"><h4>For</h4><ul>
+        <li>Lowest risk: same three components, same Split.js machinery, rearranged.</li>
+        <li>Editor always visible &mdash; no interaction model to learn.</li>
+        <li>Node editors are real forms (tabs, sub-grids); a docked pane gives them honest width.</li>
+    </ul></div>
+    <div class="con"><h4>Against</h4><ul>
+        <li>Editor pane taxes canvas width &mdash; the axis horizontal flow needs most.</li>
+        <li>Always-visible buys less than it looks: saving triggers a 3&ndash;10&nbsp;s node re-compute before the grid updates, so editor and grid were never a live feedback pair.</li>
+        <li>Wide analyses will still pan; acceptable, canvas already scrolls.</li>
+    </ul></div>
+</div>
+
+<h2>Drawer <span class="verdict recommended">building &mdash; toggles with Swap</span></h2>
+<p>Same bottom-docked grid, but the canvas takes the full top row. Selecting a node slides the editor in over the canvas from the right; close it (or press <kbd>Esc</kbd>) and the whole width returns to the graph. <strong>Click a node below.</strong></p>
+
+<figure>
+    <div class="mock">
+        <div class="mock-chrome"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">variantgrid/analysis/1234</span></div>
+        <div class="mock-body">
+            <div class="mock-toolbar"><span class="select">Add node&hellip; &#9662;</span><span class="tool">&#10133;</span><span class="tool">&#10064;</span><span class="tool">&#128465;</span><span class="tool">&#9881;</span><span class="tool">&#127991;</span><span class="build">GRCh38</span></div>
+            <div class="pane-row" style="flex:0 0 55%; position:relative">
+                <div class="canvas" id="canvas-drawer" style="flex:1"><span class="pane-label">node canvas &mdash; full width</span></div>
+                <div class="drawer" id="drawer-el"></div>
+            </div>
+            <div class="gut-h" data-gutter="h"></div>
+            <div class="vgrid" id="grid-drawer"><span class="pane-label">variant grid &mdash; full width</span></div>
+        </div>
+    </div>
+    <figcaption>The drawer is the Dock's editor pane made collapsible &mdash; docked when open, gone when closed. A pin control could hold it open (which is exactly the Dock layout), so this ships as an enhancement, not an alternative.</figcaption>
+</figure>
+
+<div class="pros-cons">
+    <div class="pro"><h4>For</h4><ul>
+        <li>Full canvas width while browsing the graph; editor appears only when needed.</li>
+        <li>Familiar pattern (n8n, Node-RED, Retool all edit nodes in a side panel).</li>
+        <li>Resizable width; can cover complex editors comfortably.</li>
+    </ul></div>
+    <div class="con"><h4>Against</h4><ul>
+        <li>Overlays the right of the graph while open &mdash; needs a pin/dock toggle for compare-while-editing workflows.</li>
+        <li>Slightly more state to persist (open/pinned/width) per analysis.</li>
+    </ul></div>
+</div>
+
+<h2>Swap <span class="verdict recommended">building &mdash; toggles with Drawer</span></h2>
+<p>Canvas gets the whole top, and the bottom pane is shared: it <em>tabs</em> between editor and grid, each at full width and full pane height. Selecting a node flips to the editor; <strong>Save</strong> flips back to the grid so you see the result. <strong>Click a node, then click Save.</strong></p>
+
+<figure>
+    <div class="mock">
+        <div class="mock-chrome"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">variantgrid/analysis/1234</span></div>
+        <div class="mock-body">
+            <div class="mock-toolbar"><span class="select">Add node&hellip; &#9662;</span><span class="tool">&#10133;</span><span class="tool">&#10064;</span><span class="tool">&#128465;</span><span class="tool">&#9881;</span><span class="tool">&#127991;</span><span class="build">GRCh38</span></div>
+            <div class="pane-row" style="flex:0 0 48%">
+                <div class="canvas" id="canvas-swap" style="flex:1"><span class="pane-label">node canvas &mdash; full width</span></div>
+            </div>
+            <div class="gut-h" data-gutter="h"></div>
+            <div class="tabbar">
+                <span class="tab" id="tab-editor" data-pane="pane-editor">Editor</span>
+                <span class="tab on" id="tab-grid" data-pane="pane-grid">Grid<span class="tab-count">1,204</span></span>
+            </div>
+            <div class="tab-pane" id="pane-editor">
+                <div class="editor wide" id="editor-swap"><span class="pane-label">node editor &mdash; full width</span></div>
+            </div>
+            <div class="tab-pane on" id="pane-grid">
+                <div class="vgrid" id="grid-swap"><span class="pane-label">variant grid &mdash; full width</span></div>
+            </div>
+        </div>
+    </div>
+    <figcaption>This is the current <code>#grid-and-editor-container</code> (editor stacked on grid) moved to the bottom and given tabs instead of a stack &mdash; the editor/grid loading plumbing barely changes, so it's by far the least work of the four. The auto-flip on select/save is what makes it livable.</figcaption>
+</figure>
+
+<div class="pros-cons">
+    <div class="pro"><h4>For</h4><ul>
+        <li>Cheapest to build: the existing editor+grid container and its paired-loading logic move wholesale; the only new UI is the tab strip.</li>
+        <li>Lazy by construction: a hidden Grid tab defers the expensive grid query (via the existing <code>grid_auto_load</code>/deferred machinery) &mdash; editing a chain of nodes issues no grid fetches until you flip to Grid.</li>
+        <li>Editor, grid <em>and</em> canvas each get full width &mdash; nothing shares an axis with anything.</li>
+        <li>Matches real usage: analysts mostly browse node results (grid tab stays put as you click around the graph); editing is the occasional detour.</li>
+    </ul></div>
+    <div class="con"><h4>Against</h4><ul>
+        <li>Editor and grid are never visible together &mdash; but saving already triggers a 3&ndash;10&nbsp;s node re-compute before the grid refreshes, so there was never a live pair to lose. The residual cost is a tab flip when comparing settings against results.</li>
+        <li>Full width is wasted on most editors (they're narrow forms), which is the axis the grid actually needed.</li>
+        <li>Hidden-tab grids need care: a jqGrid sized while hidden gets zero width (DataTables has the same quirk) &mdash; resize on tab-show.</li>
+    </ul></div>
+</div>
+
+<h2>Float <span class="verdict fallback">not as the only mode</span></h2>
+<p>The editor as a floating panel that pops up beside the selected node (draggable by its title bar). <strong>Click a node below</strong>, then drag the panel around.</p>
+
+<figure>
+    <div class="mock">
+        <div class="mock-chrome"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">variantgrid/analysis/1234</span></div>
+        <div class="mock-body">
+            <div class="mock-toolbar"><span class="select">Add node&hellip; &#9662;</span><span class="tool">&#10133;</span><span class="tool">&#10064;</span><span class="tool">&#128465;</span><span class="tool">&#9881;</span><span class="tool">&#127991;</span><span class="build">GRCh38</span></div>
+            <div class="pane-row" style="flex:0 0 55%; position:relative">
+                <div class="canvas" id="canvas-float" style="flex:1"><span class="pane-label">node canvas &mdash; full width</span></div>
+                <div class="floated" id="float-el"></div>
+            </div>
+            <div class="gut-h" data-gutter="h"></div>
+            <div class="vgrid" id="grid-float"><span class="pane-label">variant grid &mdash; full width</span></div>
+        </div>
+    </div>
+    <figcaption>Feels great for quick tweaks, but it sits on top of the thing you're navigating, fights node dragging for mouse territory, and the bigger editors (FilterNode's column builder, GeneListNode) outgrow a popover. Worth having later as a "quick edit"; not the primary editor surface.</figcaption>
+</figure>
+
+<p>A fourth idea &mdash; the editor sliding out from behind the node card itself <span class="verdict parked">parked</span> &mdash; looks delightful but doesn't survive contact with the content: cards are 64px wide and editors need ten times that, so the "slide out" immediately becomes a detached panel anyway (i.e. Float), while adding z-order and repaint fights with jsPlumb during drag.</p>
+
+<hr>
+
+<h2>Settings &amp; behaviour notes</h2>
+<ul>
+    <li><strong>Already reserved:</strong> <code>UserSettings.analysis_horizontal_mode</code> (default for new analyses) and <code>Analysis.analysis_horizontal_mode</code> (what the page actually renders). Per-analysis is right for a deeper reason than taste: <strong>saved node positions are authored for an orientation</strong>. A vertical DAG is tall and narrow; flipping it to horizontal without touching positions gives a mess.</li>
+    <li><strong>Mode switch on an existing analysis:</strong> transpose node positions (swap x/y) as the first pass &mdash; a topologically-sorted DAG transposes surprisingly well. Offer "auto-arrange" as the escape hatch.</li>
+    <li><strong>Anchors:</strong> vertical mode wires <code>BottomCenter &rarr; TopCenter</code>; horizontal becomes <code>RightMiddle &rarr; LeftMiddle</code> (and the dual-parent Top&nbsp;Left/Right endpoints for Trio-style nodes become upper/lower on the left edge).</li>
+    <li><strong>Splitter persistence:</strong> <code>analysis_panel_fraction</code> can keep meaning "fraction of the primary split" in both modes (canvas/editor today, canvas-row/grid in horizontal mode); the Dock's editor width is one more float.</li>
+    <li><strong>Dual-screen mode</strong> composes fine: it already ships editor+grid to a second window, which is the ultimate "grid gets the full width" &mdash; horizontal mode just makes single-screen life better.</li>
+</ul>
+
+<h2>Sequencing the three jobs</h2>
+<p>The rule that decides the order: <strong>never bundle a library migration with a UX change</strong>. A migration is verifiable exactly because current behaviour is the baseline; redesign at the same time and every bug becomes unattributable.</p>
+
+<ol class="seq">
+    <li>
+        <h3>jsPlumb 1.4.1 &rarr; Community Edition 5/6 (<code>@jsplumb/browser-ui</code>) &mdash; like-for-like</h3>
+        <p>1.4.1 is from 2013 and the API it exposes no longer exists: the new library is instance-based (<code>newInstance({container})</code>), jQuery-free, and does its own dragging &mdash; which absorbs the jquery-ui draggable + <code>multidraggable.js</code> stack (5+ has native drag-selection for multi-node drag). Do this <em>before</em> the layout work so the horizontal anchor/orientation code is written once, against an API that's alive, instead of written for 1.4.1 and immediately ported.</p>
+    </li>
+    <li>
+        <h3>Layout rework &mdash; Swap, with Dock/Drawer as optional evolutions</h3>
+        <p>Mostly templates, CSS and Split.js reconfiguration plus wiring the reserved settings; the existing editor+grid container moves to the bottom pane and gains tabs. jqGrid survives the move: the existing resize plumbing (<code>setGridWidth</code> on splitter drag) keeps working, so the layout doesn't wait on the grid migration. This is the step users actually see &mdash; land it second.</p>
+    </li>
+    <li>
+        <h3>jqGrid &rarr; DataTables &mdash; the big one, in its final home</h3>
+        <p>The analysis grid is the deepest jqGrid usage in the codebase: custom column collections, server-side sort persistence, exports, tag rendering, variant links. Doing it after the layout means the DataTable is designed once for where it will live &mdash; full-width, arbitrary height, Scroller/fixed-header &mdash; rather than tuned for the narrow right panel and re-tuned after. The <code>DatatableConfig</code>/<code>RichColumn</code> infrastructure is already the house pattern.</p>
+        <p><em>Swap 2&nbsp;&amp;&nbsp;3 only if</em> jqGrid's resize behaviour proves too janky in a freely-draggable pane &mdash; that's the one scenario where the grid migration blocks the layout instead of following it.</p>
+    </li>
+</ol>
+
+<script>
+// ---------- fake data ----------
+const COLS = ["Variant","Gene","HGVS c.","HGVS p.","dbSNP","gnomAD AF","CADD","GERP","ClinVar","Consequence","SIFT","PolyPhen","Zyg.","Depth","Tags"];
+const ROWS = [
+    ["3:178936091 G>A","PIK3CA","c.1633G>A","p.Glu545Lys","rs104886003","0.00001","32","5.1","Pathogenic","missense","del","prob_dam","HET","142",""],
+    ["17:41245466 C>T","BRCA1","c.181T>G","p.Cys61Gly","rs28897672","0.00002","28","4.9","Pathogenic","missense","del","prob_dam","HET","98","&#9873;"],
+    ["7:117199644 AT>A","CFTR","c.1521_1523del","p.Phe508del","rs113993960","0.0071","&mdash;","&mdash;","Pathogenic","inframe_del","&mdash;","&mdash;","HOM","87",""],
+    ["13:32914438 T>C","BRCA2","c.5946T>C","p.=","rs206075","0.4312","3","-1.2","Benign","synonymous","tol","benign","HET","110",""],
+    ["2:47641560 G>T","MSH2","c.942+3A>T","&mdash;","rs193922376","0.00004","24","5.4","Likely path.","splice_region","&mdash;","&mdash;","HET","76","&#9873;"],
+    ["12:25398284 C>T","KRAS","c.35G>A","p.Gly12Asp","rs121913529","&mdash;","29","5.6","Pathogenic","missense","del","prob_dam","HET","203",""],
+    ["1:11856378 G>A","MTHFR","c.665C>T","p.Ala222Val","rs1801133","0.3121","12","2.3","Benign","missense","tol","benign","HOM","54",""],
+    ["19:11224301 C>T","LDLR","c.1060+1G>A","&mdash;","rs879254797","0.00001","27","5.2","Pathogenic","splice_donor","&mdash;","&mdash;","HET","91",""],
+    ["X:153296777 G>C","MECP2","c.397C>G","p.Arg133Gly","rs61748421","&mdash;","25","4.7","VUS","missense","del","poss_dam","HET","66",""],
+];
+function makeGrid(id) {
+    const el = document.getElementById(id);
+    const t = ["<table><thead><tr>", ...COLS.map(c => `<th>${c}</th>`), "</tr></thead><tbody>"];
+    for (const r of ROWS) { t.push("<tr>", ...r.map(c => `<td>${c}</td>`), "</tr>"); }
+    t.push("</tbody></table>");
+    el.insertAdjacentHTML("beforeend", t.join(""));
+}
+["grid-current","grid-dock","grid-drawer","grid-float","grid-swap"].forEach(makeGrid);
+
+// ---------- mini node canvases ----------
+const NW = 76, NH = 40; // approximate card size for anchor maths
+function drawCanvas(id, nodes, edges, mode, onClick) {
+    const canvas = document.getElementById(id);
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "edges");
+    canvas.appendChild(svg);
+    const byId = {};
+    for (const n of nodes) {
+        const el = document.createElement("div");
+        el.className = `mnode ${n.cls}` + (n.active ? " active" : "");
+        el.style.left = n.x + "px";
+        el.style.top = n.y + "px";
+        el.innerHTML = `<span class="mbadge">${n.cls === "source" ? "&#9654;" : "&#9661;"}</span>` +
+            `<div class="mklass">${n.klass}</div><div class="mname">${n.name}</div><div class="mcount">${n.count}</div>`;
+        canvas.appendChild(el);
+        byId[n.id] = n;
+        el.addEventListener("click", () => {
+            canvas.querySelectorAll(".mnode").forEach(m => m.classList.remove("active"));
+            el.classList.add("active");
+            if (onClick) onClick(n, el);
+        });
+    }
+    for (const [a, b] of edges) {
+        const na = byId[a], nb = byId[b];
+        let x1, y1, x2, y2, c;
+        if (mode === "v") {
+            x1 = na.x + NW / 2; y1 = na.y + NH + 14; x2 = nb.x + NW / 2; y2 = nb.y - 1;
+            c = `M${x1},${y1} C${x1},${y1 + 28} ${x2},${y2 - 28} ${x2},${y2}`;
+        } else {
+            x1 = na.x + NW + 1; y1 = na.y + NH / 2 + 4; x2 = nb.x - 1; y2 = nb.y + NH / 2 + 4;
+            c = `M${x1},${y1} C${x1 + 30},${y1} ${x2 - 30},${y2} ${x2},${y2}`;
+        }
+        const p = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        p.setAttribute("d", c);
+        svg.appendChild(p);
+        for (const [cx, cy] of [[x1, y1], [x2, y2]]) {
+            const dot = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+            dot.setAttribute("cx", cx); dot.setAttribute("cy", cy); dot.setAttribute("r", 2.5);
+            svg.appendChild(dot);
+        }
+    }
+}
+
+const V_NODES = [
+    {id:"s", cls:"source", klass:"Sample", name:"HG002 proband", count:"4,412,067", x:70, y:22},
+    {id:"z", cls:"filter", klass:"Zygosity", name:"Het / Hom alt", count:"1,982,410", x:18, y:110, active:true},
+    {id:"p", cls:"filter", klass:"Population", name:"gnomAD &lt; 1%", count:"84,217", x:126, y:110},
+    {id:"g", cls:"filter", klass:"Gene list", name:"Incidentalome", count:"1,204", x:70, y:198},
+];
+const V_EDGES = [["s","z"],["s","p"],["z","g"],["p","g"]];
+
+const H_NODES = [
+    {id:"s", cls:"source", klass:"Sample", name:"HG002 proband", count:"4,412,067", x:26, y:80},
+    {id:"z", cls:"filter", klass:"Zygosity", name:"Het / Hom alt", count:"1,982,410", x:170, y:26},
+    {id:"p", cls:"filter", klass:"Population", name:"gnomAD &lt; 1%", count:"84,217", x:170, y:134},
+    {id:"g", cls:"filter", klass:"Gene list", name:"Incidentalome", count:"1,204", x:314, y:80, active:true},
+    {id:"e", cls:"filter", klass:"Effect", name:"HIGH / MODERATE impact", count:"312", x:458, y:80},
+];
+const H_EDGES = [["s","z"],["s","p"],["z","g"],["p","g"],["g","e"]];
+
+function editorHTML(n, closable) {
+    return `<div class="ed-head"><span class="mbadge" style="background:${n.cls === "source" ? "#0e7a4a" : "#3455a4"}">${n.cls === "source" ? "&#9654;" : "&#9661;"}</span>` +
+        `<span class="ed-title">${n.name}</span>${closable ? '<span class="ed-close" title="Close">&#10005;</span>' : ""}</div>` +
+        `<div class="ed-tabs"><span class="on">Editor</span><span>Doc</span><span>Audit</span></div>` +
+        `<div class="ed-form">` +
+        `<label>Name</label><div class="field">${n.name}</div>` +
+        `<label>${n.klass}</label><div class="field">&hellip;</div>` +
+        `<label>Min count</label><div class="field">1</div>` +
+        `<label>Options</label><div class="field" style="min-height:34px"></div>` +
+        `</div><div class="ed-apply">Save</div>`;
+}
+
+drawCanvas("canvas-current", V_NODES, V_EDGES, "v",
+    n => { document.getElementById("editor-current").innerHTML = '<span class="pane-label">node editor</span>' + editorHTML(n, false); });
+document.getElementById("editor-current").insertAdjacentHTML("beforeend", editorHTML(V_NODES[1], false));
+
+drawCanvas("canvas-dock", H_NODES, H_EDGES, "h",
+    n => { document.getElementById("editor-dock").innerHTML = '<span class="pane-label">node editor</span>' + editorHTML(n, false); });
+document.getElementById("editor-dock").insertAdjacentHTML("beforeend", editorHTML(H_NODES[3], false));
+
+const drawer = document.getElementById("drawer-el");
+drawCanvas("canvas-drawer", H_NODES.map(n => ({...n, active:false})), H_EDGES, "h", n => {
+    drawer.innerHTML = editorHTML(n, true);
+    drawer.classList.add("open");
+    drawer.querySelector(".ed-close").addEventListener("click", closeDrawer);
+});
+function closeDrawer() {
+    drawer.classList.remove("open");
+    document.querySelectorAll("#canvas-drawer .mnode").forEach(m => m.classList.remove("active"));
+}
+document.addEventListener("keydown", e => { if (e.key === "Escape") { closeDrawer(); floatEl.classList.remove("open"); } });
+
+// Swap: tabbed bottom pane. Node select -> editor tab; Save -> grid tab.
+function swapShowTab(paneId) {
+    document.querySelectorAll(".tabbar .tab").forEach(t => t.classList.toggle("on", t.dataset.pane === paneId));
+    ["pane-editor", "pane-grid"].forEach(id =>
+        document.getElementById(id).classList.toggle("on", id === paneId));
+}
+document.querySelectorAll(".tabbar .tab").forEach(t =>
+    t.addEventListener("click", () => swapShowTab(t.dataset.pane)));
+drawCanvas("canvas-swap", H_NODES.map(n => ({...n, active:false})), H_EDGES, "h", n => {
+    const ed = document.getElementById("editor-swap");
+    ed.innerHTML = '<span class="pane-label">node editor &mdash; full width</span>' + editorHTML(n, false);
+    swapShowTab("pane-editor");
+    ed.querySelector(".ed-apply").addEventListener("click", () => swapShowTab("pane-grid"));
+});
+
+const floatEl = document.getElementById("float-el");
+drawCanvas("canvas-float", H_NODES.map(n => ({...n, active:false})), H_EDGES, "h", (n, el) => {
+    floatEl.innerHTML = editorHTML(n, true);
+    const parent = floatEl.parentElement.getBoundingClientRect();
+    const rect = el.getBoundingClientRect();
+    floatEl.style.left = Math.min(rect.right - parent.left + 14, parent.width - 292) + "px";
+    floatEl.style.top = Math.max(8, Math.min(rect.top - parent.top - 10, 130)) + "px";
+    floatEl.classList.add("open");
+    floatEl.querySelector(".ed-close").addEventListener("click", () => {
+        floatEl.classList.remove("open");
+        document.querySelectorAll("#canvas-float .mnode").forEach(m => m.classList.remove("active"));
+    });
+    makeDraggable(floatEl, floatEl.querySelector(".ed-head"));
+});
+function makeDraggable(panel, handle) {
+    handle.onpointerdown = e => {
+        if (e.target.classList.contains("ed-close")) return;
+        const startX = e.clientX - panel.offsetLeft, startY = e.clientY - panel.offsetTop;
+        handle.setPointerCapture(e.pointerId);
+        handle.onpointermove = ev => {
+            panel.style.left = (ev.clientX - startX) + "px";
+            panel.style.top = (ev.clientY - startY) + "px";
+        };
+        handle.onpointerup = () => { handle.onpointermove = null; };
+    };
+}
+
+// ---------- draggable gutters ----------
+document.querySelectorAll("[data-gutter]").forEach(g => {
+    const horiz = g.dataset.gutter === "v"; // v gutter moves along x
+    g.addEventListener("pointerdown", e => {
+        e.preventDefault();
+        const prev = g.previousElementSibling;
+        const start = horiz ? e.clientX : e.clientY;
+        const base = horiz ? prev.getBoundingClientRect().width : prev.getBoundingClientRect().height;
+        g.setPointerCapture(e.pointerId);
+        const move = ev => {
+            const d = (horiz ? ev.clientX : ev.clientY) - start;
+            prev.style.flex = `0 0 ${Math.max(60, base + d)}px`;
+        };
+        g.addEventListener("pointermove", move);
+        g.addEventListener("pointerup", () => g.removeEventListener("pointermove", move), {once:true});
+    });
+});
+</script>
+</main>
+</body>
+</html>
