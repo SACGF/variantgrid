@@ -131,9 +131,12 @@ function bottomPaneGridHidden() {
 
 // Set by node_data_grid.html when it built a grid whose rows we skipped because the Grid tab was hidden
 let deferredGridLoad = null;
+// A big grid still sits behind its placeholder until the user picks the Grid tab themselves
+let deferredGridLoadNeedsUserRequest = false;
 
-function registerDeferredGridLoad(loadFunc) {
+function registerDeferredGridLoad(loadFunc, needsUserRequest) {
     deferredGridLoad = loadFunc;
+    deferredGridLoadNeedsUserRequest = Boolean(needsUserRequest);
 }
 
 // Editor tabs share a pane, so they're told apart by which node editor tab they point at
@@ -327,8 +330,8 @@ function updatePaneVisibility() {
     $("#node-grid-container").toggle(!docked || activeBottomPaneTab === BOTTOM_PANE_GRID);
 }
 
-function gridPaneShown() {
-    if (deferredGridLoad) {
+function gridPaneShown(userRequestedGrid) {
+    if (deferredGridLoad && (userRequestedGrid || !deferredGridLoadNeedsUserRequest)) {
         const loadFunc = deferredGridLoad;
         deferredGridLoad = null;
         loadFunc();
@@ -336,7 +339,9 @@ function gridPaneShown() {
     resizeGrid();  // a jqGrid sized while hidden measures zero width
 }
 
-function showBottomPaneTab(name) {
+/* userRequestedGrid is the user asking for the grid itself (clicking the Grid tab) rather than the
+   pane coming up for some other reason - that's the choice the big-grid placeholder asks for */
+function showBottomPaneTab(name, userRequestedGrid) {
     if (!isHorizontalMode()) {
         return;
     }
@@ -344,7 +349,7 @@ function showBottomPaneTab(name) {
     updatePaneVisibility();
     updateMirroredTabHighlight();
     if ($("#node-grid-container").is(":visible")) {
-        gridPaneShown();
+        gridPaneShown(userRequestedGrid);
     }
 }
 
@@ -446,7 +451,7 @@ function setupBottomPaneTabs() {
             showNodeEditorTab(NODE_EDITOR_TAB_EDITOR);
         } else {
             setNodeEditorTab(NODE_EDITOR_TAB_EDITOR);  // clicking Grid asks for the variant grid
-            showBottomPaneTab(pane);
+            showBottomPaneTab(pane, pane === BOTTOM_PANE_GRID);
         }
     });
     $("#undock-editor-button", tabs).click(function() {
@@ -904,7 +909,7 @@ function loadGridAndEditorForNode(nodeId, extra_filters, fromSelectNode) {
 
         dataContainer.attr("node_url", load_node_url);
         removeGridLoadingOverlay();  // tear down any in-progress grid overlay from the previous node
-        deferredGridLoad = null;  // the pending load belonged to the node we're leaving
+        registerDeferredGridLoad(null);  // the pending load belonged to the node we're leaving
         $("#node-editor-container").empty();
         closeAllVariantDetailsTabs();  // they belonged to the grid we're replacing
         showNodeEditorTab(NODE_EDITOR_TAB_EDITOR);  // a node comes up on its editor, so its grid stays deferred

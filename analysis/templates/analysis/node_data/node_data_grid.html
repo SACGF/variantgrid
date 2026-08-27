@@ -106,8 +106,8 @@ $(document).ready(function() {
     const wantsGrid = {{ grid_auto_load|yesno:"true,false" }} || alreadyLoaded;
     // Nothing to show while the Editor tab is up, so don't pay for the rows - the tab-show handler
     // in analysis.js fires the load we register below.
-    const deferredForHiddenTab = wantsGrid && typeof bottomPaneGridHidden === "function" && bottomPaneGridHidden();
-    const autoLoad = wantsGrid && !deferredForHiddenTab;
+    const gridTabHidden = typeof bottomPaneGridHidden === "function" && bottomPaneGridHidden();
+    const autoLoad = wantsGrid && !gridTabHidden;
 
     const showGrid = function() {
         $("#grid-placeholder-{{ node_id }}").hide();
@@ -128,9 +128,12 @@ $(document).ready(function() {
         loadNodeGridData({{ node_id }}, unique_code);  // fires deferred phase 2
     };
 
-    if (deferredForHiddenTab) {
-        registerDeferredGridLoad(loadDeferredGrid);
-    } else if (!autoLoad) {
+    if (gridTabHidden) {
+        // Picking the Grid tab is itself the user asking for the rows, so it stands in for the
+        // placeholder's "Show grid" click on a node over the row-count threshold
+        registerDeferredGridLoad(loadDeferredGrid, !wantsGrid);
+    }
+    if (!autoLoad) {
         // Over the row-count threshold - the placeholder gives the user the choice
         $("#load-variants-{{ node_id }}").click(loadDeferredGrid);
     }
