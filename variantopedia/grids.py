@@ -8,6 +8,7 @@ from django.db import connection
 from django.db.models import Case, Count, IntegerField, OuterRef, Q, QuerySet, Subquery, Value, When
 from django.http import HttpRequest
 from django.shortcuts import get_object_or_404
+from django.urls import reverse
 
 from analysis.models import Analysis, VariantTag
 from annotation.annotation_version_querysets import (
@@ -15,10 +16,9 @@ from annotation.annotation_version_querysets import (
     get_variant_queryset_for_latest_annotation_version,
 )
 from annotation.models import AnnotationVersion, VariantAnnotation
-from library.jqgrid.jqgrid_user_row_config import JqGridUserRowConfig
-from library.utils import JsonDataType, update_dict_of_dict_values
+from library.utils import JsonDataType, full_class_name, update_dict_of_dict_values
 from snpdb.grid_columns.custom_columns import get_custom_column_fields_override_and_sample_position
-from snpdb.grids import AbstractVariantGrid
+from snpdb.grids import AbstractVariantGrid, url_if_visible
 from snpdb.models import GenomeBuild, Tag, Variant, VariantWiki, VariantZygosityCountCollection
 from snpdb.models.models_user_settings import UserGridConfig, UserSettings
 from snpdb.utils import get_tag_sort_order_by_tag
@@ -216,86 +216,103 @@ class NearbyVariantsGrid(AbstractVariantGrid):
         return qs
 
 
-class VariantTagsGrid(JqGridUserRowConfig):
-    """ List VariantTags (Tag-centric) """
-    model = VariantTag
-    caption = 'Variant Tags'
-    fields = ["id", "variant__variantannotation__transcript_version__gene_version__gene_symbol__symbol",
-              "variant__id", "node__id", "tag__id", "analysis__name", "analysis__id", "user__username", "created"]
+class VariantTagsColumns(DatatableConfig[VariantTag]):
+    """ List VariantTags (Tag-centric) - @see variant_tags.html and base_related_analyses.html """
+    GRID_NAME = 'Variant Tags'
 
-    colmodel_overrides = {
-        'id': {'hidden': True, "Label": "TagID"},
-        "variant__id": {"hidden": True, "label": "VariantID"},
-        "node__id": {"hidden": True, "label": "NodeID"},
-        "variant__variantannotation__transcript_version__gene_version__gene_symbol__symbol": {'label': 'Gene', 'formatter': 'geneSymbolNewWindowLink'},
-        "tag__id": {'label': "Tag", "formatter": "formatVariantTag"},
-        "analysis__name": {'label': 'Analysis', "formatter": "formatAnalysis"},
-        "analysis__id": {'hidden': True, "label": "AnalysisID"},
-        "user__username": {'label': "Username"},
-        "created": {'label': "Created"},
-    }
+    def __init__(self, request: HttpRequest):
+        super().__init__(request)
+        self.genome_build = GenomeBuild.get_name_or_alias(self.get_query_param("genome_build_name"))
 
-    def __init__(self, user, genome_build_name, extra_filters=None, **kwargs):
-        super().__init__(user)
+        self.rich_columns = [
+            RichColumn("id", visible=False),
+            RichColumn("variant_string", label="Variant", orderable=True, default_sort=SortOrder.ASC,
+                       extra_columns=["id", "variant__id", "tag__id", "analysis__id"],
+                       renderer=self.render_variant, client_renderer="renderVariantTagVariant"),
+            RichColumn(name="genome_build", label="Genome Build", renderer=self.render_genome_build),
+            RichColumn("variant__variantannotation__transcript_version__gene_version__gene_symbol__symbol",
+                       name="gene_symbol", label="Gene", orderable=True,
+                       client_renderer="renderGeneSymbolNewWindow"),
+            RichColumn("tag__id", name="tag", label="Tag", orderable=True, extra_columns=["variant__id"],
+                       renderer=self.render_tag, client_renderer="renderVariantTagPill"),
+            RichColumn("analysis__name", name="analysis", label="Analysis", orderable=True,
+                       extra_columns=["analysis__id"],
+                       renderer=self.render_analysis, client_renderer="renderVariantTagAnalysis"),
+            RichColumn("user__username", name="user", label="Username", orderable=True),
+            RichColumn("created", label="Created", orderable=True, client_renderer="TableFormat.timestamp"),
+            RichColumn("id", name="delete", label="", extra_columns=["analysis__id"],
+                       renderer=self.render_delete, client_renderer="TableFormat.deleteRow"),
+        ]
 
-        genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
-        self.genome_build_name = genome_build.name
-        queryset = VariantTag.get_for_build(genome_build)
+    def render_genome_build(self, _cell: CellData) -> JsonDataType:
+        return self.genome_build.name
 
-        filter_user_id = None
-        if extra_filters:
-            analysis_ids = extra_filters.get("analysis_ids")
-            if analysis_ids is not None:
-                analyses_queryset = Analysis.filter_for_user(user).filter(pk__in=analysis_ids)
-                queryset = queryset.filter(analysis__in=analyses_queryset)
+    @staticmethod
+    def render_variant(cell: CellData) -> JsonDataType:
+        data = {
+            "variant_string": cell.value,
+            "url": url_if_visible("view_variant", variant_id=cell["variant__id"]),
+        }
+        # The tag is a to-do item - offer to complete it @see analysis.variant_tag_operations
+        if cell["tag__id"] == settings.TAG_REQUIRES_CLASSIFICATION and (analysis_id := cell["analysis__id"]):
+            data["classify_url"] = url_if_visible("create_classification_for_variant_tag",
+                                                  analysis_id=analysis_id, variant_tag_id=cell["id"])
+        return data
 
-            gene_id = extra_filters.get("gene")
-            if gene_id:
-                queryset = queryset.filter(variant__variantannotation__transcript_version__gene_version__gene_id=gene_id)
+    @staticmethod
+    def render_tag(cell: CellData) -> JsonDataType:
+        return {"tag": cell.value, "variant_id": cell["variant__id"]}
 
-            tag_id = extra_filters.get("tag")
-            if tag_id is not None:
-                tag = Tag.objects.get(pk=tag_id)
-                queryset = queryset.filter(tag=tag)
+    @staticmethod
+    def render_analysis(cell: CellData) -> JsonDataType:
+        analysis_id = cell["analysis__id"]
+        if analysis_id is None:
+            return None
+        return {
+            "text": f"{analysis_id} - {cell.value}",
+            "url": url_if_visible("analysis", analysis_id=analysis_id),
+        }
 
-            if tag_ids := extra_filters.get("tags"):
-                queryset = queryset.filter(tag__in=tag_ids)
+    def render_delete(self, cell: CellData) -> Optional[str]:
+        """ can_write delegates to the analysis, so build the stub from the row rather than re-loading the tag """
+        variant_tag = VariantTag(pk=cell.value, analysis_id=cell["analysis__id"])
+        if not variant_tag.can_write(self.user):
+            return None
+        return reverse('group_permissions_object_delete',
+                       kwargs={'class_name': full_class_name(VariantTag), 'primary_key': cell.value})
 
-            if filter_user_id := extra_filters.get("user"):
-                queryset = queryset.filter(user_id=filter_user_id)
+    def get_initial_queryset(self) -> QuerySet[VariantTag]:
+        qs = VariantTag.get_for_build(self.genome_build)
+        # Need to go through Allele to get variant in this build
+        qs = qs.filter(allele__variantallele__genome_build=self.genome_build)
+        return Variant.annotate_variant_string(qs, path_to_variant="allele__variantallele__variant__")
 
-        user_grid_config = UserGridConfig.get(user, self.caption)
+    def filter_queryset(self, qs: QuerySet[VariantTag]) -> QuerySet[VariantTag]:
+        analysis_ids = self.get_query_json("analysis_ids")
+        if analysis_ids is not None:
+            analyses_queryset = Analysis.filter_for_user(self.user).filter(pk__in=analysis_ids)
+            qs = qs.filter(analysis__in=analyses_queryset)
+
+        if gene_id := self.get_query_param("gene"):
+            qs = qs.filter(variant__variantannotation__transcript_version__gene_version__gene_id=gene_id)
+
+        if tag_id := self.get_query_param("tag"):
+            qs = qs.filter(tag_id=tag_id)
+
+        if tag_ids := self.get_query_json("tags"):
+            qs = qs.filter(tag__in=tag_ids)
+
+        filter_user_id = self.get_query_param("user")
+        if filter_user_id:
+            qs = qs.filter(user_id=filter_user_id)
+
+        user_grid_config = UserGridConfig.get(self.user, self.GRID_NAME)
         if user_grid_config.show_group_data or filter_user_id:
             # An explicit user filter overrides show_group_data - still permission checked
-            queryset = VariantTag.filter_for_user(user, queryset=queryset)
+            qs = VariantTag.filter_for_user(self.user, queryset=qs)
         else:
-            queryset = queryset.filter(user=user)
-
-        # Need to go through Allele to get variant in this build
-        queryset = queryset.filter(allele__variantallele__genome_build=genome_build)
-        queryset = Variant.annotate_variant_string(queryset,
-                                                   path_to_variant="allele__variantallele__variant__")
-        field_names = self.get_field_names() + ["variant_string"]
-        self.queryset = queryset.values(*field_names)
-        self.extra_config.update({'sortname': 'variant_string',
-                                  'sortorder': 'asc'})
-
-    def iter_format_items(self, items):
-        """ Inject constant genome build value into iterator results """
-        items = super().iter_format_items(items)
-        genome_build_name = self.genome_build_name
-        for row in items:
-            row['view_genome_build'] = genome_build_name
-            yield row
-
-    def get_colmodels(self, remove_server_side_only=False):
-        before_colmodels = [
-            {'index': 'variant_string', 'name': 'variant_string',
-             'label': 'Variant', 'formatter': 'formatVariantTagFirstColumn'},
-            {'index': 'view_genome_build', 'name': 'view_genome_build', 'label': 'Genome Build', 'sortable': False},
-        ]
-        colmodels = super().get_colmodels(remove_server_side_only=remove_server_side_only)
-        return before_colmodels + colmodels
+            qs = qs.filter(user=self.user)
+        return qs
 
 
 class TaggedVariantGrid(AbstractVariantGrid):

@@ -8,7 +8,7 @@ from variantopedia.grids import (
     TaggedVariantGrid,
     VariantTagCountsColumns,
     VariantTagDetailColumns,
-    VariantTagsGrid,
+    VariantTagsColumns,
     VariantWikiColumns,
 )
 
@@ -77,6 +77,8 @@ urlpatterns = [
     path('variant/<int:variant_id>/tag/<tag>/datatable/',
          DatabaseTableView.as_view(column_class=VariantTagDetailColumns),
          name='variant_tag_detail_datatable'),
+    path('tags/datatable/<genome_build_name>/', DatabaseTableView.as_view(column_class=VariantTagsColumns),
+         name='variant_tags_datatable'),
 
     path('nearby/grid/<variant_id>/<genome_build_name>/<region_type>/<slug:op>/',
          JQGridView.as_view(grid=NearbyVariantsGrid, csv_download=True),
@@ -86,8 +88,6 @@ urlpatterns = [
          name='nearby_gene_variants_grid'),
     path('all_variants/grid/<genome_build_name>/<slug:op>/', JQGridView.as_view(grid=AllVariantsGrid, csv_download=True),
          name='all_variants_grid'),
-    path('tags/grid/<genome_build_name>/<slug:op>/',
-         JQGridView.as_view(grid=VariantTagsGrid, delete_row=True), name='variant_tags_grid'),
     path('tagged_variants/grid/<genome_build_name>/<slug:op>/',
          JQGridView.as_view(grid=TaggedVariantGrid, delete_row=True), name='tagged_variant_grid'),
 

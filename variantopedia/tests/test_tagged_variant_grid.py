@@ -1,9 +1,11 @@
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.test import RequestFactory, TestCase
 from django.urls import resolve, reverse
 from guardian.shortcuts import assign_perm
 
-from analysis.models import VariantTag
+from analysis.models import Analysis, VariantTag
+from annotation.models import AnnotationVersion
 from annotation.fake_annotation import create_fake_variants, get_fake_annotation_version
 from snpdb.models import (
     Allele,
@@ -17,7 +19,7 @@ from snpdb.models import (
     Variant,
     VariantAllele,
 )
-from variantopedia.grids import TaggedVariantGrid, VariantTagCountsColumns, VariantTagsGrid
+from variantopedia.grids import TaggedVariantGrid, VariantTagCountsColumns, VariantTagsColumns
 
 
 class TaggedVariantGridTest(TestCase):
@@ -58,9 +60,14 @@ class TaggedVariantGridTest(TestCase):
     def _grid_variant_ids(self, extra_filters) -> set[int]:
         return set(self._grid_rows(extra_filters))
 
-    def _tags_grid_variant_ids(self, extra_filters) -> set[int]:
-        grid = VariantTagsGrid(self.user, self.genome_build.name, extra_filters=extra_filters)
-        return {row["variant__id"] for row in grid.queryset}
+    def _tags_grid_variant_ids(self, filters) -> set[int]:
+        url = reverse('variant_tags_datatable', kwargs={"genome_build_name": self.genome_build.name})
+        request = RequestFactory().get(url, filters)
+        request.resolver_match = resolve(url)
+        request.user = self.user
+        config = VariantTagsColumns(request)
+        qs = config.filter_queryset(config.get_initial_queryset())
+        return set(qs.values_list("variant__id", flat=True))
 
     def test_single_tag_filter(self):
         self.assertEqual(self._grid_variant_ids({"tag": "Artefact"}),
@@ -82,6 +89,52 @@ class TaggedVariantGridTest(TestCase):
                          {self.other_user_variant.pk})
         self.assertEqual(self._tags_grid_variant_ids({"user": self.other_user.pk}),
                          {self.other_user_variant.pk})
+
+    def test_variant_tags_datatable_row(self):
+        """ Rows carry what the client renderers need - tag pill, variant link, delete URL, constant build """
+        self.client.force_login(self.user)
+        url = reverse('variant_tags_datatable', kwargs={"genome_build_name": self.genome_build.name})
+        response = self.client.get(url, {"tag": self.reportable.pk})
+        self.assertEqual(response.status_code, 200)
+
+        rows = response.json()["data"]
+        self.assertEqual(len(rows), 1)
+        row = rows[0]
+        self.assertEqual(row["genome_build"], self.genome_build.name)
+        self.assertEqual(row["tag"], {"tag": self.reportable.pk, "variant_id": self.both_variant.pk})
+        self.assertEqual(row["variant_string"]["url"],
+                         reverse("view_variant", kwargs={"variant_id": self.both_variant.pk}))
+        self.assertTrue(row["delete"], "Tag owner can delete their own tag")
+
+    def test_variant_tags_datatable_classify_button(self):
+        """ A RequiresClassification tag is a to-do item - offer to complete it from the analysis it came from """
+        annotation_version = AnnotationVersion.latest(self.genome_build)
+        analysis = Analysis.objects.create(genome_build=self.genome_build, annotation_version=annotation_version,
+                                           user=self.user)
+        requires_classification, _ = Tag.objects.get_or_create(pk=settings.TAG_REQUIRES_CLASSIFICATION)
+        variant_tag = self._tag(self.artefact_variant, requires_classification)
+        variant_tag.analysis = analysis
+        variant_tag.save()
+
+        self.client.force_login(self.user)
+        url = reverse('variant_tags_datatable', kwargs={"genome_build_name": self.genome_build.name})
+        response = self.client.get(url, {"tag": requires_classification.pk})
+        row = response.json()["data"][0]
+        self.assertEqual(row["variant_string"]["classify_url"],
+                         reverse("create_classification_for_variant_tag",
+                                 kwargs={"analysis_id": analysis.pk, "variant_tag_id": variant_tag.pk}))
+
+    def test_variant_tags_export(self):
+        """ CSV comes off the queryset - the DataTable itself only ever pages 100 rows at a time """
+        self.client.force_login(self.user)
+        url = reverse('variant_tags_export', kwargs={"genome_build_name": self.genome_build.name})
+        response = self.client.get(url, {"tag": self.reportable.pk})
+        self.assertEqual(response.status_code, 200)
+
+        lines = b"".join(response.streaming_content).decode().strip().splitlines()
+        self.assertEqual(len(lines), 2, lines)
+        self.assertTrue(lines[1].startswith(f"{self.genome_build.name},"), lines[1])
+        self.assertIn(self.reportable.pk, lines[1])
 
     def _variant_tag_counts_tags(self) -> list[str]:
         url = reverse('variant_tag_counts_datatable', kwargs={"variant_id": self.both_variant.pk})
@@ -108,7 +161,7 @@ class TaggedVariantGridTest(TestCase):
     def test_user_filter_overrides_show_group_data(self):
         """ An explicit user filter must still show another user's (permission-visible) tags
             even when the grid config is set to only show your own data """
-        for caption in [TaggedVariantGrid.caption, VariantTagsGrid.caption]:
+        for caption in [TaggedVariantGrid.caption, VariantTagsColumns.GRID_NAME]:
             config = UserGridConfig.get(self.user, caption)
             config.show_group_data = False
             config.save()

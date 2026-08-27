@@ -195,3 +195,73 @@ function renderSequencingRunVCFs(data, type, row) {
     }
     return dom.prop('outerHTML');
 }
+
+
+// Variant tags grid (@see VariantTagsColumns) - the tag colour CSS comes from render_tag_styles_and_formatter
+function renderVariantTagVariant(data, type, row) {
+    if (!data || !data.variant_string) {
+        return '';
+    }
+    const dom = $('<div>');
+    if (data.url) {
+        $('<a>', {href: data.url, target: '_blank', text: data.variant_string}).appendTo(dom);
+    } else {
+        $('<span>', {text: data.variant_string}).appendTo(dom);
+    }
+    if (data.classify_url) {
+        $('<a>', {
+            href: data.classify_url,
+            target: '_blank',
+            class: 'btn btn-primary new-classification-button',
+            html: [$('<i>', {class: 'fas fa-plus-circle'}), ' New Classification']
+        }).appendTo(dom);
+    }
+    return dom.prop('outerHTML');
+}
+
+
+function renderVariantTagAnalysis(data, type, row) {
+    if (!data || !data.text) {
+        return '';
+    }
+    if (!data.url) {
+        return $('<span>', {text: data.text}).prop('outerHTML');
+    }
+    return $('<a>', {href: data.url, target: '_blank', text: data.text}).prop('outerHTML');
+}
+
+
+function renderVariantTagPill(data, type, row) {
+    if (!data || !data.tag) {
+        return '';
+    }
+    const tag = data.tag;
+    return $('<span>', {
+        class: `grid-tag tagged-${tag}`,
+        title: `Tagged as ${tag}`,
+        variant_id: data.variant_id,
+        tag_id: tag,
+        html: $('<span>', {class: 'user-tag-colored', text: tag})
+    }).prop('outerHTML');
+}
+
+
+// Comma separated list of symbols, each opening in a new window
+function renderGeneSymbolNewWindow(data, type, row) {
+    if (!data) {
+        return '';
+    }
+    const dom = $('<div>');
+    data.split(",").forEach((geneSymbol, index) => {
+        if (index) {
+            dom.append(', ');
+        }
+        $('<a>', {
+            href: Urls.view_gene_symbol(geneSymbol),
+            target: '_blank',
+            title: 'View gene in new window',
+            text: geneSymbol
+        }).appendTo(dom);
+    });
+    return dom.prop('outerHTML');
+}

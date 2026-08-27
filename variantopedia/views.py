@@ -1,3 +1,4 @@
+import csv
 import json
 import logging
 import operator
@@ -14,8 +15,10 @@ from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
 from django.db import connection
 from django.forms import model_to_dict
+from django.http import StreamingHttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils.text import slugify
 from django.utils.timesince import timesince
 from django.utils.timezone import localtime
 from django.views.decorators.http import require_POST
@@ -51,7 +54,7 @@ from eventlog.models import create_event
 from genes.hgvs import HGVSMatcher
 from genes.models import CanonicalTranscriptCollection, GeneSymbol
 from library.django_utils import get_field_counts, highest_pk, require_superuser
-from library.django_utils.jqgrid_view import JQGridView
+from library.django_utils.jqgrid_view import EXPORT_ROWS_PER_CHUNK, JQGridView
 from library.git import Git
 from library.guardian_utils import admin_bot
 from library.health_check import HealthCheckRequest, health_check_overall_stats_signal
@@ -62,7 +65,8 @@ from library.log_utils import (
     report_message,
     slack_bot_username,
 )
-from library.utils import flatten_nested_lists
+from library.utils import StashFile, flatten_nested_lists
+from library.utils.date_utils import local_date_string
 from pathtests.models import cases_for_user
 from seqauto.models import VCFFromSequencingRun, get_20x_gene_coverage
 from seqauto.seqauto_stats import get_sample_enrichment_kits_df
@@ -98,7 +102,7 @@ from upload.upload_stats import get_vcf_variant_upload_stats
 from variantgrid.celery import app
 from variantgrid.tasks.server_monitoring_tasks import get_disk_messages
 from variantopedia import forms
-from variantopedia.grids import TaggedVariantGrid, VariantTagsGrid
+from variantopedia.grids import TaggedVariantGrid, VariantTagsColumns
 from variantopedia.interesting_nearby import (
     get_method_summaries,
     get_nearby_qs,
@@ -907,21 +911,49 @@ def nearby_variants(request, variant_id, annotation_version_id):
 
 def _get_grid_name(request, name) -> str:
     name_parts = [name]
+    tag_id = request.GET.get("tag")
     if extra_filters := request.GET.get("extra_filters"):
-        extra_filters = json.loads(extra_filters)
-        if tag_id := extra_filters.get("tag"):
-            name_parts.extend(["tag", tag_id])
+        tag_id = json.loads(extra_filters).get("tag")
+    if tag_id:
+        name_parts.extend(["tag", tag_id])
     return "_".join(name_parts)
 
 
-def variant_tags_export(request, genome_build_name):
-    class SortVariantTagsGrid(VariantTagsGrid):
-        def _get_sidx_and_sord(self, request) -> tuple:
-            return "variant_string", "asc"
+# The DataTable pages at 100 rows, so the variant tags CSV comes from the queryset directly
+VARIANT_TAGS_EXPORT_COLUMNS = {
+    "variant_string": "Variant",
+    "variant__variantannotation__transcript_version__gene_version__gene_symbol__symbol": "Gene",
+    "tag__id": "Tag",
+    "analysis__id": "Analysis ID",
+    "analysis__name": "Analysis",
+    "user__username": "Username",
+    "created": "Created",
+    "variant__id": "Variant ID",
+    "id": "Tag ID",
+}
 
-    basename = _get_grid_name(request, "variant_tags_export")
-    return JQGridView.export_grid_as_csv(request, grid_klass=SortVariantTagsGrid,
-                                         basename=basename, genome_build_name=genome_build_name)
+
+def variant_tags_export(request, genome_build_name):
+    config = VariantTagsColumns(request)
+    qs = config.filter_queryset(config.get_initial_queryset()).order_by("variant_string")
+    basename = f"{_get_grid_name(request, 'variant_tags_export')}_{local_date_string()}"
+
+    pseudo_buffer = StashFile()
+    writer = csv.writer(pseudo_buffer, dialect='excel', quoting=csv.QUOTE_MINIMAL)
+
+    def iter_rows():
+        writer.writerow(["Genome Build"] + list(VARIANT_TAGS_EXPORT_COLUMNS.values()))
+        yield pseudo_buffer.value
+        for i, row in enumerate(qs.values(*VARIANT_TAGS_EXPORT_COLUMNS), start=1):
+            writer.writerow([genome_build_name] + [row[k] for k in VARIANT_TAGS_EXPORT_COLUMNS])
+            if i % EXPORT_ROWS_PER_CHUNK == 0:
+                yield pseudo_buffer.value
+        if remaining := pseudo_buffer.value:
+            yield remaining
+
+    response = StreamingHttpResponse(iter_rows(), content_type="text/csv")
+    response['Content-Disposition'] = f'attachment; filename="{slugify(basename)}.csv"'
+    return response
 
 
 def tagged_variant_export(request, genome_build_name):

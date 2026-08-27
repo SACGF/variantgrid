@@ -9,30 +9,3 @@
 
     {% render_rgb_css 'tagged-' user_tag_styles %}
 </style>
-<script>
-    $(document).ready(function() {
-        jQuery.extend($.fn.fmatter , {
-            formatVariantTag : function(cellValue, options, rowObject) {
-                let variantId = rowObject["variant__id"];
-                return getVariantTagHtml(variantId, cellValue);
-            },
-        {% if url_name_visible.analysis %}
-            formatAnalysis : function(analysisName, options, rowObject) {
-                let analysis = "";
-                if (analysisName) {
-                    let analysisId = rowObject["analysis__id"];
-                    const URL = Urls.analysis(analysisId);
-                    analysis = `<a href='${URL}' target='_blank'>${analysisId} - ${analysisName}</a>`;
-                }
-                return analysis;
-            },
-        {% endif %}
-        {% if url_name_visible.view_variant %}
-            formatVariantString : function(variantString, options, rowObject) {
-                const URL = Urls.view_variant(rowObject["variant__id"]);
-                return "<a href='" + URL + "' target='_blank'>" + variantString + "</a>";
-            },
-        {% endif %}
-        });
-    });
-</script>

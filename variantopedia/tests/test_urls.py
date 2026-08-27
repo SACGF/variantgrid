@@ -127,10 +127,14 @@ class Test(URLTestCase):
 
         GRID_LIST_URLS = [
             ("all_variants_grid", build_name_kwargs, self.variant),
-            ("variant_tags_grid", build_name_kwargs, self.variant_tag),
             ("tagged_variant_grid", build_name_kwargs, self.variant),
         ]
         self._test_jqgrid_urls_contains_objs(GRID_LIST_URLS, self.user, True)
+
+        DATATABLE_GRID_LIST_URLS = [
+            ("variant_tags_datatable", build_name_kwargs, self.variant_tag),
+        ]
+        self._test_datatables_grid_urls_contains_objs(DATATABLE_GRID_LIST_URLS, self.user, True)
 
     def testDataGridUrls(self):
         DATATABLE_GRID_LIST_URLS = [

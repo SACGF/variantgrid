@@ -52,7 +52,7 @@ from uicore.templatetags.js_tags import jsonify_for_js
 from variantgrid.perm_path import get_visible_url_names
 
 
-def _url_if_visible(url_name: str, **kwargs) -> Optional[str]:
+def url_if_visible(url_name: str, **kwargs) -> Optional[str]:
     """ Deployments without patients (eg Shariant) unregister these urls entirely """
     if get_visible_url_names().get(url_name):
         return reverse(url_name, kwargs=kwargs)
@@ -181,7 +181,7 @@ class SamplesListColumns(DatatableConfig[Sample]):
 
     @staticmethod
     def _render_vcf(cell: CellData) -> JsonDataType:
-        return {"text": cell.value, "url": _url_if_visible("view_vcf", vcf_id=cell["vcf__id"])}
+        return {"text": cell.value, "url": url_if_visible("view_vcf", vcf_id=cell["vcf__id"])}
 
     @staticmethod
     def _render_sample_gene_list_count(cell: CellData) -> JsonDataType:
@@ -191,7 +191,7 @@ class SamplesListColumns(DatatableConfig[Sample]):
     def _render_mutational_signature(cell: CellData) -> JsonDataType:
         url = None
         if mutational_signature_id := cell["mutationalsignature__id"]:
-            url = _url_if_visible("view_mutational_signature",
+            url = url_if_visible("view_mutational_signature",
                                   mutational_signature_id=mutational_signature_id)
         return {"text": cell.value, "url": url}
 
@@ -211,7 +211,7 @@ class SamplesListColumns(DatatableConfig[Sample]):
         pk = cell[pk_column]
         if not pk:
             return {"text": cell.value}
-        return {"text": cell.value or f"({pk})", "url": _url_if_visible(url_name, **{url_kwarg: pk})}
+        return {"text": cell.value or f"({pk})", "url": url_if_visible(url_name, **{url_kwarg: pk})}
 
     def _sample_queryset(self) -> QuerySet[Sample]:
         user_grid_config = UserGridConfig.get(self.user, 'Samples')

@@ -158,26 +158,32 @@
         {% render_tag_styles_and_formatter %}
 
         <script>
-            function getRelatedVariantsExtraFilters() {
-                let variantTagGridParams = {
-                    analysis_ids : {{ analysis_ids_list | jsonify }},
-                };
-                return JSON.stringify(variantTagGridParams);
+            const relatedAnalysisIds = {{ analysis_ids_list | jsonify }};
+
+            // Called by DataTables before each ajax call
+            function relatedVariantTagsDatatableFilter(data) {
+                data["analysis_ids"] = JSON.stringify(relatedAnalysisIds);
             }
-        
-            function getRelatedVariantTagsConfigUrl() { 
-                return "extra_filters=" + getRelatedVariantsExtraFilters();
-            }
-            
-            function relatedAnalysesGridInitFunc(grid, pagerId) {
-                grid[0].p.postData["extra_filters"] = getRelatedVariantsExtraFilters;
+
+            function downloadRelatedVariantTagsCSV(url) {
+                const params = {};
+                relatedVariantTagsDatatableFilter(params);
+                window.location = url + "?" + EncodeQueryData(params);
             }
         </script>
         <h3>Variants tagged in analyses</h3>
-        {% load jqgrid_tags %}
+        {% load datatable_tags %}
         {%  for genome_build_name in variant_tag_genome_build_names %}
-            {% user_data_grid_filter genome_build_name|slugify 'Variant Tags' %}
-            {% jqgrid 'variant_tags_grid' genome_build_name|slugify template_name='jqgrid/variant_details_link_grid.html' genome_build_name=genome_build_name|slugify search=False download_grid_json_as_csv=True jqgrid_config_get_parameters_func='getRelatedVariantTagsConfigUrl' init_func='relatedAnalysesGridInitFunc' %}
+            {% with table_id=genome_build_name|slugify|add:"-variant-tags-datatable" %}
+                {% datatable_user_data_filter table_id 'Variant Tags' %}
+                <table id="{{ table_id }}" class="sticky-header"
+                       data-datatable-url="{% url 'variant_tags_datatable' genome_build_name|slugify %}"
+                       data-datatable-data="relatedVariantTagsDatatableFilter"></table>
+                <div data-toolbar="#{{ table_id }}">
+                    <a class="btn btn-outline-secondary fas fa-download"
+                       href="javascript:downloadRelatedVariantTagsCSV('{% url 'variant_tags_export' genome_build_name|slugify %}')">CSV</a>
+                </div>
+            {% endwith %}
         {%  endfor %}
     {% endif %}
     
