@@ -2335,6 +2335,12 @@ class VariantAnnotation(AbstractVariantAnnotation):
     def gnomad_sv_overlap(self) -> list[dict]:
         return self.get_gnomad_sv_overlap(self.__dict__, self.version.gnomad_sv)
 
+    def get_short_label(self) -> str:
+        """ Falls back to g.HGVS, which only this (per-variant) annotation has """
+        if self.hgvs_p or self.has_hgvs_c:
+            return super().get_short_label()
+        return self.hgvs_g or str(self.variant)
+
     @staticmethod
     def get_hgvs_g(variant: Variant) -> Optional[str]:
         """ This is very slow - only use on a page with just 1 variant, not in a loop """

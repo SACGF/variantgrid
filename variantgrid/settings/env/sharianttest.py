@@ -12,6 +12,7 @@ from variantgrid.settings.env.shariantcommon import *  # pylint: disable=wildcar
 # import all the base settings #
 SITE_ID = 6
 SITE_NAME = "Shariant Test"
+SITE_SHORT_NAME = "Shariant Test"
 SITE_MESSAGE = "This is the test version of Shariant. Please avoid sharing real data in this environment."
 
 SLACK['emoji'] = ':mouse:'

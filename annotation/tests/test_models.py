@@ -28,3 +28,7 @@ class TestAnnotationModels(TestCase):
     def test_get_short_label_without_symbol(self):
         va = VariantAnnotation(hgvs_p="NP_001745.2:p.Ala547Val")
         self.assertEqual("p.Ala547Val", va.get_short_label())
+
+    def test_get_short_label_falls_back_to_g_hgvs(self):
+        va = VariantAnnotation(hgvs_g="NC_000021.9:g.34859474G>A")
+        self.assertEqual("NC_000021.9:g.34859474G>A", va.get_short_label())

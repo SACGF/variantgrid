@@ -9,6 +9,7 @@ from variantgrid.settings.env.shariantcommon import *  # pylint: disable=wildcar
 # import all the base settings #
 SITE_ID = 8
 SITE_NAME = "Shariant Demo"
+SITE_SHORT_NAME = "Shariant Demo"
 SITE_MESSAGE = "This is the demo version of Shariant. Please avoid sharing real data in this environment."
 
 OIDC_REQUIRED_GROUP = '/variantgrid/shariant_demo'

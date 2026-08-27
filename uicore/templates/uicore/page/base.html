@@ -10,7 +10,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
     <link href="{% static 'js/lib/bootstrap/4.5.2/css/bootstrap.min.css' %}" rel="stylesheet">
 
-    <title>{% block title %}{{ site_name }}{% endblock %}</title>
+    <title>{{ site_short_name }} {% block title %}{% endblock %}</title>
     <meta name="description" content="{% block meta_description %}{{ site_description }}{% endblock %}">
     <link rel="canonical" href="{% block canonical_url %}{{ request.scheme }}://{{ request.get_host }}{{ request.path }}{% endblock %}">
 

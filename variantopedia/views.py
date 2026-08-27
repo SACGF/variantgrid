@@ -666,8 +666,23 @@ class AlleleOriginGroupingDescription:
         )
 
 
+def get_allele_short_label(allele: Allele, preferred_genome_build: GenomeBuild) -> str:
+    """ Shortest label that still tells a human which allele this is, eg "RUNX1:p.Ala547Val" - taken from
+        the representative (MANE where we have it) transcript, falling back to g.HGVS """
+    variant_alleles = list(allele.variant_alleles())
+    preferred_first = sorted(variant_alleles, key=lambda va: va.genome_build != preferred_genome_build)
+    for variant_allele in preferred_first:
+        vav = VariantAnnotationVersion.latest(variant_allele.genome_build)
+        if va := variant_allele.variant.variantannotation_set.filter(version=vav).first():
+            return va.get_short_label()
+    if preferred_first:
+        return VariantAnnotation.get_hgvs_g(preferred_first[0].variant) or str(allele)
+    return str(allele)
+
+
 def view_allele(request, allele_id: int):
     allele: Allele = get_object_or_404(Allele, pk=allele_id)
+    user_settings = UserSettings.get_for_user(request.user)
     link_allele_to_existing_variants(allele, AlleleConversionTool.CLINGEN_ALLELE_REGISTRY)
     ClinVarRecordCollection.set_allele_for_variants(allele)
 
@@ -688,6 +703,7 @@ def view_allele(request, allele_id: int):
         "show_overall_diff": show_overall_diff,
         "allele_card": AlleleCard(user=request.user, allele=allele),
         "allele": allele,
+        "allele_short_label": get_allele_short_label(allele, user_settings.default_genome_build),
         "edit_clinical_groupings": request.GET.get('edit_clinical_groupings') == 'True'
     }
     return render(request, "variantopedia/view_allele.html", context)
@@ -816,8 +832,8 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
         "variant": variant,
         "variant_allele": variant_allele_data,
         "variant_annotation": variant_annotation,
-        # Names the analysis' variant details tab, which has no room for a transcript
-        "variant_short_label": variant_annotation.get_short_label() if variant_annotation else str(variant),
+        # Names the page and the analysis' variant details tab, which have no room for a transcript
+        "variant_short_label": variant_annotation.get_short_label() if variant_annotation else hgvs_g or str(variant),
         "variant_tag_stale_days": user_settings.variant_tag_stale_days,
         "visible_fields": variant_annotation.visible_columns if variant_annotation else frozenset(),
         "vts": vts,
