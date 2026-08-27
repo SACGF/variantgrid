@@ -3,9 +3,8 @@ from django.db.models import Q, QuerySet
 from django.db.models.aggregates import Count
 from django.utils.timezone import now
 
-from classification.enums import ShareLevel
-from classification.enums.discordance_enums import DiscordanceReportResolution
-from classification.models import DiscordanceReport, Classification, ClinVarExport
+from classification.enums import ShareLevel, OverlapStatus, OverlapType
+from classification.models import DiscordanceReport, Classification, ClinVarExport, Overlap
 from snpdb.models import Lab, Allele, Organization
 
 
@@ -40,6 +39,10 @@ class ClassificationPublicSummaryData:
     @cached_property
     def discordant_alleles(self) -> int:
         # TODO no distinction between germline and somatic
+
+        # warning, counts discordances with ClinVar
+        # Also if an Overlap has ever been discordant it counts
+        return Overlap.objects.filter(overlap_max_ever_status__gte=OverlapStatus.MAJOR_DIFFERENCES, overlap_type=OverlapType.SINGLE_CONTEXT).count()
         return DiscordanceReport.objects.annotate(lab_count=Count("discordancereportclassification__classification_original__classification__lab", distinct=True)).filter(lab_count__gte=2).count()
 
     @cached_property
