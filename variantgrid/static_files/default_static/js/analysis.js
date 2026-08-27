@@ -907,6 +907,7 @@ function loadGridAndEditorForNode(nodeId, extra_filters, fromSelectNode) {
         deferredGridLoad = null;  // the pending load belonged to the node we're leaving
         $("#node-editor-container").empty();
         closeAllVariantDetailsTabs();  // they belonged to the grid we're replacing
+        showNodeEditorTab(NODE_EDITOR_TAB_EDITOR);  // a node comes up on its editor, so its grid stays deferred
         openNodeEditorDrawer();  // selecting a node is what opens the drawer
         showLoadingOverlay();
         dataContainer.load(load_node_url, function() {

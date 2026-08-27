@@ -29,6 +29,7 @@ from analysis.models.nodes.filters.selected_in_parent_node import NodeVariant, S
 from analysis.models.nodes.filters.venn_node import VennNode
 from analysis.models.nodes.node_types import get_node_types_hash_by_class_name
 from analysis.models.nodes.node_utils import (
+    get_child_position,
     get_rendering_dict,
     get_toposorted_nodes,
     reload_analysis_nodes,
@@ -304,8 +305,7 @@ def create_filter_child(request, analysis_id, node_id):
 @require_POST
 def create_extra_filter_child(request, analysis_id, node_id, extra_filters):
     node = get_node_subclass_or_404(request.user, node_id, write=True)
-    x = node.x + 50 + random.randrange(-10, 10)
-    y = node.y + 100 + random.randrange(-10, 10)
+    x, y = get_child_position(node)
     filter_node = BuiltInFilterNode.objects.create(analysis=node.analysis,
                                                    built_in_filter=extra_filters,
                                                    x=x,
@@ -322,8 +322,7 @@ def create_extra_filter_child(request, analysis_id, node_id, extra_filters):
 
 def create_selected_child(request, analysis_id, node_id):
     node = get_node_subclass_or_404(request.user, node_id)
-    x = node.x + 50 + random.randrange(-10, 10)
-    y = node.y + 100 + random.randrange(-10, 10)
+    x, y = get_child_position(node)
 
     selected_node = SelectedInParentNode.objects.create(analysis=node.analysis,
                                                         x=x,
