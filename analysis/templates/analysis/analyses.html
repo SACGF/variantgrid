@@ -28,7 +28,7 @@
         });
 
         function renderAnalysisTags(data, type, row) {
-            return tagsGlobalFormatter(data, null, {id: row.id.text});
+            return VariantGridFormat.tagsGlobal(data, null, {id: row.id.text});
         }
 
         $(document).ready(() => {

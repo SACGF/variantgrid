@@ -1,20 +1,5 @@
 {% extends "jqgrid/jqgrid.html" %}
 {% load settings_tags %}
 
-{% block formatter %}
-    'detailsLink' : detailsLink,
-    'tagsFormatter' : tagsFormatter,
-    'tagsGlobalFormatter' : tagsGlobalFormatter,
-    'clinvarLink' : clinvarLink,
-    'cosmicLink' : cosmicLink,
-    'omimLink' : omimLink,
-    'formatClinGenAlleleId': formatClinGenAlleleId,
-    'formatDBSNP': formatDBSNP,
-    'formatOntologyTerms': formatOntologyTerms,
-    'formatPubMed': formatPubMed,
-    'geneSymbolLink' : geneSymbolLink,
-    'geneSymbolNewWindowLink' : geneSymbolNewWindowLink,
-    'gnomadFilteredFormatter' : gnomadFilteredFormatter,
-    'unitAsPercentFormatter' : unitAsPercentFormatter,
-    'geneSymbolNewWindowLink' : geneSymbolNewWindowLink,
-{% endblock %}
+{# LEGACY-JQGRID: the variant formatters are registered against $.fn.fmatter by grid.js, which #}
+{# every page using this template loads. Delete this template with the last jqGrid variant grid. #}

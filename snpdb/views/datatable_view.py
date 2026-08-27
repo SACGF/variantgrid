@@ -17,6 +17,7 @@ from kombu.utils import json
 
 from library.log_utils import report_exc_info
 from library.utils import JsonDataType, JsonObjType, full_class_name, nice_class_name, pretty_label
+from snpdb.models import UserGridConfig
 from snpdb.views.datatable_mixins import JSONResponseView
 
 logger = logging.getLogger(__name__)
@@ -222,6 +223,9 @@ class DatatableConfig(Generic[DC]):
     rich_columns: list[RichColumn]  # columns for display
     expand_client_renderer: Optional[str] = None  # if provided, will expand rows and render content with this JavaScript method
     scroll_x = False
+    # Set to opt in to rows per page persisting per user (in UserGridConfig, keyed on this name)
+    # rather than in the browser's localStorage
+    grid_name: Optional[str] = None
 
     def row_css(self, row: CellData) -> Optional[str]:
         """
@@ -540,6 +544,12 @@ class DatabaseTableView(Generic[DC], JSONResponseView):
             "expandClientRenderer": config.expand_client_renderer,
             "scrollX": config.scroll_x,
         }
+        if grid_name := config.grid_name:
+            rows, row_selections = UserGridConfig.get_rows_and_selections(self.request.user, grid_name)
+            data["gridName"] = grid_name
+            data["pageLength"] = rows
+            data["lengthMenu"] = row_selections
+
         if config.default_sort_order_column:
             data["order"] = [[config.column_index(config.default_sort_order_column), "asc" if config.default_sort_order_column.default_sort != SortOrder.DESC else "desc"]]
 

@@ -165,10 +165,6 @@
         }
 
         $(document).ready(() => {
-            jQuery.extend($.fn.fmatter, {
-                'detailsLink' : detailsLink,
-            });
-
             $(".contig-filter, #non-standard-contigs, .variant-type-filter").change(function() {
                 updateFilters($(this));
             });

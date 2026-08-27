@@ -248,8 +248,8 @@ function transcriptFunc(transcriptId, data) {
         applyValue(name, value);
     });
 
-    formatField($("#cosmic_id"), cosmicLink);
-    formatField($("#cosmic_legacy_id"), cosmicLink);
+    formatField($("#cosmic_id"), VariantGridFormat.cosmicLink);
+    formatField($("#cosmic_legacy_id"), VariantGridFormat.cosmicLink);
     formatField($("#gnomad_gene_constraint_retrieval"), gnomadGeneConstraintRetrieval);
 }
 
@@ -446,7 +446,7 @@ $(document).ready(function() {
     handlePubMedLinks("{{ variant_annotation.pubmed|default_if_none:''|escapejs }}");
     let dbSNP = $("#dbsnp_rs_id").text();
     if (dbSNP && dbSNP !== '-') {
-        formatField($("#dbsnp_rs_id"), formatDBSNP);
+        formatField($("#dbsnp_rs_id"), VariantGridFormat.dbsnp);
     }
 
     $('.search-terms-toggle').click(function() {

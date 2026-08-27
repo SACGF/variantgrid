@@ -54,6 +54,7 @@ const DataTableDefinition = (function() {
 
         this.tableId = null;
         this.lengthKey = null;
+        this.lastDraw = null;
         this.serverParams = null;
         this.dtParams = null;
         this.dataTable = null;
@@ -65,6 +66,9 @@ const DataTableDefinition = (function() {
     };
 
     DataTableDefinition.definitions = {};
+
+    // DataTables' own request params - anything else in the data object is page/grid state
+    DataTableDefinition.DATATABLES_PARAMS = ['draw', 'columns', 'order', 'start', 'length', 'search'];
 
     DataTableDefinition.prototype = {
 
@@ -105,7 +109,50 @@ const DataTableDefinition = (function() {
             return definitionData.then(data => {this.serverParams = data;});
         },
 
+        /* The ajax `data` hook. Normally the page's own function; where the definition asks for
+           cache stable params it also sends a minimal, stably ordered param set, so identical grid
+           state produces an identical querystring and a response cached data endpoint keeps its key
+           (@see NodeGridHandler). `draw` varies per request, so it is stripped here and put back on
+           the response by dataSrc. */
+        buildAjaxData: function() {
+            const userDataFn = this.data ? eval(this.data) : null;
+            if (!this.serverParams.cacheStableParams) {
+                return userDataFn;
+            }
+            const self = this;
+            return function(data, settings) {
+                self.lastDraw = data.draw;
+                const params = {};
+                if (userDataFn) {
+                    const returned = userDataFn(data, settings);
+                    if (returned) {
+                        Object.assign(params, returned);
+                    }
+                }
+                for (const key of Object.keys(data)) {
+                    if (DataTableDefinition.DATATABLES_PARAMS.indexOf(key) === -1) {
+                        params[key] = data[key];  // added by the page's data function
+                    }
+                }
+                params.start = data.start;
+                params.length = data.length;
+                if (data.order && data.order.length) {
+                    params['order[0][column]'] = data.order[0].column;
+                    params['order[0][dir]'] = data.order[0].dir;
+                }
+                if (data.search && data.search.value) {
+                    params['search[value]'] = data.search.value;
+                }
+                const stableParams = {};
+                for (const key of Object.keys(params).sort()) {
+                    stableParams[key] = params[key];
+                }
+                return stableParams;
+            };
+        },
+
         convertDefinition: function() {
+            const self = this;
             const defn = this.serverParams;
             const tableId = this.tableId;
             const lengthKey = this.lengthKey;
@@ -113,6 +160,9 @@ const DataTableDefinition = (function() {
             let lengthValue = 10;
             if (tableId) {
                 lengthValue = parseInt(localStorage.getItem(lengthKey)) || 10;
+            }
+            if (defn.pageLength) {
+                lengthValue = defn.pageLength;  // this user's UserGridConfig rows beats the local default
             }
 
             const domString = `<"top"><"toolbar"<"custom">${ defn.searchBoxEnabled ? 'f' : ''}>rt${ defn.downloadCsvButtonEnabled ? 'B' : ''}<"bottom"<"showing"il>p><"clear">`;
@@ -122,7 +172,7 @@ const DataTableDefinition = (function() {
                 serverSide: true,
                 pageLength: lengthValue,
                 dom: domString,
-                order: defn.order,
+                order: defn.order || [],
                 fixedOrder: defn.order,
                 pagingType: "input",
                 classes: {
@@ -131,8 +181,8 @@ const DataTableDefinition = (function() {
                 },
                 ajax: {
                     url: this.url,
-                    type: 'POST',
-                    data: this.data ? eval(this.data) : null
+                    type: defn.ajaxType || 'POST',
+                    data: this.buildAjaxData()
                 },
                 bFilter: defn.searchBoxEnabled,
                 bAutoWidth: false,
@@ -143,6 +193,31 @@ const DataTableDefinition = (function() {
             };
             if (defn.order) {
                 dtParams.orderSequence = defn.orderSequence;
+            }
+            if (defn.lengthMenu) {
+                dtParams.lengthMenu = defn.lengthMenu;
+            }
+            if (defn.deferLoading) {
+                // Build the table now, fetch rows when the page asks for them (table.ajax.reload())
+                dtParams.deferLoading = 0;
+            }
+            if (defn.cacheStableParams) {
+                dtParams.ajax.dataSrc = function(json) {
+                    if (json.draw === undefined) {
+                        json.draw = self.lastDraw;  // stripped from the request to keep the URL cacheable
+                    }
+                    return json.data;
+                };
+            }
+            if (defn.approximateCount) {
+                // A planner estimate rather than a COUNT(*) - say so rather than claiming an exact total
+                dtParams.infoCallback = function(settings, start, end, max, total, pre) {
+                    const json = this.api().ajax.json();
+                    if (json && json.approximateRecords) {
+                        return `Showing ${start} to ${end} of ${json.approximateRecords} entries`;
+                    }
+                    return pre;
+                };
             }
 
             if (defn.downloadCsvButtonEnabled) {
@@ -191,8 +266,11 @@ const DataTableDefinition = (function() {
                 columnDefs.push(columnDef);
                 if (col.render) {
                     const rawRenderer = eval(col.render);
+                    // Grid wide metadata + this column's kwargs, closed over at table build time -
+                    // jqGrid formatters read the equivalent off options.colModel
+                    const renderContext = {extra: defn.extra || {}, kwargs: col.renderKwargs || null};
                     const renderer = (data, type, row) => {
-                        const output = rawRenderer(data, type, row);
+                        const output = rawRenderer(data, type, row, renderContext);
                         if (output instanceof jQuery) {
                             return output.prop("outerHTML");
                         }
@@ -230,7 +308,11 @@ const DataTableDefinition = (function() {
 
             // GENERATE COLUMNS
             for (const columnDef of dtParams.columnDefs) {
-                $('<th/>', {class: columnDef.classNames, html: columnDef.label}).appendTo(tHeadTr);
+                const th = $('<th/>', {class: columnDef.classNames, html: columnDef.label});
+                if (columnDef.headerTitle) {
+                    th.attr('title', columnDef.headerTitle);
+                }
+                th.appendTo(tHeadTr);
             }
 
             dtParams.createdRow = (row, data, dataIndex) => {
@@ -254,12 +336,35 @@ const DataTableDefinition = (function() {
 
             const tableId = this.tableId;
             const lengthKey = this.lengthKey;
+            const gridName = this.serverParams.gridName;
 
             $(`select[name=${tableId}_length]`).change(function() {
-                localStorage.setItem(lengthKey, $(this).val());
+                const gridRows = $(this).val();
+                localStorage.setItem(lengthKey, gridRows);
+                if (gridName) {
+                    // Opted in via DatatableConfig.grid_name - remember it for this user, not this browser
+                    $.ajax({
+                        type: 'POST',
+                        url: Urls.set_user_row_config(),
+                        data: {grid_name: gridName, grid_rows: gridRows},
+                        headers: {'X-CSRFToken': Cookies.get('csrftoken')}
+                    });
+                }
             });
+            const toolbar = dom.closest('.dataTables_wrapper').find('.toolbar .custom');
             // move any externally defined toolbar elements onto it
-            $(`[data-toolbar="#${tableId}"]`).detach().appendTo(dom.closest('.dataTables_wrapper').find('.toolbar .custom'));
+            $(`[data-toolbar="#${tableId}"]`).detach().appendTo(toolbar);
+
+            const downloadUrl = this.serverParams.downloadUrl;
+            if (downloadUrl) {
+                // Server side streaming CSV - raw values and every row, unlike the client side button
+                // which pulls rows back through the ajax endpoint
+                const link = $('<a>', {class: 'btn btn-outline-secondary',
+                                       html: '<i class="fas fa-download"></i> CSV'}).appendTo(toolbar);
+                dataTable.on('draw', function() {
+                    link.attr('href', downloadUrl + '?' + $.param(dataTable.ajax.params() || {}));
+                });
+            }
         },
 
         setupClientExpend: function() {

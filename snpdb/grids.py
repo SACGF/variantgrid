@@ -561,6 +561,10 @@ class AbstractVariantGrid(JqGridUserRowConfig):
     def _get_base_queryset(self) -> QuerySet:
         raise NotImplementedError()
 
+    def get_datatable_extra(self) -> dict:
+        # gnomAD links are per genome build - jqGrid formatters read the page's ANALYSIS_SETTINGS global
+        return {"genomeBuild": self.genome_build.name}
+
     def _get_permission_user(self):
         return self.user
 

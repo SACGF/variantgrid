@@ -157,6 +157,13 @@ class VariantGrid(AbstractVariantGrid):
                 cm["sortable"] = False
         return colmodels
 
+    def get_datatable_extra(self) -> dict:
+        extra = super().get_datatable_extra()
+        # jqGrid put these in every colmodel - the DataTables renderers read them from one grid-wide block
+        extra["analysisNode"] = {"visible": self.node.visible}
+        extra["sortingDisabled"] = self.sorting_disabled()
+        return extra
+
     def _get_q(self) -> Optional[Q]:
         q = None
         if self.node_count:

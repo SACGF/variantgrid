@@ -423,6 +423,12 @@ class JqGrid:
         }
         return config
 
+    def get_datatable_extra(self) -> dict:
+        """ Grid-wide metadata for the DataTables client renderers - jqGrid formatters read this kind of
+            thing off options.colModel, which has no DataTables equivalent.
+            @see library.django_utils.jqgrid_datatable_adapter """
+        return {}
+
     def get_url(self):
         return str(self.url)
 

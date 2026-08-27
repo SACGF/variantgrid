@@ -138,9 +138,21 @@ class UserGridConfig(models.Model):
     class Meta:
         unique_together = ("user", "grid_name")
 
+    DEFAULT_ROWS = 10
+    DEFAULT_ROW_SELECTIONS = {DEFAULT_ROWS, 15, 20, 25, 50, 100}
+
     @staticmethod
     def get(user: User, grid_name: str) -> 'UserGridConfig':
         return thread_safe_unique_together_get_or_create(UserGridConfig, user=user, grid_name=grid_name)[0]
+
+    @staticmethod
+    def get_rows_and_selections(user: User, grid_name: str) -> tuple[int, list[int]]:
+        """ (this user's rows per page, the selections to offer) - the stored value is always offered """
+        try:
+            rows = UserGridConfig.objects.get(user=user, grid_name=grid_name).rows
+        except UserGridConfig.DoesNotExist:
+            rows = UserGridConfig.DEFAULT_ROWS
+        return rows, sorted(UserGridConfig.DEFAULT_ROW_SELECTIONS | {rows})
 
     def __str__(self):
         details = []
