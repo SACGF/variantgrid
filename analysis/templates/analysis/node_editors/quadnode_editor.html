@@ -4,6 +4,7 @@
     var quadForm = $("#quad-form");
     var ZYGOSITY_MAP = JSON.parse(document.getElementById('zygosity-data').textContent);
     var motherAffected = false, fatherAffected = false, siblingAffected = false;
+    var quadLoadable = {{ quad_loadable|yesno:"true,false" }};
 
     function getQuadId() {
        return $("#id_quad", quadForm).find(":selected").val();
@@ -67,18 +68,31 @@
         updateZygosityTable();
     }
 
+    function showQuadLoadError() {
+        $("#quad-load-error").text("Unable to load this Quad - see node errors for details.").show();
+    }
+
     function changeQuad() {
         $("#quad-info").hide();
+        $("#quad-load-error").hide();
         var quadId = getQuadId();
         if (quadId) {
-            $.ajax({
-                url: Urls.api_view_quad(quadId),
-                success: displayQuadInfo,
-            });
             setCrossLink($("#quad-link"), Urls.view_quad, quadId);
+            if (quadLoadable) {
+                $.ajax({
+                    url: Urls.api_view_quad(quadId),
+                    success: displayQuadInfo,
+                    error: showQuadLoadError,
+                });
+            } else {
+                showQuadLoadError();
+            }
         }
     }
-    $("#id_quad").change(changeQuad);
+    $("#id_quad").change(function() {
+        quadLoadable = true;  // Only the autocomplete's own choices get here, and they're all visible
+        changeQuad();
+    });
     $("#id_inheritance").change(updateZygosityTable);
     $("#id_require_parent_zygosity").change(updateZygosityTable);
     $("#id_require_sibling_zygosity").change(updateZygosityTable);
@@ -110,6 +124,7 @@
             <div>
                 <b>Quad:</b> {{ form.quad }}{{ form.quad.errors }} <a class="cross-link" id="quad-link" target="_blank">View Quad</a>
             </div>
+            <div id='quad-load-error' class='text-danger' style='display: none;'></div>
             <div id='quad-info'>
                 <table>
                 <tr>

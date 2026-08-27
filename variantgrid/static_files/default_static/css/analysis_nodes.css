@@ -670,6 +670,26 @@ span.node-counts {
 	}
 }
 
+/* An errored node never gets counts, so put a cross where the spinner was rather than
+   leaving the strip blank - see updateDirtyNode() */
+.design-a-node[node_error] .node-counts {
+	visibility: hidden;
+}
+
+.design-a-node[node_error] .node-counts-strip::after {
+	content: "\2715";
+	position: absolute;
+	inset: 0;
+	margin: auto;
+	width: 12px;
+	height: 12px;
+	line-height: 12px;
+	text-align: center;
+	font-size: 11px;
+	font-weight: 700;
+	color: #c02b2b;
+}
+
 .node-count .live-data-marker {
 	font-size: 0.8em;
 	opacity: 0.7;

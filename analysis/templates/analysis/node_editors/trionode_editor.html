@@ -4,6 +4,7 @@
     var trioForm = $("#trio-form");
     var ZYGOSITY_MAP = JSON.parse(document.getElementById('zygosity-data').textContent);
     var motherAffected = false, fatherAffected = false;
+    var trioLoadable = {{ trio_loadable|yesno:"true,false" }};
 
     function getTrioId() {
        return $("#id_trio", trioForm).find(":selected").val();
@@ -63,18 +64,31 @@
         updateZygosityTable();
     }
 
+    function showTrioLoadError() {
+        $("#trio-load-error").text("Unable to load this Trio - see node errors for details.").show();
+    }
+
     function changeTrio() {
         $("#trio-info").hide();
+        $("#trio-load-error").hide();
         var trioId = getTrioId();
         if (trioId) {
-            $.ajax({
-                url: Urls.api_view_trio(trioId),
-                success: displayTrioInfo,
-            });
             setCrossLink($("#trio-link"), Urls.view_trio, trioId);
+            if (trioLoadable) {
+                $.ajax({
+                    url: Urls.api_view_trio(trioId),
+                    success: displayTrioInfo,
+                    error: showTrioLoadError,
+                });
+            } else {
+                showTrioLoadError();
+            }
         }
     }
-    $("#id_trio").change(changeTrio);
+    $("#id_trio").change(function() {
+        trioLoadable = true;  // Only the autocomplete's own choices get here, and they're all visible
+        changeTrio();
+    });
     $("#id_inheritance").change(updateZygosityTable);
     $("#id_require_zygosity").change(updateZygosityTable);
 
@@ -105,6 +119,7 @@
             <div>
                 <b>Trio:</b> {{ form.trio }}{{ form.trio.errors }} <a class="cross-link" id="trio-link" target="_blank">View Trio</a>
             </div>
+            <div id='trio-load-error' class='text-danger' style='display: none;'></div>
             <div id='trio-info'>
                 <table>
                 <tr>

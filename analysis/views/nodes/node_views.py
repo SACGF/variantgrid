@@ -341,6 +341,14 @@ class ZygosityTableMixin:
         return context
 
 
+def _source_visible_to_user(source, user) -> bool:
+    """ The editors AJAX their family member details from the REST API, which applies the same
+        permission filter - it 404s for eg a Trio whose cohort import failed """
+    if source is None:
+        return False
+    return type(source).filter_for_user(user).filter(pk=source.pk).exists()
+
+
 class TrioNodeView(ZygosityTableMixin, NodeView):
     model = TrioNode
     form_class = TrioNodeForm
@@ -349,6 +357,11 @@ class TrioNodeView(ZygosityTableMixin, NodeView):
         form_kwargs = super().get_form_kwargs()
         form_kwargs["genome_build"] = self.object.analysis.genome_build
         return form_kwargs
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["trio_loadable"] = _source_visible_to_user(self.object.trio, self.request.user)
+        return context
 
 
 class QuadNodeView(ZygosityTableMixin, NodeView):
@@ -359,6 +372,11 @@ class QuadNodeView(ZygosityTableMixin, NodeView):
         form_kwargs = super().get_form_kwargs()
         form_kwargs["genome_build"] = self.object.analysis.genome_build
         return form_kwargs
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["quad_loadable"] = _source_visible_to_user(self.object.quad, self.request.user)
+        return context
 
 
 class VennNodeView(NodeView):

@@ -594,6 +594,8 @@ function updateDirtyNode(node, refresh) {
 	const variant_count = $(".node-count-__total", node_counts);
 	setVariantCount(variant_count, '?');
     node.attr("loading", "true"); // #616 - Don't flash red when loading - this will stop next cycle of shadow setting
+	node.removeAttr("node_error"); // A reloading node shows the spinner, not the previous run's cross
+	$(".node-counts-strip", node).removeAttr("title");
 
 	const asyncUpdateNode = function (data) {
 		// Flash the card border between its normal colour and shadowColor. The border is currentColor,
@@ -637,6 +639,10 @@ function updateDirtyNode(node, refresh) {
 			}
 			markLiveDataCount(node_counts, deterministic, data.live_data_sources);
 		} else {
+			// The counts strip is where the eye is already waiting, so mark the spot the spinner
+			// vacated with a cross rather than leaving it blank
+			node.attr("node_error", "true");
+			$(".node-counts-strip", node).attr("title", "Node failed to load - click the node to see the errors");
 			setVariantCount(variant_count, "");
 		}
 		repaintNode(node);

@@ -9,7 +9,7 @@ from analysis.models.enums import GroupOperation
 from analysis.models.nodes.analysis_node import NodeAlleleFrequencyFilter, NodeVCFFilter
 from patients.models_enums import Zygosity
 from snpdb.archive import DataArchivedError
-from snpdb.models import Cohort, CohortGenotypeCollection, Sample, VCFFilter
+from snpdb.models import Cohort, CohortGenotypeCollection, ImportStatus, Sample, VCFFilter
 from upload.models import UploadedVCF
 
 
@@ -306,6 +306,10 @@ class CohortMixin:
     def _get_configuration_errors(self) -> list:
         errors = super()._get_configuration_errors()
         for cohort in self._get_configuration_check_cohorts():
+            if cohort.import_status != ImportStatus.SUCCESS:
+                errors.append(f"'{cohort}' has import status: {cohort.get_import_status_display()}")
+                continue
+
             try:
                 _ = cohort.cohort_genotype_collection
             except CohortGenotypeCollection.DoesNotExist:
