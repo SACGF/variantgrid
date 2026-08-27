@@ -888,9 +888,11 @@ def triage(context,
 
 
 @register.inclusion_tag("classification/tags/overlap_state.html")
-def overlap_state(overlap: Overlap, show_link=False, show_link_if_discordant=False):
+def overlap_state(overlap: Overlap, show_link=False, show_link_if_discordant=False, show_link_single_context=False):
     if not show_link and show_link_if_discordant:
         show_link = overlap.overlap_status.is_discordant and overlap.is_single_context
+    if not show_link and show_link_single_context:
+        show_link = overlap.is_single_context
 
     show_medical_significant_icon = False
     if overlap.overlap_status == 90 and overlap.is_single_context and overlap.value_type == ClassificationResultValue.ONC_PATH:
