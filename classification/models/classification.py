@@ -8,7 +8,7 @@ from collections import Counter, namedtuple
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
-from enum import Enum, StrEnum
+from enum import Enum
 from functools import cached_property, reduce
 from typing import (
     Any,
@@ -73,7 +73,6 @@ from classification.models.evidence_key import (
 )
 from classification.models.evidence_mixin import EvidenceMixin, VCPatch
 from classification.models.evidence_mixin_summary_cache import (
-    ClassificationSummaryCacheDict,
     ClassificationSummaryCalculator,
 )
 from classification.models.flag_types import classification_flag_types
@@ -705,12 +704,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
     """ Will be a ClassificationSummaryCacheDict """
 
     @property
-    def summary_typed(self) -> ClassificationSummaryCacheDict:
-        # DEPRECATED - use summary_obj instead
-        return self.summary
-
-    @property
-    def summary_obj(self) -> Any:
+    def summary_obj(self) -> 'ClassificationSummaryCacheObj':
         from classification.models import ClassificationSummaryCacheObj
         return ClassificationSummaryCacheObj.from_dict_safe(self.summary)
 
@@ -769,7 +763,9 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         """
         Runs off the ClassificationSummary
         """
-        if bucket := self.summary_typed.get("somatic", {}).get("testing_context_bucket"):
+        from classification.models import ClassificationSummaryCacheObj
+        summary_obj: ClassificationSummaryCacheObj = self.summary_obj
+        if bucket := summary_obj.somatic.testing_context_bucket:
             return TestingContextBucket(bucket)
         else:
             return TestingContextBucket.GERMLINE
@@ -779,7 +775,9 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         """
         Runs off the ClassificationSummary
         """
-        return self.summary_typed.get("somatic", {}).get("tumor_type_category")
+        from classification.models import ClassificationSummaryCacheObj
+        summary_obj: ClassificationSummaryCacheObj = self.summary_obj
+        return summary_obj.somatic.tumor_type_category
 
     @staticmethod
     def is_supported_transcript(transcript_or_hgvs: str):

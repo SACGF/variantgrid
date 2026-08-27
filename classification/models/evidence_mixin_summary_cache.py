@@ -1,58 +1,9 @@
 from dataclasses import dataclass
 from functools import cached_property
-from typing import TypedDict, Optional, Self
+from typing import Optional, Self
 from dataclasses_json import DataClassJsonMixin
 from classification.criteria_strengths import CriteriaStrength
 from classification.enums import AlleleOriginBucket, SpecialEKeys, CriteriaEvaluation, TestingContextBucket, ClassificationResultValue
-from library.utils import strip_json
-
-"""
-return {
-    "criteria_labels": self.criteria_labels,
-    "classification_value": self.classification_value,
-    "classification_sort": self.classification_sort,
-    "pathogenicity": {
-        "classification": self.classification_value,
-        "sort": self.classification_sort,
-    },
-    "somatic": {
-        "clinical_significance": self.somatic_clinical_significance,
-        "amp_level": self.somatic_amp_level,
-        "sort": self.somatic_sort
-    },
-    "date": {
-        "value": curated_date.date_str,
-        "type": curated_date.name
-    }
-}
-"""
-
-
-class ClassificationSummaryCacheDictPathogenicity(TypedDict):
-    classification: Optional[str]
-    sort: int
-    # pending: Optional[str]
-
-
-class ClassificationSummaryCacheDictSomatic(TypedDict):
-    testing_context_bucket: Optional[str]
-    tumor_type_category: Optional[str]  # condition grouping if testing_contest is solid-tumor
-    clinical_significance: Optional[str]
-    amp_level: Optional[str]
-    sort: int
-
-
-class ClassificationSummaryCachedDictDate(TypedDict):
-    date: str
-    type: Optional[str]
-
-
-class ClassificationSummaryCacheDict(TypedDict):
-    criteria_labels: list[str]
-    pathogenicity: ClassificationSummaryCacheDictPathogenicity
-    somatic: ClassificationSummaryCacheDictSomatic
-    allele_origin_bucket: str
-    date: ClassificationSummaryCachedDictDate
 
 
 @dataclass(frozen=True)
@@ -168,7 +119,7 @@ class ClassificationSummaryCalculator:
     def __init__(self, cm: 'ClassificationModification'):
         self.cm = cm
 
-    def cache_dict(self) -> ClassificationSummaryCacheDict:
+    def cache_dict(self) -> dict:
         from classification.models import CuratedDate
         curated_date = CuratedDate(self.cm).relevant_date
 
@@ -191,24 +142,7 @@ class ClassificationSummaryCalculator:
                 type=curated_date.name
             )
         )
-        return strip_json(full_obj.to_dict())
-
-    # @cached_property
-    # def pending_classification_value(self) -> Optional[str]:
-    #     from classification.models import classification_flag_types, ClassificationFlagTypes
-    #     from flags.models import Flag, FlagStatus
-    #     if flag := Flag.objects.filter(
-    #         flag_type=classification_flag_types.classification_pending_changes,
-    #         resolution__status=FlagStatus.OPEN,
-    #         collection_id=self.cm.classification.flag_collection_id
-    #     ).first():
-    #         return flag.data.get(ClassificationFlagTypes.CLASSIFICATION_PENDING_CHANGES_CLIN_SIG_KEY) if flag.data else 'Unknown'
-    #     return None
-
-    # @cached_property
-    # def germline_bucket(self) -> Optional[int]:
-    #     from classification.models import EvidenceKeyMap
-    #     return EvidenceKeyMap.clinical_significance_to_bucket().get(self.classification_value)
+        return full_obj.to_dict()
 
     @cached_property
     def allele_origin_bucket(self) -> AlleleOriginBucket:
@@ -300,19 +234,17 @@ class ClassificationSummaryCalculator:
 
 
 # FIXME underlying code should change due to overlaps
-def clinical_significance_pills(summary: ClassificationSummaryCacheDict, allele_origin_bucket: str) -> list[dict]:
+def clinical_significance_pills(summary: ClassificationSummaryCacheObj, allele_origin_bucket: str) -> list[dict]:
     from classification.models import EvidenceKeyMap
     """ Label/CSS class for the c-pill spans - rendered server side by the clinical_significance_values
         tag, and client side by the variant details samples grid. CSS is .c-pill.cs-* / .c-pill.scs-* """
-    pathogenicity = summary.get("pathogenicity") or {}
-    somatic = summary.get("somatic") or {}
+    pathogenicity = summary.pathogenicity
+    somatic = summary.somatic
 
     germline_key = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE)
     pending_from = None
-    value = pathogenicity.get("classification")
-    if pending_classification_value := pathogenicity.get("pending"):
-        pending_from = germline_key.pretty_value(value, value) or "No Data"
-        value = pending_classification_value
+    value = pathogenicity.classification
+    # TODO pending from isn't in the ClassificationSummary anymore
 
     pills = [{
         "title": germline_key.pretty_label,
@@ -322,11 +254,11 @@ def clinical_significance_pills(summary: ClassificationSummaryCacheDict, allele_
     }]
 
     always_show_somatic = allele_origin_bucket != AlleleOriginBucket.GERMLINE
-    if always_show_somatic or somatic.get("classification"):
+    if always_show_somatic or somatic.clinical_significance:
         somatic_key = EvidenceKeyMap.cached_key(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE)
-        value = somatic.get("clinical_significance")
+        value = somatic.clinical_significance
         label = somatic_key.pretty_value(value, value) or "No Data"
-        if amp_level := somatic.get("amp_level"):
+        if amp_level := somatic.amp_level:
             label += amp_level
         pills.append({
             "title": somatic_key.pretty_label,

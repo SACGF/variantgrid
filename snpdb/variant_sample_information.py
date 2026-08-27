@@ -419,7 +419,7 @@ class VariantSampleGenotypes(VariantZygosityCounts):
                                                         classification__sample__in=sample_ids)
         for cm in qs.select_related("classification__lab"):
             classification = cm.classification
-            pills = clinical_significance_pills(classification.summary_typed, classification.allele_origin_bucket)
+            pills = clinical_significance_pills(classification.summary_obj, classification.allele_origin_bucket)
             classification_json = {
                 "id": classification.pk,
                 "url": classification.get_absolute_url(),
