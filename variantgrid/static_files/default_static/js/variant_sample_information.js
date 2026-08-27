@@ -8,7 +8,8 @@
  * The allele may be created (and linked to the other builds' variants) by the variant details page while
  * this is loading, so we also listen for ALLELE_VARIANTS_EVENT and pick up any variants that turned up.
  */
-const VariantSampleInformation = (function () {
+// var not const - the analysis' variant details tabs load this script again for each variant
+var VariantSampleInformation = (function () {
     // Ordered as the zygosity filter checkboxes are drawn
     const ZYGOSITIES = [
         {code: 'R', label: 'REF'},
@@ -42,6 +43,8 @@ const VariantSampleInformation = (function () {
     ];
     const GRAPH_HEIGHT = 384;
     const ALLELE_VARIANTS_EVENT = "allele-variants-loaded";
+    // Namespaced so re-loading the section (another variant details tab) replaces its document handlers
+    const EVENT_NAMESPACE = ".variantSampleInformation";
 
     let config = null;
     let dataTable = null;
@@ -666,11 +669,14 @@ const VariantSampleInformation = (function () {
         config = cfg;
         createDataTable();
 
+        $(document).off(EVENT_NAMESPACE);
+
         // getOntologyTermLinks makes these as the grid renders, so delegate from the document
-        $(document).on('click', '.ontology-terms-container .collapsed-term', expandCollapsedOntologyTerm);
+        $(document).on('click' + EVENT_NAMESPACE, '.ontology-terms-container .collapsed-term',
+                       expandCollapsedOntologyTerm);
 
         // The allele can be created (linking the other builds' variants) while this section is loading
-        $(document).on(ALLELE_VARIANTS_EVENT, (event, variantIds) => requestVariants(variantIds));
+        $(document).on(ALLELE_VARIANTS_EVENT + EVENT_NAMESPACE, (event, variantIds) => requestVariants(variantIds));
 
         requestVariants(config.variantIds);
         requestVariants(window.alleleVariantIds);  // Allele resolved before we got here, so we missed the event

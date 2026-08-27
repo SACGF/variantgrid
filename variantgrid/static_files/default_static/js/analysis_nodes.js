@@ -25,13 +25,18 @@ const NODE_ORIENTATIONS = {
 		instanceAnchors: ["Right", "Left"],
 		input: "Left",
 		output: "Right",
-		vennInputs: [[0, 0.25, -1, 0], [0, 0.75, -1, 0]],
+		// The card's rings are rotated anti-clockwise (see analysis_nodes.css), which puts the left
+		// ring at the bottom - so the left input takes the lower endpoint
+		vennInputs: [[0, 0.75, -1, 0], [0, 0.25, -1, 0]],
 	},
 };
 
+function isHorizontalNodeFlow() {
+	return typeof ANALYSIS_HORIZONTAL_MODE !== "undefined" && ANALYSIS_HORIZONTAL_MODE;
+}
+
 function getNodeOrientation() {
-	const horizontal = typeof ANALYSIS_HORIZONTAL_MODE !== "undefined" && ANALYSIS_HORIZONTAL_MODE;
-	return NODE_ORIENTATIONS[horizontal ? "horizontal" : "vertical"];
+	return NODE_ORIENTATIONS[isHorizontalNodeFlow() ? "horizontal" : "vertical"];
 }
 
 // @jsplumb/browser-ui instance, created in variantgridPipeline.init once #analysis is in the DOM
@@ -924,10 +929,12 @@ function drawCountLegend(nodeCountTypes) {
         }
     }
 
-    // Absolute positioning can sometimes get thrown off after resizing contents
-    const rowHeight = 31;
-    const numRows = 1 + nodeCountTypes.length;
-    legend.height(rowHeight * numRows);
+    if (!isHorizontalNodeFlow()) {
+        // Absolute positioning can sometimes get thrown off after resizing contents
+        const rowHeight = 31;
+        const numRows = 1 + nodeCountTypes.length;
+        legend.height(rowHeight * numRows);
+    }
 }
 
 

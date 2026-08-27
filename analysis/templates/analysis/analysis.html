@@ -56,7 +56,9 @@
 
     #analysis-toolbar {
         width: 100%;
-        z-index: 9999;
+        /* Over the canvas (nodes are 24) but under Bootstrap's tooltips, so a hover from the
+           toolbar or the editor drawer isn't drawn behind the bar */
+        z-index: 100;
         position: absolute;
         top: 0px;
         left: 0px;
@@ -349,6 +351,9 @@
                     <div class="drawer-resize-handle" title="Drag to resize"></div>
                     <div class="drawer-header">
                         <span class="drawer-title">Node editor</span>
+                        {# The node editor's own tabs are mirrored in here - see syncNodeEditorTabs() #}
+                        <span id="drawer-node-tabs" class="drawer-node-tabs"></span>
+                        <span id="drawer-variant-tabs" class="drawer-node-tabs"></span>
                         <a id="dock-editor-as-tab-button" class="toolbar-button" href="javascript:void(0)"
                            title="Dock the editor as a tab in the bottom panel"><i class="fa-solid fa-window-maximize"></i></a>
                         <a id="close-editor-drawer-button" class="toolbar-button" href="javascript:void(0)"

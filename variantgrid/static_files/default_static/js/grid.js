@@ -69,6 +69,10 @@ function load_variant_details(variant_id) {
             }
         }
     }
+    // Horizontal mode gives each variant its own closable tab, leaving the node editor where it was
+    if (typeof openVariantDetailsTab === "function" && openVariantDetailsTab(variant_id, variant_details_url)) {
+        return;
+    }
     const editorContainer = $("#node-editor-container");
     editorContainer.html('<div class="editor-loading"><i class="fa fa-spinner"></i> Loading variant details...</div>');
     editorContainer.load(variant_details_url);

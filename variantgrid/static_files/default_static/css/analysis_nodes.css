@@ -826,6 +826,26 @@ span.node-counts {
 	margin-bottom: -1px;
 }
 
+/* Variant details tabs - one pane each, closed with the x on the tab. See openVariantDetailsTab() */
+.variant-tab {
+	display: inline-flex;
+	align-items: center;
+}
+
+.close-variant-tab {
+	margin-left: 6px;
+	font-size: 0.85em;
+	opacity: 0.5;
+}
+
+.close-variant-tab:hover {
+	opacity: 1;
+}
+
+.variant-details-pane {
+	padding: 5px;
+}
+
 .bottom-pane-tab-action {
 	margin-left: auto;
 	align-self: center;
@@ -835,6 +855,60 @@ span.node-counts {
 	font-size: 0.9em;
 }
 
+.bottom-pane-node-tabs {
+	display: flex;
+	align-items: stretch;
+	gap: 2px;
+}
+
+/* One row of tabs - the node editor's own strip is mirrored into the bar of whichever home it's in */
+.analysis-horizontal #node-editor-tabs > ul.ui-tabs-nav {
+	display: none;
+}
+
+/* Node counts legend - moved into the toolbar (see layoutAnalysisPanels), so it reads as a single row */
+.analysis-horizontal #node-count-legend {
+	position: static;
+	float: none;  /* #analysis-toolbar floats its divs - this one sits inline after the genome build */
+	display: inline-flex;
+	align-items: center;
+	vertical-align: middle;
+	gap: 12px;
+	margin-left: 15px;
+	height: auto;
+}
+
+.analysis-horizontal #node-count-legend .legend-row {
+	display: flex;
+	align-items: center;
+	min-height: 0;
+	margin: 0;
+}
+
+.analysis-horizontal #node-count-legend .legend-color-box {
+	float: none;
+	width: 14px;
+	height: 14px;
+	margin-right: 4px;
+}
+
+.analysis-horizontal #node-count-legend .legend-label {
+	float: none;
+	white-space: nowrap;
+}
+
+/* The Venn rings and the Merge glyph turn with the flow, so they line up with their input endpoints */
+.analysis-horizontal .design-a-node .node-venn {
+	align-items: center;
+	height: 56px;
+}
+
+.analysis-horizontal .design-a-node .node-venn svg,
+.analysis-horizontal .design-a-node .node-graphic svg {
+	flex-shrink: 0;
+	transform: rotate(-90deg);
+}
+
 /* The editor's other home - slides in over the right of the canvas ("Drawer") */
 #node-editor-drawer {
 	position: absolute;
@@ -842,7 +916,7 @@ span.node-counts {
 	right: 0;
 	bottom: 0;
 	width: 450px;
-	z-index: 9998; /* over the nodes, under #analysis-toolbar */
+	z-index: 200; /* over #analysis-toolbar, so header tooltips aren't drawn behind it */
 	display: flex;
 	flex-direction: column;
 	background-color: white;
@@ -869,8 +943,44 @@ span.node-counts {
 }
 
 .drawer-title {
-	flex: 1;
 	font-weight: bold;
+	margin-right: 4px;
+}
+
+#node-editor-drawer.has-node-tabs .drawer-title {
+	display: none;
+}
+
+.drawer-header .toolbar-button:first-of-type {
+	margin-left: auto;
+}
+
+/* The editor's tabs, mirrored into the drawer header - see syncNodeEditorTabs() */
+.drawer-node-tabs {
+	display: flex;
+	align-items: center;
+	gap: 2px;
+	overflow: hidden;
+}
+
+.drawer-tab {
+	padding: 2px 8px;
+	border: 1px solid transparent;
+	border-radius: 4px;
+	color: #333;
+	text-decoration: none;
+	white-space: nowrap;
+}
+
+.drawer-tab:hover {
+	text-decoration: none;
+	background-color: #f6f6f6;
+}
+
+.drawer-tab.active {
+	background-color: white;
+	border-color: #ccc;
+	font-weight: 600;
 }
 
 #node-editor-drawer-body {

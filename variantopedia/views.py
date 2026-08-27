@@ -816,6 +816,8 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
         "variant": variant,
         "variant_allele": variant_allele_data,
         "variant_annotation": variant_annotation,
+        # Names the analysis' variant details tab, which has no room for a transcript
+        "variant_short_label": variant_annotation.get_short_label() if variant_annotation else str(variant),
         "variant_tag_stale_days": user_settings.variant_tag_stale_days,
         "visible_fields": variant_annotation.visible_columns if variant_annotation else frozenset(),
         "vts": vts,

@@ -35,7 +35,13 @@ function analysisLinkRenderer(data, type, row) {
 }
 
 // User's variant_tag_stale_days setting (null = staleness off)
-const VARIANT_TAG_STALE_DAYS = {{ variant_tag_stale_days|jsonify }};
+// var not const - the analysis editor loads this page's scripts into the same document each time
+var VARIANT_TAG_STALE_DAYS = {{ variant_tag_stale_days|jsonify }};
+
+// Opened from an analysis grid - name the tab now we know what the variant is called
+if (typeof setVariantDetailsTabLabel === "function") {
+    setVariantDetailsTabLabel({{ variant.pk }}, {{ variant_short_label|jsonify }});
+}
 
 function tagRenderer(data, type, row) {
     let tagLabel = row.tag;
