@@ -341,7 +341,7 @@ $(document).ready(function() {
     {% endfor %}
 });
 </script>
-<!-- jqGrid is used in skipped annotation tab -->
+{# LEGACY-JQGRID: the skipped annotation tab is still {% jqgrid %}, and loads by ajax #}
 <script src="{% static 'js/lib/free-jqgrid/jquery.jqgrid.min.js' %}"></script>
 <script type="text/javascript" src="{% static 'js/grid.js' %}"></script>
 <link rel="stylesheet" type="text/css" media="screen" href="{% static 'js/lib/free-jqgrid/css/ui.jqgrid.min.css' %}" />

@@ -6,6 +6,7 @@
 {% block title %}Cohort {% endblock %}
 {% block head %}
 {{ block.super }}
+{# LEGACY-JQGRID: the cohort sample pickers below build their own jqGrids #}
 <link rel="stylesheet" type="text/css" media="screen" href="{% static 'js/lib/free-jqgrid/css/ui.jqgrid.min.css' %}" />
 <script src="{% static 'js/lib/free-jqgrid/jquery.jqgrid.min.js' %}"></script>
 <script type="text/javascript" src="{% static 'js/grid.js' %}"></script>

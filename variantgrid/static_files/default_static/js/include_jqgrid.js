@@ -1,3 +1,4 @@
+// LEGACY-JQGRID: loaded by jqgrid.html and the phenotype entry tag - delete with the last {% jqgrid %}
 // I have problems with formatters when re-importing the grid. Manage this via only importing if not already exists 
 if (!$(document).jqGrid) {
     //console.log("Importing JQGrid stuff");

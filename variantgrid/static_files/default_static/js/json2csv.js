@@ -1,3 +1,5 @@
+// LEGACY-JQGRID: client side CSV for the jqGrid pages (seqauto, pathtests, patients, node editor
+// popups). DataTables grids download from the server instead - see DataTableDefinition's downloadUrl.
 // From https://stackoverflow.com/a/24643992/295724
 function JSON2CSV(objArray, header, quote) {
     const getValue = function(val, defaultValue) {

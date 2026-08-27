@@ -479,6 +479,59 @@ actually left:
 
 Start with `grep -rn LEGACY-JQGRID` — that is the whole worklist for the client side.
 
+### Stage 5 outcome — what actually landed
+
+Both `LEGACY-JQGRID` items are gone; `LEGACY-JQGRID-ENGINE` on `FILTER_OPERATIONS` stays.
+
+- **`$.fn.fmatter` shim** (`grid.js`) — deleted with `jqGridFormatterContext`. Confirmed first that no
+  `{% jqgrid %}` page renders a variant column: the 16 shimmed names are only set in
+  `AbstractVariantGrid._get_standard_overrides` and `VariantGrid` (both converted), plus
+  `GenesGrid`'s `geneSymbolLink` - and the two pages serving `genes_grid` (`genes.html`,
+  `view_contig.html`) register their own `geneSymbolLink` in a `{% block formatter %}` that already
+  won, being a later `$(document).ready`. `showGridCell` drops its `aria-describedby` branch; only
+  the adapter's `dt-<column>` cells are left to scroll to.
+- **`FilterNode.get_extra_grid_config`'s `search = True`** — removed. It only ever reached jqGrid
+  through `JqGrid.get_config`, which no browser-facing variant grid goes through any more; the node
+  grid's definition comes from `datatable_definition()`. The rules still travel on `postData`.
+- **`analysis_downloads.js`'s `.ui-pg-div`** — the download buttons are Bootstrap `<a>` elements now,
+  so the nav-button lookup and the `target`/`container` split it existed for are gone.
+- **`view_pedigree.html`** — dropped its jqGrid css/js: that page has no grid at all (its related
+  data/analyses includes are DataTables). Inspection only - this DB has no `Pedigree` rows.
+
+**Pages still loading jqGrid assets, and why** - all now carry a `{# LEGACY-JQGRID #}` marker:
+
+| Page / template | Why |
+|---|---|
+| `analysis_includes.html` | node editor tabs (gene coverage, phenotype, MOI) are `{% jqgrid %}` and load by ajax, after ready - `include_jqgrid.js`'s async append would race |
+| `view_sample.html`, `view_vcf.html` | the skipped annotation tabs, same ajax timing |
+| `view_cohort.html` | the two sample pickers build their own jqGrids |
+| `jqgrid.html`, `phenotype_entry_tag.html` | `include_jqgrid.js` + `json2csv.js` for every remaining `{% jqgrid %}` page |
+
+**Browser harness** (`scratchpad/harness/`, throwaway) - rebuilt as a CDP driver rather than
+`--dump-dom`: `drive.py` starts headless Chrome with `--remote-debugging-port`, sets the minted
+`sessionid` cookie through `Network.setCookie`, navigates, then evaluates a probe file and returns
+its value alongside every `Log.entryAdded`/`Runtime.exceptionThrown`. `--virtual-time-budget` was no
+use here - it expires before the grid ajax lands, so every grid read as empty. The session is minted
+with `SessionStore` as in Stage 3, but `_auth_user_backend` must be `ModelBackend`: picking
+`AUTHENTICATION_BACKENDS[0]` gets `AxesStandaloneBackend`, which has no `get_user` and 500s every page.
+
+**Evidence** (live pages, this dev box)
+
+- Converted: All Variants 105 columns / 81,595 records / 10 rows; gene symbol page 87 columns / 1 row;
+  variant tags 106 columns / 8 rows beside the 9 row tag table; variant details genotype grid 168 rows.
+- Analysis 22, FilterNode 223: grid shows "1 to 10 of 3,148", the builder loads the saved
+  `locus__contig__name eq MT` rule, and there is no `searchmodfbox_` dialog anywhere on the page.
+- Still jqGrid: `sequencing_stats/data` builds 4 grids and 4 rows; the genes page builds 10 rows with
+  `<a href="/genes/view_gene_symbol/A1BG">A1BG</a>` from its own formatter; `$.fn.fmatter` carries 16-18
+  names depending on page (the jqGrid built-ins plus each page's own), no variant renderers among them.
+  Analysis 42's phenotype node editor still constructs its jqGrid, with `JSON2CSV` present and the
+  jQuery UI `#node-editor-tabs` strip intact at 9 tabs.
+- Console is clean on every page checked. The gene symbol page's 500 on
+  `classification/groups/datatables` reproduces on stashed master - unrelated.
+- Tests: 1328 across analysis/snpdb/variantopedia/genes/library/pedigree/patients/seqauto/pathtests.
+  The 3 `seqauto.tests.test_extraction_link` errors fail identically on stashed master. pylint 10.00
+  on `filter_node.py`.
+
 ### jqGrid deprecation markers (every stage)
 
 As each stage touches code, tag anything found to exist *only* for jqGrid with a greppable marker comment — `# LEGACY-JQGRID` in Python, `// LEGACY-JQGRID` in JS, `{# LEGACY-JQGRID #}` in templates — with a short note of what still uses it. The eventual full jqGrid removal then becomes a `grep -r LEGACY-JQGRID` sweep instead of re-discovery. Code the adapter keeps as its engine (the `JqGrid` server classes, `get_q` filter parsing for `FakeFilterGrid`) gets tagged `# LEGACY-JQGRID-ENGINE` instead, meaning: survives until the eventual native rewrite.

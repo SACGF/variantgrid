@@ -4,9 +4,7 @@
      ctx.extra    grid wide metadata from the definition JSON (JqGrid.get_datatable_extra)
      ctx.kwargs   this column's renderKwargs (jqGrid's colmodel formatter_kwargs)
 
-   The jqGrid formatters delegate here while those pages are still on jqGrid - see the $.fn.fmatter
-   registration in grid.js. Shared page helpers (createGridLink, IGV, tags, load_variant_details)
-   live in grid.js and are used by both.
+   Shared page helpers (createGridLink, IGV, tags, load_variant_details) live in grid.js.
    @see library/django_utils/jqgrid_datatable_adapter.py for the formatter -> renderer mapping */
 
 const VariantGridFormat = (function() {
