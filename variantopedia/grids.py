@@ -5,7 +5,10 @@ from typing import Any, Optional
 
 from django.conf import settings
 from django.db import connection
-from django.db.models import Case, Count, IntegerField, OuterRef, Q, QuerySet, Subquery, Value, When
+from django.db.models import (
+    Case, Count, FilteredRelation, IntegerField, OuterRef, Q, QuerySet, Subquery, TextField, Value, When,
+)
+from django.db.models.functions import Coalesce, Concat
 from django.http import HttpRequest
 from django.shortcuts import get_object_or_404
 from django.urls import reverse
@@ -282,10 +285,31 @@ class VariantTagsColumns(DatatableConfig[VariantTag]):
                        kwargs={'class_name': full_class_name(VariantTag), 'primary_key': cell.value})
 
     def get_initial_queryset(self) -> QuerySet[VariantTag]:
+        # get_for_build has already restricted this to tags visible in the build, either via their
+        # allele or - for a tag made in this build - via the tag's own variant
         qs = VariantTag.get_for_build(self.genome_build)
-        # Need to go through Allele to get variant in this build
-        qs = qs.filter(allele__variantallele__genome_build=self.genome_build)
-        return Variant.annotate_variant_string(qs, path_to_variant="allele__variantallele__variant__")
+        # Pick the variant for *this* build out of the allele, rather than whichever one a plain join
+        # would land on
+        qs = qs.annotate(build_variant_allele=FilteredRelation(
+            "allele__variantallele",
+            condition=Q(allele__variantallele__genome_build=self.genome_build)))
+        return self._annotate_variant_string(qs)
+
+    @staticmethod
+    def _annotate_variant_string(qs: QuerySet[VariantTag]) -> QuerySet[VariantTag]:
+        """ A "1:123321 G>C" string built from the build's variant, falling back per field to the one
+            the tag was made on - a tag keeps its own variant until the liftover task assigns it an
+            allele (@see analysis.tasks.variant_tag_tasks._liftover_variant_tag), and that variant is
+            in this build by definition. Dropping those rows made the grid disagree with the tag counts.
+
+            The fallback is per field because Concat renders a NULL argument as empty rather than
+            returning NULL, so coalescing the finished strings would never reach the second one. """
+        def field(name: str):
+            return Coalesce(f"build_variant_allele__variant__{name}", f"variant__{name}")
+
+        return qs.annotate(variant_string=Concat(
+            field("locus__contig__name"), Value(":"), field("locus__position"), Value(" "),
+            field("locus__ref__seq"), Value(">"), field("alt__seq"), output_field=TextField()))
 
     def filter_queryset(self, qs: QuerySet[VariantTag]) -> QuerySet[VariantTag]:
         analysis_ids = self.get_query_json("analysis_ids")

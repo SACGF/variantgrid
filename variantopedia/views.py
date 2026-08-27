@@ -503,8 +503,11 @@ def variant_tags(request, genome_build_name=None):
     if (user_id := request.GET.get("user")) and user_id.isdigit():
         filter_user = User.objects.filter(pk=user_id).first()
 
-    # The grids below show coordinates, so a tag needs a variant in this build to appear in them
-    without_coordinate_qs = VariantTag.objects.exclude(allele__variantallele__genome_build=genome_build)
+    # The grids below show coordinates, so a tag needs a variant in this build to appear in them.
+    # get_for_build is what they both start from, so ask it rather than re-deriving the rule - a tag
+    # made in this build has its own variant and shows up before liftover assigns it an allele
+    without_coordinate_qs = VariantTag.objects.exclude(
+        pk__in=variant_tags_qs.values_list("pk", flat=True))
     if filter_user:
         without_coordinate_qs = without_coordinate_qs.filter(user=filter_user)
 

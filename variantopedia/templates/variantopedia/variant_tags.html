@@ -118,8 +118,12 @@
             last 30 days.
             {% if tags_without_build_coordinate %}
                 <p class="text-muted small mb-0 mt-2">
-                    <strong>{{ tags_without_build_coordinate }}</strong> tag events have no
-                    {{ genome_build }} coordinate, so aren't shown in the grids below. See
+                    <strong>{{ tags_without_build_coordinate }}</strong> tag
+                    event{{ tags_without_build_coordinate|pluralize }}
+                    {{ tags_without_build_coordinate|pluralize:"has,have" }} no
+                    {{ genome_build }} coordinate, so
+                    {{ tags_without_build_coordinate|pluralize:"isn't,aren't" }} shown in the grids
+                    below. See
                     <a href="{% url 'tag_stats' %}">tag stats</a> for counts across all builds.
                 </p>
             {% endif %}
@@ -143,7 +147,7 @@
     <table id="tagged-variants-datatable" class="sticky-header"
            data-datatable-url="{% url 'tagged_variant_grid' genome_build_name=genome_build.name op='handler' %}"
            data-datatable-data="taggedVariantDatatableFilter"></table>
-    <div data-toolbar="#tagged-variants-datatable">
+    <div data-toolbar-bottom="#tagged-variants-datatable">
         <a class="btn btn-outline-secondary fas fa-download" href="javascript:downloadTaggedVariantCSV()">CSV</a>
     </div>
 
@@ -155,7 +159,7 @@
     <table id="variant-tags-datatable" class="sticky-header"
            data-datatable-url="{% url 'variant_tags_datatable' genome_build.name %}"
            data-datatable-data="variantTagsDatatableFilter"></table>
-    <div data-toolbar="#variant-tags-datatable">
+    <div data-toolbar-bottom="#variant-tags-datatable">
         <a class="btn btn-outline-secondary fas fa-download" href="javascript:downloadVariantTagsCSV()">CSV</a>
     </div>
 

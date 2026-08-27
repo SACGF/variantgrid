@@ -124,6 +124,42 @@ class TaggedVariantGridTest(TestCase):
                          reverse("create_classification_for_variant_tag",
                                  kwargs={"analysis_id": analysis.pk, "variant_tag_id": variant_tag.pk}))
 
+    def test_tag_awaiting_liftover_keeps_its_own_coordinate(self):
+        """ A tag gets its allele assigned asynchronously (@see _liftover_variant_tag), so a freshly
+            made one has nothing to reach a variant through. It was made on a variant in this build,
+            so show that rather than dropping the row - the grid disagreed with the tag counts. """
+        variant = self.artefact_variant
+        VariantTag.objects.create(variant=variant, allele=None, tag=self.reportable,
+                                  genome_build=self.genome_build, user=self.user)
+
+        url = reverse('variant_tags_datatable', kwargs={"genome_build_name": self.genome_build.name})
+        request = RequestFactory().get(url, {"tag": self.reportable.pk})
+        request.resolver_match = resolve(url)
+        request.user = self.user
+        config = VariantTagsColumns(request)
+        rows = config.filter_queryset(config.get_initial_queryset()).values("variant__id", "variant_string")
+
+        by_variant = {r["variant__id"]: r["variant_string"] for r in rows}
+        self.assertIn(variant.pk, by_variant, "Tag with no allele yet should still be listed")
+        self.assertEqual(f"{variant.locus.contig.name}:{variant.locus.position} "
+                         f"{variant.locus.ref}>{variant.alt}",
+                         by_variant[variant.pk])
+
+    def test_grids_and_the_no_coordinate_warning_account_for_every_tag(self):
+        """ The page warns how many tags the grids can't place in this build. Counting those by a
+            different rule than the grids use left tags counted as both shown and not shown. """
+        other_build = GenomeBuild.get_name_or_alias("GRCh38")
+        for_build = VariantTag.get_for_build(self.genome_build)
+        without_coordinate = VariantTag.objects.exclude(pk__in=for_build.values_list("pk", flat=True))
+
+        self.assertEqual(VariantTag.objects.count(),
+                         for_build.count() + without_coordinate.count())
+        # A tag made in the other build with no allele yet has no coordinate here, so it is warned about
+        stray = VariantTag.objects.create(variant=self.both_variant, allele=None, tag=self.artefact,
+                                          genome_build=other_build, user=self.user)
+        self.assertIn(stray.pk, set(without_coordinate.values_list("pk", flat=True)))
+        self.assertNotIn(stray.pk, set(for_build.values_list("pk", flat=True)))
+
     def test_variant_tags_export(self):
         """ CSV comes off the queryset - the DataTable itself only ever pages 100 rows at a time """
         self.client.force_login(self.user)
