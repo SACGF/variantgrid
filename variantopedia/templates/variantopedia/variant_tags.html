@@ -3,7 +3,6 @@
 {% load static %}
 {% load crispy_forms_tags %}
 {% load genome_build_tags %}
-{% load jqgrid_tags %}
 {% load datatable_tags %}
 {% load user_tag_color_tags %}
 {% load js_tags %}
@@ -19,33 +18,12 @@
         open_variant_details_in_new_window: true,
     };
 
-    function addCSVDownloadToGrid(grid, pagerId, url) {
-        grid.jqGrid(
-                'navButtonAdd', pagerId, {
-                caption : "CSV",
-                buttonicon : "ui-icon-arrowthickstop-1-s",
-                onClickButton : function() {
-                    let url_with_params = url + "?extra_filters=" + getVariantTagsGridExtraFilters();
-                    window.location = url_with_params;
-                },
-                title : "Download as CSV",
-                cursor : "pointer"
-        });
-    }
-
     const initialTags = {{ initial_tags|jsonify }};
     const filterUserId = {% if filter_user %}{{ filter_user.pk }}{% else %}null{% endif %};
-    // Shared filter state - the tag-centric DataTable and the variant-centric jqGrid both read this
+    // Shared filter state - both tables on this page read it
     gridParams = initialTags.length ? {"tags": initialTags} : {};
     if (filterUserId) {
         gridParams["user"] = filterUserId;
-    }
-    function getVariantTagsGridExtraFilters() {
-        return JSON.stringify(gridParams);
-    }
-
-    function getVariantTagsConfigUrl() {
-        return "extra_filters=" + getVariantTagsGridExtraFilters();
     }
 
     // Called by DataTables before each ajax call - lists go down as JSON, everything else as a plain param
@@ -55,16 +33,21 @@
         }
     }
 
-    function taggedVariantGridInitFunc(grid, pagerId) {
-        grid[0].p.postData["extra_filters"] = getVariantTagsGridExtraFilters;
-        let url = Urls.tagged_variant_export("{{ genome_build.name }}");
-        addCSVDownloadToGrid(grid, pagerId, url);
+    // The variant-centric grid class takes the same selection as a single extra_filters blob
+    function taggedVariantDatatableFilter(data) {
+        data["extra_filters"] = JSON.stringify(gridParams);
     }
 
     function downloadVariantTagsCSV() {
         const params = {};
         variantTagsDatatableFilter(params);
         window.location = Urls.variant_tags_export("{{ genome_build.name }}") + "?" + EncodeQueryData(params);
+    }
+
+    function downloadTaggedVariantCSV() {
+        const params = {};
+        taggedVariantDatatableFilter(params);
+        window.location = Urls.tagged_variant_export("{{ genome_build.name }}") + "?" + EncodeQueryData(params);
     }
 
     function showAll() {
@@ -75,10 +58,10 @@
     }
 
     function reloadGrid() {
-        $("#tagged_variant-grid").trigger("reloadGrid");
-        const variantTagsTable = $("#variant-tags-datatable");
-        if ($.fn.DataTable.isDataTable(variantTagsTable)) {
-            variantTagsTable.DataTable().ajax.reload();
+        for (const table of [$("#tagged-variants-datatable"), $("#variant-tags-datatable")]) {
+            if ($.fn.DataTable.isDataTable(table)) {
+                table.DataTable().ajax.reload();
+            }
         }
     }
 
@@ -157,7 +140,12 @@
 
     (One variant per row, with all associated tags)
 
-    {% jqgrid 'tagged_variant_grid' 'tagged_variant' template_name='jqgrid/variant_details_link_grid.html' genome_build_name=genome_build.name search=False init_func='taggedVariantGridInitFunc' jqgrid_config_get_parameters_func='getVariantTagsConfigUrl' %}
+    <table id="tagged-variants-datatable" class="sticky-header"
+           data-datatable-url="{% url 'tagged_variant_grid' genome_build_name=genome_build.name op='handler' %}"
+           data-datatable-data="taggedVariantDatatableFilter"></table>
+    <div data-toolbar="#tagged-variants-datatable">
+        <a class="btn btn-outline-secondary fas fa-download" href="javascript:downloadTaggedVariantCSV()">CSV</a>
+    </div>
 
     <h3>Tags</h3>
 

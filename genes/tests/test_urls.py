@@ -175,12 +175,17 @@ class Test(URLTestCase):
         genome_build_name = self.grch37.name
 
         GRID_LIST_URLS = [
-            ("gene_symbol_variants_grid", {"gene_symbol": self.gene_symbol.pk, "genome_build_name": genome_build_name, "op": "config"}, 200),
             ("genes_grid", {"genome_build_name": genome_build_name, "op": "config"}, 200),
             ("gene_coverage_collection_grid", {"gene_coverage_collection_id": self.gene_coverage_collection.pk,
                                                "op": "config"}, 200),
         ]
         self._test_urls(GRID_LIST_URLS, self.user_non_owner)
+
+        DATATABLE_GRID_LIST_URLS = [
+            ("gene_symbol_variants_grid", {"gene_symbol": self.gene_symbol.pk,
+                                           "genome_build_name": genome_build_name, "op": "handler"}, 200),
+        ]
+        self._test_datatable_urls(DATATABLE_GRID_LIST_URLS, self.user_non_owner)
 
     def testAutocompleteUrls(self):
         """ Autocompletes w/o permissions """

@@ -10,15 +10,19 @@ import json
 from django.db import connection
 from django.test import RequestFactory
 from django.test.utils import CaptureQueriesContext
+from django.urls.base import reverse
 
 from analysis.grids import VariantGrid
 from analysis.tests.test_grid_export import GridExportTestCase
 from library.django_utils.jqgrid_datatable_adapter import (
+    DEFAULT_COLUMN_WIDTH,
     JqGridDatatableView,
     datatable_columns_from_colmodels,
     datatable_order_from_config,
 )
+from library.django_utils.jqgrid_view import JQGridViewOp
 from snpdb.models import UserGridConfig
+from variantopedia.grids import AllVariantsGrid
 
 
 class AdapterColumnsTest(GridExportTestCase):
@@ -36,7 +40,6 @@ class AdapterColumnsTest(GridExportTestCase):
 
         self.assertEqual(["id", "tags_global", "secret"], [c["data"] for c in columns])
         self.assertEqual("VariantGridFormat.detailsLink", columns[0]["render"])
-        self.assertEqual(110, columns[0]["width"])
         self.assertEqual("The variant", columns[0]["headerTitle"])
         self.assertTrue(columns[0]["orderable"])  # jqGrid colmodels are sortable unless they say otherwise
 
@@ -46,6 +49,13 @@ class AdapterColumnsTest(GridExportTestCase):
         # Hidden columns stay in the list so a client column index maps back to its colmodel
         self.assertFalse(columns[2]["visible"])
         self.assertIsNone(columns[2]["render"])
+
+    def test_every_column_carries_a_width(self):
+        """ The client lays these tables out table-layout: fixed, which needs a width per column -
+            without one a cell holding 40 PubMed links runs to a few thousand pixels """
+        columns = datatable_columns_from_colmodels([{"name": "id", "width": 110}, {"name": "pubmed"}])
+        self.assertEqual("110px", columns[0]["width"])
+        self.assertEqual(f"{DEFAULT_COLUMN_WIDTH}px", columns[1]["width"])
 
     def test_order_from_sortname(self):
         colmodels = [{"name": "id"}, {"name": "locus__position", "index": "locus__position"}]
@@ -88,6 +98,12 @@ class AdapterParamTranslationTest(GridExportTestCase):
         """ rows=0 is the grid engine's 'everything' - the export path relies on it """
         params = self._translate(start=0, length=0)
         self.assertEqual(0, params["rows"])
+
+    def test_a_request_without_datatables_params_pages_off_the_grid_config(self):
+        """ A bookmarked grid URL has no 'length' - leave it out so get_paginate_by uses rowNum """
+        params = self._translate()
+        self.assertNotIn("rows", params)
+        self.assertNotIn("page", params)
 
     def test_order_column_index_becomes_sidx(self):
         colmodels = self.grid.get_colmodels()
@@ -181,6 +197,22 @@ class AdapterDefinitionTest(GridExportTestCase):
         extra = self._definition()["extra"]
         self.assertTrue(extra["analysisNode"]["visible"])
         self.assertEqual(self.genome_build.name, extra["genomeBuild"])
+
+    def test_download_url_reverses_onto_the_download_op(self):
+        """ The client renders the toolbar CSV button from it - server side streaming, every row """
+        url = reverse("all_variants_grid",
+                      kwargs={"genome_build_name": self.genome_build.name, "op": JQGridViewOp.HANDLER})
+        request = RequestFactory().get(url, {"dataTableDefinition": 1})
+        request.user = self.user
+        grid = AllVariantsGrid(self.user, self.genome_build.name)
+        definition = JqGridDatatableView(csv_download=True).json_definition(
+            request, grid, genome_build_name=self.genome_build.name, op=JQGridViewOp.HANDLER)
+
+        self.assertEqual(reverse("all_variants_grid",
+                                 kwargs={"genome_build_name": self.genome_build.name,
+                                         "op": JQGridViewOp.DOWNLOAD}),
+                         definition["downloadUrl"])
+        self.assertFalse(definition["downloadCsvButtonEnabled"], "Client side CSV pages through the grid")
 
     def test_page_length_comes_from_the_users_grid_config(self):
         UserGridConfig.objects.update_or_create(user=self.user, grid_name="VariantGrid",

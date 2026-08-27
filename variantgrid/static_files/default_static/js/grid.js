@@ -260,7 +260,11 @@ function create_igv_link(locus, getBamsFuncString) {
 }
 
 function showGridCell(gridColumn) {
-    const selector = $("td[aria-describedby*='" + gridColumn + "']");
+    // jqGrid names its cells via aria-describedby, DataTables via the column class the adapter adds
+    let selector = $("td[aria-describedby*='" + gridColumn + "']");
+    if (!selector.length) {
+        selector = $("td.dt-" + gridColumn);
+    }
     if (selector.length) {
         selector[0].scrollIntoView();
     }
@@ -347,23 +351,26 @@ function jqGridFormatterContext(options) {
     return {extra: {analysisNode: colModel.analysisNode}, kwargs: colModel.formatter_kwargs};
 }
 
-jQuery.extend($.fn.fmatter , {
-    'detailsLink': (v, o, row) => VariantGridFormat.detailsLink(v, null, row, jqGridFormatterContext(o)),
-    'geneSymbolLink': (v, o, row) => VariantGridFormat.geneSymbolLink(v, null, row, jqGridFormatterContext(o)),
-    'gnomadFilteredFormatter': (v, o, row) => VariantGridFormat.gnomadFiltered(v, null, row, jqGridFormatterContext(o)),
-    'tagsFormatter': (v, o, row) => VariantGridFormat.tags(v, null, row),
-    'tagsGlobalFormatter': (v, o, row) => VariantGridFormat.tagsGlobal(v, null, row),
-    'clinvarLink': (v) => VariantGridFormat.clinvarLink(v),
-    'cosmicLink': (v) => VariantGridFormat.cosmicLink(v),
-    'omimLink': (v) => VariantGridFormat.omimLink(v),
-    'formatClinGenAlleleId': (v) => VariantGridFormat.clinGenAlleleId(v),
-    'formatDBSNP': (v) => VariantGridFormat.dbsnp(v),
-    'formatOntologyTerms': (v) => VariantGridFormat.ontologyTerms(v),
-    'formatPubMed': (v) => VariantGridFormat.pubMed(v),
-    'geneSymbolNewWindowLink': (v) => VariantGridFormat.geneSymbolNewWindowLink(v),
-    'unitAsPercentFormatter': (v) => VariantGridFormat.unitAsPercent(v),
-    'formatMasterMindMMID3': (v) => VariantGridFormat.masterMind(v),
-    'formatMavedbUrnLinks': (v) => VariantGridFormat.mavedbUrn(v),
+// $.fn.fmatter only exists once include_jqgrid.js has run, which those pages do from the body
+$(document).ready(function() {
+    jQuery.extend($.fn.fmatter , {
+        'detailsLink': (v, o, row) => VariantGridFormat.detailsLink(v, null, row, jqGridFormatterContext(o)),
+        'geneSymbolLink': (v, o, row) => VariantGridFormat.geneSymbolLink(v, null, row, jqGridFormatterContext(o)),
+        'gnomadFilteredFormatter': (v, o, row) => VariantGridFormat.gnomadFiltered(v, null, row, jqGridFormatterContext(o)),
+        'tagsFormatter': (v, o, row) => VariantGridFormat.tags(v, null, row),
+        'tagsGlobalFormatter': (v, o, row) => VariantGridFormat.tagsGlobal(v, null, row),
+        'clinvarLink': (v) => VariantGridFormat.clinvarLink(v),
+        'cosmicLink': (v) => VariantGridFormat.cosmicLink(v),
+        'omimLink': (v) => VariantGridFormat.omimLink(v),
+        'formatClinGenAlleleId': (v) => VariantGridFormat.clinGenAlleleId(v),
+        'formatDBSNP': (v) => VariantGridFormat.dbsnp(v),
+        'formatOntologyTerms': (v) => VariantGridFormat.ontologyTerms(v),
+        'formatPubMed': (v) => VariantGridFormat.pubMed(v),
+        'geneSymbolNewWindowLink': (v) => VariantGridFormat.geneSymbolNewWindowLink(v),
+        'unitAsPercentFormatter': (v) => VariantGridFormat.unitAsPercent(v),
+        'formatMasterMindMMID3': (v) => VariantGridFormat.masterMind(v),
+        'formatMavedbUrnLinks': (v) => VariantGridFormat.mavedbUrn(v),
+    });
 });
 
 

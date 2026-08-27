@@ -847,6 +847,32 @@ table.as_table td {
   border: none;
 }
 
+table.variantgrid-datatable {
+  table-layout: fixed;
+  width: auto;
+}
+table.variantgrid-datatable th,
+table.variantgrid-datatable td {
+  padding: 2px 4px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+table.variantgrid-datatable .variant_id-container {
+  display: flex;
+  align-items: center;
+}
+table.variantgrid-datatable td .external-link::after {
+  content: none;
+}
+table.variantgrid-datatable.dataTable thead > tr > th {
+  padding-right: 16px !important;
+}
+table.variantgrid-datatable.dataTable thead > tr > th::before,
+table.variantgrid-datatable.dataTable thead > tr > th::after {
+  right: 2px !important;
+}
+
 table.sticky-header thead th {
   background-color: white;
   position: sticky !important;

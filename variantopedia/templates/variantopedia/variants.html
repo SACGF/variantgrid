@@ -26,21 +26,19 @@
             open_variant_details_in_new_window: true,
         };
 
-        function getExtraFilters() {
-            var extraFilters = '';
+        // Called by DataTables before each ajax call (and so also by the CSV download, which is
+        // built from the table's live ajax params)
+        function allVariantsDatatableFilter(data) {
             if (gridExtraFilters) {
-                extraFilters = JSON.stringify(gridExtraFilters);
+                data["extra_filters"] = JSON.stringify(gridExtraFilters);
             }
-            return extraFilters;
-        }
-
-        function allVariantsGridInit(grid, pagerId, initKwargs) {
-            // Send the filter selection with every data fetch (and with the CSV download, which copies postData)
-            grid[0].p.postData["extra_filters"] = getExtraFilters;
         }
 
         function filterGrid() {
-            $("#all-variants-grid").trigger("reloadGrid");
+            const table = $("#all-variants-datatable");
+            if ($.fn.DataTable.isDataTable(table)) {
+                table.DataTable().ajax.reload();
+            }
         }
 
         function checkedValues(selector) {
@@ -262,6 +260,7 @@
                     Filtering to <span id='all-variants-filter'></span>. <a href='javascript:resetFilters()'>Reset</a>
                 </p>
             </div>
-        {% load jqgrid_tags %}
-        {% jqgrid 'all_variants_grid' 'all-variants' template_name='jqgrid/variant_details_link_grid.html' genome_build_name=genome_build.name search=True delete=False download_grid_json_as_csv=True init_func='allVariantsGridInit' %}
+        <table id="all-variants-datatable" class="sticky-header"
+               data-datatable-url="{% url 'all_variants_grid' genome_build_name=genome_build.name op='handler' %}"
+               data-datatable-data="allVariantsDatatableFilter"></table>
 {% endblock submenu_page_content %}

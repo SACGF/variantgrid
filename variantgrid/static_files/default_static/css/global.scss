@@ -973,6 +973,45 @@ table.as_table {
 	}
 }
 
+// The jqGrid derived variant grids (@see library/django_utils/jqgrid_datatable_adapter.py) are
+// dozens of columns wide and hold cells with hundreds of links. Every column carries a width from
+// its colmodel, so lay the table out from those and clip each cell to one line - the way jqGrid
+// rendered them - rather than letting one PubMed cell run to a few thousand pixels.
+table.variantgrid-datatable {
+	table-layout: fixed;
+	width: auto;
+
+	th,
+	td {
+		padding: 2px 4px;
+		overflow: hidden;
+		white-space: nowrap;
+		text-overflow: ellipsis;
+	}
+
+	// detailsLink's boxes are floats, which wrap once the column is narrower than the row of them
+	.variant_id-container {
+		display: flex;
+		align-items: center;
+	}
+
+	// One trailing icon per link is unreadable in a cell holding dozens of them
+	td .external-link::after {
+		content: none;
+	}
+
+	// DataTables reserves 26px of every header for its sort arrows, which over this many columns
+	// costs more than the labels themselves. Its stylesheet loads after ours, hence !important
+	&.dataTable thead > tr > th {
+		padding-right: 16px !important;
+	}
+
+	&.dataTable thead > tr > th::before,
+	&.dataTable thead > tr > th::after {
+		right: 2px !important;
+	}
+}
+
 table {
 	&.sticky-header thead th {
 		background-color: white;

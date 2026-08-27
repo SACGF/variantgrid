@@ -5,7 +5,7 @@ server side formatters shared with the CSV/VCF export path are all unchanged. Th
 translates protocols - a DataTables request in, a jqGrid request out; a jqGrid data envelope back,
 a DataTables one out - so a converted page runs the same grid class the exports do.
 
-@see claude/plans/variant_grid_to_datatables_plan.md
+@see claude/plans/variantgrid_to_datatables_plan.md
 """
 import json
 import logging
@@ -23,6 +23,12 @@ from library.utils import JsonObjType, nice_class_name
 from snpdb.views.datatable_view import DatabaseTableView
 
 logger = logging.getLogger(__name__)
+
+# These grids are wide (dozens of columns) and hold cells with hundreds of links, so the client lays
+# them out table-layout: fixed and clips each cell to one line - the way jqGrid rendered them.
+# That needs every column to carry a width. @see .variantgrid-datatable in global.scss
+DATATABLE_TABLE_CLASS = "variantgrid-datatable"
+DEFAULT_COLUMN_WIDTH = 150  # jqGrid's own colModel default, for colmodels that don't set one
 
 # jqGrid colmodel 'formatter' name -> DataTables client renderer
 # @see variantgrid/static_files/default_static/js/variantgrid_formats.js
@@ -62,8 +68,7 @@ def datatable_columns_from_colmodels(colmodels: list[dict]) -> list[JsonObjType]
             "className": " ".join(css_classes),
             "render": JQGRID_FORMATTER_TO_CLIENT_RENDERER.get(cm.get("formatter")),
         }
-        if width := cm.get("width"):
-            column["width"] = width
+        column["width"] = f"{cm.get('width') or DEFAULT_COLUMN_WIDTH}px"
         if header_title := cm.get("headerTitle"):
             column["headerTitle"] = header_title
         if formatter_kwargs := cm.get("formatter_kwargs"):
@@ -174,6 +179,7 @@ class JqGridDatatableView(View):
             "columns": datatable_columns_from_colmodels(colmodels),
             "order": datatable_order_from_config(config, colmodels),
             "scrollX": self.scroll_x,
+            "tableClass": DATATABLE_TABLE_CLASS,
             "searchBoxEnabled": False,
             "downloadCsvButtonEnabled": False,  # server side streaming download instead, see downloadUrl
             "downloadUrl": self._download_url(request, **kwargs),
@@ -196,10 +202,12 @@ class JqGridDatatableView(View):
             Column filtering ('filters'/'_search') and any page specific params pass through untouched. """
         params = request.GET.copy()
 
-        length = int(params.get("length") or 0)
-        start = int(params.get("start") or 0)
-        params["rows"] = length  # 0 means no pagination
-        params["page"] = (start // length) + 1 if length else 1
+        # A request with no 'length' (a bookmarked grid URL) gets the grid's own configured page size
+        if (length_param := params.get("length")) not in (None, ""):
+            length = int(length_param)
+            start = int(params.get("start") or 0)
+            params["rows"] = length  # 0 means no pagination
+            params["page"] = (start // length) + 1 if length else 1
 
         if (column_index := params.get("order[0][column]")) not in (None, ""):
             colmodels = grid.get_colmodels()

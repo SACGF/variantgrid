@@ -53,6 +53,7 @@ const DataTableDefinition = (function() {
         this.adjustColumns = params.adjustColumns !== false;
 
         this.tableId = null;
+        this.tableWidth = null;
         this.lengthKey = null;
         this.lastDraw = null;
         this.serverParams = null;
@@ -294,6 +295,17 @@ const DataTableDefinition = (function() {
                 this.waitOn = EKeys.load();
             }
 
+            // table-layout: fixed only kicks in when the table has a real width, so add up what the
+            // columns asked for. Anything left over is shared out proportionally, so this wants to be
+            // the exact sum of the columns DataTables will actually render
+            let tableWidth = 0;
+            for (const col of defn.columns) {
+                if (col.visible !== false && col.width) {
+                    tableWidth += parseFloat(col.width) || 0;
+                }
+            }
+            this.tableWidth = tableWidth || null;
+
             this.dtParams = dtParams;
             return dtParams;
         },
@@ -302,6 +314,12 @@ const DataTableDefinition = (function() {
             const dom = this.dom;
             dom.empty();
             const dtParams = this.dtParams;
+            if (this.serverParams.tableClass) {
+                dom.addClass(this.serverParams.tableClass);
+            }
+            if (this.tableWidth) {
+                dom.css('width', this.tableWidth + 'px');
+            }
 
             const tHead = $('<thead/>').appendTo(dom);
             const tHeadTr = $('<tr/>').appendTo(tHead);
@@ -311,6 +329,12 @@ const DataTableDefinition = (function() {
                 const th = $('<th/>', {class: columnDef.classNames, html: columnDef.label});
                 if (columnDef.headerTitle) {
                     th.attr('title', columnDef.headerTitle);
+                }
+                if (columnDef.width) {
+                    // DataTables only reads columns.width when autoWidth is on, and autoWidth sizes to
+                    // content - which a cell holding 40 PubMed links blows out. Set it here instead and
+                    // let table-layout: fixed make it the actual width
+                    th.css('width', columnDef.width);
                 }
                 th.appendTo(tHeadTr);
             }

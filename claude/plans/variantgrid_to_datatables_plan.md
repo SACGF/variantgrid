@@ -78,7 +78,7 @@ The variant tags page then runs one DataTable (tag-centric) beside one jqGrid (`
 - Existing tests to port: `variantopedia/tests/test_tagged_variant_grid.py` (`_tags_grid_variant_ids` at L60, user-filter L79, show_group_data L108); URL test entry in `variantopedia/tests/test_urls.py:129-141`. DataTables test patterns: `seqauto/tests/test_sequencing_run_datatable.py` (config unit test via `RequestFactory` + `resolver_match`), `_test_datatables_grid_urls_contains_objs` in `library/django_utils/unittest_utils.py:196`.
 - Tag colour CSS comes from `{% render_tag_styles_and_formatter %}` already on both pages — the ported renderers keep emitting `<span class='grid-tag tagged-<tag>'>` markup so it applies unchanged.
 
-## Stage 2 — Adapter infrastructure + ported client formatters
+## Stage 2 — Adapter infrastructure + ported client formatters — **DONE**
 
 New server pieces (suggested: `library/django_utils/jqgrid_datatable_adapter.py`):
 
@@ -108,20 +108,161 @@ New client pieces:
 
 Tests: adapter unit tests (definition JSON shape, param translation incl. packed-genotype `index` round-trip, known-count passthrough with zero `COUNT(*)` queries, draw handling). The existing grid-class tests keep passing untouched.
 
+### Stage 2 outcome — what actually landed
+
+**Adapter** — `library/django_utils/jqgrid_datatable_adapter.py`:
+
+- `JqGridDatatableView(View)` with class attrs `grid`, `csv_download`, `scroll_x` (default True),
+  `defer_loading` (default False), `cache_stable_params` (default True). It keeps `JQGridView`'s URL shape:
+  register it on the existing `<slug:op>` path and the client points at `.../handler/` while
+  `op == "download"` still streams `grid_export_request` (raw values, `rows=0`).
+- `?dataTableDefinition=1` returns the definition; anything else returns data. Both are encoded with
+  `library.jqgrid.jqgrid.json_encode` (strict, `allow_nan=False`) rather than `JsonResponse`.
+- Definition keys: `columns`, `order`, `extra`, `gridName`, `pageLength`, `lengthMenu`, `ajaxType`
+  (`"GET"`), `cacheStableParams`, `deferLoading`, `approximateCount`, `downloadUrl`, `csvName`,
+  `scrollX`, `searchBoxEnabled`, `downloadCsvButtonEnabled`. Per column: `data` (colmodel `name`),
+  `label`, `orderable` (from `sortable`), `visible` (from `hidden`), `className`, `render`, `width`,
+  `headerTitle`, `renderKwargs` (from `formatter_kwargs`).
+- Every colmodel becomes a column, hidden ones included, so a client column index maps back to its
+  colmodel. `datatable_columns_from_colmodels()` and `datatable_order_from_config()` are module level
+  and unit tested on their own.
+- Data envelope: `{recordsTotal, recordsFiltered, data, approximateRecords?, draw?}`. Both counts come
+  from the one paginator count, so `get_known_count()` flows through with zero `COUNT(*)`. Rows keep
+  their `.values()` field-name keys and pass through `DatabaseTableView.sanitize_value` /
+  `limit_value_size`. `draw` is echoed only when the request carried one.
+- `translate_params()`: `length`→`rows` (0 = no paging), `start//length + 1`→`page`,
+  `order[0][column]`→`colmodels[i]["index"]`→`sidx` + `order[0][dir]`→`sord`. `filters` / `_search`
+  and any page params pass through untouched, so the packed-genotype index string round-trips exactly.
+- `JqGrid.get_datatable_extra()` is the grid-wide metadata hook (jqGrid formatters read the equivalent
+  off `options.colModel`). `AbstractVariantGrid` returns `{"genomeBuild": ...}`; `VariantGrid` adds
+  `analysisNode: {visible}` and `sortingDisabled`.
+- `downloadUrl` is filled in automatically when `csv_download=True` and the URL has an `op` kwarg, and
+  the client renders a toolbar CSV button from it carrying the table's live ajax params — Stage 3 pages
+  get the server streaming download without page-level wiring.
+
+**Rows per page** — `DatatableConfig.grid_name` (default None) is the general opt-in; when set,
+`DatabaseTableView.json_definition()` emits `gridName`/`pageLength`/`lengthMenu` from
+`UserGridConfig.get_rows_and_selections(user, grid_name)` (moved off `JqGridUserRowConfig`, which now
+calls it), and the client POSTs `set_user_row_config` on length change alongside its localStorage write.
+The server value wins over the localStorage default. The adapter opts in automatically for any
+`JqGridUserRowConfig` grid, keyed on the caption.
+
+**Client** — `variantgrid/static_files/default_static/js/variantgrid_formats.js`, namespace
+`VariantGridFormat`, loaded from `uicore/page/base.html`:
+
+- Renderer signature is `(data, type, row, ctx)` where `ctx = {extra, kwargs}` — `extra` is the
+  definition's grid-wide block, `kwargs` the column's `renderKwargs`. `DataTableDefinition` closes
+  over both at table build time.
+- The formatter bodies **moved** here from `grid.js` (they are not duplicated). `grid.js` keeps a
+  marked `$.fn.fmatter` shim that delegates to `VariantGridFormat.*`, mapping jqGrid's
+  `(cellvalue, options, rowObject)` onto the ctx object — so the pages still on `{% jqgrid %}` run the
+  same implementations. Shared page helpers (`createGridLink`, IGV, tag helpers,
+  `load_variant_details`, `inAnalysis`) stayed in `grid.js` and are called from both.
+- `gnomadFiltered` reads the genome build from `ctx.extra.genomeBuild`, falling back to
+  `ANALYSIS_SETTINGS` — so it works on a converted page with no `ANALYSIS_SETTINGS` shim.
+- The jqGrid → renderer mapping is `JQGRID_FORMATTER_TO_CLIENT_RENDERER` in the adapter module; a new
+  formatter needs an entry there and a `VariantGridFormat` member.
+- `snpdb/templates/jqgrid/variant_details_link_grid.html` and
+  `variantopedia/templates/variantopedia/grids/gene_variants_grid.html` no longer register formatters
+  (`grid.js` already does); both are now bare `{% extends "jqgrid/jqgrid.html" %}` and get deleted when
+  their last page converts.
+
+**`datatable_definition.js`** gained: definition-supplied `pageLength`/`lengthMenu`, `ajaxType`,
+`deferLoading` (built as `deferLoading: 0`), `cacheStableParams`, `approximateCount`, the renderer
+`ctx` argument, `headerTitle` on the `<th>`, the rows-per-page POST, and the `downloadUrl` toolbar
+button. Everything is gated on a definition flag, so existing DataTables are unchanged.
+
+**Cache stability**: with `cacheStableParams` the client's ajax `data` hook returns a minimal,
+key-sorted object — `start`, `length`, `order[0][*]`, `search[value]` where searching, plus whatever
+the page's own data function added — and drops `draw` and the whole `columns[...]` array (which alone
+would be ~600 params on a wide cohort grid). `draw` is stashed on the definition instance and restored
+onto the response by `ajax.dataSrc`. Verified: identical grid state produces a byte-identical
+querystring.
+
+**Tests**: `analysis/tests/test_jqgrid_datatable_adapter.py` (17) — column/order mapping, param
+translation including the packed-genotype round-trip, envelope shape, known-count with zero `COUNT(*)`,
+draw-only-when-sent, `pageLength` from `UserGridConfig`. All existing grid tests pass untouched.
+
+**Naming**: new names spell it `variantgrid`, one word (hence `variantgrid_formats.js`).
+
 ## Stage 3 — Variantopedia + gene pages
 
 Convert in this order within the one Stage 3 PR (each lands as its own commit so it can be reviewed and reverted independently):
 
-1. **Nearby variants** (`nearby_variants.html`, 5 grids) — simplest: `search=False`, straight conversion of the `{% jqgrid %}` tags to `<table data-datatable-url=...>` against `JqGridDatatableView.as_view(grid=NearbyVariantsGrid)` URLs. Add a toolbar Download button hitting the existing `op=download` streaming CSV (the `data-toolbar` mechanism already moves page elements into the DataTables toolbar).
+1. **Nearby variants** (`nearby_variants.html`, 5 grids) — simplest: straight conversion of the `{% jqgrid %}` tags to `<table data-datatable-url=...>` pointing at the `handler` op of `JqGridDatatableView.as_view(grid=NearbyVariantsGrid, csv_download=True)`. The download button comes from the definition's `downloadUrl`.
 2. **Gene symbol page** (`view_gene_symbol.html`) — `extra_filters` (hotspot protein position, tag clicks) move to a `data-datatable-data` function + `table.ajax.reload()`; CSV switches from the client-side `JSON2CSV` hack to the server streaming download (`csv_download=True` on the URL — raw values, unlimited rows, matches export-consistency rule in `snpdb/grids.py:486`).
-3. **All Variants** (`variants.html`) — filter panel's `getExtraFilters` becomes the `data-datatable-data` function; approximate-count pager text via the definition passthrough; CSV via existing `op=download`.
+3. **All Variants** (`variants.html`) — filter panel's `getExtraFilters` becomes the `data-datatable-data` function (mutating `data` in place, as `variantTagsDatatableFilter` does); the "~N" pager text and the CSV button both come through the definition already.
 4. **`TaggedVariantGrid`** (`variant_tags.html`) — completes the variant tags page (`VariantTagsGrid` already converted in Stage 1); row delete via an action column posting to the existing delete endpoint; CSV keeps the dedicated `tagged_variant_export` view.
 
 Per-column ad-hoc filtering (jqGrid `searchGrid` dialog: `search=True` on All Variants, `showFilter()` on the gene page): replaced by the filter-builder component built in Stage 4 for FilterNode. These pages ship with their page-level filters only; the column filter dialog arrives with Stage 4 (resolved decision 1).
 
-Cleanup as pages convert: their `{% jqgrid %}` usage, `ANALYSIS_SETTINGS` shims, and grid-specific `init_func`s go; `variant_details_link_grid.html` is deleted when the last Stage 3 page lands.
+Cleanup as pages convert: their `{% jqgrid %}` usage, `ANALYSIS_SETTINGS` shims, and grid-specific `init_func`s go, along with the `JSON2CSV` client CSV helpers. `variant_details_link_grid.html` (now a bare `{% extends %}`) is deleted once `variant_tags.html` is the last page off it in Stage 3, and `grids/gene_variants_grid.html` is already unreferenced.
 
 Tests: switch `variantopedia/tests/test_urls.py` and `genes/tests/test_urls.py` entries from `_test_jqgrid_urls_contains_objs` to the datatable harness; keep the grid-logic tests (they exercise the classes directly).
+
+### Stage 3 outcome — what actually landed
+
+Four `JqGridDatatableView` URLs (`nearby_variants_grid` / `nearby_gene_variants_grid`,
+`gene_symbol_variants_grid`, `all_variants_grid`, `tagged_variant_grid`) and four converted pages.
+Every page now renders `<table data-datatable-url="…/handler/">`; no `{% jqgrid %}` variant grid
+is left.
+
+- **Nearby variants** — 5 plain tables, no page filter state. CSV comes from the definition's
+  `downloadUrl` (`csv_download=True`).
+- **Gene symbol page** — `geneVariantsDatatableFilter` sends `geneVariantsGridParams` as
+  `extra_filters`; hotspot clicks, `tagClick` and "Show all" all call `reloadGeneVariantsTable()`
+  (`ajax.reload()`, which resets to page 1). CSV moved off the client `JSON2CSV` hack onto the
+  server streaming download. The jqGrid `searchGrid` "Filter grid..." link is gone - the column
+  filter dialog arrives with Stage 4 (resolved decision 1).
+- **All Variants** — `allVariantsDatatableFilter` sends the filter panel's `gridExtraFilters` as
+  `extra_filters`; `filterGrid()` reloads the table. Per-column search and the client CSV are
+  replaced by the page filters and the server download respectively.
+- **Variant tags** — `taggedVariantDatatableFilter` sends the shared `gridParams` as a single
+  `extra_filters` blob (the grid class's own contract), beside `variantTagsDatatableFilter`'s plain
+  params for the tag-centric table. `reloadGrid()` now reloads two DataTables - the Stage 1 fan-out
+  to `trigger("reloadGrid")` is gone. CSV stays on `tagged_variant_export`, reached from a
+  `data-toolbar` button, because that view forces the genomic-order sort.
+
+**Layout** — the converted pages are 87 columns wide with cells holding hundreds of links, which the
+default DataTables sizing cannot carry:
+
+- DataTables only reads `columns.width` when `autoWidth` is on, and `autoWidth` sizes to content -
+  so the widths the adapter sent were being ignored (the 110px variant column rendered at 64px, so
+  `detailsLink`'s somatic box wrapped to a second line) and a PubMed cell with 40 ids rendered
+  2267px wide, pushing every later column off screen.
+- The adapter now sends a width for *every* column (colmodel width, else jqGrid's own 150 default)
+  plus `tableClass: "variantgrid-datatable"`. `datatable_definition.js` puts the width on the `<th>`
+  itself and sets the table's width to their sum, so `table-layout: fixed` engages - it is inert
+  while the table width is `auto`.
+- `.variantgrid-datatable` in `global.scss` clips each cell to one line (`overflow: hidden`,
+  `nowrap`, ellipsis) with jqGrid's 2px/4px cell padding, flexes `.variant_id-container` so
+  `detailsLink`'s floated boxes stay on one row (ClinVar, germline, somatic, IGV), drops the
+  `external-link` trailing icon inside cells, and trims DataTables' 26px sort-arrow header gutter to
+  16px. Rows are 20px, the way jqGrid rendered them.
+
+Also:
+
+- `translate_params` only sets `rows`/`page` when the request actually carried a `length`, so a
+  bookmarked grid URL pages off the grid's own `rowNum` instead of asking for everything (which
+  `JqGrid.get_data` cannot serve - it dereferences a null paginator).
+- `grid.js` registers its `$.fn.fmatter` shim from `$(document).ready` - `$.fn.fmatter` does not
+  exist until `include_jqgrid.js` has run, which the jqGrid pages do from the body, after grid.js.
+  Before this the Stage 2 shim silently no-opped (pre-Stage-2 the formatters were global functions,
+  which jqGrid falls back to). The analysis node grid is the page that needed it.
+- `showGridCell` (used by `detailsLink`'s ClinVar / internal-classification boxes) matches the
+  adapter's `dt-<column>` class as well as jqGrid's `aria-describedby`.
+- Deleted: `snpdb/templates/jqgrid/variant_details_link_grid.html` and
+  `variantopedia/templates/variantopedia/grids/gene_variants_grid.html` (both already bare
+  `{% extends %}`), the gene page's dead `$(window).resize` jqGrid `setGridWidth` handler and its
+  `<table id="grid">`/`<div id="pager">` leftovers.
+- `TaggedVariantGrid` gets no delete action column: its URL carried `delete_row=True` but
+  `{% jqgrid %}` was called with the default `delete=False`, so the page never showed one - and the
+  grid's model is `Variant`, so `JqGridUserRowConfig.delete_row` would have targeted the variant
+  rather than the tag. Tag deletion stays on the tag-centric table.
+- `JSON2CSV` / `download_grid_json_as_csv` stay: seqauto, pathtests, patients and the node-editor
+  popup grids still use them.
+- Tests: `variantopedia`/`genes` URL tests moved to the datatable harness (plus a nearby-variants
+  entry); two new adapter tests cover the no-`length` default and the `downloadUrl` reversal.
 
 ## Stage 4 — Analysis node grid
 

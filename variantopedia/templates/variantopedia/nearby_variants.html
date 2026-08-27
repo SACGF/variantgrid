@@ -6,7 +6,6 @@
 {% load static %}
 {% load js_tags %}
 {% load user_tag_color_tags %}
-{% load jqgrid_tags %}
 {% block submenu %}{% menu_bar_variants %}{% endblock %}
 
 {% block title %}Nearby to {{ variant }}{% endblock title %}
@@ -50,7 +49,8 @@
         <div><b>Method:</b> {{ method_summaries.codon }}</div>
         <div>
             {% if codon.exists %}
-                {% jqgrid 'nearby_variants_grid' 'nearby_codon' template_name='jqgrid/variant_details_link_grid.html' variant_id=variant.pk genome_build_name=genome_build.name region_type='codon' search=False %}
+                <table id="nearby-codon-datatable" class="sticky-header"
+                       data-datatable-url="{% url 'nearby_variants_grid' variant_id=variant.pk genome_build_name=genome_build.name region_type='codon' op='handler' %}"></table>
             {% else %}
                 -
             {% endif %}
@@ -60,7 +60,8 @@
         <div><b>Method:</b> {{ method_summaries.exon }}</div>
         <div>
             {% if exon.exists %}
-                {% jqgrid 'nearby_variants_grid' 'nearby_exon' template_name='jqgrid/variant_details_link_grid.html' variant_id=variant.pk genome_build_name=genome_build.name region_type='exon' search=False %}
+                <table id="nearby-exon-datatable" class="sticky-header"
+                       data-datatable-url="{% url 'nearby_variants_grid' variant_id=variant.pk genome_build_name=genome_build.name region_type='exon' op='handler' %}"></table>
             {% else %}
                 -
             {% endif %}
@@ -70,7 +71,8 @@
         <div><b>Method:</b> {{ method_summaries.domain }}</div>
         <div>
             {% if domain.exists %}
-                {% jqgrid 'nearby_variants_grid' 'nearby_domain' template_name='jqgrid/variant_details_link_grid.html' variant_id=variant.pk genome_build_name=genome_build.name region_type='domain' search=False %}
+                <table id="nearby-domain-datatable" class="sticky-header"
+                       data-datatable-url="{% url 'nearby_variants_grid' variant_id=variant.pk genome_build_name=genome_build.name region_type='domain' op='handler' %}"></table>
             {% else %}
                 -
             {% endif %}
@@ -83,7 +85,8 @@
                 <h3><a href="{% url 'view_gene_symbol' gene_symbol %}">{{ gene_symbol }}</a></h3>
                 <div>
                     {% if gene_nearby.exists %}
-                        {% jqgrid 'nearby_gene_variants_grid' 'nearby_gene'|add:gene_symbol template_name='jqgrid/variant_details_link_grid.html' variant_id=variant.pk genome_build_name=genome_build.name region_type='genes' gene_symbol=gene_symbol search=False %}
+                        <table id="nearby-gene-{{ gene_symbol|slugify }}-datatable" class="sticky-header"
+                               data-datatable-url="{% url 'nearby_gene_variants_grid' variant_id=variant.pk genome_build_name=genome_build.name region_type='genes' gene_symbol=gene_symbol op='handler' %}"></table>
                     {% else %}
                         -
                     {% endif %}
@@ -99,7 +102,8 @@
         <div><b>Method:</b> {{ method_summaries.range }}</div>
         <div>
             {% if range.exists %}
-                {% jqgrid 'nearby_variants_grid' 'nearby_range' template_name='jqgrid/variant_details_link_grid.html' variant_id=variant.pk genome_build_name=genome_build.name region_type='range' search=False %}
+                <table id="nearby-range-datatable" class="sticky-header"
+                       data-datatable-url="{% url 'nearby_variants_grid' variant_id=variant.pk genome_build_name=genome_build.name region_type='range' op='handler' %}"></table>
             {% else %}
                 -
             {% endif %}
