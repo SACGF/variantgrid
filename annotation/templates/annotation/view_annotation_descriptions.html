@@ -30,7 +30,7 @@
             min-width: 250px;
         }
 
-        .vep-category {
+        .annotation-category {
             color: #fff;
             border-radius: 5px;
             white-space: nowrap;
@@ -38,56 +38,81 @@
             padding: 2px;
         }
 
-        .vep-category-C {
+        .annotation-source {
+            color: #fff;
+            border-radius: 5px;
+            white-space: nowrap;
+            text-align: center;
+            padding: 2px;
+        }
+
+        .annotation-source-vep {
             background-color: #02599C;
         }
 
-        .vep-category-E {
+        .annotation-source-annotsv {
+            background-color: #2E8B57;
+        }
+
+        .annotation-source-variantgrid {
+            background-color: #555555;
+        }
+
+        .annotation-source-detail {
+            padding-top: 2px;
+            text-align: center;
+        }
+
+        .annotation-category-C {
+            background-color: #02599C;
+        }
+
+        .annotation-category-E {
             background-color: #333333;
         }
 
-        .vep-category-F {
+        .annotation-category-F {
             background-color: #FF7F50;
         }
 
-        .vep-category-G {
+        .annotation-category-G {
             background-color: #97f988;
             color: #680677;
         }
 
-        .vep-category-H {
+        .annotation-category-H {
             background-color: #9400D3;
         }
 
-        .vep-category-L {
+        .annotation-category-L {
             background-color: #6A5ACD;
         }
 
-        .vep-category-N {
+        .annotation-category-N {
             background-color: #E75480;
         }
 
-        .vep-category-P {
+        .annotation-category-P {
             background-color: #1E90FF;
         }
 
-        .vep-category-Y {
+        .annotation-category-Y {
             background-color: ;
         }
 
-        .vep-category-D {
+        .annotation-category-D {
             background-color: #ff9900;
         }
 
-        .vep-category-Q {
+        .annotation-category-Q {
             background-color: #5F81A9;
         }
 
-        .vep-category-S {
+        .annotation-category-S {
             background-color: red;
         }
 
-        .vep-category-V {
+        .annotation-category-V {
         }
     </style>
 {% endblock head %}
@@ -171,11 +196,11 @@
             </div>
         </div>
 
-        {% for annotation_level, columns_and_vep in columns_and_vep_by_annotation_level.items %}
+        {% for annotation_level, columns in columns_by_annotation_level.items %}
             <div class='card mt-4'>
                 <div class="card-header align-center">
                     <div class="color-box {{ annotation_level|lower }}-column">&nbsp;</div>
-                    <div class="annotation-level-title"><b>{{ annotation_level }} Level</b> Annotated by an <a class="hover-link" href="{% url 'variant_annotation_runs' %}">Variant Annotation Run</a>
+                    <div class="annotation-level-title"><b>{{ annotation_level }} Level</b> Annotated by a <a class="hover-link" href="{% url 'variant_annotation_runs' %}">Variant Annotation Run</a>
                         {% if annotation_level == 'Transcript' %}
                           - can have different values per transcript
                         {% endif %}
@@ -185,52 +210,45 @@
                     <table class='annotations-table table'>
                     <tr>
                         <th>Name</th>
+                        <th>Source</th>
                         <th>Category</th>
-                        <th>VEP field</th>
-                        <th>VEP custom/plugin</th>
+                        <th>Source field</th>
                         <th>Details</th>
                     </tr>
-                    {% for v, columnvepfield in columns_and_vep.items %}
+                    {% for row in columns %}
                         <tr class='annotation-row'>
-                            <th>{{ v.pk }}
+                            <th>{{ row.column.pk }}
                             <td>
-                            {% if columnvepfield %}
-                                <div class='vep-category vep-category-{{ columnvepfield.category }}'>
-                                    {{ columnvepfield.category.label }}
+                                <div class='annotation-source annotation-source-{{ row.source|lower }}'>{{ row.source }}</div>
+                                {% if row.source_detail %}
+                                    <div class='annotation-source-detail'>{{ row.source_detail }}</div>
+                                {% endif %}
+                            </td>
+                            <td>
+                            {% if row.category %}
+                                <div class='annotation-category annotation-category-{{ row.category }}'>
+                                    {{ row.category.label }}
                                 </div>
                             {% endif %}
                             </td>
                             <td>
-                            {% if columnvepfield %}
-                                <div class='vep-source-field'>
-                                    {{ columnvepfield.source_field }}
-                                    {% if columnvepfield.source_field_processing_description %}
-                                        ({{ columnvepfield.source_field_processing_description }})
+                            {% if row.source_field %}
+                                <div class='source-field'>
+                                    {{ row.source_field }}
+                                    {% if row.source_field_processing_description %}
+                                        ({{ row.source_field_processing_description }})
                                     {% endif %}
                                 </div>
                             {% endif %}
                             </td>
-                            <td>
-                            {% if columnvepfield %}
-                                <div class='vep-source-field'>
-                                    {% if columnvepfield.vep_plugin %}
-                                        Plugin: <b>{{ columnvepfield.vep_plugin.label }}</b>
-                                    {% endif %}
-
-                                    {% if columnvepfield.vep_custom %}
-                                        (custom)
-                                    {% endif %}
-                                </div>
-                            {% endif %}
-                            </td>
-                            <td>{{ v.description | safe }}
-                            {% if columnvepfield.min_vep_columns_version or columnvepfield.max_vep_columns_version %}
+                            <td>{{ row.column.description | safe }}
+                            {% if row.vep.min_columns_version or row.vep.max_columns_version %}
                                 <div>
                                     Note:
-                                    <b>{{ columnvepfield.columns_version_description }}</b> only
+                                    <b>{{ row.vep.columns_version_description }}</b> only
                                 </div>
                             {% endif %}
-                            {% if columnvepfield.vep_plugin == 'd' %}
+                            {% if row.vep.vep_plugin == 'd' %}
                                 <div>
                                 Note: Values from dbNSFP are for non-synonymous SNVs only (no indels or intergenic)
                                 </div>

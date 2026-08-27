@@ -12,41 +12,13 @@ import logging
 import re
 from typing import Any, Optional
 
+from annotation.annotsv_columns import FULL_COLUMN_MAP
 from annotation.models.models import AnnotationRun, VariantAnnotation
 
 # AnnotSV preserves the input VCF INFO column when run with -SVinputInfo 1.
 # The dump VCF writes "variant_id=NNN" into INFO; we use that to join back.
 _VARIANT_ID_RE = re.compile(r"(?:^|;)variant_id=(\d+)")
 
-
-# AnnotSV TSV column name -> VariantAnnotation field name. Values verified
-# against the bundle shipped with AnnotSV 3.5.8.
-FULL_COLUMN_MAP: dict[str, str] = {
-    "ACMG_class": "annotsv_acmg_class",
-    "AnnotSV_ranking_score": "annotsv_acmg_score",
-    "AnnotSV_ranking_criteria": "annotsv_acmg_criteria",
-    "RE_gene": "annotsv_re_gene",
-    "Repeat_type_left": "annotsv_repeat_type_left",
-    "Repeat_type_right": "annotsv_repeat_type_right",
-    "SegDup_left": "annotsv_segdup_left",
-    "SegDup_right": "annotsv_segdup_right",
-    "ENCODE_blacklist_left": "annotsv_encode_blacklist_left",
-    "ENCODE_blacklist_right": "annotsv_encode_blacklist_right",
-    "ENCODE_blacklist_characteristics_left": "annotsv_encode_blacklist_characteristics_left",
-    "ENCODE_blacklist_characteristics_right": "annotsv_encode_blacklist_characteristics_right",
-    "B_gain_AFmax": "annotsv_b_gain_af_max",
-    "B_loss_AFmax": "annotsv_b_loss_af_max",
-    "B_ins_AFmax": "annotsv_b_ins_af_max",
-    "B_inv_AFmax": "annotsv_b_inv_af_max",
-    "Frameshift": "annotsv_frameshift",
-    "Exons_spanned": "annotsv_exons_spanned",
-    "Dist_nearest_SS": "annotsv_dist_nearest_ss",
-    "Nearest_SS_type": "annotsv_nearest_ss_type",
-    "OMIM_inheritance": "annotsv_omim_inheritance",
-    "OMIM_morbid": "annotsv_omim_morbid",
-    "OMIM_phenotype": "annotsv_omim_phenotype",
-    "OMIM_ID": "annotsv_omim_id",
-}
 
 INT_FIELDS = {
     "annotsv_acmg_class",

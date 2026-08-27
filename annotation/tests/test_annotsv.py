@@ -7,6 +7,7 @@ from django.test import TestCase
 from django.test.utils import override_settings
 
 from annotation.annotation_run_files import get_annotsv_dir, write_qs_to_vcf
+from annotation.annotsv_columns import ANNOTSV_COLUMNS, all_variant_grid_column_ids
 from annotation.annotation_versions import get_annotation_range_lock_and_unannotated_count
 from annotation.annotsv_annotation import get_annotsv_command, get_annotsv_tsv_filename
 from annotation.fake_annotation import get_fake_annotation_settings_dict, get_fake_vep_version
@@ -31,7 +32,8 @@ from annotation.vep_annotation import (
     vep_dict_to_variant_annotation_version_kwargs,
 )
 from genes.models_enums import AnnotationConsortium
-from snpdb.models import Variant
+from snpdb.grids import server_side_format_annotsv_pathogenic_overlaps
+from snpdb.models import Variant, VariantGridColumn
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.tests.utils.vcf_testing_utils import (
     slowly_create_loci_and_variants_for_vcf,
@@ -498,3 +500,33 @@ class TestImportAnnotsvTsv(TestCase):
         self.assertTrue(VariantAnnotation.objects.filter(annotation_run=self.vep_run).exists())
         self.annotation_run.delete_related_objects()
         self.assertTrue(VariantAnnotation.objects.filter(annotation_run=self.vep_run).exists())
+
+
+class AnnotSVColumnsRegistryTest(TestCase):
+
+    def test_referenced_variant_grid_columns_exist(self):
+        known = set(VariantGridColumn.objects.values_list("pk", flat=True))
+        missing = all_variant_grid_column_ids() - known
+        self.assertFalse(missing, f"annotsv_columns.py references unknown VariantGridColumn ids: {sorted(missing)}")
+
+    def test_registry_covers_every_annotsv_field(self):
+        """ New AnnotSV fields need a registry entry so they show up on the annotation descriptions page """
+        model_fields = {f.name for f in VariantAnnotation._meta.fields if f.name.startswith("annotsv_")}
+        self.assertFalse(model_fields - all_variant_grid_column_ids())
+
+    def test_source_fields_unique(self):
+        source_fields = [c.source_field for c in ANNOTSV_COLUMNS]
+        self.assertEqual(len(source_fields), len(set(source_fields)))
+
+
+class AnnotSVPathogenicOverlapsFormatterTest(TestCase):
+    FIELD = "variantannotation__annotsv_pathogenic_overlaps"
+
+    def test_formats_each_event_type(self):
+        row = {self.FIELD: {"gain": {"source": "ClinVar", "phen": "Seizures", "coord": "1:100-200"},
+                            "loss": {"source": "dbVar"}}}
+        self.assertEqual(server_side_format_annotsv_pathogenic_overlaps(row, self.FIELD),
+                         "gain: ClinVar / Seizures / 1:100-200, loss: dbVar")
+
+    def test_empty(self):
+        self.assertIsNone(server_side_format_annotsv_pathogenic_overlaps({self.FIELD: None}, self.FIELD))

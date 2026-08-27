@@ -12,7 +12,7 @@ from django.views.decorators.http import require_POST
 from django.views.decorators.vary import vary_on_cookie
 from htmlmin.decorators import not_minified_response
 
-from annotation import vep_columns
+from annotation import annotsv_columns, vep_columns
 from annotation.annotation_versions import vav_diff_vs_kwargs
 from annotation.clinvar_fetch_request import ClinVarFetchRequest
 from annotation.manual_variant_entry import create_manual_variants
@@ -716,12 +716,13 @@ def subdivide_annotation_run(request, annotation_run_id):
 def view_annotation_descriptions(request, genome_build_name=None):
     genome_build = UserSettings.get_genome_build_or_default(request.user, genome_build_name)
     variantgrid_columns_by_annotation_level = defaultdict(list)
-    vep_annotation_levels = [ColumnAnnotationLevel.TRANSCRIPT_LEVEL, ColumnAnnotationLevel.VARIANT_LEVEL]
-    columns_and_vep_by_annotation_level = {al.label: {} for al in vep_annotation_levels}
+    annotation_run_levels = [ColumnAnnotationLevel.TRANSCRIPT_LEVEL, ColumnAnnotationLevel.VARIANT_LEVEL]
+    columns_by_annotation_level = {al.label: [] for al in annotation_run_levels}
 
     # Use a VEPConfig so we hide columns whose data file isn't configured for this build
     # (e.g. dbNSFP under T2T) - same source of truth as get_vep_command/BulkVEPVCFAnnotationInserter.
     vep_config = VEPConfig(genome_build)
+    vep_referenced = vep_columns.all_variant_grid_column_ids()
 
     def _first_for_build(vgc_id, build_name):
         for c in vep_columns.for_variant_grid_column(vgc_id, vep_config=vep_config):
@@ -731,18 +732,56 @@ def view_annotation_descriptions(request, genome_build_name=None):
                 return c
         return None
 
+    def _vep_source_detail(vep) -> str:
+        details = []
+        if vep.vep_plugin:
+            details.append(f"Plugin: {vep.vep_plugin.label}")
+        if vep.vep_custom:
+            details.append("custom")
+        return ", ".join(details)
+
     for vgc in VariantGridColumn.objects.all().order_by("grid_column_name"):
-        if vgc.annotation_level in vep_annotation_levels:
-            # For Transcript/Variant that use VEP - only show if visible in that build
-            if vep := _first_for_build(vgc.pk, genome_build.name):
-                columns_and_vep_by_annotation_level[vgc.get_annotation_level_display()][vgc] = vep
-        else:
+        if vgc.annotation_level not in annotation_run_levels:
             variantgrid_columns_by_annotation_level[vgc.annotation_level].append(vgc)
+            continue
+
+        if vep := _first_for_build(vgc.pk, genome_build.name):
+            row = {
+                "source": "VEP",
+                "source_detail": _vep_source_detail(vep),
+                "category": vep.category,
+                "source_field": vep.source_field,
+                "source_field_processing_description": vep.source_field_processing_description,
+                "vep": vep,
+            }
+        elif vgc.pk in vep_referenced:
+            continue  # VEP column that isn't populated in this build
+        elif annotsv := annotsv_columns.for_variant_grid_column(vgc.pk):
+            row = {
+                "source": "AnnotSV",
+                "source_detail": "",
+                "category": annotsv.category,
+                "source_field": annotsv.source_field,
+                "source_field_processing_description": annotsv.source_field_processing_description,
+                "vep": None,
+            }
+        else:
+            # Calculated during annotation import rather than read from an annotation tool's output
+            row = {
+                "source": "VariantGrid",
+                "source_detail": "",
+                "category": None,
+                "source_field": None,
+                "source_field_processing_description": None,
+                "vep": None,
+            }
+        row["column"] = vgc
+        columns_by_annotation_level[vgc.get_annotation_level_display()].append(row)
 
     context = {
         "genome_build": genome_build,
         "variantgrid_columns_by_annotation_level": variantgrid_columns_by_annotation_level,
-        "columns_and_vep_by_annotation_level": columns_and_vep_by_annotation_level
+        "columns_by_annotation_level": columns_by_annotation_level,
     }
     return render(request, "annotation/view_annotation_descriptions.html", context)
 

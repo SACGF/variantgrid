@@ -474,6 +474,18 @@ def server_side_format_exon_and_intron(row, field):
     return val
 
 
+def server_side_format_annotsv_pathogenic_overlaps(row, field):
+    """ AnnotSV's nested {event type: {source/phen/hpo/coord}} JSON -> one entry per event type """
+    text = None
+    if overlaps := row[field]:
+        events = []
+        for event, data in overlaps.items():
+            details = " / ".join(str(v) for v in data.values())
+            events.append(f"{event}: {details}")
+        text = ", ".join(events)
+    return text
+
+
 class AbstractVariantGrid(JqGridUserRowConfig):
     model = Variant
 
@@ -515,6 +527,9 @@ class AbstractVariantGrid(JqGridUserRowConfig):
             'variantannotation__intron': {"server_side_formatter": server_side_format_exon_and_intron},
             'variantannotation__mastermind_mmid3': {'formatter': 'formatMasterMindMMID3'},
             'variantannotation__mavedb_urn': {'formatter': 'formatMavedbUrnLinks'},  # formatMavedbUrnLinks
+            'variantannotation__annotsv_pathogenic_overlaps': {
+                "server_side_formatter": server_side_format_annotsv_pathogenic_overlaps
+            },
             # There is more server side formatting (Unit -> Percent) added in _get_fields_and_overrides
         }
 
