@@ -56,7 +56,9 @@ class JSONResponseMixin:
         else:
             response = func_val
 
-        dump = json.dumps(response, cls=LazyEncoder)
+        # Strict JSON: a NaN in a float column would otherwise go down as a bare NaN token and blow
+        # up JSON.parse in the browser, with nothing server side to say why
+        dump = json.dumps(response, cls=LazyEncoder, allow_nan=False)
         return self.render_to_response(dump)
 
 

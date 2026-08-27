@@ -279,23 +279,22 @@ class CohortMixin:
         """ show filters if we have them and they're not filtered away (no point then) """
         return [f"{cgc.cohortgenotype_alias}__filters" for cgc in self._get_filters_cohort_genotype_collections()]
 
-    def _get_node_extra_colmodel_overrides(self):
-        extra_colmodel_overrides = super()._get_node_extra_colmodel_overrides()
+    def _get_node_extra_column_overrides(self):
+        extra_column_overrides = super()._get_node_extra_column_overrides()
         cgcs = self._get_filters_cohort_genotype_collections()
         for cgc in cgcs:
             vcf = cgc.cohort.get_vcf()
             filters_column = f"{cgc.cohortgenotype_alias}__filters"
             overrides = {
-                'name': filters_column,
                 'model_field': False,  # It's an alias
                 'queryset_field': True,
                 'server_side_formatter': VCFFilter.get_formatter(vcf),
             }
             if len(cgcs) > 1:  # Which VCF's FILTER this is only needs saying when there are several
                 overrides['label'] = f"{vcf} Filters"
-            extra_colmodel_overrides[filters_column] = overrides
+            extra_column_overrides[filters_column] = overrides
 
-        return extra_colmodel_overrides
+        return extra_column_overrides
 
     def _get_configuration_check_cohorts(self) -> list:
         """ Cohorts to check for missing/archived genotype data. Nodes spanning VCFs override """

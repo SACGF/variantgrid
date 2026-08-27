@@ -927,24 +927,24 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
             cache.set(cache_key, extra_columns)
         return extra_columns
 
-    def _get_node_extra_colmodel_overrides(self):
-        """ Subclasses should override to add colmodel overrides for JQGrid """
+    def _get_node_extra_column_overrides(self):
+        """ Subclasses should override to add column overrides for the variant grid """
         return {}
 
-    def _get_inherited_colmodel_overrides(self):
+    def _get_inherited_column_overrides(self):
         extra_overrides = {}
         if self.inherits_parent_columns():
             parent = self.get_single_parent()
-            extra_overrides.update(parent.get_extra_colmodel_overrides())
+            extra_overrides.update(parent.get_extra_column_overrides())
         return extra_overrides
 
-    def get_extra_colmodel_overrides(self):
-        """ For JQGrid - subclasses should override _get_node_extra_colmodel_overrides """
+    def get_extra_column_overrides(self):
+        """ @see snpdb.grid_columns.variant_columns - subclasses override _get_node_extra_column_overrides """
 
         extra_overrides = {}
         if self.is_valid and self.uses_parent_queryset:
-            extra_overrides.update(self._get_inherited_colmodel_overrides())
-        extra_overrides.update(self._get_node_extra_colmodel_overrides())
+            extra_overrides.update(self._get_inherited_column_overrides())
+        extra_overrides.update(self._get_node_extra_column_overrides())
         return extra_overrides
 
     def get_node_classification(self):

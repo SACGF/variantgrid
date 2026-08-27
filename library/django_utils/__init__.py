@@ -10,7 +10,7 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
 from django.core.exceptions import PermissionDenied, ValidationError, ObjectDoesNotExist
-from django.db.models import F
+from django.db.models import F, JSONField
 from django.db.models.aggregates import Count, Max
 from django.db.models.base import ModelBase
 from django.db.models.fields.reverse_related import OneToOneRel
@@ -84,6 +84,24 @@ class RequireSuperUserView(View):
 def get_model_fields(model, ignore_fields=None) -> list[str]:
     ignore_fields = set(ignore_fields or [])
     return [f.name for f in model._meta.fields if f.name not in ignore_fields]
+
+
+def lookup_field_path(options, field_path: str, return_json_fields_as_tuple=False):
+    """ Resolve a '__' separated field path (following FKs and one to ones) to the Django field.
+        Doesn't descend into JSON fields - with return_json_fields_as_tuple, a path into one comes
+        back as (json_field, json_data_field) strings instead """
+
+    if '__' in field_path:
+        fk_name, field_path = field_path.split('__', 1)
+        field = options.get_field(fk_name)
+        if field:
+            if isinstance(field, JSONField):
+                if return_json_fields_as_tuple:
+                    return fk_name, field_path
+                return field
+            return lookup_field_path(field.related_model._meta, field_path,
+                                     return_json_fields_as_tuple=return_json_fields_as_tuple)
+    return options.get_field(field_path)
 
 
 def get_expanded_field(obj, field):
@@ -366,7 +384,7 @@ class UserMatcher:
 
 
 class FakeRequest(HttpRequest):
-    """ Used as a hack for things that require it, eg JqGrid in a celery task """
+    """ Used as a hack for things that require it, eg a DatatableConfig in a celery task """
     def __init__(self, user):
         super().__init__()
         self.user = user

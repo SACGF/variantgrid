@@ -8,6 +8,7 @@ from django.db.models import Q
 from analysis.grids import VariantGrid
 from analysis.models import AnalysisNode
 from annotation.models import AnnotationVersion
+from library.django_utils import FakeRequest
 from library.guardian_utils import admin_bot
 from snpdb.models import CustomColumnsCollection, GenomeBuild
 
@@ -42,9 +43,6 @@ class Command(BaseCommand):
         if not node:
             raise AnalysisNode.DoesNotExist(f"No nodes for {annotation_version=}")
         node.analysis.custom_columns_collection = all_columns  # Don't save this!
-        grid = VariantGrid(user, node)
-        float_fields = []
-        for cm in grid.get_colmodels():
-            if cm.get("sorttype") == "float":
-                float_fields.append(cm["index"])
+        grid = VariantGrid(FakeRequest(user=user), node)
+        float_fields = [rc.name for rc in grid.enabled_columns if rc.data_type == "float"]
         return node, float_fields

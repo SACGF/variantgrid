@@ -309,19 +309,18 @@ class CohortNode(AbstractCohortBasedNode, AbstractZygosityCountNode):
             extra_columns.append(self.het_count_column)
         return extra_columns
 
-    def _get_node_extra_colmodel_overrides(self):
-        extra_colmodel_overrides = super()._get_node_extra_colmodel_overrides()
+    def _get_node_extra_column_overrides(self):
+        extra_column_overrides = super()._get_node_extra_column_overrides()
         if self.cohort and self.count_column_prefix is not None:
             labels = ["Cohort Hom Count", "Cohort Het Count"]
             for c, l in zip([self.hom_count_column, self.het_count_column], labels):
-                override = extra_colmodel_overrides.get(c, {})
+                override = extra_column_overrides.get(c, {})
                 override["label"] = l
-                override["name"] = c
                 override["model_field"] = False
                 override["queryset_field"] = True
-                extra_colmodel_overrides[c] = override
+                extra_column_overrides[c] = override
 
-        return extra_colmodel_overrides
+        return extra_column_overrides
 
     def save(self, *args, **kwargs):
         is_new = self.version == 0

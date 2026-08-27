@@ -156,8 +156,7 @@ const DataTableDefinition = (function() {
                 params.start = data.start;
                 params.length = data.length;
                 if (self.filterRules && self.filterRules.rules.length) {
-                    // The grid engine's own column filtering - JqGrid.get_filters reads these two
-                    params._search = 'true';
+                    // Column filtering - @see library.django_utils.filter_rules
                     params.filters = JSON.stringify(self.filterRules);
                 }
                 if (data.order && data.order.length) {
@@ -308,9 +307,9 @@ const DataTableDefinition = (function() {
                 columnDefs.push(columnDef);
                 if (col.render) {
                     const rawRenderer = eval(col.render);
-                    // Grid wide metadata + this column's kwargs, closed over at table build time -
-                    // jqGrid formatters read the equivalent off options.colModel
-                    const renderContext = {extra: defn.extra || {}, kwargs: col.renderKwargs || null};
+                    // Grid wide metadata, closed over at table build time - a renderer gets no
+                    // per column config of its own
+                    const renderContext = {extra: defn.extra || {}};
                     const renderer = (data, type, row) => {
                         const output = rawRenderer(data, type, row, renderContext);
                         if (output instanceof jQuery) {
@@ -441,9 +440,9 @@ const DataTableDefinition = (function() {
             }
         },
 
-        /* The column filter dialog, as a panel above the table. Rules go up as '_search'/'filters',
-           which the grid engine turns into a Q object - so this is the same filtering the jqGrid
-           "Filter grid..." dialog did, and page level filters (extra_filters) stack on top of it. */
+        /* The column filter dialog, as a panel above the table. Rules go up as a 'filters' param,
+           which the server turns into a Q object (@see library.django_utils.filter_rules); page
+           level filters (extra_filters) stack on top of it. */
         setupFilterBuilder: function(toolbar) {
             const defn = this.serverParams;
             if (!defn.filterBuilder || !(defn.filterBuilder.fields || []).length) {

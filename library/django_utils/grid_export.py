@@ -1,6 +1,5 @@
 import csv
 from collections.abc import Iterator
-from typing import Optional
 
 from django.http.response import StreamingHttpResponse
 from django.utils.text import slugify
@@ -22,9 +21,10 @@ def csv_streaming_response(basename: str, csv_iterator: Iterator[str]) -> Stream
     return response
 
 
-def grid_export_csv(colmodels, items, label_overrides: Optional[dict] = None) -> Iterator[str]:
+def grid_export_csv(columns, items) -> Iterator[str]:
+    """ columns: [{name, label}] - @see DatatableConfig.csv_columns """
     pseudo_buffer = StashFile()
-    header, labels = colmodel_header_labels(colmodels, label_overrides=label_overrides)
+    header, labels = _header_labels(columns)
     # Don't use dictwriter as some sample names may be the same
     writer = csv.writer(pseudo_buffer, dialect='excel', quoting=csv.QUOTE_MINIMAL)
     if header and str(header[0]).upper().startswith("ID"):
@@ -44,16 +44,13 @@ def grid_export_csv(colmodels, items, label_overrides: Optional[dict] = None) ->
         yield remaining
 
 
-def colmodel_header_labels(colmodels, label_overrides: Optional[dict] = None):
+def _header_labels(columns):
     labels = {}
 
     header = []
-    for c in colmodels:
+    for c in columns:
         name = c['name']
         column_label = c.get("label", name)
-        if label_overrides:
-            column_label = label_overrides.get(name, column_label)
-
         labels[name] = column_label
         header.append(column_label)
 

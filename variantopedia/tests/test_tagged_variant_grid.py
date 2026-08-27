@@ -1,8 +1,12 @@
+import csv
+import json
+
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.test import RequestFactory, TestCase
 from django.urls import resolve, reverse
 from guardian.shortcuts import assign_perm
+from threadlocals.threadlocals import set_thread_variable
 
 from analysis.models import Analysis, VariantTag
 from annotation.models import AnnotationVersion
@@ -45,6 +49,12 @@ class TaggedVariantGridTest(TestCase):
         other_user_tag = cls._tag(cls.other_user_variant, cls.artefact, user=cls.other_user)
         assign_perm(VariantTag.get_read_perm(), cls.user, other_user_tag)
 
+    def setUp(self):
+        # A test client call leaves its request in the threadlocals, and UserSettings are cached against
+        # it - so the next test would read settings computed before it changed them
+        set_thread_variable("request", None)
+        set_thread_variable("user", None)
+
     @classmethod
     def _tag(cls, variant: Variant, tag: Tag, user: User = None) -> VariantTag:
         allele, _ = VariantAllele.objects.get_or_create(
@@ -54,8 +64,13 @@ class TaggedVariantGridTest(TestCase):
                                          genome_build=cls.genome_build, user=user or cls.user)
 
     def _grid_rows(self, extra_filters=None) -> dict[int, dict]:
-        grid = TaggedVariantGrid(self.user, self.genome_build.name, extra_filters=extra_filters)
-        return {row["id"]: row for row in grid.get_queryset(None)}
+        url = reverse('tagged_variant_grid', kwargs={"genome_build_name": self.genome_build.name})
+        params = {"extra_filters": json.dumps(extra_filters)} if extra_filters else {}
+        request = RequestFactory().get(url, params)
+        request.resolver_match = resolve(url)
+        request.user = self.user
+        grid = TaggedVariantGrid(request)
+        return {row["id"]: row for row in grid.row_values(grid.get_initial_queryset())}
 
     def _grid_variant_ids(self, extra_filters) -> set[int]:
         return set(self._grid_rows(extra_filters))
@@ -172,6 +187,25 @@ class TaggedVariantGridTest(TestCase):
         self.assertTrue(lines[1].startswith(f"{self.genome_build.name},"), lines[1])
         self.assertIn(self.reportable.pk, lines[1])
 
+    def test_tagged_variant_export(self):
+        """ The variant-centric CSV streams every row in genomic order, with the grid's own columns """
+        self.client.force_login(self.user)
+        url = reverse('tagged_variant_export', kwargs={"genome_build_name": self.genome_build.name})
+        response = self.client.get(url, {"extra_filters": json.dumps({"tag": self.artefact.pk})})
+        self.assertEqual(response.status_code, 200)
+
+        lines = b"".join(response.streaming_content).decode().strip().splitlines()
+        header, rows = lines[0], lines[1:]
+        self.assertIn("variant_id", header)
+        variant_id_index = next(csv.reader([header])).index("variant_id")
+        exported = [int(next(csv.reader([row]))[variant_id_index]) for row in rows]
+        self.assertEqual(set(exported), self._grid_variant_ids({"tag": self.artefact.pk}),
+                         "The CSV holds exactly what the grid does")
+
+        positions = list(Variant.objects.filter(pk__in=exported).order_by("locus__position", "pk")
+                         .values_list("pk", flat=True))
+        self.assertEqual(exported, positions)
+
     def _variant_tag_counts_tags(self) -> list[str]:
         url = reverse('variant_tag_counts_datatable', kwargs={"variant_id": self.both_variant.pk})
         request = RequestFactory().get(url)
@@ -197,8 +231,8 @@ class TaggedVariantGridTest(TestCase):
     def test_user_filter_overrides_show_group_data(self):
         """ An explicit user filter must still show another user's (permission-visible) tags
             even when the grid config is set to only show your own data """
-        for caption in [TaggedVariantGrid.caption, VariantTagsColumns.GRID_NAME]:
-            config = UserGridConfig.get(self.user, caption)
+        for grid_name in [TaggedVariantGrid.grid_name, VariantTagsColumns.GRID_NAME]:
+            config = UserGridConfig.get(self.user, grid_name)
             config.show_group_data = False
             config.save()
 

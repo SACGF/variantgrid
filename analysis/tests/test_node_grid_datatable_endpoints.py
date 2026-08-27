@@ -1,5 +1,5 @@
 """
-Tests for the analysis node grid's two DataTables endpoints (plan Stage 4 item 1).
+Tests for the analysis node grid's two DataTables endpoints.
 
 node_grid_config answers the table definition (columns, renderers, and the node's per-request state
 as postData); node_grid_handler answers the rows in the DataTables envelope. Both stay behind
@@ -92,14 +92,14 @@ class NodeGridHandlerTest(NodeGridEndpointTestCase):
         # Rows keep their .values() field name keys, so they match the columns' 'data' keys
         self.assertIn("locus__position", data["data"][0])
 
-    def test_paging_translates_to_the_grid_engines(self):
+    def test_paging(self):
         page_two = self._handler(start="2", length="2")
         self.assertEqual(2, len(page_two["data"]))
 
     def test_column_filters_narrow_the_rows(self):
-        """ The filter builder's rules ride up as _search/filters and the grid engine parses them """
+        """ The filter builder's rules ride up as a 'filters' param (@see filter_rules_to_q) """
         rules = {"groupOp": "AND", "rules": [{"field": "locus__position", "op": "lt", "data": "1500"}]}
-        data = self._handler(_search="true", filters=json.dumps(rules))
+        data = self._handler(filters=json.dumps(rules))
         self.assertLess(data["recordsFiltered"], self.node.count)
 
 

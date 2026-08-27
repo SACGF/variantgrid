@@ -125,13 +125,11 @@ class Test(URLTestCase):
         """ Grids w/o permissions """
         build_name_kwargs = {"genome_build_name": self.grch37.name}
 
-        handler_kwargs = {**build_name_kwargs, "op": "handler"}
-
         DATATABLE_GRID_LIST_URLS = [
-            ("all_variants_grid", handler_kwargs, self.variant),
-            ("tagged_variant_grid", handler_kwargs, self.variant),
+            ("all_variants_grid", build_name_kwargs, self.variant),
+            ("tagged_variant_grid", build_name_kwargs, self.variant),
             # Nearby excludes the variant itself, so this just checks the URL serves a data envelope
-            ("nearby_variants_grid", {"variant_id": self.variant.pk, **handler_kwargs,
+            ("nearby_variants_grid", {"variant_id": self.variant.pk, **build_name_kwargs,
                                       "region_type": "range"}, None),
             ("variant_tags_datatable", build_name_kwargs, self.variant_tag),
         ]

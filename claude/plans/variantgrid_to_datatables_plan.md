@@ -39,6 +39,12 @@ So: a thin protocol adapter serves the existing grid classes to the standard Dat
 
 A later native rewrite (folding the engine into `DatatableConfig` proper and retiring `library/jqgrid`) remains possible as a pure server-side refactor once every jqGrid page is converted — it becomes invisible to users and is much safer done then.
 
+**That rewrite has since landed** — @see `claude/plans/jqgrid_engine_rewrite_plan.md` (issue #1785
+section 3). The variant grids are `DatatableConfig` subclasses, `library/jqgrid` is deleted, and each
+behaviour listed above has a named native home. The rest of this document describes how the client
+was converted and is kept for that history; where it names `library/jqgrid`, the adapter, colmodels
+or `LEGACY-JQGRID` markers, those are gone.
+
 ---
 
 ## Stage 1 — VariantTagsGrid: straight native `DatatableConfig` conversion — **DONE**

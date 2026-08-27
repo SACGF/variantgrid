@@ -3,7 +3,6 @@ import os
 from functools import reduce
 from typing import Any, Optional
 
-from django.conf import settings
 from django.core.exceptions import PermissionDenied
 from django.db.models import Count, IntegerField, OuterRef, QuerySet, StringAgg, Subquery, TextField, Value
 from django.http import HttpRequest
@@ -29,10 +28,9 @@ from genes.models import (
     TranscriptVersion,
 )
 from genes.models_enums import AnnotationConsortium, GeneSymbolAliasSource
-from library.utils import pretty_label, update_dict_of_dict_values
-from snpdb.grid_columns.custom_columns import get_custom_column_fields_override_and_sample_position
+from library.utils import pretty_label
 from snpdb.grids import AbstractVariantGrid
-from snpdb.models import ImportStatus, Q, Tag, UserSettings, VariantGridColumn
+from snpdb.models import ImportStatus, Q, Tag, VariantGridColumn
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.variant_queries import (
     get_variant_queryset_for_gene_symbol,
@@ -121,28 +119,18 @@ class GeneListGenesColumns(DatatableConfig[GeneListGeneSymbol]):
 
 class GeneSymbolVariantsGrid(AbstractVariantGrid):
     """ Uses custom columns subtracting away the gene annotations (as they're displayed above) """
-    caption = 'Gene Variants'
+    grid_name = 'Gene Variants'
+    default_sort_field = "locus__position"
 
-    def __init__(self, user, gene_symbol, genome_build_name, **kwargs):
-        extra_filters = kwargs.pop("extra_filters", None)
-        self.gene_symbol = get_object_or_404(GeneSymbol, pk=gene_symbol)
-        user_settings = UserSettings.get_for_user(user)
-        genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
-        self.genome_build = genome_build
-        self.annotation_version = AnnotationVersion.latest(genome_build)
-        fields, override, _ = get_custom_column_fields_override_and_sample_position(user_settings.columns,
-                                                                                    self.annotation_version)
-        self.fields = self._get_non_gene_fields(fields)
-        super().__init__(user)
+    def _setup(self):
+        self.gene_symbol = get_object_or_404(GeneSymbol, pk=self.get_query_param("gene_symbol"))
+        self.genome_build = GenomeBuild.get_name_or_alias(self.get_query_param("genome_build_name"))
+        self.annotation_version = AnnotationVersion.latest(self.genome_build)
+        self.extra_filters = self.get_query_json("extra_filters")
 
-        af_show_in_percent = settings.VARIANT_ALLELE_FREQUENCY_CLIENT_SIDE_PERCENT
-        update_dict_of_dict_values(self._overrides, self._get_standard_overrides(af_show_in_percent))
-        update_dict_of_dict_values(self._overrides, override)
-
-        self.extra_filters = extra_filters
-        self.extra_config.update({'sortname': "locus__position",
-                                  'sortorder': "asc",
-                                  'shrinkToFit': False})
+    def _get_fields_and_overrides(self) -> tuple[list, dict]:
+        fields, overrides = self._user_settings_fields_and_overrides()
+        return self._get_non_gene_fields(fields), overrides
 
     def _get_base_queryset(self) -> QuerySet:
         genes_qs = get_variant_queryset_for_gene_symbol(self.gene_symbol, self.annotation_version)

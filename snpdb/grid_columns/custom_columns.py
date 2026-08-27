@@ -7,7 +7,7 @@ from analysis.models import VariantTag
 from annotation import vep_columns
 from annotation.models import AnnotationVersion
 from classification.models import ClassificationModification
-from library.jqgrid.jqgrid_sql import get_overrides
+from snpdb.grid_columns.variant_columns import column_overrides
 from snpdb.models import CustomColumn, CustomColumnsCollection
 from snpdb.models.models_enums import ColumnAnnotationLevel
 
@@ -40,11 +40,11 @@ def get_custom_column_fields_override_and_sample_position(custom_columns_collect
             if c.column.annotation_level == ColumnAnnotationLevel.SAMPLE_LEVEL:
                 sample_columns_position = field_pos
 
-        col_overrides = get_overrides([f], [{}],
-                                      model_field=c.column.model_field, queryset_field=c.column.queryset_field)
+        col_overrides = column_overrides([f], [{}],
+                                         model_field=c.column.model_field, queryset_field=c.column.queryset_field)
         col_override = col_overrides[f]
         description = c.column.description.replace("'", "&#146;")
-        col_override["headerTitle"] = description
+        col_override["header_title"] = description
         col_override["label"] = c.column.label
 
         if c.column.width is not None:
@@ -58,7 +58,7 @@ def get_custom_column_fields_override_and_sample_position(custom_columns_collect
                                     "clinvar__highest_pathogenicity",
                                     "clinvar__clinical_significance"]
     # These come from get_variantgrid_extra_annotate rather than the model, so mark them as
-    # annotations so they end up in the colmodel (for detailsLink) but not the values() queryset
+    # annotations so they end up in the column list (for detailsLink) but not the values() queryset
     ID_FORMATTER_REQUIRED_ANNOTATIONS = ["internally_classified",
                                          "max_internal_classification",
                                          "internally_classified_somatic",
@@ -67,10 +67,10 @@ def get_custom_column_fields_override_and_sample_position(custom_columns_collect
         if field not in fields:
             fields.append(field)
             if field in ID_FORMATTER_REQUIRED_ANNOTATIONS:
-                ov = get_overrides([field], [{}], model_field=False, queryset_field=False)[field]
+                ov = column_overrides([field], [{}], model_field=False, queryset_field=False)[field]
             else:
                 ov = override.get(field, {})
-            ov["hidden"] = True
+            ov["visible"] = False
             override[field] = ov
 
     return fields, override, sample_columns_position

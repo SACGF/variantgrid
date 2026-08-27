@@ -1,5 +1,6 @@
 import operator
-from functools import reduce
+from collections.abc import Iterable
+from functools import cached_property, reduce
 from typing import Any, Optional
 
 from django.conf import settings
@@ -14,13 +15,17 @@ from guardian.shortcuts import get_objects_for_user
 
 from annotation.annotation_version_querysets import get_queryset_for_latest_annotation_version
 from annotation.models import PATIENT_ONTOLOGY_TERM_PATH, ManualVariantEntryCollection
+from library.django_utils.filter_rules import filter_rules_to_q
 from library.genomics.vcf_enums import INFO_LIFTOVER_SWAPPED_REF_ALT
-from library.jqgrid.jqgrid_user_row_config import JqGridUserRowConfig
 from library.unit_percent import get_allele_frequency_formatter
-from library.utils import JsonDataType, calculate_age
+from library.utils import JsonDataType, calculate_age, nice_class_name, update_dict_of_dict_values
 from ontology.models import OntologyService
 from patients.models_enums import Sex
-from snpdb.grid_columns.custom_columns import get_variantgrid_extra_annotate
+from snpdb.grid_columns.custom_columns import (
+    get_custom_column_fields_override_and_sample_position,
+    get_variantgrid_extra_annotate,
+)
+from snpdb.grid_columns.variant_columns import build_variant_columns, column_by_name, format_rows
 from snpdb.models import (
     VCF,
     Allele,
@@ -46,6 +51,7 @@ from snpdb.models import (
     VariantsType,
     VariantZygosityCountCollection,
 )
+from snpdb.models.models_user_settings import UserSettings
 from snpdb.sample_filters import get_sample_ontology_q, get_sample_qc_gene_list_gene_symbol_q
 from snpdb.views.datatable_view import CellData, DatatableConfig, RichColumn, SortOrder
 from uicore.templatetags.js_tags import jsonify_for_js
@@ -491,47 +497,113 @@ def server_side_format_annotsv_pathogenic_overlaps(row, field):
     return text
 
 
-class AbstractVariantGrid(JqGridUserRowConfig):
-    model = Variant
+class AbstractVariantGrid(DatatableConfig[Variant]):
+    """ The grids that show Variants with user configurable columns - the analysis node grid, All
+        Variants, Nearby Variants, Tagged Variants and Gene Symbol Variants.
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.queryset_is_sorted = False
+        Their columns come from a CustomColumnsCollection rather than being declared, so subclasses
+        provide _get_fields_and_overrides() and the columns are built from that.
+        @see snpdb.grid_columns.variant_columns """
+    model = Variant
+    csv_name = nice_class_name(Variant)
+    # Rows per page is the user's own UserGridConfig setting, so no cap of our own
+    max_page_length = None
+    # Counting the whole variant table to say "filtered from N" costs more than the page itself
+    count_unfiltered = False
+    scroll_x = True
+    table_class = "variantgrid-datatable"
+    compact_controls = True  # every pixel of chrome under these grids is a row the user can't see
+    ajax_type = "GET"  # keeps @cache_page on the data endpoint working (@see NodeGridHandler)
+    cache_stable_params = True
+    approximate_count = True
+    filter_builder = True
+    server_csv_download = True  # streams every row, rather than the client paging through the grid
+    download_csv_button_enabled = False
+
+    grid_name: Optional[str] = None  # rows per page, and show_group_data, are stored under this
+    # Initial sort, where the grid has one. Also the secondary sort when ordering by another column
+    default_sort_field: Optional[str] = None
+    default_sort_order = SortOrder.ASC
+
+    def __init__(self, request: HttpRequest):
+        super().__init__(request)
+        self._setup()
+        fields, overrides = self._get_fields_and_overrides()
+        self.rich_columns = build_variant_columns(self.model, fields, overrides)
+        self._set_default_sort()
+
+    def _setup(self):
+        """ Read the page's params and load whatever the columns and the queryset are built from """
+
+    def _get_fields_and_overrides(self) -> tuple[list[str], dict]:
+        raise NotImplementedError()
+
+    def _user_settings_fields_and_overrides(self, extra_overrides: Optional[dict] = None) -> tuple[list[str], dict]:
+        """ Columns from the user's own CustomColumnsCollection - the pages that aren't an analysis """
+        user_settings = UserSettings.get_for_user(self.user)
+        fields, override, _ = get_custom_column_fields_override_and_sample_position(user_settings.columns,
+                                                                                    self.annotation_version)
+        af_show_in_percent = settings.VARIANT_ALLELE_FREQUENCY_CLIENT_SIDE_PERCENT
+        overrides = self._get_standard_overrides(af_show_in_percent)
+        update_dict_of_dict_values(overrides, override)
+        if extra_overrides:
+            update_dict_of_dict_values(overrides, extra_overrides)
+        return fields, overrides
+
+    def _set_default_sort(self):
+        """ Sets it on the column, so it's both the initial order and the secondary sort """
+        if self.default_sort_field:
+            if rc := column_by_name(self.rich_columns, self.default_sort_field):
+                if rc.orderable:
+                    rc.default_sort = self.default_sort_order
+
+    @cached_property
+    def default_sort_order_column(self) -> Optional[RichColumn]:
+        """ No initial order unless a sortable column asked for one - the base class falls back to the
+            first column, which would sort the whole grid on load """
+        for rc in self.enabled_columns:
+            if rc.default_sort and rc.visible and rc.orderable:
+                return rc
+        return None
 
     def _get_standard_overrides(self, af_show_in_percent):
         overrides = {
-            # Note:     client side formatters should only be used for adding links etc, never conversion of data, such as
-            #           unit to percent, as the CSV downloads (w/o JS formatters) won't match the grid.
+            # Note:     client side renderers should only be used for adding links etc, never conversion of data, such as
+            #           unit to percent, as the CSV downloads (w/o JS renderers) won't match the grid.
             # Width fits detailsLink()'s boxes: select checkbox, details, ClinVar, germline + somatic
             # internal classifications, IGV
-            'id': {'editable': False, 'width': 110, 'fixed': True, 'formatter': 'detailsLink', 'sorttype': 'int'},
+            'id': {'width': 110, 'client_renderer': 'VariantGridFormat.detailsLink', 'data_type': 'int'},
             'tags_global': {
                 'model_field': False, 'queryset_field': False,
-                'name': 'tags_global', 'index': 'tags_global',
-                'classes': 'no-word-wrap', 'formatter': 'tagsGlobalFormatter', 'sortable': False
+                'css_class': 'no-word-wrap', 'client_renderer': 'VariantGridFormat.tagsGlobal', 'orderable': False
             },
-            'clinvar__clinvar_variation_id': {'width': 60, 'formatter': 'clinvarLink'},
+            'clinvar__clinvar_variation_id': {'width': 60, 'client_renderer': 'VariantGridFormat.clinvarLink'},
             'variantallele__allele__clingen_allele__id': {
                 'width': 90,
                 "server_side_formatter": server_side_format_clingen_allele,
-                'formatter': 'formatClinGenAlleleId'
+                'client_renderer': 'VariantGridFormat.clinGenAlleleId'
             },
-            'variantannotation__cosmic_id': {'width': 130, 'formatter': 'cosmicLink'},
-            'variantannotation__cosmic_legacy_id': {'width': 130, 'formatter': 'cosmicLink'},
-            'variantannotation__dbsnp_rs_id': {'width': 130, 'formatter': 'formatDBSNP'},
-            'variantannotation__pubmed': {'formatter': 'formatPubMed'},
-            'variantannotation__gene__geneannotation__hpo_terms': {'formatter': 'formatOntologyTerms'},
-            'variantannotation__gene__geneannotation__mondo_terms': {'formatter': 'formatOntologyTerms'},
-            'variantannotation__gene__geneannotation__omim_terms': {'formatter': 'formatOntologyTerms'},
-            'variantannotation__transcript_version__gene_version__gene_symbol__symbol': {'formatter': 'geneSymbolLink'},
-            'variantannotation__overlapping_symbols': {'formatter': 'geneSymbolNewWindowLink'},
-            'variantannotation__transcript_version__gene_version__hgnc__omim_ids': {'width': 60,
-                                                                                    'formatter': 'omimLink'},
-            'variantannotation__gnomad_filtered': {"formatter": "gnomadFilteredFormatter"},
+            'variantannotation__cosmic_id': {'width': 130, 'client_renderer': 'VariantGridFormat.cosmicLink'},
+            'variantannotation__cosmic_legacy_id': {'width': 130, 'client_renderer': 'VariantGridFormat.cosmicLink'},
+            'variantannotation__dbsnp_rs_id': {'width': 130, 'client_renderer': 'VariantGridFormat.dbsnp'},
+            'variantannotation__pubmed': {'client_renderer': 'VariantGridFormat.pubMed'},
+            'variantannotation__gene__geneannotation__hpo_terms': {'client_renderer': 'VariantGridFormat.ontologyTerms'},
+            'variantannotation__gene__geneannotation__mondo_terms': {'client_renderer': 'VariantGridFormat.ontologyTerms'},
+            'variantannotation__gene__geneannotation__omim_terms': {'client_renderer': 'VariantGridFormat.ontologyTerms'},
+            'variantannotation__transcript_version__gene_version__gene_symbol__symbol': {
+                'client_renderer': 'VariantGridFormat.geneSymbolLink'
+            },
+            'variantannotation__overlapping_symbols': {
+                'client_renderer': 'VariantGridFormat.geneSymbolNewWindowLink'
+            },
+            'variantannotation__transcript_version__gene_version__hgnc__omim_ids': {
+                'width': 60, 'client_renderer': 'VariantGridFormat.omimLink'
+            },
+            'variantannotation__gnomad_filtered': {'client_renderer': 'VariantGridFormat.gnomadFiltered'},
             'variantannotation__exon': {"server_side_formatter": server_side_format_exon_and_intron},
             'variantannotation__intron': {"server_side_formatter": server_side_format_exon_and_intron},
-            'variantannotation__mastermind_mmid3': {'formatter': 'formatMasterMindMMID3'},
-            'variantannotation__mavedb_urn': {'formatter': 'formatMavedbUrnLinks'},  # formatMavedbUrnLinks
+            'variantannotation__mastermind_mmid3': {'client_renderer': 'VariantGridFormat.masterMind'},
+            'variantannotation__mavedb_urn': {'client_renderer': 'VariantGridFormat.mavedbUrn'},
             'variantannotation__annotsv_pathogenic_overlaps': {
                 "server_side_formatter": server_side_format_annotsv_pathogenic_overlaps
             },
@@ -566,14 +638,14 @@ class AbstractVariantGrid(JqGridUserRowConfig):
     def _get_base_queryset(self) -> QuerySet:
         raise NotImplementedError()
 
-    def get_datatable_extra(self) -> dict:
-        # gnomAD links are per genome build - jqGrid formatters read the page's ANALYSIS_SETTINGS global
+    def get_extra(self) -> JsonDataType:
+        # gnomAD links are per genome build - the client renderers read it off this one grid-wide block
         return {"genomeBuild": self.genome_build.name}
 
     def _get_permission_user(self):
         return self.user
 
-    def get_queryset(self, request):
+    def get_initial_queryset(self) -> QuerySet[Variant]:
         qs = self._get_base_queryset()
         # Restrict the variantallele join to this grid's genome build. Some contigs are shared between builds
         # (e.g. MT / NC_012920 is shared by GRCh37 & GRCh38) so the same Variant has a VariantAllele per build -
@@ -583,16 +655,20 @@ class AbstractVariantGrid(JqGridUserRowConfig):
         qs = qs.filter(Q(variantallele__isnull=True) | Q(variantallele__genome_build=self.genome_build))
         # Annotate so we can use global_variant_zygosity in grid columns
         qs, _ = VariantZygosityCountCollection.annotate_global_germline_counts(qs)
-        # JQGrid request filtering is applied by JqGrid.get_items on our result - doing it here as well
-        # adds a second JOIN per filtered relation, which multiplies rows
         if q := self._get_q():
             qs = qs.filter(q)
+        return qs.annotate(**self._grid_annotation_kwargs)
 
-        field_names = self.get_queryset_field_names()
-        a_kwargs = self._get_grid_only_annotation_kwargs()
-        qs = qs.annotate(**a_kwargs)
-        field_names.extend(a_kwargs)
-        return qs.values(*field_names)
+    def filter_queryset(self, qs: QuerySet[Variant]) -> QuerySet[Variant]:
+        """ The filter builder's rules. Applied here rather than in get_initial_queryset - doing it
+            there as well adds a second JOIN per filtered relation, which multiplies rows """
+        if q := filter_rules_to_q(self.filter_rules):
+            qs = qs.filter(q)
+        return qs
+
+    @cached_property
+    def _grid_annotation_kwargs(self) -> dict:
+        return self._get_grid_only_annotation_kwargs()
 
     def _get_grid_only_annotation_kwargs(self):
         """ Things not used in counts etc - only to display grid """
@@ -602,17 +678,28 @@ class AbstractVariantGrid(JqGridUserRowConfig):
     def _get_q(self) -> Optional[Q]:
         return None
 
-    def column_in_queryset_fields(self, field):
-        colmodel = self.get_override(field)
-        return colmodel.get("queryset_field", True)
+    def value_columns(self) -> list[str]:
+        """ The annotations aren't all columns (packed genotype data is read by the sample columns'
+            formatters) and not every column is selected (some are produced by a formatter) """
+        names = [rc.name for rc in self.enabled_columns if rc.queryset_field]
+        for name in self._grid_annotation_kwargs:
+            if name not in names:
+                names.append(name)
+        return names
 
-    def get_queryset_field_names(self):
-        field_names = []
-        for f in super().get_field_names():
-            if self.column_in_queryset_fields(f):
-                field_names.append(f)
+    def row_values(self, qs: QuerySet[Variant]) -> Iterable[dict]:
+        return format_rows(self.enabled_columns, qs.values(*self.value_columns()))
 
-        return field_names
+    def csv_rows(self, qs: QuerySet[Variant]) -> Iterable[dict]:
+        return format_rows(self.enabled_columns, qs.values(*self.value_columns()).iterator())
+
+    def csv_columns(self) -> list[dict[str, str]]:
+        columns = super().csv_columns()
+        for column in columns:
+            if column["name"] == "id":
+                # The variant grids call the column 'id' - say what it's the id of
+                column["label"] = "variant_id"
+        return columns
 
 
 class TagColorsCollectionColumns(DatatableConfig[TagColorsCollection]):

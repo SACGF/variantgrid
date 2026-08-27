@@ -968,10 +968,9 @@ table.as_table {
 	}
 }
 
-// The jqGrid derived variant grids (@see library/django_utils/jqgrid_datatable_adapter.py) are
-// dozens of columns wide and hold cells with hundreds of links. Every column carries a width from
-// its colmodel, so lay the table out from those and clip each cell to one line - the way jqGrid
-// rendered them - rather than letting one PubMed cell run to a few thousand pixels.
+// The variant grids (@see snpdb/grid_columns/variant_columns.py) are dozens of columns wide and hold
+// cells with hundreds of links. Every column carries a width, so lay the table out from those and
+// clip each cell to one line, rather than letting one PubMed cell run to a few thousand pixels.
 table.variantgrid-datatable {
 	table-layout: fixed;
 	width: auto;

@@ -46,14 +46,13 @@ class NodeView(UpdateView):
             context["node_warnings"] = list(context.get("node_warnings") or []) + configuration_errors
 
         try:
-            grid = VariantGrid(self.request.user, self.object, extra_filters)
-            colmodels = grid.get_colmodels()
-            columns = [data['name'] for data in colmodels]
-            graph_form = GraphTypeChoiceForm(self.object, columns)
+            grid = VariantGrid(self.request, self.object, extra_filters)
+            grid_columns = grid.enabled_columns
+            graph_form = GraphTypeChoiceForm(self.object, [rc.name for rc in grid_columns])
             if graph_form.has_graph_types:
                 context['graph_form'] = graph_form
 
-            context['column_summary_form'] = ColumnSummaryForm(colmodels)
+            context['column_summary_form'] = ColumnSummaryForm(grid_columns)
             context['snp_matrix_form'] = SNPMatrixForm(initial={'significant_figures': 2})
 
             user_settings = UserSettings.get_for_user(self.request.user)

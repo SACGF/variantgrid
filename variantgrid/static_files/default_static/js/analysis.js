@@ -338,7 +338,7 @@ function gridPaneShown(userRequestedGrid) {
         deferredGridLoad = null;
         loadFunc();
     }
-    resizeGrid();  // a jqGrid sized while hidden measures zero width
+    resizeGrid();  // a table sized while hidden measures zero width
 }
 
 /* userRequestedGrid is the user asking for the grid itself (clicking the Grid tab) rather than the

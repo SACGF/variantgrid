@@ -1,4 +1,3 @@
-from library.django_utils.jqgrid_datatable_adapter import JqGridDatatableView
 from snpdb.views.datatable_view import DatabaseTableView
 from variantgrid.perm_path import path
 from variantopedia import views, views_tag_stats
@@ -80,18 +79,18 @@ urlpatterns = [
     path('tags/datatable/<genome_build_name>/', DatabaseTableView.as_view(column_class=VariantTagsColumns),
          name='variant_tags_datatable'),
 
-    path('nearby/grid/<variant_id>/<genome_build_name>/<region_type>/<slug:op>/',
-         JqGridDatatableView.as_view(grid=NearbyVariantsGrid, csv_download=True),
+    path('nearby/grid/<variant_id>/<genome_build_name>/<region_type>/',
+         DatabaseTableView.as_view(column_class=NearbyVariantsGrid),
          name='nearby_variants_grid'),
-    path('nearby/grid/<variant_id>/<genome_build_name>/<region_type>/<gene_symbol>/<slug:op>/',
-         JqGridDatatableView.as_view(grid=NearbyVariantsGrid, csv_download=True),
+    path('nearby/grid/<variant_id>/<genome_build_name>/<region_type>/<gene_symbol>/',
+         DatabaseTableView.as_view(column_class=NearbyVariantsGrid),
          name='nearby_gene_variants_grid'),
-    path('all_variants/grid/<genome_build_name>/<slug:op>/',
-         JqGridDatatableView.as_view(grid=AllVariantsGrid, csv_download=True),
+    path('all_variants/grid/<genome_build_name>/',
+         DatabaseTableView.as_view(column_class=AllVariantsGrid),
          name='all_variants_grid'),
     # CSV comes off the dedicated tagged_variant_export view, which forces a genomic order sort
-    path('tagged_variants/grid/<genome_build_name>/<slug:op>/',
-         JqGridDatatableView.as_view(grid=TaggedVariantGrid), name='tagged_variant_grid'),
+    path('tagged_variants/grid/<genome_build_name>/',
+         DatabaseTableView.as_view(column_class=TaggedVariantGrid), name='tagged_variant_grid'),
 
     # Grid export
     path('tags/export/<genome_build_name>/', views.variant_tags_export, name='variant_tags_export'),
