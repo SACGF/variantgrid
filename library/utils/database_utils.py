@@ -1,3 +1,4 @@
+import contextlib
 from collections.abc import Iterable
 from typing import Any, Optional
 
@@ -6,6 +7,8 @@ from django.db import connection, transaction
 
 # 970: Added transaction wrapper due to Postgres hanging query
 from django.db.models import QuerySet
+from django.db.models.lookups import In
+from django.db.models.sql.where import NothingNode
 
 from library.cache import timed_cache
 from library.constants import DAY_SECS
@@ -27,6 +30,34 @@ def get_postgresql_version() -> str:
         cursor.execute('SHOW server_version')
         version = cursor.fetchone()[0]
     return version
+
+
+@contextlib.contextmanager
+def render_empty_result_set_sql():
+    """ Django short circuits provably empty predicates (eg "pk__in=[]") by raising EmptyResultSet during
+        compilation, so there's no SQL to look at. For debugging we want to see the query anyway, so compile
+        those to equivalent SQL that matches nothing.
+
+        Patches are global for the duration - a concurrent query that would have short circuited runs the
+        (still empty) SQL instead. """
+
+    def _in_process_rhs(self, compiler, connection_):
+        if self.rhs_is_direct_value() and not [r for r in self.rhs if r is not None]:
+            return "(NULL)", []
+        return original_in_process_rhs(self, compiler, connection_)
+
+    def _nothing_as_sql(*_args, **_kwargs):
+        return "0 = 1", []
+
+    original_in_process_rhs = In.process_rhs
+    original_nothing_as_sql = NothingNode.as_sql
+    In.process_rhs = _in_process_rhs
+    NothingNode.as_sql = _nothing_as_sql
+    try:
+        yield
+    finally:
+        In.process_rhs = original_in_process_rhs
+        NothingNode.as_sql = original_nothing_as_sql
 
 
 def queryset_to_sql(queryset: QuerySet, pretty=False) -> str:

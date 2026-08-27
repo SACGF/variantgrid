@@ -101,7 +101,7 @@ from library.constants import HOUR_SECS, WEEK_SECS
 from library.django_utils import add_save_message, get_field_counts, set_form_read_only
 from library.guardian_utils import is_superuser
 from library.utils import defaultdict_to_dict, full_class_name
-from library.utils.database_utils import queryset_to_sql, run_sql
+from library.utils.database_utils import queryset_to_sql, render_empty_result_set_sql, run_sql
 from patients.models import Extraction
 from patients.sample_grouping import get_extraction_sample_group
 from pedigree.models import Pedigree
@@ -514,14 +514,17 @@ def node_view(request, analysis_id, analysis_version, node_id, node_version, ext
 def get_node_sql(grid):
     # Temporarily disabling SQL formatting as it's really slow.
     request = RequestFactory().get('/fake')
-    qs = grid.get_queryset(request)
-    grid_sql = queryset_to_sql(qs)
-    # grid_sql = sqlparse.format(grid_sql, reindent=True, keyword_case='upper')
+    # A node that filters on an empty set (eg comp het with no 2-hit genes) would otherwise
+    # short circuit with EmptyResultSet - we still want to show the SQL in the debug tab
+    with render_empty_result_set_sql():
+        qs = grid.get_queryset(request)
+        grid_sql = queryset_to_sql(qs)
+        # grid_sql = sqlparse.format(grid_sql, reindent=True, keyword_case='upper')
 
-    grid.fields = ['id']
-    qs = grid.get_queryset(request)
-    node_sql = queryset_to_sql(qs)
-    # node_sql_ = sqlparse.format(node_sql_, reindent=True, keyword_case='upper')
+        grid.fields = ['id']
+        qs = grid.get_queryset(request)
+        node_sql = queryset_to_sql(qs)
+        # node_sql_ = sqlparse.format(node_sql_, reindent=True, keyword_case='upper')
 
     return node_sql, grid_sql
 
