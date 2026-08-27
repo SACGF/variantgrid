@@ -124,7 +124,20 @@ class VariantExtra:
 )
 def variant_cosmic_search(search_input: SearchInputInstance):
     # Do via API as a full table scan takes way too long with big data
+    unsupported_builds = []
+    supported_builds = []
     for genome_build in search_input.genome_builds:
+        if CosmicAPI.supports_genome_build(genome_build):
+            supported_builds.append(genome_build)
+        else:
+            unsupported_builds.append(genome_build)
+
+    if unsupported_builds and not supported_builds:
+        build_names = ", ".join(sorted(str(gb) for gb in unsupported_builds))
+        msg = f"COSMIC search is only available for GRCh37/GRCh38, not {build_names}"
+        yield SearchMessageOverall(msg, severity=LogLevel.WARNING, genome_builds=unsupported_builds)
+
+    for genome_build in supported_builds:
         matcher = HGVSMatcher.instance(genome_build)
         cosmic = CosmicAPI(search_input.search_string, genome_build)
         results_by_variant_identifier: dict[str, list[SearchResult]] = defaultdict(list)
