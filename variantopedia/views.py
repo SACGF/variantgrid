@@ -54,7 +54,8 @@ from eventlog.models import create_event
 from genes.hgvs import HGVSMatcher
 from genes.models import CanonicalTranscriptCollection, GeneSymbol
 from library.django_utils import get_field_counts, highest_pk, require_superuser
-from library.django_utils.jqgrid_view import EXPORT_ROWS_PER_CHUNK, JQGridView
+from library.django_utils.grid_export import EXPORT_ROWS_PER_CHUNK
+from library.django_utils.jqgrid_view import export_grid_as_csv
 from library.git import Git
 from library.guardian_utils import admin_bot
 from library.health_check import HealthCheckRequest, health_check_overall_stats_signal
@@ -965,5 +966,5 @@ def tagged_variant_export(request, genome_build_name):
             return "locus__position", "asc"
 
     basename = _get_grid_name(request, "tagged_variant_export")
-    return JQGridView.export_grid_as_csv(request, grid_klass=SortTaggedVariantGrid,
-                                         basename=basename, genome_build_name=genome_build_name)
+    return export_grid_as_csv(request, grid_klass=SortTaggedVariantGrid,
+                              basename=basename, genome_build_name=genome_build_name)

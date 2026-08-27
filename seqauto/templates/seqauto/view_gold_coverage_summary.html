@@ -6,17 +6,6 @@
 <link rel="stylesheet" href="{% static 'css/seqauto.css' %}" />
 {% endblock %}
 
-{% block jsdocumentready %}
-    const GOLD_KIT_ID = "{{ gold_reference.enrichment_kit.pk }}";
-
-    jQuery.extend($.fn.fmatter , {
-        viewGoldSummaryGeneLink : function(geneSymbol, options, rowObject) {
-            var url = Urls.view_enrichment_kit_gene_coverage(GOLD_KIT_ID, geneSymbol);
-            return "<a class='grid-link' target='_blank' href='" + url + "'>" + geneSymbol + "</a>";
-        }
-    });
-{% endblock %}
-
 {% block submenu_page_content %}
 
     <div>
@@ -39,8 +28,7 @@
     {% endif %}
 
     <div>
-    {% load jqgrid_tags %}
-    {% jqgrid 'gold_coverage_summary_grid' 'GoldCoverageSummaries' search=True pk=gold_reference.pk download_grid_json_as_csv=True %}
+    <table id="gold-coverage-summary-grid" class="sticky-header" data-datatable-url="{% url 'gold_coverage_summary_datatable' pk=gold_reference.pk %}"></table>
     </div>
 
 {% endblock %}

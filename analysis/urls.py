@@ -7,10 +7,10 @@ from analysis.grids import (
     CandidateColumns,
     CandidateSearchRunColumns,
     KaryomappingAnalysesColumns,
-    NodeColumnSummaryGrid,
-    NodeGeneDiseaseClassificationGenesGrid,
+    NodeColumnSummaryConfig,
+    NodeGeneDiseaseClassificationGenesConfig,
     NodeGeneListGenesColumns,
-    NodeOntologyGenesGrid,
+    NodeOntologyGenesConfig,
     NodeTissueExpressionGenesColumns,
     NodeTissueUniProtGenesColumns,
 )
@@ -22,7 +22,7 @@ from analysis.views import (
     views_json,
     views_karyomapping,
 )
-from library.django_utils.jqgrid_view import JQGridView
+from library.django_utils.datatable_dataframe import DataFrameTableView
 from snpdb.views.datatable_view import DatabaseTableView
 from variantgrid.perm_path import path
 
@@ -134,18 +134,19 @@ urlpatterns = [
     path('<int:analysis_id>/<int:analysis_version>/node_grid/cfg/<int:node_id>/<int:node_version>/<slug:extra_filters>/', views_grid.NodeGridConfig.as_view(), name='node_grid_config'),
     path('<int:analysis_id>/node_grid/handler/', views_grid.NodeGridHandler.as_view(), name='node_grid_handler'),
 
-    path('<int:analysis_id>/node_column_summary/grid/<int:node_id>/<int:node_version>/<slug:extra_filters>/<slug:variant_column>/<int:significant_figures>/<slug:op>/', JQGridView.as_view(grid=NodeColumnSummaryGrid, csv_download=True), name='node_column_summary_grid'),
+    path('<int:analysis_id>/node_column_summary/datatable/<int:node_id>/<int:node_version>/<slug:extra_filters>/<slug:variant_column>/<int:significant_figures>/',
+         DataFrameTableView.as_view(column_class=NodeColumnSummaryConfig), name='node_column_summary_datatable'),
     path('analyses/datatable/', DatabaseTableView.as_view(column_class=AnalysesListColumns), name='analyses_list_datatable'),
     path('analysis_templates/datatable/', DatabaseTableView.as_view(column_class=AnalysisTemplatesColumns),
          name='analysis_templates_datatable'),
     path('analysis_issues/datatables/',
          DatabaseTableView.as_view(column_class=AnalysisNodeIssuesColumns), name='analysis_node_issues_datatable'),
 
-    path('<int:analysis_id>/node/ontology/genes/grid/<int:node_id>/<int:version>/<slug:op>/',
-         JQGridView.as_view(grid=NodeOntologyGenesGrid), name='node_ontology_genes_grid'),
-    path('<int:analysis_id>/node/gene_disease_classification/grid/<int:node_id>/<int:version>/<slug:op>/',
-         JQGridView.as_view(grid=NodeGeneDiseaseClassificationGenesGrid),
-         name='node_gene_disease_classification_genes_grid'),
+    path('<int:analysis_id>/node/ontology/genes/datatable/<int:node_id>/<int:version>/',
+         DataFrameTableView.as_view(column_class=NodeOntologyGenesConfig), name='node_ontology_genes_datatable'),
+    path('<int:analysis_id>/node/gene_disease_classification/datatable/<int:node_id>/<int:version>/',
+         DataFrameTableView.as_view(column_class=NodeGeneDiseaseClassificationGenesConfig),
+         name='node_gene_disease_classification_genes_datatable'),
 
     path('<int:analysis_id>/node/tissue/genes/datatables/<int:node_id>/<int:version>/',
          DatabaseTableView.as_view(column_class=NodeTissueExpressionGenesColumns), name='node_tissue_expression_genes_datatable'),

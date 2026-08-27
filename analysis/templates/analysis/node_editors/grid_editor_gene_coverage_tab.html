@@ -1,6 +1,5 @@
 {% extends "analysis/node_editors/grid_editor.html" %}
 {% load datatable_tags %}
-{% load jqgrid_tags %}
 {% load help_tags %}
 
 {% block docreadyjs %}
@@ -47,7 +46,7 @@
                         <div>
                         Genes with no coverage: {{ no_coverage_gene_names }}
                         </div>
-                        {% jqgrid 'uncovered_genes_grid' 'UncoveredGenes' False None 'jqgrid/jqgrid.html' None False gene_coverage_collection_id=cov.pk gene_list_id_list=gene_list_id_list min_depth=sample.get_minimum_coverage_required %}
+                        <table id="uncovered-genes-grid-{{ cov.pk }}" class="sticky-header" data-datatable-url="{% url 'uncovered_genes_datatable' gene_coverage_collection_id=cov.pk min_depth=sample.get_minimum_coverage_required gene_list_id_list=gene_list_id_list %}"></table>
                     {% endfor %}
 
                     <p>Minimum depth required is {{ min_coverage }}</p>
@@ -63,7 +62,7 @@
                         <b>{{ sample }}</b>
                         {% if cov %}
                         <div>Showing genes in gene list. <a href='{% url 'view_qc' cov.qcgenecoverage.qc.pk %}'>Full coverage</a></div>
-                        {% jqgrid 'gene_coverage_collection_gene_list_grid' 'GeneCoverage' search=False download_grid_json_as_csv=True gene_coverage_collection_id=cov.pk gene_list_id_list=gene_list_id_list %}
+                        <table id="gene-coverage-grid-{{ cov.pk }}" class="sticky-header" data-datatable-url="{% url 'gene_coverage_collection_gene_list_datatable' gene_coverage_collection_id=cov.pk gene_list_id_list=gene_list_id_list %}"></table>
                         {% else %}
                             Sample has no coverage.
                         {% endif %}

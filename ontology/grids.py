@@ -3,11 +3,15 @@ from collections import defaultdict
 
 import pandas as pd
 
-from library.pandas_jqgrid import DataFrameJqGrid
+from library.django_utils.datatable_dataframe import DataFrameDatatableConfig
 from ontology.models import OntologyTerm, OntologyVersion
 
 
-class AbstractOntologyGenesGrid(DataFrameJqGrid, abc.ABC):
+class AbstractOntologyGenesConfig(DataFrameDatatableConfig, abc.ABC):
+    """ Gene symbols matched by a set of ontology terms, one column per ontology service """
+    index_label = "Gene Symbol"
+    csv_name = "ontology_genes"
+
     @abc.abstractmethod
     def _get_ontology_term_ids(self):
         pass
@@ -15,7 +19,7 @@ class AbstractOntologyGenesGrid(DataFrameJqGrid, abc.ABC):
     def _get_ontology_version(self) -> OntologyVersion:
         return OntologyVersion.latest()
 
-    def get_dataframe(self):
+    def get_dataframe(self) -> pd.DataFrame:
         # This uses the same method as gene filter (special_case_gene_symbols_for_hpo_and_omim) though with individual
         # calls per term so that it matches what gene filters is doing
         terms_dict = OntologyTerm.split_hpo_omim_mondo_as_dict(self._get_ontology_term_ids())

@@ -341,10 +341,6 @@ $(document).ready(function() {
     {% endfor %}
 });
 </script>
-{# LEGACY-JQGRID: the skipped annotation tab is still {% jqgrid %}, and loads by ajax #}
-<script src="{% static 'js/lib/free-jqgrid/jquery.jqgrid.min.js' %}"></script>
-<script type="text/javascript" src="{% static 'js/grid.js' %}"></script>
-<link rel="stylesheet" type="text/css" media="screen" href="{% static 'js/lib/free-jqgrid/css/ui.jqgrid.min.css' %}" />
 {% endblock %}
 
 
@@ -704,8 +700,7 @@ $(document).ready(function() {
 {% if skipped_annotation_count %}
     <div id="vcf-skipped-annotation">
         <p>Variants that Variant Effect Predictor (VEP) was unable to annotate.</p>
-        {% load jqgrid_tags %}
-        {% jqgrid 'vcf_skipped_annotation_grid' name='VCF Skipped Annotation' search=False vcf_id=vcf.pk %}
+        <table id="vcf-skipped-annotation-grid" class="sticky-header" data-datatable-url="{% url 'vcf_skipped_annotation_datatable' vcf_id=vcf.pk %}"></table>
     </div>
 {% endif %}
 </div>

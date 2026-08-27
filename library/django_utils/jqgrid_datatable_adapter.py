@@ -7,7 +7,6 @@ a DataTables one out - so a converted page runs the same grid class the exports 
 
 @see claude/plans/variantgrid_to_datatables_plan.md
 """
-import json
 import logging
 from typing import Any, Optional
 
@@ -16,7 +15,7 @@ from django.http import HttpRequest, HttpResponse, QueryDict
 from django.urls.base import resolve, reverse
 from django.views.generic.base import View
 
-from library.django_utils.jqgrid_view import JQGridViewOp, grid_export_request
+from library.django_utils.jqgrid_view import JQGridViewOp, create_grid_from_request, grid_export_request
 from library.jqgrid.jqgrid import FILTER_OPERATIONS, json_encode
 from library.jqgrid.jqgrid_user_row_config import JqGridUserRowConfig
 from library.utils import JsonObjType, nice_class_name
@@ -263,19 +262,11 @@ class JqGridDatatableView(View):
     filter_builder = True
     filter_builder_toolbar = True
 
-    @staticmethod
-    def create_grid_from_request(request, grid_klass, **kwargs):
-        kwargs["user"] = request.user
-        # extra_filters are commonly used to filter by something custom via JS
-        if extra_filters := request.GET.get("extra_filters"):
-            kwargs["extra_filters"] = json.loads(extra_filters)
-        return grid_klass(**kwargs)
-
     def _load_grid(self, request, **kwargs):
         if self.grid is None:
             msg = f"{nice_class_name(self)}.grid not set"
             raise ValueError(msg)
-        return self.create_grid_from_request(request, self.grid, **kwargs)
+        return create_grid_from_request(request, self.grid, **kwargs)
 
     def get(self, request, *args, **kwargs):
         op = kwargs.get("op")

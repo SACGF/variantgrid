@@ -53,6 +53,12 @@ class Test(URLTestCase):
             ("aligner_datatable", {}, 200),
             ("variant_caller_datatable", {}, 200),
             ("variant_calling_pipeline_datatable", {}, 200),
+            ("illumina_flowcell_qc_datatable", {}, 200),
+            ("fastqc_datatable", {}, 200),
+            ("flagstats_datatable", {}, 200),
+            ("qc_exec_summary_datatable", {}, 200),
+            ("sequencing_samples_datatable", {}, 200),
+            ("sequencing_samples_historical_datatable", {"time_frame": "year"}, 200),
         ]
         self._test_datatable_urls(GRID_LIST_URLS, self.user_non_owner)
 

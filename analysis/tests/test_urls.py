@@ -153,6 +153,10 @@ class Test(URLTestCase):
                                      "extra_filters": "default",
                                      "grid_column_name": grid_column_name,
                                      "significant_figures": 2}, 200),
+            ('node_column_summary_datatable', {**node_version_params,
+                                               "extra_filters": "default",
+                                               "variant_column": grid_column_name,
+                                               "significant_figures": 2}, 200),
             ('node_snp_matrix', {**node_version_params,
                                  "conversion": SNPMatrix.TOTAL_PERCENT,
                                  "significant_figures": 2}, 200),
@@ -172,10 +176,6 @@ class Test(URLTestCase):
             ('node_method_description', node_version_params, 200),
 
             ('view_karyomapping_analysis', {"pk": cls.karyomapping_analysis.pk}, 200),
-        ]
-
-        cls.PRIVATE_GRID_LIST_URLS = [
-            #("vcfs_grid", {}, cls.vcf),
         ]
 
     def testUrls(self):
@@ -217,13 +217,6 @@ class Test(URLTestCase):
     @prevent_request_warnings
     def testNoPermission(self):
         self._test_urls(self.PRIVATE_OBJECT_URL_NAMES_AND_KWARGS, self.user_non_owner, expected_code_override=403)
-
-    def testJqGridListPermission(self):
-        self._test_jqgrid_urls_contains_objs(self.PRIVATE_GRID_LIST_URLS, self.user_owner, True)
-
-    @prevent_request_warnings
-    def testJqGridListNoPermission(self):
-        self._test_jqgrid_urls_contains_objs(self.PRIVATE_GRID_LIST_URLS, self.user_non_owner, False)
 
     def _testVariantGridExport(self, export_type: str):
         """ The export runs under Celery now (#1257) - the view launches it and redirects to the

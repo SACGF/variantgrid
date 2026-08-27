@@ -8,7 +8,6 @@ from django.core.exceptions import PermissionDenied
 from django.db.models import Count, IntegerField, OuterRef, QuerySet, StringAgg, Subquery, TextField, Value
 from django.http import HttpRequest
 from django.shortcuts import get_object_or_404
-from django.urls.base import reverse
 
 from analysis.models import VariantTag
 from annotation.models.models import (
@@ -30,13 +29,11 @@ from genes.models import (
     TranscriptVersion,
 )
 from genes.models_enums import AnnotationConsortium, GeneSymbolAliasSource
-from library.django_utils.jqgrid_view import JQGridViewOp
-from library.jqgrid.jqgrid_user_row_config import JqGridUserRowConfig
-from library.utils import update_dict_of_dict_values
+from library.utils import pretty_label, update_dict_of_dict_values
 from snpdb.grid_columns.custom_columns import get_custom_column_fields_override_and_sample_position
 from snpdb.grids import AbstractVariantGrid
 from snpdb.models import ImportStatus, Q, Tag, UserSettings, VariantGridColumn
-from snpdb.models.models_genome import Contig, GenomeBuild
+from snpdb.models.models_genome import GenomeBuild
 from snpdb.variant_queries import (
     get_variant_queryset_for_gene_symbol,
     variant_qs_filter_has_internal_data,
@@ -203,60 +200,69 @@ def _get_gene_fields():
     return first_fields + fields
 
 
-class GenesGrid(JqGridUserRowConfig):
+class GenesColumns(DatatableConfig[ReleaseGeneVersion]):
     """ Shows genes / symbols in a gene annotation release """
-    model = ReleaseGeneVersion
-    caption = "Gene Release"
-    colmodel_overrides = {
-        'gene_version__gene_symbol__symbol': {'formatter': 'geneSymbolLink'},
-        "gene_version__hgnc__gene_symbol__symbol": {"label": "HGNC Symbol"},
-    }
+    grid_name = "Gene Release"
+    server_csv_download = True
+    search_box_enabled = True
+    scroll_x = True
 
-    def __init__(self, user, genome_build_name, **kwargs):
-        extra_filters = kwargs.pop("extra_filters", None)
-        self.fields = _get_gene_fields()
-        super().__init__(user)
-        queryset = self.model.objects.all()
-        genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
+    GENE_SYMBOL_FIELD = "gene_version__gene_symbol__symbol"
 
-        # TODO: Put back all the other fields - joining to HGNC and to GeneAnnotation
-        q_and_list = []
+    def __init__(self, request: HttpRequest):
+        super().__init__(request)
+        column_labels = _gene_column_labels()
+        self.rich_columns = []
+        for field in _get_gene_fields():
+            is_symbol = field == self.GENE_SYMBOL_FIELD
+            self.rich_columns.append(
+                RichColumn(key=field, label=column_labels.get(field, pretty_label(field.split("__")[-1])),
+                           orderable=True, search=is_symbol,
+                           default_sort=SortOrder.ASC if is_symbol else None,
+                           client_renderer='renderGeneSymbol' if is_symbol else None))
 
+    def _get_gene_annotation_release_id(self) -> int:
+        if release_id := self.get_query_param("gene_annotation_release_id"):
+            return int(release_id)
+        genome_build = GenomeBuild.get_name_or_alias(self.get_query_param("genome_build_name"))
         av = AnnotationVersion.latest(genome_build)
-        gene_annotation_release_id = av.gene_annotation_version.gene_annotation_release_id
-        if extra_filters:
-            if contig_id := extra_filters.get("contig_id"):
-                contig = Contig.objects.get(pk=contig_id)
-                gene_versions = TranscriptVersion.objects.filter(contig=contig).values_list("gene_version_id", flat=True)
-                q_and_list.append(Q(gene_version__in=gene_versions))
+        return av.gene_annotation_version.gene_annotation_release_id
 
-            if gar_id := extra_filters.get("gene_annotation_release_id"):
-                gene_annotation_release_id = gar_id
-
-            if column := extra_filters.get("column"):
-                if column in self.fields:
-                    is_null = extra_filters.get("is_null", False)
-                    kwargs = {f"{column}__isnull": is_null}
-                    q_and_list.append(Q(**kwargs))
-                else:
-                    raise PermissionDenied(f"Bad column '{column}'")
-
-        gene_annotation_version = GeneAnnotationVersion.objects.filter(gene_annotation_release_id=gene_annotation_release_id).order_by("annotation_date").last()
+    def get_initial_queryset(self) -> QuerySet[ReleaseGeneVersion]:
+        gene_annotation_release_id = self._get_gene_annotation_release_id()
+        gene_annotation_version = GeneAnnotationVersion.objects.filter(
+            gene_annotation_release_id=gene_annotation_release_id).order_by("annotation_date").last()
         if gene_annotation_version is None:
-            raise InvalidAnnotationVersionError(f"No gene annotation version for gene_annotation_release: {gene_annotation_release_id}")
+            raise InvalidAnnotationVersionError(
+                f"No gene annotation version for gene_annotation_release: {gene_annotation_release_id}")
 
-        q_and_list.extend([
-            Q(release_id=gene_annotation_release_id),
-            Q(gene_version__gene__geneannotation__version=gene_annotation_version),
-        ])
-        q = reduce(operator.and_, q_and_list)
-        self.queryset = queryset.filter(q).values(*self.get_field_names())
-        grid_export_url = reverse("genes_grid", kwargs={"genome_build_name": genome_build_name,
-                                                        "op": JQGridViewOp.DOWNLOAD})
-        self.extra_config.update({'sortname': 'gene_version__gene_symbol',
-                                  'sortorder': 'asc',
-                                  'shrinkToFit': False,
-                                  'grid_export_url': grid_export_url})
+        return ReleaseGeneVersion.objects.filter(
+            release_id=gene_annotation_release_id,
+            gene_version__gene__geneannotation__version=gene_annotation_version)
+
+    def filter_queryset(self, qs: QuerySet[ReleaseGeneVersion]) -> QuerySet[ReleaseGeneVersion]:
+        if contig_id := self.get_query_param("contig_id"):
+            gene_versions = TranscriptVersion.objects.filter(contig_id=contig_id).values_list("gene_version_id",
+                                                                                              flat=True)
+            qs = qs.filter(gene_version__in=gene_versions)
+
+        if column := self.get_query_param("column"):
+            if column not in {rc.key for rc in self.enabled_columns}:
+                raise PermissionDenied(f"Bad column '{column}'")
+            is_null = self.get_query_param("is_null") == "true"
+            qs = qs.filter(**{f"{column}__isnull": is_null})
+        return qs
+
+
+def _gene_column_labels() -> dict[str, str]:
+    """ Gene column path -> the label the variant grid gives it """
+    labels = {}
+    for variant_column, label in VariantGridColumn.objects.values_list("variant_column", "label"):
+        gene_column = variant_column.replace("variantannotation__", "").replace("transcript_version__", "")
+        if gene_column.startswith("gene__"):
+            gene_column = "gene_version__" + gene_column
+        labels[gene_column] = label
+    return labels
 
 
 class CanonicalTranscriptCollectionColumns(DatatableConfig[CanonicalTranscriptCollection]):
@@ -320,59 +326,50 @@ class CanonicalTranscriptColumns(DatatableConfig[CanonicalTranscript]):
         return qs
 
 
-class QCGeneCoverageGrid(JqGridUserRowConfig):
-    model = GeneCoverageCanonicalTranscript
-    caption = 'QC'
-    fields = ["gene_symbol__symbol", "transcript__identifier", "original_gene_symbol", "original_transcript", "min",
-              "mean", "std_dev", "percent_1x", "percent_10x", "percent_20x"]
-    number_format = {'formatter': 'number', 'width': 80}
-    colmodel_overrides = {'gene_symbol__symbol': {"width": 110},
-                          'transcript__identifier': {"width": 110},
-                          "original_gene_symbol": {'label': 'original symbol'},
-                          "original_transcript": {'label': 'original transcript'},
-                          'min': {'width': 40},
-                          'mean': number_format,
-                          'std_dev': number_format,
-                          'percent_1x': number_format,
-                          'percent_10x': number_format,
-                          'percent_20x': number_format}
+class QCGeneCoverageColumns(DatatableConfig[GeneCoverageCanonicalTranscript]):
+    """ Coverage for the genes in a GeneCoverageCollection, optionally restricted to gene lists """
+    grid_name = "QC"
+    server_csv_download = True
 
-    def __init__(self, user, gene_coverage_collection_id, gene_list_id_list=None):
-        super().__init__(user)
-        gene_coverage_collection = get_object_or_404(GeneCoverageCollection, pk=gene_coverage_collection_id)
-        gene_symbols = set()
-        if gene_list_id_list:
-            gene_list_ids = gene_list_id_list.split("/")
-            if gene_list_ids:
-                for gene_list_id in gene_list_ids:
-                    gene_list = GeneList.get_for_user(user, gene_list_id, success_only=False)
-                    gene_symbols.update(gene_list.get_gene_names())
-
-        q = self.get_coverage_q(gene_coverage_collection, gene_symbols)
-        queryset = self.model.objects.filter(q)
-        self.queryset = queryset.values(*self.get_field_names())
-        self.extra_config.update({'sortname': 'id',
-                                  'sortorder': 'desc'})
+    def __init__(self, request: HttpRequest):
+        super().__init__(request)
+        self.rich_columns = [
+            RichColumn(key="gene_symbol__symbol", label="Gene Symbol", orderable=True,
+                       client_renderer='renderGeneSymbol'),
+            RichColumn(key="transcript__identifier", label="Transcript", orderable=True),
+            RichColumn(key="original_gene_symbol", label="Original Symbol", orderable=True),
+            RichColumn(key="original_transcript", label="Original Transcript", orderable=True),
+            RichColumn(key="min", label="Min", orderable=True, css_class="num"),
+            RichColumn(key="mean", label="Mean", orderable=True, css_class="num"),
+            RichColumn(key="std_dev", label="Std Dev", orderable=True, css_class="num"),
+            RichColumn(key="percent_1x", label="% 1x", orderable=True, css_class="num"),
+            RichColumn(key="percent_10x", label="% 10x", orderable=True, css_class="num"),
+            RichColumn(key="percent_20x", label="% 20x", orderable=True, css_class="num"),
+        ]
 
     def get_coverage_q(self, gene_coverage_collection, gene_symbols) -> Q:
-        filters = [
-            Q(gene_coverage_collection=gene_coverage_collection),
-        ]
+        filters = [Q(gene_coverage_collection=gene_coverage_collection)]
         if gene_symbols:
             filters.append(Q(gene_symbol__in=gene_symbols))
-
         return reduce(operator.and_, filters)
 
+    def get_initial_queryset(self) -> QuerySet[GeneCoverageCanonicalTranscript]:
+        gene_coverage_collection = get_object_or_404(GeneCoverageCollection,
+                                                     pk=self.get_query_param("gene_coverage_collection_id"))
+        gene_symbols = set()
+        if gene_list_id_list := self.get_query_param("gene_list_id_list"):
+            for gene_list_id in gene_list_id_list.split("/"):
+                gene_list = GeneList.get_for_user(self.user, gene_list_id, success_only=False)
+                gene_symbols.update(gene_list.get_gene_names())
 
-class UncoveredGenesGrid(QCGeneCoverageGrid):
+        q = self.get_coverage_q(gene_coverage_collection, gene_symbols)
+        return GeneCoverageCanonicalTranscript.objects.filter(q)
 
-    def __init__(self, user, min_depth, **kwargs):
-        self.min_depth = min_depth
-        super().__init__(user, **kwargs)
 
+class UncoveredGenesColumns(QCGeneCoverageColumns):
     def get_coverage_q(self, gene_coverage_collection, gene_symbols) -> Q:
         q = super().get_coverage_q(gene_coverage_collection, gene_symbols)
-        return q & Q(min__lt=self.min_depth)
+        return q & Q(min__lt=int(self.get_query_param("min_depth")))
 
 
 class GeneSymbolWikiColumns(DatatableConfig[GeneSymbolWiki]):

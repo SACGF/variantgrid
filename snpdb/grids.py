@@ -240,90 +240,95 @@ class SamplesListColumns(DatatableConfig[Sample]):
         return qs
 
 
-class AbstractSkippedAnnotationGrid(JqGridUserRowConfig):
+class AbstractSkippedAnnotationColumns(DatatableConfig[Variant]):
     """ Shows Variants that VEP was unable to annotate (variantannotation__vep_skipped_reason set).
         Subclasses provide a variant source (VCF/Sample - anything with get_variant_qs) via
-        set_skipped_annotation_queryset(). """
-    model = Variant
-    caption = 'Skipped Annotation'
-    fields = ["id", "variantannotation__vep_skipped_reason", "variantannotation__annotation_run_id"]
+        _get_variant_source(). """
+    grid_name = "Skipped Annotation"
 
-    colmodel_overrides = {"id": {"hidden": True},
-                          "variantannotation__annotation_run_id": {'formatter': 'formatAnnotationRunLink'}}
+    def __init__(self, request: HttpRequest):
+        super().__init__(request)
+        self.rich_columns = [
+            RichColumn(key="id", visible=False),
+            RichColumn(key="variant_string", label="Variant", orderable=True, default_sort=SortOrder.ASC,
+                       renderer=self._render_variant, extra_columns=["id"],
+                       client_renderer='renderOptionalLink'),
+            RichColumn(key="variantannotation__vep_skipped_reason", label="Skipped Reason", orderable=True),
+            RichColumn(key="variantannotation__annotation_run_id", label="Annotation Run", orderable=True,
+                       renderer=self._render_annotation_run, client_renderer='renderOptionalLink'),
+        ]
 
-    def set_skipped_annotation_queryset(self, variant_source, genome_build):
-        qs = get_queryset_for_latest_annotation_version(self.model, genome_build)
+    def _get_variant_source(self) -> tuple[Any, GenomeBuild]:
+        """ (object with get_variant_qs, the build its variants are in) """
+        raise NotImplementedError()
+
+    @staticmethod
+    def _render_variant(cell: CellData) -> JsonDataType:
+        return {"text": cell.value, "url": reverse("view_variant", kwargs={"variant_id": cell["id"]})}
+
+    @staticmethod
+    def _render_annotation_run(cell: CellData) -> JsonDataType:
+        if annotation_run_id := cell.value:
+            return {"text": f"AnnotationRun {annotation_run_id}",
+                    "url": reverse("view_annotation_run", kwargs={"annotation_run_id": annotation_run_id})}
+        return None
+
+    def get_initial_queryset(self) -> QuerySet[Variant]:
+        variant_source, genome_build = self._get_variant_source()
+        qs = get_queryset_for_latest_annotation_version(Variant, genome_build)
         qs = variant_source.get_variant_qs(qs).filter(variantannotation__vep_skipped_reason__isnull=False)
-        qs = Variant.annotate_variant_string(qs)
-
-        field_names = list(self.get_field_names())
-        field_names.insert(1, "variant_string")
-
-        self.queryset = qs.values(*field_names)
-        self.extra_config.update({'sortname': 'variant_string',
-                                  'sortorder': 'asc'})
-
-    def get_colmodels(self, remove_server_side_only=False):
-        before_colmodels = [{'index': 'variant_string', 'name': 'variant_string', 'label': 'Variant',
-                             'formatter': 'linkFormatter',
-                             'formatter_kwargs': {"url_name": "view_variant", "url_object_column": "id"}}]
-        colmodels = super().get_colmodels(remove_server_side_only=remove_server_side_only)
-        return before_colmodels + colmodels
+        return Variant.annotate_variant_string(qs)
 
 
-class SampleSkippedAnnotationGrid(AbstractSkippedAnnotationGrid):
-    def __init__(self, user, sample_id):
-        super().__init__(user)
-        sample = Sample.get_for_user(user, sample_id)
-        self.set_skipped_annotation_queryset(sample, sample.genome_build)
+class SampleSkippedAnnotationColumns(AbstractSkippedAnnotationColumns):
+    def _get_variant_source(self) -> tuple[Any, GenomeBuild]:
+        sample = Sample.get_for_user(self.user, self.get_query_param("sample_id"))
+        return sample, sample.genome_build
 
 
-class VCFSkippedAnnotationGrid(AbstractSkippedAnnotationGrid):
-    def __init__(self, user, vcf_id):
-        super().__init__(user)
-        vcf = VCF.get_for_user(user, vcf_id)
-        self.set_skipped_annotation_queryset(vcf, vcf.genome_build)
+class VCFSkippedAnnotationColumns(AbstractSkippedAnnotationColumns):
+    def _get_variant_source(self) -> tuple[Any, GenomeBuild]:
+        vcf = VCF.get_for_user(self.user, self.get_query_param("vcf_id"))
+        return vcf, vcf.genome_build
 
 
-class CohortSampleListGrid(JqGridUserRowConfig):
-    model = Sample
-    caption = 'Cohort Samples'
-    fields = ["id", "name", "vcf__name", "patient__family_code", "patient__patient_code",
-              "patient__first_name", "patient__first_name",
-              "patient__sex", "patient__date_of_birth"]
-    colmodel_overrides = {'id': {'width': 20, 'formatter': 'viewSampleLink'},
-                          'vcf__name': {'label': 'VCF'},
-                          'patient__family_code': {'label': 'Family Code'},
-                          'patient__patient_code': {'label': 'Patient Code'},
-                          'patient__first_name': {'label': 'First Name'},
-                          'patient__last_name': {'label': 'Last Name'},
-                          'patient__sex': {'label': 'Sex'},
-                          'patient__date_of_birth': {'label': 'D.O.B.'}}
+class CohortSampleListColumns(DatatableConfig[Sample]):
+    """ Sample picker on the cohort page - either the cohort's samples, or the ones it could add """
+    grid_name = "Cohort Samples"
+    SHOW_COHORT = "show_cohort"
+    EXCLUDE_COHORT = "exclude_cohort"
 
-    def __init__(self, user, cohort_id, extra_filters=None):
-        super().__init__(user)
+    def __init__(self, request: HttpRequest):
+        super().__init__(request)
+        self.rich_columns = [
+            RichColumn(key="id", label="ID", orderable=True, default_sort=SortOrder.DESC,
+                       renderer=self.view_primary_key, client_renderer='renderCohortSampleCheckbox'),
+            RichColumn(key="name", label="Name", orderable=True),
+            RichColumn(key="vcf__name", label="VCF", orderable=True),
+            RichColumn(key="patient__family_code", label="Family Code", orderable=True),
+            RichColumn(key="patient__patient_code", label="Patient Code", orderable=True),
+            RichColumn(key="patient__first_name", label="First Name", orderable=True),
+            RichColumn(key="patient__last_name", label="Last Name", orderable=True),
+            RichColumn(key="patient__sex", label="Sex", orderable=True,
+                       client_renderer=RichColumn.choices_client_renderer(Sex.choices)),
+            RichColumn(key="patient__date_of_birth", label="D.O.B.", orderable=True,
+                       client_renderer='TableFormat.timestamp'),
+        ]
 
-        if extra_filters is None:
-            extra_filters = {}
+    def get_initial_queryset(self) -> QuerySet[Sample]:
+        cohort = Cohort.get_for_user(self.user, self.get_query_param("cohort_id"))
+        qs = Sample.filter_for_user(self.user)
+        qs = qs.filter(vcf__genome_build=cohort.genome_build, import_status=ImportStatus.SUCCESS)
 
-        cohort = Cohort.get_for_user(user, cohort_id)
-        sample_filters = [Q(vcf__genome_build=cohort.genome_build),
-                          Q(import_status=ImportStatus.SUCCESS)]
-        SHOW_COHORT = "show_cohort"
-        EXCLUDE_COHORT = "exclude_cohort"
-        cohort_op = extra_filters.get("cohort_op", EXCLUDE_COHORT)
+        cohort_op = self.get_query_param("cohort_op") or self.EXCLUDE_COHORT
         cohort_q = Q(cohortsample__cohort=cohort)
-        if cohort_op == SHOW_COHORT:
+        if cohort_op == self.SHOW_COHORT:
             pass
-        elif cohort_op == EXCLUDE_COHORT:
+        elif cohort_op == self.EXCLUDE_COHORT:
             cohort_q = ~cohort_q
         else:
             raise ValueError(f"Unknown cohort_op: '{cohort_op}'")
-
-        sample_filters.append(cohort_q)
-        q = reduce(operator.and_, sample_filters)
-        queryset = Sample.filter_for_user(user).filter(q).order_by("-pk")
-        self.queryset = queryset.values(*self.get_field_names())
+        return qs.filter(cohort_q)
 
 
 class CohortListColumns(DatatableConfig[Cohort]):

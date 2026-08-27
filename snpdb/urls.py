@@ -3,12 +3,11 @@ from django.urls import include
 from django.urls.conf import path as path_standard
 from django.views.generic import RedirectView
 
-from library.django_utils.jqgrid_view import JQGridView
 from library.preview_request import preview_view
 from snpdb.grids import (
     AlleleLiftoverFailureColumns,
     CohortListColumns,
-    CohortSampleListGrid,
+    CohortSampleListColumns,
     CustomColumnsCollectionColumns,
     GenomicIntervalsListColumns,
     LiftoverRunAlleleLiftoverColumns,
@@ -16,12 +15,12 @@ from snpdb.grids import (
     ManualVariantEntryCollectionColumns,
     QuadsListColumns,
     SampleColumns,
-    SampleSkippedAnnotationGrid,
+    SampleSkippedAnnotationColumns,
     SamplesListColumns,
     TagColorsCollectionColumns,
     TriosListColumns,
     VCFListColumns,
-    VCFSkippedAnnotationGrid,
+    VCFSkippedAnnotationColumns,
 )
 from snpdb.views import views, views_autocomplete, views_json, views_rest
 from snpdb.views.datatable_view import DatabaseTableView
@@ -136,11 +135,12 @@ urlpatterns = [
 
     # Grids
     path('cohort/datatable/', DatabaseTableView.as_view(column_class=CohortListColumns), name='cohort_datatable'),
-    path('cohort_sample/grid/<int:cohort_id>/<slug:op>/', JQGridView.as_view(grid=CohortSampleListGrid), name='cohort_sample_grid'),
+    path('cohort_sample/datatable/<int:cohort_id>/', DatabaseTableView.as_view(column_class=CohortSampleListColumns), name='cohort_sample_datatable'),
     path('sample/list/datatable/', DatabaseTableView.as_view(column_class=SamplesListColumns),
          name='samples_list_datatable'),
-    path('sample/skipped_annotation/grid/<int:sample_id>/<slug:op>/',
-         JQGridView.as_view(grid=SampleSkippedAnnotationGrid), name='sample_skipped_annotation_grid'),
+    path('sample/skipped_annotation/datatable/<int:sample_id>/',
+         DatabaseTableView.as_view(column_class=SampleSkippedAnnotationColumns),
+         name='sample_skipped_annotation_datatable'),
     path('genomic_intervals/datatable/', DatabaseTableView.as_view(column_class=GenomicIntervalsListColumns), name='genomic_intervals_datatable'),
     path('liftover/liftover_runs/datatable', DatabaseTableView.as_view(column_class=LiftoverRunColumns),
          name='liftover_runs_datatable'),
@@ -161,8 +161,9 @@ urlpatterns = [
     path('trio/datatable/', DatabaseTableView.as_view(column_class=TriosListColumns), name='trio_datatable'),
     path('quad/datatable/', DatabaseTableView.as_view(column_class=QuadsListColumns), name='quad_datatable'),
     path('vcfs/datatable/', DatabaseTableView.as_view(column_class=VCFListColumns), name='vcfs_datatable'),
-    path('vcf/skipped_annotation/grid/<int:vcf_id>/<slug:op>/',
-         JQGridView.as_view(grid=VCFSkippedAnnotationGrid), name='vcf_skipped_annotation_grid'),
+    path('vcf/skipped_annotation/datatable/<int:vcf_id>/',
+         DatabaseTableView.as_view(column_class=VCFSkippedAnnotationColumns),
+         name='vcf_skipped_annotation_datatable'),
 
     # Autocompletes
     path('autocomplete/Cohort/', views_autocomplete.CohortAutocompleteView.as_view(), name='cohort_autocomplete'),

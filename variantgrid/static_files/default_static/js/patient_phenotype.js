@@ -120,7 +120,7 @@ function displayPhenotypeMatches(descriptionBox, phenotypeText, phenotypeMatches
 }
 
 
-function phenotypeMatchesToJqGridData(phenotypeMatches) {
+function phenotypeMatchesToGridData(phenotypeMatches) {
     const gridData = [];
     const accessionSet = new Set(); // unique terms only
     for (let i=0 ; i<phenotypeMatches.length ; ++i) {

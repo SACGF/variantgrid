@@ -265,3 +265,30 @@ function renderGeneSymbolNewWindow(data, type, row) {
     });
     return dom.prop('outerHTML');
 }
+
+
+// Cohort page sample pickers - the checkbox is what add/remove to cohort reads
+function renderCohortSampleCheckbox(data, type, row) {
+    if (!data || !data.text) {
+        return '<span class="no-value">-</span>';
+    }
+    const dom = $('<span>');
+    $('<input>', {type: 'checkbox', class: 'sample-checkbox', sample_id: data.text}).appendTo(dom);
+    $('<a>', {href: data.url, class: 'hover-link ml-1', text: data.text}).appendTo(dom);
+    return dom.prop('outerHTML');
+}
+
+
+// Node editor column summary - each value links to a FilterNode on it, where the column supports one
+function renderColumnSummaryFilterChildLink(data, type, row, renderContext) {
+    const extra = renderContext.extra;
+    if (!extra.createFilterChildLinks) {
+        return data;
+    }
+    // A missing value goes back as the string "null" - that's what the column filter matches on
+    const value = JSON.stringify(String(row.c0));
+    return $('<a>', {
+        href: `javascript:createFilterChild(${JSON.stringify(extra.gridColumnName)}, ${value});`,
+        html: data
+    }).prop('outerHTML');
+}

@@ -16,23 +16,24 @@
 <h3>Sequencing Stats Data</h3>
 
 {% if has_sequencing_samples %}
-{% load jqgrid_tags %}
-
 <div class='grid-container'>
-{% jqgrid 'sequencing_samples_grid' name='Sequencing Samples' search=False delete=False %}
+<h4>Sequencing Samples</h4>
+<table id="sequencing-samples-grid" class="sticky-header" data-datatable-url="{% url 'sequencing_samples_datatable' %}"></table>
 </div>
 
 <div class='grid-container'>
-{% jqgrid 'sequencing_samples_historical_grid' name='All Sequencing Samples' search=False delete=False time_frame='all' %}
-</div>
-
-
-<div class='grid-container'>
-{% jqgrid 'sequencing_samples_historical_grid' name='Sequencing Samples By Year' search=False delete=False time_frame='year' %}
+<h4>All Sequencing Samples</h4>
+<table id="all-sequencing-samples-grid" class="sticky-header" data-datatable-url="{% url 'sequencing_samples_historical_datatable' time_frame='all' %}"></table>
 </div>
 
 <div class='grid-container'>
-{% jqgrid 'sequencing_samples_historical_grid' name='Sequencing Samples By Month' search=False delete=False time_frame='month_offset' %}
+<h4>Sequencing Samples By Year</h4>
+<table id="sequencing-samples-by-year-grid" class="sticky-header" data-datatable-url="{% url 'sequencing_samples_historical_datatable' time_frame='year' %}"></table>
+</div>
+
+<div class='grid-container'>
+<h4>Sequencing Samples By Month</h4>
+<table id="sequencing-samples-by-month-grid" class="sticky-header" data-datatable-url="{% url 'sequencing_samples_historical_datatable' time_frame='month_offset' %}"></table>
 </div>
 {% else %}
     <p>No sequencing runs to show.</p> 

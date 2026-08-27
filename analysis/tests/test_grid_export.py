@@ -32,7 +32,7 @@ from analysis.tasks.analysis_grid_export_tasks import (
 )
 from annotation.fake_annotation import get_fake_annotation_version
 from library.django_utils import FakeRequest
-from library.django_utils.jqgrid_view import EXPORT_ROWS_PER_CHUNK, grid_export_csv
+from library.django_utils.grid_export import EXPORT_ROWS_PER_CHUNK, grid_export_csv
 from snpdb.models import CachedGeneratedFile, CohortGenotype, GenomeBuild, Tag
 from snpdb.models.models_cohort import CohortGenotypeCollection
 from snpdb.models.models_enums import CohortGenotypeCollectionType

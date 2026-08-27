@@ -1,6 +1,6 @@
-from library.django_utils.jqgrid_view import JQGridView
 from pathtests import views, views_autocomplete, views_rest
-from pathtests.grids import CasesGrid, PathologyTestOrdersGrid, PathologyTestsGrid
+from pathtests.grids import CasesColumns, PathologyTestOrdersColumns, PathologyTestsColumns
+from snpdb.views.datatable_view import DatabaseTableView
 from variantgrid.perm_path import path
 
 urlpatterns = [
@@ -22,9 +22,9 @@ urlpatterns = [
     path('view_case/<int:pk>', views.view_case, name='view_case'),
     path('view_external_case/<external_pk>', views.view_external_case, name='view_external_case'),
     # Grids
-    path('pathology_test_orders/grid/<slug:op>/', JQGridView.as_view(grid=PathologyTestOrdersGrid), name='pathology_test_orders_grid'),
-    path('cases/grid/<slug:op>/', JQGridView.as_view(grid=CasesGrid), name='cases_grid'),
-    path('pathology_test/grid/<slug:op>/', JQGridView.as_view(grid=PathologyTestsGrid), name='pathology_tests_grid'),
+    path('pathology_test_orders/datatable/', DatabaseTableView.as_view(column_class=PathologyTestOrdersColumns), name='pathology_test_orders_datatable'),
+    path('cases/datatable/', DatabaseTableView.as_view(column_class=CasesColumns), name='cases_datatable'),
+    path('pathology_test/datatable/', DatabaseTableView.as_view(column_class=PathologyTestsColumns), name='pathology_tests_datatable'),
     # Autocompletes
     path('autocomplete/PathologyTest/v2', views_autocomplete.PathologyTestAutocompleteView.as_view(), name='pathology_test_autocomplete'),
     path('autocomplete/PathologyTestVersion', views_autocomplete.PathologyTestVersionAutocompleteView.as_view(), name='pathology_test_version_autocomplete'),

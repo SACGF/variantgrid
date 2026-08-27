@@ -17,22 +17,24 @@
     <div class="container-table">
         <h3>QC Data</h3>
 
-        {% load jqgrid_tags %}
-
         <div class='grid-container'>
-        {% jqgrid 'illumina_flowcell_qc_grid' name='IlluminaFlowcellQC' search=False delete=False %}
+        <h4>IlluminaFlowcellQC</h4>
+        <table id="illumina-flowcell-qc-grid" class="sticky-header" data-datatable-url="{% url 'illumina_flowcell_qc_datatable' %}"></table>
         </div>
 
         <div class='grid-container'>
-        {% jqgrid 'fastqc_grid' name='FastQC' search=False delete=False %}
+        <h4>FastQC</h4>
+        <table id="fastqc-grid" class="sticky-header" data-datatable-url="{% url 'fastqc_datatable' %}"></table>
         </div>
 
         <div class='grid-container'>
-        {% jqgrid 'flagstats_grid' name='Flagstats' search=False delete=False %}
+        <h4>Flagstats</h4>
+        <table id="flagstats-grid" class="sticky-header" data-datatable-url="{% url 'flagstats_datatable' %}"></table>
         </div>
 
         <div class='grid-container'>
-        {% jqgrid 'qc_exec_summary_grid' name='QCExecSummary' search=False delete=False %}
+        <h4>QCExecSummary</h4>
+        <table id="qc-exec-summary-grid" class="sticky-header" data-datatable-url="{% url 'qc_exec_summary_datatable' %}"></table>
         </div>
     </div>
 

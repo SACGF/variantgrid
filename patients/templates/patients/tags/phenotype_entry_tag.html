@@ -40,10 +40,7 @@ span.select2-container {
 }
 
 </style>
-{# LEGACY-JQGRID: the phenotype terms grid and its client side CSV #}
-<script src="{% static 'js/include_jqgrid.js' %}"></script>
-<script src="{% static 'js/patient_phenotype.js' %}"></script> 
-<script src="{% static 'js/json2csv.js' %}"></script> 
+<script src="{% static 'js/patient_phenotype.js' %}"></script>
 <script>
 // Global scope functions - so need to be unique
 function showPhenotypeGrid_{{ flattened_uuid }}() {
@@ -52,30 +49,12 @@ function showPhenotypeGrid_{{ flattened_uuid }}() {
 }
 
 
-function downloadPhenotypeGridAsCSV_{{ flattened_uuid }}() {
-    const phenotypeEditorTag = $("#phenotype-entry-{{ flattened_uuid }}");
-    const selector = $("#phenotype-entry-terms-grid", phenotypeEditorTag);
-    const grid = jQuery(selector).jqGrid();
-    const gridData = grid.getRowData();
-
-    const csv = JSON2CSV(gridData, true, true);
-    const downloadLink = document.createElement("a");
-    const blob = new Blob(["\ufeff", csv], {type: 'text/csv'});
-    downloadLink.href = URL.createObjectURL(blob);
-    downloadLink.download = "phenotypes.csv";
-    
-    document.body.appendChild(downloadLink);
-    downloadLink.click();
-    document.body.removeChild(downloadLink);
-}
-
 
 (function() {
     let typingTimer;                //timer identifier
     const doneTypingInterval = 2000;  //time in ms (2 seconds)
     let ignoreAutcompleteChangeEvent = false;
     const phenotypeEditorTag = $("#phenotype-entry-{{ flattened_uuid }}");
-    const downloadPhenotypeGridAsCSV = downloadPhenotypeGridAsCSV_{{ flattened_uuid }};
     const phenotypeExcludeString = {% if phenotype_exclude_string %}"{{ phenotype_exclude_string|escapejs }}"{% else %}null{% endif %};
     
     function getPhenotypeInput() {
@@ -96,7 +75,7 @@ function downloadPhenotypeGridAsCSV_{{ flattened_uuid }}() {
             success: function(phenotypeMatches) {
                 console.log(phenotypeMatches);
                 displayPhenotypeMatches(descriptionBox, phenotypeText, phenotypeMatches, phenotypeExcludeString);
-                const gridData = phenotypeMatchesToJqGridData(phenotypeMatches);
+                const gridData = phenotypeMatchesToGridData(phenotypeMatches);
                 if (gridData.length) {
                     $(".has-phenotypes-icon").show();
                     createTermGrid(gridData);
@@ -171,41 +150,26 @@ function downloadPhenotypeGridAsCSV_{{ flattened_uuid }}() {
     }
     
     
+    // The rows come from the phenotype matcher rather than an endpoint, so this is a client side table
     function createTermGrid(gridData) {
-        const selector = $("#phenotype-entry-terms-grid", phenotypeEditorTag);
-        const pagerId = "#phenotype-entry-terms-grid-pager-{{ flattened_uuid }}";
+        const selector = $("#phenotype-entry-terms-grid-{{ flattened_uuid }}");
 
-        const alreadyLoaded = selector[0].grid;
-        if (alreadyLoaded) {
-            // update existing grid
-            selector.jqGrid('setGridParam', {data: gridData}).trigger('reloadGrid');
+        if ($.fn.dataTable.isDataTable(selector)) {
+            selector.DataTable().clear().rows.add(gridData).draw();
         } else {
-            const grid = selector.jqGrid({
-                datatype: "local",
+            selector.DataTable({
                 data: gridData,
-                colModel: [
-                    {name: 'accession', index: 'accession', label: 'Accession', formatter: 'ontologyTermFormatter'},
-                    {name: 'name', index: 'name', label: 'Name'},
-                    {name: 'gene_symbols', index: 'gene_symbols', label: 'Gene Symbols'},
+                columns: [
+                    {data: 'accession', title: 'Accession', render: ontologyTermFormatter},
+                    {data: 'name', title: 'Name'},
+                    {data: 'gene_symbols', title: 'Gene Symbols'},
                 ],
-                caption: "Matched Phenotype Terms",
-                height: 'auto',
-                autowidth: true,
-                rowNum: 20,
-                pager: pagerId,
-            });
-            grid.navGrid(pagerId, {add: false, edit: false, del: false, view: false, search: false});
-        
-            grid.jqGrid('navButtonAdd', pagerId, {
-                        caption : "Download CSV",
-                        buttonicon : "ui-icon-arrowthickstop-1-s",
-                        onClickButton : downloadPhenotypeGridAsCSV,
-                        position : "first",
-                        title : "Export",
-                        cursor : "pointer"
+                pageLength: 20,
+                dom: '<"toolbar">rtBip',
+                buttons: [{extend: 'csvHtml5', text: 'Download as CSV', filename: 'phenotypes'}],
             });
         }
-        
+
         {% if show_grid %}
             if (gridData.length) {
                 showGrid();
@@ -222,9 +186,7 @@ function downloadPhenotypeGridAsCSV_{{ flattened_uuid }}() {
         if (m) {
             let safeTermId = m[1] + "_" + m[2];
             let url = Urls.ontology_term(safeTermId);
-            console.log(url);
             termText = `<a href='${url}' target='_blank'>${termText}</a>`;
-
         }
         return termText;
     }
@@ -236,7 +198,7 @@ function downloadPhenotypeGridAsCSV_{{ flattened_uuid }}() {
             const descriptionBox = $("#description-highlighted", phenotypeEditorTag);
             const phenotypeText = `{{ initial_phenotype_text|escapejs }}`; // can have newlines
             displayPhenotypeMatches(descriptionBox, phenotypeText, phenotypeMatches, phenotypeExcludeString);
-            const gridData = phenotypeMatchesToJqGridData(phenotypeMatches);
+            const gridData = phenotypeMatchesToGridData(phenotypeMatches);
             createTermGrid(gridData);
             $(".has-phenotypes-icon").show();
         } else {
@@ -280,11 +242,6 @@ function downloadPhenotypeGridAsCSV_{{ flattened_uuid }}() {
         {% endif %}
         
     });
-
-    jQuery.extend($.fn.fmatter , {
-        'ontologyTermFormatter': ontologyTermFormatter,
-    });
-
 
 })();
 </script>
@@ -359,14 +316,11 @@ function downloadPhenotypeGridAsCSV_{{ flattened_uuid }}() {
         <a class='left' title='Show Grid' href="javascript:showPhenotypeGrid_{{ flattened_uuid }}()">
             <div class='show-grid-icon icon32 has-phenotypes-icon hidden'></div>
         </a>
-        <a class='left' title='Download Phenotypes as CSV' href="javascript:downloadPhenotypeGridAsCSV_{{ flattened_uuid }}()">
-            <div class='csv-icon icon32 has-phenotypes-icon hidden'></div>
-        </a>
         <div class='clear'></div>
     </div>
     <div class='hidden' id='phenotype-entry-terms-grid-container'>
-        <table id='phenotype-entry-terms-grid'></table>
-        <div id="phenotype-entry-terms-grid-pager-{{ flattened_uuid }}"></div> 
+        <h5>Matched Phenotype Terms</h5>
+        <table id='phenotype-entry-terms-grid-{{ flattened_uuid }}' class='sticky-header'></table>
     </div>
     <div id="phenotype-message">
 

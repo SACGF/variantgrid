@@ -761,11 +761,6 @@ li.error::before {
   margin-right: 4px;
 }
 
-.jqgrid-container .ui-corner-top {
-  border-top-right-radius: 0;
-  border-top-left-radius: 0;
-}
-
 .grid-link {
   float: left;
   border: 0px !important;
@@ -1483,10 +1478,6 @@ span.select2-container {
 }
 .card-body-list .list-group .list-group-item:last-child {
   border-bottom: none !important;
-}
-
-.ui-jqgrid > .ui-jqgrid-pager {
-  height: 38px !important;
 }
 
 hr {
