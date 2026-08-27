@@ -38,8 +38,9 @@ class OverlapCalculatorBase(ABC):
             match entry.contribution_status:
                 case OverlapContributionStatus.CONTRIBUTING:
                     contributing.append(entry)
-                    if contributing_lab_group := entry.classification_grouping.lab.group_name:
-                        involved_labs.append(contributing_lab_group)
+                    if classification_grouping := entry.classification_grouping:
+                        if contributing_lab_group := classification_grouping.lab.group_name:
+                            involved_labs.append(contributing_lab_group)
                 case OverlapContributionStatus.NON_COMPARABLE_VALUE:
                     non_comparable_values += 1
                 case _:
