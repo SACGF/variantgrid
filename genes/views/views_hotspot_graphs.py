@@ -16,6 +16,7 @@ from annotation.models.models import AnnotationVersion, VariantAnnotation, Varia
 from annotation.models.molecular_consequence_enums import MolecularConsequenceColors
 from classification.enums import ShareLevel
 from classification.models import Classification, ClassificationModification
+from genes.interpro import store_domains_for_transcripts
 from genes.models import Gene, Transcript, TranscriptVersion
 from library.constants import MINUTE_SECS
 from library.utils import segment
@@ -107,6 +108,10 @@ class HotspotGraphView(TemplateView):
             # Sort by canonical then choose higher version if any ties
             tv_list = sorted(tv_qs, key=lambda tv: (tv.canonical_score, tv.version), reverse=True)
             if tv_list:
+                # Pfam domains are fetched from InterPro on demand - warm up the whole candidate set in
+                # one batch, so the search below (and get_context_data) see everything we can get
+                store_domains_for_transcripts({tv.transcript_id for tv in tv_list})
+
                 # First, we look for canonical in our gene annotation release
                 canonical, non_canonical = segment(tv_list, filter_func=lambda tv: tv.canonical_score)
                 if self._prefer_canonical_with_diff_version:

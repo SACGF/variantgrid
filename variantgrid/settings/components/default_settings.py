@@ -474,6 +474,16 @@ LIFTOVER_BCFTOOLS_ALLOW_SWAP = False
 
 BCFTOOLS_COMMAND = "bcftools"  # if not absolute, needs to be in path
 
+# Pfam protein domains are fetched per-gene from the InterPro API the first time a gene's graph is
+# viewed, then cached in PfamDomains - @see https://github.com/SACGF/variantgrid/issues/1554
+PFAM_INTERPRO_LAZY_DOMAINS = True
+PFAM_INTERPRO_API_URL = "https://www.ebi.ac.uk/interpro/api"
+PFAM_INTERPRO_TIMEOUT_SECONDS = 30
+PFAM_INTERPRO_MAX_WORKERS = 8
+# Genes with a lot of UniProt sequences would otherwise stall a page - whatever hasn't come back by
+# then is left unstamped, and picked up by the next view
+PFAM_INTERPRO_DEADLINE_SECONDS = 20
+
 PANEL_APP_CACHE_DAYS = 7  # Automatically re-check after this time
 GENE_RELATION_PANEL_APP_LIVE_UPDATE = False  # Use GenCC cached result if False, poll panel app if True
 
