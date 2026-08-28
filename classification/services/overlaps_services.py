@@ -414,6 +414,7 @@ class ChangeRow:
     timestamp: datetime
     is_new_record: bool
     is_withdrawn: bool = False
+    is_unwithdrawn: bool = False
 
     def __lt__(self, other):
         return self.timestamp < other.timestamp
@@ -553,125 +554,92 @@ class OverlapGrouping3:
             return f"Decoding Error: {value}"
         return value
 
+    def _to_value_dict(self, buffer: list[LogEntry], overlap_contribution: OverlapContribution, is_new_record: bool = False) -> Optional[ChangeRow]:
+        comment: Optional[str] = None
+        field_changes: list[FieldChange] = []
+        for key in "effective_date", "triage_status", "value", "comment":
+            # get new value
+            old_value = None
+            new_value = None
+            found_value = False
+            is_withdrawn = False
+            for entry in reversed(buffer):
+                if value_list := entry.changes_dict.get(key):
+                    if new_value_test := OverlapGrouping3.tidy_change(overlap_contribution, key, value_list[1]):
+                        new_value = new_value_test
+                        found_value = True
+                        break
+            for entry in buffer:
+                if value_list := entry.changes_dict.get(key):
+                    if old_value_test := OverlapGrouping3.tidy_change(overlap_contribution, key, value_list[0]):
+                        old_value = old_value_test
+                        found_value = True
+                        break
+            for entry in reversed(buffer):
+                if contribution_status_change := entry.changes_dict.get("contribution_status"):
+                    if contribution_status_change[1] == OverlapContributionStatus.NO_VALUE:
+                        is_withdrawn=True
+                    break
+
+            if found_value:
+                if key == "comment":
+                    comment = new_value
+                else:
+                    field_changes.append(FieldChange(field=key, old_value=old_value, new_value=new_value))
+
+        if field_changes or comment:
+            reference_entry = buffer[-1]
+            return ChangeRow(
+                overlap_contribution=overlap_contribution,
+                user=reference_entry.actor,
+                changes=field_changes,
+                comment=comment,
+                timestamp=reference_entry.timestamp,
+                is_new_record=is_new_record,
+                is_withdrawn=is_withdrawn
+            )
+        else:
+            return None
+
     @cached_property
     def change_log(self) -> list[ChangeRow]:
-        """
-        Code is a bit of a mess, but converts a list of LogEntry into ChangeRows
-        Complexity comes from:
-            If a record is new, merge all the changes from before it was shared (so we just see everything at the state when it was first shared)/
-            Otherwise if 2+ (non-conflicting) changes happen within a very small time window, merge them together
-        """
-
+        merge_buffer = timedelta(seconds=1)
         change_rows: list[ChangeRow] = []
 
         for contribution in self.overlap.contributions_all:
             contribution_log: list[LogEntry] = list(LogEntry.objects.get_for_object(contribution).order_by('timestamp').all())
 
+            is_new_record = True
+            just_withdrawn = False
             buffer: list[LogEntry] = []
-            time_buffer = False
-            for index, entry in enumerate(contribution_log):
 
-                is_new_record = False
-                if (id_change := entry.changes_dict.get("id")) and id_change[0] == 'None':
-                    is_new_record = True
+            def handle_buffer():
+                nonlocal buffer
+                nonlocal contribution
+                nonlocal is_new_record
+                nonlocal change_rows
+                nonlocal just_withdrawn
 
-                    contributing_status = entry.changes_dict.get("contribution_status")
-                    if not contributing_status or contributing_status[1] not in (OverlapContributionStatus.CONTRIBUTING, OverlapContributionStatus.NON_COMPARABLE_VALUE):
-                        buffer.append(entry)
-                        continue
-
-                elif buffer and not time_buffer:
-                    merge_buffer = False
-                    if contributing_status := entry.changes_dict.get("contribution_status"):
-                        if contributing_status[1] in (OverlapContributionStatus.CONTRIBUTING, OverlapContributionStatus.NON_COMPARABLE_VALUE):
-                            merge_buffer = True
-
-                    if not merge_buffer:
-                        buffer.append(entry)
-                        continue
-
-                if time_buffer or not buffer:
-                    if index + 1 < len(contribution_log):
-                        next_log = contribution_log[index + 1]
-                        use_timestamp = buffer[0] if buffer else entry
-                        # buffer events that happen within 1 seconds - catches knock on effects
-                        if next_log.timestamp - use_timestamp.timestamp < timedelta(seconds=1):
-                            has_clash = False
-                            for key in "effective_date", "triage_status", "value", "triage_state", "comment":
-                                if key in entry.changes_dict:
-                                    for buffered in buffer:
-                                        if key in buffered.changes_dict:
-                                            has_clash = True
-                                            break
-                                if has_clash:
-                                    break
-                            if not has_clash:
-                                time_buffer = True
-                                buffer.append(entry)
-                                continue
-
-                latest_values = {}
-                if buffer:
-                    if time_buffer:
-                        time_buffer = False
-                    else:
-                        is_new_record = True  # as in this is the first time we're displaying the record
-
-                    for buffered_entry in reversed([entry] + buffer):
-                        for key, value_list in buffered_entry.changes_dict.items():
-                            if key not in latest_values:
-                                latest_values[key] = value_list
-                    buffer.clear()
-                else:
-                    latest_values = entry.changes_dict
-
-                comment: Optional[TriageComment] = None
-                field_changes = []
-
-                if contribution_status_change := latest_values.get("contribution_status"):
-                    if not is_new_record and contribution_status_change[1] == OverlapContributionStatus.NO_VALUE:
-                        change_rows.append(ChangeRow(
-                            overlap_contribution=contribution,
-                            user=entry.actor,
-                            changes=[],
-                            comment=None,
-                            timestamp=entry.timestamp,
-                            is_new_record=False,
-                            is_withdrawn=True
-                        ))
-                        buffer.append(entry)
-                        continue
-
-                for key, value_list in latest_values.items():
-                    old_value = OverlapGrouping3.tidy_change(contribution, key, value_list[0])
-                    new_value = OverlapGrouping3.tidy_change(contribution, key, value_list[1])
-
-                    if key == "comment":
-                        if new_value:
-                            comment = new_value
-                        continue
-                    elif key not in ("effective_date", "triage_status", "value", "triage_state"):
-                        continue
-
-                    if is_new_record and key == "triage_state":
-                        continue  # triage_state should always start as pending
-
-                    field_change = FieldChange(key, old_value, new_value)
-                    field_changes.append(field_change)
-
-                if field_changes or comment:
-
-                    user: Optional[User] = entry.actor
-                    change_row = ChangeRow(
-                        overlap_contribution=contribution,
-                        user=user,
-                        changes=list(sorted(field_changes)),
-                        comment=comment,
-                        timestamp=entry.timestamp,
-                        is_new_record=is_new_record
-                    )
+                if change_row := self._to_value_dict(buffer, contribution, is_new_record):
+                    if change_row.is_withdrawn:
+                        just_withdrawn = True
+                    elif just_withdrawn:
+                        change_row.is_unwithdrawn = True
+                        just_withdrawn = False
+                    is_new_record = False
                     change_rows.append(change_row)
 
+            for index, entry in enumerate(contribution_log):
+                if not buffer:
+                    buffer.append(entry)
+                elif entry.timestamp - buffer[0].timestamp < merge_buffer:
+                    buffer.append(entry)
+                else:
+                    handle_buffer()
+                    buffer.clear()
+                    buffer.append(entry)
+            if buffer:
+                handle_buffer()
         return list(sorted(change_rows))
 
 

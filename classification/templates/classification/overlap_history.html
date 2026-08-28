@@ -25,11 +25,14 @@
                     {% if change.is_new_record %}
                         <label class="mb-2">Record registered in {{ site_name }}</label>
                     {% endif %}
+                    {% if change.is_unwithdrawn %}
+                        <label class="mb-2">Record re-added</label>
+                    {% endif %}
                     {% if change.is_withdrawn %}
                         <div><label class="text-danger">Record withdrawn</label></div>
                     {% else %}
                         {% for field_change in change.changes %}
-                            <div><label>{{ field_change.field | pretty_label }}</label>: {% if not change.is_new_record %}{{ field_change.old_value }} -> {% endif %}{{ field_change.new_value }}</div>
+                            <div><label>{{ field_change.field | pretty_label }}</label>: {% if not change.is_new_record and not change.is_unwithdrawn %}{{ field_change.old_value }} -> {% endif %}{{ field_change.new_value }}</div>
                         {% endfor %}
                         {% if change.comment %}
                             <div class="comment">{{ change.comment.text }}</div>

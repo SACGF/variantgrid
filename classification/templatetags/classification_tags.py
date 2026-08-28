@@ -402,7 +402,7 @@ def classification_quick(context,
 
     category_text = None
     if show_category:
-        if grouping := ClassificationGroupingEntry.grouping_for(vcm.classification):
+        if grouping := ClassificationGroupingEntry.grouping_for(vc.classification):
             parts = grouping.allele_origin_grouping.labels(include_allele_origin=True)
             if parts[0] == "Somatic":
                 parts = parts[1:]
