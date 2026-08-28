@@ -38,6 +38,14 @@ class ClassificationsNodeClinVarQTest(AnalysisSetupMixin, TestCase):
         # An empty Q drops out of the OR, so the node still asks exactly what it asked before
         self.assertEqual(node._get_node_q(), node._classifications_q())
 
+    def test_clinvar_only_node_skips_the_classification_query(self):
+        """ No significance pills selected - the node is purely a ClinVar filter """
+        all_pills_off = dict.fromkeys(list(ClassificationsNode.FIELD_CLINICAL_SIGNIFICANCE) +
+                                      list(ClassificationsNode.FIELD_SOMATIC_CLINICAL_SIGNIFICANCE), False)
+        node = ClassificationsNode.objects.create(analysis=self.analysis, clinvar_pathogenic=True, **all_pills_off)
+        self.assertFalse(node.has_classification_filters())
+        self.assertEqual(node._get_node_q(), node._clinvar_q())
+
     def test_significance_include(self):
         node = ClassificationsNode(analysis=self.analysis, clinvar_pathogenic=True, clinvar_likely_pathogenic=True)
         self.assertEqual(node._clinvar_q(),

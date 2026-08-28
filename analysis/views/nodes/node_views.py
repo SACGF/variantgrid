@@ -111,14 +111,16 @@ class ClassificationsNodeView(NodeView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        modified = self.object.modified
-        count = Classification.objects.filter(modified__gt=modified).count()
-        if count:
-            if count == 1:
-                plural = ""
-            else:
-                plural = "s"
-            context["out_of_date_message"] = f"{count} new classification{plural} since last save."
+        # ClinVar comes from a fixed annotation version, so only classification filters go out of date
+        if self.object.has_classification_filters():
+            modified = self.object.modified
+            count = Classification.objects.filter(modified__gt=modified).count()
+            if count:
+                if count == 1:
+                    plural = ""
+                else:
+                    plural = "s"
+                context["out_of_date_message"] = f"{count} new classification{plural} since last save."
         return context
 
     def _get_form_initial(self):

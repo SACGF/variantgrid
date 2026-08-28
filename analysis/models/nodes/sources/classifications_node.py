@@ -156,6 +156,15 @@ class ClassificationsNode(AnalysisNode):
             vc_qs = vc_qs.filter(lab__in=lab_list)
         return Classification.get_variant_q_from_classification_qs(vc_qs, self.analysis.genome_build)
 
+    def has_classification_filters(self) -> bool:
+        """ Whether any classification significance is selected for the node's allele origin - with none
+            selected the node is purely a ClinVar filter """
+        if self.germline_enabled and self._selected_values(self.FIELD_CLINICAL_SIGNIFICANCE):
+            return True
+        if self.somatic_enabled and self._selected_values(self.FIELD_SOMATIC_CLINICAL_SIGNIFICANCE):
+            return True
+        return False
+
     def has_clinvar_filters(self) -> bool:
         return any([self._selected_values(self.FIELD_CLINVAR_PATHOGENICITY),
                     self._selected_values(self.FIELD_CLINVAR_SOMATIC_TIER),
@@ -229,7 +238,12 @@ class ClassificationsNode(AnalysisNode):
     def _get_node_q(self) -> Optional[Q]:
         # Classifications and ClinVar both answer "what has anyone said about this variant", so they OR -
         # which makes the NOT case "neither source says so"
-        q = self._classifications_q() | self._clinvar_q()
+        clinvar_q = self._clinvar_q()
+        if self.has_classification_filters() or not self.has_clinvar_filters():
+            q = self._classifications_q() | clinvar_q
+        else:
+            # ClinVar only - skip the classification query, which hits the DB to build its variant ids
+            q = clinvar_q
         if self.node_input == ClassificationsNodeInput.PARENT_NOT_MATCHING:
             q = ~q
         return q

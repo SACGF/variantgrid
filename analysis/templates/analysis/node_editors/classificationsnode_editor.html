@@ -153,12 +153,14 @@
             <div>
     		  <b>Last Saved:</b> {{ node.modified }}
             </div>
+            {% if node.has_classification_filters %}
             <div>
 		      <b>Warning:</b> This node retrieves variants that have been classified in this database - this changes over time!
             {% if out_of_date_message %}
 		      <p>{{ out_of_date_message }}</p>
             {% endif %}
 		    </div>
+            {% endif %}
         {% if has_write_permission %}
             <button id='classifications-node-save' class="btn btn-primary">save</button>
         {% endif %}
