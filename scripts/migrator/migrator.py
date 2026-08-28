@@ -310,7 +310,8 @@ class Migrator:
         # collectstatic without warning for conflicting files has been an issue for 6 years
         # see https://code.djangoproject.com/ticket/26583 maybe it'll get fixed soon? For now (since we've never had
         # a problem) just turn off all verbosity
-        CommandSubMigration.manage_py(["collectstatic", "-v", "0", "--noinput"]).using(key="c",
+        # --clear so a moved file whose mtime looks unchanged doesn't leave a stale copy behind
+        CommandSubMigration.manage_py(["collectstatic", "-v", "0", "--noinput", "--clear"]).using(key="c",
                                                                                        task_id="manage*collectstatic"),
         CommandSubMigration.manage_py(["deployment_check", "--die-if-invalid", "--quiet"]).using(key="k",
                                                                                        task_id="manage*deployment_check"),
