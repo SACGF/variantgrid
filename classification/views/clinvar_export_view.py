@@ -123,7 +123,7 @@ class ClinVarExportColumns(DatatableConfig[ClinVarExport]):
         allele = allele_for(row["clinvar_allele__allele"])
         return f"{allele:CA}"
 
-    def pre_render(self, qs: QuerySet[ClinVarExport]):
+    def pre_render(self, qs: QuerySet[ClinVarExport], rows: list[dict]):
         # find all the batches these records are in
         # do this once rather than per row
         self.export_to_batches = _export_id_to_batch_ids(qs)

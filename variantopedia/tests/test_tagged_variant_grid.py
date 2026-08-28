@@ -1,12 +1,22 @@
 from django.conf import settings
 from django.contrib.auth.models import User
+from django.db import connection
 from django.test import RequestFactory, TestCase
+from django.test.utils import CaptureQueriesContext
 from django.urls import resolve, reverse
 from guardian.shortcuts import assign_perm
 
 from analysis.models import Analysis, VariantTag
-from annotation.models import AnnotationVersion
+from annotation.models import (
+    AnnotationRangeLock,
+    AnnotationRun,
+    AnnotationVersion,
+    VariantAnnotation,
+    VariantAnnotationVersion,
+)
 from annotation.fake_annotation import create_fake_variants, get_fake_annotation_version
+from annotation.tests.test_data_fake_genes import create_fake_transcript_version, create_gata2_transcript_version
+from library.django_utils.django_partition import temporary_db_table
 from snpdb.models import (
     Allele,
     AlleleOrigin,
@@ -206,3 +216,115 @@ class TaggedVariantGridTest(TestCase):
                          {self.other_user_variant.pk})
         self.assertEqual(self._tags_grid_variant_ids({"user": self.other_user.pk}),
                          {self.other_user_variant.pk})
+
+
+class VariantTagsGridQueryTest(TestCase):
+    """ The tags grid pages 100 rows out of a query over every tag in the build, so what it costs per
+        row and per annotation version is the whole cost of the page (@see issue #1794) """
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.user = User.objects.get_or_create(username='variant_tags_grid_user')[0]
+        cls.other_user = User.objects.get_or_create(username='variant_tags_grid_other_user')[0]
+        cls.genome_build = GenomeBuild.get_name_or_alias("GRCh37")
+        cls.old_annotation_version = get_fake_annotation_version(cls.genome_build)
+        create_fake_variants(cls.genome_build)
+        cls.tag = Tag.objects.create(pk="GridQuery")
+        cls.variant, cls.other_variant = list(Variant.objects.order_by("pk")[:2])
+
+    @classmethod
+    def _tag(cls, variant: Variant, user: User = None, analysis: Analysis = None) -> VariantTag:
+        allele, _ = VariantAllele.objects.get_or_create(
+            variant=variant, genome_build=cls.genome_build, origin=AlleleOrigin.IMPORTED_TO_DATABASE,
+            defaults={"allele": Allele.objects.create()})
+        return VariantTag.objects.create(variant=variant, allele=allele.allele, tag=cls.tag, analysis=analysis,
+                                         genome_build=cls.genome_build, user=user or cls.user)
+
+    def _response(self, user: User = None):
+        url = reverse('variant_tags_datatable', kwargs={"genome_build_name": self.genome_build.name})
+        self.client.force_login(user or self.user)
+        response = self.client.post(url, {"length": 100, "tag": self.tag.pk})
+        self.assertEqual(response.status_code, 200)
+        return response.json()
+
+    def _rows(self, user: User = None) -> list[dict]:
+        return self._response(user)["data"]
+
+    def _annotate(self, variant_annotation_version: VariantAnnotationVersion, transcript_version):
+        """ Annotation lives in the version's own partition, so write it there not the parent table """
+        annotation_range_lock, _ = AnnotationRangeLock.objects.get_or_create(
+            version=variant_annotation_version, min_variant=self.variant, max_variant=self.variant, count=1)
+        annotation_run, _ = AnnotationRun.objects.get_or_create(annotation_range_lock=annotation_range_lock)
+        partition_table = variant_annotation_version.get_partition_table(
+            base_table_name=VariantAnnotationVersion.REPRESENTATIVE_TRANSCRIPT_ANNOTATION)
+        with temporary_db_table(VariantAnnotation, partition_table):
+            VariantAnnotation.objects.create(version=variant_annotation_version, variant=self.variant,
+                                             transcript_version=transcript_version,
+                                             gene=transcript_version.gene_version.gene,
+                                             annotation_run=annotation_run,
+                                             predictions_num_pathogenic=0, predictions_num_benign=0)
+
+    def _new_variant_annotation_version(self) -> VariantAnnotationVersion:
+        """ Retire the fake version and stand up a copy of it as the build's current annotation """
+        old_pk = self.old_annotation_version.variant_annotation_version_id
+        variant_annotation_version = VariantAnnotationVersion.objects.get(pk=old_pk)
+        variant_annotation_version.pk = None
+        variant_annotation_version.status = VariantAnnotationVersion.Status.NEW
+        variant_annotation_version.save()  # Creates the partition to write annotation into
+
+        VariantAnnotationVersion.objects.filter(pk=old_pk).update(
+            status=VariantAnnotationVersion.Status.HISTORICAL)
+        variant_annotation_version.status = VariantAnnotationVersion.Status.ACTIVE
+        variant_annotation_version.save()
+        AnnotationVersion.new_sub_version(self.genome_build)
+        return variant_annotation_version
+
+    def test_gene_symbol_comes_from_the_build_annotation_version_only(self):
+        """ Joining every version of the annotation multiplied the rows the DISTINCT had to sort """
+        self._tag(self.variant)
+        self._annotate(self.old_annotation_version.variant_annotation_version,
+                       create_fake_transcript_version(self.genome_build))  # RUNX1
+        self._annotate(self._new_variant_annotation_version(),
+                       create_gata2_transcript_version(self.genome_build))  # GATA2
+
+        rows = self._rows()
+        self.assertEqual(len(rows), 1, "One row per tag, however many versions the variant is annotated in")
+        self.assertEqual(rows[0]["gene_symbol"], "GATA2")
+
+    def test_delete_permissions_cost_the_same_however_many_rows(self):
+        """ can_write delegates to the analysis, so checking it per row was 2 Guardian queries a row """
+        analysis = Analysis.objects.create(genome_build=self.genome_build, user=self.user)
+        self._tag(self.variant, analysis=analysis)
+        self._rows()  # Warm the caches the first request of a session fills
+        with CaptureQueriesContext(connection) as one_row:
+            self._rows()
+
+        other_analysis = Analysis.objects.create(genome_build=self.genome_build, user=self.user)
+        self._tag(self.other_variant, analysis=analysis)
+        self._tag(self.other_variant, analysis=other_analysis)
+        with CaptureQueriesContext(connection) as three_rows:
+            rows = self._rows()
+
+        self.assertEqual(len(rows), 3)
+        self.assertEqual(len(three_rows.captured_queries), len(one_row.captured_queries))
+
+    def test_only_writable_tags_offer_delete(self):
+        other_analysis = Analysis.objects.create(genome_build=self.genome_build, user=self.other_user)
+        mine = self._tag(self.variant)
+        theirs = self._tag(self.other_variant, user=self.other_user, analysis=other_analysis)
+        assign_perm(VariantTag.get_read_perm(), self.user, theirs)
+        assign_perm(Analysis.get_read_perm(), self.user, other_analysis)
+
+        delete_by_tag_id = {row["id"]: row["delete"] for row in self._rows()}
+        self.assertTrue(delete_by_tag_id[mine.pk], "Own tag is deletable")
+        self.assertIsNone(delete_by_tag_id[theirs.pk], "Tag on someone else's analysis is not deletable")
+
+    def test_records_total_skips_counting_the_unfiltered_queryset(self):
+        """ The initial queryset is every tag in the build - too expensive to count for a footer """
+        self._tag(self.variant)
+        VariantTag.objects.create(variant=self.other_variant, tag=Tag.objects.create(pk="OtherGridQuery"),
+                                  genome_build=self.genome_build, user=self.user)
+        data = self._response()
+        self.assertEqual(1, data["recordsFiltered"])
+        self.assertEqual(data["recordsFiltered"], data["recordsTotal"])

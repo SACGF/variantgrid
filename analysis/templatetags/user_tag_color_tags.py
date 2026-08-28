@@ -117,15 +117,18 @@ def tag_colors_collection_link(context):
 
 @register.inclusion_tag("analysis/tags/tag_counts_filter.html", takes_context=True)
 def tag_counts_filter(context, genome_build: GenomeBuild,
-                      click_func=None, show_all_func=None, gene_symbol=None, any_tag_button=True):
-    tag_kwargs = {}
-    if gene_symbol:
-        annotation_version = AnnotationVersion.latest(genome_build)
-        gene_variant_qs = get_variant_queryset_for_gene_symbol(gene_symbol, annotation_version,
-                                                               traverse_aliases=True)
-        tag_kwargs["variant_qs"] = gene_variant_qs
-    variant_tags_qs = VariantTag.get_for_build(genome_build=genome_build, **tag_kwargs)
-    tag_counts = sorted(get_field_counts(variant_tags_qs, "tag").items())
+                      click_func=None, show_all_func=None, gene_symbol=None, any_tag_button=True,
+                      tag_counts=None):
+    """ tag_counts - pass these in if the page has already counted them, it's an expensive count """
+    if tag_counts is None:
+        tag_kwargs = {}
+        if gene_symbol:
+            annotation_version = AnnotationVersion.latest(genome_build)
+            gene_variant_qs = get_variant_queryset_for_gene_symbol(gene_symbol, annotation_version,
+                                                                   traverse_aliases=True)
+            tag_kwargs["variant_qs"] = gene_variant_qs
+        variant_tags_qs = VariantTag.get_for_build(genome_build=genome_build, **tag_kwargs)
+        tag_counts = sorted(get_field_counts(variant_tags_qs, "tag").items())
     return {
         "any_tag_button": any_tag_button,
         "tag_counts": tag_counts,

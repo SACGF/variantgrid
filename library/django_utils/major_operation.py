@@ -14,10 +14,12 @@ See variantgrid_private #1502.
 """
 import logging
 from contextlib import contextmanager
+from typing import Optional
 
 from django.conf import settings
 from django.core.cache import cache
 from django.db import connection
+from django.http import JsonResponse
 
 from library.utils.hash_utils import sha256sum_str
 
@@ -104,3 +106,23 @@ def major_operation(user, operation_name: str = "major_operation"):
             yield
     finally:
         _release_slot(count_key)
+
+
+class MajorOperationViewMixin:
+    """ Opt a class based view into the major operation limits by setting major_operation_name.
+
+        Answers with 503 when the user is already at their concurrency limit - the grid endpoints
+        this wraps are DataTables ajax POSTs, whose params live in the body, so there is nothing to
+        redirect-and-retry with the way the analysis node grid does. """
+
+    major_operation_name: Optional[str] = None
+
+    def dispatch(self, request, *args, **kwargs):
+        if not self.major_operation_name:
+            return super().dispatch(request, *args, **kwargs)
+
+        try:
+            with major_operation(request.user, self.major_operation_name):
+                return super().dispatch(request, *args, **kwargs)
+        except TooManyMajorOperationsError as e:
+            return JsonResponse({"error": str(e)}, status=503)

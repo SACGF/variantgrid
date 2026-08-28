@@ -17,6 +17,7 @@ from django.urls import reverse
 from kombu.utils import json
 
 from library.django_utils.grid_export import csv_streaming_response, grid_export_csv
+from library.django_utils.major_operation import MajorOperationViewMixin
 from library.log_utils import report_exc_info
 from library.utils import JsonDataType, JsonObjType, full_class_name, nice_class_name, pretty_label
 from snpdb.models import UserGridConfig
@@ -237,6 +238,9 @@ class DatatableConfig(Generic[DC]):
     # Set to opt in to rows per page persisting per user (in UserGridConfig, keyed on this name)
     # rather than in the browser's localStorage
     grid_name: Optional[str] = None
+    # recordsTotal only feeds DataTables' "(filtered from N total)" text. Turn this off where the
+    # unfiltered queryset is expensive to count - the filtered count is then reported for both.
+    count_unfiltered = True
 
     def row_css(self, row: CellData) -> Optional[str]:
         """
@@ -380,10 +384,11 @@ class DatatableConfig(Generic[DC]):
         sort_by_list.append(self._get_sort_tiebreaker())
         return qs.order_by(*sort_by_list)
 
-    def pre_render(self, qs: QuerySet[DC]):
+    def pre_render(self, qs: QuerySet[DC], rows: list[dict]):
         """
         Last method called before we start rendering
         qs: The QuerySet with all filtering, ordering applied
+        rows: The page's raw values - use it to resolve in one query what would otherwise be per-row
         """
         pass
 
@@ -418,7 +423,7 @@ class DatatableConfig(Generic[DC]):
                        kwargs={'class_name': full_class_name(self._model), 'primary_key': cell.value})
 
 
-class DatabaseTableView(Generic[DC], JSONResponseView):
+class DatabaseTableView(Generic[DC], MajorOperationViewMixin, JSONResponseView):
     """
     Wraps a column_class to give it functionality for a view to provide data to a DataTables view
     """
@@ -545,13 +550,13 @@ class DatabaseTableView(Generic[DC], JSONResponseView):
         raise NotImplementedError("filter_queryset returned None")
 
     def prepare_results(self, qs: QuerySet[DC]):
-        self.config.pre_render(qs)
-
-        data = []
         # select out all columns but only send down data for enabled columns
         all_columns = self.config.value_columns()
+        rows = list(qs.values(*all_columns))
+        self.config.pre_render(qs, rows)
 
-        for row in qs.values(*all_columns):
+        data = []
+        for row in rows:
             # fix me, do server side rendering
             row_json = {}
             for rc in self.config.enabled_columns:
@@ -615,18 +620,18 @@ class DatabaseTableView(Generic[DC], JSONResponseView):
             # prepare initial queryset
             qs = self.get_initial_queryset()
 
-            # store the total number of records (before filtering)
-            total_records = qs.count()
-
             # apply filters
             filtered_qs = self.filter_queryset(qs)
 
-            # number of records after filtering - filter_queryset hands back the same queryset when no
-            # filters were supplied, and the count is often expensive enough to be worth not repeating
-            if filtered_qs is qs:
-                total_display_records = total_records
+            # number of records after filtering
+            total_display_records = filtered_qs.count()
+
+            # the total before filtering - filter_queryset hands back the same queryset when no filters
+            # were supplied, and counting the unfiltered queryset can be expensive enough to skip
+            if self.config.count_unfiltered and filtered_qs is not qs:
+                total_records = qs.count()
             else:
-                total_display_records = filtered_qs.count()
+                total_records = total_display_records
             qs = filtered_qs
 
             # apply ordering

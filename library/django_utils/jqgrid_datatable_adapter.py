@@ -14,6 +14,7 @@ from django.urls.base import resolve, reverse
 from django.views.generic.base import View
 
 from library.django_utils.jqgrid_view import JQGridViewOp, create_grid_from_request, grid_export_request
+from library.django_utils.major_operation import MajorOperationViewMixin
 from library.jqgrid.jqgrid import FILTER_OPERATIONS, json_encode
 from library.jqgrid.jqgrid_user_row_config import JqGridUserRowConfig
 from library.utils import JsonObjType, nice_class_name
@@ -238,7 +239,7 @@ def datatable_json_response(data: JsonObjType) -> HttpResponse:
     return HttpResponse(json_encode(data), content_type="application/json")  # pylint: disable=http-response-with-content-type-json
 
 
-class JqGridDatatableView(View):
+class JqGridDatatableView(MajorOperationViewMixin, View):
     """ Serves a library.jqgrid grid class to a DataTables page. Constructed from URL kwargs plus
         an optional 'extra_filters' JSON param; the 'op' kwarg selects 'download', which streams the
         server side CSV.

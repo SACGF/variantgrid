@@ -131,7 +131,7 @@
     <a class="btn btn-outline-secondary fas fa-tags" href="{% url 'tag_settings' %}">Tag Settings</a>
     <a class="btn btn-outline-secondary fas fa-chart-bar" href="{% url 'tag_stats' %}">Tag Stats</a>
 
-    {% tag_counts_filter genome_build=genome_build click_func='tagClick' show_all_func='showAll' any_tag_button=False %}
+    {% tag_counts_filter genome_build=genome_build tag_counts=tag_counts click_func='tagClick' show_all_func='showAll' any_tag_button=False %}
 
     <div class="form-inline my-2">
         <label class="mr-2">Filter to user:</label>

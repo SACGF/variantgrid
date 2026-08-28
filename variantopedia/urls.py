@@ -77,7 +77,8 @@ urlpatterns = [
     path('variant/<int:variant_id>/tag/<tag>/datatable/',
          DatabaseTableView.as_view(column_class=VariantTagDetailColumns),
          name='variant_tag_detail_datatable'),
-    path('tags/datatable/<genome_build_name>/', DatabaseTableView.as_view(column_class=VariantTagsColumns),
+    path('tags/datatable/<genome_build_name>/',
+         DatabaseTableView.as_view(column_class=VariantTagsColumns, major_operation_name="variant_tags"),
          name='variant_tags_datatable'),
 
     path('nearby/grid/<variant_id>/<genome_build_name>/<region_type>/<slug:op>/',
@@ -91,7 +92,8 @@ urlpatterns = [
          name='all_variants_grid'),
     # CSV comes off the dedicated tagged_variant_export view, which forces a genomic order sort
     path('tagged_variants/grid/<genome_build_name>/<slug:op>/',
-         JqGridDatatableView.as_view(grid=TaggedVariantGrid), name='tagged_variant_grid'),
+         JqGridDatatableView.as_view(grid=TaggedVariantGrid, major_operation_name="tagged_variants"),
+         name='tagged_variant_grid'),
 
     # Grid export
     path('tags/export/<genome_build_name>/', views.variant_tags_export, name='variant_tags_export'),

@@ -926,7 +926,7 @@ def _get_grid_name(request, name) -> str:
 # The DataTable pages at 100 rows, so the variant tags CSV comes from the queryset directly
 VARIANT_TAGS_EXPORT_COLUMNS = {
     "variant_string": "Variant",
-    "variant__variantannotation__transcript_version__gene_version__gene_symbol__symbol": "Gene",
+    "gene_symbol": "Gene",
     "tag__id": "Tag",
     "analysis__id": "Analysis ID",
     "analysis__name": "Analysis",

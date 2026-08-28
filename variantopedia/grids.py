@@ -12,6 +12,7 @@ from django.db.models.functions import Coalesce, Concat
 from django.http import HttpRequest
 from django.shortcuts import get_object_or_404
 from django.urls import reverse
+from guardian.shortcuts import get_objects_for_user
 
 from analysis.models import Analysis, VariantTag
 from annotation.annotation_version_querysets import (
@@ -19,6 +20,7 @@ from annotation.annotation_version_querysets import (
     get_variant_queryset_for_latest_annotation_version,
 )
 from annotation.models import AnnotationVersion, VariantAnnotation
+from library.django_utils.django_queryset_sql_transformer import get_queryset_with_transformer_hook
 from library.utils import JsonDataType, full_class_name, update_dict_of_dict_values
 from snpdb.grid_columns.custom_columns import get_custom_column_fields_override_and_sample_position
 from snpdb.grids import AbstractVariantGrid, url_if_visible
@@ -222,19 +224,22 @@ class NearbyVariantsGrid(AbstractVariantGrid):
 class VariantTagsColumns(DatatableConfig[VariantTag]):
     """ List VariantTags (Tag-centric) - @see variant_tags.html and base_related_analyses.html """
     GRID_NAME = 'Variant Tags'
+    # The initial queryset is every tag in the build - a DISTINCT over a dozen joins - and recordsTotal
+    # only feeds the "(filtered from N total)" text, so it isn't worth a second count of it
+    count_unfiltered = False
 
     def __init__(self, request: HttpRequest):
         super().__init__(request)
         self.genome_build = GenomeBuild.get_name_or_alias(self.get_query_param("genome_build_name"))
+        self.annotation_version = AnnotationVersion.latest_or_none(self.genome_build, context=self.GRID_NAME)
 
         self.rich_columns = [
             RichColumn("id", visible=False),
-            RichColumn("variant_string", label="Variant", orderable=True, default_sort=SortOrder.ASC,
+            RichColumn("variant_string", label="Variant", orderable=True,
                        extra_columns=["id", "variant__id", "tag__id", "analysis__id"],
                        renderer=self.render_variant, client_renderer="renderVariantTagVariant"),
             RichColumn(name="genome_build", label="Genome Build", renderer=self.render_genome_build),
-            RichColumn("variant__variantannotation__transcript_version__gene_version__gene_symbol__symbol",
-                       name="gene_symbol", label="Gene", orderable=True,
+            RichColumn("gene_symbol", label="Gene", orderable=True,
                        client_renderer="renderGeneSymbolNewWindow"),
             RichColumn("tag__id", name="tag", label="Tag", orderable=True, extra_columns=["variant__id"],
                        renderer=self.render_tag, client_renderer="renderVariantTagPill"),
@@ -242,7 +247,8 @@ class VariantTagsColumns(DatatableConfig[VariantTag]):
                        extra_columns=["analysis__id"],
                        renderer=self.render_analysis, client_renderer="renderVariantTagAnalysis"),
             RichColumn("user__username", name="user", label="Username", orderable=True),
-            RichColumn("created", label="Created", orderable=True, client_renderer="TableFormat.timestamp"),
+            RichColumn("created", label="Created", orderable=True, default_sort=SortOrder.DESC,
+                       client_renderer="TableFormat.timestamp"),
             RichColumn("id", name="delete", label="", extra_columns=["analysis__id"],
                        renderer=self.render_delete, client_renderer="TableFormat.deleteRow"),
         ]
@@ -276,10 +282,33 @@ class VariantTagsColumns(DatatableConfig[VariantTag]):
             "url": url_if_visible("analysis", analysis_id=analysis_id),
         }
 
+    def pre_render(self, qs: QuerySet[VariantTag], rows: list[dict]):
+        """ can_write delegates to the analysis when there is one, so resolve the whole page in a
+            couple of queries rather than a pair of Guardian lookups per row """
+        analysis_ids = set()
+        tag_ids = set()
+        for row in rows:
+            if analysis_id := row["analysis__id"]:
+                analysis_ids.add(analysis_id)
+            else:
+                tag_ids.add(row["id"])
+
+        self._writable_analysis_ids = self._writable_pks(Analysis, analysis_ids)
+        self._writable_tag_ids = self._writable_pks(VariantTag, tag_ids)
+
+    def _writable_pks(self, klass, pks: set) -> set:
+        if not pks:
+            return set()
+        writable_qs = get_objects_for_user(self.user, klass.get_write_perm(),
+                                           klass=klass.objects.filter(pk__in=pks), accept_global_perms=False)
+        return set(writable_qs.values_list("pk", flat=True))
+
     def render_delete(self, cell: CellData) -> Optional[str]:
-        """ can_write delegates to the analysis, so build the stub from the row rather than re-loading the tag """
-        variant_tag = VariantTag(pk=cell.value, analysis_id=cell["analysis__id"])
-        if not variant_tag.can_write(self.user):
+        if analysis_id := cell["analysis__id"]:
+            writable = analysis_id in self._writable_analysis_ids
+        else:
+            writable = cell.value in self._writable_tag_ids
+        if not writable:
             return None
         return reverse('group_permissions_object_delete',
                        kwargs={'class_name': full_class_name(VariantTag), 'primary_key': cell.value})
@@ -287,29 +316,45 @@ class VariantTagsColumns(DatatableConfig[VariantTag]):
     def get_initial_queryset(self) -> QuerySet[VariantTag]:
         # get_for_build has already restricted this to tags visible in the build, either via their
         # allele or - for a tag made in this build - via the tag's own variant
-        qs = VariantTag.get_for_build(self.genome_build)
+        qs = VariantTag.get_for_build(self.genome_build, tags_qs=self._annotation_version_queryset())
         # Pick the variant for *this* build out of the allele, rather than whichever one a plain join
         # would land on
         qs = qs.annotate(build_variant_allele=FilteredRelation(
             "allele__variantallele",
             condition=Q(allele__variantallele__genome_build=self.genome_build)))
-        return self._annotate_variant_string(qs)
+        return self._annotate_gene_symbol(self._annotate_variant_string(qs))
+
+    def _annotation_version_queryset(self) -> QuerySet[VariantTag]:
+        """ Join VariantAnnotation through the build's partition rather than the parent table - every
+            historical version otherwise multiplies the rows the DISTINCT has to sort through """
+        qs = get_queryset_with_transformer_hook(klass=VariantTag)
+        if self.annotation_version:
+            qs.add_sql_transformer(self.annotation_version.sql_partition_transformer)
+        return qs
 
     @staticmethod
-    def _annotate_variant_string(qs: QuerySet[VariantTag]) -> QuerySet[VariantTag]:
-        """ A "1:123321 G>C" string built from the build's variant, falling back per field to the one
-            the tag was made on - a tag keeps its own variant until the liftover task assigns it an
-            allele (@see analysis.tasks.variant_tag_tasks._liftover_variant_tag), and that variant is
-            in this build by definition. Dropping those rows made the grid disagree with the tag counts.
+    def _build_variant_field(name: str):
+        """ A field off the build's variant, falling back to the one the tag was made on - a tag keeps
+            its own variant until the liftover task assigns it an allele (@see
+            analysis.tasks.variant_tag_tasks._liftover_variant_tag), and that variant is in this build
+            by definition. Dropping those rows made the grid disagree with the tag counts. """
+        return Coalesce(f"build_variant_allele__variant__{name}", f"variant__{name}")
+
+    @classmethod
+    def _annotate_variant_string(cls, qs: QuerySet[VariantTag]) -> QuerySet[VariantTag]:
+        """ A "1:123321 G>C" string.
 
             The fallback is per field because Concat renders a NULL argument as empty rather than
             returning NULL, so coalescing the finished strings would never reach the second one. """
-        def field(name: str):
-            return Coalesce(f"build_variant_allele__variant__{name}", f"variant__{name}")
-
+        field = cls._build_variant_field
         return qs.annotate(variant_string=Concat(
             field("locus__contig__name"), Value(":"), field("locus__position"), Value(" "),
             field("locus__ref__seq"), Value(">"), field("alt__seq"), output_field=TextField()))
+
+    @classmethod
+    def _annotate_gene_symbol(cls, qs: QuerySet[VariantTag]) -> QuerySet[VariantTag]:
+        symbol = "variantannotation__transcript_version__gene_version__gene_symbol__symbol"
+        return qs.annotate(gene_symbol=cls._build_variant_field(symbol))
 
     def filter_queryset(self, qs: QuerySet[VariantTag]) -> QuerySet[VariantTag]:
         analysis_ids = self.get_query_json("analysis_ids")
