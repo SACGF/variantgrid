@@ -108,12 +108,6 @@
     <link rel="stylesheet" type="text/css" href="{% static 'js/lib/datatables/datatables.min.css' %}"/>
     <script type="text/javascript" src="{% static 'js/lib/datatables/datatables.min.js' %}"></script>
 
-    <!-- Needed for drag & drop
-    TODO reduce scope of jquery UI to only elements we need -->
-    <link href="{% static 'js/lib/jquery-ui-1.13.2.custom/jquery-ui.min.css' %}" rel="stylesheet">
-    <link href="{% static 'js/lib/jquery-ui-1.13.2.custom/jquery-ui.theme.css' %}" rel="stylesheet">
-    <script src="{% static 'js/lib/jquery-ui-1.13.2.custom/jquery-ui.min.js' %}"></script>
-
     <script>
         {% block jshead %}{% endblock %}
         function openExternalHelpUrl(suffix) {
