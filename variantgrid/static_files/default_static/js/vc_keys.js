@@ -337,10 +337,10 @@ const EKeys = (function() {
                     }
                     config.config_updates = true;
                 }
-                if (ekey.options && _.some(ekey.options, (input) => {return !!(input.namespace);})) {
+                if (ekey.options && ekey.options.some((input) => {return !!(input.namespace);})) {
                     config = config || {};
                     config.config_updates = true;
-                    config.options = _.cloneDeep(ekey.options);
+                    config.options = structuredClone(ekey.options);
                     for (const option of config.options) {
                         if (option.namespace) {
                             option.exclude_namespace = !namespaces.has(option.namespace);

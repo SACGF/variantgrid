@@ -102,7 +102,7 @@ const DataTableDefinition = (function() {
 
             let tableId = this.dom.attr('id');
             if (!tableId) {
-                tableId = "tid" + _.random(0,100000);
+                tableId = "tid" + Math.floor(Math.random() * 100001);
                 this.dom.attr('id', tableId);
             }
             // this.dom.style('width', '100%');

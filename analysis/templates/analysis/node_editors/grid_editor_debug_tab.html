@@ -1,5 +1,7 @@
 {% load js_tags %}
 {% load settings_tags %}
+{% load static %}
+<link rel="stylesheet" type="text/css" media="screen" href="{% static 'js/lib/highlight/styles/default.css' %}" />
 <style>
     code {
         white-space: pre-wrap;
@@ -22,9 +24,18 @@
 {% if node.valid %}
     <script>
     $(document).ready(function() {
-        $('pre code.sql').each(function(i, block) {
-            hljs.highlightBlock(block);
-        });
+        // This tab is the only user of highlight.js, and it arrives by ajax - fetch the
+        // library on first open rather than on every analysis page
+        function highlightSql() {
+            $('pre code.sql').each(function(i, block) {
+                hljs.highlightBlock(block);
+            });
+        }
+        if (window.hljs) {
+            highlightSql();
+        } else {
+            $.ajax({url: "{% static 'js/lib/highlight/highlight.pack.js' %}", dataType: "script", cache: true}).done(highlightSql);
+        }
 
         $('input#show-grid-columns').click(function() {
             var checked = $(this).prop('checked');

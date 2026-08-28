@@ -91,7 +91,7 @@ function sampleNodeUpdateState(args) {
 		const sex = patient['sex'];
 		const deceased = patient['deceased'];
 
-		const svg = d3.select(this).append("svg:svg")
+		const svg = svgSelect(this).append("svg:svg")
 			.attr("version", "1.1")
 			.attr("width", sideLength)
 			.attr("height", sideLength);

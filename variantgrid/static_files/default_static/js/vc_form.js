@@ -992,7 +992,7 @@ const VCForm = (function() {
                     this.record.allele_origin_bucket === "G" &&
                     !this.record.has_changes) {
                     const conditionUrl = Urls.condition_matching(this.record.condition_text_match);
-                    conditionElement = $('<a>', {href: conditionUrl , title:`Resolve condition text<br>"${_.escape(condition)}"<br>to a standard term`, text: condition, class: 'hover-link edit-link', target: '_blank'});
+                    conditionElement = $('<a>', {href: conditionUrl , title:`Resolve condition text<br>"${escapeHtml(condition)}"<br>to a standard term`, text: condition, class: 'hover-link edit-link', target: '_blank'});
                 } else {
                     conditionElement = $('<span>', { text: condition });
                 }
@@ -1768,7 +1768,10 @@ const VCForm = (function() {
                     let optionSources = eKey.options || [];
 
                     // move all disabled options to the bottom
-                    optionSources = _.flatten(_.partition(optionSources, o => !o.exclude_namespace));
+                    optionSources = [
+                        ...optionSources.filter(o => !o.exclude_namespace),
+                        ...optionSources.filter(o => o.exclude_namespace),
+                    ];
                     if (type === 'bool') {
                         optionSources = [
                             {key: 'true', label: 'True'},

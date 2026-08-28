@@ -21,8 +21,6 @@ export default [
                 // vendored libraries loaded via <script> tags
                 jsPlumb: "readonly",
                 moment: "readonly",
-                _: "readonly",
-                d3: "readonly",
                 Plotly: "readonly",
                 Cookies: "readonly",
                 Split: "readonly",
@@ -40,6 +38,8 @@ export default [
                 showReloadPageErrorDialog: "readonly", // global.js
                 limitLength: "readonly", // global.js
                 debounce: "readonly", // global.js
+                escapeHtml: "readonly", // global.js
+                svgSelect: "readonly", // global.js
                 toFixedString: "readonly", // scientific_number_widget.js
                 toPercent: "readonly", // scientific_number_widget.js
                 loadNodeData: "readonly", // analysis.js

@@ -4,7 +4,7 @@ VENN_TOGGLE_WIDGET_CLASS = "venn_toggle_widget";
 function venn_select(selector, venn_flag) {
 		$('.' + VENN_TOGGLE_WIDGET_CLASS, selector).each(function() {
 			const toggled = venn_flag & $(this).attr("venn_bit");
-			const widget = d3.select(this);
+			const widget = svgSelect(this);
 			toggleSelect(widget, !!toggled);
 		});
 }
@@ -13,7 +13,7 @@ function vennAddToggleCallbacks(selector, callback) {
 	get_venn_flag = function() {
 		let venn_flag = 0;
 		$('.' + VENN_TOGGLE_WIDGET_CLASS, selector).each(function() {
-			const widget = d3.select(this);
+			const widget = svgSelect(this);
 			toggled = widget.attr("toggled");
 			if (toggled == "true") {
 				venn_flag |= widget.attr("venn_bit");
@@ -22,13 +22,13 @@ function vennAddToggleCallbacks(selector, callback) {
 		return venn_flag;
 	};
 	toggleColor = function() {
-		toggleSelect(d3.select(this));
+		toggleSelect(svgSelect(this));
 		venn_flag = get_venn_flag();
 		callback(venn_flag);
 	};
 
 	$('.' + VENN_TOGGLE_WIDGET_CLASS, selector).each(function() {
-		const widget = d3.select(this);
+		const widget = svgSelect(this);
 		widget.on("click", toggleColor);
 	});
 }
@@ -52,7 +52,7 @@ function venn2(selector, w, h) {
 	const circle2 = "circle2_" + venn_id;
 
 	const radius = w * 0.25;
-	const svg = d3.select(selector).append("svg:svg")
+	const svg = svgSelect(selector).append("svg:svg")
 	    .attr("width", w)
 	    .attr("height", h);
 	
@@ -120,96 +120,3 @@ function venn2(selector, w, h) {
 	setRing(addCirc1(svg));
 	setRing(addCirc2(svg));
 }
-
-
-function venn3(selector, w, h) {
-	radius = w * 0.3;
-
-	const svg = d3.select(selector).append("svg:svg")
-	    .attr("width", w)
-	    .attr("height", h);
-	
-	const defs = svg.append("svg:defs");
-	
-	defs.append("svg:clipPath")
-	    .attr("id", "circle1")
-	  	.append("svg:circle")
-	    .attr("cx", w*0.36)
-	    .attr("cy", h*0.33)
-	    .attr("r", radius);
-	
-	
-	defs.append("svg:clipPath")
-	    .attr("id", "circle2")
-	  	.append("svg:circle")
-	    .attr("cx", w*0.57)
-	    .attr("cy", h*0.33)
-	    .attr("r", radius);
-	
-	defs.append("svg:clipPath")
-	    .attr("id", "circle3")
-	  	.append("svg:circle")
-	    .attr("cx", w*0.46)
-	    .attr("cy", h*0.56)
-	    .attr("r", radius);
-	
-	svg.append("svg:rect")
-	    .attr("clip-path", "url(#circle1)")
-	    .attr("width", w)
-	    .attr("height", h)
-	    .style("fill", "#ff0000")
-	    .on("click", function() { alert(2); });
-	
-	svg.append("svg:rect")
-	    .attr("clip-path", "url(#circle2)")
-	    .attr("width", w)
-	    .attr("height", h)
-	    .style("fill", "#00ff00")
-	    .on("click", function() { alert(2); });
-	
-	svg.append("svg:rect")
-	    .attr("clip-path", "url(#circle3)")
-	    .attr("width", w)
-	    .attr("height", h)
-	    .style("fill", "#0000ff")
-	    .on("click", function() { alert(3); });
-	
-	svg.append("svg:g")
-	    .attr("clip-path", "url(#circle1)")
-	  	.append("svg:rect")
-	    .attr("clip-path", "url(#circle2)")
-	    .attr("width", w)
-	    .attr("height", h)
-	    .style("fill", "#ffff00")
-	    .on("click", function() { alert("4"); });
-	
-	svg.append("svg:g")
-	    .attr("clip-path", "url(#circle2)")
-	  	.append("svg:rect")
-	    .attr("clip-path", "url(#circle3)")
-	    .attr("width", w)
-	    .attr("height", h)
-	    .style("fill", "#00ffff")
-	    .on("click", function() { alert("5"); });
-	
-	svg.append("svg:g")
-	    .attr("clip-path", "url(#circle3)")
-	  	.append("svg:rect")
-	    .attr("clip-path", "url(#circle1)")
-	    .attr("width", w)
-	    .attr("height", h)
-	    .style("fill", "#ff00ff")
-	    .on("click", function() { alert("6"); });
-	
-	svg.append("svg:g")
-	    .attr("clip-path", "url(#circle3)")
-	  .append("svg:g")
-	    .attr("clip-path", "url(#circle2)")
-	  .append("svg:rect")
-	    .attr("clip-path", "url(#circle1)")
-	    .attr("width", w)
-	    .attr("height", h)
-	    .style("fill", "#ffffff")
-	    .on("click", function() { alert("7"); });
-}
-

@@ -183,7 +183,7 @@ function applyValue(name, value) {
     if (value === null) {
         hasValue = false;
         value = $('<span>', {class: 'no-value', text:'-'});
-    } else if (_.isNumber(value)) {
+    } else if (typeof value === "number") {
         let threshold = CODE_THRESHOLDS[name];
         let cssClasses = ["text-monospace"];
         if (threshold) {
@@ -220,12 +220,12 @@ function applyValue(name, value) {
             cssClasses.push("text-secondary");
         }
         value = $('<span>', {"class": cssClasses.join(" "), text: formatNumberSigDigits(value)});
-    } else if (_.isString(value)) {
+    } else if (typeof value === "string") {
         let threshold = CODE_WORDS[value.toLowerCase()];
         if (threshold) {
             value = $('<span>', {"class": `threshold threshold-${threshold}`, text: value});
         }
-    } else if (_.isBoolean(value)) {
+    } else if (typeof value === "boolean") {
         let threshold = value? "high" : "low";
         value = $('<span>', {"class": `threshold threshold-${threshold}`, text: value});
     }

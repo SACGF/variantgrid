@@ -890,7 +890,6 @@ function dynamicSort(property, caseSensitive) {
 }
 
 function zero_pad(num, size) {
-    // deprecated use _.pad(num + "", size, '0');
     let s = num + "";
     while (s.length < size) s = "0" + s;
     return s;
@@ -1130,15 +1129,88 @@ function limitLength(text, limit) {
     }
 }
 
-function debounce( func , timeout ) {
-    var timeoutID , timeout = timeout || 200;
-    return function () {
-        const scope = this , args = arguments;
-        clearTimeout( timeoutID );
-        timeoutID = setTimeout( function () {
-            func.apply( scope , Array.prototype.slice.call( args ) );
-        }, timeout );
-   };
+// Trailing-edge debounce with lodash-compatible maxWait and flush()
+function debounce(func, wait, {maxWait} = {}) {
+    const delay = wait || 200;
+    let timer = null;
+    let maxTimer = null;
+    let pendingArgs = null;
+    let pendingThis = null;
+
+    function invoke() {
+        clearTimeout(timer);
+        clearTimeout(maxTimer);
+        timer = maxTimer = null;
+        if (pendingArgs) {
+            const [args, self] = [pendingArgs, pendingThis];
+            pendingArgs = pendingThis = null;
+            func.apply(self, args);
+        }
+    }
+
+    function debounced(...args) {
+        pendingArgs = args;
+        pendingThis = this;
+        clearTimeout(timer);
+        timer = setTimeout(invoke, delay);
+        if (maxWait && !maxTimer) {
+            maxTimer = setTimeout(invoke, maxWait);
+        }
+    }
+    debounced.flush = invoke;
+    debounced.cancel = function() {
+        clearTimeout(timer);
+        clearTimeout(maxTimer);
+        timer = maxTimer = pendingArgs = pendingThis = null;
+    };
+    return debounced;
+}
+
+// Escapes &, <, >, " and ' for interpolation into an HTML string
+function escapeHtml(text) {
+    return String(text).replace(/[&<>"']/g, (c) => {
+        return {"&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;"}[c];
+    });
+}
+
+// Minimal chainable SVG element builder - replaces the d3 v2 subset we used.
+// jQuery can't do this: SVG elements need createElementNS to render.
+const SVG_NS = "http://www.w3.org/2000/svg";
+
+class SvgSelection {
+    constructor(node) {
+        this.node = node;
+    }
+
+    // Accepts "svg:rect" or "rect" - the d3 v2 namespace prefix is kept so call sites read the same
+    append(tagName) {
+        const child = document.createElementNS(SVG_NS, tagName.replace(/^svg:/, ""));
+        this.node.appendChild(child);
+        return new SvgSelection(child);
+    }
+
+    attr(name, value) {
+        if (value === undefined) {
+            return this.node.getAttribute(name);
+        }
+        this.node.setAttribute(name, value);
+        return this;
+    }
+
+    style(name, value) {
+        this.node.style.setProperty(name, value);
+        return this;
+    }
+
+    on(eventName, handler) {
+        this.node.addEventListener(eventName, handler.bind(this.node));
+        return this;
+    }
+}
+
+function svgSelect(target) {
+    const node = typeof target === "string" ? document.querySelector(target) : (target.jquery ? target[0] : target);
+    return new SvgSelection(node);
 }
 
 function highlightTextAsDom(value, full_text) {
@@ -1315,11 +1387,11 @@ function formatJson(jsonObj) {
 }
 
 function _formatJson(jsonObj) {
-    if (_.isNumber(jsonObj)) {
+    if (typeof jsonObj === "number") {
         return $('<span>', {class: 'js-num', text: jsonObj});
-    } else if (_.isBoolean(jsonObj)) {
+    } else if (typeof jsonObj === "boolean") {
         return $('<span>', {class: 'js-bool', text: jsonObj});
-    } else if (_.isString(jsonObj)) {
+    } else if (typeof jsonObj === "string") {
         let text = JSON.stringify(jsonObj);
         text = text.substring(1, text.length-1);
         const html = [];
@@ -1331,7 +1403,7 @@ function _formatJson(jsonObj) {
         // return $('<span>', {class: 'js-str', text: JSON.stringify(jsonObj)});
     } else if (jsonObj === null) {
         return $('<span>', {class: 'js-null', text: 'null'});
-    } else if (_.isArray(jsonObj)) {
+    } else if (Array.isArray(jsonObj)) {
         const html = [];
         html.push($('<span>', {class: 'js-br', text: '['}));
         let first = true;
