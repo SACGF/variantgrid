@@ -46,6 +46,7 @@ def settings_context_processor(request):
         'site_name': settings.SITE_NAME,
         'site_short_name': settings.SITE_SHORT_NAME,
         'site_description': settings.SITE_DESCRIPTION,
+        'tips_enabled': settings.TIPS_ENABLED,
         'timezone': settings.TIME_ZONE,
         'top_right_search_form': SearchForm(search_allow_blank=True),
         'url_name_visible': get_visible_url_names(),

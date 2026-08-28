@@ -123,6 +123,7 @@ from snpdb.models import (
     get_igv_data,
 )
 from variantgrid.celery import app
+from variantgrid.tips import get_tips
 
 
 def analysis_list(request):
@@ -225,6 +226,7 @@ def view_analysis(request, analysis_id, active_node_id=0):
         "has_write_permission": analysis.can_write(request.user),
         "warnings": analysis.get_toolbar_warnings(request.user),
         "loading_animations": user_settings.grid_loading_animations,
+        "tips": [t.tip for t in get_tips(app="analysis")] if user_settings.show_tips else [],
     }
     return render(request, 'analysis/analysis.html', context)
 

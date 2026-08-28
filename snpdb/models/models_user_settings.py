@@ -318,6 +318,9 @@ class UserSettingsOverride(SettingsOverride):
     # null/empty = DEFAULT_GRID_LOADING_ANIMATIONS. See GridLoadingAnimation for valid values.
     loading_animations = models.JSONField(null=True, blank=True,
                                           help_text="Animations randomly shown while a node's variant grid loads.")
+    # Personal (not org/lab) preference - can be turned off from the tip box itself, see set_show_tips
+    show_tips = models.BooleanField(default=True, verbose_name="Show Tips",
+                                    help_text="Show feature tips on loading screens and blank grids.")
 
     def auto_set_default_lab(self):
         user = self.user
@@ -483,6 +486,7 @@ class UserSettings:
     oauth_sub: str
     timezone: str
     loading_animations: Optional[list[str]]
+    show_tips: bool
     _settings_overrides: list[SettingsOverride]
 
     @property

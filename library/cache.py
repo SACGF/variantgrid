@@ -75,6 +75,13 @@ def timed_cache(size_limit=0, ttl=0, quick_key_access=False):
                         break
 
             return result
+
+        def cache_clear():
+            storage.clear()
+            ttls.clear()
+            keys.clear()
+
+        wrapper.cache_clear = cache_clear
         return wrapper
     return decorator
 

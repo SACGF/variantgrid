@@ -2,6 +2,7 @@
 {% load static %}
 {% load js_tags %}
 {% load settings_tags %}
+{% load tips_tags %}
 {% block head %}
     <script type="text/javascript" src="{% static 'js/lib/plotly-latest.min.js' %}"></script>
     <script type="text/javascript" src="{% static 'js/plotly_helper.js' %}"></script>
@@ -26,6 +27,8 @@
             <label>Code last modified</label>: {% timestamp git.last_modified_date time_ago=True %}, see
             <a href="{% url 'changelog' %}">changelog</a>.
         </div>
+
+        {% tip_box %}
 
     {% if sapath_enabled %}
         {% if user_has_cases %}

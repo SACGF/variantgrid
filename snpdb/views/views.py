@@ -958,6 +958,14 @@ def set_user_data_grid_config(request):
 
 
 @require_POST
+def set_show_tips(request):
+    """ Turn off feature tips - posted by the tip box's dismiss button, see tips.js """
+
+    UserSettingsOverride.objects.update_or_create(user=request.user, defaults={"show_tips": False})
+    return HttpResponse()
+
+
+@require_POST
 def set_all_variants_filter(request, genome_build_name):
     """ Remember the All Variants page filter selections - set from variants.html whenever a filter changes """
 

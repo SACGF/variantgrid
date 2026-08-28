@@ -926,6 +926,10 @@ function loadGridAndEditorForNode(nodeId, extra_filters, fromSelectNode) {
         closeAllVariantDetailsTabs();
         $("#node-editor-container").html("Please select a node");
         dataContainer.empty();
+        const tipBox = analysisTipBox();
+        if (tipBox) {
+            dataContainer.append(tipBox);  // the grid area is blank until a node is picked
+        }
     }
 }
 
@@ -993,6 +997,16 @@ function hideLoadingOverlay() {
 // (the editor) stays visible and usable. Builds its own double-helix inside the container rather
 // than reparenting the shared #overlay-container - which flashed over the whole panel before
 // snapping into place.
+// Feature tip for the grid area - ANALYSIS_TIPS comes from analysis.html, buildTipBox from tips.js
+// (neither exists in the stand alone grid window). Returns null when there's nothing to show.
+function analysisTipBox() {
+    if (typeof buildTipBox !== "function" || typeof ANALYSIS_TIPS === "undefined") {
+        return null;
+    }
+    return buildTipBox(ANALYSIS_TIPS);
+}
+
+
 function showGridLoadingOverlay(container) {
     if ($("#grid-loading-overlay").length) {
         return;
@@ -1044,6 +1058,13 @@ function showGridLoadingOverlay(container) {
         canvas.css('opacity', 0.35);
         canvas.DoubleHelix({fps: 20, spinSpeed: 4});
         overlay.append(canvas);
+    }
+
+    // People are waiting here anyway - pin a tip along the bottom so it leaves the loader centred
+    const tipBox = analysisTipBox();
+    if (tipBox) {
+        tipBox.css({position: "absolute", left: 0, right: 0, bottom: "12px"});
+        overlay.append(tipBox);
     }
 }
 

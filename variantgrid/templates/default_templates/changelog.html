@@ -2,12 +2,15 @@
 {% load js_tags %}
 {% load ui_menu_bars %}
 {% load ui_utils %}
+{% load tips_tags %}
 {% block title %}Changelog{% endblock %}
 
 {% block submenu %}{% menu_bar_settings %}{% endblock submenu %}
 {% block content %}
     <div class="container">
         <h3>Changelog</h3>
+
+        {% tip_box %}
 
     <!-- Style hint: keep bullets short - entries from 2025 and earlier average 77 chars (median 67).
          One line per feature: "#issue - what changed". -->

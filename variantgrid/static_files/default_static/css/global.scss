@@ -3305,3 +3305,43 @@ a .c-hgvs-body {
 		background: black;
 	}
 }
+
+/* Feature tips (see variantgrid/tips.py) - sits over a grid loading overlay or under a page
+   heading, so it reads as a friendly aside rather than a warning */
+.tip-box {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	max-width: 640px;
+	margin: 12px auto;
+	padding: 8px 14px;
+	border-radius: 18px;
+	background-color: #f2f7fd;
+	border: 1px solid #d8e6f5;
+	color: #40546a;
+	font-size: 0.9em;
+	line-height: 1.35;
+	.tip-icon {
+		color: #e0a900;
+	}
+	.tip-label {
+		font-weight: 600;
+		color: #2f4a68;
+	}
+	.tip-text {
+		flex: 1;
+	}
+	.tip-next, .tip-dismiss {
+		color: #8ba3bc;
+		opacity: 0.7;
+		&:hover {
+			color: #2f4a68;
+			opacity: 1;
+			text-decoration: none;
+		}
+	}
+	&.tips-off {
+		justify-content: center;
+		font-style: italic;
+	}
+}
