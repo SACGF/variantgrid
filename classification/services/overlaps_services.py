@@ -607,6 +607,10 @@ class OverlapGrouping3:
         change_rows: list[ChangeRow] = []
 
         for contribution in self.overlap.contributions_all:
+            if classification_grouping := contribution.classification_grouping:
+                if not classification_grouping.share_level_obj.is_discordant_level:
+                    continue
+
             contribution_log: list[LogEntry] = list(LogEntry.objects.get_for_object(contribution).order_by('timestamp').all())
 
             is_new_record = True
@@ -628,16 +632,28 @@ class OverlapGrouping3:
                         just_withdrawn = False
                     is_new_record = False
                     change_rows.append(change_row)
+                buffer.clear()
 
+            amend_next = False
             for index, entry in enumerate(contribution_log):
-                if not buffer:
+                contribution_status_no_value = False
+                if cs := entry.changes_dict.get("contribution_status"):
+                    contribution_status_no_value = cs[1] == OverlapContributionStatus.NO_VALUE
+
+                if amend_next:
+                    buffer.append(entry)
+                    amend_next = False
+                elif not buffer:
                     buffer.append(entry)
                 elif entry.timestamp - buffer[0].timestamp < merge_buffer:
                     buffer.append(entry)
                 else:
                     handle_buffer()
-                    buffer.clear()
                     buffer.append(entry)
+
+                if is_new_record and contribution_status_no_value:
+                    amend_next = True
+
             if buffer:
                 handle_buffer()
         return list(sorted(change_rows))

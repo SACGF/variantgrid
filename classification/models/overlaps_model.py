@@ -148,7 +148,7 @@ class OverlapContribution(TimeStampedModel):
         return f"{self.allele} {self.testing_context_full} {self.value_type}"
 
     def __str__(self):
-        return f"{self.pk} {self.source} {self.lab_like} {self.value}"
+        return f"{self.pk} {self.lab_like} {self.value_type} : {self.value}"
 
     @property
     def testing_context_bucket_obj(self) -> TestingContextBucket:
