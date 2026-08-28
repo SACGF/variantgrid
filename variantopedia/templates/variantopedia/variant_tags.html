@@ -145,7 +145,7 @@
     (One variant per row, with all associated tags)
 
     <table id="tagged-variants-datatable" class="sticky-header"
-           data-datatable-url="{% url 'tagged_variant_grid' genome_build_name=genome_build.name op='handler' %}"
+           data-datatable-url="{% url 'tagged_variant_grid' genome_build_name=genome_build.name %}"
            data-datatable-data="taggedVariantDatatableFilter"></table>
     <div data-toolbar-bottom="#tagged-variants-datatable">
         <a class="btn btn-outline-secondary fas fa-download" href="javascript:downloadTaggedVariantCSV()">CSV</a>

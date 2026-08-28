@@ -43,6 +43,7 @@ from snpdb.models import (
     Sample,
     VCFFilter,
 )
+from snpdb.grid_columns.variant_columns import column_by_name
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
 
 
@@ -352,10 +353,11 @@ class TestSampleNodeExtraction(ExtractionNodeTestCase):
         node.status = NodeStatus.READY
         node.save()
 
-        grid = VariantGrid(self.user, node)
-        self.assertIn(VariantGrid.SOURCE_COLUMN, grid.fields)
+        grid = VariantGrid(FakeRequest(user=self.user), node)
+        source_column = column_by_name(grid.enabled_columns, VariantGrid.SOURCE_COLUMN)
+        self.assertIsNotNone(source_column)
 
-        formatter = grid.get_override(VariantGrid.SOURCE_COLUMN)["server_side_formatter"]
+        formatter = source_column.server_side_formatter
         snv_packed = self.snv_cgc.get_packed_column_alias("samples_zygosity")
         cnv_packed = self.cnv_cgc.get_packed_column_alias("samples_zygosity")
 
@@ -370,7 +372,8 @@ class TestSampleNodeExtraction(ExtractionNodeTestCase):
         node.count = node.get_queryset().count()
         node.status = NodeStatus.READY
         node.save()
-        self.assertNotIn(VariantGrid.SOURCE_COLUMN, VariantGrid(self.user, node).fields)
+        grid = VariantGrid(FakeRequest(user=self.user), node)
+        self.assertIsNone(column_by_name(grid.enabled_columns, VariantGrid.SOURCE_COLUMN))
 
     def test_exported_rows_carry_their_source_and_each_vcfs_filters(self):
         """ End to end through the grid: each row says which VCF called it, and carries that VCF's

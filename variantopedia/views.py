@@ -55,7 +55,6 @@ from genes.hgvs import HGVSMatcher
 from genes.models import CanonicalTranscriptCollection, GeneSymbol
 from library.django_utils import get_field_counts, highest_pk, require_superuser
 from library.django_utils.grid_export import EXPORT_ROWS_PER_CHUNK
-from library.django_utils.jqgrid_view import export_grid_as_csv
 from library.git import Git
 from library.guardian_utils import admin_bot
 from library.health_check import HealthCheckRequest, health_check_overall_stats_signal
@@ -99,6 +98,7 @@ from snpdb.variant_filters import (
     get_variant_type_label,
     resolve_gene_symbols,
 )
+from snpdb.views.datatable_view import datatable_csv_response
 from upload.upload_stats import get_vcf_variant_upload_stats
 from variantgrid.celery import app
 from variantgrid.tasks.server_monitoring_tasks import get_disk_messages
@@ -960,11 +960,15 @@ def variant_tags_export(request, genome_build_name):
     return response
 
 
-def tagged_variant_export(request, genome_build_name):
-    class SortTaggedVariantGrid(TaggedVariantGrid):
-        def _get_sidx_and_sord(self, request) -> tuple:
-            return "locus__position", "asc"
+class GenomicOrderTaggedVariantGrid(TaggedVariantGrid):
+    """ The tagged variants CSV, in genomic order rather than however the page was sorted """
+    server_csv_download = True
 
-    basename = _get_grid_name(request, "tagged_variant_export")
-    return export_grid_as_csv(request, grid_klass=SortTaggedVariantGrid,
-                              basename=basename, genome_build_name=genome_build_name)
+    def ordering(self, qs):
+        return qs.order_by("locus__position", "pk")
+
+
+def tagged_variant_export(request, genome_build_name):
+    config = GenomicOrderTaggedVariantGrid(request)
+    config.csv_name = _get_grid_name(request, "tagged_variant_export")
+    return datatable_csv_response(config)

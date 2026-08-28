@@ -8,12 +8,12 @@ from django.db.models.deletion import CASCADE
 
 from analysis.models.nodes.analysis_node import AnalysisNode, NodeAuditLogMixin
 from analysis.models.nodes.node_display import NodeIcon
-from library.jqgrid.jqgrid import JqGrid, format_operation
-from snpdb.models import Variant, VariantGridColumn
+from library.django_utils.filter_rules import filter_rules_to_q, format_operation
+from snpdb.models import VariantGridColumn
 
 
 # TODO: This node has quite a few redundant operations - e.g. it will filter the queryset
-# By the filter, and then have it re-applied by jqgrid. Maybe we could override the filter
+# By the filter, and then have it re-applied by the grid. Maybe we could override the filter
 # method if already filtered, to save work.
 # But: Get it right, then get it fast.....
 class FilterNode(AnalysisNode):
@@ -23,14 +23,7 @@ class FilterNode(AnalysisNode):
         return self.filternodeitem_set.exists()
 
     def _get_node_q(self) -> Optional[Q]:
-        class FakeFilterGrid(JqGrid):
-            model = Variant
-            fields = ["id"]
-
-        # This filter uses JQGrid's built in query filter.
-        # Load stored params from the DB, convert to JSON and send to a fake request
-        fake_filter_grid = FakeFilterGrid()
-        return fake_filter_grid.get_q(self.get_filters())
+        return filter_rules_to_q(self.get_filters())
 
     def get_extra_grid_config(self):
         existing_extra_config = super().get_extra_grid_config()
@@ -82,14 +75,14 @@ class FilterNode(AnalysisNode):
     def get_help_text() -> str:
         return "Filter based on column values"
 
-    def _get_inherited_colmodel_overrides(self):
-        # Don't allow searching on inherited columns, as this causes an extra join
-        extra_overrides = super()._get_inherited_colmodel_overrides()
+    def _get_inherited_column_overrides(self):
+        # Don't offer inherited columns in the filter builder, as filtering on them causes an extra join
+        extra_overrides = super()._get_inherited_column_overrides()
         extra_columns = self._get_inherited_columns()
 
         for col in extra_columns:
             data = extra_overrides.get(col) or {}
-            data['search'] = False
+            data['filterable'] = False
             extra_overrides[col] = data
 
         return extra_overrides

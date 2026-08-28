@@ -295,29 +295,17 @@ class AnalysisForm(forms.ModelForm, ROFormMixin):
 class ColumnSummaryForm(forms.Form):
     column = forms.ChoiceField()
 
-    def __init__(self, colmodels, *args, **kwargs):
+    def __init__(self, columns, *args, **kwargs):
         super().__init__(*args, **kwargs)
-
-        labels = []
-        name = []
-        for cm in ColumnSummaryForm.get_summarisable_colmodels(colmodels):
-            labels.append(cm['label'])
-            name.append(cm['name'])
-        choices = zip(name, labels)
-        self.fields['column'].choices = choices
+        summarisable = ColumnSummaryForm.get_summarisable_columns(columns)
+        self.fields['column'].choices = [(rc.name, rc.label) for rc in summarisable]
 
     @staticmethod
-    def get_summarisable_colmodels(colmodels):
+    def get_summarisable_columns(columns):
+        """ Only a column the queryset actually selects, and that has a VariantGridColumn behind it,
+            can have its values counted """
         variantgrid_columns_dict = get_models_dict_by_column(VariantGridColumn, column="variant_column")
-        summarisable_colmodels = []
-        for cm in colmodels:
-            variant_column = cm.get("index") or cm.get("name")
-            has_variantgrid_column = variant_column in variantgrid_columns_dict
-            queryset_field = cm.get("queryset_field")
-
-            if has_variantgrid_column and queryset_field:
-                summarisable_colmodels.append(cm)
-        return summarisable_colmodels
+        return [rc for rc in columns if rc.queryset_field and rc.name in variantgrid_columns_dict]
 
 
 class SNPMatrixForm(forms.Form):

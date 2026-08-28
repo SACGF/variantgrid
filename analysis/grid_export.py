@@ -10,10 +10,10 @@ from annotation.models import VariantTranscriptAnnotation
 from genes.models import CanonicalTranscriptCollection
 from library.django_utils import get_model_fields
 from library.django_utils.grid_export import EXPORT_ROWS_PER_CHUNK, grid_export_csv
-from library.django_utils.jqgrid_view import VARIANT_GRID_LABEL_OVERRIDES
 from library.genomics.vcf_writer import VCFWriter
 from library.utils import StashFile, iter_fixed_chunks
 from patients.models_enums import Zygosity
+from snpdb.grid_columns.variant_columns import format_rows
 from snpdb.models import Sample, VariantGridColumn
 from snpdb.vcf_export_columns import COLUMN_VCF_INFO
 from snpdb.vcf_export_utils import get_vcf_header_from_contigs
@@ -37,12 +37,12 @@ def node_grid_get_export_iterator(request, node, export_type, canonical_transcri
         grid_kwargs["af_show_in_percent"] = False
 
     extra_filters = request.GET.get("extra_filters")
-    grid = ExportVariantGrid(request.user, node, extra_filters, **grid_kwargs)
+    grid = ExportVariantGrid(request, node, extra_filters, **grid_kwargs)
 
     if basename is None:
         basename = get_node_export_basename(node)
     sample_ids = node.get_sample_ids()
-    _, _, items = grid.get_items(request)
+    items = grid.export_rows()
 
     if canonical_transcript_collection:
         basename += f"_{canonical_transcript_collection}"
@@ -53,15 +53,15 @@ def node_grid_get_export_iterator(request, node, export_type, canonical_transcri
     if row_wrapper:
         items = row_wrapper(items)
 
-    colmodels = grid.get_colmodels()
+    columns = grid.csv_columns()
 
     if export_type == 'csv':
-        file_iterator = grid_export_csv(colmodels, items, label_overrides=VARIANT_GRID_LABEL_OVERRIDES)
+        file_iterator = grid_export_csv(columns, items)
     elif export_type == 'vcf':
         genome_build = node.analysis.genome_build
         values_qs = Sample.objects.filter(id__in=sample_ids).values_list("id", "name")
         sample_names_by_id = dict(values_qs)
-        file_iterator = _grid_export_vcf(genome_build, colmodels, items, sample_ids, sample_names_by_id)
+        file_iterator = _grid_export_vcf(genome_build, columns, items, sample_ids, sample_names_by_id)
     else:
         raise ValueError(f"unknown export type: '{export_type}'")
 
@@ -94,11 +94,11 @@ def get_node_export_basename(node: AnalysisNode) -> str:
     return "_".join(name_parts)
 
 
-def _grid_export_vcf(genome_build, colmodels, items, sample_ids, sample_names_by_id) -> Iterator[str]:
+def _grid_export_vcf(genome_build, columns, items, sample_ids, sample_names_by_id) -> Iterator[str]:
     samples = [sample_names_by_id[s_id] for s_id in sample_ids]
 
     use_accession = False
-    info_dict = _get_colmodel_info_dict(colmodels)
+    info_dict = _get_column_info_dict(columns)
     header_lines = get_vcf_header_from_contigs(genome_build, info_dict, samples, use_accession=use_accession)
 
     pseudo_buffer = StashFile()
@@ -133,11 +133,11 @@ def _get_column_vcf_info():
     return column_vcf_info
 
 
-def _get_colmodel_info_dict(colmodels):
+def _get_column_info_dict(columns):
     column_vcf_info = _get_column_vcf_info()
 
     info_dict = {}
-    for c in colmodels:
+    for c in columns:
         name = c['name']
         col_info = column_vcf_info.get(name)
         if col_info:
@@ -276,7 +276,7 @@ def _replace_transcripts_iterator(grid, ctc: CanonicalTranscriptCollection, item
     transcript_fields = set(get_model_fields(VariantTranscriptAnnotation, ignore_fields=["id", "version", "variant"]))
     annotation_prefix = "variantannotation__"
     annotation_prefix_len = len(annotation_prefix)
-    for f in grid.get_field_names():
+    for f in [rc.name for rc in grid.enabled_columns]:
         if f.startswith(annotation_prefix):
             suffix = f[annotation_prefix_len:]
             tf = suffix.split("__", 1)[0]
@@ -299,7 +299,7 @@ def _replace_transcripts_iterator(grid, ctc: CanonicalTranscriptCollection, item
                     transcript_item[after] = transcript_data[before]
                 yield transcript_item
 
-        return {item["id"]: item for item in grid.iter_format_items(transcript_items())}
+        return {item["id"]: item for item in format_rows(grid.enabled_columns, transcript_items())}
 
     # Loop through items and changeroo
     for batch in iter_fixed_chunks(items, TRANSCRIPT_REPLACE_BATCH_SIZE):

@@ -179,7 +179,7 @@ class Test(URLTestCase):
             ("gene_coverage_collection_datatable",
              {"gene_coverage_collection_id": self.gene_coverage_collection.pk}, 200),
             ("gene_symbol_variants_grid", {"gene_symbol": self.gene_symbol.pk,
-                                           "genome_build_name": genome_build_name, "op": "handler"}, 200),
+                                           "genome_build_name": genome_build_name}, 200),
         ]
         self._test_datatable_urls(DATATABLE_GRID_LIST_URLS, self.user_non_owner)
 

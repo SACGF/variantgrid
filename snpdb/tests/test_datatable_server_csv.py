@@ -4,7 +4,13 @@ from django.db.models import QuerySet
 from django.test import RequestFactory, TestCase
 
 from snpdb.models import Cohort, GenomeBuild, ImportStatus
-from snpdb.views.datatable_view import DatabaseTableView, DatatableConfig, RichColumn, SortOrder
+from snpdb.views.datatable_view import (
+    DatatableConfig,
+    RichColumn,
+    SortOrder,
+    datatable_csv_response,
+    datatable_definition,
+)
 
 
 class CohortCsvColumns(DatatableConfig[Cohort]):
@@ -42,16 +48,13 @@ class DatatableServerCsvTests(TestCase):
             Cohort.objects.create(name=name, user=self.user, genome_build=genome_build,
                                   import_status=ImportStatus.SUCCESS, vcf=None)
 
-    def _view(self, column_class=CohortCsvColumns, **params) -> DatabaseTableView:
+    def _config(self, column_class=CohortCsvColumns, **params) -> DatatableConfig:
         request = RequestFactory().get("/fake/cohorts/", params)
         request.user = self.user
-        view = DatabaseTableView(column_class=column_class)
-        view.request = request
-        view.config = column_class(request)
-        return view
+        return column_class(request)
 
     def _csv_lines(self, **params) -> list[str]:
-        response = self._view(**params).download_csv()
+        response = datatable_csv_response(self._config(**params))
         return b"".join(response.streaming_content).decode().strip().splitlines()
 
     def test_csv_columns_deduplicated(self):
@@ -68,12 +71,12 @@ class DatatableServerCsvTests(TestCase):
         self.assertEqual(lines[1].split(",")[1], "zebra")
 
     def test_definition_offers_download_url(self):
-        definition = self._view().json_definition()
+        definition = datatable_definition(self._config())
         self.assertIn("dataTableCsv=1", definition["downloadUrl"])
         self.assertEqual(definition["csvName"], "cohorts")
 
-        self.assertNotIn("downloadUrl", self._view(column_class=NoCsvColumns).json_definition())
+        self.assertNotIn("downloadUrl", datatable_definition(self._config(column_class=NoCsvColumns)))
 
     def test_csv_refused_where_not_enabled(self):
         with self.assertRaises(PermissionDenied):
-            self._view(column_class=NoCsvColumns).download_csv()
+            datatable_csv_response(self._config(column_class=NoCsvColumns))

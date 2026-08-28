@@ -261,6 +261,6 @@
                 </p>
             </div>
         <table id="all-variants-datatable" class="sticky-header"
-               data-datatable-url="{% url 'all_variants_grid' genome_build_name=genome_build.name op='handler' %}"
+               data-datatable-url="{% url 'all_variants_grid' genome_build_name=genome_build.name %}"
                data-datatable-data="allVariantsDatatableFilter"></table>
 {% endblock submenu_page_content %}

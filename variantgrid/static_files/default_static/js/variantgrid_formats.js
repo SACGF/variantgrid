@@ -1,11 +1,10 @@
 /* Client renderers for the variant grids (the AbstractVariantGrid family).
 
    DataTables renderer signature is (data, type, row, ctx), where ctx is added by DataTableDefinition:
-     ctx.extra    grid wide metadata from the definition JSON (JqGrid.get_datatable_extra)
-     ctx.kwargs   this column's renderKwargs (jqGrid's colmodel formatter_kwargs)
+     ctx.extra    grid wide metadata from the definition JSON (DatatableConfig.get_extra)
 
    Shared page helpers (createGridLink, IGV, tags, load_variant_details) live in grid.js.
-   @see library/django_utils/jqgrid_datatable_adapter.py for the formatter -> renderer mapping */
+   Columns name their renderer in the overrides - @see snpdb/grid_columns/variant_columns.py */
 
 const VariantGridFormat = (function() {
     "use strict";
@@ -97,12 +96,7 @@ function internalClassificationBox(title, maxClassification, classifiedSummary, 
 
 
 VariantGridFormat.detailsLink = (variantId, type, rowData, ctx) => {
-    let nodeVisible = _isNodeVisible(ctx);
-    const kwargs = ctx && ctx.kwargs;
-    if (kwargs) {
-        nodeVisible = kwargs.node_visible;
-    }
-
+    const nodeVisible = _isNodeVisible(ctx);
     const variantBoxes = [];
     if (nodeVisible) {
         const variant_selector = "<input type='checkbox' class='variant-select' variant_id=" + variantId + ">";
@@ -429,16 +423,4 @@ VariantGridFormat.unitAsPercent = (unitValue) => {
         return "";
     }
     return (100.0 * unitValue).toPrecision(3) + "%";
-};
-
-
-// renderKwargs: url_name, url_object_column, icon_css_class
-VariantGridFormat.link = (cellValue, type, row, ctx) => {
-    const kwargs = (ctx && ctx.kwargs) || {};
-    const cssClasses = ["icon24", "left", "margin-r-5"];
-    const iconList = kwargs.icon_css_class ? [kwargs.icon_css_class] : ["view-details-link"];
-    const icons = iconList.map(icon => `<div class='${cssClasses.concat(icon).join(" ")}'></div>`).join("");
-    const urlObject = kwargs.url_object_column ? row[kwargs.url_object_column] : cellValue;
-    const url = Urls[kwargs.url_name](urlObject);
-    return `<a class='grid-link' href='${url}'>${icons}<div class='display-text'>${cellValue}</div></a>`;
 };

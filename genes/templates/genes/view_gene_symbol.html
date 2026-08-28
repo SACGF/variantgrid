@@ -496,7 +496,7 @@
                 </script>
                 {% tag_counts_filter genome_build=genome_build gene_symbol=gene_symbol click_func='tagClick' show_all_func='clearGeneVariantsGrid' %}
                 <table id="gene-variants-datatable" class="sticky-header"
-                       data-datatable-url="{% url 'gene_symbol_variants_grid' gene_symbol=gene_symbol.pk genome_build_name=genome_build.name op='handler' %}"
+                       data-datatable-url="{% url 'gene_symbol_variants_grid' gene_symbol=gene_symbol.pk genome_build_name=genome_build.name %}"
                        data-datatable-data="geneVariantsDatatableFilter"></table>
             {% else %}
                 There are no variants for this gene.

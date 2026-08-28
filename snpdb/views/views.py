@@ -921,9 +921,8 @@ def watch_manual_variant_entry(request, pk):
 
 @require_POST
 def set_user_row_config(request):
-    """ Rows per page, per user. Posted when the page length changes - from jqgrid.html
-        setRowChangeCallbacks, and from DataTables where the config opted in with a grid_name
-        (@see DatatableConfig.grid_name) """
+    """ Rows per page, per user. Posted by DataTables when the page length changes, where the config
+        opted in with a grid_name (@see DatatableConfig.grid_name) """
 
     grid_name = request.POST["grid_name"]
     grid_rows = int(request.POST["grid_rows"])

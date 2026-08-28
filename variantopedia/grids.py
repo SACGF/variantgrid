@@ -19,8 +19,7 @@ from annotation.annotation_version_querysets import (
     get_variant_queryset_for_latest_annotation_version,
 )
 from annotation.models import AnnotationVersion, VariantAnnotation
-from library.utils import JsonDataType, full_class_name, update_dict_of_dict_values
-from snpdb.grid_columns.custom_columns import get_custom_column_fields_override_and_sample_position
+from library.utils import JsonDataType, full_class_name
 from snpdb.grids import AbstractVariantGrid, url_if_visible
 from snpdb.models import GenomeBuild, Tag, Variant, VariantWiki, VariantZygosityCountCollection
 from snpdb.models.models_user_settings import UserGridConfig, UserSettings
@@ -76,7 +75,7 @@ class VariantWikiColumns(DatatableConfig[VariantWiki]):
 
 
 class AllVariantsGrid(AbstractVariantGrid):
-    caption = 'All Variants'
+    grid_name = 'All Variants'
     # Sorting on a joined or unindexed column full-sorts the whole result set before LIMIT, blowing the
     # statement_timeout (@see issues #1279, #1651). Nothing is user-sortable - every page is served in genomic
     # order (see DEFAULT_ORDER_BY), which is the one ordering a contig-filtered page can stream. @see issue #1663
@@ -87,23 +86,19 @@ class AllVariantsGrid(AbstractVariantGrid):
     # tiebreaker makes pagination stable. @see issue #1663
     DEFAULT_ORDER_BY = ("locus__contig_id", "locus__position", "pk")
 
-    def __init__(self, user, genome_build_name, **kwargs):
-        user_settings = UserSettings.get_for_user(user)
-        genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
-        self.genome_build = genome_build
-        self.annotation_version = AnnotationVersion.latest(genome_build)
-        fields, override, _ = get_custom_column_fields_override_and_sample_position(user_settings.columns,
-                                                                                    self.annotation_version)
-        self.fields = fields
-        super().__init__(user)
-        af_show_in_percent = settings.VARIANT_ALLELE_FREQUENCY_CLIENT_SIDE_PERCENT
-        update_dict_of_dict_values(self._overrides, self._get_standard_overrides(af_show_in_percent))
-        update_dict_of_dict_values(self._overrides, override)
+    def _setup(self):
+        self.genome_build = GenomeBuild.get_name_or_alias(self.get_query_param("genome_build_name"))
+        self.annotation_version = AnnotationVersion.latest(self.genome_build)
         self.vzcc = VariantZygosityCountCollection.get_global_germline_counts()
-        self.extra_filters = kwargs.pop("extra_filters", {})
-        self.extra_config.update({'sortname': 'locus__position',
-                                  'sortorder': "asc",
-                                  'shrinkToFit': False})
+        self.extra_filters = self.get_query_json("extra_filters") or {}
+
+    def _get_fields_and_overrides(self) -> tuple[list, dict]:
+        """ Only the allowlisted columns keep their sort arrows """
+        fields, overrides = self._user_settings_fields_and_overrides()
+        for field in fields:
+            if field not in self.SORTABLE_FIELDS:
+                overrides.setdefault(field, {})["orderable"] = False
+        return fields, overrides
 
     def _get_base_queryset(self) -> QuerySet:
         return get_variant_queryset_for_annotation_version(self.annotation_version)
@@ -139,19 +134,11 @@ class AllVariantsGrid(AbstractVariantGrid):
 
         return reduce(operator.and_, filter_list)
 
-    def get_colmodels(self, remove_server_side_only=False):
-        """ Only the allowlisted columns keep their sort arrows """
-        colmodels = super().get_colmodels(remove_server_side_only=remove_server_side_only)
-        for cm in colmodels:
-            if cm.get("name") not in self.SORTABLE_FIELDS:
-                cm["sortable"] = False
-        return colmodels
-
-    def _sort_items(self, items, sidx, sord):
-        """ Serve every page in genomic order regardless of any sidx a hand-crafted grid URL supplies. Emitted as
+    def ordering(self, qs: QuerySet) -> QuerySet:
+        """ Serve every page in genomic order regardless of any order a hand-crafted grid URL supplies. Emitted as
             a plain order_by so it matches the snpdb_locus(contig_id, position, ref_id) btree exactly - the base
-            class's F(sidx).asc(nulls_first=...) path defeats that index. @see issue #1663 """
-        return items.order_by(*self.DEFAULT_ORDER_BY)
+            class's F(key).asc(nulls_first=...) path defeats that index. @see issue #1663 """
+        return qs.order_by(*self.DEFAULT_ORDER_BY)
 
     def _get_approx_count(self, qs) -> int:
         sql, params = qs.query.sql_with_params()
@@ -163,51 +150,37 @@ class AllVariantsGrid(AbstractVariantGrid):
             raise ValueError(f"Could not parse row estimate from EXPLAIN output: {first_line!r}")
         return int(match.group(1))
 
-    def get_known_count(self, request, items) -> Optional[int]:
-        """ A COUNT(*) over a huge table costs more than the page itself - hand the paginator the
-            planner's estimate instead, and tell the user it's approximate """
-        if self.get_filters(request):
-            return None  # jqGrid column filters narrow the rows the estimate was taken over
+    def get_known_count(self, qs) -> Optional[int]:
+        """ A COUNT(*) over a huge table costs more than the page itself - hand back the planner's
+            estimate instead, and tell the user it's approximate """
+        if self.filter_rules:
+            return None  # column filters narrow the rows the estimate was taken over
 
         try:
-            estimate = self._get_approx_count(items)
+            estimate = self._get_approx_count(qs)
         except Exception:
             return None
 
         if estimate >= 1_000_000:
-            self._used_approx_count = True
+            self.approximate_records = _format_approx_count(estimate)
             return estimate
         return None
 
-    def get_data(self, request) -> dict:
-        self._used_approx_count = False
-        data = super().get_data(request)
-        if self._used_approx_count:
-            data['approximate_records'] = _format_approx_count(data['records'])
-        return data
-
 
 class NearbyVariantsGrid(AbstractVariantGrid):
-    caption = 'Nearby Variants'
+    grid_name = 'Nearby Variants'
+    default_sort_field = "locus__position"
+    default_sort_order = SortOrder.DESC
 
-    def __init__(self, user, variant_id, genome_build_name, region_type, gene_symbol=None, **kwargs):
-        self.variant = get_object_or_404(Variant, pk=variant_id)
-        self.genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
-        self.region_type = region_type
-        self.gene_symbol = gene_symbol
-
-        user_settings = UserSettings.get_for_user(user)
+    def _setup(self):
+        self.variant = get_object_or_404(Variant, pk=self.get_query_param("variant_id"))
+        self.genome_build = GenomeBuild.get_name_or_alias(self.get_query_param("genome_build_name"))
         self.annotation_version = AnnotationVersion.latest(self.genome_build)
-        fields, override, _ = get_custom_column_fields_override_and_sample_position(user_settings.columns,
-                                                                                    self.annotation_version)
-        self.fields = fields
-        super().__init__(user)
-        af_show_in_percent = settings.VARIANT_ALLELE_FREQUENCY_CLIENT_SIDE_PERCENT
-        update_dict_of_dict_values(self._overrides, self._get_standard_overrides(af_show_in_percent))
-        update_dict_of_dict_values(self._overrides, override)
-        self.extra_config.update({'sortname': "locus__position",
-                                  'sortorder': "desc",
-                                  'shrinkToFit': False})
+        self.region_type = self.get_query_param("region_type")
+        self.gene_symbol = self.get_query_param("gene_symbol")
+
+    def _get_fields_and_overrides(self) -> tuple[list, dict]:
+        return self._user_settings_fields_and_overrides()
 
     def _get_base_queryset(self) -> QuerySet:
         region_filters = get_nearby_qs(self.variant, self.annotation_version)
@@ -341,21 +314,24 @@ class VariantTagsColumns(DatatableConfig[VariantTag]):
 
 class TaggedVariantGrid(AbstractVariantGrid):
     """ Shows Variants that have been tagged (Variant-centric) """
-    caption = 'Variant with tags'
+    grid_name = 'Variant with tags'
+    default_sort_field = "locus__position"
+    # CSV comes off the dedicated tagged_variant_export view, which forces a genomic order sort
+    server_csv_download = False
 
     TAG_COUNT_OVERRIDE = {
         'model_field': False, 'queryset_field': False,
-        'name': 'tag_count', 'index': 'tag_count', 'label': 'Tag Events',
-        'width': 60, 'sorttype': 'int',
+        'label': 'Tag Events', 'width': 60, 'data_type': 'int',
     }
 
-    def __init__(self, user, genome_build_name, extra_filters=None):
-        genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
-        self.genome_build = genome_build
+    def _setup(self):
+        self.genome_build = GenomeBuild.get_name_or_alias(self.get_query_param("genome_build_name"))
+        self.annotation_version = AnnotationVersion.latest(self.genome_build)
+
         tag_ids = []
         require_all_tags = False
         filter_user_id = None
-        if extra_filters:
+        if extra_filters := self.get_query_json("extra_filters"):
             if tag_id := extra_filters.get("tag"):
                 tag_ids.append(tag_id)
             # Variants carrying ALL of these tags - @see tag stats co-occurrence card
@@ -367,20 +343,10 @@ class TaggedVariantGrid(AbstractVariantGrid):
         self.require_all_tags = require_all_tags
         self.filter_user_id = filter_user_id
 
-        user_settings = UserSettings.get_for_user(user)
-        self.annotation_version = AnnotationVersion.latest(genome_build)
-        fields, override, _ = get_custom_column_fields_override_and_sample_position(user_settings.columns,
-                                                                                    self.annotation_version)
-        self.fields = fields + ["tag_count"]
-        super().__init__(user)
-
-        af_show_in_percent = settings.VARIANT_ALLELE_FREQUENCY_CLIENT_SIDE_PERCENT
-        update_dict_of_dict_values(self._overrides, self._get_standard_overrides(af_show_in_percent))
-        update_dict_of_dict_values(self._overrides, override)
-        update_dict_of_dict_values(self._overrides, {"tag_count": self.TAG_COUNT_OVERRIDE})
-        self.extra_config.update({'sortname': "locus__position",
-                                  'sortorder': "asc",
-                                  'shrinkToFit': False})
+    def _get_fields_and_overrides(self) -> tuple[list, dict]:
+        fields, overrides = self._user_settings_fields_and_overrides(
+            extra_overrides={"tag_count": self.TAG_COUNT_OVERRIDE})
+        return fields + ["tag_count"], overrides
 
     def _get_grid_only_annotation_kwargs(self):
         """ How many times this variant has been tagged - sort on it to find the most re-tagged variants """
@@ -399,7 +365,7 @@ class TaggedVariantGrid(AbstractVariantGrid):
 
     def _get_q(self) -> Optional[Q]:
         genome_build = self.annotation_version.genome_build
-        user_grid_config = UserGridConfig.get(self.user, self.caption)
+        user_grid_config = UserGridConfig.get(self.user, self.grid_name)
         tags_qs = VariantTag.filter_for_user(self.user)
         if self.filter_user_id:
             # An explicit user filter overrides show_group_data - still permission checked

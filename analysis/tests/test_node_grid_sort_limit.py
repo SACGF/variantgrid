@@ -1,5 +1,5 @@
 from django.contrib.auth.models import User
-from django.test import TestCase, override_settings
+from django.test import RequestFactory, TestCase, override_settings
 from django.urls import reverse
 
 from analysis.grids import VariantGrid
@@ -22,9 +22,16 @@ class NodeGridSortLimitTest(TestCase):
         cls.analysis = Analysis(genome_build=cls.grch37)
         cls.analysis.set_defaults_and_save(cls.user)
 
-    def _grid(self, count):
+    def _grid(self, count, **params) -> VariantGrid:
         node = AllVariantsNode.objects.create(analysis=self.analysis, count=count)
-        return VariantGrid(self.user, node)
+        request = RequestFactory().get("/grid/", params)
+        request.user = self.user
+        return VariantGrid(request, node)
+
+    def _order_params(self, grid: VariantGrid, column_name: str) -> dict:
+        """ What the client sends to sort on a column - its index in the enabled column list """
+        index = [rc.name for rc in grid.enabled_columns].index(column_name)
+        return {"order[0][column]": index, "order[0][dir]": "asc"}
 
     def test_small_node_sorting_enabled(self):
         grid = self._grid(count=500)
@@ -40,33 +47,34 @@ class NodeGridSortLimitTest(TestCase):
 
     def test_large_node_ignores_requested_sort(self):
         grid = self._grid(count=50_000)
-        qs = grid._get_base_queryset()
-        sorted_qs = grid._sort_items(qs, sidx="variantannotation__gene_symbol", sord="asc")
+        # The order params a client could still send by hand
+        grid.request.GET = {"order[0][column]": "0", "order[0][dir]": "asc"}
+        sorted_qs = grid.ordering(grid._get_base_queryset())
         self.assertEqual(list(sorted_qs.query.order_by), ["-pk"])
 
     def test_small_node_keeps_requested_sort(self):
         grid = self._grid(count=500)
-        qs = grid._get_base_queryset()
-        sorted_qs = grid._sort_items(qs, sidx="start", sord="asc")
+        grid.request.GET = self._order_params(grid, "locus__position")
+        sorted_qs = grid.ordering(grid._get_base_queryset())
         # Requested column first, PK tiebreaker last
-        self.assertEqual(list(sorted_qs.query.order_by)[-1], "-pk")
-        self.assertGreater(len(sorted_qs.query.order_by), 1)
+        order_by = list(sorted_qs.query.order_by)
+        self.assertEqual(str(order_by[-1].expression), "F(pk)")
+        self.assertGreater(len(order_by), 1)
 
-    def test_large_node_colmodels_not_sortable(self):
+    def test_large_node_columns_not_orderable(self):
         grid = self._grid(count=50_000)
-        colmodels = grid.get_colmodels()
-        self.assertTrue(colmodels)
-        self.assertTrue(all(cm.get("sortable") is False for cm in colmodels))
+        self.assertTrue(grid.enabled_columns)
+        self.assertTrue(all(rc.orderable is False for rc in grid.enabled_columns))
 
-    def test_small_node_colmodels_sortable_default(self):
+    def test_small_node_columns_orderable_by_default(self):
         grid = self._grid(count=500)
-        colmodels = grid.get_colmodels()
-        # Sorting isn't force-disabled - columns keep their normal (non-False) sortable setting
-        self.assertFalse(all(cm.get("sortable") is False for cm in colmodels))
+        # Sorting isn't force-disabled - columns keep their normal (orderable) setting
+        self.assertFalse(all(rc.orderable is False for rc in grid.enabled_columns))
 
-    def test_large_node_no_initial_sortname(self):
+    def test_large_node_has_no_initial_order(self):
         grid = self._grid(count=50_000)
-        self.assertNotIn("sortname", grid.extra_config)
+        self.assertIsNone(grid.default_sort_order_column)
+        self.assertIsNone(grid.default_sort_field)
 
 
 @override_settings(ANALYSIS_GRID_SORT_MAX_ROWS=10_000)

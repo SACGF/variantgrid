@@ -19,7 +19,6 @@ from django.db.models import Count
 from django.forms.models import inlineformset_factory
 from django.http.response import HttpResponse, HttpResponseRedirect, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
-from django.test.client import RequestFactory
 from django.urls.base import reverse
 from django.utils import timezone
 from django.views.decorators.cache import cache_page, never_cache
@@ -513,17 +512,14 @@ def node_view(request, analysis_id, analysis_version, node_id, node_version, ext
 
 def get_node_sql(grid):
     # Temporarily disabling SQL formatting as it's really slow.
-    request = RequestFactory().get('/fake')
     # A node that filters on an empty set (eg comp het with no 2-hit genes) would otherwise
     # short circuit with EmptyResultSet - we still want to show the SQL in the debug tab
     with render_empty_result_set_sql():
-        qs = grid.get_queryset(request)
-        grid_sql = queryset_to_sql(qs)
+        grid_qs = grid.get_initial_queryset().values(*grid.value_columns())
+        grid_sql = queryset_to_sql(grid_qs)
         # grid_sql = sqlparse.format(grid_sql, reindent=True, keyword_case='upper')
 
-        grid.fields = ['id']
-        qs = grid.get_queryset(request)
-        node_sql = queryset_to_sql(qs)
+        node_sql = queryset_to_sql(grid.node.get_queryset())
         # node_sql_ = sqlparse.format(node_sql_, reindent=True, keyword_case='upper')
 
     return node_sql, grid_sql
@@ -547,7 +543,7 @@ def node_debug(request, analysis_id, analysis_version, node_id, node_version, ex
     context = {"node": node,
                "node_data": dict(sorted(serializer.data.items()))}
     if node.valid:
-        grid = VariantGrid(request.user, node, extra_filters)
+        grid = VariantGrid(request, node, extra_filters)
         try:
             node_sql_, grid_sql = get_node_sql(grid)
             context['node_sql'] = node_sql_
@@ -646,11 +642,10 @@ def node_data_grid(request, analysis_id, analysis_version, node_id, node_version
 def node_column_summary(request, analysis_id, analysis_version, node_id, node_version, extra_filters, grid_column_name, significant_figures):
     node = get_node_subclass_or_404(request.user, node_id, version=node_version)
 
-    grid = VariantGrid(request.user, node, extra_filters)
-    cm = grid.get_column_colmodel(grid_column_name)
-    variant_column = cm['name']
-    sorttype = cm.get('sorttype')
-    quantitative = sorttype in ['float', 'int']
+    grid = VariantGrid(request, node, extra_filters)
+    rich_column = grid.get_column(grid_column_name)
+    variant_column = rich_column.name
+    quantitative = rich_column.data_type in ['float', 'int']
 
     context = {
         "analysis_id": analysis_id,
@@ -660,7 +655,7 @@ def node_column_summary(request, analysis_id, analysis_version, node_id, node_ve
     }
 
     if quantitative:
-        label = cm['label']
+        label = rich_column.label
 
         poll_url = reverse(column_summary_boxplot, kwargs={"analysis_id": analysis_id, "node_id": node_id,
                                                            "label": label, "variant_column": variant_column})

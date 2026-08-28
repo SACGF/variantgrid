@@ -17,7 +17,7 @@ from seqauto.models import (
     VCFFromSequencingRun,
 )
 from snpdb.models import VCF, GenomeBuild, ImportStatus, UserGridConfig
-from snpdb.views.datatable_view import DatabaseTableView
+from snpdb.views.datatable_view import prepare_rows
 
 
 class SequencingRunDatatableTests(TestCase):
@@ -51,11 +51,9 @@ class SequencingRunDatatableTests(TestCase):
         request = RequestFactory().get(url, params)
         request.resolver_match = resolve(url)
         request.user = self.user
-        view = DatabaseTableView(column_class=SequencingRunColumns)
-        view.request = request
-        view.config = SequencingRunColumns(request)
-        qs = view.config.filter_queryset(view.config.get_initial_queryset())
-        return view.prepare_results(view.config.ordering(qs))
+        config = SequencingRunColumns(request)
+        qs = config.filter_queryset(config.get_initial_queryset())
+        return prepare_rows(config, config.ordering(qs))
 
     def test_sample_count_and_vcfs(self):
         row = self._rows()[0]

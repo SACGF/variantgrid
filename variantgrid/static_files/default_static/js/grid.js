@@ -290,7 +290,7 @@ function create_igv_link(locus, getBamsFuncString) {
 }
 
 function showGridCell(gridColumn) {
-    // The adapter names each cell with a dt-<column> class
+    // Every cell carries a dt-<column> class (@see RichColumn.css_classes)
     const selector = $("td.dt-" + gridColumn);
     if (selector.length) {
         selector[0].scrollIntoView();
@@ -423,16 +423,12 @@ function setupNodeGrid(config_url, handler_url, analysisId, nodeId, versionId, u
         dom: getGrid(nodeId, unique_code),
         definitionUrl: config_url,
         url: handler_url,
-        // The widths come from the colmodel and the CSS lays the table out table-layout: fixed, so
+        // The widths come from the definition and the CSS lays the table out table-layout: fixed, so
         // there is nothing to measure - and on a deferred grid the adjust draw is the fetch we're holding
         adjustColumns: false,
+        // FilterNode rules are saved against the node, so they ride along with its other state
         data: function(data) {
-            const postData = $.extend({}, definition.serverParams.postData);
-            // FilterNode rules are saved against the node, so they ride along with its other state
-            if (postData.filters) {
-                postData._search = 'true';
-            }
-            return postData;
+            return $.extend({}, definition.serverParams.postData);
         },
         onDefinition: function(defn) {
             if (defn.errors) {

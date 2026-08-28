@@ -27,6 +27,7 @@ from snpdb.variant_filters import (
     get_contig_ids_for_gene_symbols,
     get_default_all_variants_filters,
 )
+from snpdb.views.datatable_view import datatable_data, datatable_definition
 from variantopedia.grids import AllVariantsGrid, NearbyVariantsGrid
 
 
@@ -83,10 +84,16 @@ class AllVariantsGridFilterTest(TestCase):
                            'VALUES (%s, %s, %s, %s)',
                            [variant_annotation_version.pk, annotation_run.pk, variant.pk, gene.pk])
 
+    def _grid(self, extra_filters) -> AllVariantsGrid:
+        request = FakeRequest(user=self.user)
+        request.GET = {"genome_build_name": self.genome_build.name,
+                       "extra_filters": json.dumps(extra_filters)}
+        return AllVariantsGrid(request)
+
     def _grid_variant_ids(self, extra_filters) -> set[int]:
-        grid = AllVariantsGrid(self.user, self.genome_build.name, extra_filters=extra_filters)
+        grid = self._grid(extra_filters)
         qs = grid._get_base_queryset()
-        # AbstractVariantGrid.get_queryset() always installs this join, so min_count has its aliases
+        # AbstractVariantGrid.get_initial_queryset() always installs this join, so min_count has its aliases
         qs, _ = VariantZygosityCountCollection.annotate_global_germline_counts(qs)
         if q := grid._get_q():
             qs = qs.filter(q)
@@ -204,16 +211,18 @@ class AllVariantsGridSortTest(TestCase):
         cls.genome_build = GenomeBuild.get_name_or_alias("GRCh37")
         get_fake_annotation_version(cls.genome_build)
 
-    def _grid(self) -> AllVariantsGrid:
-        return AllVariantsGrid(self.user, self.genome_build.name)
+    def _grid(self, **params) -> AllVariantsGrid:
+        request = FakeRequest(user=self.user)
+        request.GET = {"genome_build_name": self.genome_build.name, **params}
+        return AllVariantsGrid(request)
 
     def test_requested_sort_is_replaced_by_genomic_order(self):
-        """ A hand-crafted grid URL can't get a joined column sorted - sidx is ignored either way """
-        grid = self._grid()
-        for sidx in ["variantannotation__gene_symbol", "id"]:
-            sorted_qs = grid._sort_items(grid._get_base_queryset(), sidx=sidx, sord="asc")
+        """ A hand-crafted grid URL can't get a joined column sorted - the order params are ignored """
+        for column_index in [0, 1]:
+            grid = self._grid(**{"order[0][column]": str(column_index), "order[0][dir]": "asc"})
+            sorted_qs = grid.ordering(grid._get_base_queryset())
             self.assertEqual(list(AllVariantsGrid.DEFAULT_ORDER_BY), list(sorted_qs.query.order_by),
-                             f"sidx={sidx} should be served in genomic order")
+                             f"order on column {column_index} should be served in genomic order")
 
     def test_genomic_order_leads_with_the_locus_index_and_ends_with_a_tiebreaker(self):
         """ (contig, position) is the leading edge of snpdb_locus's unique index, so a contig-filtered
@@ -221,20 +230,20 @@ class AllVariantsGridSortTest(TestCase):
         self.assertEqual(("locus__contig_id", "locus__position"), AllVariantsGrid.DEFAULT_ORDER_BY[:2])
         self.assertEqual("pk", AllVariantsGrid.DEFAULT_ORDER_BY[-1])
 
-    def test_colmodels_outside_allowlist_not_sortable(self):
+    def test_columns_outside_allowlist_not_orderable(self):
         grid = self._grid()
-        colmodels = grid.get_colmodels()
-        self.assertTrue(colmodels)
-        for cm in colmodels:
-            if cm["name"] in AllVariantsGrid.SORTABLE_FIELDS:
-                self.assertNotEqual(False, cm.get("sortable"))
+        self.assertTrue(grid.enabled_columns)
+        for rich_column in grid.enabled_columns:
+            if rich_column.name in AllVariantsGrid.SORTABLE_FIELDS:
+                self.assertTrue(rich_column.orderable)
             else:
-                self.assertIs(False, cm.get("sortable"))
+                self.assertFalse(rich_column.orderable)
 
-    def test_default_sort_is_genomic_position(self):
+    def test_definition_asks_for_no_initial_order(self):
+        """ Nothing is sortable, so the client shouldn't request a sort on the first load """
         grid = self._grid()
-        self.assertEqual("locus__position", grid.extra_config["sortname"])
-        self.assertEqual("asc", grid.extra_config["sortorder"])
+        self.assertIsNone(grid.default_sort_order_column)
+        self.assertIsNone(datatable_definition(grid).get("order"))
 
 
 class AllVariantsGridApproximateCountTest(TestCase):
@@ -254,47 +263,44 @@ class AllVariantsGridApproximateCountTest(TestCase):
                                           locus__ref__seq='C', alt__seq='T')
         cls.contig = cls.variant.locus.contig
 
-    def _grid(self) -> AllVariantsGrid:
-        return AllVariantsGrid(self.user, self.genome_build.name,
-                               extra_filters={"contig_ids": [self.contig.pk]})
+    def _grid(self, **params) -> AllVariantsGrid:
+        request = FakeRequest(user=self.user)
+        request.GET = {"genome_build_name": self.genome_build.name,
+                       "extra_filters": json.dumps({"contig_ids": [self.contig.pk]}),
+                       **params}
+        return AllVariantsGrid(request)
 
-    def _get_data(self, request=None) -> tuple[dict, list[str]]:
+    def _get_data(self, **params) -> tuple[dict, list[str]]:
         """ (grid data, the COUNT(*) queries it ran) """
-        if request is None:
-            request = FakeRequest(user=self.user)
+        grid = self._grid(**params)
         with CaptureQueriesContext(connection) as queries:
-            data = self._grid().get_data(request)
+            data = datatable_data(grid)
         count_queries = [q["sql"] for q in queries.captured_queries if q["sql"].startswith("SELECT COUNT(")]
         return data, count_queries
-
-    def _filtered_request(self) -> FakeRequest:
-        request = FakeRequest(user=self.user)
-        rules = [{"op": "lt", "field": "locus__position", "data": "100000000"}]
-        request.GET = {"_search": "true", "filters": json.dumps({"groupOp": "AND", "rules": rules})}
-        return request
 
     @mock.patch.object(AllVariantsGrid, "_get_approx_count", return_value=APPROX_COUNT)
     def test_large_estimate_is_reported_as_approximate(self, _mock_approx_count):
         data, count_queries = self._get_data()
-        self.assertEqual(self.APPROX_COUNT, data["records"])
-        self.assertEqual("~5.0M", data["approximate_records"])
+        self.assertEqual(self.APPROX_COUNT, data["recordsTotal"])
+        self.assertEqual("~5.0M", data["approximateRecords"])
         self.assertEqual([], count_queries)
 
     @mock.patch.object(AllVariantsGrid, "_get_approx_count", return_value=999)
     def test_small_estimate_counts_the_queryset(self, _mock_approx_count):
         data, count_queries = self._get_data()
-        self.assertNotIn("approximate_records", data)
-        self.assertEqual(len(data["rows"]), data["records"])
+        self.assertNotIn("approximateRecords", data)
+        self.assertEqual(len(data["data"]), data["recordsTotal"])
         self.assertEqual(1, len(count_queries))
 
     @mock.patch.object(AllVariantsGrid, "_get_approx_count", return_value=APPROX_COUNT)
     def test_filtered_request_counts_the_queryset(self, mock_approx_count):
-        """ A jqGrid column filter narrows the rows the estimate was taken over """
-        data, count_queries = self._get_data(self._filtered_request())
+        """ A column filter narrows the rows the estimate was taken over """
+        rules = [{"op": "lt", "field": "locus__position", "data": "100000000"}]
+        data, count_queries = self._get_data(filters=json.dumps({"groupOp": "AND", "rules": rules}))
         mock_approx_count.assert_not_called()
-        self.assertNotIn("approximate_records", data)
-        self.assertEqual(len(data["rows"]), data["records"])
-        self.assertEqual(1, len(count_queries))
+        self.assertNotIn("approximateRecords", data)
+        self.assertEqual(len(data["data"]), data["recordsFiltered"])
+        self.assertEqual(1, len(count_queries), "The whole-table total isn't worth a second count")
 
 
 class NearbyVariantsGridCountTest(TestCase):
@@ -311,12 +317,14 @@ class NearbyVariantsGridCountTest(TestCase):
                                           locus__ref__seq='C', alt__seq='T')
 
     def test_records_come_from_the_queryset(self):
-        grid = NearbyVariantsGrid(self.user, self.variant.pk, self.genome_build.name, "range")
         request = FakeRequest(user=self.user)
+        request.GET = {"variant_id": self.variant.pk, "genome_build_name": self.genome_build.name,
+                       "region_type": "range"}
+        grid = NearbyVariantsGrid(request)
         with CaptureQueriesContext(connection) as queries:
-            data = grid.get_data(request)
+            data = datatable_data(grid)
         count_queries = [q["sql"] for q in queries.captured_queries if q["sql"].startswith("SELECT COUNT(")]
-        self.assertEqual(len(data["rows"]), data["records"])
+        self.assertEqual(len(data["data"]), data["recordsTotal"])
         self.assertEqual(1, len(count_queries))
 
 
