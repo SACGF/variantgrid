@@ -86,73 +86,34 @@ Variant tags can be added or removed directly from the variant detail page. You 
 "The server status page shows system health, database statistics, and activity details. Useful for admins checking annotation pipeline status.",variantopedia,server_status
 You can search for EnrichmentKit names in the global search. Takes you straight to the kit's page showing associated samples.,variantopedia,search
 Horizontal mode lays nodes out left to right with the variant grid docked full width along the bottom. Turn it on in Analysis Settings → Details tab (or set it as your default in User Settings).,analysis,analysis_settings_details_tab
-Nodes now show icons and info chips summarising how they're configured. Source and filter nodes are coloured differently so you can read the shape of an analysis at a glance.,analysis,analysis
 "Node counts record where their number came from. An exact count is a hard number, an advisory count means data has changed since it was calculated and it needs a reload.",analysis,analysis
-Big nodes no longer load their grid automatically. Change the variant count threshold in User Settings if you'd rather they always load.,snpdb,view_user_settings
-Node CSV/VCF exports are generated in the background and their progress shows on the analysis toolbar. You can click through to other nodes while an export runs.,analysis,analysis
-"Nodes can be toggled between germline and somatic. Somatic mode shows tier pills, and node counts include Tier I/II.",analysis,analysis
-"The All Variants node can filter by variant type (eg symbolic / structural) and by chromosome or contig, so you can start an analysis from just one region.",analysis,analysis
+Big nodes no longer load their grid automatically. Change the variant count threshold in User Settings,snpdb,view_user_settings
 The Population node can exclude variants that gnomAD itself filtered out. Handy for dropping low quality population records.,analysis,analysis
 The Effect node uses the new pathogenicity prediction columns and automatically switches based on the annotation version your analysis is using.,analysis,analysis
-The Tissue node filters variants to genes expressed in a chosen tissue using Human Protein Atlas annotation.,analysis,analysis
-The Damage node can filter frameshifts by how far the premature termination codon is from the last junction and whether it's predicted to escape NMD.,analysis,analysis
-Trio and Quad compound het filtering uses gene overlaps. So a long structural variant spanning a gene counts as a hit.,analysis,analysis
 "The Tag node has a 'tagged within days' filter, so you can look at just recent tagging activity. Tags marked stale are flagged too.",analysis,analysis
-The Sample node can pull in every sample belonging to an extraction in one step instead of adding them individually.,analysis,analysis
-"Nodes with gene lists warn you when a gene of interest has incomplete coverage, if you've uploaded coverage data for the sample.",analysis,analysis
-A node that fails now shows the error in the node editor rather than throwing you to an error page.,analysis,analysis
-"Tags and classifications in the analysis grid respect sharing and withdrawal, so you only ever see records you're allowed to see.",analysis,analysis
-Tags applied inside an analysis are shown on the analysis listing page. Useful for finding the case you were part way through.,analysis,analyses
-"Pathogenicity predictions are now rankscores (0-1) - AlphaMissense, BayesDel, CADD raw, ClinPred, REVEL, MetaLR and VEST4. One score per variant rather than per transcript.",annotation,view_annotation_descriptions
 "Structural variants get AnnotSV annotation, shown on the variant details page and in grids.",variantopedia,view_variant
-"SpliceAI is run as a command now, so indels are scored too. Raw (unmasked) scores are flagged with a warning.",variantopedia,view_variant
 "MAVEdb links are shown on the variant page, so you can check whether a variant has functional assay data.",variantopedia,view_variant
 denovoDB annotation is available for checking whether a variant has been seen as de novo in published studies.,annotation,view_annotation_descriptions
-"gnomAD v4.1 is used for GRCh38, with extra gnomAD v2 fields kept for GRCh37.",annotation,annotation_versions
-"Gene annotation now includes MOI columns from GenCC, split by evidence level, so you can see gene/disease inheritance patterns with their source.",annotation,view_annotation_descriptions
 "New dbNSFP gene columns cover haploinsufficiency, essentiality, pathways, GO terms and interactions. See the annotation descriptions page for the full list.",annotation,view_annotation_descriptions
 "New frameshift columns - stop codon distance, PTC to last junction, and NMD escape - are predicted from the new stop codon rather than the variant position.",annotation,view_annotation_descriptions
 Any variants that couldn't be annotated are listed on the VCF and sample pages so you know what's missing rather than silently losing them.,snpdb,view_vcf
 "T2T-CHM13v2 is supported as an experimental genome build. Not all annotation is available yet, but you can load and browse data against it.",snpdb,view_genome_build
-The variant details page can query external GA4GH Beacons to see whether other institutions hold the same variant.,beacon,external_beacons
+The variant details page can query external GA4GH Beacons to see whether other institutions hold the same variant. Contact the admin if you know of other servers we should add,beacon,external_beacons
 "This server can act as a GA4GH Beacon v2 node, exposing variants (including CNVs and somatic) to other beacons.",beacon,beacon_index
-"MatchMaker Exchange lets you match rare disease patients against other MME nodes. A classification is submitted once it reaches the 'public' share level - the classification page tells you whether that record is eligible.",mme,mme_classification_panel
+MatchMaker Exchange lets you match rare disease patients against other MME nodes. A classification is submitted once it reaches the 'public' share level - the classification page tells you whether that record is eligible.,mme,mme_classification_panel
 Inbound MatchMaker matches raise a notification and can be reviewed with the submitting contact's details.,mme,mme_view_inbound_match
-"MatchMaker gene matching works on HGNC symbol, Entrez and Ensembl IDs, so aliases and superseded gene symbols still match.",mme,mme_public_metrics
 "Reclassification analytics shows reclassification rates, VUS rate over time, and which genes carry the most reclassification burden.",classification,classification_reclassification_analytics
 Somatic classifications have their own evidence keys and tier-based clinical significance alongside the germline ACMG workflow.,classification,view_classification
 "The classification page shows sync status - whether the last published version reached each remote (with a link), or why it was excluded.",classification,view_classification
-"Classifications submitted as g.HGVS only (eg intergenic variants) are validated as genomic submissions, so a missing transcript no longer holds them back from export.",classification,view_classification
-gnomAD structural variant frequencies autopopulate classifications for SVs the same way gnomAD does for small variants.,classification,view_classification
-Turn on the research classification highlight in User Settings if you want research records visually distinguished from clinical ones.,snpdb,view_user_settings
 Candidate Search can re-run an analysis against current classifications to find variants that were missed or whose classification has since changed.,classification,new_reanalysis_candidate_search
-"You can archive VCF data without losing the metadata, so old analyses still make sense after the variant data is gone.",snpdb,archive_vcf
-There's an API for uploading files and downloading annotated VCF/CSV output. Useful for scripting a pipeline against the server.,snpdb,api_annotated_download
-"A failed import can be retried - the pipeline steps re-run while keeping records it can't recreate, like manual variant entry and classification imports.",upload,upload_retry_import
-"Unsorted VCFs are sorted during import rather than failing. You get a warning on the import so you know it happened.",upload,upload
-"chrM variants are imported now, and g.VCF files are handled properly, including converting 'ref=N' to the real reference sequence.",upload,upload
+"You can archive VCF data to save space / remove variants without losing the metadata, so old analyses still make sense after the variant data is gone, and you can restore the VCF to bring it back",snpdb,archive_vcf
 "HGVS resolution uses the BioCommons library. It handles 'inv', gaps in alignments, LRG references and non-coding transcripts.",variantopedia,search
-A mitochondrial 'm.' HGVS on a non-MT reference now gives you a warning rather than quietly resolving it as 'g.'.,variantopedia,search
-"COSMIC variants that aren't in the database yet can be created straight from search, using the COSMIC API.",variantopedia,search
-"Search tells you what it actually searched, highlighted in green. So you can see why you got the results you got.",variantopedia,search
-"You can search for cohorts, pedigrees, trios, quads and ontology terms - not just variants and genes.",variantopedia,search
-"PanelApp panels are matched on HGNC ID rather than a dated gene symbol snapshot, so renamed genes stay in the panel.",genes,view_gene_list
-"You can paste a list of genes straight into a gene list, and the graphs tab shows where those genes sit across the genome.",genes,gene_list_graphs_tab
+If you visit the gene list page (genes → gene lists) there is a graphs tab that shows where those genes sit across the genome.,genes,gene_list_graphs_tab
 Lab heads can add and remove members from the lab page without needing an admin.,snpdb,lab_members_tab
 Your user page shows your tags and your classifications in one place.,snpdb,view_user
 "The Tag Stats page shows tag counts over time, broken down by user, lab and gene, plus which tags co-occur.",variantopedia,tag_stats
 "Duplicate tags can be merged - the old tag is retired rather than deleted, and the operation is logged.",snpdb,tag_merge
 Tag sort order is set on the tag colors page. Artifact tags sort last by default so they stay out of your way.,snpdb,tag_settings
-The Tags for Variants grid is back - one row per variant showing all its tags across analyses.,variantopedia,tagged_variant_grid
+The Tags for Variants grid is back in VG4 - one row per variant showing all its tags across analyses.,variantopedia,tagged_variant_grid
 Ontologies can have multiple versions now. Term pages tell you which version you're looking at so upgrades don't silently change meanings.,ontology,ontology_term
 "Phenotype text matching handles aliases that map to multiple terms, warns when a match is ambiguous, and lets you skip or disable auto-matched terms.",patients,view_patient
-"Specimen and Extraction records track a sample from tissue through to sequencing, with their own pages, grids and API.",patients,specimens
-Extractions link sequencing samples back to the patient specimen they came from. Unmatched extractions are listed so you can fix up the links.,patients,extractions
-"Patients, specimens and extractions all have a REST API for integrating with a LIMS.",patients,patients_apis
-The variant page links straight out to AlphaFold protein structure predictions for the affected gene.,variantopedia,view_variant
-"The variant page shows 8 transcripts initially and collapses annotation version and RepeatMasker detail, so there's much less scrolling.",variantopedia,view_variant
-Variant details shows a quick summary of gene/disease info at the top - click to expand the full set of links.,variantopedia,view_variant
-The variant page shows other variants at the same locus regardless of genotype calls and links to alleles that shared a row in the original VCF.,variantopedia,view_variant
-Structural variants get a different variant details layout - unavailable annotations are hidden and notes explain what applies to SVs.,variantopedia,view_variant
-"Every grid on the site is now DataTables - consistent sorting, filtering and CSV download everywhere.",snpdb,data
-Liftover falls back to bcftools +liftover for anything the ClinGen Allele Registry can't handle. Check the allele page to see how a variant was lifted over.,variantopedia,view_allele
