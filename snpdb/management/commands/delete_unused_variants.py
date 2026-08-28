@@ -51,8 +51,12 @@ PRELOAD_VARIANT_RELATIONS = [
     (AnnotationRangeLock, "min_variant_id"),
     (AnnotationRangeLock, "max_variant_id"),
     (AllVariantsNode, "max_variant_id"),
-    (IntersectionNode, "hgvs_variant_id"),
     (UploadedVCFPipelineMaxVariant, "max_variant_id"),
+]
+
+# Same idea, but the column is an ArrayField of variant PKs rather than an FK
+PRELOAD_VARIANT_ARRAY_RELATIONS = [
+    (IntersectionNode, "variant_ids"),
 ]
 
 
@@ -84,6 +88,9 @@ class Command(BaseCommand):
         preloaded_referenced_ids = set()
         for klass, fk in PRELOAD_VARIANT_RELATIONS:
             preloaded_referenced_ids.update(klass.objects.values_list(fk, flat=True))
+        for klass, array_field in PRELOAD_VARIANT_ARRAY_RELATIONS:
+            for variant_ids in klass.objects.values_list(array_field, flat=True):
+                preloaded_referenced_ids.update(variant_ids or [])
 
         while True:
             batch_pks = list(Variant.objects.filter(pk__gt=last_pk).order_by("pk")

@@ -14,11 +14,7 @@
 		width: 100% !important;
 	}
 	
-	#intersectionnode-custom-range input {
-		width: 100px;
-	}
-
-	#intersectionnode-hgvs input {
+	#intersectionnode-variants textarea {
 		width: 400px;
 	}
 
@@ -40,17 +36,13 @@
 		        </div>
 		        </li>
                 <li>
-                <h3>Custom Range</h3>
-                    <div id='intersectionnode-custom-range'>
-                    {{ form.chrom.errors }}{{ form.chrom }} : 
-                    {{ form.start.errors }}{{ form.start }} - 
-                    {{ form.end.errors }}{{ form.end }}
+                <h3>Variants</h3>
+                    <div id='intersectionnode-variants'>
+                    {{ form.variant_text.errors }}{{ form.variant_text }}
+                    <div class="text-muted">
+                        dbSNP IDs, HGVS, variant coordinates, loci, ClinGen allele IDs, COSMIC IDs
+                        and regions (chr:start-end) - one per line.
                     </div>
-                </li>
-                <li>
-                <h3>HGVS</h3>
-                    <div id='intersectionnode-hgvs'>
-                    {{ form.hgvs_string.errors }}{{ form.hgvs_string }}
                     </div>
                 </li>
                 <li>

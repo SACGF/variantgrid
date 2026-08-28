@@ -202,12 +202,7 @@ class IntersectionNodeView(NodeView):
 
     def _get_form_initial(self):
         form_initial = super()._get_form_initial()
-        if self.object.genomic_interval:
-            form_initial["chrom"] = self.object.genomic_interval.chrom
-            form_initial["start"] = self.object.genomic_interval.start
-            form_initial["end"] = self.object.genomic_interval.end
         form_initial["contigs"] = self.object.intersectionnodecontig_set.all().values_list("contig", flat=True)
-
         return form_initial
 
     def get_form_kwargs(self):

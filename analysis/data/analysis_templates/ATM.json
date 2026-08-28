@@ -33,15 +33,16 @@
         "analysis_update_uuid": null,
         "status": "R",
         "genomic_intervals_collection": null,
-        "genomic_interval": null,
-        "hgvs_string": "NM_000051.3(ATM):c.7271T>G",
-        "hgvs_variant": null,
         "left": 0,
         "right": 0,
-        "accordion_panel": 2,
+        "accordion_panel": 1,
         "analysisvariable_set": [],
         "nodeallelefrequencyfilter": null,
-        "nodewiki": null
+        "nodewiki": null,
+        "variant_text": "NM_000051.3(ATM):c.7271T>G",
+        "variant_ids": [],
+        "variant_regions": [],
+        "variant_text_unresolved": []
       }
     },
     {

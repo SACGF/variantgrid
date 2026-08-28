@@ -8,19 +8,17 @@ from typing import Optional
 
 from auditlog.registry import auditlog
 from django.conf import settings
+from django.contrib.postgres.fields import ArrayField
 from django.db import models
 from django.db.models import CASCADE
 from django.db.models.deletion import SET_NULL
 from django.db.models.query_utils import Q
-from django.db.models.signals import post_delete
-from django.dispatch.dispatcher import receiver
 
 from analysis.models.nodes.analysis_node import AnalysisNode, NodeAuditLogMixin
 from analysis.models.nodes.node_display import NodeIcon
-from genes.hgvs import get_hgvs_variant
+from analysis.variant_text import get_variant_text_summary, parse_region, resolve_variant_text
 from snpdb.models import (
     Cohort,
-    GenomicInterval,
     GenomicIntervalsCollection,
     Sample,
     VariantCollection,
@@ -32,17 +30,22 @@ from snpdb.variants_to_vcf import write_qs_to_vcf_file_sort_alphabetically
 
 
 class IntersectionNode(AnalysisNode):
+    # accordion_panel is the accordion index in intersectionnode_editor.html
     SELECTED_INTERVALS = 0
-    CUSTOM_INTERVAL = 1
-    HGVS = 2
-    BACKEND_ENRICHMENT_KIT = 3
-    CONTIG = 4
+    VARIANTS = 1
+    BACKEND_ENRICHMENT_KIT = 2
+    CONTIG = 3
+
+    # A pk__in list stops being the cheap option somewhere around here - above it we let
+    # NodeCache write the result out to a VariantCollection instead
+    VARIANTS_CACHE_MIN = 1000
 
     genomic_intervals_collection = models.ForeignKey(GenomicIntervalsCollection, null=True, blank=True, on_delete=SET_NULL)
-    genomic_interval = models.OneToOneField(GenomicInterval, null=True, on_delete=SET_NULL)
-    # HGVS linking done in both form and save() method below
-    hgvs_string = models.TextField(null=True, blank=True)
-    hgvs_variant = models.ForeignKey(Variant, null=True, blank=True, on_delete=SET_NULL)
+    # Free text entries (one per line) resolved to variants/regions in the form and save() below
+    variant_text = models.TextField(null=True, blank=True)
+    variant_ids = ArrayField(models.IntegerField(), default=list, blank=True)
+    variant_regions = ArrayField(models.TextField(), default=list, blank=True)
+    variant_text_unresolved = ArrayField(models.TextField(), default=list, blank=True)
     left = models.IntegerField(default=0)
     right = models.IntegerField(default=0)
     accordion_panel = models.IntegerField(default=0)
@@ -56,14 +59,12 @@ class IntersectionNode(AnalysisNode):
         ).order_by("contig__genomebuildcontig__order")
         return list(qs.values_list("contig_id", flat=True))
 
-    def valid_custom_genomic_interval(self):
-        return self.accordion_panel == self.CUSTOM_INTERVAL and self.genomic_interval
-
     def valid_selected_genomic_intervals_collection(self):
         return self.accordion_panel == self.SELECTED_INTERVALS and self.genomic_intervals_collection
 
-    def valid_hgvs(self):
-        return self.accordion_panel == self.HGVS and self.hgvs_string
+    def valid_variants(self):
+        # Text that resolved to nothing still filters (to nothing) - that's the honest answer
+        return self.accordion_panel == self.VARIANTS and bool(self.variant_text)
 
     def valid_backend_enrichment_kit(self):
         pbi, _ = self.get_vcf_bed_intersection_and_enrichment_kit()
@@ -73,14 +74,15 @@ class IntersectionNode(AnalysisNode):
         return self.accordion_panel == self.CONTIG and bool(self.contig_ids)
 
     def modifies_parents(self):
-        return any([self.valid_custom_genomic_interval(),
-                    self.valid_selected_genomic_intervals_collection(),
-                    self.valid_hgvs(),
+        return any([self.valid_selected_genomic_intervals_collection(),
+                    self.valid_variants(),
                     self.valid_backend_enrichment_kit(),
                     self.valid_contig()])
 
     @property
     def use_cache(self):
+        if self.valid_variants() and len(self.variant_ids) > self.VARIANTS_CACHE_MIN:
+            return True
         return super().use_cache or self.valid_selected_genomic_intervals_collection()
 
     def _get_configuration_errors(self) -> list:
@@ -90,18 +92,22 @@ class IntersectionNode(AnalysisNode):
                                                         self.genomic_intervals_collection.genome_build))
         return errors
 
+    def _get_variants_q(self) -> Q:
+        q_list = []
+        if self.variant_ids:
+            q_list.append(Q(pk__in=self.variant_ids))
+        for region in self.variant_regions:
+            chrom, start, end = parse_region(region)
+            q_list.append(Variant.get_chrom_q(chrom) & Q(locus__position__gte=start, locus__position__lte=end))
+        if not q_list:
+            # Entries that aren't in the system will always match nothing
+            return self.q_none()
+        return reduce(operator.or_, q_list)
+
     def _get_node_q(self) -> Optional[Q]:
         q = None
-        if self.accordion_panel == self.CUSTOM_INTERVAL:
-            q_chrom = Variant.get_chrom_q(self.genomic_interval.chrom)
-            q = q_chrom & Q(locus__position__gte=self.genomic_interval.start,
-                            locus__position__lte=self.genomic_interval.end)
-        elif self.accordion_panel == self.HGVS:
-            # if hgvs_variant doesn't exist - then it's not in the system - so will always be nothing
-            if self.hgvs_variant:
-                q = Q(pk=self.hgvs_variant_id)
-            else:
-                q = self.q_none()
+        if self.accordion_panel == self.VARIANTS:
+            q = self._get_variants_q()
         elif self.accordion_panel == self.CONTIG:
             if self.contig_ids:
                 q = reduce(operator.or_, [Q(locus__contig_id=c) for c in self.contig_ids])
@@ -156,8 +162,8 @@ class IntersectionNode(AnalysisNode):
     def _get_method_summary(self):
         method_summary = 'No filtering applied.'
         if self.modifies_parents():
-            if self.accordion_panel == self.CUSTOM_INTERVAL:
-                method_summary = f"Filtering to custom interval {self.genomic_interval}"
+            if self.accordion_panel == self.VARIANTS:
+                method_summary = f"Filtering to variant entries: {self.variant_text}"
             elif self.accordion_panel == self.SELECTED_INTERVALS:
                 method_summary = f"Filtering to selected interval {self.genomic_intervals_collection.name}"
             elif self.accordion_panel == self.BACKEND_ENRICHMENT_KIT:
@@ -177,8 +183,8 @@ class IntersectionNode(AnalysisNode):
     def get_node_name(self):
         name = ''
         if self.modifies_parents():
-            if self.accordion_panel == self.CUSTOM_INTERVAL:
-                name = str(self.genomic_interval)
+            if self.accordion_panel == self.VARIANTS:
+                name = self._get_variant_text_name()
             elif self.accordion_panel == self.SELECTED_INTERVALS:
                 name = self.genomic_intervals_collection.name
             elif self.accordion_panel == self.BACKEND_ENRICHMENT_KIT:
@@ -188,30 +194,66 @@ class IntersectionNode(AnalysisNode):
                 name = self._get_contig_names()
         return name
 
+    def _get_variant_text_name(self) -> str:
+        entries = self.get_variant_text_entries()
+        if len(entries) == 1:
+            return entries[0]
+        return f"{len(entries)} variant entries"
+
+    def get_variant_text_entries(self) -> list[str]:
+        return [line for line in (self.variant_text or "").splitlines() if line.strip()]
+
+    def _get_variant_text_summary(self) -> Optional[str]:
+        return get_variant_text_summary(len(self.get_variant_text_entries()), self.variant_ids,
+                                        self.variant_regions, self.variant_text_unresolved)
+
+    def get_live_data_notes(self) -> list[str]:
+        notes = super().get_live_data_notes()
+        if self.valid_variants():
+            notes.append(self._get_variant_text_summary())
+        return notes
+
+    def get_warnings(self) -> list[str]:
+        warnings = super().get_warnings()
+        if self.valid_variants() and self.variant_text_unresolved:
+            unresolved = ", ".join(self.variant_text_unresolved)
+            warnings.append(f"Not found in this database: {unresolved} - "
+                            f"use manual variant entry if you want them created.")
+        return warnings
+
     @staticmethod
     def get_help_text() -> str:
-        return "Filter to genomic ranges including BED files or HGVS"
+        return "Filter to BED files, chromosomes, regions or a list of variants"
 
     def save(self, *args, **kwargs):
-        # HGVS name is validated in IntersectionNodeForm, and linked to a variant if one is found
-        # But it's possible a variant isn't there at form save time, but will appear later
-        # Thus if hgvs_string is set, but hgvs_variant isn't - recheck in save (eg re-connected to diff source node)
-        if self.hgvs_string:
-            # May need to re-match if analysis template was different genome build
-            if self.hgvs_variant is None or (self.analysis.genome_build not in self.hgvs_variant.genome_builds):
-                self.hgvs_variant = get_hgvs_variant(self.hgvs_string, self.analysis.genome_build)
+        # Entries are resolved in IntersectionNodeForm, but a clone (eg an analysis template run against
+        # a different genome build) carries variant PKs that don't belong to this analysis - re-resolve those
+        if self.variant_text and self._variant_text_needs_resolving():
+            self._resolve_variant_text()
         return super().save(*args, **kwargs)
 
+    def _variant_text_needs_resolving(self) -> bool:
+        if not (self.variant_ids or self.variant_regions or self.variant_text_unresolved):
+            return True  # Never resolved - eg a template imported from JSON
+        return not self._variant_ids_match_genome_build()
+
+    def _variant_ids_match_genome_build(self) -> bool:
+        if not self.variant_ids:
+            return True
+        genome_build = self.analysis.genome_build
+        num_in_build = Variant.objects.filter(Variant.get_contigs_q(genome_build),
+                                              pk__in=self.variant_ids).count()
+        return num_in_build == len(self.variant_ids)
+
+    def _resolve_variant_text(self):
+        resolution = resolve_variant_text(self.analysis.user, self.analysis.genome_build, self.variant_text)
+        self.variant_ids = resolution.variant_ids
+        self.variant_regions = resolution.regions
+        self.variant_text_unresolved = resolution.unresolved + resolution.errors
+
     def save_clone(self):
-        orig_genomic_interval = self.genomic_interval
         contig_ids = self.contig_ids  # Save before clone
-
-        # genomic_interval is a 1-to-1 field, so don't want to copy it in super().save_clone()
-        if self.genomic_interval:
-            self.genomic_interval = self.genomic_interval.clone()
-
         copy = super().save_clone()
-        self.genomic_interval = orig_genomic_interval
         for contig_id in contig_ids:
             copy.intersectionnodecontig_set.create(contig_id=contig_id)
         return copy
@@ -239,7 +281,7 @@ class IntersectionNode(AnalysisNode):
 
     @staticmethod
     def get_node_class_label():
-        return "Intervals intersection"
+        return "Intervals and variants"
 
     @classmethod
     def get_node_class_icon(cls) -> NodeIcon:
@@ -263,12 +305,6 @@ class IntersectionNodeContig(NodeAuditLogMixin, models.Model):
 
     def __str__(self):
         return f"IntersectionNodeContig {self.intersection_node_id}: {self.contig}"
-
-
-@receiver(post_delete, sender=IntersectionNode)
-def post_delete_intersection_node(sender, instance, **kwargs):  # pylint: disable=unused-argument
-    if instance.genomic_interval is not None:
-        instance.genomic_interval.delete()
 
 
 auditlog.register(IntersectionNode)

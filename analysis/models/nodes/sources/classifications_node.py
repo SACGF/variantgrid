@@ -1,11 +1,16 @@
+import operator
+from functools import reduce
 from typing import Optional
 
 from auditlog.registry import auditlog
+from django.contrib.postgres.fields import ArrayField
 from django.db import models
 from django.db.models import CASCADE, Q
 
+from analysis.models.enums import ClassificationsNodeInput, ClinVarRecordFilter
 from analysis.models.nodes.analysis_node import AnalysisNode
 from analysis.models.nodes.node_display import NodeChip, NodeIcon
+from annotation.models.models_enums import ClinVarPathogenicity, ClinVarReviewStatus
 from classification.enums import ClinicalSignificance, SomaticClinicalSignificance
 from classification.models.classification import Classification, ClassificationModification
 from snpdb.models import Lab
@@ -13,6 +18,8 @@ from snpdb.models.models_enums import AlleleOriginFilterDefault
 
 
 class ClassificationsNode(AnalysisNode):
+    node_input = models.CharField(max_length=1, choices=ClassificationsNodeInput.choices,
+                                  default=ClassificationsNodeInput.MATCHING_VARIANTS)
     # Default is to show all
     allele_origin = models.CharField(max_length=1, choices=AlleleOriginFilterDefault.choices,
                                      default=AlleleOriginFilterDefault.SHOW_ALL)
@@ -41,8 +48,38 @@ class ClassificationsNode(AnalysisNode):
         'tier_3': SomaticClinicalSignificance.TIER_3,
         'tier_4': SomaticClinicalSignificance.TIER_4,
     }
-    min_inputs = 0
-    max_inputs = 0
+
+    # ClinVar - unlike the classification pills above, nothing selected means no ClinVar filter
+    clinvar_benign = models.BooleanField(default=False, blank=True)
+    clinvar_likely_benign = models.BooleanField(default=False, blank=True)
+    clinvar_uncertain = models.BooleanField(default=False, blank=True)
+    clinvar_likely_pathogenic = models.BooleanField(default=False, blank=True)
+    clinvar_pathogenic = models.BooleanField(default=False, blank=True)
+    clinvar_significance_exclude = models.BooleanField(default=False, blank=True)
+    clinvar_record = models.CharField(max_length=1, choices=ClinVarRecordFilter.choices,
+                                      default=ClinVarRecordFilter.ANY)
+    clinvar_stars_min = models.IntegerField(default=0)
+    clinvar_conflicting = models.BooleanField(default=False, blank=True)
+    clinvar_conflicting_significance = models.TextField(null=True, blank=True)
+    clinvar_variation_ids = ArrayField(models.IntegerField(), default=list, blank=True)
+
+    FIELD_CLINVAR_PATHOGENICITY = {
+        'clinvar_benign': ClinVarPathogenicity.BENIGN,
+        'clinvar_likely_benign': ClinVarPathogenicity.LIKELY_BENIGN,
+        'clinvar_uncertain': ClinVarPathogenicity.UNCERTAIN,
+        'clinvar_likely_pathogenic': ClinVarPathogenicity.LIKELY_PATHOGENIC,
+        'clinvar_pathogenic': ClinVarPathogenicity.PATHOGENIC,
+    }
+
+    @property
+    def min_inputs(self):
+        return self.max_inputs
+
+    @property
+    def max_inputs(self):
+        if self.node_input == ClassificationsNodeInput.MATCHING_VARIANTS:
+            return 0
+        return 1
 
     @property
     def allele_origin_filter(self) -> AlleleOriginFilterDefault:
@@ -85,13 +122,61 @@ class ClassificationsNode(AnalysisNode):
             classification_q |= self._somatic_q()
         return classification_q
 
-    def _get_node_q(self) -> Optional[Q]:
+    def _classifications_q(self) -> Q:
         cm_qs = ClassificationModification.latest_for_user(self.analysis.user, published=True)
         cm_qs = cm_qs.filter(self._classification_match_q())
         vc_qs = Classification.objects.filter(pk__in=cm_qs.values('classification'))
         if lab_list := list(self.get_labs()):
             vc_qs = vc_qs.filter(lab__in=lab_list)
         return Classification.get_variant_q_from_classification_qs(vc_qs, self.analysis.genome_build)
+
+    def has_clinvar_filters(self) -> bool:
+        return any([self._selected_values(self.FIELD_CLINVAR_PATHOGENICITY),
+                    self.clinvar_record != ClinVarRecordFilter.ANY,
+                    self.clinvar_stars_min,
+                    self.clinvar_conflicting,
+                    self.clinvar_conflicting_significance,
+                    self.clinvar_variation_ids])
+
+    def _clinvar_q(self) -> Q:
+        """ Each active control restricts - an inactive section returns an empty Q, which drops out of the OR """
+        and_filters = []
+        if selected := self._selected_values(self.FIELD_CLINVAR_PATHOGENICITY):
+            q_significance = Q(clinvar__highest_pathogenicity__in=selected)
+            if self.clinvar_significance_exclude:
+                # Negated subquery (NOT EXISTS) so variants with no ClinVar record survive - pair with
+                # clinvar_record=PRESENT to get the "in ClinVar and not benign" reading
+                q_significance = ~q_significance
+            and_filters.append(q_significance)
+
+        if self.clinvar_record != ClinVarRecordFilter.ANY:
+            has_record = self.clinvar_record == ClinVarRecordFilter.PRESENT
+            and_filters.append(Q(clinvar__isnull=not has_record))
+
+        if self.clinvar_stars_min:
+            review_statuses = ClinVarReviewStatus.statuses_gte_stars(self.clinvar_stars_min)
+            and_filters.append(Q(clinvar__review_status__in=review_statuses))
+
+        if self.clinvar_conflicting:
+            and_filters.append(Q(clinvar__conflicting_clinical_significance__isnull=False))
+
+        if conflicting_significance := self.clinvar_conflicting_significance:
+            and_filters.append(Q(clinvar__conflicting_clinical_significance__icontains=conflicting_significance))
+
+        if self.clinvar_variation_ids:
+            and_filters.append(Q(clinvar__clinvar_variation_id__in=self.clinvar_variation_ids))
+
+        if not and_filters:
+            return Q()
+        return reduce(operator.and_, and_filters)
+
+    def _get_node_q(self) -> Optional[Q]:
+        # Classifications and ClinVar both answer "what has anyone said about this variant", so they OR -
+        # which makes the NOT case "neither source says so"
+        q = self._classifications_q() | self._clinvar_q()
+        if self.node_input == ClassificationsNodeInput.PARENT_NOT_MATCHING:
+            q = ~q
+        return q
 
     def get_labs(self):
         return Lab.objects.filter(pk__in=self.classificationsnodelab_set.all().values_list("lab", flat=True))
@@ -104,11 +189,14 @@ class ClassificationsNode(AnalysisNode):
         return copy
 
     def get_node_name(self):
-        return self.get_node_class_label()
+        name = self.get_node_class_label()
+        if self.node_input == ClassificationsNodeInput.PARENT_NOT_MATCHING:
+            name = f"Not {name.lower()}"
+        return name
 
     @staticmethod
     def get_help_text() -> str:
-        return "Variants that have been classified. Can filter by allele origin and germline/somatic clinical significance."
+        return "Variants classified in this database or in ClinVar. Can be a source, or filter its parent."
 
     @staticmethod
     def get_node_class_label():
@@ -151,11 +239,31 @@ class ClassificationsNode(AnalysisNode):
         if self.pk:
             for lab in self.get_labs():
                 chips.append(NodeChip(text=lab.name, icon="fa-solid fa-flask", title=f"Restricted to lab: {lab}"))
+        if self.has_clinvar_filters():
+            chips.append(NodeChip(text="ClinVar", icon="fa-solid fa-hospital",
+                                  title=f"ClinVar: {self._clinvar_summary()}"))
         return chips
+
+    def _clinvar_summary(self) -> str:
+        parts = []
+        if selected := self._selected_values(self.FIELD_CLINVAR_PATHOGENICITY):
+            labels = ", ".join(ClinVarPathogenicity(p).label for p in selected)
+            parts.append(f"{'not ' if self.clinvar_significance_exclude else ''}{labels}")
+        if self.clinvar_record != ClinVarRecordFilter.ANY:
+            parts.append(ClinVarRecordFilter(self.clinvar_record).label)
+        if self.clinvar_stars_min:
+            parts.append("★" * self.clinvar_stars_min)
+        if self.clinvar_conflicting:
+            parts.append("conflicting interpretations")
+        if conflicting_significance := self.clinvar_conflicting_significance:
+            parts.append(f"conflicting contains '{conflicting_significance}'")
+        if self.clinvar_variation_ids:
+            parts.append(f"{len(self.clinvar_variation_ids)} variation IDs")
+        return "; ".join(parts)
 
     def _get_method_summary(self):
         class_name = ClassificationsNode.get_node_class_label()
-        method_summary = f"{class_name}, date={self.modified}"
+        method_summary = f"{class_name} ({self.get_node_input_display()}), date={self.modified}"
 
         filters = []
         allele_origin_filter = self.allele_origin_filter
@@ -177,6 +285,9 @@ class ClassificationsNode(AnalysisNode):
 
         if labs := self.get_labs():
             method_summary += f". Restricted to labs: {','.join([l.name for l in labs])}"
+
+        if self.has_clinvar_filters():
+            method_summary += f". OR ClinVar: {self._clinvar_summary()}"
 
         return method_summary
 

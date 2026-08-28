@@ -1,4 +1,5 @@
 import json
+import re
 
 from dal import forward
 from django import forms
@@ -10,6 +11,7 @@ from django.utils.text import slugify
 from analysis import models
 from analysis.models import Analysis, AnalysisNode, AnalysisTemplateType, MOINode
 from analysis.models.enums import SampleNodeSourceLevel
+from analysis.variant_text import resolve_variant_text
 from analysis.models.nodes.analysis_node import NodeAlleleFrequencyFilter, NodeVCFFilter
 from analysis.models.nodes.filters.conservation_node import ConservationNode
 from analysis.models.nodes.filters.damage_node import DamageNode
@@ -36,15 +38,15 @@ from analysis.models.nodes.sources.trio_node import TrioNode
 from annotation.models import VariantAnnotation
 from annotation.pathogenicity_predictions import TOOLS
 from genes.custom_text_gene_list import create_custom_text_gene_list
-from genes.hgvs import HGVSException, get_hgvs_variant, get_hgvs_variant_coordinate
 from genes.models import CustomTextGeneList, GeneList, GeneListCategory, PanelAppPanel
 from library.django_utils.autocomplete_utils import ModelSelect2, ModelSelect2Multiple
 from library.forms import NumberInput, StarsWidget
+from library.genomics.vcf_enums import VARIANT_CLASS_GROUPS
 from library.utils import sha256sum_str
 from ontology.models import OntologyTerm
 from patients.models_enums import GnomADPopulation
 from snpdb.forms import GenomeBuildAutocompleteForwardMixin
-from snpdb.models import GenomicInterval, Lab, Sample, Tag, VCFFilter
+from snpdb.models import Lab, Sample, Tag, VCFFilter
 from snpdb.models.models_genome import Contig
 
 # Can use this for ModelForm.exclude to only use node specific fields
@@ -240,16 +242,42 @@ class ClassificationsNodeForm(BaseNodeForm):
                                          required=False,
                                          widget=ModelSelect2Multiple(url='lab_autocomplete',
                                                                      attrs={'data-placeholder': 'Lab...'}))
+    clinvar_variation_ids = forms.CharField(required=False, label="ClinVar variation IDs",
+                                            widget=TextInput(attrs={'placeholder': 'eg 12345, 67890'}))
 
     class Meta:
         model = ClassificationsNode
-        fields = ('lab', 'allele_origin',
+        fields = ('node_input', 'lab', 'allele_origin',
                   'other', 'benign', 'likely_benign', 'vus', 'likely_pathogenic', 'pathogenic',
-                  'tier_1', 'tier_2', 'tier_3', 'tier_4')
-        widgets = {'allele_origin': RadioSelect()}
+                  'tier_1', 'tier_2', 'tier_3', 'tier_4',
+                  'clinvar_benign', 'clinvar_likely_benign', 'clinvar_uncertain',
+                  'clinvar_likely_pathogenic', 'clinvar_pathogenic', 'clinvar_significance_exclude',
+                  'clinvar_record', 'clinvar_stars_min', 'clinvar_conflicting',
+                  'clinvar_conflicting_significance')
+        widgets = {
+            'allele_origin': RadioSelect(),
+            'clinvar_stars_min': StarsWidget(),
+            'clinvar_conflicting_significance': TextInput(attrs={'placeholder': 'eg Pathogenic'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        variation_ids = self.instance.clinvar_variation_ids
+        self.fields["clinvar_variation_ids"].initial = ", ".join(str(v) for v in variation_ids)
+
+    def clean_clinvar_variation_ids(self) -> list[int]:
+        variation_ids = []
+        for value in re.split(r"[,\s]+", self.cleaned_data["clinvar_variation_ids"]):
+            if value:
+                try:
+                    variation_ids.append(int(value))
+                except ValueError as e:
+                    raise forms.ValidationError(f"'{value}' is not a ClinVar variation ID") from e
+        return variation_ids
 
     def save(self, commit=True):
         node = super().save(commit=False)
+        node.clinvar_variation_ids = self.cleaned_data["clinvar_variation_ids"]
 
         lab_set = node.classificationsnodelab_set
         lab_set.all().delete()
@@ -353,6 +381,11 @@ class ConservationNodeForm(BaseNodeForm):
 
 
 class DamageNodeForm(BaseNodeForm):
+    # Choices follow VARIANT_CLASS_GROUPS order so the sub-widgets slice up into groups
+    variant_class = forms.MultipleChoiceField(
+        required=False, label="Variant type", widget=forms.CheckboxSelectMultiple,
+        choices=[(vc.value, vc.label) for group in VARIANT_CLASS_GROUPS.values() for vc in group])
+
     class Meta:
         model = DamageNode
         exclude = ANALYSIS_NODE_FIELDS
@@ -390,6 +423,12 @@ class DamageNodeForm(BaseNodeForm):
                     if tool.raw_max_benign_threshold is not None:
                         attrs["data-benign-max"] = tool.raw_max_benign_threshold
                     self.fields[field_name].widget = HiddenInput(attrs=attrs)
+
+    def get_variant_class_groups(self) -> list[tuple[str, list]]:
+        """ (group name, sub-widgets) for the grouped checkboxes in the editor """
+        subwidgets_by_value = {sw.data["value"]: sw for sw in self["variant_class"]}
+        return [(group_name, [subwidgets_by_value[vc.value] for vc in variant_classes])
+                for group_name, variant_classes in VARIANT_CLASS_GROUPS.items()]
 
 
 class FilterNodeForm(BaseNodeForm):
@@ -493,11 +532,14 @@ class GeneListNodeForm(BaseNodeForm):
 
 class IntersectionNodeForm(GenomeBuildAutocompleteForwardMixin, BaseNodeForm):
     genome_build_fields = ["genomic_intervals_collection", "contigs"]
-    CUSTOM_INTERVAL_FIELDS = {'chrom', 'start', 'end'}
-    # also be able to save GenomicInterval
-    chrom = forms.CharField(required=False, empty_value=None, widget=TextInput(attrs={'placeholder': 'chrom'}))
-    start = forms.IntegerField(required=False, widget=NumberInput(attrs={'placeholder': 'start'}))
-    end = forms.IntegerField(required=False, widget=NumberInput(attrs={'placeholder': 'end'}))
+    VARIANT_TEXT_PLACEHOLDER = "\n".join([
+        "One entry per line, eg:",
+        "rs6025",
+        "NM_000552.4:c.3922G>A",
+        "1:169519049 T>C",
+        "CA285410130",
+        "chr1:169519049-169520049",
+    ])
     contigs = forms.ModelMultipleChoiceField(required=False,
                                              queryset=Contig.objects.all(),
                                              widget=ModelSelect2Multiple(url='contig_autocomplete',
@@ -505,67 +547,37 @@ class IntersectionNodeForm(GenomeBuildAutocompleteForwardMixin, BaseNodeForm):
 
     class Meta:
         model = IntersectionNode
-        fields = ("genomic_intervals_collection", "hgvs_string", "accordion_panel")
+        fields = ("genomic_intervals_collection", "variant_text", "accordion_panel")
         widgets = {
             "genomic_intervals_collection": ModelSelect2(url='genomic_intervals_collection_autocomplete',
                                                          attrs={'data-placeholder': 'Genomic Intervals...'}),
-            "hgvs_string": TextInput(attrs={'placeholder': 'HGVS...'}),
             'accordion_panel': HiddenInput(),
         }
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["variant_text"].widget = forms.Textarea(attrs={"rows": 6,
+                                                                  "placeholder": self.VARIANT_TEXT_PLACEHOLDER})
+        self.variant_text_resolution = None
+
     def clean(self):
         cleaned_data = super().clean()
-
-        # CUSTOM_INTERVAL:
-        genomic_interval_fields = set()
-
-        for f in self.CUSTOM_INTERVAL_FIELDS:
-            val = cleaned_data.get(f)
-            if val is not None:
-                genomic_interval_fields.add(f)
-        if genomic_interval_fields:
-            # Some provided
-            missing_fields = self.CUSTOM_INTERVAL_FIELDS - genomic_interval_fields
-            for f in missing_fields:
-                self.add_error(f, "Missing value. Must provide all custom interval fields if any given.")
-
-            chrom = cleaned_data.get("chrom")
-            if chrom is not None:
-                genome_build = self.instance.analysis.genome_build
-                if chrom not in genome_build.chrom_contig_mappings:
-                    self.add_error("chrom", f"Chromosome/contig not in {genome_build}")
-
-            start = cleaned_data.get("start")
-            end = cleaned_data.get("end")
-            if start is not None and end is not None:
-                if start > end:
-                    for f in ["start", "end"]:
-                        self.add_error(f, "start > end")
-        # HGVS:
-        if hgvs_string := cleaned_data.get("hgvs_string"):
-            try:
-                get_hgvs_variant_coordinate(hgvs_string, self.instance.analysis.genome_build)
-            except HGVSException as e:
-                self.add_error("hgvs_string", str(e))
+        # Resolving hits external services (dbSNP, ClinGen), so only do it when the text actually changed
+        if "variant_text" in self.changed_data:
+            analysis = self.instance.analysis
+            self.variant_text_resolution = resolve_variant_text(analysis.user, analysis.genome_build,
+                                                                cleaned_data.get("variant_text"))
+            for error in self.variant_text_resolution.errors:
+                self.add_error("variant_text", error)
+        return cleaned_data
 
     def save(self, commit=True):
         node = super().save(commit=False)
 
-        if self.CUSTOM_INTERVAL_FIELDS & set(self.changed_data):
-            try:
-                # Update existing if there, otherwise create new
-                genomic_interval = node.genomic_interval or GenomicInterval()
-                genomic_interval.chrom = self.cleaned_data["chrom"]
-                genomic_interval.start = self.cleaned_data["start"]
-                genomic_interval.end = self.cleaned_data["end"]
-                genomic_interval.save()
-                node.genomic_interval = genomic_interval
-            except Exception:
-                pass
-
-        if "hgvs_string" in self.changed_data:
-            hgvs_string = self.cleaned_data.get("hgvs_string")
-            node.hgvs_variant = get_hgvs_variant(hgvs_string, self.instance.analysis.genome_build)
+        if self.variant_text_resolution is not None:
+            node.variant_ids = self.variant_text_resolution.variant_ids
+            node.variant_regions = self.variant_text_resolution.regions
+            node.variant_text_unresolved = self.variant_text_resolution.unresolved
 
         contigs_set = self.instance.intersectionnodecontig_set
         contigs_set.all().delete()

@@ -5,6 +5,7 @@ from typing import Optional
 
 from auditlog.registry import auditlog
 from django.conf import settings
+from django.contrib.postgres.fields import ArrayField
 from django.db import models
 from django.db.models.query_utils import Q
 
@@ -21,6 +22,7 @@ from annotation.models.damage_enums import (
 from annotation.models.models import VariantAnnotation
 from annotation.models.models_enums import NMDEscapeStatus
 from annotation.pathogenicity_predictions import TOOLS, TOOLS_BY_PRED_FIELD
+from library.genomics.vcf_enums import VariantClass
 
 
 class ALoFTPredictionOptions(models.TextChoices):
@@ -32,6 +34,12 @@ class ALoFTPredictionOptions(models.TextChoices):
 
 class DamageNode(AnalysisNode):
     """ This is called 'EffectNode' in analysis """
+    # A type restriction restricts - it goes in and_filters rather than the scoring OR pool,
+    # so it has no _required flag. Empty means every type.
+    variant_class = ArrayField(models.CharField(max_length=2, choices=VariantClass.choices),
+                               default=list, blank=True)
+    variant_class_exclude = models.BooleanField(default=False)
+
     impact_min = models.CharField(max_length=1, choices=PathogenicityImpact.CHOICES, null=True, blank=True)
     impact_required = models.BooleanField(default=False)
 
@@ -179,7 +187,7 @@ class DamageNode(AnalysisNode):
 
     def modifies_parents(self):
         all_versions = [self.impact_min, self.splice_min, self.cosmic_count_min, self.damage_predictions_min,
-                        self.protein_domain, self.published]
+                        self.protein_domain, self.published, self.variant_class]
         v2_fields = [self.bayesdel_noaf_rankscore_min, self.cadd_raw_rankscore_min, self.clinpred_rankscore_min,
                 self.metalr_rankscore_min, self.revel_rankscore_min, self.vest4_rankscore_min,
                 self.nmd_escaping_variant, self.aloft]
@@ -302,6 +310,13 @@ class DamageNode(AnalysisNode):
     def _get_node_q(self) -> Optional[Q]:
         or_filters = []
         and_filters = []
+
+        if self.variant_class:
+            q_variant_class = Q(variantannotation__variant_class__in=self.variant_class)
+            if self.variant_class_exclude:
+                # Negated subquery so variants without annotation aren't silently dropped
+                q_variant_class = ~q_variant_class
+            and_filters.append(q_variant_class)
 
         if self.impact_min is not None:
             q_impact = PathogenicityImpact.get_q(self.impact_min)
@@ -521,10 +536,20 @@ class DamageNode(AnalysisNode):
 
     @staticmethod
     def get_help_text() -> str:
-        return "Impact, damage predictions, conservation and splicing filter"
+        return "Variant type, impact, damage predictions, conservation and splicing filter"
+
+    def get_variant_class_summary(self) -> str:
+        labels = [VariantClass(vc).label for vc in self.variant_class]
+        summary = ", ".join(labels)
+        if self.variant_class_exclude:
+            summary = f"not {summary}"
+        return summary
 
     def get_node_chips(self) -> list[NodeChip]:
         chips = super().get_node_chips()
+        if self.variant_class:
+            chips.append(NodeChip(text="type", icon="fa-solid fa-shapes",
+                                  title=f"Variant type: {self.get_variant_class_summary()}"))
         if self.splice_min is not None:
             chips.append(NodeChip(text="splice", icon="fa-solid fa-scissors",
                                   title=f"Splicing prediction score >= {self.splice_min}"))

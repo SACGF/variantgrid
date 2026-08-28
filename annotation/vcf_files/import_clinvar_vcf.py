@@ -7,6 +7,7 @@ from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
 
 from annotation.models import ClinVarReviewStatus, Variant
+from annotation.models.models_enums import ClinVarPathogenicity
 from annotation.models.models import ClinVar, ClinVarVersion
 from annotation.vcf_files.vcf_types import VCFVariant
 from snpdb.models import VariantCoordinate
@@ -116,11 +117,11 @@ class BulkClinVarInserter:
                           ]
 
     CLINSIG_TO_PATHOGENICITY = {
-        "Benign": 1,
-        "Likely_benign": 2,
-        "Uncertain_significance": 3,
-        "Likely_pathogenic": 4,
-        "Pathogenic": 5,
+        "Benign": ClinVarPathogenicity.BENIGN,
+        "Likely_benign": ClinVarPathogenicity.LIKELY_BENIGN,
+        "Uncertain_significance": ClinVarPathogenicity.UNCERTAIN,
+        "Likely_pathogenic": ClinVarPathogenicity.LIKELY_PATHOGENIC,
+        "Pathogenic": ClinVarPathogenicity.PATHOGENIC,
     }
 
     MAX_CONFLICTING_RECORDS_MISSING_CLINSIGCONF = 1000

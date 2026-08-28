@@ -38,6 +38,19 @@
 	    display: none;
 	}
 
+	#variant-class-individual {
+	    display: none;
+	}
+
+	.variant-class-group-classes {
+	    margin-top: 4px;
+	}
+
+	.variant-class-group-label, .variant-class-label, .variant-class-exclude-label {
+	    margin-right: 10px;
+	    font-weight: normal;
+	}
+
 	/* Calibrated ClinGen PP3/BP4 cutoff bands drawn behind the raw-score slider track */
 	.cutoff-band {
 	    position: absolute;
@@ -73,6 +86,17 @@
 
     function toggleRequiredFilter() {
         showRequiredFilter = !showRequiredFilter;
+        $(".variant-class-group").each(function() {
+            let groupCheckbox = $(this);
+            updateVariantClassGroup(groupCheckbox);
+            groupCheckbox.change(function() {
+                variantClassGroupCheckboxes(groupCheckbox).prop("checked", groupCheckbox.prop("checked"));
+            });
+            variantClassGroupCheckboxes(groupCheckbox).change(function() {
+                updateVariantClassGroup(groupCheckbox);
+            });
+        });
+
         if (showRequiredFilter) {
             $(".filter-required").show();
         } else {
@@ -81,6 +105,22 @@
             let frInputs = $("input", ".filter-required");
             frInputs.prop("checked", false);
         }
+    }
+
+    function variantClassGroupCheckboxes(groupCheckbox) {
+        return $("#variant-class-individual").find(".variant-class-group-classes[data-group='" +
+                 groupCheckbox.data("group") + "'] input[type=checkbox]");
+    }
+
+    function updateVariantClassGroup(groupCheckbox) {
+        let boxes = variantClassGroupCheckboxes(groupCheckbox);
+        let numChecked = boxes.filter(":checked").length;
+        groupCheckbox.prop("checked", numChecked > 0 && numChecked === boxes.length);
+        groupCheckbox.prop("indeterminate", numChecked > 0 && numChecked < boxes.length);
+    }
+
+    function toggleVariantClasses() {
+        $("#variant-class-individual").toggle();
     }
 
     function showIndividualPathogenicPredictions() {
@@ -272,6 +312,35 @@
                 <td></td>
                 <th><a class="hover-link" href="javascript:toggleRequiredFilter()">Required</a></th>
                 <th class="collapse filter-required">Allow Null</th>
+            </tr>
+            <tr>
+                <th>{{ form.variant_class.label }}</th>
+                <td>{{ form.variant_class.errors }}
+                    <div id="variant-class-groups">
+                        {% for group_name, subwidgets in form.get_variant_class_groups %}
+                            <label class="variant-class-group-label">
+                                <input type="checkbox" class="variant-class-group" data-group="{{ forloop.counter }}" />
+                                {{ group_name }}
+                            </label>
+                        {% endfor %}
+                        <label class="variant-class-exclude-label" title="Show everything except the selected types">
+                            {{ form.variant_class_exclude }} exclude
+                        </label>
+                        <a class="hover-link" href="javascript:toggleVariantClasses()">Show individual variant classes</a>
+                    </div>
+                    <div id="variant-class-individual">
+                        {% for group_name, subwidgets in form.get_variant_class_groups %}
+                            <div class="variant-class-group-classes" data-group="{{ forloop.counter }}">
+                                <span class="label">{{ group_name }}</span>
+                                {% for subwidget in subwidgets %}
+                                    <label class="variant-class-label">{{ subwidget.tag }} {{ subwidget.choice_label }}</label>
+                                {% endfor %}
+                            </div>
+                        {% endfor %}
+                    </div>
+                </td>
+                <td class="collapse filter-required"> <!-- variant type always restricts --> </td>
+                <td class="collapse filter-required"> <!-- variant_class is non-nullable --> </td>
             </tr>
             <tr>
                 <th>{{ form.impact_min.label }}</th>

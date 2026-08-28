@@ -52,11 +52,24 @@
 #classification-node-form-widgets label.pill-toggle.unchecked {
     opacity: 0.35;
 }
+
+#classification-node-form-widgets .clinvar-row {
+    margin: 4px 0;
+}
+
+#classification-node-form-widgets .clinvar-row label,
+#classification-node-form-widgets label.clinvar-exclude {
+    font-weight: normal;
+    margin-right: 6px;
+}
 </style>
 <div>
 	<form id="classifications-node-form" method="post" action="{{ request.path }}">
         {% csrf_token %}
             <div id="classification-node-form-widgets">
+                <div id="node-input-select">
+                    <label for="{{ form.node_input.id_for_label }}">Input:</label> {{ form.node_input }}
+                </div>
                 <div id="allele-origin-toggle" style="display: inline-block">
                     <div class="btn-group btn-group-toggle" data-toggle="buttons">
                         {% for radio in form.allele_origin %}
@@ -84,6 +97,42 @@
                 </div>
                 <div>
                     {{ form.lab }}
+                </div>
+                <hr />
+                <div id="clinvar-filters">
+                    <div class="significance-pills">
+                        <span class="row-label">ClinVar:</span>
+                        <label class="c-pill pill-toggle cs-b" title="Benign">{{ form.clinvar_benign }}B</label>
+                        <label class="c-pill pill-toggle cs-lb" title="Likely Benign">{{ form.clinvar_likely_benign }}LB</label>
+                        <label class="c-pill pill-toggle cs-vus" title="Uncertain">{{ form.clinvar_uncertain }}VUS</label>
+                        <label class="c-pill pill-toggle cs-lp" title="Likely Pathogenic">{{ form.clinvar_likely_pathogenic }}LP</label>
+                        <label class="c-pill pill-toggle cs-p" title="Pathogenic">{{ form.clinvar_pathogenic }}P</label>
+                        <label class="clinvar-exclude" title="Show everything except the selected significances">
+                            {{ form.clinvar_significance_exclude }} exclude
+                        </label>
+                    </div>
+                    <div class="clinvar-row">
+                        <label for="{{ form.clinvar_record.id_for_label }}">ClinVar record:</label>
+                        {{ form.clinvar_record }}
+                    </div>
+                    <div class="clinvar-row">
+                        <label>Min review status:</label> {{ form.clinvar_stars_min }}
+                    </div>
+                    <div class="clinvar-row">
+                        <label class="clinvar-exclude" title="Has conflicting interpretations">
+                            {{ form.clinvar_conflicting }} Conflicting interpretations
+                        </label>
+                        {{ form.clinvar_conflicting_significance.errors }}{{ form.clinvar_conflicting_significance }}
+                    </div>
+                    <div class="clinvar-row">
+                        <label for="{{ form.clinvar_variation_ids.id_for_label }}">{{ form.clinvar_variation_ids.label }}:</label>
+                        {{ form.clinvar_variation_ids.errors }}{{ form.clinvar_variation_ids }}
+                    </div>
+                    <div class="text-muted">
+                        Variants are kept when they match the classification filter <b>or</b> the ClinVar filter.
+                        Exclude-benign on its own keeps variants ClinVar has never seen - pair it with
+                        "Has a ClinVar record" to keep only variants ClinVar knows and doesn't call benign.
+                    </div>
                 </div>
             </div>
             <div>

@@ -216,6 +216,16 @@ class ClinVarReviewStatus(models.TextChoices):
         return statuses
 
 
+class ClinVarPathogenicity(models.IntegerChoices):
+    """ ClinVar.highest_pathogenicity - CLNSIG mapped onto an ordered scale (0 = none of the below,
+        eg a drug response or risk factor record) """
+    BENIGN = 1, "Benign"
+    LIKELY_BENIGN = 2, "Likely benign"
+    UNCERTAIN = 3, "Uncertain"
+    LIKELY_PATHOGENIC = 4, "Likely pathogenic"
+    PATHOGENIC = 5, "Pathogenic"
+
+
 class ManualVariantEntryType(models.TextChoices):
     DBSNP = "d", "dbSNP"
     HGVS = "h", "HGVS"

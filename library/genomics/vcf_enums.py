@@ -150,6 +150,61 @@ class VariantClass(models.TextChoices):
     GENE_FUSION = 'GF', "gene_fusion"
 
 
+# Presentation grouping for variant type filters - every VariantClass belongs to exactly one group.
+# A new VEP class is an enum member plus a line here.
+VARIANT_CLASS_GROUPS = {
+    "SNV": [
+        VariantClass.SNV,
+    ],
+    "Indel": [
+        VariantClass.INSERTION,
+        VariantClass.DELETION,
+        VariantClass.INDEL,
+        VariantClass.SUBSTITUTION,
+        VariantClass.COMPLEX_SUBSTITUTION,
+        VariantClass.SEQUENCE_ALTERATION,
+    ],
+    "Copy number": [
+        VariantClass.COPY_NUMBER_GAIN,
+        VariantClass.COPY_NUMBER_LOSS,
+        VariantClass.COPY_NUMBER_VARIATION,
+        VariantClass.DUPLICATION,
+        VariantClass.TANDEM_DUPLICATION,
+    ],
+    "Rearrangement": [
+        VariantClass.INVERSION,
+        VariantClass.TRANSLOCATION,
+        VariantClass.INTERCHROMOSOMAL_TRANSLOCATION,
+        VariantClass.INTRACHROMOSOMAL_TRANSLOCATION,
+        VariantClass.CHROMOSOME_BREAKPOINT,
+        VariantClass.INTERCHROMOSOMAL_BREAKPOINT,
+        VariantClass.INTRACHROMOSOMAL_BREAKPOINT,
+        VariantClass.COMPLEX_STRUCTURAL_ALTERATION,
+        VariantClass.LOSS_OF_HETEROZYGOSITY,
+    ],
+    "Fusion": [
+        VariantClass.GENE_FUSION,
+    ],
+    "Other": [
+        VariantClass.ALU_INSERTION,
+        VariantClass.HERV_INSERTION,
+        VariantClass.LINE1_INSERTION,
+        VariantClass.SVA_INSERTION,
+        VariantClass.MOBILE_ELEMENT_INSERTION,
+        VariantClass.MOBILE_ELEMENT_DELETION,
+        VariantClass.ALU_DELETION,
+        VariantClass.HERV_DELETION,
+        VariantClass.LINE1_DELETION,
+        VariantClass.SVA_DELETION,
+        VariantClass.NOVEL_SEQUENCE_INSERTION,
+        VariantClass.TANDEM_REPEAT,
+        VariantClass.SHORT_TANDEM_REPEAT_VARIATION,
+        VariantClass.GENETIC_MARKER,
+        VariantClass.PROBE,
+    ],
+}
+
+
 INFO_LIFTOVER_SWAPPED_REF_ALT = "VG_LIFTOVER_SWAPPED_REF_ALT"
 
 # FILTER values the source header never declared. vcf_clean_and_filter moves them here because bcftools
