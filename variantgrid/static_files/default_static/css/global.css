@@ -2164,20 +2164,31 @@ a.nav-link.not-important.active {
 }
  */
 /* DataTables positions the processing box against the wrapper, which lands it halfway down the
-   grid - the table gets its own container so it sits over the header row instead */
+   grid - the table gets its own container, and the box sticks to the top of it so it stays over
+   the header row (which does its own sticking) however far the grid is scrolled */
 .dt-table-container {
   position: relative;
 }
 
 div.dataTables_processing {
+  position: sticky;
   top: 0;
-  margin-top: 0;
+  left: auto;
+  height: 0;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  background: none;
+  border: none;
   z-index: 2;
-  background-color: rgba(255, 255, 255, 0.9);
-  border-radius: 4px;
 }
 div.dataTables_processing div {
-  margin: 4px !important;
+  display: inline-block;
+  margin: 0 !important;
+  padding: 2px 8px;
+  background-color: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(0, 0, 0, 0.125);
+  border-radius: 4px;
 }
 div.dataTables_processing div::before {
   content: 'Processing...';
@@ -2188,6 +2199,7 @@ div.dataTables_processing div * {
 }
 div.dataTables_processing > div:last-child {
   width: auto !important;
+  height: auto !important;
 }
 
 /**
