@@ -26,7 +26,7 @@ function AnalysisMessagePoller(node_status_url, task_status_url) {
 
 				function loggedInHandler() {
 					const message = "AnalysisMessagePoller couldn't handle response.";
-					showReloadPageErrorDialog($("#error-dialog"), message, true);
+					showReloadPageErrorDialog(message, true);
 				}
 
 				checkLoggedIn(loggedInHandler, loggedOutHandler);

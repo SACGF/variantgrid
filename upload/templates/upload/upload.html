@@ -173,7 +173,7 @@ img.thumbnail {
 		    success: process_upload_status,
             error: function(jqXHR, textStatus, errorThrown) {
                 checkLoggedIn(null, function() {
-                    showReloadPageErrorDialog($("#error-dialog"), "You have been logged out.");
+                    showReloadPageErrorDialog("You have been logged out.");
                 });
             }
 		});
@@ -538,9 +538,6 @@ img.thumbnail {
 		})();
 	</script>
 	{% endif %}
-
-    <div id="error-dialog">
-    </div>
 
 {% include "analysis/svg_dropshadow.html" %}
 </div>

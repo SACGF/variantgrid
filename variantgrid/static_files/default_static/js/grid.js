@@ -210,16 +210,7 @@ function open_igv_link(locus, getBamsFunc) {
                 let message = "<p>Could not connect to IGV - is it running and accepting connections on " + base_url + "?";
                 message += "<p>See also <a target='_blank' href='" + igvIntegrationUrl + "'>IGV Integration</a>";
                 
-                $("#error-dialog").html(message).dialog({
-                    minWidth: 500,
-                    buttons: [
-                        {   text: "OK",
-                            click: function() {
-                                $(this).dialog("close");
-                            },
-                        },
-                    ],                
-                });
+                createModal("igv-error-dialog", "IGV", message);
                 seen_igv_error = true;
             }
         },

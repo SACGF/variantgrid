@@ -113,20 +113,19 @@ function addCreateProjectButtonAndForm() {
         .addClass("click-to-add-button left")
         .attr("title", "Create new project...");
 
-    let dialog, form;
-    const allFields = $("input", "#new-project-dialog");
+    const dialog = $("#new-project-dialog");
+    const form = dialog.find("form");
+    const allFields = $("input", dialog);
 
     function createNewProject() {
-        allFields.removeClass("ui-state-error");
+        allFields.removeClass("is-invalid");
         let valid = true;
         const name = $("#name", form);
         const nameVal = name.val().trim();
         if (!nameVal) {
-            name.addClass("ui-state-error");
+            name.addClass("is-invalid");
             valid = false;
         }
-
-        name.addClass("ui-state-error");
 
         if (valid) {
             const postData = {
@@ -149,7 +148,7 @@ function addCreateProjectButtonAndForm() {
                     }
                     const option = $('<option>', {value: data.name, text: name, selected: 'selected'});
                     $("select#id_project").append(option);
-                    dialog.dialog("close");
+                    dialog.modal("hide");
                 },
                 error: function(data) {
                     const errorMessage = data.responseJSON.name[0];
@@ -161,39 +160,21 @@ function addCreateProjectButtonAndForm() {
         return valid;
     }
 
-    dialog = $("#new-project-dialog").dialog({
-      autoOpen: false,
-      height: 400,
-      width: 350,
-      modal: true,
-      buttons: {
-        "Create new project": {
-            "click": createNewProject,
-            "class": "btn btn-primary",
-            "text": "Create new project",
-        },
-        Cancel: {
-            "click": function () {
-                dialog.dialog("close");
-            },
-            "class": "btn btn-secondary",
-            "text": "Cancel",
-        },
-      },
-      close: function() {
-        form[0].reset();
-        allFields.removeClass( "ui-state-error" );
-        $(".error-messages", "#new-project-dialog").empty();
-      }
+    $("#create-new-project-button", dialog).click(createNewProject);
+
+    dialog.on("hidden.bs.modal", function() {
+      form[0].reset();
+      allFields.removeClass("is-invalid");
+      $(".error-messages", dialog).empty();
     });
 
-    form = dialog.find( "form" ).on( "submit", function( event ) {
+    form.on("submit", function(event) {
       event.preventDefault();
       createNewProject();
     });
 
     createProjectButton.click(function() {
-      dialog.dialog("open");
+      dialog.modal("show");
     });
 
     $("select#id_project").addClass("left").after(createProjectButton);
@@ -717,22 +698,37 @@ $(document).ready(function() {
 </div>
 
 
-<div id="new-project-dialog" title="New project">
-  <p class="validateTips">Name is required.</p>
-
-  <form>
-    <table>
-    <tr>
-      <th><label for="name">Name</label>
-      <td><input type="text" name="name" id="name" class="text ui-widget-content ui-corner-all">
-    <tr>
-      <th><label for="description">Description</label>
-      <td><input type="text" name="description" id="description" class="text ui-widget-content ui-corner-all">
-            <!-- Allow form submission with keyboard without duplicating the dialog button -->
-            <input type="submit" tabindex="-1" style="position:absolute; top:-1000px">
-    </table>
-    <div class="error-messages"></div>
-  </form>
+<div class="modal fade" id="new-project-dialog" tabindex="-1" role="dialog" aria-labelledby="new-project-dialog-label" aria-hidden="true">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="new-project-dialog-label">New project</h5>
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body">
+        <form>
+          <div class="form-group">
+            <label for="name">Name</label>
+            <input type="text" name="name" id="name" class="form-control">
+            <div class="invalid-feedback">Name is required.</div>
+          </div>
+          <div class="form-group">
+            <label for="description">Description</label>
+            <input type="text" name="description" id="description" class="form-control">
+          </div>
+          <!-- Allow form submission with keyboard without duplicating the dialog button -->
+          <input type="submit" tabindex="-1" style="position:absolute; top:-1000px">
+          <div class="error-messages"></div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+        <button type="button" id="create-new-project-button" class="btn btn-primary">Create new project</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- create_patient_dialog -->

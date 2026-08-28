@@ -1039,7 +1039,7 @@ function addConnectedNode(data) {
 
 
 function loggedOutHandler() {
-    showReloadPageErrorDialog($("#error-dialog"), "You have been logged out.", true);
+    showReloadPageErrorDialog("You have been logged out.", true);
 }
 
 

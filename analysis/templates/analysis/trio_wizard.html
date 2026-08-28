@@ -6,7 +6,6 @@
 {% block head %}
 <style>
 #form-submitted-dialog {
-    display: none;
     text-align: center;
 }
 
@@ -36,7 +35,7 @@ tr:last-child td.patient-phenotype {
   border-bottom: none;
 }
 
-#form-submitted-dialog > .TrioNode {
+#form-submitted-dialog .TrioNode {
     margin: 0 auto;
 }
 
@@ -121,10 +120,7 @@ function setProbandPhenoText() {
     $("#create-trio-button").click(function() {
         setProbandPhenoText();
     
-        $("#form-submitted-dialog").dialog({
-            dialogClass: "no-close",
-            minWidth: 500,
-        });
+        $("#form-submitted-dialog").modal("show");
 
     });
 
@@ -177,14 +173,21 @@ function setProbandPhenoText() {
 
             <button id='create-trio-button' class="btn btn-primary"><i class="fas fa-plus-circle"></i> Create Trio</button>
         </form>
-        <div id='form-submitted-dialog'>
-            <div><i class="fa fa-spinner"></i> Creating Trio...</div>
-            <div class="TrioNode"></div>
-            <div id='proband-description'>
-                <div id='proband-text'></div>
-                <ul id='proband-phenos'></ul>
+        <div class="modal" id="form-submitted-dialog" data-backdrop="static" data-keyboard="false"
+             tabindex="-1" role="dialog" aria-hidden="true">
+            <div class="modal-dialog" role="document">
+                <div class="modal-content">
+                    <div class="modal-body">
+                        <div><i class="fa fa-spinner"></i> Creating Trio...</div>
+                        <div class="TrioNode"></div>
+                        <div id='proband-description'>
+                            <div id='proband-text'></div>
+                            <ul id='proband-phenos'></ul>
+                        </div>
+                    </div>
+                </div>
             </div>
-            </div>
+        </div>
 
 	</div>
 

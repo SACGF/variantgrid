@@ -730,10 +730,6 @@ span.node-counts {
 	height: 100%;
 }
 
-.no-close .ui-dialog-titlebar-close {
-  display: none;
-}
-
 #node-count-legend {
 	position: absolute;
 	left: 0px;

@@ -1339,33 +1339,25 @@ function suggestionDialogSaved() {
     });
 }
 
-// FIXME turn into Bootstrap modal
-function showReloadPageErrorDialog(selector, message, allowClose) {
-    const buttons = [
-        {   text: "Reload Page",
-            class: "btn",
-            click: function() {
-                $(this).dialog("close");
-                location.reload();
-            },
-        },
-    ];
-    if (allowClose) {
-        const closeButton = {
-            text: "Close and continue (not recommended)",
-            class: "btn btn-outline-danger",
-            click: function () {
-                $(this).dialog("close");
-            },
-        };
-        buttons.push(closeButton);
+function showReloadPageErrorDialog(message, allowClose) {
+    // Reused across repeated errors so a polling loop doesn't stack modals
+    let modalContent = $('#error-dialog');
+    if (!modalContent.length) {
+        modalContent = createModalShell('error-dialog', 'Error', 'lg');
+        // The page is broken - only the footer buttons get you out of here
+        modalContent.attr({'data-backdrop': 'static', 'data-keyboard': 'false'});
+        modalContent.find('.modal-header .close').remove();
     }
-
-    $(selector).html(message).dialog({
-        dialogClass: "no-close",
-        minWidth: 500,
-        buttons: buttons,
-    });
+    modalContent.find('.modal-body').html(message);
+    const footer = modalContent.find('.modal-footer').empty();
+    $('<button>', {type: 'button', 'class': 'btn btn-primary', text: "Reload Page"})
+        .click(function() { location.reload(); })
+        .appendTo(footer);
+    if (allowClose) {
+        $('<button>', {type: 'button', 'class': 'btn btn-outline-danger', 'data-dismiss': 'modal',
+                       text: "Close and continue (not recommended)"}).appendTo(footer);
+    }
+    modalContent.modal({focus: true, backdrop: 'static', keyboard: false, show: true});
 }
 
 function severityIcon(severity) {

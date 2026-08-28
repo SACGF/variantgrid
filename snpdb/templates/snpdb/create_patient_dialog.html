@@ -20,27 +20,9 @@
 
 function setupCreatePatientDialog() {
     const form = $("#patient-form");
-    const dialog = $("#new-patient-dialog").dialog({
-        autoOpen: false,
-        width: Math.min(900, $(window).width() * 0.9),
-        maxHeight: Math.round($(window).height() * 0.85),
-        modal: true,
-        buttons: [
-            {
-                "text": "Create Patient",
-                "class": "btn btn-primary",
-                "click": function() {
-                    form.submit();
-                },
-            },
-            {
-                "text": "Cancel",
-                "class": "btn btn-secondary",
-                "click": function() {
-                    dialog.dialog("close");
-                },
-            },
-        ],
+    const dialog = $("#new-patient-dialog");
+    $("#create-patient-button", dialog).click(function() {
+        form.submit();
     });
 
     function showFormErrors(errors) {
@@ -64,7 +46,7 @@ function setupCreatePatientDialog() {
             }
             const patientSelect = $(window.activePatientSelect);
             setAutocompleteValue(patientSelect, data.patient_id, data.__str__);
-            dialog.dialog("close");
+            dialog.modal("hide");
         },
         error: function(data) {
             $(".error-messages", form).empty().append(
@@ -94,48 +76,64 @@ function addCreatePatientButton(dialog, patientSelect, sampleName, buttonContain
             .show();
 
         window.activePatientSelect = patientSelect;
-        dialog.dialog("open");
+        dialog.modal("show");
     });
 
     buttonContainer.append(createPatientButton);
 }
 </script>
-<div id="new-patient-dialog" title="New Patient">
-    <form id="patient-form" method="post" action="{% url 'create_patient' %}">
-        {% csrf_token %}
-        <div class="error-messages"></div>
-        <div class="d-flex justify-content-end">
-            <div id="sample-node-container"></div>
-        </div>
-        <div class="form-row">
-            <div class="col-md-6">
-                {{ patient_form.patient_code|as_crispy_field }}
-                <a href="#" class="set-from-sample hover-link" data-field="patient_code"></a>
+<div class="modal fade" id="new-patient-dialog" tabindex="-1" role="dialog" aria-labelledby="new-patient-dialog-label" aria-hidden="true">
+  <div class="modal-dialog modal-lg" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="new-patient-dialog-label">New Patient</h5>
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body">
+        <form id="patient-form" method="post" action="{% url 'create_patient' %}">
+            {% csrf_token %}
+            <div class="error-messages"></div>
+            <div class="d-flex justify-content-end">
+                <div id="sample-node-container"></div>
             </div>
-            <div class="col-md-6">{{ patient_form.family_code|as_crispy_field }}</div>
-        </div>
-        <div class="form-row">
-            <div class="col-md-6">{{ patient_form.first_name|as_crispy_field }}</div>
-            <div class="col-md-6">
-                {{ patient_form.last_name|as_crispy_field }}
-                <a href="#" class="set-from-sample hover-link" data-field="last_name"></a>
+            <div class="form-row">
+                <div class="col-md-6">
+                    {{ patient_form.patient_code|as_crispy_field }}
+                    <a href="#" class="set-from-sample hover-link" data-field="patient_code"></a>
+                </div>
+                <div class="col-md-6">{{ patient_form.family_code|as_crispy_field }}</div>
             </div>
-        </div>
-        <div class="form-row">
-            <div class="col-md-4">{{ patient_form.date_of_birth|as_crispy_field }}</div>
-            <div class="col-md-4">{{ patient_form.date_of_death|as_crispy_field }}</div>
-            <div class="col-md-4">{{ patient_form.sex|as_crispy_field }}</div>
-        </div>
-        <div class="form-row">
-            <div class="col-md-4">{{ patient_form.affected|as_crispy_field }}</div>
-            <div class="col-md-4">{{ patient_form.consanguineous|as_crispy_field }}</div>
-        </div>
-        {{ patient_form.phenotype|as_crispy_field }}
-        {% page_help user 'patients/patient_population_help' 'Patient Population' %}
-        {{ patient_form.population|as_crispy_field }}
-        <!-- Allow form submission with keyboard without duplicating the dialog button -->
-        <input type="submit" tabindex="-1" style="position:absolute; top:-1000px">
-    </form>
+            <div class="form-row">
+                <div class="col-md-6">{{ patient_form.first_name|as_crispy_field }}</div>
+                <div class="col-md-6">
+                    {{ patient_form.last_name|as_crispy_field }}
+                    <a href="#" class="set-from-sample hover-link" data-field="last_name"></a>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="col-md-4">{{ patient_form.date_of_birth|as_crispy_field }}</div>
+                <div class="col-md-4">{{ patient_form.date_of_death|as_crispy_field }}</div>
+                <div class="col-md-4">{{ patient_form.sex|as_crispy_field }}</div>
+            </div>
+            <div class="form-row">
+                <div class="col-md-4">{{ patient_form.affected|as_crispy_field }}</div>
+                <div class="col-md-4">{{ patient_form.consanguineous|as_crispy_field }}</div>
+            </div>
+            {{ patient_form.phenotype|as_crispy_field }}
+            {% page_help user 'patients/patient_population_help' 'Patient Population' %}
+            {{ patient_form.population|as_crispy_field }}
+            <!-- Allow form submission with keyboard without duplicating the dialog button -->
+            <input type="submit" tabindex="-1" style="position:absolute; top:-1000px">
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+        <button type="button" id="create-patient-button" class="btn btn-primary">Create Patient</button>
+      </div>
+    </div>
+  </div>
 </div>
 {% include "patients/patient_samplenode_svg.html" %}
 <!-- end create_patient_dialog.html -->

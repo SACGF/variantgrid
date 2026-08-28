@@ -343,10 +343,6 @@ a.navigation-bar {
     }   
 }
 .tab-dialog {
-    .ui-dialog-content {
-        padding: 0 !important;  
-        overflow-y: hidden; 
-    }
     .nav-tabs {
         padding: 0 !important;   
         border-width: 0 1px 1px 1px;
@@ -558,8 +554,6 @@ a.navigation-bar {
         text-align: left;   
     }
 }
-
-.ui-dialog-content { border-bottom: 1px solid blue; }
 
 #flags-filter {
     .filter-cell {

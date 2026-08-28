@@ -609,7 +609,7 @@ function ajaxError(event, jqxhr, settings, thrownError) {
             message += "\n Unknown error, readyState: " + jqxhr.readyState;
         }
         createJSErrorEvent(message, true); // suppressErrors=True so we don't keep re-triggering errors
-        showReloadPageErrorDialog($("#error-dialog"), message, true);
+        showReloadPageErrorDialog(message, true);
     }
 }
 
@@ -630,7 +630,7 @@ function setupErrorHandlers() {
         userMessage += "<p>The error has been reported. In the mean time you can try reloading the page and avoiding whatever caused the error. ";
         userMessage += "<p>You could also try pressing <B>SHIFT</B> then click the <b>RELOAD</b> button (circular arrow) in your browswer to update your cache.";
         userMessage += "<p>Error was: <pre>" + details + "</pre>";
-        showReloadPageErrorDialog($("#error-dialog"), userMessage, true);
+        showReloadPageErrorDialog(userMessage, true);
 
         const suppressErrorAlert = false;
         return suppressErrorAlert;

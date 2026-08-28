@@ -35,10 +35,10 @@ $(document).ready(function() {
     });
 
     function showPopup(sampleId, geneSymbol, sample) {
-        // create template url
-        const SVGD_URL = Urls.sample_variants_gene_detail(sampleId, geneSymbol);
-        const str_title = "Showing " + geneSymbol + " variant(s) for sample " + sample;
-        $("#sample-variants").dialog({ title: str_title, width: "80%", height: 400, modal: true}).dialog('open').load(SVGD_URL);
+        loadAjaxModal($("<a>", {
+            "data-href": Urls.sample_variants_gene_detail(sampleId, geneSymbol),
+            "data-title": "Showing " + geneSymbol + " variant(s) for sample " + sample,
+        }));
     }
 {% endif %}
 
@@ -100,24 +100,6 @@ $(document).ready(function() {
 #runx1-lab-locations, .leaflet-container {  /* map thumbnail */
     width:  500px;
     height: 300px;
-}
-
-#sample-variants{
-    display: none;
-    border: 1px solid black;
-    width: 100%;
-    height: 100%;
-}
-
-.ui-dialog {
-    z-index: 100000 !important ;
-}
-
-.ui-dialog.position{
-    my: "center",
-    at: "center",
-    of: $("body"),
-    within: $("body")
 }
 
 .front-page-only {
@@ -185,8 +167,6 @@ $(document).ready(function() {
     </div>
 
   <div id='classifications-hotspot-graph-container'></div>
-  <div id="sample-variants" class="dialog">
-  </div>
   <div id='runx1-gene-sample-matrix'>
   </div>
 </div>
