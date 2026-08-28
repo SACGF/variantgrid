@@ -288,7 +288,7 @@ function renderColumnSummaryFilterChildLink(data, type, row, renderContext) {
     // A missing value goes back as the string "null" - that's what the column filter matches on
     const value = JSON.stringify(String(row.c0));
     return $('<a>', {
-        href: `javascript:createFilterChild(${JSON.stringify(extra.gridColumnName)}, ${value});`,
+        href: `javascript:createFilterChild(${JSON.stringify(extra.variantColumn)}, ${value});`,
         html: data
     }).prop('outerHTML');
 }

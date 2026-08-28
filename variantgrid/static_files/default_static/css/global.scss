@@ -2518,7 +2518,17 @@ a.nav-link.not-important {
 }
  */
 
+/* DataTables positions the processing box against the wrapper, which lands it halfway down the
+   grid - the table gets its own container so it sits over the header row instead */
+.dt-table-container {
+	position: relative;
+}
+
 div.dataTables_processing {
+	top: 0;
+	margin-top: 0;
+	z-index: 2; // table.sticky-header thead is 1
+	background-color: rgba(255, 255, 255, 0.9);
 	border-radius: 4px;
 
 	div {

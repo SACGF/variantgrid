@@ -189,7 +189,8 @@ const DataTableDefinition = (function() {
                 lengthValue = defn.pageLength;  // this user's UserGridConfig rows beats the local default
             }
 
-            const domString = `<"top"><"toolbar"<"custom">${ defn.searchBoxEnabled ? 'f' : ''}>rt${ defn.downloadCsvButtonEnabled ? 'B' : ''}<"bottom"<"showing"il><"bottom-toolbar">p><"clear">`;
+            // 'r' (processing) sits inside dt-table-container so it's positioned against the table, not the wrapper
+            const domString = `<"top"><"toolbar"<"custom">${ defn.searchBoxEnabled ? 'f' : ''}><"dt-table-container"rt>${ defn.downloadCsvButtonEnabled ? 'B' : ''}<"bottom"<"showing"il><"bottom-toolbar">p><"clear">`;
 
             const dtParams = {
                 processing: true,

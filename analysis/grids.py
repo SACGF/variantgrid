@@ -578,7 +578,7 @@ class NodeColumnSummaryConfig(DataFrameDatatableConfig):
     def get_extra(self) -> JsonObjType:
         """ The labels renderer only links where the column can become a FilterNode """
         return {
-            "gridColumnName": self.grid_column_name,
+            "variantColumn": self.variant_column,
             "createFilterChildLinks": VariantGridColumn.objects.filter(variant_column=self.variant_column).exists(),
         }
 
