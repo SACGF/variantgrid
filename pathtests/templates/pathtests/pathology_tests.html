@@ -4,14 +4,6 @@
 
 {% block jsdocumentready %}
 
-jQuery.extend($.fn.fmatter , {
-        viewPathologyOrderLink : function(cellvalue, options, rowObject) {
-            const VIEW_PATHOLOGY_TEST_ORDER_URL = Urls.view_pathology_test_order(rowObject.id);
-            var viewLink = "<a class='grid-link' href=" + VIEW_PATHOLOGY_TEST_ORDER_URL + "><div class='grid-link-icon view-details-link'></div></a>";
-            return "<span>" + viewLink + "</span>";
-        }
-});
-
 {% if external_test_order_form %}
 $('#id_external_pk').change(function() {
     var externalPK = $(this).val();
@@ -33,8 +25,6 @@ $('#id_external_pk').change(function() {
     </form>
     {% endif %}
 
-    {% load jqgrid_tags %}
-    {% jqgrid 'pathology_test_orders_grid' 'pathology_test_orders' False None 'jqgrid/jqgrid.html' download_grid_json_as_csv=True %}
-    
-    
+    <table id="pathology-test-orders-grid" data-datatable-url="{% url 'pathology_test_orders_datatable' %}" class="sticky-header"></table>
+
 {% endblock submenu_page_content %}

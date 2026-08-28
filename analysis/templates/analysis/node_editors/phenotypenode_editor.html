@@ -2,8 +2,6 @@
 {% load static %}
 {% load js_tags %}
 {% block style %}
-{% load jqgrid_tags %}
-
 #gene-lists-container {
     width: 100%;
     height: 100%;
@@ -27,7 +25,7 @@
 
 {% block gene_list_grid %}
 
-{% jqgrid 'node_ontology_genes_grid' 'node-ontology-genes' search=False download_grid_json_as_csv=True analysis_id=node.analysis_id node_id=node.pk version=node.version %}
+<table id="node-ontology-genes-grid" class="sticky-header" data-datatable-url="{% url 'node_ontology_genes_datatable' analysis_id=node.analysis_id node_id=node.pk version=node.version %}"></table>
 
 {% endblock gene_list_grid %}
 

@@ -6,10 +6,6 @@
 {% block title %}Cohort {% endblock %}
 {% block head %}
 {{ block.super }}
-{# LEGACY-JQGRID: the cohort sample pickers below build their own jqGrids #}
-<link rel="stylesheet" type="text/css" media="screen" href="{% static 'js/lib/free-jqgrid/css/ui.jqgrid.min.css' %}" />
-<script src="{% static 'js/lib/free-jqgrid/jquery.jqgrid.min.js' %}"></script>
-<script type="text/javascript" src="{% static 'js/grid.js' %}"></script>
 <style>
 	table#grid-container {
 		width: 100%;
@@ -21,10 +17,6 @@
 		overflow: auto;
 	}
 	
-	.ui-jqgrid-titlebar {
-		display: none;
-	}	
-
 	.cohort-button {
 		width: 36px;
 		height: 36px;
@@ -69,32 +61,30 @@
 	const CC_STATUS_COMPLETE = "complete";
 	const CC_STATUS_FAILURE = "failure";
 	let cohortCountStatus = CC_STATUS_MODIFIED;
-	let numGridsLoaded = 0;
+	const gridsLoaded = new Set();
+	let cohortSampleCount = 0;
 
-	function gridComplete(grid) {
-        numGridsLoaded++;
+	function gridDrawn(gridId) {
+        gridsLoaded.add(gridId);
 		messageCheck();
 	}
 
 	function getSelectedSamples(grid) {
 		let samples = [];
 
-		$("input.sample-checkbox", grid).each(function() {
-			if ($(this).is(":checked")) {
-                const sampleId = $(this).attr("sample_id");
-                samples.push(sampleId);
-			}
+		$("input.sample-checkbox:checked", grid).each(function() {
+            samples.push($(this).attr("sample_id"));
 		});
 		return samples;
 	}
 
 	function messageCheck() {
-        if (numGridsLoaded <2) {
+        if (gridsLoaded.size < 2) {
             return;
         }
 	
 		$(".cohort-message").hide();
-		let totalSamples = $("input.sample-checkbox", "#right-grid").length;
+		let totalSamples = cohortSampleCount;
         let samplesTabState = null;
         
 		if (totalSamples === 0) {
@@ -144,16 +134,12 @@
 	}
 
 	function reloadGrids() {
-		$(".jqgrid").each(function() {
-			$(this).trigger('reloadGrid');
+		$("table.cohort-sample-grid").each(function() {
+			$(this).DataTable().ajax.reload(null, false);
 		});
-		
+
 		// Untick any select all stuff
-		$("input.select-all").each(function() {
-			$(this).prop('checked', false);
-		});
-		
-		
+		$("input.select-all").prop('checked', false);
 	}
 
 	function editCohortSample(cohortOp, samples) {
@@ -186,33 +172,14 @@
 		});
 	}
 
-	function setupCohortGrid(grid, pagerId, cohortOp) {
-		$(function () {
-	    	$.getJSON("{% url 'cohort_sample_grid' op='config' cohort_id=cohort.pk %}", function(data) {
-                const postData = data["postData"] || {};
-                const extraFilters = {"cohort_op": cohortOp};
-                postData["extra_filters"] = JSON.stringify(extraFilters);
+	// The two pickers share one endpoint - cohort_op says whether to show the cohort's samples
+	// or the ones it could still add
+	function availableSamplesFilter(data) {
+		data.cohort_op = 'exclude_cohort';
+	}
 
-				data["postData"] = postData;
-				data['sortname'] = 'id';
-				data['sortorder'] = 'desc';
-				data['gridComplete'] = function() {
-					gridComplete(grid);
-				};
-				
-				data["pager"] = pagerId;
-
-			    grid.jqGrid(data)
-	            	.navGrid(pagerId,
-	                	{add: false, edit: false, del: false, view: true, search:false},
-			       		{}, // edit options
-			        	{}, // add options
-			       	 	{}, // del options 
-			        	{ multipleSearch:true, closeOnEscape:true }, // search options 
-			        	{ jqModal:false, closeOnEscape:true} // view options 
-		        	);
-		    });
-		});
+	function cohortSamplesFilter(data) {
+		data.cohort_op = 'show_cohort';
 	}
 
 	function count_complete(result) {
@@ -270,16 +237,13 @@
     }
     
 $(document).ready(function() {
-	jQuery.extend($.fn.fmatter , {
-   		viewSampleLink : function(sampleId) {
-            const attr = {'type': 'checkbox', 'class': 'sample-checkbox', sample_id: sampleId};
-            const checkbox = $("<input/>", attr);
-            const checkbox_html = $('<div>').append(checkbox).html();
-            const url = Urls.view_sample(sampleId);
-            const sampleLink = "<a class='grid-link' href='" + url + "'><div class='grid-link-icon view-details-link'></div></a>";
-            return "<span>" + checkbox_html + " " + sampleLink + "</span>";
-		}
-	});
+    $("#left-grid").on('draw.dt', function() {
+        gridDrawn('left-grid');
+    });
+    $("#right-grid").on('draw.dt', function() {
+        cohortSampleCount = $(this).DataTable().page.info().recordsTotal;
+        gridDrawn('right-grid');
+    });
 
     $("button#change-name").button();
 
@@ -294,12 +258,6 @@ $(document).ready(function() {
             }
         });
 	});
-
-    let grid = $("#left-grid");
-    setupCohortGrid(grid, '#left-pager', 'exclude_cohort');
-
-    grid = $("#right-grid");
-    setupCohortGrid(grid, '#right-pager', 'show_cohort');
 
 	$("#add-to-cohort-button").attr('href', "javascript:addToCohort()");
 	$("#remove-from-cohort-button").attr('href', "javascript:removeFromCohort()");
@@ -427,14 +385,16 @@ $(function() {
     		<tr>
     		<td width="50%">
     			<span class='grid-container'>
-    			<table id="left-grid" class='jqgrid'></table>
-    			<div id="left-pager"></div>
+    			<table id="left-grid" class='cohort-sample-grid sticky-header'
+    			       data-datatable-url="{% url 'cohort_sample_datatable' cohort_id=cohort.pk %}"
+    			       data-datatable-data="availableSamplesFilter"></table>
     			</span>
     		</td>
     		<td width="50%">
     			<span class='grid-container'>
-    			<table id="right-grid" class='jqgrid'></table>
-    			<div id="right-pager"></div>
+    			<table id="right-grid" class='cohort-sample-grid sticky-header'
+    			       data-datatable-url="{% url 'cohort_sample_datatable' cohort_id=cohort.pk %}"
+    			       data-datatable-data="cohortSamplesFilter"></table>
     			</span>
     		</td>
     		</tr>

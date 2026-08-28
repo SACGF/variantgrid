@@ -10,7 +10,7 @@ from django.urls import reverse
 
 from annotation.models.models_phenotype_match import PATIENT_ONTOLOGY_TERM_PATH
 from library.utils import JsonDataType
-from ontology.grids import AbstractOntologyGenesGrid
+from ontology.grids import AbstractOntologyGenesConfig
 from ontology.models import OntologyService, OntologyTerm
 from patients.external_references import ExternalReference
 from patients.models import Extraction, Patient, PatientRecord, PatientRecords, Specimen
@@ -349,10 +349,10 @@ class UnmatchedExtractionSequencingSampleColumns(DatatableConfig[SequencingSampl
                                                extraction_reference__isnull=False)
 
 
-class PatientOntologyGenesGrid(AbstractOntologyGenesGrid):
-    def __init__(self, user, patient_id):
-        self.patient = Patient.get_for_user(user, pk=patient_id)
-        super().__init__()
+class PatientOntologyGenesConfig(AbstractOntologyGenesConfig):
+    def __init__(self, request: HttpRequest):
+        super().__init__(request)
+        self.patient = Patient.get_for_user(self.user, pk=self.get_query_param("patient_id"))
 
     def _get_ontology_term_ids(self):
         return self.patient.get_ontology_term_ids()

@@ -9,18 +9,23 @@ from functools import cached_property, reduce
 from typing import Any, Generic, Optional, TypeVar, Union
 
 from django.contrib.auth.models import User
+from django.core.exceptions import PermissionDenied
 from django.db import models
 from django.db.models import F, OrderBy, Q, QuerySet
-from django.http import HttpRequest, QueryDict
+from django.http import HttpRequest, QueryDict, StreamingHttpResponse
 from django.urls import reverse
 from kombu.utils import json
 
+from library.django_utils.grid_export import csv_streaming_response, grid_export_csv
 from library.log_utils import report_exc_info
 from library.utils import JsonDataType, JsonObjType, full_class_name, nice_class_name, pretty_label
 from snpdb.models import UserGridConfig
 from snpdb.views.datatable_mixins import JSONResponseView
 
 logger = logging.getLogger(__name__)
+
+# Client asks for the server side CSV by adding this to the table's own ajax params
+DATATABLE_CSV_PARAM = "dataTableCsv"
 
 
 class SortOrder(enum.Enum):
@@ -95,7 +100,8 @@ class RichColumn:
                  visible: bool = True,
                  detail: bool = False,
                  css_class: str = None,
-                 extra_columns: Optional[list[str]] = None):
+                 extra_columns: Optional[list[str]] = None,
+                 include_in_csv: Optional[bool] = None):
         """
         #TODO consolidate, orderable, default_sort, sort_order_sequence
         :param key: A column name to be retrieved and returned and sorted on
@@ -114,6 +120,7 @@ class RichColumn:
         :param detail: If True, the column will be shown in the expand section of the table only (requires responsive)
         :param css_class: css class to apply to the column
         :param extra_columns: other columns that need to be selected out for the server renderer
+        :param include_in_csv: whether the raw value goes in the server side CSV (defaults to having a key)
         """
         self.key = key
         self.sort_keys = sort_keys
@@ -156,6 +163,7 @@ class RichColumn:
         self.visible = visible
         self.css_class = css_class
         self.extra_columns = extra_columns
+        self.include_in_csv = bool(key) if include_in_csv is None else include_in_csv
 
     @property
     def css_classes(self) -> str:
@@ -219,6 +227,9 @@ class DatatableConfig(Generic[DC]):
     """
     search_box_enabled = False
     download_csv_button_enabled = False
+    # Streams every row's raw values from the server, rather than the client side button which pulls
+    # the rendered rows back through the ajax endpoint - use it on anything that can grow large
+    server_csv_download = False
     csv_name: Optional[str] = None  # filename for CSV download (date suffix added automatically)
     rich_columns: list[RichColumn]  # columns for display
     expand_client_renderer: Optional[str] = None  # if provided, will expand rows and render content with this JavaScript method
@@ -234,6 +245,15 @@ class DatatableConfig(Generic[DC]):
         :return: A css class or None
         """
         return None
+
+    def csv_columns(self) -> list[dict[str, str]]:
+        """ Columns for the server side CSV, in colmodel ({name, label}) shape - de-duplicated as
+            action columns (delete etc) share their key with the column they act on """
+        colmodels = {}
+        for rc in self.enabled_columns:
+            if rc.include_in_csv and rc.key not in colmodels:
+                colmodels[rc.key] = {"name": rc.key, "label": rc.label}
+        return list(colmodels.values())
 
     def row_columns(self) -> list[str]:
         """
@@ -312,8 +332,8 @@ class DatatableConfig(Generic[DC]):
         :param param: the key of the param
         :return: the value of the param
         """
-        if param in self.request.resolver_match.kwargs:
-            return self.request.resolver_match.kwargs[param]
+        if (resolver_match := self.request.resolver_match) and param in resolver_match.kwargs:
+            return resolver_match.kwargs[param]
 
         return self._querydict.get(param)
 
@@ -411,8 +431,29 @@ class DatabaseTableView(Generic[DC], JSONResponseView):
         return self.column_class(request)
 
     def get(self, request: HttpRequest, *args, **kwargs):
+        self.request = request
         self.config = self.config_for_request(request)
+        if self._querydict.get(DATATABLE_CSV_PARAM):
+            return self.download_csv()
         return super().get(request, *args, **kwargs)
+
+    def download_csv(self) -> StreamingHttpResponse:
+        config = self.config
+        if not config.server_csv_download:
+            raise PermissionDenied(f"CSV download requested but 'server_csv_download' not set on "
+                                   f"{nice_class_name(config)}")
+        colmodels = config.csv_columns()
+        qs = self.ordering(self.filter_queryset(self.get_initial_queryset()))
+        items = qs.values(*[c["name"] for c in colmodels]).iterator()
+        return csv_streaming_response(self._csv_name(), grid_export_csv(colmodels, items))
+
+    def _csv_name(self) -> str:
+        if csv_name := self.config.csv_name:
+            return csv_name
+        try:
+            return nice_class_name(self.get_initial_queryset().model)
+        except Exception:
+            return "export"
 
     @property
     def _querydict(self) -> QueryDict:
@@ -529,21 +570,16 @@ class DatabaseTableView(Generic[DC], JSONResponseView):
     def json_definition(self) -> JsonObjType:
         config = self.config
 
-        csv_name = config.csv_name
-        if not csv_name:
-            try:
-                csv_name = nice_class_name(config.get_initial_queryset().model)
-            except Exception:
-                csv_name = "export"
-
         data: JsonObjType = {
             "responsive": any(col.detail for col in config.enabled_columns),
             "searchBoxEnabled": config.search_box_enabled,
             "downloadCsvButtonEnabled": config.download_csv_button_enabled,
-            "csvName": csv_name,
+            "csvName": self._csv_name(),
             "expandClientRenderer": config.expand_client_renderer,
             "scrollX": config.scroll_x,
         }
+        if config.server_csv_download:
+            data["downloadUrl"] = f"{self.request.path}?{DATATABLE_CSV_PARAM}=1"
         if grid_name := config.grid_name:
             rows, row_selections = UserGridConfig.get_rows_and_selections(self.request.user, grid_name)
             data["gridName"] = grid_name

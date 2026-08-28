@@ -11,55 +11,18 @@
     }
 </style>
 <script>
-    let searchVisible = false;
     let gridExtraFilters = {};
-    
-    function showSearch() {
-        searchVisible = true;
-        $("#searchmodfbox_gene-annotation-versions-grid").show();
-    }
 
-    function getExtraFilters() {
-        let extraFilters = '';
-        if (gridExtraFilters) {
-            extraFilters = JSON.stringify(gridExtraFilters);
-        }
-        return extraFilters;
+    // The page level filters (release, and the OMIM terms shortcuts) - the CSV download picks these
+    // up too, as it goes out with the table's own ajax params
+    function genesDatatableFilter(data) {
+        Object.assign(data, gridExtraFilters);
+        data['gene_annotation_release_id'] = $("#id_release").val();
     }
 
     function filterGrid(extra_filters) {
         gridExtraFilters = extra_filters || {};
-        gridExtraFilters['gene_annotation_release_id'] = $("#id_release").val();
-
-        let grid = $("#gene-annotation-versions-grid");
-        grid.trigger("reloadGrid");
-    }
-
-    function getExportUrl(exportUrl) {
-        console.log("getExportUrl:" + getExportUrl);
-    
-        let extraFilters = getExtraFilters();
-        if (extraFilters) {
-            exportUrl += '?extra_filters=' + extraFilters;
-        }
-        return exportUrl;
-    }
-    
-
-    function genes_grid_complete() {
-        let grid = $("#gene-annotation-versions-grid");
-        grid[0].p.postData["extra_filters"] = getExtraFilters;
-
-        let searchToolBox = $("#searchmodfbox_gene-annotation-versions-grid");
-        searchToolBox.width(650); // make space for data entry
-        if (!searchVisible) {
-            searchToolBox.hide();
-        }
-    }
-
-    function geneSymbolLink(v) {
-        let url = Urls.view_gene_symbol(v);
-        return `<a href='${url}'>${v}</a>`;
+        $("#gene-annotation-versions-grid").DataTable().ajax.reload();
     }
 
     $(document).ready(function() {
@@ -71,12 +34,6 @@
             let geneSymbol = $("#id_gene_symbol").val();
             window.location = Urls.view_gene_symbol(geneSymbol);
         });
-
-        jQuery.extend($.fn.fmatter , {
-            'geneSymbolLink' : geneSymbolLink,
-        });
-
-
     });
 </script>
 
@@ -100,13 +57,13 @@
         <div class="horizontal-fields">
             <img src="{% static 'icons/filter.svg' %}" width="20px" height="20px" title="Filter options to the right" />
             <a class="hover-link" href="javascript:filterGrid()">All</a>
-            <a class="hover-link" href="javascript:showSearch()">Search</a>
-            <a class="hover-link" href="javascript:filterGrid({'column' : 'gene_version__gene__geneannotation__omim_terms', 'is_null' : false})">OMIM Terms</a>
-            <a class="hover-link" href="javascript:filterGrid({'column' : 'gene_version__gene__geneannotation__omim_terms', 'is_null' : true})">No OMIM Terms</a>
+            <a class="hover-link" href="javascript:filterGrid({'column' : 'gene_version__gene__geneannotation__omim_terms', 'is_null' : 'false'})">OMIM Terms</a>
+            <a class="hover-link" href="javascript:filterGrid({'column' : 'gene_version__gene__geneannotation__omim_terms', 'is_null' : 'true'})">No OMIM Terms</a>
         </div>
         <div id='gene-annotation-versions'>
-        {% load jqgrid_tags %}
-        {% jqgrid 'genes_grid' 'gene-annotation-versions' genome_build_name=genome_build.name search=True delete=False grid_complete='genes_grid_complete' modify_export_url='getExportUrl' %}
+        <table id="gene-annotation-versions-grid" class="sticky-header"
+               data-datatable-url="{% url 'genes_datatable' genome_build_name=genome_build.name %}"
+               data-datatable-data="genesDatatableFilter"></table>
         </div>
 
     </div>

@@ -82,10 +82,6 @@ class Test(URLTestCase):
             # Data objects
             ('view_genomic_intervals', {"genomic_intervals_collection_id": cls.genomic_intervals_collection.pk}, 200),
             ('genomic_intervals_graphs_tab', {"genomic_intervals_collection_id": cls.genomic_intervals_collection.pk}, 200),
-
-            # Grids for objects
-            ("cohort_sample_grid", {"cohort_id": cls.cohort.pk, "op": "config"}, 200),
-            ("cohort_sample_grid", {"cohort_id": cls.cohort.pk, "op": "handler"}, 200),
         ]
 
         cls.PRIVATE_AUTOCOMPLETE_URLS = [
@@ -104,6 +100,7 @@ class Test(URLTestCase):
             ("trio_datatable", {}, cls.trio),
             ("quad_datatable", {}, cls.quad),
             ("genomic_intervals_datatable", {}, cls.genomic_intervals_collection),
+            ("cohort_sample_datatable", {"cohort_id": cls.cohort.pk}, None),
         ]
 
     def testUrls(self):

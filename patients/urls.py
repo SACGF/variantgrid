@@ -1,12 +1,12 @@
 from django.urls import include
 from rest_framework import routers
 
-from library.django_utils.jqgrid_view import JQGridView
+from library.django_utils.datatable_dataframe import DataFrameTableView
 from patients import views, views_autocomplete
 from patients.grids import (
     ExtractionColumns,
     PatientListColumns,
-    PatientOntologyGenesGrid,
+    PatientOntologyGenesConfig,
     PatientRecordColumns,
     PatientRecordsColumns,
     SpecimenColumns,
@@ -78,8 +78,8 @@ urlpatterns = [
     path('unmatched_extraction/sequencing_sample/datatables/',
          DatabaseTableView.as_view(column_class=UnmatchedExtractionSequencingSampleColumns),
          name='unmatched_extraction_sequencing_sample_datatables'),
-    path('patient/ontology/genes/grid/<int:patient_id>/<slug:op>/', JQGridView.as_view(grid=PatientOntologyGenesGrid),
-         name='patient_ontology_genes_grid'),
+    path('patient/ontology/genes/datatable/<int:patient_id>/', DataFrameTableView.as_view(column_class=PatientOntologyGenesConfig),
+         name='patient_ontology_genes_datatable'),
 
     # Autocomplete
     path('autocomplete/Patient/', views_autocomplete.PatientAutocompleteView.as_view(), name='patient_autocomplete'),

@@ -39,16 +39,17 @@ from annotation.models import HumanProteinAtlasAnnotation
 from classification.models import Classification
 from genes.grids import GeneListGenesColumns
 from genes.models import HGNC, GeneList
+from library.django_utils.datatable_dataframe import DataFrameDatatableConfig
 from library.jqgrid.jqgrid_sql import get_overrides
-from library.pandas_jqgrid import DataFrameJqGrid
 from library.unit_percent import get_allele_frequency_formatter
 from library.utils import (
     JsonDataType,
+    JsonObjType,
     iter_fixed_chunks,
     sha256sum_str,
     update_dict_of_dict_values,
 )
-from ontology.grids import AbstractOntologyGenesGrid
+from ontology.grids import AbstractOntologyGenesConfig
 from ontology.models import GeneDiseaseClassification, OntologyTermRelation, OntologyVersion
 from patients.models_enums import Zygosity
 from snpdb.grid_columns.custom_columns import (
@@ -545,35 +546,45 @@ class AnalysisTemplatesColumns(DatatableConfig[AnalysisTemplate]):
         return qs
 
 
-class NodeColumnSummaryGrid(DataFrameJqGrid):
-    colmodel_overrides = {
-        "ID": {"hidden": True},
-        "labels": {'formatter': 'createFilterChildLink'},
-        "Percent": {"formatter": "number"},
-    }
+class NodeColumnSummaryConfig(DataFrameDatatableConfig):
+    """ Value counts for one variant grid column across a node's variants """
+    index_visible = False
+    default_sort_column = "Counts"
+    default_sort_order = SortOrder.DESC
+    csv_name = "node_column_summary"
 
-    def __init__(self, user, analysis_id, node_id, node_version, extra_filters, variant_column, significant_figures):
-        super().__init__()
+    LABELS_COLUMN = "labels"
 
-        self.node = get_node_subclass_or_404(user, node_id, version=node_version)
-        grid = VariantGrid(user, self.node, extra_filters)
-        cm = grid.get_column_colmodel(variant_column)
-        grid_column_name = cm["label"]
-        field_formatters = grid.get_field_formatters()
-        self.formatter = field_formatters.get(variant_column)
-        self.extra_filters = extra_filters
-        self.variant_column = variant_column
-        self.significant_figures = significant_figures
-        self.grid_column_name = grid_column_name
-        self._overrides["labels"]["label"] = grid_column_name
-        self.extra_config.update({'sortname': 'Counts',
-                                  'sortorder': 'desc'})
+    def __init__(self, request: HttpRequest):
+        super().__init__(request)
+        self.node = get_node_subclass_or_404(self.user, self.get_query_param("node_id"),
+                                             version=self.get_query_param("node_version"))
+        self.extra_filters = self.get_query_param("extra_filters")
+        self.variant_column = self.get_query_param("variant_column")
+        grid = VariantGrid(self.user, self.node, self.extra_filters)
+        self.grid_column_name = grid.get_column_colmodel(self.variant_column)["label"]
+        self.formatter = grid.get_field_formatters().get(self.variant_column)
 
-        if VariantGridColumn.objects.filter(variant_column=variant_column).exists():
-            self.extra_config["create_filter_child_links"] = True
+    def get_column_label(self, column_name: Any) -> str:
+        if column_name == self.LABELS_COLUMN:
+            return self.grid_column_name
+        return str(column_name)
 
-    def get_dataframe(self):
-        counts = NodeColumnSummaryCacheCollection.get_counts_for_node(self.node, self.variant_column, self.extra_filters)
+    def get_column_client_renderer(self, column_name: Any) -> Optional[str]:
+        if column_name == self.LABELS_COLUMN:
+            return "renderColumnSummaryFilterChildLink"
+        return "TableFormat.number"
+
+    def get_extra(self) -> JsonObjType:
+        """ The labels renderer only links where the column can become a FilterNode """
+        return {
+            "gridColumnName": self.grid_column_name,
+            "createFilterChildLinks": VariantGridColumn.objects.filter(variant_column=self.variant_column).exists(),
+        }
+
+    def get_dataframe(self) -> pd.DataFrame:
+        counts = NodeColumnSummaryCacheCollection.get_counts_for_node(self.node, self.variant_column,
+                                                                     self.extra_filters)
         if self.formatter:
             labels = {}
             for field in counts:
@@ -583,7 +594,7 @@ class NodeColumnSummaryGrid(DataFrameJqGrid):
             labels = {field: field for field in counts}
 
         counts_series = pd.Series(counts)
-        df = pd.DataFrame({"labels": labels, "Counts": counts_series})
+        df = pd.DataFrame({self.LABELS_COLUMN: labels, "Counts": counts_series})
         total = counts_series.sum()
         if total != 0:
             df['Percent'] = 100.0 * df['Counts'] / total
@@ -592,16 +603,11 @@ class NodeColumnSummaryGrid(DataFrameJqGrid):
         return df.sort_values("Counts", ascending=False)
 
 
-class NodeOntologyGenesGrid(AbstractOntologyGenesGrid):
-    colmodel_overrides = {
-        "ID": {"width": 200},
-        "hpo": {"width": 400},
-        "omim": {"width": 400},
-    }
-
-    def __init__(self, user, analysis_id, node_id, version):
-        self.node = get_node_subclass_or_404(user, node_id, version=version)
-        super().__init__()
+class NodeOntologyGenesConfig(AbstractOntologyGenesConfig):
+    def __init__(self, request: HttpRequest):
+        super().__init__(request)
+        self.node = get_node_subclass_or_404(self.user, self.get_query_param("node_id"),
+                                             version=self.get_query_param("version"))
 
     def _get_ontology_version(self) -> OntologyVersion:
         return self.node.analysis.annotation_version.ontology_version
@@ -610,27 +616,27 @@ class NodeOntologyGenesGrid(AbstractOntologyGenesGrid):
         return self.node.get_ontology_term_ids()
 
 
-class NodeGeneDiseaseClassificationGenesGrid(DataFrameJqGrid):
-    def __init__(self, user, analysis_id, node_id, version):
-        super().__init__()
-        self.node = get_node_subclass_or_404(user, node_id, version=version)
+class NodeGeneDiseaseClassificationGenesConfig(DataFrameDatatableConfig):
+    """ Gene symbols in a MOI node, with each source term's mode of inheritance summary """
+    index_label = "Gene Symbol"
+    csv_name = "gene_disease_classification_genes"
+
+    def __init__(self, request: HttpRequest):
+        super().__init__(request)
+        self.node = get_node_subclass_or_404(self.user, self.get_query_param("node_id"),
+                                             version=self.get_query_param("version"))
 
     def _get_ontology_term_relations(self) -> list[OntologyTermRelation]:
         return self.node.get_gene_disease_relations()
 
-    def get_dataframe(self):
+    def get_dataframe(self) -> pd.DataFrame:
         gene_data = defaultdict(dict)
         valid_classifications = list(reversed(GeneDiseaseClassification.labels))
-        columns = {}
         for otr in self._get_ontology_term_relations():
             moi_classifications = otr.get_gene_disease_moi_classifications()
             gene_symbol = otr.dest_term.name
             summary = ", ".join(otr.get_moi_summary(moi_classifications, valid_classifications))
-            column = str(otr.source_term)
-            columns[column] = True
-            gene_data[gene_symbol][column] = summary
-
-        self._overrides.update({column: {"width": 500} for column in columns})
+            gene_data[gene_symbol][str(otr.source_term)] = summary
 
         df = pd.DataFrame.from_dict(gene_data, orient='index')
         return df.sort_index()

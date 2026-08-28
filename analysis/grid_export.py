@@ -9,7 +9,8 @@ from analysis.models import AnalysisNode
 from annotation.models import VariantTranscriptAnnotation
 from genes.models import CanonicalTranscriptCollection
 from library.django_utils import get_model_fields
-from library.django_utils.jqgrid_view import EXPORT_ROWS_PER_CHUNK, grid_export_csv
+from library.django_utils.grid_export import EXPORT_ROWS_PER_CHUNK, grid_export_csv
+from library.django_utils.jqgrid_view import VARIANT_GRID_LABEL_OVERRIDES
 from library.genomics.vcf_writer import VCFWriter
 from library.utils import StashFile, iter_fixed_chunks
 from patients.models_enums import Zygosity
@@ -55,7 +56,7 @@ def node_grid_get_export_iterator(request, node, export_type, canonical_transcri
     colmodels = grid.get_colmodels()
 
     if export_type == 'csv':
-        file_iterator = grid_export_csv(colmodels, items)
+        file_iterator = grid_export_csv(colmodels, items, label_overrides=VARIANT_GRID_LABEL_OVERRIDES)
     elif export_type == 'vcf':
         genome_build = node.analysis.genome_build
         values_qs = Sample.objects.filter(id__in=sample_ids).values_list("id", "name")

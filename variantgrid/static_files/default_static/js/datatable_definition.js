@@ -434,8 +434,9 @@ const DataTableDefinition = (function() {
                 // which pulls rows back through the ajax endpoint
                 const link = $('<a>', {class: 'btn btn-outline-secondary',
                                        html: '<i class="fas fa-download"></i> CSV'}).appendTo(toolbar);
+                const joiner = downloadUrl.indexOf('?') === -1 ? '?' : '&';
                 dataTable.on('draw', function() {
-                    link.attr('href', downloadUrl + '?' + $.param(dataTable.ajax.params() || {}));
+                    link.attr('href', downloadUrl + joiner + $.param(dataTable.ajax.params() || {}));
                 });
             }
         },

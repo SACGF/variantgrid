@@ -1,8 +1,7 @@
-from library.django_utils.jqgrid_view import JQGridView
 from snpdb.views.datatable_view import DatabaseTableView
 from upload.grids import (
-    UploadPipelineModifiedVariantsGrid,
-    UploadPipelineSkippedAnnotationGrid,
+    UploadPipelineModifiedVariantsColumns,
+    UploadPipelineSkippedAnnotationColumns,
     UploadStepColumns,
 )
 from upload.views import views
@@ -21,10 +20,12 @@ urlpatterns = [
 
     path('upload_pipeline/steps/datatables/', DatabaseTableView.as_view(column_class=UploadStepColumns), name='upload_step_datatables'),
     path('upload_pipeline/step/<int:upload_step_id>', view_upload_step_detail, name='upload_step_detail'),
-    path('upload_pipeline/skipped_annotation/grid/<int:upload_pipeline_id>/<slug:op>/',
-         JQGridView.as_view(grid=UploadPipelineSkippedAnnotationGrid),
-         name='upload_pipeline_skipped_annotation_grid'),
-    path('upload_pipeline/modified_variants/grid/<int:upload_pipeline_id>/<slug:op>/', JQGridView.as_view(grid=UploadPipelineModifiedVariantsGrid), name='upload_pipeline_modified_variants_grid'),
+    path('upload_pipeline/skipped_annotation/datatable/<int:upload_pipeline_id>/',
+         DatabaseTableView.as_view(column_class=UploadPipelineSkippedAnnotationColumns),
+         name='upload_pipeline_skipped_annotation_datatable'),
+    path('upload_pipeline/modified_variants/datatable/<int:upload_pipeline_id>/',
+         DatabaseTableView.as_view(column_class=UploadPipelineModifiedVariantsColumns),
+         name='upload_pipeline_modified_variants_datatable'),
 
     path('view_upload_stats/detail', views.view_upload_stats, name='view_upload_stats_detail'),
     path('vcf_import_info_tags/accept/<int:vcf_import_info_id>', views.accept_vcf_import_info_tag, name='accept_vcf_import_info_tag'),

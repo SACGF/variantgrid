@@ -934,7 +934,7 @@ def set_user_row_config(request):
 
 @require_POST
 def set_user_data_grid_config(request):
-    """ This is set from user_data_grid_filter.html, should contain either filter_level+checked or filter_name """
+    """ This is set from datatables/user_data_grid_filter.html, should contain either filter_level+checked or filter_name """
 
     grid_name = request.POST["grid_name"]
     user_grid_config = UserGridConfig.get(request.user, grid_name)

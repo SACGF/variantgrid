@@ -1,19 +1,19 @@
 from django.urls import include
 from rest_framework import routers
 
-from library.django_utils.jqgrid_view import JQGridView
+from library.django_utils.datatable_dataframe import DataFrameTableView
 from seqauto import views, views_autocomplete, views_rest
 from seqauto.grids.qc_data_grids import (
-    FastQCGrid,
-    FlagstatsGrid,
-    IlluminaFlowcellQCGrid,
-    QCExecSummaryGrid,
+    FastQCColumns,
+    FlagstatsColumns,
+    IlluminaFlowcellQCColumns,
+    QCExecSummaryColumns,
 )
 from seqauto.grids.seqauto_grids import (
-    EnrichmentKitGeneCoverageGrid,
-    GoldCoverageSummaryGrid,
-    SequencingSamplesGrid,
-    SequencingSamplesHistoricalGrid,
+    EnrichmentKitGeneCoverageColumns,
+    GoldCoverageSummaryColumns,
+    SequencingSamplesColumns,
+    SequencingSamplesHistoricalConfig,
 )
 from seqauto.grids.sequencing_data_grids import (
     BamFileColumns,
@@ -124,15 +124,23 @@ urlpatterns = [
          name='vcf_file_datatable'),
     path('qc/datatable/', DatabaseTableView.as_view(column_class=QCColumns), name='qc_datatable'),
     path('enrichment_kit/grid/', DatabaseTableView.as_view(column_class=EnrichmentKitColumns), name='enrichment_kit_datatable'),
-    path('enrichment_kit/gene/grid/<int:enrichment_kit_id>/<genome_build_name>/<gene_symbol>/<slug:op>/', JQGridView.as_view(grid=EnrichmentKitGeneCoverageGrid), name='enrichment_kit_gene_coverage_grid'),
-    path('gold_coverage_summary/grid/<pk>/<slug:op>/', JQGridView.as_view(grid=GoldCoverageSummaryGrid), name='gold_coverage_summary_grid'),
-    path('sequencing_stats/sequencing_samples/grid/<slug:op>/', JQGridView.as_view(grid=SequencingSamplesGrid, csv_download=True), name='sequencing_samples_grid'),
-    path('sequencing_stats/sequencing_samples_historical/grid/<slug:time_frame>/<slug:op>/', JQGridView.as_view(grid=SequencingSamplesHistoricalGrid, csv_download=True), name='sequencing_samples_historical_grid'),
+    path('enrichment_kit/gene/datatable/<int:enrichment_kit_id>/<genome_build>/<gene_symbol>/',
+         DatabaseTableView.as_view(column_class=EnrichmentKitGeneCoverageColumns),
+         name='enrichment_kit_gene_coverage_datatable'),
+    path('gold_coverage_summary/datatable/<pk>/', DatabaseTableView.as_view(column_class=GoldCoverageSummaryColumns),
+         name='gold_coverage_summary_datatable'),
+    path('sequencing_stats/sequencing_samples/datatable/',
+         DatabaseTableView.as_view(column_class=SequencingSamplesColumns), name='sequencing_samples_datatable'),
+    path('sequencing_stats/sequencing_samples_historical/datatable/<slug:time_frame>/',
+         DataFrameTableView.as_view(column_class=SequencingSamplesHistoricalConfig),
+         name='sequencing_samples_historical_datatable'),
     # QC Data
-    path('illumina_flowcell_qc/grid/<slug:op>/', JQGridView.as_view(grid=IlluminaFlowcellQCGrid, csv_download=True), name='illumina_flowcell_qc_grid'),
-    path('fastqc/grid/<slug:op>/', JQGridView.as_view(grid=FastQCGrid, csv_download=True), name='fastqc_grid'),
-    path('flagstats/grid/<slug:op>/', JQGridView.as_view(grid=FlagstatsGrid, csv_download=True), name='flagstats_grid'),
-    path('qc_exec_summary/grid/<slug:op>/', JQGridView.as_view(grid=QCExecSummaryGrid, csv_download=True), name='qc_exec_summary_grid'),
+    path('illumina_flowcell_qc/datatable/', DatabaseTableView.as_view(column_class=IlluminaFlowcellQCColumns),
+         name='illumina_flowcell_qc_datatable'),
+    path('fastqc/datatable/', DatabaseTableView.as_view(column_class=FastQCColumns), name='fastqc_datatable'),
+    path('flagstats/datatable/', DatabaseTableView.as_view(column_class=FlagstatsColumns), name='flagstats_datatable'),
+    path('qc_exec_summary/datatable/', DatabaseTableView.as_view(column_class=QCExecSummaryColumns),
+         name='qc_exec_summary_datatable'),
     # Software/settings
     path('sequencing_software_versions/library/datatables/', DatabaseTableView.as_view(column_class=LibraryColumns), name='library_datatable'),
     path('sequencing_software_versions/sequencer/datatables/', DatabaseTableView.as_view(column_class=SequencerColumns), name='sequencer_datatable'),

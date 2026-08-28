@@ -2,24 +2,6 @@
 {% load static %}
 
 {% block title %}Import Warnings and Errors{% endblock %}
-{% block head %}
-<script>
-$(document).ready(function() {
-    jQuery.extend($.fn.fmatter , {
-        formatVariantString : function(variantString, options, rowObject) {
-            const URL = Urls.view_variant(rowObject["id"]);
-            return "<a href='" + URL + "' target='_blank'>" + variantString + "</a>";
-        },
-        formatAnnotationRunLink : function(annotationRunId) {
-            const URL = Urls.view_annotation_run(annotationRunId);
-            return "<a href='" + URL + "' target='_blank'>AnnotationRun " + annotationRunId + "</a>";
-        },
-    });
-});
-</script>
-<style>
-</style>
-{% endblock %}
 {% block submenu_page_content %}
 
     <div class="container">
@@ -49,8 +31,7 @@ $(document).ready(function() {
             <h3>Skipped annotation</h3>
             <p>{{ skipped_annotation.message }}
 
-            {% load jqgrid_tags %}
-            {% jqgrid 'upload_pipeline_skipped_annotation_grid' name='Skipped Annotation' search=False upload_pipeline_id=upload_pipeline.pk %}
+            <table id="skipped-annotation-grid" class="sticky-header" data-datatable-url="{% url 'upload_pipeline_skipped_annotation_datatable' upload_pipeline_id=upload_pipeline.pk %}"></table>
         </div>
         {% endif %}
 
@@ -60,8 +41,7 @@ $(document).ready(function() {
             <h3>Modified Imported Variants</h3>
             <p>We decompose multi-allelic variants and normalise indels (using <a href="https://samtools.github.io/bcftools/bcftools.html#norm">BCFtools</a>) during import, so variants from different VCF files have a consistent representation. Normalisation is the left-aligned minimal representation of an indel
 
-            {% load jqgrid_tags %}
-            {% jqgrid 'upload_pipeline_modified_variants_grid' name='Modified Imported Variant' search=False upload_pipeline_id=upload_pipeline.pk %}
+            <table id="modified-imported-variants-grid" class="sticky-header" data-datatable-url="{% url 'upload_pipeline_modified_variants_datatable' upload_pipeline_id=upload_pipeline.pk %}"></table>
         </div>
         {% endif %}
     </div>
