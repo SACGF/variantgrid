@@ -385,4 +385,10 @@
         {% clinvar allele=allele expert_panel_only=True %}
     </div>
 
+    {% if withdrawn_count %}
+    <div class="mt-4">
+        {% labelled admin_only=True label="Withdrawn Count" %}{{ withdrawn_count | number }}{% endlabelled %}
+    </div>
+    {% endif %}
+
 {% endblock content %}

@@ -32,9 +32,10 @@ from annotation.models import (
 from annotation.transcripts_annotation_selections import VariantTranscriptSelections
 from classification.enums import OverlapType
 from classification.models import (
-    OverlapStatus, Overlap,
+    OverlapStatus, Overlap, ClassificationModification,
 )
 from classification.models.classification_import_run import ClassificationImportRun
+from classification.templatetags.classification_tags import imported_allele_info
 from classification.variant_card import AlleleCard
 from classification.views.exports import ClassificationExportFormatterCSV
 from classification.views.exports.classification_export_filter import ClassificationFilter
@@ -604,6 +605,10 @@ def view_allele(request, allele_id: int):
         "allele": allele,
         "edit_clinical_groupings": request.GET.get('edit_clinical_groupings') == 'True'
     }
+    if request.user.is_superuser:
+        withdrawn_count = Classification.objects.filter(allele_info__allele=allele, withdrawn=True).count()
+        context["withdrawn_count"] = withdrawn_count
+
     return render(request, "variantopedia/view_allele.html", context)
 
 
