@@ -1,5 +1,4 @@
 {% extends menu_variants_base %}
-{% load static %}
 {% load ui_utils %}
 {% load ui_help %}
 {% load ui_menu_bars %}
@@ -10,7 +9,6 @@
     {{ block.super }}
     {% render_tag_styles_and_formatter %}
     {{ gene_symbol_form.media }}
-    <script type="text/javascript" src="{% static 'js/grid.js' %}"></script>
     <script>
         let gridExtraFilters = {{ initial_filters_json | safe }};
         const setAllVariantsFilterUrl = "{% url 'set_all_variants_filter' genome_build.name %}";

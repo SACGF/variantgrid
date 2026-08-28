@@ -51,9 +51,9 @@ def json_encode(data):
     return encoder.encode(data)
 
 
-# LEGACY-JQGRID-ENGINE: the filter rule vocabulary. get_q below turns these into Django lookups,
-# FilterNodeItem persists them, and the DataTables filter builder offers them - so all three stay in
-# step off this one list. 'takes_data' is False for the operations that filter on their own.
+# The filter rule vocabulary. get_q below turns these into Django lookups, FilterNodeItem persists
+# them, and the DataTables filter builder offers them - so all three stay in step off this one list.
+# 'takes_data' is False for the operations that filter on their own.
 FILTER_OPERATIONS = [
     ("eq", "equal", True),
     ("ne", "not equal", True),
@@ -95,8 +95,6 @@ class JqGrid:
     fields = []
     allow_empty = True
 
-    pager_id = '#pager'
-    url = None
     caption = None
     colmodel_overrides = {}  # Class member, do not modify in instances!
 
@@ -215,35 +213,24 @@ class JqGrid:
         # TODO: Add more support for RelatedFields (searching and displaying)
         # FIXME: Validate data types are correct for field being searched.
         filter_map = {
-            # jqgrid op: (django_lookup, use_exclude)
-            'ne': ('%(field)s__exact', True),
-            'bn': ('%(field)s__startswith', True),
-            'en': ('%(field)s__endswith', True),
-            'nc': ('%(field)s__contains', True),
+            # op: (django_lookup, use_exclude). Text comparisons are case insensitive
+            'ne': ('%(field)s__iexact', True),
+            'bn': ('%(field)s__istartswith', True),
+            'en': ('%(field)s__iendswith', True),
+            'nc': ('%(field)s__icontains', True),
             'ni': ('%(field)s__in', True),
             'in': ('%(field)s__in', False),
-            'eq': ('%(field)s__exact', False),
-            'bw': ('%(field)s__startswith', False),
+            'eq': ('%(field)s__iexact', False),
+            'bw': ('%(field)s__istartswith', False),
             'gt': ('%(field)s__gt', False),
             'ge': ('%(field)s__gte', False),
             'lt': ('%(field)s__lt', False),
             'le': ('%(field)s__lte', False),
-            'ew': ('%(field)s__endswith', False),
-            'cn': ('%(field)s__contains', False),
+            'ew': ('%(field)s__iendswith', False),
+            'cn': ('%(field)s__icontains', False),
             'nu': ('%(field)s__isnull', True),
             'nn': ('%(field)s__isnull', False),
         }
-        if self.get_config(False)['ignoreCase']:
-            filter_map.update({'ne': ('%(field)s__iexact', True),
-                               'eq': ('%(field)s__iexact', False),
-                               'bn': ('%(field)s__istartswith', True),
-                               'bw': ('%(field)s__istartswith', False),
-                               'en': ('%(field)s__iendswith', True),
-                               'ew': ('%(field)s__iendswith', False),
-                               'nc': ('%(field)s__icontains', True),
-                               'cn': ('%(field)s__icontains', False)
-                               }
-                              )
 
         q_filters = []
         for rule in json_filters['rules']:
@@ -317,7 +304,7 @@ class JqGrid:
         return items
 
     def get_paginate_by(self, request):
-        rows = request.GET.get('rows', self.get_config(False)['rowNum'])
+        rows = request.GET.get('rows', self.get_config()['rowNum'])
         try:
             paginate_by = int(rows)
         except ValueError:
@@ -400,44 +387,10 @@ class JqGrid:
             'records': int(paginator.count),
         }
 
-    def get_json(self, request):
-        data = self.get_data(request)
-        return json_encode(data)
-
-    def get_default_config(self):
-        config = {
-            'datatype': 'json',
-            'autowidth': True,
-            'forcefit': True,
-            'ignoreCase': True,
-            'shrinkToFit': True,
-            'jsonReader': {'repeatitems': False},
-            'rowNum': 10,
-            'rowList': [10, 25, 50, 100],
-            'sortname': 'pk',
-            'viewrecords': True,
-            'sortorder': "asc",
-            'pager': self.pager_id,
-            'altRows': True,
-            'gridview': True,
-            'height': 'auto',
-            #'multikey': 'ctrlKey',
-            #'multiboxonly': True,
-            #'multiselect': True,
-            #'toolbar': [False, 'bottom'],
-            #'userData': None,
-            #'rownumbers': False,
-        }
-        return config
-
     def get_datatable_extra(self) -> dict:
-        """ Grid-wide metadata for the DataTables client renderers - jqGrid formatters read this kind of
-            thing off options.colModel, which has no DataTables equivalent.
-            @see library.django_utils.jqgrid_datatable_adapter """
+        """ Grid-wide metadata for the client renderers - things that belong to the grid rather than
+            to any one column. @see library.django_utils.jqgrid_datatable_adapter """
         return {}
-
-    def get_url(self):
-        return str(self.url)
 
     def get_caption(self):
         if self.caption is None:
@@ -445,16 +398,16 @@ class JqGrid:
             self.caption = opts.verbose_name_plural.capitalize()
         return self.caption
 
-    def get_config(self, as_json=True):
-        config = self.get_default_config()
+    def get_config(self) -> dict:
+        """ Grid-wide settings - initial sort and page size, which subclasses set via extra_config
+            @see library.django_utils.jqgrid_datatable_adapter.datatable_definition """
+        config = {
+            'rowNum': 10,
+            'rowList': [10, 25, 50, 100],
+            'sortname': 'pk',
+            'sortorder': "asc",
+        }
         config.update(self.extra_config)
-        config.update({
-            'url': self.get_url(),
-            'caption': self.get_caption(),
-            'colModel': self.get_colmodels(remove_server_side_only=True),
-        })
-        if as_json:
-            config = json_encode(config)
         return config
 
     @staticmethod

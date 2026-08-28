@@ -928,7 +928,7 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
         return extra_columns
 
     def _get_node_extra_colmodel_overrides(self):
-        """ Subclasses should override to add colmodel overrides for JQGrid """
+        """ Subclasses should override to add colmodel overrides for the node grid """
         return {}
 
     def _get_inherited_colmodel_overrides(self):
@@ -939,7 +939,7 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
         return extra_overrides
 
     def get_extra_colmodel_overrides(self):
-        """ For JQGrid - subclasses should override _get_node_extra_colmodel_overrides """
+        """ Subclasses should override _get_node_extra_colmodel_overrides """
 
         extra_overrides = {}
         if self.is_valid and self.uses_parent_queryset:

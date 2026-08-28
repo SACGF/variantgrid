@@ -6,19 +6,6 @@
 {% block submenu %}{% menu_bar_sequencing %}{% endblock %}
 
 {% block head %}
-    <script>
-        function close_existing_grid() {
-            if (typeof grid != 'undefined') {
-                grid.jqGrid('GridUnload');
-                delete grid;
-            }
-            if (typeof reloadGridTimeout != 'undefined') {
-                clearTimeout(reloadGridTimeout);
-                delete reloadGridTimeout;
-            }
-        }
-    </script>
-
     <style>
         img.vcenter {
             vertical-align:middle

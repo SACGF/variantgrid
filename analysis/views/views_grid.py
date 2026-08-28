@@ -34,8 +34,8 @@ from snpdb.models import CachedGeneratedFile, Cohort, Sample
 
 # What a node grid request may carry, so the cache key and the export params hash are built off a
 # known set. The DataTables client sends start/length/order (@see translate_datatable_params turning
-# them into rows/page/sidx/sord); the jqGrid names are still here because node_grid_export builds its
-# params from this list and the export path reads them straight off the request.
+# them into rows/page/sidx/sord); the engine's own rows/page/sidx/sord names are here too because
+# node_grid_export builds its params from this list and the export path reads them off the request.
 _NODE_GRID_ALLOWED_PARAMS = {
     '_search',
     'ccc_id',

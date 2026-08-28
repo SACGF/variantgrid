@@ -308,8 +308,7 @@ const DataTableDefinition = (function() {
                 columnDefs.push(columnDef);
                 if (col.render) {
                     const rawRenderer = eval(col.render);
-                    // Grid wide metadata + this column's kwargs, closed over at table build time -
-                    // jqGrid formatters read the equivalent off options.colModel
+                    // Grid wide metadata + this column's kwargs, closed over at table build time
                     const renderContext = {extra: defn.extra || {}, kwargs: col.renderKwargs || null};
                     const renderer = (data, type, row) => {
                         const output = rawRenderer(data, type, row, renderContext);
@@ -442,8 +441,8 @@ const DataTableDefinition = (function() {
         },
 
         /* The column filter dialog, as a panel above the table. Rules go up as '_search'/'filters',
-           which the grid engine turns into a Q object - so this is the same filtering the jqGrid
-           "Filter grid..." dialog did, and page level filters (extra_filters) stack on top of it. */
+           which the grid engine turns into a Q object. Page level filters (extra_filters) stack on
+           top of it. */
         setupFilterBuilder: function(toolbar) {
             const defn = this.serverParams;
             if (!defn.filterBuilder || !(defn.filterBuilder.fields || []).length) {

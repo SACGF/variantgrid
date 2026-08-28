@@ -2,13 +2,8 @@
 {% load related_data_tags %}
 {% load related_analyses_tags %}
 {% load crispy_forms_tags %}
-{% load static %}
 
 {% block title %}Pedigree: {{ pedigree.name }}{% endblock title %}
-{% block head %}
-{{ block.super }}
-<script type="text/javascript" src="{% static 'js/grid.js' %}"></script>
-{% endblock %}
 {% block css %}
 	table {
 		border-collapse: collapse;

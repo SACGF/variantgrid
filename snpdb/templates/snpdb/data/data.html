@@ -11,18 +11,6 @@
 
 {% block head %}
     <script>
-        function close_existing_grid() {
-            console.log("close_existing_grid");
-            if (typeof grid !== 'undefined') {
-                grid.jqGrid('GridUnload');
-                delete grid;
-            }
-            if (typeof reloadGridTimeout != 'undefined') {
-                clearTimeout(reloadGridTimeout);
-                delete reloadGridTimeout;
-            }
-        }
-
         $(document).ready(function() {
             var tabs = $("#tabs");
             tabs.tabs().css({height: '100%'});

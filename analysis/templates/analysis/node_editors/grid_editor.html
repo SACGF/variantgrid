@@ -22,12 +22,6 @@
 		}
 	}
 	
-	function getVariantIdForRow(row) {
-	   // We run a formatter (grid.js detailsLink) on ID column, so this is a bit complicated 
-        var container = $(".variant_id-container", row);
-        return container.attr("variant_id");
-	}
-	
 {% endblock inlinejs %}
 
 {% block griddocreadyjs %}

@@ -167,7 +167,7 @@ class AllVariantsGrid(AbstractVariantGrid):
         """ A COUNT(*) over a huge table costs more than the page itself - hand the paginator the
             planner's estimate instead, and tell the user it's approximate """
         if self.get_filters(request):
-            return None  # jqGrid column filters narrow the rows the estimate was taken over
+            return None  # column filters narrow the rows the estimate was taken over
 
         try:
             estimate = self._get_approx_count(items)

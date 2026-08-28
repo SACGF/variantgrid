@@ -1,5 +1,4 @@
 {% extends "uicore/page/base.html" %}
-{% load static %}
 {% load avatar_tags %}
 {% load crispy_forms_tags %}
 {% load crispy_forms_field %}
@@ -10,7 +9,6 @@
 {% load genome_build_tags %}
 
 {% block head %}
-    <script type="text/javascript" src="{% static 'js/grid.js' %}"></script>
     <script>
         window.ANALYSIS_SETTINGS = {
             show_igv_links : true,

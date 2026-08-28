@@ -73,7 +73,7 @@ The `DJANGO_SETTINGS_MODULE` defaults to `variantgrid.settings` which triggers h
 There are per-app research documents generated in claude/research
 
 ### Core genetic apps (dependency order)
-- **`library/`** — Shared utilities (not a Django app). No Django models; provides: permissions (`guardian_utils`), notifications (`log_utils.NotificationBuilder`), preview system, jQGrid/DataTables base classes, caching, and 20+ utility modules in `library/utils/`.
+- **`library/`** — Shared utilities (not a Django app). No Django models; provides: permissions (`guardian_utils`), notifications (`log_utils.NotificationBuilder`), preview system, grid base classes, caching, and 20+ utility modules in `library/utils/`.
 - **`snpdb/`** — Foundation genetic models: `Variant`, `Allele`, `Locus`, `GenomeBuild`, `VCF`, `Sample`, `Cohort`, `Lab`, `Organization`. Also called "SNPDB" (the original project name). Most other apps depend on this.
 - **`genes/`** — Genes, transcripts, HGVS resolution, canonical transcript management. Contains `hgvs/` subdirectory with the biocommons HGVS converter.
 - **`annotation/`** — VEP annotation integration, ClinVar, variant annotation versions.
@@ -97,7 +97,7 @@ There are per-app research documents generated in claude/research
 The project enforces two protections via global middleware, so individual views do **not** need per-view decorators for either — their absence is intentional, not a security gap, and must not be flagged during audits:
 
 - **Login:** `global_login_required.GlobalLoginRequiredMiddleware` enforces login on **all** views globally, so no view needs `@login_required`.
-- **CSRF:** Django's `CsrfViewMiddleware` is active globally, so all state-changing views (POST/PUT/DELETE), including jQGrid and DataTables handlers, are CSRF-protected without `@csrf_protect`.
+- **CSRF:** Django's `CsrfViewMiddleware` is active globally, so all state-changing views (POST/PUT/DELETE), including grid handlers, are CSRF-protected without `@csrf_protect`.
 
 DRF is configured with `DEFAULT_PERMISSION_CLASSES = [IsAuthenticated]`, so all REST API endpoints require authentication by default. Individual API views do not need explicit `permission_classes` — their absence is intentional, not a security gap.
 
@@ -125,9 +125,11 @@ output: a temporary copy, gitignored, and overwritten by the next `manage.py col
 Files like `global.css` are compiled from their `.scss` sources (e.g. `global.scss`) by a PyCharm file watcher — do not run `sassc`/`sass` yourself, as its output formatting differs and creates huge diffs. When changing styles, edit the `.scss` file, then hand-apply the same minimal change to the generated `.css` (matching its existing formatting) so the change works before PyCharm next recompiles. Leave `.css.map` files alone.
 
 ### Grid/table views
-Two systems coexist:
-- **jQGrid** (legacy): `JqGridUserRowConfig` base class in `library/jqgrid/`. Still used in many places.
-- **DataTables** (current): `DatatableConfig` + `RichColumn` in `snpdb/views/datatable_view.py`. Preferred for new tables.
+Everything renders with DataTables on the client. Two server side implementations:
+- **`DatatableConfig`** + `RichColumn` in `snpdb/views/datatable_view.py`. Use this for new tables.
+- **`JqGridUserRowConfig`** in `library/jqgrid/` — the older engine, still driving the variant grids
+  (dynamic `CustomColumn` columns) and the CSV/VCF export. `JqGridDatatableView` in
+  `library/django_utils/jqgrid_datatable_adapter.py` serves it to the DataTables client.
 
 ### Celery task queues
 Four worker queues: `analysis_workers`, `annotation_workers`, `db_workers` (default), `web_workers`, plus `scheduling_single_worker`. Assign tasks to appropriate queues via `@app.task(queue='...')`.

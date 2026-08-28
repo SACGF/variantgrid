@@ -1,6 +1,5 @@
 {% extends menu_variants_base %}
 {% load settings_tags %}
-{% load static %}
 {% load crispy_forms_tags %}
 {% load genome_build_tags %}
 {% load datatable_tags %}
@@ -91,7 +90,6 @@
     });
 
 </script>
-<script type="text/javascript" src="{% static 'js/grid.js' %}"></script>
 <style>
 {% render_node_count_colors_css %}
 .new-classification-button {

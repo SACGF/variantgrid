@@ -11,10 +11,14 @@ LabNotificationBuilder: (in the snpdb project) Use this to notify a lab via thei
 discordances or other lab specific events.
 
 
-## jQGrid
+## Grids
 
-This is a way of providing paginated data using jQuery's jQGrid. This has been deprecated in favour of using
-DataTables, but many jQGrid's still exist.
+Every grid on the site renders with DataTables. There are two server side implementations:
+
+* `snpdb.views.datatable_view.DatatableConfig` - use this for new grids.
+* `library.jqgrid.JqGrid` - the older engine, still driving the variant grids (which build their
+  columns dynamically from `CustomColumn`) and the CSV/VCF export. `JqGridDatatableView`
+  (`library/django_utils/jqgrid_datatable_adapter.py`) serves it to the DataTables client.
 
 ## Utils directory
 class_utils

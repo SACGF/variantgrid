@@ -289,7 +289,7 @@ class AllVariantsGridApproximateCountTest(TestCase):
 
     @mock.patch.object(AllVariantsGrid, "_get_approx_count", return_value=APPROX_COUNT)
     def test_filtered_request_counts_the_queryset(self, mock_approx_count):
-        """ A jqGrid column filter narrows the rows the estimate was taken over """
+        """ A column filter narrows the rows the estimate was taken over """
         data, count_queries = self._get_data(self._filtered_request())
         mock_approx_count.assert_not_called()
         self.assertNotIn("approximate_records", data)

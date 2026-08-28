@@ -1,5 +1,4 @@
 {% extends menu_patients_base %}
-{% load static %}
 {% load model_tags %}
 {% load related_data_tags %}
 {% load related_analyses_tags %}
@@ -13,7 +12,6 @@
         $("#trio-tabs").tabs();
     });
 </script>
-<script type="text/javascript" src="{% static 'js/grid.js' %}"></script>
 {% endblock %}
 
 {% block submenu_page_content %}

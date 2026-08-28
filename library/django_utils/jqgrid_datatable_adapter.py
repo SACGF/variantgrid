@@ -1,11 +1,9 @@
-""" Serves the jqGrid server classes (library.jqgrid) to the standard DataTables client.
+""" Serves the grid classes in library.jqgrid to the standard DataTables client.
 
-The grid classes stay the engine: column building, querysets, sorting, counting, filtering and the
-server side formatters shared with the CSV/VCF export path are all unchanged. This module only
-translates protocols - a DataTables request in, a jqGrid request out; a jqGrid data envelope back,
-a DataTables one out - so a converted page runs the same grid class the exports do.
-
-@see claude/plans/variantgrid_to_datatables_plan.md
+Those classes are the grid engine - column building, querysets, sorting, counting, filtering and the
+server side formatters shared with the CSV/VCF export path. This module only translates protocols:
+a DataTables request in, an engine request out; an engine data envelope back, a DataTables one out -
+so a grid page and its exports run the same grid class.
 """
 import logging
 from typing import Any, Optional
@@ -24,12 +22,12 @@ from snpdb.views.datatable_view import DatabaseTableView
 logger = logging.getLogger(__name__)
 
 # These grids are wide (dozens of columns) and hold cells with hundreds of links, so the client lays
-# them out table-layout: fixed and clips each cell to one line - the way jqGrid rendered them.
-# That needs every column to carry a width. @see .variantgrid-datatable in global.scss
+# them out table-layout: fixed and clips each cell to one line. That needs every column to carry a
+# width. @see .variantgrid-datatable in global.scss
 DATATABLE_TABLE_CLASS = "variantgrid-datatable"
-DEFAULT_COLUMN_WIDTH = 150  # jqGrid's own colModel default, for colmodels that don't set one
+DEFAULT_COLUMN_WIDTH = 150  # for colmodels that don't set one
 
-# jqGrid colmodel 'formatter' name -> DataTables client renderer
+# colmodel 'formatter' name -> DataTables client renderer
 # @see variantgrid/static_files/default_static/js/variantgrid_formats.js
 JQGRID_FORMATTER_TO_CLIENT_RENDERER = {
     "clinvarLink": "VariantGridFormat.clinvarLink",
@@ -110,7 +108,7 @@ def datatable_filter_fields_from_colmodels(colmodels: list[dict]) -> list[JsonOb
 
 
 def datatable_order_from_config(config: dict, colmodels: list[dict]) -> Optional[list]:
-    """ jqGrid sortname/sortorder -> DataTables 'order'. None where the grid has no sortable
+    """ The grid's sortname/sortorder -> DataTables 'order'. None where the grid has no sortable
         initial column (sortname defaults to 'pk', which is not a grid column) """
     sortname = config.get("sortname")
     if not sortname:
@@ -138,7 +136,7 @@ def datatable_definition(grid, *, download_url: Optional[str] = None, scroll_x: 
                          filter_builder: bool = True, filter_builder_toolbar: bool = True) -> JsonObjType:
     """ The table definition DataTableDefinition builds the table from. Computed per request -
         hide_non_admin columns and UserGridConfig rows are both per user. """
-    config = grid.get_config(as_json=False)
+    config = grid.get_config()
     colmodels = grid.get_colmodels(remove_server_side_only=True)
 
     data: JsonObjType = {
@@ -176,7 +174,7 @@ def datatable_definition(grid, *, download_url: Optional[str] = None, scroll_x: 
 
 
 def translate_datatable_params(request: HttpRequest, grid) -> QueryDict:
-    """ DataTables request params -> the jqGrid ones the grid engine reads off request.GET.
+    """ DataTables request params -> the ones the grid engine reads off request.GET.
         Column filtering ('filters'/'_search') and any page specific params pass through untouched. """
     params = request.GET.copy()
 
@@ -241,9 +239,9 @@ def datatable_json_response(data: JsonObjType) -> HttpResponse:
 
 
 class JqGridDatatableView(View):
-    """ Drop-in replacement for JQGridView on grids whose page has been converted to DataTables.
-        Same constructor conventions (URL kwargs + an 'extra_filters' JSON param), same URL shape -
-        the 'op' kwarg keeps working so 'download' still streams the server side CSV.
+    """ Serves a library.jqgrid grid class to a DataTables page. Constructed from URL kwargs plus
+        an optional 'extra_filters' JSON param; the 'op' kwarg selects 'download', which streams the
+        server side CSV.
 
         Add to urls.py like:
             perm_path('all_variants/grid/<genome_build_name>/<slug:op>/',

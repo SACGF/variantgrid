@@ -127,7 +127,7 @@ def download_karyomapping_gene_csv(request, pk):
     variant_and_genotypes = karyomapping_gene.get_variant_and_genotypes()
 
     filename = f"karyomapping_gene_{karyomapping_gene.pk}_{karyomapping_gene}.csv"
-    # TODO: merge code w/library.jqgrid_export.grid_export_csv
+    # TODO: merge code w/library.django_utils.grid_export.grid_export_csv
 
     karotype_bin_lookup = KaryotypeBins.get_karotype_bin_lookup()
 

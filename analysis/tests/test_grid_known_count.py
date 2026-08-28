@@ -40,7 +40,7 @@ class NodeGridKnownCountTest(GridExportTestCase):
         self.assertEqual([], count_queries)
 
     def test_column_filter_counts_the_queryset(self):
-        """ A jqGrid column filter narrows the rows the stored count was taken over """
+        """ A column filter narrows the rows the stored count was taken over """
         node = self._sample_node()
         grid = VariantGrid(self.user, node)
         data, count_queries = self._get_data(grid, self._request(position_less_than=self.FILTERED_POSITION))

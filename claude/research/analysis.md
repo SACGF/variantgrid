@@ -2,7 +2,7 @@
 
 ## Overview
 
-The `analysis` app provides an interactive, graph-based variant filtering pipeline. Users construct DAG (directed acyclic graph) workflows where nodes filter and transform variants, enabling complex multi-step analysis of genomic data. Supports single-sample, trio, cohort, and pedigree analysis modes. Results are displayed in JQGrid datatables with dynamic column configurations. The system is built on `django-dag` for graph structure and Celery for asynchronous execution of node computations.
+The `analysis` app provides an interactive, graph-based variant filtering pipeline. Users construct DAG (directed acyclic graph) workflows where nodes filter and transform variants, enabling complex multi-step analysis of genomic data. Supports single-sample, trio, cohort, and pedigree analysis modes. Results are displayed in DataTables grids with dynamic column configurations. The system is built on `django-dag` for graph structure and Celery for asynchronous execution of node computations.
 
 ---
 
@@ -14,7 +14,7 @@ The `analysis` app is the core interactive analysis engine of VariantGrid. It al
 - Chain nodes together to form complex multi-step pipelines with branching and merging logic.
 - Analyse single samples, trios (mother/father/proband), cohorts (groups of samples), and pedigrees.
 - Save and reuse analysis workflows as **templates** that can be parameterised with new inputs.
-- Display filtered variant results in paginated, sortable, filterable JQGrid datatables with dynamically added columns based on node type.
+- Display filtered variant results in paginated, sortable, filterable DataTables grids with dynamically added columns based on node type.
 - Cache intermediate results at multiple levels (Redis, database VariantCollections) for performance.
 - Automatically trigger analyses on new VCF imports via `AutoLaunchAnalysisTemplate`.
 
@@ -396,9 +396,9 @@ Returns all variants in the genome build without any source-level filtering. Typ
 These nodes take the variant set from their parent node(s) and apply additional filtering.
 
 #### `FilterNode`
-Generic column-based filtering using JQGrid's filter JSON format.
+Generic column-based filtering using the grid engine's filter JSON format.
 
-**Mechanism:** The JQGrid UI sends filter rules as JSON (column name, operator, value). `FilterNode` deserialises this JSON and converts it to Django Q objects, supporting operators like `eq`, `ne`, `lt`, `gt`, `bw` (begins with), `cn` (contains), `in`, etc.
+**Mechanism:** The filter builder UI (`variantgrid_filter_builder.js`) sends filter rules as JSON (column name, operator, value). `FilterNode` deserialises this JSON and converts it to Django Q objects, supporting operators like `eq`, `ne`, `lt`, `gt`, `bw` (begins with), `cn` (contains), `in`, etc.
 
 This is the most flexible filter node, allowing users to filter on any column available in the analysis grid.
 
@@ -675,22 +675,22 @@ When a new VCF is imported, `auto_run_analyses_for_vcf` (Celery task) checks all
 
 ### Analysis List and Main View
 
-- `analyses/list/` → `AnalysesGrid`: Paginated JQGrid listing all analyses visible to the user, with Guardian permission filtering.
+- `analyses/list/` → `AnalysesGrid`: Paginated listing of all analyses visible to the user, with Guardian permission filtering.
 - `<analysis_id>/` → `view_analysis`: The main analysis editor UI. Renders the graph canvas with nodes, edges, and the result data grid.
 
 ### Node Views
 
-- `node/view/<node_id>/<version>/<extra_filters>/` → Node detail view. The `version` parameter allows the UI to detect stale views and prompt for refresh. `extra_filters` provides additional JQGrid filter context.
+- `node/view/<node_id>/<version>/<extra_filters>/` → Node detail view. The `version` parameter allows the UI to detect stale views and prompt for refresh. `extra_filters` provides additional grid filter context.
 - `node/<id>/update/` → `NodeUpdate`: JSON endpoint for saving node configuration changes. Returns the new node state including version and status.
 - `node/<id>/data/` → Node data endpoint for loading node-specific configuration data into the UI.
 
 ### Grid Endpoints
 
-- `node_grid/handler/` → `NodeGridHandler`: The primary data endpoint for the JQGrid result table.
+- `node_grid/handler/` → `NodeGridHandler`: The primary data endpoint for the result table.
   - Implements **per-user locking** with a 10-minute lock to prevent duplicate expensive queries when the same user triggers multiple rapid page requests.
   - Caches grid responses for up to **1 week** (since results are deterministic for a given node version).
-  - Returns paginated, sorted, filtered variant rows in JQGrid JSON format.
-- `node_grid/cfg/` → `NodeGridConfig`: Returns the JQGrid column configuration for a specific node. Dynamic columns (e.g. sample zygosity columns for `CohortNode`, per-sample AF columns) are added based on the node type.
+  - Returns paginated, sorted, filtered variant rows as the DataTables JSON envelope.
+- `node_grid/cfg/` → `NodeGridConfig`: Returns the DataTables definition (columns, widths, renderers) for a specific node. Dynamic columns (e.g. sample zygosity columns for `CohortNode`, per-sample AF columns) are added based on the node type.
 - `node_grid/export/` → Export endpoint. Supports CSV and VCF export formats via Celery background tasks.
 
 ### Template Views
@@ -699,15 +699,15 @@ When a new VCF is imported, `auto_run_analyses_for_vcf` (Celery task) checks all
 - `analysis_template/<pk>/save/` → Save/version a template.
 - `templates/variable/<node_id>/` → Manage `AnalysisVariable` entries for a node.
 
-### JQGrid Integration
+### Grid Integration
 
-The `VariantGrid` class (in `analysis/views/`) orchestrates the JQGrid integration:
+The `VariantGrid` class (in `analysis/views/`) orchestrates the grid integration:
 
-- `get_config()`: Produces the column configuration object consumed by the JQGrid JavaScript plugin. Includes:
+- `get_colmodels()`: Produces the column configuration the DataTables adapter translates. Includes:
   - Standard variant columns (chromosome, position, ref, alt, gene, consequence, etc.).
   - Annotation columns (ClinVar, gnomAD, etc.).
   - Node-type-specific dynamic columns (zygosity per sample, AF columns, count columns).
-- `get_data()`: Executes the node's queryset with pagination, sorting, and filter parameters from the JQGrid request. Returns serialised row data.
+- `get_data()`: Executes the node's queryset with pagination, sorting, and filter parameters from the grid request. Returns serialised row data.
 
 ---
 
@@ -785,7 +785,7 @@ analysis/
 │       │   ├── pedigree_node.py     # PedigreeNode
 │       │   └── ...
 │       └── filter_nodes/
-│           ├── filter_node.py       # FilterNode (JQGrid JSON → Q)
+│           ├── filter_node.py       # FilterNode (filter rule JSON → Q)
 │           ├── phenotype_node.py    # PhenotypeNode
 │           ├── gene_list_node.py    # GeneListNode
 │           ├── venn_node.py         # VennNode

@@ -1,9 +1,8 @@
 """
-LEGACY-JQGRID-ENGINE: what's left of the jqGrid views once every page renders DataTables.
+Building a library.jqgrid grid class from a request, and streaming its rows as CSV.
 
-The jqGrid server classes (library.jqgrid) are still the engine behind the DataTables adapter
-(@see library.django_utils.jqgrid_datatable_adapter) and the Celery CSV/VCF export, so the pieces
-that drive them from a request live on here.
+Shared by the DataTables adapter (@see library.django_utils.jqgrid_datatable_adapter) and the
+Celery CSV/VCF export.
 """
 import json
 

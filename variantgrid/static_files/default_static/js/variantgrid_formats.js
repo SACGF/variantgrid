@@ -2,7 +2,7 @@
 
    DataTables renderer signature is (data, type, row, ctx), where ctx is added by DataTableDefinition:
      ctx.extra    grid wide metadata from the definition JSON (JqGrid.get_datatable_extra)
-     ctx.kwargs   this column's renderKwargs (jqGrid's colmodel formatter_kwargs)
+     ctx.kwargs   this column's renderKwargs (the colmodel's formatter_kwargs)
 
    Shared page helpers (createGridLink, IGV, tags, load_variant_details) live in grid.js.
    @see library/django_utils/jqgrid_datatable_adapter.py for the formatter -> renderer mapping */

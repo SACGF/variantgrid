@@ -160,7 +160,7 @@ class VariantGrid(AbstractVariantGrid):
 
     def get_datatable_extra(self) -> dict:
         extra = super().get_datatable_extra()
-        # jqGrid put these in every colmodel - the DataTables renderers read them from one grid-wide block
+        # Node state the renderers need, once per grid rather than repeated in every colmodel
         extra["analysisNode"] = {"visible": self.node.visible}
         extra["sortingDisabled"] = self.sorting_disabled()
         return extra
@@ -189,7 +189,7 @@ class VariantGrid(AbstractVariantGrid):
         """ The node load pipeline has already counted this node version, so the paginator doesn't
             have to count the annotated grid queryset again """
         if self.get_filters(request):
-            return None  # jqGrid column filters narrow the rows the stored count was taken over
+            return None  # column filters narrow the rows the stored count was taken over
         count = self._grid_row_count()
         if self.node.count_is_deterministic:
             return count

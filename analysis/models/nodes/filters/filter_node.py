@@ -13,7 +13,7 @@ from snpdb.models import Variant, VariantGridColumn
 
 
 # TODO: This node has quite a few redundant operations - e.g. it will filter the queryset
-# By the filter, and then have it re-applied by jqgrid. Maybe we could override the filter
+# By the filter, and then have it re-applied by the grid engine. Maybe we could override the filter
 # method if already filtered, to save work.
 # But: Get it right, then get it fast.....
 class FilterNode(AnalysisNode):
@@ -27,8 +27,8 @@ class FilterNode(AnalysisNode):
             model = Variant
             fields = ["id"]
 
-        # This filter uses JQGrid's built in query filter.
-        # Load stored params from the DB, convert to JSON and send to a fake request
+        # Reuse the grid engine's rule -> Q conversion, so a FilterNode and a grid column
+        # filter on the same rules produce the same queryset
         fake_filter_grid = FakeFilterGrid()
         return fake_filter_grid.get_q(self.get_filters())
 

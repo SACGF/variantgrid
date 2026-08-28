@@ -121,11 +121,12 @@ System for generating rich previews/summaries of data objects.
 
 ---
 
-## jQGrid Support
+## Grid Support
 
 ### jqgrid/jqgrid.py
 
-**JqGrid** (base class, legacy):
+**JqGrid** (base class) — the older of the two grid engines, still driving the variant grids and the
+CSV/VCF export. Served to the DataTables client by `django_utils/jqgrid_datatable_adapter.py`.
 - Fields: queryset, model, fields
 - `json_encode()` — DjangoJSONEncoder wrapper
 - Various operation formatting utilities

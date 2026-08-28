@@ -3,7 +3,6 @@
 	<script src="{% static 'js/lib/jquery.blockUI.js' %}"></script>
 	<script> 
 		$(document).ready(function() {
-			close_existing_grid();
 			var options	= {
 				target: '#upload-tab-{{ file_type }}-wrapper',
 				beforeSubmit: function() {

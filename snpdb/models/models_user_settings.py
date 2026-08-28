@@ -128,7 +128,7 @@ class UserPageAck(TimeStampedModel):
 
 class UserGridConfig(models.Model):
     user = models.ForeignKey(User, on_delete=CASCADE)
-    grid_name = models.TextField()  # JQGrid caption
+    grid_name = models.TextField()  # JqGrid.get_caption() / DatatableConfig.grid_name
     rows = models.IntegerField(default=10)
     show_group_data = models.BooleanField(default=True)
     show_incomplete_data = models.BooleanField(default=False)

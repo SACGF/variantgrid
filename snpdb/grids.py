@@ -567,7 +567,7 @@ class AbstractVariantGrid(JqGridUserRowConfig):
         raise NotImplementedError()
 
     def get_datatable_extra(self) -> dict:
-        # gnomAD links are per genome build - jqGrid formatters read the page's ANALYSIS_SETTINGS global
+        # gnomAD links are per genome build, and the client renderers have no other way to know it
         return {"genomeBuild": self.genome_build.name}
 
     def _get_permission_user(self):
@@ -583,7 +583,7 @@ class AbstractVariantGrid(JqGridUserRowConfig):
         qs = qs.filter(Q(variantallele__isnull=True) | Q(variantallele__genome_build=self.genome_build))
         # Annotate so we can use global_variant_zygosity in grid columns
         qs, _ = VariantZygosityCountCollection.annotate_global_germline_counts(qs)
-        # JQGrid request filtering is applied by JqGrid.get_items on our result - doing it here as well
+        # Column filtering is applied by JqGrid.get_items on our result - doing it here as well
         # adds a second JOIN per filtered relation, which multiplies rows
         if q := self._get_q():
             qs = qs.filter(q)
