@@ -17,7 +17,6 @@ The Conservation node lets you filter variants by evolutionary conservation scor
 "You can filter variants by whether they're tagged. The Tag node can show only tagged, only untagged, or tagged with specific tags",analysis,analysis,
 The Classifications node lets you search for variants that have existing classifications in your lab or visible shared labs.,analysis,analysis,
 The Gene List node supports PanelApp UK + Australia panels. Search for a panel by name and it automatically loads the gene list.,analysis,analysis,
-"The Venn node lets you combine (union), intersect, or subtract variant sets from two parent nodes. Great for comparing sample groups.",analysis,analysis,
 "You can create a sub-cohort from any cohort. Useful for splitting a large study group into smaller, more specific cohorts for analysis.",snpdb,cohorts,
 Download an annotated CSV or VCF directly from any VCF or sample page. The file is generated in the background so downloads are fast.,snpdb,view_vcf,
 You can customise the sample name shown in the analysis grid. Set it to display the patient name for easier identification (Sample page → edit sample label).,snpdb,view_sample,
@@ -33,21 +32,18 @@ You can manually enter a novel variant through Search → and create + annotate 
 Variant tags are lifted over between genome builds. A tag you apply in GRCh37 analysis will show up in GRCh38 views of the same allele.,variantopedia,variant_tags,
 You can view all of your variant tags across every analysis in one place from the Variant Tags grid.,variantopedia,variant_tags,
 Tag colour schemes can be shared across your lab. Create a colour collection in Settings → Tags and share it with your group.,snpdb,tag_settings,
-The Variant Details page shows 'Nearby Variants' with tag and classification counts. Great for spotting if a neighbouring variant has already been classified.,variantopedia,view_variant,
-Variant Details shows all other samples in your database that carry the same variant. Filterable by zygosity.,variantopedia,variant_sample_information,VARIANT_DETAILS_SHOW_SAMPLES
+The Variant Details page shows 'Nearby Variants' with tag and classification counts. You can use this to spot if variant in same region/domain etc have been tagged or classified,variantopedia,view_variant,
+"Variant Details shows all other samples in your database that carry the same variant, including other genome builds. Filterable by zygosity.",variantopedia,variant_sample_information,VARIANT_DETAILS_SHOW_SAMPLES
 The Gene Symbol page has a hotspot graph showing where classifications cluster across the transcript. Click through to see the underlying records.,genes,view_gene_symbol,VIEW_GENE_HOTSPOT_GRAPH_CLASSIFICATIONS
 Gene Symbol pages show GenCC gene/disease relationships with evidence levels. Click to expand the full list including MOI and source.,genes,view_gene_symbol,
-You can download all classifications for a gene as a CSV from the Gene Symbol page → Classifications tab.,genes,view_gene_symbol_classifications_download,
 The Gene Wiki lets you add lab-wide notes to any gene. These notes appear across all analysis grids and variant pages for that gene.,genes,gene_wiki,VIEW_GENE_WIKI
 The Variant Wiki works the same way as Gene Wiki but is specific to a single variant. Useful for documenting known artefacts or interpretations.,variantopedia,variant_wiki,
 You can search for Ensembl Gene versions like 'ENSG00000243646.11'. It takes you straight to the gene page.,variantopedia,search,
 The annotation descriptions page documents every column available in the grids and what it means. Find it under Annotation → Descriptions.,annotation,view_annotation_descriptions,
 MANE transcripts are indicated and selected as the default on variant detail pages and during classification. Look for the MANE badge on transcripts.,variantopedia,view_variant,
 "On the variant details page, you can toggle between genome builds if the variant exists in multiple builds. The switcher only shows builds where it's actually present.",variantopedia,view_variant,
-Intergenic variants are supported. You can still see limited annotation for variants that fall outside gene boundaries.,variantopedia,view_variant,
 "The Classification Dashboard shows pathogenicity distribution, discordance summaries, and per-gene classification counts for your lab.",classification,classification_dashboard,
 Discordance Reports highlight variants where your lab and another lab have conflicting pathogenicity calls. Review and triage them from the Discordance Reports page.,classification,discordance_reports,DISCORDANCE_ENABLED
-The Activity feed shows a timeline of recent classification changes across your lab. Great for staying up to date with team activity.,classification,activity,
 You can create a classification directly from an HGVS string. Useful when you want to classify a variant you haven't uploaded yet.,classification,create_classification_from_hgvs,CLASSIFICATION_WEB_FORM_CREATE_ALLOW_NO_VARIANT
 "Condition text in classifications is automatically matched to MONDO, OMIM, and HPO terms. Check the Condition Matchings page to review and fix any unresolved terms.",classification,condition_matchings,
 The Candidate Search feature can find existing classifications across your database that might be relevant to a sample you're currently analysing.,classification,classification_candidate_search,
@@ -60,7 +56,6 @@ Patients can have HPO/OMIM/MONDO phenotype terms attached. These are used by the
 "You can bulk import patient records from CSV. Download the template first and include phenotype terms, DOB, sex, and specimen info.",patients,patient_imports,
 The QC Coverage page shows gene-level coverage statistics across sequenced samples. Useful for checking if a gene of interest is well covered in your cohort.,genes,qc_coverage,
 Somalier ancestry analysis is shown on sample pages. It classifies predicted ancestry based on variant patterns across the genome.,snpdb,view_sample,SOMALIER.enabled
-Mutational signature analysis shows SNP transition/transversion patterns for a sample. Accessible from the sample page.,analysis,view_mutational_signature,
 The Classification report generates a formatted summary of a classification record that can be shared or printed. Find it in the classification actions menu.,classification,view_template_report,
 Hover over any annotation column header in a grid for a tooltip explaining what that column means. No need to look it up separately.,variantopedia,view_variant,
 User settings let you set a default genome build. So every page defaults to your preferred build without having to switch each time.,snpdb,view_user_settings,
@@ -78,18 +73,17 @@ The Karyomapping view lets you visually map inherited chromosomal regions in com
 Sample pages show the full upload and annotation history trail. Useful for understanding if a sample was re-annotated or re-imported.,snpdb,view_sample,
 The Cohort Hotspot page shows which genes are most frequently variant in your cohort. Great for spotting systematic issues or shared disease genes.,snpdb,cohort_hotspot,
 You can group samples into a Pedigree and use the Pedigree node in analysis to filter by inheritance across a multi-generation family.,snpdb,view_cohort,
-"Structural variant annotation includes gnomAD SV frequencies and RepeatMasker overlap. Check the variant details page for SVs like DEL, DUP, and INV.",variantopedia,view_variant,VARIANT_SYMBOLIC_ALT_ENABLED
 The 'Nearby Classifications' section on the variant page looks across genome builds. So a GRCh37 classification will show up when viewing the GRCh38 equivalent.,variantopedia,view_variant,
 Variant tags can be added or removed directly from the variant detail page. You don't have to be in an analysis to tag a variant.,variantopedia,view_variant,
 "The server status page shows system health, database statistics, and activity details. Useful for admins checking annotation pipeline status.",variantopedia,server_status,
 You can search for EnrichmentKit names in the global search. Takes you straight to the kit's page showing associated samples.,variantopedia,search,
-Horizontal mode lays nodes out left to right with the variant grid docked full width along the bottom. Turn it on in Analysis Settings → Details tab (or set it as your default in User Settings).,analysis,analysis_settings_details_tab,
+Analyses can have “Horizontal mode” which lays nodes out left to right with the variant grid docked full width along the bottom. Turn it on in Analysis Settings → Details tab (or set it as your default in User Settings).,analysis,analysis_settings_details_tab,
 "Node counts record where their number came from. An exact count is a hard number, an advisory count means data has changed since it was calculated and it needs a reload.",analysis,analysis,
 Big nodes no longer load their grid automatically. Change the variant count threshold in User Settings,snpdb,view_user_settings,ANALYSIS_NODE_GRID_AUTO_LOAD_MAX_VARIANTS
-The Population node can exclude variants that gnomAD itself filtered out. Handy for dropping low quality population records.,analysis,analysis,
+Analysis Population node can exclude variants that fail gnomAD filters to drop low quality population records,analysis,analysis,
 The Effect node uses the new pathogenicity prediction columns and automatically switches based on the annotation version your analysis is using.,analysis,analysis,
 "The Tag node has a 'tagged within days' filter, so you can look at just recent tagging activity. Tags marked stale are flagged too.",analysis,analysis,
-"Structural variants get AnnotSV annotation, shown on the variant details page and in grids.",variantopedia,view_variant,VARIANT_SYMBOLIC_ALT_ENABLED
+"Structural variants get AnnotSV, plus gnomAD SV, conservation and RepeatMasker annotation, shown on the variant details page and in grids.",variantopedia,view_variant,VARIANT_SYMBOLIC_ALT_ENABLED
 "MAVEdb links are shown on the variant page, so you can check whether a variant has functional assay data.",variantopedia,view_variant,
 denovoDB annotation is available for checking whether a variant has been seen as de novo in published studies.,annotation,view_annotation_descriptions,
 "New dbNSFP gene columns cover haploinsufficiency, essentiality, pathways, GO terms and interactions. See the annotation descriptions page for the full list.",annotation,view_annotation_descriptions,
