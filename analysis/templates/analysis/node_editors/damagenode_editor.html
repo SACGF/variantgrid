@@ -8,16 +8,18 @@
 	}
 
 	.slider {
+		display: block;
+		width: 200px;
+		height: 20px;
+		margin: 0;
+	}
+
+	/* Positioning context for the cutoff bands drawn over the range input's track */
+	.slider-track {
+		position: relative;
 		display: inline-block;
 		width: 200px;
-	}
-	
-	.slider label {
-	    position: absolute;
-	    width: 20px;
-	    margin-left: -10px;
-	    text-align: center;
-	    margin-top: 20px;
+		vertical-align: middle;
 	}
 
 	.slider-labels {
@@ -51,12 +53,13 @@
 	    font-weight: normal;
 	}
 
-	/* Calibrated ClinGen PP3/BP4 cutoff bands drawn behind the raw-score slider track */
+	/* Calibrated ClinGen PP3/BP4 cutoff bands drawn over the raw-score slider track */
 	.cutoff-band {
 	    position: absolute;
-	    top: 0;
-	    height: 100%;
-	    z-index: 0;
+	    top: 50%;
+	    height: 8px;
+	    transform: translateY(-50%);
+	    z-index: 1;
 	    opacity: 0.35;
 	    pointer-events: none;
 	}
@@ -142,7 +145,7 @@
         $("#show-rankscore-prediction").hide();
     }
 
-    // Draw the calibrated PP3/BP4 cutoff bands behind a raw-score slider track. The thresholds come
+    // Draw the calibrated PP3/BP4 cutoff bands over a raw-score slider track. The thresholds come
     // from data-pathogenic-min / data-benign-max (set in DamageNodeForm from the per-tool TOOLS table);
     // sliders without them (rankscores, splice, cosmic) get no bands.
     function addCutoffBands(inputSelector, sliderSelector) {
@@ -158,7 +161,7 @@
             $('<div class="cutoff-band cutoff-band-benign"></div>')
                 .css({left: 0, width: pct + "%"})
                 .attr("title", "BP4-supporting (benign) ≤ " + benignMax)
-                .prependTo(sliderSelector);
+                .prependTo(sliderSelector.parent(".slider-track"));
         }
         let pathMin = inputSelector.attr("data-pathogenic-min");
         if (typeof pathMin !== 'undefined') {
@@ -166,7 +169,7 @@
             $('<div class="cutoff-band cutoff-band-pathogenic"></div>')
                 .css({left: pct + "%", width: (100 - pct) + "%"})
                 .attr("title", "PP3-supporting (pathogenic) ≥ " + pathMin)
-                .prependTo(sliderSelector);
+                .prependTo(sliderSelector.parent(".slider-track"));
         }
     }
 
@@ -200,8 +203,8 @@
         setupSlider(inputSelector, sliderSelector);
         addCutoffBands(inputSelector, sliderSelector);
         colourSliderValue(inputSelector, sliderSelector);
-        // setupSlider's own slide handler updates inputSelector.val() first, so recolour from it here
-        sliderSelector.on("slide", function () {
+        // setupSlider's own input handler updates inputSelector.val() first, so recolour from it here
+        sliderSelector.on("input", function () {
             colourSliderValue(inputSelector, sliderSelector);
         });
         let sliderVal = inputSelector.val();
@@ -213,13 +216,13 @@
 
             enableInput.change(function () {
                 if ($(this).is(":checked")) {
-                    sliderSelector.slider("enable");
+                    sliderSelector.prop("disabled", false);
                     frInputs.prop("disabled", false);
                     colourSliderValue(inputSelector, sliderSelector);
                 } else {
                     setVisibleSliderValue(inputSelector, sliderSelector, "");
-                    sliderSelector.slider({value: 0})
-                    sliderSelector.slider("disable");
+                    sliderSelector.val(sliderSelector.attr("min"));
+                    sliderSelector.prop("disabled", true);
                     inputSelector.val("");
                     colourSliderValue(inputSelector, sliderSelector);
                     frInputs.prop("disabled", true);
@@ -234,11 +237,7 @@
             }
         }
 
-        if (sliderVal === '') {
-            sliderSelector.slider("disable");
-        } else {
-            sliderSelector.slider("enable");
-        }
+        sliderSelector.prop("disabled", sliderVal === '');
     }
 
 
@@ -358,7 +357,7 @@
                     <input id="enable-splice"  title="Enable Splicing slider" class="enable-slider" type="checkbox" />
                     <span class='slider-container'>
                         <div class="display-flex">
-                            <div id="splice-slider" class='slider'></div>
+                            <span class="slider-track"><input type="range" id="splice-slider" class='slider' /></span>
                             <div class='label slider-value'></div>
                         </div>
                         <div class='slider-labels'>
@@ -381,7 +380,7 @@
                     <input id="enable-damage-predictions" title="Enable Damage Predictions slider" class="enable-slider" type="checkbox" />
                     <span class='slider-container'>
                         <div class="display-flex">
-                            <div id="damage-predictions-min-slider" class='slider'></div>
+                            <span class="slider-track"><input type="range" id="damage-predictions-min-slider" class='slider' /></span>
                             <div class='label slider-value'></div>
                         </div>
                         <div class='slider-labels'>
@@ -416,7 +415,7 @@
                         <input id="enable-cadd" title="Enable CADD slider" class="enable-slider" type="checkbox" />
                         <span class='slider-container'>
                             <div class="display-flex">
-                                <div id="cadd-slider" class='slider'></div>
+                                <span class="slider-track"><input type="range" id="cadd-slider" class='slider' /></span>
                                 <div class='label slider-value'></div>
                             </div>
                             <div class='slider-labels'>
@@ -434,7 +433,7 @@
                         <input id="enable-revel"  title="Enable Revel slider" class="enable-slider" type="checkbox" />
                         <span class='slider-container'>
                             <div class="display-flex">
-                                <div id="revel-slider" class='slider'></div>
+                                <span class="slider-track"><input type="range" id="revel-slider" class='slider' /></span>
                                 <div class='label slider-value'></div>
                             </div>
                             <div class='slider-labels'>
@@ -455,7 +454,7 @@
                             <input id="enable-alphamissense_rankscore"  title="Enable AlphaMissense slider" class="enable-slider" type="checkbox" />
                             <span class='slider-container'>
                                 <div class="display-flex">
-                                    <div id="alphamissense_rankscore-slider" class='slider'></div>
+                                    <span class="slider-track"><input type="range" id="alphamissense_rankscore-slider" class='slider' /></span>
                                     <div class='label slider-value'></div>
                                 </div>
                                 <div class='slider-labels'>
@@ -474,7 +473,7 @@
                         <input id="enable-bayesdel_noaf_rankscore"  title="Enable BayesDel slider" class="enable-slider" type="checkbox" />
                         <span class='slider-container'>
                             <div class="display-flex">
-                                <div id="bayesdel_noaf_rankscore-slider" class='slider'></div>
+                                <span class="slider-track"><input type="range" id="bayesdel_noaf_rankscore-slider" class='slider' /></span>
                                 <div class='label slider-value'></div>
                             </div>
                             <div class='slider-labels'>
@@ -492,7 +491,7 @@
                         <input id="enable-cadd_raw_rankscore"  title="Enable CADD slider" class="enable-slider" type="checkbox" />
                         <span class='slider-container'>
                             <div class="display-flex">
-                                <div id="cadd_raw_rankscore-slider" class='slider'></div>
+                                <span class="slider-track"><input type="range" id="cadd_raw_rankscore-slider" class='slider' /></span>
                                 <div class='label slider-value'></div>
                             </div>
                             <div class='slider-labels'>
@@ -510,7 +509,7 @@
                         <input id="enable-clinpred_rankscore"  title="Enable ClinPRed slider" class="enable-slider" type="checkbox" />
                         <span class='slider-container'>
                             <div class="display-flex">
-                                <div id="clinpred_rankscore-slider" class='slider'></div>
+                                <span class="slider-track"><input type="range" id="clinpred_rankscore-slider" class='slider' /></span>
                                 <div class='label slider-value'></div>
                             </div>
                             <div class='slider-labels'>
@@ -528,7 +527,7 @@
                         <input id="enable-metalr_rankscore"  title="Enable MetaLR slider" class="enable-slider" type="checkbox" />
                         <span class='slider-container'>
                             <div class="display-flex">
-                                <div id="metalr_rankscore-slider" class='slider'></div>
+                                <span class="slider-track"><input type="range" id="metalr_rankscore-slider" class='slider' /></span>
                                 <div class='label slider-value'></div>
                             </div>
                             <div class='slider-labels'>
@@ -546,7 +545,7 @@
                         <input id="enable-revel_rankscore"  title="Enable Revel Rankscore slider" class="enable-slider" type="checkbox" />
                         <span class='slider-container'>
                             <div class="display-flex">
-                                <div id="revel_rankscore-slider" class='slider'></div>
+                                <span class="slider-track"><input type="range" id="revel_rankscore-slider" class='slider' /></span>
                                 <div class='label slider-value'></div>
                             </div>
                             <div class='slider-labels'>
@@ -564,7 +563,7 @@
                         <input id="enable-vest4_rankscore"  title="Enable VEST4 Rankscore slider" class="enable-slider" type="checkbox" />
                         <span class='slider-container'>
                             <div class="display-flex">
-                                <div id="vest4_rankscore-slider" class='slider'></div>
+                                <span class="slider-track"><input type="range" id="vest4_rankscore-slider" class='slider' /></span>
                                 <div class='label slider-value'></div>
                             </div>
                             <div class='slider-labels'>
@@ -584,7 +583,7 @@
                             <input id="enable-alphamissense_score" title="Enable AlphaMissense raw slider" class="enable-slider" type="checkbox" />
                             <span class='slider-container'>
                                 <div class="display-flex">
-                                    <div id="alphamissense_score-slider" class='slider'></div>
+                                    <span class="slider-track"><input type="range" id="alphamissense_score-slider" class='slider' /></span>
                                     <div class='label slider-value'></div>
                                 </div>
                                 <div class='slider-labels'>
@@ -602,7 +601,7 @@
                             <input id="enable-bayesdel_noaf_score" title="Enable BayesDel raw slider" class="enable-slider" type="checkbox" />
                             <span class='slider-container'>
                                 <div class="display-flex">
-                                    <div id="bayesdel_noaf_score-slider" class='slider'></div>
+                                    <span class="slider-track"><input type="range" id="bayesdel_noaf_score-slider" class='slider' /></span>
                                     <div class='label slider-value'></div>
                                 </div>
                                 <div class='slider-labels'>
@@ -620,7 +619,7 @@
                             <input id="enable-cadd_phred" title="Enable CADD phred slider" class="enable-slider" type="checkbox" />
                             <span class='slider-container'>
                                 <div class="display-flex">
-                                    <div id="cadd_phred-slider" class='slider'></div>
+                                    <span class="slider-track"><input type="range" id="cadd_phred-slider" class='slider' /></span>
                                     <div class='label slider-value'></div>
                                 </div>
                                 <div class='slider-labels'>
@@ -638,7 +637,7 @@
                             <input id="enable-clinpred_score" title="Enable ClinPred raw slider" class="enable-slider" type="checkbox" />
                             <span class='slider-container'>
                                 <div class="display-flex">
-                                    <div id="clinpred_score-slider" class='slider'></div>
+                                    <span class="slider-track"><input type="range" id="clinpred_score-slider" class='slider' /></span>
                                     <div class='label slider-value'></div>
                                 </div>
                                 <div class='slider-labels'>
@@ -656,7 +655,7 @@
                             <input id="enable-metarnn_score" title="Enable MetaRNN raw slider" class="enable-slider" type="checkbox" />
                             <span class='slider-container'>
                                 <div class="display-flex">
-                                    <div id="metarnn_score-slider" class='slider'></div>
+                                    <span class="slider-track"><input type="range" id="metarnn_score-slider" class='slider' /></span>
                                     <div class='label slider-value'></div>
                                 </div>
                                 <div class='slider-labels'>
@@ -674,7 +673,7 @@
                             <input id="enable-mpc_score" title="Enable MPC raw slider" class="enable-slider" type="checkbox" />
                             <span class='slider-container'>
                                 <div class="display-flex">
-                                    <div id="mpc_score-slider" class='slider'></div>
+                                    <span class="slider-track"><input type="range" id="mpc_score-slider" class='slider' /></span>
                                     <div class='label slider-value'></div>
                                 </div>
                                 <div class='slider-labels'>
@@ -692,7 +691,7 @@
                             <input id="enable-mutpred2_score" title="Enable MutPred2 raw slider" class="enable-slider" type="checkbox" />
                             <span class='slider-container'>
                                 <div class="display-flex">
-                                    <div id="mutpred2_score-slider" class='slider'></div>
+                                    <span class="slider-track"><input type="range" id="mutpred2_score-slider" class='slider' /></span>
                                     <div class='label slider-value'></div>
                                 </div>
                                 <div class='slider-labels'>
@@ -710,7 +709,7 @@
                             <input id="enable-primateai_score" title="Enable PrimateAI raw slider" class="enable-slider" type="checkbox" />
                             <span class='slider-container'>
                                 <div class="display-flex">
-                                    <div id="primateai_score-slider" class='slider'></div>
+                                    <span class="slider-track"><input type="range" id="primateai_score-slider" class='slider' /></span>
                                     <div class='label slider-value'></div>
                                 </div>
                                 <div class='slider-labels'>
@@ -728,7 +727,7 @@
                             <input id="enable-revel_score" title="Enable REVEL raw slider" class="enable-slider" type="checkbox" />
                             <span class='slider-container'>
                                 <div class="display-flex">
-                                    <div id="revel_score-slider" class='slider'></div>
+                                    <span class="slider-track"><input type="range" id="revel_score-slider" class='slider' /></span>
                                     <div class='label slider-value'></div>
                                 </div>
                                 <div class='slider-labels'>
@@ -746,7 +745,7 @@
                             <input id="enable-varity_er_score" title="Enable VARITY_ER raw slider" class="enable-slider" type="checkbox" />
                             <span class='slider-container'>
                                 <div class="display-flex">
-                                    <div id="varity_er_score-slider" class='slider'></div>
+                                    <span class="slider-track"><input type="range" id="varity_er_score-slider" class='slider' /></span>
                                     <div class='label slider-value'></div>
                                 </div>
                                 <div class='slider-labels'>
@@ -764,7 +763,7 @@
                             <input id="enable-varity_r_score" title="Enable VARITY_R raw slider" class="enable-slider" type="checkbox" />
                             <span class='slider-container'>
                                 <div class="display-flex">
-                                    <div id="varity_r_score-slider" class='slider'></div>
+                                    <span class="slider-track"><input type="range" id="varity_r_score-slider" class='slider' /></span>
                                     <div class='label slider-value'></div>
                                 </div>
                                 <div class='slider-labels'>
@@ -782,7 +781,7 @@
                             <input id="enable-vest4_score" title="Enable VEST4 raw slider" class="enable-slider" type="checkbox" />
                             <span class='slider-container'>
                                 <div class="display-flex">
-                                    <div id="vest4_score-slider" class='slider'></div>
+                                    <span class="slider-track"><input type="range" id="vest4_score-slider" class='slider' /></span>
                                     <div class='label slider-value'></div>
                                 </div>
                                 <div class='slider-labels'>
@@ -826,7 +825,7 @@
                     <input id="enable-cosmic-count"  title="Enable COSMIC count slider" class="enable-slider" type="checkbox" />
                     <span class='slider-container'>
                         <div class="display-flex">
-                            <div id="cosmic-count-slider" class='slider'></div>
+                            <span class="slider-track"><input type="range" id="cosmic-count-slider" class='slider' /></span>
                             <div class='label slider-value'></div>
                         </div>
                         <div class='slider-labels'>

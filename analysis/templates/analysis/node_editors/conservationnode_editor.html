@@ -10,14 +10,7 @@
 	.slider {
 		display: inline-block;
 		width: 200px;
-	}
-	
-	.slider label {
-	    position: absolute;
-	    width: 20px;
-	    margin-left: -10px;
-	    text-align: center;
-	    margin-top: 20px;
+		vertical-align: middle;
 	}
 
 	.slider-labels {
@@ -46,11 +39,7 @@
     }
 
     function setSliderEnabled(sliderSelector, enabled) {
-        if (enabled) {
-            sliderSelector.slider("enable");
-        } else {
-            sliderSelector.slider("disable");
-        }
+        sliderSelector.prop("disabled", !enabled);
     }
 
     function setupConservationNodeSlider(inputSelector, sliderSelector, enableInput) {
@@ -77,14 +66,14 @@
             var max = parseFloat(inputSelector.attr("max"));
             var range = max-min;
             var newSliderValue = min + range * floatVal;
-            sliderSelector.slider('value', newSliderValue);
+            sliderSelector.val(newSliderValue);
             inputSelector.val(newSliderValue);
             setVisibleSliderValue(inputSelector, sliderSelector, newSliderValue);
         {% endfor %}
     }
 
-    function masterSliderChanged(event, ui) {
-        setIndividualSlidersFromMaster(ui.value);
+    function masterSliderChanged() {
+        setIndividualSlidersFromMaster(this.value);
     }
 
     $(document).ready(function() {
@@ -101,7 +90,7 @@
         }
         useIndividualSliders.change(setEnabledIfNotChecked);
         setEnabledIfNotChecked();
-        masterSlider.slider('option', 'change', masterSliderChanged);
+        masterSlider.on('change', masterSliderChanged);
 
         {% for field_name in form.individual_conservation_score_fields %}
             setupConservationNodeSlider($("#id_{{ field_name }}"), $("#{{ field_name }}-slider"), useIndividualSliders);
@@ -129,7 +118,7 @@
                     {{ form.any_scaled_min.errors }}
                     <span class='slider-container'>
                         <div class="display-flex">
-                            <div id="any_scaled_min-slider" class='slider'></div>
+                            <input type="range" id="any_scaled_min-slider" class='slider' />
                             <div class='label slider-value'></div>
                         </div>
                         <div class='slider-labels'>
@@ -158,7 +147,7 @@
                     <td>{{ field.errors }}
                         <span class='slider-container'>
                             <div class="display-flex">
-                                <div id="{{ field_name }}-slider" class='slider'></div>
+                                <input type="range" id="{{ field_name }}-slider" class='slider' />
                                 <div class='label slider-value'></div>
                             </div>
                             <div class='slider-labels'>

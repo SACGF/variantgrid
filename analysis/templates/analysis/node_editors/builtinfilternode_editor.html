@@ -10,14 +10,7 @@
 	.slider {
 		display: inline-block;
 		width: 200px;
-	}
-
-	.slider label {
-	    position: absolute;
-	    width: 20px;
-	    margin-left: -10px;
-	    text-align: center;
-	    margin-top: 20px;
+		vertical-align: middle;
 	}
 
 	.slider-labels {
@@ -86,7 +79,7 @@
             <label>COSMIC count min</label>
             <div class='slider-container'>
                 <div class="display-flex">
-                    <div id="cosmic-count-slider" class='slider'></div>
+                    <input type="range" id="cosmic-count-slider" class='slider' />
                     <div class='label slider-value'></div>
                 </div>
                 <div class='slider-labels'>

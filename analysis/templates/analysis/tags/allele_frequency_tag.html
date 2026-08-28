@@ -1,7 +1,7 @@
 <style>
     .af-slider {
         width: 50%;
-        margin: 0px 10px 0px 10px;
+        margin: 8px 10px 10px 10px;  /* noUiSlider's handles overhang its 18px track */
     }
     
     .slider-label {
@@ -57,7 +57,7 @@
         $(".slider-max", container).text(maxVal);
     }
 
-    function createSlider(value1, value2) {
+    function addSlider(value1, value2) {
         value1 = getValue(value1, 0);
         value2 = getValue(value2, 1);
 
@@ -65,40 +65,34 @@
         const sliderContainer = $(sliderTemplate);
         const slider = $(".af-slider", sliderContainer);
 
-        slider.slider({
-            range: true,
-            min: 0,
-            max: 1,
-            step: 0.01,
-            values: [ value1, value2 ],
-            slide: function(event, ui) {
-                afSetSliderMinMaxLabels(this, ui.values[0], ui.values[1]);
-            }
-        });
-        // initial labels
-        afSetSliderMinMaxLabels(slider, slider.slider('values', 0), slider.slider('values', 1));
-
         $(".delete-slider", sliderContainer).click(function() {
+            slider[0].noUiSlider.destroy();
             sliderContainer.remove();
         });
 
-        return sliderContainer;
-    }
-
-
-    function addSlider(value1, value2) {
-        const sliderContainer = createSlider(value1, value2);
+        // noUiSlider needs the element in the DOM before create()
         $("#allele-frequency-filter").append(sliderContainer);
-        return $(".af-slider", sliderContainer);
+
+        noUiSlider.create(slider[0], {
+            start: [value1, value2],
+            connect: true,
+            range: {min: 0, max: 1},
+            step: 0.01,
+        });
+        // update fires on create as well as on drag, so it sets the initial labels too
+        slider[0].noUiSlider.on("update", function(values, handle, unencoded) {
+            afSetSliderMinMaxLabels(slider, unencoded[0], unencoded[1]);
+        });
+
+        return slider;
     }
 
 
     function getAlleleFrequencyValues() {
         const sliderList = [];
         $(".af-slider").each(function() {
-            const sMin = $(this).slider('values', 0);
-            const sMax = $(this).slider('values', 1);
-            sliderList.push([sMin, sMax]);
+            const values = this.noUiSlider.get(true);
+            sliderList.push([values[0], values[1]]);
         });
         
         return {

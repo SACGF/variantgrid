@@ -1124,7 +1124,7 @@ function setVisibleSliderValue(inputSelector, sliderSelector, value) {
 }
 
 function setupSlider(inputSelector, sliderSelector) {
-    // Returns sliderValue
+    // sliderSelector is an <input type="range"> - inputSelector is the hidden form field it writes to
     const sliderMinVal = Number(inputSelector.attr("min"));
     const sliderMaxVal = Number(inputSelector.attr("max"));
     const sliderVal = inputSelector.val();
@@ -1132,18 +1132,19 @@ function setupSlider(inputSelector, sliderSelector) {
 
     setVisibleSliderValue(inputSelector, sliderSelector, sliderVal); // set initial
 
-    sliderSelector.slider({
+    sliderSelector.attr({
         min: sliderMinVal,
         max: sliderMaxVal,
         step: Number(inputSelector.attr("step") || 1),
-        value: sliderVal,
-        change: function (event, ui) {
-            inputSelector.val(ui.value);
-        },
-        slide: function (event, ui) {
-            inputSelector.val(ui.value);
-            setVisibleSliderValue(inputSelector, sliderSelector, ui.value);
-        },
+    });
+    // A blank form field means "not set" - park the handle at min without writing a value back
+    sliderSelector.val(sliderVal === '' ? sliderMinVal : sliderVal);
+    sliderSelector.on("input", function () {
+        inputSelector.val(this.value);
+        setVisibleSliderValue(inputSelector, sliderSelector, this.value);
+    });
+    sliderSelector.on("change", function () {
+        inputSelector.val(this.value);
     });
 
     $(".min-value", container).html(sliderMinVal);

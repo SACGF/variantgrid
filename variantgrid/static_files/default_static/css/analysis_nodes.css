@@ -543,10 +543,6 @@ svg.node-icon {
 	box-shadow: 0 0 0 2px rgba(255, 0, 0, .35), 2px 2px 8px rgba(0, 0, 0, .25);
 }
 
-#node-size-slider {
-	width: 100px;
-}
-
 .tag-counter {
 	padding: 1px;
 	margin-left: 5px;

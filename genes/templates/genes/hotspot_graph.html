@@ -5,14 +5,21 @@
     <div class="hotspot-graph" id="hotspot-graph-{{ uuid }}"></div>
     <style>
         .gnomad-af-slider {
+            position: relative;
             margin-left: 15px;
             width: 400px;
+            height: 40px;
+        }
+
+        .gnomad-af-slider input[type=range] {
+            width: 100%;
+            margin: 0;
         }
 
         .gnomad-af-slider label {
           position: absolute;
+          top: 22px;
           width: 20px;
-          margin-top: 15px;
           margin-left: -10px;
           text-align: center;
         }
@@ -25,7 +32,9 @@
     <div class="slider-container">
     {% if has_graph_filter_toolbar %}
         <label class="left" for="hotspot-graph-af-slider-{{ uuid }}">Graph gnomAD max %: </label>
-        <div class="left gnomad-af-slider" id="hotspot-graph-af-slider-{{ uuid }}"></div>
+        <div class="left gnomad-af-slider">
+            <input type="range" id="hotspot-graph-af-slider-{{ uuid }}" />
+        </div>
     {% endif %}
         <a class="toggle-link" data-toggle="collapse" href="#hotspot-transcripts-{{ uuid }}">HotSpot graph transcripts...</a>
         <div class="clear"></div>
@@ -305,30 +314,22 @@
         }
 
         $(document).ready(function () {
-            let sliderDiv = $("#hotspot-graph-af-slider-{{ uuid }}");
+            let slider = $("#hotspot-graph-af-slider-{{ uuid }}");
             function drawMyTranscriptModel() {
                 let gnomADMaxPercent = 100;
-                if ($(sliderDiv).length) {
-                    let value = $(sliderDiv).slider("value");
-                    gnomADMaxPercent = GNOMAD_PERCENT[value];
+                if (slider.length) {
+                    gnomADMaxPercent = GNOMAD_PERCENT[Number(slider.val())];
                 }
                 drawTranscriptModel(hotSpotId, gnomADMaxPercent);
             }
 
-            let gnomadMax = GNOMAD_PERCENT.length - 1;
-            sliderDiv.slider({
-                min: 0, max: gnomadMax, step: 1, value: gnomadMax,
-                change: drawMyTranscriptModel
-            }).each(function() {
-                // From: https://stackoverflow.com/a/16877678/295724
-                const opt = $(this).data().uiSlider.options;
-                const vals = opt.max - opt.min;
-                for (let i = 0; i <= vals; i++) {
-                    const label = GNOMAD_PERCENT[i] + "%";
-                    const el = $('<label>' + label + '</label>').css('left', (i/vals*100) + '%');
-                    sliderDiv.append(el);
-                }
-            });
+            const gnomadMax = GNOMAD_PERCENT.length - 1;
+            slider.attr({min: 0, max: gnomadMax, step: 1}).val(gnomadMax).on("change", drawMyTranscriptModel);
+            // A label per step, positioned along the track
+            for (let i = 0; i <= gnomadMax; i++) {
+                const el = $('<label>' + GNOMAD_PERCENT[i] + '%</label>').css('left', (i / gnomadMax * 100) + '%');
+                slider.parent().append(el);
+            }
 
             drawMyTranscriptModel();
 
