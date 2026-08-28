@@ -23,3 +23,12 @@ class NodeChip:
     icon: Optional[str] = None  # FontAwesome classes
     title: Optional[str] = None  # hover text
     css_class: Optional[str] = None
+
+
+def significance_chips(selected: list, field_count: int, short_labels: dict, long_labels: dict,
+                       css_class_func) -> list[NodeChip]:
+    """ Chips for a row of significance pills - an all-on row isn't filtering, so it says nothing """
+    if len(selected) == field_count:
+        return []
+    return [NodeChip(text=short_labels[value], title=long_labels[value], css_class=css_class_func(value))
+            for value in selected]

@@ -183,17 +183,11 @@ class TagNodeInput(models.TextChoices):
     PARENT_NOT_TAGGED = 'E', 'Parent variants that are NOT tagged'
 
 
-class ClassificationsNodeInput(models.TextChoices):
+class NodeMatchInput(models.TextChoices):
     """ Whether the node is a source (matching variants) or filters its parent """
     MATCHING_VARIANTS = 'C', 'Matching variants (no parent)'
     PARENT_MATCHING = 'I', 'Parent variants that MATCH'
     PARENT_NOT_MATCHING = 'E', 'Parent variants that DO NOT match'
-
-
-class ClinVarRecordFilter(models.TextChoices):
-    ANY = 'A', 'Any'
-    PRESENT = 'P', 'Has a ClinVar record'
-    ABSENT = 'N', 'No ClinVar record'
 
 
 class TagLocation(models.TextChoices):

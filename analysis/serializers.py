@@ -8,6 +8,7 @@ from analysis.models import (
     BuiltInFilterNode,
     CandidateSearchRun,
     ClassificationsNode,
+    ClinVarNode,
     CohortNode,
     DamageNode,
     FilterNode,
@@ -144,6 +145,12 @@ class BuiltInFilterNodeSerializer(AnalysisNodeSerializer):
 class ClassificationsNodeSerializer(AnalysisNodeSerializer):
     class Meta(AnalysisNodeSerializer.Meta):
         model = ClassificationsNode
+        fields = _analysis_node_fields(model)
+
+
+class ClinVarNodeSerializer(AnalysisNodeSerializer):
+    class Meta(AnalysisNodeSerializer.Meta):
+        model = ClinVarNode
         fields = _analysis_node_fields(model)
 
 

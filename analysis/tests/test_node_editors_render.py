@@ -5,10 +5,11 @@ from django.test import TestCase
 from django.test.client import Client
 from django.urls.base import reverse
 
-from analysis.models.enums import ClassificationsNodeInput
+from analysis.models.enums import NodeMatchInput
+from analysis.models.nodes.filters.classifications_node import ClassificationsNode
+from analysis.models.nodes.filters.clinvar_node import ClinVarNode
 from analysis.models.nodes.filters.damage_node import DamageNode
 from analysis.models.nodes.filters.intersection_node import IntersectionNode
-from analysis.models.nodes.sources.classifications_node import ClassificationsNode
 from analysis.tests.utils import AnalysisSetupMixin
 from library.genomics.vcf_enums import VariantClass
 from library.guardian_utils import assign_permission_to_user_and_groups
@@ -91,21 +92,20 @@ class NodeEditorRenderTest(AnalysisSetupMixin, TestCase):
         content = self._get_editor(node).content.decode()
         self.assertIn("1:100-200", content)
 
-    def test_classifications_node_clinvar_section(self):
-        node = ClassificationsNode.objects.create(analysis=self.analysis,
-                                                  node_input=ClassificationsNodeInput.PARENT_NOT_MATCHING,
-                                                  clinvar_benign=True, clinvar_variation_ids=[12345])
+    def test_clinvar_node_editor(self):
+        node = ClinVarNode.objects.create(analysis=self.analysis,
+                                          node_input=NodeMatchInput.PARENT_NOT_MATCHING,
+                                          germline_benign=False, variation_ids=[12345])
         content = self._get_editor(node).content.decode()
-        self.assertIn("id_clinvar_benign", content)
+        self.assertIn("id_germline_benign", content)
         self.assertIn("12345", content)
 
-    def test_classifications_node_editor_posts_back_valid(self):
+    def _test_editor_posts_back_valid(self, node, form_id):
         """ The editor's own HTML has to survive a round trip through its form - a widget that submits
             nothing for a required field (a radio group with no option checked) blocks every save """
-        node = ClassificationsNode.objects.create(analysis=self.analysis)
         response = self._get_editor(node)
-        data = form_submit_data(response.content.decode(), "classifications-node-form")
-        data["node_input"] = ClassificationsNodeInput.PARENT_MATCHING
+        data = form_submit_data(response.content.decode(), form_id)
+        data["node_input"] = NodeMatchInput.PARENT_MATCHING
 
         client = Client()
         client.force_login(self.user)
@@ -113,4 +113,12 @@ class NodeEditorRenderTest(AnalysisSetupMixin, TestCase):
         # JSON back means saved - an invalid form comes back as the re-rendered editor HTML
         self.assertEqual({}, post_response.json())
         node.refresh_from_db()
-        self.assertEqual(ClassificationsNodeInput.PARENT_MATCHING, node.node_input)
+        self.assertEqual(NodeMatchInput.PARENT_MATCHING, node.node_input)
+
+    def test_classifications_node_editor_posts_back_valid(self):
+        node = ClassificationsNode.objects.create(analysis=self.analysis)
+        self._test_editor_posts_back_valid(node, "classifications-node-form")
+
+    def test_clinvar_node_editor_posts_back_valid(self):
+        node = ClinVarNode.objects.create(analysis=self.analysis)
+        self._test_editor_posts_back_valid(node, "clinvar-node-form")

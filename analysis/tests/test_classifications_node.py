@@ -1,8 +1,9 @@
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
+from analysis.models.enums import NodeMatchInput
+from analysis.models.nodes.filters.classifications_node import ClassificationsNode
 from analysis.models.nodes.node_counts import get_extra_filters_q
-from analysis.models.nodes.sources.classifications_node import ClassificationsNode
 from analysis.tests.utils import AnalysisSetupMixin
 from annotation.fake_annotation import get_fake_annotation_version
 from classification.enums import ClinicalSignificance, SomaticClinicalSignificance, SpecialEKeys, SubmissionSource
@@ -170,6 +171,26 @@ class BuiltInClassificationFilterTest(ClassificationTestDataMixin, TestCase):
         self.assertEqual(self._filter_variant_pks(BuiltInFilters.CLASSIFIED_TIER_1_2),
                          {self.variant_pks[self.somatic_tier_1.pk],
                           self.variant_pks[self.somatic_tier_1_or_2.pk]})
+
+
+class ClassificationsNodeInputTest(AnalysisSetupMixin, TestCase):
+    def test_source_mode_takes_no_parent(self):
+        node = ClassificationsNode(analysis=self.analysis, node_input=NodeMatchInput.MATCHING_VARIANTS)
+        self.assertEqual((node.min_inputs, node.max_inputs), (0, 0))
+        self.assertTrue(node.is_source)
+
+    def test_filter_modes_take_one_parent(self):
+        for node_input in (NodeMatchInput.PARENT_MATCHING, NodeMatchInput.PARENT_NOT_MATCHING):
+            node = ClassificationsNode(analysis=self.analysis, node_input=node_input)
+            self.assertEqual((node.min_inputs, node.max_inputs), (1, 1))
+            self.assertFalse(node.is_source)
+
+    def test_not_matching_negates_the_match(self):
+        matching = ClassificationsNode.objects.create(analysis=self.analysis,
+                                                      node_input=NodeMatchInput.PARENT_MATCHING)
+        not_matching = ClassificationsNode.objects.create(analysis=self.analysis,
+                                                          node_input=NodeMatchInput.PARENT_NOT_MATCHING)
+        self.assertEqual(not_matching._get_node_q(), ~matching._get_node_q())
 
 
 class ClassificationsNodeEditorTest(AnalysisSetupMixin, TestCase):

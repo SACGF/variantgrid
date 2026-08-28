@@ -1,0 +1,22 @@
+{% comment %}
+    Pill row behaviour shared by the Classifications and ClinVar node editors - include inside
+    the editor's docreadyjs block. The editor marks its widget container .significance-pills-form
+    and tags each row .germline-row / .somatic-row for the allele origin toggle to show and hide.
+{% endcomment %}
+    const $pillsForm = $(".significance-pills-form");
+
+    function updatePillToggles() {
+        $("label.pill-toggle", $pillsForm).each(function() {
+            $(this).toggleClass("unchecked", !$("input", this).prop("checked"));
+        });
+    }
+    $("label.pill-toggle input", $pillsForm).change(updatePillToggles);
+    updatePillToggles();
+
+    function updateSignificanceRows() {
+        const alleleOrigin = $("input[name='allele_origin']:checked", $pillsForm).val();
+        $(".germline-row", $pillsForm).toggle(alleleOrigin !== 'S');
+        $(".somatic-row", $pillsForm).toggle(alleleOrigin !== 'G');
+    }
+    $("input[name='allele_origin']", $pillsForm).change(updateSignificanceRows);
+    updateSignificanceRows();

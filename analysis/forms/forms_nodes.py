@@ -13,6 +13,8 @@ from analysis.models import Analysis, AnalysisNode, AnalysisTemplateType, MOINod
 from analysis.models.enums import SampleNodeSourceLevel
 from analysis.variant_text import resolve_variant_text
 from analysis.models.nodes.analysis_node import NodeAlleleFrequencyFilter, NodeVCFFilter
+from analysis.models.nodes.filters.classifications_node import ClassificationsNode
+from analysis.models.nodes.filters.clinvar_node import ClinVarNode
 from analysis.models.nodes.filters.conservation_node import ConservationNode
 from analysis.models.nodes.filters.damage_node import DamageNode
 from analysis.models.nodes.filters.gene_list_node import GeneListNode
@@ -25,7 +27,6 @@ from analysis.models.nodes.filters.tag_node import TagNode
 from analysis.models.nodes.filters.tissue_node import TissueNode
 from analysis.models.nodes.filters.venn_node import VennNode
 from analysis.models.nodes.sources.all_variants_node import AllVariantsNode
-from analysis.models.nodes.sources.classifications_node import ClassificationsNode
 from analysis.models.nodes.sources.cohort_node import (
     CohortNode,
     CohortNodeZygosityFilter,
@@ -242,35 +243,55 @@ class ClassificationsNodeForm(BaseNodeForm):
                                          required=False,
                                          widget=ModelSelect2Multiple(url='lab_autocomplete',
                                                                      attrs={'data-placeholder': 'Lab...'}))
-    clinvar_variation_ids = forms.CharField(required=False, label="ClinVar variation IDs",
-                                            widget=TextInput(attrs={'placeholder': 'eg 12345, 67890'}))
 
     class Meta:
         model = ClassificationsNode
         fields = ('node_input', 'lab', 'allele_origin',
                   'other', 'benign', 'likely_benign', 'vus', 'likely_pathogenic', 'pathogenic',
-                  'tier_1', 'tier_2', 'tier_3', 'tier_4',
-                  'clinvar_benign', 'clinvar_likely_benign', 'clinvar_uncertain',
-                  'clinvar_likely_pathogenic', 'clinvar_pathogenic', 'clinvar_significance_exclude',
-                  'clinvar_tier_1', 'clinvar_tier_2', 'clinvar_tier_3', 'clinvar_tier_4',
-                  'clinvar_benign_onc', 'clinvar_likely_benign_onc', 'clinvar_uncertain_onc',
-                  'clinvar_likely_oncogenic', 'clinvar_oncogenic',
-                  'clinvar_record', 'clinvar_stars_min', 'clinvar_conflicting',
-                  'clinvar_conflicting_significance')
+                  'tier_1', 'tier_2', 'tier_3', 'tier_4')
         widgets = {
             'allele_origin': RadioSelect(),
-            'clinvar_stars_min': StarsWidget(),
-            'clinvar_conflicting_significance': TextInput(attrs={'placeholder': 'eg Pathogenic'}),
+        }
+
+    def save(self, commit=True):
+        node = super().save(commit=False)
+
+        lab_set = node.classificationsnodelab_set
+        lab_set.all().delete()
+        for lab in self.cleaned_data["lab"]:
+            lab_set.create(lab=lab)
+
+        if commit:
+            node.save()
+        return node
+
+
+class ClinVarNodeForm(BaseNodeForm):
+    variation_ids = forms.CharField(required=False, label="ClinVar variation IDs",
+                                    widget=TextInput(attrs={'placeholder': 'eg 12345, 67890'}))
+
+    class Meta:
+        model = ClinVarNode
+        fields = ('node_input', 'allele_origin',
+                  'germline_pathogenic', 'germline_likely_pathogenic', 'germline_uncertain',
+                  'germline_likely_benign', 'germline_benign', 'germline_other',
+                  'somatic_tier_1', 'somatic_tier_2', 'somatic_tier_3', 'somatic_tier_4', 'somatic_tier_none',
+                  'oncogenicity_oncogenic', 'oncogenicity_likely_oncogenic', 'oncogenicity_uncertain',
+                  'oncogenicity_likely_benign', 'oncogenicity_benign', 'oncogenicity_none',
+                  'stars_min', 'conflicting', 'conflicting_significance')
+        widgets = {
+            'allele_origin': RadioSelect(),
+            'stars_min': StarsWidget(),
+            'conflicting_significance': TextInput(attrs={'placeholder': 'eg Pathogenic'}),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        variation_ids = self.instance.clinvar_variation_ids
-        self.fields["clinvar_variation_ids"].initial = ", ".join(str(v) for v in variation_ids)
+        self.fields["variation_ids"].initial = ", ".join(str(v) for v in self.instance.variation_ids)
 
-    def clean_clinvar_variation_ids(self) -> list[int]:
+    def clean_variation_ids(self) -> list[int]:
         variation_ids = []
-        for value in re.split(r"[,\s]+", self.cleaned_data["clinvar_variation_ids"]):
+        for value in re.split(r"[,\s]+", self.cleaned_data["variation_ids"]):
             if value:
                 try:
                     variation_ids.append(int(value))
@@ -280,13 +301,7 @@ class ClassificationsNodeForm(BaseNodeForm):
 
     def save(self, commit=True):
         node = super().save(commit=False)
-        node.clinvar_variation_ids = self.cleaned_data["clinvar_variation_ids"]
-
-        lab_set = node.classificationsnodelab_set
-        lab_set.all().delete()
-        for lab in self.cleaned_data["lab"]:
-            lab_set.create(lab=lab)
-
+        node.variation_ids = self.cleaned_data["variation_ids"]
         if commit:
             node.save()
         return node

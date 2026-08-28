@@ -9,6 +9,7 @@ from analysis.forms.forms_nodes import (
     AllVariantsNodeForm,
     BuiltInFilterNodeForm,
     ClassificationsNodeForm,
+    ClinVarNodeForm,
     CohortNodeForm,
     ConservationNodeForm,
     DamageNodeForm,
@@ -31,6 +32,8 @@ from analysis.models import MOINode, OntologyTerm, TagNode
 from analysis.models.enums import SetOperations
 from analysis.models.nodes.filters.allele_frequency_node import AlleleFrequencyNode
 from analysis.models.nodes.filters.built_in_filter_node import BuiltInFilterNode
+from analysis.models.nodes.filters.classifications_node import ClassificationsNode
+from analysis.models.nodes.filters.clinvar_node import ClinVarNode
 from analysis.models.nodes.filters.conservation_node import ConservationNode
 from analysis.models.nodes.filters.damage_node import DamageNode
 from analysis.models.nodes.filters.filter_node import FilterNode, FilterNodeItem
@@ -44,7 +47,6 @@ from analysis.models.nodes.filters.venn_node import VennNode
 from analysis.models.nodes.filters.zygosity_node import ZygosityNode
 from analysis.models.nodes.node_utils import update_analysis
 from analysis.models.nodes.sources.all_variants_node import AllVariantsNode
-from analysis.models.nodes.sources.classifications_node import ClassificationsNode
 from analysis.models.nodes.sources.cohort_node import CohortNode
 from analysis.models.nodes.sources.pedigree_node import PedigreeNode
 from analysis.models.nodes.sources.quad_node import QuadNode
@@ -127,6 +129,11 @@ class ClassificationsNodeView(NodeView):
         form_initial = super()._get_form_initial()
         form_initial["lab"] = self.object.get_labs()
         return form_initial
+
+
+class ClinVarNodeView(NodeView):
+    model = ClinVarNode
+    form_class = ClinVarNodeForm
 
 
 class CohortNodeView(NodeView):
