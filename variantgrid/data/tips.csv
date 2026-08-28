@@ -72,7 +72,7 @@ The variant annotation history tab shows how annotation values for a variant hav
 The Karyomapping view lets you visually map inherited chromosomal regions in complex family scenarios.,analysis,karyomapping_analyses,
 Sample pages show the full upload and annotation history trail. Useful for understanding if a sample was re-annotated or re-imported.,snpdb,view_sample,
 The Cohort Hotspot page shows which genes are most frequently variant in your cohort. Great for spotting systematic issues or shared disease genes.,snpdb,cohort_hotspot,
-You can group samples into a Pedigree and use the Pedigree node in analysis to filter by inheritance across a multi-generation family.,snpdb,view_cohort,
+You can a VCF / cohort’s samples into a Pedigree with a .ped file and use the Pedigree node in analysis to filter by inheritance across a multi-generation family.,snpdb,view_cohort,
 The 'Nearby Classifications' section on the variant page looks across genome builds. So a GRCh37 classification will show up when viewing the GRCh38 equivalent.,variantopedia,view_variant,
 Variant tags can be added or removed directly from the variant detail page. You don't have to be in an analysis to tag a variant.,variantopedia,view_variant,
 "The server status page shows system health, database statistics, and activity details. Useful for admins checking annotation pipeline status.",variantopedia,server_status,
