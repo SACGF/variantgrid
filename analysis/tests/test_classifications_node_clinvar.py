@@ -41,24 +41,24 @@ class ClassificationsNodeClinVarQTest(AnalysisSetupMixin, TestCase):
     def test_significance_include(self):
         node = ClassificationsNode(analysis=self.analysis, clinvar_pathogenic=True, clinvar_likely_pathogenic=True)
         self.assertEqual(node._clinvar_q(),
-                         Q(clinvar__highest_pathogenicity__in=[ClinVarPathogenicity.LIKELY_PATHOGENIC,
-                                                              ClinVarPathogenicity.PATHOGENIC]))
+                         Q(clinvar__highest_pathogenicity__in=[ClinVarPathogenicity.PATHOGENIC,
+                                                              ClinVarPathogenicity.LIKELY_PATHOGENIC]))
 
     def test_significance_exclude_is_a_negated_subquery(self):
         """ ~Q compiles to NOT EXISTS, so variants with no ClinVar record survive - unlike a `ne` lookup """
         node = ClassificationsNode(analysis=self.analysis, clinvar_benign=True, clinvar_likely_benign=True,
                                    clinvar_significance_exclude=True)
         self.assertEqual(node._clinvar_q(),
-                         ~Q(clinvar__highest_pathogenicity__in=[ClinVarPathogenicity.BENIGN,
-                                                                ClinVarPathogenicity.LIKELY_BENIGN]))
+                         ~Q(clinvar__highest_pathogenicity__in=[ClinVarPathogenicity.LIKELY_BENIGN,
+                                                                ClinVarPathogenicity.BENIGN]))
 
     def test_exclude_benign_paired_with_has_record(self):
         """ The faithful replacement for the prod rule 'highest_pathogenicity != 1 AND != 2' """
         node = ClassificationsNode(analysis=self.analysis, clinvar_benign=True, clinvar_likely_benign=True,
                                    clinvar_significance_exclude=True,
                                    clinvar_record=ClinVarRecordFilter.PRESENT)
-        expected = ~Q(clinvar__highest_pathogenicity__in=[ClinVarPathogenicity.BENIGN,
-                                                          ClinVarPathogenicity.LIKELY_BENIGN]) \
+        expected = ~Q(clinvar__highest_pathogenicity__in=[ClinVarPathogenicity.LIKELY_BENIGN,
+                                                          ClinVarPathogenicity.BENIGN]) \
             & Q(clinvar__isnull=False)
         self.assertEqual(node._clinvar_q(), expected)
 
@@ -112,8 +112,8 @@ class ClassificationsNodeClinVarSomaticQTest(AnalysisSetupMixin, TestCase):
     def test_oncogenicity(self):
         node = ClassificationsNode(analysis=self.analysis, clinvar_likely_oncogenic=True, clinvar_oncogenic=True)
         self.assertEqual(node._clinvar_q(),
-                         Q(clinvar__highest_oncogenicity__in=[ClinVarOncogenicity.LIKELY_ONCOGENIC,
-                                                             ClinVarOncogenicity.ONCOGENIC]))
+                         Q(clinvar__highest_oncogenicity__in=[ClinVarOncogenicity.ONCOGENIC,
+                                                             ClinVarOncogenicity.LIKELY_ONCOGENIC]))
 
     def test_stars_read_the_axis_being_filtered(self):
         node = ClassificationsNode(analysis=self.analysis, clinvar_tier_1=True, clinvar_stars_min=1)

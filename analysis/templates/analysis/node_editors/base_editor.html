@@ -46,6 +46,10 @@
 						successFunc();
 					}
 					reloadNodeAndData({{ node.pk }});
+				} else {
+					// base_editor renders form.errors above the editor - say so in the console too
+					console.warn("Node {{ node.pk }} not saved - the form came back with errors",
+					             $(".node-editor-form-errors", "#node-editor-wrapper").text().trim());
 				}
 			},
 		};
@@ -258,6 +262,13 @@
 					</h4>
 
 				{% endblock node_filter_info %}
+				{% if form.errors %}
+					{# The editor comes back re-rendered instead of saving - show why, wherever the editor
+					   template didn't render the field's own errors #}
+					<div class="alert alert-danger node-editor-form-errors">
+						<b>Not saved</b> {{ form.errors }}
+					</div>
+				{% endif %}
 				{% block content %}{% endblock content %}
                 {% if node_live_data_notes %}
                     <div>

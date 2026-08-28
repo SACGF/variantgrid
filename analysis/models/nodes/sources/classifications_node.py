@@ -34,13 +34,15 @@ class ClassificationsNode(AnalysisNode):
     tier_3 = models.BooleanField(default=True, blank=True)
     tier_4 = models.BooleanField(default=True, blank=True)
 
+    # Ordering is user-facing - the editor pills, node chips and summaries all read most pathogenic
+    # first, matching the somatic tiers (Tier I -> Tier IV)
     FIELD_CLINICAL_SIGNIFICANCE = {
-        'other': ClinicalSignificance.OTHER,
-        'benign': ClinicalSignificance.BENIGN,
-        'likely_benign': ClinicalSignificance.LIKELY_BENIGN,
-        'vus': ClinicalSignificance.VUS,
-        'likely_pathogenic': ClinicalSignificance.LIKELY_PATHOGENIC,
         'pathogenic': ClinicalSignificance.PATHOGENIC,
+        'likely_pathogenic': ClinicalSignificance.LIKELY_PATHOGENIC,
+        'vus': ClinicalSignificance.VUS,
+        'likely_benign': ClinicalSignificance.LIKELY_BENIGN,
+        'benign': ClinicalSignificance.BENIGN,
+        'other': ClinicalSignificance.OTHER,
     }
     FIELD_SOMATIC_CLINICAL_SIGNIFICANCE = {
         'tier_1': SomaticClinicalSignificance.TIER_1,
@@ -75,11 +77,11 @@ class ClassificationsNode(AnalysisNode):
     clinvar_oncogenic = models.BooleanField(default=False, blank=True)
 
     FIELD_CLINVAR_PATHOGENICITY = {
-        'clinvar_benign': ClinVarPathogenicity.BENIGN,
-        'clinvar_likely_benign': ClinVarPathogenicity.LIKELY_BENIGN,
-        'clinvar_uncertain': ClinVarPathogenicity.UNCERTAIN,
-        'clinvar_likely_pathogenic': ClinVarPathogenicity.LIKELY_PATHOGENIC,
         'clinvar_pathogenic': ClinVarPathogenicity.PATHOGENIC,
+        'clinvar_likely_pathogenic': ClinVarPathogenicity.LIKELY_PATHOGENIC,
+        'clinvar_uncertain': ClinVarPathogenicity.UNCERTAIN,
+        'clinvar_likely_benign': ClinVarPathogenicity.LIKELY_BENIGN,
+        'clinvar_benign': ClinVarPathogenicity.BENIGN,
     }
     FIELD_CLINVAR_SOMATIC_TIER = {
         'clinvar_tier_1': SomaticClinicalSignificance.TIER_1,
@@ -88,11 +90,11 @@ class ClassificationsNode(AnalysisNode):
         'clinvar_tier_4': SomaticClinicalSignificance.TIER_4,
     }
     FIELD_CLINVAR_ONCOGENICITY = {
-        'clinvar_benign_onc': ClinVarOncogenicity.BENIGN,
-        'clinvar_likely_benign_onc': ClinVarOncogenicity.LIKELY_BENIGN,
-        'clinvar_uncertain_onc': ClinVarOncogenicity.UNCERTAIN,
-        'clinvar_likely_oncogenic': ClinVarOncogenicity.LIKELY_ONCOGENIC,
         'clinvar_oncogenic': ClinVarOncogenicity.ONCOGENIC,
+        'clinvar_likely_oncogenic': ClinVarOncogenicity.LIKELY_ONCOGENIC,
+        'clinvar_uncertain_onc': ClinVarOncogenicity.UNCERTAIN,
+        'clinvar_likely_benign_onc': ClinVarOncogenicity.LIKELY_BENIGN,
+        'clinvar_benign_onc': ClinVarOncogenicity.BENIGN,
     }
 
     @property

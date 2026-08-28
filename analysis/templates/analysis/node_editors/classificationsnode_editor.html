@@ -81,12 +81,12 @@
                 </div>
                 <div id="germline-significances" class="significance-pills">
                     <span class="row-label">Germline:</span>
-                    <label class="c-pill pill-toggle cs-none" title="Other">{{ form.other }}O</label>
-                    <label class="c-pill pill-toggle cs-b" title="Benign">{{ form.benign }}B</label>
-                    <label class="c-pill pill-toggle cs-lb" title="Likely Benign">{{ form.likely_benign }}LB</label>
-                    <label class="c-pill pill-toggle cs-vus" title="VUS">{{ form.vus }}VUS</label>
-                    <label class="c-pill pill-toggle cs-lp" title="Likely Pathogenic">{{ form.likely_pathogenic }}LP</label>
                     <label class="c-pill pill-toggle cs-p" title="Pathogenic">{{ form.pathogenic }}P</label>
+                    <label class="c-pill pill-toggle cs-lp" title="Likely Pathogenic">{{ form.likely_pathogenic }}LP</label>
+                    <label class="c-pill pill-toggle cs-vus" title="VUS">{{ form.vus }}VUS</label>
+                    <label class="c-pill pill-toggle cs-lb" title="Likely Benign">{{ form.likely_benign }}LB</label>
+                    <label class="c-pill pill-toggle cs-b" title="Benign">{{ form.benign }}B</label>
+                    <label class="c-pill pill-toggle cs-none" title="Other">{{ form.other }}O</label>
                 </div>
                 <div id="somatic-significances" class="significance-pills">
                     <span class="row-label">Somatic:</span>
@@ -102,11 +102,11 @@
                 <div id="clinvar-filters">
                     <div id="clinvar-germline-significances" class="significance-pills">
                         <span class="row-label">ClinVar:</span>
-                        <label class="c-pill pill-toggle cs-b" title="Benign">{{ form.clinvar_benign }}B</label>
-                        <label class="c-pill pill-toggle cs-lb" title="Likely Benign">{{ form.clinvar_likely_benign }}LB</label>
-                        <label class="c-pill pill-toggle cs-vus" title="Uncertain">{{ form.clinvar_uncertain }}VUS</label>
-                        <label class="c-pill pill-toggle cs-lp" title="Likely Pathogenic">{{ form.clinvar_likely_pathogenic }}LP</label>
                         <label class="c-pill pill-toggle cs-p" title="Pathogenic">{{ form.clinvar_pathogenic }}P</label>
+                        <label class="c-pill pill-toggle cs-lp" title="Likely Pathogenic">{{ form.clinvar_likely_pathogenic }}LP</label>
+                        <label class="c-pill pill-toggle cs-vus" title="Uncertain">{{ form.clinvar_uncertain }}VUS</label>
+                        <label class="c-pill pill-toggle cs-lb" title="Likely Benign">{{ form.clinvar_likely_benign }}LB</label>
+                        <label class="c-pill pill-toggle cs-b" title="Benign">{{ form.clinvar_benign }}B</label>
                         <label class="clinvar-exclude" title="Show everything except the selected significances">
                             {{ form.clinvar_significance_exclude }} exclude
                         </label>
@@ -120,11 +120,11 @@
                     </div>
                     <div id="clinvar-oncogenic-significances" class="significance-pills">
                         <span class="row-label">ClinVar Onc:</span>
-                        <label class="c-pill pill-toggle cs-b" title="Benign">{{ form.clinvar_benign_onc }}B</label>
-                        <label class="c-pill pill-toggle cs-lb" title="Likely Benign">{{ form.clinvar_likely_benign_onc }}LB</label>
-                        <label class="c-pill pill-toggle cs-vus" title="Uncertain">{{ form.clinvar_uncertain_onc }}VUS</label>
-                        <label class="c-pill pill-toggle cs-lo" title="Likely Oncogenic">{{ form.clinvar_likely_oncogenic }}LO</label>
                         <label class="c-pill pill-toggle cs-o" title="Oncogenic">{{ form.clinvar_oncogenic }}O</label>
+                        <label class="c-pill pill-toggle cs-lo" title="Likely Oncogenic">{{ form.clinvar_likely_oncogenic }}LO</label>
+                        <label class="c-pill pill-toggle cs-vus" title="Uncertain">{{ form.clinvar_uncertain_onc }}VUS</label>
+                        <label class="c-pill pill-toggle cs-lb" title="Likely Benign">{{ form.clinvar_likely_benign_onc }}LB</label>
+                        <label class="c-pill pill-toggle cs-b" title="Benign">{{ form.clinvar_benign_onc }}B</label>
                     </div>
                     <div class="clinvar-row">
                         <label for="{{ form.clinvar_record.id_for_label }}">ClinVar record:</label>

@@ -41,3 +41,16 @@
     font-weight: 900; /* FontAwesome solid = filled star */
     color: #28a745;   /* Bootstrap text-success */
 }
+
+/* "clear" resets to the zero radio - pointless (and confusing) when that's already the value */
+.stars-input-container:has(input[value="0"]:checked) .stars-clear {
+    visibility: hidden;
+}
+
+.stars-clear {
+    margin: 0 0 0 6px;
+    font-weight: normal;
+    font-size: 0.8em;
+    color: #007bff;
+    cursor: pointer;
+}

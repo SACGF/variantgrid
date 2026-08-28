@@ -37,33 +37,8 @@
 </style>
 <script>
     function setupClinVarStars(bifSelect) {
-        let starsContainer = $("#stars-clinvar_stars_min");
-
-        // We need to add a zero radio input, because it doesn't save to DB when none are selected.
-        let inputZero = $("<input/>", {
-            id:"clinvar_stars_min-zero", name:"clinvar_stars_min", type:"radio", value:"0",
-        });
-        // If nothing selected, make 0 selected
-        if (!getStarsRadioInputs().is(":checked")) {
-            inputZero.prop("checked", true);
-        }
-        starsContainer.append(inputZero);
-
-        // Make a "clear" link - to be able to have zero stars
-        let clearLink = $("<a/>", {id: "zero-stars-link", href: "javascript:clearStars()"}).text("Show all (set to zero stars)");
-        starsContainer.after(clearLink);
-
-        function checkSelectedStars() {
-            let numStars = getStarsRadioInputs().filter(":checked").val();
-            if (parseInt(numStars) !== 0) {
-                clearLink.show();
-            } else {
-                $("#zero-stars-link").hide();
-            }
-        }
-
-        getStarsRadioInputs().change(checkSelectedStars);
-        checkSelectedStars();
+        // StarsWidget renders the zero radio and its "clear" label - we only show/hide the whole thing
+        let starsContainer = $("#stars-clinvar_stars_min").parents(".stars-input-container");
 
         function checkClinVarStarsVisibility() {
             if (bifSelect.val() == 'C') {
@@ -77,17 +52,6 @@
 
         bifSelect.change(checkClinVarStarsVisibility);
         checkClinVarStarsVisibility();
-    }
-
-    function getStarsRadioInputs() {
-        let starsContainer = $("#stars-clinvar_stars_min");
-        return $('input[type="radio"]', starsContainer);
-    }
-
-    function clearStars() {
-        $("#zero-stars-link").hide();
-        getStarsRadioInputs().prop('checked', false);
-        $("#clinvar_stars_min-zero").prop("checked", "checked");
     }
 
     function setupCOSMICCount(bifSelect) {

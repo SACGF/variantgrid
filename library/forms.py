@@ -17,7 +17,10 @@ class StarsWidget(Widget):
 
         Renders hidden radio inputs styled as stars via css/stars_input.css. Filled/hover behaviour is
         pure CSS (the `input:checked ~ label` sibling selector), so the stars are rendered highest-first.
-        Matches the read-only `clinvar_stars` template tag styling (fa-solid star + text-success). """
+        Matches the read-only `clinvar_stars` template tag styling (fa-solid star + text-success).
+
+        A zero radio is rendered last (and a "clear" label for it), so "no stars" submits 0 rather than
+        omitting the field - an omitted radio group fails validation on a required IntegerField. """
 
     class Media:
         css = {"all": ["css/stars_input.css"]}
@@ -38,8 +41,16 @@ class StarsWidget(Widget):
                 '<input type="radio" name="{name}" id="{id}" value="{i}"{checked}>'
                 '<label for="{id}" title="{title}"><i class="fa-regular fa-star"></i></label>',
                 name=name, id=input_id, i=i, checked=checked, title=title))
-        return format_html('<div class="stars-input" id="{}">{}</div>',
-                           container_id, mark_safe("".join(parts)))
+
+        zero_id = f"{name}-0"
+        zero_checked = mark_safe(" checked") if str(value) not in [str(i) for i in range(1, self.stars + 1)] else ""
+        parts.append(format_html('<input type="radio" name="{name}" id="{id}" value="0"{checked}>',
+                                 name=name, id=zero_id, checked=zero_checked))
+        return format_html('<span class="stars-input-container">'
+                           '<span class="stars-input" id="{container_id}">{stars}</span>'
+                           '<label class="stars-clear" for="{zero_id}" title="No minimum">clear</label>'
+                           '</span>',
+                           container_id=container_id, stars=mark_safe("".join(parts)), zero_id=zero_id)
 
 
 class ROFormMixin(forms.BaseForm):

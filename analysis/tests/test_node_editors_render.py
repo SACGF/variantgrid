@@ -1,3 +1,5 @@
+from html.parser import HTMLParser
+
 from django.contrib.auth.models import User
 from django.test import TestCase
 from django.test.client import Client
@@ -10,6 +12,44 @@ from analysis.models.nodes.sources.classifications_node import ClassificationsNo
 from analysis.tests.utils import AnalysisSetupMixin
 from library.genomics.vcf_enums import VariantClass
 from library.guardian_utils import assign_permission_to_user_and_groups
+
+
+class _FormSubmitDataParser(HTMLParser):
+    """ Collects what a browser would POST for a form - the successful controls only """
+
+    def __init__(self, form_id):
+        super().__init__()
+        self.form_id = form_id
+        self.data = {}
+        self._in_form = False
+        self._select_name = None
+
+    def handle_starttag(self, tag, attrs):
+        attrs = dict(attrs)
+        if tag == "form":
+            self._in_form = attrs.get("id") == self.form_id
+        elif not self._in_form:
+            return
+        elif tag == "input":
+            name = attrs.get("name")
+            if name and (attrs.get("type") not in ("checkbox", "radio") or "checked" in attrs):
+                self.data[name] = attrs.get("value", "")
+        elif tag == "select":
+            self._select_name = attrs.get("name")
+        elif tag == "option" and self._select_name and "selected" in attrs:
+            self.data[self._select_name] = attrs.get("value", "")
+
+    def handle_endtag(self, tag):
+        if tag == "form":
+            self._in_form = False
+        elif tag == "select":
+            self._select_name = None
+
+
+def form_submit_data(html, form_id) -> dict:
+    parser = _FormSubmitDataParser(form_id)
+    parser.feed(html)
+    return parser.data
 
 
 class NodeEditorRenderTest(AnalysisSetupMixin, TestCase):
@@ -58,3 +98,19 @@ class NodeEditorRenderTest(AnalysisSetupMixin, TestCase):
         content = self._get_editor(node).content.decode()
         self.assertIn("id_clinvar_benign", content)
         self.assertIn("12345", content)
+
+    def test_classifications_node_editor_posts_back_valid(self):
+        """ The editor's own HTML has to survive a round trip through its form - a widget that submits
+            nothing for a required field (a radio group with no option checked) blocks every save """
+        node = ClassificationsNode.objects.create(analysis=self.analysis)
+        response = self._get_editor(node)
+        data = form_submit_data(response.content.decode(), "classifications-node-form")
+        data["node_input"] = ClassificationsNodeInput.PARENT_MATCHING
+
+        client = Client()
+        client.force_login(self.user)
+        post_response = client.post(response.request["PATH_INFO"], data)
+        # JSON back means saved - an invalid form comes back as the re-rendered editor HTML
+        self.assertEqual({}, post_response.json())
+        node.refresh_from_db()
+        self.assertEqual(ClassificationsNodeInput.PARENT_MATCHING, node.node_input)
