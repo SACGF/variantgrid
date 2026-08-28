@@ -7,6 +7,7 @@
 {{ block.super }}
 <link href="{% static 'css/colorPicker.css' %}" rel="stylesheet"></link>
 <script type="text/javascript" src="{% static 'js/lib/jquery.colorPicker.min.js' %}"></script>
+<script type="text/javascript" src="{% static 'js/lib/html5sortable/html5sortable.min.js' %}"></script>
 <style>
 	.sort_placeholder {height: 15px; border: red 3px solid;}
 {% if has_write_permission %}
@@ -56,10 +57,12 @@
             });
         });
 
-		$("#tag-colors-sortable").sortable({
+		sortable("#tag-colors-sortable", {
 		    items: "tr.tag-color-row",
-		    placeholder: "sort_placeholder",
-		}).bind("sortupdate", function(event, ui) {
+		    placeholderClass: "sort_placeholder",
+		});
+
+		$("#tag-colors-sortable").on("sortupdate", function() {
 		    const tagOrder = [];
 		    $("#tag-colors-sortable tr.tag-color-row").each(function() { tagOrder.push($(this).attr("tag_id")) });
 

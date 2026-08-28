@@ -1,4 +1,5 @@
 {% extends menu_settings_base %}
+{% load static %}
 
 {% block title %}VariantGrid Custom Columns{% endblock %}
 
@@ -23,6 +24,7 @@
 	.columns-list ul {
 		height: 100%;
 		list-style: none;
+		user-select: none;
 	}
 
 	div#columns-widget {
@@ -65,6 +67,7 @@
 	}
 {% endif %}
 </style>
+<script type="text/javascript" src="{% static 'js/lib/html5sortable/html5sortable.min.js' %}"></script>
 <script>
 	function cloneCustomColumns() {
 		$(this).prop("disabled", true);
@@ -79,21 +82,11 @@
 		});
 	}
 
-	// .sortable('serialize') doesn't work with multiple underscores
+	// Library serializers split ids on underscore - ours contain them, so build the list by hand
 	function serialize_columns(select) {
         const ids = [];
         $(select + ' .user-column').each(function() { ids.push($(this).attr("id")) });
 		return ids.toString();
-	}
-
-	function clear_custom_columns() {
-        const my_columns = $("#my_columns_sortable");
-        my_columns.find("li.user-column").appendTo("#available_columns_sortable");
-
-        const widget = my_columns.sortable("widget");
-        if (widget) {
-	    	widget.trigger("sortupdate");
-	    }
 	}
 
 	$(document).ready(function() {
@@ -121,11 +114,20 @@
             });
         });
 
-		$("#my_columns_sortable").sortable({
+		sortable("#my_columns_sortable", {
 		    items: "li.user-column",
-		    placeholder: "sort_placeholder",
-		    connectWith: '#available_columns_sortable',
-		}).bind("sortupdate", function(event, ui) {
+		    placeholderClass: "sort_placeholder",
+		    acceptFrom: '#available_columns_sortable',
+		});
+
+		sortable("#available_columns_sortable", {
+		    items: "li.user-column",
+		    placeholderClass: "sort_placeholder",
+		    acceptFrom: '#my_columns_sortable',
+		});
+
+		// html5sortable fires sortupdate on the list the item was dropped into
+		$("#my_columns_sortable, #available_columns_sortable").on("sortupdate", function() {
             const result_my_columns = serialize_columns("#my_columns_sortable");
 
             $.ajax({
@@ -133,14 +135,7 @@
 		        data: 'columns=' + result_my_columns + '&my_columns=true',
 		        url: "{{ request.path }}",
             });
-		}).disableSelection();
-
-
-		$("#available_columns_sortable").sortable({
-		    items: "li.user-column",
-		    placeholder: "sort_placeholder",
-		    connectWith: '#my_columns_sortable',
-		}).disableSelection();
+		});
 
 		// Set the height of both columns-list to be that of largest
         const tallest = Math.max($("#my_columns")[0].scrollHeight, $("#available_columns")[0].scrollHeight);
@@ -211,7 +206,7 @@
 <div id="columns-widget">
 	<div id="my_columns" class="columns-list">
 		<ul id="my_columns_sortable">
-			<li id="active_placeholder" class="ui-state-disabled"><h2>My Columns</h2></li>
+			<li id="active_placeholder" class="list_placeholder"><h2>My Columns</h2></li>
 			{% for column in my_columns_list %}
 			<li class="{{ column.get_css_classes }} cursor-move" id="{{ column.pk }}" column_id="{{ column.pk }}">
 				<div class="column-name">{{ column.pk }}</div>
@@ -225,7 +220,7 @@
 	</div>
 	<div id="available_columns" class="columns-list">
 		<ul id="available_columns_sortable">
-			<li id="inactive_placeholder" class="ui-state-disabled"><h2>Available Columns</h2></li>
+			<li id="inactive_placeholder" class="list_placeholder"><h2>Available Columns</h2></li>
 			{% for column in available_columns_list %}
 			<li class="{{ column.get_css_classes }} cursor-move" id="{{ column.pk }}" column_id="{{ column.pk }}">
 				<div class="column-name">{{ column.pk }}</div>

@@ -1,4 +1,5 @@
 {% load js_tags %}
+{% load static %}
 <div id='analysis-settings-node-counts-tab'>
 {% include "uicore/messages/messages.html" %}
 <style>
@@ -52,9 +53,10 @@
        float: left;
     }
 
-    ul.ui-sortable {
+    #my_filters_sortable, #available_filters_sortable {
         /* Need somewhere to drag to if empty */
         min-height: 100px;
+        user-select: none;
     }
 
 
@@ -62,26 +64,29 @@
     {% render_node_count_colors_css %}
 
 </style>
+<script type="text/javascript" src="{% static 'js/lib/html5sortable/html5sortable.min.js' %}"></script>
 <script>
 	DIV_TO_RELOAD = '#analysis-settings-node-counts-tab';
 	var IN_ANALYSIS = $("#analysis-and-toolbar-container").length > 0;
     var nodeCountsChanged = false;
 
 	function setupNodeCountsWidget() {
-        $("#my_filters_sortable").sortable({
+        sortable("#my_filters_sortable", {
             items: "li.node-count-filter",
-            placeholder: "sort_placeholder",
-            connectWith: '#available_filters_sortable',
-        }).bind("sortupdate", function(event, ui) {
+            placeholderClass: "sort_placeholder",
+            acceptFrom: '#available_filters_sortable',
+        });
+
+        sortable("#available_filters_sortable", {
+            items: "li.node-count-filter",
+            placeholderClass: "sort_placeholder",
+            acceptFrom: '#my_filters_sortable',
+        });
+
+        // html5sortable fires sortupdate on the list the item was dropped into
+        $("#my_filters_sortable, #available_filters_sortable").on("sortupdate", function() {
             nodeCountsChanged = true;
-        }).disableSelection();
-        
-        
-        $("#available_filters_sortable").sortable({
-            items: "li.node-count-filter",
-            placeholder: "sort_placeholder",
-            connectWith: '#my_filters_sortable',
-        }).disableSelection();
+        });
 	}
 
     function serialize_columns() {

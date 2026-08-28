@@ -1,4 +1,5 @@
 {% extends menu_patients_base %}
+{% load static %}
 
 {% block title %}Sort Cohort{% endblock %}
 
@@ -6,6 +7,7 @@
 <style>
 	ul#cohort-samples-sortable {
 		list-style: none;
+		user-select: none;
 	}
 
 	div#cohort-samples-widget {
@@ -31,8 +33,9 @@
 	
 </style>
 
+<script type="text/javascript" src="{% static 'js/lib/html5sortable/html5sortable.min.js' %}"></script>
 <script>
-	// .sortable('serialize') doesn't work with multiple underscores
+	// Library serializers split ids on underscore - ours contain them, so build the list by hand
 	function serialize_cohort_samples(select) {
 		var ids = [];
 		$('.cohort-sample', select).each(function() { ids.push($(this).attr("id")) });
@@ -42,10 +45,11 @@
 {% endblock %}
 
 {% block jsdocumentready %}
-	console.log($("#cohort-samples-sortable"));
-	$("#cohort-samples-sortable").sortable({
+	sortable("#cohort-samples-sortable", {
 	    items: "li.cohort-sample",
-	}).bind("sortupdate", function(event, ui) {
+	});
+
+	$("#cohort-samples-sortable").on("sortupdate", function() {
 	        var cohort_samples = serialize_cohort_samples("#cohort-samples-sortable");
 
 	        $.ajax({
@@ -53,7 +57,7 @@
 	            data: 'cohort_samples=' + cohort_samples,
 	            url: "{{ request.path }}"
 	        });
-	}).disableSelection();
+	});
 {% endblock %}
 
 {% block submenu_page_content %}
