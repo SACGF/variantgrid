@@ -14,7 +14,7 @@
 
     {% if sapath_enabled %}
         <!-- Do all as 1 big change -->
-        <!-- Last audited/updated: 19 August 2026 (includes features up to the 19 August 2026 deploy) -->
+        <!-- Last audited/updated: 28 August 2026 (includes features up to the 28 August 2026 deploy) -->
 
         <div class="card mt-4">
             <div class="card-header">VariantGrid 4.0</div>
@@ -44,6 +44,11 @@
                         don't auto-load their grid, and large grids no longer auto-sort</li>
                     <li>Node CSV/VCF exports are generated in the background, with progress shown on the analysis toolbar so
                         they survive clicking through to other nodes</li>
+                    <li>Nodes redesigned - cards with icons and info chips, clearer source/filter colours</li>
+                    <li>Horizontal mode - nodes flow left to right, with the variant grid docked full width along the bottom
+                        and variant details shown as tabs</li>
+                    <li>Somatic classifications - node germline/somatic toggle and tier pills, grid germline/somatic boxes, Tier I/II node count</li>
+                    <li>Node counts record their data sources - exact vs advisory when the data may have changed</li>
                 </ul>
 
                 <h4>Annotation</h4>
@@ -92,6 +97,8 @@
                     <li>dbNSFP 5.3.1 - new columns, and VEP 116 plugin columns (eg Promoter AI) shown on variant details</li>
                     <li>denovoDB, and AnnotSV for structural variants (own pipeline - upgrade without re-running VEP)</li>
                     <li>SpliceAI is now run as a command so indels are scored. Raw (rather than masked) scores are flagged with a warning</li>
+                    <li>AnnotSV annotations shown on the variant details page and grids</li>
+                    <li>Annotation descriptions page covers AnnotSV and calculated columns, not just VEP</li>
                     <li>Annotation pipeline - runs are merged into larger batches, new runs pause when the annotation disk is low,
                         and temporary files are cleaned up once a run has imported. The VCF/Sample page shows any variants that couldn't be annotated</li>
                 </ul>
@@ -103,6 +110,7 @@
                     <li>Candidate search - re-runs analyses against existing classifications, to find variants that were missed
                         or whose classification has since changed</li>
                     <li>Setting to highlight research classifications</li>
+                    <li>Reclassification analytics - reclassification rates, VUS rate over time, gene burden</li>
                 </ul>
 
                 <h4>Data</h4>
@@ -198,10 +206,11 @@
 
                 <h4>User Interface</h4>
                 <ul>
-                    <li>Grids throughout the site have been converted from jqGrid to DataTables (analysis, snpdb, annotation, pedigrees, seqauto)</li>
+                    <li>Every grid on the site has been converted from jqGrid to DataTables - sorting, filtering and downloads throughout</li>
                     <li>Grid download filenames include a date suffix, and analysis exports record the node version</li>
                     <li>Lab heads can add and remove members on their lab page</li>
                     <li>Faster page loads - related data, ontology versions and contigs no longer run a query per row</li>
+                    <li>Page titles prefixed with the site name, variant / allele pages named by short label</li>
                 </ul>
 
                 <h4>Variant Details</h4>
@@ -242,6 +251,25 @@
 
 
     {% else %}
+       <div class="card mt-4">
+            <div class="card-header">28 August 2026</div>
+            <div class="card-body">
+                <h4>Analysis</h4>
+                <ul>
+                    <li>#38 - Horizontal mode - single tab strip, variant details shown as tabs</li>
+                </ul>
+                <h4>Annotation</h4>
+                <ul>
+                    <li>#1533 - Annotation descriptions page covers AnnotSV and calculated columns, not just VEP</li>
+                </ul>
+                <h4>User Interface</h4>
+                <ul>
+                    <li>#1785, #1462 - All remaining grids converted to DataTables (sorting, filtering, downloads); jqGrid removed</li>
+                    <li>Page titles prefixed with the site name, variant / allele pages named by short label</li>
+                </ul>
+            </div>
+       </div>
+
        <div class="card mt-4">
             <div class="card-header">26 August 2026</div>
             <div class="card-body">
