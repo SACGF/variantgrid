@@ -1128,6 +1128,11 @@ const VCForm = (function() {
                             // to finish (if the auto-update kicked in).
                         } else {
                             elem.val(val);
+                            if (val && elem.attr('type') === 'date' && elem.val() === '') {
+                                // a date the browser's picker can't hold (the server warns on anything
+                                // but yyyy-mm-dd) - show it as free text so it stays visible and editable
+                                elem.attr('type', 'text').val(val);
+                            }
                             if (elem.refresh) {
                                 elem.refesh();
                             }
@@ -1929,7 +1934,7 @@ const VCForm = (function() {
                             }
                         });
                     if (type === 'date') {
-                        input.datepicker({dateFormat: "yy-mm-dd"});
+                        input.attr('type', 'date');
                     }
 
                     widgetDiv.append(input);

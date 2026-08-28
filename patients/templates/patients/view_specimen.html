@@ -2,14 +2,6 @@
 {% load ui_utils %}
 {% load crispy_forms_tags %}
 {% block title %}Specimen {{ specimen.reference_id }}{% endblock title %}
-{% block head %}
-<script>
-    $(document).ready(() => {
-        $(".date-picker").datepicker({changeYear: true, yearRange: "-120:+0"});
-    });
-</script>
-{% endblock head %}
-
 {% block submenu_page_content %}
     <div class="container">
         <h3>Specimen: {{ specimen.reference_id }} {% admin_link specimen %}</h3>

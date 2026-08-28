@@ -40,7 +40,7 @@
         $("input", this).val("");
     });
 
-    let hasDates = $('#moi-dates input[type="text"]').filter(function () {
+    let hasDates = $('#moi-dates input').filter(function () {
         return this.value.length > 0
     }).length;
     if (hasDates) {

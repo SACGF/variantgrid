@@ -1,6 +1,5 @@
 from typing import Any, Optional
 
-from django import forms
 from django.contrib import messages
 from django.core.exceptions import ValidationError
 from django.forms import BoundField, DateField, Form
@@ -20,6 +19,7 @@ from review.models import (
 )
 from review.widgets.multi_lab_selector import MultiChoiceLabField
 from snpdb.models import UserSettings
+from uicore.widgets.date_widget import NativeDateInput
 from uicore.widgets.describe_difference_widget import DescribeDifference, DescribeDifferenceField
 from uicore.widgets.radio_other_widget import MultiChoiceFieldWithOther
 
@@ -27,7 +27,7 @@ from uicore.widgets.radio_other_widget import MultiChoiceFieldWithOther
 class ReviewForm(Form):
     # should it be a select field? can select fields handle other?
     review_date = DateField(
-        widget=forms.TextInput(attrs={"class": "date-picker form-control"}),
+        widget=NativeDateInput(attrs={"class": "form-control"}),
         required=True
     )
     review_method = MultiChoiceFieldWithOther(

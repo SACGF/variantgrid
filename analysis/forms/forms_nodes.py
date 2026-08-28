@@ -49,6 +49,7 @@ from patients.models_enums import GnomADPopulation
 from snpdb.forms import GenomeBuildAutocompleteForwardMixin
 from snpdb.models import Lab, Sample, Tag, VCFFilter
 from snpdb.models.models_genome import Contig
+from uicore.widgets.date_widget import NativeDateInput
 
 # Can use this for ModelForm.exclude to only use node specific fields
 ANALYSIS_NODE_FIELDS = fields_for_model(AnalysisNode)
@@ -627,8 +628,8 @@ class MOINodeForm(BaseNodeForm):
         model = MOINode
         exclude = ANALYSIS_NODE_FIELDS
         widgets = {
-            'min_date': TextInput(attrs={'class': 'date-picker', 'placeholder': 'Min Date'}),
-            'max_date': TextInput(attrs={'class': 'date-picker', 'placeholder': 'Max Date'}),
+            'min_date': NativeDateInput(allow_future=True),
+            'max_date': NativeDateInput(allow_future=True),
             'accordion_panel': HiddenInput(),
         }
 
