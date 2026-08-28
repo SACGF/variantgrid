@@ -27,7 +27,8 @@ class ColumnBoxplotGraph(CacheableGraph):
 
         data = []
         for c in df.columns:
-            series = df[c]
+            # Nullable int columns come back as object dtype, which np.isfinite can't handle
+            series = pd.to_numeric(df[c], errors="coerce")
             ok = np.isfinite(series * 1.01)  # Handle almost infinity
             series = series[ok]
             data.append(series)
