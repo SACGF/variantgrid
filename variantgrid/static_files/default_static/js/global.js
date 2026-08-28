@@ -47,7 +47,6 @@ function tweakAjax() {
         console.log(jqxhr);
 
         // messagePoller.stop_polling();
-        // $.blockUI({ message: $('#ajax-error') });
     });
 }
 
