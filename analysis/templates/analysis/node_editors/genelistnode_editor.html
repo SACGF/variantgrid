@@ -80,40 +80,49 @@
         {% endfor %}
 
 		<div id="accordion-container">
-			<ul class="accordion">
-                <li>
-                <h3>Named Gene Lists</h3>
-                <div>
+			<div class="accordion node-editor-accordion" id="gene-list-node-accordion">
+                <div class="card">
+                <div class="card-header" data-toggle="collapse" data-target="#gene-list-panel-named">Named Gene Lists</div>
+                <div id="gene-list-panel-named" class="collapse" data-parent="#gene-list-node-accordion">
+                <div class="card-body">
                     <div><b>Gene List:</b> {{ form.gene_list }}</div>
                     <div><b>Exclude:</b> {{ form.exclude }} (filter OUT these genes)</div>
                 </div>
-                </li>
-                <li>
-                <h3>Custom Gene List</h3>
-                    <div id='custom-gene-list-form'>
+                </div>
+                </div>
+                <div class="card">
+                <div class="card-header" data-toggle="collapse" data-target="#gene-list-panel-custom">Custom Gene List</div>
+                <div id="gene-list-panel-custom" class="collapse" data-parent="#gene-list-node-accordion">
+                    <div class="card-body" id='custom-gene-list-form'>
                         <div>{{ form.custom_gene_list_text }}</div>
                         <div><b>Exclude:</b> <input id='mirror-exclude' type='checkbox'> (filter OUT these genes)</div>
 
                     </div>
-                </li>
-                <li id='sample-qc-gene-list'>
-                <h3>Sample QC Gene List</h3>
-                <div>Sample: {{ form.sample  }}
                 </div>
-                </li>
-                <li id='pathology-test-gene-list'>
-                <h3>{{ pathology_test_category.name }}</h3>
-                <div>
+                </div>
+                <div class="card" id='sample-qc-gene-list'>
+                <div class="card-header" data-toggle="collapse" data-target="#gene-list-panel-sample-qc">Sample QC Gene List</div>
+                <div id="gene-list-panel-sample-qc" class="collapse" data-parent="#gene-list-node-accordion">
+                <div class="card-body">Sample: {{ form.sample  }}
+                </div>
+                </div>
+                </div>
+                <div class="card" id='pathology-test-gene-list'>
+                <div class="card-header" data-toggle="collapse" data-target="#gene-list-panel-pathology-test">{{ pathology_test_category.name }}</div>
+                <div id="gene-list-panel-pathology-test" class="collapse" data-parent="#gene-list-node-accordion">
+                <div class="card-body">
                     <div style="display: flex; align-items: flex-start; gap: 10px;">
                         <div class='gene-list-icon icon48 {{ pathology_test_category.icon_css_class }}'></div>
                         <div>{{ form.pathology_test_version }}</div>
                         <div id="pathology-test-info"></div>
                     </div>
                 </div>
-                </li>
-                <li>
-                    <h3>PanelApp Panels</h3>
-                    <div>
+                </div>
+                </div>
+                <div class="card">
+                    <div class="card-header" data-toggle="collapse" data-target="#gene-list-panel-panel-app">PanelApp Panels</div>
+                    <div id="gene-list-panel-panel-app" class="collapse" data-parent="#gene-list-node-accordion">
+                    <div class="card-body">
                         <div class="fieldWrapper">
                             {{ form.min_panel_app_confidence.errors }}
                             <label for="{{ form.min_panel_app_confidence.id_for_label }}">Min PanelApp Confidence:</label>
@@ -131,8 +140,9 @@
                             {{ form.panel_app_panel_eng }}
                         </div>
                     </div>
-                </li>
-			</ul>
+                    </div>
+                </div>
+			</div>
 		</div>
         <div>
         {% if node.accordion_panel == 4 and panel_app_warnings %}

@@ -57,22 +57,39 @@
 	}
 
 
+	function accordionPanels(accordion) {
+		// accordion_panel indexes the cards in document order
+		return $("> .card > .collapse", accordion);
+	}
+
+	function showAccordionPanel(accordion, index) {
+		accordionPanels(accordion).eq(index).collapse("show");
+	}
+
 	function accordionForm(formSelector) {
-		// Expects: ul.accordion and hidden input #id_accordion_panel that maps to accordion settings
+		// Expects: div.accordion of Bootstrap cards and hidden input #id_accordion_panel holding the open card's index
 
 		const accordion = $(".accordion", formSelector);
 		const accordionStateInput = $("#id_accordion_panel", formSelector);
+		const panels = accordionPanels(accordion);
 
-		accordion.accordion({
-			heightStyle: "content",
-			widthStyle: "fill",
-			active: parseInt(accordionStateInput.val()),
-			activate: function() {
-				const accordionId = $(this).accordion("option", "active");
-				accordionStateInput.val(accordionId);
+		accordion.on("shown.bs.collapse", "> .card > .collapse", function() {
+			accordionStateInput.val(panels.index(this));
+		});
+
+		// The open panel is what the node filters on, so keep one open - clicking the open header does nothing
+		accordion.on("click", "> .card > .card-header", function(event) {
+			if (!$(this).hasClass("collapsed")) {
+				event.stopPropagation();
 			}
 		});
 
+		// Open the stored panel by class so the editor doesn't animate as it loads
+		const activePanel = panels.eq(parseInt(accordionStateInput.val()) || 0);
+		panels.removeClass("show");
+		$("> .card > .card-header", accordion).addClass("collapsed");
+		activePanel.addClass("show");
+		activePanel.prev(".card-header").removeClass("collapsed");
 	}
 
 

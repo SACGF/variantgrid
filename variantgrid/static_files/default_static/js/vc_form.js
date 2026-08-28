@@ -1430,7 +1430,6 @@ const VCForm = (function() {
             }
 
             val = val.toLowerCase();
-            //let inst = jContent.accordion('instance');
             eKeys.forEach(eKey => {
                 let matches = false;
                 if (eKey.exclude_namespace && this.value(eKey.key) == null) {

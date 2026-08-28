@@ -171,10 +171,11 @@
         <div id="cohort-node-notes"></div>
 
 		<div id="accordion-container">
-			<ul class="accordion">
-                <li>
-                <h3>Counts</h3>
-                <div>
+			<div class="accordion node-editor-accordion" id="cohort-node-accordion">
+                <div class="card">
+                <div class="card-header" data-toggle="collapse" data-target="#cohort-panel-counts">Counts</div>
+                <div id="cohort-panel-counts" class="collapse" data-parent="#cohort-node-accordion">
+                <div class="card-body">
                     <table>
                         <tr>
                             <th></th>
@@ -216,10 +217,12 @@
                         </tr>
                     </table>
                 </div>
-                </li>
-				<li>
-		        <h3>Simple Zygosity</h3>
-		        <div>
+                </div>
+                </div>
+				<div class="card">
+		        <div class="card-header" data-toggle="collapse" data-target="#cohort-panel-simple-zygosity">Simple Zygosity</div>
+		        <div id="cohort-panel-simple-zygosity" class="collapse" data-parent="#cohort-node-accordion">
+		        <div class="card-body">
                     <div>
                     <b>Genotype:</b> {{ form.zygosity }} for {{ form.zygosity_op }} samples.
                     </div>
@@ -227,13 +230,16 @@
                         "Any zygosity call" means Ref, Het or Hom Alt - samples with no zygosity call ("?") don't count.
                     </div>
 		        </div>
-		        </li>
-		        <li>
-		        <h3>Per Sample Zygosity</h3>
-		        <div id='per-sample-zygosity-container'>
 		        </div>
-		        </li>
-			</ul>
+		        </div>
+		        <div class="card">
+		        <div class="card-header" data-toggle="collapse" data-target="#cohort-panel-per-sample-zygosity">Per Sample Zygosity</div>
+		        <div id="cohort-panel-per-sample-zygosity" class="collapse" data-parent="#cohort-node-accordion">
+		        <div class="card-body" id='per-sample-zygosity-container'>
+		        </div>
+		        </div>
+		        </div>
+			</div>
 		</div>
         {% if has_write_permission %}
     		<button id='cohort-save' class="btn btn-primary">save</button>

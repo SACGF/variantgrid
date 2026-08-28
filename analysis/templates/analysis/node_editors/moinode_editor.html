@@ -69,8 +69,8 @@
     }
 
     function disableAccordion(accordion) {
-        accordion.accordion({active: 0});
-        $("h3#moi-accordion-patient-control", accordion).addClass("ui-state-disabled");
+        showAccordionPanel(accordion, 0);
+        $("#moi-accordion-patient-control", accordion).addClass("disabled");
     }
 
     function populateMOIPatient(sampleId, data, changed) {
@@ -95,9 +95,9 @@
                     patientText += " of which " + terms.length + " are MONDO gene/disease classification terms usable by this node.";
                     patientTerms.append(termsUl(terms));
                     if (changed) {
-                        accordion.accordion({active: 1});
+                        showAccordionPanel(accordion, 1);
                     }
-                    $("h3#moi-accordion-patient-control", accordion).removeClass("ui-state-disabled");
+                    $("#moi-accordion-patient-control", accordion).removeClass("disabled");
                 } else {
                     disableAccordion(accordion);
                     patientText += ". No MONDO terms with gene/disease classification terms";
@@ -166,20 +166,24 @@
             </span>
         </div>
 
-		<ul id="moi-terms-accordion" class="accordion">
-            <li>
-                <h3>Custom Disease</h3>
-                <div>
+		<div id="moi-terms-accordion" class="accordion node-editor-accordion">
+            <div class="card">
+                <div class="card-header" data-toggle="collapse" data-target="#moi-panel-custom">Custom Disease</div>
+                <div id="moi-panel-custom" class="collapse" data-parent="#moi-terms-accordion">
+                <div class="card-body">
                     {{ form.mondo }}
                 </div>
-            </li>
-			<li>
-                <h3 id="moi-accordion-patient-control">From Patient</h3>
-                <div id="moi-patient-terms">
+                </div>
+            </div>
+			<div class="card">
+                <div class="card-header" id="moi-accordion-patient-control" data-toggle="collapse" data-target="#moi-panel-patient">From Patient</div>
+                <div id="moi-panel-patient" class="collapse" data-parent="#moi-terms-accordion">
+                <div class="card-body" id="moi-patient-terms">
                     <!-- Populated via populateMOIPatient -->
                 </div>
-	        </li>
-		</ul>
+                </div>
+	        </div>
+		</div>
 
         <div>
             <div>

@@ -29,40 +29,50 @@
         {% endfor %}
 
 		<div id="accordion-container">
-			<ul class="accordion">
-		        <h3>Genomic Intervals</h3>
-		        <div>
+			<div class="accordion node-editor-accordion" id="intersection-node-accordion">
+                <div class="card">
+		        <div class="card-header" data-toggle="collapse" data-target="#intersection-panel-intervals">Genomic Intervals</div>
+		        <div id="intersection-panel-intervals" class="collapse" data-parent="#intersection-node-accordion">
+		        <div class="card-body">
 					<div><b>GenomicIntervals:</b> {{ form.genomic_intervals_collection }}</div>
 		        </div>
-		        </li>
-                <li>
-                <h3>Variants</h3>
-                    <div id='intersectionnode-variants'>
+		        </div>
+		        </div>
+                <div class="card">
+                <div class="card-header" data-toggle="collapse" data-target="#intersection-panel-variants">Variants</div>
+                <div id="intersection-panel-variants" class="collapse" data-parent="#intersection-node-accordion">
+                    <div class="card-body" id='intersectionnode-variants'>
                     {{ form.variant_text.errors }}{{ form.variant_text }}
                     <div class="text-muted">
                         dbSNP IDs, HGVS, variant coordinates, loci, ClinGen allele IDs, COSMIC IDs
                         and regions (chr:start-end) - one per line.
                     </div>
                     </div>
-                </li>
-                <li>
-                <h3>EnrichmentKit</h3>
-                <div>
+                </div>
+                </div>
+                <div class="card">
+                <div class="card-header" data-toggle="collapse" data-target="#intersection-panel-enrichment-kit">EnrichmentKit</div>
+                <div id="intersection-panel-enrichment-kit" class="collapse" data-parent="#intersection-node-accordion">
+                <div class="card-body">
                     {% if enrichment_kit %}
                         <b>EnrichmentKit:</b>{{ enrichment_kit }}
                     {% else %}
                         Can't determine enrichment_kit from input samples
                     {% endif %}
                 </div>
-                <li>
-                <h3>Contig</h3>
-                    <div id='intersectionnode-contig'>
+                </div>
+                </div>
+                <div class="card">
+                <div class="card-header" data-toggle="collapse" data-target="#intersection-panel-contig">Contig</div>
+                <div id="intersection-panel-contig" class="collapse" data-parent="#intersection-node-accordion">
+                    <div class="card-body" id='intersectionnode-contig'>
                     {{ form.contigs.errors }}
                     <label for="{{ form.contigs.id_for_label }}">Chromosomes:</label>
                     {{ form.contigs }}
                     </div>
-                </li>
-			</ul>
+                </div>
+                </div>
+			</div>
 		</div>
         {{ form.non_field_errors }}
 		<div>

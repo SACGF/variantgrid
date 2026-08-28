@@ -43,9 +43,11 @@
             {{ hidden }}
         {% endfor %}
 
-		<ul class="accordion">
-            <li>
-                <h3>Custom Fields</h3>
+		<div class="accordion node-editor-accordion" id="phenotype-node-accordion">
+            <div class="card">
+                <div class="card-header" data-toggle="collapse" data-target="#phenotype-panel-custom">Custom Fields</div>
+                <div id="phenotype-panel-custom" class="collapse" data-parent="#phenotype-node-accordion">
+                <div class="card-body">
                 <table>
                     <tr>
                         <th class='hpo'>Phenotype:</th>
@@ -69,10 +71,13 @@
                             Function (case insensitive)</i></td>
                     </tr>
                 </table>
-            </li>
-			<li>
-	        <h3>From Patient</h3>
-	        <div>
+                </div>
+                </div>
+            </div>
+			<div class="card">
+	        <div class="card-header" data-toggle="collapse" data-target="#phenotype-panel-patient">From Patient</div>
+	        <div id="phenotype-panel-patient" class="collapse" data-parent="#phenotype-node-accordion">
+	        <div class="card-body">
                 {% if node.has_sample_inputs_with_patient %}
     				Patient: {{ form.patient }}
                     {% if node.patient %}
@@ -113,8 +118,9 @@
                     <i>There are no patients assigned to samples above this node.</i>
                 {% endif %}
 	        </div>
-	        </li>
-		</ul>
+	        </div>
+	        </div>
+		</div>
 
         {% if has_write_permission %}
 	    	<button id='phenotype-save' class="btn btn-primary">save</button>
