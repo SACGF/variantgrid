@@ -135,7 +135,7 @@ def prevent_request_warnings(original_function):
                    GENES_DEFAULT_CANONICAL_TRANSCRIPT_COLLECTION_ID=None,
                    LIFTOVER_CLASSIFICATIONS=False,
                    ANNOTATION_CACHED_WEB_RESOURCES=[],  # So we don't auto load resources in test
-                   CELERY_ALWAYS_EAGER=True)  # Don't launch async tasks
+                   CELERY_TASK_ALWAYS_EAGER=True)  # Run async tasks inline
 class URLTestCase(TestCase):
     """ Need to override settings as ManifestStaticFilesStorage expects staticfiles.json to exist
         and contain the file asked. @see https://stackoverflow.com/a/51580328/295724 """

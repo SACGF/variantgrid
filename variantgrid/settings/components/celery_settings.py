@@ -1,5 +1,6 @@
 from kombu import Exchange, Queue
 
+from variantgrid.settings.components.default_settings import UNIT_TEST
 from variantgrid.settings.components.secret_settings import get_secret
 
 # Using RabbitMQ as Redis broker was re-executing long tasks (eg variant annotation)
@@ -18,7 +19,12 @@ from variantgrid.settings.components.secret_settings import get_secret
 
 
 # Default is guest:guest default account see: https://www.rabbitmq.com/access-control.html
-CELERY_BROKER_URL = get_secret("CELERY.broker_url")
+if UNIT_TEST:
+    # In-process broker, so tasks fired during tests don't hit the dev worker (which then fails
+    # looking up objects from the rolled back test DB)
+    CELERY_BROKER_URL = "memory://"
+else:
+    CELERY_BROKER_URL = get_secret("CELERY.broker_url")
 
 CELERY_TASK_DEFAULT_QUEUE = 'db_workers'
 CELERY_TASK_QUEUES = (
