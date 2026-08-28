@@ -259,8 +259,6 @@ $(document).ready(function() {
         // is running
         setTimeout(poll_candidate_search_run, update_secs * 1000);
     {% endif %}
-    $("#candidate-search-tabs").tabs();
-
     $("#id_candidate_status input[type=checkbox], #id_evidence input[type=checkbox]").on('change', filterCandidateSearchRunGrid);
 });
 
@@ -280,16 +278,17 @@ $(document).ready(function() {
         </div>
         <div id="candidate-search-tabs">
             {% with top_aggregate_counts=candidate_search_run.get_top_aggregate_counts %}
-                <ul>
-                    <li><a href="#details">Details</a></li>
+                <ul class="nav nav-tabs" role="tablist">
+                    <li class="nav-item"><a class="nav-link show active" data-toggle="tab" role="tab" href="#details">Details</a></li>
                     {% for count_name in top_aggregate_counts %}
-                        <li><a href="#{{ count_name|slugify }}">{{ count_name }}</a></li>
+                        <li class="nav-item"><a class="nav-link" data-toggle="tab" role="tab" href="#{{ count_name|slugify }}">{{ count_name }}</a></li>
                     {% endfor %}
                     {% if has_write_permission %}
-                    <li><a href="{% url 'group_permissions' 'analysis.models.CandidateSearchRun' candidate_search_run.pk %}">Sharing / Permissions</a></li>
+                    <li class="nav-item"><a class="nav-link" data-toggle="tab" role="tab" href="#candidate-search-permissions" data-href="{% url 'group_permissions' 'analysis.models.CandidateSearchRun' candidate_search_run.pk %}">Sharing / Permissions</a></li>
                     {% endif %}
                 </ul>
-                <div id="details" class="card-body">
+                <div class="tab-content">
+                <div id="details" role="tabpanel" class="tab-pane show active card-body">
                     {% labelled id='Methods' label='' hint="tiny" %}{{ candidate_search_run.search_version.methods }}{% endlabelled %}
                     {% labelled id='created' label='Created' hint="tiny" %}{{ candidate_search_run.created }}{% endlabelled %}
                     {% labelled id='user' label='User' hint="tiny" %}{{ candidate_search_run.user }}{% endlabelled %}
@@ -305,7 +304,7 @@ $(document).ready(function() {
                     {% labelled admin_only=True id='git_hash' label='Git Hash' hint="tiny" %}{{ candidate_search_run.git_hash }}{% endlabelled %}
                 </div>
                 {% for count_name, aggregate_counts in top_aggregate_counts.items %}
-                    <div id="{{ count_name|slugify }}" class="card-body">
+                    <div id="{{ count_name|slugify }}" role="tabpanel" class="tab-pane card-body">
                         <ul>
                             {% for obj, column, count in aggregate_counts %}
                             <li>
@@ -316,6 +315,10 @@ $(document).ready(function() {
                         </ul>
                     </div>
                 {% endfor %}
+                {% if has_write_permission %}
+                <div class="tab-pane card-body" role="tabpanel" id="candidate-search-permissions"></div>
+                {% endif %}
+                </div>
             {% endwith %}
         </div>
     </div>

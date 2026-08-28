@@ -5,26 +5,22 @@
 
 {% block title %}Trio {{ trio }}{% endblock %}
 
-{% block head %}
-{{ block.super }}
-<script type="text/javascript">
-    $(document).ready(function() {
-        $("#trio-tabs").tabs();
-    });
-</script>
-{% endblock %}
-
 {% block submenu_page_content %}
 
     <div id="trio-tabs">
-        <ul>
-            <li><a id='details-tab' href="#details">Details</a></li>
+        <ul class="nav nav-tabs mb-4" role="tablist">
+            <li class="nav-item"><a id='details-tab' class="nav-link show active" data-toggle="tab" role="tab" href="#details">Details</a></li>
             {% if has_write_permission %}
-            <li><a href="{% url 'group_permissions' 'snpdb.models.Trio' trio.pk %}">Sharing / Permissions</a></li>
+            <li class="nav-item"><a class="nav-link" data-toggle="tab" role="tab" href="#trio-permissions" data-href="{% url 'group_permissions' 'snpdb.models.Trio' trio.pk %}">Sharing / Permissions</a></li>
             {% endif %}
         </ul>
-        <div id="details">
-            {% trio_table trio %}
+        <div class="tab-content">
+            <div class="tab-pane show active" role="tabpanel" id="details">
+                {% trio_table trio %}
+            </div>
+            {% if has_write_permission %}
+            <div class="tab-pane" role="tabpanel" id="trio-permissions"></div>
+            {% endif %}
         </div>
     </div>
 

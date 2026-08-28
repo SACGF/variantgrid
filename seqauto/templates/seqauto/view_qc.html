@@ -14,30 +14,37 @@
 </style>
 {% endblock %}
 
-{% block jsdocumentready %}
-	$("#qc-tabs").tabs();
-{% endblock %}
-
 {% block submenu_page_content %}
 
 	<h2>{{ qc }}</h2>
 
 	<div id="qc-tabs">
-		<ul>
-	    	<li><a href="{% url 'view_qc_exec_summary_tab' qc.pk %}">Exec Summary</a></li>
+		<ul class="nav nav-tabs mb-4" role="tablist">
+	    	<li class="nav-item"><a class="nav-link show active" data-toggle="tab" role="tab" href="#qc-exec-summary" data-href="{% url 'view_qc_exec_summary_tab' qc.pk %}">Exec Summary</a></li>
             {% if qc.qcgenelist_set.exists %}
-            <li><a href="{% url 'view_qc_gene_list_tab' qc.pk %}">Genes of Interest</a></li>
+            <li class="nav-item"><a class="nav-link" data-toggle="tab" role="tab" href="#qc-gene-list" data-href="{% url 'view_qc_gene_list_tab' qc.pk %}">Genes of Interest</a></li>
             {% endif %}
 			{% if gene_coverage %}
-	    	<li><a href="{% url 'view_qc_gene_coverage_collection_tab' qc.pk %}">Gene Coverage</a></li>
+	    	<li class="nav-item"><a class="nav-link" data-toggle="tab" role="tab" href="#qc-gene-coverage" data-href="{% url 'view_qc_gene_coverage_collection_tab' qc.pk %}">Gene Coverage</a></li>
 			{% endif %}
-	    	<li><a href="#qc-details">Details</a></li>
+	    	<li class="nav-item"><a class="nav-link" data-toggle="tab" role="tab" href="#qc-details">Details</a></li>
 	  	</ul>
-		<div id="qc-details">
-			<form>
-                {% crispy form form_helper.horizontal %}
-			</form>
+		<div class="tab-content">
+			<div class="tab-pane show active" role="tabpanel" id="qc-exec-summary"></div>
+			{% if qc.qcgenelist_set.exists %}
+			<div class="tab-pane" role="tabpanel" id="qc-gene-list"></div>
+			{% endif %}
+			{% if gene_coverage %}
+			<div class="tab-pane" role="tabpanel" id="qc-gene-coverage"></div>
+			{% endif %}
+			<div class="tab-pane" role="tabpanel" id="qc-details">
+				<form>
+					{% crispy form form_helper.horizontal %}
+				</form>
+			</div>
 		</div>
+	</div>
+
 	<div>
 
 		<h3>Input</h3>

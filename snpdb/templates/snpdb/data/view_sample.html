@@ -71,11 +71,9 @@ $(document).ready(function() {
     setPatientLink();
     setExtractionLink();
 
-    $("#sample-tabs").tabs();
-
     // Skipped-annotation warning message (issue #1409) links to its tab
     $(".activate-tab").click(function() {
-        $("#sample-tabs > ul a[href='" + $(this).attr("href") + "']").trigger("click");
+        $("#sample-tabs .nav-tabs a[href='" + $(this).attr("href") + "']").tab('show');
         return false;
     });
 
@@ -123,25 +121,25 @@ $(document).ready(function() {
     <h1>Sample: {{ sample.name }}</h1>
 
     <div id="sample-tabs">
-        <ul>
-            <li><a href="#details">Details</a></li>
+        <ul class="nav nav-tabs mb-4" role="tablist">
+            <li class="nav-item"><a class="nav-link show active" data-toggle="tab" role="tab" href="#details">Details</a></li>
             {% if sample_genotype_stats.import_status == 'S' %}
-            <li><a href="#sample-stats">Stats</a></li>
+            <li class="nav-item"><a class="nav-link" data-toggle="tab" role="tab" href="#sample-stats">Stats</a></li>
             {% endif %}
-            <li><a href="{% url 'sample_files_tab' sample.pk %}">Files</a></li>
+            <li class="nav-item"><a class="nav-link" data-toggle="tab" role="tab" href="#sample-files" data-href="{% url 'sample_files_tab' sample.pk %}">Files</a></li>
             {% if somalier_enabled and sample.somaliersampleextract %}
-            <li><a href="#sample-ancestry-relatedness">Ancestry/Relatedness</a></li>
+            <li class="nav-item"><a class="nav-link" data-toggle="tab" role="tab" href="#sample-ancestry-relatedness">Ancestry/Relatedness</a></li>
             {% endif %}
-            <li><a href="{% url 'sample_variants_tab' sample.pk %}">Variants</a></li>
+            <li class="nav-item"><a class="nav-link" data-toggle="tab" role="tab" href="#sample-variants" data-href="{% url 'sample_variants_tab' sample.pk %}">Variants</a></li>
             {% if sample.import_status == 'S' or sample.import_status == 'A' %}
-            <li><a href="{% url 'sample_graphs_tab' sample.pk %}">Graphs</a></li>
+            <li class="nav-item"><a class="nav-link" data-toggle="tab" role="tab" href="#sample-graphs" data-href="{% url 'sample_graphs_tab' sample.pk %}">Graphs</a></li>
             {% endif %}
             {% if skipped_annotation_count %}
-            <li><a href="#sample-skipped-annotation">Skipped Annotation ({{ skipped_annotation_count }})</a></li>
+            <li class="nav-item"><a class="nav-link" data-toggle="tab" role="tab" href="#sample-skipped-annotation">Skipped Annotation ({{ skipped_annotation_count }})</a></li>
             {% endif %}
             {% if url_name_visible.sample_gene_lists_tab %}
-            <li>
-                <a class="sample-gene-list-link" href="{% url 'sample_gene_lists_tab' sample.pk %}">
+            <li class="nav-item">
+                <a class="nav-link sample-gene-list-link" data-toggle="tab" role="tab" href="#sample-gene-lists" data-href="{% url 'sample_gene_lists_tab' sample.pk %}">
                     <div class="left">Genes of Interest</div>
                     {% if sample.activesamplegenelist %}
                     <div title="Active GeneList" class="left icon16 check-mark-green"></div>
@@ -151,13 +149,14 @@ $(document).ready(function() {
             </li>
             {% endif %}
             {% if sample.sequencing_run and url_name_visible.view_sample_qc_tab %}
-            <li><a href="{% url 'view_sample_qc_tab' sample.pk %}">QC</a></li>
+            <li class="nav-item"><a class="nav-link" data-toggle="tab" role="tab" href="#sample-qc" data-href="{% url 'view_sample_qc_tab' sample.pk %}">QC</a></li>
             {% endif %}
             {% if has_write_permission %}
-            <li><a href="{% url 'sample_permissions_tab' sample.pk %}">Sharing / Permissions</a></li>
+            <li class="nav-item"><a class="nav-link" data-toggle="tab" role="tab" href="#sample-permissions" data-href="{% url 'sample_permissions_tab' sample.pk %}">Sharing / Permissions</a></li>
             {% endif %}
         </ul>
-        <div id="details">
+        <div class="tab-content">
+        <div class="tab-pane show active" role="tabpanel" id="details">
             {% page_help user 'data/view_sample_help' 'Sample Help' %}
 
             <form method="post" id='sample-form'>
@@ -184,7 +183,7 @@ $(document).ready(function() {
             </form>
         </div>
     {% if sample_genotype_stats.import_status == 'S' %}
-        <div id="sample-stats">
+        <div class="tab-pane" role="tabpanel" id="sample-stats">
         {% if not sample_stats_variant_class_df.empty %}
             <h4>Variant Class</h4>
             {% render_dataframe sample_stats_variant_class_df 1 %}
@@ -225,7 +224,7 @@ $(document).ready(function() {
      {% if somalier_enabled and sample.somaliersampleextract %}
          {%  with sse=sample.somaliersampleextract %}
              {% with ancestry=sse.somalierancestry %}
-                <div id="sample-ancestry-relatedness">
+                <div class="tab-pane" role="tabpanel" id="sample-ancestry-relatedness">
                     {% page_help page_id='data/related_samples_help' title='Related Samples' show_title=False %}
 
                     {% if sse.has_sufficient_data %}
@@ -340,11 +339,26 @@ $(document).ready(function() {
          {% endwith %}
     {% endif %}
     {% if skipped_annotation_count %}
-        <div id="sample-skipped-annotation">
+        <div class="tab-pane" role="tabpanel" id="sample-skipped-annotation">
             <p>Variants that Variant Effect Predictor (VEP) was unable to annotate.</p>
             <table id="sample-skipped-annotation-grid" class="sticky-header" data-datatable-url="{% url 'sample_skipped_annotation_datatable' sample_id=sample.pk %}"></table>
         </div>
     {% endif %}
+        <div class="tab-pane" role="tabpanel" id="sample-files"></div>
+        <div class="tab-pane" role="tabpanel" id="sample-variants"></div>
+        {% if sample.import_status == 'S' or sample.import_status == 'A' %}
+        <div class="tab-pane" role="tabpanel" id="sample-graphs"></div>
+        {% endif %}
+        {% if url_name_visible.sample_gene_lists_tab %}
+        <div class="tab-pane" role="tabpanel" id="sample-gene-lists"></div>
+        {% endif %}
+        {% if sample.sequencing_run and url_name_visible.view_sample_qc_tab %}
+        <div class="tab-pane" role="tabpanel" id="sample-qc"></div>
+        {% endif %}
+        {% if has_write_permission %}
+        <div class="tab-pane" role="tabpanel" id="sample-permissions"></div>
+        {% endif %}
+        </div>
     </div> <!-- /sample-tabs -->
 
     {% related_data_for_samples samples show_sample_info=False %}

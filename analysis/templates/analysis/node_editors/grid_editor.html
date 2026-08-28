@@ -17,7 +17,7 @@
 			let stab = $("#selected-tab");
 			stab.show();
 			if (focus) {
-				$("#node-editor-tabs").tabs("option", "active", stab.index());
+				$("a", stab).tab("show");
 			}
 		}
 	}
@@ -29,11 +29,11 @@
 {% endblock griddocreadyjs %}
 
 {% block node_editor_tab_links_end %}
-	    	<li id='selected-tab' style='display: none'><a href="#node-selected">Selected</a></li>
+	    	<li id='selected-tab' class="nav-item" style='display: none'><a class="nav-link" data-toggle="tab" role="tab" href="#node-selected">Selected</a></li>
 {% endblock node_editor_tab_links_end %}
 
 {% block node_editor_tabs_end %}
-		<div id="node-selected">
+		<div class="tab-pane" role="tabpanel" id="node-selected">
 			<div>
 			<a class="hover-link" href='javascript:createSelectedChild()'>Filter to selected variants</a>
 			</div>

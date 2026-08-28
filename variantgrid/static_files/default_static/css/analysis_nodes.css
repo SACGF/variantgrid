@@ -880,18 +880,18 @@ span.node-counts {
 }
 
 /* One row of tabs - the node editor's own strip is mirrored into the bar of whichever home it's in */
-.analysis-horizontal #node-editor-tabs > ul.ui-tabs-nav {
+.analysis-horizontal #node-editor-tabs > ul.nav-tabs {
 	display: none;
 }
 
-/* jQuery UI sizes its tabs in em (.5em/1em on the links), which costs ~42px of the editor pane
-   before any content. Match the bottom pane strip instead - that height is rows on the grid. */
-#node-editor-tabs > ul.ui-tabs-nav {
+/* Bootstrap's default tab padding costs ~40px of the editor pane before any content.
+   Match the bottom pane strip instead - that height is rows on the grid. */
+#node-editor-tabs > ul.nav-tabs {
 	padding: 0;
 	font-size: 13px;
 }
 
-#node-editor-tabs > ul.ui-tabs-nav li a {
+#node-editor-tabs > ul.nav-tabs > li > a {
 	padding: 1px 12px;
 	line-height: 20px;
 }

@@ -344,12 +344,6 @@ img.thumbnail {
 
 
 	$(document).ready(function() {
-        const tabs = $("#tabs");
-        tabs.tabs();
-		tabs.bind('tabsselect', function(event, ui) {
-   			$(".ui-tabs-panel", this).empty();
-		});
-
 		$("#show-file-types-toggle").click(function() {
 			$("#file-types-description").hide()
 		});

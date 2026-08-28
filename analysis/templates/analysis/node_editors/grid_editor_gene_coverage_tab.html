@@ -4,7 +4,6 @@
 
 {% block docreadyjs %}
 	{% if node.has_gene_coverage != None %}
-		$("#gene-tabs").tabs();
 		var shadowColor = "{{ node.shadow_color }}";
 		var tabsToColor = ["#gene-list-tab", "#incomplete-coverage-tab"];
 		for (var i=0 ; i<tabsToColor.length ; ++i) {
@@ -17,30 +16,31 @@
 {% block node_editor_tab_links_second %}
 {% if node.status == 'R' %}
 	{% if node.has_gene_coverage != None %}
-	    	<li id='gene-list-tab'><a href="#node-genes-tab">Genes/Coverage</a></li>
+	    	<li id='gene-list-tab' class="nav-item"><a class="nav-link" data-toggle="tab" role="tab" href="#node-genes-tab">Genes/Coverage</a></li>
 	{% else %}
-	    	<li id='gene-list-tab'><a href="#node-genes-tab">Genes</a></li>
+	    	<li id='gene-list-tab' class="nav-item"><a class="nav-link" data-toggle="tab" role="tab" href="#node-genes-tab">Genes</a></li>
 	{% endif %}
 {% endif %}
 {% endblock node_editor_tab_links_second %}
 
 {% block node_editor_tabs_second %}
     {% if node.status == 'R' %}
-		<div id="node-genes-tab">
+		<div class="tab-pane" role="tabpanel" id="node-genes-tab">
 	    {% if gene_lists %}
             {% page_help page_id='genes/gene_list_gene_matching_help' title="Gene List Gene Matching" show_title=False %}
 
             {% if node.has_gene_coverage != None %}
             <div id="gene-tabs">
-                <ul>
+                <ul class="nav nav-tabs mb-4" role="tablist">
                     {% if incomplete_gene_coverage %}
-                    <li id='incomplete-coverage-tab'><a href="#gene-incomplete-coverage">Incomplete Coverage</a></li>
+                    <li id='incomplete-coverage-tab' class="nav-item"><a class="nav-link show active" data-toggle="tab" role="tab" href="#gene-incomplete-coverage">Incomplete Coverage</a></li>
                     {% endif %}
-                    <li><a href="#gene-list-genes">Genes</a></li>
-                    <li><a href="#gene-coverage">Coverage</a></li>
+                    <li class="nav-item"><a class="nav-link{% if not incomplete_gene_coverage %} show active{% endif %}" data-toggle="tab" role="tab" href="#gene-list-genes">Genes</a></li>
+                    <li class="nav-item"><a class="nav-link" data-toggle="tab" role="tab" href="#gene-coverage">Coverage</a></li>
                 </ul>
+                <div class="tab-content">
                 {% if incomplete_gene_coverage %}
-                <div id="gene-incomplete-coverage">
+                <div class="tab-pane show active" role="tabpanel" id="gene-incomplete-coverage">
                     {% for sample, cov, no_coverage_gene_names in incomplete_gene_coverage %}
                         <b>Sample: {{ sample }}</b>
                         <div>
@@ -52,12 +52,12 @@
                     <p>Minimum depth required is {{ min_coverage }}</p>
                 </div>
                 {% endif %}
-                <div id="gene-list-genes">
+                <div class="tab-pane{% if not incomplete_gene_coverage %} show active{% endif %}" role="tabpanel" id="gene-list-genes">
                     {%  for gene_list in gene_lists %}
                         <table id="gene-lists-genes-datatable-{{ gene_list.pk }}" class="sticky-header" data-datatable-responsive="true" data-datatable-url="{% url 'analysis_node_gene_list_genes_datatable' analysis_id=node.analysis_id node_id=node.pk version=node.version gene_list_id=gene_list.pk %}"></table>
                     {%  endfor %}
                 </div>
-                <div id="gene-coverage">
+                <div class="tab-pane" role="tabpanel" id="gene-coverage">
                     {% for sample, cov, _ in sample_coverage_and_uncovered %}
                         <b>{{ sample }}</b>
                         {% if cov %}
@@ -67,6 +67,7 @@
                             Sample has no coverage.
                         {% endif %}
                     {% endfor %}
+                </div>
                 </div>
             </div>
             {% else %}

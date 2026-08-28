@@ -100,8 +100,6 @@
 		$("#clone-button").click(cloneCustomColumns);
 
 	{% if has_write_permission %}
-		$("#custom-column-tabs").tabs({cache: true});
-
         $("button#change-name-button").click(function() {
             let nameInput = $("#custom-columns-name");
             let name = nameInput.val();
@@ -156,11 +154,12 @@
 
 {% if has_write_permission %}
     <div id="custom-column-tabs">
-        <ul>
-            <li><a href="#name">Name</a></li>
-	        <li><a href="{% url 'group_permissions' 'snpdb.models.CustomColumnsCollection' custom_columns.pk %}">Sharing / Permissions</a></li>
+        <ul class="nav nav-tabs mb-4" role="tablist">
+            <li class="nav-item"><a class="nav-link show active" data-toggle="tab" role="tab" href="#name">Name</a></li>
+	        <li class="nav-item"><a class="nav-link" data-toggle="tab" role="tab" href="#custom-columns-permissions" data-href="{% url 'group_permissions' 'snpdb.models.CustomColumnsCollection' custom_columns.pk %}">Sharing / Permissions</a></li>
 		</ul>
-        <div id="name">
+        <div class="tab-content">
+        <div class="tab-pane show active" role="tabpanel" id="name">
 			<form id="custom-columns-form" method="post">
 				{% csrf_token %}
 				<label for="custom-columns-name">Name:</label>
@@ -170,6 +169,8 @@
 				<ul id="save-name-message" class="messages">
 				</ul>
 			</form>
+		</div>
+        <div class="tab-pane" role="tabpanel" id="custom-columns-permissions"></div>
 		</div>
 	</div>
 

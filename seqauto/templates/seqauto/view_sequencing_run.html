@@ -123,9 +123,9 @@
 
 {% block jsdocumentready %}
     var tab_id = {{ tab_id }};
-    console.log("tab_id = " + tab_id);
-    var tabParams = {active : tab_id};
-	$("#sequencing-run-tabs").tabs(tabParams);
+    if (tab_id) {
+        $("#sequencing-run-tabs .nav-link").eq(tab_id).tab('show');
+    }
 
     {% if show_stats %}
         loadIndexMetricsGraph();
@@ -211,28 +211,30 @@
 	</table>
 
 	<div id="sequencing-run-tabs">
-		<ul>
-	    	<li><a href="{% url 'view_sequencing_run_stats_tab' sequencing_run.pk %}">Run Stats</a></li>
-            <li><a href="#wiki">Wiki{% if sequencing_run.sequencingrunwiki %}*{% endif %}</a></li>
-            <li><a href="#barcodes">Barcodes</a></li>
-	    	<li><a href="#samples">Samples</a></li>
+		<ul class="nav nav-tabs mb-4" role="tablist">
+	    	<li class="nav-item"><a class="nav-link{% if not tab_id %} show active{% endif %}" data-toggle="tab" role="tab" href="#run-stats" data-href="{% url 'view_sequencing_run_stats_tab' sequencing_run.pk %}">Run Stats</a></li>
+            <li class="nav-item"><a class="nav-link" data-toggle="tab" role="tab" href="#wiki">Wiki{% if sequencing_run.sequencingrunwiki %}*{% endif %}</a></li>
+            <li class="nav-item"><a class="nav-link" data-toggle="tab" role="tab" href="#barcodes">Barcodes</a></li>
+	    	<li class="nav-item"><a class="nav-link" data-toggle="tab" role="tab" href="#samples">Samples</a></li>
 		{% if sequencing_run.experiment %}
-	    	<li><a href="#experiment">{{ sequencing_run.experiment }}</a></li>
+	    	<li class="nav-item"><a class="nav-link" data-toggle="tab" role="tab" href="#experiment">{{ sequencing_run.experiment }}</a></li>
 		{% endif %}
-            <li><a href="#data">Data</a></li>
+            <li class="nav-item"><a class="nav-link" data-toggle="tab" role="tab" href="#data">Data</a></li>
         {% if sequencing_run.sequencingrunmodification_set.exists %}
-            <li><a href="#modifications">Modifications</a></li>
+            <li class="nav-item"><a class="nav-link" data-toggle="tab" role="tab" href="#modifications">Modifications</a></li>
         {% endif %}
         {% if user.is_superuser %}
-            <li><a href="#admin">Admin</a></li>
+            <li class="nav-item"><a class="nav-link" data-toggle="tab" role="tab" href="#admin">Admin</a></li>
         {% endif %}
 
 	  	</ul>
-        <div id="wiki">
+        <div class="tab-content">
+        <div class="tab-pane{% if not tab_id %} show active{% endif %}" role="tabpanel" id="run-stats"></div>
+        <div class="tab-pane" role="tabpanel" id="wiki">
             {% load wiki_tags %}
             {% wiki_editor sequencing_run.sequencingrunwiki class_name='seqauto.models.SequencingRunWiki' unique_keyword='sequencing_run_id' unique_value=sequencing_run.pk %}
         </div>
-		<div id="samples">
+		<div class="tab-pane" role="tabpanel" id="samples">
 
             {% page_help user 'seqauto/sequencing_run_samples_help' 'Sequencing Run Samples' %}
 		
@@ -268,7 +270,7 @@
             </table>		
 		
         </div>
-        <div id="barcodes">
+        <div class="tab-pane" role="tabpanel" id="barcodes">
 
 		{% if sample_sheet %}
 			{% if user.is_superuser %}
@@ -320,7 +322,7 @@
 		</div>
 
 		{% if sequencing_run.experiment %}
-		<div id='experiment'>
+		<div class="tab-pane" role="tabpanel" id='experiment'>
             <div id='experiment-info-text'>
                 <p>ExperimentID (
                 <a href="{% url 'view_experiment' sequencing_run.experiment.pk %}">{{ sequencing_run.experiment }}</a>) was read from RunParameters.xml (or if missing, RunInfo.xml) in the Sequencing Run directory labelled <b>Path</b> above.
@@ -329,7 +331,7 @@
 		</div>
 		{% endif %}
 
-        <div id='data'>
+        <div class="tab-pane" role="tabpanel" id='data'>
             <h3>Made from this data</h3>
             {% with joint_called_vcfs=sample_sheet.get_joint_called_vcfs %}
             {% if joint_called_vcfs %}
@@ -390,7 +392,7 @@
 
 
         {% if sequencing_run.sequencingrunmodification_set.exists %}
-        <div id='modifications'>
+        <div class="tab-pane" role="tabpanel" id='modifications'>
             <table>
                 <tr><th>User <th>Created <th>Message
             {% for srm in sequencing_run.sequencingrunmodification_set.all %}
@@ -405,7 +407,7 @@
 
 
     {% if user.is_superuser %}
-        <div id='admin'>
+        <div class="tab-pane" role="tabpanel" id='admin'>
             <h3>SequencingRun Admin</h3>
 
             <script>
@@ -476,6 +478,7 @@
 
         </div>
     {% endif %}
+        </div>
 	</div>
 
 

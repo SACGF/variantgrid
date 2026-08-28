@@ -4,6 +4,7 @@
 <link href="https://fonts.googleapis.com/css?family=Open+Sans" rel="stylesheet">
 {% if stand_alone %}
 <!-- Importing headers due to stand alone window -->
+<link href="{% static 'js/lib/bootstrap/4.5.2/css/bootstrap.min.css' %}" rel="stylesheet">
 <link href="{% static 'js/lib/jquery-ui-1.13.2.custom/jquery-ui.min.css' %}" rel="stylesheet">
 <link href="{% static 'js/lib/jquery-ui-1.13.2.custom/jquery-ui.theme.css' %}" rel="stylesheet">
 <link href="{% static 'fontawesomefree/css/all.min.css' %}" rel="stylesheet" type="text/css">
@@ -12,6 +13,8 @@
 <link rel="shortcut icon" href="{% static 'favicon.ico' %}" />
 <script type="text/javascript" src="{% static 'js/lib/jquery-3.7.1/jquery-3.7.1.min.js' %}"></script>
 <script type="text/javascript" src="{% static 'js/lib/jquery-ui-1.13.2.custom/jquery-ui.min.js' %}"></script>
+{# The node editor's tabs are Bootstrap - this window renders it without uicore's base.html #}
+<script type="text/javascript" src="{% static 'js/lib/bootstrap/4.5.2/js/bootstrap.min.js' %}"></script>
 {# venn_intersect.js builds its SVG through svgSelect #}
 <script type="text/javascript" src="{% static 'js/global.js' %}"></script>
 {% include "analysis/analysis_includes.html" %}

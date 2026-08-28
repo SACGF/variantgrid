@@ -307,10 +307,10 @@ function renderVariantDetailsTabs() {
 // Point the node editor (and so the data container, see switch_node_data) at one of its own tabs
 function setNodeEditorTab(editorTab) {
     activeNodeEditorTab = editorTab;
-    // ui-tabs-nav is added by the widget - the editor is only tabbed once it's finished loading
-    const tabs = $("#node-editor-tabs:has(> ul.ui-tabs-nav)");
-    if (tabs.length && tabs.tabs("option", "active") !== editorTab) {
-        tabs.tabs("option", "active", editorTab);
+    // the editor is only tabbed once it's finished loading
+    const links = $("#node-editor-tabs > ul.nav-tabs > li > a");
+    if (links.length && !links.eq(editorTab).hasClass("active")) {
+        links.eq(editorTab).tab("show");
     }
 }
 

@@ -1213,10 +1213,6 @@ div.readonly {
   font-style: italic;
 }
 
-.ui-tabs .ui-tabs-nav li.ui-tabs-active {
-  padding-bottom: 0 !important;
-}
-
 .debug {
   padding: 4px;
   margin-left: auto;

@@ -5,7 +5,7 @@
 {% load tz %}
 {% load ui_utils %}
 {% block node_editor_not_visible_tab_links %}
-    <li><a href="#tag-classification">Classifications</a></li>
+    <li class="nav-item"><a class="nav-link" data-toggle="tab" role="tab" href="#tag-classification">Classifications</a></li>
 {% endblock node_editor_not_visible_tab_links %}
 
 {% block content %}
@@ -42,7 +42,7 @@ $(document).ready(function() {
 
     {%  if not requires_classification_tags %}
         {% if not node.analysis.analysisclassification_set.exists %}
-            $("#node-editor-tabs").tabs({"disabled" : [1]});
+            $("#node-editor-tabs > ul.nav-tabs > li > a").eq(1).addClass("disabled").removeAttr("data-toggle");
         {% endif %}
     {% endif %}
 
@@ -86,7 +86,7 @@ $(document).ready(function() {
 {% endblock content %}
 
 {% block node_editor_not_visible_tab %}
-<div id='tag-classification'>
+<div class="tab-pane" role="tabpanel" id='tag-classification'>
 
     {% if requires_classification_tags %}
         <p>

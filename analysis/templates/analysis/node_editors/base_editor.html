@@ -173,25 +173,16 @@
 	}
 
 	$(document).ready(function() {
-		const tab = $("#node-editor-tabs");
-		let params = {
-			activate: function (event, ui) {
-				const active = tab.tabs('option', 'active');
-				const activeTabLinkId = $("ul>li a", tab).eq(active).attr("id");
-				switch_node_data(activeTabLinkId);
-			}
-		};
-		tab.tabs(params);
+		$("#node-editor-tabs > ul.nav-tabs > li > a").on('shown.bs.tab', function () {
+			switch_node_data($(this).attr("id"));
+		});
 		if (typeof syncNodeEditorTabs === 'function') {
 			syncNodeEditorTabs();  // horizontal mode shows these tabs in the bottom pane or drawer bar
 		}
 
-		params = {
-			activate: function (event, ui) {
-				$("#node-data-summary").html("Please select configuration above and select view.");
-			}
-		};
-		$("#node-summary-tabs").tabs(params).addClass('ui-tabs-vertical ui-helper-clearfix');
+		$("#node-summary-tabs > ul.nav-tabs > li > a").on('shown.bs.tab', function () {
+			$("#node-data-summary").html("Please select configuration above and select view.");
+		});
 
 		$("#column-summary-button").click(load_column_summary);
 		$("#snp-matrix-button").click(load_snp_matrix_summary);
@@ -219,29 +210,30 @@
 	</style>
 	<div id="node-editor-wrapper" node_id="{{ node.pk }}">
 		<div id="node-editor-tabs">
-			<ul>
+			<ul class="nav nav-tabs" role="tablist">
 				{# Horizontal mode mirrors these into the bottom pane strip, where this tab is the editor half #}
-				<li><a id='tab-link-grid' href="#node-grid">{% if node.analysis.analysis_horizontal_mode %}Editor{% else %}Grid{% endif %}</a></li>
+				<li class="nav-item"><a id='tab-link-grid' class="nav-link show active" data-toggle="tab" role="tab" href="#node-grid">{% if node.analysis.analysis_horizontal_mode %}Editor{% else %}Grid{% endif %}</a></li>
 				{% block node_editor_tab_links_second %}{% endblock node_editor_tab_links_second %}
 
 				{% if node.visible %}
-					<li><a id='tab-link-summary' href="#node-summary">Summary</a></li>
-					<li><a id='tab-link-doc' href="{% url 'node_doc' node.analysis_id node.pk %}">Doc</a></li>
+					<li class="nav-item"><a id='tab-link-summary' class="nav-link" data-toggle="tab" role="tab" href="#node-summary">Summary</a></li>
+					<li class="nav-item"><a id='tab-link-doc' class="nav-link" data-toggle="tab" role="tab" href="#node-doc" data-href="{% url 'node_doc' node.analysis_id node.pk %}">Doc</a></li>
 					{% if graph_form %}
-					<li><a id='tab-link-graphs' href="#node-graphs">Graphs</a></li>
+					<li class="nav-item"><a id='tab-link-graphs' class="nav-link" data-toggle="tab" role="tab" href="#node-graphs">Graphs</a></li>
 					{% endif %}
 				{% else %}
 					{% block node_editor_not_visible_tab_links %}{% endblock node_editor_not_visible_tab_links %}
 				{% endif %}
 				{% if node.has_audit_log %}
-					<li><a id='tab-link-node-audit-log' href="{% url 'node_audit_log' node.analysis_id node.analysis.version node.pk node.version extra_filters %}">Audit Log</a></li>
+					<li class="nav-item"><a id='tab-link-node-audit-log' class="nav-link" data-toggle="tab" role="tab" href="#node-audit-log" data-href="{% url 'node_audit_log' node.analysis_id node.analysis.version node.pk node.version extra_filters %}">Audit Log</a></li>
 				{% endif %}
 				{% if node_debug_tab %}
-					<li><a id='tab-link-debug' href="{% url 'node_debug' node.analysis_id node.analysis.version node.pk node.version extra_filters %}">Debug</a></li>
+					<li class="nav-item"><a id='tab-link-debug' class="nav-link" data-toggle="tab" role="tab" href="#node-debug" data-href="{% url 'node_debug' node.analysis_id node.analysis.version node.pk node.version extra_filters %}">Debug</a></li>
 				{% endif %}
 				{% block node_editor_tab_links_end %}{% endblock node_editor_tab_links_end %}
 			</ul>
-			<div id="node-grid">
+			<div class="tab-content">
+			<div class="tab-pane show active" role="tabpanel" id="node-grid">
 				{% block node_filter_info %}
 					{% if extra_filters_label %}
 						<b>Filtering to:</b> <span class="node-count-{{ extra_filters }}"><span class='user-tag-colored'>{{ extra_filters_label }}</span> - <a href="javascript:createExtraFilterChild()">create child node.</a></span>
@@ -288,14 +280,15 @@
 			</div>
 			{% if node.visible %}
 			{% block node_editor_tabs_second %}{% endblock node_editor_tabs_second %}
-			<div id="node-summary">
-				<div id='node-summary-tabs'>
-					<ul>
+			<div class="tab-pane" role="tabpanel" id="node-summary">
+				<div id='node-summary-tabs' class="vertical-tabs">
+					<ul class="nav nav-tabs flex-column" role="tablist">
 					{% block node_summary_tab_links %}{% endblock node_summary_tab_links %}
-					<li><a href='#column-summary-editor'>Column Summary</a></li>
-					<li><a href='#snp-matrix-editor'>SNP Matrix</a></li>
+					<li class="nav-item"><a class="nav-link show active" data-toggle="tab" role="tab" href='#column-summary-editor'>Column Summary</a></li>
+					<li class="nav-item"><a class="nav-link" data-toggle="tab" role="tab" href='#snp-matrix-editor'>SNP Matrix</a></li>
 					</ul>
-					<div id='column-summary-editor'>
+					<div class="tab-content">
+					<div class="tab-pane show active" role="tabpanel" id='column-summary-editor'>
 						<form id='column-summary-form'>
 							{% csrf_token %}
 							<div>
@@ -306,7 +299,7 @@
 							</div>
 						</form>
 					</div>
-					<div id='snp-matrix-editor'>
+					<div class="tab-pane" role="tabpanel" id='snp-matrix-editor'>
 						<form id='snp-matrix-form'>
 							{% csrf_token %}
 							<table>
@@ -318,10 +311,12 @@
 							</table>
 						</form>
 					</div>
+					</div>
 				</div>
 			</div>
+				<div class="tab-pane" role="tabpanel" id="node-doc"></div>
 				{% if graph_form %}
-				<div id="node-graphs">
+				<div class="tab-pane" role="tabpanel" id="node-graphs">
 					<form id="graph-node-form">
 						{% csrf_token %}
 						Graph: {{ graph_form.graph_type }}
@@ -333,7 +328,14 @@
 			{% else %}
 			  {% block node_editor_not_visible_tab %}{% endblock node_editor_not_visible_tab %}
 			{% endif %}
+			{% if node.has_audit_log %}
+			<div class="tab-pane" role="tabpanel" id="node-audit-log"></div>
+			{% endif %}
+			{% if node_debug_tab %}
+			<div class="tab-pane" role="tabpanel" id="node-debug"></div>
+			{% endif %}
 			{% block node_editor_tabs_end %}{% endblock node_editor_tabs_end %}
+			</div>
 		</div>
 
 	</div>

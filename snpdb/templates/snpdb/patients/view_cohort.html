@@ -226,14 +226,18 @@
 		});
 	}
 
+    function showCohortTab(index) {
+        $("#cohort-tabs .nav-link").eq(index).tab('show');
+    }
+
     function hideDetailsTab() {
         $("#details-tab").hide();
-        $("#cohort-tabs").tabs({"active" : 1});
+        showCohortTab(1);
     }
 
     function showDetailsTab() {
         $("#details-tab").show();
-        $("#cohort-tabs").tabs({"active" : 0});
+        showCohortTab(0);
     }
     
 $(document).ready(function() {
@@ -285,11 +289,8 @@ $(document).ready(function() {
 
 	messageCheck();
 
-{% if cohort_genotype_collection %}
-    $("#cohort-tabs").tabs({"active" : 0});
-{% else %}
-    $("#cohort-tabs").tabs({"active" : 1});
-    hideDetailsTab();    
+{% if not cohort_genotype_collection %}
+    hideDetailsTab();
 {% endif %}
     
 })
@@ -329,16 +330,17 @@ $(function() {
     </div>
     
     <div id="cohort-tabs">
-    <ul>
-        <li><a id='details-tab' href="{% url 'view_cohort_details_tab' cohort.pk %}">Details</a></li>
+    <ul class="nav nav-tabs mb-4" role="tablist">
+        <li class="nav-item"><a id='details-tab' class="nav-link{% if cohort_genotype_collection %} show active{% endif %}" data-toggle="tab" role="tab" href="#details" data-href="{% url 'view_cohort_details_tab' cohort.pk %}">Details</a></li>
         {% if has_write_permission %}
-        <li id="samples-tab"><a href="#samples">Add/Remove Samples</a></li>
-        <li><a href="{% url 'group_permissions' 'snpdb.models.Cohort' cohort.pk %}">Sharing / Permissions</a></li>
+        <li class="nav-item" id="samples-tab"><a class="nav-link{% if not cohort_genotype_collection %} show active{% endif %}" data-toggle="tab" role="tab" href="#samples">Add/Remove Samples</a></li>
+        <li class="nav-item"><a class="nav-link" data-toggle="tab" role="tab" href="#cohort-permissions" data-href="{% url 'group_permissions' 'snpdb.models.Cohort' cohort.pk %}">Sharing / Permissions</a></li>
         {% endif %}
     </ul>
-    <div id="details">
+    <div class="tab-content">
+    <div class="tab-pane{% if cohort_genotype_collection %} show active{% endif %}" role="tabpanel" id="details">
     </div>
-    <div id="samples">
+    <div class="tab-pane{% if not cohort_genotype_collection %} show active{% endif %}" role="tabpanel" id="samples">
         {% page_help user 'patients/view_cohort_help' %}
     		<table id="grid-container">
     		<tr><th>Available Samples ({{ cohort.genome_build }})</th><th>Cohort Samples</th> 
@@ -415,6 +417,10 @@ $(function() {
                     <button id='launch-cohort-count-task-button' class="btn btn-secondary" type='button'>Save cohort</button>
                 </div>
             </div>
+    </div>
+    {% if has_write_permission %}
+    <div class="tab-pane" role="tabpanel" id="cohort-permissions"></div>
+    {% endif %}
     </div>
     </div>
 </form>

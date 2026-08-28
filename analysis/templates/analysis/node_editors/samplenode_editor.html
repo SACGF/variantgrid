@@ -121,7 +121,7 @@
     {{ block.super }}
 
     {% if sample.patient %}
-            <li id='patient-tab'><a href="#node-patient">Patient</a></li>
+            <li id='patient-tab' class="nav-item"><a class="nav-link" data-toggle="tab" role="tab" href="#node-patient">Patient</a></li>
     {% endif %}
 {% endblock node_editor_tab_links_second %}
 
@@ -140,7 +140,7 @@
     {{ block.super }}
 
 	{% if sample.patient %}
-		<div id="node-patient">
+		<div class="tab-pane" role="tabpanel" id="node-patient">
 			<p>
 			<b>Patient: </b>{{ sample.patient }} <a target='_blank' href="{% url 'view_patient' sample.patient.pk %}">Edit Patient</a>
 			</p>

@@ -56,8 +56,6 @@
             });
         });
 
-		$("#tag-colors-collection-tabs").tabs({cache: true});
-
 		$("#tag-colors-sortable").sortable({
 		    items: "tr.tag-color-row",
 		    placeholder: "sort_placeholder",
@@ -104,11 +102,12 @@
 
 {% if has_write_permission %}
     <div id="tag-colors-collection-tabs">
-        <ul>
-            <li><a href="#name">Name</a></li>
-	        <li><a href="{% url 'group_permissions' 'snpdb.models.TagColorsCollection' tag_colors_collection.pk %}">Sharing / Permissions</a></li>
+        <ul class="nav nav-tabs mb-4" role="tablist">
+            <li class="nav-item"><a class="nav-link show active" data-toggle="tab" role="tab" href="#name">Name</a></li>
+	        <li class="nav-item"><a class="nav-link" data-toggle="tab" role="tab" href="#tag-colors-collection-permissions" data-href="{% url 'group_permissions' 'snpdb.models.TagColorsCollection' tag_colors_collection.pk %}">Sharing / Permissions</a></li>
 		</ul>
-        <div id="name">
+        <div class="tab-content">
+        <div class="tab-pane show active" role="tabpanel" id="name">
 			<form id="tag-colors-collection-form" method="post">
 				{% csrf_token %}
 				<label for="tag-colors-collection-name">Name:</label>
@@ -118,6 +117,8 @@
 				<ul id="save-name-message" class="messages">
 				</ul>
 			</form>
+		</div>
+        <div class="tab-pane" role="tabpanel" id="tag-colors-collection-permissions"></div>
 		</div>
 	</div>
 
