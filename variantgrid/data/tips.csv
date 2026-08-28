@@ -19,7 +19,6 @@ The Classifications node lets you search for variants that have existing classif
 The Gene List node supports PanelApp UK + Australia panels. Search for a panel by name and it automatically loads the gene list.,analysis,analysis,
 "The Venn node lets you combine (union), intersect, or subtract variant sets from two parent nodes. Great for comparing sample groups.",analysis,analysis,
 "You can create a sub-cohort from any cohort. Useful for splitting a large study group into smaller, more specific cohorts for analysis.",snpdb,cohorts,
-The Cohort node can show per-sample het/hom counts in the grid. Use this to quickly see zygosity across all cohort members for each variant.,analysis,analysis,
 Download an annotated CSV or VCF directly from any VCF or sample page. The file is generated in the background so downloads are fast.,snpdb,view_vcf,
 You can customise the sample name shown in the analysis grid. Set it to display the patient name for easier identification (Sample page → edit sample label).,snpdb,view_sample,
 Sample pages show a graph of chromosomal variant distribution. Useful for spotting sample-level quality issues or unusual patterns.,snpdb,sample_graphs_tab,
@@ -51,7 +50,6 @@ Discordance Reports highlight variants where your lab and another lab have confl
 The Activity feed shows a timeline of recent classification changes across your lab. Great for staying up to date with team activity.,classification,activity,
 You can create a classification directly from an HGVS string. Useful when you want to classify a variant you haven't uploaded yet.,classification,create_classification_from_hgvs,CLASSIFICATION_WEB_FORM_CREATE_ALLOW_NO_VARIANT
 "Condition text in classifications is automatically matched to MONDO, OMIM, and HPO terms. Check the Condition Matchings page to review and fix any unresolved terms.",classification,condition_matchings,
-"Classifications support file attachments. Upload PDFs, images, or supporting documents directly to a classification record.",classification,classification_file_upload,CLASSIFICATION_FILE_ATTACHMENTS
 The Candidate Search feature can find existing classifications across your database that might be relevant to a sample you're currently analysing.,classification,classification_candidate_search,
 You can bulk import classifications from a CSV or Excel file. Go to Classifications → Import Upload to check the expected format and upload.,classification,classification_upload_unmapped,
 Export your classifications as a REDCap-compatible CSV for research database integration.,classification,export_classifications_grid_redcap,CLASSIFICATION_REDCAP_EXPORT
