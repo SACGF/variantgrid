@@ -30,6 +30,11 @@ IN_REVIEW_VALUE = "in-review"
 
 
 class OverlapContribution(TimeStampedModel):
+    """
+    Represents a record that will contribute to one or multiple overlaps.
+    (An overlap being records that should be compared for discordances, primarily an Allele and a Testing Context).
+
+    """
     history = AuditlogHistoryField()
 
     source = models.TextField(choices=OverlapEntrySourceTextChoices.choices)

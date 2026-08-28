@@ -1,6 +1,9 @@
+from typing import Iterable
+
 from auditlog.mixins import AuditlogHistoryAdminMixin
-from django.contrib.admin import TabularInline
+from django.contrib.admin import TabularInline, ModelAdmin
 from django.db.models import QuerySet
+from django.http import HttpRequest
 
 from classification.enums import OverlapStatus
 from classification.models import Overlap, OverlapContribution, OverlapContributionSkew
@@ -8,7 +11,7 @@ from classification.services.overlaps_services import OverlapServices
 from snpdb.admin_utils import ModelAdminBasics, admin_action, admin_list_column
 from django.contrib import admin
 
-from snpdb.models import AlleleOrigin, Allele
+from snpdb.models import AlleleOrigin, Allele, Lab
 
 
 # class OverlapContributionInline(admin.TabularInline):
@@ -42,16 +45,36 @@ class OverlapContributionSpecial(admin.SimpleListFilter):
         return queryset
 
 
+class OverlapContributionLab(admin.SimpleListFilter):
+    title = 'Lab'
+    parameter_name = 'lab'
+    default_value = None
+
+    def lookups(self, request: HttpRequest, model_admin: ModelAdmin):
+        return [("clinvar", "ClinVar")] + [(lab.group_name, str(lab)) for lab in sorted(Lab.objects.all())]
+
+    def queryset(self, request: HttpRequest, queryset: QuerySet) -> QuerySet:
+        if value := self.value():
+            if value == "clinvar":
+                return queryset.filter(scv__isnull=False)
+            else:
+                return queryset.filter(classification_grouping__lab=Lab.objects.filter(group_name=value).first())
+        return queryset
+
 @admin.register(OverlapContribution)
 class OverlapContributionAdmin(AuditlogHistoryAdminMixin, ModelAdminBasics):
     show_auditlog_history_link = True
     search_fields = ("id", "scv", "value")
-    list_display = ['pk', 'source', 'allele', 'triage_state_formatted', 'classification_grouping', 'value_type', 'value', 'testing_context_bucket', 'effective_date__date', 'classification_grouping__lab']
-    list_filter = ('source', 'value_type', 'testing_context_bucket', 'classification_grouping__lab', OverlapContributionSpecial)
+    list_display = ('pk', 'source', 'allele', 'triage_state_formatted', 'classification_grouping', 'value_type', 'value', 'testing_context_bucket', 'display_effective_date', 'display_lab')
+    list_filter = ('source', 'value_type', 'testing_context_bucket', OverlapContributionSpecial, OverlapContributionLab)
 
-    @admin_list_column(short_description="Effective Date", order_field="effective_date__date")
-    def effective_date__date(self, obj: OverlapContribution):
+    @admin_list_column(short_description='Effective Date', order_field="effective_date__date")
+    def display_effective_date(self, obj: OverlapContribution):
         return obj.effective_date_obj
+
+    @admin_list_column(short_description='Lab', order_field="classification_grouping__lab")
+    def display_lab(self, obj: OverlapContribution):
+        return str(obj.lab_like)
 
     @admin_list_column(order_field="triage_state__status")
     def triage_state_formatted(self, obj: OverlapContribution):
