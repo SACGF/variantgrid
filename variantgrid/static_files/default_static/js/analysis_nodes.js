@@ -1,5 +1,5 @@
 const endpointColor = "#121212";
-const ACTIVE_CLASS = "ui-selected";
+const ACTIVE_CLASS = "node-selected";
 const DELETING_CLASS = "node-deleting";  // fade out transition, see analysis_nodes.css
 const ACTIVE_NODE_COUNT_CLASS = "node-counts-selected"; // Needs to be different so not grabbed with multi-draggable
 const NODE_COUNT_TOTAL = "T";  // snpdb.models.models_enums.BuiltInFilters.TOTAL
@@ -813,17 +813,67 @@ function bringNodeToFront(node) {
 }
 
 
+// The marquee only starts on empty canvas - grabbing a node hands the mouse to jsPlumb's dragging.
+// Everything is done in page coordinates so the canvas scrolling in horizontal mode doesn't shift it.
 function setupNodeModifications() {
-	// The marquee only starts on empty canvas - grabbing a node hands the mouse to jsPlumb's dragging.
-	// unselectActive on start to also unselect node counts
-	$('#analysis-container').selectable({
-		filter: "div.window",
-		start: function () {
-			// clear editor/grid so people don't get confused about active node
-			replaceEditorWindow();
-			loadGridAndEditorForNode();
-		},
-		cancel: '.cancel, div.window'
+	const canvas = $("#analysis");
+	let origin = null;
+	let marquee = null;
+
+	function draggedRect(event) {
+		return {
+			left: Math.min(origin.x, event.pageX),
+			top: Math.min(origin.y, event.pageY),
+			right: Math.max(origin.x, event.pageX),
+			bottom: Math.max(origin.y, event.pageY),
+		};
+	}
+
+	function drawMarquee(event) {
+		const rect = draggedRect(event);
+		const canvasOffset = canvas.offset();
+		marquee.css({
+			left: rect.left - canvasOffset.left,
+			top: rect.top - canvasOffset.top,
+			width: rect.right - rect.left,
+			height: rect.bottom - rect.top,
+		});
+	}
+
+	function selectNodesIn(rect) {
+		$("div.window", canvas).each(function() {
+			const node = $(this);
+			const offset = node.offset();
+			const intersects = offset.left < rect.right && offset.left + node.outerWidth() > rect.left &&
+							   offset.top < rect.bottom && offset.top + node.outerHeight() > rect.top;
+			if (intersects) {
+				node.addClass(ACTIVE_CLASS);
+			}
+		});
+	}
+
+	$('#analysis-container').on("mousedown", function(event) {
+		const grabbedNode = $(event.target).closest("div.window").length > 0;
+		if (event.which !== 1 || grabbedNode) {
+			return;
+		}
+		origin = {x: event.pageX, y: event.pageY};
+		unselectActive();  // also unselects node counts
+		// clear editor/grid so people don't get confused about active node
+		replaceEditorWindow();
+		loadGridAndEditorForNode();
+
+		marquee = $("<div/>", {class: "node-marquee"}).appendTo(canvas);
+		drawMarquee(event);
+		event.preventDefault();
+
+		$(document).on("mousemove.node-marquee", drawMarquee)
+				   .on("mouseup.node-marquee", function(e) {
+			$(document).off(".node-marquee");
+			marquee.remove();
+			marquee = null;
+			selectNodesIn(draggedRect(e));
+		});
 	});
 }
 

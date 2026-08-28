@@ -120,7 +120,11 @@ button.add-analysis-variable-button {
 	margin: 5px;
 }
 
-/* Add node dropdown - jQuery UI selectmenu, see setupNodeTypeSelect() */
+/* Add node dropdown - Bootstrap dropdown over the node types select, see setupNodeTypeSelect() */
+#analysis-toolbar .node-type-item {
+    float: none;  /* #analysis-toolbar floats its divs - the dropdown rows lay themselves out */
+}
+
 #id_node_types-button {
     display: flex;
     align-items: center;
@@ -136,22 +140,20 @@ button.add-analysis-variable-button {
 }
 
 #id_node_types-button:hover,
-#id_node_types-button.ui-state-active {
+.dropdown.show > #id_node_types-button {
     border-color: #3455a4;
     background: #f4f6f8;
 }
 
-#id_node_types-button .ui-selectmenu-text {
+#id_node_types-button .node-type-button-text {
     flex: 1;
     margin-right: 0;
 }
 
-#id_node_types-button .ui-selectmenu-icon {
-    margin-top: 3px;
-}
-
 .node-type-menu {
+    min-width: 180px; /* match #id_node_types-button */
     max-height: 60vh;
+    overflow-y: auto;
     padding: 3px;
     border: 1px solid #c6cdd6;
     border-radius: 6px;
@@ -159,21 +161,19 @@ button.add-analysis-variable-button {
     font-size: 12px;
 }
 
-.node-type-menu .ui-menu-item-wrapper {
+.node-type-menu .dropdown-item {
     padding: 2px 6px;
     border: none;
     border-radius: 4px;
 }
 
-.node-type-menu .ui-state-active {
-    /* The theme gives .ui-state-active a border and margin: -1px to absorb it - we draw no border,
-       so the negative margin would grow the row as you mouse down the list */
-    margin: 0;
+.node-type-menu .dropdown-item:hover,
+.node-type-menu .dropdown-item.active {
     background: #eef2fb;
     color: #24292f;
 }
 
-.node-type-menu .ui-selectmenu-optgroup {
+.node-type-menu .dropdown-header {
     margin-top: 4px;
     padding: 2px 6px;
     font-size: 9px;
@@ -538,9 +538,18 @@ svg.node-icon {
 	border-radius: 6px;
 }
 
-.ui-selected.design-a-node {
+.node-selected.design-a-node {
 	border-color: red;
 	box-shadow: 0 0 0 2px rgba(255, 0, 0, .35), 2px 2px 8px rgba(0, 0, 0, .25);
+}
+
+/* Rubber band drawn over empty canvas, see setupNodeModifications() */
+.node-marquee {
+	position: absolute;
+	z-index: 30; /* over the nodes, which are 24 */
+	border: 1px dotted black;
+	background-color: rgba(52, 85, 164, .1);
+	pointer-events: none;
 }
 
 .tag-counter {
@@ -557,10 +566,6 @@ svg.node-icon {
 }
 
 tr.jqgrow {
-	background-image: None;
-}
-
-table.grid tr.ui-state-highlight {
 	background-image: None;
 }
 

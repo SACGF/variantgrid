@@ -651,25 +651,47 @@ function setupNodeTypeSelect() {
         return wrapper;
     }
 
-    $.widget( "custom.iconselectmenu", $.ui.selectmenu, {
-      _renderItem: function( ul, item ) {
-        const li = $( "<li>" );
-        if ( item.disabled ) {
-          li.addClass( "ui-state-disabled" );
-        }
-        return li.append(renderNodeTypeItem(item.element.attr("value"), item.label)).appendTo( ul );
-      },
+    // Bootstrap dropdown over the form's <select> - addNode() still reads the select's value
+    const select = $("#id_node_types");
+    if (!select.length) {
+        return;  // read only analysis - no add node toolbar
+    }
+    select.hide();
+    const button = $("<button>", {id: "id_node_types-button", type: "button", "class": "dropdown-toggle",
+                                  "data-toggle": "dropdown", "aria-haspopup": "true", "aria-expanded": "false"});
+    const menu = $("<div>", {"class": "dropdown-menu node-type-menu", "aria-labelledby": "id_node_types-button"});
 
-      _renderButtonItem: function( item ) {
-        return renderNodeTypeItem(item.element.attr("value"), item.label)
-            .addClass("ui-selectmenu-text");
-      }
+    function addMenuItem(option) {
+        $("<a>", {"class": "dropdown-item", href: "javascript:void(0)", "data-value": option.val()})
+            .append(renderNodeTypeItem(option.val(), option.text()))
+            .appendTo(menu);
+    }
+
+    select.children().each(function() {
+        const child = $(this);
+        if (child.is("optgroup")) {
+            $("<h6>", {"class": "dropdown-header", text: child.attr("label")}).appendTo(menu);
+            child.children("option").each(function() { addMenuItem($(this)); });
+        } else {
+            addMenuItem(child);
+        }
     });
 
-    $("#id_node_types").iconselectmenu({width: false})
-        .iconselectmenu( "menuWidget" )
-        .addClass( "node-type-menu" );
+    function showSelected() {
+        const value = select.val();
+        const label = select.find("option:selected").text();
+        button.empty().append(renderNodeTypeItem(value, label).addClass("node-type-button-text"));
+        $(".dropdown-item", menu).removeClass("active")
+            .filter("[data-value='" + value + "']").addClass("active");
+    }
 
+    menu.on("click", ".dropdown-item", function() {
+        select.val($(this).data("value")).trigger("change");
+    });
+    select.on("change", showSelected);
+
+    $("<div>", {"class": "dropdown"}).append(button, menu).insertAfter(select);
+    showSelected();
 }
 
 function addVariantTag(variantId, nodeId, tagId, successFunc) {
