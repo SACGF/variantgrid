@@ -75,7 +75,6 @@ The Cohort Hotspot page shows which genes are most frequently variant in your co
 You can a VCF / cohort’s samples into a Pedigree with a .ped file and use the Pedigree node in analysis to filter by inheritance across a multi-generation family.,snpdb,view_cohort,
 The 'Nearby Classifications' section on the variant page looks across genome builds. So a GRCh37 classification will show up when viewing the GRCh38 equivalent.,variantopedia,view_variant,
 Variant tags can be added or removed directly from the variant detail page. You don't have to be in an analysis to tag a variant.,variantopedia,view_variant,
-"The server status page shows system health, database statistics, and activity details. Useful for admins checking annotation pipeline status.",variantopedia,server_status,
 You can search for EnrichmentKit names in the global search. Takes you straight to the kit's page showing associated samples.,variantopedia,search,
 Analyses can have “Horizontal mode” which lays nodes out left to right with the variant grid docked full width along the bottom. Turn it on in Analysis Settings → Details tab (or set it as your default in User Settings).,analysis,analysis_settings_details_tab,
 "Node counts record where their number came from. An exact count is a hard number, an advisory count means data has changed since it was calculated and it needs a reload.",analysis,analysis,
@@ -91,10 +90,8 @@ denovoDB annotation is available for checking whether a variant has been seen as
 Any variants that couldn't be annotated are listed on the VCF and sample pages so you know what's missing rather than silently losing them.,snpdb,view_vcf,
 "T2T-CHM13v2 is supported as an experimental genome build. Not all annotation is available yet, but you can load and browse data against it.",snpdb,view_genome_build,
 The variant details page can query external GA4GH Beacons to see whether other institutions hold the same variant. Contact the admin if you know of other servers we should add,beacon,external_beacons,BEACON_OUTBOUND_ENABLED
-"This server can act as a GA4GH Beacon v2 node, exposing variants (including CNVs and somatic) to other beacons.",beacon,beacon_index,BEACON_ENABLED
 MatchMaker Exchange lets you match rare disease patients against other MME nodes. A classification is submitted once it reaches the 'public' share level - the classification page tells you whether that record is eligible.,mme,mme_classification_panel,MME_ENABLED
 Inbound MatchMaker matches raise a notification and can be reviewed with the submitting contact's details.,mme,mme_view_inbound_match,MME_ENABLED
-"Reclassification analytics shows reclassification rates, VUS rate over time, and which genes carry the most reclassification burden.",classification,classification_reclassification_analytics,
 Somatic classifications have their own evidence keys and tier-based clinical significance alongside the germline ACMG workflow.,classification,view_classification,
 "The classification page shows sync status - whether the last published version reached each remote (with a link), or why it was excluded.",classification,view_classification,SYNC_DETAILS
 Candidate Search can re-run an analysis against current classifications to find variants that were missed or whose classification has since changed.,classification,new_reanalysis_candidate_search,
@@ -104,7 +101,6 @@ If you visit the gene list page (genes → gene lists) there is a graphs tab tha
 Lab heads can add and remove members from the lab page without needing an admin.,snpdb,lab_members_tab,LAB_HEAD_MANAGE_MEMBERS
 Your user page shows your tags and your classifications in one place.,snpdb,view_user,
 "The Tag Stats page shows tag counts over time, broken down by user, lab and gene, plus which tags co-occur.",variantopedia,tag_stats,
-"Duplicate tags can be merged - the old tag is retired rather than deleted, and the operation is logged.",snpdb,tag_merge,
 Tag sort order is set on the tag colors page. Artifact tags sort last by default so they stay out of your way.,snpdb,tag_settings,
 The Tags for Variants grid is back in VG4 - one row per variant showing all its tags across analyses.,variantopedia,tagged_variant_grid,
 Ontologies can have multiple versions now. Term pages tell you which version you're looking at so upgrades don't silently change meanings.,ontology,ontology_term,
