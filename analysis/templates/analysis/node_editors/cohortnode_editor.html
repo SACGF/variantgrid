@@ -61,8 +61,7 @@
 
 	function loadPerSampleZygosityForm(cohortId) {
 	    // We need to stop people saving form with old cohort zygosity there
-	    var cohortSaveButton = $("button#cohort-save").button();
-	    cohortSaveButton.button('disable');
+	    $("button#cohort-save").prop("disabled", true);
 		var container = $("#per-sample-zygosity-container");
 		var notes = $("#cohort-node-notes").empty();
 		if (cohortId) {
@@ -78,7 +77,7 @@
                     container.html("Error loading zygosity for cohort (perhaps re-save node?)");
                 },
                 complete: function() {
-                    $("button#cohort-save").button('enable');                
+                    $("button#cohort-save").prop("disabled", false);
                 }
 			});
 		} else {
@@ -112,7 +111,6 @@
         $("input#id_per_sample_zygosity").val(JSON.stringify(getPerSampleZygosity()));
     }
 
-	$("button#cohort-save").button();
 	$("#id_cohort").change(changeCohort);
 
 	$("#id_min_het_or_hom_count").change(function() {

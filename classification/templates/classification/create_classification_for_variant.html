@@ -56,7 +56,7 @@
         $("span#zygosity").empty();
         $("#no-sample-link").hide();
         $("#no-sample-text").show();
-        $("button#create-variant-classification").button('enable');
+        $("button#create-variant-classification").prop("disabled", false);
     }
 
     pendingRefreshAutoPopulate = false;
@@ -134,7 +134,7 @@
 
     function restrictSamples() {
     {% if initially_require_sample %}
-        $("button#create-variant-classification").button('disable');
+        $("button#create-variant-classification").prop("disabled", true);
         $("#no-sample-link").show();
     {% endif %}
     }
@@ -157,10 +157,10 @@
                 let zygosity_html;
                 if (data.zygosity == MISSING) {
                     zygosity_html = '<div class="my-1"><i class="fas fa-exclamation-triangle text-error"></i> This sample does not contain the variant.</div>';
-                    createClassificationButton.button('disable');
+                    createClassificationButton.prop("disabled", true);
                 } else {
                     zygosity_html = "<b>Zygosity:</b>" + data.zygosity;
-                    createClassificationButton.button('enable');
+                    createClassificationButton.prop("disabled", false);
                 }
                 zygositySpan.html(zygosity_html);
             },
@@ -172,7 +172,6 @@
 
     $(document).ready(() => {
         createClassificationButton = $("button#create-variant-classification");
-        createClassificationButton.button();
 
         let sampleForm = $("#{{ variant_sample_autocomplete_form.sample.auto_id }}");
         let sampleId = sampleForm.val();

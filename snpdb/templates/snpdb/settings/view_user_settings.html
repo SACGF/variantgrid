@@ -19,7 +19,7 @@
             const editAvatar = $("#edit-avatar");
             function changeAvatarLoaded() {
                 $("#avatar-preview").hide();
-                $("input[type=submit]", editAvatar).button()
+                $("input[type=submit]", editAvatar).addClass("btn btn-primary")
             }
             editAvatar.load("{% url 'avatar:change' %}", changeAvatarLoaded);
         }

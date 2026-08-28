@@ -31,7 +31,6 @@ $(document).ready(function() {
         load_gene_list({{ gene_list_id }});
     {% endif %}
     
-    $("button#custom-genes-button").button();
 });
 </script>
 {% endblock %}
@@ -51,7 +50,7 @@ $(document).ready(function() {
             <form id="new-gene-list-form" method="post">
                 {% csrf_token %}
                 {{ custom_gene_list_form.custom_gene_list_text }}
-                <button id='custom-genes-button'>Use Custom Genes</button>
+                <button id='custom-genes-button' class="btn btn-primary">Use Custom Genes</button>
             </form>
         </div>
     </table>

@@ -93,7 +93,7 @@ function showBulkSet() {
 
 function initSubCohort() {
     const subCohortButton = $("#sub-cohort-button");
-    subCohortButton.button({disabled: true});
+    subCohortButton.prop("disabled", true);
     {% if vcf.import_status == 'S' and vcf.cohort %}
     subCohortButton.click(subCohortClick);
     $(".sample-select").change(setupSubCohortButton);

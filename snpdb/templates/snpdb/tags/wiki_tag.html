@@ -12,7 +12,7 @@
 <script>
 function initWiki() {
     const wikiId = $("#wiki-{{ uuid }}");
-    const wikiSaveButton = $(".wiki-save", wikiId).button();
+    const wikiSaveButton = $(".wiki-save", wikiId);
 
     let events = {};
     {% if has_write_permission %}

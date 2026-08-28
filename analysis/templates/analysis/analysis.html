@@ -288,8 +288,8 @@
             <div id='analysis-variables-help' class="left">
                 <b>Analysis Variables</b> - these fields are set from external data when creating an analysis
                 {% if analysis.template_type == 'T' %}
-                <div><b>Add:</b>Click <span id="av-example-add-button"></span> inside a node.</div>
-                <div><b>Remove:</b>Click the <span class="analysis-variable" id="av-example-button">variable</span> in this window.</div>
+                <div><b>Add:</b>Click <button type="button" id="av-example-add-button" class="add-analysis-variable-button btn btn-primary"><i class="fas fa-caret-square-up"></i>+</button> inside a node.</div>
+                <div><b>Remove:</b>Click the <button type="button" class="btn btn-primary-outline analysis-variable" id="av-example-button">variable</button> in this window.</div>
                 {% endif %}
             </div>
             <div class="clear"></div>

@@ -50,8 +50,7 @@ function setupPatientSamplenode(initialPatientDict) {
 		resetPatientSampleNode(); // set initial
 	});
 	form.change(formChanged);
-	$("input[type=submit]", form).button();
-	$("button#reset-form").button().click(function() {
+	$("button#reset-form").click(function() {
 		form.each(function() {
 			this.reset();
 			this.resetPatientSampleNode();

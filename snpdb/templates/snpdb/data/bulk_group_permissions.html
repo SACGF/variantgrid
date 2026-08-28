@@ -48,7 +48,6 @@ function checkboxSetup(addClickHandler) {
         checkboxSetup(false);
     });
     
-    $("button#save-group-permissions").button();
 {% endblock %}
 
 
@@ -96,7 +95,7 @@ function checkboxSetup(addClickHandler) {
     {% endfor %}
     </table>
     {% include "messages/messages.html" %}
-    <button id='save-group-permissions'>Save Permissions</button>
+    <button id='save-group-permissions' class="btn btn-primary">Save Permissions</button>
 </form>
 
 {% endblock %}

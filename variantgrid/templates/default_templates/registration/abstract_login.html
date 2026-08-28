@@ -11,9 +11,6 @@
 </style>
 <script type="text/javascript">
 {%  if use_oidc %}
-    $(document).ready(function () {
-        $("button").button();
-    });
     function login() {
         window.location = '{% url 'oidc_authentication_init' %}';
     }
@@ -39,7 +36,7 @@
         {% settings_value 'LOGIN_USERNAME_PLACEHOLDER' as username_placeholder %}
         <td><input id='username' name="username" placeholder="{{ username_placeholder|default:'Username' }}" autofocus />
         <td><input id='password' type="password" name="password" placeholder="Password" />
-        <td><button type="submit" name="go" class="btn">Log in</button>
+        <td><button type="submit" name="go" class="btn btn-primary">Log in</button>
         </table>
       <input type="hidden" name="next" value="{{ next }}" />
     </form>

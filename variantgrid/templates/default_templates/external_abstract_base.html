@@ -24,9 +24,7 @@
 	<link rel="shortcut icon" href="{% static 'favicon.ico' %}" />
 	<script type="text/javascript">
 		$(document).ready(function () {
-        {% block jsdocumentready %}
-            $("button").button();
-        {% endblock %}
+        {% block jsdocumentready %}{% endblock %}
 		});
 	</script>
     <style>

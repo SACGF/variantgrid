@@ -17,18 +17,17 @@ function allowNoSample() {
     clearAutocompleteChoice("#id_sample");
     $("#no-sample-link").hide();
     $("#no-sample-text").show();
-    $("button#create-variant-classification").button('enable');
+    $("button#create-variant-classification").prop("disabled", false);
 }
 
 {% endblock %}
 
 {% block jsdocumentready %}
 var createClassificationButton = $("button#create-variant-classification");
-createClassificationButton.button();
 
 function restrictSamples() {
 {% if initially_require_sample %}
-    createClassificationButton.button('disable');
+    createClassificationButton.prop("disabled", true);
     $("#no-sample-link").show();
 {% endif %}
 }
@@ -99,7 +98,7 @@ restrictSamples();
                 <div>Please fix all errors before creating a classification.</div>
             {% else %}
             <div class="buttons">
-            <button id='create-variant-classification'>Create Classification</button>
+            <button id='create-variant-classification' class="btn btn-primary">Create Classification</button>
             </div>
             {% endif %}
 

@@ -777,8 +777,6 @@ function addAnalysisVariableButton(nodeId, field, readOnly) {
     analysisNodeVariables[nodeId] = nodeFieldSet;
     nodeFieldSet.add(field);
 
-    $("#av-example-add-button", ANALYSIS_VARIABLES_HELP_DIV).button({icon: "ui-icon-arrowthick-1-n"});
-    $("#av-example-button", ANALYSIS_VARIABLES_HELP_DIV).button();
 
     const node = getNode(nodeId);
     const avContainer = $("#analysis-variables");
@@ -837,7 +835,7 @@ function checkTemplateSave() {
 function setupAnalysisTemplateTopBar(analysisTemplateId) {
     const templateInfo = $("#analysis-template-info");
     const atVersion = $("#analysis-template-version");
-    $("button#analysis-template-save-version", atVersion).button().click(function() {
+    $("button#analysis-template-save-version", atVersion).click(function() {
         const analysisNameTemplate = $("#id_analysis_name_template").val();
 
         atVersion.hide();

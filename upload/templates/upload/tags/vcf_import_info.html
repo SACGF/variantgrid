@@ -6,7 +6,7 @@ button.vcf-import-info-accept {
 </style>
 <script>
 $(document).ready(function() {
-    $("button.vcf-import-info-accept").button().click(function() {
+    $("button.vcf-import-info-accept").click(function() {
         let vii_id = $(this).attr("vcf-import-info");
         $.ajax({
             type: "POST",
