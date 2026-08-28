@@ -2556,6 +2556,9 @@ class Pfam(models.Model):
 
 class PfamSequence(models.Model):
     seq_id = models.TextField(primary_key=True)
+    # Set once InterPro has been asked for this sequence's domains - a protein with no Pfam match is
+    # a legitimate answer, so "no PfamDomains rows" can't be used to mean "not fetched yet"
+    domains_imported = models.DateTimeField(null=True)
 
 
 class PfamDomains(models.Model):

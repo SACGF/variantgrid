@@ -2,7 +2,8 @@
 PFam entries (used for annotating protein domains). Uses data from:
  * ftp://ftp.ebi.ac.uk/pub/databases/Pfam/current_release/Pfam-A.clans.tsv.gz
  * ftp://ftp.uniprot.org/pub/databases/uniprot/current%5Frelease/knowledgebase/idmapping/by_organism/HUMAN_9606_idmapping.dat.gz
- * ftp://ftp.ebi.ac.uk/pub/databases/Pfam/current_release/proteomes/9606.tsv.gz
+
+The domains themselves come from the InterPro API, fetched per-gene on demand - @see genes/interpro.py
 """
 import ftplib
 import gzip
@@ -14,7 +15,6 @@ import pandas as pd
 
 from genes.models import (
     Pfam,
-    PfamDomains,
     PfamSequence,
     PfamSequenceIdentifier,
     Transcript,
@@ -27,15 +27,24 @@ PFAM_SEQUENCE_PATTERN = re.compile(r"(.+?)-\d+$")
 
 
 def store_pfam_from_web(cached_web_resource):
-    """ Disabled: the upstream per-organism file
-        ftp://ftp.ebi.ac.uk/pub/databases/Pfam/current_release/proteomes/9606.tsv.gz
-        was discontinued (no proteomes/ subdirectory in Pfam38.1, Jan 2025).
-        Tracked in https://github.com/SACGF/variantgrid/issues/1554 — pick a replacement
-        source (Pfam-A.regions.tsv.gz or InterPro protein2ipr.dat.gz) before re-enabling. """
-    raise NotImplementedError(
-        "Pfam web update is disabled: upstream proteomes/9606.tsv.gz no longer exists. "
-        "See https://github.com/SACGF/variantgrid/issues/1554"
-    )
+    """ Pfam-A.clans.tsv
+      This file contains a list of all Pfam-A families that are in clans.
+      The columns are: Pfam accession, clan accession, clan ID, Pfam
+      ID, Pfam description. """
+
+    if not Transcript.objects.exists():
+        raise ValueError("No transcripts - you need to import them first.")
+
+    # Clear existing records + recreate. This cascades away every lazily fetched PfamDomains row, which is
+    # what we want - a new Pfam/UniProt release invalidates them, and they refill as genes are viewed
+    Pfam.objects.all().delete()
+    PfamSequence.objects.all().delete()
+
+    num_pfam = store_pfam()
+    num_sequences = store_pfam_sequences()
+
+    cached_web_resource.description = f"{num_pfam} Pfam. {num_sequences} sequences."
+    cached_web_resource.save()
 
 
 def store_pfam() -> int:
@@ -60,7 +69,7 @@ def store_pfam() -> int:
     return len(pfam_list)
 
 
-def store_pfam_sequences_and_domains() -> int:
+def store_pfam_sequences() -> int:
     logging.debug("Retrieving Uniprot mappings via FTP")
     ftp = ftplib.FTP("ftp.uniprot.org")
     ftp.login("anonymous", "anonymous")
@@ -76,29 +85,24 @@ def store_pfam_sequences_and_domains() -> int:
 
     # Insert sequences
     unique_sequences = mapping_df[ensembl_transcript_mask | refseq_transcript_mask]["seq_id"].unique()
-    insert_sequences(unique_sequences)
+    num_sequences = insert_sequences(unique_sequences)
     insert_mappings(mapping_df[ensembl_transcript_mask], AnnotationConsortium.ENSEMBL)
     insert_mappings(mapping_df[refseq_transcript_mask], AnnotationConsortium.REFSEQ)
 
-    logging.debug("Retrieving Pfam protein domains via FTP")
-    ftp = ftplib.FTP("ftp.ebi.ac.uk")
-    ftp.login("anonymous", "anonymous")
-    buffer = BytesIO()
-    ftp.retrbinary('RETR /pub/databases/Pfam/current_release/proteomes/9606.tsv.gz', buffer.write)
-    buffer.seek(0)
-    with gzip.GzipFile(fileobj=buffer) as pfam_tsv:
-        return insert_domains(pfam_tsv)
+    return num_sequences
 
 
-def insert_sequences(unique_sequences):
-    pfam_sequences = []
+def insert_sequences(unique_sequences) -> int:
+    seq_ids = set()
     for seq in unique_sequences:
         if m := PFAM_SEQUENCE_PATTERN.match(seq):
             seq = m.group(1)  # Strip off end bit
-        pfam_sequences.append(PfamSequence(seq_id=seq))
+        seq_ids.add(seq)
+    pfam_sequences = [PfamSequence(seq_id=seq_id) for seq_id in seq_ids]
     if pfam_sequences:
         logging.info("Creating %d PFam sequences", len(pfam_sequences))
         PfamSequence.objects.bulk_create(pfam_sequences, batch_size=BULK_INSERT_SIZE, ignore_conflicts=True)
+    return len(pfam_sequences)
 
 
 def insert_mappings(mapping_df, annotation_consortium):
@@ -126,40 +130,3 @@ def insert_mappings(mapping_df, annotation_consortium):
         PfamSequenceIdentifier.objects.bulk_create(mappings, batch_size=BULK_INSERT_SIZE)
     if num_missing_transcripts:
         logging.warning("Missing %d %s transcripts", num_missing_transcripts, ac_label)
-
-
-def insert_domains(pfam_tsv) -> int:
-    # We only want to insert the ones we have mappings for
-    names = ["seq_id", "alignment_start", "alignment_end", "envelope_start", "envelope_end",
-             "hmm_acc", "hmm_name", "type", "hmm_start", "hmm_end", "hmm_length",
-             "bit_score", "e_value", "clan"]
-
-    pfam_ids = set(Pfam.objects.all().values_list("pk", flat=True))
-    mapping_df = pd.read_csv(pfam_tsv, header=None, names=names, sep='\t', skiprows=3)
-
-    pfam_sequence_ids = set(PfamSequenceIdentifier.objects.all().values_list("pfam_sequence", flat=True))
-    pfam_domains = []
-    num_missing_pfam = 0
-    for _, row in mapping_df.iterrows():
-        seq_id = row["seq_id"]
-        if seq_id not in pfam_sequence_ids:  # Not mapped to one of our genes
-            continue
-
-        hmm_acc = row["hmm_acc"]
-        pfam_id = Pfam.get_pk_from_accession(hmm_acc)
-        if pfam_id in pfam_ids:
-            pf_domain = PfamDomains(pfam_sequence_id=seq_id,
-                                    pfam_id=pfam_id,
-                                    start=row["alignment_start"],
-                                    end=row["alignment_end"])
-            pfam_domains.append(pf_domain)
-        else:
-            num_missing_pfam += 1
-
-    if pfam_domains:
-        PfamDomains.objects.bulk_create(pfam_domains, batch_size=BULK_INSERT_SIZE)
-
-    if num_missing_pfam:
-        logging.warning("Missing %d Pfam entries", num_missing_pfam)
-
-    return len(pfam_domains)
