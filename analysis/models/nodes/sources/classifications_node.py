@@ -296,8 +296,10 @@ class ClassificationsNode(AnalysisNode):
             for lab in self.get_labs():
                 chips.append(NodeChip(text=lab.name, icon="fa-solid fa-flask", title=f"Restricted to lab: {lab}"))
         if self.has_clinvar_filters():
-            chips.append(NodeChip(text="ClinVar", icon="fa-solid fa-hospital",
-                                  title=f"ClinVar: {self._clinvar_summary()}"))
+            text = "ClinVar"
+            if self.clinvar_stars_min:
+                text += " " + "★" * self.clinvar_stars_min
+            chips.append(NodeChip(text=text, title=f"ClinVar: {self._clinvar_summary()}"))
         return chips
 
     def _clinvar_summary(self) -> str:

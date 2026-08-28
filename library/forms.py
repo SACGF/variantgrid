@@ -19,8 +19,9 @@ class StarsWidget(Widget):
         pure CSS (the `input:checked ~ label` sibling selector), so the stars are rendered highest-first.
         Matches the read-only `clinvar_stars` template tag styling (fa-solid star + text-success).
 
-        A zero radio is rendered last (and a "clear" label for it), so "no stars" submits 0 rather than
-        omitting the field - an omitted radio group fails validation on a required IntegerField. """
+        A zero radio is rendered last, labelled "0" - it sits to the left of the 1 star (the row is
+        laid out right-to-left) so "no minimum" is picked the same way as any other value, and always
+        submits a value - an omitted radio group fails validation on a required IntegerField. """
 
     class Media:
         css = {"all": ["css/stars_input.css"]}
@@ -44,13 +45,14 @@ class StarsWidget(Widget):
 
         zero_id = f"{name}-0"
         zero_checked = mark_safe(" checked") if str(value) not in [str(i) for i in range(1, self.stars + 1)] else ""
-        parts.append(format_html('<input type="radio" name="{name}" id="{id}" value="0"{checked}>',
-                                 name=name, id=zero_id, checked=zero_checked))
+        parts.append(format_html(
+            '<input type="radio" name="{name}" id="{id}" value="0"{checked}>'
+            '<label class="stars-none" for="{id}" title="No minimum">0</label>',
+            name=name, id=zero_id, checked=zero_checked))
         return format_html('<span class="stars-input-container">'
                            '<span class="stars-input" id="{container_id}">{stars}</span>'
-                           '<label class="stars-clear" for="{zero_id}" title="No minimum">clear</label>'
                            '</span>',
-                           container_id=container_id, stars=mark_safe("".join(parts)), zero_id=zero_id)
+                           container_id=container_id, stars=mark_safe("".join(parts)))
 
 
 class ROFormMixin(forms.BaseForm):

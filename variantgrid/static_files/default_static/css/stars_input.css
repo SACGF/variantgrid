@@ -42,15 +42,17 @@
     color: #28a745;   /* Bootstrap text-success */
 }
 
-/* "clear" resets to the zero radio - pointless (and confusing) when that's already the value */
-.stars-input-container:has(input[value="0"]:checked) .stars-clear {
-    visibility: hidden;
+/* "0" (no minimum) sits at the left of the row - text rather than an <i>, so the star fill
+   rules above pass over it */
+.stars-input .stars-none {
+    font-size: 14px;
+    font-weight: bold;
+    opacity: 0.25;
+    padding: 0 3px 0 1px;
 }
 
-.stars-clear {
-    margin: 0 0 0 6px;
-    font-weight: normal;
-    font-size: 0.8em;
-    color: #007bff;
-    cursor: pointer;
+.stars-input input[value="0"]:checked ~ .stars-none,
+.stars-input .stars-none:hover {
+    opacity: 1;
+    color: #28a745;
 }
