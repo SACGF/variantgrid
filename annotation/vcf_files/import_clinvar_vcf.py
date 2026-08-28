@@ -7,8 +7,8 @@ from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
 
 from annotation.models import ClinVarReviewStatus, Variant
-from annotation.models.models_enums import ClinVarPathogenicity
 from annotation.models.models import ClinVar, ClinVarVersion
+from annotation.vcf_files.clinvar_significance import highest_oncogenicity, highest_pathogenicity, somatic_tier
 from annotation.vcf_files.vcf_types import VCFVariant
 from snpdb.models import VariantCoordinate
 from snpdb.variant_pk_lookup import VariantPKLookup
@@ -107,22 +107,16 @@ class BulkClinVarInserter:
                           'oncogenic_review_status',
                           'oncogenic_classification',
                           'oncogenic_conflicting_classification',
+                          'highest_oncogenicity',
                           'oncogenic_preferred_disease_name',
                           'oncogenic_disease_database_name',
 
                           'somatic_review_status',
                           'somatic_clinical_significance',
+                          'somatic_tier',
                           'somatic_preferred_disease_name',
                           'somatic_disease_database_name'
                           ]
-
-    CLINSIG_TO_PATHOGENICITY = {
-        "Benign": ClinVarPathogenicity.BENIGN,
-        "Likely_benign": ClinVarPathogenicity.LIKELY_BENIGN,
-        "Uncertain_significance": ClinVarPathogenicity.UNCERTAIN,
-        "Likely_pathogenic": ClinVarPathogenicity.LIKELY_PATHOGENIC,
-        "Pathogenic": ClinVarPathogenicity.PATHOGENIC,
-    }
 
     MAX_CONFLICTING_RECORDS_MISSING_CLINSIGCONF = 1000
 
@@ -217,19 +211,10 @@ class BulkClinVarInserter:
 
         # clinical_significance is now a '|' separated string
         if clinical_significance := kwargs.get("clinical_significance"):
-            # FIXME do the same for somatic classification
-            drug_response = "drug_response" in clinical_significance
-            highest_pathogenicity = 0
-            if clinical_significance.startswith("Conflicting_interpretations_of_pathogenicity"):
-                multiple_clinical_significances = kwargs.get("conflicting_clinical_significance")
-            else:
-                multiple_clinical_significances = clinical_significance
-
-            if multiple_clinical_significances:
-                for clnsig, pathogenicity in BulkClinVarInserter.CLINSIG_TO_PATHOGENICITY.items():  # low->high
-                    if clnsig in multiple_clinical_significances:
-                        highest_pathogenicity = pathogenicity
-            else:
+            kwargs["drug_response"] = "drug_response" in clinical_significance
+            pathogenicity = highest_pathogenicity(clinical_significance,
+                                                  kwargs.get("conflicting_clinical_significance"))
+            if pathogenicity is None:
                 # 3 out of 50504 records in 20210828 with Conflicting_interpretations_of_pathogenicity are missing
                 # CLNSIGCONF (conflicting_clinical_significance), e.g. see
                 # https://www.ncbi.nlm.nih.gov/clinvar/variation/161486/
@@ -241,9 +226,16 @@ class BulkClinVarInserter:
                               f"CLINSIG=Conflicting_interpretations_of_pathogenicity but no CLNSIGCONF. " \
                               f"A few missing are expected but this many is likely due to INFO field changes"
                     raise ValueError(message)
+                pathogenicity = 0
+            kwargs["highest_pathogenicity"] = pathogenicity
 
-            kwargs["highest_pathogenicity"] = highest_pathogenicity
-            kwargs["drug_response"] = drug_response
+        if oncogenic_classification := kwargs.get("oncogenic_classification"):
+            oncogenicity = highest_oncogenicity(oncogenic_classification,
+                                                kwargs.get("oncogenic_conflicting_classification"))
+            kwargs["highest_oncogenicity"] = oncogenicity or 0
+
+        if somatic_clinical_significance := kwargs.get("somatic_clinical_significance"):
+            kwargs["somatic_tier"] = somatic_tier(somatic_clinical_significance)
 
         return ClinVar(**kwargs)
 

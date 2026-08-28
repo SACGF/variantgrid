@@ -226,6 +226,16 @@ class ClinVarPathogenicity(models.IntegerChoices):
     PATHOGENIC = 5, "Pathogenic"
 
 
+class ClinVarOncogenicity(models.IntegerChoices):
+    """ ClinVar.highest_oncogenicity - ONC mapped onto an ordered scale (0 = ClinVar has given no
+        oncogenicity call for this variant) """
+    BENIGN = 1, "Benign"
+    LIKELY_BENIGN = 2, "Likely benign"
+    UNCERTAIN = 3, "Uncertain"
+    LIKELY_ONCOGENIC = 4, "Likely oncogenic"
+    ONCOGENIC = 5, "Oncogenic"
+
+
 class ManualVariantEntryType(models.TextChoices):
     DBSNP = "d", "dbSNP"
     HGVS = "h", "HGVS"

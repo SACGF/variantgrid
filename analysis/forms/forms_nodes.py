@@ -252,6 +252,9 @@ class ClassificationsNodeForm(BaseNodeForm):
                   'tier_1', 'tier_2', 'tier_3', 'tier_4',
                   'clinvar_benign', 'clinvar_likely_benign', 'clinvar_uncertain',
                   'clinvar_likely_pathogenic', 'clinvar_pathogenic', 'clinvar_significance_exclude',
+                  'clinvar_tier_1', 'clinvar_tier_2', 'clinvar_tier_3', 'clinvar_tier_4',
+                  'clinvar_benign_onc', 'clinvar_likely_benign_onc', 'clinvar_uncertain_onc',
+                  'clinvar_likely_oncogenic', 'clinvar_oncogenic',
                   'clinvar_record', 'clinvar_stars_min', 'clinvar_conflicting',
                   'clinvar_conflicting_significance')
         widgets = {

@@ -52,6 +52,7 @@ from annotation.models.damage_enums import (
 from annotation.models.models_citations import Citation, CitationFetchRequest, CitationFetchResponse
 from annotation.models.models_enums import (
     AnnotationStatus,
+    ClinVarOncogenicity,
     ClinVarReviewStatus,
     EssentialGeneCRISPR,
     EssentialGeneCRISPR2,
@@ -66,7 +67,7 @@ from annotation.models.repeat_masker import RepeatMaskerSummary
 from annotation.utils.clinvar_constants import CLINVAR_REVIEW_EXPERT_PANEL_STARS_VALUE
 from annotation.vep_columns import visible_columns_for
 from annotation.vep_config import VEPConfig
-from classification.enums import AlleleOriginBucket
+from classification.enums import AlleleOriginBucket, SomaticClinicalSignificance
 from genes.models import Gene, GeneAnnotationRelease, GeneSymbol, Transcript, TranscriptVersion
 from genes.models_enums import AnnotationConsortium
 from library.django_utils import object_is_referenced
@@ -217,6 +218,8 @@ class ClinVar(models.Model):
     # ONCCONF
     oncogenic_conflicting_classification = models.TextField(null=True, blank=True)
 
+    highest_oncogenicity = models.IntegerField(default=0)  # Highest of oncogenic_classification
+
     # ONCDN
     oncogenic_preferred_disease_name = models.TextField(null=True, blank=True)
     # ONCDISDB
@@ -226,6 +229,9 @@ class ClinVar(models.Model):
     somatic_review_status = models.CharField(max_length=1, null=True, choices=ClinVarReviewStatus.choices)
     # SCI
     somatic_clinical_significance = models.TextField(null=True, blank=True)
+    # Derived from SCI
+    somatic_tier = models.CharField(max_length=20, null=True, blank=True,
+                                    choices=SomaticClinicalSignificance.CHOICES)
 
     # SCIDN
     somatic_preferred_disease_name = models.TextField(null=True, blank=True)
@@ -300,6 +306,15 @@ class ClinVar(models.Model):
     @property
     def oncogenic_stars(self) -> int:
         return ClinVar._stars_for(self.oncogenic_review_status)
+
+    @property
+    def somatic_tier_label(self) -> Optional[str]:
+        return SomaticClinicalSignificance.LABELS.get(self.somatic_tier)
+
+    def get_highest_oncogenicity_display(self) -> Optional[str]:
+        if self.highest_oncogenicity:
+            return ClinVarOncogenicity(self.highest_oncogenicity).label
+        return None
 
     @property
     def is_expert_panel_or_greater(self):

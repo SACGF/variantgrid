@@ -6,6 +6,7 @@ from django.db.models.query_utils import Q
 
 from annotation.models import AnnotationVersion, GeneAnnotation
 from annotation.models.damage_enums import PathogenicityImpact
+from annotation.models.models_enums import ClinVarOncogenicity, ClinVarPathogenicity
 from classification.enums import ClinicalSignificance, SomaticClinicalSignificance
 from classification.models import Classification
 from snpdb.models.models_enums import BuiltInFilters
@@ -22,7 +23,10 @@ def get_omim_q(annotation_version: AnnotationVersion) -> Q:
 
 def get_extra_filters_q(user: User, annotation_version: AnnotationVersion, extra_filters):
     if extra_filters == BuiltInFilters.CLINVAR:
-        q = Q(clinvar__highest_pathogenicity__gte=4)
+        # ClinVar's 3 classification axes - a variant is significant if any of them says so
+        q = Q(clinvar__highest_pathogenicity__gte=ClinVarPathogenicity.LIKELY_PATHOGENIC) \
+            | Q(clinvar__somatic_tier__in=SomaticClinicalSignificance.TIER_1_AND_2_VALUES) \
+            | Q(clinvar__highest_oncogenicity__gte=ClinVarOncogenicity.LIKELY_ONCOGENIC)
     elif extra_filters == BuiltInFilters.OMIM:
         q = get_omim_q(annotation_version)
     elif extra_filters in [BuiltInFilters.CLASSIFIED, BuiltInFilters.CLASSIFIED_PATHOGENIC,

@@ -10,7 +10,7 @@ from django.db.models import CASCADE, Q
 from analysis.models.enums import ClassificationsNodeInput, ClinVarRecordFilter
 from analysis.models.nodes.analysis_node import AnalysisNode
 from analysis.models.nodes.node_display import NodeChip, NodeIcon
-from annotation.models.models_enums import ClinVarPathogenicity, ClinVarReviewStatus
+from annotation.models.models_enums import ClinVarOncogenicity, ClinVarPathogenicity, ClinVarReviewStatus
 from classification.enums import ClinicalSignificance, SomaticClinicalSignificance
 from classification.models.classification import Classification, ClassificationModification
 from snpdb.models import Lab
@@ -63,12 +63,36 @@ class ClassificationsNode(AnalysisNode):
     clinvar_conflicting_significance = models.TextField(null=True, blank=True)
     clinvar_variation_ids = ArrayField(models.IntegerField(), default=list, blank=True)
 
+    clinvar_tier_1 = models.BooleanField(default=False, blank=True)
+    clinvar_tier_2 = models.BooleanField(default=False, blank=True)
+    clinvar_tier_3 = models.BooleanField(default=False, blank=True)
+    clinvar_tier_4 = models.BooleanField(default=False, blank=True)
+
+    clinvar_benign_onc = models.BooleanField(default=False, blank=True)
+    clinvar_likely_benign_onc = models.BooleanField(default=False, blank=True)
+    clinvar_uncertain_onc = models.BooleanField(default=False, blank=True)
+    clinvar_likely_oncogenic = models.BooleanField(default=False, blank=True)
+    clinvar_oncogenic = models.BooleanField(default=False, blank=True)
+
     FIELD_CLINVAR_PATHOGENICITY = {
         'clinvar_benign': ClinVarPathogenicity.BENIGN,
         'clinvar_likely_benign': ClinVarPathogenicity.LIKELY_BENIGN,
         'clinvar_uncertain': ClinVarPathogenicity.UNCERTAIN,
         'clinvar_likely_pathogenic': ClinVarPathogenicity.LIKELY_PATHOGENIC,
         'clinvar_pathogenic': ClinVarPathogenicity.PATHOGENIC,
+    }
+    FIELD_CLINVAR_SOMATIC_TIER = {
+        'clinvar_tier_1': SomaticClinicalSignificance.TIER_1,
+        'clinvar_tier_2': SomaticClinicalSignificance.TIER_2,
+        'clinvar_tier_3': SomaticClinicalSignificance.TIER_3,
+        'clinvar_tier_4': SomaticClinicalSignificance.TIER_4,
+    }
+    FIELD_CLINVAR_ONCOGENICITY = {
+        'clinvar_benign_onc': ClinVarOncogenicity.BENIGN,
+        'clinvar_likely_benign_onc': ClinVarOncogenicity.LIKELY_BENIGN,
+        'clinvar_uncertain_onc': ClinVarOncogenicity.UNCERTAIN,
+        'clinvar_likely_oncogenic': ClinVarOncogenicity.LIKELY_ONCOGENIC,
+        'clinvar_oncogenic': ClinVarOncogenicity.ONCOGENIC,
     }
 
     @property
@@ -132,11 +156,35 @@ class ClassificationsNode(AnalysisNode):
 
     def has_clinvar_filters(self) -> bool:
         return any([self._selected_values(self.FIELD_CLINVAR_PATHOGENICITY),
+                    self._selected_values(self.FIELD_CLINVAR_SOMATIC_TIER),
+                    self._selected_values(self.FIELD_CLINVAR_ONCOGENICITY),
                     self.clinvar_record != ClinVarRecordFilter.ANY,
                     self.clinvar_stars_min,
                     self.clinvar_conflicting,
                     self.clinvar_conflicting_significance,
                     self.clinvar_variation_ids])
+
+    def _clinvar_somatic_tiers(self) -> list[str]:
+        selected = self._selected_values(self.FIELD_CLINVAR_SOMATIC_TIER)
+        if selected and (self.clinvar_tier_1 or self.clinvar_tier_2):
+            # A record recorded as "Tier I/II" might be either, so it matches when Tier I or II is selected
+            selected.append(SomaticClinicalSignificance.TIER_1_OR_2)
+        return selected
+
+    def _clinvar_review_status_q(self, review_statuses: list[str]) -> Q:
+        """ ORs the review status of each axis the node filters on - all 3 when it names none,
+            which matches ClinVar.is_expert_panel_or_greater taking the max across them """
+        axis_fields = []
+        if self._selected_values(self.FIELD_CLINVAR_PATHOGENICITY):
+            axis_fields.append("clinvar__review_status__in")
+        if self._selected_values(self.FIELD_CLINVAR_SOMATIC_TIER):
+            axis_fields.append("clinvar__somatic_review_status__in")
+        if self._selected_values(self.FIELD_CLINVAR_ONCOGENICITY):
+            axis_fields.append("clinvar__oncogenic_review_status__in")
+        if not axis_fields:
+            axis_fields = ["clinvar__review_status__in", "clinvar__somatic_review_status__in",
+                           "clinvar__oncogenic_review_status__in"]
+        return reduce(operator.or_, (Q(**{f: review_statuses}) for f in axis_fields))
 
     def _clinvar_q(self) -> Q:
         """ Each active control restricts - an inactive section returns an empty Q, which drops out of the OR """
@@ -149,13 +197,19 @@ class ClassificationsNode(AnalysisNode):
                 q_significance = ~q_significance
             and_filters.append(q_significance)
 
+        if selected := self._clinvar_somatic_tiers():
+            and_filters.append(Q(clinvar__somatic_tier__in=selected))
+
+        if selected := self._selected_values(self.FIELD_CLINVAR_ONCOGENICITY):
+            and_filters.append(Q(clinvar__highest_oncogenicity__in=selected))
+
         if self.clinvar_record != ClinVarRecordFilter.ANY:
             has_record = self.clinvar_record == ClinVarRecordFilter.PRESENT
             and_filters.append(Q(clinvar__isnull=not has_record))
 
         if self.clinvar_stars_min:
             review_statuses = ClinVarReviewStatus.statuses_gte_stars(self.clinvar_stars_min)
-            and_filters.append(Q(clinvar__review_status__in=review_statuses))
+            and_filters.append(self._clinvar_review_status_q(review_statuses))
 
         if self.clinvar_conflicting:
             and_filters.append(Q(clinvar__conflicting_clinical_significance__isnull=False))
@@ -249,6 +303,10 @@ class ClassificationsNode(AnalysisNode):
         if selected := self._selected_values(self.FIELD_CLINVAR_PATHOGENICITY):
             labels = ", ".join(ClinVarPathogenicity(p).label for p in selected)
             parts.append(f"{'not ' if self.clinvar_significance_exclude else ''}{labels}")
+        if selected := self._selected_values(self.FIELD_CLINVAR_SOMATIC_TIER):
+            parts.append(", ".join(SomaticClinicalSignificance.LABELS[scs] for scs in selected))
+        if selected := self._selected_values(self.FIELD_CLINVAR_ONCOGENICITY):
+            parts.append(", ".join(ClinVarOncogenicity(o).label for o in selected))
         if self.clinvar_record != ClinVarRecordFilter.ANY:
             parts.append(ClinVarRecordFilter(self.clinvar_record).label)
         if self.clinvar_stars_min:
