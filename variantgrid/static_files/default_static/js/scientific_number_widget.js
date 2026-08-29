@@ -59,32 +59,26 @@ function toPercent(value, multiplier) {
     }
 }
 
-$.widget('custom.scientific', {
+// jQuery plugin: $input.scientific(options) wraps an input with a live % representation
 
-    options: {
-        placeholder: null,
-        tooltip: null,
-        multiplier: null
-    },
+class ScientificWidget {
 
-    _create: function() {
+    constructor(element, options) {
+        this.element = $(element);
+        this.options = $.extend({placeholder: null, placeholder_short: null, tooltip: null, multiplier: null}, options);
+
         this.wrapper = $('<span>', {class: 'custom-scientific'});
         this.wrapper.insertAfter(this.element);
         this.element.appendTo(this.wrapper);
 
         this.notation = $('<span>', {class: 'notation', text: '', title: this.options.tooltip});
-        //this.element.insertAfter(this.notation);
         this.notation.appendTo(this.wrapper);
-        // save this so we can unbind it later
-        this.updateBinding = () => {
-            this.refreshScientificNote();
-        };
 
         this.element.attr('placeholder', this.options.placeholder_short);
         this.element.attr('title', this.options.placeholder);
-        this.element.keyup(this.updateBinding);
+        this.element.on('keyup', () => {this.refreshScientificNote();});
         this.value(this.element.val());
-        this.element.bind('blur', () => {
+        this.element.on('blur', () => {
             const oldValue = this.element.val();
             this.value(this.element.val());
             const neatValue = this.element.val();
@@ -94,36 +88,37 @@ $.widget('custom.scientific', {
         });
 
         this.element.attr('customPopulate', true);
-        this.element.bind('onpopulate', (event, val) => {
+        this.element.on('onpopulate', (event, val) => {
             this.value(val);
         });
-    },
+    }
 
-    value: function(value) {
-        if (value === undefined) {
-            return this.value;
-        }
-        const strValue = toFixedString(value);
-        this.element.val(strValue);
+    value(value) {
+        this.element.val(toFixedString(value));
         this.refreshScientificNote();
-    },
+    }
 
-    fieldsUpdated: function() {
-        this.refreshScientificNote();
-        //this._trigger("updated", null, {value: this.element.val()});
-    },
-
-    refreshScientificNote: function() {
+    refreshScientificNote() {
         let scientificValue = toPercent(this.element.val(), this.options.multiplier);
         if (scientificValue === null) {
-            scientificValue = ''; // this.options.placeholder;
+            scientificValue = '';
         }
         this.notation.text(`${scientificValue}`);
-    },
-
-    _destroy: function() {
-        this.element.unbind('keyup', this.updateBinding);
-        this.element.insertBefore(this.wrapper);
-        this.wrapper.remove();
     }
-});
+}
+
+$.fn.scientific = function(optionsOrMethod, ...args) {
+    let methodResult;
+    this.each(function() {
+        const element = $(this);
+        const widget = element.data('scientificWidget');
+        if (typeof optionsOrMethod === 'string') {
+            if (widget) {
+                methodResult = widget[optionsOrMethod](...args);
+            }
+        } else {
+            element.data('scientificWidget', new ScientificWidget(this, optionsOrMethod));
+        }
+    });
+    return methodResult === undefined ? this : methodResult;
+};

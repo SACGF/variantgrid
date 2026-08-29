@@ -1,12 +1,32 @@
+// jQuery plugin: $span.age(options) to create, $span.age('value', val) to get/set
 
+class AgeWidget {
 
-$.widget('custom.age', {
+    constructor(element, options) {
+        this.element = $(element);
+        this.options = $.extend({value: null, updated: null}, options);
 
-    options: {
-        value: null,
-    },
+        this.element.addClass('custom-age');
 
-    value: function(value) {
+        this.entryText = $('<input>', {class: 'custom-age-number'});
+
+        this.unitSelect = $('<select>', {class: 'custom-age-unit custom-age-select', html: [
+                $('<option>', {text: "years", value: ""}),
+                $('<option>', {text: "months", value: "months"}),
+                $('<option>', {text: "weeks gestation", value: "weeks_gestation"})
+        ]});
+
+        this.element.append(this.entryText);
+        this.element.append(this.unitSelect);
+
+        this.entryText.on('keyup', () => {this.fieldsUpdated();});
+        this.unitSelect.on('change', () => {this.fieldsUpdated();});
+        this.unitSelect.chosen({width: '160px'});
+
+        this.value(this.options.value);
+    }
+
+    value(value) {
         if (value === undefined) {
             return this.options.value;
         }
@@ -24,51 +44,41 @@ $.widget('custom.age', {
             parts.unit = unitsM[2] || '';
         }
         this.options.value = `${parts.num}${parts.unit || 'y'}`;
-        this._refreshView(parts);
-    },
+        this.refreshView(parts);
+    }
 
-    _create: function() {
-        this.element.addClass('custom-age');
-
-        this.entryText = $('<input>', {class: 'custom-age-number'});
-
-        this.unitSelect = $('<select>', {class: 'custom-age-unit custom-age-select', html: [
-                $('<option>', {text: "years", value: ""}),
-                $('<option>', {text: "months", value: "months"}),
-                $('<option>', {text: "weeks gestation", value: "weeks_gestation"})
-        ]});
-        $('<option>', {text: "years"}).appendTo();
-
-        this.element.append(this.entryText);
-        this.element.append(this.unitSelect);
-
-        $(this.entryText).keyup(() => {this.fieldsUpdated();});
-        $(this.unitSelect).change(() => {this.fieldsUpdated();});
-        $(this.unitSelect).chosen({width: '160px'});
-
-        this.value(this.options.value);
-    },
-
-    fieldsUpdated: function() {
+    fieldsUpdated() {
         const parts = {
             num: this.entryText.val().trim(),
             unit: this.unitSelect.val() || ''
         };
-        const value = `${parts.num}${parts.unit}`;
         this.options.value = `${parts.num}${parts.unit}`;
-        this._refreshView(parts);
+        this.refreshView(parts);
 
-        this._trigger("updated", null, {value: this.options.value});
-    },
+        if (this.options.updated) {
+            this.options.updated(null, {value: this.options.value});
+        }
+    }
 
-    _refreshView: function(parts) {
+    refreshView(parts) {
         this.entryText.val(parts.num);
         this.unitSelect.val( parts.unit );
         this.unitSelect.trigger("chosen:updated");
-    },
-
-    _destroy: function() {
-        this.rangeSelect.remove();
-        this.element.removeClass('custom-age');
     }
-});
+}
+
+$.fn.age = function(optionsOrMethod, ...args) {
+    let methodResult;
+    this.each(function() {
+        const element = $(this);
+        const widget = element.data('ageWidget');
+        if (typeof optionsOrMethod === 'string') {
+            if (widget) {
+                methodResult = widget[optionsOrMethod](...args);
+            }
+        } else {
+            element.data('ageWidget', new AgeWidget(this, optionsOrMethod));
+        }
+    });
+    return methodResult === undefined ? this : methodResult;
+};
