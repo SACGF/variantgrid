@@ -206,7 +206,6 @@ const DataTableDefinition = (function() {
                 ajax: {
                     url: this.url,
                     type: defn.ajaxType || 'POST',
-                    data: this.buildAjaxData(),
                     error: function(jqXHR, textStatus, errorThrown) {
                         if (self.onLoadError) {
                             self.onLoadError(jqXHR, textStatus, errorThrown);
@@ -220,6 +219,12 @@ const DataTableDefinition = (function() {
                     $('th.toggle-link').removeClass('toggle-link');
                 }
             };
+            const ajaxData = this.buildAjaxData();
+            if (ajaxData) {
+                // Only when we have one - DataTables shallow extends ajax over its own request
+                // options, so a null here replaces the draw/start/length params with nothing
+                dtParams.ajax.data = ajaxData;
+            }
             if (defn.order) {
                 dtParams.orderSequence = defn.orderSequence;
             }
