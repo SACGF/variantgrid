@@ -350,7 +350,6 @@ function enhanceAndMonitor() {
                     data: data, // as in a function that filters the data displayed
                     filterCount: node.attr('data-datatable-filter-count'),
                     dom: node,
-                    adjustColumns: node.attr('data-adjust-columns') != 'false',
                 }).setup();
             }
         },

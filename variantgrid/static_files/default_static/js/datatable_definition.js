@@ -66,7 +66,6 @@ const DataTableDefinition = (function() {
         this.onBeforeSend = params.onBeforeSend;
         this.onLoadError = params.onLoadError;
         this.waitOn = Promise.resolve();
-        this.adjustColumns = params.adjustColumns !== false;
 
         this.tableId = null;
         this.tableWidth = null;
@@ -600,12 +599,6 @@ const DataTableDefinition = (function() {
                     this.setupDom();
                     this.setupClientExpend();
                     this.setupResponsiveExpand();
-                    // note the below causes the dataTable to re-download data from the server redundantly
-                    // not sure under what circumstances it's actually required - and on a deferred table
-                    // the draw is the fetch the page is deliberately holding back
-                    if (this.adjustColumns && !this.serverParams.deferLoading) {
-                        this.dataTable.columns.adjust().draw(false);
-                    }
                     return this;
                 });
             });

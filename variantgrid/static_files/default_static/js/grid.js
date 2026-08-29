@@ -414,9 +414,6 @@ function setupNodeGrid(config_url, handler_url, analysisId, nodeId, versionId, u
         dom: getGrid(nodeId, unique_code),
         definitionUrl: config_url,
         url: handler_url,
-        // The widths come from the colmodel and the CSS lays the table out table-layout: fixed, so
-        // there is nothing to measure - and on a deferred grid the adjust draw is the fetch we're holding
-        adjustColumns: false,
         data: function(data) {
             const postData = $.extend({}, definition.serverParams.postData);
             // FilterNode rules are saved against the node, so they ride along with its other state
