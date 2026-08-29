@@ -114,16 +114,12 @@
             });
         });
 
-		sortable("#my_columns_sortable", {
+		// acceptFrom is the whole answer to "can this list take that item", so both lists need
+		// to be named - listing only the other one stops a list accepting its own items
+		sortable("#my_columns_sortable, #available_columns_sortable", {
 		    items: "li.user-column",
 		    placeholderClass: "sort_placeholder",
-		    acceptFrom: '#available_columns_sortable',
-		});
-
-		sortable("#available_columns_sortable", {
-		    items: "li.user-column",
-		    placeholderClass: "sort_placeholder",
-		    acceptFrom: '#my_columns_sortable',
+		    acceptFrom: '#my_columns_sortable, #available_columns_sortable',
 		});
 
 		// html5sortable fires sortupdate on the list the item was dropped into

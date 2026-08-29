@@ -71,16 +71,12 @@
     var nodeCountsChanged = false;
 
 	function setupNodeCountsWidget() {
-        sortable("#my_filters_sortable", {
+        // acceptFrom is the whole answer to "can this list take that item", so both lists need
+        // to be named - listing only the other one stops a list accepting its own items
+        sortable("#my_filters_sortable, #available_filters_sortable", {
             items: "li.node-count-filter",
             placeholderClass: "sort_placeholder",
-            acceptFrom: '#available_filters_sortable',
-        });
-
-        sortable("#available_filters_sortable", {
-            items: "li.node-count-filter",
-            placeholderClass: "sort_placeholder",
-            acceptFrom: '#my_filters_sortable',
+            acceptFrom: '#my_filters_sortable, #available_filters_sortable',
         });
 
         // html5sortable fires sortupdate on the list the item was dropped into
