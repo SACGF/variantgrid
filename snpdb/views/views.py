@@ -1691,6 +1691,7 @@ def cohort_gene_counts(request, cohort_id):
                'gene_list_id': gene_list_id,
                'gene_list_form': UserGeneListForm(),
                'custom_gene_list_form': custom_gene_list_form,
+               'has_gene_count_types': GeneCountType.objects.filter(enabled=True).exists(),
                'gene_count_type_choice_form': GeneCountTypeChoiceForm()}
     return render(request, 'snpdb/patients/cohort_gene_counts.html', context)
 

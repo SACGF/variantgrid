@@ -3,7 +3,9 @@
 {% if cohort.import_status == "S" %}
     <ul>
         <li><a href="{% url 'cohort_hotspot' cohort.pk %}">View gene hotspots for this cohort</a></li>
-        <li><a href="{% url 'cohort_gene_counts' cohort.pk %}">View gene damage counts for this cohort</a></li>
+        {% if has_gene_count_types %}
+            <li><a href="{% url 'cohort_gene_counts' cohort.pk %}">View gene damage counts for this cohort</a></li>
+        {% endif %}
     </ul>
 
     {% load related_analyses_tags %}

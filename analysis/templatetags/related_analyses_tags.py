@@ -8,6 +8,7 @@ from django.db.models import Model, Q
 from django.template import Library
 
 from analysis.forms import get_analysis_template_form_for_variables_only_of_class
+from annotation.models.models_gene_counts import GeneCountType
 from analysis.models import Analysis, AnalysisTemplate, MutationalSignature
 from analysis.models.models_karyomapping import KaryomappingAnalysis
 from analysis.related_analyses import (
@@ -90,6 +91,7 @@ def related_analyses_for_cohort(context, cohort):
 
     update_context_with_related_analysis(context, cohort.get_samples(), cohorts=cohorts, trios=trios, pedigrees=pedigrees)
     context["cohort"] = cohort
+    context["has_gene_count_types"] = GeneCountType.objects.filter(enabled=True).exists()
     return context
 
 

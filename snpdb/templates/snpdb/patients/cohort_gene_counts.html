@@ -13,23 +13,25 @@ $(document).ready(function() {
         gcContainer.load(url);
     }
 
-    function load_gene_list(geneListId) {
-        const geneCountType = $("#id_gene_count_type").val();
-        load_graph(Urls.cohort_gene_counts_matrix({{ cohort.pk }}, geneCountType, geneListId));
-    }
+    let geneListId = {{ gene_list_id|default:"null" }};
 
-    $('#id_gene_list').change(function() {
-        const geneListId = $(this).val();
-        if (geneListId) {
-            load_gene_list(geneListId);
+    function load_gene_list() {
+        const geneCountType = $("#id_gene_count_type").val();
+        if (geneCountType && geneListId) {
+            load_graph(Urls.cohort_gene_counts_matrix({{ cohort.pk }}, geneCountType, geneListId));
         } else {
             gcContainer.empty();
         }
+    }
+
+    $('#id_gene_count_type').change(load_gene_list);
+
+    $('#id_gene_list').change(function() {
+        geneListId = $(this).val();
+        load_gene_list();
     });
-    
-    {% if gene_list_id %}
-        load_gene_list({{ gene_list_id }});
-    {% endif %}
+
+    load_gene_list();
     
 });
 </script>
@@ -39,24 +41,30 @@ $(document).ready(function() {
 
     <a href="{% url 'view_cohort' cohort.pk %}">Back to cohort {{ cohort.name }}</a>
 
-    <table>
-    {{ gene_count_type_choice_form }}
-    <tr>
-        <th>Gene List
-        <td>{{ gene_list_form.gene_list }}{{ gene_list_form.media }}
-    <tr><th>Enter Genes
-        <td>
-        <div id='gene-list-form-container'>
-            <form id="new-gene-list-form" method="post">
-                {% csrf_token %}
-                {{ custom_gene_list_form.custom_gene_list_text }}
-                <button id='custom-genes-button' class="btn btn-primary">Use Custom Genes</button>
-            </form>
-        </div>
-    </table>
+    {% if has_gene_count_types %}
+        <table>
+        {{ gene_count_type_choice_form }}
+        <tr>
+            <th>Gene List
+            <td>{{ gene_list_form.gene_list }}{{ gene_list_form.media }}
+        <tr><th>Enter Genes
+            <td>
+            <div id='gene-list-form-container'>
+                <form id="new-gene-list-form" method="post">
+                    {% csrf_token %}
+                    {{ custom_gene_list_form.custom_gene_list_text }}
+                    <button id='custom-genes-button' class="btn btn-primary">Use Custom Genes</button>
+                </form>
+            </div>
+        </table>
 
-    <div id='cohort-gene-counts-graph-container'>
-    
-    </div>
+        <div id='cohort-gene-counts-graph-container'>
+        
+        </div>
+    {% else %}
+        <div class="no-value mt-4">
+            No gene count types have been configured - see the 'vcf_sample_gene_damage_counts' management command.
+        </div>
+    {% endif %}
 
 {% endblock %}
