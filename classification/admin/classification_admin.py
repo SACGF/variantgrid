@@ -1,4 +1,5 @@
 import json
+from collections.abc import Callable
 from datetime import timedelta
 from typing import Optional, Union
 
@@ -738,7 +739,9 @@ class DiscordanceReportAdminExport(ExportRow):
         return EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE).option_dictionary_property("vg")
 
     @staticmethod
-    def _less_more_certain(summary: DiscordanceLabSummary):
+    def _describe_movement(summary: DiscordanceLabSummary, describe: Callable[[int, int], str]) -> str:
+        """ Handles the cases where the two clinical significances can't be compared (withdrawn, unchanged,
+            or one of them not on the vg scale), otherwise describe() names the direction travelled """
         cs_to_index = DiscordanceReportAdminExport.cs_to_index()
         from_value = int(cs_to_index.get(summary.clinical_significance_from, "0"))
         to_value = int(cs_to_index.get(summary.clinical_significance_to, "0"))
@@ -749,29 +752,22 @@ class DiscordanceReportAdminExport(ExportRow):
             return "same"
         elif from_value == 0 or to_value == 0:
             return "?"
-        else:
-            if abs(to_value - 3) > abs(from_value - 3):
-                return "more"
-            else:
-                return "less"
+        return describe(from_value, to_value)
+
+    @staticmethod
+    def _less_more_certain(summary: DiscordanceLabSummary):
+        # VUS is the middle of the vg scale, so distance from it is how certain the call is
+        def describe(from_value: int, to_value: int) -> str:
+            return "more" if abs(to_value - 3) > abs(from_value - 3) else "less"
+
+        return DiscordanceReportAdminExport._describe_movement(summary, describe)
 
     @staticmethod
     def _up_down_for(summary: DiscordanceLabSummary):
-        cs_to_index = DiscordanceReportAdminExport.cs_to_index()
-        from_value = int(cs_to_index.get(summary.clinical_significance_from, "0"))
-        to_value = int(cs_to_index.get(summary.clinical_significance_to, "0"))
+        def describe(from_value: int, to_value: int) -> str:
+            return "upgrade" if to_value > from_value else "downgrade"
 
-        if summary.clinical_significance_to == 'withdrawn':
-            return "withdrawn"
-        elif from_value == to_value:
-            return "same"
-        elif from_value == 0 or to_value == 0:
-            return "?"
-        else:
-            if to_value > from_value:
-                return "upgrade"
-            else:
-                return "downgrade"
+        return DiscordanceReportAdminExport._describe_movement(summary, describe)
 
     def __init__(self, discordance_report: DiscordanceReport, perspective: LabPickerData):
         self.discordance_report = discordance_report

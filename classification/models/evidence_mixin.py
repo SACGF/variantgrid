@@ -9,7 +9,7 @@ from django.conf import settings
 from annotation.models import CitationFetchRequest
 from annotation.models.models_citations import CitationFetchResponse
 from classification.criteria_strengths import CriteriaStrength, CriteriaStrengths
-from classification.enums import AlleleOriginBucket, SpecialEKeys
+from classification.enums import AlleleOriginBucket, CriteriaEvaluation, SpecialEKeys
 from genes.hgvs import HGVSComponents, PHGVS
 from library.log_utils import report_message
 from library.utils import empty_to_none
@@ -220,6 +220,24 @@ class EvidenceMixin:
                 criteria.append(CriteriaStrength(ek, strength))
 
         return CriteriaStrengths(strengths=criteria, is_acmg_standard=self.is_likely_acmg)
+
+    def met_criteria_strengths(self) -> set[CriteriaStrength]:
+        """ Criteria that were actually met, plus one per somatic AMP level value selected """
+        from classification.models import EvidenceKeyMap
+
+        strengths: set[CriteriaStrength] = set()
+        for e_key in EvidenceKeyMap.cached().criteria():
+            strength = self.get(e_key.key)
+            if CriteriaEvaluation.is_met(strength):
+                strengths.add(CriteriaStrength(e_key, strength))
+        for amp_level, letter in SpecialEKeys.AMP_LEVELS_TO_LEVEL.items():
+            if value := self.get_value_list(amp_level):
+                e_key = EvidenceKeyMap.cached_key(amp_level)
+                for sub_value in value:
+                    sub_value_label = e_key.pretty_value(sub_value)
+                    strengths.add(CriteriaStrength(ekey=e_key,
+                                                  custom_strength=f"{letter}_{sub_value_label}"))
+        return strengths
 
     def criteria_strength_summary(self, ekeys: Optional['EvidenceKeyMap'] = None, only_acmg: bool = False) -> str:
         strengths = self.criteria_strengths(e_keys=ekeys)

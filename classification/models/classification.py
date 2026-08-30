@@ -2028,47 +2028,6 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 visible_evidence[k] = {'value': "(hidden)", 'hidden': True}
         return visible_evidence
 
-    def get_allele_info_dict(self) -> Optional[dict[str, Any]]:
-        allele_info_dict = {}
-        if allele_info := self.allele_info:
-            resolved_dict = {
-                "allele_id": allele_info.allele_id,
-                "allele_info_id": allele_info.id,
-                "allele_info_status": allele_info.status,
-                "status": allele_info.status,
-                "include": allele_info.latest_validation.include if allele_info.latest_validation else None,
-                "variant_coordinate": allele_info.variant_coordinate
-            }
-
-            if (genome_build := self.get_genome_build_opt()) and \
-                    (preferred_build := allele_info[genome_build]) and \
-                    (c_hgvs := preferred_build.c_hgvs_display):
-                resolved_dict.update(c_hgvs.to_json())
-            elif c_hgvs_raw := self.get(SpecialEKeys.C_HGVS):
-                resolved_dict.update(HGVSDisplay.parse(c_hgvs_raw).to_json())
-
-            include = False
-            if latest_validation := allele_info.latest_validation:
-                include = latest_validation.include
-
-            resolved_dict["include"] = include
-            if warning_icon := ImportedAlleleInfo.icon_for(status=allele_info.status, include=include):
-                resolved_dict.update(warning_icon.as_json())
-
-            allele_info_dict["resolved"] = resolved_dict
-
-            genome_builds = {}
-            for variant_info in allele_info.resolved_builds:
-                genome_builds[variant_info.genome_build.name] = {
-                    'variant_id': variant_info.variant_id,
-                    SpecialEKeys.C_HGVS: variant_info.c_hgvs
-                }
-
-            if genome_builds:
-                allele_info_dict["genome_builds"] = genome_builds
-
-        return allele_info_dict
-
     @staticmethod
     def get_url_for_pk(pk):
         return reverse('view_classification', kwargs={'classification_id': pk})
