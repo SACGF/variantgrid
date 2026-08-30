@@ -16,7 +16,7 @@ function plotHBarArrays(selector, title, x, y, width, height, color, margin) {
     var layout = defaultLayout(title, width, height);
     if (margin) {
         layout["margin"] = margin;
-  	    layout["xaxis"] = {autotick: true};
+  	    layout["xaxis"] = {tickmode: 'auto'};
   	}
     Plotly.newPlot(selector, [data], layout);
 }

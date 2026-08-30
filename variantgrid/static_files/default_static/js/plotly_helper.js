@@ -5,9 +5,9 @@ function defaultFor(arg, val) {
 /** Pass width=null for a plot that fills (and resizes with) its container */
 function defaultLayout(title, width, height) {
     const layout = {
-      title: title,
+      title: {text: title},
       'height': defaultFor(height, 400),
-      xaxis: { autotick: false },
+      xaxis: { tickmode: 'linear' },
     };
     if (width === null) {
         layout.autosize = true;
@@ -132,7 +132,7 @@ function plotHBarArrays(selector, title, x, y, width, height, color, margin) {
         data["marker"] = {color: color};
     }
     const layout = defaultLayout(title, width, height);
-    layout["xaxis"] = {autotick: true};
+    layout["xaxis"] = {tickmode: 'auto'};
 
     if (margin) {
         layout["margin"] = margin;
@@ -191,18 +191,18 @@ function showHeatMap(elementId, title, x, y, z, labels) {
     }];
     
     const layout = {
-      title: title,
-      titlefont: {
-        size: 32,
+      title: {
+        text: title,
+        font: {size: 32},
       },
       annotations: [],
       xaxis: {
-        title: 'Old Category',
+        title: {text: 'Old Category'},
         ticks: '',
         side: 'top'
       },
       yaxis: {
-        title: 'New Category',
+        title: {text: 'New Category'},
         ticks: '',
         ticksuffix: ' ',
         width: 700,

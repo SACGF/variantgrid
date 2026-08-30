@@ -563,7 +563,7 @@ var VariantSampleInformation = (function () {
             xbins: {start: 0, size: .05, end: 1},
         };
         const histogramLayout = defaultLayout(config.variantLabel + " Allele Frequency Histogram", null, GRAPH_HEIGHT);
-        histogramLayout.xaxis = {autotick: true, range: [0, 1]};
+        histogramLayout.xaxis = {tickmode: 'auto', range: [0, 1]};
         histogramLayout.yaxis = {showline: false, zeroline: false, showticklabels: false};
         Plotly.newPlot('sample-allele-frequency-histogram', [histogramData], histogramLayout, RESPONSIVE);
     }

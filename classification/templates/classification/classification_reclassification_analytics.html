@@ -9,7 +9,7 @@
 {% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
 {% block content %}
 {% settings_value 'CLASSIFICATION_GRID_EXTERNAL_LAB_FILTER' as CLASSIFICATION_GRID_EXTERNAL_LAB_FILTER %}
-<script type="text/javascript" src="{% static 'js/lib/plotly-latest.min.js' %}"></script>
+<script type="text/javascript" src="{% static 'js/lib/plotly-custom-3.7.0.min.js' %}"></script>
 <script type="text/javascript" src="{% static 'js/plotly_helper.js' %}"></script>
 <style>
     .reclassification-analytics .chart { min-height: 420px; }
@@ -465,11 +465,11 @@
             barmode: 'stack',
             bargap: 0,
             legend: {traceorder: 'normal'},
-            xaxis: {title: 'Days at the starting significance', range: [0, edges[edges.length - 1]],
+            xaxis: {title: {text: 'Days at the starting significance'}, range: [0, edges[edges.length - 1]],
                     tickmode: 'array', tickvals: timeToReclassification.tick_values,
                     ticktext: timeToReclassification.tick_labels,
                     gridcolor: GRID_COLOUR, zeroline: false},
-            yaxis: {title: 'Reclassifications', gridcolor: GRID_COLOUR, zeroline: false}
+            yaxis: {title: {text: 'Reclassifications'}, gridcolor: GRID_COLOUR, zeroline: false}
         }), plotConfig);
     }
 
@@ -540,9 +540,9 @@
         Plotly.newPlot('survival', traces, chartLayout({
             hovermode: 'x unified',
             legend: {traceorder: 'normal'},
-            xaxis: {title: 'Years since the cohort was taken', tickmode: 'linear', dtick: 0.5,
+            xaxis: {title: {text: 'Years since the cohort was taken'}, tickmode: 'linear', dtick: 0.5,
                     gridcolor: GRID_COLOUR, zeroline: false},
-            yaxis: {title: '% of the cohort still waiting', range: [0, 100],
+            yaxis: {title: {text: '% of the cohort still waiting'}, range: [0, 100],
                     gridcolor: GRID_COLOUR, zeroline: false}
         }), plotConfig);
     }
@@ -586,9 +586,9 @@
             hovermode: 'x unified',
             legend: {orientation: 'h', y: -0.2},
             margin: {t: 20, r: 70, b: 80, l: 70},
-            xaxis: {title: 'Year', tickmode: 'linear', gridcolor: GRID_COLOUR, zeroline: false},
-            yaxis: {title: '% of the catalogue', gridcolor: GRID_COLOUR, zeroline: false},
-            yaxis2: {title: 'Reviewed per change', overlaying: 'y', side: 'right', showgrid: false,
+            xaxis: {title: {text: 'Year'}, tickmode: 'linear', gridcolor: GRID_COLOUR, zeroline: false},
+            yaxis: {title: {text: '% of the catalogue'}, gridcolor: GRID_COLOUR, zeroline: false},
+            yaxis2: {title: {text: 'Reviewed per change'}, overlaying: 'y', side: 'right', showgrid: false,
                      zeroline: false, rangemode: 'tozero'},
             yaxis3: {overlaying: 'y', side: 'right', showgrid: false, zeroline: false, visible: false,
                      rangemode: 'tozero'}
@@ -607,8 +607,8 @@
             }
         ], chartLayout({
             barmode: 'group',
-            xaxis: {title: 'Distinct years the record was touched in', gridcolor: GRID_COLOUR, zeroline: false},
-            yaxis: {title: 'Records', type: 'log', gridcolor: GRID_COLOUR, zeroline: false}
+            xaxis: {title: {text: 'Distinct years the record was touched in'}, gridcolor: GRID_COLOUR, zeroline: false},
+            yaxis: {title: {text: 'Records'}, type: 'log', gridcolor: GRID_COLOUR, zeroline: false}
         }), plotConfig);
     }
 
@@ -625,7 +625,7 @@
         }], chartLayout({
             height: 700,
             margin: {t: 20, r: 20, b: 60, l: 120},
-            xaxis: {title: 'Records currently at VUS', gridcolor: GRID_COLOUR, zeroline: false},
+            xaxis: {title: {text: 'Records currently at VUS'}, gridcolor: GRID_COLOUR, zeroline: false},
             yaxis: {gridcolor: GRID_COLOUR, zeroline: false, automargin: true}
         }), plotConfig);
     }
@@ -655,7 +655,7 @@
             barmode: 'group',
             margin: {t: 20, r: 20, b: 160, l: 70},
             xaxis: {gridcolor: GRID_COLOUR, zeroline: false, automargin: true, tickangle: -40},
-            yaxis: {title: '% of records held', gridcolor: GRID_COLOUR, zeroline: false}
+            yaxis: {title: {text: '% of records held'}, gridcolor: GRID_COLOUR, zeroline: false}
         }), plotConfig);
     }
 
@@ -675,7 +675,7 @@
             height: Math.max(320, 44 * traces.length + 120),
             showlegend: false,
             margin: {t: 20, r: 20, b: 60, l: 120},
-            xaxis: {title: 'ACMG points travelled, positive towards pathogenic',
+            xaxis: {title: {text: 'ACMG points travelled, positive towards pathogenic'},
                     gridcolor: GRID_COLOUR, zeroline: true, zerolinecolor: AXIS_COLOUR},
             yaxis: {gridcolor: GRID_COLOUR, zeroline: false, automargin: true}
         }), plotConfig);
@@ -712,7 +712,7 @@
                 barmode: 'relative',
                 margin: {t: 20, r: 20, b: 60, l: 220},
                 legend: {traceorder: 'normal'},
-                xaxis: {title: 'Unapplied or weakened \u2190  reclassifications  \u2192 applied, strengthened or changed',
+                xaxis: {title: {text: 'Unapplied or weakened \u2190  reclassifications  \u2192 applied, strengthened or changed'},
                         tickformat: 'd', gridcolor: GRID_COLOUR, zeroline: true, zerolinecolor: AXIS_COLOUR},
                 yaxis: {gridcolor: GRID_COLOUR, zeroline: false, automargin: true}
             }), plotConfig);

@@ -42,9 +42,9 @@
         ];
 
         const layout = {
-            title: "Total Variants / samples " + `(${buildName})`,
-            xaxis: {title: "Samples"},
-            yaxis: {title: "Variants"}
+            title: {text: "Total Variants / samples " + `(${buildName})`},
+            xaxis: {title: {text: "Samples"}},
+            yaxis: {title: {text: "Variants"}}
         };
 
         Plotly.newPlot('variant-totals-graph-' + buildNameSlug, data, layout);
@@ -62,9 +62,9 @@
         ];
 
         const layout = {
-            title: "Total Variants / genotypes" + `(${buildName})`,
-            xaxis: {title: "Genotypes"},
-            yaxis: {title: "Variants"}
+            title: {text: "Total Variants / genotypes" + `(${buildName})`},
+            xaxis: {title: {text: "Genotypes"}},
+            yaxis: {title: {text: "Variants"}}
         };
 
         Plotly.newPlot('variant-genotypes-graph-' + buildNameSlug, data, layout);
@@ -83,9 +83,9 @@
         ];
 
         const layout = {
-            title: "Percent of imported variants already seen " + `(${buildName})`,
-            xaxis: {title: "Samples"},
-            yaxis: {title: "Variants"}
+            title: {text: "Percent of imported variants already seen " + `(${buildName})`},
+            xaxis: {title: {text: "Samples"}},
+            yaxis: {title: {text: "Variants"}}
         };
 
         Plotly.newPlot('variant-percent-known-graph-' + buildNameSlug, data, layout);
@@ -110,6 +110,6 @@
 </script>
 {% comment %}
 <!-- required on the including page -->
-<script type="text/javascript" src="{% static 'js/lib/plotly-latest.min.js' %}"></script>
+<script type="text/javascript" src="{% static 'js/lib/plotly-custom-3.7.0.min.js' %}"></script>
 <script type="text/javascript" src="{% static 'js/plotly_helper.js' %}"></script>
 {% endcomment %}

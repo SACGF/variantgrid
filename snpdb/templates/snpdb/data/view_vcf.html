@@ -9,7 +9,7 @@
 
 {% block title %}{{ vcf.name }}{% endblock %}
 {% block head %}
-<script type="text/javascript" src="{% static 'js/lib/plotly-latest.min.js' %}"></script>
+<script type="text/javascript" src="{% static 'js/lib/plotly-custom-3.7.0.min.js' %}"></script>
 <script type="text/javascript" src="{% static 'js/cached_generated_files.js' %}"></script>
 <script type="text/javascript" src="{% static 'js/annotated_file_download.js' %}"></script>
 <script type="text/javascript" src="{% static 'js/plotly_helper.js' %}"></script>
@@ -211,9 +211,9 @@ function drawLengthHistograms() {
             let title = variant_class + " lengths"
             var trace = {x: data.bin_centers, y: data.counts, type: 'bar'};
             var layout = {
-                title: title,
-                xaxis: {title: data.is_log ? 'Log10(length)' : 'length'},
-                yaxis: {title: 'Frequency'}
+                title: {text: title},
+                xaxis: {title: {text: data.is_log ? 'Log10(length)' : 'length'}},
+                yaxis: {title: {text: 'Frequency'}}
             };
             if (data.is_log) {
               var minTick = Math.floor(Math.min(...data.bin_centers));

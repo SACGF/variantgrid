@@ -6,7 +6,7 @@
 {% block head %}
     {% include "patients/patient_samplenode_head.html" %}
     {% if phenotype_match_graphs %}
-    <script type="text/javascript" src="{% static 'js/lib/plotly-latest.min.js' %}"></script>
+    <script type="text/javascript" src="{% static 'js/lib/plotly-custom-3.7.0.min.js' %}"></script>
     <script type="text/javascript" src="{% static 'js/plotly_helper.js' %}"></script>
     {% load patient_graph_tags %}
     {% endif %}

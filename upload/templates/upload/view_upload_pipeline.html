@@ -16,7 +16,7 @@
         }
     </script>
     {% if has_upload_steps and step_start_end_lines %}
-        <script type="text/javascript" src="{% static 'js/lib/plotly-latest.min.js' %}"></script>
+        <script type="text/javascript" src="{% static 'js/lib/plotly-custom-3.7.0.min.js' %}"></script>
         <script>
             var COLORS = [  '#e6194b',
                             '#3cb44b',
@@ -121,11 +121,11 @@
 
 
                 const layout = {
-                    'title': title,
+                    'title': {text: title},
                     'xaxis': {
                         showgrid: false,
                         zeroline: false,
-                        title: 'seconds'
+                        title: {text: 'seconds'}
                     },
                     'yaxis': {
                         showgrid: false,
