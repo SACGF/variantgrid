@@ -3,6 +3,7 @@ from typing import Union
 from django.conf import settings
 from django.contrib.auth.models import Group, User
 from django.core.exceptions import PermissionDenied
+from django.db.models import QuerySet
 from django.shortcuts import get_object_or_404
 from guardian.shortcuts import get_group_perms, get_objects_for_group, get_objects_for_user
 
@@ -65,6 +66,22 @@ class GuardianPermissionsMixin:
             return self.get_write_perm() in get_group_perms(user_or_group, self)
         return user_or_group.has_perm(self.get_write_perm(), self)
 
+    @classmethod
+    def filter_writable_for_user(cls, user) -> QuerySet:
+        """ Everything the user can write - the batch form of can_write(), so a page of grid rows
+            resolves in one query rather than a pair of Guardian lookups each.
+            A class that overrides can_write() overrides this too, or the two drift apart. """
+        if not (user and user.is_authenticated):
+            return cls.objects.none()
+        perm_class = cls.get_permission_class()
+        if perm_class != cls:
+            return cls._filter_from_permission_object_qs(perm_class.filter_writable_for_user(user))
+        if user.is_superuser:
+            return cls.objects.all()
+        # Object level only, the way can_write() asks Guardian
+        return get_objects_for_user(user, cls.get_write_perm(), klass=cls.objects.all(),
+                                    accept_global_perms=False)
+
     def check_can_write(self, user_or_group: Union[User, Group]):
         if not self.can_write(user_or_group):
             msg = f"You do not have WRITE permission for {self.pk}"
@@ -94,15 +111,6 @@ class GuardianPermissionsMixin:
                 queryset = get_objects_for_group(group, cls.get_read_perm(), klass=klass, accept_global_perms=True)
 
         return cls._filter_from_permission_object_qs(queryset)
-
-    @classmethod
-    def get_instance_for_permission_check(cls, pk):
-        """ Return an instance sufficient for can_write/can_view checks.
-            If permissions live on this model, a stub with just pk is enough (Guardian only needs pk).
-            If permissions delegate to a related object, the full instance must be loaded from DB. """
-        if cls.get_permission_class() == cls:
-            return cls(pk=pk)
-        return cls.objects.get(pk=pk)
 
     @classmethod
     def get_for_user(cls, user, pk, write=False):

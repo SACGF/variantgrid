@@ -1,5 +1,5 @@
 import operator
-from functools import reduce
+from functools import cached_property, reduce
 from typing import Any, Optional
 
 from django.conf import settings
@@ -60,9 +60,10 @@ def url_if_visible(url_name: str, **kwargs) -> Optional[str]:
 
 
 class VCFListColumns(DatatableConfig[VCF]):
+    server_csv_download = True
+
     def __init__(self, request: HttpRequest):
         super().__init__(request)
-        self.download_csv_button_enabled = True
         self.scroll_x = True
 
         self.rich_columns = [
@@ -104,13 +105,17 @@ class VCFListColumns(DatatableConfig[VCF]):
 
 
 class SamplesListColumns(DatatableConfig[Sample]):
+    server_csv_download = True
+    # The unfiltered count is over a correlated subquery and a group by, and only feeds the
+    # "(filtered from N total)" text
+    count_unfiltered = False
+
     def __init__(self, request: HttpRequest):
         super().__init__(request)
-        self.download_csv_button_enabled = True
         self.scroll_x = True
 
         # Only show columns that have data somewhere in what this user can see
-        qs = self._sample_queryset()
+        qs = self._sample_queryset
         has_mutational_signature = qs.filter(mutationalsignature__isnull=False).exists()
         has_somalier_ancestry = qs.filter(somaliersampleextract__somalierancestry__isnull=False).exists()
         has_sample_gene_lists = qs.filter(samplegenelist__isnull=False).exists()
@@ -213,6 +218,7 @@ class SamplesListColumns(DatatableConfig[Sample]):
             return {"text": cell.value}
         return {"text": cell.value or f"({pk})", "url": url_if_visible(url_name, **{url_kwarg: pk})}
 
+    @cached_property
     def _sample_queryset(self) -> QuerySet[Sample]:
         user_grid_config = UserGridConfig.get(self.user, 'Samples')
         return Sample.filter_for_user(self.user, group_data=user_grid_config.show_group_data)
@@ -225,7 +231,7 @@ class SamplesListColumns(DatatableConfig[Sample]):
                                 filter_key__isnull=True, passing_filter=False)
                         .annotate(het_plus_hom=F("het_count") + F("hom_count"))
                         .values("het_plus_hom")[:1])
-        return self._sample_queryset().annotate(
+        return self._sample_queryset.annotate(
             sample_gene_list_count=Count("samplegenelist", distinct=True),
             het_hom_count=Subquery(cgs_subquery, output_field=IntegerField()))
 

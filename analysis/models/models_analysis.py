@@ -10,7 +10,7 @@ from django.apps import apps
 from django.conf import settings
 from django.contrib.auth.models import Group, User
 from django.db import models
-from django.db.models import Count, F, Max, Model, Q, QuerySet
+from django.db.models import Count, F, Max, Model, OuterRef, Q, QuerySet, Subquery
 from django.db.models.deletion import CASCADE, PROTECT, SET_DEFAULT, SET_NULL, ProtectedError
 from django.db.models.signals import pre_delete
 from django.dispatch import receiver
@@ -133,6 +133,17 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel, Previe
         if super().can_write(user_or_group):
             return not self.is_locked
         return False
+
+    @classmethod
+    def filter_writable_for_user(cls, user):
+        """ Batch can_write - a locked analysis, and a snapshot (which is locked by definition),
+            are read only @see is_locked """
+        last_lock_locked = Subquery(AnalysisLock.objects.filter(analysis=OuterRef("pk"))
+                                    .order_by("-pk").values("locked")[:1])
+        unlocked = cls.objects.annotate(last_lock_locked=last_lock_locked).filter(
+            Q(last_lock_locked__isnull=True) | Q(last_lock_locked=False),
+            analysistemplateversion__isnull=True)
+        return super().filter_writable_for_user(user).filter(pk__in=unlocked.values("pk"))
 
     def get_absolute_url(self):
         return reverse('analysis', kwargs={"analysis_id": self.pk})

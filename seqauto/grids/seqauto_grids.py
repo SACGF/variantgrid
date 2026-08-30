@@ -116,6 +116,9 @@ class GoldCoverageSummaryColumns(DatatableConfig[GoldCoverageSummary]):
 class EnrichmentKitGeneCoverageColumns(DatatableConfig[GeneCoverageCanonicalTranscript]):
     grid_name = "Enrichment Kit Gene Coverage"
     server_csv_download = True
+    # The unfiltered count walks the kit's whole coverage history through five joins, and only feeds
+    # the "(filtered from N total)" text
+    count_unfiltered = False
 
     SEQUENCING_SAMPLE_PATH = "gene_coverage_collection__qcgenecoverage__qc__bam_file__sequencing_sample"
     SEQUENCING_RUN_PATH = SEQUENCING_SAMPLE_PATH + "__sample_sheet__sequencing_run"

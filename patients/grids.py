@@ -31,7 +31,10 @@ class PatientListColumns(DatatableConfig[Patient]):
     """ The ontology term columns are aggregated per patient, so filtering to a single term still shows
         every term that patient has """
     search_box_enabled = True
-    download_csv_button_enabled = True
+    server_csv_download = True
+    # The unfiltered count is over six aggregates, one of them a permission subquery, and only feeds
+    # the "(filtered from N total)" text
+    count_unfiltered = False
 
     FILTER_FIELDS = {
         "first_name": "first_name__icontains",

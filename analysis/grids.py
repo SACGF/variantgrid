@@ -440,9 +440,13 @@ class ExportVariantGrid(VariantGrid):
 
 
 class AnalysesListColumns(DatatableConfig[Analysis]):
+    server_csv_download = True
+    # The unfiltered count is over the tag aggregate and the lock join, and only feeds the
+    # "(filtered from N total)" text
+    count_unfiltered = False
+
     def __init__(self, request: HttpRequest):
         super().__init__(request)
-        self.download_csv_button_enabled = True
         self.scroll_x = True
 
         self.genome_builds = list(GenomeBuild.builds_with_annotation())
@@ -502,9 +506,10 @@ class AnalysesListColumns(DatatableConfig[Analysis]):
 
 
 class AnalysisTemplatesColumns(DatatableConfig[AnalysisTemplate]):
+    server_csv_download = True
+
     def __init__(self, request: HttpRequest):
         super().__init__(request)
-        self.download_csv_button_enabled = True
 
         self.rich_columns = [
             RichColumn(key="id", visible=False),
