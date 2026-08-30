@@ -206,6 +206,9 @@ class GenesColumns(DatatableConfig[ReleaseGeneVersion]):
     server_csv_download = True
     search_box_enabled = True
     scroll_x = True
+    # The unfiltered count is every gene in the release joined to its annotation, and only feeds the
+    # "(filtered from N total)" text
+    count_unfiltered = False
 
     GENE_SYMBOL_FIELD = "gene_version__gene_symbol__symbol"
 

@@ -189,6 +189,12 @@ class Patient(GuardianPermissionsMixin, HasPhenotypeDescriptionMixin, Externally
         return ExternallyManagedModel.can_write(self, user) and GuardianPermissionsMixin.can_write(self, user)
 
     @classmethod
+    def filter_writable_for_user(cls, user):
+        """ Batch can_write - a record an external manager owns is read only here """
+        qs = super().filter_writable_for_user(user)
+        return qs.exclude(external_pk__external_manager__can_modify=False)
+
+    @classmethod
     def allow_group_permission_delete(cls) -> bool:
         # Deletable via the group_permissions delete view (can_write() still blocks externally-managed ones)
         return True

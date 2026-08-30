@@ -75,6 +75,12 @@ class Cohort(GuardianPermissionsAutoInitialSaveMixin, PreviewModelMixin, SortByP
         return super().can_write(user_or_group)
 
     @classmethod
+    def filter_writable_for_user(cls, user):
+        """ Batch can_write - a cohort behind a VCF takes the VCF's permission """
+        own = super().filter_writable_for_user(user)
+        return cls.objects.filter(Q(vcf__in=VCF.filter_writable_for_user(user)) | Q(pk__in=own))
+
+    @classmethod
     def preview_icon(cls) -> str:
         return "fa-solid fa-people-arrows"
 

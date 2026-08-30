@@ -396,6 +396,12 @@ class Sample(GuardianPermissionsMixin, SortByPKMixin, PreviewModelMixin, Extract
         write_perm = DjangoPermission.perm(self, DjangoPermission.WRITE)
         return self.vcf.can_write(user_or_group) or user_or_group.has_perm(write_perm, self)
 
+    @classmethod
+    def filter_writable_for_user(cls, user):
+        """ Batch can_write - permission may be on the whole VCF or just this sample """
+        own = super().filter_writable_for_user(user)
+        return cls.objects.filter(Q(vcf__in=VCF.filter_writable_for_user(user)) | Q(pk__in=own))
+
     def check_can_write(self, user_or_group: Union[User, Group]):
         if not self.can_write(user_or_group):
             msg = f"You do not have permission to modify sample {self.pk} (vcf {self.vcf.pk})"
@@ -404,11 +410,6 @@ class Sample(GuardianPermissionsMixin, SortByPKMixin, PreviewModelMixin, Extract
     @classmethod
     def allow_group_permission_delete(cls) -> bool:
         return True  # User data; deletable via the group_permissions delete view
-
-    @classmethod
-    def get_instance_for_permission_check(cls, pk):
-        # can_write() falls back to the Sample's VCF, so a pk-only stub isn't enough
-        return cls.objects.select_related("vcf").get(pk=pk)
 
     def delete_internal_data(self):
         """ for reloading in place """

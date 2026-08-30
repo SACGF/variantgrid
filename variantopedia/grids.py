@@ -12,7 +12,6 @@ from django.db.models.functions import Coalesce, Concat
 from django.http import HttpRequest
 from django.shortcuts import get_object_or_404
 from django.urls import reverse
-from guardian.shortcuts import get_objects_for_user
 
 from analysis.models import Analysis, VariantTag
 from annotation.annotation_version_querysets import (
@@ -21,7 +20,7 @@ from annotation.annotation_version_querysets import (
 )
 from annotation.models import AnnotationVersion, VariantAnnotation
 from library.django_utils.django_queryset_sql_transformer import get_queryset_with_transformer_hook
-from library.utils import JsonDataType, full_class_name, update_dict_of_dict_values
+from library.utils import JsonDataType, update_dict_of_dict_values
 from snpdb.grid_columns.custom_columns import get_custom_column_fields_override_and_sample_position
 from snpdb.grids import AbstractVariantGrid, url_if_visible
 from snpdb.models import GenomeBuild, Tag, Variant, VariantWiki, VariantZygosityCountCollection
@@ -281,37 +280,6 @@ class VariantTagsColumns(DatatableConfig[VariantTag]):
             "text": f"{analysis_id} - {cell.value}",
             "url": url_if_visible("analysis", analysis_id=analysis_id),
         }
-
-    def pre_render(self, qs: QuerySet[VariantTag], rows: list[dict]):
-        """ can_write delegates to the analysis when there is one, so resolve the whole page in a
-            couple of queries rather than a pair of Guardian lookups per row """
-        analysis_ids = set()
-        tag_ids = set()
-        for row in rows:
-            if analysis_id := row["analysis__id"]:
-                analysis_ids.add(analysis_id)
-            else:
-                tag_ids.add(row["id"])
-
-        self._writable_analysis_ids = self._writable_pks(Analysis, analysis_ids)
-        self._writable_tag_ids = self._writable_pks(VariantTag, tag_ids)
-
-    def _writable_pks(self, klass, pks: set) -> set:
-        if not pks:
-            return set()
-        writable_qs = get_objects_for_user(self.user, klass.get_write_perm(),
-                                           klass=klass.objects.filter(pk__in=pks), accept_global_perms=False)
-        return set(writable_qs.values_list("pk", flat=True))
-
-    def render_delete(self, cell: CellData) -> Optional[str]:
-        if analysis_id := cell["analysis__id"]:
-            writable = analysis_id in self._writable_analysis_ids
-        else:
-            writable = cell.value in self._writable_tag_ids
-        if not writable:
-            return None
-        return reverse('group_permissions_object_delete',
-                       kwargs={'class_name': full_class_name(VariantTag), 'primary_key': cell.value})
 
     def get_initial_queryset(self) -> QuerySet[VariantTag]:
         # get_for_build has already restricted this to tags visible in the build, either via their

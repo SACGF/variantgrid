@@ -276,6 +276,8 @@ class DatatableConfig(Generic[DC]):
     def __init__(self, request: HttpRequest):
         self.request: HttpRequest = request
         self.user: User = request.user
+        self._page_rows: list[dict] = []
+        self._page_writable_pks: Optional[set] = None
 
     @cached_property
     def default_sort_order_column(self) -> RichColumn:
@@ -389,8 +391,10 @@ class DatatableConfig(Generic[DC]):
         Last method called before we start rendering
         qs: The QuerySet with all filtering, ordering applied
         rows: The page's raw values - use it to resolve in one query what would otherwise be per-row
+        Overrides call super() - render_delete resolves the page's write permissions off these rows
         """
-        pass
+        self._page_rows = rows
+        self._page_writable_pks = None
 
     @cached_property
     def _model(self) -> type[DC]:
@@ -413,14 +417,20 @@ class DatatableConfig(Generic[DC]):
         }
 
     def render_delete(self, cell: CellData) -> Optional[str]:
-        try:
-            obj = self._model.get_instance_for_permission_check(cell.value)
-        except self._model.DoesNotExist:
-            return None
-        if not obj.can_write(self.user):
+        """ The delete link, or None where the user can't write the row """
+        if cell.value not in self._writable_pks_for_page(cell.key):
             return None
         return reverse('group_permissions_object_delete',
                        kwargs={'class_name': full_class_name(self._model), 'primary_key': cell.value})
+
+    def _writable_pks_for_page(self, pk_column: str) -> set:
+        """ Which of the page's rows the user can write, resolved on the first row that asks -
+            a pair of Guardian lookups per row is the single most expensive thing a grid can do """
+        if self._page_writable_pks is None:
+            pks = {pk for row in self._page_rows if (pk := row.get(pk_column)) is not None}
+            writable_qs = self._model.filter_writable_for_user(self.user).filter(pk__in=pks)
+            self._page_writable_pks = set(writable_qs.values_list("pk", flat=True))
+        return self._page_writable_pks
 
 
 class DatabaseTableView(Generic[DC], MajorOperationViewMixin, JSONResponseView):
