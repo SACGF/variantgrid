@@ -10,9 +10,11 @@ Everything created is obviously fake, and every subcommand takes '--delete' to r
 from django.core.management.base import BaseCommand
 
 from analysis.fake_variant_tags import FakeVariantTags
+from classification.fake_reclassifications import FakeReclassifications
 
 FAKE_DATA = {
     "tags": FakeVariantTags,
+    "reclassifications": FakeReclassifications,
 }
 
 
