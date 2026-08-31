@@ -72,26 +72,3 @@ class SnpdbConfig(AppConfig):
 
         # So static serve of MEDIA_ROOT just prompts to download VCF (used to rename to vcf.vcf)
         mimetypes.add_type("application/octet-stream", ".vcf", strict=True)
-
-        import builtins
-        import inspect
-
-        # Override print to show filename and line number so they're easier to track down and remove
-        # Save the original print function so we don't cause infinite recursion
-        _original_print = builtins.print
-
-        def line_aware_print(*args, **kwargs):
-            # Get the outer execution frame (where print was actually called)
-            frame = inspect.currentframe().f_back
-
-            # Extract file details safely
-            frame_info = inspect.getframeinfo(frame)
-            filename = frame_info.filename.split('/')[-1]
-            lineno = frame_info.lineno
-
-            # Inject the prefix before sending args to the original print
-            prefix = f"\033[94m[{filename}:{lineno}]\033[0m"  # Cyan color for visibility
-            _original_print(prefix, *args, **kwargs)
-
-        # Overwrite Python's built-in print function globally
-        builtins.print = line_aware_print
