@@ -1,7 +1,7 @@
 {% comment %}
     Pill row behaviour shared by the Classifications and ClinVar node editors - include inside
     the editor's docreadyjs block. The editor marks its widget container .significance-pills-form
-    and tags each row .germline-row / .somatic-row for the allele origin toggle to show and hide.
+    and tags each row .germline-row / .somatic-row for the allele origin toggle to grey out.
 {% endcomment %}
     const $pillsForm = $(".significance-pills-form");
 
@@ -13,10 +13,20 @@
     $("label.pill-toggle input", $pillsForm).change(updatePillToggles);
     updatePillToggles();
 
+    function setRowOriginDisabled($rows, disabled, alleleOriginLabel) {
+        $rows.toggleClass("origin-disabled", disabled);
+        $("input", $rows).prop("disabled", disabled);
+        if (disabled) {
+            $rows.attr("title", "Not filtered on while allele origin is " + alleleOriginLabel);
+        } else {
+            $rows.removeAttr("title");
+        }
+    }
+
     function updateSignificanceRows() {
         const alleleOrigin = $("input[name='allele_origin']:checked", $pillsForm).val();
-        $(".germline-row", $pillsForm).toggle(alleleOrigin !== 'S');
-        $(".somatic-row", $pillsForm).toggle(alleleOrigin !== 'G');
+        setRowOriginDisabled($(".germline-row", $pillsForm), alleleOrigin === 'S', "Somatic");
+        setRowOriginDisabled($(".somatic-row", $pillsForm), alleleOrigin === 'G', "Germline");
     }
     $("input[name='allele_origin']", $pillsForm).change(updateSignificanceRows);
     updateSignificanceRows();

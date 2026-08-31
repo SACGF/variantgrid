@@ -115,7 +115,7 @@ class ClassificationsNode(SignificanceFilterNodeMixin, AnalysisNode):
     @staticmethod
     def get_help_text() -> str:
         return "Variants classified in this database. Filters its parent, or set Input to " \
-               "'Matching variants' to read the database directly."
+               "'All classifications in this database' to read the database directly."
 
     @staticmethod
     def get_node_class_label():

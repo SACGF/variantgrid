@@ -13,7 +13,8 @@
             cutoffs below. A score <b>&ge;</b> the PP3 threshold supports pathogenic; a score <b>&le;</b> the
             BP4 threshold supports benign; values in between are indeterminate. Tools without a published
             ClinGen calibration use the author-recommended cutoff (single threshold) or, where noted, have no
-            calibrated threshold.
+            calibrated threshold. The last rows are not missense pathogenicity predictors at all - they are
+            offered as Effect node filters only, and take no part in the colour bands or the damage count.
         </p>
         <p class="text-muted">
             These thresholds drive the colour bands on the analysis Effect (Damage) node sliders and the
@@ -26,6 +27,7 @@
                     <thead>
                         <tr>
                             <th>Tool</th>
+                            <th title="Which side of the score the Effect node slider keeps">Filter</th>
                             <th class="text-monospace">Raw min</th>
                             <th class="text-monospace">BP4-supporting (benign) &le;</th>
                             <th class="text-monospace">PP3-supporting (pathogenic) &ge;</th>
@@ -40,6 +42,7 @@
                                     {{ t.name }}
                                     {% if t.note %}<div class="text-muted small font-weight-normal mt-1">{{ t.note }}</div>{% endif %}
                                 </th>
+                                <td class="text-monospace">{{ t.raw_direction.comparison }}</td>
                                 <td class="text-monospace">{{ t.raw_min }}</td>
                                 <td class="text-monospace">
                                     {% if t.raw_max_benign_threshold is not None %}

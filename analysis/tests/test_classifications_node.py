@@ -2,6 +2,7 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from analysis.models import Analysis
+from analysis.forms.forms_nodes import ClassificationsNodeForm
 from analysis.models.enums import NodeMatchInput
 from analysis.models.nodes.filters.classifications_node import ClassificationsNode
 from analysis.models.nodes.node_counts import get_extra_filters_q
@@ -214,3 +215,35 @@ class ClassificationsNodeEditorTest(AnalysisSetupMixin, TestCase):
         self.assertIn("germline-significances", content)
         self.assertIn("scs-tier_1", content)
         self.assertEqual(content.count('name="allele_origin"'), 3)
+
+
+class ClassificationsNodeFormRememberedPillsTest(AnalysisSetupMixin, TestCase):
+    def _save(self, node, allele_origin, **data):
+        form = ClassificationsNodeForm(data={"allele_origin": allele_origin,
+                                             "node_input": NodeMatchInput.MATCHING_VARIANTS, **data},
+                                       instance=node)
+        self.assertTrue(form.is_valid(), form.errors)
+        return form.save()
+
+    def test_pills_for_the_other_origin_survive_a_save(self):
+        node = ClassificationsNode.objects.create(analysis=self.analysis)
+        self._save(node, AlleleOriginFilterDefault.SHOW_ALL, pathogenic="on", tier_1="on")
+
+        self._save(node, AlleleOriginFilterDefault.SOMATIC, tier_3="on")
+        node.refresh_from_db()
+        self.assertTrue(node.pathogenic)
+        self.assertFalse(node.vus)
+        self.assertTrue(node.tier_3)
+        self.assertFalse(node.tier_1)
+
+        self._save(node, AlleleOriginFilterDefault.GERMLINE, vus="on")
+        node.refresh_from_db()
+        self.assertTrue(node.tier_3)
+        self.assertTrue(node.vus)
+        self.assertFalse(node.pathogenic)
+
+    def test_matching_variants_label_names_the_source(self):
+        form = ClassificationsNodeForm(instance=ClassificationsNode(analysis=self.analysis))
+        choices = dict(form.fields["node_input"].choices)
+        self.assertEqual(choices[NodeMatchInput.MATCHING_VARIANTS],
+                         "All classifications in this database (no parent)")

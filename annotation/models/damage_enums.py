@@ -174,3 +174,11 @@ class MetaRNNPrediction(ToleratedDamagingPrediction):
 
 class PrimateAIPrediction(ToleratedDamagingPrediction):
     VARIANT_PATH = "variantannotation__primateai_pred"
+
+
+class EVEClass(models.TextChoices):
+    """ EVE plugin's own call at its 75% uncertain threshold. Unlike the dbNSFP preds these are
+        stored as words, so the DamageNode filter matches VariantAnnotation.eve_class directly. """
+    BENIGN = 'Benign', 'Benign'
+    UNCERTAIN = 'Uncertain', 'Uncertain'
+    PATHOGENIC = 'Pathogenic', 'Pathogenic'

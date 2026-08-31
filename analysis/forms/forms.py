@@ -234,7 +234,8 @@ class AnalysisForm(forms.ModelForm, ROFormMixin):
                   "grid_sample_label_template", "variant_tag_stale_days",
                   "show_igv_links", "analysis_horizontal_mode", "annotation_version", "lock_input_sources",
                   "node_queryset_filter_contigs")
-        read_only = ('user', 'genome_build')
+        read_only = ('genome_build', )
+        read_only_display = ('user', )
         model = Analysis
         widgets = {'name': TextInput(),
                    'grid_sample_label_template': TextInput(),

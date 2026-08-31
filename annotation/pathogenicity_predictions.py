@@ -1,6 +1,23 @@
 from collections.abc import Callable
 from dataclasses import dataclass
+from enum import Enum
 from typing import Optional
+
+
+class RawScoreDirection(Enum):
+    """ Which way a raw score runs, so the DamageNode slider filters on the damaging side of it """
+    HIGHER = "higher"        # higher = more damaging (every dbNSFP score): keep score >= slider
+    LOWER = "lower"          # lower = more damaging (popEVE log-likelihood ratios): keep score <= slider
+    MAGNITUDE = "magnitude"  # signed, strength is |score| (PromoterAI): keep |score| >= slider
+
+    @property
+    def comparison(self) -> str:
+        """ How the slider value reads against the score, for labels and the thresholds page """
+        return {
+            RawScoreDirection.HIGHER: "≥",
+            RawScoreDirection.LOWER: "≤",
+            RawScoreDirection.MAGNITUDE: "|score| ≥",
+        }[self]
 
 
 @dataclass(frozen=True)
@@ -15,10 +32,18 @@ class PathogenicityTool:
     raw_max_benign_threshold: Optional[float]          # BP4-supporting upper bound (colour band lower)
     raw_pathogenic_threshold: Optional[float]          # PP3-supporting lower bound (colour band upper, raw count cutoff)
     pred_pathogenic_values: tuple[str, ...] = ()       # categorical pred values counted as pathogenic
+    raw_direction: RawScoreDirection = RawScoreDirection.HIGHER
+    node_label: str = ""                               # DamageNode slider label, where the auto field label would mislead
     source: str = ""                                   # short citation tag (table cell / colour-band tooltip)
     source_detail: str = ""                            # full citation, shown on the Pathogenicity Thresholds page
     source_url: str = ""                               # DOI / URL for the citation
     note: str = ""                                     # caveat shown on the Pathogenicity Thresholds page (e.g. threshold not clinically recommended)
+
+    @property
+    def node_threshold_field(self) -> str:
+        """ DamageNode field holding this tool's slider value - named for the side it keeps """
+        suffix = "max" if self.raw_direction == RawScoreDirection.LOWER else "min"
+        return f"{self.raw_field}_{suffix}"
 
 
 # Pejaver V, Byrne AB, Feng B-J, et al. Calibration of computational tools for missense variant
@@ -121,14 +146,37 @@ TOOLS: tuple[PathogenicityTool, ...] = (
         name="EVE",
         rankscore_field=None,
         raw_field="eve_score",
-        pred_field=None,
+        pred_field="eve_class",
         raw_min=0.0, raw_max=1.0, raw_step=0.05,
         raw_max_benign_threshold=None,
         raw_pathogenic_threshold=None,
+        node_label="EVE score",
         source="Bergquist 2024", source_detail=_BERGQUIST_2024[0], source_url=_BERGQUIST_2024[1],
         note="Bergquist 2024 measured supporting thresholds (pathogenic ≥ 0.684, benign ≤ 0.137) but "
              "declined to recommend them for clinical use due to potential sampling bias, so no "
-             "ClinGen-calibrated PP3/BP4 cutoff is applied.",
+             "ClinGen-calibrated PP3/BP4 cutoff is applied. EVE_CLASS uses the plugin's own "
+             "Benign / Uncertain / Pathogenic call at a 75% uncertain threshold.",
+    ),
+    # popEVE - Orenbuch 2023 (population-adjusted EVE). GRCh38, VEP >= 116. Scores are
+    # log-likelihood ratios, so they run the other way to every dbNSFP score: more negative =
+    # more damaging, and the slider keeps everything at or below it. No ClinGen calibration.
+    PathogenicityTool(
+        name="popEVE",
+        rankscore_field=None,
+        raw_field="popeve_score",
+        pred_field=None,
+        raw_min=-15.0, raw_max=2.0, raw_step=0.5,
+        raw_max_benign_threshold=None,
+        raw_pathogenic_threshold=None,
+        raw_direction=RawScoreDirection.LOWER,
+        node_label="popEVE score",
+        source="popEVE (no calibration)",
+        source_detail="Orenbuch R, Kollasch AW, Spinner HD, et al. Deep generative modeling of the human "
+                      "proteome reveals over a hundred novel genes involved in rare genetic disorders. "
+                      "medRxiv 2023.11.27.23299062. Population-adjusted EVE; no ClinGen calibration.",
+        source_url="https://doi.org/10.1101/2023.11.27.23299062",
+        note="Log-likelihood ratio scale - more negative is more damaging, so the slider keeps scores "
+             "at or below the chosen value. No ClinGen-calibrated PP3/BP4 cutoff.",
     ),
     # MetaRNN - Li 2022, Genome Med (DOI 10.1186/s13073-022-01120-z). dbNSFP 5.3a readme field 82.
     # No ClinGen calibration; use author cutoff 0.5. Single threshold.
@@ -227,6 +275,51 @@ TOOLS: tuple[PathogenicityTool, ...] = (
         raw_max_benign_threshold=0.449,
         raw_pathogenic_threshold=0.764,
         source="Pejaver 2022", source_detail=_PEJAVER_2022[0], source_url=_PEJAVER_2022[1],
+    ),
+
+    # ---- Not missense pathogenicity predictors: no PP3/BP4 cutoff, no colour band, and they sit
+    # outside predictions_num_pathogenic. Offered as Effect node filters only (#1808). ----
+    # ProtVar ddG - protein stability change in kcal/mol from the ProtVar plugin. Not a pathogenicity
+    # predictor: it says whether a substitution destabilises the fold. The plugin header calls
+    # ddG > 2 "likely to be unstabilising"; higher = more destabilising.
+    PathogenicityTool(
+        name="ProtVar ddG stability",
+        rankscore_field=None,
+        raw_field="protvar_stability",
+        pred_field=None,
+        raw_min=-10.0, raw_max=10.0, raw_step=0.5,
+        raw_max_benign_threshold=None,
+        raw_pathogenic_threshold=None,
+        node_label="ProtVar ddG stability",
+        source="ProtVar (no calibration)",
+        source_detail="Stephenson JD, Totoo P, Burke DF, et al. ProtVar: mapping and contextualizing human "
+                      "missense variation. Nucleic Acids Res. 2024;52(W1):W140-W147. Stability is ddG in "
+                      "kcal/mol, not a pathogenicity score; no ClinGen calibration.",
+        source_url="https://doi.org/10.1093/nar/gkae413",
+        note="Protein stability change (ddG, kcal/mol), not a pathogenicity prediction. The plugin calls "
+             "ddG > 2 likely destabilising. No ClinGen-calibrated PP3/BP4 cutoff.",
+    ),
+    # PromoterAI - Illumina. Promoter variants' effect on expression, so unlike every other tool here it
+    # is not missense. The score is signed (predicted expression up/down) and it is the magnitude that
+    # says how strong the effect is - matching how the importer picks the strongest TSS entry.
+    PathogenicityTool(
+        name="PromoterAI",
+        rankscore_field=None,
+        raw_field="promoter_ai_score",
+        pred_field=None,
+        raw_min=0.0, raw_max=1.0, raw_step=0.05,
+        raw_max_benign_threshold=None,
+        raw_pathogenic_threshold=None,
+        raw_direction=RawScoreDirection.MAGNITUDE,
+        node_label="PromoterAI",
+        source="PromoterAI (no calibration)",
+        source_detail="Jaganathan K, Panagiotopoulou SK, McRae JF, et al. PromoterAI: deep learning "
+                      "predicts promoter variant effects on gene expression (Illumina). Signed score; "
+                      "no ClinGen calibration.",
+        source_url="https://github.com/Illumina/PromoterAI",
+        note="Promoter (non-coding) expression effect, not a missense pathogenicity prediction. The score "
+             "is signed for direction of expression change, so the slider filters on |score|. "
+             "No ClinGen-calibrated PP3/BP4 cutoff.",
     ),
 )
 

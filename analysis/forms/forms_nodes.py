@@ -12,6 +12,7 @@ from django.utils.text import slugify
 
 from analysis import models
 from analysis.models import Analysis, AnalysisNode, AnalysisTemplateType, MOINode
+from analysis.models.enums import NodeMatchInput
 from analysis.variant_text import resolve_variant_text
 from analysis.models.nodes.analysis_node import NodeAlleleFrequencyFilter, NodeVCFFilter
 from analysis.models.nodes.filters.classifications_node import ClassificationsNode
@@ -50,6 +51,7 @@ from patients.models_enums import GnomADPopulation, SampleSourceLevel
 from patients.sample_grouping import SOURCE_LEVEL_MODELS
 from snpdb.forms import GenomeBuildAutocompleteForwardMixin
 from snpdb.models import Lab, Sample, Tag, VCFFilter
+from snpdb.models.models_enums import AlleleOriginFilterDefault
 from snpdb.models.models_genome import Contig
 from uicore.widgets.date_widget import NativeDateInput
 
@@ -257,7 +259,40 @@ class BuiltInFilterNodeForm(BaseNodeForm):
                    "cosmic_count_min": HiddenInput(attrs={"min": 0, "max": 50, "step": 1})}
 
 
-class ClassificationsNodeForm(BaseNodeForm):
+class SignificanceFilterFormMixin:
+    """ The editor greys out the pill row for the origin the node isn't filtering on, and disabled pills
+        don't post - keep the stored values so switching the origin back restores what was on """
+    GERMLINE_FIELDS: tuple[str, ...] = ()
+    SOMATIC_FIELDS: tuple[str, ...] = ()
+    MATCHING_VARIANTS_LABEL: str = ""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # The enum is shared, so each node names the source it reads when it has no parent
+        self.fields["node_input"].choices = [
+            (value, self.MATCHING_VARIANTS_LABEL if value == NodeMatchInput.MATCHING_VARIANTS else label)
+            for value, label in NodeMatchInput.choices
+        ]
+
+    def clean(self):
+        cleaned_data = super().clean()
+        allele_origin = cleaned_data.get("allele_origin")
+        if allele_origin == AlleleOriginFilterDefault.SOMATIC:
+            remembered_fields = self.GERMLINE_FIELDS
+        elif allele_origin == AlleleOriginFilterDefault.GERMLINE:
+            remembered_fields = self.SOMATIC_FIELDS
+        else:
+            remembered_fields = ()
+        for field in remembered_fields:
+            cleaned_data[field] = getattr(self.instance, field)
+        return cleaned_data
+
+
+class ClassificationsNodeForm(SignificanceFilterFormMixin, BaseNodeForm):
+    GERMLINE_FIELDS = tuple(ClassificationsNode.FIELD_CLINICAL_SIGNIFICANCE)
+    SOMATIC_FIELDS = tuple(ClassificationsNode.FIELD_SOMATIC_CLINICAL_SIGNIFICANCE)
+    MATCHING_VARIANTS_LABEL = "All classifications in this database (no parent)"
+
     lab = forms.ModelMultipleChoiceField(queryset=Lab.objects.all(),
                                          required=False,
                                          widget=ModelSelect2Multiple(url='lab_autocomplete',
@@ -285,7 +320,11 @@ class ClassificationsNodeForm(BaseNodeForm):
         return node
 
 
-class ClinVarNodeForm(BaseNodeForm):
+class ClinVarNodeForm(SignificanceFilterFormMixin, BaseNodeForm):
+    GERMLINE_FIELDS = tuple(ClinVarNode.FIELD_PATHOGENICITY)
+    SOMATIC_FIELDS = tuple(ClinVarNode.FIELD_SOMATIC_TIER) + tuple(ClinVarNode.FIELD_ONCOGENICITY)
+    MATCHING_VARIANTS_LABEL = "All records in ClinVar (no parent)"
+
     variation_ids = forms.CharField(required=False, label="ClinVar variation IDs",
                                     widget=TextInput(attrs={'placeholder': 'eg 12345, 67890'}))
 
@@ -452,14 +491,37 @@ class DamageNodeForm(BaseNodeForm):
         # calibrated ClinGen colour bands and value colouring in damagenode_editor.html (omitted when None).
         for tool in TOOLS:
             if tool.raw_field:
-                field_name = f"{tool.raw_field}_min"
-                if field_name in self.fields:
-                    attrs = {"min": tool.raw_min, "max": tool.raw_max, "step": tool.raw_step}
-                    if tool.raw_pathogenic_threshold is not None:
-                        attrs["data-pathogenic-min"] = tool.raw_pathogenic_threshold
-                    if tool.raw_max_benign_threshold is not None:
-                        attrs["data-benign-max"] = tool.raw_max_benign_threshold
-                    self.fields[field_name].widget = HiddenInput(attrs=attrs)
+                attrs = {"min": tool.raw_min, "max": tool.raw_max, "step": tool.raw_step}
+                if tool.raw_pathogenic_threshold is not None:
+                    attrs["data-pathogenic-min"] = tool.raw_pathogenic_threshold
+                if tool.raw_max_benign_threshold is not None:
+                    attrs["data-benign-max"] = tool.raw_max_benign_threshold
+                field = self.fields[tool.node_threshold_field]
+                field.widget = HiddenInput(attrs=attrs)
+                if tool.node_label:
+                    # Only where the auto label would mislead - a signed or inverted score
+                    field.label = f"{tool.node_label} {tool.raw_direction.comparison}"
+
+    def get_raw_score_rows(self) -> list[dict]:
+        """ Per-tool bound fields for the raw-score slider rows and their setup calls in the editor,
+            so a tool added to TOOLS gets a slider without touching the template (#1808) """
+        return [{
+            "tool": tool,
+            "field": tool.raw_field,
+            "threshold_field": tool.node_threshold_field,
+            "min_field": self[tool.node_threshold_field],
+            "required_field": self[f"{tool.raw_field}_required"],
+            "allow_null_field": self[f"{tool.raw_field}_allow_null"],
+        } for tool in self.instance.get_raw_score_tools()]
+
+    def get_pred_rows(self) -> list[dict]:
+        """ Per-tool bound fields for the categorical prediction dropdown rows """
+        return [{
+            "tool": tool,
+            "pred_field": self[tool.pred_field],
+            "required_field": self[f"{tool.pred_field}_required"],
+            "allow_null_field": self[f"{tool.pred_field}_allow_null"],
+        } for tool in self.instance.get_pred_tools()]
 
     def get_variant_class_groups(self) -> list[tuple[str, list]]:
         """ (group name, sub-widgets) for the grouped checkboxes in the editor """

@@ -983,6 +983,25 @@ class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
     def has_phylop_46_way_mammalian(self) -> bool:
         return self._vep_config.get("phylop46way")
 
+    def get_visible_columns(self, pipeline_type: Optional[VariantAnnotationPipelineType] = None) -> frozenset[str]:
+        """ VariantGrid columns this version populates, off the same VEP_COLUMNS table that controls what
+            annotation writes (#1148). Pass a pipeline_type to narrow to what that pipeline wrote. """
+        return visible_columns_for(
+            vep_config=VEPConfig(self.genome_build),
+            genome_build_name=self.genome_build.name,
+            pipeline_type=pipeline_type,
+            columns_version=self.columns_version,
+            vep_version=self.vep,
+            cosmic_version=self.cosmic,
+            gnomad4_minor_version=self.gnomad,
+        )
+
+    @cached_property
+    def visible_columns(self) -> frozenset[str]:
+        """ Columns populated by any pipeline on this version - what filter nodes can offer, as they
+            work off the version rather than an individual annotation run. """
+        return self.get_visible_columns()
+
     @cached_property
     def vep_gene_set_versions(self) -> VepGeneSetVersions:
         """ The VEP version strings describing which gene set was annotated against """
@@ -2062,15 +2081,7 @@ class VariantAnnotation(AbstractVariantAnnotation):
             table that controls what annotation writes, so the two can't drift (#1148). Passing `vep_config`
             drops columns whose data file isn't configured - matching the `VariantAnnotationVersion.has_*`
             flags (e.g. PhastCons/PhyloP mammalian tracks). """
-        return visible_columns_for(
-            vep_config=VEPConfig(self.version.genome_build),
-            genome_build_name=self.version.genome_build.name,
-            pipeline_type=self.annotation_run.pipeline_type,
-            columns_version=self.version.columns_version,
-            vep_version=self.version.vep,
-            cosmic_version=self.version.cosmic,
-            gnomad4_minor_version=self.version.gnomad,
-        )
+        return self.version.get_visible_columns(self.annotation_run.pipeline_type)
 
     @property
     def has_non_gnomad_population_frequency(self) -> bool:
