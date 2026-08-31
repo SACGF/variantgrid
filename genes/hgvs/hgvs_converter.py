@@ -2,7 +2,19 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Optional
 
-from genes.hgvs import HGVSVariant
+from genes.hgvs.hgvs_variant import HGVSVariant
+
+
+class HGVSException(Exception):
+    """ A wrapper for Biocommons HGVS Exceptions to allow library independent code """
+
+
+class HGVSNomenclatureException(HGVSException):
+    """ HGVSException subclass for when problem is with HGVS string (users can fix) """
+
+
+class HGVSImplementationException(HGVSException):
+    """ HGVSException subclass for when problem is with the library (users can NOT fix) """
 
 
 class HGVSConverterType(Enum):

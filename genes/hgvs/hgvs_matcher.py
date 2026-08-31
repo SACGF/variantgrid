@@ -16,7 +16,6 @@ from django.conf import settings
 from django.core.cache import cache
 from django.db.models import Max, Min
 from django.utils.timezone import now
-from hgvs_shim import HGVSConverter
 
 from genes.hgvs import HGVSComponents, HGVSImplementationException, HGVSNomenclatureException, HGVSVariant
 from genes.hgvs.biocommons_hgvs.data_provider import DjangoTranscriptDataProvider
@@ -119,7 +118,7 @@ class HGVSConverterFactory:
 
     @staticmethod
     def factory(genome_build: GenomeBuild, hgvs_converter_type: Optional[HGVSConverterType] = None,
-                local_resolution=True, clingen_resolution=True) -> HGVSConverter:
+                local_resolution=True, clingen_resolution=True) -> BioCommonsHGVSConverter:
         if hgvs_converter_type is None:
             hgvs_converter_type = HGVSConverterType.BIOCOMMONS_HGVS
 

@@ -10,12 +10,12 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.db.models import QuerySet
 from django.urls import reverse
-from hgvs_shim import HGVSException, HGVSImplementationException, HGVSNomenclatureException
 
 from annotation.cosmic import CosmicAPI
 from annotation.manual_variant_entry import CreateManualVariantForbidden, check_can_create_variants
 from classification.models import Classification, CreateNoClassificationForbidden
-from genes.hgvs import HGVSMatcher, HgvsOriginallyNormalized, VariantResolvingError
+from genes.hgvs import HGVSException, HGVSImplementationException, HGVSMatcher, \
+    HGVSNomenclatureException, HgvsOriginallyNormalized, VariantResolvingError
 from genes.hgvs.hgvs_converter import HgvsMatchRefAllele
 from genes.gene_fusions import find_gene_fusions_for_string
 from genes.models import MANE, BadTranscript, MissingTranscript, TranscriptVersion

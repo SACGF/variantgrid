@@ -1,26 +1,45 @@
 import copy
+import re
+from importlib import metadata
 from typing import Optional
 
 from bioutils.sequences import reverse_complement
+from hgvs.assemblymapper import AssemblyMapper
 from hgvs.exceptions import (
     HGVSDataNotAvailableError,
     HGVSError,
+    HGVSInternalError,
+    HGVSInvalidIntervalError,
     HGVSInvalidVariantError,
+    HGVSNormalizationError,
+    HGVSParseError,
     HGVSUnsupportedOperationError,
+    HGVSUsageError,
+    HGVSVerifyFailedError,
 )
+from hgvs.extras.babelfish import Babelfish
+from hgvs.normalizer import Normalizer
+from hgvs.parser import Parser
 from hgvs.sequencevariant import SequenceVariant
-from hgvs_shim import BioCommonsHGVSConverter as _BioCommonsHGVSConverterBase
-from hgvs_shim.hgvs_converter_biocommons import BioCommonsHGVSVariant
+from hgvs.validator import ExtrinsicValidator
+from hgvs.variantmapper import VariantMapper
 
 from genes.hgvs.biocommons_hgvs.data_provider import DjangoTranscriptDataProvider
 from genes.hgvs.hgvs_converter import (
     HGVSConverterType,
+    HGVSException,
+    HGVSImplementationException,
+    HGVSNomenclatureException,
     HgvsMatchRefAllele,
     HgvsOriginallyNormalized,
 )
+from genes.hgvs.hgvs_variant import HGVSVariant, _looks_like_transcript
 from genes.models import TranscriptVersion
 from genes.transcripts_utils import get_refseq_type
 from snpdb.models import Contig, GenomeBuild, VariantCoordinate
+
+# Parser construction is slow, so keep a single one per process
+_hgvs_parser = Parser()
 
 
 class HgvsMatchTranscriptAndGenomeRefAllele(HgvsMatchRefAllele):
@@ -60,45 +79,106 @@ class HgvsMatchTranscriptAndGenomeRefAllele(HgvsMatchRefAllele):
         return message
 
 
-class BioCommonsHGVSConverter(_BioCommonsHGVSConverterBase):
+class BioCommonsHGVSConverter:
     """
-    Django-coupled subclass of hgvs_shim.BioCommonsHGVSConverter.
-
-    Adds VariantCoordinate handling, reference matching, normalization tracking,
-    and the DjangoTranscriptDataProvider. Inherits parser setup, normalization
-    helpers, and exception mapping from the shim base class.
+    Biocommons HGVS wrapped to work with VG's VariantCoordinate, reference matching and
+    normalization tracking, backed by the DjangoTranscriptDataProvider.
     """
+    hgvs_span_trailing_int_length_pattern = re.compile(r"(.*(?:del|dup|inv))(\d+)$")
 
     def __init__(self, genome_build: GenomeBuild, local_resolution=True, clingen_resolution=True):
         self.genome_build = genome_build
         self.local_resolution = local_resolution
         self.clingen_resolution = clingen_resolution
 
-        hdp = DjangoTranscriptDataProvider(genome_build)
-
-        # Calls hgvs_shim base: sets up self.hdp, self.babelfish (using genome_build.name),
-        # self.am, self.ev, self.norm_5p, self.no_validate_mapper, self.no_validate_normalizer
-        super().__init__(assembly_name=genome_build.name, hdp=hdp)
-
-        # Override babelfish with patch name for GRCh37 to get MT chromosome mapping
+        self.hdp = DjangoTranscriptDataProvider(genome_build)
+        assembly_name = genome_build.name
+        # GRCh37 needs the patch name to get the MT chromosome mapping
         if genome_build.name == 'GRCh37':
-            from hgvs.extras.babelfish import Babelfish
-            self.babelfish = Babelfish(self.hdp, genome_build.get_build_with_patch())
+            babelfish_assembly = genome_build.get_build_with_patch()
+        else:
+            babelfish_assembly = assembly_name
+        self.babelfish = Babelfish(self.hdp, babelfish_assembly)
+        self.am = AssemblyMapper(self.hdp,
+                                 assembly_name=assembly_name,
+                                 alt_aln_method='splign',
+                                 replace_reference=True)
+        self.ev = ExtrinsicValidator(self.hdp)
+        self.norm_5p = Normalizer(self.hdp, shuffle_direction=5)
+        self.no_validate_mapper = VariantMapper(self.hdp, replace_reference=True, prevalidation_level="NONE")
+        self.no_validate_normalizer = Normalizer(self.hdp, cross_boundaries=True, validate=False,
+                                                 variantmapper=self.no_validate_mapper)
+
+    @staticmethod
+    def _hgvs_string_validation(hgvs_string: str):
+        """ raise exceptions on any errors """
+
+        if "ins" in hgvs_string:
+            if re.match(r".*ins\d+$", hgvs_string):
+                raise HGVSNomenclatureException("Insertions require inserted sequence, not an integer length")
+            if re.match(".*ins$", hgvs_string):
+                raise HGVSNomenclatureException("Insertions require inserted sequence")
+        if ":" not in hgvs_string:
+            raise HGVSNomenclatureException("No colon (':') provided")
+        for char in [":", "c", "g", "."]:
+            if hgvs_string.startswith(char):
+                raise HGVSNomenclatureException("Missing reference sequence")
+
+    def _parser_hgvs(self, hgvs_string: str) -> SequenceVariant:
+        """ All calls to parsing go through here. Protected: subclasses may override. """
+
+        self._hgvs_string_validation(hgvs_string)
+
+        # Biocommons HGVS doesn't accept integers on the end of indels - ie NM_001354689.1(RAF1):c.1_2dup3
+        # We want to strip these and raise an error if the span is wrong
+        provided_span_length = None
+        if m := self.hgvs_span_trailing_int_length_pattern.match(hgvs_string):
+            hgvs_string, provided_span_length = m.groups()
+            provided_span_length = int(provided_span_length)
+
+        try:
+            sequence_variant = _hgvs_parser.parse(hgvs_string)
+        except HGVSError as hgvs_error:
+            klass = self._get_exception_class(hgvs_error)
+            raise klass(hgvs_error) from hgvs_error
+
+        if provided_span_length is not None:
+            if sequence_variant.posedit.edit.type == 'inv':
+                # HGVS is 0 based
+                coord_span = (sequence_variant.posedit.pos.end - sequence_variant.posedit.pos.start) + 1
+            else:
+                coord_span = abs(sequence_variant.posedit.length_change())
+            if coord_span != provided_span_length:
+                raise HGVSNomenclatureException(f"coordinate span ({coord_span}) not equal to provided ref length {provided_span_length}")
+        return sequence_variant
+
+    def create_hgvs_variant(self, hgvs_string: str) -> HGVSVariant:
+
+        try:
+            sequence_variant = self._parser_hgvs(hgvs_string)
+            return HGVSVariant(sequence_variant)
+        except HGVSError as e:
+            raise HGVSNomenclatureException from e
+
+    def normalize(self, hgvs_variant: HGVSVariant) -> HGVSVariant:
+        sv = hgvs_variant._sequence_variant
+        sv_normalized = self.no_validate_normalizer.normalize(sv)
+        return HGVSVariant(sv_normalized)
 
     def _vc_to_sequence_variant(self, vc: VariantCoordinate) -> SequenceVariant:
         """Convert VariantCoordinate to genomic HGVS SequenceVariant via babelfish."""
         chrom, position, ref, alt, _svlen = vc.as_external_explicit(self.genome_build)
         return self.babelfish.vcf_to_g_hgvs(chrom, position, ref, alt)
 
-    def variant_coordinate_to_g_hgvs(self, vc: VariantCoordinate) -> BioCommonsHGVSVariant:
+    def variant_coordinate_to_g_hgvs(self, vc: VariantCoordinate) -> HGVSVariant:
         """VG API: takes VariantCoordinate; handles mitochondria kind."""
         var_g = self._vc_to_sequence_variant(vc)
-        hgvs_variant = BioCommonsHGVSVariant(var_g)
+        hgvs_variant = HGVSVariant(var_g)
         if hgvs_variant.contig_accession == self.genome_build.mitochondria_accession:
             hgvs_variant.kind = 'm'
         return hgvs_variant
 
-    def variant_coordinate_to_c_hgvs(self, vc: VariantCoordinate, transcript_version) -> BioCommonsHGVSVariant:
+    def variant_coordinate_to_c_hgvs(self, vc: VariantCoordinate, transcript_version) -> HGVSVariant:
         """ In VG we call non-coding "c.HGVS" as well - so have to handle that """
         try:
             var_g = self._vc_to_sequence_variant(vc)  # returns normalized (default HGVS 3')
@@ -117,7 +197,7 @@ class BioCommonsHGVSConverter(_BioCommonsHGVSConverterBase):
 
         if gene_symbol := transcript_version.gene_symbol:
             var_c.gene = gene_symbol.symbol
-        return BioCommonsHGVSVariant(var_c)
+        return HGVSVariant(var_c)
 
     def hgvs_to_variant_coordinate_reference_match_and_normalized(
             self, hgvs_string: str, transcript_version=None
@@ -137,8 +217,32 @@ class BioCommonsHGVSConverter(_BioCommonsHGVSConverterBase):
         vc = VariantCoordinate.from_explicit_no_svlen(chrom, position, ref=ref, alt=alt)
         return vc.as_internal_symbolic(self.genome_build), matches_reference, originally_normalized
 
+    def c_hgvs_remove_gene_symbol(self, hgvs_string: str) -> str:
+        sequence_variant = self._parser_hgvs(hgvs_string)
+        sequence_variant.gene = None
+        return sequence_variant.format()
+
+    def get_transcript_accession(self, hgvs_string: str) -> str:
+        """ Only returns anything if c. HGVS """
+        transcript_accession = ''
+        if hgvs_string is not None:
+            sequence_variant = self._parser_hgvs(hgvs_string)
+            transcript_accession = self._get_transcript_accession_from_sequence_variant(sequence_variant)
+        return transcript_accession
+
+    @staticmethod
+    def _get_transcript_accession_from_sequence_variant(sequence_variant: SequenceVariant) -> str:
+        transcript_accession = ''
+        if sequence_variant.type != 'g':
+            if _looks_like_transcript(sequence_variant.ac):
+                transcript_accession = sequence_variant.ac
+        return transcript_accession
+
     def get_hgvs_converter_type(self) -> HGVSConverterType:
         return HGVSConverterType.BIOCOMMONS_HGVS
+
+    def get_version(self) -> str:
+        return metadata.version('hgvs')
 
     def description(self, describe_fallback=True) -> str:
         hgvs_converter_type = self.get_hgvs_converter_type()
@@ -148,7 +252,37 @@ class BioCommonsHGVSConverter(_BioCommonsHGVSConverterBase):
             desc += " (ClinGen fallback)"
         return desc
 
-    # --- VG-specific private methods ---
+    @staticmethod
+    def _m_to_g(var_m):
+        # mito is basically the same as genomic except for the letter
+        var_m.type = 'g'
+        return var_m
+
+    @staticmethod
+    def _get_exception_class(hgvs_error: HGVSError) -> type:
+        """ Convert from HGVS to our generic errors """
+
+        exception_mappings = {
+            HGVSNomenclatureException: {
+                HGVSInvalidIntervalError,
+                HGVSInvalidVariantError,
+                HGVSNormalizationError,
+                HGVSParseError,
+                HGVSUnsupportedOperationError
+            },
+            HGVSImplementationException: {
+                HGVSDataNotAvailableError,
+                HGVSInternalError,
+                HGVSUsageError,
+                HGVSVerifyFailedError,
+            },
+        }
+
+        for our_ex, biocommons_hgvs_exceptions in exception_mappings.items():
+            for hgvs_ex in biocommons_hgvs_exceptions:
+                if isinstance(hgvs_error, hgvs_ex):
+                    return our_ex
+        return HGVSException  # General one...
 
     def _fix_ref(self, var_x: SequenceVariant) -> tuple[SequenceVariant, HgvsMatchRefAllele]:
         if provided_ref := var_x.posedit.edit.ref_s:
@@ -189,8 +323,8 @@ class BioCommonsHGVSConverter(_BioCommonsHGVSConverterBase):
         normalization_error = None
         try:
             var_x_normalized = self.no_validate_normalizer.normalize(var_x)
-            originally_normalized = HgvsOriginallyNormalized(original_hgvs=BioCommonsHGVSVariant(var_x_original),
-                                                             normalized_hgvs=BioCommonsHGVSVariant(var_x_normalized))
+            originally_normalized = HgvsOriginallyNormalized(original_hgvs=HGVSVariant(var_x_original),
+                                                             normalized_hgvs=HGVSVariant(var_x_normalized))
         except HGVSUnsupportedOperationError as hgvs_error:
             normalization_error = hgvs_error
 

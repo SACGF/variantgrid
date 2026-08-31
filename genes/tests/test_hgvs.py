@@ -5,14 +5,13 @@ from unittest import skip
 
 from django.test import TestCase, override_settings
 from hgvs.parser import Parser
-from hgvs_shim.hgvs_converter_biocommons import BioCommonsHGVSVariant
 
 from annotation.fake_annotation import get_fake_annotation_version
 from annotation.tests.test_data_fake_genes import (
     create_fake_transcript_version,
     create_gata2_transcript_version,
 )
-from genes.hgvs import HGVSConverterType, HGVSException, HGVSMatcher
+from genes.hgvs import HGVSConverterType, HGVSException, HGVSMatcher, HGVSVariant
 from genes.hgvs.hgvs_matcher import FakeTranscriptVersion
 from snpdb.models import GenomeBuild, VariantCoordinate
 
@@ -86,7 +85,7 @@ class TestHGVS(TestCase):
 
         parser = Parser()
         for hgvs_string, hgvs_expected_trimmed in LONG_AND_TRIMMED_HGVS.items():
-            hgvs_variant = BioCommonsHGVSVariant(parser.parse(hgvs_string))
+            hgvs_variant = HGVSVariant(parser.parse(hgvs_string))
             hgvs_actual_trimmed = hgvs_variant.format(max_ref_length=10)
             self.assertEqual(hgvs_actual_trimmed, hgvs_expected_trimmed)
 

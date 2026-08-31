@@ -234,9 +234,6 @@ hgvs @ git+https://github.com/biocommons/hgvs@3ac3d43fd3f8bef1854af11c95219cea8d
     # via
     #   -r requirements.in
     #   cdot
-    #   hgvs-shim
-hgvs-shim==0.2.1
-    # via -r requirements.in
 html5lib==1.1
     # via django-htmlmin
 htseq==2.1.2
