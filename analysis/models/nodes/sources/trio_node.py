@@ -1,74 +1,28 @@
 import operator
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from functools import reduce
 from typing import Optional
 
 from auditlog.registry import auditlog
-from cache_memoize import cache_memoize
 from django.db import models
-from django.db.models import Count
 from django.db.models.deletion import SET_NULL
 from django.db.models.query_utils import Q
 
 from analysis.models.enums import AnalysisTemplateType, NodeErrorSource, TrioInheritance
 from analysis.models.nodes.sources import AbstractCohortBasedNode
-from analysis.models.nodes.sources._stats_cache import (
-    UNCACHEABLE,
-    get_cached_label_count_for_cohort,
-    get_handler_for_node,
+from analysis.models.nodes.sources._family_inheritance import (
+    AbstractCompHetInheritance,
+    AbstractFamilyInheritance,
+    _build_family_zyg_q,
+    _dominant_requires_affected_parent_error,
+    _xlinked_recessive_errors,
 )
 from analysis.models.nodes.node_display import NodeIcon
-from annotation.models.models import VariantTranscriptAnnotation
-from library.constants import DAY_SECS
-from patients.models_enums import Sex, Zygosity
+from patients.models_enums import Zygosity
 from snpdb.models import Contig, Sample, Trio
 
 
-def _build_family_zyg_q(cohort_genotype_collection, sample_zyg_require: list[tuple]) -> Q:
-    """Build a zygosity Q for any number of family members.
-
-    Args:
-        cohort_genotype_collection: The CGC to build the Q for.
-        sample_zyg_require: List of (sample, zygosity_set, require_zygosity).
-            Entries with an empty zygosity_set are silently skipped
-            (used for father in X-linked recessive).
-    """
-    sample_zygosities_dict = {}
-    sample_require_zygosity_dict = {}
-    for sample, zyg_set, require in sample_zyg_require:
-        if zyg_set:
-            sample_zygosities_dict[sample] = zyg_set
-            sample_require_zygosity_dict[sample] = require
-    return cohort_genotype_collection.get_zygosity_q(
-        sample_zygosities_dict, sample_require_zygosity_dict
-    )
-
-
-def _dominant_requires_affected_parent_error(mother_affected: bool, father_affected: bool):
-    if not (mother_affected or father_affected):
-        return "Dominant inheritance requires an affected parent"
-    return None
-
-
-def _xlinked_recessive_errors(proband_sample, mother_affected: bool) -> list[str]:
-    errors = []
-    proband_is_female = proband_sample.patient and proband_sample.patient.sex == Sex.FEMALE
-    if proband_is_female:
-        errors.append("X-linked recessive inheritance doesn't currently work with female proband")
-    elif mother_affected:
-        errors.append("X-linked recessive inheritance requires an unaffected mother")
-    return errors
-
-
-class AbstractTrioInheritance(ABC):
-    """ Do inheritance filtering in subclasses to keep filters/methods consistent """
-    NO_VARIANT = {Zygosity.MISSING, Zygosity.HOM_REF}  # 2 different het would be "missing" (as has no ref)
-    HAS_VARIANT = {Zygosity.HET, Zygosity.HOM_ALT}
-    UNAFFECTED_AND_AFFECTED_ZYGOSITIES = [NO_VARIANT, HAS_VARIANT]
-
-    def __init__(self, node: 'TrioNode'):
-        self.node = node
-
+class AbstractTrioInheritance(AbstractFamilyInheritance):
     def _get_zyg_q(self, cohort_genotype_collection, trio_zyg_data) -> Q:
         """ trio_zyg_data = tuple of mum_zyg_set, dad_zyg_set, proband_zyg_set """
         trio = self.node.trio
@@ -78,40 +32,12 @@ class AbstractTrioInheritance(ABC):
             (trio.proband.sample, trio_zyg_data[2], True),  # 947 - Always require zygosity for Proband
         ])
 
-    @staticmethod
-    def _zygosity_options(zyg: set, allow_unknown=False):
-        if allow_unknown:
-            # Make a new set so as to not alter passed in value
-            zyg = zyg | {Zygosity.UNKNOWN_ZYGOSITY}
-        zyg = zyg - {Zygosity.MISSING}  # Implementation detail - don't show to user
-        return ", ".join(sorted([Zygosity.display(z) for z in zyg]))
-
     def get_zygosities_method(self, mum_z: set, dad_z: set, proband_z: set):
         proband = self._zygosity_options(proband_z)
         mum = self._zygosity_options(mum_z, not self.node.require_zygosity)
         dad = self._zygosity_options(dad_z, not self.node.require_zygosity)
         filters = {"Proband": proband, "Mother": mum, "Father": dad}
         return ", ".join([f"{k}: {v}" for k, v in filters.items() if v])
-
-    @abstractmethod
-    def get_arg_q_dict(self) -> dict[Optional[str], dict[str, Q]]:
-        pass
-
-    @abstractmethod
-    def get_method(self) -> str:
-        pass
-
-    def get_contigs(self) -> Optional[set[Contig]]:
-        """ None means we don't know """
-        return None
-
-    def get_other_filters_description(self) -> str:
-        """Variant-level filters applied in addition to per-member zygosity.
-
-        Shown in every member row of the "Other Filters" column on the
-        zygosity table. Empty string means no extra filters.
-        """
-        return ""
 
 
 class SimpleTrioInheritance(AbstractTrioInheritance):
@@ -198,51 +124,12 @@ class TrioAllRecessive(AbstractTrioInheritance):
         return "XLR branch: Chr X only"
 
 
-class CompHet(AbstractTrioInheritance):
+class CompHet(AbstractCompHetInheritance, AbstractTrioInheritance):
     def _mum_but_not_dad(self):
         return {Zygosity.HET}, self.NO_VARIANT, {Zygosity.HET}
 
     def _dad_but_not_mum(self):
         return self.NO_VARIANT, {Zygosity.HET}, {Zygosity.HET}
-
-    @cache_memoize(DAY_SECS, args_rewrite=lambda s: (s.node.pk, s.node.version))
-    def _get_comp_het_q_and_two_hit_genes(self):
-        cohort_genotype_collection = self.node.trio.cohort.cohort_genotype_collection
-
-        parent = self.node.get_single_parent()
-        mum_but_not_dad = self._get_zyg_q(cohort_genotype_collection, self._mum_but_not_dad())
-        dad_but_not_mum = self._get_zyg_q(cohort_genotype_collection, self._dad_but_not_mum())
-        comp_het_q = mum_but_not_dad | dad_but_not_mum
-
-        # Need to pass in kwargs in case we have parent (eg Venn node) that doesn't have same cohort annotation kwargs
-        annotation_kwargs = self.node.get_annotation_kwargs()
-
-        # Gene overlaps (not transcript annotation) - a long SV is skipped by VEP so its only
-        # record of the genes it crosses is VariantGeneOverlap @see issue #940
-        def get_parent_genes(q):
-            qs = parent.get_queryset(q, extra_annotation_kwargs=annotation_kwargs)
-            return qs.values_list("variantgeneoverlap__gene", flat=True).distinct()
-
-        # This ends up doing 3 queries (where we call set() - to work out what Q we need to return)
-        common_genes = set(get_parent_genes(mum_but_not_dad)) & set(get_parent_genes(dad_but_not_mum))
-        variant_annotation_version = self.node.analysis.annotation_version.variant_annotation_version
-        q_in_genes = VariantTranscriptAnnotation.get_overlapping_genes_q(variant_annotation_version, common_genes)
-        parent_genes_qs = parent.get_queryset(q_in_genes, extra_annotation_kwargs=annotation_kwargs)
-        parent_genes_qs = parent_genes_qs.values_list("variantgeneoverlap__gene")
-        two_hits = parent_genes_qs.annotate(gene_count=Count("pk")).filter(gene_count__gte=2)
-        two_hit_genes = set(two_hits.values_list("variantgeneoverlap__gene", flat=True).distinct())
-        return comp_het_q, two_hit_genes
-
-    def get_arg_q_dict(self) -> dict[Optional[str], dict[str, Q]]:
-        comp_het_q, two_hit_genes = self._get_comp_het_q_and_two_hit_genes()
-        variant_annotation_version = self.node.analysis.annotation_version.variant_annotation_version
-        comp_het_genes = VariantTranscriptAnnotation.get_overlapping_genes_q(variant_annotation_version, two_hit_genes)
-        cgc = self.node.trio.cohort.cohort_genotype_collection
-        q_hash = str(comp_het_q)
-        return {
-            cgc.cohortgenotype_alias: {q_hash: comp_het_q},
-            None: {q_hash: comp_het_genes},
-        }
 
     def get_method(self) -> str:
         mum1, dad1, _ = self._mum_but_not_dad()
@@ -250,15 +137,6 @@ class CompHet(AbstractTrioInheritance):
         mum2, dad2, _ = self._dad_but_not_mum()
         dad_but_not_mum = self.get_zygosities_method(mum2, dad2, set())
         return f"Proband: HET, and >=2 hits from genes where ({mum_but_not_dad}) OR ({dad_but_not_mum})"
-
-    def get_contigs(self) -> Optional[set[Contig]]:
-        _, two_hit_genes = self._get_comp_het_q_and_two_hit_genes()
-        contig_qs = Contig.objects.filter(transcriptversion__genome_build=self.node.trio.genome_build,
-                                          transcriptversion__gene_version__gene__in=two_hit_genes)
-        return set(contig_qs.distinct())
-
-    def get_other_filters_description(self) -> str:
-        return "≥2 hits in same gene, one from mother and one from father"
 
 
 class TrioAnyAffected(AbstractTrioInheritance):
@@ -351,32 +229,13 @@ class TrioNode(AbstractCohortBasedNode):
         return AbstractCohortBasedNode._has_filters_that_affect_label_counts(self)
 
     def _get_cached_label_count(self, label):
-        if self.trio is None:
-            return None
         # Compound het is the only trio mode that takes a parent (max_inputs=1), and its queryset
-        # is intersected with that parent (uses_parent_queryset). The cohort-wide stats cache below
+        # is intersected with that parent (uses_parent_queryset). The cohort-wide stats cache
         # can't represent the parent restriction, so it would over-count (tripping the single-parent
         # check in node_counts()). Fall back to a real DB count of the parent-intersected queryset.
         if self.has_input():
             return None
-        if self._has_filters_that_affect_label_counts():
-            return None
-        filter_code = self.get_filter_code()
-        if filter_code not in (0, 1):
-            return None
-        handler = get_handler_for_node(self)
-        filter_key = handler.filter_key_for_node(self)
-        if filter_key is UNCACHEABLE:
-            return None
-        return get_cached_label_count_for_cohort(
-            cohort=self.trio.cohort,
-            sample=None,
-            filter_key=filter_key,
-            annotation_version=self.analysis.annotation_version,
-            passing_filter=bool(filter_code),
-            zygosities=self._cached_label_count_zygosities(),
-            label=label,
-        )
+        return super()._get_cached_label_count(label)
 
     def modifies_parents(self):
         return self.trio is not None
@@ -437,7 +296,7 @@ class TrioNode(AbstractCohortBasedNode):
         For modes where affected status matters, includes both affected/unaffected variants.
         """
         from types import SimpleNamespace
-        fmt = AbstractTrioInheritance._zygosity_options
+        fmt = AbstractFamilyInheritance._zygosity_options
         members = ['mother', 'father', 'proband']
         stub_node = SimpleNamespace(trio=SimpleNamespace())
 

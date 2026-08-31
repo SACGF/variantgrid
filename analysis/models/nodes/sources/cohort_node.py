@@ -49,6 +49,29 @@ class AbstractCohortBasedNode(CohortMixin, AnalysisNode):
             in count_for_zygosity. """
         return [True, True, True, True]
 
+    def _get_cached_label_count(self, label):
+        cohort = self._get_cohort()
+        if cohort is None:
+            return None
+        if self._has_filters_that_affect_label_counts():
+            return None
+        filter_code = self.get_filter_code()
+        if filter_code not in (0, 1):
+            return None
+        handler = get_handler_for_node(self)
+        filter_key = handler.filter_key_for_node(self)
+        if filter_key is UNCACHEABLE:
+            return None
+        return get_cached_label_count_for_cohort(
+            cohort=cohort,
+            sample=None,  # aggregate row
+            filter_key=filter_key,
+            annotation_version=self.analysis.annotation_version,
+            passing_filter=bool(filter_code),
+            zygosities=self._cached_label_count_zygosities(),
+            label=label,
+        )
+
     def _get_q_and_list(self) -> list[Q]:
         q_and = super()._get_q_and_list()
 
@@ -103,28 +126,6 @@ class CohortNode(AbstractCohortBasedNode, AbstractZygosityCountNode):
         if self.accordion_panel != self.COUNT:
             return True
         return False
-
-    def _get_cached_label_count(self, label):
-        if self.cohort is None:
-            return None
-        if self._has_filters_that_affect_label_counts():
-            return None
-        filter_code = self.get_filter_code()
-        if filter_code not in (0, 1):
-            return None
-        handler = get_handler_for_node(self)
-        filter_key = handler.filter_key_for_node(self)
-        if filter_key is UNCACHEABLE:
-            return None
-        return get_cached_label_count_for_cohort(
-            cohort=self.cohort,
-            sample=None,  # aggregate row
-            filter_key=filter_key,
-            annotation_version=self.analysis.annotation_version,
-            passing_filter=bool(filter_code),
-            zygosities=self._cached_label_count_zygosities(),
-            label=label,
-        )
 
     def _get_cohort(self):
         return self.cohort
