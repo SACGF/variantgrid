@@ -153,6 +153,13 @@ Reference GitHub issues in commit messages (e.g., `#1400`) but do NOT use keywor
 
 Before committing, check `git status` for already-staged changes unrelated to the current task. If any exist, stop and confirm with the user before proceeding — do not include them in the commit.
 
+## Plans
+
+Plans live in `claude/plans/<issue>_<slug>_plan.md`. Directly under the title, record which Claude model
+wrote it, e.g. `Written by Claude Fable 5 (claude-fable-5), 2026-08-31` — so when a plan is picked up
+later it is clear which model's judgement it reflects. Update the line if a different model revises the
+plan.
+
 ## Implementation Prompts
 
 When asked to draft a prompt for an agent to implement a plan in another conversation:
