@@ -15,9 +15,7 @@
     <!-- Font Awesome -->
     <link href="{% static 'fontawesomefree/css/all.min.css' %}" rel="stylesheet" type="text/css">
 
-    <style>
-        @import url("https://fonts.googleapis.com/css?family=Raleway:400,500");
-    </style>
+    <link href="{% static 'css/fonts.css' %}" rel="stylesheet">
     {% compress css %}
     <!-- standard values -->
         <link href="{% static 'css/global.css' %}" rel="stylesheet">
@@ -31,11 +29,12 @@
     <script>
         var $buoop = {
             required:{e:16,f:60,o:53,s:11,c:66},insecure:false,api:2021.03,reminder:0,test:false,no_permanent_hide: true,
+            jsshowurl:"{% static 'js/lib/browser-update/3.3.67/update.show.min.js' %}",
             text:'Your browser {brow_name} <b>will not work on this site</b>.<br/>Please <a{up_but}>click here</a> for details on getting an up to date browser.'
         };
         function $buo_f(){
          var e = document.createElement("script");
-         e.src = "//browser-update.org/update.min.js";
+         e.src = "{% static 'js/lib/browser-update/3.3.67/update.min.js' %}";
          document.body.appendChild(e);
         };
         try {document.addEventListener("DOMContentLoaded", $buo_f,false)}

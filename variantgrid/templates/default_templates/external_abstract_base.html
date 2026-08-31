@@ -20,16 +20,13 @@
     <meta name="twitter:title" content="{% block twitter_title %}{{ site_name }}{% endblock %}">
     <meta name="twitter:description" content="{% block twitter_description %}{{ site_description }}{% endblock %}">
 
-    <link href="https://fonts.googleapis.com/css?family=Open+Sans:400,600" rel="stylesheet">
 	<link rel="shortcut icon" href="{% static 'favicon.ico' %}" />
 	<script type="text/javascript">
 		$(document).ready(function () {
         {% block jsdocumentready %}{% endblock %}
 		});
 	</script>
-    <style>
-        @import url("https://fonts.googleapis.com/css?family=Raleway:400,500");
-    </style>
+    <link href="{% static 'css/fonts.css' %}" rel="stylesheet">
     <link href="{% static 'css/global.css' %}" rel="stylesheet">
     <link href="{% static 'css/global_deprecated.css' %}" rel="stylesheet">
     <style>
