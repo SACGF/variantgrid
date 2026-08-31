@@ -12,15 +12,10 @@ from library.django_utils import get_model_fields, get_model_fields_and_formatte
 register = template.Library()
 
 
-@register.filter()
-def as_table(model):
-    ret = ""
-
-    rows = get_model_fields_and_formatted_values_tuples_list(model)
-    for name, field in rows:
+def _display_rows(model):
+    """ (label, css data type, escaped value) per model field """
+    for name, field in get_model_fields_and_formatted_values_tuples_list(model):
         data_type = field.__class__.__name__
-        value = str(field)
-
         name = name.replace('_', ' ')
 
         if str(field).isdigit():
@@ -28,32 +23,22 @@ def as_table(model):
             value = format(int(field), ',')
         else:
             value = escape(field)
+        yield name, data_type, value
 
-        row = f'<tr id="{name}-row"><th class="name {data_type}">{name}</th><td class="field {data_type}">{value}</td></tr>'
-        ret += row
-    return ret
+
+@register.filter()
+def as_table(model):
+    # Callers apply |safe at the template, so this stays a plain str
+    return "".join(f'<tr id="{name}-row"><th class="name {data_type}">{name}</th>'
+                   f'<td class="field {data_type}">{value}</td></tr>'
+                   for name, data_type, value in _display_rows(model))
 
 
 @register.filter()
 def as_p(model):
-    ret = ""
-
-    rows = get_model_fields_and_formatted_values_tuples_list(model)
-    for name, field in rows:
-        data_type = field.__class__.__name__
-        value = str(field)
-
-        name = name.replace('_', ' ')
-
-        if str(field).isdigit():
-            data_type = 'num'
-            value = format(int(field), ',')
-        else:
-            value = escape(field)
-
-        row = f'<p><label for="{name}-value">{name}</label><span class="field {data_type}">{value}</span></p>'
-        ret += row
-    return mark_safe(ret)
+    return mark_safe("".join(f'<p><label for="{name}-value">{name}</label>'
+                             f'<span class="field {data_type}">{value}</span></p>'
+                             for name, data_type, value in _display_rows(model)))
 
 @register.filter()
 def qs_as_htable(qs):

@@ -152,6 +152,59 @@ def parse_dump_metadata(path) -> dict:
     return meta
 
 
+class _ExternalDump:
+    """ One dump directory's worth of runs. The callers differ only in how they get hold of their
+        AnnotationRuns - creating them up front, or adopting existing ones - then each run goes through
+        add_run() and the dump is closed off with finish(). """
+
+    def __init__(self, variant_annotation_version: VariantAnnotationVersion, output_dir: str,
+                 pipeline_type, min_variants: int, described_as: str):
+        self.variant_annotation_version = variant_annotation_version
+        self.output_dir = output_dir
+        self.pipeline_type = pipeline_type
+        self.min_variants = min_variants
+        self.described_as = described_as  # "external" or "existing", for the log lines
+        # Every run in this dump shares the same VAV, so compute the version identity (which runs VEP) once,
+        # lazily on the first run so a no-op dump never invokes VEP.
+        self._identity = None
+        self.annotation_runs = []
+        self.reverted = []
+        os.makedirs(output_dir, exist_ok=True)
+
+    def add_run(self, annotation_run: AnnotationRun):
+        # If already counted off-thread (AnnotationRun.count, #1646), reject a too-small run before dumping.
+        # A counted run here is always non-empty (the count lane finishes count==0 runs itself).
+        if annotation_run.count is not None and annotation_run.count < self.min_variants:
+            _revert_too_small_run(annotation_run, annotation_run.count, self.min_variants, self.reverted)
+            return
+        dump_count = get_runner(self.pipeline_type).dump(annotation_run, dump_dir=self.output_dir)
+        # Range locks are sized without pipeline_type, so an SV dump leaves most locks with zero SVs; such a
+        # run is already FINISHED (get_status: dump_count == 0) with nothing to annotate, so skip its sidecar
+        # rather than emit a no-op .meta.json (thousands of them, for a handful of SVs).
+        if dump_count == 0:
+            return
+        if dump_count < self.min_variants:  # uncounted run whose dump turned out too small
+            _revert_too_small_run(annotation_run, dump_count, self.min_variants, self.reverted)
+            return
+        if self._identity is None:
+            self._identity = variant_annotation_version_identity(self.variant_annotation_version)
+        meta_filename = write_dump_metadata(annotation_run, dump_dir=self.output_dir, identity=self._identity)
+        logging.info("Dumped %s AnnotationRun %s: %d variants -> %s (meta %s)",
+                     self.described_as, annotation_run.pk, dump_count, annotation_run.vcf_dump_filename,
+                     meta_filename)
+        self.annotation_runs.append(annotation_run)
+
+    def finish(self) -> list[AnnotationRun]:
+        write_snakemake_bundle(self.output_dir, self.variant_annotation_version,
+                               pipeline_type=self.pipeline_type)
+        if self.reverted:
+            dispatch_annotation_runs.si(self.variant_annotation_version.pk).apply_async()
+        logging.info("Dumped %d %s annotation run(s) for %s into %s (reverted %d too-small run(s) to local)",
+                     len(self.annotation_runs), self.described_as, self.variant_annotation_version,
+                     self.output_dir, len(self.reverted))
+        return self.annotation_runs
+
+
 def dump_external_annotation_runs(variant_annotation_version: VariantAnnotationVersion,
                                   output_dir: str,
                                   pipeline_type=VariantAnnotationPipelineType.STANDARD,
@@ -167,47 +220,16 @@ def dump_external_annotation_runs(variant_annotation_version: VariantAnnotationV
         A run holding fewer than `min_variants` variants is reverted to the local pipeline instead of parked
         external (see DEFAULT_MIN_EXTERNAL_VARIANTS) - the external round-trip is not worth it for a tiny run. """
     _require_sv_offload_supported(pipeline_type)
-    os.makedirs(output_dir, exist_ok=True)
-    # Every run in this dump shares the same VAV, so compute the version identity (which runs VEP) once,
-    # lazily on the first run so a no-op dump never invokes VEP.
-    identity = None
-    annotation_runs = []
-    reverted = []
+    dump = _ExternalDump(variant_annotation_version, output_dir, pipeline_type, min_variants, "external")
     while True:
         range_lock, _unannotated_count = get_annotation_range_lock_and_unannotated_count(
             variant_annotation_version, settings.ANNOTATION_VEP_BATCH_MIN, settings.ANNOTATION_VEP_BATCH_MAX)
         if range_lock is None:
             break
         range_lock.save()
-        annotation_run = AnnotationRun.objects.create(annotation_range_lock=range_lock,
-                                                      pipeline_type=pipeline_type, external=True)
-        # If already counted off-thread (AnnotationRun.count, #1646), reject a too-small run before dumping.
-        # A counted run here is always non-empty (the count lane finishes count==0 runs itself).
-        if annotation_run.count is not None and annotation_run.count < min_variants:
-            _revert_too_small_run(annotation_run, annotation_run.count, min_variants, reverted)
-            continue
-        dump_count = get_runner(pipeline_type).dump(annotation_run, dump_dir=output_dir)
-        # Range locks are sized without pipeline_type, so an SV dump leaves most locks with zero SVs; such a
-        # run is already FINISHED (get_status: dump_count == 0) with nothing to annotate, so skip its sidecar
-        # rather than emit a no-op .meta.json (thousands of them, for a handful of SVs).
-        if dump_count == 0:
-            continue
-        if dump_count < min_variants:  # uncounted run whose dump turned out too small
-            _revert_too_small_run(annotation_run, dump_count, min_variants, reverted)
-            continue
-        if identity is None:
-            identity = variant_annotation_version_identity(variant_annotation_version)
-        meta_filename = write_dump_metadata(annotation_run, dump_dir=output_dir, identity=identity)
-        logging.info("Dumped external AnnotationRun %s: %d variants -> %s (meta %s)",
-                     annotation_run.pk, dump_count, annotation_run.vcf_dump_filename, meta_filename)
-        annotation_runs.append(annotation_run)
-
-    write_snakemake_bundle(output_dir, variant_annotation_version, pipeline_type=pipeline_type)
-    if reverted:
-        dispatch_annotation_runs.si(variant_annotation_version.pk).apply_async()
-    logging.info("Dumped %d external annotation run(s) for %s into %s (reverted %d too-small run(s) to local)",
-                 len(annotation_runs), variant_annotation_version, output_dir, len(reverted))
-    return annotation_runs
+        dump.add_run(AnnotationRun.objects.create(annotation_range_lock=range_lock,
+                                                  pipeline_type=pipeline_type, external=True))
+    return dump.finish()
 
 
 def dump_existing_annotation_runs(variant_annotation_version: VariantAnnotationVersion,
@@ -227,8 +249,8 @@ def dump_existing_annotation_runs(variant_annotation_version: VariantAnnotationV
     if leave < 0:
         raise ValueError(f"leave must be >= 0, got {leave}")
     _require_sv_offload_supported(pipeline_type)
+    dump = _ExternalDump(variant_annotation_version, output_dir, pipeline_type, min_variants, "existing")
 
-    os.makedirs(output_dir, exist_ok=True)
     now = timezone.now()
     # Mirror the dispatcher's dispatchable filter (annotation_scheduler_task._dispatchable_runs_qs) and its
     # lowest-min-variant-first order, so we adopt exactly the runs it would otherwise launch.
@@ -246,11 +268,6 @@ def dump_existing_annotation_runs(variant_annotation_version: VariantAnnotationV
     logging.info("dump_existing: %d dispatchable run(s); leaving %d on the local pipeline, dumping %d",
                  len(kept) + len(candidate_ids), len(kept), len(candidate_ids))
 
-    # Every run in this dump shares the same VAV, so compute the version identity (which runs VEP) once,
-    # lazily on the first claimed run so a no-op dump never invokes VEP.
-    identity = None
-    annotation_runs = []
-    reverted = []
     for pk in candidate_ids:
         # Atomically claim as external only while still dispatchable (same filter as the dispatcher) so we
         # never adopt a run it just leased. If we lose the race (0 rows updated) skip it; if we win, the run
@@ -266,33 +283,9 @@ def dump_existing_annotation_runs(variant_annotation_version: VariantAnnotationV
                             "scheduler?)", pk)
             continue
 
-        annotation_run = AnnotationRun.objects.get(pk=pk)
-        # If already counted off-thread (AnnotationRun.count, #1646), reject a too-small run before dumping.
-        # A counted run here is always non-empty (the count lane finishes count==0 runs itself).
-        if annotation_run.count is not None and annotation_run.count < min_variants:
-            _revert_too_small_run(annotation_run, annotation_run.count, min_variants, reverted)
-            continue
-        dump_count = get_runner(pipeline_type).dump(annotation_run, dump_dir=output_dir)
-        # A zero-count run is already FINISHED (get_status: dump_count == 0) with nothing to annotate, so
-        # skip its sidecar rather than emit a no-op .meta.json (see dump_external_annotation_runs).
-        if dump_count == 0:
-            continue
-        if dump_count < min_variants:  # uncounted run whose dump turned out too small
-            _revert_too_small_run(annotation_run, dump_count, min_variants, reverted)
-            continue
-        if identity is None:
-            identity = variant_annotation_version_identity(variant_annotation_version)
-        meta_filename = write_dump_metadata(annotation_run, dump_dir=output_dir, identity=identity)
-        logging.info("Dumped existing AnnotationRun %s: %d variants -> %s (meta %s)",
-                     annotation_run.pk, dump_count, annotation_run.vcf_dump_filename, meta_filename)
-        annotation_runs.append(annotation_run)
+        dump.add_run(AnnotationRun.objects.get(pk=pk))
 
-    write_snakemake_bundle(output_dir, variant_annotation_version, pipeline_type=pipeline_type)
-    if reverted:
-        dispatch_annotation_runs.si(variant_annotation_version.pk).apply_async()
-    logging.info("Dumped %d existing annotation run(s) for %s into %s (reverted %d too-small run(s) to local)",
-                 len(annotation_runs), variant_annotation_version, output_dir, len(reverted))
-    return annotation_runs
+    return dump.finish()
 
 
 def verify_annotated_vcf_variant_ids(annotation_run: AnnotationRun, meta: dict):

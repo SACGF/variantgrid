@@ -770,17 +770,9 @@ class CohortGenotype(models.Model):
         unique_together = ("collection", "variant")
 
 
-class Trio(GuardianPermissionsAutoInitialSaveMixin, PreviewModelMixin, SortByPKMixin, TimeStampedModel):
-    """ A simple pedigree used frequently for Mendellian disease (TrioNode in analysis)
-        and karyomapping """
-    name = models.TextField(blank=True)
-    user = models.ForeignKey(User, null=True, on_delete=CASCADE)
-    cohort = models.ForeignKey(Cohort, on_delete=CASCADE)
-    mother = models.ForeignKey(CohortSample, related_name='trio_mother', on_delete=CASCADE)
-    mother_affected = models.BooleanField(default=False)
-    father = models.ForeignKey(CohortSample, related_name='trio_father', on_delete=CASCADE)
-    father_affected = models.BooleanField(default=False)
-    proband = models.ForeignKey(CohortSample, related_name='trio_proband', on_delete=CASCADE)
+class FamilyGroupMixin:
+    """ Shared by Trio and Quad - permissions and display that don't care how many members there are.
+        Subclasses provide get_cohort_samples() and their own urls. """
 
     @classmethod
     def get_permission_class(cls):
@@ -790,16 +782,12 @@ class Trio(GuardianPermissionsAutoInitialSaveMixin, PreviewModelMixin, SortByPKM
     def preview_icon(cls) -> str:
         return "fa-solid fa-people-roof"
 
-    @classmethod
-    def preview_if_url_visible(cls) -> str:
-        return "trios"
-
     @property
     def preview(self) -> 'PreviewData':
         return self.preview_with(identifier=str(self))
 
     def get_permission_object(self):
-        # Trio permissions based on cohort
+        # Permissions are based on the cohort
         return self.cohort
 
     @classmethod
@@ -814,11 +802,43 @@ class Trio(GuardianPermissionsAutoInitialSaveMixin, PreviewModelMixin, SortByPKM
     def data_archived(self) -> bool:
         return self.cohort.data_archived
 
-    def get_cohort_samples(self):
-        return [self.mother, self.father, self.proband]
-
     def get_samples(self):
         return Sample.objects.filter(cohortsample__in=self.get_cohort_samples()).order_by("pk")
+
+    @staticmethod
+    def _member_details(member, affected: bool) -> str:
+        return f"{member} ({'affected' if affected else 'unaffected'})"
+
+    @property
+    def mother_details(self):
+        return self._member_details(self.mother, self.mother_affected)
+
+    @property
+    def father_details(self):
+        return self._member_details(self.father, self.father_affected)
+
+    def __str__(self):
+        return self.name or f"{type(self).__name__} {self.pk}"
+
+
+class Trio(FamilyGroupMixin, GuardianPermissionsAutoInitialSaveMixin, PreviewModelMixin, SortByPKMixin, TimeStampedModel):
+    """ A simple pedigree used frequently for Mendellian disease (TrioNode in analysis)
+        and karyomapping """
+    name = models.TextField(blank=True)
+    user = models.ForeignKey(User, null=True, on_delete=CASCADE)
+    cohort = models.ForeignKey(Cohort, on_delete=CASCADE)
+    mother = models.ForeignKey(CohortSample, related_name='trio_mother', on_delete=CASCADE)
+    mother_affected = models.BooleanField(default=False)
+    father = models.ForeignKey(CohortSample, related_name='trio_father', on_delete=CASCADE)
+    father_affected = models.BooleanField(default=False)
+    proband = models.ForeignKey(CohortSample, related_name='trio_proband', on_delete=CASCADE)
+
+    @classmethod
+    def preview_if_url_visible(cls) -> str:
+        return "trios"
+
+    def get_cohort_samples(self):
+        return [self.mother, self.father, self.proband]
 
     def get_absolute_url(self):
         return reverse('view_trio', kwargs={"pk": self.pk})
@@ -826,21 +846,8 @@ class Trio(GuardianPermissionsAutoInitialSaveMixin, PreviewModelMixin, SortByPKM
     def get_listing_url(self):
         return reverse('trios')
 
-    @property
-    def mother_details(self):
-        affected = "affected" if self.mother_affected else "unaffected"
-        return f"{self.mother} ({affected})"
 
-    @property
-    def father_details(self):
-        affected = "affected" if self.father_affected else "unaffected"
-        return f"{self.father} ({affected})"
-
-    def __str__(self):
-        return self.name or f"Trio {self.pk}"
-
-
-class Quad(GuardianPermissionsAutoInitialSaveMixin, PreviewModelMixin, SortByPKMixin, TimeStampedModel):
+class Quad(FamilyGroupMixin, GuardianPermissionsAutoInitialSaveMixin, PreviewModelMixin, SortByPKMixin, TimeStampedModel):
     """Mother + Father + Proband + Sibling.
 
     Extends the Trio concept to 4 family members. The sibling (typically
@@ -859,41 +866,11 @@ class Quad(GuardianPermissionsAutoInitialSaveMixin, PreviewModelMixin, SortByPKM
     sibling_affected = models.BooleanField(default=False)
 
     @classmethod
-    def get_permission_class(cls):
-        return Cohort
-
-    @classmethod
-    def preview_icon(cls) -> str:
-        return "fa-solid fa-people-roof"
-
-    @classmethod
     def preview_if_url_visible(cls) -> str:
         return "quads"
 
-    @property
-    def preview(self) -> 'PreviewData':
-        return self.preview_with(identifier=str(self))
-
-    def get_permission_object(self):
-        return self.cohort
-
-    @classmethod
-    def _filter_from_permission_object_qs(cls, queryset):
-        return cls.objects.filter(cohort__in=queryset)
-
-    @property
-    def genome_build(self):
-        return self.cohort.genome_build
-
-    @property
-    def data_archived(self) -> bool:
-        return self.cohort.data_archived
-
     def get_cohort_samples(self):
         return [self.mother, self.father, self.proband, self.sibling]
-
-    def get_samples(self):
-        return Sample.objects.filter(cohortsample__in=self.get_cohort_samples()).order_by("pk")
 
     def get_absolute_url(self):
         return reverse('view_quad', kwargs={"pk": self.pk})
@@ -902,22 +879,8 @@ class Quad(GuardianPermissionsAutoInitialSaveMixin, PreviewModelMixin, SortByPKM
         return reverse('quads')
 
     @property
-    def mother_details(self):
-        affected = "affected" if self.mother_affected else "unaffected"
-        return f"{self.mother} ({affected})"
-
-    @property
-    def father_details(self):
-        affected = "affected" if self.father_affected else "unaffected"
-        return f"{self.father} ({affected})"
-
-    @property
     def sibling_details(self):
-        affected = "affected" if self.sibling_affected else "unaffected"
-        return f"{self.sibling} ({affected})"
-
-    def __str__(self):
-        return self.name or f"Quad {self.pk}"
+        return self._member_details(self.sibling, self.sibling_affected)
 
 
 # This has to be in this file so we don't end up with circular references

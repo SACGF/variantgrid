@@ -26,8 +26,7 @@ from guardian.models import GroupObjectPermission
 
 from analysis.models import VariantTag
 from analysis.models.enums import TagLocation
-from annotation.models import VariantAnnotation, VariantAnnotationVersion
-from genes.models import TranscriptVersion
+from annotation.fake_data import get_variant_ids_by_gene, zipf_weight
 from library.guardian_utils import all_users_group
 from snpdb.models import Allele, AlleleConversionTool, AlleleOrigin, GenomeBuild, GlobalSettings, Lab, Organization, \
     Tag, TagColor, TagColorsCollection, VariantAllele
@@ -219,13 +218,13 @@ class FakeVariantTags:
     def _pick_variants(self, genome_build: GenomeBuild, group: str, genes: list[str],
                        num_variants: int) -> list[FakeVariant]:
         """ Real variants, so the gene cards have real symbols to group on and the links all work """
-        variant_ids_by_gene = _variant_ids_by_gene(genome_build, genes)
+        variant_ids_by_gene = get_variant_ids_by_gene(genome_build, genes)
         tags = [t for t in FAKE_TAGS if t.group in (group, BOTH)]
 
         fake_variants = []
         for i, gene_symbol in enumerate(genes):
             available = variant_ids_by_gene.get(gene_symbol, [])
-            wanted = int(num_variants * _zipf_weight(i) / sum(_zipf_weight(j) for j in range(len(genes))))
+            wanted = int(num_variants * zipf_weight(i) / sum(zipf_weight(j) for j in range(len(genes))))
             if len(available) < wanted:
                 self.stdout.write(f"{gene_symbol}: only {len(available)} annotated variants, wanted {wanted}")
                 wanted = len(available)
@@ -331,22 +330,6 @@ def _tag_colors_collection() -> TagColorsCollection:
         global_settings.tag_colors = collection
         global_settings.save()
     return collection
-
-
-def _variant_ids_by_gene(genome_build: GenomeBuild, genes: list[str]) -> dict[str, list[int]]:
-    gene_symbol_field = "transcript_version__gene_version__gene_symbol_id"
-    transcript_versions_qs = TranscriptVersion.objects.filter(genome_build=genome_build,
-                                                              gene_version__gene_symbol__in=genes)
-    variant_annotation_qs = VariantAnnotation.objects.filter(version=VariantAnnotationVersion.latest(genome_build),
-                                                             transcript_version__in=transcript_versions_qs)
-    variant_ids_by_gene = {}
-    for gene_symbol, variant_id in variant_annotation_qs.values_list(gene_symbol_field, "variant_id"):
-        variant_ids_by_gene.setdefault(gene_symbol, []).append(variant_id)
-    return variant_ids_by_gene
-
-
-def _zipf_weight(rank: int) -> float:
-    return 1 / (rank + 1) ** 0.8
 
 
 def _allocate_events(fake_variants: list[FakeVariant], num_events: int):
