@@ -187,6 +187,9 @@ function updateNodeFromData(node, nodeData) {
 
 	const chipsHolder = $(".node-chips", node).empty();
 	$.each(nodeData.chips || [], function() {
+		if (this.row_break && chipsHolder.children().length) {
+			$("<div/>", {class: "node-chip-row-break"}).appendTo(chipsHolder);
+		}
 		chipsHolder.append(renderChip(this));
 	});
 

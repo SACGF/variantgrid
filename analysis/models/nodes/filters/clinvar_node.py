@@ -15,10 +15,7 @@ from classification.enums import SomaticClinicalSignificance
 from snpdb.models.models_enums import AlleleOriginFilterDefault
 
 NO_CLINVAR_CALL = 0
-""" ClinVar.highest_pathogenicity / highest_oncogenicity for a record ClinVar hasn't given that call on """
-
-NO_SOMATIC_TIER = None
-""" ClinVar.somatic_tier for a record with no somatic call """
+""" ClinVar.highest_pathogenicity for a record ClinVar hasn't given a germline classification on """
 
 PATHOGENICITY_LABELS = {
     ClinVarPathogenicity.PATHOGENIC: "Pathogenic",
@@ -51,7 +48,6 @@ ONCOGENICITY_LABELS = {
     ClinVarOncogenicity.UNCERTAIN: "Uncertain",
     ClinVarOncogenicity.LIKELY_BENIGN: "Likely benign",
     ClinVarOncogenicity.BENIGN: "Benign",
-    NO_CLINVAR_CALL: "No oncogenicity call",
 }
 ONCOGENICITY_SHORT_LABELS = {
     ClinVarOncogenicity.ONCOGENIC: "O",
@@ -59,7 +55,6 @@ ONCOGENICITY_SHORT_LABELS = {
     ClinVarOncogenicity.UNCERTAIN: "VUS",
     ClinVarOncogenicity.LIKELY_BENIGN: "LB",
     ClinVarOncogenicity.BENIGN: "B",
-    NO_CLINVAR_CALL: "None",
 }
 ONCOGENICITY_CSS_CLASSES = {
     ClinVarOncogenicity.ONCOGENIC: "cs-o",
@@ -67,11 +62,7 @@ ONCOGENICITY_CSS_CLASSES = {
     ClinVarOncogenicity.UNCERTAIN: "cs-vus",
     ClinVarOncogenicity.LIKELY_BENIGN: "cs-lb",
     ClinVarOncogenicity.BENIGN: "cs-b",
-    NO_CLINVAR_CALL: "cs-none",
 }
-
-SOMATIC_TIER_LABELS = SomaticClinicalSignificance.LABELS | {NO_SOMATIC_TIER: "No somatic tier"}
-SOMATIC_TIER_SHORT_LABELS = SomaticClinicalSignificance.SHORT_LABELS | {NO_SOMATIC_TIER: "None"}
 
 
 class ClinVarNode(SignificanceFilterNodeMixin, AnalysisNode):
@@ -93,14 +84,12 @@ class ClinVarNode(SignificanceFilterNodeMixin, AnalysisNode):
     somatic_tier_2 = models.BooleanField(default=True, blank=True)
     somatic_tier_3 = models.BooleanField(default=True, blank=True)
     somatic_tier_4 = models.BooleanField(default=True, blank=True)
-    somatic_tier_none = models.BooleanField(default=True, blank=True)
 
     oncogenicity_oncogenic = models.BooleanField(default=True, blank=True)
     oncogenicity_likely_oncogenic = models.BooleanField(default=True, blank=True)
     oncogenicity_uncertain = models.BooleanField(default=True, blank=True)
     oncogenicity_likely_benign = models.BooleanField(default=True, blank=True)
     oncogenicity_benign = models.BooleanField(default=True, blank=True)
-    oncogenicity_none = models.BooleanField(default=True, blank=True)
 
     stars_min = models.IntegerField(default=0)
     conflicting = models.BooleanField(default=False, blank=True)
@@ -121,7 +110,6 @@ class ClinVarNode(SignificanceFilterNodeMixin, AnalysisNode):
         'somatic_tier_2': SomaticClinicalSignificance.TIER_2,
         'somatic_tier_3': SomaticClinicalSignificance.TIER_3,
         'somatic_tier_4': SomaticClinicalSignificance.TIER_4,
-        'somatic_tier_none': NO_SOMATIC_TIER,
     }
     FIELD_ONCOGENICITY = {
         'oncogenicity_oncogenic': ClinVarOncogenicity.ONCOGENIC,
@@ -129,7 +117,6 @@ class ClinVarNode(SignificanceFilterNodeMixin, AnalysisNode):
         'oncogenicity_uncertain': ClinVarOncogenicity.UNCERTAIN,
         'oncogenicity_likely_benign': ClinVarOncogenicity.LIKELY_BENIGN,
         'oncogenicity_benign': ClinVarOncogenicity.BENIGN,
-        'oncogenicity_none': NO_CLINVAR_CALL,
     }
 
     def _filtering_values(self, field_values: dict) -> list:
@@ -156,16 +143,11 @@ class ClinVarNode(SignificanceFilterNodeMixin, AnalysisNode):
 
     @staticmethod
     def _somatic_tier_q(selected: list) -> Q:
-        tiers = [tier for tier in selected if tier is not NO_SOMATIC_TIER]
+        tiers = list(selected)
         if SomaticClinicalSignificance.TIER_1 in tiers or SomaticClinicalSignificance.TIER_2 in tiers:
             # A record recorded as "Tier I/II" might be either, so it matches when Tier I or II is selected
             tiers.append(SomaticClinicalSignificance.TIER_1_OR_2)
-        q_list = []
-        if tiers:
-            q_list.append(Q(clinvar__somatic_tier__in=tiers))
-        if NO_SOMATIC_TIER in selected:
-            q_list.append(Q(clinvar__somatic_tier__isnull=True))
-        return reduce(operator.or_, q_list)
+        return Q(clinvar__somatic_tier__in=tiers)
 
     def _review_status_q(self, review_statuses: list[str]) -> Q:
         """ ORs the review status of each axis the node filters on - all 3 when it names none,
@@ -225,33 +207,45 @@ class ClinVarNode(SignificanceFilterNodeMixin, AnalysisNode):
     def get_node_class_icon(cls) -> NodeIcon:
         return NodeIcon(fa="fa-solid fa-book-medical")
 
+    @staticmethod
+    def _allele_origin_chip(allele_origin: AlleleOriginFilterDefault) -> NodeChip:
+        """ Leads the row of pills it applies to - reading what the node filters on rather than the
+            allele origin setting, so two nodes with the same query look the same """
+        return NodeChip(text=allele_origin.label, title=f"{allele_origin.label} ClinVar classifications",
+                        css_class=f"allele-origin-box allele-origin-{allele_origin.value}", row_break=True)
+
     def get_node_chips(self) -> list[NodeChip]:
         chips = super().get_node_chips()
-        allele_origin_filter = self.allele_origin_filter
-        if allele_origin_filter != AlleleOriginFilterDefault.SHOW_ALL:
-            chips.append(NodeChip(text=allele_origin_filter.label, title="Allele Origin",
-                                  css_class=f"allele-origin-box allele-origin-{self.allele_origin}"))
-        chips += significance_chips(self._pathogenicity_values(), len(self.FIELD_PATHOGENICITY),
-                                    PATHOGENICITY_SHORT_LABELS, PATHOGENICITY_LABELS,
-                                    PATHOGENICITY_CSS_CLASSES.get)
-        chips += significance_chips(self._somatic_tier_values(), len(self.FIELD_SOMATIC_TIER),
-                                    SOMATIC_TIER_SHORT_LABELS, SOMATIC_TIER_LABELS,
-                                    SomaticClinicalSignificance.css_class)
-        chips += significance_chips(self._oncogenicity_values(), len(self.FIELD_ONCOGENICITY),
-                                    ONCOGENICITY_SHORT_LABELS, ONCOGENICITY_LABELS,
-                                    ONCOGENICITY_CSS_CLASSES.get)
+        if pathogenicity := self._pathogenicity_values():
+            chips.append(self._allele_origin_chip(AlleleOriginFilterDefault.GERMLINE))
+            chips += significance_chips(pathogenicity, len(self.FIELD_PATHOGENICITY),
+                                        PATHOGENICITY_SHORT_LABELS, PATHOGENICITY_LABELS,
+                                        PATHOGENICITY_CSS_CLASSES.get)
+
+        somatic_tiers = self._somatic_tier_values()
+        oncogenicity = self._oncogenicity_values()
+        if somatic_tiers or oncogenicity:
+            chips.append(self._allele_origin_chip(AlleleOriginFilterDefault.SOMATIC))
+            chips += significance_chips(somatic_tiers, len(self.FIELD_SOMATIC_TIER),
+                                        SomaticClinicalSignificance.SHORT_LABELS,
+                                        SomaticClinicalSignificance.LABELS,
+                                        SomaticClinicalSignificance.css_class)
+            chips += significance_chips(oncogenicity, len(self.FIELD_ONCOGENICITY),
+                                        ONCOGENICITY_SHORT_LABELS, ONCOGENICITY_LABELS,
+                                        ONCOGENICITY_CSS_CLASSES.get)
         if self.stars_min:
-            chips.append(NodeChip(text="★" * self.stars_min, title=f"Review status {self.stars_min}+ stars"))
+            chips.append(NodeChip(text="★" * self.stars_min, title=f"Review status {self.stars_min}+ stars",
+                                  row_break=True))
         return chips
 
     def _clinvar_summary(self) -> str:
         parts = []
         if selected := self._pathogenicity_values():
-            parts.append(", ".join(PATHOGENICITY_LABELS[p] for p in selected))
+            parts.append("germline: " + ", ".join(PATHOGENICITY_LABELS[p] for p in selected))
         if selected := self._somatic_tier_values():
-            parts.append(", ".join(SOMATIC_TIER_LABELS[tier] for tier in selected))
+            parts.append("somatic: " + ", ".join(SomaticClinicalSignificance.LABELS[tier] for tier in selected))
         if selected := self._oncogenicity_values():
-            parts.append(", ".join(ONCOGENICITY_LABELS[o] for o in selected))
+            parts.append("oncogenicity: " + ", ".join(ONCOGENICITY_LABELS[o] for o in selected))
         if self.stars_min:
             parts.append("★" * self.stars_min)
         if self.conflicting:
@@ -265,10 +259,6 @@ class ClinVarNode(SignificanceFilterNodeMixin, AnalysisNode):
     def _get_method_summary(self):
         class_name = ClinVarNode.get_node_class_label()
         method_summary = f"{class_name} ({self.get_node_input_display()}), date={self.modified}"
-
-        allele_origin_filter = self.allele_origin_filter
-        if allele_origin_filter != AlleleOriginFilterDefault.SHOW_ALL:
-            method_summary += f". Allele origin: {allele_origin_filter.label}"
 
         if summary := self._clinvar_summary():
             method_summary += f". {summary}"

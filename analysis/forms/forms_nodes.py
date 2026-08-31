@@ -341,9 +341,9 @@ class ClinVarNodeForm(SignificanceFilterFormMixin, BaseNodeForm):
         fields = ('node_input', 'allele_origin',
                   'germline_pathogenic', 'germline_likely_pathogenic', 'germline_uncertain',
                   'germline_likely_benign', 'germline_benign', 'germline_other',
-                  'somatic_tier_1', 'somatic_tier_2', 'somatic_tier_3', 'somatic_tier_4', 'somatic_tier_none',
+                  'somatic_tier_1', 'somatic_tier_2', 'somatic_tier_3', 'somatic_tier_4',
                   'oncogenicity_oncogenic', 'oncogenicity_likely_oncogenic', 'oncogenicity_uncertain',
-                  'oncogenicity_likely_benign', 'oncogenicity_benign', 'oncogenicity_none',
+                  'oncogenicity_likely_benign', 'oncogenicity_benign',
                   'stars_min', 'conflicting', 'conflicting_significance')
         widgets = {
             'allele_origin': RadioSelect(),

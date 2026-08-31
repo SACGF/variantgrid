@@ -338,6 +338,12 @@ button.add-analysis-variable-button {
 	padding: 0 4px 4px;
 }
 
+/* NodeChip(row_break=True) - a zero height full width flex item wraps everything after it */
+.design-a-node .node-chip-row-break {
+	flex-basis: 100%;
+	height: 0;
+}
+
 .design-a-node .node-chips:empty {
 	display: none;
 }

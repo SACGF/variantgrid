@@ -24,6 +24,7 @@ class NodeChip:
     title: Optional[str] = None  # hover text
     css_class: Optional[str] = None
     count: Optional[int] = None  # Small bubble after the text, eg the x3 on a "VCF" chip
+    row_break: bool = False  # draw this chip and the ones after it on a new line
     # Chips nested the way the relations are - a specimen wrapping its extractions wrapping their VCFs
     children: tuple["NodeChip", ...] = ()
 

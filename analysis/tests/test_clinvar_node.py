@@ -50,21 +50,9 @@ class ClinVarNodeQTest(AnalysisSetupMixin, TestCase):
                            germline_uncertain=False, germline_likely_benign=False, germline_benign=False)
         self.assertEqual(node._get_node_q(), self.HAS_RECORD & Q(clinvar__highest_pathogenicity__in=[0]))
 
-    def test_oncogenicity_catch_all_pill_selects_no_call(self):
-        node = ClinVarNode(analysis=self.analysis, oncogenicity_oncogenic=False,
-                           oncogenicity_likely_oncogenic=False, oncogenicity_uncertain=False,
-                           oncogenicity_likely_benign=False, oncogenicity_benign=False)
-        self.assertEqual(node._get_node_q(), self.HAS_RECORD & Q(clinvar__highest_oncogenicity__in=[0]))
-
-    def test_somatic_catch_all_pill_selects_null_tier(self):
-        node = ClinVarNode(analysis=self.analysis, somatic_tier_1=False, somatic_tier_2=False,
-                           somatic_tier_3=False, somatic_tier_4=False)
-        self.assertEqual(node._get_node_q(), self.HAS_RECORD & Q(clinvar__somatic_tier__isnull=True))
-
     def test_oncogenicity_subset(self):
         node = ClinVarNode(analysis=self.analysis, oncogenicity_uncertain=False,
-                           oncogenicity_likely_benign=False, oncogenicity_benign=False,
-                           oncogenicity_none=False)
+                           oncogenicity_likely_benign=False, oncogenicity_benign=False)
         expected = self.HAS_RECORD & Q(clinvar__highest_oncogenicity__in=[ClinVarOncogenicity.ONCOGENIC,
                                                                           ClinVarOncogenicity.LIKELY_ONCOGENIC])
         self.assertEqual(node._get_node_q(), expected)
@@ -72,14 +60,14 @@ class ClinVarNodeQTest(AnalysisSetupMixin, TestCase):
     def test_somatic_tier_1_pulls_in_tier_1_or_2(self):
         """ Tier I/II records might be either, so they match when Tier I or II is selected """
         node = ClinVarNode(analysis=self.analysis, somatic_tier_2=False, somatic_tier_3=False,
-                           somatic_tier_4=False, somatic_tier_none=False)
+                           somatic_tier_4=False)
         expected = self.HAS_RECORD & Q(clinvar__somatic_tier__in=[SomaticClinicalSignificance.TIER_1,
                                                                   SomaticClinicalSignificance.TIER_1_OR_2])
         self.assertEqual(node._get_node_q(), expected)
 
     def test_somatic_tier_3_does_not_pull_in_tier_1_or_2(self):
         node = ClinVarNode(analysis=self.analysis, somatic_tier_1=False, somatic_tier_2=False,
-                           somatic_tier_4=False, somatic_tier_none=False)
+                           somatic_tier_4=False)
         expected = self.HAS_RECORD & Q(clinvar__somatic_tier__in=[SomaticClinicalSignificance.TIER_3])
         self.assertEqual(node._get_node_q(), expected)
 
@@ -100,7 +88,7 @@ class ClinVarNodeQTest(AnalysisSetupMixin, TestCase):
 
     def test_stars_read_the_axis_being_filtered(self):
         node = ClinVarNode(analysis=self.analysis, stars_min=1, somatic_tier_2=False, somatic_tier_3=False,
-                           somatic_tier_4=False, somatic_tier_none=False)
+                           somatic_tier_4=False)
         review_statuses = ClinVarReviewStatus.statuses_gte_stars(1)
         expected = self.HAS_RECORD \
             & Q(clinvar__somatic_tier__in=[SomaticClinicalSignificance.TIER_1,
@@ -111,6 +99,31 @@ class ClinVarNodeQTest(AnalysisSetupMixin, TestCase):
     def test_variation_ids(self):
         node = ClinVarNode(analysis=self.analysis, variation_ids=[12345])
         self.assertEqual(node._get_node_q(), self.HAS_RECORD & Q(clinvar__clinvar_variation_id__in=[12345]))
+
+
+class ClinVarNodeChipsTest(AnalysisSetupMixin, TestCase):
+    """ The card reads what the node filters on, so two nodes with the same query look the same """
+    GERMLINE_P_LP = {"germline_uncertain": False, "germline_likely_benign": False,
+                     "germline_benign": False, "germline_other": False}
+
+    def test_row_labels_lead_their_pills(self):
+        node = ClinVarNode(analysis=self.analysis, somatic_tier_3=False, somatic_tier_4=False,
+                           oncogenicity_uncertain=False, oncogenicity_likely_benign=False,
+                           oncogenicity_benign=False, **self.GERMLINE_P_LP)
+        chips = node.get_node_chips()
+        self.assertEqual([c.text for c in chips], ["Germline", "P", "LP", "Somatic", "I", "II", "O", "LO"])
+        self.assertEqual([c.text for c in chips if c.row_break], ["Germline", "Somatic"])
+
+    def test_allele_origin_only_shows_up_where_it_filters(self):
+        """ Germline-only with every germline pill on is the same query as showing all """
+        show_all = ClinVarNode(analysis=self.analysis, **self.GERMLINE_P_LP)
+        germline_only = ClinVarNode(analysis=self.analysis, allele_origin=AlleleOriginFilterDefault.GERMLINE,
+                                    **self.GERMLINE_P_LP)
+        self.assertEqual(show_all._get_node_q(), germline_only._get_node_q())
+        self.assertEqual(show_all.get_node_chips(), germline_only.get_node_chips())
+
+    def test_default_node_has_no_chips(self):
+        self.assertEqual(ClinVarNode(analysis=self.analysis).get_node_chips(), [])
 
 
 class ClinVarNodeFormVariationIdsTest(AnalysisSetupMixin, TestCase):
