@@ -1,9 +1,12 @@
+from unittest.mock import patch
+
 from django.test import TestCase, override_settings
 
 from analysis.models import AllVariantsNode, AnalysisNode
 from analysis.models.enums import NodeStatus, SetOperations
-from analysis.models.nodes.filters.venn_node import VennNode, VennNodeCache
+from analysis.models.nodes.filters.venn_node import VennNode, VennNodeCache, venn_cache_count
 from analysis.tests.utils import AnalysisSetupMixin
+from snpdb.models import ProcessingStatus, VariantCollection
 
 A = VennNodeCache.A_ONLY
 I = VennNodeCache.INTERSECTION
@@ -90,3 +93,36 @@ class TestVennNode(AnalysisSetupMixin, TestCase):
         venn, left, right = self._venn()
         a, b = self._reload(venn).ordered_parents
         self.assertEqual((a.pk, b.pk), (left.pk, right.pk))
+
+    def _cache(self, venn, intersection_type) -> VennNodeCache:
+        a, b = self._reload(venn).ordered_parents
+        variant_collection = VariantCollection.objects.create(name="test venn cache")
+        return VennNodeCache.objects.create(parent_a_node_version=a.node_version,
+                                            parent_b_node_version=b.node_version,
+                                            intersection_type=intersection_type,
+                                            variant_collection=variant_collection)
+
+    def test_intersection_with_an_empty_parent_skips_loading_variants(self):
+        """ Pulling a side's variant ids is the expensive part - an empty parent decides it without them """
+        venn, _left, right = self._venn(set_operation=SetOperations.INTERSECTION)
+        AllVariantsNode.objects.filter(pk=right.pk).update(count=0)
+        vennode_cache = self._cache(venn, VennNodeCache.INTERSECTION)
+
+        with patch("analysis.models.nodes.filters.venn_node._node_variant_ids") as mock_variant_ids:
+            venn_cache_count(vennode_cache.pk)
+        mock_variant_ids.assert_not_called()
+
+        vennode_cache.variant_collection.refresh_from_db()
+        self.assertEqual(vennode_cache.variant_collection.status, ProcessingStatus.SUCCESS)
+
+    def test_difference_only_skips_the_side_it_subtracts(self):
+        """ A - B with an empty B is just A, so B's variants are never needed """
+        venn, left, right = self._venn(set_operation=SetOperations.A_NOT_B)
+        AllVariantsNode.objects.filter(pk=right.pk).update(count=0)
+        vennode_cache = self._cache(venn, VennNodeCache.A_ONLY)
+
+        with patch("analysis.models.nodes.filters.venn_node._node_variant_ids") as mock_variant_ids:
+            mock_variant_ids.return_value = set()
+            venn_cache_count(vennode_cache.pk)
+        (call_node,) = [c.args[0] for c in mock_variant_ids.call_args_list]
+        self.assertEqual(call_node.pk, left.pk)
