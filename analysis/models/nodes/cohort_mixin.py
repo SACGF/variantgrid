@@ -293,7 +293,11 @@ class CohortMixin:
                 'name': filters_column,
                 'model_field': False,  # It's an alias
                 'queryset_field': True,
+                'width': 80,
                 'server_side_formatter': VCFFilter.get_formatter(vcf),
+                # Nearly every record passed - the cell fades a pass right down so only a
+                # failure reads. @see VariantGridFormat.vcfFilters
+                'formatter': 'vcfFiltersFormatter',
             }
             if len(cgcs) > 1:  # Which VCF's FILTER this is only needs saying when there are several
                 overrides['label'] = f"{vcf} Filters"

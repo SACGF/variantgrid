@@ -612,10 +612,10 @@ const DataTableDefinition = (function() {
                     return;
                 }
                 const header = $(dataTable.column(columnIndex).header());
-                const menu = $('<span>', {class: 'dt-sort-menu dropdown'});
+                const menu = $('<span>', {class: 'dt-sort-menu'});
                 const toggle = $('<a>', {class: 'dt-sort-menu-toggle', href: 'javascript:void(0)',
-                                         title: 'Sort this column by', 'data-toggle': 'dropdown', text: '▾'});
-                const items = $('<div>', {class: 'dropdown-menu dropdown-menu-right'});
+                                         title: 'Sort this column by', text: '▾'});
+                const items = $('<div>', {class: 'dropdown-menu dt-sort-menu-items'});
                 for (const entry of col.sortMenu) {
                     const target = columnIndexByData[entry.column];
                     if (target === undefined) {
@@ -624,15 +624,24 @@ const DataTableDefinition = (function() {
                     $('<a>', {class: 'dropdown-item', href: 'javascript:void(0)', text: entry.label})
                         .on('click', function(event) {
                             event.stopPropagation();
+                            FloatingPanel.hide();
                             dataTable.order([target, 'asc']).draw();
                         }).appendTo(items);
                 }
                 if (!items.children().length) {
                     return;
                 }
-                // The header cell is itself the sort toggle - the menu is a separate control on it
-                toggle.on('click', event => event.stopPropagation());
-                menu.append(toggle, items);
+                // The header cell is itself the sort toggle, so the menu has to swallow the click -
+                // which is also why it opens as a floating panel rather than a Bootstrap dropdown
+                toggle.on('click', function(event) {
+                    event.stopPropagation();
+                    if (FloatingPanel.isShowing(items)) {
+                        FloatingPanel.hide();
+                    } else {
+                        FloatingPanel.show(items, this, {alignRight: true});
+                    }
+                });
+                menu.append(toggle);
                 header.append(menu);
             });
         },

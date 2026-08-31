@@ -728,9 +728,18 @@ span.node-counts {
 .node-tag-counts .tag-counts-icon {
 	flex: 0 0 auto;
 	font-size: 8px;
-	line-height: 14px;
-	padding: 0 3px;
+	line-height: 12px;
+	padding: 0 2px 0 1px;
 	color: #98a2b3;
+}
+
+/* A tag count is a handful of variants at most, so pack them in at their own width - a node with
+   a dozen tags reads as a row of colours rather than six rows of two */
+.node-tag-counts .node-count {
+	flex: 0 0 auto;
+	height: 12px;
+	line-height: 12px;
+	padding: 0 2px;
 }
 
 /* Counts are unknown until the node update comes back (updateDirtyNode sets loading), so spin
@@ -788,15 +797,6 @@ span.node-counts {
     padding: 2px;
     display: inline-block;
     white-space: nowrap;
-    cursor: pointer;
-}
-
-.add-variant-tag {
-    width: 16px;
-    height: 16px;
-    background-size: 16px 16px;
-    background-image: url(/static/icons/add-icon.png);
-    display: inline-block;
     cursor: pointer;
 }
 

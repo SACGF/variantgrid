@@ -243,8 +243,8 @@ VariantGridFormat.impactConsequence = (consequence, type, rowData) => {
          + `${impactWord}</span>`;
 };
 
-// The sample's call as a glyph, with the allele frequency and read depth beside it. The zygosity
-// text comes through the server side formatter (Zygosity.CHOICES); the AF and depth ride along on
+// The sample's whole call in one cell. The zygosity text comes through the server side formatter
+// (Zygosity.CHOICES); everything else - AF, AD, DP, GQ, PL and the sample filters - rides along on
 // this sample's own hidden columns, named by the samplePrefix render kwarg.
 // @see get_grid_genotype_columns_and_overrides in analysis/grids.py
 const ZYGOSITY_GLYPHS = {
@@ -265,6 +265,28 @@ function _hasSampleValue(value) {
     return value != null && value !== '' && value !== '.';
 }
 
+// GQ and PL are only worth a reader's attention when they're bad, so the cell marks them rather
+// than spelling them out - the numbers are in the cell's title. GQ is a minimum (higher is better),
+// PL the phred likelihood of the called genotype, which reads the other way.
+// @see VARIANT_GRID_GENOTYPE_QUALITY_THRESHOLDS
+const GENOTYPE_QUALITIES = [
+    {key: 'gq', field: 'samples_genotype_quality', label: 'GQ', higherIsBetter: true},
+    {key: 'pl', field: 'samples_phred_likelihood', label: 'PL', higherIsBetter: false},
+];
+
+function _genotypeQualityCss(value, thresholds, higherIsBetter) {
+    if (!thresholds) {
+        return 'zyg-qual-good';
+    }
+    if (higherIsBetter ? value <= thresholds.bad : value >= thresholds.bad) {
+        return 'zyg-qual-bad';
+    }
+    if (higherIsBetter ? value < thresholds.marginal : value > thresholds.marginal) {
+        return 'zyg-qual-marginal';
+    }
+    return 'zyg-qual-good';
+}
+
 VariantGridFormat.sampleZygosity = (zygosity, type, rowData, ctx) => {
     const glyph = ZYGOSITY_GLYPHS[zygosity];
     if (!glyph) {
@@ -272,15 +294,56 @@ VariantGridFormat.sampleZygosity = (zygosity, type, rowData, ctx) => {
         return '';
     }
     const prefix = (ctx && ctx.kwargs && ctx.kwargs.samplePrefix) || '';
-    const named = [["AF", rowData[`${prefix}samples_allele_frequency`]],
-                   ["depth", rowData[`${prefix}samples_read_depth`]]].filter(([, v]) => _hasSampleValue(v));
-    const title = [zygosity].concat(named.map(([name, v]) => `${name} ${v}`)).join(' · ');
-    let html = `<span class='sample-zygosity' title='${escapeHtml(title)}'>`
-             + `<svg class='zyg-glyph ${ZYGOSITY_GLYPH_CSS[zygosity]}' viewBox='0 0 16 16'>${glyph}</svg>`;
-    if (named.length) {
-        html += `<span class='zyg-values'>${escapeHtml(named.map(([, v]) => v).join(' '))}</span>`;
+    const sampleValue = (field) => rowData[`${prefix}${field}`];
+    const detail = [zygosity];
+
+    // Allele frequency, then the alt reads over the total behind it
+    const af = sampleValue('samples_allele_frequency');
+    const ad = sampleValue('samples_allele_depth');
+    const dp = sampleValue('samples_read_depth');
+    let values = '';
+    if (_hasSampleValue(af)) {
+        values += `<span class='zyg-af'>${escapeHtml(String(af))}</span>`;
+        detail.push(`AF ${af}`);
     }
-    return html + '</span>';
+    const depths = [];
+    if (_hasSampleValue(ad)) {
+        depths.push(ad);
+        detail.push(`AD ${ad}`);
+    }
+    if (_hasSampleValue(dp)) {
+        depths.push(dp);
+        detail.push(`DP ${dp}`);
+    }
+    if (depths.length) {
+        values += `<span class='zyg-depth'>${escapeHtml(depths.join('/'))}</span>`;
+    }
+
+    const thresholds = (ctx && ctx.extra && ctx.extra.genotypeQuality) || {};
+    let quality = '';
+    for (const q of GENOTYPE_QUALITIES) {
+        const value = sampleValue(q.field);
+        if (!_hasSampleValue(value)) {
+            continue;
+        }
+        const css = _genotypeQualityCss(parseFloat(value), thresholds[q.key], q.higherIsBetter);
+        quality += `<i class='zyg-qual ${css}' title='${q.label} ${escapeHtml(String(value))}'></i>`;
+        detail.push(`${q.label} ${value}`);
+    }
+
+    // Passing every filter is the common case and says nothing - only a call that failed one shows
+    const filters = sampleValue('samples_filters');
+    let filtersHtml = '';
+    if (_hasSampleValue(filters) && String(filters).toUpperCase() !== 'PASS') {
+        filtersHtml = `<i class='zyg-filtered fa-solid fa-triangle-exclamation' `
+                    + `title='${escapeHtml(`Filtered: ${filters}`)}'></i>`;
+        detail.push(`FT ${filters}`);
+    }
+
+    return `<span class='sample-zygosity' title='${escapeHtml(detail.join(' · '))}'>`
+         + `<svg class='zyg-glyph ${ZYGOSITY_GLYPH_CSS[zygosity]}' viewBox='0 0 16 16'>${glyph}</svg>`
+         + (values ? `<span class='zyg-values'>${values}</span>` : '')
+         + quality + filtersHtml + '</span>';
 };
 
 
@@ -370,6 +433,58 @@ VariantGridFormat.mastermind = (cdnaCount, type, rowData) => {
 };
 
 
+// ALoFT's whole call in one cell - the prediction, a dot for how damaging it is and the probability
+// behind it. A low confidence call (ALoFT's p >= 0.05) recedes rather than reading as a firm answer.
+// Reads the probabilities, the confidence flag and the chosen transcript from
+// COMPOSITE_COLUMN_ROW_FIELDS (snpdb/grid_columns/custom_columns.py); sorts on the prediction.
+// The choices are expanded server side, so the value here is 'Tolerant' / 'Recessive' / 'Dominant'
+const ALOFT_PREDICTIONS = {
+    'dominant': {css: 'aloft-dominant', field: 'variantannotation__aloft_prob_dominant'},
+    'recessive': {css: 'aloft-recessive', field: 'variantannotation__aloft_prob_recessive'},
+    'tolerant': {css: 'aloft-tolerant', field: 'variantannotation__aloft_prob_tolerant'},
+};
+const ALOFT_PROBABILITIES = [
+    ["Tol", "variantannotation__aloft_prob_tolerant"],
+    ["Rec", "variantannotation__aloft_prob_recessive"],
+    ["Dom", "variantannotation__aloft_prob_dominant"],
+];
+
+VariantGridFormat.aloft = (prediction, type, rowData) => {
+    if (prediction == null || prediction === '') {
+        return '';
+    }
+    const called = ALOFT_PREDICTIONS[String(prediction).toLowerCase()];
+    // null is no call on confidence either way, which is not the same as a call ALoFT doubts
+    const highConfidence = rowData["variantannotation__aloft_high_confidence"];
+    const detail = [prediction];
+    if (highConfidence != null) {
+        detail.push(highConfidence ? 'high confidence' : 'low confidence');
+    }
+
+    const probabilities = ALOFT_PROBABILITIES
+        .filter(([, field]) => rowData[field] != null && rowData[field] !== '')
+        .map(([label, field]) => `${label} ${rowData[field]}`);
+    if (probabilities.length) {
+        detail.push(probabilities.join(' / '));
+    }
+    const transcript = rowData["variantannotation__aloft_ensembl_transcript"];
+    if (transcript) {
+        detail.push(transcript);
+    }
+
+    // The probability of the call itself - the other two, and the full precision, are on hover.
+    // ALoFT calls the highest of the three, so this one never rounds away to nothing
+    const calledProbability = called && rowData[called.field] != null && rowData[called.field] !== ''
+        ? Number(rowData[called.field]) : NaN;
+    const probabilityHtml = isFinite(calledProbability)
+        ? `<span class='aloft-prob'>${calledProbability.toFixed(2)}</span>` : '';
+    const confidenceCss = highConfidence === false ? ' aloft-low-confidence' : '';
+    return `<span class='aloft${confidenceCss}' title='${escapeHtml(detail.join(' · '))}'>`
+         + `<i class='aloft-dot ${called ? called.css : 'aloft-unknown'}'></i>`
+         + `${escapeHtml(String(prediction))}${probabilityHtml}</span>`;
+};
+
+
 // Pathogenicity predictions as a segmented meter - one segment per tool that made a call, damaging
 // first. Reads variantannotation__predictions_num_benign; sorts on the damaging count.
 VariantGridFormat.predictions = (numPathogenic, type, rowData) => {
@@ -387,16 +502,22 @@ VariantGridFormat.predictions = (numPathogenic, type, rowData) => {
 };
 
 
-// This database's zygosity counts in one cell - hom · het, with ref and unknown in the title.
-// Sorts on the het count, the column it lives on.
-VariantGridFormat.dbZygosityCounts = (hetCount, type, rowData) => {
-    const hom = rowData["global_variant_zygosity__hom_count"];
+// Zygosity counts in one cell - hom · het, with the rest in the title. Sorts on the het count, the
+// column it lives on. The row key prefix comes from the countPrefix render kwarg: this database's
+// global counts by default, a cohort node's own counts where it names its own.
+// @see CohortNode._get_node_extra_colmodel_overrides
+const DB_ZYGOSITY_COUNT_PREFIX = "global_variant_zygosity__";
+
+VariantGridFormat.dbZygosityCounts = (hetCount, type, rowData, ctx) => {
+    const prefix = (ctx && ctx.kwargs && ctx.kwargs.countPrefix) || DB_ZYGOSITY_COUNT_PREFIX;
+    const hom = rowData[`${prefix}hom_count`];
     if ((hetCount == null || hetCount === '') && (hom == null || hom === '')) {
         return '';
     }
+    // A cohort node counts calls it made, so it has no unknown count - it drops out of the title
     const counts = {hom: hom, het: hetCount,
-                    ref: rowData["global_variant_zygosity__ref_count"],
-                    unknown: rowData["global_variant_zygosity__unk_count"]};
+                    ref: rowData[`${prefix}ref_count`],
+                    unknown: rowData[`${prefix}unk_count`]};
     const title = Object.entries(counts)
         .filter(([, v]) => v != null && v !== '')
         .map(([k, v]) => `${v} ${k}`).join(', ');
@@ -406,6 +527,22 @@ VariantGridFormat.dbZygosityCounts = (hetCount, type, rowData) => {
         return `<span class='db-count${zero}'>${escapeHtml(v)}</span>`;
     }).join(' · ');
     return `<span class='db-zygosity-counts' title='${escapeHtml(title)}'>${cell}</span>`;
+};
+
+
+// The record's VCF FILTER. Nearly every row passed, and a column of 'PASS' is a column of nothing -
+// so a pass fades almost out and only a call that failed something reads.
+// @see CohortMixin._get_node_extra_colmodel_overrides
+VariantGridFormat.vcfFilters = (filters) => {
+    if (filters == null || filters === '' || filters === '.') {
+        return '';
+    }
+    const text = String(filters);
+    if (text.toUpperCase() === 'PASS') {
+        return `<span class='vcf-filter-pass' title='Passed every VCF filter'>PASS</span>`;
+    }
+    return `<span class='vcf-filter-failed' title='${escapeHtml(`Filtered: ${text}`)}'>`
+         + `<i class='fa-solid fa-triangle-exclamation'></i>${escapeHtml(text)}</span>`;
 };
 
 
@@ -534,8 +671,7 @@ VariantGridFormat.tags = (tagsCellValue, type, rowData) => {
     const readOnly = aWin.variantTagsReadOnly || !inAnalysis();
 
     if (!readOnly) {
-        tagHtml += "<a class='show-tag-autocomplete' href='javascript:showTagAutocomplete(" + variantId + ")'><span class='add-variant-tag' title='Tag variant..'></span></a>";
-        tagHtml += "<span id='tag-entry-container-" + variantId + "'></span>";
+        tagHtml += "<a class='show-tag-autocomplete' variant_id='" + variantId + "' href='javascript:showTagAutocomplete(" + variantId + ")'><span class='add-variant-tag' title='Tag variant..'></span></a>";
     }
 
     const tagList = (aWin.variantTags || {})[variantId];
@@ -760,14 +896,19 @@ VariantGridFormat.gnomadAf = (af, type, rowData, ctx) => {
     const filteredLink = VariantGridFormat.gnomadFiltered(rowData["variantannotation__gnomad_filtered"],
                                                           type, rowData, ctx);
     if (af == null || af === '') {
-        return filteredLink;
+        return filteredLink ? `<span class='gnomad-af-cell'>${filteredLink}</span>` : '';
     }
     // At or above the import 'common' filter's AF the variant is one everybody carries - mute it so
     // the rare frequencies down the column are the ones that catch the eye
     const commonAf = ctx && ctx.extra && ctx.extra.commonGnomadAf;
     const common = commonAf != null && parseFloat(af) >= commonAf ? ' gnomad-af-common' : '';
     const afHtml = `<span class='gnomad-af${common}'>${escapeHtml(af)}</span>`;
-    return filteredLink ? `${afHtml} ${filteredLink}` : afHtml;
+    if (!filteredLink) {
+        return afHtml;
+    }
+    // The Pass/Fail goes to the cell's right edge, so they line up down the column whatever width
+    // the frequency beside them takes
+    return `<span class='gnomad-af-cell'>${afHtml}${filteredLink}</span>`;
 };
 
 

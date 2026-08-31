@@ -31,6 +31,7 @@ DEFAULT_COLUMN_WIDTH = 150  # for colmodels that don't set one
 # colmodel 'formatter' name -> DataTables client renderer
 # @see variantgrid/static_files/default_static/js/variantgrid_formats.js
 JQGRID_FORMATTER_TO_CLIENT_RENDERER = {
+    "aloftFormatter": "VariantGridFormat.aloft",
     "classificationsFormatter": "VariantGridFormat.classifications",
     "clinvarLink": "VariantGridFormat.clinvarLink",
     "cosmicLink": "VariantGridFormat.cosmicLink",
@@ -58,6 +59,7 @@ JQGRID_FORMATTER_TO_CLIENT_RENDERER = {
     "tagsFormatter": "VariantGridFormat.tags",
     "tagsGlobalFormatter": "VariantGridFormat.tagsGlobal",
     "unitAsPercentFormatter": "VariantGridFormat.unitAsPercent",
+    "vcfFiltersFormatter": "VariantGridFormat.vcfFilters",
 }
 
 

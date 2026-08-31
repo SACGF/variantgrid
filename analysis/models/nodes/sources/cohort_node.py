@@ -309,23 +309,42 @@ class CohortNode(AbstractCohortBasedNode, AbstractZygosityCountNode):
             errors.extend(self._get_genome_build_errors("cohort", self.cohort.genome_build))
         return errors
 
+    @property
+    def _count_columns(self) -> list:
+        """ The het count carries the cell; hom and ref ride along in it.
+            @see VariantGridFormat.dbZygosityCounts """
+        return [self.het_count_column, self.hom_count_column, self.ref_count_column]
+
     def _get_node_extra_columns(self):
         extra_columns = super()._get_node_extra_columns()
         if self.cohort and self.count_column_prefix is not None:
-            extra_columns.append(self.hom_count_column)
-            extra_columns.append(self.het_count_column)
+            extra_columns.extend(self._count_columns)
         return extra_columns
 
     def _get_node_extra_colmodel_overrides(self):
         extra_colmodel_overrides = super()._get_node_extra_colmodel_overrides()
         if self.cohort and self.count_column_prefix is not None:
-            labels = ["Cohort Hom Count", "Cohort Het Count"]
-            for c, l in zip([self.hom_count_column, self.het_count_column], labels):
+            visible = self._count_columns[0]
+            for c in self._count_columns:
                 override = extra_colmodel_overrides.get(c, {})
-                override["label"] = l
                 override["name"] = c
                 override["model_field"] = False
                 override["queryset_field"] = True
+                if c == visible:
+                    # hom · het in the one cell, the counts it doesn't draw on hover
+                    override.update({
+                        "label": "Cohort Counts",
+                        "width": 70,
+                        "formatter": "dbZygosityCountsFormatter",
+                        "formatter_kwargs": {"countPrefix": self.count_column_prefix},
+                        "sort_menu": [
+                            {"label": "Het count", "column": self.het_count_column},
+                            {"label": "Hom count", "column": self.hom_count_column},
+                            {"label": "Ref count", "column": self.ref_count_column},
+                        ],
+                    })
+                else:
+                    override["hidden"] = True
                 extra_colmodel_overrides[c] = override
 
         return extra_colmodel_overrides

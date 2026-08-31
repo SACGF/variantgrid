@@ -934,18 +934,33 @@ li.error::before {
 	background-size: 48px 48px;
 }
 
-.click-to-delete-button {
-	background-image: url("/static/icons/delete-icon.png");
+// Font Awesome glyphs rather than images, so they take the surrounding font size and colour
+.click-to-delete-button,
+.click-to-add-button {
 	cursor: pointer;
 	height: 16px;
 	width: 16px;
+	line-height: 16px;
+	text-align: center;
+	font-family: 'Font Awesome 6 Free', 'FontAwesome';
+	font-weight: 900;
+	font-size: 14px;
+}
+
+.click-to-delete-button {
+	color: #c02b2b;
+
+	&::before {
+		content: "\f057";
+	}
 }
 
 .click-to-add-button {
-	background-image: url("/static/icons/add-icon.png");
-	cursor: pointer;
-	height: 16px;
-	width: 16px;
+	color: #3f9a5e;
+
+	&::before {
+		content: "\f055";
+	}
 }
 
 ////////////////////////
@@ -1031,25 +1046,13 @@ table.variantgrid-datatable {
 	}
 
 	// A composite header's ▾ - the sort keys the cell's other values offer. The header cell is
-	// itself the sort toggle, so this sits on top of it as its own control
-	th .dt-sort-menu {
-		position: static;
-
-		.dt-sort-menu-toggle {
-			margin-left: 4px;
-			color: #888;
-			text-decoration: none;
-			font-size: 10px;
-		}
-
-		.dropdown-menu {
-			font-size: 12px;
-			min-width: 0;
-		}
-
-		.dropdown-item {
-			padding: 2px 12px;
-		}
+	// itself the sort toggle, so this sits on top of it as its own control. The menu it opens is
+	// floated on the body (the scroll head clips it here) - @see .dt-sort-menu-items
+	th .dt-sort-menu .dt-sort-menu-toggle {
+		margin-left: 4px;
+		color: #888;
+		text-decoration: none;
+		font-size: 10px;
 	}
 
 	// Representative variant cell: expand arrow (td.toggle-link:before) · checkbox · label (details link)
@@ -1187,6 +1190,25 @@ table.variantgrid-datatable {
 		color: #999;
 	}
 
+	// The Pass/Fail sits on the cell's right edge so the badges line up down the column, whatever
+	// width the frequency beside them takes
+	.gnomad-af-cell {
+		display: flex;
+		align-items: center;
+		gap: 4px;
+		min-width: 0;
+
+		.gnomad-af {
+			overflow: hidden;
+			text-overflow: ellipsis;
+		}
+
+		.gnomad-link {
+			margin-left: auto;
+			flex: none;
+		}
+	}
+
 	// SpliceAI max delta, dot at the 0.2 / 0.5 / 0.8 cutoffs
 	.spliceai {
 		display: inline-flex;
@@ -1214,6 +1236,40 @@ table.variantgrid-datatable {
 
 	.mastermind-link {
 		text-decoration: none;
+	}
+
+	// ALoFT: the prediction, a dot for how damaging it is and the probability behind it
+	.aloft {
+		display: inline-flex;
+		align-items: center;
+		gap: 5px;
+		min-width: 0;
+
+		.aloft-dot {
+			width: 8px;
+			height: 8px;
+			border-radius: 50%;
+			flex: none;
+		}
+
+		.aloft-dominant { background: #cf3f3a; }
+		.aloft-recessive { background: #dd8a1c; }
+		.aloft-tolerant { background: #3f9a5e; }
+		.aloft-unknown { background: transparent; box-shadow: inset 0 0 0 1px #ccc; }
+
+		.aloft-prob {
+			color: #777;
+			font-size: 10px;
+		}
+	}
+
+	// ALoFT's own confidence call (p >= 0.05) - recede rather than read as a firm answer
+	.aloft-low-confidence {
+		color: #999;
+
+		.aloft-dot {
+			opacity: .45;
+		}
 	}
 
 	// One segment per prediction tool that made a call, damaging first
@@ -1245,12 +1301,39 @@ table.variantgrid-datatable {
 		color: #bbb;
 	}
 
-	// The sample's call: zygosity glyph, then allele frequency and read depth
+	// A record that passed every VCF filter is the overwhelming majority - fade it almost out so
+	// the eye only stops on the ones that failed something
+	.vcf-filter-pass {
+		color: #dde1e6;
+		font-size: 10px;
+	}
+
+	.vcf-filter-failed {
+		display: inline-flex;
+		align-items: center;
+		gap: 4px;
+		min-width: 0;
+		color: #cf3f3a;
+		overflow: hidden;
+		text-overflow: ellipsis;
+
+		i {
+			font-size: 10px;
+			flex: none;
+		}
+	}
+
+	// The sample's whole call in one cell: zygosity glyph, allele frequency over alt/total reads,
+	// then GQ/PL as quality marks and a flag if the call failed a filter
 	.sample-zygosity {
 		display: inline-flex;
 		align-items: center;
-		gap: 5px;
+		gap: 4px;
 		min-width: 0;
+		// The row is a 16px line box - take it exactly, so a row with a call is no taller than one
+		// where the sample has none
+		height: 16px;
+		vertical-align: top;
 
 		.zyg-glyph {
 			width: 12px;
@@ -1264,11 +1347,113 @@ table.variantgrid-datatable {
 		.zyg-unknown { color: #b0b6bd; }
 
 		.zyg-values {
+			display: inline-flex;
+			align-items: baseline;
+			gap: 4px;
 			color: #555;
 			font-size: 11px;
 			overflow: hidden;
 			text-overflow: ellipsis;
 		}
+
+		// The reads behind the frequency - present for the doubt the frequency alone leaves
+		.zyg-depth {
+			color: #888;
+			font-size: 10px;
+		}
+
+		// One mark per quality, coloured by how bad it is - the numbers are in the cell's title
+		.zyg-qual {
+			width: 3px;
+			height: 10px;
+			border-radius: 1px;
+			flex: none;
+		}
+
+		.zyg-qual-good { background: #d5dae0; }
+		.zyg-qual-marginal { background: #dd8a1c; }
+		.zyg-qual-bad { background: #cf3f3a; }
+
+		.zyg-filtered {
+			color: #cf3f3a;
+			font-size: 10px;
+			flex: none;
+		}
+	}
+
+	// Tags sit inside the row's line box, so tagging a variant doesn't make its row taller than
+	// every other row in the grid. @see VariantGridFormat.tags
+	.grid-tag {
+		position: relative;
+		display: inline-block;
+		// top, not middle - a 16px box aligned to the middle of a 16px line box makes the line
+		// (and so every tagged row) taller than the rest of the grid
+		vertical-align: top;
+
+		// Capped so one long tag name can't take the whole cell (and push the X out of the clipped
+		// cell with it) - the full name is in the tag's title
+		.user-tag-colored {
+			display: inline-block;
+			max-width: 130px;
+			height: 16px;
+			line-height: 16px;
+			margin: 0 3px 0 0;
+			padding: 0 6px;
+			border-radius: 8px;
+			font-size: 10px;
+			background: #eceff3;
+			color: #333;
+			overflow: hidden;
+			white-space: nowrap;
+			text-overflow: ellipsis;
+		}
+	}
+
+	.grid-tag-deletable .user-tag-colored {
+		cursor: pointer;
+	}
+
+	// Armed by clicking the tag - it sits over the tag's right end rather than being given room
+	// inside it, so arming a tag resizes nothing and the grid doesn't reflow. @see tagClickHandler
+	.grid-tag-delete {
+		position: absolute;
+		top: 2px;
+		right: 4px;
+		z-index: 2;
+		width: 12px;
+		height: 12px;
+		font-size: 12px;
+		line-height: 12px;
+		color: #c02b2b;
+		background: white;
+		border-radius: 50%;
+		cursor: pointer;
+	}
+
+	.grid-tag-armed .user-tag-colored {
+		outline: 1px solid #c02b2b;
+	}
+
+	// Sits with the tags rather than above them, so an untagged row is the same height as a tagged one
+	.add-variant-tag {
+		display: inline-block;
+		height: 16px;
+		line-height: 16px;
+		margin-right: 3px;
+		font-size: 12px;
+		color: #a0a8b3;
+		vertical-align: top;
+		cursor: pointer;
+
+		&::before {
+			content: "\f055";
+			font-family: 'Font Awesome 6 Free', 'FontAwesome';
+			font-weight: 900;
+		}
+	}
+
+	.show-tag-autocomplete:hover .add-variant-tag {
+		color: #3a6ea5;
 	}
 
 	// Only the arrow cell invites a click - the rest of the row is links
@@ -2974,6 +3159,27 @@ li.help-item {
 	.allele-origin-text {
 		padding: 3px 6px 2px 6px;
 		font-size: 8pt;
+	}
+}
+
+// Tag entry, floated on the body beside the + it was raised from. @see showTagAutocomplete
+.variant-tag-entry {
+	width: 260px;
+	padding: 6px;
+	background: white;
+	border: 1px solid #ccc;
+	border-radius: 4px;
+	box-shadow: 0 2px 8px rgba(0, 0, 0, .2);
+}
+
+// The composite header sort menus, floated on the body by FloatingPanel so the DataTables scroll
+// head can't clip them. @see setupSortMenus
+.dt-sort-menu-items {
+	font-size: 12px;
+	min-width: 0;
+
+	.dropdown-item {
+		padding: 2px 12px;
 	}
 }
 

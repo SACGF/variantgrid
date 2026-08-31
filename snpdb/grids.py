@@ -544,6 +544,16 @@ class AbstractVariantGrid(JqGridUserRowConfig):
             'variantannotation__maxentscan_percent_diff_ref': {'width': 90,
                                                                'formatter': 'maxentscanFormatter'},
             'variantannotation__mastermind_count_1_cdna': {'width': 80, 'formatter': 'mastermindFormatter'},
+            'variantannotation__aloft_pred': {
+                'width': 125, 'formatter': 'aloftFormatter',
+                'sort_menu': [
+                    {"label": "Prediction", "column": "variantannotation__aloft_pred"},
+                    {"label": "Probability dominant", "column": "variantannotation__aloft_prob_dominant"},
+                    {"label": "Probability recessive", "column": "variantannotation__aloft_prob_recessive"},
+                    {"label": "Probability tolerant", "column": "variantannotation__aloft_prob_tolerant"},
+                    {"label": "High confidence", "column": "variantannotation__aloft_high_confidence"},
+                ],
+            },
             'variantannotation__predictions_num_pathogenic': {'width': 80,
                                                               'formatter': 'predictionsFormatter'},
             'global_variant_zygosity__het_count': {'width': 70, 'formatter': 'dbZygosityCountsFormatter'},
@@ -590,7 +600,9 @@ class AbstractVariantGrid(JqGridUserRowConfig):
     def get_datatable_extra(self) -> dict:
         # gnomAD links are per genome build, and the client renderers have no other way to know it
         extra = {"genomeBuild": self.genome_build.name,
-                 "clinvarStars": dict(ClinVarReviewStatus.STARS)}
+                 "clinvarStars": dict(ClinVarReviewStatus.STARS),
+                 # What counts as a bad GQ/PL in the sample genotype cell
+                 "genotypeQuality": settings.VARIANT_GRID_GENOTYPE_QUALITY_THRESHOLDS}
         # The AF the import 'common' filter uses, in the units the grid shows AFs in - the gnomAD
         # cell mutes at or above it so rare variants keep the reader's full attention
         if cf_data := settings.VCF_IMPORT_COMMON_FILTERS.get(self.genome_build.name):

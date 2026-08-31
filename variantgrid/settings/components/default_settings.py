@@ -126,7 +126,7 @@ MAJOR_OPERATION_SLOT_EXPIRE_SECONDS = 10 * 60  # Safety TTL so a crashed request
 CACHE_HOURS = 48
 TIMEOUT = 60 * 60 * CACHE_HOURS
 REDIS_PORT = 6379
-CACHE_VERSION = 49  # increment to flush caches (eg if invalid due to upgrade)
+CACHE_VERSION = 50  # increment to flush caches (eg if invalid due to upgrade)
 if UNIT_TEST:
     # In-process cache, so tests don't read/write the dev Redis (state leaking between runs)
     CACHES = {
@@ -584,6 +584,14 @@ ANALYSIS_NODE_EXPORT_CACHE_DAYS = 7
 
 VARIANT_ALLELE_FREQUENCY_CLIENT_SIDE_PERCENT = True  # For analysis Grid/CSV export. VCF export is always unit
 VARIANT_SHOW_CANONICAL_HGVS = True
+
+# The variant grid's sample cell marks the call's genotype quality rather than spelling it out - the
+# numbers are on hover. GQ is a minimum (at or under 'bad' is red, under 'marginal' amber); PL is the
+# phred likelihood of the called genotype, so it reads the other way (at or over 'bad' is red)
+VARIANT_GRID_GENOTYPE_QUALITY_THRESHOLDS = {
+    "gq": {"bad": 20, "marginal": 30},
+    "pl": {"bad": 50, "marginal": 20},
+}
 
 # if True, CR_lab_id will be used in all instances
 CLASSIFICATION_ID_OVERRIDE_PREFIX = False

@@ -319,14 +319,21 @@ function inAnalysis() {
 }
 
 
+// The tag entry widget is a full sized select2 - loaded into the cell it opened the row (and so
+// every row height below it) right up, so it floats over the grid anchored to the + it came from
 function showTagAutocomplete(variantId) {
-    const container = $("#tag-entry-container-" + variantId);
-    const addTagButton = $(".show-tag-autocomplete", container.parent());
-    const nodeId = container.parents("#node-data-container").attr("node_id");
-    
+    const addTagButton = $(".show-tag-autocomplete[variant_id=" + variantId + "]");
+    const cell = addTagButton.parent();
+    const nodeId = addTagButton.parents("#node-data-container").attr("node_id");
+
+    const panel = $("<div/>", {"class": "variant-tag-entry"});
     addTagButton.hide();
-    container.load(Urls.tag_autocomplete_form(), function() {
-        const tagSelect = $("select#id_tag", container);
+    FloatingPanel.show(panel, addTagButton[0], {onHide: function() {
+        addTagButton.show();
+    }});
+
+    panel.load(Urls.tag_autocomplete_form(), function() {
+        const tagSelect = $("select#id_tag", panel);
         tagSelect.change(function() {
             const tag = $(this).val();
             if (tag) {
@@ -334,22 +341,20 @@ function showTagAutocomplete(variantId) {
                     const vtHtml = getVariantTagHtml(variantId, tag);
                     const newTag = $(vtHtml);
                     newTag.click(tagClickHandler);
-                    container.parent().append(newTag);
-                    container.empty();
-                    addTagButton.show();
+                    cell.append(newTag);
+                    FloatingPanel.hide();
                 };
                 addVariantTag(variantId, nodeId, tag, successFunc);
             }
         });
 
         // Can't call open() until element is fully initialised
-        $(document).on("dal-element-initialized", function (e) {
+        $(document).off("dal-element-initialized.tagEntry").on("dal-element-initialized.tagEntry", function (e) {
             if (e.detail.element == tagSelect[0]) {
                 tagSelect.select2("open").trigger("focus");
             }
         });
     });
-
 }
 
 
@@ -385,27 +390,52 @@ function sortVariantTags(aWin, tagList) {
 }
 
 
+function disarmVariantTags(except) {
+    let armed = $(".grid-tag-armed");
+    if (except) {
+        armed = armed.not(except);
+    }
+    armed.removeClass("grid-tag-armed").children(".grid-tag-delete").remove();
+}
+
+
+// Click a tag to arm it, then click the X to delete. The X is drawn over the tag's right end rather
+// than given room inside it - arming resizes nothing, so the grid doesn't reflow, and the X stays
+// inside the clipped cell no matter how long the tag name is
 function tagClickHandler() {
     const gridTag = $(this);
-    const innerSpan = $(".user-tag-colored", gridTag);
+    if (gridTag.hasClass("grid-tag-armed")) {
+        disarmVariantTags();
+        return;
+    }
+    disarmVariantTags(gridTag);
+    gridTag.addClass("grid-tag-armed");
 
-    function removeClickHandler() {
-        const tagId = gridTag.attr('tag_id');
-        const variantId = gridTag.attr('variant_id');
+    const deleteButton = $("<i/>", {"class": "grid-tag-delete fa-solid fa-circle-xmark",
+                                    "title": "Remove tag"});
+    deleteButton.click(function(event) {
+        event.stopPropagation();
         const removeTagCallback = function () {
             gridTag.remove();
         };
-        removeVariantTag(variantId, tagId, removeTagCallback);
-    }
-    deleteItemClickHandler(gridTag, innerSpan, removeClickHandler);
+        removeVariantTag(gridTag.attr('variant_id'), gridTag.attr('tag_id'), removeTagCallback);
+    });
+    gridTag.append(deleteButton);
 }
 
 
 // Kicked off after every grid draw, alongside the page's own gridComplete
 function gridCompleteExtra() {
+    FloatingPanel.hide();  // A tag entry or sort menu raised off the last draw's cells is stale now
     const aWin = getAnalysisWindow();
     if (!aWin.variantTagsReadOnly) {
         $(".grid-tag-deletable").click(tagClickHandler);
+        // Namespaced + off first as this runs after every draw
+        $(document).off("click.gridTagDisarm").on("click.gridTagDisarm", function(event) {
+            if (!$(event.target).closest(".grid-tag").length) {
+                disarmVariantTags();
+            }
+        });
     }
 
     // We want to be able to right click to open full screen link new tab

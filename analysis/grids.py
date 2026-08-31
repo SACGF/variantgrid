@@ -327,7 +327,7 @@ class VariantGrid(AbstractVariantGrid):
                                                 af_show_in_percent: bool, sample_formatter: Optional[Callable] = None):
         available_format_columns = get_available_format_columns(cohorts)
         sample_columns = {
-            'samples_zygosity': ('Zygosity', '%(sample)s %(label)s', 110),
+            'samples_zygosity': ('Zygosity', '%(sample)s %(label)s', 140),
             'samples_allele_depth': ('AD', '%(label)s %(sample)s', 25),
             'samples_allele_frequency': ('AF', '%(label)s %(sample)s', 30),
             'samples_read_depth': ('DP', '%(label)s %(sample)s', 25),
@@ -335,14 +335,20 @@ class VariantGrid(AbstractVariantGrid):
             'samples_phred_likelihood': ('PL', '%(label)s %(sample)s', 25),
             'samples_filters': ('FT', '%(label)s %(sample)s', 100),
         }
-        # The zygosity cell draws the glyph, then the allele frequency and read depth beside it -
-        # those two ride along hidden and stay in the CSV. @see VariantGridFormat.sampleZygosity.
-        # The header's sort menu offers whichever of the three the sample's VCF actually has
-        SAMPLE_COMPOSITE_COLUMNS = ['samples_allele_frequency', 'samples_read_depth']
+        # The sample's whole call is drawn in the one zygosity cell - glyph, frequency, depths, then
+        # GQ/PL as quality marks and the sample filters. The rest ride along hidden and stay in the
+        # CSV. @see VariantGridFormat.sampleZygosity. The header's sort menu offers whichever of them
+        # the sample's VCF actually has
+        SAMPLE_COMPOSITE_COLUMNS = ['samples_allele_depth', 'samples_allele_frequency', 'samples_read_depth',
+                                    'samples_genotype_quality', 'samples_phred_likelihood', 'samples_filters']
         SAMPLE_SORT_KEY_LABELS = {
             'samples_zygosity': 'Zygosity',
             'samples_allele_frequency': 'Allele frequency',
+            'samples_allele_depth': 'Allele depth',
             'samples_read_depth': 'Read depth',
+            'samples_genotype_quality': 'Genotype quality',
+            'samples_phred_likelihood': 'Phred likelihood',
+            'samples_filters': 'Filters',
         }
         packed_data_replace = dict(Zygosity.CHOICES)
         # Some legacy data (Missing data in FreeBayes before PythonKnownVariantsImporter v12) has -2147483647 for

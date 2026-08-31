@@ -61,6 +61,13 @@ COMPOSITE_COLUMN_ROW_FIELDS = {
         "variantannotation__mastermind_count_3_aa_change",
         "variantannotation__mastermind_mmid3",
     ],
+    "variantannotation__aloft_pred": [
+        "variantannotation__aloft_high_confidence",
+        "variantannotation__aloft_prob_tolerant",
+        "variantannotation__aloft_prob_recessive",
+        "variantannotation__aloft_prob_dominant",
+        "variantannotation__aloft_ensembl_transcript",
+    ],
     "variantannotation__predictions_num_pathogenic": ["variantannotation__predictions_num_benign"],
     "global_variant_zygosity__het_count": [
         "global_variant_zygosity__hom_count",

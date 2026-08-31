@@ -783,6 +783,63 @@ function dictFromLabelsAndValues(labels, values) {
     return dict;
 }
 
+// A panel raised from inside a DataTable can't live inside it - with scrollX both the scroll head
+// and the scroll body clip their overflow, so anything positioned in a header or a cell is cut off
+// at the edge. These float the panel over the page, anchored to the element it was raised from.
+const FloatingPanel = {
+    panel: null,
+    onHide: null,
+
+    isShowing: function(panel) {
+        return FloatingPanel.panel !== null && FloatingPanel.panel[0] === $(panel)[0];
+    },
+
+    show: function(panel, anchorElement, options) {
+        FloatingPanel.hide();
+        options = options || {};
+        panel = $(panel);
+        const rect = anchorElement.getBoundingClientRect();
+        // Fixed, so the viewport rect is the position - no offset parent to fight over
+        panel.css({position: "fixed", top: rect.bottom + 2, left: 0, zIndex: 2000, display: "block"});
+        panel.appendTo(document.body);
+        const width = panel.outerWidth();
+        const wanted = options.alignRight ? rect.right - width : rect.left;
+        panel.css("left", Math.max(4, Math.min(wanted, $(window).width() - width - 4)));
+
+        FloatingPanel.panel = panel;
+        FloatingPanel.onHide = options.onHide;
+        $(document).on("mousedown.floatingPanel", function(event) {
+            const target = $(event.target);
+            // select2 draws its dropdown on the body, so a click in it is still inside the panel
+            if (!target.closest(panel).length && !target.closest(".select2-container").length) {
+                FloatingPanel.hide();
+            }
+        });
+        $(document).on("keydown.floatingPanel", function(event) {
+            if (event.key === "Escape") {
+                FloatingPanel.hide();
+            }
+        });
+        return panel;
+    },
+
+    hide: function() {
+        const panel = FloatingPanel.panel;
+        if (!panel) {
+            return;
+        }
+        const onHide = FloatingPanel.onHide;
+        FloatingPanel.panel = null;
+        FloatingPanel.onHide = null;
+        $(document).off(".floatingPanel");
+        panel.detach();  // not remove() - callers reuse their panel
+        if (onHide) {
+            onHide();
+        }
+    },
+};
+
+
 function deleteItemClickHandler(outerElement, innerSpan, deleteClickHandler) {
     const isExpanded = innerSpan.attr("original_width");
     let completeFunc;
