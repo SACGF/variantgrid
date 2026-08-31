@@ -15,7 +15,7 @@ then repoint the partition to the combined filter.
 import logging
 
 from django.conf import settings
-from django.core.management import BaseCommand
+from django.core.management import BaseCommand, CommandError
 from django.db import transaction
 
 from annotation.models import VariantAnnotationVersion
@@ -50,41 +50,59 @@ class Command(BaseCommand):
             self._migrate_genome_build(genome_build, dry_run=dry_run)
 
     def _migrate_genome_build(self, genome_build: GenomeBuild, dry_run: bool):
-        target_filter = get_common_filter(genome_build)
-        if target_filter is None:
-            logging.info("%s: no common filter configured - skipping", genome_build)
-            return
-
-        target_versions = target_filter.gnomad_versions
-        logging.info("%s: target common filter is %s (versions: %s)",
-                     genome_build, target_filter, sorted(target_versions))
-
         common_cgc_qs = CohortGenotypeCollection.objects.filter(
             collection_type=CohortGenotypeCollectionType.COMMON,
             common_filter__genome_build=genome_build,
-        ).exclude(common_filter=target_filter)
+        )
+        if not common_cgc_qs.exists():
+            logging.info("%s: no common partitions - skipping", genome_build)
+            return
 
-        for common_cgc in common_cgc_qs.iterator():
-            self._migrate_common_collection(common_cgc, target_filter, target_versions, dry_run=dry_run)
+        cf_data = settings.VCF_IMPORT_COMMON_FILTERS.get(genome_build.name)
+        if cf_data is None:
+            logging.info("%s: no common filter configured - skipping", genome_build)
+            return
 
-    def _migrate_common_collection(self, common_cgc: CohortGenotypeCollection, target_filter, target_versions,
+        # get_common_filter creates the filter if missing, so check we can do the work before calling it
+        target_versions = {cf_data["gnomad_version"], *cf_data.get("additional_gnomad_versions", [])}
+        version_annotation = self._get_version_annotation(genome_build, target_versions)
+
+        target_filter = get_common_filter(genome_build)
+        logging.info("%s: target common filter is %s (versions: %s)",
+                     genome_build, target_filter, sorted(target_versions))
+
+        for common_cgc in common_cgc_qs.exclude(common_filter=target_filter).iterator():
+            self._migrate_common_collection(common_cgc, target_filter, version_annotation, dry_run=dry_run)
+
+    @staticmethod
+    def _get_version_annotation(genome_build: GenomeBuild, target_versions) -> dict[str, VariantAnnotationVersion]:
+        """ We need the AF data for every version in the combined filter to work out the intersection """
+        version_annotation = {}
+        missing = []
+        for version in sorted(target_versions):
+            vav = VariantAnnotationVersion.objects.filter(gnomad=version,
+                                                          genome_build=genome_build).order_by("pk").last()
+            if vav is None:
+                missing.append(version)
+            else:
+                version_annotation[version] = vav
+
+        if missing:
+            raise CommandError(f"{genome_build}: no VariantAnnotationVersion for gnomAD {', '.join(missing)}. "
+                               "Annotate against these versions first so the AF data is available.")
+        return version_annotation
+
+    def _migrate_common_collection(self, common_cgc: CohortGenotypeCollection, target_filter, version_annotation,
                                    dry_run: bool):
-        genome_build = common_cgc.common_filter.genome_build
         af_min = common_cgc.common_filter.gnomad_af_min
-        versions_to_enforce = target_versions - common_cgc.common_filter.gnomad_versions
+        versions_to_enforce = set(version_annotation) - common_cgc.common_filter.gnomad_versions
 
         uncommon_cgc = common_cgc.uncommon  # the rare/uncommon partner partition
         logging.info("%s: enforcing versions %s (af > %s)", common_cgc, sorted(versions_to_enforce), af_min)
 
         moved = 0
-        for version in versions_to_enforce:
-            vav = VariantAnnotationVersion.objects.filter(gnomad=version,
-                                                          genome_build=genome_build).order_by("pk").last()
-            if vav is None:
-                raise VariantAnnotationVersion.DoesNotExist(
-                    f"Can't enforce gnomAD {version} on {common_cgc}: no VariantAnnotationVersion for it. "
-                    "Annotate against this version first so the AF data is available.")
-
+        for version in sorted(versions_to_enforce):
+            vav = version_annotation[version]
             # Variants in the common partition that are NOT common (AF > af_min) in this version -> must be moved
             move_qs = CohortGenotype.objects.filter(collection=common_cgc).exclude(
                 variant__variantannotation__version=vav,
