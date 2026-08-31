@@ -224,6 +224,7 @@ button.add-analysis-variable-button {
 			.node-chips		- pills from get_node_chips()
 			.node-color-overlay - analysis variable / output node tint
 		.node-counts-strip > .node-counts > .node-count-<type>
+		.node-counts-strip > .node-counts.node-tag-counts > .node-count-<type> (tag counts, if any)
 
 	Everything on the card is data driven from the rendering dict - see node_display.py
 */
@@ -716,6 +717,20 @@ span.node-counts {
 	font-weight: 700;
 	padding: 1px 0px;
 	overflow: hidden;
+}
+
+/* Tag counts sit below the built-in counts, behind a tag icon so it's clear they're tags */
+.node-tag-counts {
+	align-items: center;
+	border-top: 1px dotted #e4e7ec;
+}
+
+.node-tag-counts .tag-counts-icon {
+	flex: 0 0 auto;
+	font-size: 8px;
+	line-height: 14px;
+	padding: 0 3px;
+	color: #98a2b3;
 }
 
 /* Counts are unknown until the node update comes back (updateDirtyNode sets loading), so spin

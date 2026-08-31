@@ -613,6 +613,10 @@ function setNodeCounts(node, data) {
 		}
 	}
 	markLiveDataCount(node_counts, deterministic, data.live_data_sources);
+
+	// Most nodes have no tagged variants - don't leave them showing a bare tag icon
+	const tag_counts = $(".node-tag-counts", node).show();  // Un-hide so :visible reflects this update's counts
+	tag_counts.toggle(tag_counts.find(".node-count:visible").length > 0);
 }
 
 function updateDirtyNode(node, refresh) {
@@ -709,36 +713,57 @@ function updateTagNodeCounts(nodeCountTypes) {
 		attachVariantCounters($(".window"), nodeCountTypes);  // Redraws the counters
 	}
 
-	const hasTagCounts = nodeCountTypes.some(function(nct) { return Boolean(nct[1].tag); });
+	const hasTagCounts = nodeCountTypes.some(isTagNodeCount);
 	if (hasTagCounts) {
 		refreshNodeCounts();
 	}
 }
 
 
+function createNodeCountDiv(nodeCountType) {
+	const name = nodeCountType[0];
+	const data = nodeCountType[1];
+	const label = data["label"];
+	const nodeCountContent = "<div class='user-tag-colored count-value'>?</div>";
+	const nodeCountDiv = $("<div count_type=" + name + " title='" + label + "' class='node-count node-count-" + name + "'>" + nodeCountContent + "</div>");
+	if (data["link"]) {
+		nodeCountDiv.addClass("clickable-count");
+		nodeCountDiv.click(clickCounter);
+	}
+	if (data["show_zero"]) {
+		nodeCountDiv.addClass("show-zero");
+	}
+	return nodeCountDiv;
+}
+
+
+function isTagNodeCount(nodeCountType) {
+	return Boolean(nodeCountType[1].tag);
+}
+
+
 function attachVariantCounters(nodes_selector, nodeCountTypes) {
     drawCountLegend(nodeCountTypes);
 
+	const builtInCountTypes = nodeCountTypes.filter(function(nct) { return !isTagNodeCount(nct); });
+	const tagCountTypes = nodeCountTypes.filter(isTagNodeCount);
+
 	nodes_selector.filter("[output_endpoint=true]").each(function() {
 		const strip = $(".node-counts-strip", this).empty();
-		const node_counts = $("<span class='node-counts'></span>").appendTo(strip);
 
-		for (let i=0 ; i<nodeCountTypes.length ; ++i) {
-			const node_count_type = nodeCountTypes[i];
-			const name = node_count_type[0];
-			const data = node_count_type[1];
-			const label = data["label"];
-			const nodeCountContent = "<div class='user-tag-colored count-value'>?</div>";
-			const nodeCountDiv = $("<div count_type=" + name + " title='" + label + "' class='node-count node-count-" + name + "'>" + nodeCountContent + "</div>");
-			if (data["link"]) {
-				$(nodeCountDiv).addClass("clickable-count");
-				$(nodeCountDiv).click(clickCounter);
+		if (builtInCountTypes.length) {
+			const node_counts = $("<span class='node-counts'></span>").appendTo(strip);
+			for (let i=0 ; i<builtInCountTypes.length ; ++i) {
+				createNodeCountDiv(builtInCountTypes[i]).appendTo(node_counts);
 			}
-			if (data["show_zero"]) {
-				$(nodeCountDiv).addClass("show-zero");
+		}
+
+		if (tagCountTypes.length) {
+			// Tag counts get their own row behind a tag icon, so they read as tags not built-in filters
+			const tag_counts = $("<span class='node-counts node-tag-counts'><i class='fa-solid fa-tags tag-counts-icon'></i></span>").appendTo(strip);
+			for (let i=0 ; i<tagCountTypes.length ; ++i) {
+				createNodeCountDiv(tagCountTypes[i]).appendTo(tag_counts);
 			}
-			window.count_data = data;
-			nodeCountDiv.appendTo(node_counts);
 		}
 		updateDirtyNode($(this));
 	});
@@ -1065,8 +1090,7 @@ function changeAnalysisSettings(oldAnalysisSettings) {
 		for (let i=0 ; i<newNodeCountTypes.length ; ++i) {
             const countType = newNodeCountTypes[i][0];
             // Tag counts are filled in server side as they're configured, so they don't need a reload
-            const isTagCount = Boolean(newNodeCountTypes[i][1].tag);
-            if (!isTagCount && $.inArray(countType, oldTypeNames) == -1) {
+            if (!isTagNodeCount(newNodeCountTypes[i]) && $.inArray(countType, oldTypeNames) == -1) {
                 requireReload = true;
                 break;
             }
