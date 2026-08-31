@@ -1,0 +1,458 @@
+<title>Scannable Variant Grid</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root {
+  --bg: #ffffff; --bg-alt: #f5f7f9; --bg-head: #eef1f4; --text: #1f2328; --muted: #667085; --faint: #a3adb8;
+  --border: #e1e5ea; --border-strong: #c9d0d8; --link: #1a5fb4; --accent: #1f7a5c; --accent-soft: #e3f3ec;
+  --row-hover: #f2f7fb; --shadow: 0 6px 24px rgba(20,30,40,.14);
+  --imp-high: #cf3f3a; --imp-mod: #dd8a1c; --imp-low: #3f9a5e; --imp-modifier: #a0a8b3;
+  --zyg: #2f5fd0; --zyg-ring: #c8d3ee; --gnomad: #5b8def; --gnomad-track: #e3e8f2;
+  --pred-path: #cf3f3a; --pred-benign: #7bb287; --pred-track: #e6e9ee;
+  /* clinical significance - from global.scss .c-pill */
+  --cs-p: #ffcccc; --cs-lp: #ffdddd; --cs-vus: #dddddd; --cs-lb: #ddddff; --cs-b: #ccccff; --cs-none: #eeeeee;
+  --cs-text: #1f2328; --germline: #88cc88; --somatic: #cc99cc;
+  --tag-a: #f9c74f; --tag-b: #90be6d; --tag-c: #f8961e; --tag-d: #577590;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #15181c; --bg-alt: #1b1f24; --bg-head: #20252b; --text: #e6e9ed; --muted: #97a1ad; --faint: #6b7580;
+    --border: #2a3038; --border-strong: #3a424c; --link: #6ea8f0; --accent: #46b08a; --accent-soft: #1b3a30;
+    --row-hover: #1e262e; --shadow: 0 6px 24px rgba(0,0,0,.5);
+    --zyg: #6d8ff0; --zyg-ring: #34405e; --gnomad: #6e9cf5; --gnomad-track: #2a3240; --pred-track: #2a3240;
+    --cs-text: #1f2328;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #15181c; --bg-alt: #1b1f24; --bg-head: #20252b; --text: #e6e9ed; --muted: #97a1ad; --faint: #6b7580;
+  --border: #2a3038; --border-strong: #3a424c; --link: #6ea8f0; --accent: #46b08a; --accent-soft: #1b3a30;
+  --row-hover: #1e262e; --shadow: 0 6px 24px rgba(0,0,0,.5);
+  --zyg: #6d8ff0; --zyg-ring: #34405e; --gnomad: #6e9cf5; --gnomad-track: #2a3240; --pred-track: #2a3240;
+  --cs-text: #1f2328;
+}
+
+body { background: var(--bg); color: var(--text); margin: 0; padding: 28px 36px 80px;
+       font: 14px/1.5 "IBM Plex Sans", -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
+.mono { font-family: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+h1 { font-size: 22px; font-weight: 600; margin: 0 0 2px; letter-spacing: -.01em; text-wrap: balance; }
+h2 { font-size: 16px; font-weight: 600; margin: 44px 0 6px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+h3 { font-size: 11px; font-weight: 600; margin: 20px 0 8px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+p { margin: 4px 0 10px; max-width: 78ch; }
+p.lede { color: var(--muted); font-size: 14px; }
+.note { color: var(--muted); font-size: 12.5px; max-width: 78ch; }
+a { color: var(--link); text-decoration: none; }
+a:hover { text-decoration: underline; }
+code { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 12px; background: var(--bg-alt); padding: 0 4px; border-radius: 3px; }
+.pill { display: inline-block; font-size: 10px; font-weight: 600; padding: 1px 7px; border-radius: 99px; vertical-align: middle; margin-left: 6px; }
+.pill-new { background: var(--accent); color: #fff; }
+.pill-today { background: var(--border-strong); color: var(--text); }
+.pill-alt { background: var(--bg-head); color: var(--muted); border: 1px solid var(--border-strong); }
+.scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; align-items: start; }
+@media (max-width: 1100px) { .two { grid-template-columns: 1fr; } }
+
+/* ---------- the grid (mimics table.variantgrid-datatable at 12px) ---------- */
+table.vg { border-collapse: separate; border-spacing: 0; font: 12px/16px -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+           color: var(--text); table-layout: fixed; width: max-content; min-width: 100%; }
+table.vg th { background: var(--bg-head); text-align: left; font-weight: 600; font-size: 11px; letter-spacing: .02em; text-transform: uppercase;
+              color: var(--muted); padding: 7px 8px; border-bottom: 1px solid var(--border-strong); white-space: nowrap; position: sticky; top: 0; }
+table.vg th .sort { color: var(--faint); margin-left: 4px; font-size: 9px; }
+table.vg th.sorted { color: var(--text); }
+table.vg th.sorted .sort { color: var(--accent); }
+table.vg td { padding: 4px 8px; border-bottom: 1px solid var(--border); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; vertical-align: middle; }
+table.vg tbody tr:hover td { background: var(--row-hover); }
+table.vg tr.hl td { background: var(--row-hover); }
+table.vg.rows2 td { height: 36px; }
+table.vg.rows1 td { height: 20px; padding: 2px 8px; }
+td.center, th.center { text-align: center; }
+td.num { text-align: right; font-variant-numeric: tabular-nums; }
+.sub { color: var(--muted); font-size: 11px; display: block; line-height: 14px; }
+.hgvs { font-family: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 12px; letter-spacing: -.01em; }
+.hgvs a { color: var(--link); }
+.hgvs .change { font-weight: 600; }
+.hgvs.p { color: var(--muted); font-weight: 400; }
+.gene { font-weight: 600; color: var(--link); }
+.tx { color: var(--muted); font-size: 11px; }
+.tx .badge { display: inline-block; font-size: 9px; padding: 0 4px; border-radius: 3px; background: var(--bg-head); border: 1px solid var(--border-strong); color: var(--muted); margin-left: 3px; vertical-align: 1px; }
+input.sel { width: 13px; height: 13px; margin: 0; vertical-align: middle; }
+.icons a { color: var(--faint); margin-right: 6px; font-size: 12px; }
+.icons a:hover { color: var(--link); }
+
+/* ClinVar / internal classification chips */
+.cs { display: inline-flex; align-items: center; gap: 4px; height: 16px; padding: 0 6px; border-radius: 4px; font-size: 10.5px; font-weight: 700;
+      color: var(--cs-text); background: var(--cs-none); margin-right: 4px; line-height: 16px; vertical-align: middle; }
+.cs .src { font-weight: 600; opacity: .55; font-size: 9px; letter-spacing: .03em; }
+.cs.p { background: var(--cs-p); } .cs.lp { background: var(--cs-lp); } .cs.vus { background: var(--cs-vus); }
+.cs.lb { background: var(--cs-lb); } .cs.b { background: var(--cs-b); }
+.cs.none { background: transparent; color: var(--faint); border: 1px dashed var(--border-strong); font-weight: 500; }
+.cs.g { box-shadow: inset 3px 0 0 var(--germline); padding-left: 8px; }
+.cs.s { box-shadow: inset 3px 0 0 var(--somatic); padding-left: 8px; }
+.stars { color: #d9a400; letter-spacing: -1px; font-size: 9px; }
+.stars .off { color: var(--border-strong); }
+.multi { font-size: 9px; font-weight: 600; background: rgba(0,0,0,.08); border-radius: 99px; padding: 0 4px; }
+
+/* tags */
+.tag { display: inline-block; height: 16px; line-height: 16px; padding: 0 6px; border-radius: 3px; font-size: 10.5px; font-weight: 600; color: #1f2328; margin-right: 3px; }
+.tag.a { background: var(--tag-a); } .tag.b { background: var(--tag-b); } .tag.c { background: var(--tag-c); } .tag.d { background: var(--tag-d); color: #fff; }
+.tag.add { background: transparent; color: var(--faint); border: 1px dashed var(--border-strong); padding: 0 4px; }
+
+/* zygosity */
+.zyg { display: inline-flex; align-items: center; gap: 6px; }
+.zyg svg { width: 16px; height: 16px; flex: none; }
+.zyg .af { font-variant-numeric: tabular-nums; min-width: 34px; }
+.zyg .dp { color: var(--muted); font-size: 10.5px; }
+.trio { display: inline-flex; gap: 3px; }
+.trio svg { width: 14px; height: 14px; }
+
+/* impact + consequence */
+.imp { display: inline-flex; align-items: center; gap: 6px; }
+.imp i.dot { width: 8px; height: 8px; border-radius: 50%; flex: none; display: inline-block; }
+.dot.high { background: var(--imp-high); } .dot.mod { background: var(--imp-mod); } .dot.low { background: var(--imp-low); } .dot.modifier { background: var(--imp-modifier); }
+.imp .lvl { font-size: 10px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+
+/* gnomAD: plain number, rare stands out, common recedes */
+.gaf { display: inline-flex; align-items: baseline; gap: 5px; font-variant-numeric: tabular-nums; }
+.gaf .v { min-width: 52px; text-align: right; }
+.gaf .pop { color: var(--muted); font-size: 10px; }
+.gaf.common { color: var(--faint); }
+.gaf.common .pop { color: var(--faint); }
+.gaf.absent { color: var(--faint); }
+
+/* predictions meter: n pathogenic / n benign of total */
+.pred { display: inline-flex; gap: 2px; align-items: center; }
+.pred i { display: inline-block; width: 6px; height: 12px; border-radius: 1px; background: var(--pred-track); }
+.pred i.pa { background: var(--pred-path); } .pred i.be { background: var(--pred-benign); }
+.pred .n { margin-left: 5px; font-variant-numeric: tabular-nums; color: var(--muted); font-size: 11px; }
+
+/* SpliceAI */
+.splice { display: inline-flex; align-items: center; gap: 5px; font-variant-numeric: tabular-nums; }
+.splice i { width: 8px; height: 8px; border-radius: 50%; background: var(--pred-track); display: inline-block; }
+.splice i.hi { background: var(--imp-high); } .splice i.md { background: var(--imp-mod); } .splice i.lo { background: var(--imp-low); }
+
+/* popover */
+.pop-wrap { position: relative; }
+.popover { position: absolute; left: 190px; top: 40px; z-index: 5; width: 360px; background: var(--bg); border: 1px solid var(--border-strong); border-radius: 8px;
+           box-shadow: var(--shadow); font-size: 12px; padding: 10px 12px; }
+.popover h4 { margin: 0 0 6px; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 600; }
+.popover table { border-collapse: collapse; width: 100%; }
+.popover td { padding: 3px 0; border: 0; white-space: nowrap; height: auto; }
+.popover td:first-child { color: var(--muted); width: 88px; font-size: 11px; }
+.popover td:last-child { text-align: right; color: var(--faint); width: 20px; }
+.popover .act { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); display: flex; gap: 12px; }
+.popover .act a { font-size: 11.5px; }
+.sortmenu { position: absolute; left: 700px; top: 34px; z-index: 5; width: 250px; background: var(--bg); border: 1px solid var(--border-strong); border-radius: 8px;
+            box-shadow: var(--shadow); font-size: 12px; padding: 8px 6px; }
+.sortmenu h4 { margin: 0 6px 6px; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 600; }
+.sortmenu .item { display: flex; align-items: center; gap: 6px; padding: 4px 6px; border-radius: 4px; }
+.sortmenu .item.on { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.sortmenu .item:hover { background: var(--row-hover); }
+.sortmenu .chk { width: 12px; font-size: 10px; }
+.sortmenu .dir { margin-left: auto; font-size: 9px; }
+.sortmenu .sep { border-top: 1px solid var(--border); margin: 6px 0; }
+.sortmenu .item.sub { color: var(--muted); font-size: 11.5px; }
+table.vg th .menu { color: var(--faint); margin-left: 3px; font-size: 9px; }
+table.vg th.open { color: var(--text); background: var(--row-hover); }
+.ico { display: inline-block; width: 1.1em; text-align: center; color: var(--muted); }
+
+/* anatomy */
+.anat { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+@media (max-width: 1100px) { .anat { grid-template-columns: 1fr; } }
+.card { border: 1px solid var(--border); border-radius: 6px; padding: 14px 16px; background: var(--bg); }
+.card h3 { margin-top: 0; }
+.cascade { list-style: none; margin: 0; padding: 0; }
+.cascade li { display: grid; grid-template-columns: 22px 150px 1fr; gap: 10px; align-items: baseline; padding: 7px 0; border-bottom: 1px solid var(--border); font-size: 12.5px; }
+.cascade li:last-child { border-bottom: 0; }
+.cascade .step { width: 18px; height: 18px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); font-size: 10px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; }
+.cascade .when { color: var(--muted); font-size: 12px; }
+.legend { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px 28px; font-size: 12.5px; }
+.legend .row { display: flex; align-items: center; gap: 10px; padding: 4px 0; }
+.legend .row .k { min-width: 70px; }
+.legend .row .d { color: var(--muted); }
+table.spec { border-collapse: collapse; font-size: 12.5px; width: 100%; }
+table.spec th, table.spec td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+table.spec th { background: var(--bg-head); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.caption { color: var(--muted); font-size: 12px; margin: 6px 2px 0; }
+.callout { border-left: 3px solid var(--accent); background: var(--accent-soft); padding: 8px 12px; border-radius: 0 6px 6px 0; font-size: 13px; max-width: 78ch; }
+</style>
+
+<h1>Scannable Variant Grid</h1>
+<p class="lede">Mockups for <a href="https://github.com/SACGF/variantgrid_private/issues/686">variantgrid_private#686</a> — a representative
+Variant column (c.HGVS first) replacing the mandatory chrom / position / ref / alt columns, plus glyphs for the fields people scan rather than read.</p>
+
+<h2>Today <span class="pill pill-today">current</span> &nbsp;→&nbsp; Proposed <span class="pill pill-new">default columns</span></h2>
+<p class="note">Left: the first eight columns of the current "Default columns" collection. Right: the same rows with the proposed
+leading cluster. Everything the old boxes linked to is still reachable — the variant text is the details link, the
+classification chips still jump to their columns, and IGV / g.HGVS / VG id live in the hover popover.</p>
+
+<div class="two">
+  <div>
+    <div class="scroll">
+      <table class="vg rows1" id="grid-today"></table>
+    </div>
+    <div class="caption">8 columns, 640px, before a single annotation value is visible. Five 16px boxes carry ClinVar, germline, somatic, IGV and details.</div>
+  </div>
+  <div>
+    <div class="scroll">
+      <table class="vg rows2" id="grid-prop-mini"></table>
+    </div>
+    <div class="caption">3 columns, 560px: the variant is named the way a curator would say it, and both classification sources read at a glance. (Two-line rows shown here; the one-line default is below.)</div>
+  </div>
+</div>
+
+<h2>Proposed default grid <span class="pill pill-new">one-line rows</span></h2>
+<p class="note">Single-sample analysis at the current 20px row height, sorted by Variant (genomic order — chrom / position / ref / alt under
+the hood, never by the HGVS string). c.HGVS and p.HGVS share the cell; transcript and exon live in the hover. Two things are open here:
+the variant popover (from clicking a variant name), and the sort menu on the <b>Sample</b> header — the answer to "how do I sort a composite column by AF".</p>
+<div class="pop-wrap">
+  <div class="scroll">
+    <table class="vg rows1" id="grid-compact"></table>
+  </div>
+  <div class="popover" aria-hidden="true">
+    <h4>NM_000546.6(TP53):c.743G&gt;A</h4>
+    <table>
+      <tr><td>Protein</td><td class="hgvs">p.(Arg248Gln)</td><td><span class="ico">⧉</span></td></tr>
+      <tr><td>Genomic</td><td class="hgvs">NC_000017.11:g.7674220C&gt;T</td><td><span class="ico">⧉</span></td></tr>
+      <tr><td>GRCh38</td><td class="hgvs">17:7674220 C&gt;T</td><td><span class="ico">⧉</span></td></tr>
+      <tr><td>GRCh37</td><td class="hgvs">17:7577538 C&gt;T</td><td><span class="ico">⧉</span></td></tr>
+      <tr><td>ClinGen</td><td class="hgvs">CA000123</td><td><span class="ico">⧉</span></td></tr>
+      <tr><td>VariantGrid</td><td class="hgvs">v 48812331</td><td><span class="ico">⧉</span></td></tr>
+    </table>
+    <div class="act">
+      <a href="#"><span class="ico">ⓘ</span> Details</a>
+      <a href="#"><span class="ico">▥</span> IGV</a>
+      <a href="#"><span class="ico">↗</span> Open in new tab</a>
+      <a href="#"><span class="ico">☰</span> Other transcripts (4) · exon 7/11</a>
+    </div>
+  </div>
+  <div class="sortmenu" aria-hidden="true">
+    <h4>Sample — sort by</h4>
+    <div class="item on"><span class="chk">✓</span>Zygosity <span class="dir">▲</span></div>
+    <div class="item"><span class="chk"></span>Allele frequency</div>
+    <div class="item"><span class="chk"></span>Read depth</div>
+    <div class="sep"></div>
+    <div class="item sub"><span class="chk"></span>Add "Allele frequency" as its own column</div>
+  </div>
+</div>
+<div class="caption">Every composite column carries a default sort key and a ▾ menu of its other keys; server side it is only a choice of which underlying field goes into <code>sidx</code>.</div>
+
+<h2>Sorting and filtering composite columns</h2>
+<div class="anat">
+  <div class="card">
+    <h3>Header sort menu <span class="pill pill-new">do this</span></h3>
+    <p class="note" style="margin:0">Default key per composite: Sample → zygosity; Consequence → impact; Classifications → internal germline max; Predictions → damaging count.
+      The ▾ lists the others. Nothing new is fetched — the underlying values are already in the row for the renderer.</p>
+  </div>
+  <div class="card">
+    <h3>Raw columns stay available <span class="pill pill-new">and this</span></h3>
+    <p class="note" style="margin:0"><code>samples_allele_frequency</code>, <code>gnomad_af</code>, <code>impact</code>… remain ordinary optional columns in the column chooser
+      (that is what the last menu item adds). The FilterNode builder keeps filtering by column name, so composites are display-only and filters are untouched.</p>
+  </div>
+</div>
+<p class="note" style="margin-top:12px">Click-to-expand a composite into its sub-columns was considered and left out: it needs per-user expand state, width
+recalculation and a colmodel that differs from the export, for the same outcome as adding the raw column.</p>
+
+<h2>Anatomy</h2>
+<div class="anat">
+  <div class="card">
+    <h3>Representative variant — preference cascade</h3>
+    <p class="note" style="margin-top:0">One renderer, one sort key. Loop the preferences the way c.HGVS selection already does; the first that resolves wins.
+      The column sorts by <code>(contig order, position, ref, alt)</code> regardless of what is shown.</p>
+    <ol class="cascade">
+      <li><span class="step">1</span><span class="hgvs"><span class="gene">BRCA1</span> c.5266dup</span><span class="when">c.HGVS on the representative transcript. Gene leads because eyes find symbols faster than accessions; the transcript moves to line 2.</span></li>
+      <li><span class="step">2</span><span class="hgvs">g.128748315C&gt;T</span><span class="when">g.HGVS when there is no transcript (intergenic, no annotation yet). Contig prefix dropped, shown on line 2 as <code>chr8 · GRCh38</code>.</span></li>
+      <li><span class="step">3</span><span class="hgvs">2:47641560 A&gt;ins[52]</span><span class="when">Long alleles: keep the position, collapse the sequence to a length. Full alleles in the popover.</span></li>
+      <li><span class="step">4</span><span class="hgvs">1:155.00–155.12 Mb <b>DEL</b></span><span class="when">Symbolic / structural: span in Mb, type in bold, size on line 2 (<code>120 kb · 6 genes</code>). Overlapping symbols stay in their own column.</span></li>
+      <li><span class="step">5</span><span class="hgvs">v 48812331</span><span class="when">Last resort while annotation is still running — same id the old box linked to.</span></li>
+    </ol>
+  </div>
+  <div class="card">
+    <h3>Glyph legend</h3>
+    <div class="legend">
+      <div class="row"><span class="k zyg"><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="6.5" fill="none" stroke="var(--zyg)" stroke-width="1.6"/><path d="M8 1.5 A6.5 6.5 0 0 1 8 14.5 Z" fill="var(--zyg)"/></svg></span><span class="d">HET — half fill, AF and depth beside it</span></div>
+      <div class="row"><span class="k zyg"><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="6.5" fill="var(--zyg)"/></svg></span><span class="d">HOM ALT / hemizygous</span></div>
+      <div class="row"><span class="k zyg"><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="6.5" fill="none" stroke="var(--zyg-ring)" stroke-width="1.6"/></svg></span><span class="d">REF — outline only</span></div>
+      <div class="row"><span class="k zyg"><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="6.5" fill="none" stroke="var(--zyg-ring)" stroke-width="1.6" stroke-dasharray="2 2"/></svg></span><span class="d">Unknown / no call</span></div>
+      <div class="row"><span class="k imp"><i class="dot high"></i></span><span class="d">HIGH impact</span></div>
+      <div class="row"><span class="k imp"><i class="dot mod"></i></span><span class="d">MODERATE</span></div>
+      <div class="row"><span class="k imp"><i class="dot low"></i></span><span class="d">LOW</span></div>
+      <div class="row"><span class="k imp"><i class="dot modifier"></i></span><span class="d">MODIFIER</span></div>
+      <div class="row"><span class="k"><span class="cs p"><span class="src">CV</span>P <span class="stars">★★★<span class="off">★</span></span></span></span><span class="d">ClinVar — pathogenicity + review stars</span></div>
+      <div class="row"><span class="k"><span class="cs g lp">LP <span class="multi">×3</span></span></span><span class="d">Internal germline; green rail, count of records</span></div>
+      <div class="row"><span class="k"><span class="cs s p">Tier I</span></span><span class="d">Internal somatic; purple rail</span></div>
+      <div class="row"><span class="k"><span class="cs none">—</span></span><span class="d">Not classified (kept, so columns stay aligned)</span></div>
+      <div class="row"><span class="k gaf"><span class="v">4e-4%</span><span class="pop">AMR</span></span><span class="d">gnomAD AF + popmax; rare reads at full weight</span></div>
+      <div class="row"><span class="k gaf common"><span class="v">15.0%</span><span class="pop">EAS</span></span><span class="d">Muted above the analysis's "common" threshold</span></div>
+      <div class="row"><span class="k pred"><i class="pa"></i><i class="pa"></i><i class="pa"></i><i class="pa"></i><i class="be"></i><i></i></span><span class="d">Predictions: 4 damaging · 1 benign of 6</span></div>
+      <div class="row"><span class="k splice"><i class="hi"></i> 0.91</span><span class="d">SpliceAI max Δ; dot at 0.2 / 0.5 / 0.8</span></div>
+      <div class="row"><span class="k trio"><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="6.5" fill="none" stroke="var(--zyg)" stroke-width="1.6"/><path d="M8 1.5 A6.5 6.5 0 0 1 8 14.5 Z" fill="var(--zyg)"/></svg><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="6.5" fill="none" stroke="var(--zyg-ring)" stroke-width="1.6"/></svg><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="6.5" fill="none" stroke="var(--zyg-ring)" stroke-width="1.6"/></svg></span><span class="d">Trio: proband · mother · father (de novo reads instantly)</span></div>
+    </div>
+  </div>
+</div>
+
+<h2>Two-line alternative <span class="pill pill-alt">36px rows</span></h2>
+<p class="note">Same renderers with transcript, p.HGVS and impact word on a second line. Fewer rows per screen; kept here as a per-user toggle rather than the default.</p>
+<div class="scroll">
+  <table class="vg rows2" id="grid-prop"></table>
+</div>
+
+<h2>What changes where</h2>
+<table class="spec">
+  <tr><th style="width:190px">Column</th><th>Data</th><th>Renderer</th><th>Notes</th></tr>
+  <tr><td><b>Variant</b> (mandatory)</td><td><code>id</code> + hidden <code>hgvs_c</code>, <code>hgvs_g</code>, <code>hgvs_p</code>, <code>gene_symbol</code>, <code>transcript</code>, <code>locus__*</code>, <code>alt</code>, <code>variant_class</code>, <code>svlen</code></td><td>New <code>representativeVariant</code> replacing <code>detailsLink</code>; cascade above, client side (data already in the row). Popover fetched lazily.</td><td>Sort stays <code>(contig, position, ref, alt)</code>. chrom / position / ref / alt become ordinary optional columns and drop out of the default collections. Export unchanged.</td></tr>
+  <tr><td><b>Classifications</b></td><td><code>clinvar__highest_pathogenicity</code>, <code>clinvar__review_status</code>, <code>max_internal_classification</code>, <code>internally_classified</code>, somatic equivalents</td><td>Three chips; <code>.cs-*</code> colours from <code>global.scss</code>, existing G/S colours as a left rail</td><td>Replaces three 16px boxes. Count badge from the <code>|</code>-joined summary that already ships with the row.</td></tr>
+  <tr><td><b>Sample</b> zygosity</td><td>packed <code>samples_zygosity</code>, <code>samples_allele_frequency</code>, <code>samples_allele_depth</code>/<code>read_depth</code></td><td>SVG glyph + AF + depth; trio/cohort render one glyph per sample</td><td>Header ▾ picks the sort key (zygosity / AF / depth); the raw columns stay in the chooser.</td></tr>
+  <tr><td><b>Impact · Consequence</b></td><td><code>impact</code>, <code>consequence</code>, <code>exon</code></td><td>Coloured dot, consequence text, impact word muted underneath</td><td>Two existing columns become one; colours match the node-count legend so the grid and the graph agree.</td></tr>
+  <tr><td><b>gnomAD</b></td><td><code>gnomad_af</code>, <code>gnomad_popmax</code></td><td>Value + popmax label, muted above the analysis "common" AF</td><td>Rare variants keep full weight; common ones recede instead of drawing the eye.</td></tr>
+  <tr><td><b>Predictions</b></td><td><code>predictions_num_pathogenic</code>, <code>predictions_num_benign</code></td><td>Segmented meter</td><td>Both columns already exist (migration 0123) — this is only a renderer.</td></tr>
+  <tr><td><b>SpliceAI</b></td><td>max of the four <code>spliceai_pred_ds_*</code></td><td>Threshold dot + value</td><td>Individual scores keep their columns for power users; the dot is the scan cue.</td></tr>
+</table>
+
+<div class="callout" style="margin-top:22px">
+  <b>Suggested first slice:</b> the Variant column only — <code>representativeVariant</code> renderer, cascade, popover, and removing chrom/pos/ref/alt from the default
+  collections. It is the change the issue actually asks for, it shrinks the mandatory footprint from 5 columns to 1, and every glyph column above is an independent follow-up.
+</div>
+
+<script>
+const ZYG = {
+  het: '<svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="6.5" fill="none" stroke="var(--zyg)" stroke-width="1.6"/><path d="M8 1.5 A6.5 6.5 0 0 1 8 14.5 Z" fill="var(--zyg)"/></svg>',
+  hom: '<svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="6.5" fill="var(--zyg)"/></svg>',
+  ref: '<svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="6.5" fill="none" stroke="var(--zyg-ring)" stroke-width="1.6"/></svg>',
+  unk: '<svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="6.5" fill="none" stroke="var(--zyg-ring)" stroke-width="1.6" stroke-dasharray="2 2"/></svg>',
+};
+const IMP = {HIGH: 'high', MODERATE: 'mod', LOW: 'low', MODIFIER: 'modifier'};
+const CS_CLASS = {P: 'p', LP: 'lp', VUS: 'vus', LB: 'lb', B: 'b'};
+
+// chrom, pos, ref, alt, gene, tx, c, p, impact, consequence, exon, zyg, af, dp, dbHom, dbHet, gnomad, popmax, pred[path,benign,total], splice, clinvar{cs,stars,cond}, g{cs,n}, s, tags
+const ROWS = [
+  {chrom:'1', pos:155235252, ref:'C', alt:'T', gene:'GBA1', tx:'NM_000157.4', c:'c.1226A>G', p:'p.(Asn409Ser)', imp:'MODERATE', cons:'missense', exon:'9/11', zyg:'het', af:'47%', dp:88, hom:2, het:41, gn:0.0031, pop:'NFE', pred:[3,2,6], splice:0.01, cv:{cs:'P', stars:3, cond:'Gaucher disease'}, g:{cs:'P', n:2}, s:null, tags:[['a','Report']]},
+  {chrom:'1', pos:155000000, ref:'N', alt:'<DEL>', gene:null, tx:null, c:null, g_repr:'1:155.00–155.12 Mb <b>DEL</b>', sub:'120 kb · 6 genes · GRCh38', imp:'HIGH', cons:'transcript ablation', exon:'', zyg:'het', af:'—', dp:null, hom:0, het:0, gn:null, pop:'', pred:null, splice:null, cv:null, g:null, s:null, tags:[]},
+  {chrom:'2', pos:47641560, ref:'A', alt:'T', gene:'MSH2', tx:'NM_000251.3', c:'c.942+3A>T', p:null, imp:'LOW', cons:'splice region', exon:'intron 5/15', zyg:'het', af:'51%', dp:64, hom:0, het:3, gn:0.000008, pop:'', pred:null, splice:0.87, cv:{cs:'P', stars:3, cond:'Lynch syndrome'}, g:{cs:'LP', n:1}, s:null, tags:[['c','Requires classification']]},
+  {chrom:'3', pos:37048605, ref:'C', alt:'T', gene:'MLH1', tx:'NM_000249.4', c:'c.350C>T', p:'p.(Thr117Met)', imp:'MODERATE', cons:'missense', exon:'4/19', zyg:'het', af:'49%', dp:102, hom:0, het:1, gn:0.000004, pop:'', pred:[6,0,6], splice:0.02, cv:{cs:'P', stars:2, cond:'Lynch syndrome 2'}, g:{cs:'VUS', n:1}, s:null, tags:[['c','Requires classification'],['d','Discordant']]},
+  {chrom:'7', pos:117559590, ref:'ATCT', alt:'A', gene:'CFTR', tx:'NM_000492.4', c:'c.1521_1523del', p:'p.(Phe508del)', imp:'MODERATE', cons:'inframe deletion', exon:'11/27', zyg:'het', af:'46%', dp:71, hom:1, het:18, gn:0.0071, pop:'NFE', pred:null, splice:0.00, cv:{cs:'P', stars:4, cond:'Cystic fibrosis'}, g:{cs:'P', n:5}, s:null, tags:[['a','Report']]},
+  {chrom:'8', pos:128748315, ref:'C', alt:'T', gene:null, tx:null, c:null, g_repr:'g.128748315C>T', sub:'chr8 · GRCh38 · intergenic', imp:'MODIFIER', cons:'intergenic', exon:'', zyg:'hom', af:'100%', dp:33, hom:212, het:640, gn:0.41, pop:'EAS', pred:null, splice:null, cv:null, g:null, s:null, tags:[]},
+  {chrom:'11', pos:2583470, ref:'G', alt:'A', gene:'KCNQ1', tx:'NM_000218.3', c:'c.1032G>A', p:'p.(Ala344=)', imp:'LOW', cons:'synonymous', exon:'7/16', zyg:'het', af:'44%', dp:56, hom:0, het:0, gn:null, pop:'', pred:null, splice:0.91, cv:{cs:'LP', stars:2, cond:'Long QT syndrome 1'}, g:null, s:null, tags:[]},
+  {chrom:'12', pos:21178615, ref:'T', alt:'C', gene:'SLCO1B1', tx:'NM_006446.5', c:'c.521T>C', p:'p.(Val174Ala)', imp:'MODERATE', cons:'missense', exon:'6/15', zyg:'hom', af:'99%', dp:93, hom:388, het:2101, gn:0.15, pop:'EAS', pred:[1,4,6], splice:0.00, cv:{cs:'B', stars:3, cond:'Simvastatin response'}, g:null, s:null, tags:[]},
+  {chrom:'14', pos:23429279, ref:'G', alt:'A', gene:'MYH7', tx:'NM_000257.4', c:'c.1207C>T', p:'p.(Arg403Trp)', imp:'MODERATE', cons:'missense', exon:'13/40', zyg:'het', af:'52%', dp:77, hom:0, het:0, gn:null, pop:'', pred:[5,0,6], splice:0.03, cv:{cs:'LP', stars:2, cond:'Hypertrophic cardiomyopathy'}, g:{cs:'LP', n:1}, s:null, tags:[['b','Review']]},
+  {chrom:'17', pos:7674220, ref:'C', alt:'T', gene:'TP53', tx:'NM_000546.6', c:'c.743G>A', p:'p.(Arg248Gln)', imp:'MODERATE', cons:'missense', exon:'7/11', zyg:'het', af:'31%', dp:412, hom:0, het:7, gn:0.000004, pop:'', pred:[6,0,6], splice:0.01, cv:{cs:'P', stars:2, cond:'Li-Fraumeni syndrome'}, g:{cs:'P', n:1}, s:{cs:'Tier I', n:2}, tags:[['a','Report']], hl:true},
+  {chrom:'17', pos:43057062, ref:'C', alt:'CG', gene:'BRCA1', tx:'NM_007294.4', c:'c.5266dup', p:'p.(Gln1756ProfsTer74)', imp:'HIGH', cons:'frameshift', exon:'19/23', zyg:'het', af:'48%', dp:66, hom:0, het:4, gn:0.00002, pop:'AMR', pred:null, splice:0.00, cv:{cs:'P', stars:4, cond:'Hereditary breast & ovarian cancer'}, g:{cs:'P', n:3}, s:null, tags:[['a','Report']]},
+  {chrom:'19', pos:11089432, ref:'C', alt:'G', gene:'LDLR', tx:'NM_000527.5', c:'c.-135C>G', p:null, imp:'MODIFIER', cons:"5' UTR", exon:'1/18', zyg:'het', af:'50%', dp:48, hom:9, het:130, gn:0.032, pop:'FIN', pred:null, splice:0.00, cv:{cs:'LB', stars:1, cond:'Familial hypercholesterolemia'}, g:null, s:null, tags:[]},
+  {chrom:'X', pos:31627748, ref:'C', alt:'T', gene:'DMD', tx:'NM_004006.3', c:'c.9563+1G>A', p:null, imp:'HIGH', cons:'splice donor', exon:'intron 65/78', zyg:'hom', af:'100%', dp:29, hom:0, het:0, gn:null, pop:'', pred:null, splice:0.98, cv:null, g:null, s:null, tags:[['b','Review']]},
+];
+
+function esc(s) { return String(s).replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+function hgvsMark(c) { // bold the change part after the position
+  const m = c.match(/^(c\.[-+*\d_]+)(.*)$/);
+  return m ? esc(m[1]) + '<span class="change">' + esc(m[2]) + '</span>' : esc(c);
+}
+function variantCell(r, twoLine) {
+  let line1, line2;
+  if (r.c) {
+    line1 = `<span class="hgvs"><a href="#"><span class="gene">${r.gene}</span> ${hgvsMark(r.c)}</a></span>`;
+    line2 = `<span class="tx">${r.tx}<span class="badge">rep</span>${r.p ? ' · <span class="hgvs p">' + esc(r.p) + '</span>' : ''}</span>`;
+  } else {
+    line1 = `<span class="hgvs"><a href="#">${r.g_repr}</a></span>`;
+    line2 = `<span class="tx">${r.sub}</span>`;
+  }
+  if (!twoLine) {
+    const p = r.p ? ` <span class="hgvs p">${esc(r.p)}</span>` : '';
+    return line1 + p;
+  }
+  return line1 + '<span class="sub">' + line2 + '</span>';
+}
+function csChip(kind, x, label) {
+  if (!x) return `<span class="cs none ${kind}">—</span>`;
+  const cls = CS_CLASS[x.cs] || (x.cs.startsWith('Tier I') ? 'p' : 'vus');
+  let inner = esc(x.cs);
+  if (kind === 'cv') {
+    let stars = '';
+    for (let i = 0; i < 4; i++) stars += `<span class="${i < x.stars ? '' : 'off'}">★</span>`;
+    inner = `<span class="src">CV</span>${inner} <span class="stars">${stars}</span>`;
+  } else if (x.n > 1) {
+    inner += ` <span class="multi">×${x.n}</span>`;
+  }
+  return `<span class="cs ${cls} ${kind === 'cv' ? '' : kind}" title="${label}">${inner}</span>`;
+}
+function classCell(r) { return csChip('cv', r.cv, 'ClinVar') + csChip('g', r.g, 'Internal germline') + csChip('s', r.s, 'Internal somatic'); }
+function tagsCell(r) { return r.tags.map(t => `<span class="tag ${t[0]}">${t[1]}</span>`).join('') + '<span class="tag add">+</span>'; }
+function zygCell(r) {
+  const dp = r.dp ? `<span class="dp">${r.dp}×</span>` : '';
+  return `<span class="zyg">${ZYG[r.zyg]}<span class="af">${r.af}</span>${dp}</span>`;
+}
+function impCell(r, twoLine) {
+  const lvl = twoLine ? `<span class="sub lvl">${r.imp}</span>` : '';
+  return `<span class="imp"><i class="dot ${IMP[r.imp]}"></i><span>${esc(r.cons)}${lvl}</span></span>`;
+}
+function fmtAf(v) {
+  if (v == null) return '—';
+  const pct = v * 100;
+  if (pct >= 1) return pct.toFixed(1) + '%';
+  if (pct >= 0.01) return pct.toFixed(2) + '%';
+  return pct.toExponential(0).replace('e-', 'e-') + '%';
+}
+function gnomadCell(r) {
+  if (r.gn == null) return `<span class="gaf absent"><span class="v">absent</span></span>`;
+  const common = r.gn >= 0.01;  // the analysis's "common" AF threshold
+  return `<span class="gaf ${common ? 'common' : ''}"><span class="v">${fmtAf(r.gn)}</span><span class="pop">${r.pop}</span></span>`;
+}
+function predCell(r) {
+  if (!r.pred) return '<span style="color:var(--faint)">—</span>';
+  const [pa, be, tot] = r.pred;
+  let s = '';
+  for (let i = 0; i < tot; i++) s += `<i class="${i < pa ? 'pa' : (i < pa + be ? 'be' : '')}"></i>`;
+  return `<span class="pred">${s}<span class="n">${pa}/${tot}</span></span>`;
+}
+function spliceCell(r) {
+  if (r.splice == null) return '<span style="color:var(--faint)">—</span>';
+  const c = r.splice >= 0.8 ? 'hi' : r.splice >= 0.5 ? 'md' : r.splice >= 0.2 ? 'lo' : '';
+  return `<span class="splice"><i class="${c}"></i>${r.splice.toFixed(2)}</span>`;
+}
+function dbCell(r) { return `<span title="hom / het in database">${r.hom} <span style="color:var(--faint)">/</span> ${r.het}</span>`; }
+function condCell(r) { return r.cv ? esc(r.cv.cond) : '<span style="color:var(--faint)">—</span>'; }
+
+function th(label, w, extra) { return `<th style="width:${w}px" ${extra || ''}>${label}</th>`; }
+
+// ---- Today: mimic the current grid's leading columns ----
+function box(text, bg, title) {
+  return `<span title="${title}" style="display:inline-block;width:16px;height:16px;line-height:16px;text-align:center;font-size:10px;font-weight:700;border:1px solid var(--border-strong);background:${bg};margin-right:1px;color:#1f2328">${text}</span>`;
+}
+function todayVariantBox(r) {
+  const cv = r.cv ? box(String(({B:1,LB:2,VUS:3,LP:4,P:5})[r.cv.cs]), 'var(--bg-alt)', 'ClinVar') : box('', 'var(--bg-alt)', 'ClinVar: not classified');
+  const g = r.g ? box(String(({B:1,LB:2,VUS:3,LP:4,P:5})[r.g.cs]), 'var(--germline)', 'Germline') : box('', 'var(--bg-alt)', 'Not classified');
+  const s = r.s ? box('1', 'var(--somatic)', 'Somatic') : box('', 'var(--bg-alt)', 'Not classified');
+  return `<input class="sel" type="checkbox">${box('◉', 'var(--bg-alt)', 'Details')}${cv}${g}${s}${box('▥', 'var(--bg-alt)', 'IGV')}`;
+}
+(function renderToday() {
+  const rows = [ROWS[0], ROWS[2], ROWS[3], ROWS[4], ROWS[9], ROWS[10]];
+  let h = '<thead><tr>' + th('Variant', 118) + th('Chrom', 52, 'class="sorted"') + th('Position', 78) + th('Ref', 46) + th('Alt', 46) + th('Gene', 66) + th('HGVS c.', 120) + th('Tags', 110) + '</tr></thead><tbody>';
+  for (const r of rows) {
+    h += `<tr><td>${todayVariantBox(r)}</td><td>${r.chrom}</td><td class="num">${r.pos}</td><td>${esc(r.ref)}</td><td>${esc(r.alt)}</td><td><a href="#">${r.gene || ''}</a></td><td>${r.c ? esc(r.tx + '(' + r.gene + '):' + r.c) : ''}</td><td>${tagsCell(r)}</td></tr>`;
+  }
+  document.getElementById('grid-today').innerHTML = h + '</tbody>';
+})();
+
+(function renderPropMini() {
+  const rows = [ROWS[0], ROWS[2], ROWS[3], ROWS[4], ROWS[9], ROWS[10]];
+  let h = '<thead><tr>' + th('', 28) + th('Variant <span class="sort">▲</span>', 250, 'class="sorted"') + th('Classifications', 240) + th('Tags', 150) + '</tr></thead><tbody>';
+  for (const r of rows) h += `<tr><td class="center"><input class="sel" type="checkbox"></td><td>${variantCell(r, true)}</td><td>${classCell(r)}</td><td>${tagsCell(r)}</td></tr>`;
+  document.getElementById('grid-prop-mini').innerHTML = h + '</tbody>';
+})();
+
+(function renderProp() {
+  let h = '<thead><tr>' + th('', 28) + th('Variant <span class="sort">▲</span>', 250, 'class="sorted"') + th('Classifications', 228) + th('Tags', 150)
+        + th('Sample', 120) + th('DB hom / het', 90, 'class="center"') + th('Consequence', 160) + th('Exon', 90) + th('gnomAD', 110) + th('Predictions', 110) + th('SpliceAI', 80) + th('ClinVar condition', 210) + '</tr></thead><tbody>';
+  for (const r of ROWS) {
+    h += `<tr class="${r.hl ? 'hl' : ''}"><td class="center"><input class="sel" type="checkbox"></td><td>${variantCell(r, true)}</td><td>${classCell(r)}</td><td>${tagsCell(r)}</td>`
+       + `<td>${zygCell(r)}</td><td class="center">${dbCell(r)}</td><td>${impCell(r, true)}</td><td>${r.exon || '<span style="color:var(--faint)">—</span>'}</td><td>${gnomadCell(r)}</td><td>${predCell(r)}</td><td>${spliceCell(r)}</td><td>${condCell(r)}</td></tr>`;
+  }
+  document.getElementById('grid-prop').innerHTML = h + '</tbody>';
+})();
+
+(function renderCompact() {
+  let h = '<thead><tr>' + th('', 28) + th('Variant <span class="sort">▲</span>', 300, 'class="sorted"') + th('Class. <span class="menu">▾</span>', 210) + th('Tags', 130)
+        + th('Sample <span class="menu">▾</span>', 110, 'class="open"') + th('DB', 70, 'class="center"') + th('Consequence <span class="menu">▾</span>', 150) + th('gnomAD', 110) + th('Pred <span class="menu">▾</span>', 100) + th('SpliceAI', 76) + th('ClinVar condition', 200) + '</tr></thead><tbody>';
+  for (const r of ROWS) {
+    h += `<tr><td class="center"><input class="sel" type="checkbox"></td><td>${variantCell(r, false)}</td><td>${classCell(r)}</td><td>${tagsCell(r)}</td>`
+       + `<td>${zygCell(r)}</td><td class="center">${dbCell(r)}</td><td>${impCell(r, false)}</td><td>${gnomadCell(r)}</td><td>${predCell(r)}</td><td>${spliceCell(r)}</td><td>${condCell(r)}</td></tr>`;
+  }
+  document.getElementById('grid-compact').innerHTML = h + '</tbody>';
+})();
+</script>
