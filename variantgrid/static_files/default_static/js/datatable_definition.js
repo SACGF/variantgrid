@@ -608,8 +608,8 @@ const DataTableDefinition = (function() {
             const dataTable = this.dataTable;
 
             columns.forEach((col, columnIndex) => {
-                if (!col.sortMenu || col.visible === false) {
-                    return;
+                if (!col.sortMenu || col.visible === false || col.orderable === false) {
+                    return;  // nothing to offer if this grid (or column) can't be sorted at all
                 }
                 const header = $(dataTable.column(columnIndex).header());
                 const menu = $('<span>', {class: 'dt-sort-menu'});

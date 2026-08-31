@@ -98,11 +98,11 @@ class NodeGridSortLimitBannerTest(TestCase):
         response = self._get_grid(node)
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.context["grid_sorting_disabled"])
-        self.assertContains(response, "Sorting is disabled")
+        self.assertContains(response, "Sorting disabled (50,000 variants)")
 
     def test_small_node_no_banner(self):
         node = AllVariantsNode.objects.create(analysis=self.analysis, count=500)
         response = self._get_grid(node)
         self.assertEqual(response.status_code, 200)
         self.assertFalse(response.context["grid_sorting_disabled"])
-        self.assertNotContains(response, "Sorting is disabled")
+        self.assertNotContains(response, "Sorting disabled")

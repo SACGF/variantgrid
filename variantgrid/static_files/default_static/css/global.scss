@@ -1381,6 +1381,27 @@ table.variantgrid-datatable {
 		}
 	}
 
+	// A row can carry more tags than the column is wide, and the cell clips. Hovering lifts the
+	// whole set out of the clip - over the cells to its right, on the row's hover colour - so the
+	// tags past the edge (and their delete X) can still be read and clicked
+	.grid-tags {
+		display: inline-block;
+		vertical-align: top;
+	}
+
+	td.dt-tags,
+	td.dt-tags_global {
+		&:hover {
+			overflow: visible;
+
+			> .grid-tags {
+				position: relative;
+				z-index: 3;
+				background: #f8f8f8;
+			}
+		}
+	}
+
 	// Tags sit inside the row's line box, so tagging a variant doesn't make its row taller than
 	// every other row in the grid. @see VariantGridFormat.tags
 	.grid-tag {

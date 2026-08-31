@@ -1199,6 +1199,20 @@ table.variantgrid-datatable .sample-zygosity .zyg-filtered {
   font-size: 10px;
   flex: none;
 }
+table.variantgrid-datatable .grid-tags {
+  display: inline-block;
+  vertical-align: top;
+}
+table.variantgrid-datatable td.dt-tags:hover,
+table.variantgrid-datatable td.dt-tags_global:hover {
+  overflow: visible;
+}
+table.variantgrid-datatable td.dt-tags:hover > .grid-tags,
+table.variantgrid-datatable td.dt-tags_global:hover > .grid-tags {
+  position: relative;
+  z-index: 3;
+  background: #f8f8f8;
+}
 table.variantgrid-datatable .grid-tag {
   position: relative;
   display: inline-block;

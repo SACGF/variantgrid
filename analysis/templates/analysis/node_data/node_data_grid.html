@@ -4,6 +4,8 @@
 {% block css %}
 .node-grid-placeholder { padding: 12px; }
 .node-grid-placeholder .placeholder-buttons { display: flex; flex-direction: row; align-items: center; gap: 24px; }
+.node-grid-sorting-disabled { color: #8a6d3b; font-size: 11px; white-space: nowrap; }
+.node-grid-sorting-disabled i { margin-right: 3px; }
 {% endblock css %}
 {% block content %}
 <script>
@@ -191,14 +193,15 @@ $(document).ready(function() {
 	</div>
 	{% endif %}
 	<div id='node-data-grid' class='node-data'{% if not grid_auto_load %} style='display: none'{% endif %}>
-	{% if grid_sorting_disabled %}
-	<div class="alert alert-info" role="alert">
-        <b>Sorting is disabled</b> above {{ grid_sort_max_variants|intcomma }} variants (grid={{ grid_row_count|default_if_none:"?"|intcomma }}) Please add more filters to re-enable sorting.
-	</div>
-	{% endif %}
 	<table id='grid-{{ node_id }}' class='grid'>
 	</table>
-	{# Downloads sit under the grid, on the pager's row - moved there by DataTableDefinition.setupDom #}
+	{# Downloads and the sorting note sit under the grid on the pager's row (moved there by DataTableDefinition.setupDom) - space above the grid is rows the user can't see #}
+	{% if grid_sorting_disabled %}
+	<div class="node-grid-sorting-disabled" data-toolbar-bottom="#grid-{{ node_id }}"
+		 title="Sorting is disabled above {{ grid_sort_max_variants|intcomma }} variants - add more filters to re-enable it">
+		<i class="fas fa-sort"></i> Sorting disabled ({{ grid_row_count|default_if_none:"?"|intcomma }} variants)
+	</div>
+	{% endif %}
 	<div id="node-grid-toolbar-{{ node_id }}" data-toolbar-bottom="#grid-{{ node_id }}"></div>
 	</div>
 	<div id='node-data-summary' class='node-data' style='display: none'>

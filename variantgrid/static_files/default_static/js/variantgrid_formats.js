@@ -682,7 +682,8 @@ VariantGridFormat.tags = (tagsCellValue, type, rowData) => {
             tagHtml += getVariantTagHtml(variantId, tag, readOnly);
         }
     }
-    return tagHtml;
+    // Wrapped so the set can lift out of the clipped cell as one thing on hover - @see .grid-tags
+    return tagHtml ? `<span class='grid-tags'>${tagHtml}</span>` : "";
 };
 
 
@@ -744,7 +745,7 @@ VariantGridFormat.tagsGlobal = (value, type, rowData) => {
         }
         tagGlobalHtml += getVariantTagHtml(variantId, tag, true, tagLabel, extraClasses, title);
     }
-    return tagGlobalHtml;
+    return tagGlobalHtml ? `<span class='grid-tags'>${tagGlobalHtml}</span>` : "";
 };
 
 

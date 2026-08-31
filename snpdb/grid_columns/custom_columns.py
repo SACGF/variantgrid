@@ -88,9 +88,12 @@ CLASSIFICATIONS_COLUMN_ROW_ANNOTATIONS = [
 def get_custom_column_fields_override_and_sample_position(custom_columns_collection: CustomColumnsCollection,
                                                           annotation_version: AnnotationVersion,
                                                           analysis_tags=False):
-    columns_version = annotation_version.variant_annotation_version.columns_version
+    variant_annotation_version = annotation_version.variant_annotation_version
+    # A column only annotated for other builds (eg the gnomAD 4 FAFs, GRCh38 only) would always be
+    # empty here, so it drops out of the grid (and its exports) for this build
     in_version_vgcs = {
-        vgc for c in vep_columns.filter_for(columns_version=columns_version)
+        vgc for c in vep_columns.filter_for(columns_version=variant_annotation_version.columns_version,
+                                            genome_build_name=variant_annotation_version.genome_build.name)
         for vgc in c.variant_grid_columns
     }
     ever_referenced = vep_columns.all_variant_grid_column_ids()
