@@ -528,7 +528,7 @@ class UserSettings:
         return settings_overrides
 
     @staticmethod
-    def get_for(user: Optional[User] = None, lab: Optional[Lab] = None, organization: Optional[Organization] = None):
+    def get_for(user: Optional[User] = None, lab: Optional[Lab] = None, organization: Optional[Organization] = None) -> 'UserSettings':
         override_fields = [s.name for s in dataclasses.fields(UserSettings)]
         kwargs = dict.fromkeys(override_fields)  # Need to pass all params
         settings_overrides = UserSettings.get_settings_overrides(user=user, lab=lab, organization=organization)

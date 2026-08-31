@@ -21,14 +21,14 @@ from classification.models import ClassificationGrouping, ClassificationResultVa
     TriageNextStep, TriageState, EffectiveDate, TriageComment, EffectiveDateType, OverlapDiscordanceNotification, \
     DiscordanceReport, ClassificationImportRun, EvidenceKeyMap
 from classification.enums.overlaps_enums import TriageStatus
-from classification.services.overlap_calculator import calculator_for_value_type, OverlapCalculatorOncPath, \
+from classification.services.overlap_calculator import overlap_calculator_for_value_type, OverlapCalculatorOncPath, \
     OverlapCalculatorClinSig, OVERLAP_CLIN_SIG_ENABLED
 import json
 from library.django_utils import get_url_from_view_path
 from library.log_utils import NotificationBuilder
 from review.models import Review
 from snpdb.lab_picker import LabPickerData
-from snpdb.models import Lab, LabLike
+from snpdb.models import Lab, LabLike, UserSettings
 from snpdb.utils import LabNotificationBuilder
 
 
@@ -37,16 +37,16 @@ class OverlapServices:
     @staticmethod
     def update_classification_grouping_overlap_contribution(classification_grouping: ClassificationGrouping, migration: bool = False, recalc_overlaps: bool = True):
         if classification_grouping.testing_context in {TestingContextBucket.OTHER, TestingContextBucket.UNKNOWN}:
-            # no overlaps for other
+            # Don't make overlaps for Other or Unknown, treat them as just not being put in a group properly yet
             return
 
         value_types: list[ClassificationResultValue] = [ClassificationResultValue.ONC_PATH]
         if classification_grouping.testing_context != TestingContextBucket.GERMLINE:
-            # somatic classifications contribute to both OncPath and Somatic Clin Sig overlaps
+            # Germline only looks on Pathogenicity, but Somatic will look at Oncogenicity and Somatic Clinical Significance (e.g. Tier I, Tier II)
             value_types.append(ClassificationResultValue.SOMATIC_CLINICAL_SIGNIFICANCE)
 
         for value_type in value_types:
-            calc = calculator_for_value_type(value_type)
+            calc = overlap_calculator_for_value_type(value_type)
             value = calc.value_from_summary(classification_grouping.latest_cached_summary_obj)
             is_comparable = calc.is_comparable_value(value)
             is_shared = classification_grouping.share_level_obj.is_discordant_level
@@ -273,7 +273,7 @@ class OverlapServices:
             elif reviewed_complex:
                 # Everyone said it's complex
                 for r_complex in reviewed_complex:
-                    # FIXME, should everybody saying it's complex update the Overlap itself?
+                    # Note, if everyone says complex the overlap will also be set to OverlapOverrideStatus.COMPLEX
                     r_complex.next_step = TriageNextStep.UNANIMOUSLY_COMPLEX
 
         # the above should have updated every skew perspective, check below
@@ -288,7 +288,7 @@ class OverlapServices:
 
     @staticmethod
     def recalc_overlap(overlap: Overlap):
-        calculator = calculator_for_value_type(overlap.value_type)
+        calculator = overlap_calculator_for_value_type(overlap.value_type)
 
         overlap_status_calculation = calculator.calculate_entries(overlap.contributions_list)
         cached_state = overlap.cached_overlap_state_obj
@@ -467,12 +467,13 @@ class OverlapGrouping3:
         for overlap_contribution in self.overlap.contributions:
             subject = None
             if lab := overlap_contribution.lab:
-                # TODO get lab's preferred genome build too
-                subject = self.overlap.c_hgvs(lab=lab)
+                genome_build = UserSettings.get_for(lab=lab).default_genome_build
+                subject = f"{settings.SITE_NAME} record : {self.overlap.c_hgvs(lab=lab, genome_build=genome_build)}"
+
             labs.add(
                 LabContext(
-                    overlap_contribution.lab_like,
-                    subject
+                    lab=overlap_contribution.lab_like,
+                    contact_subject=subject
                 )
             )
         return list(sorted(labs, key=lambda x: x.lab))

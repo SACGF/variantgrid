@@ -16,7 +16,7 @@ from classification.models import ClassificationGrouping, Overlap, OverlapContri
     ClassificationFlagTypes, ClassificationModification, Classification, ClassificationGroupingEntry
 from classification.enums.overlaps_enums import OverlapContributionStatus, TriageState, \
     TriageStatus
-from classification.services.overlap_calculator import calculator_for_value_type
+from classification.services.overlap_calculator import overlap_calculator_for_value_type
 from classification.services.overlaps_services import OverlapServices, OverlapGrouping3
 from flags.models import Flag, FlagStatus
 from library.guardian_utils import admin_bot
@@ -240,7 +240,7 @@ class Command(BaseCommand):
             if grouping.allele_origin_bucket == AlleleOriginBucket.SOMATIC:
                 value_types = [ClassificationResultValue.ONC_PATH, ClassificationResultValue.SOMATIC_CLINICAL_SIGNIFICANCE]
             for value_type in value_types:
-                calc = calculator_for_value_type(value_type)
+                calc = overlap_calculator_for_value_type(value_type)
                 all_classifications = grouping.classificationgroupingentry_set.values_list("classification", flat=True)
                 all_modifications = ClassificationModification.objects.filter(classification_id__in=all_classifications, published=True, share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS).order_by('created')
 

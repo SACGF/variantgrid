@@ -14,7 +14,7 @@ from classification.enums import SpecialEKeys, OverlapStatus, OverlapType, Overl
 from classification.models import ClassificationResultValue, \
     EvidenceKey, EvidenceKeyMap, OverlapContribution, Overlap, TriageNextStep, OverlapContributionSkew
 from classification.enums.overlaps_enums import TriageState, TriageStatus
-from classification.services.overlap_calculator import calculator_for_value_type, OVERLAP_CLIN_SIG_ENABLED
+from classification.services.overlap_calculator import overlap_calculator_for_value_type, OVERLAP_CLIN_SIG_ENABLED
 from classification.services.overlaps_services import OverlapServices, OverlapGrouping3
 from classification.views.overlaps_datatables_3 import OverlapColumns
 from library.django_utils import get_url_from_view_path
@@ -249,7 +249,7 @@ def discordance_calculator(request: HttpRequest) -> HttpResponseBase:
     overlap_status = OverlapStatus.EXACT_AGREEMENT
     if len(values) > 1:
         value_type = ClassificationResultValue(request.GET.get("value_type"))
-        calculator = calculator_for_value_type(value_type)
+        calculator = overlap_calculator_for_value_type(value_type)
         overlap_status = calculator.calculate_status_for_multiple_entries(values)
     return render(request, "classification/snippets/overlap_status.html", {"overlap_status": overlap_status})
 

@@ -181,7 +181,7 @@ class OverlapCalculatorOncPath(OverlapCalculatorBase):
             raise ValueError("Unhandled calculation state")
 
 
-def calculator_for_value_type(value_type: ClassificationResultValue) -> OverlapCalculatorBase:
+def overlap_calculator_for_value_type(value_type: ClassificationResultValue) -> OverlapCalculatorBase:
     if value_type == ClassificationResultValue.ONC_PATH:
         return OverlapCalculatorOncPath()
     elif value_type == ClassificationResultValue.SOMATIC_CLINICAL_SIGNIFICANCE:
