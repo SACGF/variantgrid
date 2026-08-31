@@ -74,6 +74,8 @@ class TestAnnotationVCFCNV(TestCase):
         va = VariantAnnotation.objects.get(variant_id=202)
         self.assertEqual(va.variant_class, VariantClass.INVERSION)
         self.assertEqual(va.impact, PathogenicityImpact.MODIFIER)
+        # #1571 - a ranged inv is HGVS from coordinates alone, so 1.1Mb is no obstacle
+        self.assertEqual("NC_000003.11:g.127535894_128720376inv", va.hgvs_g)
 
         # 17	41236500	.	G	<DEL>	.	.	SVTYPE=DEL;SVLEN=14500;variant_id=203
         va = VariantAnnotation.objects.get(variant_id=203)
@@ -106,6 +108,8 @@ class TestAnnotationVCFCNV(TestCase):
         va = VariantAnnotation.objects.get(variant_id=102)
         self.assertEqual(va.variant_class, VariantClass.DELETION)
         self.assertEqual(va.impact, PathogenicityImpact.HIGH)
+        # #1571 - the padding base at POS is excluded, so the interval opens at POS + 1
+        self.assertEqual("NC_000021.9:g.35041809_35051808del", va.hgvs_g)
 
 
 @override_settings(**get_fake_annotation_settings_dict(columns_version=4))
@@ -239,3 +243,28 @@ class TestAnnotationVCFCNV4(TestAnnotationVCFCNV):
                    return_value=scored) as mock_score:
             call_command("backfill_sv_conservation", "--genome-build", "GRCh37")
         mock_score.assert_not_called()
+
+    def test_recalculate_symbolic_hgvs(self):
+        """ #1571: rows imported before symbolic DEL/DUP/INV resolved from coordinates hold a
+            placeholder message - the backfill turns those into real HGVS """
+        self._write_conservation_sidecar(self.TEST_ANNOTATION_VCF_GRCH37, self.CONSERVATION_GRCH37)
+        self._import_grch37_run()
+
+        va = VariantAnnotation.objects.get(variant_id=202)
+        expected_hgvs_g = va.hgvs_g
+        va.hgvs_g = VariantAnnotation.SV_HGVS_TOO_LONG_MESSAGE
+        va.hgvs_c = VariantAnnotation.SV_HGVS_TOO_LONG_MESSAGE
+        va.save()
+
+        untouched = VariantAnnotation.objects.get(variant_id=203)
+        untouched_hgvs_g = untouched.hgvs_g
+
+        call_command("one_off_recalculate_symbolic_hgvs", "--genome-build", "GRCh37")
+
+        va.refresh_from_db()
+        self.assertEqual(expected_hgvs_g, va.hgvs_g)
+        # No local transcript sequences in the fixture, so c.HGVS resolves to blank rather than the message
+        self.assertIsNone(va.hgvs_c)
+
+        untouched.refresh_from_db()
+        self.assertEqual(untouched_hgvs_g, untouched.hgvs_g)

@@ -419,6 +419,20 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
             return True
         return self.alt in {VCFSymbolicAllele.DEL, VCFSymbolicAllele.DUP, VCFSymbolicAllele.INV}
 
+    @property
+    def symbolic_hgvs_interval(self) -> Optional[tuple[int, int]]:
+        """ 1-based inclusive interval the symbolic alt spans, ready to hand to HGVS.
+            <DEL>/<DUP> carry the VCF padding base at position; <INV> starts on it.
+            None for anything with no ranged HGVS form - <CNV>, <INS>, gene-level and
+            every explicit coordinate - which have to go through as_external_explicit() """
+        if not self.is_symbolic or self.svlen is None:
+            return None
+        if self.alt in {VCFSymbolicAllele.DEL, VCFSymbolicAllele.DUP}:
+            return self.position + 1, self.end
+        if self.alt == VCFSymbolicAllele.INV:
+            return self.position, self.end
+        return None
+
     def calculated_reference(self, genome_build) -> str:
         contig_sequence = genome_build.genome_fasta.fasta[self.chrom]
         # reference sequence is 0-based
@@ -862,7 +876,12 @@ class Variant(PreviewModelMixin, models.Model):
 
     @property
     def can_have_c_hgvs(self) -> bool:
-        return self.can_have_annotation and (self.svlen is None or abs(self.svlen) <= settings.HGVS_MAX_SEQUENCE_LENGTH)
+        if not self.can_have_annotation:
+            return False
+        if self.is_symbolic and self.can_make_g_hgvs:
+            # DEL/DUP/INV are HGVS from coordinates alone, at any size (#1571)
+            return True
+        return self.svlen is None or abs(self.svlen) <= settings.HGVS_MAX_SEQUENCE_LENGTH
 
     def as_tuple(self) -> tuple[str, int, str, str, int]:
         return self.locus.contig.name, self.locus.position, self.locus.ref.seq, self.alt.seq, self.svlen

@@ -250,8 +250,9 @@ class VariantTranscriptSelections:
         ac_key = self._ac_key(self.annotation_consortium)
         other_ac_key = self._ac_key(self.other_annotation_consortium)
 
+        # Symbolic DEL/DUP/INV resolve from coordinates alone, so length doesn't cost anything (#1571)
         svlen = variant.svlen or 0
-        if abs(svlen) > settings.HGVS_MAX_SEQUENCE_LENGTH:
+        if variant.coordinate.symbolic_hgvs_interval is None and abs(svlen) > settings.HGVS_MAX_SEQUENCE_LENGTH:
             other_ac = AnnotationConsortium(self.other_annotation_consortium)
             self.warning_messages.append(f"Not adding {other_ac.label} transcripts due to length")
             return

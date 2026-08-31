@@ -119,3 +119,49 @@ def create_gata2_transcript_version(genome_build) -> TranscriptVersion:
                               "cds_start": 128481018}}}
 
     return _insert_transcript_data(genome_build, nm_001145661_2, gene_version)
+
+
+def create_pten_transcript_version(genome_build) -> TranscriptVersion:
+    """ Plus strand - GATA2 above is minus, so the pair covers both orientations """
+
+    gene_version = _create_fake_gene_version(genome_build, "5728", "PTEN", AnnotationConsortium.REFSEQ)
+    nm_000314_8 = {"id": "NM_000314.8",
+                   "cdot": "0.2.17",
+                   "hgnc": "9588",
+                   "biotype": ["protein_coding"],
+                   "gene_name": "PTEN",
+                   "stop_codon": 2057,
+                   "start_codon": 845,
+                   "genome_builds": {
+                       "GRCh37": {
+                           "url": "https://ftp.ncbi.nlm.nih.gov/genomes/all/annotation_releases/9606/GCF_000001405.25-RS_2024_09/GCF_000001405.25_GRCh37.p13_genomic.gff.gz",
+                           "exons": [[89623381, 89624305, 0, 1, 924, None],
+                                     [89653781, 89653866, 1, 925, 1009, None],
+                                     [89685269, 89685314, 2, 1010, 1054, None],
+                                     [89690802, 89690846, 3, 1055, 1098, None],
+                                     [89692769, 89693008, 4, 1099, 1337, None],
+                                     [89711874, 89712016, 5, 1338, 1479, None],
+                                     [89717609, 89717776, 6, 1480, 1646, None],
+                                     [89720650, 89720875, 7, 1647, 1871, None],
+                                     [89725043, 89731687, 8, 1872, 8515, None]],
+                           "contig": "NC_000010.10",
+                           "strand": "+",
+                           "cds_end": 89725229,
+                           "cds_start": 89624226},
+                       "GRCh38": {
+                           "url": "https://ftp.ncbi.nlm.nih.gov/genomes/all/annotation_releases/9606/GCF_000001405.40-RS_2025_08/GCF_000001405.40_GRCh38.p14_genomic.gff.gz",
+                           "exons": [[87863624, 87864548, 0, 1, 924, None],
+                                     [87894024, 87894109, 1, 925, 1009, None],
+                                     [87925512, 87925557, 2, 1010, 1054, None],
+                                     [87931045, 87931089, 3, 1055, 1098, None],
+                                     [87933012, 87933251, 4, 1099, 1337, None],
+                                     [87952117, 87952259, 5, 1338, 1479, None],
+                                     [87957852, 87958019, 6, 1480, 1646, None],
+                                     [87960893, 87961118, 7, 1647, 1871, None],
+                                     [87965286, 87971930, 8, 1872, 8515, None]],
+                           "contig": "NC_000010.11",
+                           "strand": "+",
+                           "cds_end": 87965472,
+                           "cds_start": 87864469}}}
+
+    return _insert_transcript_data(genome_build, nm_000314_8, gene_version)

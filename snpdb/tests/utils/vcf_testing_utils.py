@@ -72,6 +72,7 @@ def slowly_create_loci_and_variants_for_vcf(genome_build, vcf_filename, get_vari
 
         kwargs = {"locus": locus,
                   "end": vc.end,
+                  "svlen": vc.svlen,
                   "alt_id": alt_id}
         if get_variant_id_from_info:
             kwargs["id"] = v.INFO.get("variant_id")

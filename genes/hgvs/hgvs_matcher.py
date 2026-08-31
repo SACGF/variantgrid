@@ -623,7 +623,9 @@ class HGVSMatcher:
         return self.variant_coordinate_to_hgvs_variant(variant.coordinate, transcript_name=transcript_name)
 
     def variant_coordinate_to_hgvs_variant(self, variant_coordinate: VariantCoordinate, transcript_name=None) -> HGVSVariant:
-        variant_coordinate = variant_coordinate.as_external_explicit(self.genome_build)
+        # Symbolic DEL/DUP/INV go to the converter as coordinates - no reference read at all (#1571)
+        if variant_coordinate.symbolic_hgvs_interval is None:
+            variant_coordinate = variant_coordinate.as_external_explicit(self.genome_build)
         return self.variant_coordinate_to_hgvs_used_converter_type_and_method(variant_coordinate, transcript_name).hgvs_variant
 
     def _fast_variant_coordinate_to_g_hgvs(self, refseq_accession, offset, ref, alt) -> str:
@@ -643,9 +645,11 @@ class HGVSMatcher:
         return self.variant_coordinate_to_g_hgvs(variant.coordinate)
 
     def variant_coordinate_to_g_hgvs(self, variant_coordinate: VariantCoordinate) -> str:
-        variant_coordinate = variant_coordinate.as_external_explicit(self.genome_build)
+        symbolic = variant_coordinate.symbolic_hgvs_interval is not None
+        if not symbolic:
+            variant_coordinate = variant_coordinate.as_external_explicit(self.genome_build)
         (chrom, position, ref, alt, _svlen) = variant_coordinate
-        if len(alt) == 1 and len(ref) == 1:
+        if not symbolic and len(alt) == 1 and len(ref) == 1:
             contig = self.genome_build.chrom_contig_mappings[chrom]
             hgvs_str = self._fast_variant_coordinate_to_g_hgvs(contig.refseq_accession, position, ref, alt)
         else:

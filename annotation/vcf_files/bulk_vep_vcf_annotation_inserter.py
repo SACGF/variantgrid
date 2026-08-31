@@ -752,16 +752,19 @@ class BulkVEPVCFAnnotationInserter:
         if transcript_data.get('hgvs_c'):
             return
 
-        if transcript_data.get(VEPColumns.PICK):
-            max_length = settings.HGVS_MAX_SEQUENCE_LENGTH_REPRESENTATIVE_TRANSCRIPT
-        else:
-            max_length = settings.HGVS_MAX_SEQUENCE_LENGTH
+        # The limit caps reading sequence out of the reference - symbolic DEL/DUP/INV are HGVS from
+        # coordinates alone (#1571), so it only applies to coordinates carrying explicit sequence
+        if variant_coordinate.symbolic_hgvs_interval is None:
+            if transcript_data.get(VEPColumns.PICK):
+                max_length = settings.HGVS_MAX_SEQUENCE_LENGTH_REPRESENTATIVE_TRANSCRIPT
+            else:
+                max_length = settings.HGVS_MAX_SEQUENCE_LENGTH
 
-        # Only calculate very long HGVS for representative transcripts
-        if variant_coordinate.max_sequence_length > max_length:
-            transcript_data['hgvs_c'] = VariantAnnotation.SV_HGVS_TOO_LONG_MESSAGE
-            self._generated_hgvs_c["too_long"] += 1
-            return
+            # Only calculate very long HGVS for representative transcripts
+            if variant_coordinate.max_sequence_length > max_length:
+                transcript_data['hgvs_c'] = VariantAnnotation.SV_HGVS_TOO_LONG_MESSAGE
+                self._generated_hgvs_c["too_long"] += 1
+                return
 
         if transcript_accession:
 
@@ -783,7 +786,7 @@ class BulkVEPVCFAnnotationInserter:
             return
 
         max_length = settings.HGVS_MAX_SEQUENCE_LENGTH_REPRESENTATIVE_TRANSCRIPT  # VariantAnnotation
-        if variant_coordinate.max_sequence_length > max_length:
+        if variant_coordinate.symbolic_hgvs_interval is None and variant_coordinate.max_sequence_length > max_length:
             hgvs_g = VariantAnnotation.SV_HGVS_TOO_LONG_MESSAGE
         else:
             try:
@@ -805,9 +808,11 @@ class BulkVEPVCFAnnotationInserter:
 
         svlen = v.INFO.get("SVLEN")
         variant_coordinate = VariantCoordinate(chrom=v.CHROM, position=v.POS, ref=v.REF, alt=v.ALT[0], svlen=svlen)
-        # Do now so we only retrieve sequences once. <CNV>/<INS> can't be expanded to explicit
-        # ref/alt - leave them symbolic (downstream HGVS/SV-overlap handle the symbolic form)
-        if variant_coordinate.can_be_made_explicit:
+        # The standard pipeline's consumers need explicit sequence - _add_calculated_ptc measures
+        # len(ref)/len(alt) and the internal alt='=' has to resolve. Do it once here.
+        # The SV pipeline's consumers (HGVS #1571, gnomAD SV overlap) work off the symbolic form
+        if self.annotation_run.pipeline_type == VariantAnnotationPipelineType.STANDARD \
+                and variant_coordinate.can_be_made_explicit:
             variant_coordinate = variant_coordinate.as_external_explicit(self.annotation_run.genome_build)
 
         try:

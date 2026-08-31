@@ -5,6 +5,7 @@ from typing import Optional
 
 from bioutils.sequences import reverse_complement
 from hgvs.assemblymapper import AssemblyMapper
+from hgvs.edit import Dup, Inv, NARefAlt
 from hgvs.exceptions import (
     HGVSDataNotAvailableError,
     HGVSError,
@@ -18,8 +19,10 @@ from hgvs.exceptions import (
     HGVSVerifyFailedError,
 )
 from hgvs.extras.babelfish import Babelfish
+from hgvs.location import Interval, SimplePosition
 from hgvs.normalizer import Normalizer
 from hgvs.parser import Parser
+from hgvs.posedit import PosEdit
 from hgvs.sequencevariant import SequenceVariant
 from hgvs.validator import ExtrinsicValidator
 from hgvs.variantmapper import VariantMapper
@@ -36,10 +39,18 @@ from genes.hgvs.hgvs_converter import (
 from genes.hgvs.hgvs_variant import HGVSVariant, _looks_like_transcript
 from genes.models import TranscriptVersion
 from genes.transcripts_utils import get_refseq_type
+from library.genomics.vcf_enums import VCFSymbolicAllele
 from snpdb.models import Contig, GenomeBuild, VariantCoordinate
 
 # Parser construction is slow, so keep a single one per process
 _hgvs_parser = Parser()
+
+# A ranged del/dup/inv needs no sequence - ref='' is what hgvs.edit formats from (#1571)
+SYMBOLIC_EDITS = {
+    VCFSymbolicAllele.DEL: lambda: NARefAlt(ref='', alt=None),
+    VCFSymbolicAllele.DUP: lambda: Dup(ref=''),
+    VCFSymbolicAllele.INV: lambda: Inv(ref=''),
+}
 
 
 class HgvsMatchTranscriptAndGenomeRefAllele(HgvsMatchRefAllele):
@@ -103,6 +114,13 @@ class BioCommonsHGVSConverter:
                                  assembly_name=assembly_name,
                                  alt_aln_method='splign',
                                  replace_reference=True)
+        # Symbolic DEL/DUP/INV are pure coordinates - replace_reference/normalize would read the
+        # whole span out of the reference, which is exactly what we're avoiding (#1571)
+        self.am_symbolic = AssemblyMapper(self.hdp,
+                                          assembly_name=assembly_name,
+                                          alt_aln_method='splign',
+                                          replace_reference=False,
+                                          normalize=False)
         self.ev = ExtrinsicValidator(self.hdp)
         self.norm_5p = Normalizer(self.hdp, shuffle_direction=5)
         self.no_validate_mapper = VariantMapper(self.hdp, replace_reference=True, prevalidation_level="NONE")
@@ -165,8 +183,18 @@ class BioCommonsHGVSConverter:
         sv_normalized = self.no_validate_normalizer.normalize(sv)
         return HGVSVariant(sv_normalized)
 
+    def _symbolic_to_sequence_variant(self, vc: VariantCoordinate, interval: tuple[int, int]) -> SequenceVariant:
+        """ Build the SequenceVariant straight from the interval, without ever reading the reference """
+        start, end = interval
+        pos = Interval(start=SimplePosition(start), end=SimplePosition(end))
+        edit = SYMBOLIC_EDITS[vc.alt]()
+        contig = self.genome_build.chrom_contig_mappings[vc.chrom]
+        return SequenceVariant(ac=contig.refseq_accession, type='g', posedit=PosEdit(pos, edit))
+
     def _vc_to_sequence_variant(self, vc: VariantCoordinate) -> SequenceVariant:
         """Convert VariantCoordinate to genomic HGVS SequenceVariant via babelfish."""
+        if interval := vc.symbolic_hgvs_interval:
+            return self._symbolic_to_sequence_variant(vc, interval)
         chrom, position, ref, alt, _svlen = vc.as_external_explicit(self.genome_build)
         return self.babelfish.vcf_to_g_hgvs(chrom, position, ref, alt)
 
@@ -180,17 +208,21 @@ class BioCommonsHGVSConverter:
 
     def variant_coordinate_to_c_hgvs(self, vc: VariantCoordinate, transcript_version) -> HGVSVariant:
         """ In VG we call non-coding "c.HGVS" as well - so have to handle that """
+        symbolic = vc.symbolic_hgvs_interval is not None
         try:
             var_g = self._vc_to_sequence_variant(vc)  # returns normalized (default HGVS 3')
             # Biocommons HGVS doesn't normalize introns as it works with transcript sequences so doesn't have introns
             # workaround is to normalize on genome sequence first, so if it can't norm it's correct
-            if transcript_version.strand == '-':
+            # SV breakpoints are segmentation estimates (the VCF declares CIPOS/CIEND around them) so
+            # there's nothing to 3' shift - report the coordinates we were given
+            if transcript_version.strand == '-' and not symbolic:
                 var_g = self.norm_5p.normalize(var_g)
 
+            mapper = self.am_symbolic if symbolic else self.am
             if transcript_version.is_coding:
-                var_c = self.am.g_to_c(var_g, transcript_version.accession)
+                var_c = mapper.g_to_c(var_g, transcript_version.accession)
             else:
-                var_c = self.am.g_to_n(var_g, transcript_version.accession)
+                var_c = mapper.g_to_n(var_g, transcript_version.accession)
         except HGVSError as e:  # Can be out of bounds etc
             klass = self._get_exception_class(e)
             raise klass(e) from e
