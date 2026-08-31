@@ -182,9 +182,7 @@ function updateNodeFromData(node, nodeData) {
 	const nodeOverlay = $(".node-overlay", node);
 	nodeOverlay.attr("class", nodeData.overlay_css_classes);
 	$(".node-name", node).text(nodeData.name);
-	// The strip has ~45px of text - a long label (EXTRACTION) needs the smaller rule
-	const classLabel = nodeData.class_label_short || "";
-	$(".node-klass", node).text(classLabel).toggleClass("node-klass-long", classLabel.length > 8);
+	$(".node-klass", node).text(nodeData.class_label_short);
 	$(".node-badge", node).empty().append(renderNodeIcon(nodeData.icon));
 
 	const chipsHolder = $(".node-chips", node).empty();

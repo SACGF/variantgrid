@@ -15,7 +15,7 @@ from guardian.shortcuts import assign_perm
 from library.guardian_utils import DjangoPermission, assign_permission_to_user_and_groups
 from patients.models import Extraction, Patient, Specimen
 from patients.models_enums import NucleicAcid, SampleSourceLevel
-from patients.sample_grouping import get_patient_sample_tree, get_sample_group
+from patients.sample_grouping import get_patient_sample_tree, get_sample_group, sample_as_json
 from snpdb.models import (
     VCF,
     Cohort,
@@ -76,47 +76,42 @@ class ExtractionSampleTestCase(TestCase):
         return sample, cgc
 
 
-class TestExtractionSamplesView(ExtractionSampleTestCase):
-    def _get(self, user, **params) -> dict:
-        self.client.force_login(user)
-        url = reverse("extraction_samples", kwargs={"extraction_id": self.extraction.pk})
-        response = self.client.get(url, params)
-        self.assertEqual(response.status_code, 200)
-        return json.loads(response.content)
+class TestSampleGroup(ExtractionSampleTestCase):
+    """ What a level resolves to, and what it reports leaving out """
+
+    def _group(self, user=None, genome_build=None):
+        return get_sample_group(user or self.user, SampleSourceLevel.EXTRACTION, self.extraction,
+                                genome_build)
 
     def test_counts_come_off_the_stats_rows(self):
-        data = self._get(self.user, genome_build="GRCh37")
-        self.assertEqual(data["totals"], {"samples": 1, "vcfs": 1, "variant_count": 93})
-        self.assertEqual(data["samples"][0]["sample"], self.sample.name)
-        self.assertEqual(data["samples"][0]["variant_count"], 93)
+        group = self._group(genome_build=self.grch37)
+        self.assertEqual([s.name for s in group.samples], [self.sample.name])
+        self.assertEqual(sample_as_json(self.sample)["variant_count"], 93)
 
     def test_uncalculated_counts_are_null(self):
-        data = self._get(self.user)  # No build restriction, so the GRCh38 sample is in too
-        by_name = {s["sample"]: s for s in data["samples"]}
-        self.assertIsNone(by_name[self.other_build_sample.name]["variant_count"])
+        self.assertIsNone(sample_as_json(self.other_build_sample)["variant_count"])
 
     def test_other_genome_build_reported_not_omitted(self):
-        data = self._get(self.user, genome_build="GRCh37")
-        self.assertEqual(len(data["excluded"]), 1)
-        self.assertEqual(data["excluded"][0]["sample"], self.other_build_sample.name)
-        self.assertIn("GRCh38", data["excluded"][0]["reason"])
-        self.assertTrue(any("GRCh38" in w for w in data["warnings"]))
+        group = self._group(genome_build=self.grch37)
+        self.assertEqual([e.sample for e in group.excluded], [self.other_build_sample])
+        self.assertIn("GRCh38", group.excluded[0].reason)
+        self.assertTrue(any("GRCh38" in w for w in group.warnings))
 
     def test_archived_vcf_reported_not_omitted(self):
         vcf = self.sample.vcf
         vcf.data_archived_date = timezone.now()
         vcf.save()
 
-        data = self._get(self.user, genome_build="GRCh37")
-        self.assertEqual(data["totals"]["samples"], 0)
-        self.assertTrue(any("archived" in e["reason"] for e in data["excluded"]))
+        group = self._group(genome_build=self.grch37)
+        self.assertEqual(group.samples, [])
+        self.assertTrue(any("archived" in e.reason for e in group.excluded))
 
     def test_samples_without_permission_are_counted_not_named(self):
         """ Reported as a count - naming samples the user can't view would leak them """
-        data = self._get(self.other_user, genome_build="GRCh37")
-        self.assertEqual(data["samples"], [])
-        self.assertEqual(data["excluded"], [])
-        self.assertEqual(data["hidden_count"], 2)
+        group = self._group(user=self.other_user, genome_build=self.grch37)
+        self.assertEqual(group.samples, [])
+        self.assertEqual(group.excluded, [])
+        self.assertEqual(group.hidden_count, 2)
 
     def test_no_source_resolves_to_nothing(self):
         group = get_sample_group(self.user, SampleSourceLevel.EXTRACTION, None)
@@ -165,22 +160,6 @@ class TestSampleGroupTree(ExtractionSampleTestCase):
                 self.assertEqual(tree["selected"], {"level": level, "id": source.pk,
                                                     "label": str(source)})
 
-    def test_only_the_picked_subtree_is_in_selection(self):
-        tree = get_patient_sample_tree(self.user, SampleSourceLevel.EXTRACTION, self.extraction,
-                                       self.grch37)
-        self.assertFalse(tree["patient"]["in_selection"])
-        specimen = tree["specimens"][0]
-        self.assertFalse(specimen["in_selection"])
-        extraction = specimen["extractions"][0]
-        self.assertTrue(extraction["in_selection"])
-        self.assertTrue(all(s["in_selection"] for s in extraction["samples"]))
-
-    def test_one_sample_row_is_in_selection_at_sample_level(self):
-        tree = get_patient_sample_tree(self.user, SampleSourceLevel.SAMPLE, self.sample, self.grch37)
-        samples = tree["specimens"][0]["extractions"][0]["samples"]
-        in_selection = {s["sample"]: s["in_selection"] for s in samples}
-        self.assertEqual(in_selection, {self.sample.name: True, self.other_build_sample.name: False})
-
     def test_excluded_samples_stay_visible_with_their_reason(self):
         tree = get_patient_sample_tree(self.user, SampleSourceLevel.PATIENT, self.patient, self.grch37)
         samples = {s["sample"]: s for s in tree["specimens"][0]["extractions"][0]["samples"]}
@@ -217,7 +196,6 @@ class TestSampleGroupTree(ExtractionSampleTestCase):
         self.assertIsNone(tree["patient"])
         self.assertEqual(tree["specimens"], [])
         self.assertEqual([s["sample"] for s in tree["samples"]], [loose.name])
-        self.assertTrue(tree["samples"][0]["in_selection"])
 
     def test_an_unknown_level_is_a_404(self):
         self.client.force_login(self.user)

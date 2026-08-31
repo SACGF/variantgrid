@@ -29,34 +29,33 @@ def get_node_types_hash():
     return subclasses
 
 
+def _walk_menu_entries():
+    """ (node class, node instance, menu entry) for every add node dropdown row """
+    for node_class in get_node_types_hash().values():
+        node = node_class()
+        for entry in node_class.get_menu_entries():
+            yield node_class, node, entry
+
+
 def get_nodes_by_classification() -> dict[str, list]:
     """ Add node dropdown rows. A class contributes one row unless it declares several menu entries
         (SampleNode, one per source level) """
     nodes = defaultdict(list)
-
-    for node_class in get_node_types_hash().values():
-        node = node_class()
+    for _node_class, node, entry in _walk_menu_entries():
         classification = node.get_node_classification()
-        for entry in node_class.get_menu_entries():
-            nodes[classification].append({
-                "key": entry.key,  # What node_create is passed
-                "class_name": node.get_class_name(),  # Picks up the node's accent colour
-                "class_label": entry.label,
-                "class_label_short": node_class.get_node_class_label_short(),
-                "classification": classification,  # add node dropdown colours icons like the cards
-                "icon": asdict(entry.icon),
-            })
-
+        nodes[classification].append({
+            "key": entry.key,  # What node_create is passed
+            "class_name": node.get_class_name(),  # Picks up the node's accent colour
+            "class_label": entry.label,
+            "classification": classification,  # add node dropdown colours icons like the cards
+            "icon": asdict(entry.icon),
+        })
     return nodes
 
 
 def get_menu_entries_by_key() -> dict[str, tuple]:
-    """ (node class, initial kwargs) for each add node dropdown row """
-    entries = {}
-    for node_class in get_node_types_hash().values():
-        for entry in node_class.get_menu_entries():
-            entries[entry.key] = (node_class, entry.initial_kwargs)
-    return entries
+    """ (node class, menu entry) for each add node dropdown row """
+    return {entry.key: (node_class, entry) for node_class, _node, entry in _walk_menu_entries()}
 
 
 def get_node_display_data_by_menu_key() -> dict[str, dict]:

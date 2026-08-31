@@ -94,6 +94,15 @@ SAMPLE_SOURCE_TEXT = {
 }
 
 
+# str() on a result walks up the hierarchy, so pull the parent in with the row
+SAMPLE_SOURCE_SELECT_RELATED = {
+    SampleSourceLevel.SPECIMEN: ("patient",),
+    SampleSourceLevel.EXTRACTION: ("specimen", "specimen__patient"),
+    SampleSourceLevel.SAMPLE: ("vcf",),
+}
+
+
+@method_decorator([cache_page(MINUTE_SECS), vary_on_cookie], name='dispatch')
 class SampleSourceAutocompleteView(AutocompleteView):
     """ One search box over all four levels of the hierarchy, so the SampleNode editor asks for the
         thing rather than for a level and then a thing.
@@ -120,8 +129,9 @@ class SampleSourceAutocompleteView(AutocompleteView):
             view.q = self.q
             view.forwarded = self.forwarded
             get_text = SAMPLE_SOURCE_TEXT.get(level, str)
+            qs = view.get_queryset().select_related(*SAMPLE_SOURCE_SELECT_RELATED.get(level, ()))
             children = [{"id": f"{level}:{obj.pk}", "text": get_text(obj)}
-                        for obj in view.get_queryset()[:self.MAX_PER_GROUP]]
+                        for obj in qs[:self.MAX_PER_GROUP]]
             if children:
                 results.append({"text": label, "children": children})
         return JsonResponse({"results": results, "pagination": {"more": False}})

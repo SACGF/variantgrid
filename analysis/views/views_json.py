@@ -123,7 +123,7 @@ def node_create(request, analysis_id, node_type):
     analysis = get_analysis_or_404(request.user, analysis_id, write=True)
 
     # A menu entry is a class plus the field values it stamps on the new node (eg a source level)
-    node_class, initial_kwargs = MENU_ENTRIES_BY_KEY[node_type]
+    node_class, menu_entry = MENU_ENTRIES_BY_KEY[node_type]
     # New nodes go at the start of the flow - the top in vertical mode, the left edge in horizontal
     if analysis.analysis_horizontal_mode:
         x = 50 + random.random() * 20
@@ -131,7 +131,7 @@ def node_create(request, analysis_id, node_type):
     else:
         x = 10 + random.random() * 50
         y = 50 + random.random() * 20
-    node = node_class.objects.create(analysis=analysis, x=x, y=y, **initial_kwargs)
+    node = node_class.objects.create(analysis=analysis, x=x, y=y, **menu_entry.initial_kwargs)
     update_analysis(node.analysis_id)
     return JsonResponse(get_rendering_dict(node))
 

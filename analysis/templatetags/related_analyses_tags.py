@@ -10,6 +10,12 @@ from django.template import Library
 from analysis.forms import get_analysis_template_form_for_variables_only_of_class
 from annotation.models.models_gene_counts import GeneCountType
 from analysis.models import Analysis, AnalysisTemplate, MutationalSignature
+from analysis.models.models_analysis import (
+    ANALYSIS_TEMPLATE_SAMPLE_GROUP_FIELDS,
+    ANALYSIS_TEMPLATE_SOURCE_FIELDS,
+    ANALYSIS_TEMPLATE_VCF_SOURCE_FIELDS,
+)
+from analysis.models.nodes.sources.sample_node import SampleNode
 from analysis.models.models_karyomapping import KaryomappingAnalysis
 from analysis.related_analyses import (
     get_related_analysis_details_for_cohort,
@@ -18,7 +24,6 @@ from analysis.related_analyses import (
     get_related_analysis_details_for_samples,
     get_related_analysis_details_for_trio,
 )
-from patients.models_enums import SampleSourceLevel
 from patients.sample_grouping import get_sample_group
 from pedigree.models import Pedigree
 from snpdb.models import Cohort, Trio
@@ -123,13 +128,9 @@ def related_analyses_for_pedigree(context, pedigree):
     return context
 
 
-SINGLE_MODEL_ARGS = {"sample", "cohort", "trio", "quad", "pedigree", "extraction", "specimen", "patient"}
-# These reach their samples through the hierarchy rather than owning one VCF
-SAMPLE_GROUP_ARGS = {
-    "extraction": SampleSourceLevel.EXTRACTION,
-    "specimen": SampleSourceLevel.SPECIMEN,
-    "patient": SampleSourceLevel.PATIENT,
-}
+# The grouping fields, paired with the level that resolves them to samples
+SAMPLE_GROUP_ARGS = {field: level for level, field in SampleNode.SOURCE_LEVEL_FIELDS.items()
+                     if field in ANALYSIS_TEMPLATE_SAMPLE_GROUP_FIELDS}
 
 
 def _source_is_archived(user, kwargs: dict) -> bool:
@@ -139,7 +140,7 @@ def _source_is_archived(user, kwargs: dict) -> bool:
 
         A grouping object is archived only once every sample it reaches is - one live arm is still
         worth analysing. """
-    for key in ("sample", "cohort", "trio", "quad", "pedigree"):
+    for key in ANALYSIS_TEMPLATE_VCF_SOURCE_FIELDS:
         obj = kwargs.get(key)
         if obj is not None and getattr(obj, "data_archived", False):
             return True
@@ -156,7 +157,7 @@ def _source_is_archived(user, kwargs: dict) -> bool:
 def analysis_templates_tag(context, genome_build, autocomplete_field=True, has_somatic_sample=False, has_sample_gene_list=False, requires_sample_gene_list=None,
                            **kwargs):
     user = context["user"]
-    single_model_args = SINGLE_MODEL_ARGS
+    single_model_args = ANALYSIS_TEMPLATE_SOURCE_FIELDS
     params_error_message = f"analysis_templates_tag should be passed dict with exactly one Model value for {','.join(single_model_args)}. Args: {kwargs}"
 
     if _source_is_archived(user, kwargs):

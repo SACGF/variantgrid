@@ -1,5 +1,5 @@
 import operator
-from functools import reduce
+from functools import cached_property, reduce
 from typing import Optional
 
 from auditlog.registry import auditlog
@@ -14,7 +14,6 @@ from analysis.models.nodes.analysis_node import (
     AnalysisNode,
     NodeAlleleFrequencyFilter,
     NodeAuditLogMixin,
-    NodeVCFFilter,
     annotate_and_filter_queryset,
     queryset_to_pk_in_q,
 )
@@ -26,6 +25,7 @@ from analysis.models.nodes.stats_cache import (
 )
 from genes.models import SampleGeneList
 from library.constants import DAY_SECS
+from library.utils import remove_duplicates_from_list
 from patients.models import Extraction, Patient, Specimen
 from patients.models_enums import NucleicAcid, SampleSourceLevel, Sex, Zygosity
 from patients.sample_grouping import (
@@ -85,6 +85,8 @@ class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
         SampleSourceLevel.PATIENT: NodeIcon(fa=Patient.preview_icon()),
     }
     VCF_CHIP_ICON = "fa-solid fa-file-lines"
+    # Above this the class strip's ~45px runs out at 7px, so the card asks for the smaller rule
+    MAX_STRIP_LABEL_CHARS = 8
     # Above this many siblings in one chip group the card runs out of room, so they collapse to a count
     MAX_GROUP_CHIPS = 3
     min_inputs = 0
@@ -109,14 +111,21 @@ class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
         """ The object this node groups on (a Sample at sample level) """
         return getattr(self, self.source_field)
 
-    def get_sample_group(self) -> SampleGroup:
-        """ The one place samples are resolved - query, warnings, badge and chips all come from here """
+    @cached_property
+    def _sample_group(self) -> SampleGroup:
         if self.source_level == SampleSourceLevel.SAMPLE:
             # A hand picked sample is read as chosen - an archived or other build one is a
             # configuration error rather than a group silently narrowing
             return SampleGroup(samples=[self.sample] if self.sample else [])
         return get_sample_group(self.analysis.user, self.source_level, self.get_source_object(),
                                 self.analysis.genome_build)
+
+    def get_sample_group(self) -> SampleGroup:
+        """ The one place samples are resolved - query, warnings, badge and chips all come from here.
+
+            Cached per instance: the editor alone asks four times (errors, warnings, context, form
+            kwargs) and the query build asks once per sample """
+        return self._sample_group
 
     def get_source_samples(self) -> list[Sample]:
         return self.get_sample_group().samples
@@ -303,22 +312,6 @@ class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
             return self.get_sample_group().vcfs
         return super().get_vcf_locus_filter_vcfs()
 
-    @property
-    def has_filters(self):
-        if self.is_group_level:
-            return any(vcf.vcffilter_set.exists() for vcf in self.get_sample_group().vcfs)
-        return super().has_filters
-
-    def get_filter_code(self):
-        if self.is_group_level:
-            # Filter ids are node level - they translate into each VCF's own codes at query time
-            if filter_ids := NodeVCFFilter.get_filter_ids(self):
-                if filter_ids == {None}:  # PASS only
-                    return 1
-                return 2
-            return 0
-        return super().get_filter_code()
-
     def _get_filters_cohort_genotype_collections(self) -> list:
         if self.is_group_level:
             if not self.has_filters:
@@ -446,21 +439,37 @@ class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
 
             The badge has always drawn the patient, and every level resolves to one, so what the
             node actually is goes on the class strip instead """
-        patient = self.get_patient()
-        if patient is None:
+        if self.get_source_object() is None:
             return self.get_node_class_icon()
-        sex = "female" if patient.sex == Sex.FEMALE else "male"
-        deceased = "-deceased" if patient.deceased else ""
-        return NodeIcon(symbol=f"node-icon-sample-{sex}{deceased}")
+        if not (badge := self._get_card_data()["patient_badge"]):
+            return self.get_node_class_icon()
+        return NodeIcon(symbol=badge)
 
     def get_node_strip_label(self) -> str:
         return SampleSourceLevel(self.source_level).label
 
-    @cache_memoize(DAY_SECS, args_rewrite=lambda s: (s.pk, s.version))
-    def _get_chip_data(self) -> dict:
-        """ The specimen -> extraction -> VCF names tree of what the node actually reads.
+    def get_css_classes(self):
+        css_classes = super().get_css_classes()
+        if len(self.get_node_strip_label()) > self.MAX_STRIP_LABEL_CHARS:
+            css_classes.append("node-klass-long")
+        return css_classes
 
-            Memoized because get_node_chips runs for every node on every analysis render """
+    def _get_patient_badge(self) -> Optional[str]:
+        """ The sprite symbol for the patient's pedigree shape, or None where there is no patient """
+        patient = self.get_patient()
+        if patient is None:
+            return None
+        sex = "female" if patient.sex == Sex.FEMALE else "male"
+        deceased = "-deceased" if patient.deceased else ""
+        return f"node-icon-sample-{sex}{deceased}"
+
+    @cache_memoize(DAY_SECS, args_rewrite=lambda s: (s.pk, s.version))
+    def _get_card_data(self) -> dict:
+        """ Everything the canvas card draws that needs the database - the pedigree badge, and the
+            specimen -> extraction -> VCF names tree of what the node actually reads.
+
+            Memoized together because get_rendering_dict runs for every node on every analysis
+            render, and walking to the patient is up to three FK hops """
         group = self.get_sample_group()
         specimens = {}
         unlinked_vcfs = []
@@ -472,14 +481,16 @@ class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
                     "label": get_specimen_label(specimen), "title": str(specimen), "extractions": {}})
                 extraction_data = specimen_data["extractions"].setdefault(extraction.pk, {
                     "label": get_extraction_label(extraction), "title": str(extraction), "vcfs": []})
-                if vcf_name not in extraction_data["vcfs"]:
+                if vcf_name not in extraction_data["vcfs"]:  # A caller can have several samples
                     extraction_data["vcfs"].append(vcf_name)
-            elif vcf_name not in unlinked_vcfs:
+            else:
                 unlinked_vcfs.append(vcf_name)
 
         return {
+            "patient_badge": self._get_patient_badge(),
+            "sample_vcf": str(self.sample.vcf) if self.sample else None,
             "specimens": [dict(sp, extractions=list(sp["extractions"].values())) for sp in specimens.values()],
-            "unlinked_vcfs": unlinked_vcfs,
+            "unlinked_vcfs": remove_duplicates_from_list(unlinked_vcfs),
             "warnings": group.warnings,
         }
 
@@ -516,12 +527,12 @@ class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
         if self.get_source_object() is None:
             return chips
 
+        data = self._get_card_data()
         if self.source_level == SampleSourceLevel.SAMPLE:
             # A hand picked sample leaves nothing out, so there's no tree to walk
-            chips.append(NodeChip(text="VCF", icon=self.VCF_CHIP_ICON, title=str(self.sample.vcf)))
+            chips.append(NodeChip(text="VCF", icon=self.VCF_CHIP_ICON, title=data["sample_vcf"]))
             return chips
 
-        data = self._get_chip_data()
         specimens = data["specimens"]
         if self.source_level == SampleSourceLevel.EXTRACTION:
             extractions = specimens[0]["extractions"] if specimens else []

@@ -294,8 +294,9 @@ button.add-analysis-variable-button {
 	z-index: 3;
 }
 
-/* EXTRACTION doesn't fit the strip's ~45px at 7px - analysis_nodes.js adds this over 8 characters */
-.design-a-node .node-klass.node-klass-long {
+/* EXTRACTION doesn't fit the strip's ~45px at 7px - nodes whose strip label can be that long
+   ask for the smaller rule from get_css_classes() */
+.node-klass-long .node-klass {
 	font-size: 6px;
 	letter-spacing: .02em;
 }

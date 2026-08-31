@@ -1529,15 +1529,29 @@ class NodeVCFFilter(NodeAuditLogMixin, models.Model):
         return set(all_nvf_qs.values_list("vcf_filter__filter_id", flat=True))
 
     @staticmethod
+    def has_pass(node) -> bool:
+        """ PASS is stored as the node level row with no vcf_filter - it's the one FILTER value
+            that means the same thing in every VCF """
+        return NodeVCFFilter.objects.filter(node_id=node.pk, vcf_filter__isnull=True).exists()
+
+    @staticmethod
+    def get_vcf_filter_ids(node, vcf=None) -> list[tuple]:
+        """ (vcf_id, filter_id) for the node's non-PASS rows, optionally for one VCF """
+        nvf_qs = NodeVCFFilter.objects.filter(node_id=node.pk, vcf_filter__isnull=False)
+        if vcf is not None:
+            nvf_qs = nvf_qs.filter(vcf_filter__vcf=vcf)
+        return list(nvf_qs.values_list("vcf_filter__vcf_id", "vcf_filter__filter_id"))
+
+    @staticmethod
     def get_filter_codes(node, vcf):
         """ What this VCF lets through: its own ticked codes, plus PASS if the node's PASS row is set.
 
             PASS is the one FILTER value that means the same thing in every VCF, so a code is never
             translated across them - 'LowDepth' in a DRAGEN small variant VCF is not 'LowDepth' in
             its CNV VCF. """
-        nvf_qs = NodeVCFFilter.objects.filter(node_id=node.pk)
-        filter_codes = set(nvf_qs.filter(vcf_filter__vcf=vcf).values_list("vcf_filter__filter_code", flat=True))
-        if nvf_qs.filter(vcf_filter__isnull=True).exists():  # PASS
+        nvf_qs = NodeVCFFilter.objects.filter(node_id=node.pk, vcf_filter__vcf=vcf)
+        filter_codes = set(nvf_qs.values_list("vcf_filter__filter_code", flat=True))
+        if NodeVCFFilter.has_pass(node):
             filter_codes.add(None)
         return filter_codes
 

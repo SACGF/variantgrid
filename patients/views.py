@@ -33,8 +33,7 @@ from patients.models_enums import MatchStatus, SampleSourceLevel
 from patients.sample_grouping import (
     SOURCE_LEVELS,
     get_patient_sample_tree,
-    get_sample_group,
-    sample_group_as_json,
+    get_source_level_q,
 )
 from seqauto.models import SequencingSample
 from snpdb.models import GenomeBuild, Sample
@@ -44,12 +43,10 @@ from uicore.utils.form_helpers import form_helper_horizontal
 def _sample_group_genome_builds(user, level: str, source) -> list:
     """ Which builds an analysis template could be launched in - an analysis has exactly one, and a
         specimen's arms can sit in different ones """
-    group = get_sample_group(user, level, source)
-    builds = []
-    for sample in group.samples:
-        if sample.genome_build not in builds:
-            builds.append(sample.genome_build)
-    return builds
+    build_ids = (Sample.filter_for_user(user)
+                 .filter(get_source_level_q(level, source))
+                 .values_list("vcf__genome_build_id", flat=True).distinct())
+    return list(GenomeBuild.objects.filter(pk__in=build_ids).order_by("pk"))
 
 
 def view_patient(request, patient_id):
@@ -260,29 +257,12 @@ def _get_request_genome_build(request):
     return None
 
 
-def sample_group_samples(request, level, pk):
-    """ The samples an analysis grouping node reaches for this object, with per sample counts off
-        the stats rows. Keyed on the object rather than a node, as it has to answer before a node
-        is saved.
-
-        Pass ?genome_build= to restrict to an analysis' build - what that leaves out comes back in
-        'excluded' rather than being quietly dropped. """
-    source = _get_sample_source(request.user, level, pk)
-    group = get_sample_group(request.user, level, source, _get_request_genome_build(request))
-    return JsonResponse(sample_group_as_json(group))
-
-
 def sample_group_tree(request, level, pk):
     """ The whole patient the object belongs to, with the picked row's subtree flagged - what the
         SampleNode editor draws so moving up or down a level doesn't need another search """
     source = _get_sample_source(request.user, level, pk)
     tree = get_patient_sample_tree(request.user, level, source, _get_request_genome_build(request))
     return JsonResponse(tree)
-
-
-def extraction_samples(request, extraction_id):
-    """ Extraction arm of sample_group_samples - linked from the extraction page """
-    return sample_group_samples(request, SampleSourceLevel.EXTRACTION, extraction_id)
 
 
 def view_patient_genes(request, patient_id):

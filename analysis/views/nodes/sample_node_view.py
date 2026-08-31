@@ -29,23 +29,25 @@ class SampleNodeView(GeneCoverageNodeView):
 
     def _get_vcf_locus_filters(self) -> dict:
         """ The hidden field's shape - PASS at node level, everything else under its own VCF """
-        nvf_qs = NodeVCFFilter.objects.filter(node=self.object).exclude(vcf_filter__isnull=True)
         by_vcf = {}
-        for vcf_id, filter_id in nvf_qs.values_list("vcf_filter__vcf_id", "vcf_filter__filter_id"):
+        for vcf_id, filter_id in NodeVCFFilter.get_vcf_filter_ids(self.object):
             by_vcf.setdefault(str(vcf_id), []).append(filter_id)
-        return {
-            "pass": NodeVCFFilter.objects.filter(node=self.object, vcf_filter__isnull=True).exists(),
-            "by_vcf": by_vcf,
-        }
+        return {"pass": NodeVCFFilter.has_pass(self.object), "by_vcf": by_vcf}
+
+    def _has_genotype(self) -> bool:
+        """ A node reading no genotype at all hides the genotype widgets - which the form drops and
+            the editor's tree hides, so it has to be worked out in one place """
+        if self.object.is_group_level:
+            samples = self.object.get_source_samples()
+            return any(s.has_genotype for s in samples) if samples else True
+        return self.object.sample.has_genotype if self.object.sample else True
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        has_genotype = True
         sample = self.object.sample
         show_genes_tab = False
         gene_list = None
         if sample:
-            has_genotype = sample.has_genotype
             if self.object.sample_gene_list:
                 gene_list = self.object.sample_gene_list.gene_list
             show_genes_tab = gene_list and self.object.restrict_to_qc_gene_list
@@ -55,19 +57,16 @@ class SampleNodeView(GeneCoverageNodeView):
         else:
             base_template = "analysis/node_editors/grid_editor.html"
 
-        if self.object.is_group_level:
-            if samples := self.object.get_source_samples():
-                has_genotype = any(s.has_genotype for s in samples)
-
         source_object = self.object.get_source_object()
         context.update({"base_template": base_template,
                         "sample": sample,
                         "patient": self.object.get_patient(),
-                        "has_genotype": has_genotype,
+                        "has_genotype": self._has_genotype(),
                         # The editor tree draws the whole patient, then flags the picked subtree
                         "source_level": self.object.source_level,
                         "source_id": source_object.pk if source_object else None,
                         "source_levels": {level.name: level.value for level in SampleSourceLevel},
+                        "source_level_labels": dict(SampleSourceLevel.choices),
                         "sample_threshold_overrides": self._get_sample_threshold_overrides(),
                         "vcf_locus_filters": self._get_vcf_locus_filters(),
                         "show_genes_tab": show_genes_tab,
@@ -76,15 +75,9 @@ class SampleNodeView(GeneCoverageNodeView):
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
-        has_genotype = True
-        if self.object.is_group_level:
-            if samples := self.object.get_source_samples():
-                has_genotype = any(s.has_genotype for s in samples)
-        elif self.object.sample:
-            has_genotype = self.object.sample.has_genotype
         analysis = self.object.analysis
         kwargs["genome_build"] = analysis.genome_build
         if not analysis.template_type:  # Always show everything in templates
             kwargs["lock_input_sources"] = analysis.lock_input_sources
-            kwargs["has_genotype"] = has_genotype
+            kwargs["has_genotype"] = self._has_genotype()
         return kwargs

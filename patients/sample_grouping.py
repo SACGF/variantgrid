@@ -7,11 +7,13 @@
     Keyed on the object rather than a node, since the editor has to answer before a node is saved.
 """
 import operator
+from collections import defaultdict
 from dataclasses import dataclass, field
 from functools import reduce
 from typing import Optional
 
 from django.contrib.auth.models import User
+from django.db.models import Count, F
 from django.db.models.query_utils import Q
 
 from patients.models import Extraction, Patient, Specimen
@@ -19,10 +21,12 @@ from patients.models_enums import SampleSourceLevel, TissueStatus
 from snpdb.archive import DataArchivedError
 from snpdb.models import (
     CohortGenotypeCollection,
+    CohortGenotypeCollectionType,
     CohortGenotypeStats,
     GenomeBuild,
     ImportStatus,
     Sample,
+    VCFFilter,
 )
 
 @dataclass(frozen=True)
@@ -87,7 +91,7 @@ class SampleGroup:
         return warnings
 
 
-def _get_source_level_q(level: str, source) -> Q:
+def get_source_level_q(level: str, source) -> Q:
     """ The samples a source object reaches. Every path takes the pk, so one lookup shape covers
         'pk' and the FK chains alike """
     paths = SOURCE_LEVELS[level].sample_paths
@@ -111,7 +115,7 @@ def get_sample_group(user: User, level: str, source, genome_build: Optional[Geno
     if source is None:
         return group
 
-    q = _get_source_level_q(level, source)
+    q = get_source_level_q(level, source)
     all_sample_ids = set(Sample.objects.filter(q).values_list("pk", flat=True))
     sample_qs = Sample.filter_for_user(user).filter(q).select_related("vcf").distinct()
     for sample in sample_qs.order_by("pk"):
@@ -161,8 +165,14 @@ def get_sample_variant_count(sample: Sample) -> Optional[int]:
     return stats.variant_count if stats else None
 
 
-def sample_as_json(sample: Sample, genome_build: Optional[GenomeBuild] = None) -> dict:
+def sample_as_json(sample: Sample, genome_build: Optional[GenomeBuild] = None,
+                   variant_counts: Optional[dict] = None) -> dict:
+    """ Pass variant_counts (sample pk -> count) to skip the per sample stats lookup """
     reason = get_exclusion_reason(sample, genome_build)
+    if variant_counts is None:
+        variant_count = get_sample_variant_count(sample)
+    else:
+        variant_count = variant_counts.get(sample.pk)
     return {
         "sample_id": sample.pk,
         "sample": sample.name,
@@ -170,26 +180,29 @@ def sample_as_json(sample: Sample, genome_build: Optional[GenomeBuild] = None) -
         "vcf": str(sample.vcf),
         "genome_build": str(sample.genome_build),
         "has_genotype": sample.has_genotype,
-        "variant_count": get_sample_variant_count(sample),
+        "variant_count": variant_count,
         "included": reason is None,
         "reason": reason,
     }
 
 
-def sample_group_as_json(group: SampleGroup) -> dict:
-    samples = [sample_as_json(sample) for sample in group.samples]
+def get_sample_variant_counts(samples: list[Sample]) -> dict[int, int]:
+    """ Batched get_sample_variant_count - the editor tree asks for a whole patient at once.
 
-    return {
-        "samples": samples,
-        "excluded": [{"sample": e.sample.name, "reason": e.reason} for e in group.excluded],
-        "hidden_count": group.hidden_count,
-        "warnings": group.warnings,
-        "totals": {
-            "samples": len(group.samples),
-            "vcfs": len(group.vcfs),
-            "variant_count": sum(s["variant_count"] or 0 for s in samples) or None,
-        },
-    }
+        Mirrors Cohort.cohort_genotype_collection: the current version's UNCOMMON collection, and
+        nothing for an archived VCF (whose partition has been dropped). """
+    live = [s for s in samples if not s.data_archived]
+    if not live:
+        return {}
+    cgc_qs = CohortGenotypeCollection.objects.filter(
+        cohort__in={s.vcf.cohort.pk for s in live},  # Reverse one-to-one, so no cohort_id
+        cohort_version=F("cohort__version"),
+        collection_type=CohortGenotypeCollectionType.UNCOMMON)
+    cgc_ids = set(cgc_qs.values_list("pk", flat=True))
+    stats_qs = CohortGenotypeStats.objects.filter(cohort_genotype_collection__in=cgc_ids,
+                                                  sample__in=live,
+                                                  filter_key__isnull=True, passing_filter=False)
+    return dict(stats_qs.values_list("sample_id", "variant_count"))
 
 
 def get_specimen_label(specimen: Specimen) -> str:
@@ -207,39 +220,41 @@ def get_extraction_label(extraction: Extraction) -> str:
     return extraction.reference_id or extraction.external_pk or f"({extraction.pk})"
 
 
-def _vcf_filters_as_json(vcf) -> list[dict]:
-    """ A VCF's own FILTER codes - only PASS means the same thing in every VCF, so the editor draws
-        these under each sample row rather than pooling them """
-    return [{"filter_id": vf.filter_id, "description": vf.description}
-            for vf in vcf.vcffilter_set.order_by("filter_id")]
+def _get_vcf_filters(samples: list[Sample]) -> dict[int, list[dict]]:
+    """ Each VCF's own FILTER codes, keyed by VCF - only PASS means the same thing in every VCF, so
+        the editor draws these under each sample row rather than pooling them. One query for the
+        patient rather than one per sample, since a patient's samples share few VCFs """
+    vcf_filters = defaultdict(list)
+    vcf_filter_qs = VCFFilter.objects.filter(vcf__in={s.vcf_id for s in samples}).order_by("filter_id")
+    for vcf_id, filter_id, description in vcf_filter_qs.values_list("vcf_id", "filter_id", "description"):
+        vcf_filters[vcf_id].append({"filter_id": filter_id, "description": description})
+    return vcf_filters
 
 
-def _tree_samples(sample_qs, genome_build, selected, in_selection: bool) -> list[dict]:
-    samples = []
-    for sample in sample_qs:
-        data = sample_as_json(sample, genome_build)
-        data["vcf_filters"] = _vcf_filters_as_json(sample.vcf)
+def _tree_samples(samples: list[Sample], genome_build, variant_counts, vcf_filters) -> list[dict]:
+    rows = []
+    for sample in samples:
+        data = sample_as_json(sample, genome_build, variant_counts=variant_counts)
+        data["vcf_filters"] = vcf_filters.get(sample.vcf_id, [])
         data["level"] = SampleSourceLevel.SAMPLE
         data["id"] = sample.pk
-        data["in_selection"] = in_selection or selected == (SampleSourceLevel.SAMPLE, sample.pk)
-        samples.append(data)
-    return samples
+        rows.append(data)
+    return rows
 
 
 def get_patient_sample_tree(user: User, level: str, source, genome_build: Optional[GenomeBuild] = None) -> dict:
-    """ The whole patient a source object belongs to, with the picked row's subtree flagged.
+    """ The whole patient a source object belongs to.
 
         The node editor draws this rather than just the resolved samples, so moving up or down a
-        level - the RNA arm, the other specimen - is a click rather than another search.
+        level - the RNA arm, the other specimen - is a click rather than another search. Which rows
+        the pick actually reads is worked out client side, since the tree is redrawn as the user
+        moves between them without fetching again.
 
         `samples` are the rows with no extraction above them: the patient's own where there is a
         patient, and just the picked sample where there is not - a deployment that hasn't set up
         specimens and extractions has no hierarchy to draw, so the editor says so and shows the one
         row rather than inventing containers around it. """
     patient = get_patient_for_source(level, source)
-    selected = (level, source.pk) if source is not None else None
-    visible_samples = Sample.filter_for_user(user).select_related("vcf")
-
     tree = {
         "selected": {"level": level, "id": source.pk, "label": str(source)} if source else None,
         "patient": None,
@@ -247,52 +262,65 @@ def get_patient_sample_tree(user: User, level: str, source, genome_build: Option
         "samples": [],
     }
 
+    # Everything the rows need, up front - this is per editor open, so a query per sample shows
+    visible_samples = Sample.filter_for_user(user).select_related("vcf__cohort")
     if patient is None:
-        if level == SampleSourceLevel.SAMPLE:
-            tree["samples"] = _tree_samples(visible_samples.filter(pk=source.pk),
-                                            genome_build, selected, False)
+        samples = list(visible_samples.filter(pk=source.pk)) if level == SampleSourceLevel.SAMPLE else []
+    else:
+        samples = list(visible_samples.filter(get_source_level_q(SampleSourceLevel.PATIENT, patient))
+                       .distinct().order_by("pk"))
+    row_kwargs = {
+        "genome_build": genome_build,
+        "variant_counts": get_sample_variant_counts(samples),
+        "vcf_filters": _get_vcf_filters(samples),
+    }
+
+    if patient is None:
+        tree["samples"] = _tree_samples(samples, **row_kwargs)
         return tree
 
-    patient_selected = selected == (SampleSourceLevel.PATIENT, patient.pk)
+    by_extraction = defaultdict(list)
+    unlinked = []
+    for sample in samples:
+        if sample.extraction_id:
+            by_extraction[sample.extraction_id].append(sample)
+        else:
+            unlinked.append(sample)
+    # Samples on the extraction the user can't view are a count - naming them would leak them
+    all_counts = dict(Sample.objects.filter(extraction__specimen__patient=patient)
+                      .values_list("extraction_id").annotate(n=Count("pk")))
+
     tree["patient"] = {
         "level": SampleSourceLevel.PATIENT,
         "id": patient.pk,
         "label": str(patient),
         "detail": patient.get_sex_display() if patient.sex else "",
-        "in_selection": patient_selected,
     }
-
-    for specimen in patient.specimen_set.select_related("tissue").order_by("pk"):
-        specimen_selected = patient_selected or selected == (SampleSourceLevel.SPECIMEN, specimen.pk)
+    specimen_qs = patient.specimen_set.select_related("tissue").prefetch_related("extraction_set")
+    for specimen in specimen_qs.order_by("pk"):
         specimen_data = {
             "level": SampleSourceLevel.SPECIMEN,
             "id": specimen.pk,
             "label": get_specimen_label(specimen),
             "detail": str(specimen),
-            "in_selection": specimen_selected,
             "extractions": [],
         }
-        for extraction in specimen.extraction_set.order_by("pk"):
-            extraction_selected = specimen_selected or selected == (SampleSourceLevel.EXTRACTION, extraction.pk)
-            sample_qs = visible_samples.filter(extraction=extraction).order_by("pk")
-            all_count = Sample.objects.filter(extraction=extraction).count()
-            samples = _tree_samples(sample_qs, genome_build, selected, extraction_selected)
+        for extraction in sorted(specimen.extraction_set.all(), key=lambda e: e.pk):
+            extraction_samples = by_extraction.get(extraction.pk, [])
             specimen_data["extractions"].append({
                 "level": SampleSourceLevel.EXTRACTION,
                 "id": extraction.pk,
                 "label": get_extraction_label(extraction),
                 "detail": str(extraction),
-                "in_selection": extraction_selected,
-                "hidden_count": all_count - len(samples),
-                "sample_count": len(samples),
-                "samples": samples,
+                "hidden_count": all_counts.get(extraction.pk, 0) - len(extraction_samples),
+                "sample_count": len(extraction_samples),
+                "samples": _tree_samples(extraction_samples, **row_kwargs),
             })
         specimen_data["sample_count"] = sum(e["sample_count"] for e in specimen_data["extractions"])
         tree["specimens"].append(specimen_data)
 
     # Samples the patient CSV attached straight to the patient, with no extraction to sit under
-    unlinked_qs = visible_samples.filter(patient=patient, extraction__isnull=True).order_by("pk")
-    tree["samples"] = _tree_samples(unlinked_qs, genome_build, selected, patient_selected)
+    tree["samples"] = _tree_samples(unlinked, **row_kwargs)
     tree["patient"]["sample_count"] = (sum(sp["sample_count"] for sp in tree["specimens"])
                                        + len(tree["samples"]))
     return tree

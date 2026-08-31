@@ -889,9 +889,8 @@ def _render_vcf_locus_filters(request, node, vcf):
         every VCF, so a code is never offered from or resolved into another one """
     context = {"vcf": vcf}
     if vcf:
-        nvf_qs = NodeVCFFilter.objects.filter(node=node)
-        set_filter_ids = set(nvf_qs.filter(vcf_filter__vcf=vcf).values_list("vcf_filter__filter_id", flat=True))
-        pass_set = nvf_qs.filter(vcf_filter__isnull=True).exists()
+        set_filter_ids = {filter_id for _, filter_id in NodeVCFFilter.get_vcf_filter_ids(node, vcf)}
+        pass_set = NodeVCFFilter.has_pass(node)
 
         vcf_filter_descriptions = {"PASS": "All filters passed"}
         existing_filter_settings = {"PASS": pass_set}
@@ -912,11 +911,6 @@ def vcf_locus_filters(request, analysis_id, node_id, vcf_id):
     node = get_node_subclass_or_404(request.user, node_id)
     vcf = VCF.get_for_user(node.analysis.user, vcf_id) if vcf_id else None
     return _render_vcf_locus_filters(request, node, vcf)
-
-
-def sample_vcf_locus_filters(request, analysis_id, node_id, sample_id):
-    sample = Sample.get_for_user(request.user, sample_id)
-    return vcf_locus_filters(request, analysis_id, node_id, sample.vcf.pk)
 
 
 def cohort_vcf_locus_filters(request, analysis_id, node_id, cohort_id):

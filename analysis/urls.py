@@ -66,7 +66,6 @@ urlpatterns = [
     path('<int:analysis_id>/<int:analysis_version>/node/graph/<int:node_id>/<int:node_version>/<slug:graph_type_id>/<slug:cmap>/', views.node_data_graph, name='node_data_graph'),
     path('<int:analysis_id>/node/cohort_zygosity_filters/<int:node_id>/<int:cohort_id>/', views.cohort_zygosity_filters, name='cohort_zygosity_filters'),
     path('<int:analysis_id>/node/vcf_locus_filters/<int:node_id>/<int:vcf_id>/', views.vcf_locus_filters, name='vcf_locus_filters'),
-    path('<int:analysis_id>/node/sample_vcf_locus_filters/<int:node_id>/<int:sample_id>/', views.sample_vcf_locus_filters, name='sample_vcf_locus_filters'),
     path('<int:analysis_id>/node/cohort_vcf_locus_filters/<int:node_id>/<int:cohort_id>/', views.cohort_vcf_locus_filters, name='cohort_vcf_locus_filters'),
     path('<int:analysis_id>/node/pedigree_vcf_locus_filters/<int:node_id>/<int:pedigree_id>/', views.pedigree_vcf_locus_filters, name='pedigree_vcf_locus_filters'),
 

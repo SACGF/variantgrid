@@ -99,6 +99,7 @@
 
     // The editor is loaded with jQuery .load(), so top level bindings have to be re-declarable
     var SOURCE_LEVELS = {{ source_levels|jsonify }};
+    var SOURCE_LEVEL_LABELS = {{ source_level_labels|jsonify }};
     var GENOME_BUILD = "{{ node.analysis.genome_build }}";
     var THRESHOLD_FIELDS = [{name: "min_ad", label: "AD\u2265"}, {name: "min_dp", label: "DP\u2265"},
                             {name: "min_gq", label: "GQ\u2265"}, {name: "max_pl", label: "PL\u2264"}];
@@ -107,11 +108,6 @@
     SOURCE_VIEW_URLS[SOURCE_LEVELS.EXTRACTION] = Urls.view_extraction;
     SOURCE_VIEW_URLS[SOURCE_LEVELS.SPECIMEN] = Urls.view_specimen;
     SOURCE_VIEW_URLS[SOURCE_LEVELS.PATIENT] = Urls.view_patient;
-    var SOURCE_LEVEL_LABELS = {};
-    SOURCE_LEVEL_LABELS[SOURCE_LEVELS.SAMPLE] = "Sample";
-    SOURCE_LEVEL_LABELS[SOURCE_LEVELS.EXTRACTION] = "Extraction";
-    SOURCE_LEVEL_LABELS[SOURCE_LEVELS.SPECIMEN] = "Specimen";
-    SOURCE_LEVEL_LABELS[SOURCE_LEVELS.PATIENT] = "Patient";
 
     // What the node has saved. The tree is redrawn client side as you move between its rows, and
     // only re-fetched when the search box finds a different patient
@@ -174,13 +170,9 @@
             label.append(document.createTextNode(" " + vcfFilter.filter_id));
             checkbox.change(function() {
                 var codes = vcfLocusFilters["by_vcf"][sample.vcf_id] || [];
-                var index = codes.indexOf(vcfFilter.filter_id);
+                removeItemFromArray(vcfFilter.filter_id, codes);
                 if ($(this).is(":checked")) {
-                    if (index === -1) {
-                        codes.push(vcfFilter.filter_id);
-                    }
-                } else if (index !== -1) {
-                    codes.splice(index, 1);
+                    codes.push(vcfFilter.filter_id);
                 }
                 vcfLocusFilters["by_vcf"][sample.vcf_id] = codes;
                 drawSourceTree();
@@ -291,9 +283,10 @@
         }
     }
 
-    function renderContainerRow(container, levelLabel, parentInSelection, holder) {
+    function renderContainerRow(container, parentInSelection, holder) {
+        var levelLabel = SOURCE_LEVEL_LABELS[container.level];
         container.in_selection = inSelection(container.level, container.id, parentInSelection);
-        var row = $("<div/>", {"class": "source-row source-row-" + levelLabel.toLowerCase()}).appendTo(holder);
+        var row = $("<div/>", {"class": "source-row"}).appendTo(holder);
         if (!container.in_selection) {
             row.addClass("source-row-unselected");
         }
@@ -317,7 +310,7 @@
     }
 
     function renderExtraction(extraction, parentInSelection, holder) {
-        var inSel = renderContainerRow(extraction, "Extraction", parentInSelection, holder);
+        var inSel = renderContainerRow(extraction, parentInSelection, holder);
         renderSampleRows(extraction.samples, inSel, holder, true);
         if (extraction.hidden_count) {
             // Naming samples the user can't view would leak them, so they are a count
@@ -354,9 +347,9 @@
             return;
         }
 
-        var patientInSel = renderContainerRow(sourceTree.patient, "Patient", false, holder);
+        var patientInSel = renderContainerRow(sourceTree.patient, false, holder);
         $.each(sourceTree.specimens, function(i, specimen) {
-            var specimenInSel = renderContainerRow(specimen, "Specimen", patientInSel, holder);
+            var specimenInSel = renderContainerRow(specimen, patientInSel, holder);
             $.each(specimen.extractions, function(j, extraction) {
                 renderExtraction(extraction, specimenInSel, holder);
             });
