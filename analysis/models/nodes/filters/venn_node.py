@@ -46,9 +46,10 @@ class VennNode(AnalysisNode):
         return super().add_parent(parent, *args, **kwargs)
 
     def remove_parent(self, parent):
-        if self.left_parent == parent:
+        # Compare on pk - the FKs hold AnalysisNode rows while callers pass subclasses, which never compare equal
+        if self.left_parent_id == parent.pk:
             self.left_parent = None
-        elif self.right_parent == parent:
+        elif self.right_parent_id == parent.pk:
             self.right_parent = None
         else:
             msg = f"Parent {parent} not on left or right side!"
@@ -59,9 +60,9 @@ class VennNode(AnalysisNode):
         return super().remove_parent(parent)
 
     def get_side_for_parent(self, parent):
-        if self.left_parent == parent:
+        if self.left_parent_id == parent.pk:
             return VennNode.LEFT_PARENT
-        if self.right_parent == parent:
+        if self.right_parent_id == parent.pk:
             return VennNode.RIGHT_PARENT
         msg = f"Parent {parent} not on left or right side!"
         logging.error(msg)
@@ -169,6 +170,7 @@ class VennNode(AnalysisNode):
 
     def get_vennodecache_intersection_types(self):
         INTERSECTIONS = {
+            SetOperations.NONE: [],  # Nothing selected in the venn widget - nothing to cache
             SetOperations.UNION: [VennNodeCache.A_ONLY, VennNodeCache.INTERSECTION, VennNodeCache.B_ONLY],
             SetOperations.A_NOT_B: [VennNodeCache.A_ONLY],
             SetOperations.INTERSECTION: [VennNodeCache.INTERSECTION],
