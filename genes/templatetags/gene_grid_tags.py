@@ -148,8 +148,18 @@ def gene_grid(context, columns_from_url=None,
     gene_symbol_form = GeneSymbolForm()
     gene_symbol_form.fields["gene_symbol"].widget.attrs['data-placeholder'] = "Add Gene Symbol"
 
-    return {
+    gene_grid_config = {
         "initial_columns": initial_columns,
+        "panel_app_servers": [{"pk": server.pk, "icon_css_class": server.icon_css_class} for server in panel_app_servers],
+        "panel_app_form_ids": panel_app_form_ids,
+        "enrichment_kit_columns": settings.GENE_GRID_ENRICHMENT_KIT_COLUMNS,
+        "enrichment_kit_column_tool_tips": settings.GENE_GRID_ENRICHMENT_KIT_COLUMN_TOOL_TIPS,
+        "enrichment_kit_column_labels": settings.GENE_GRID_ENRICHMENT_KIT_COLUMN_LABELS,
+        "enrichment_kit_column_label_tool_tips": settings.GENE_GRID_ENRICHMENT_KIT_COLUMN_LABEL_TOOL_TIPS,
+    }
+
+    return {
+        "gene_grid_config": gene_grid_config,
         "init_callback": init_callback,
         "update_url_callback": update_url_callback,
         "save_gene_list_callback": save_gene_list_callback,
@@ -157,7 +167,6 @@ def gene_grid(context, columns_from_url=None,
         "data_columns": data_columns,
         "categories": categories,
         "panel_app_servers": panel_app_servers,
-        "panel_app_form_ids": panel_app_form_ids,
         "gene_symbol_form": gene_symbol_form,
         "named_custom_gene_list_form": named_custom_gene_list_form,
         "user": user,
