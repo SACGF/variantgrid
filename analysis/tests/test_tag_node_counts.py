@@ -7,6 +7,7 @@ from django.urls import reverse
 from analysis.models import Analysis, VariantTag
 from analysis.models.nodes.analysis_node import NodeCount
 from analysis.models.nodes.node_counts import get_extra_filters_q, get_node_counts_mine_and_available
+from analysis.models.nodes.node_utils import update_analysis_tag_node_counts
 from analysis.tests.test_grid_export import GridExportTestCase
 from snpdb.models import Tag, Variant
 from snpdb.models.models_enums import BuiltInFilters, TagFilter
@@ -63,7 +64,10 @@ class TestTagNodeCountConfig(TagNodeCountTestCase):
 
 
 class TestTagNodeCountValues(TagNodeCountTestCase):
+    """ The recount runs in a task after tagging, so call it directly rather than through celery """
+
     def _tag_count(self, node) -> int:
+        update_analysis_tag_node_counts(self.analysis)
         return NodeCount.objects.get(node_version=node.node_version, label=self.tag_label).count
 
     def test_counts_tagged_variants_in_the_node(self):
@@ -85,6 +89,18 @@ class TestTagNodeCountValues(TagNodeCountTestCase):
         outside_variant = slowly_create_test_variant("3", 12345, "A", "T", self.genome_build)
         self._tag_variant(outside_variant)
         self.assertEqual(0, self._tag_count(node))
+
+    def test_recount_bumps_modified_so_the_client_sees_it(self):
+        """ nodes_status hands the client counts_modified - it's how it knows a recount landed """
+        node = self._sample_node()
+        self._tag_variant(self.variants[0])
+        update_analysis_tag_node_counts(self.analysis)
+        node_count = NodeCount.objects.get(node_version=node.node_version, label=self.tag_label)
+        first_modified = node_count.modified
+
+        update_analysis_tag_node_counts(self.analysis)
+        node_count.refresh_from_db()
+        self.assertGreater(node_count.modified, first_modified)
 
 
 class TestTagExtraFiltersQ(TagNodeCountTestCase):

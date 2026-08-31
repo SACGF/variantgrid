@@ -586,6 +586,7 @@ function markLiveDataCount(node_counts, deterministic, liveDataSources) {
 }
 
 function setNodeCounts(node, data) {
+	node.attr("counts_modified", data.counts_modified || "");
 	const node_counts = $(".node-counts", node);
 	const counts = data.counts;
 	const deterministic = data.deterministic !== false;
@@ -668,31 +669,22 @@ function clickCounter(evt) {
 } 
 
 
-function refreshNodeCounts() {
-	// Tag counts change without bumping node versions, so checkAndMarkDirtyNodes won't pick them up
-	const nodes = [];
-	$(".window[output_endpoint=true]").each(function() {
-		nodes.push($(this).attr("node_id"));
-	});
-	if (!nodes.length) {
-		return;
-	}
+// Tag counts are recalculated in a task, so wait for the counts to actually change rather than
+// reading them straight back - see AnalysisMessagePoller.observe_counts_changed
+const REFRESH_NODE_COUNTS_TIMEOUT = 30000;
 
-	$.ajax({
-		type: "GET",
-		data: 'nodes=' + JSON.stringify(nodes),
-		url: messagePoller.node_status_url,
-		success: function(data) {
-			const nodeStatusList = data.node_status || [];
-			for (let i=0 ; i<nodeStatusList.length ; ++i) {
-				const nodeStatus = nodeStatusList[i];
-				const node = getNode(nodeStatus.id);
-				// A node that moved on since we asked is about to be redrawn by its own update
-				if (node.length && node.attr("version_id") == nodeStatus.version && nodeStatus.valid) {
-					setNodeCounts(node, nodeStatus);
-				}
+function refreshNodeCounts() {
+	$(".window[output_endpoint=true]").each(function() {
+		const node = $(this);
+		const updateCounts = function(nodeStatus) {
+			// A node that moved on since we asked is about to be redrawn by its own update
+			const latest = getNode(nodeStatus.id);
+			if (latest.length && latest.attr("version_id") == nodeStatus.version && nodeStatus.valid) {
+				setNodeCounts(latest, nodeStatus);
 			}
-		},
+		};
+		messagePoller.observe_counts_changed(node.attr("node_id"), node.attr("counts_modified"),
+											 REFRESH_NODE_COUNTS_TIMEOUT, updateCounts);
 	});
 }
 
@@ -701,8 +693,7 @@ function updateTagNodeCounts(nodeCountTypes) {
 	// Tagging can add/remove that tag's own node count @see Analysis.node_count_auto_add_tags
 	if (JSON.stringify(nodeCountTypes) != JSON.stringify(ANALYSIS_SETTINGS.node_count_types)) {
 		ANALYSIS_SETTINGS.node_count_types = nodeCountTypes;
-		attachVariantCounters($(".window"), nodeCountTypes);  // Redraws counters, which refetches counts
-		return;
+		attachVariantCounters($(".window"), nodeCountTypes);  // Redraws the counters
 	}
 
 	const hasTagCounts = nodeCountTypes.some(function(nct) { return Boolean(nct[1].tag); });

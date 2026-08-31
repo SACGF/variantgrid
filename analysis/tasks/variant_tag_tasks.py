@@ -19,16 +19,16 @@ def analysis_tag_nodes_set_dirty(analysis: Analysis, tag: Tag, visible: bool):
         node.save()
 
 
-def sync_analysis_tag_node_counts(analysis: Analysis, tag: Tag):
-    """ Keeps an analysis' node counts in step with the tags used in it (#21). Done in the request
-        (not a task) so the counts are already right when the client asks for them after tagging """
+def update_analysis_tag_node_count_config(analysis: Analysis, tag: Tag):
+    """ Adds/removes the tag's node count (#21). Cheap, and the client needs it in the tagging
+        response to draw the badge, so unlike the recount itself this is done in the request """
+    if not analysis.node_count_auto_add_tags:
+        return
     label = TagFilter.label(tag.pk)
-    if analysis.node_count_auto_add_tags:
-        if VariantTag.objects.filter(analysis=analysis, tag=tag).exists():
-            analysis.add_node_count_type(label)
-        else:
-            analysis.remove_node_count_type(label)
-    update_analysis_tag_node_counts(analysis, tag_labels=[label])
+    if VariantTag.objects.filter(analysis=analysis, tag=tag).exists():
+        analysis.add_node_count_type(label)
+    else:
+        analysis.remove_node_count_type(label)
 
 
 @celery.shared_task
@@ -40,6 +40,7 @@ def variant_tag_created_task(variant_tag_id):
         return  # Deleted before this got run, doesn't matter...
     if variant_tag.analysis:
         analysis_tag_nodes_set_dirty(variant_tag.analysis, variant_tag.tag, visible=False)
+        update_analysis_tag_node_counts(variant_tag.analysis, tag_labels=[TagFilter.label(variant_tag.tag_id)])
         update_analysis(variant_tag.analysis.pk)
     _liftover_variant_tag(variant_tag)
 
@@ -51,6 +52,7 @@ def variant_tag_deleted_in_analysis_task(analysis_id, tag_id):
     analysis = Analysis.objects.get(pk=analysis_id)
     tag = Tag.objects.get(pk=tag_id)
     analysis_tag_nodes_set_dirty(analysis, tag, visible=False)
+    update_analysis_tag_node_counts(analysis, tag_labels=[TagFilter.label(tag_id)])
     update_analysis(analysis.pk)
 
 

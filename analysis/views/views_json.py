@@ -388,11 +388,17 @@ def analysis_reload(request, analysis_id):
 def nodes_status(request, analysis_id):
     analysis = get_analysis_or_404(request.user, analysis_id)
     nodes = json.loads(request.GET['nodes'])
-    node_counts_qs = NodeCount.objects.filter(node_version__node__in=nodes).select_related("node_version")
+    node_counts_qs = NodeCount.objects.filter(node_version__node__in=nodes)
     node_counts = defaultdict(dict)
-    for node_id, version, label, count in node_counts_qs.values_list("node_version__node_id", "node_version__version",
-                                                                     "label", "count"):
-        node_counts[f"{node_id}_{version}"][label] = count
+    # Tag counts are recalculated without bumping the node version (@see update_analysis_tag_node_counts),
+    # so hand the client the last time the counts changed - that's how it knows a recount landed
+    counts_modified = {}
+    for node_id, version, label, count, modified in node_counts_qs.values_list(
+            "node_version__node_id", "node_version__version", "label", "count", "modified"):
+        key = f"{node_id}_{version}"
+        node_counts[key][label] = count
+        if modified and modified.isoformat() > counts_modified.get(key, ""):
+            counts_modified[key] = modified.isoformat()
 
     node_version_qs = NodeVersion.objects.filter(node__in=nodes)
     live_data_sources = {f"{node_id}_{version}": sources
@@ -411,6 +417,7 @@ def nodes_status(request, analysis_id):
         counts = node_counts.get(f"{node_id}_{version}", {})
         counts[BuiltInFilters.TOTAL] = data["count"]
         data["counts"] = counts
+        data["counts_modified"] = counts_modified.get(f"{node_id}_{version}", "")
         # A node reading mutable tables has an advisory count - the client shows it abbreviated (#235)
         sources = live_data_sources.get(f"{node_id}_{version}") or {}
         data["deterministic"] = not sources

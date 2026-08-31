@@ -1029,7 +1029,8 @@ def _analysis_settings_node_counts_tab(request, analysis, is_analysis=True, has_
             node_counts_array = node_counts_str.split(',')
             analysis.set_node_count_types(node_counts_array)
             if is_analysis:
-                # Tag counts are cheap enough to fill in here, so adding one doesn't cost a node reload
+                # Unlike tagging (where this is done in a task) the user is already waiting on this
+                # form, and filling the counts in here means the tab comes back with them populated
                 node_utils.update_analysis_tag_node_counts(analysis)
         add_save_message(request, True, "Node Counts")
 

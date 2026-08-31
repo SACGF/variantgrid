@@ -88,7 +88,9 @@ def update_analysis(analysis_id):
 
 def update_analysis_tag_node_counts(analysis: Analysis, tag_labels=None):
     """ Adding/removing a tag doesn't bump node versions, so the usual reload doesn't recount.
-        Recount the tag node counts in place against the versions the nodes are already on.
+        Recount the tag node counts in place against the versions the nodes are already on. Building
+        each node's queryset costs ~15 queries, so this runs in a task off the back of tagging
+        @see analysis.tasks.variant_tag_tasks.
         tag_labels - restrict to these (default: every tag node count the analysis has configured) """
     configured_tag_labels = {label for label, _ in analysis.get_node_count_types() if TagFilter.get_tag_id(label)}
     if tag_labels is not None:
@@ -110,7 +112,9 @@ def update_analysis_tag_node_counts(analysis: Analysis, tag_labels=None):
     if node_counts:
         try:
             with transaction.atomic():
-                NodeCount.objects.bulk_create(node_counts, update_conflicts=True, update_fields=["count"],
+                # "modified" is the client's signal that this recount landed @see nodes_status
+                NodeCount.objects.bulk_create(node_counts, update_conflicts=True,
+                                              update_fields=["count", "modified"],
                                               unique_fields=["node_version", "label"])
         except IntegrityError:
             # A node bumped its version while we were counting - it counts these itself when it reloads

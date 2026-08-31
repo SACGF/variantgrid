@@ -1085,7 +1085,7 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
             # Counts are a cache of a query against an immutable node_version, so a re-load (eg after a
             # backoff retry that failed once these were already written) can safely overwrite them
             NodeCount.objects.bulk_create(node_counts, update_conflicts=True,
-                                          update_fields=["count", "variant_ids"],
+                                          update_fields=["count", "variant_ids", "modified"],
                                           unique_fields=["node_version", "label"])
 
         # Every label count is a subset of the total - a bigger one means the query fanned out over a
