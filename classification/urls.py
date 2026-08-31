@@ -18,11 +18,6 @@ from classification.views.classification_email_view import (
 )
 from classification.views.classification_export_view import ClassificationApiExportView
 from classification.views.classification_grouping_datatables import ClassificationGroupingColumns
-from classification.views.classification_overlaps_view import (
-    view_clinical_context,
-    view_overlaps,
-    view_overlaps_detail,
-)
 from classification.views.classification_overlaps_vus_view import (
     view_overlaps_vus,
     view_overlaps_vus_detail,
@@ -53,9 +48,6 @@ from classification.views.discordance_report_views import (
     action_discordance_report_review,
     discordance_report_review,
     discordance_report_view,
-    discordance_reports_active_detail,
-    discordance_reports_download,
-    discordance_reports_history_detail,
     discordance_reports_view,
     export_discordance_report,
 )
@@ -201,11 +193,13 @@ urlpatterns = [
 
     path('accumulation_data', classification_accumulation_graph.download_report, name="classification_accumulation_data"),
 
+    # discordance reports just redirects to overlaps now, path kept here so old links work
     path('discordance_reports', discordance_reports_view, name='discordance_reports'),
-    path('discordance_reports/<str:lab_id>', discordance_reports_view, name='discordance_reports'),
-    path('discordance_reports/<str:lab_id>/history_detail', discordance_reports_history_detail, name='discordance_reports_history_detail'),
-    path('discordance_reports/<str:lab_id>/active_detail', discordance_reports_active_detail, name='discordance_reports_active_detail'),
-    path('discrodance_reports/<str:lab_id>/download', discordance_reports_download, name='discordance_reports_download'),
+
+    # path('discordance_reports/<str:lab_id>', discordance_reports_view, name='discordance_reports'),
+    # path('discordance_reports/<str:lab_id>/history_detail', discordance_reports_history_detail, name='discordance_reports_history_detail'),
+    # path('discordance_reports/<str:lab_id>/active_detail', discordance_reports_active_detail, name='discordance_reports_active_detail'),
+    # path('discrodance_reports/<str:lab_id>/download', discordance_reports_download, name='discordance_reports_download'),
     # 'classification' is redundant but there'll be other references to these URLs, so keep the URLs valid
     path('classification/discordance_report/<int:discordance_report_id>', discordance_report_view, name='discordance_report_deprecated'),
     path('classification/discordance_report/<int:discordance_report_id>/review', discordance_report_review, name='discordance_report_review'),
@@ -226,9 +220,9 @@ urlpatterns = [
     path('hgvs_resolution_tool', hgvs_resolution_tool, name='hgvs_resolution_tool'),
 
     # path('clinical_context', post_clinical_context, name='clinical_context'),
-    path('overlaps', view_overlaps, name='overlaps'),
-    path('overlaps/<str:lab_id>', view_overlaps, name='overlaps'),
-    path('overlaps_detail/<str:lab_id>', view_overlaps_detail, name='overlaps_detail'),
+    # path('overlaps', view_overlaps, name='overlaps'),
+    # path('overlaps/<str:lab_id>', view_overlaps, name='overlaps'),
+    # path('overlaps_detail/<str:lab_id>', view_overlaps_detail, name='overlaps_detail'),
 
     path('overlaps3/calc', discordance_calculator, name='overlap_calc'),
     path('overlaps3/triage/<int:triage_id>', TriageView3.as_view(), name='triage_3'),
@@ -245,7 +239,7 @@ urlpatterns = [
     path('vus', view_overlaps_vus, name='vus'),
     path('vus/<str:lab_id>', view_overlaps_vus, name='vus'),
     path('vus_detail/<str:lab_id>', view_overlaps_vus_detail, name='vus_detail'),
-    path('clinical_context/<int:pk>', view_clinical_context, name='clinical_context'),
+    # path('clinical_context/<int:pk>', view_clinical_context, name='clinical_context'),
 
     path('imported_allele_info', view_imported_allele_info, name='view_imported_allele_info'),
     path('imported_allele_info/<int:allele_info_id>', view_imported_allele_info_detail, name='view_imported_allele_info_detail'),

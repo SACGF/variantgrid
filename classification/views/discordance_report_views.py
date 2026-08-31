@@ -52,21 +52,7 @@ from uicore.views.ajax_form_view import LazyRender
 
 
 def discordance_reports_view(request: HttpRequest, lab_id: Optional[str] = None) -> HttpResponseBase:
-    lab_picker = LabPickerData.from_request(request=request, selection=lab_id, view_name='discordance_reports')
-    if redirect_response := lab_picker.check_redirect():
-        return redirect_response
-
-    return render(request, "classification/discordance_reports.html", {
-        "dlab": ClassificationDashboard(lab_picker=lab_picker)
-    })
-
-
-def discordance_reports_active_detail(request: HttpRequest, lab_id: Optional[str] = None) -> HttpResponseBase:
-    lab_picker = LabPickerData.from_request(request=request, selection=lab_id)
-
-    return render(request, "classification/discordance_reports_active_detail.html", {
-        "dlab": ClassificationDashboard(lab_picker=lab_picker)
-    })
+    return redirect(reverse('overlaps_3'))
 
 
 def discordance_reports_history_detail(request: HttpRequest, lab_id: Optional[str] = None) -> HttpResponseBase:
