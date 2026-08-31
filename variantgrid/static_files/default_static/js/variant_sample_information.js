@@ -556,15 +556,18 @@ var VariantSampleInformation = (function () {
         const histogramData = {
             name: "Allele Frequency",
             type: 'histogram',
+            orientation: 'h',
             marker: {color: AF_COLOR},
-            x: clampedAf,
-            autobinx: false,
+            y: clampedAf,
+            autobiny: false,
             histnorm: "count",
-            xbins: {start: 0, size: .05, end: 1},
+            ybins: {start: 0, size: .05, end: 1},
         };
         const histogramLayout = defaultLayout(config.variantLabel + " Allele Frequency Histogram", null, GRAPH_HEIGHT);
-        histogramLayout.xaxis = {tickmode: 'auto', range: [0, 1]};
-        histogramLayout.yaxis = {showline: false, zeroline: false, showticklabels: false};
+        // Bins run up the same scale as the scatter beside it, so it reads as that plot's summary
+        histogramLayout.xaxis = {tickmode: 'auto', showgrid: false, zeroline: false};
+        histogramLayout.yaxis = {range: [0, 1.05], showgrid: false, zeroline: false, showticklabels: false};
+        histogramLayout.margin = {l: 20};
         Plotly.newPlot('sample-allele-frequency-histogram', [histogramData], histogramLayout, RESPONSIVE);
     }
 
