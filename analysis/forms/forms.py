@@ -345,7 +345,7 @@ class GraphTypeChoiceForm(forms.Form):
 
         # We don't join to observed variant anymore, but to keep compatibility
         # We can still get it if we have exactly 1 sample
-        if len(node.get_sample_ids()) == 1:
+        if len(node.get_sample_ids_with_genotype()) == 1:
             columns.append("observedvariant__zygosity")
             columns.append("observedvariant__allele_frequency")
 

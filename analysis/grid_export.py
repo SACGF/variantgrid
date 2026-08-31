@@ -41,7 +41,7 @@ def node_grid_get_export_iterator(request, node, export_type, canonical_transcri
 
     if basename is None:
         basename = get_node_export_basename(node)
-    sample_ids = node.get_sample_ids()
+    sample_ids = node.get_sample_ids_with_genotype()
     _, _, items = grid.get_items(request)
 
     if canonical_transcript_collection:

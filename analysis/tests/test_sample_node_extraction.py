@@ -270,7 +270,7 @@ class TestSampleNodeExtraction(ExtractionNodeTestCase):
         node = self._extraction_node()
         cohorts, visibility = node.get_cohorts_and_sample_visibility()
         self.assertEqual(set(cohorts), {self.snv_sample.vcf.cohort, self.cnv_sample.vcf.cohort})
-        self.assertEqual(set(node.get_samples()), {self.snv_sample, self.cnv_sample})
+        self.assertEqual(set(node.get_samples_with_genotype()), {self.snv_sample, self.cnv_sample})
         self.assertTrue(visibility[self.snv_sample])
 
     def test_cache_key_folds_in_every_samples_genotype_collection(self):

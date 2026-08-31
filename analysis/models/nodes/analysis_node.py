@@ -266,12 +266,12 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
         return cohorts, visibility
 
     @cache_memoize(DAY_SECS, args_rewrite=lambda s: (s.pk, s.version))
-    def get_sample_ids(self) -> list[Sample]:
-        return [s.pk for s in self.get_samples()]
+    def get_sample_ids_with_genotype(self) -> list[int]:
+        return [s.pk for s in self.get_samples_with_genotype()]
 
     def get_samples_from_node_only_not_ancestors(self):
-        cohorts, visibility = self._get_cohorts_and_sample_visibility_for_node()
-        return self._get_visible_samples_from_cohort(cohorts, visibility)
+        _, visibility = self._get_cohorts_and_sample_visibility_for_node()
+        return sorted(visibility)
 
     def _get_proband_sample_for_node(self) -> Optional[Sample]:
         """ Sample of the object of a study, if known """
@@ -294,10 +294,21 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
             proband_sample = proband_samples.pop()
         return proband_sample
 
-    def get_samples(self) -> list[Sample]:
-        """ Return all ancestor samples for a node"""
+    def get_samples_with_genotype(self) -> list[Sample]:
+        """ Node + ancestor samples whose genotype we can show/filter on - ie variant-only VCFs
+            (has_genotype=False) are left out. Use get_samples() for sample level data """
         cohorts, visibility = self.get_cohorts_and_sample_visibility(sort=False)
         return self._get_visible_samples_from_cohort(cohorts, visibility)
+
+    def get_samples(self) -> list[Sample]:
+        """ Every node + ancestor sample, including those from variant-only VCFs. Sample level data
+            that doesn't come from the genotype - gene lists, coverage, BAMs, patients - and
+            restricting sample fields to ancestors @see AncestorSampleMixin """
+        _, visibility = self.get_cohorts_and_sample_visibility(sort=False)
+        return sorted(visibility)  # Every sample the node knows about is a key, genotype or not
+
+    def get_sample_ids(self) -> list[int]:
+        return [s.pk for s in self.get_samples()]
 
     def get_bams_dict(self):
         bams_dict = defaultdict(set)

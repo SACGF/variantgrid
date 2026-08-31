@@ -129,7 +129,7 @@ class VariantGrid(AbstractVariantGrid):
         post_data['ccc_version_id'] = custom_columns_collection.version_id
         post_data["extra_filters"] = extra_filters
 
-        sample_ids = node.get_sample_ids()
+        sample_ids = node.get_sample_ids_with_genotype()
         if sample_ids:
             samples_str = ''.join([str(s) for s in sample_ids])
             post_data['zygosity_samples_hash'] = sha256sum_str(samples_str)

@@ -2,6 +2,8 @@ import unittest
 
 from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
+from django.test.client import Client
+from django.urls.base import reverse
 from django.utils import timezone
 
 from analysis.forms.forms import AnalysisForm
@@ -14,7 +16,9 @@ from analysis.models import (
     SampleNode,
     ZygosityNode,
 )
+from analysis.tests.test_node_editors_render import form_submit_data
 from annotation.fake_annotation import get_fake_annotation_version
+from genes.models import GeneList, SampleGeneList
 from library.guardian_utils import assign_permission_to_user_and_groups
 from snpdb.models import (
     VCF,
@@ -213,6 +217,46 @@ class AncestorSampleNoGenotypeTestCase(TestCase):
 
         gene_list_node.handle_ancestor_input_samples_changed()
         self.assertEqual(gene_list_node.sample, self.sample)
+
+    def test_get_samples_includes_no_genotype_sample(self):
+        """ Sample level data uses get_samples(), only the genotype ones can be shown/filtered """
+        gene_list_node = self._create_child_node(GeneListNode)
+        self.assertEqual([self.sample], gene_list_node.get_samples())
+        self.assertEqual([], gene_list_node.get_samples_with_genotype())
+
+    def _get_node_editor_url(self, node) -> str:
+        return reverse("node_view", kwargs={"analysis_id": self.analysis.pk,
+                                            "analysis_version": self.analysis.version,
+                                            "node_id": node.pk,
+                                            "node_version": node.version,
+                                            "extra_filters": "default"})
+
+    def test_gene_list_node_editor_round_trip(self):
+        """ The ancestor sample has to be in the editor's sample choices, or the node can't be saved """
+        gene_list_node = self._create_child_node(GeneListNode)
+        client = Client()
+        client.force_login(self.user)
+        url = self._get_node_editor_url(gene_list_node)
+        response = client.get(url)
+        self.assertEqual(200, response.status_code)
+        data = form_submit_data(response.content.decode(), "node-gene-list-form")
+        self.assertEqual(str(self.sample.pk), data.get("sample"), "Sample selected in editor")
+
+        # JSON back means saved - an invalid form comes back as the re-rendered editor HTML
+        self.assertEqual({}, client.post(url, data).json())
+        gene_list_node.refresh_from_db()
+        self.assertEqual(self.sample, gene_list_node.sample)
+
+    def test_gene_list_node_editor_sample_gene_lists(self):
+        gene_list_node = self._create_child_node(GeneListNode)
+        gene_list = GeneList.objects.create(name="sample gene list", user=self.user)
+        SampleGeneList.objects.create(sample=self.sample, gene_list=gene_list)
+
+        client = Client()
+        client.force_login(self.user)
+        response = client.get(self._get_node_editor_url(gene_list_node))
+        self.assertEqual(200, response.status_code)
+        self.assertTrue(response.context["has_sample_gene_lists"])
 
 
 if __name__ == '__main__':

@@ -177,7 +177,8 @@ class CohortMixin:
 
     def get_allele_frequency_q_list(self):
         """ Anything that subclasses this (eg TrioNode/PedigreeNode) must also implement
-            self.get_samples() and reduce to what is used there so filter is only applied on those samples """
+            self.get_samples_with_genotype() and reduce to what is used there so filter is only
+            applied on those samples """
         try:
             naff = self.nodeallelefrequencyfilter
             if not naff.nodeallelefrequencyrange_set.exists():
@@ -189,8 +190,8 @@ class CohortMixin:
         cgc = self.cohort_genotype_collection
         packed_index_by_sample_id = cgc.get_packed_index_by_sample_id
 
-        for sample in self.get_samples():
-            # get_samples() includes ancestor samples (eg a compound het Trio/Quad's parent node)
+        for sample in self.get_samples_with_genotype():
+            # get_samples_with_genotype() includes ancestor samples (eg a compound het Trio/Quad's parent node)
             # that may not be in this cohort's genotype array - skip those.
             if sample.pk not in packed_index_by_sample_id:
                 continue
@@ -375,15 +376,12 @@ class AncestorSampleMixin(SampleMixin):
         return errors
 
     def _get_ancestor_samples(self) -> set[Sample]:
-        """ Get all samples from ancestor nodes, including those from VCFs without genotypes.
-            Uses cohort samples directly rather than visibility-filtered get_samples(),
-            so that variant-only VCFs (has_genotype=False) are still recognized as valid ancestors. """
+        """ Get all samples from ancestor nodes, including those from VCFs without genotypes,
+            so that variant-only VCFs (has_genotype=False) are still valid ancestors """
         parent_sample_set = set()
         parents, _errors = self.get_parent_subclasses_and_errors()
         for parent in parents:  # Use parent samples not own as own inserts self.sample
-            cohorts, _ = parent.get_cohorts_and_sample_visibility(sort=False)
-            for c in cohorts:
-                parent_sample_set.update(c.get_samples())
+            parent_sample_set.update(parent.get_samples())
         return parent_sample_set
 
     def handle_ancestor_input_samples_changed(self):

@@ -151,7 +151,7 @@ class TestQuadNodeInheritance(InheritanceNodeTestsMixin, TestCase):
     # ── CompHet node type ─────────────────────────────────────────────────────
 
     def test_quality_filter_ignores_foreign_ancestor_samples(self):
-        """Regression: COMPOUND_HET is the only mode with a parent input, so get_sample_ids()
+        """Regression: COMPOUND_HET is the only mode with a parent input, so get_sample_ids_with_genotype()
         includes ancestor samples that may not belong to this node's cohort. Per-sample quality
         filters must skip those rather than raising KeyError in get_array_index_for_sample_id."""
         node = self._make_node(QuadInheritance.COMPOUND_HET, min_dp=30)
@@ -161,7 +161,7 @@ class TestQuadNodeInheritance(InheritanceNodeTestsMixin, TestCase):
         foreign_sample_id = self.quad_aff.proband.sample_id
         self.assertNotIn(foreign_sample_id, quad_sample_ids)
 
-        with patch.object(node, "get_sample_ids", return_value=quad_sample_ids + [foreign_sample_id]):
+        with patch.object(node, "get_sample_ids_with_genotype", return_value=quad_sample_ids + [foreign_sample_id]):
             cohort, arg_q_dict = node.get_cohort_and_arg_q_dict()  # Must not raise KeyError
 
         self.assertEqual(cohort, self.quad.cohort)
