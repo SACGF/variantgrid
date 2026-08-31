@@ -509,8 +509,8 @@ const DataTableDefinition = (function() {
 
             dom.on('click', 'tr', function(event) {
                 // A click on a link or control belongs to it (the variant grids have a details link, a
-                // checkbox and tag links in every row) - only bare row space toggles
-                if ($(event.target).closest('a, input, button, select, label').length) {
+                // checkbox, and tag chips that expand to a delete button) - only bare row space toggles
+                if ($(event.target).closest('a, input, button, select, label, .grid-tag-deletable').length) {
                     return;
                 }
                 const tr = $(this); //.closest('tr');
@@ -596,6 +596,47 @@ const DataTableDefinition = (function() {
             });
         },
 
+        /* A composite cell draws several values, so its header offers a sort key per value. Each
+           entry names another column - hidden or not - whose colmodel already carries that key's
+           sort index, so picking one is just an order() on that column. */
+        setupSortMenus: function() {
+            const columns = this.serverParams.columns || [];
+            const columnIndexByData = {};
+            columns.forEach((col, i) => {
+                columnIndexByData[col.data] = i;
+            });
+            const dataTable = this.dataTable;
+
+            columns.forEach((col, columnIndex) => {
+                if (!col.sortMenu || col.visible === false) {
+                    return;
+                }
+                const header = $(dataTable.column(columnIndex).header());
+                const menu = $('<span>', {class: 'dt-sort-menu dropdown'});
+                const toggle = $('<a>', {class: 'dt-sort-menu-toggle', href: 'javascript:void(0)',
+                                         title: 'Sort this column by', 'data-toggle': 'dropdown', text: '▾'});
+                const items = $('<div>', {class: 'dropdown-menu dropdown-menu-right'});
+                for (const entry of col.sortMenu) {
+                    const target = columnIndexByData[entry.column];
+                    if (target === undefined) {
+                        continue;
+                    }
+                    $('<a>', {class: 'dropdown-item', href: 'javascript:void(0)', text: entry.label})
+                        .on('click', function(event) {
+                            event.stopPropagation();
+                            dataTable.order([target, 'asc']).draw();
+                        }).appendTo(items);
+                }
+                if (!items.children().length) {
+                    return;
+                }
+                // The header cell is itself the sort toggle - the menu is a separate control on it
+                toggle.on('click', event => event.stopPropagation());
+                menu.append(toggle, items);
+                header.append(menu);
+            });
+        },
+
         /* Resolves with this definition once the table is built, so a caller can wire up row
            interactions or announce itself (the analysis editor waits on its grid) */
         setup: function() {
@@ -612,6 +653,7 @@ const DataTableDefinition = (function() {
                     this.setupDom();
                     this.setupClientExpend();
                     this.setupResponsiveExpand();
+                    this.setupSortMenus();
                     return this;
                 });
             });

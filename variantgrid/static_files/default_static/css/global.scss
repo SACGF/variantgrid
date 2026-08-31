@@ -994,6 +994,64 @@ table.variantgrid-datatable {
 		line-height: 16px;
 	}
 
+	// The second line every composite cell carries. Off by default - the per-user 'two line rows'
+	// setting turns it on. @see AbstractVariantGrid.get_extra_table_classes
+	.rv-line2,
+	.ic-line2 {
+		display: none;
+	}
+
+	&.two-line-rows {
+		tbody td {
+			line-height: 16px;
+			vertical-align: top;
+			white-space: normal;
+		}
+
+		.rv-line2,
+		.ic-line2 {
+			display: block;
+			color: #888;
+			font-size: 10px;
+			overflow: hidden;
+			text-overflow: ellipsis;
+		}
+
+		.variant_id-container {
+			align-items: flex-start;
+
+			a.rv-label {
+				white-space: normal;
+			}
+		}
+
+		.impact-consequence {
+			display: inline-block;
+		}
+	}
+
+	// A composite header's ▾ - the sort keys the cell's other values offer. The header cell is
+	// itself the sort toggle, so this sits on top of it as its own control
+	th .dt-sort-menu {
+		position: static;
+
+		.dt-sort-menu-toggle {
+			margin-left: 4px;
+			color: #888;
+			text-decoration: none;
+			font-size: 10px;
+		}
+
+		.dropdown-menu {
+			font-size: 12px;
+			min-width: 0;
+		}
+
+		.dropdown-item {
+			padding: 2px 12px;
+		}
+	}
+
 	// Representative variant cell: expand arrow (td.toggle-link:before) · checkbox · label (details link)
 	.variant_id-container {
 		display: inline-flex;
@@ -1025,13 +1083,13 @@ table.variantgrid-datatable {
 		font-size: 11px;
 	}
 
-	// ClinVar / germline / somatic each get a fixed share of whatever the cell is, so the three line
-	// up down the column - the eye scans one origin without tracking sideways. Shares rather than
-	// fixed widths: the cell is overflow:hidden, and fixed widths wider than the column silently cut
-	// the last chip off the right edge
+	// The germline pair then the somatic pair, each with a fixed share of whatever the cell is, so
+	// the four line up down the column - the eye scans one origin without tracking sideways. Shares
+	// rather than fixed widths: the cell is overflow:hidden, and fixed widths wider than the column
+	// silently cut the last chip off the right edge
 	.cs-chips {
 		display: grid;
-		grid-template-columns: 74fr 52fr 60fr;
+		grid-template-columns: 74fr 52fr 66fr 60fr;
 		gap: 3px;
 		align-items: center;
 	}
@@ -1122,6 +1180,95 @@ table.variantgrid-datatable {
 	.gnomad-popmax-pop {
 		color: #777;
 		font-size: 10px;
+	}
+
+	// Common in gnomAD - recede rather than disappear, the value is still readable
+	.gnomad-af-common {
+		color: #999;
+	}
+
+	// SpliceAI max delta, dot at the 0.2 / 0.5 / 0.8 cutoffs
+	.spliceai {
+		display: inline-flex;
+		align-items: center;
+		gap: 5px;
+		min-width: 0;
+
+		.spliceai-dot {
+			width: 8px;
+			height: 8px;
+			border-radius: 50%;
+			flex: none;
+		}
+
+		.spliceai-high { background: #cf3f3a; }
+		.spliceai-moderate { background: #dd8a1c; }
+		.spliceai-low { background: #d8c53a; }
+		.spliceai-none { background: transparent; box-shadow: inset 0 0 0 1px #ccc; }
+	}
+
+	// A negative MaxEntScan difference is a weakened splice site - the direction that matters
+	.maxentscan-weakened {
+		color: #cf3f3a;
+	}
+
+	.mastermind-link {
+		text-decoration: none;
+	}
+
+	// One segment per prediction tool that made a call, damaging first
+	.predictions {
+		display: inline-flex;
+		align-items: center;
+		gap: 1px;
+		min-width: 0;
+
+		i {
+			width: 4px;
+			height: 10px;
+			border-radius: 1px;
+			flex: none;
+		}
+
+		.pred-damaging { background: #cf3f3a; }
+		.pred-benign { background: #a0a8b3; }
+
+		.predictions-count {
+			margin-left: 5px;
+			color: #777;
+			font-size: 10px;
+		}
+	}
+
+	// Database hom · het; a zero count recedes so a real count stands out
+	.db-count-zero {
+		color: #bbb;
+	}
+
+	// The sample's call: zygosity glyph, then allele frequency and read depth
+	.sample-zygosity {
+		display: inline-flex;
+		align-items: center;
+		gap: 5px;
+		min-width: 0;
+
+		.zyg-glyph {
+			width: 12px;
+			height: 12px;
+			flex: none;
+		}
+
+		.zyg-het,
+		.zyg-hom-alt { color: #3a6ea5; }
+		.zyg-ref,
+		.zyg-unknown { color: #b0b6bd; }
+
+		.zyg-values {
+			color: #555;
+			font-size: 11px;
+			overflow: hidden;
+			text-overflow: ellipsis;
+		}
 	}
 
 	// Only the arrow cell invites a click - the rest of the row is links
@@ -2852,7 +2999,8 @@ li.help-item {
 	background-color: #5cb85c;
 }
 
-.gnomad-filtered {
+.gnomad-filtered,
+.gnomad-flagged {
 	background-color: #f0ad4e;
 }
 

@@ -53,6 +53,20 @@ class AdapterColumnsTest(GridExportTestCase):
         self.assertFalse(columns[2]["visible"])
         self.assertIsNone(columns[2]["render"])
 
+    def test_composite_column_extras(self):
+        """ A composite cell's renderer kwargs and its header's alternative sort keys """
+        colmodels = [
+            {"name": "sample_1_samples_zygosity", "formatter": "sampleZygosityFormatter",
+             "formatter_kwargs": {"samplePrefix": "sample_1_"},
+             "sort_menu": [{"label": "Read depth", "column": "sample_1_samples_read_depth"}]},
+            {"name": "sample_1_samples_read_depth", "hidden": True},
+        ]
+        columns = datatable_columns_from_colmodels(colmodels)
+        self.assertEqual({"samplePrefix": "sample_1_"}, columns[0]["renderKwargs"])
+        self.assertEqual([{"label": "Read depth", "column": "sample_1_samples_read_depth"}],
+                         columns[0]["sortMenu"])
+        self.assertNotIn("sortMenu", columns[1])
+
     def test_every_column_carries_a_width(self):
         """ The client lays these tables out table-layout: fixed, which needs a width per column -
             without one a cell holding 40 PubMed links runs to a few thousand pixels """

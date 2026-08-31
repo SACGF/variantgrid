@@ -43,6 +43,7 @@ from snpdb.models import (
     TagColorsCollection,
     Trio,
     UserGridConfig,
+    UserSettings,
     Variant,
     VariantsType,
     VariantZygosityCountCollection,
@@ -532,10 +533,20 @@ class AbstractVariantGrid(JqGridUserRowConfig):
             'variantannotation__overlapping_symbols': {'formatter': 'geneSymbolNewWindowLink'},
             'variantannotation__transcript_version__gene_version__hgnc__omim_ids': {'width': 60,
                                                                                     'formatter': 'omimLink'},
+            # Still in the catalogue and 'All columns' - a collection that shows it standalone gets
+            # the same Pass/Fail gnomAD link the gnomAD AF cell draws
             'variantannotation__gnomad_filtered': {"formatter": "gnomadFilteredFormatter"},
-            # Composite cells - the partner value rides along hidden (COMPOSITE_COLUMN_ROW_FIELDS)
+            # Composite cells - the partner values ride along hidden (COMPOSITE_COLUMN_ROW_FIELDS)
             'variantannotation__consequence': {'width': 160, 'formatter': 'impactConsequenceFormatter'},
+            'variantannotation__gnomad_af': {'width': 130, 'formatter': 'gnomadAfFormatter'},
             'variantannotation__gnomad_popmax_af': {'width': 110, 'formatter': 'gnomadPopmaxFormatter'},
+            'variantannotation__spliceai_max_ds': {'width': 80, 'formatter': 'spliceaiFormatter'},
+            'variantannotation__maxentscan_percent_diff_ref': {'width': 90,
+                                                               'formatter': 'maxentscanFormatter'},
+            'variantannotation__mastermind_count_1_cdna': {'width': 80, 'formatter': 'mastermindFormatter'},
+            'variantannotation__predictions_num_pathogenic': {'width': 80,
+                                                              'formatter': 'predictionsFormatter'},
+            'global_variant_zygosity__het_count': {'width': 70, 'formatter': 'dbZygosityCountsFormatter'},
             'variantannotation__exon': {"server_side_formatter": server_side_format_exon_and_intron},
             'variantannotation__intron': {"server_side_formatter": server_side_format_exon_and_intron},
             'variantannotation__mastermind_mmid3': {'formatter': 'formatMasterMindMMID3'},
@@ -578,8 +589,23 @@ class AbstractVariantGrid(JqGridUserRowConfig):
 
     def get_datatable_extra(self) -> dict:
         # gnomAD links are per genome build, and the client renderers have no other way to know it
-        return {"genomeBuild": self.genome_build.name,
-                "clinvarStars": dict(ClinVarReviewStatus.STARS)}
+        extra = {"genomeBuild": self.genome_build.name,
+                 "clinvarStars": dict(ClinVarReviewStatus.STARS)}
+        # The AF the import 'common' filter uses, in the units the grid shows AFs in - the gnomAD
+        # cell mutes at or above it so rare variants keep the reader's full attention
+        if cf_data := settings.VCF_IMPORT_COMMON_FILTERS.get(self.genome_build.name):
+            common_af = cf_data["gnomad_af_min"]
+            if settings.VARIANT_ALLELE_FREQUENCY_CLIENT_SIDE_PERCENT:
+                common_af *= 100
+            extra["commonGnomadAf"] = common_af
+        return extra
+
+    def get_extra_table_classes(self) -> list[str]:
+        """ Two line rows are a per-user setting. The second line is in the markup either way -
+            CSS decides whether it shows, so switching it doesn't need the rows re-rendering """
+        if UserSettings.get_for_user(self.user).variant_grid_two_line_rows:
+            return ["two-line-rows"]
+        return []
 
     def _get_annotation_version(self) -> AnnotationVersion:
         return self.annotation_version

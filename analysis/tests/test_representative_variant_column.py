@@ -18,7 +18,7 @@ from snpdb.grid_columns.custom_columns import (
     COMPOSITE_COLUMN_ROW_FIELDS,
     VARIANT_COLUMN_ROW_FIELDS,
 )
-from snpdb.models import CustomColumnsCollection
+from snpdb.models import CustomColumnsCollection, UserSettings
 
 
 class RepresentativeVariantColumnTest(GridExportTestCase):
@@ -45,8 +45,12 @@ class RepresentativeVariantColumnTest(GridExportTestCase):
         colmodels = self._colmodels_by_name()
         self.assertEqual(colmodels["id"]["formatter"], "representativeVariant")
         for field in (VARIANT_COLUMN_ROW_FIELDS + CLASSIFICATIONS_COLUMN_ROW_FIELDS
-                      + COMPOSITE_COLUMN_ROW_FIELDS + CLASSIFICATIONS_COLUMN_ROW_ANNOTATIONS):
+                      + CLASSIFICATIONS_COLUMN_ROW_ANNOTATIONS):
             self.assertIn(field, colmodels)
+        for visible, partners in COMPOSITE_COLUMN_ROW_FIELDS.items():
+            # A partner only rides along while the collection shows the column that reads it
+            for partner in partners:
+                self.assertEqual(visible in colmodels, partner in colmodels, partner)
         # Not in the default collection, so hidden, and labelled from the catalogue for the CSV header
         self.assertTrue(colmodels["locus__ref__seq"]["hidden"])
         self.assertEqual(colmodels["locus__ref__seq"]["label"], "Reference")
@@ -56,7 +60,9 @@ class RepresentativeVariantColumnTest(GridExportTestCase):
         request = FakeRequest(user=self.user)
         request.GET = {"rows": "1", "page": "1"}
         row = self.grid.get_data(request)["rows"][0]
-        for field in VARIANT_COLUMN_ROW_FIELDS + CLASSIFICATIONS_COLUMN_ROW_FIELDS + COMPOSITE_COLUMN_ROW_FIELDS:
+        composite_partners = [p for visible, partners in COMPOSITE_COLUMN_ROW_FIELDS.items()
+                              for p in partners if visible in row]
+        for field in VARIANT_COLUMN_ROW_FIELDS + CLASSIFICATIONS_COLUMN_ROW_FIELDS + composite_partners:
             self.assertIn(field, row)
         self.assertNotIn("classifications", row)  # renderer-only column, like tags
 
@@ -65,14 +71,47 @@ class RepresentativeVariantColumnTest(GridExportTestCase):
         self.assertEqual(cm["formatter"], "classificationsFormatter")
         self.assertFalse(cm["sortable"])
 
-    def test_composite_columns_keep_their_server_side_formatting(self):
-        """ gnomAD popmax AF is formatted server side (unit -> percent) so the CSV matches the grid -
-            the client renderer only adds the population beside it """
+    def test_composite_columns_carry_their_renderers(self):
         colmodels = self._colmodels_by_name()
-        self.assertEqual(colmodels["variantannotation__consequence"]["formatter"], "impactConsequenceFormatter")
-        popmax_af = colmodels["variantannotation__gnomad_popmax_af"]
-        self.assertEqual(popmax_af["formatter"], "gnomadPopmaxFormatter")
-        self.assertIn("server_side_formatter", popmax_af)
+        for name, formatter in [
+                ("variantannotation__consequence", "impactConsequenceFormatter"),
+                ("variantannotation__spliceai_max_ds", "spliceaiFormatter"),
+                ("variantannotation__maxentscan_percent_diff_ref", "maxentscanFormatter"),
+                ("variantannotation__mastermind_count_1_cdna", "mastermindFormatter"),
+                ("variantannotation__predictions_num_pathogenic", "predictionsFormatter"),
+                ("global_variant_zygosity__het_count", "dbZygosityCountsFormatter")]:
+            self.assertEqual(colmodels[name]["formatter"], formatter, name)
+
+    def test_gnomad_columns_keep_their_server_side_formatting(self):
+        """ The gnomAD AFs are formatted server side (unit -> percent) so the CSV matches the grid -
+            the client renderers only add the population / the Pass-Fail link beside them """
+        colmodels = self._colmodels_by_name()
+        for name, formatter in [("variantannotation__gnomad_popmax_af", "gnomadPopmaxFormatter"),
+                                ("variantannotation__gnomad_af", "gnomadAfFormatter")]:
+            cm = colmodels[name]
+            self.assertEqual(cm["formatter"], formatter)
+            self.assertIn("server_side_formatter", cm)
+
+    def test_sample_zygosity_cell_carries_its_partners(self):
+        """ AF and read depth are drawn inside the zygosity cell, so they ride along hidden """
+        colmodels = self._colmodels_by_name()
+        sample_pk = self.sample.pk
+        zygosity = colmodels[f"sample_{sample_pk}_samples_zygosity"]
+        self.assertEqual(zygosity["formatter"], "sampleZygosityFormatter")
+        self.assertEqual(zygosity["formatter_kwargs"], {"samplePrefix": f"sample_{sample_pk}_"})
+        # One sort key per value the cell shows, each naming the column carrying that key's sort index
+        self.assertEqual([entry["column"] for entry in zygosity["sort_menu"]],
+                         [f"sample_{sample_pk}_samples_{c}"
+                          for c in ["zygosity", "allele_frequency", "read_depth"]])
+        for partner in ["allele_frequency", "read_depth"]:
+            self.assertTrue(colmodels[f"sample_{sample_pk}_samples_{partner}"]["hidden"], partner)
+
+    def test_two_line_rows_is_a_user_setting(self):
+        self.assertEqual([], self.grid.get_extra_table_classes())
+        user_settings_override = UserSettings.get_settings_overrides(user=self.user)[-1]
+        user_settings_override.variant_grid_two_line_rows = True
+        user_settings_override.save()
+        self.assertEqual(["two-line-rows"], VariantGrid(self.user, self.node).get_extra_table_classes())
 
     def test_definition_declares_row_expansion(self):
         definition = datatable_definition(self.grid)
@@ -85,9 +124,15 @@ class RepresentativeVariantColumnTest(GridExportTestCase):
         columns = list(CustomColumnsCollection.get_system_default().customcolumn_set
                        .order_by("sort_order").values_list("column_id", flat=True))
         self.assertEqual(columns[:4], ["variant", "classifications", "tags", "tags_global"])
-        # Coordinates now live in the Variant cell; impact and popmax inside their composite cells
-        for removed in ["chrom", "position", "ref", "alt", "svlen", "hgvs_g", "impact", "gnomad_popmax"]:
+        # Coordinates now live in the Variant cell; the rest inside their composite cells
+        for removed in ["chrom", "position", "ref", "alt", "svlen", "hgvs_g", "impact", "gnomad_popmax",
+                        "gnomad_filtered", "spliceai_pred_ds_ag", "spliceai_pred_dp_dl", "maxentscan_ref",
+                        "maxentscan_alt", "maxentscan_diff", "mastermind_mmid3", "predictions_num_benign",
+                        "total_db_hom", "total_db_ref", "total_db_unk"]:
             self.assertNotIn(removed, columns)
+        for merged in ["spliceai_max_ds", "maxentscan_percent_diff_ref", "mastermind_count_1_cdna",
+                       "predictions_num_pathogenic", "total_db_het"]:
+            self.assertIn(merged, columns)
 
 
 class VariantGridRowDetailViewTest(GridExportTestCase):

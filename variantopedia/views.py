@@ -446,6 +446,7 @@ def variant_tag_detail(request, variant_id, tag):
 
 
 VARIANT_GRID_ROW_DETAIL_MAX_TRANSCRIPTS = 20
+VARIANT_GRID_ROW_DETAIL_MAX_CLASSIFICATIONS = 10
 
 
 def variant_grid_row_detail(request, variant_id: int, annotation_version_id: int):
@@ -462,12 +463,27 @@ def variant_grid_row_detail(request, variant_id: int, annotation_version_id: int
     transcript_annotations = sorted(transcript_annotations[:VARIANT_GRID_ROW_DETAIL_MAX_TRANSCRIPTS],
                                     key=lambda ta: (ta.transcript_version_id != representative_transcript_version_id,
                                                     ta.hgvs_c))
+    # The records behind the Classifications column's internal chips
+    classifications = []
+    if allele := variant.allele:
+        cm_qs = ClassificationModification.latest_for_user(request.user) \
+            .filter(classification__allele=allele) \
+            .select_related("classification", "classification__lab").order_by("classification__pk")
+        classifications = list(cm_qs[:VARIANT_GRID_ROW_DETAIL_MAX_CLASSIFICATIONS])
+
+    # Symbolic variants span genes rather than sitting in one, so name what they hit
+    overlapping_symbols = None
+    if variant.is_symbolic and variant_annotation:
+        overlapping_symbols = variant_annotation.overlapping_symbols
+
     context = {
         "variant": variant,
         "variant_annotation": variant_annotation,
         "transcript_annotations": transcript_annotations,
         "build_variants": variant.all_build_variants,
         "clingen_allele": variant.allele.clingen_allele if variant.allele else None,
+        "classifications": classifications,
+        "overlapping_symbols": overlapping_symbols,
     }
     return render(request, "variantopedia/variant_grid_row_detail.html", context)
 

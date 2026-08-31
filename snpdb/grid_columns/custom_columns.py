@@ -28,13 +28,46 @@ CLASSIFICATIONS_COLUMN_ROW_FIELDS = [
     "clinvar__highest_pathogenicity",
     "clinvar__clinical_significance",
     "clinvar__review_status",
+    "clinvar__highest_oncogenicity",
+    "clinvar__oncogenic_classification",
+    "clinvar__oncogenic_review_status",
+    "clinvar__somatic_tier",
+    "clinvar__somatic_review_status",
 ]
-# The partner each composite column renderer pairs with its own value - the impact dot beside the
-# consequence, the population beside the popmax AF
-COMPOSITE_COLUMN_ROW_FIELDS = [
-    "variantannotation__impact",
-    "variantannotation__gnomad_popmax",
-]
+# Composite cells: the visible column the renderer sits on -> the partner values it draws alongside.
+# The partners ride along hidden, and only while the collection actually shows the column that reads
+# them. @see _get_standard_overrides in snpdb/grids.py for the renderer each one is paired with
+COMPOSITE_COLUMN_ROW_FIELDS = {
+    "variantannotation__consequence": ["variantannotation__impact"],
+    "variantannotation__gnomad_af": ["variantannotation__gnomad_filtered"],
+    "variantannotation__gnomad_popmax_af": ["variantannotation__gnomad_popmax"],
+    "variantannotation__spliceai_max_ds": [
+        "variantannotation__spliceai_pred_ds_ag",
+        "variantannotation__spliceai_pred_ds_al",
+        "variantannotation__spliceai_pred_ds_dg",
+        "variantannotation__spliceai_pred_ds_dl",
+        "variantannotation__spliceai_pred_dp_ag",
+        "variantannotation__spliceai_pred_dp_al",
+        "variantannotation__spliceai_pred_dp_dg",
+        "variantannotation__spliceai_pred_dp_dl",
+    ],
+    "variantannotation__maxentscan_percent_diff_ref": [
+        "variantannotation__maxentscan_ref",
+        "variantannotation__maxentscan_alt",
+        "variantannotation__maxentscan_diff",
+    ],
+    "variantannotation__mastermind_count_1_cdna": [
+        "variantannotation__mastermind_count_2_cdna_prot",
+        "variantannotation__mastermind_count_3_aa_change",
+        "variantannotation__mastermind_mmid3",
+    ],
+    "variantannotation__predictions_num_pathogenic": ["variantannotation__predictions_num_benign"],
+    "global_variant_zygosity__het_count": [
+        "global_variant_zygosity__hom_count",
+        "global_variant_zygosity__ref_count",
+        "global_variant_zygosity__unk_count",
+    ],
+}
 # These come from get_variantgrid_extra_annotate rather than the model, so they are colmodel-only
 # (not in the values() queryset)
 CLASSIFICATIONS_COLUMN_ROW_ANNOTATIONS = [
@@ -85,20 +118,35 @@ def get_custom_column_fields_override_and_sample_position(custom_columns_collect
 
         override[f] = col_override
 
-    hidden_fields = VARIANT_COLUMN_ROW_FIELDS + CLASSIFICATIONS_COLUMN_ROW_FIELDS + COMPOSITE_COLUMN_ROW_FIELDS
-    # A hidden model field still gets a CSV header - use the catalogue label rather than the model
+    composite_partners = [partner for visible, partners in COMPOSITE_COLUMN_ROW_FIELDS.items()
+                          for partner in partners if visible in fields]
+    hidden_fields = VARIANT_COLUMN_ROW_FIELDS + CLASSIFICATIONS_COLUMN_ROW_FIELDS + composite_partners
+    # A hidden field still gets a CSV header - use the catalogue label rather than the model
     # verbose_name (locus__ref__seq and alt__seq are both 'seq')
-    hidden_labels = dict(VariantGridColumn.objects.filter(variant_column__in=hidden_fields)
-                         .values_list("variant_column", "label"))
-    for field in hidden_fields + CLASSIFICATIONS_COLUMN_ROW_ANNOTATIONS:
+    hidden_columns = {vgc.variant_column: vgc
+                      for vgc in VariantGridColumn.objects.filter(variant_column__in=hidden_fields)}
+    for field in hidden_fields:
         if field not in fields:
             fields.append(field)
-            if field in CLASSIFICATIONS_COLUMN_ROW_ANNOTATIONS:
-                ov = get_overrides([field], [{}], model_field=False, queryset_field=False)[field]
+            vgc = hidden_columns.get(field)
+            if vgc is not None and vgc.model_field is False:
+                # An annotation rather than a model field (the global zygosity counts) - the colmodel
+                # has to say so, or the engine goes looking for a model field of that name
+                ov = get_overrides([field], [{}], model_field=False,
+                                   queryset_field=vgc.queryset_field)[field]
             else:
                 ov = {}
-                if label := hidden_labels.get(field):
-                    ov["label"] = label
+            if vgc is not None:
+                ov["label"] = vgc.label
+            ov["hidden"] = True
+            override[field] = ov
+
+    # Grid-only values from get_variantgrid_extra_annotate - not queryset fields, so they need a
+    # colmodel that says so
+    for field in CLASSIFICATIONS_COLUMN_ROW_ANNOTATIONS:
+        if field not in fields:
+            fields.append(field)
+            ov = get_overrides([field], [{}], model_field=False, queryset_field=False)[field]
             ov["hidden"] = True
             override[field] = ov
 

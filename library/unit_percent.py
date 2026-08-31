@@ -1,5 +1,7 @@
 from functools import partial
 
+from library.utils.text_utils import format_significant_digits
+
 
 def convert_from_percent_to_unit(percent, missing_value=None):
     if percent != missing_value:
@@ -18,10 +20,11 @@ def convert_from_unit_to_percent(unit, missing_value=None):
 
 
 def server_side_format_percent(val, missing_value=None):
-    """ Shows falsey values (eg 0.0) or '.' as blank """
+    """ Shows falsey values (eg 0.0) or '.' as blank. Significant digits rather than '%g' - rare
+        allele frequencies are small enough that '%g' switches to scientific notation """
     display_value = ""
     if val and val != missing_value:
-        display_value = f"{val:.3g}%"
+        display_value = f"{format_significant_digits(val)}%"
     return display_value
 
 

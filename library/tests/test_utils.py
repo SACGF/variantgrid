@@ -49,6 +49,9 @@ class TestServerSideFormatPercent(TestCase):
     def test_nonzero_formats_with_percent(self):
         self.assertEqual(server_side_format_percent(0.5), "0.5%")
 
+    def test_rare_frequency_is_not_scientific_notation(self):
+        self.assertEqual(server_side_format_percent(0.0000123), "0.0000123%")
+
     def test_none_as_missing_value(self):
         self.assertEqual(server_side_format_percent(None, missing_value=None), "")
 

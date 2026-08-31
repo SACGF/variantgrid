@@ -3,6 +3,7 @@
     {% if variant_annotation.hgvs_c %}<tr><th>Transcript</th><td class="mono">{{ variant_annotation.hgvs_c }}</td></tr>{% endif %}
     {% if variant_annotation.hgvs_p %}<tr><th>Protein</th><td class="mono">{{ variant_annotation.hgvs_p }}</td></tr>{% endif %}
     {% if variant_annotation.hgvs_g %}<tr><th>Genomic</th><td class="mono">{{ variant_annotation.hgvs_g }}</td></tr>{% endif %}
+    {% if overlapping_symbols %}<tr><th>Genes</th><td>{{ overlapping_symbols }}</td></tr>{% endif %}
     {% for build_variant in build_variants %}
       <tr><th>{{ build_variant.any_genome_build }}</th><td class="mono">{{ build_variant.full_string }}</td></tr>
     {% endfor %}
@@ -14,6 +15,17 @@
     <tr><th colspan="2">Transcripts</th></tr>
     {% for ta in transcript_annotations %}
       <tr><td class="mono">{{ ta.hgvs_c }}</td><td class="mono text-muted">{{ ta.hgvs_p|default:"" }}</td></tr>
+    {% endfor %}
+  </table>
+  {% endif %}
+  {% if classifications %}
+  <table class="variant-row-detail-table">
+    <tr><th colspan="2">Classifications</th></tr>
+    {% for cm in classifications %}
+      <tr>
+        <td><a href="{{ cm.get_absolute_url }}">{{ cm.classification.lab }}</a></td>
+        <td class="text-muted">{{ cm.classification.get_clinical_significance_display|default:"No data" }}</td>
+      </tr>
     {% endfor %}
   </table>
   {% endif %}

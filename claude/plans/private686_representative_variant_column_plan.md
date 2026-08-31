@@ -1094,17 +1094,17 @@ Analysis page, a node with a few hundred rows, `Default columns`:
 - `Minimalism` and a user-cloned collection (still containing chrom/position…) both render.
 - One other expandable grid (e.g. the eventlog) still expands on row click and its links still work.
 
-## Follow-ups (separate issues)
+## Follow-ups
 
-- Sample zygosity glyph column with header sort menu (zygosity / AF / depth)
-- Merge gnomAD AF and gnomAD filtered into one column, the way popmax AF and popmax are merged -
-  `variantannotation__gnomad_af` carries the value, `variantannotation__gnomad_filtered` rides along
-  hidden for the filtered marker (it has its own `gnomadFilteredFormatter` today)
-- gnomAD "common" AF muting (the value + popmax pairing is built - see "As built")
-- Predictions meter, SpliceAI threshold dot
-- Two-line rows as a per-user toggle
-- ClinVar somatic / oncogenic chips
-- Expanded row: overlapping genes for SVs, links to the classification records behind the chips
+All done - see "Follow-ups as built" at the end.
+
+- ~~Merge gnomAD AF and gnomAD filtered into one column~~
+- ~~gnomAD "common" AF muting~~
+- ~~Predictions meter, SpliceAI threshold dot~~
+- ~~Sample zygosity glyph column with header sort menu (zygosity / AF / depth)~~
+- ~~ClinVar somatic / oncogenic chips~~
+- ~~Two-line rows as a per-user toggle~~
+- ~~Expanded row: overlapping genes for SVs, links to the classification records behind the chips~~
 
 ## As built
 
@@ -1170,3 +1170,60 @@ detail view was rendered for a real annotated variant. `python3 manage.py test -
 Step 6 plus `variantopedia.tests.test_urls`: 77 tests, OK. eslint: 0 errors. pylint: 9.96/10.
 
 Checked in a browser against the "Manual verification" list above and working.
+
+## Follow-ups as built
+
+Every follow-up above is implemented (migrations `snpdb/0226` - `0229`, one `CACHE_VERSION` bump).
+
+### The composite cell pattern, generalised
+
+`COMPOSITE_COLUMN_ROW_FIELDS` is now a dict - the visible column the renderer sits on -> the partner
+values it draws. A partner rides along hidden only while the collection shows the column that reads
+it, so a collection without the composite pays nothing for its partners. A partner whose catalogue
+entry has `model_field=False` (the global zygosity counts) gets a colmodel that says so; without it
+the engine drops the field from the queryset and the renderer reads `undefined`.
+
+| Cell | Visible column (sorts on) | Rides along |
+|---|---|---|
+| Impact · Consequence | `consequence` | `impact` |
+| gnomAD | `gnomad_af` | `gnomad_filtered` |
+| gnomAD PopMax | `gnomad_popmax_af` | `gnomad_popmax` |
+| SpliceAI | `spliceai_max_ds` (new catalogue column, indexed) | the four `spliceai_pred_ds_*` + `dp_*` |
+| MaxEntScan | `maxentscan_percent_diff_ref` | `maxentscan_ref` / `alt` / `diff` |
+| Mastermind | `mastermind_count_1_cdna` | `count_2_cdna_prot`, `count_3_aa_change`, `mmid3` |
+| Predictions | `predictions_num_pathogenic` | `predictions_num_benign` |
+| DB counts | `total_db_het` | `hom` / `ref` / `unk` counts |
+| Sample | `sample_<pk>_samples_zygosity` | that sample's AF and read depth |
+
+The default collection went from 101 columns to 86. Every partner stays in the catalogue, in
+`All columns` and in the column chooser, and every one still exports.
+
+### Details
+
+- **gnomAD is the AF with its Pass/Fail gnomAD link beside it** - the link stays where it has always
+  been, on the badge. At or above `VCF_IMPORT_COMMON_FILTERS[build]["gnomad_af_min"]` (passed to the
+  client as `commonGnomadAf`, in the units the grid shows AFs in) the value mutes, so rare
+  frequencies are what catch the eye.
+- **`server_side_format_percent` uses `format_significant_digits`** rather than `%g`. Rare allele
+  frequencies read as plain decimals (`0.0000123%`), and the grid now agrees with the variant details
+  page, which already used that helper. Applies to every AF column, sample AFs included.
+- **`.gnomad-flagged` had no CSS rule** - only `.gnomad-filtered` did - so the gnomAD **Fail** badge
+  rendered green like Pass. Fixed as part of the merge.
+- **The Classifications column carries four chips** - germline pair then somatic pair. The new
+  ClinVar somatic chip leads with oncogenicity and falls back to the AMP tier when that is all the
+  record has. `clinvar_oncogenic_classification` joins the catalogue as the somatic twin of
+  `clinical_significance`, for the chip's tooltip.
+- **The Sample cell is the zygosity glyph with AF and read depth beside it.** Its header carries a ▾
+  offering a sort key per value shown - each entry names the (hidden) column whose colmodel already
+  holds that key's packed sort index, so picking one is an `order()` on that column and the server
+  side is untouched. `formatter_kwargs` gets its first server side writer here: the renderer needs
+  the sample's row-key prefix. @see `DataTableDefinition.setupSortMenus`.
+- **Two line rows are a per-user setting** (`SettingsOverride.variant_grid_two_line_rows`, so it
+  cascades org -> lab -> user like the rest). The second line is always in the markup and CSS decides
+  whether it shows, so the setting needs no re-render: `AbstractVariantGrid.get_extra_table_classes`
+  adds `two-line-rows` to the table.
+- **The expanded row gained the classification records behind the chips** (published, filtered for
+  the user, linked) and, for symbolic variants, the genes they span.
+- **Row expansion leaves deletable tags alone.** A click on a tag chip expanded the row instead of
+  opening its delete button - `.grid-tag-deletable` joins the interactive selector in
+  `setupClientExpend`.

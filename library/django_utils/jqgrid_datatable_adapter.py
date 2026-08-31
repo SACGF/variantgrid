@@ -34,6 +34,7 @@ JQGRID_FORMATTER_TO_CLIENT_RENDERER = {
     "classificationsFormatter": "VariantGridFormat.classifications",
     "clinvarLink": "VariantGridFormat.clinvarLink",
     "cosmicLink": "VariantGridFormat.cosmicLink",
+    "dbZygosityCountsFormatter": "VariantGridFormat.dbZygosityCounts",
     "formatClinGenAlleleId": "VariantGridFormat.clinGenAlleleId",
     "formatDBSNP": "VariantGridFormat.dbsnp",
     "formatMasterMindMMID3": "VariantGridFormat.masterMind",
@@ -42,12 +43,18 @@ JQGRID_FORMATTER_TO_CLIENT_RENDERER = {
     "formatPubMed": "VariantGridFormat.pubMed",
     "geneSymbolLink": "VariantGridFormat.geneSymbolLink",
     "geneSymbolNewWindowLink": "VariantGridFormat.geneSymbolNewWindowLink",
+    "gnomadAfFormatter": "VariantGridFormat.gnomadAf",
     "gnomadFilteredFormatter": "VariantGridFormat.gnomadFiltered",
     "gnomadPopmaxFormatter": "VariantGridFormat.gnomadPopmax",
     "impactConsequenceFormatter": "VariantGridFormat.impactConsequence",
     "linkFormatter": "VariantGridFormat.link",
+    "mastermindFormatter": "VariantGridFormat.mastermind",
+    "maxentscanFormatter": "VariantGridFormat.maxentscan",
     "omimLink": "VariantGridFormat.omimLink",
+    "predictionsFormatter": "VariantGridFormat.predictions",
     "representativeVariant": "VariantGridFormat.representativeVariant",
+    "sampleZygosityFormatter": "VariantGridFormat.sampleZygosity",
+    "spliceaiFormatter": "VariantGridFormat.spliceai",
     "tagsFormatter": "VariantGridFormat.tags",
     "tagsGlobalFormatter": "VariantGridFormat.tagsGlobal",
     "unitAsPercentFormatter": "VariantGridFormat.unitAsPercent",
@@ -74,6 +81,10 @@ def datatable_columns_from_colmodels(colmodels: list[dict]) -> list[JsonObjType]
             column["headerTitle"] = header_title
         if formatter_kwargs := cm.get("formatter_kwargs"):
             column["renderKwargs"] = formatter_kwargs
+        if sort_menu := cm.get("sort_menu"):
+            # Alternative sort keys for a composite cell - each names another column whose own
+            # colmodel already carries the sort index. @see DataTableDefinition.setupSortMenus
+            column["sortMenu"] = sort_menu
         columns.append(column)
     return columns
 
@@ -146,12 +157,13 @@ def datatable_definition(grid, *, download_url: Optional[str] = None, scroll_x: 
         a row for 500ms fetches that content early). """
     config = grid.get_config()
     colmodels = grid.get_colmodels(remove_server_side_only=True)
+    table_classes = [DATATABLE_TABLE_CLASS] + list(getattr(grid, "get_extra_table_classes", list)())
 
     data: JsonObjType = {
         "columns": datatable_columns_from_colmodels(colmodels),
         "order": datatable_order_from_config(config, colmodels),
         "scrollX": scroll_x,
-        "tableClass": DATATABLE_TABLE_CLASS,
+        "tableClass": " ".join(table_classes),
         "searchBoxEnabled": False,
         "downloadCsvButtonEnabled": False,  # server side streaming download instead, see downloadUrl
         "downloadUrl": download_url,

@@ -256,6 +256,8 @@ class SettingsOverride(models.Model):
 
     initially_show_zygosity_table = models.BooleanField(null=True, blank=True,
                                                          help_text="Initially expand the zygosity requirements table in Trio/Quad node editors")
+    variant_grid_two_line_rows = models.BooleanField(null=True, blank=True,
+                                                     help_text="Variant grid rows are two lines high, with the transcript, protein change and impact on the second line. Fewer variants per screen, more of each one")
     node_grid_auto_load_max_variants = models.IntegerField(
         null=True, blank=True,
         help_text="Analysis nodes with at least this many variants don't auto-load "
@@ -459,6 +461,7 @@ class UserSettings:
     show_candidates_cross_sample_classification: bool
     show_candidates_classification_evidence_update: bool
     initially_show_zygosity_table: bool
+    variant_grid_two_line_rows: bool
     node_grid_auto_load_max_variants: Optional[int]
     variant_tag_stale_days: Optional[int]
 

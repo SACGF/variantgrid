@@ -98,10 +98,29 @@ const CLINVAR_PATHOGENICITY_CHIPS = {  // ClinVar.highest_pathogenicity (ClinVar
     5: {text: 'P', css: 'cs-p'},
 };
 
-// Each chip sits in a fixed width slot (global.scss) so ClinVar / germline / somatic line up down
-// the column - a reader scans one origin without their eye tracking sideways
+const CLINVAR_ONCOGENICITY_CHIPS = {  // ClinVar.highest_oncogenicity (ClinVarOncogenicity)
+    1: {text: 'B', css: 'cs-b'},
+    2: {text: 'LB', css: 'cs-lb'},
+    3: {text: 'VUS', css: 'cs-vus'},
+    4: {text: 'LO', css: 'cs-lp'},
+    5: {text: 'O', css: 'cs-p'},
+};
+
+// ClinVar.somatic_tier (SomaticClinicalSignificance) - the AMP tier, in the short form the chip has
+// room for
+const CLINVAR_SOMATIC_TIER_CHIPS = {
+    'tier_1': {text: 'I', css: 'scs-tier_1'},
+    'tier_1_or_2': {text: 'I/II', css: 'scs-tier_1_or_2'},
+    'tier_2': {text: 'II', css: 'scs-tier_2'},
+    'tier_3': {text: 'III', css: 'scs-tier_3'},
+    'tier_4': {text: 'IV', css: 'scs-tier_4'},
+};
+
+// Each chip sits in a fixed slot (global.scss) so the four origins line up down the column - a
+// reader scans one origin without their eye tracking sideways
 const CLINVAR_CHIP_SLOT = 'cs-chip-clinvar';
 const GERMLINE_CHIP_SLOT = 'cs-chip-germline';
+const CLINVAR_SOMATIC_CHIP_SLOT = 'cs-chip-clinvar-somatic';
 const SOMATIC_CHIP_SLOT = 'cs-chip-somatic';
 
 function _classificationChip(cssClasses, innerHtml, title, gridColumn) {
@@ -136,30 +155,64 @@ function _clinvarChip(rowData, ctx) {
         return _emptyChip(CLINVAR_CHIP_SLOT, "ClinVar: not classified");
     }
     const chip = CLINVAR_PATHOGENICITY_CHIPS[highestPath] || {text: String(highestPath), css: 'cs-none'};
-    const starsLookup = (ctx && ctx.extra && ctx.extra.clinvarStars) || {};
-    const stars = starsLookup[rowData["clinvar__review_status"]];
-    let inner = `<span class='cs-chip-src'>CV</span>${escapeHtml(chip.text)}`;
-    if (stars !== undefined) {
-        let starHtml = '';
-        for (let i = 0; i < 4; ++i) {
-            starHtml += `<span class='${i < stars ? '' : 'off'}'>&#9733;</span>`;
-        }
-        inner += ` <span class='cs-chip-stars'>${starHtml}</span>`;
-    }
+    const inner = `<span class='cs-chip-src'>CV</span>${escapeHtml(chip.text)}`
+                + _clinvarStarsHtml(rowData["clinvar__review_status"], ctx);
     const title = "ClinVar: " + (rowData["clinvar__clinical_significance"] || chip.text);
     return _classificationChip([CLINVAR_CHIP_SLOT, chip.css], inner, title, "clinvar__clinical_significance");
+}
+
+function _clinvarStarsHtml(reviewStatus, ctx) {
+    const starsLookup = (ctx && ctx.extra && ctx.extra.clinvarStars) || {};
+    const stars = starsLookup[reviewStatus];
+    if (stars === undefined) {
+        return '';
+    }
+    let starHtml = '';
+    for (let i = 0; i < 4; ++i) {
+        starHtml += `<span class='${i < stars ? '' : 'off'}'>&#9733;</span>`;
+    }
+    return ` <span class='cs-chip-stars'>${starHtml}</span>`;
+}
+
+// ClinVar's somatic view of the variant. Oncogenicity is the call most records carry, so it leads;
+// a record with only an AMP tier shows the tier instead. Both go in the tooltip either way.
+function _clinvarSomaticChip(rowData, ctx) {
+    const oncogenicity = rowData["clinvar__highest_oncogenicity"];
+    const tier = rowData["clinvar__somatic_tier"];
+    const oncChip = CLINVAR_ONCOGENICITY_CHIPS[oncogenicity];
+    const tierChip = CLINVAR_SOMATIC_TIER_CHIPS[tier];
+    if (!oncChip && !tierChip) {
+        return _emptyChip(CLINVAR_SOMATIC_CHIP_SLOT, "ClinVar somatic: no call");
+    }
+    const titleParts = [];
+    if (oncChip) {
+        titleParts.push("oncogenicity " + (rowData["clinvar__oncogenic_classification"] || oncChip.text));
+    }
+    if (tierChip) {
+        titleParts.push("AMP tier " + tierChip.text);
+    }
+    const chip = oncChip || tierChip;
+    const reviewStatus = oncChip ? rowData["clinvar__oncogenic_review_status"]
+                                 : rowData["clinvar__somatic_review_status"];
+    const gridColumn = oncChip ? "clinvar__highest_oncogenicity" : "clinvar__somatic_tier";
+    const inner = `<span class='cs-chip-src'>CV</span>${escapeHtml(chip.text)}`
+                + _clinvarStarsHtml(reviewStatus, ctx);
+    return _classificationChip([CLINVAR_SOMATIC_CHIP_SLOT, chip.css], inner,
+                               "ClinVar somatic: " + titleParts.join(", "), gridColumn);
 }
 
 
 // Renderer-only column (no row key of its own) - reads the hidden fields listed in
 // CLASSIFICATIONS_COLUMN_ROW_FIELDS / _ANNOTATIONS (snpdb/grid_columns/custom_columns.py)
 VariantGridFormat.classifications = (_value, type, rowData, ctx) => {
-    // Always three chips in the same order, empty ones included - the .cs-chips grid gives each a
-    // fixed share of the cell, so they line up down the column whatever the column is set to
+    // Always four chips in the same order, empty ones included - germline pair then somatic pair.
+    // The .cs-chips grid gives each a fixed share of the cell, so they line up down the column
+    // whatever the column is set to
     const chips = _clinvarChip(rowData, ctx)
         + _internalClassificationChip("Internally Classified (Germline)", "allele-origin-G", GERMLINE_CHIP_SLOT,
             rowData["max_internal_classification"], rowData["internally_classified"],
             "max_internal_classification", GERMLINE_CLASSIFICATION_CHIPS, GERMLINE_CLASSIFICATION_BOXES)
+        + _clinvarSomaticChip(rowData, ctx)
         + _internalClassificationChip("Internally Classified (Somatic)", "allele-origin-S", SOMATIC_CHIP_SLOT,
             rowData["max_internal_somatic_classification"], rowData["internally_classified_somatic"],
             "max_internal_somatic_classification", SOMATIC_CLASSIFICATION_CHIPS, SOMATIC_CLASSIFICATION_BOXES);
@@ -184,9 +237,177 @@ VariantGridFormat.impactConsequence = (consequence, type, rowData) => {
     }
     const dotCss = IMPACT_DOT_CSS[impact] || 'impact-unknown';
     const title = [impact, consequence].filter(v => v != null).join(' · ');
+    const impactWord = impact == null ? '' : `<span class='ic-line2'>${escapeHtml(impact)}</span>`;
     return `<span class='impact-consequence' title='${escapeHtml(title)}'>`
-         + `<i class='impact-dot ${dotCss}'></i>${escapeHtml(consequence == null ? '' : consequence)}</span>`;
+         + `<i class='impact-dot ${dotCss}'></i>${escapeHtml(consequence == null ? '' : consequence)}`
+         + `${impactWord}</span>`;
 };
+
+// The sample's call as a glyph, with the allele frequency and read depth beside it. The zygosity
+// text comes through the server side formatter (Zygosity.CHOICES); the AF and depth ride along on
+// this sample's own hidden columns, named by the samplePrefix render kwarg.
+// @see get_grid_genotype_columns_and_overrides in analysis/grids.py
+const ZYGOSITY_GLYPHS = {
+    'HET': '<circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" stroke-width="1.6"/>'
+         + '<path d="M8 1.5 A6.5 6.5 0 0 1 8 14.5 Z" fill="currentColor"/>',
+    'HOM_ALT': '<circle cx="8" cy="8" r="6.5" fill="currentColor"/>',
+    'REF': '<circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" stroke-width="1.6"/>',
+    '?': '<circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-dasharray="2 2"/>',
+};
+const ZYGOSITY_GLYPH_CSS = {
+    'HET': 'zyg-het',
+    'HOM_ALT': 'zyg-hom-alt',
+    'REF': 'zyg-ref',
+    '?': 'zyg-unknown',
+};
+
+function _hasSampleValue(value) {
+    return value != null && value !== '' && value !== '.';
+}
+
+VariantGridFormat.sampleZygosity = (zygosity, type, rowData, ctx) => {
+    const glyph = ZYGOSITY_GLYPHS[zygosity];
+    if (!glyph) {
+        // '.' - the sample has no call for this variant at all
+        return '';
+    }
+    const prefix = (ctx && ctx.kwargs && ctx.kwargs.samplePrefix) || '';
+    const named = [["AF", rowData[`${prefix}samples_allele_frequency`]],
+                   ["depth", rowData[`${prefix}samples_read_depth`]]].filter(([, v]) => _hasSampleValue(v));
+    const title = [zygosity].concat(named.map(([name, v]) => `${name} ${v}`)).join(' · ');
+    let html = `<span class='sample-zygosity' title='${escapeHtml(title)}'>`
+             + `<svg class='zyg-glyph ${ZYGOSITY_GLYPH_CSS[zygosity]}' viewBox='0 0 16 16'>${glyph}</svg>`;
+    if (named.length) {
+        html += `<span class='zyg-values'>${escapeHtml(named.map(([, v]) => v).join(' '))}</span>`;
+    }
+    return html + '</span>';
+};
+
+
+// SpliceAI: the max delta score with a dot at the standard 0.2 / 0.5 / 0.8 cutoffs, and the position
+// offset of whichever of the four predictions the max came from. Reads the eight spliceai_pred_*
+// ride-alongs; sorts on spliceai_max_ds, the indexed column it lives on.
+const SPLICEAI_PREDICTIONS = [
+    ["ag", "acceptor gain"],
+    ["al", "acceptor loss"],
+    ["dg", "donor gain"],
+    ["dl", "donor loss"],
+];
+
+function _spliceaiThresholdCss(maxDs) {
+    if (maxDs >= 0.8) {
+        return 'spliceai-high';
+    }
+    if (maxDs >= 0.5) {
+        return 'spliceai-moderate';
+    }
+    if (maxDs >= 0.2) {
+        return 'spliceai-low';
+    }
+    return 'spliceai-none';
+}
+
+VariantGridFormat.spliceai = (maxDs, type, rowData) => {
+    if (maxDs == null || maxDs === '') {
+        return '';
+    }
+    const detail = [];
+    for (const [suffix, label] of SPLICEAI_PREDICTIONS) {
+        const ds = rowData[`variantannotation__spliceai_pred_ds_${suffix}`];
+        if (ds == null) {
+            continue;
+        }
+        const dp = rowData[`variantannotation__spliceai_pred_dp_${suffix}`];
+        detail.push(`${label} ${ds}${dp == null ? '' : ` @ ${dp}`}`);
+    }
+    const title = detail.length ? detail.join(', ') : `SpliceAI max Δ ${maxDs}`;
+    return `<span class='spliceai' title='${escapeHtml(title)}'>`
+         + `<i class='spliceai-dot ${_spliceaiThresholdCss(maxDs)}'></i>${escapeHtml(maxDs)}</span>`;
+};
+
+
+// MaxEntScan: the drop from the reference splice site score, with the raw ref -> alt scores in the
+// title. Negative means the variant weakens the site, which is the direction that matters.
+VariantGridFormat.maxentscan = (percentDiffRef, type, rowData) => {
+    if (percentDiffRef == null || percentDiffRef === '') {
+        return '';
+    }
+    const ref = rowData["variantannotation__maxentscan_ref"];
+    const alt = rowData["variantannotation__maxentscan_alt"];
+    const diff = rowData["variantannotation__maxentscan_diff"];
+    const parts = [];
+    if (ref != null && alt != null) {
+        parts.push(`ref ${ref} → alt ${alt}`);
+    }
+    if (diff != null) {
+        parts.push(`diff ${diff}`);
+    }
+    const title = parts.length ? parts.join(', ') : `${percentDiffRef}% of the reference score`;
+    const weakened = Number(percentDiffRef) < 0 ? ' maxentscan-weakened' : '';
+    return `<span class='maxentscan${weakened}' title='${escapeHtml(title)}'>${escapeHtml(percentDiffRef)}%</span>`;
+};
+
+
+// Mastermind's three granularities in one cell - cDNA · cDNA+protein · AA change - linked to the
+// article list through the MMID3 ride-along.
+VariantGridFormat.mastermind = (cdnaCount, type, rowData) => {
+    const counts = [cdnaCount,
+                    rowData["variantannotation__mastermind_count_2_cdna_prot"],
+                    rowData["variantannotation__mastermind_count_3_aa_change"]];
+    if (counts.every(c => c == null || c === '')) {
+        return '';
+    }
+    const labels = ["cDNA", "cDNA + protein", "AA change"];
+    const title = counts.map((c, i) => `${labels[i]}: ${c == null ? 0 : c}`).join(', ');
+    const text = counts.map(c => c == null ? 0 : c).join(' · ');
+    const body = `<span class='mastermind-counts' title='${escapeHtml(title)}'>${escapeHtml(text)}</span>`;
+    const mmid3 = rowData["variantannotation__mastermind_mmid3"];
+    if (!mmid3) {
+        return body;
+    }
+    const url = `https://mastermind.genomenon.com/detail?mutation=${encodeURIComponent(String(mmid3).split("&")[0])}`;
+    return `<a class='mastermind-link' href='${escapeHtml(url)}' target='_blank'>${body}</a>`;
+};
+
+
+// Pathogenicity predictions as a segmented meter - one segment per tool that made a call, damaging
+// first. Reads variantannotation__predictions_num_benign; sorts on the damaging count.
+VariantGridFormat.predictions = (numPathogenic, type, rowData) => {
+    const damaging = Number(numPathogenic) || 0;
+    const benign = Number(rowData["variantannotation__predictions_num_benign"]) || 0;
+    const total = damaging + benign;
+    if (!total) {
+        return '';
+    }
+    const segments = '<i class="pred-damaging"></i>'.repeat(damaging)
+                   + '<i class="pred-benign"></i>'.repeat(benign);
+    const title = `${damaging} damaging · ${benign} benign of ${total} prediction tools`;
+    return `<span class='predictions' title='${escapeHtml(title)}'>${segments}`
+         + `<span class='predictions-count'>${damaging}/${total}</span></span>`;
+};
+
+
+// This database's zygosity counts in one cell - hom · het, with ref and unknown in the title.
+// Sorts on the het count, the column it lives on.
+VariantGridFormat.dbZygosityCounts = (hetCount, type, rowData) => {
+    const hom = rowData["global_variant_zygosity__hom_count"];
+    if ((hetCount == null || hetCount === '') && (hom == null || hom === '')) {
+        return '';
+    }
+    const counts = {hom: hom, het: hetCount,
+                    ref: rowData["global_variant_zygosity__ref_count"],
+                    unknown: rowData["global_variant_zygosity__unk_count"]};
+    const title = Object.entries(counts)
+        .filter(([, v]) => v != null && v !== '')
+        .map(([k, v]) => `${v} ${k}`).join(', ');
+    const cell = ["hom", "het"].map(k => {
+        const v = counts[k] == null || counts[k] === '' ? 0 : counts[k];
+        const zero = Number(v) ? '' : ' db-count-zero';
+        return `<span class='db-count${zero}'>${escapeHtml(v)}</span>`;
+    }).join(' · ');
+    return `<span class='db-zygosity-counts' title='${escapeHtml(title)}'>${cell}</span>`;
+};
+
 
 // gnomAD popmax AF with the population it came from - reads variantannotation__gnomad_popmax.
 // The AF itself is formatted server side (unit -> percent) so the CSV matches the grid.
@@ -258,6 +479,10 @@ function _representativeVariantLabel(variantId, rowData) {
         if (p) {
             html += ` <span class='rv-hgvs-p'>${escapeHtml(p.change)}</span>`;
         }
+        // Two line rows move the accession and the protein change below the name (global.scss picks
+        // which of the two shows) - the identifiers a reader wants next, without a second column
+        html += `<span class='rv-line2'>${escapeHtml(c.accession)}`
+              + (p ? ` <span class='rv-hgvs-p'>${escapeHtml(p.change)}</span>` : '') + '</span>';
         return {html: html, title: hgvsC + (hgvsP ? " " + hgvsP : "")};
     }
     // 2. g.HGVS (no transcript - intergenic, or annotation not run yet for this variant)
@@ -505,7 +730,7 @@ function gnomADVariant(rowData) {
 
 VariantGridFormat.gnomadFiltered = (gnomadFilteredCellValue, type, rowData, ctx) => {
     let gnomadFilteredString = '';
-    if (gnomadFilteredCellValue !== null) {
+    if (gnomadFilteredCellValue != null) {
         const filterDiv = $("<div/>").addClass("gnomad-flag-label");
         if (gnomadFilteredCellValue) {
             filterDiv.addClass("gnomad-flagged");
@@ -525,6 +750,24 @@ VariantGridFormat.gnomadFiltered = (gnomadFilteredCellValue, type, rowData, ctx)
         gnomadFilteredString = gnomADLink.get(0).outerHTML;
     }
     return gnomadFilteredString;
+};
+
+
+// gnomAD AF with the gnomAD Pass/Fail link beside it - reads variantannotation__gnomad_filtered from
+// COMPOSITE_COLUMN_ROW_FIELDS (snpdb/grid_columns/custom_columns.py). The AF is formatted server side
+// (unit -> percent) so the CSV matches the grid. Sorts by frequency, the column it lives on.
+VariantGridFormat.gnomadAf = (af, type, rowData, ctx) => {
+    const filteredLink = VariantGridFormat.gnomadFiltered(rowData["variantannotation__gnomad_filtered"],
+                                                          type, rowData, ctx);
+    if (af == null || af === '') {
+        return filteredLink;
+    }
+    // At or above the import 'common' filter's AF the variant is one everybody carries - mute it so
+    // the rare frequencies down the column are the ones that catch the eye
+    const commonAf = ctx && ctx.extra && ctx.extra.commonGnomadAf;
+    const common = commonAf != null && parseFloat(af) >= commonAf ? ' gnomad-af-common' : '';
+    const afHtml = `<span class='gnomad-af${common}'>${escapeHtml(af)}</span>`;
+    return filteredLink ? `${afHtml} ${filteredLink}` : afHtml;
 };
 
 

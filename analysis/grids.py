@@ -327,13 +327,22 @@ class VariantGrid(AbstractVariantGrid):
                                                 af_show_in_percent: bool, sample_formatter: Optional[Callable] = None):
         available_format_columns = get_available_format_columns(cohorts)
         sample_columns = {
-            'samples_zygosity': ('Zygosity', '%(sample)s %(label)s', 55),
+            'samples_zygosity': ('Zygosity', '%(sample)s %(label)s', 110),
             'samples_allele_depth': ('AD', '%(label)s %(sample)s', 25),
             'samples_allele_frequency': ('AF', '%(label)s %(sample)s', 30),
             'samples_read_depth': ('DP', '%(label)s %(sample)s', 25),
             'samples_genotype_quality': ('GQ', '%(label)s %(sample)s', 25),
             'samples_phred_likelihood': ('PL', '%(label)s %(sample)s', 25),
             'samples_filters': ('FT', '%(label)s %(sample)s', 100),
+        }
+        # The zygosity cell draws the glyph, then the allele frequency and read depth beside it -
+        # those two ride along hidden and stay in the CSV. @see VariantGridFormat.sampleZygosity.
+        # The header's sort menu offers whichever of the three the sample's VCF actually has
+        SAMPLE_COMPOSITE_COLUMNS = ['samples_allele_frequency', 'samples_read_depth']
+        SAMPLE_SORT_KEY_LABELS = {
+            'samples_zygosity': 'Zygosity',
+            'samples_allele_frequency': 'Allele frequency',
+            'samples_read_depth': 'Read depth',
         }
         packed_data_replace = dict(Zygosity.CHOICES)
         # Some legacy data (Missing data in FreeBayes before PythonKnownVariantsImporter v12) has -2147483647 for
@@ -375,6 +384,18 @@ class VariantGrid(AbstractVariantGrid):
                     # Index is what is passed back to server side for sorting - we'll pack the info here
                     "index": ":".join([cgc.cohortgenotype_alias, str(sql_index), column]),
                 }
+                if column == 'samples_zygosity':
+                    col_data_dict.update({
+                        "formatter": "sampleZygosityFormatter",
+                        "formatter_kwargs": {"samplePrefix": f"sample_{sample.pk}_"},
+                        "sort_menu": [
+                            {"label": label, "column": f"sample_{sample.pk}_{c}"}
+                            for c, label in SAMPLE_SORT_KEY_LABELS.items()
+                            if available_format_columns[c]
+                        ],
+                    })
+                elif column in SAMPLE_COMPOSITE_COLUMNS:
+                    col_data_dict["hidden"] = True
                 column_data.append(col_data_dict)
 
         overrides = get_overrides(column_names, column_data, model_field=False, queryset_field=False)
