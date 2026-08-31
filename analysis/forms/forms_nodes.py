@@ -472,14 +472,37 @@ class DamageNodeForm(BaseNodeForm):
         # calibrated ClinGen colour bands and value colouring in damagenode_editor.html (omitted when None).
         for tool in TOOLS:
             if tool.raw_field:
-                field_name = f"{tool.raw_field}_min"
-                if field_name in self.fields:
-                    attrs = {"min": tool.raw_min, "max": tool.raw_max, "step": tool.raw_step}
-                    if tool.raw_pathogenic_threshold is not None:
-                        attrs["data-pathogenic-min"] = tool.raw_pathogenic_threshold
-                    if tool.raw_max_benign_threshold is not None:
-                        attrs["data-benign-max"] = tool.raw_max_benign_threshold
-                    self.fields[field_name].widget = HiddenInput(attrs=attrs)
+                attrs = {"min": tool.raw_min, "max": tool.raw_max, "step": tool.raw_step}
+                if tool.raw_pathogenic_threshold is not None:
+                    attrs["data-pathogenic-min"] = tool.raw_pathogenic_threshold
+                if tool.raw_max_benign_threshold is not None:
+                    attrs["data-benign-max"] = tool.raw_max_benign_threshold
+                field = self.fields[tool.node_threshold_field]
+                field.widget = HiddenInput(attrs=attrs)
+                if tool.node_label:
+                    # Only where the auto label would mislead - a signed or inverted score
+                    field.label = f"{tool.node_label} {tool.raw_direction.comparison}"
+
+    def get_raw_score_rows(self) -> list[dict]:
+        """ Per-tool bound fields for the raw-score slider rows and their setup calls in the editor,
+            so a tool added to TOOLS gets a slider without touching the template (#1808) """
+        return [{
+            "tool": tool,
+            "field": tool.raw_field,
+            "threshold_field": tool.node_threshold_field,
+            "min_field": self[tool.node_threshold_field],
+            "required_field": self[f"{tool.raw_field}_required"],
+            "allow_null_field": self[f"{tool.raw_field}_allow_null"],
+        } for tool in self.instance.get_raw_score_tools()]
+
+    def get_pred_rows(self) -> list[dict]:
+        """ Per-tool bound fields for the categorical prediction dropdown rows """
+        return [{
+            "tool": tool,
+            "pred_field": self[tool.pred_field],
+            "required_field": self[f"{tool.pred_field}_required"],
+            "allow_null_field": self[f"{tool.pred_field}_allow_null"],
+        } for tool in self.instance.get_pred_tools()]
 
     def get_variant_class_groups(self) -> list[tuple[str, list]]:
         """ (group name, sub-widgets) for the grouped checkboxes in the editor """

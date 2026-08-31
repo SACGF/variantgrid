@@ -15,13 +15,19 @@ from annotation.models.damage_enums import (
     ALoFTPrediction,
     AlphaMissensePrediction,
     ClinPredPrediction,
+    EVEClass,
     MetaRNNPrediction,
     PathogenicityImpact,
     PrimateAIPrediction,
 )
 from annotation.models.models import VariantAnnotation
 from annotation.models.models_enums import NMDEscapeStatus
-from annotation.pathogenicity_predictions import TOOLS, TOOLS_BY_PRED_FIELD
+from annotation.pathogenicity_predictions import (
+    TOOLS,
+    TOOLS_BY_PRED_FIELD,
+    PathogenicityTool,
+    RawScoreDirection,
+)
 from library.genomics.vcf_enums import VariantClass
 
 
@@ -116,6 +122,28 @@ class DamageNode(AnalysisNode):
     clinpred_score_required = models.BooleanField(default=False)
     clinpred_score_allow_null = models.BooleanField(default=True)
 
+    # The VEP 116 plugin scores below are GRCh38 + columns_version >= 5, so unlike the dbNSFP scores
+    # their sliders only show on annotation versions that populate them (#1808)
+    eve_score_min = models.FloatField(null=True, blank=True)
+    eve_score_required = models.BooleanField(default=False)
+    eve_score_allow_null = models.BooleanField(default=True)
+
+    # popEVE is a log-likelihood ratio - more negative is more damaging, hence _max not _min
+    popeve_score_max = models.FloatField(null=True, blank=True)
+    popeve_score_required = models.BooleanField(default=False)
+    popeve_score_allow_null = models.BooleanField(default=True)
+
+    # ProtVar ddG (kcal/mol) and PromoterAI aren't missense pathogenicity predictions - they filter
+    # only, and stay out of predictions_num_pathogenic. PromoterAI's score is signed, so it matches
+    # on |score|.
+    protvar_stability_min = models.FloatField(null=True, blank=True)
+    protvar_stability_required = models.BooleanField(default=False)
+    protvar_stability_allow_null = models.BooleanField(default=True)
+
+    promoter_ai_score_min = models.FloatField(null=True, blank=True)
+    promoter_ai_score_required = models.BooleanField(default=False)
+    promoter_ai_score_allow_null = models.BooleanField(default=True)
+
     metarnn_score_min = models.FloatField(null=True, blank=True)
     metarnn_score_required = models.BooleanField(default=False)
     metarnn_score_allow_null = models.BooleanField(default=True)
@@ -160,6 +188,11 @@ class DamageNode(AnalysisNode):
     primateai_pred_required = models.BooleanField(default=False)
     primateai_pred_allow_null = models.BooleanField(default=True)
 
+    # EVE's class is stored as a word, not the dbNSFP single-char code
+    eve_class = models.CharField(max_length=10, choices=EVEClass.choices, null=True, blank=True)
+    eve_class_required = models.BooleanField(default=False)
+    eve_class_allow_null = models.BooleanField(default=True)
+
     nmd_escaping_variant = models.BooleanField(default=False)
     nmd_escaping_variant_required = models.BooleanField(default=False)
 
@@ -171,16 +204,25 @@ class DamageNode(AnalysisNode):
     aloft_required = models.BooleanField(default=False)
     aloft_allow_null = models.BooleanField(default=True)
 
+    def get_raw_score_tools(self) -> list[PathogenicityTool]:
+        """ Tools whose raw-score slider this analysis's annotation version actually populates -
+            gated off visible_columns so the editor can't offer a filter over an empty column. """
+        visible_columns = self.analysis.annotation_version.variant_annotation_version.visible_columns
+        return [t for t in TOOLS if t.raw_field in visible_columns]
+
+    def get_pred_tools(self) -> list[PathogenicityTool]:
+        """ Tools offering a categorical prediction dropdown on this annotation version """
+        visible_columns = self.analysis.annotation_version.variant_annotation_version.visible_columns
+        return [t for t in TOOLS if t.pred_field in visible_columns]
+
     def _v4_score_min_fields(self) -> list:
-        # REVEL is in TOOLS but uses revel_rankscore_min (v2/v3 field), not revel_score_min;
-        # safe getattr keeps the helper robust to TOOLS-vs-model field divergence.
-        return [getattr(self, f"{t.raw_field}_min", None) for t in TOOLS if t.raw_field]
+        return [getattr(self, t.node_threshold_field) for t in TOOLS if t.raw_field]
 
     def _v4_pred_fields(self) -> list:
         return [getattr(self, t.pred_field) for t in TOOLS if t.pred_field]
 
     def _v4_score_required_fields(self) -> list:
-        return [getattr(self, f"{t.raw_field}_required", False) for t in TOOLS if t.raw_field]
+        return [getattr(self, f"{t.raw_field}_required") for t in TOOLS if t.raw_field]
 
     def _v4_pred_required_fields(self) -> list:
         return [getattr(self, f"{t.pred_field}_required") for t in TOOLS if t.pred_field]
@@ -294,6 +336,15 @@ class DamageNode(AnalysisNode):
                 "nmd_escape_status has not been backfilled. "
                 "Run `manage.py backfill_ptc_annotation` to enable the filter."
             )
+        for tool in TOOLS:
+            if tool.raw_field and getattr(self, tool.node_threshold_field) is not None:
+                if tool.raw_field not in vav.visible_columns:
+                    warnings.append(
+                        f"{tool.name} filter has no data on this VariantAnnotationVersion: "
+                        f"{tool.raw_field} is not populated on {vav.genome_build} / VEP {vav.vep} / "
+                        f"columns_version {vav.columns_version}."
+                    )
+
         if self.splice_min is not None and vav.uses_raw_spliceai:
             warnings.append(
                 "SpliceAI scores on this VariantAnnotationVersion are from the raw precomputed file "
@@ -303,6 +354,18 @@ class DamageNode(AnalysisNode):
                 "https://github.com/Illumina/SpliceAI"
             )
         return warnings
+
+    @staticmethod
+    def _raw_score_q(tool: PathogenicityTool, threshold: float) -> Q:
+        """ Keeps the damaging side of the score - which side that is depends on the tool """
+        field = f"variantannotation__{tool.raw_field}"
+        match tool.raw_direction:
+            case RawScoreDirection.LOWER:
+                return Q(**{f"{field}__lte": threshold})
+            case RawScoreDirection.MAGNITUDE:
+                return Q(**{f"{field}__gte": abs(threshold)}) | Q(**{f"{field}__lte": -abs(threshold)})
+            case _:
+                return Q(**{f"{field}__gte": threshold})
 
     def _get_node_q_hash(self) -> str:
         return str(self._get_node_q())
@@ -392,18 +455,18 @@ class DamageNode(AnalysisNode):
                     else:
                         or_filters.append(q_path)
 
-            # Raw-score filters (v4 onward) — driven by TOOLS so VARITY_ER (no
-            # ClinGen calibration, slider-only) is included alongside calibrated tools.
+            # Raw-score filters (v4 onward) — driven by TOOLS so the uncalibrated tools
+            # (VARITY_ER, EVE, popEVE, ProtVar ddG, PromoterAI) are offered alongside the
+            # calibrated ones.
             if self.columns_version >= 4:
                 for tool in TOOLS:
                     raw_field = tool.raw_field
                     if not raw_field:
                         continue
-                    raw_field_min = f"{raw_field}_min"
-                    if score_min := getattr(self, raw_field_min, None):
-                        q_raw = Q(**{f"variantannotation__{raw_field}__gte": score_min})
-                        if getattr(self, f"{raw_field}_required", False):
-                            if getattr(self, f"{raw_field}_allow_null", False):
+                    if threshold := getattr(self, tool.node_threshold_field):
+                        q_raw = self._raw_score_q(tool, threshold)
+                        if getattr(self, f"{raw_field}_required"):
+                            if getattr(self, f"{raw_field}_allow_null"):
                                 q_raw |= Q(**{f"variantannotation__{raw_field}__isnull": True})
                             and_filters.append(q_raw)
                         else:
