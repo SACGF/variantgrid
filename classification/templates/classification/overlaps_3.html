@@ -8,8 +8,11 @@
 {% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
 {% block content %}
 <style>
+    .overlaps tbody tr td {
+        height: 70px;
+    }
     .dt-classification {
-        width: 240px;
+        width: 280px;
     }
     .dt-testing_context {
         width: 100px;
@@ -57,7 +60,7 @@
     <table
            data-datatable-data='groupingFilter'
            data-datatable-url="{% url 'overlaps_3_datatables' %}"
-           class="sticky-header thick-border"
+           class="sticky-header thick-border overlaps"
            id="overlaps-table"
            data-adjust-columns="false">
     </table>
