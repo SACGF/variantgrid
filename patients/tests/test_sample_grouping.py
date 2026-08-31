@@ -219,6 +219,11 @@ class TestSampleGroupTree(ExtractionSampleTestCase):
         self.assertEqual([s["sample"] for s in tree["samples"]], [loose.name])
         self.assertTrue(tree["samples"][0]["in_selection"])
 
+    def test_an_unknown_level_is_a_404(self):
+        self.client.force_login(self.user)
+        url = reverse("sample_group_tree", kwargs={"level": "Z", "pk": self.patient.pk})
+        self.assertEqual(self.client.get(url).status_code, 404)
+
     def test_samples_without_permission_are_counted_not_named(self):
         tree = get_patient_sample_tree(self.other_user, SampleSourceLevel.PATIENT, self.patient,
                                        self.grch37)

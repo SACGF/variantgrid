@@ -523,16 +523,15 @@ class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
 
         data = self._get_chip_data()
         specimens = data["specimens"]
-        match self.source_level:
-            case SampleSourceLevel.EXTRACTION:
-                extractions = specimens[0]["extractions"] if specimens else []
-                chips.extend(self._extraction_chip(e) for e in extractions)
-            case SampleSourceLevel.SPECIMEN:
-                chips.extend(self._specimen_chip(sp) for sp in specimens)
-            case SampleSourceLevel.PATIENT:
-                chips.extend(self._group_chips(specimens, SampleSourceLevel.SPECIMEN, self._specimen_chip))
-                if unlinked_vcfs := data["unlinked_vcfs"]:
-                    chips.append(self._vcf_chip(unlinked_vcfs))
+        if self.source_level == SampleSourceLevel.EXTRACTION:
+            extractions = specimens[0]["extractions"] if specimens else []
+            chips.extend(self._extraction_chip(e) for e in extractions)
+        elif self.source_level == SampleSourceLevel.SPECIMEN:
+            chips.extend(self._specimen_chip(sp) for sp in specimens)
+        elif self.source_level == SampleSourceLevel.PATIENT:
+            chips.extend(self._group_chips(specimens, SampleSourceLevel.SPECIMEN, self._specimen_chip))
+            if unlinked_vcfs := data["unlinked_vcfs"]:
+                chips.append(self._vcf_chip(unlinked_vcfs))
 
         if warnings := data["warnings"]:
             chips.append(NodeChip(text="", icon="fa-solid fa-triangle-exclamation", count=len(warnings),

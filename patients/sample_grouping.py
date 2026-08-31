@@ -6,7 +6,9 @@
 
     Keyed on the object rather than a node, since the editor has to answer before a node is saved.
 """
+import operator
 from dataclasses import dataclass, field
+from functools import reduce
 from typing import Optional
 
 from django.contrib.auth.models import User
@@ -23,11 +25,29 @@ from snpdb.models import (
     Sample,
 )
 
-SOURCE_LEVEL_MODELS = {
-    SampleSourceLevel.SAMPLE: Sample,
-    SampleSourceLevel.EXTRACTION: Extraction,
-    SampleSourceLevel.SPECIMEN: Specimen,
-    SampleSourceLevel.PATIENT: Patient,
+@dataclass(frozen=True)
+class SourceLevel:
+    """ What one level of the hierarchy is, so the levels differ in a table rather than in branches """
+    model: type
+    # Sample lookups reaching this object's samples, OR'd together. Patient takes two because the
+    # links are set independently - the VCF import carries extraction down without setting
+    # sample.patient, while the patient CSV sets patient and may leave extraction null
+    sample_paths: tuple[str, ...]
+    # Attribute paths from the object to its patient, first one that resolves wins.
+    # Empty means the object is already the patient
+    patient_paths: tuple[str, ...] = ()
+
+
+SOURCE_LEVELS = {
+    SampleSourceLevel.SAMPLE: SourceLevel(
+        model=Sample, sample_paths=("pk",),
+        patient_paths=("patient", "extraction__specimen__patient")),
+    SampleSourceLevel.EXTRACTION: SourceLevel(
+        model=Extraction, sample_paths=("extraction",), patient_paths=("specimen__patient",)),
+    SampleSourceLevel.SPECIMEN: SourceLevel(
+        model=Specimen, sample_paths=("extraction__specimen",), patient_paths=("patient",)),
+    SampleSourceLevel.PATIENT: SourceLevel(
+        model=Patient, sample_paths=("patient", "extraction__specimen__patient")),
 }
 
 
@@ -68,21 +88,10 @@ class SampleGroup:
 
 
 def _get_source_level_q(level: str, source) -> Q:
-    """ The samples a source object reaches.
-
-        Patient is a union because the two links are set independently - the VCF import carries
-        extraction down without setting sample.patient, while the patient CSV sets patient and may
-        leave extraction null. """
-    match level:
-        case SampleSourceLevel.SAMPLE:
-            return Q(pk=source.pk)
-        case SampleSourceLevel.EXTRACTION:
-            return Q(extraction=source)
-        case SampleSourceLevel.SPECIMEN:
-            return Q(extraction__specimen=source)
-        case SampleSourceLevel.PATIENT:
-            return Q(patient=source) | Q(extraction__specimen__patient=source)
-    raise ValueError(f"Unknown sample source level: '{level}'")
+    """ The samples a source object reaches. Every path takes the pk, so one lookup shape covers
+        'pk' and the FK chains alike """
+    paths = SOURCE_LEVELS[level].sample_paths
+    return reduce(operator.or_, [Q(**{path: source.pk}) for path in paths])
 
 
 def get_exclusion_reason(sample: Sample, genome_build: Optional[GenomeBuild]) -> Optional[str]:
@@ -116,23 +125,28 @@ def get_sample_group(user: User, level: str, source, genome_build: Optional[Geno
     return group
 
 
+def _follow_path(obj, path: str):
+    """ Walk an attribute path, giving up at the first null link. A name that isn't there still
+        raises - that's a typo in the table above, not a sample without a patient """
+    for attribute in path.split("__"):
+        obj = getattr(obj, attribute)
+        if obj is None:
+            return None
+    return obj
+
+
 def get_patient_for_source(level: str, source) -> Optional[Patient]:
     """ Every level resolves to a patient - it's what the node's pedigree badge and the editor tree
         are drawn from """
     if source is None:
         return None
-    match level:
-        case SampleSourceLevel.SAMPLE:
-            if source.patient:
-                return source.patient
-            return source.extraction.specimen.patient if source.extraction else None
-        case SampleSourceLevel.EXTRACTION:
-            return source.specimen.patient
-        case SampleSourceLevel.SPECIMEN:
-            return source.patient
-        case SampleSourceLevel.PATIENT:
-            return source
-    raise ValueError(f"Unknown sample source level: '{level}'")
+    patient_paths = SOURCE_LEVELS[level].patient_paths
+    if not patient_paths:
+        return source  # A Patient is its own
+    for path in patient_paths:
+        if patient := _follow_path(source, path):
+            return patient
+    return None
 
 
 def get_sample_variant_count(sample: Sample) -> Optional[int]:

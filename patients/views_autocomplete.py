@@ -86,16 +86,12 @@ class ExternalPKAutocompleteView(AutocompleteView):
         return qs
 
 
-def _sample_source_text(level: str, obj) -> str:
-    """ Carries the parent, so two "DNA" extractions are told apart in one flat list """
-    match level:
-        case SampleSourceLevel.SPECIMEN:
-            return f"{obj} \u2014 {obj.patient}"
-        case SampleSourceLevel.EXTRACTION:
-            return f"{obj} \u2014 {obj.specimen}"
-        case SampleSourceLevel.SAMPLE:
-            return f"{obj.name} ({obj.vcf})"
-    return str(obj)
+# Result text carries the parent, so two "DNA" extractions are told apart in one flat list
+SAMPLE_SOURCE_TEXT = {
+    SampleSourceLevel.SPECIMEN: lambda obj: f"{obj} \u2014 {obj.patient}",
+    SampleSourceLevel.EXTRACTION: lambda obj: f"{obj} \u2014 {obj.specimen}",
+    SampleSourceLevel.SAMPLE: lambda obj: f"{obj.name} ({obj.vcf})",
+}
 
 
 class SampleSourceAutocompleteView(AutocompleteView):
@@ -123,7 +119,8 @@ class SampleSourceAutocompleteView(AutocompleteView):
             view.request = request
             view.q = self.q
             view.forwarded = self.forwarded
-            children = [{"id": f"{level}:{obj.pk}", "text": _sample_source_text(level, obj)}
+            get_text = SAMPLE_SOURCE_TEXT.get(level, str)
+            children = [{"id": f"{level}:{obj.pk}", "text": get_text(obj)}
                         for obj in view.get_queryset()[:self.MAX_PER_GROUP]]
             if children:
                 results.append({"text": label, "children": children})

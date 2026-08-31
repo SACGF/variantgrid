@@ -48,7 +48,7 @@ from library.genomics.vcf_enums import VARIANT_CLASS_GROUPS
 from library.utils import sha256sum_str
 from ontology.models import OntologyTerm
 from patients.models_enums import GnomADPopulation, SampleSourceLevel
-from patients.sample_grouping import SOURCE_LEVEL_MODELS
+from patients.sample_grouping import SOURCE_LEVELS
 from snpdb.forms import GenomeBuildAutocompleteForwardMixin
 from snpdb.models import Lab, Sample, Tag, VCFFilter
 from snpdb.models.models_enums import AlleleOriginFilterDefault
@@ -988,9 +988,10 @@ class SampleNodeForm(GenomeBuildAutocompleteForwardMixin, SampleThresholdsMixin,
         if not value:
             return None
         level, _, pk = value.partition(":")
-        model = SOURCE_LEVEL_MODELS.get(level)
-        if model is None or level not in SampleNode.implemented_source_levels():
+        source_level = SOURCE_LEVELS.get(level)
+        if source_level is None or level not in SampleNode.implemented_source_levels():
             raise forms.ValidationError(f"Unknown source level: '{level}'")
+        model = source_level.model
         try:
             return level, model.get_for_user(self.instance.analysis.user, pk)
         except (Http404, PermissionDenied, ValueError) as e:

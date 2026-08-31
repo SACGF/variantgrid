@@ -31,7 +31,7 @@ from patients.models import (
 )
 from patients.models_enums import MatchStatus, SampleSourceLevel
 from patients.sample_grouping import (
-    SOURCE_LEVEL_MODELS,
+    SOURCE_LEVELS,
     get_patient_sample_tree,
     get_sample_group,
     sample_group_as_json,
@@ -248,10 +248,10 @@ def view_extraction(request, extraction_id):
 
 def _get_sample_source(user, level: str, pk: int):
     """ A level of Patient -> Specimen -> Extraction -> Sample, loaded through its own permissions """
-    model = SOURCE_LEVEL_MODELS.get(level)
-    if model is None:
+    source_level = SOURCE_LEVELS.get(level)
+    if source_level is None:
         raise Http404(f"Unknown sample source level '{level}'")
-    return model.get_for_user(user, pk)
+    return source_level.model.get_for_user(user, pk)
 
 
 def _get_request_genome_build(request):
