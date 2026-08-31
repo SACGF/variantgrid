@@ -1,6 +1,5 @@
 import hashlib
 import json
-import secrets
 from hashlib import md5
 
 import deprecation
@@ -43,11 +42,6 @@ def stable_dict_hash(d: dict) -> str:
         compares equal to a value round-tripped through a CharField). """
     s = json.dumps(d, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
     return hashlib.sha256(s.encode()).hexdigest()
-
-
-def secure_random_string() -> str:
-    random_bytes = secrets.token_bytes(32)
-    return hashlib.sha256(random_bytes).hexdigest()
 
 
 @deprecation.deprecated(details="Use file_sha256sum instead")

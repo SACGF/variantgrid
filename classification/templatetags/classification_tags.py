@@ -97,7 +97,6 @@ def classification_groups(
     :param genome_build: Preferred genome build
     :param title: Heading to give the table
     :param context_object: If all these records are from an allele, provide "allele" if from a discordance report provide "discordance_report" etc
-    :param old_classification_modifications: For showing what a discordance report used to be
     :param default_sort: The column to sort by default
     """
     if isinstance(classification_modifications, QuerySet):

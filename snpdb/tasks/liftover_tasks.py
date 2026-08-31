@@ -7,7 +7,6 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.db.models import QuerySet
 
-from library.log_utils import log_traceback
 from snpdb.liftover import create_liftover_pipelines
 from snpdb.models import Allele, GenomeBuild, ImportSource
 
@@ -44,9 +43,6 @@ def liftover_allele_batch(username, genome_build_name, other_build_name, min_all
     # Re-query, so any alleles lifted over since the batches were worked out drop out
     alleles = Allele.missing_variants_for_build(genome_build).filter(pk__gte=min_allele_id,
                                                                      pk__lte=max_allele_id)
-    try:
-        logging.info("creating liftover pipelines from %s to %s for alleles %d-%d",
-                     other_build, genome_build, min_allele_id, max_allele_id)
-        create_liftover_pipelines(user, alleles, ImportSource.WEB, other_build, [genome_build])
-    except Exception:
-        log_traceback()
+    logging.info("creating liftover pipelines from %s to %s for alleles %d-%d",
+                 other_build, genome_build, min_allele_id, max_allele_id)
+    create_liftover_pipelines(user, alleles, ImportSource.WEB, other_build, [genome_build])
