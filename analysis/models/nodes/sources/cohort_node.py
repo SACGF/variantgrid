@@ -10,7 +10,7 @@ from django.db.models.functions import Concat, Length, Replace, Substr
 
 from analysis.models import AnalysisNode, GroupOperation
 from analysis.models.nodes.cohort_mixin import CohortMixin
-from analysis.models.nodes.sources._stats_cache import (
+from analysis.models.nodes.stats_cache import (
     UNCACHEABLE,
     get_cached_label_count_for_cohort,
     get_handler_for_node,

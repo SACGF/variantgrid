@@ -14,7 +14,7 @@ from django.contrib.auth.models import User
 from django.test import TestCase
 
 from analysis.models.enums import TrioInheritance
-from analysis.models.nodes.sources._stats_cache import (
+from analysis.models.nodes.stats_cache import (
     UNCACHEABLE,
     NoFilterHandler,
     TrioInheritanceHandler,

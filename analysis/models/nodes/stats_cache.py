@@ -116,7 +116,7 @@ def _cohort_trio(cohort):
 
 
 def get_handler_for_node(node) -> FilterKeyHandler:
-    # Local imports avoid eager imports of node modules during _stats_cache import.
+    # Local imports avoid eager imports of node modules during stats_cache import.
     from analysis.models.nodes.sources.cohort_node import CohortNode
     from analysis.models.nodes.sources.pedigree_node import PedigreeNode
     from analysis.models.nodes.sources.sample_node import SampleNode

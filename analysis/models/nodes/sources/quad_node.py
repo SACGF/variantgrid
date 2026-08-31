@@ -10,7 +10,7 @@ from django.db.models.query_utils import Q
 
 from analysis.models.enums import AnalysisTemplateType, NodeErrorSource, QuadInheritance
 from analysis.models.nodes.sources import AbstractCohortBasedNode
-from analysis.models.nodes.sources._family_inheritance import (
+from analysis.models.nodes.family_inheritance import (
     AbstractCompHetInheritance,
     AbstractFamilyInheritance,
     _build_family_zyg_q,

@@ -280,7 +280,7 @@ def _compute_and_persist_cohort_stats(cohort: Cohort, cgc: CohortGenotypeCollect
     """ Accumulate the four CohortGenotype*Stats families for the cohort and persist
         them via _persist_cohort_stats. Must run inside the per-CGC locked
         transaction opened by calculate_cohort_stats, using the locked cgc. """
-    from analysis.models.nodes.sources._stats_cache import (
+    from analysis.models.nodes.stats_cache import (
         get_filter_keys_to_precompute_for_cohort,
         inheritance_filter_key,
     )

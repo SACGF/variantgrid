@@ -20,7 +20,7 @@ from analysis.models.nodes.analysis_node import (
 )
 from analysis.models.nodes.cohort_mixin import SampleMixin
 from analysis.models.nodes.node_display import NodeChip, NodeIcon
-from analysis.models.nodes.sources._stats_cache import (
+from analysis.models.nodes.stats_cache import (
     get_cached_label_count_for_cohort,
     get_handler_for_node,
 )
