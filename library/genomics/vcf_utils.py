@@ -107,11 +107,6 @@ def vcf_to_variant_coordinates_and_records(filename: str) -> Iterable[tuple[Vari
             yield variant_coordinate, v
 
 
-def vcf_to_variant_coordinates(filename: str) -> Iterable[VariantCoordinate]:
-    for vc, _ in vcf_to_variant_coordinates_and_records(filename):
-        yield vc
-
-
 def get_variant_caller_and_version_from_vcf(filename) -> tuple[str, str]:
     variant_caller = None
     version = None
@@ -138,10 +133,6 @@ def get_variant_caller_and_version_from_vcf(filename) -> tuple[str, str]:
                     version = version.replace('"', "")  # Strip quotes
 
     return variant_caller, version
-
-
-def vcf_allele_is_symbolic(allele: str) -> bool:
-    return allele.startswith("<") and allele.endswith(">")
 
 
 class UnsortedVCFError(ValueError):

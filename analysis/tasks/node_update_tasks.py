@@ -228,7 +228,7 @@ def node_cache_task(node_id, version):
         try:
             node.write_cache(variant_collection)
             processing_status = ProcessingStatus.SUCCESS
-        except:
+        except Exception:
             log_traceback()
             processing_status = ProcessingStatus.ERROR
 

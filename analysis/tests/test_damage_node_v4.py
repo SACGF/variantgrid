@@ -14,6 +14,9 @@ from annotation.pathogenicity_predictions import TOOLS
 from snpdb.models import Variant
 from snpdb.models.models_genome import GenomeBuild
 
+# In TOOLS but with no DamageNode slider, so the node can't filter on them
+UNFILTERED_RAW_FIELDS = {"eve_score"}
+
 
 @override_settings(**get_fake_annotation_settings_dict(columns_version=2))
 class TestDamageNodeV4Q(TestCase):
@@ -39,12 +42,18 @@ class TestDamageNodeV4Q(TestCase):
         # pick a small positive value (or the BayesDel midpoint) per tool.
         kwargs = {}
         expected_fields = []
+        unfiltered = set()
         for tool in TOOLS:
-            field = f"{tool.raw_field}_min" if tool.raw_field else None
-            if not field or not hasattr(DamageNode, field):
+            if not tool.raw_field:
+                continue
+            field = f"{tool.raw_field}_min"
+            if not hasattr(DamageNode, field):
+                unfiltered.add(tool.raw_field)
                 continue
             kwargs[field] = max(tool.raw_min + tool.raw_step, 0.01)
             expected_fields.append(tool.raw_field)
+        # Pin the gap, so a renamed/dropped slider shrinks the assertions below visibly
+        self.assertEqual(UNFILTERED_RAW_FIELDS, unfiltered)
         node = DamageNode(analysis=self.analysis, **kwargs)
         q_str = str(node._get_node_q())
         for raw_field in expected_fields:

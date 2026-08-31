@@ -154,9 +154,9 @@ class VepColumnsRegistryTest(TestCase):
         )
         self.assertEqual(rows, ())
 
-    # ----- field_formatters migration snapshot (#1645) --------------------------
-    # These pin the destination-column -> formatter map (now built from the config)
-    # against the previously hardcoded mapping in the inserter, so the move can't drift.
+    # ----- field_formatters snapshot --------------------------------------------
+    # Pin the destination-column -> formatter map the config builds, so a config edit
+    # that silently drops or re-points a formatter shows up here.
 
     def test_field_formatters_snapshot_grch38_v4(self):
         """ Representative modern config (GRCh38, columns_version 4, gnomAD 4.1, VEP 112). """

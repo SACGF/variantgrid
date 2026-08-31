@@ -466,8 +466,10 @@ class DatabaseTableView(Generic[DC], MajorOperationViewMixin, JSONResponseView):
         if csv_name := self.config.csv_name:
             return csv_name
         try:
-            return nice_class_name(self.get_initial_queryset().model)
+            return nice_class_name(self._model)
         except Exception:
+            # json_definition() names the download before any request filtering, and a config
+            # whose queryset needs those params raises here - a generic filename is fine
             return "export"
 
     @property

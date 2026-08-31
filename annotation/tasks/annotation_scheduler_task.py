@@ -318,7 +318,7 @@ def dispatch_annotation_runs(variant_annotation_version_id=None):
         if variant_annotation_version_id is not None:
             priority_vav = VariantAnnotationVersion.objects.get(pk=variant_annotation_version_id)
         _dispatch_sweep(priority_vav=priority_vav)
-    except:
+    except Exception:
         log_traceback()
 
 

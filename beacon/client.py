@@ -14,7 +14,6 @@ from concurrent.futures import ThreadPoolExecutor
 import requests
 from django.conf import settings
 
-from beacon.query_targets import eligible_queries
 from beacon.variant_mapping import parse_beacon_response
 
 # Identify ourselves to remote Beacons - some hosting WAFs block default client user-agents
@@ -78,11 +77,3 @@ def query_nodes(node_params: dict[str, dict]) -> list[dict]:
     items = list(node_params.items())
     with ThreadPoolExecutor(max_workers=len(items)) as executor:
         return list(executor.map(lambda item: query_node(item[0], item[1]), items))
-
-
-def query_external_beacons_for_variant(variant, genome_build) -> list[dict]:
-    """ Gate the variant against each configured node's target and fan out only to the servers
-        whose domain it matches (§9): symbolic CNVs -> copy-number Beacons, SNVs -> sequence
-        Beacons. A variant that matches no configured server queries nothing. """
-    node_params = eligible_queries(variant, genome_build, settings.BEACON_QUERY_NODES)
-    return query_nodes(node_params)

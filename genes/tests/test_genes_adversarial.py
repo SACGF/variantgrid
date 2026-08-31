@@ -20,12 +20,7 @@ from genes.hgvs.hgvs import (
 )
 from genes.hgvs.phgvs import PHGVS
 from genes.models import TranscriptVersion
-from genes.transcripts_utils import (
-    get_refseq_type,
-    looks_like_hgvs_prefix,
-    looks_like_transcript,
-    transcript_is_lrg,
-)
+from genes.transcripts_utils import get_refseq_type, transcript_is_lrg
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -414,7 +409,7 @@ class TestTokenizeGeneSymbols(TestCase):
 
 
 # ---------------------------------------------------------------------------
-# get_refseq_type() / looks_like_transcript() / transcript_is_lrg()
+# get_refseq_type() / transcript_is_lrg()
 # ---------------------------------------------------------------------------
 
 class TestTranscriptUtils(TestCase):
@@ -433,38 +428,6 @@ class TestTranscriptUtils(TestCase):
     def test_enst_prefix_returns_none_from_get_refseq_type(self):
         # ENST is not in the RefSeq prefix list
         self.assertIsNone(get_refseq_type("ENST00000001"))
-
-    # --- looks_like_transcript ---
-
-    def test_nm_looks_like_transcript(self):
-        self.assertTrue(looks_like_transcript("NM_001145661"))
-
-    def test_nc_not_a_transcript(self):
-        # NC_ is genomic → not a transcript
-        self.assertFalse(looks_like_transcript("NC_000001.11"))
-
-    def test_enst_looks_like_transcript(self):
-        self.assertTrue(looks_like_transcript("ENST00000001"))
-
-    def test_gene_symbol_not_transcript(self):
-        self.assertFalse(looks_like_transcript("BRCA1"))
-
-    def test_enst_lowercase_not_recognised(self):
-        # looks_like_hgvs_prefix uses startswith('ENST') — case sensitive
-        # lowercase "enst" is NOT matched
-        self.assertFalse(looks_like_transcript("enst00000001"))
-
-    # --- looks_like_hgvs_prefix ---
-
-    def test_lrg_looks_like_hgvs_prefix(self):
-        self.assertTrue(looks_like_hgvs_prefix("LRG_123t1"))
-
-    def test_lrg_lowercase_not_matched(self):
-        # startswith('LRG_') is case-sensitive
-        self.assertFalse(looks_like_hgvs_prefix("lrg_123t1"))
-
-    def test_nc_not_hgvs_prefix_when_filtered_to_mrna(self):
-        self.assertFalse(looks_like_hgvs_prefix("NC_000001", refseq_types=("mRNA",)))
 
     # --- transcript_is_lrg ---
 

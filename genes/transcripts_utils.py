@@ -62,19 +62,3 @@ def clean_transcript_accession(transcript_accession: str) -> str:
         if lrg:
             return lrg + t if t else lrg
     return t_upper
-
-
-def looks_like_transcript(prefix: str) -> bool:
-    return looks_like_hgvs_prefix(prefix, refseq_types=('mRNA', 'RNA'))
-
-
-def looks_like_hgvs_prefix(prefix: str, refseq_types=None) -> bool:
-    """ copied from pyhgvs.models.hgvs_name.HGVSName.parse_prefix """
-    if prefix.startswith('ENST') or prefix.startswith('LRG_'):
-        return True
-
-    if refseq_type := get_refseq_type(prefix):
-        if refseq_types is not None:
-            return refseq_type in refseq_types
-        return True
-    return False
