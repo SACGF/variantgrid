@@ -7,13 +7,14 @@ from django.db.models import CASCADE, Q
 from analysis.models.enums import NodeMatchInput
 from analysis.models.nodes.analysis_node import AnalysisNode
 from analysis.models.nodes.node_display import NodeChip, NodeIcon, significance_chips
+from analysis.models.nodes.significance_filter_mixin import SignificanceFilterNodeMixin
 from classification.enums import ClinicalSignificance, SomaticClinicalSignificance
 from classification.models.classification import Classification, ClassificationModification
 from snpdb.models import Lab
 from snpdb.models.models_enums import AlleleOriginFilterDefault
 
 
-class ClassificationsNode(AnalysisNode):
+class ClassificationsNode(SignificanceFilterNodeMixin, AnalysisNode):
     node_input = models.CharField(max_length=1, choices=NodeMatchInput.choices,
                                   default=NodeMatchInput.PARENT_MATCHING)
     # Default is to show all
@@ -46,31 +47,6 @@ class ClassificationsNode(AnalysisNode):
         'tier_3': SomaticClinicalSignificance.TIER_3,
         'tier_4': SomaticClinicalSignificance.TIER_4,
     }
-
-    @property
-    def min_inputs(self):
-        return self.max_inputs
-
-    @property
-    def max_inputs(self):
-        if self.node_input == NodeMatchInput.MATCHING_VARIANTS:
-            return 0
-        return 1
-
-    @property
-    def allele_origin_filter(self) -> AlleleOriginFilterDefault:
-        return AlleleOriginFilterDefault(self.allele_origin)
-
-    @property
-    def germline_enabled(self) -> bool:
-        return self.allele_origin_filter != AlleleOriginFilterDefault.SOMATIC
-
-    @property
-    def somatic_enabled(self) -> bool:
-        return self.allele_origin_filter != AlleleOriginFilterDefault.GERMLINE
-
-    def _selected_values(self, field_values: dict[str, str]) -> list[str]:
-        return [value for field, value in field_values.items() if getattr(self, field)]
 
     def _germline_q(self) -> Q:
         q = Q(classification__allele_origin_bucket__in=AlleleOriginFilterDefault.GERMLINE.buckets)

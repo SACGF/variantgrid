@@ -177,7 +177,7 @@ class TestTrioNodeInheritance(InheritanceNodeTestsMixin, TestCase):
         single-parent check in node_counts(). Regression for comp-het count > parent count."""
         node = self._make_node(TrioInheritance.COMPOUND_HET)
         with mock.patch(
-                "analysis.models.nodes.sources.trio_node.get_cached_label_count_for_cohort",
+                "analysis.models.nodes.sources.cohort_node.get_cached_label_count_for_cohort",
                 return_value=999999) as m:
             self.assertIsNone(node._get_cached_label_count(BuiltInFilters.TOTAL))
             m.assert_not_called()

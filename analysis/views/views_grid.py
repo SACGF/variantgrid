@@ -32,6 +32,8 @@ from library.django_utils.major_operation import TooManyMajorOperationsError, ma
 from library.utils.hash_utils import sha256sum_str
 from snpdb.models import CachedGeneratedFile, Cohort, Sample
 
+EXPORT_TYPES = {"csv", "vcf"}
+
 # What a node grid request may carry, so the cache key and the export params hash are built off a
 # known set. The DataTables client sends start/length/order (@see translate_datatable_params turning
 # them into rows/page/sidx/sord); the engine's own rows/page/sidx/sord names are here too because
@@ -146,41 +148,40 @@ class NodeGridConfig(NodeJSONGetView):
         return ret
 
 
-def cohort_grid_export(request, cohort_id, export_type):
-    EXPORT_TYPES = {"csv", "vcf"}
-    Cohort.get_for_user(request.user, cohort_id)  # Permission check
+def _check_export_type(export_type: str):
     if export_type not in EXPORT_TYPES:
         raise ValueError(f"{export_type} must be one of: {EXPORT_TYPES}")
 
-    params_hash = get_grid_downloadable_file_params_hash(cohort_id, export_type)
-    task = export_cohort_to_downloadable_file.si(cohort_id, export_type)
-    cgf = CachedGeneratedFile.get_or_create_and_launch("export_cohort_to_downloadable_file", params_hash, task)
+
+def _source_grid_export(request, model, obj_id: int, export_type: str, export_task, generator_name: str):
+    """ Launches (or joins) a Celery export of a source node's whole grid and redirects to the
+        CachedGeneratedFile poll URL. generator_name is stored against the cached file, so it stays put """
+    model.get_for_user(request.user, obj_id)  # Permission check
+    _check_export_type(export_type)
+
+    params_hash = get_grid_downloadable_file_params_hash(obj_id, export_type)
+    task = export_task.si(obj_id, export_type)
+    cgf = CachedGeneratedFile.get_or_create_and_launch(generator_name, params_hash, task)
     if cgf.exception:
         raise ValueError(cgf.exception)
     return redirect(cgf)
+
+
+def cohort_grid_export(request, cohort_id, export_type):
+    return _source_grid_export(request, Cohort, cohort_id, export_type,
+                               export_cohort_to_downloadable_file, "export_cohort_to_downloadable_file")
 
 
 def sample_grid_export(request, sample_id, export_type):
-    EXPORT_TYPES = {"csv", "vcf"}
-    Sample.get_for_user(request.user, sample_id)  # Permission check
-    if export_type not in EXPORT_TYPES:
-        raise ValueError(f"{export_type} must be one of: {EXPORT_TYPES}")
-
-    params_hash = get_grid_downloadable_file_params_hash(sample_id, export_type)
-    task = export_sample_to_downloadable_file.si(sample_id, export_type)
-    cgf = CachedGeneratedFile.get_or_create_and_launch("export_sample_to_downloadable_file", params_hash, task)
-    if cgf.exception:
-        raise ValueError(cgf.exception)
-    return redirect(cgf)
+    return _source_grid_export(request, Sample, sample_id, export_type,
+                               export_sample_to_downloadable_file, "export_sample_to_downloadable_file")
 
 
 def node_grid_export(request, analysis_id):
     """ Launches (or joins) a Celery export and redirects to the CachedGeneratedFile poll URL, so a big
         node isn't bound by the gunicorn request timeout (issue #1257) """
-    EXPORT_TYPES = {"csv", "vcf"}
     export_type = request.GET["export_type"]
-    if export_type not in EXPORT_TYPES:
-        raise ValueError(f"{export_type} must be one of: {EXPORT_TYPES}")
+    _check_export_type(export_type)
 
     # Always export the latest version (node.version below) - deliberately don't check the
     # client's version_id, which goes stale whenever the node is updated, eg a tag delete (#789)

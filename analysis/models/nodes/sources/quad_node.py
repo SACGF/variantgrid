@@ -1,38 +1,28 @@
 import operator
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from functools import reduce
 from typing import Optional
 
 from auditlog.registry import auditlog
-from cache_memoize import cache_memoize
 from django.db import models
-from django.db.models import Count
 from django.db.models.deletion import SET_NULL
 from django.db.models.query_utils import Q
 
 from analysis.models.enums import AnalysisTemplateType, NodeErrorSource, QuadInheritance
 from analysis.models.nodes.sources import AbstractCohortBasedNode
-from analysis.models.nodes.sources.trio_node import (
-    AbstractTrioInheritance,
+from analysis.models.nodes.sources._family_inheritance import (
+    AbstractCompHetInheritance,
+    AbstractFamilyInheritance,
     _build_family_zyg_q,
     _dominant_requires_affected_parent_error,
     _xlinked_recessive_errors,
 )
 from analysis.models.nodes.node_display import NodeIcon
-from annotation.models.models import VariantTranscriptAnnotation
-from library.constants import DAY_SECS
 from patients.models_enums import Zygosity
 from snpdb.models import Contig, Quad, Sample
 
 
-class AbstractQuadInheritance(ABC):
-    NO_VARIANT = {Zygosity.MISSING, Zygosity.HOM_REF}
-    HAS_VARIANT = {Zygosity.HET, Zygosity.HOM_ALT}
-    UNAFFECTED_AND_AFFECTED_ZYGOSITIES = [NO_VARIANT, HAS_VARIANT]
-
-    def __init__(self, node: 'QuadNode'):
-        self.node = node
-
+class AbstractQuadInheritance(AbstractFamilyInheritance):
     def _get_zyg_q(self, cgc, quad_zyg_data) -> Q:
         """quad_zyg_data = (mum_zyg, dad_zyg, proband_zyg, sibling_zyg)"""
         quad = self.node.quad
@@ -42,25 +32,6 @@ class AbstractQuadInheritance(ABC):
             (quad.proband.sample, quad_zyg_data[2], True),  # 947 - Always require zygosity for Proband
             (quad.sibling.sample, quad_zyg_data[3], self.node.require_sibling_zygosity),
         ])
-
-    @abstractmethod
-    def get_arg_q_dict(self) -> dict[Optional[str], dict[str, Q]]:
-        pass
-
-    @abstractmethod
-    def get_method(self) -> str:
-        pass
-
-    def get_contigs(self) -> Optional[set[Contig]]:
-        return None
-
-    def get_other_filters_description(self) -> str:
-        """Variant-level filters applied in addition to per-member zygosity.
-
-        Shown in every member row of the "Other Filters" column on the
-        zygosity table. Empty string means no extra filters.
-        """
-        return ""
 
 
 class SimpleQuadInheritance(AbstractQuadInheritance):
@@ -159,8 +130,8 @@ class QuadAllRecessive(AbstractQuadInheritance):
         return "XLR branch: Chr X only"
 
 
-class QuadCompHet(AbstractQuadInheritance):
-    """Compound Het for Quad. Same two-pass gene logic as TrioCompHet.
+class QuadCompHet(AbstractCompHetInheritance, AbstractQuadInheritance):
+    """Compound Het for Quad. Same two-pass gene logic as the Trio's CompHet.
 
     TODO: An unaffected sibling having BOTH comp-het hits (one from mum AND one from dad)
     in the same gene is strong evidence against pathogenicity and should be excluded.
@@ -174,55 +145,8 @@ class QuadCompHet(AbstractQuadInheritance):
     def _dad_but_not_mum(self):
         return self.NO_VARIANT, {Zygosity.HET}, {Zygosity.HET}, {Zygosity.HET}
 
-    @cache_memoize(DAY_SECS, args_rewrite=lambda s: (s.node.pk, s.node.version))
-    def _get_comp_het_q_and_two_hit_genes(self):
-        cgc = self.node.quad.cohort.cohort_genotype_collection
-        parent = self.node.get_single_parent()
-        mum_but_not_dad = self._get_zyg_q(cgc, self._mum_but_not_dad())
-        dad_but_not_mum = self._get_zyg_q(cgc, self._dad_but_not_mum())
-        comp_het_q = mum_but_not_dad | dad_but_not_mum
-
-        annotation_kwargs = self.node.get_annotation_kwargs()
-
-        # Gene overlaps (not transcript annotation) - a long SV is skipped by VEP so its only
-        # record of the genes it crosses is VariantGeneOverlap @see issue #940
-        def get_parent_genes(q):
-            qs = parent.get_queryset(q, extra_annotation_kwargs=annotation_kwargs)
-            return qs.values_list("variantgeneoverlap__gene", flat=True).distinct()
-
-        common_genes = set(get_parent_genes(mum_but_not_dad)) & set(get_parent_genes(dad_but_not_mum))
-        vav = self.node.analysis.annotation_version.variant_annotation_version
-        q_in_genes = VariantTranscriptAnnotation.get_overlapping_genes_q(vav, common_genes)
-        parent_genes_qs = parent.get_queryset(q_in_genes, extra_annotation_kwargs=annotation_kwargs)
-        parent_genes_qs = parent_genes_qs.values_list("variantgeneoverlap__gene")
-        two_hits = parent_genes_qs.annotate(gene_count=Count("pk")).filter(gene_count__gte=2)
-        two_hit_genes = set(two_hits.values_list("variantgeneoverlap__gene", flat=True).distinct())
-        return comp_het_q, two_hit_genes
-
-    def get_arg_q_dict(self) -> dict[Optional[str], dict[str, Q]]:
-        comp_het_q, two_hit_genes = self._get_comp_het_q_and_two_hit_genes()
-        vav = self.node.analysis.annotation_version.variant_annotation_version
-        comp_het_genes = VariantTranscriptAnnotation.get_overlapping_genes_q(vav, two_hit_genes)
-        cgc = self.node.quad.cohort.cohort_genotype_collection
-        q_hash = str(comp_het_q)
-        return {
-            cgc.cohortgenotype_alias: {q_hash: comp_het_q},
-            None: {q_hash: comp_het_genes},
-        }
-
     def get_method(self) -> str:
         return "Proband: HET, >=2 hits in gene from (mum OR dad), sibling HET for each hit"
-
-    def get_contigs(self) -> Optional[set[Contig]]:
-        _, two_hit_genes = self._get_comp_het_q_and_two_hit_genes()
-        contig_qs = Contig.objects.filter(
-            transcriptversion__genome_build=self.node.quad.genome_build,
-            transcriptversion__gene_version__gene__in=two_hit_genes
-        )
-        return set(contig_qs.distinct())
-
-    def get_other_filters_description(self) -> str:
-        return "≥2 hits in same gene, one from mother and one from father"
 
 
 class QuadAnyAffected(AbstractQuadInheritance):
@@ -375,7 +299,7 @@ class QuadNode(AbstractCohortBasedNode):
         For modes where affected status matters, includes both affected/unaffected variants.
         """
         from types import SimpleNamespace
-        fmt = AbstractTrioInheritance._zygosity_options
+        fmt = AbstractFamilyInheritance._zygosity_options
         members = ['mother', 'father', 'proband', 'sibling']
         stub_node = SimpleNamespace(quad=SimpleNamespace())
 
