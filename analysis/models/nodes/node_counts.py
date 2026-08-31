@@ -118,18 +118,27 @@ def get_node_counts_and_labels_dict(node, counts_to_get):
     return _aggregate_node_counts(qs, node.analysis, counts_to_get)
 
 
-def get_tag_node_counts_dict(node, tag_labels) -> dict[str, int]:
+def get_tagged_variant_ids_by_label(analysis, tag_labels) -> dict[str, list[int]]:
+    """ The tagged variants behind each tag node count label. The same for every node in the analysis,
+        so look them up once and pass them to get_tag_node_counts_dict() per node """
+    return {label: get_analysis_tagged_variant_ids(analysis, TagFilter.get_tag_id(label))
+            for label in tag_labels}
+
+
+def get_tag_node_counts_dict(node, tagged_variant_ids_by_label: dict[str, list[int]]) -> dict[str, int]:
     """ Tags change without bumping node versions, so these are recounted in place. Restricting the
         node queryset to the (small) tagged variants first makes this far cheaper than a node reload """
-    tagged_variant_ids = set()
-    for label in tag_labels:
-        tagged_variant_ids.update(get_analysis_tagged_variant_ids(node.analysis, TagFilter.get_tag_id(label)))
+    all_tagged_variant_ids = set()
+    for variant_ids in tagged_variant_ids_by_label.values():
+        all_tagged_variant_ids.update(variant_ids)
 
-    if not tagged_variant_ids:
-        return dict.fromkeys(tag_labels, 0)
+    if not all_tagged_variant_ids:
+        return dict.fromkeys(tagged_variant_ids_by_label, 0)
 
-    qs = node.get_queryset(inner_query_distinct=True).filter(pk__in=tagged_variant_ids)
-    return _aggregate_node_counts(qs, node.analysis, tag_labels)
+    qs = node.get_queryset(inner_query_distinct=True).filter(pk__in=all_tagged_variant_ids)
+    aggregate_kwargs = {label: Count("pk", filter=Q(pk__in=variant_ids), empty_result_set_value=0)
+                        for label, variant_ids in tagged_variant_ids_by_label.items()}
+    return _aggregate(qs, aggregate_kwargs)
 
 
 def _aggregate_node_counts(qs, analysis, counts_to_get) -> dict[str, int]:
@@ -139,7 +148,11 @@ def _aggregate_node_counts(qs, analysis, counts_to_get) -> dict[str, int]:
             q = None
         else:
             q = get_extra_filters_q(analysis, count_type)
-        # empty_result_set_value=0 only works for Django >= 4, so we handle manually below
         aggregate_kwargs[count_type] = Count("pk", filter=q, empty_result_set_value=0)
+    return _aggregate(qs, aggregate_kwargs)
+
+
+def _aggregate(qs, aggregate_kwargs) -> dict[str, int]:
+    # empty_result_set_value=0 only works for Django >= 4, so we handle None manually
     node_counts = qs.aggregate(**aggregate_kwargs)
     return {k: v if v is not None else 0 for k, v in node_counts.items()}

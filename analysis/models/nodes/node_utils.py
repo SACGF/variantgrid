@@ -14,7 +14,7 @@ from toposort import toposort
 
 from analysis.models import Analysis, NodeColors, NodeStatus
 from analysis.models.nodes.analysis_node import AnalysisEdge, NodeCount, NodeVersion
-from analysis.models.nodes.node_counts import get_tag_node_counts_dict
+from analysis.models.nodes.node_counts import get_tag_node_counts_dict, get_tagged_variant_ids_by_label
 from analysis.tasks.node_update_tasks import delete_analysis_old_node_versions
 from library.utils import add_exception_note
 from snpdb.models.models_enums import TagFilter
@@ -96,12 +96,15 @@ def update_analysis_tag_node_counts(analysis: Analysis, tag_labels=None):
     if not configured_tag_labels:
         return
 
+    # The tagged variants are the same for every node, so look them up once for the whole analysis
+    tagged_variant_ids_by_label = get_tagged_variant_ids_by_label(analysis, configured_tag_labels)
+
     node_counts = []
     for node in analysis.analysisnode_set.filter(status=NodeStatus.READY).select_subclasses():
         node_version = NodeVersion.objects.filter(node=node, version=node.version).first()
         if node_version is None:
             continue  # Node reloaded from under us - it'll count these itself
-        for label, count in get_tag_node_counts_dict(node, configured_tag_labels).items():
+        for label, count in get_tag_node_counts_dict(node, tagged_variant_ids_by_label).items():
             node_counts.append(NodeCount(node_version=node_version, label=label, count=count))
 
     if node_counts:
