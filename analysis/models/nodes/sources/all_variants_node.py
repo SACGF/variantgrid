@@ -31,9 +31,13 @@ class AllVariantsNode(AnalysisNode, AbstractZygosityCountNode):
     min_inputs = 0
     max_inputs = 0
 
+    @property
+    def zygosity_count_max_samples(self) -> int:
+        return self.num_samples_for_build
+
     def get_warnings(self) -> list[str]:
         warnings = super().get_warnings()
-        if msg := self.get_min_above_max_warning_message(self.num_samples_for_build):
+        if msg := self.get_min_above_max_warning_message(self.zygosity_count_max_samples):
             warnings.append(msg)
         return warnings
 

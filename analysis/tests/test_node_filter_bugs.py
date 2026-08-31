@@ -152,3 +152,38 @@ class TestPopulationNodeGroupOperationQ(AnalysisSetupMixin, TestCase):
             q_str.startswith("(OR:"),
             f"ALL mode should combine filters with OR, got: {q_str!r}",
         )
+
+
+# ---------------------------------------------------------------------------
+# AbstractZygosityCountNode - bounds that match every sample
+# ---------------------------------------------------------------------------
+
+@override_settings(ANALYSIS_NODE_CACHE_Q=False)
+class TestZygosityCountNoOpBounds(AnalysisSetupMixin, TestCase):
+    """ A min of 0 or a max of every sample filters nothing, so it stays out of the query -
+        that's what keeps AllVariantsNode from joining the global zygosity counts (#24) """
+
+    MAX_SAMPLES = 10
+
+    def _node(self, **kwargs):
+        node = AllVariantsNode(analysis=self.analysis, **kwargs)
+        # Prime the cached_property behind zygosity_count_max_samples
+        node.__dict__["num_samples_for_build"] = self.MAX_SAMPLES
+        return node
+
+    def test_default_min_zero_produces_no_filter(self):
+        """ min_het_or_hom_count defaults to 0 - every variant is >= 0 """
+        self.assertEqual({}, self._node().get_zygosity_count_arg_q_dict())
+
+    def test_max_at_sample_count_produces_no_filter(self):
+        node = self._node(max_het_or_hom_count=self.MAX_SAMPLES)
+        self.assertEqual({}, node.get_zygosity_count_arg_q_dict())
+
+    def test_max_below_sample_count_filters(self):
+        node = self._node(max_het_or_hom_count=self.MAX_SAMPLES - 1)
+        self.assertTrue(node.get_zygosity_count_arg_q_dict())
+
+    def test_no_op_bounds_left_out_of_description(self):
+        node = self._node(min_het_or_hom_count=0, max_het_or_hom_count=self.MAX_SAMPLES,
+                          min_het_count=2)
+        self.assertEqual("Het >= 2", node._get_zygosity_count_description())

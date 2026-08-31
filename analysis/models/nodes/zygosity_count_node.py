@@ -22,44 +22,61 @@ class AbstractZygosityCountNode(Model):
     class Meta:
         abstract = True
 
+    @property
+    def zygosity_count_max_samples(self) -> Optional[int]:
+        """ How many samples the counts are drawn from - None if that isn't known yet """
+        raise NotImplementedError
+
+    # label, annotation arg, column, min field, max field
+    COUNT_COLUMNS = [
+        ("Het or Hom", "non_ref_call_count", "min_het_or_hom_count", "max_het_or_hom_count"),
+        ("Ref", "ref_count", "min_ref_count", "max_ref_count"),
+        ("Het", "het_count", "min_het_count", "max_het_count"),
+        ("Hom Alt", "hom_count", "min_hom_count", "max_hom_count"),
+    ]
+
+    def _effective_count_bounds(self):
+        """ (label, annotation arg, column, min, max) with bounds that match everything dropped -
+            a min of 0 or a max of every sample filters nothing, and leaving them out keeps the count
+            annotation out of the query entirely (eg AllVariantsNode's global zygosity count join) """
+        max_fields = [f for *_, f in self.COUNT_COLUMNS]
+        max_samples = None
+        if any(getattr(self, f) is not None for f in max_fields):
+            max_samples = self.zygosity_count_max_samples
+
+        for label, count_name, min_field, max_field in self.COUNT_COLUMNS:
+            min_count = getattr(self, min_field) or None
+            max_count = getattr(self, max_field)
+            # max_samples of 0 tells us nothing, so a max of 0 there stays the real "seen in no samples" filter
+            if max_count is not None and max_samples and max_count >= max_samples:
+                max_count = None
+            if min_count is not None or max_count is not None:
+                arg = getattr(self, f"{count_name}_annotation_arg")
+                column = getattr(self, f"{count_name}_column")
+                yield label, arg, column, min_count, max_count
+
     def get_zygosity_count_arg_q_dict(self) -> dict[Optional[str], dict[str, Q]]:
-        COUNT_COLUMNS = [
-            # arg                                       column                         MIN                 MAX
-            (self.non_ref_call_count_annotation_arg,    self.non_ref_call_count_column, self.min_het_or_hom_count,  self.max_het_or_hom_count),
-            (self.ref_count_annotation_arg,             self.ref_count_column,          self.min_ref_count,         self.max_ref_count),
-            (self.het_count_annotation_arg,             self.het_count_column,          self.min_het_count,         self.max_het_count),
-            (self.hom_count_annotation_arg,             self.hom_count_column,          self.min_hom_count,         self.max_hom_count),
-        ]
         arg_q_dict = defaultdict(dict)
-        for arg, column, min_count, max_count in COUNT_COLUMNS:
+        for _, arg, column, min_count, max_count in self._effective_count_bounds():
             q_and = []
             if min_count is not None:
                 q_and.append(Q(**{column + "__gte": min_count}))
             if max_count is not None:
                 q_and.append(Q(**{column + "__lte": max_count}))
-            if q_and:
-                q = reduce(operator.and_, q_and)
-                arg_q_dict[arg][str(q)] = q
+            q = reduce(operator.and_, q_and)
+            arg_q_dict[arg][str(q)] = q
 
         return arg_q_dict
 
     def _get_zygosity_count_description(self) -> str:
-        COUNT_COLUMNS = [
-            # column                         MIN                 MAX
-            ("Het or Hom", self.min_het_or_hom_count, self.max_het_or_hom_count),
-            ("Ref", self.min_ref_count, self.max_ref_count),
-            ("Het", self.min_het_count, self.max_het_count),
-            ("Hom Alt", self.min_hom_count, self.max_hom_count),
-        ]
         name = []
-        for column, min_count, max_count in COUNT_COLUMNS:
+        for label, _, _, min_count, max_count in self._effective_count_bounds():
             if min_count is not None and max_count is not None:
-                name.append(f"{min_count} <= {column} <= {max_count}")
+                name.append(f"{min_count} <= {label} <= {max_count}")
+            elif min_count is not None:
+                name.append(f"{label} >= {min_count}")
             else:
-                if min_count is not None:
-                    name.append(f"{column} >= {min_count}")
-                if max_count is not None:
-                    name.append(f"{column} <= {max_count}")
+                name.append(f"{label} <= {max_count}")
         return ", ".join(name)
 
     def get_min_above_max_warning_message(self, max_samples) -> Optional[str]:

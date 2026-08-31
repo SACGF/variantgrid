@@ -59,25 +59,31 @@
 	}
 
 
+	// The cohort whose zygosity rows are currently in the DOM - getPerSampleZygosity() posts nothing
+	// until this matches the selected cohort, so a save during (or before) the load leaves the stored
+	// per-sample filters alone rather than writing another cohort's rows over them
+	var loadedZygosityCohortId = null;
+
 	function loadPerSampleZygosityForm(cohortId) {
-	    // We need to stop people saving form with old cohort zygosity there
-	    $("button#cohort-save").prop("disabled", true);
 		var container = $("#per-sample-zygosity-container");
 		var notes = $("#cohort-node-notes").empty();
+		loadedZygosityCohortId = null;
 		if (cohortId) {
+			container.html("Loading samples...");
 			let url = Urls.cohort_zygosity_filters({{ node.analysis_id }}, {{ node.pk }}, cohortId);
 			$.ajax(url, {
                 suppressErrors: true,
                 success: function(html) {
+                    if (getCohortId() !== cohortId) {
+                        return;  // Cohort changed while this was in flight
+                    }
                     container.html(html);
                     // Sub cohort note applies to every zygosity panel, so move it above the accordion
                     notes.append($("#sub-cohort-note", container));
+                    loadedZygosityCohortId = cohortId;
                 },
                 error: function(response, status, xhr) {
                     container.html("Error loading zygosity for cohort (perhaps re-save node?)");
-                },
-                complete: function() {
-                    $("button#cohort-save").prop("disabled", false);
                 }
 			});
 		} else {
@@ -88,6 +94,9 @@
 	function getPerSampleZygosity() {
 		var per_sample_zygosity = [];
 		var form_id=0;
+		if (loadedZygosityCohortId !== getCohortId()) {
+			return per_sample_zygosity;
+		}
 		$("tr.cohort-node-zygosity-filter").each(function() {
 			var css_id_start = "#id_cohortnodezygosityfilter_set-" + form_id + "-";
 			var data = {id : $(css_id_start + "id", this).val(),
