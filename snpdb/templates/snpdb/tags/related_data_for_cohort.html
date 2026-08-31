@@ -3,11 +3,12 @@
 {% block related_data %}
 {{ block.super }}
 
-    {% if cohort.sub_cohort_set.exists %}
+    {% if sub_cohorts %}
         <h3>Sub cohorts</h3>
-        {% for sub_cohort in cohort.sub_cohort_set.all %}
+        {% for sub_cohort in sub_cohorts %}
             <div>
-                <a href="{{ sub_cohort.get_absolute_url }}">{{ sub_cohort }}</a> - {{ sub_cohort }}
+                <i class="{{ sub_cohort.preview_icon }}"></i>
+                <a href="{{ sub_cohort.get_absolute_url }}">{{ sub_cohort }}</a>
             </div>
         {% endfor %}
     {% endif %}
@@ -17,25 +18,23 @@
         <h3>Trios</h3>
         {% for trio in trios %}
             <div>
+                <i class="{{ trio.preview_icon }}"></i>
                 <a href="{% url 'view_trio' trio.pk %}">{{ trio }}</a> - {% trio_short_description trio %}
             </div>
         {% endfor %}
     </div>
     {% endif %}
 
-    {% if cohort.pedigree_set.exists %}
+    {% if pedigrees %}
     <div id='related-pedigrees'>
         <h3>Pedigrees</h3>
-        {% for pedigree in cohort.pedigree_set.all %}
+        {% for pedigree in pedigrees %}
             <div>
+                <i class="{{ pedigree.preview_icon }}"></i>
                 <a href="{% url 'view_pedigree' pedigree.pk %}">{{ pedigree }}</a>
             </div>
         {% endfor %}
-        </table>
     </div>
-
     {% endif %}
-
-
 
 {% endblock %}

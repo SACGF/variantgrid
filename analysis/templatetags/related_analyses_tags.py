@@ -85,9 +85,9 @@ def related_analyses_for_samples(context, samples, show_sample_info, show_create
 
 @register.inclusion_tag("analysis/tags/related_analyses_for_cohort.html", takes_context=True)
 def related_analyses_for_cohort(context, cohort):
-    pedigrees = cohort.pedigree_set.all()
-    trios = cohort.trio_set.all()
     cohorts = [cohort] + list(cohort.sub_cohort_set.all())
+    pedigrees = Pedigree.objects.filter(cohort__in=cohorts)
+    trios = Trio.objects.filter(cohort__in=cohorts)
 
     update_context_with_related_analysis(context, cohort.get_samples(), cohorts=cohorts, trios=trios, pedigrees=pedigrees)
     context["cohort"] = cohort

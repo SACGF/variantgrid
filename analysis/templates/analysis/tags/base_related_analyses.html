@@ -121,7 +121,7 @@
             <tbody>
         {% for analysis, sample_info in analysis_details %}
             <tr> 
-            <td><a href="{% url 'analysis' analysis.pk %}">{{ analysis.pk }} - {{ analysis }}</a>
+            <td><i class="{{ analysis.preview_icon }}"></i> <a href="{% url 'analysis' analysis.pk %}">{{ analysis.pk }} - {{ analysis }}</a>
             {% if show_output_nodes %}
                 <td>
                     {% analysis_output_node_downloads analysis %}
