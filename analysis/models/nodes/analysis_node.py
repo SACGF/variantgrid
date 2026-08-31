@@ -49,7 +49,7 @@ from analysis.models.enums import (
 )
 from analysis.models.models_analysis import Analysis
 from analysis.models.nodes.node_counts import get_extra_filters_q, get_node_counts_and_labels_dict
-from analysis.models.nodes.node_display import NodeChip, NodeIcon
+from analysis.models.nodes.node_display import NodeChip, NodeIcon, NodeMenuEntry
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
 from classification.models import Classification
 from library.constants import DAY_SECS, MINUTE_SECS
@@ -812,10 +812,22 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
         """ Class strip on the node card - override where the long label doesn't fit 128px """
         return cls.get_node_class_label()
 
+    def get_node_strip_label(self) -> str:
+        """ Class strip text for this node - override where a node's configuration changes what it
+            is rather than just what it reads (eg SampleNode at extraction level) """
+        return self.get_node_class_label_short()
+
     @classmethod
     def get_node_class_icon(cls) -> NodeIcon:
         """ Badge icon for a node of this class - also what the create node dropdown shows """
         return NodeIcon(fa="fa-solid fa-circle-nodes")
+
+    @classmethod
+    def get_menu_entries(cls) -> list[NodeMenuEntry]:
+        """ The add node dropdown rows this class provides. One per class unless a class is
+            configurable enough that users look for its configurations by name """
+        return [NodeMenuEntry(key=cls.__name__, label=cls.get_node_class_label(),
+                              icon=cls.get_node_class_icon())]
 
     def get_node_icon(self) -> NodeIcon:
         """ Badge icon for this node - the class default unless config changes it (eg SampleNode
@@ -1517,13 +1529,29 @@ class NodeVCFFilter(NodeAuditLogMixin, models.Model):
         return set(all_nvf_qs.values_list("vcf_filter__filter_id", flat=True))
 
     @staticmethod
-    def get_filter_codes(node, vcf):
-        filter_ids = NodeVCFFilter.get_filter_ids(node)
+    def has_pass(node) -> bool:
+        """ PASS is stored as the node level row with no vcf_filter - it's the one FILTER value
+            that means the same thing in every VCF """
+        return NodeVCFFilter.objects.filter(node_id=node.pk, vcf_filter__isnull=True).exists()
 
-        # Translate them into codes from our VCF
-        vf_qs = VCFFilter.objects.filter(vcf=vcf, filter_id__in=filter_ids).values("filter_code")
-        filter_codes = set(vf_qs.values_list("filter_code", flat=True).distinct())
-        if None in filter_ids:  # PASS
+    @staticmethod
+    def get_vcf_filter_ids(node, vcf=None) -> list[tuple]:
+        """ (vcf_id, filter_id) for the node's non-PASS rows, optionally for one VCF """
+        nvf_qs = NodeVCFFilter.objects.filter(node_id=node.pk, vcf_filter__isnull=False)
+        if vcf is not None:
+            nvf_qs = nvf_qs.filter(vcf_filter__vcf=vcf)
+        return list(nvf_qs.values_list("vcf_filter__vcf_id", "vcf_filter__filter_id"))
+
+    @staticmethod
+    def get_filter_codes(node, vcf):
+        """ What this VCF lets through: its own ticked codes, plus PASS if the node's PASS row is set.
+
+            PASS is the one FILTER value that means the same thing in every VCF, so a code is never
+            translated across them - 'LowDepth' in a DRAGEN small variant VCF is not 'LowDepth' in
+            its CNV VCF. """
+        nvf_qs = NodeVCFFilter.objects.filter(node_id=node.pk, vcf_filter__vcf=vcf)
+        filter_codes = set(nvf_qs.values_list("vcf_filter__filter_code", flat=True))
+        if NodeVCFFilter.has_pass(node):
             filter_codes.add(None)
         return filter_codes
 

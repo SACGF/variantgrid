@@ -638,11 +638,12 @@ function setupErrorHandlers() {
 }
 
 function setupNodeTypeSelect() {
-    // Icon and source/filter colour come from NODE_TYPES - see node_types.get_node_display_data_by_class_name()
-    function renderNodeTypeItem(className, label) {
+    // Icon and source/filter colour come from NODE_TYPES - see node_types.get_node_display_data_by_menu_key()
+    // A menu key is a node class, or a class plus the configuration the entry stamps (eg "SampleNode:E")
+    function renderNodeTypeItem(menuKey, label) {
+        const nodeType = NODE_TYPES[menuKey];
         // Class name on the row picks up the node's accent colour - see analysis_nodes.css
-        const wrapper = $("<div>", {"class": "node-type-item " + className});
-        const nodeType = NODE_TYPES[className];
+        const wrapper = $("<div>", {"class": "node-type-item " + ((nodeType && nodeType.class_name) || "")});
         if (nodeType) {
             wrapper.attr("node_classification", nodeType.classification);
         }
@@ -790,7 +791,8 @@ function lockNodeField(nodeId, field, lock) {
         nodeFieldWrapper.removeClass(NODE_FIELD_LOCKED_CSS_CLASS);
         addVariableButton.show();
     }
-    $("#id_" + field, nodeFieldWrapper).attr("disabled", lock);
+    // The wrapper holds one widget - which may be named for a picker rather than the variable's field
+    $("input, select", nodeFieldWrapper).attr("disabled", lock);
 }
 
 function addAnalysisVariableButton(nodeId, field, readOnly) {

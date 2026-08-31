@@ -6,10 +6,18 @@ from functools import reduce
 from django.conf import settings
 from django.db.models import Model, Q
 from django.template import Library
+from django.template.loader import render_to_string
+from django.utils.safestring import mark_safe
 
 from analysis.forms import get_analysis_template_form_for_variables_only_of_class
 from annotation.models.models_gene_counts import GeneCountType
 from analysis.models import Analysis, AnalysisTemplate, MutationalSignature
+from analysis.models.models_analysis import (
+    ANALYSIS_TEMPLATE_SAMPLE_GROUP_FIELDS,
+    ANALYSIS_TEMPLATE_SOURCE_FIELDS,
+    ANALYSIS_TEMPLATE_VCF_SOURCE_FIELDS,
+)
+from analysis.models.nodes.sources.sample_node import SampleNode
 from analysis.models.models_karyomapping import KaryomappingAnalysis
 from analysis.related_analyses import (
     get_related_analysis_details_for_cohort,
@@ -18,6 +26,8 @@ from analysis.related_analyses import (
     get_related_analysis_details_for_samples,
     get_related_analysis_details_for_trio,
 )
+from library.utils import remove_duplicates_from_list
+from patients.sample_grouping import get_sample_group
 from pedigree.models import Pedigree
 from snpdb.models import Cohort, Trio
 
@@ -121,14 +131,28 @@ def related_analyses_for_pedigree(context, pedigree):
     return context
 
 
-def _source_is_archived(kwargs: dict) -> bool:
+# The grouping fields, paired with the level that resolves them to samples
+SAMPLE_GROUP_ARGS = {field: level for level, field in SampleNode.SOURCE_LEVEL_FIELDS.items()
+                     if field in ANALYSIS_TEMPLATE_SAMPLE_GROUP_FIELDS}
+
+
+def _source_is_archived(user, kwargs: dict) -> bool:
     """ True when any sample/cohort/trio/quad/pedigree passed in is archived.
         Each source model implements its own `data_archived` property that walks
-        down to the underlying VCF/CohortGenotypeCollection. """
-    for key in ("sample", "cohort", "trio", "quad", "pedigree"):
+        down to the underlying VCF/CohortGenotypeCollection.
+
+        A grouping object is archived only once every sample it reaches is - one live arm is still
+        worth analysing. """
+    for key in ANALYSIS_TEMPLATE_VCF_SOURCE_FIELDS:
         obj = kwargs.get(key)
         if obj is not None and getattr(obj, "data_archived", False):
             return True
+
+    for key, level in SAMPLE_GROUP_ARGS.items():
+        if obj := kwargs.get(key):
+            group = get_sample_group(user, level, obj)
+            if not group.samples and group.excluded:
+                return True
     return False
 
 
@@ -136,10 +160,10 @@ def _source_is_archived(kwargs: dict) -> bool:
 def analysis_templates_tag(context, genome_build, autocomplete_field=True, has_somatic_sample=False, has_sample_gene_list=False, requires_sample_gene_list=None,
                            **kwargs):
     user = context["user"]
-    single_model_args = {"sample", "cohort", "trio", "quad", "pedigree"}
+    single_model_args = ANALYSIS_TEMPLATE_SOURCE_FIELDS
     params_error_message = f"analysis_templates_tag should be passed dict with exactly one Model value for {','.join(single_model_args)}. Args: {kwargs}"
 
-    if _source_is_archived(kwargs):
+    if _source_is_archived(user, kwargs):
         # Don't offer to create new analyses against archived data.
         return {
             "genome_build": genome_build,
@@ -205,6 +229,28 @@ def analysis_templates_tag(context, genome_build, autocomplete_field=True, has_s
         "hidden_inputs": hidden_inputs,
         "missing_templates": ", ".join(missing_templates),
     }
+
+
+@register.simple_tag(takes_context=True)
+def analysis_templates_for_sample_source(context, level, source):
+    """ The Create analysis block on the patient / specimen / extraction pages.
+
+        An analysis is one genome build and a specimen's arms can sit in different ones, so this
+        renders analysis_templates_tag once per build the source reaches. Its kwarg is the level's
+        own field name, which a template can't spell dynamically - hence rendering here. """
+    group = get_sample_group(context["user"], level, source)
+    genome_builds = remove_duplicates_from_list([s.genome_build for s in group.samples])
+    if not genome_builds:
+        return mark_safe('<p>No samples to analyse.</p>')
+
+    field = SampleNode.SOURCE_LEVEL_FIELDS[level]
+    rendered = []
+    for genome_build in genome_builds:
+        tag_context = analysis_templates_tag(context, genome_build, **{field: source})
+        # inclusion_tag would carry this across for us; render_to_string needs it passing
+        tag_context["csrf_token"] = context.get("csrf_token")
+        rendered.append(render_to_string("analysis/tags/analysis_templates_tag.html", tag_context))
+    return mark_safe("".join(rendered))
 
 
 @register.inclusion_tag("analysis/tags/analysis_output_node_downloads.html", takes_context=True)

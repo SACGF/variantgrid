@@ -65,18 +65,28 @@ function renderNodeIcon(icon) {
 	return $("<i/>", {class: "node-icon " + ((icon && icon.fa) || "")});
 }
 
+// A chip with children is a group - the hierarchy nested the way the relations are, eg a specimen
+// wrapping its extractions wrapping their VCFs
 function renderChip(chip) {
-	const span = $("<span/>", {class: "node-chip"});
+	const group = chip.children && chip.children.length;
+	const span = $("<span/>", {class: group ? "node-chip-group" : "node-chip"});
 	if (chip.css_class) {
 		span.addClass(chip.css_class);
 	}
 	if (chip.title) {
 		span.attr("title", chip.title);
 	}
+	const label = group ? $("<span/>", {class: "node-chip-group-label"}).appendTo(span) : span;
 	if (chip.icon) {
-		$("<i/>", {class: chip.icon}).appendTo(span);
+		$("<i/>", {class: chip.icon}).appendTo(label);
 	}
-	$("<span/>", {class: "node-chip-text", text: chip.text}).appendTo(span);
+	$("<span/>", {class: "node-chip-text", text: chip.text}).appendTo(label);
+	if (chip.count) {
+		$("<span/>", {class: "node-chip-count", text: "\u00d7" + chip.count}).appendTo(label);
+	}
+	if (group) {
+		$.each(chip.children, function() { span.append(renderChip(this)); });
+	}
 	return span;
 }
 

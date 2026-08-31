@@ -49,6 +49,12 @@
             <p>This extraction has no samples.</p>
         {% endif %}
 
+
+        <hr/>
+        <h4>Create analysis</h4>
+        {% load related_analyses_tags %}
+        {% analysis_templates_for_sample_source "E" extraction %}
+
         {% if sequencing_samples %}
             <h4>Sequencing Samples</h4>
             <table class="table">

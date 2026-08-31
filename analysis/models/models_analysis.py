@@ -433,6 +433,13 @@ class AnalysisVariable(models.Model):
         return f"{self.node_id}/{self.field}"
 
 
+# What a template can be launched from - the source node fields the launch pages hand it. VCF backed
+# sources first, then the Patient -> Specimen -> Extraction levels that resolve to a set of samples
+ANALYSIS_TEMPLATE_VCF_SOURCE_FIELDS = ("pedigree", "trio", "quad", "cohort", "sample")
+ANALYSIS_TEMPLATE_SAMPLE_GROUP_FIELDS = ("extraction", "specimen", "patient")
+ANALYSIS_TEMPLATE_SOURCE_FIELDS = ANALYSIS_TEMPLATE_VCF_SOURCE_FIELDS + ANALYSIS_TEMPLATE_SAMPLE_GROUP_FIELDS
+
+
 class AnalysisTemplate(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
     """ A snapshot of an analysis - locked-down to be used as a template """
     name = models.TextField(unique=True)
@@ -555,9 +562,9 @@ class AnalysisTemplate(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel
         if not analysis_variables.exists():
             error = "You have not configured any analysis variables."
         else:
-            required_fields = ["pedigree", "trio", "quad", "cohort", "sample"]
-            if not analysis_variables.filter(field__in=required_fields).exists():
-                error = f"You need at at least one analysis variable of: {', '.join(required_fields)}"
+            if not analysis_variables.filter(field__in=ANALYSIS_TEMPLATE_SOURCE_FIELDS).exists():
+                error = f"You need at at least one analysis variable of: " \
+                        f"{', '.join(ANALYSIS_TEMPLATE_SOURCE_FIELDS)}"
 
         if error:
             raise ValueError(error)

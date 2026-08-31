@@ -1,6 +1,6 @@
 import operator
 import re
-from functools import reduce
+from functools import cached_property, reduce
 from typing import Optional
 
 from django.db.models import Q
@@ -250,13 +250,14 @@ class CohortMixin:
             1 - Pass Only
             2 - Other (will calculate as not cached) """
 
-        vcf = self._get_vcf()
-        if vcf:
-            if filter_codes := NodeVCFFilter.get_filter_codes(self, vcf):
-                if filter_codes == [None]:  # PASS only
-                    return 1
-                return 2
-        return 0
+        filter_codes = set()
+        for vcf in self.get_vcf_locus_filter_vcfs():
+            filter_codes |= NodeVCFFilter.get_filter_codes(self, vcf)
+        if not filter_codes:
+            return 0
+        if filter_codes == {None}:  # PASS only, which means the same thing in every VCF
+            return 1
+        return 2
 
     def get_filter_description(self):
         FILTER_DESCRIPTIONS = {1: "Pass Filters",
@@ -264,10 +265,12 @@ class CohortMixin:
         filter_code = self.get_filter_code()
         return FILTER_DESCRIPTIONS.get(filter_code)
 
-    @property
-    def has_filters(self):
-        vcf = self._get_vcf()
-        return vcf and vcf.vcffilter_set.exists()
+    @cached_property
+    def has_filters(self) -> bool:
+        """ Cached: the query build asks this once per sample, and a VCF's filters can't change
+            mid request """
+        vcfs = self.get_vcf_locus_filter_vcfs()
+        return bool(vcfs) and VCFFilter.objects.filter(vcf__in=vcfs).exists()
 
     def _get_filters_cohort_genotype_collections(self) -> list:
         """ The genotype collections whose record level FILTER to show. Nodes spanning VCFs override """

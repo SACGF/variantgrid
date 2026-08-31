@@ -211,7 +211,7 @@ def get_rendering_dict(node):
         "overlay_css_classes": " ".join(css_classes),
         "name": node.name,
         "icon": asdict(node.get_node_icon()),
-        "class_label_short": node.get_node_class_label_short(),
+        "class_label_short": node.get_node_strip_label(),
         "chips": [asdict(chip) for chip in node.get_node_chips()],
         "args": node_args
     }

@@ -97,9 +97,11 @@ class NodeView(UpdateView):
         if self.object.analysis.template_type == AnalysisTemplateType.TEMPLATE and self.object.is_source:
             for field_name, field in form.fields.items():
                 if not field.widget.is_hidden:
-                    if field_name in ["pedigree", "trio", "cohort", "sample", "extraction", "sample_gene_list"]:
+                    if field_name in ["pedigree", "trio", "cohort", "source", "sample_gene_list"]:
                         field.required = False  # Need to be able to save if analysis variable
-                        self._monkey_patch_widget_render(field.widget)
+                        # The variable is keyed on the node field, which a picker may stand in for
+                        self._monkey_patch_widget_render(field.widget,
+                                                         form.get_analysis_variable_field(field_name))
 
         if not form.instance.analysis.can_write(self.request.user):
             set_form_read_only(form)
@@ -107,14 +109,14 @@ class NodeView(UpdateView):
         return form
 
     @staticmethod
-    def _monkey_patch_widget_render(widget):
+    def _monkey_patch_widget_render(widget, variable_field: str):
         old_render = widget.render
 
         def render(self, name, value, attrs=None, renderer=None):
             html = old_render(name, value, attrs=attrs, renderer=renderer)
             button_id = f"id_{name}_template_variable_button"
             span_attributes_list = ["class=analysis-variable-node-field-wrapper",
-                                    f"field='{name}'"]
+                                    f"field='{variable_field}'"]
             span_attributes = " ".join(span_attributes_list)
             html = f"""
 <span {span_attributes}>

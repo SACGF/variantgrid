@@ -14,6 +14,11 @@
 	<script type="text/javascript">
 	NODE_ID = "#analysis-node-{{ node.pk }}";
 
+	// Hooks the loaded editor fills in for the hidden fields it owns - a registry rather than
+	// global function names, so two editors can supply the same hook without one shadowing the
+	// other by load order. @see the vcf_locus_filter / allele_frequency tags and samplenode_editor
+	nodeEditorHooks = {};
+
 	function ajaxForm(selector, beforeSerializeFunc, successFunc) {
 		const options = {
 			target: "#node-editor-wrapper",
@@ -24,15 +29,11 @@
 			    submitButton.LoadingOverlay('show');
 
 				// Common hidden fields
-				if (typeof getAlleleFrequencyValues !== 'undefined') {
-					const afData = getAlleleFrequencyValues();
-					const afVal = JSON.stringify(afData);
-					$("input#id_allele_frequency").val(afVal);
+				if (nodeEditorHooks.getAlleleFrequencyValues) {
+					$("input#id_allele_frequency").val(JSON.stringify(nodeEditorHooks.getAlleleFrequencyValues()));
 				}
-				if (typeof getVCFLocusFilters !== 'undefined') {
-					const vcfFiltersData = getVCFLocusFilters();
-					const vcfFiltersVal = JSON.stringify(vcfFiltersData);
-					$("input#id_vcf_locus_filters").val(vcfFiltersVal);
+				if (nodeEditorHooks.getVCFLocusFilters) {
+					$("input#id_vcf_locus_filters").val(JSON.stringify(nodeEditorHooks.getVCFLocusFilters()));
 				}
 
 				if (beforeSerializeFunc) {
@@ -264,7 +265,8 @@
 
 					<h4 class="node-editor-title">
 						{% render_node_icon_badge node %}
-						{{ node.get_node_class_label }}
+						{# What the node is, matching the card's class strip - see get_node_strip_label() #}
+						{{ node.get_node_strip_label }}
 						<a target="_blank" href="{{ help_url }}analysis/nodes.html#{{ node.get_node_class_label|slugify }}">
 							<i title="Help docs on this node" class="fas fa-book"></i>
 						</a>

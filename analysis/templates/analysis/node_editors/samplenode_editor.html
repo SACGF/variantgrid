@@ -1,80 +1,447 @@
 {% extends base_template %}
+{% load js_tags %}
 {% block style %}
     {{ block.super }}
 
     #restrict-to-qc-gene-listmessage {
         color: #118811;
     }
-    
+
     #view-allele-frequency-filter-link {
         margin-left: 10px;
+    }
+
+    #sample-source-summary {
+        margin: 4px 0;
+    }
+
+    #sample-source-tree {
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        padding: 4px 2px;
+        max-height: 260px;
+        overflow-y: auto;
+    }
+
+    .source-row {
+        display: flex;
+        align-items: baseline;
+        gap: 4px;
+        padding: 1px 4px;
+    }
+
+    .source-row input[type=radio] {
+        margin: 0;
+    }
+
+    /* Rows outside the picked subtree stay visible - that's how you move a level without re-searching */
+    .source-row.source-row-unselected, .source-sample-detail.source-row-unselected {
+        opacity: 0.45;
+    }
+
+    .source-row-label {
+        font-weight: 600;
+    }
+
+    .source-row-detail, .source-row-count {
+        color: #6c757d;
+        font-size: 0.85em;
+    }
+
+    .source-row-count {
+        margin-left: auto;
+    }
+
+    .source-row-excluded .source-row-label {
+        text-decoration: line-through;
+    }
+
+    .source-row-warning {
+        color: #a06000;
+    }
+
+    .source-row-summary {
+        color: #0d6efd;
+        font-size: 0.85em;
+    }
+
+    .source-sample-detail {
+        margin: 2px 0 6px 42px;
+        padding: 4px 6px;
+        background-color: #f4f6f8;
+        border-radius: 4px;
+    }
+
+    .source-sample-detail label {
+        font-weight: normal;
+        margin: 0 8px 0 0;
+    }
+
+    /* Placeholder = the global value below the tree, so a blank input is an inherited one */
+    input.sample-threshold, input.node-threshold {
+        width: 4em;
+    }
+
+    input.sample-threshold.threshold-overridden {
+        font-weight: bold;
+        color: #0d6efd;
+    }
+
+    .source-expand {
+        cursor: pointer;
+        width: 1em;
+        color: #6c757d;
     }
 {% endblock style %}
 
 {% block inlinejs %}
     {{ block.super }}
 
-    function getSampleId() {
-    {% if node.analysis.lock_input_sources %}
-        var sampleId = "{{ sample.pk }}";
-    {% else %}
-        var sampleId = $("#id_sample").find(":selected").val();
-    {% endif %}
-        return sampleId;
+    // The editor is loaded with jQuery .load(), so top level bindings have to be re-declarable
+    var SOURCE_LEVELS = {{ source_levels|jsonify }};
+    var SOURCE_LEVEL_LABELS = {{ source_level_labels|jsonify }};
+    var GENOME_BUILD = "{{ node.analysis.genome_build }}";
+    var THRESHOLD_FIELDS = [{name: "min_ad", label: "AD\u2265"}, {name: "min_dp", label: "DP\u2265"},
+                            {name: "min_gq", label: "GQ\u2265"}, {name: "max_pl", label: "PL\u2264"}];
+    var SOURCE_VIEW_URLS = {};
+    SOURCE_VIEW_URLS[SOURCE_LEVELS.SAMPLE] = Urls.view_sample;
+    SOURCE_VIEW_URLS[SOURCE_LEVELS.EXTRACTION] = Urls.view_extraction;
+    SOURCE_VIEW_URLS[SOURCE_LEVELS.SPECIMEN] = Urls.view_specimen;
+    SOURCE_VIEW_URLS[SOURCE_LEVELS.PATIENT] = Urls.view_patient;
+
+    // What the node has saved. The tree is redrawn client side as you move between its rows, and
+    // only re-fetched when the search box finds a different patient
+    var sourceSelection = {level: "{{ source_level }}", id: {{ source_id|default:"null" }}};
+    var sourceTree = null;
+    var sampleThresholds = {{ sample_threshold_overrides|jsonify }};
+    var vcfLocusFilters = {{ vcf_locus_filters|jsonify }};
+    var expandedSamples = {};
+    var HAS_GENOTYPE = {% if has_genotype %}true{% else %}false{% endif %};
+    var LOCK_INPUT_SOURCES = {% if node.analysis.lock_input_sources and not node.analysis.template_type %}true{% else %}false{% endif %};
+
+    function isSelected(level, id) {
+        return sourceSelection.level === level && String(sourceSelection.id) === String(id);
     }
 
-    function setSampleLink() {
-        var sampleId = getSampleId();
-        setCrossLink($("#sample-link"), Urls.view_sample, sampleId);
+    // Everything below the picked row is read - that's the "what am I bringing in" answer
+    function inSelection(level, id, parentInSelection) {
+        return parentInSelection || isSelected(level, id);
     }
 
-    function getExtractionId() {
-        return $("#id_extraction").find(":selected").val();
+    // Blank in the tree means inherit, so its placeholders are whatever the global inputs hold now
+    function nodeThresholdValue(fieldName) {
+        var input = $("#id_" + fieldName);
+        return input.length ? input.val() : "";
     }
 
     function getSampleThresholds() {
-        // Only the rows the user actually overrode reach the server - the node's own values are
-        // what any other sample gets
-        const thresholds = {};
-        $("tr.sample-threshold-row").each(function() {
-            const row = $(this);
-            const sampleId = row.attr("sample_id");
-            const values = {};
-            row.find("input.sample-threshold").each(function() {
-                const field = $(this).attr("threshold_field");
-                const val = $(this).val();
-                values[field] = val === "" ? null : parseInt(val);
-            });
-            thresholds[sampleId] = values;
+        // Only what the user actually typed reaches the server - the node's own values are what any
+        // other sample gets, including one linked to the extraction after this was configured
+        var thresholds = {};
+        $.each(sampleThresholds, function(sampleId, values) {
+            if (values && Object.keys(values).length) {
+                thresholds[sampleId] = values;
+            }
         });
         return thresholds;
     }
 
-    function loadSampleGroupPreview() {
-        const extractionId = getExtractionId();
-        const preview = $("#sample-group-preview");
-        if (!extractionId) {
-            preview.html("No extraction selected");
+    nodeEditorHooks.getVCFLocusFilters = function() {
+        return vcfLocusFilters;
+    };
+
+    function renderSampleVCFFilters(sample, detail) {
+        if (!sample.vcf_filters.length) {
             return;
         }
-        setCrossLink($("#extraction-link"), Urls.view_extraction, extractionId);
-        const url = Urls.extraction_samples(extractionId) + "?genome_build={{ node.analysis.genome_build }}";
-        preview.html("Loading samples...");
-        $.getJSON(url, function(data) {
-            const totals = data["totals"];
-            let html = "<b>" + totals["samples"] + "</b> sample(s) in <b>" + totals["vcfs"] + "</b> VCF(s)";
-            if (totals["variant_count"] !== null) {
-                html += " - " + totals["variant_count"] + " variants";
+        var filterLine = $("<div/>").appendTo(detail);
+        $("<b/>", {text: "FILTER "}).appendTo(filterLine);
+        // PASS is the one value every VCF shares, so it is set globally below the tree
+        var passLabel = $("<label/>").appendTo(filterLine);
+        $("<input/>", {type: "checkbox", disabled: true, checked: !!vcfLocusFilters["pass"]}).appendTo(passLabel);
+        passLabel.append(document.createTextNode(" PASS (global)"));
+
+        var selected = vcfLocusFilters["by_vcf"][sample.vcf_id] || [];
+        $.each(sample.vcf_filters, function(i, vcfFilter) {
+            var label = $("<label/>", {title: vcfFilter.description}).appendTo(filterLine);
+            var checkbox = $("<input/>", {type: "checkbox",
+                                          checked: selected.indexOf(vcfFilter.filter_id) !== -1});
+            checkbox.appendTo(label);
+            label.append(document.createTextNode(" " + vcfFilter.filter_id));
+            checkbox.change(function() {
+                var codes = vcfLocusFilters["by_vcf"][sample.vcf_id] || [];
+                removeItemFromArray(vcfFilter.filter_id, codes);
+                if ($(this).is(":checked")) {
+                    codes.push(vcfFilter.filter_id);
+                }
+                vcfLocusFilters["by_vcf"][sample.vcf_id] = codes;
+                drawSourceTree();
+            });
+        });
+    }
+
+    function renderSampleThresholds(sample, detail) {
+        var thresholdLine = $("<div/>").appendTo(detail);
+        $("<b/>", {text: "Thresholds "}).appendTo(thresholdLine);
+        var overrides = sampleThresholds[sample.sample_id] || {};
+        $.each(THRESHOLD_FIELDS, function(i, field) {
+            thresholdLine.append(document.createTextNode(" " + field.label + " "));
+            var value = overrides[field.name] === undefined ? "" : overrides[field.name];
+            var input = $("<input/>", {"class": "sample-threshold", type: "number", min: 0, step: 1,
+                                       placeholder: nodeThresholdValue(field.name), value: value});
+            if (value !== "") {
+                input.addClass("threshold-overridden");
             }
-            const list = $("<ul/>");
-            $.each(data["samples"], function(i, s) {
-                const count = s["variant_count"] === null ? "count not calculated" : s["variant_count"] + " variants";
-                $("<li/>").text(s["sample"] + " (" + s["vcf"] + ") - " + count).appendTo(list);
+            input.appendTo(thresholdLine);
+            input.change(function() {
+                var typed = $(this).val();
+                var sampleOverrides = sampleThresholds[sample.sample_id] || {};
+                if (typed === "") {
+                    delete sampleOverrides[field.name];
+                } else {
+                    sampleOverrides[field.name] = parseInt(typed);
+                }
+                sampleThresholds[sample.sample_id] = sampleOverrides;
+                drawSourceTree();
             });
-            $.each(data["warnings"], function(i, w) {
-                $("<li/>").addClass("warning").text(w).appendTo(list);
+        });
+        thresholdLine.append(document.createTextNode(" "));
+        $("<a/>", {href: "javascript:void(0)", text: "reset"}).click(function() {
+            delete sampleThresholds[sample.sample_id];
+            drawSourceTree();
+        }).appendTo(thresholdLine);
+    }
+
+    function renderExpandedSample(sample) {
+        var detail = $("<div/>", {"class": "source-sample-detail"});
+        if (!sample.in_selection) {
+            detail.addClass("source-row-unselected");
+        }
+        var vcfLine = $("<div/>").appendTo(detail);
+        $("<b/>", {text: "VCF "}).appendTo(vcfLine);
+        $("<a/>", {target: "_blank", href: Urls.view_vcf(sample.vcf_id), text: sample.vcf}).appendTo(vcfLine);
+        renderSampleVCFFilters(sample, detail);
+        if (HAS_GENOTYPE) {
+            renderSampleThresholds(sample, detail);
+        }
+        return detail;
+    }
+
+    // A collapsed row still has to say it is doing something - see the mockup's blue summary
+    function sampleOverrideSummary(sample) {
+        var parts = [];
+        var overrides = sampleThresholds[sample.sample_id] || {};
+        $.each(THRESHOLD_FIELDS, function(i, field) {
+            if (overrides[field.name] !== undefined) {
+                parts.push(field.label + overrides[field.name]);
+            }
+        });
+        $.each(vcfLocusFilters["by_vcf"][sample.vcf_id] || [], function(i, filterId) {
+            parts.push("+" + filterId);
+        });
+        return parts.join(" \u00b7 ");
+    }
+
+    function renderSampleRow(sample, holder, pickable) {
+        var row = $("<div/>", {"class": "source-row source-row-sample"}).appendTo(holder);
+        if (!sample.in_selection) {
+            row.addClass("source-row-unselected");
+        }
+        if (sample.included) {
+            if (pickable) {
+                var radio = $("<input/>", {type: "radio", name: "source-row", disabled: LOCK_INPUT_SOURCES,
+                                           checked: isSelected(SOURCE_LEVELS.SAMPLE, sample.sample_id)});
+                radio.appendTo(row).change(function() { selectSource(SOURCE_LEVELS.SAMPLE, sample.sample_id); });
+            }
+            var caret = expandedSamples[sample.sample_id] ? "fa-caret-down" : "fa-caret-right";
+            $("<i/>", {"class": "source-expand fa-solid " + caret}).appendTo(row).click(function() {
+                expandedSamples[sample.sample_id] = !expandedSamples[sample.sample_id];
+                drawSourceTree();
             });
-            preview.html(html).append(list);
+        } else {
+            row.addClass("source-row-excluded");
+            $("<span/>", {"class": "source-expand"}).appendTo(row);
+            if (pickable) {
+                $("<span/>", {"class": "source-expand"}).appendTo(row);
+            }
+        }
+        $("<span/>", {"class": "source-row-label", text: sample.sample}).appendTo(row);
+        if (sample.included) {
+            var summary = sampleOverrideSummary(sample);
+            if (summary) {
+                $("<span/>", {"class": "source-row-summary", text: summary}).appendTo(row);
+            }
+            var count = sample.variant_count === null ? "count not calculated"
+                                                      : sample.variant_count.toLocaleString();
+            $("<span/>", {"class": "source-row-count", text: count}).appendTo(row);
+            if (expandedSamples[sample.sample_id]) {
+                renderExpandedSample(sample).appendTo(holder);
+            }
+        } else {
+            $("<span/>", {"class": "source-row-count source-row-warning",
+                          text: "\u26a0 " + sample.reason}).appendTo(row);
+        }
+    }
+
+    function renderContainerRow(container, parentInSelection, holder) {
+        var levelLabel = SOURCE_LEVEL_LABELS[container.level];
+        container.in_selection = inSelection(container.level, container.id, parentInSelection);
+        var row = $("<div/>", {"class": "source-row"}).appendTo(holder);
+        if (!container.in_selection) {
+            row.addClass("source-row-unselected");
+        }
+        var radio = $("<input/>", {type: "radio", name: "source-row", disabled: LOCK_INPUT_SOURCES,
+                                   checked: isSelected(container.level, container.id)});
+        radio.appendTo(row).change(function() { selectSource(container.level, container.id); });
+        $("<span/>", {"class": "source-row-label", text: container.label}).appendTo(row);
+        if (container.detail) {
+            $("<span/>", {"class": "source-row-detail", text: container.detail}).appendTo(row);
+        }
+        $("<span/>", {"class": "source-row-count",
+                      text: levelLabel + " \u00b7 " + container.sample_count + " sample(s)"}).appendTo(row);
+        return container.in_selection;
+    }
+
+    function renderSampleRows(samples, parentInSelection, holder, pickable) {
+        $.each(samples, function(i, sample) {
+            sample.in_selection = inSelection(SOURCE_LEVELS.SAMPLE, sample.sample_id, parentInSelection);
+            renderSampleRow(sample, holder, pickable);
+        });
+    }
+
+    function renderExtraction(extraction, parentInSelection, holder) {
+        var inSel = renderContainerRow(extraction, parentInSelection, holder);
+        renderSampleRows(extraction.samples, inSel, holder, true);
+        if (extraction.hidden_count) {
+            // Naming samples the user can't view would leak them, so they are a count
+            $("<div/>", {"class": "source-row source-row-unselected",
+                         text: extraction.hidden_count + " sample(s) hidden (no permission)"}).appendTo(holder);
+        }
+    }
+
+    function eachSampleList(func) {
+        if (!sourceTree) {
+            return;
+        }
+        $.each(sourceTree.specimens, function(i, specimen) {
+            $.each(specimen.extractions, function(j, extraction) { func(extraction.samples); });
+        });
+        func(sourceTree.samples);
+    }
+
+    function drawSourceTree() {
+        var holder = $("#sample-source-tree").empty();
+        if (!sourceTree) {
+            holder.text("Nothing selected");
+            $("#sample-source-summary").empty();
+            return;
+        }
+
+        if (!sourceTree.patient) {
+            // Nothing to group by, so there is no tree to draw - just say so and show the sample's
+            // own settings, which is the editor a deployment without specimens/extractions wants
+            $("<div/>", {"class": "source-row-detail",
+                         text: "Not linked to a patient - no specimen or extraction to group by"}).appendTo(holder);
+            renderSampleRows(sourceTree.samples, true, holder, false);
+            drawSourceSummary();
+            return;
+        }
+
+        var patientInSel = renderContainerRow(sourceTree.patient, false, holder);
+        $.each(sourceTree.specimens, function(i, specimen) {
+            var specimenInSel = renderContainerRow(specimen, patientInSel, holder);
+            $.each(specimen.extractions, function(j, extraction) {
+                renderExtraction(extraction, specimenInSel, holder);
+            });
+        });
+        if (sourceTree.samples.length) {
+            // The patient CSV attaches these straight to the patient, with no extraction to sit under
+            $("<div/>", {"class": "source-row source-row-detail",
+                         text: "Not in an extraction"}).appendTo(holder);
+            renderSampleRows(sourceTree.samples, patientInSel, holder, true);
+        }
+        drawSourceSummary();
+    }
+
+    function drawSourceSummary() {
+        var samples = [];
+        var skipped = [];
+        eachSampleList(function(sampleList) {
+            $.each(sampleList, function(i, sample) {
+                if (!sample.in_selection) {
+                    return;
+                }
+                if (sample.included) {
+                    samples.push(sample);
+                } else {
+                    skipped.push(sample.sample + ": " + sample.reason);
+                }
+            });
+        });
+
+        var vcfIds = {};
+        var variantCount = 0;
+        var countsKnown = samples.length > 0;
+        $.each(samples, function(i, sample) {
+            vcfIds[sample.vcf_id] = true;
+            if (sample.variant_count === null) {
+                countsKnown = false;
+            } else {
+                variantCount += sample.variant_count;
+            }
+        });
+        var text = "Reading " + samples.length + " sample(s) in " + Object.keys(vcfIds).length + " VCF(s)";
+        if (countsKnown) {
+            text += " \u00b7 " + variantCount.toLocaleString() + " variants";
+        }
+        var summary = $("#sample-source-summary").empty().text(text);
+
+        // What the node leaves out is what only this can say - the user didn't hand pick these
+        if (skipped.length) {
+            $("<span/>", {"class": "source-row-warning", title: skipped.join("\n"),
+                          text: " \u26a0 " + skipped.length + " skipped"}).appendTo(summary);
+        }
+    }
+
+    function setSourceLink() {
+        var link = $("#source-link");
+        link.text("View " + (SOURCE_LEVEL_LABELS[sourceSelection.level] || "source"));
+        setCrossLink(link, SOURCE_VIEW_URLS[sourceSelection.level], sourceSelection.id);
+    }
+
+    function selectSource(level, id) {
+        sourceSelection = {level: level, id: id};
+        $("#id_source").val(level + ":" + id);
+        setSourceLink();
+        drawSourceTree();
+    }
+
+    function loadSourceTree() {
+        setSourceLink();
+        if (sourceSelection.id === null) {
+            sourceTree = null;
+            drawSourceTree();
+            return;
+        }
+        var url = Urls.sample_group_tree(sourceSelection.level, sourceSelection.id)
+                + "?genome_build=" + GENOME_BUILD;
+        $("#sample-source-tree").text("Loading samples...");
+        $.getJSON(url, function(data) {
+            sourceTree = data;
+            drawSourceTree();  // Flags in_selection, which the auto expand below reads
+            // With one sample its own row is the only place the per VCF settings live, so open it
+            var selected = [];
+            eachSampleList(function(sampleList) {
+                $.each(sampleList, function(i, sample) {
+                    if (sample.included && sample.in_selection) {
+                        selected.push(sample);
+                    }
+                });
+            });
+            if (selected.length === 1) {
+                expandedSamples[selected[0].sample_id] = true;
+                drawSourceTree();
+            }
         });
     }
 {% endblock inlinejs %}
@@ -87,40 +454,32 @@
         $("input#id_sample_thresholds").val(JSON.stringify(getSampleThresholds()));
     });
 
-	function resetGenotypeEditors() {
-		$(".no-genotype-row").hide();
-		$(".genotype-row").show();
-	}
+    // The search box finds a different patient, so the tree comes back from the server
+    $("select#id_source").change(function() {
+        var value = $(this).val();
+        if (value) {
+            var parts = value.split(":");
+            sourceSelection = {level: parts[0], id: parseInt(parts[1])};
+            loadSourceTree();
+        }
+    });
 
-	function changeSample() {
-        var sampleId = getSampleId();
-        setSampleLink();
-        loadSampleVCFLocusFilter(sampleId);
-        resetGenotypeEditors();
-	}
+    // The tree's placeholders are the global values, so they redraw when those change
+    $("#id_min_ad, #id_min_dp, #id_min_gq, #id_max_pl").change(drawSourceTree);
+    $("#pass-only").change(function() {
+        vcfLocusFilters["pass"] = $(this).is(":checked");
+        drawSourceTree();
+    });
 
-	function changeExtraction() {
-	    loadSampleGroupPreview();
-	    loadExtractionVCFLocusFilter(getExtractionId());
-	}
-
-{% if node.is_group_level %}
-    loadSampleGroupPreview();
-    $("select#id_extraction").change(changeExtraction);
-{% else %}
-	setSampleLink();
-	$("select#id_sample").change(changeSample);
-{% endif %}
-	// Changing what the node reads changes which editors apply, so save to redraw them
-	$("select#id_source_level").change(function() { sampleForm.submit(); });
-	$("#slider-group-operation").hide(); // SampleNode doesnt use this
+    loadSourceTree();
+    $("#slider-group-operation").hide(); // SampleNode doesnt use this
 {% endblock docreadyjs %}
 
 
 {% block node_editor_tab_links_second %}
     {{ block.super }}
 
-    {% if sample.patient %}
+    {% if patient %}
             <li id='patient-tab' class="nav-item"><a class="nav-link" data-toggle="tab" role="tab" href="#node-patient">Patient</a></li>
     {% endif %}
 {% endblock node_editor_tab_links_second %}
@@ -139,23 +498,23 @@
 {% block node_editor_tabs_second %}
     {{ block.super }}
 
-	{% if sample.patient %}
+	{% if patient %}
 		<div class="tab-pane" role="tabpanel" id="node-patient">
 			<p>
-			<b>Patient: </b>{{ sample.patient }} <a target='_blank' href="{% url 'view_patient' sample.patient.pk %}">Edit Patient</a>
+			<b>Patient: </b>{{ patient }} <a target='_blank' href="{% url 'view_patient' patient.pk %}">Edit Patient</a>
 			</p>
-			{% if sample.patient.patientphenotype_set.all %}
+			{% if patient.patientphenotype_set.all %}
 				<p>
 				<b>Phenotypes:</b>
-				{% for pp in sample.patient.patientphenotype_set.all %}
+				{% for pp in patient.patientphenotype_set.all %}
 					{{ pp.hpo }}
 				{% endfor %}
 				</p>
 			{% endif %}
-			{% if sample.patient.patientmim_set.all %}
+			{% if patient.patientmim_set.all %}
 				<p>
 				<b>OMIM:</b>
-				{% for mim in sample.patient.patientmim_set.all %}
+				{% for mim in patient.patientmim_set.all %}
 					{{ mim.mim_morbid_alias.description }}
 				{% endfor %}
 				</p>
@@ -190,36 +549,16 @@ table.zygosity-table tr.top-header th {
         {{ hidden }}
     {% endfor %}
     <div>
-        {% if form.source_level %}
-            <div>
-                <b>Source:</b> {{ form.source_level }}
-            </div>
-        {% endif %}
-
-        {% if node.is_group_level %}
-            <div>
-                <b>{{ node.get_source_level_display }}:</b>
-                {% if node.analysis.lock_input_sources and node.analysis.template_type is None %}
-                    {{ node.get_source_object }}
-                {% else %}
-                    {{ form.extraction }}
-                {% endif %}
-                <a class="cross-link" id="extraction-link" target='_blank'>View Extraction</a>
-            </div>
-            <div id='sample-group-preview'></div>
-        {% else %}
         <div>
-            <b>Sample:</b>
-
-            {% if node.analysis.lock_input_sources and node.analysis.template_type is None %}
-                {{ sample }}
+            {% if form.source %}
+                {{ form.source }}
             {% else %}
-                {{ form.sample }}
+                <b>{{ node.get_source_level_display }}:</b> {{ node.get_source_object }}
             {% endif %}
-
-            <a class="cross-link" id="sample-link" target='_blank'>View Sample</a>
+            <a class="cross-link" id="source-link" target='_blank'>View {{ node.get_source_level_display }}</a>
         </div>
-        {% endif %}
+        <div id='sample-source-summary'></div>
+        <div id='sample-source-tree'></div>
 
         {% if node.analysis.template_type %}
             <!-- We never set this manually, but show so it can be set as an analysis variable via template -->
@@ -232,12 +571,10 @@ table.zygosity-table tr.top-header th {
         {% endif %}
 
         <div>
-            {% load vcf_locus_filter_tags %}
-            {% if node.is_group_level %}
-                {% vcf_locus_filter node None node.extraction %}
-            {% else %}
-                {% vcf_locus_filter node sample.vcf %}
-            {% endif %}
+            <b>Filters - all VCFs</b>
+            <label title='Only records that passed every filter. The one FILTER value that means the same thing in every VCF - the rest are under their own sample row'>
+                <input type='checkbox' id='pass-only' {% if vcf_locus_filters.pass %}checked{% endif %} /> PASS only
+            </label>
         </div>
     {% if has_genotype %}
         <div class='genotype-row'>
@@ -246,25 +583,6 @@ table.zygosity-table tr.top-header th {
             <b title='Genotype Quality'>GQ</b>&ge;{{ form.min_gq }}
             <b title='Phred-scaled Likelihoods for Genotypes'>PL</b>&le; {{ form.max_pl }}
         </div>
-        {% if source_samples %}
-        <div class='genotype-row'>
-            <b>Per sample thresholds</b> - a row applies instead of the values above (sapath#301)
-            <table id='sample-thresholds-table' class='left'>
-                <tr><th>Sample<th>VCF<th title='Allelic Depth'>AD&ge;<th title='Read Depth'>DP&ge;
-                    <th title='Genotype Quality'>GQ&ge;<th title='Phred-scaled Likelihoods for Genotypes'>PL&le;
-                {% for ss in source_samples %}
-                <tr class='sample-threshold-row' sample_id='{{ ss.sample.pk }}'>
-                    <td>{{ ss.sample.name }}
-                    <td>{{ ss.sample.vcf }}
-                    <td><input class='sample-threshold narrow' threshold_field='min_ad' type='number' min='0' step='1' value='{{ ss.thresholds.min_ad }}' />
-                    <td><input class='sample-threshold narrow' threshold_field='min_dp' type='number' min='0' step='1' value='{{ ss.thresholds.min_dp }}' />
-                    <td><input class='sample-threshold narrow' threshold_field='min_gq' type='number' min='0' step='1' value='{{ ss.thresholds.min_gq }}' />
-                    <td><input class='sample-threshold narrow' threshold_field='max_pl' type='number' min='0' step='1' value='{{ ss.thresholds.max_pl|default_if_none:"" }}' />
-                {% endfor %}
-            </table>
-            <div class='clear'></div>
-        </div>
-        {% endif %}
         <div class='genotype-row'>
             <table class='zygosity-table left' style='text-align: center'>
                 <tr class='top-header'>

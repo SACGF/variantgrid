@@ -92,5 +92,10 @@
         {% else %}
             <p>No measures recorded for this specimen.</p>
         {% endif %}
+
+        <hr/>
+        <h4>Create analysis</h4>
+        {% load related_analyses_tags %}
+        {% analysis_templates_for_sample_source "P" specimen %}
     </div>
 {% endblock submenu_page_content %}

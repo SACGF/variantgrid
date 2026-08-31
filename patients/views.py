@@ -3,6 +3,7 @@ import mimetypes
 import pandas as pd
 from django.conf import settings
 from django.db.models import Prefetch, Q
+from django.http import Http404
 from django.http.response import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_http_methods, require_POST
@@ -29,7 +30,7 @@ from patients.models import (
     Specimen,
 )
 from patients.models_enums import MatchStatus
-from patients.sample_grouping import get_extraction_sample_group, sample_group_as_json
+from patients.sample_grouping import SOURCE_LEVELS, get_patient_sample_tree
 from seqauto.models import SequencingSample
 from snpdb.models import GenomeBuild, Sample
 from uicore.utils.form_helpers import form_helper_horizontal
@@ -223,20 +224,26 @@ def view_extraction(request, extraction_id):
     return render(request, 'patients/view_extraction.html', context)
 
 
-def extraction_samples(request, extraction_id):
-    """ The samples an analysis grouping node reaches for this extraction, with per sample counts off
-        the stats rows. Keyed on the extraction rather than a node, as it has to answer before a node
-        is saved.
+def _get_sample_source(user, level: str, pk: int):
+    """ A level of Patient -> Specimen -> Extraction -> Sample, loaded through its own permissions """
+    source_level = SOURCE_LEVELS.get(level)
+    if source_level is None:
+        raise Http404(f"Unknown sample source level '{level}'")
+    return source_level.model.get_for_user(user, pk)
 
-        Pass ?genome_build= to restrict to an analysis' build - what that leaves out comes back in
-        'excluded' rather than being quietly dropped. """
-    extraction = Extraction.get_for_user(request.user, extraction_id)
-    genome_build = None
+
+def _get_request_genome_build(request):
     if genome_build_name := request.GET.get("genome_build"):
-        genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
+        return GenomeBuild.get_name_or_alias(genome_build_name)
+    return None
 
-    group = get_extraction_sample_group(request.user, extraction, genome_build)
-    return JsonResponse(sample_group_as_json(group))
+
+def sample_group_tree(request, level, pk):
+    """ The whole patient the object belongs to, with the picked row's subtree flagged - what the
+        SampleNode editor draws so moving up or down a level doesn't need another search """
+    source = _get_sample_source(request.user, level, pk)
+    tree = get_patient_sample_tree(request.user, level, source, _get_request_genome_build(request))
+    return JsonResponse(tree)
 
 
 def view_patient_genes(request, patient_id):

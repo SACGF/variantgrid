@@ -95,6 +95,13 @@ class ExternallyManagedModel(TimeStampedModel):
         abstract = True
 
     @property
+    def short_identifier(self):
+        """ What this record is known by - its local reference, else whatever external system
+            manages it, else the pk. One identity rule for previews, search and node chips """
+        local_reference = getattr(self, self.LOCAL_REFERENCE_FIELD, None)
+        return local_reference or self.external_pk or f"({self.pk})"
+
+    @property
     def external_manager(self):
         em = None
         if self.external_pk:
@@ -180,7 +187,7 @@ class Patient(GuardianPermissionsMixin, HasPhenotypeDescriptionMixin, Externally
             parts.append(PreviewKeyValue(value="deceased"))
 
         return self.preview_with(
-            identifier=self.patient_code or self.external_pk or f"({self.pk})",
+            identifier=self.short_identifier,
             title=self.name_last_name_first,
             summary_extra=parts
         )
@@ -291,7 +298,14 @@ class Patient(GuardianPermissionsMixin, HasPhenotypeDescriptionMixin, Externally
         HasPhenotypeDescriptionMixin.save_phenotype(self, pheno_kwargs)
 
     def get_samples(self):
-        return self.sample_set.all().select_related("vcf", "extraction__specimen").order_by("vcf__date")
+        """ Every sample that reaches this patient, either way round - the VCF import carries
+            extraction down without setting sample.patient, while the patient CSV sets patient and
+            may leave extraction null. Same union as SOURCE_LEVELS[PATIENT] in patients.sample_grouping;
+            Sample is taken off the relation because snpdb imports this module. """
+        sample_model = self.sample_set.model
+        reaches_patient = Q(patient=self) | Q(extraction__specimen__patient=self)
+        return sample_model.objects.filter(reaches_patient).distinct() \
+            .select_related("vcf", "extraction__specimen").order_by("vcf__date")
 
     def __str__(self):
         # De-identified patients have no name, so fall back to the code they're known by
@@ -361,7 +375,8 @@ class Specimen(GuardianPermissionsMixin, ExternallyManagedModel, PreviewModelMix
 
     @classmethod
     def preview_icon(cls) -> str:
-        return "fa-solid fa-vial"
+        # A blob against the extraction's stick - biological material vs the lab glassware taken off it
+        return "fa-solid fa-droplet"
 
     @classmethod
     def preview_if_url_visible(cls) -> Optional[str]:
@@ -374,7 +389,7 @@ class Specimen(GuardianPermissionsMixin, ExternallyManagedModel, PreviewModelMix
             parts.append(PreviewKeyValue(key="Collected", value=self.collection_date))
 
         return self.preview_with(
-            identifier=self.reference_id or self.external_pk or f"({self.pk})",
+            identifier=self.short_identifier,
             title=str(self.patient),
             summary_extra=parts
         )
@@ -482,7 +497,7 @@ class Extraction(GuardianPermissionsMixin, ExternallyManagedModel, PreviewModelM
             parts.append(PreviewKeyValue(key="Extracted", value=self.extraction_date))
 
         return self.preview_with(
-            identifier=self.reference_id or self.external_pk or f"({self.pk})",
+            identifier=self.short_identifier,
             title=str(self.specimen.patient),
             summary_extra=parts
         )
