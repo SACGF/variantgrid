@@ -91,7 +91,7 @@ class CaseForm(forms.ModelForm):
         widgets = {'name': TextInput(),
                    'lead_scientist': ModelSelect2(url='user_autocomplete',
                                                   attrs={'data-placeholder': 'User...'}),
-                   'patient': ModelSelect2(url='user_autocomplete',
+                   'patient': ModelSelect2(url='patient_autocomplete',
                                            attrs={'data-placeholder': 'Patient...'})}
 
     def __init__(self, *args, **kwargs):
