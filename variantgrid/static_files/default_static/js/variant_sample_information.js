@@ -546,7 +546,7 @@ var VariantSampleInformation = (function () {
             y: alleleFrequencies,
             text: labels,
         };
-        const layout = defaultLayout(config.variantLabel + " Allele Frequency", null, GRAPH_HEIGHT);
+        const layout = defaultLayout("Allele Frequency", null, GRAPH_HEIGHT);
         layout.xaxis = Object.assign(layout.xaxis || {}, {zeroline: false, showgrid: false, showticklabels: false});
         layout.yaxis = Object.assign(layout.yaxis || {}, {range: [0, 1.05], showgrid: false, zeroline: false});
         Plotly.newPlot('sample-allele-frequency-scatter', [scatterData], layout, RESPONSIVE);
@@ -563,7 +563,7 @@ var VariantSampleInformation = (function () {
             histnorm: "count",
             ybins: {start: 0, size: .05, end: 1},
         };
-        const histogramLayout = defaultLayout(config.variantLabel + " Allele Frequency Histogram", null, GRAPH_HEIGHT);
+        const histogramLayout = defaultLayout("Allele Frequency Histogram", null, GRAPH_HEIGHT);
         // Bins run up the same scale as the scatter beside it, so it reads as that plot's summary
         histogramLayout.xaxis = {tickmode: 'auto', showgrid: false, zeroline: false};
         histogramLayout.yaxis = {range: [0, 1.05], showgrid: false, zeroline: false, showticklabels: false};
