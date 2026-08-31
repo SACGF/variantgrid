@@ -88,7 +88,7 @@
     }
 
 
-    function getAlleleFrequencyValues() {
+    nodeEditorHooks.getAlleleFrequencyValues = function() {
         const sliderList = [];
         $(".af-slider").each(function() {
             const values = this.noUiSlider.get(true);
@@ -99,7 +99,7 @@
             "group_operation" : $("#slider-group-operation").val(),
             "sliders" : sliderList,
         };
-    }
+    };
 
     $(document).ready(function() {
         $("#add-slider").click(function(event) {

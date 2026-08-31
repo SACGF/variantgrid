@@ -13,7 +13,13 @@ from django.utils import timezone
 from guardian.shortcuts import assign_perm
 
 from library.guardian_utils import DjangoPermission, assign_permission_to_user_and_groups
-from patients.models import Extraction, Patient, Specimen
+from patients.models import (
+    Extraction,
+    ExternalModelManager,
+    ExternalPK,
+    Patient,
+    Specimen,
+)
 from patients.models_enums import NucleicAcid, SampleSourceLevel
 from patients.sample_grouping import get_patient_sample_tree, get_sample_group, sample_as_json
 from snpdb.models import (
@@ -144,6 +150,34 @@ class TestGroupingAutocompletes(ExtractionSampleTestCase):
 
         sample_ids = self._autocomplete_ids("sample_autocomplete", {"extraction": self.extraction.pk})
         self.assertEqual(sample_ids, [self.sample.pk])
+
+
+class TestShortIdentifier(ExtractionSampleTestCase):
+    """ One identity rule for previews, search and node chips - LOCAL_REFERENCE_FIELD says which
+        field carries the local reference """
+
+    def test_local_reference_wins(self):
+        self.assertEqual(self.specimen.short_identifier, self.specimen.reference_id)
+        self.assertEqual(self.extraction.short_identifier, self.extraction.reference_id)
+
+    def test_external_pk_where_there_is_no_local_reference(self):
+        manager = ExternalModelManager.objects.create(name="lims", details="test")
+        external_pk = ExternalPK.objects.create(code="XY-1", external_type="lims",
+                                                external_manager=manager)
+        Extraction.objects.filter(pk=self.extraction.pk).update(reference_id=None,
+                                                                external_pk=external_pk)
+        self.extraction.refresh_from_db()
+        self.assertEqual(self.extraction.short_identifier, external_pk)
+
+    def test_falls_back_to_the_pk(self):
+        Extraction.objects.filter(pk=self.extraction.pk).update(reference_id=None)
+        self.extraction.refresh_from_db()
+        self.assertEqual(self.extraction.short_identifier, f"({self.extraction.pk})")
+
+    def test_patient_uses_its_own_local_reference_field(self):
+        Patient.objects.filter(pk=self.patient.pk).update(patient_code="PT-9")
+        self.patient.refresh_from_db()
+        self.assertEqual(self.patient.short_identifier, "PT-9")
 
 
 class TestPatientGetSamples(ExtractionSampleTestCase):

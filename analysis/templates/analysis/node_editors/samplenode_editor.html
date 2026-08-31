@@ -146,9 +146,9 @@
         return thresholds;
     }
 
-    function getVCFLocusFilters() {
+    nodeEditorHooks.getVCFLocusFilters = function() {
         return vcfLocusFilters;
-    }
+    };
 
     function renderSampleVCFFilters(sample, detail) {
         if (!sample.vcf_filters.length) {

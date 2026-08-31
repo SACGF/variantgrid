@@ -24,7 +24,7 @@
 
         // PASS is the one FILTER value shared across VCFs, so it's stored at node level and the
         // rest under the VCF that declared them - see forms_nodes.VCFLocusFiltersMixin
-        function getVCFLocusFilters() {
+        nodeEditorHooks.getVCFLocusFilters = function() {
             const vcfId = $("#vcf-locus-filters").attr("vcf_id");
             const plf_table = $("#vcf-filter-table");
             const byVCF = [];
@@ -44,7 +44,7 @@
                 filters["by_vcf"][vcfId] = byVCF;
             }
             return filters;
-        }
+        };
 
         {% if vcf %}
         $(document).ready(function() {

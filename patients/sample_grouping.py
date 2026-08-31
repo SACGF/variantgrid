@@ -212,13 +212,13 @@ def get_specimen_label(specimen: Specimen) -> str:
         return specimen.tissue.name
     if specimen.tissue_status != TissueStatus.UNKNOWN:
         return specimen.get_tissue_status_display()
-    return specimen.reference_id or specimen.external_pk or f"({specimen.pk})"
+    return str(specimen.short_identifier)
 
 
 def get_extraction_label(extraction: Extraction) -> str:
     if extraction.nucleic_acid_source:
         return extraction.get_nucleic_acid_source_display()
-    return extraction.reference_id or extraction.external_pk or f"({extraction.pk})"
+    return str(extraction.short_identifier)
 
 
 def _get_vcf_filters(samples: list[Sample]) -> dict[int, list[dict]]:

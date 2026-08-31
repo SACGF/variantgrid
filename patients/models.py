@@ -95,6 +95,13 @@ class ExternallyManagedModel(TimeStampedModel):
         abstract = True
 
     @property
+    def short_identifier(self):
+        """ What this record is known by - its local reference, else whatever external system
+            manages it, else the pk. One identity rule for previews, search and node chips """
+        local_reference = getattr(self, self.LOCAL_REFERENCE_FIELD, None)
+        return local_reference or self.external_pk or f"({self.pk})"
+
+    @property
     def external_manager(self):
         em = None
         if self.external_pk:
@@ -180,7 +187,7 @@ class Patient(GuardianPermissionsMixin, HasPhenotypeDescriptionMixin, Externally
             parts.append(PreviewKeyValue(value="deceased"))
 
         return self.preview_with(
-            identifier=self.patient_code or self.external_pk or f"({self.pk})",
+            identifier=self.short_identifier,
             title=self.name_last_name_first,
             summary_extra=parts
         )
@@ -382,7 +389,7 @@ class Specimen(GuardianPermissionsMixin, ExternallyManagedModel, PreviewModelMix
             parts.append(PreviewKeyValue(key="Collected", value=self.collection_date))
 
         return self.preview_with(
-            identifier=self.reference_id or self.external_pk or f"({self.pk})",
+            identifier=self.short_identifier,
             title=str(self.patient),
             summary_extra=parts
         )
@@ -490,7 +497,7 @@ class Extraction(GuardianPermissionsMixin, ExternallyManagedModel, PreviewModelM
             parts.append(PreviewKeyValue(key="Extracted", value=self.extraction_date))
 
         return self.preview_with(
-            identifier=self.reference_id or self.external_pk or f"({self.pk})",
+            identifier=self.short_identifier,
             title=str(self.specimen.patient),
             summary_extra=parts
         )
