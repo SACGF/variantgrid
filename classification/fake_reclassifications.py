@@ -29,13 +29,12 @@ from django.db import transaction
 from django.utils.timezone import get_current_timezone, now
 from guardian.models import GroupObjectPermission
 
-from annotation.models import VariantAnnotation, VariantAnnotationVersion
+from annotation.fake_data import get_variant_ids_by_gene, zipf_weight
 from classification.enums import (ClinicalSignificance, CriteriaEvaluation, ShareLevel, SpecialEKeys,
                                   SubmissionSource)
 from classification.models import (Classification, ClassificationModification, ImportedAlleleInfo,
                                    ReclassificationEvent, ReclassificationEventBuilder, ResolvedVariantInfo)
 from classification.models.classification_variant_info_models import ImportedAlleleInfoStatus
-from genes.models import TranscriptVersion
 from library.guardian_utils import all_users_group
 from snpdb.models import GenomeBuild, GenomeBuildPatchVersion, Lab, Organization
 
@@ -241,7 +240,7 @@ class FakeReclassifications:
     def _pick_records(self, genome_build: GenomeBuild, labs: dict[str, Lab],
                       num_classifications: int, years: int) -> list[FakeRecord]:
         """ Real variants, so the gene chart has real symbols and the records link somewhere sensible """
-        variant_ids_by_gene = _variant_ids_by_gene(genome_build, GENES)
+        variant_ids_by_gene = get_variant_ids_by_gene(genome_build, GENES)
         lab_weights = [fake_lab.weight for fake_lab in FAKE_LABS]
         significances = list(SIGNIFICANCE_BEHAVIOUR)
         significance_weights = [SIGNIFICANCE_BEHAVIOUR[s].weight for s in significances]
@@ -251,8 +250,8 @@ class FakeReclassifications:
         records = []
         for index, gene_symbol in enumerate(GENES):
             available = variant_ids_by_gene.get(gene_symbol, [])
-            wanted = round(num_classifications * _zipf_weight(index)
-                           / sum(_zipf_weight(i) for i in range(len(GENES))))
+            wanted = round(num_classifications * zipf_weight(index)
+                           / sum(zipf_weight(i) for i in range(len(GENES))))
             if len(available) < wanted:
                 self.stdout.write(f"{gene_symbol}: only {len(available)} annotated variants, wanted {wanted}")
                 wanted = len(available)
@@ -406,22 +405,6 @@ def _keeping_our_timestamps(klass):
 
 def _period_start(years: int) -> datetime:
     return now().astimezone(get_current_timezone()) - timedelta(days=years * 365)
-
-
-def _zipf_weight(rank: int) -> float:
-    return 1 / (rank + 1) ** 0.8
-
-
-def _variant_ids_by_gene(genome_build: GenomeBuild, genes: list[str]) -> dict[str, list[int]]:
-    gene_symbol_field = "transcript_version__gene_version__gene_symbol_id"
-    transcript_versions_qs = TranscriptVersion.objects.filter(genome_build=genome_build,
-                                                              gene_version__gene_symbol__in=genes)
-    variant_annotation_qs = VariantAnnotation.objects.filter(version=VariantAnnotationVersion.latest(genome_build),
-                                                             transcript_version__in=transcript_versions_qs)
-    variant_ids_by_gene = {}
-    for gene_symbol, variant_id in variant_annotation_qs.values_list(gene_symbol_field, "variant_id"):
-        variant_ids_by_gene.setdefault(gene_symbol, []).append(variant_id)
-    return variant_ids_by_gene
 
 
 def _summary(step: FakeStep) -> dict:

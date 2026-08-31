@@ -47,7 +47,7 @@ from snpdb.models import (
     VariantZygosityCountCollection,
 )
 from snpdb.sample_filters import get_sample_ontology_q, get_sample_qc_gene_list_gene_symbol_q
-from snpdb.views.datatable_view import CellData, DatatableConfig, RichColumn, SortOrder
+from snpdb.views.datatable_view import DC, CellData, DatatableConfig, RichColumn, SortOrder
 from uicore.templatetags.js_tags import jsonify_for_js
 from variantgrid.perm_path import get_visible_url_names
 
@@ -360,9 +360,21 @@ class CohortListColumns(DatatableConfig[Cohort]):
         return qs
 
 
-class TriosListColumns(DatatableConfig[Trio]):
+class FamilyGroupListColumns(DatatableConfig[DC]):
+    """ Trios/Quads listing - same grid bar the extra family members """
+    MODEL: type[DC]
+    GRID_NAME: str
+    # (field prefix, label, has an affected column)
+    FAMILY_MEMBERS = [("mother", "Mother", True), ("father", "Father", True), ("proband", "Proband", False)]
+
     def __init__(self, request: HttpRequest):
         super().__init__(request)
+        member_columns = []
+        for member, label, has_affected in self.FAMILY_MEMBERS:
+            member_columns.append(RichColumn(key=f'{member}__sample__name', label=label, orderable=True))
+            if has_affected:
+                member_columns.append(RichColumn(key=f'{member}_affected', label=f'{label} Affected',
+                                                 orderable=True))
         self.rich_columns = [
             RichColumn(key='id', visible=False),
             RichColumn(key='name', label='Name', orderable=True,
@@ -371,57 +383,31 @@ class TriosListColumns(DatatableConfig[Trio]):
             RichColumn(key='user__username', label='User', orderable=True),
             RichColumn(key='modified', client_renderer='TableFormat.timestamp', orderable=True,
                        default_sort=SortOrder.DESC),
-            RichColumn(key='mother__sample__name', label='Mother', orderable=True),
-            RichColumn(key='mother_affected', label='Mother Affected', orderable=True),
-            RichColumn(key='father__sample__name', label='Father', orderable=True),
-            RichColumn(key='father_affected', label='Father Affected', orderable=True),
-            RichColumn(key='proband__sample__name', label='Proband', orderable=True),
+            *member_columns,
             RichColumn(key='id', name='delete', label='', orderable=False,
                        renderer=self.render_delete,
                        client_renderer='TableFormat.deleteRow'),
         ]
 
-    def get_initial_queryset(self) -> QuerySet[Trio]:
-        return Trio.filter_for_user(self.user)
+    def get_initial_queryset(self) -> QuerySet[DC]:
+        return self.MODEL.filter_for_user(self.user)
 
-    def filter_queryset(self, qs: QuerySet[Trio]) -> QuerySet[Trio]:
-        user_grid_config = UserGridConfig.get(self.user, 'Trios')
+    def filter_queryset(self, qs: QuerySet[DC]) -> QuerySet[DC]:
+        user_grid_config = UserGridConfig.get(self.user, self.GRID_NAME)
         if not user_grid_config.show_group_data:
             qs = qs.filter(user=self.user)
         return qs
 
 
-class QuadsListColumns(DatatableConfig[Quad]):
-    def __init__(self, request: HttpRequest):
-        super().__init__(request)
-        self.rich_columns = [
-            RichColumn(key='id', visible=False),
-            RichColumn(key='name', label='Name', orderable=True,
-                       renderer=self.view_primary_key,
-                       client_renderer='TableFormat.linkUrl'),
-            RichColumn(key='user__username', label='User', orderable=True),
-            RichColumn(key='modified', client_renderer='TableFormat.timestamp', orderable=True,
-                       default_sort=SortOrder.DESC),
-            RichColumn(key='mother__sample__name', label='Mother', orderable=True),
-            RichColumn(key='mother_affected', label='Mother Affected', orderable=True),
-            RichColumn(key='father__sample__name', label='Father', orderable=True),
-            RichColumn(key='father_affected', label='Father Affected', orderable=True),
-            RichColumn(key='proband__sample__name', label='Proband', orderable=True),
-            RichColumn(key='sibling__sample__name', label='Sibling', orderable=True),
-            RichColumn(key='sibling_affected', label='Sibling Affected', orderable=True),
-            RichColumn(key='id', name='delete', label='', orderable=False,
-                       renderer=self.render_delete,
-                       client_renderer='TableFormat.deleteRow'),
-        ]
+class TriosListColumns(FamilyGroupListColumns[Trio]):
+    MODEL = Trio
+    GRID_NAME = 'Trios'
 
-    def get_initial_queryset(self) -> QuerySet[Quad]:
-        return Quad.filter_for_user(self.user)
 
-    def filter_queryset(self, qs: QuerySet[Quad]) -> QuerySet[Quad]:
-        user_grid_config = UserGridConfig.get(self.user, 'Quads')
-        if not user_grid_config.show_group_data:
-            qs = qs.filter(user=self.user)
-        return qs
+class QuadsListColumns(FamilyGroupListColumns[Quad]):
+    MODEL = Quad
+    GRID_NAME = 'Quads'
+    FAMILY_MEMBERS = [*FamilyGroupListColumns.FAMILY_MEMBERS, ("sibling", "Sibling", True)]
 
 
 class GenomicIntervalsListColumns(DatatableConfig[GenomicIntervalsCollection]):
@@ -445,7 +431,9 @@ class GenomicIntervalsListColumns(DatatableConfig[GenomicIntervalsCollection]):
         return get_objects_for_user(self.user, 'snpdb.view_genomicintervalscollection', accept_global_perms=False)
 
 
-class CustomColumnsCollectionColumns(DatatableConfig[CustomColumnsCollection]):
+class NamedCollectionColumns(DatatableConfig[DC]):
+    """ A user's named collections - nothing to show but who made it and when """
+    MODEL: type[DC]
 
     def __init__(self, request):
         super().__init__(request)
@@ -462,8 +450,12 @@ class CustomColumnsCollectionColumns(DatatableConfig[CustomColumnsCollection]):
                        default_sort=SortOrder.DESC),
         ]
 
-    def get_initial_queryset(self) -> QuerySet[CustomColumnsCollection]:
-        return CustomColumnsCollection.filter_for_user(self.user)
+    def get_initial_queryset(self) -> QuerySet[DC]:
+        return self.MODEL.filter_for_user(self.user)
+
+
+class CustomColumnsCollectionColumns(NamedCollectionColumns[CustomColumnsCollection]):
+    MODEL = CustomColumnsCollection
 
 
 def server_side_format_clingen_allele(row, field):
@@ -615,25 +607,8 @@ class AbstractVariantGrid(JqGridUserRowConfig):
         return field_names
 
 
-class TagColorsCollectionColumns(DatatableConfig[TagColorsCollection]):
-
-    def __init__(self, request):
-        super().__init__(request)
-        self.user = request.user
-
-        self.rich_columns = [
-            RichColumn(key="id", visible=False),
-            RichColumn(key="name", label="Name", orderable=True,
-                       renderer=self.view_primary_key,
-                       client_renderer='TableFormat.linkUrl'),
-            RichColumn(key="user__username", label="User", orderable=True),
-            RichColumn(key="created", client_renderer='TableFormat.timestamp', orderable=True),
-            RichColumn(key="modified", client_renderer='TableFormat.timestamp', orderable=True,
-                       default_sort=SortOrder.DESC),
-        ]
-
-    def get_initial_queryset(self) -> QuerySet[TagColorsCollection]:
-        return TagColorsCollection.filter_for_user(self.user)
+class TagColorsCollectionColumns(NamedCollectionColumns[TagColorsCollection]):
+    MODEL = TagColorsCollection
 
 
 class LiftoverRunColumns(DatatableConfig[LiftoverRun]):

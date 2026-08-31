@@ -4,6 +4,7 @@ Based on example code from Ryan Dale - https://www.biostars.org/p/9922/#9969
 
 from collections import defaultdict
 
+import numpy as np
 import pandas as pd
 
 from library.genomics import format_chrom
@@ -81,3 +82,30 @@ def plot_chromosomes(ax, cytoband_filename, has_chr=False, **kwargs):
     ax.set_yticklabels(yticklabels)
     ax.set_xticks([])
     return chrom_ranges
+
+
+def plot_chromosome_bin_values(ax, chrom_ranges, bin_values_by_chrom, bin_size, cmap, vmax,
+                               padding, alpha):
+    """ Draw a heatmap band down each chromosome from its per-bin values, all sharing one colour scale.
+
+        Returns one of the QuadMeshes, for the figure to hang a colorbar off. """
+    quadmesh = None
+    for chrom, (_xranges, yranges) in chrom_ranges.items():
+        bins = bin_values_by_chrom[chrom]
+        num_bins = len(bins) + 1
+        x_pos = np.arange(num_bins) * bin_size
+
+        # Get into right dimensions
+        bins = [bins]
+        # pcolor says x,y should have dimensions 1 greater than colors
+        x_pos = [x_pos, x_pos]
+        y_top = np.empty(num_bins)
+        y_top.fill(yranges[0])
+        y_bottom = np.empty(num_bins)
+        y_bottom.fill(yranges[0] + yranges[1])
+        y_pos = [y_top + padding, y_bottom - padding]
+
+        masked_c = np.ma.masked_invalid(np.array(bins))
+        quadmesh = ax.pcolormesh(np.array(x_pos), np.array(y_pos), masked_c, cmap=cmap, alpha=alpha)
+        quadmesh.set_clim(vmin=0, vmax=vmax)
+    return quadmesh

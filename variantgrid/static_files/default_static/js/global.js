@@ -53,6 +53,24 @@ function tweakAjax() {
 const globalPreviewCache = {};
 const globalPreviewableDbs = new Set(["OMIM", "MONDO", "HPO", "PMID", "PMC", "PUBMED", "NCBIBOOKSHELF"]);
 
+// Keep a popover up while the mouse is over it, so its content can be read (and clicked)
+function popoverHoverStay($node) {
+    $node.on("mouseenter", function () {
+        const _this = this;
+        $(this).popover("show");
+        $(".popover").on("mouseleave", function () {
+            $(_this).popover('hide');
+        });
+    }).on("mouseleave", function () {
+        const _this = this;
+        setTimeout(function () {
+            if (!$(".popover:hover").length) {
+                $(_this).popover("hide");
+            }
+        }, 300);
+    });
+}
+
 function enhanceAndMonitor() {
     const popoverOpts = {
         html: true,
@@ -182,20 +200,7 @@ function enhanceAndMonitor() {
             $target.attr('data-content', $node.attr('data-help'));
             $target.attr('data-html', true);
             $target.attr('data-placement', 'left'); // top & left are preferred as most help are labels with data to the right
-            $target.on("mouseenter", function () {
-                const _this = this;
-                $(this).popover("show");
-                $(".popover").on("mouseleave", function () {
-                    $(_this).popover('hide');
-                });
-            }).on("mouseleave", function () {
-                const _this = this;
-                setTimeout(function () {
-                    if (!$(".popover:hover").length) {
-                        $(_this).popover("hide");
-                    }
-                }, 300);
-            });
+            popoverHoverStay($target);
 
             // remove attributes from parent element as to not get overlapping help
             $node.removeAttr('title');
@@ -207,20 +212,7 @@ function enhanceAndMonitor() {
                 node.addClass('hover-detail');
                 const poOpts = Object.assign({}, popoverOpts);  // clone
                 if (node.hasClass("popover-hover-stay")) {
-                    node.on("mouseenter", function () {
-                        const _this = this;
-                        $(this).popover("show");
-                        $(".popover").on("mouseleave", function () {
-                            $(_this).popover('hide');
-                        });
-                    }).on("mouseleave", function () {
-                        const _this = this;
-                        setTimeout(function () {
-                            if (!$(".popover:hover").length) {
-                                $(_this).popover("hide");
-                            }
-                        }, 300);
-                    });
+                    popoverHoverStay(node);
                     poOpts["trigger"] = "manual";
                 }
                 node.popover(poOpts);
