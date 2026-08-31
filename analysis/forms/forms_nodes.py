@@ -98,6 +98,14 @@ class VCFLocusFiltersMixin(forms.Form):
         data = self.cleaned_data["vcf_locus_filters"]
         return json.loads(data)
 
+    @staticmethod
+    def get_saved_vcf_locus_filters(node) -> dict:
+        """ What save_vcf_locus_filters wrote, in the shape the editor posts back """
+        by_vcf = {}
+        for vcf_id, filter_id in NodeVCFFilter.get_vcf_filter_ids(node):
+            by_vcf.setdefault(str(vcf_id), []).append(filter_id)
+        return {"pass": NodeVCFFilter.has_pass(node), "by_vcf": by_vcf}
+
     def save_vcf_locus_filters(self, node):
         vcfs = node.get_vcf_locus_filter_vcfs()
         if not vcfs:
@@ -899,6 +907,19 @@ class SampleThresholdsMixin(forms.Form):
         if not data:
             return {}
         return {int(sample_id): values for sample_id, values in json.loads(data).items()}
+
+    @staticmethod
+    def get_saved_sample_thresholds(node) -> dict:
+        """ What save_sample_thresholds wrote - only the fields that differ from the node's own
+            values, since the editor shows those as the placeholder and a blank input inherits """
+        node_values = {f: getattr(node, f) for f in SampleThresholdsMixin.THRESHOLD_FIELDS}
+        overrides = {}
+        for row in node.samplenodesamplethreshold_set.all():
+            values = {f: getattr(row, f) for f in SampleThresholdsMixin.THRESHOLD_FIELDS
+                      if getattr(row, f) != node_values[f]}
+            if values:
+                overrides[row.sample_id] = values
+        return overrides
 
     def save_sample_thresholds(self, node):
         sample_thresholds: dict = self.cleaned_data.get("sample_thresholds") or {}

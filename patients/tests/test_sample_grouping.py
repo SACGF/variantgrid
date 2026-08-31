@@ -146,6 +146,25 @@ class TestGroupingAutocompletes(ExtractionSampleTestCase):
         self.assertEqual(sample_ids, [self.sample.pk])
 
 
+class TestPatientGetSamples(ExtractionSampleTestCase):
+    """ Related data has to show everything related - a sample reaches its patient either way round """
+
+    def test_samples_linked_only_through_the_extraction_are_related_data(self):
+        # What the VCF import produces: extraction carried down, sample.patient left null
+        self.assertIsNone(self.sample.patient)
+        self.assertIn(self.sample, self.patient.get_samples())
+
+    def test_samples_linked_straight_to_the_patient_are_related_data(self):
+        # What the patient CSV produces: patient set, extraction left null
+        loose, _ = self._create_vcf_sample("csv_import", self.grch37)
+        Sample.objects.filter(pk=loose.pk).update(extraction=None, patient=self.patient)
+        self.assertIn(loose, self.patient.get_samples())
+
+    def test_a_sample_on_both_paths_is_listed_once(self):
+        Sample.objects.filter(pk=self.sample.pk).update(patient=self.patient)
+        self.assertEqual(list(self.patient.get_samples()).count(self.sample), 1)
+
+
 class TestSampleGroupTree(ExtractionSampleTestCase):
     """ The node editor draws the whole patient, so picking a sibling arm is a click not a search """
 

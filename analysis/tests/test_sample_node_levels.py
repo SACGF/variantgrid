@@ -691,6 +691,20 @@ class TestAnalysisTemplatesTag(SampleNodeLevelsTestCase):
                 self.assertNotIn("source_archived", context)
                 self.assertEqual(list(AnalysisTemplate.filter(self.user, class_name=class_name)), [])
 
+    def test_the_page_block_renders_once_per_build_the_source_reaches(self):
+        """ The shared Create analysis block - one analysis_templates_tag per genome build """
+        get_fake_annotation_version(self.grch38)
+        self._create_vcf_sample("grch38_caller", self.grch38, self.extraction)
+
+        self.client.force_login(self.user)
+        url = reverse("view_extraction", kwargs={"extraction_id": self.extraction.pk})
+        content = self.client.get(url).content.decode()
+        self.assertIn("Create analysis", content)
+        # A form per build, each posting to that build's create-from-template view
+        for genome_build in (self.grch37, self.grch38):
+            self.assertIn(reverse("create_analysis_from_template",
+                                  kwargs={"genome_build_name": genome_build.name}), content)
+
     def test_a_group_whose_samples_are_all_archived_offers_nothing(self):
         """ One live arm is still worth analysing, so this only trips once every sample is gone """
         for sample in (self.snv_sample, self.cnv_sample):

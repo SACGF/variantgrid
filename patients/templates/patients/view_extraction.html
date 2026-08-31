@@ -53,13 +53,7 @@
         <hr/>
         <h4>Create analysis</h4>
         {% load related_analyses_tags %}
-        {% if sample_group_genome_builds %}
-            {% for genome_build in sample_group_genome_builds %}
-                {% analysis_templates_tag genome_build extraction=extraction %}
-            {% endfor %}
-        {% else %}
-            <p>No samples to analyse.</p>
-        {% endif %}
+        {% analysis_templates_for_sample_source "E" extraction %}
 
         {% if sequencing_samples %}
             <h4>Sequencing Samples</h4>

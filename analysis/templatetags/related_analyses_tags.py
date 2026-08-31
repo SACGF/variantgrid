@@ -6,6 +6,8 @@ from functools import reduce
 from django.conf import settings
 from django.db.models import Model, Q
 from django.template import Library
+from django.template.loader import render_to_string
+from django.utils.safestring import mark_safe
 
 from analysis.forms import get_analysis_template_form_for_variables_only_of_class
 from annotation.models.models_gene_counts import GeneCountType
@@ -24,6 +26,7 @@ from analysis.related_analyses import (
     get_related_analysis_details_for_samples,
     get_related_analysis_details_for_trio,
 )
+from library.utils import remove_duplicates_from_list
 from patients.sample_grouping import get_sample_group
 from pedigree.models import Pedigree
 from snpdb.models import Cohort, Trio
@@ -226,6 +229,28 @@ def analysis_templates_tag(context, genome_build, autocomplete_field=True, has_s
         "hidden_inputs": hidden_inputs,
         "missing_templates": ", ".join(missing_templates),
     }
+
+
+@register.simple_tag(takes_context=True)
+def analysis_templates_for_sample_source(context, level, source):
+    """ The Create analysis block on the patient / specimen / extraction pages.
+
+        An analysis is one genome build and a specimen's arms can sit in different ones, so this
+        renders analysis_templates_tag once per build the source reaches. Its kwarg is the level's
+        own field name, which a template can't spell dynamically - hence rendering here. """
+    group = get_sample_group(context["user"], level, source)
+    genome_builds = remove_duplicates_from_list([s.genome_build for s in group.samples])
+    if not genome_builds:
+        return mark_safe('<p>No samples to analyse.</p>')
+
+    field = SampleNode.SOURCE_LEVEL_FIELDS[level]
+    rendered = []
+    for genome_build in genome_builds:
+        tag_context = analysis_templates_tag(context, genome_build, **{field: source})
+        # inclusion_tag would carry this across for us; render_to_string needs it passing
+        tag_context["csrf_token"] = context.get("csrf_token")
+        rendered.append(render_to_string("analysis/tags/analysis_templates_tag.html", tag_context))
+    return mark_safe("".join(rendered))
 
 
 @register.inclusion_tag("analysis/tags/analysis_output_node_downloads.html", takes_context=True)

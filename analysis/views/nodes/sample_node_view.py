@@ -1,6 +1,5 @@
 from analysis.forms import SampleNodeForm
-from analysis.forms.forms_nodes import SampleThresholdsMixin
-from analysis.models.nodes.analysis_node import NodeVCFFilter
+from analysis.forms.forms_nodes import SampleThresholdsMixin, VCFLocusFiltersMixin
 from analysis.models.nodes.sources.sample_node import SampleNode
 from analysis.views.nodes import GeneCoverageNodeView
 from patients.models_enums import SampleSourceLevel
@@ -14,25 +13,6 @@ class SampleNodeView(GeneCoverageNodeView):
         if self.object.sample:
             return self.object.sample.get_minimum_coverage_required()
         return super()._get_minimum_coverage_required()
-
-    def _get_sample_threshold_overrides(self) -> dict:
-        """ Only what the user actually typed - the editor shows the node's own values as the
-            placeholder, so an inherited field has to come through as absent rather than as a copy """
-        node_values = {f: getattr(self.object, f) for f in SampleThresholdsMixin.THRESHOLD_FIELDS}
-        overrides = {}
-        for row in self.object.samplenodesamplethreshold_set.all():
-            values = {f: getattr(row, f) for f in SampleThresholdsMixin.THRESHOLD_FIELDS
-                      if getattr(row, f) != node_values[f]}
-            if values:
-                overrides[row.sample_id] = values
-        return overrides
-
-    def _get_vcf_locus_filters(self) -> dict:
-        """ The hidden field's shape - PASS at node level, everything else under its own VCF """
-        by_vcf = {}
-        for vcf_id, filter_id in NodeVCFFilter.get_vcf_filter_ids(self.object):
-            by_vcf.setdefault(str(vcf_id), []).append(filter_id)
-        return {"pass": NodeVCFFilter.has_pass(self.object), "by_vcf": by_vcf}
 
     def _has_genotype(self) -> bool:
         """ A node reading no genotype at all hides the genotype widgets - which the form drops and
@@ -67,8 +47,9 @@ class SampleNodeView(GeneCoverageNodeView):
                         "source_id": source_object.pk if source_object else None,
                         "source_levels": {level.name: level.value for level in SampleSourceLevel},
                         "source_level_labels": dict(SampleSourceLevel.choices),
-                        "sample_threshold_overrides": self._get_sample_threshold_overrides(),
-                        "vcf_locus_filters": self._get_vcf_locus_filters(),
+                        # Read back through the mixins that own these hidden fields' formats
+                        "sample_threshold_overrides": SampleThresholdsMixin.get_saved_sample_thresholds(self.object),
+                        "vcf_locus_filters": VCFLocusFiltersMixin.get_saved_vcf_locus_filters(self.object),
                         "show_genes_tab": show_genes_tab,
                         "gene_lists": [gene_list]})
         return context

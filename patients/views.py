@@ -29,24 +29,11 @@ from patients.models import (
     PatientRecords,
     Specimen,
 )
-from patients.models_enums import MatchStatus, SampleSourceLevel
-from patients.sample_grouping import (
-    SOURCE_LEVELS,
-    get_patient_sample_tree,
-    get_source_level_q,
-)
+from patients.models_enums import MatchStatus
+from patients.sample_grouping import SOURCE_LEVELS, get_patient_sample_tree
 from seqauto.models import SequencingSample
 from snpdb.models import GenomeBuild, Sample
 from uicore.utils.form_helpers import form_helper_horizontal
-
-
-def _sample_group_genome_builds(user, level: str, source) -> list:
-    """ Which builds an analysis template could be launched in - an analysis has exactly one, and a
-        specimen's arms can sit in different ones """
-    build_ids = (Sample.filter_for_user(user)
-                 .filter(get_source_level_q(level, source))
-                 .values_list("vcf__genome_build_id", flat=True).distinct())
-    return list(GenomeBuild.objects.filter(pk__in=build_ids).order_by("pk"))
 
 
 def view_patient(request, patient_id):
@@ -74,8 +61,6 @@ def view_patient(request, patient_id):
                "specimens": specimens,
                "existing_files": existing_files,
                "show_read_only_patient_dob": show_read_only_patient_dob,
-               "sample_group_genome_builds": _sample_group_genome_builds(
-                   request.user, SampleSourceLevel.PATIENT, patient),
                "has_write_permission": has_write_permission}
     return render(request, 'patients/view_patient.html', context)
 
@@ -212,8 +197,6 @@ def view_specimen(request, specimen_id):
                "create_extraction_field": CREATE_EXTRACTION,
                "extractions": specimen.extraction_set.order_by("pk").prefetch_related(visible_samples),
                "measures": specimen.specimenmeasure_set.order_by("measure_type", "-measured_date"),
-               "sample_group_genome_builds": _sample_group_genome_builds(
-                   request.user, SampleSourceLevel.SPECIMEN, specimen),
                "has_write_permission": has_write_permission}
     return render(request, 'patients/view_specimen.html', context)
 
@@ -237,8 +220,6 @@ def view_extraction(request, extraction_id):
                "form": form,
                "samples": Sample.filter_for_user(request.user).filter(extraction=extraction).order_by("pk"),
                "sequencing_samples": extraction.sequencingsample_set.order_by("pk"),
-               "sample_group_genome_builds": _sample_group_genome_builds(
-                   request.user, SampleSourceLevel.EXTRACTION, extraction),
                "has_write_permission": has_write_permission}
     return render(request, 'patients/view_extraction.html', context)
 

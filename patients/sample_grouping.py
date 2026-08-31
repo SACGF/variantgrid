@@ -50,6 +50,7 @@ SOURCE_LEVELS = {
         model=Extraction, sample_paths=("extraction",), patient_paths=("specimen__patient",)),
     SampleSourceLevel.SPECIMEN: SourceLevel(
         model=Specimen, sample_paths=("extraction__specimen",), patient_paths=("patient",)),
+    # Keep in step with Patient.get_samples(), which expresses the same union model side
     SampleSourceLevel.PATIENT: SourceLevel(
         model=Patient, sample_paths=("patient", "extraction__specimen__patient")),
 }
