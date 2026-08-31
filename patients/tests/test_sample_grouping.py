@@ -203,7 +203,21 @@ class TestSampleGroupTree(ExtractionSampleTestCase):
         Sample.objects.filter(pk=unlinked.pk).update(extraction=None, patient=self.patient)
 
         tree = get_patient_sample_tree(self.user, SampleSourceLevel.PATIENT, self.patient, self.grch37)
-        self.assertEqual([s["sample"] for s in tree["unlinked"]["samples"]], [unlinked.name])
+        self.assertEqual([s["sample"] for s in tree["samples"]], [unlinked.name])
+        self.assertEqual(tree["patient"]["sample_count"], 3)
+
+    def test_a_sample_with_no_hierarchy_is_just_its_own_row(self):
+        """ A deployment that hasn't set up specimens and extractions has no tree to draw - the
+            editor says so rather than inventing containers around the one sample """
+        loose, _ = self._create_vcf_sample("loose_sample", self.grch37)
+        Sample.objects.filter(pk=loose.pk).update(extraction=None)
+        loose.refresh_from_db()
+
+        tree = get_patient_sample_tree(self.user, SampleSourceLevel.SAMPLE, loose, self.grch37)
+        self.assertIsNone(tree["patient"])
+        self.assertEqual(tree["specimens"], [])
+        self.assertEqual([s["sample"] for s in tree["samples"]], [loose.name])
+        self.assertTrue(tree["samples"][0]["in_selection"])
 
     def test_samples_without_permission_are_counted_not_named(self):
         tree = get_patient_sample_tree(self.other_user, SampleSourceLevel.PATIENT, self.patient,

@@ -216,7 +216,12 @@ def get_patient_sample_tree(user: User, level: str, source, genome_build: Option
     """ The whole patient a source object belongs to, with the picked row's subtree flagged.
 
         The node editor draws this rather than just the resolved samples, so moving up or down a
-        level - the RNA arm, the other specimen - is a click rather than another search. """
+        level - the RNA arm, the other specimen - is a click rather than another search.
+
+        `samples` are the rows with no extraction above them: the patient's own where there is a
+        patient, and just the picked sample where there is not - a deployment that hasn't set up
+        specimens and extractions has no hierarchy to draw, so the editor says so and shows the one
+        row rather than inventing containers around it. """
     patient = get_patient_for_source(level, source)
     selected = (level, source.pk) if source is not None else None
     visible_samples = Sample.filter_for_user(user).select_related("vcf")
@@ -225,21 +230,13 @@ def get_patient_sample_tree(user: User, level: str, source, genome_build: Option
         "selected": {"level": level, "id": source.pk, "label": str(source)} if source else None,
         "patient": None,
         "specimens": [],
-        "unlinked": None,
+        "samples": [],
     }
 
     if patient is None:
-        # A sample linked to neither a patient nor an extraction still gets its own row to configure
         if level == SampleSourceLevel.SAMPLE:
-            tree["unlinked"] = {
-                "level": None,
-                "id": None,
-                "label": "Unlinked samples",
-                "in_selection": False,
-                "hidden_count": 0,
-                "sample_count": 1,
-                "samples": _tree_samples(visible_samples.filter(pk=source.pk), genome_build, selected, False),
-            }
+            tree["samples"] = _tree_samples(visible_samples.filter(pk=source.pk),
+                                            genome_build, selected, False)
         return tree
 
     patient_selected = selected == (SampleSourceLevel.PATIENT, patient.pk)
@@ -281,16 +278,7 @@ def get_patient_sample_tree(user: User, level: str, source, genome_build: Option
 
     # Samples the patient CSV attached straight to the patient, with no extraction to sit under
     unlinked_qs = visible_samples.filter(patient=patient, extraction__isnull=True).order_by("pk")
-    if unlinked_samples := _tree_samples(unlinked_qs, genome_build, selected, patient_selected):
-        tree["unlinked"] = {
-            "level": None,
-            "id": None,
-            "label": "Unlinked samples",
-            "in_selection": patient_selected,
-            "hidden_count": 0,
-            "sample_count": len(unlinked_samples),
-            "samples": unlinked_samples,
-        }
+    tree["samples"] = _tree_samples(unlinked_qs, genome_build, selected, patient_selected)
     tree["patient"]["sample_count"] = (sum(sp["sample_count"] for sp in tree["specimens"])
-                                       + (tree["unlinked"]["sample_count"] if tree["unlinked"] else 0))
+                                       + len(tree["samples"]))
     return tree

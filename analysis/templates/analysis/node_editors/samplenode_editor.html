@@ -250,15 +250,17 @@
         return parts.join(" \u00b7 ");
     }
 
-    function renderSampleRow(sample, holder) {
+    function renderSampleRow(sample, holder, pickable) {
         var row = $("<div/>", {"class": "source-row source-row-sample"}).appendTo(holder);
         if (!sample.in_selection) {
             row.addClass("source-row-unselected");
         }
         if (sample.included) {
-            var radio = $("<input/>", {type: "radio", name: "source-row", disabled: LOCK_INPUT_SOURCES,
-                                       checked: isSelected(SOURCE_LEVELS.SAMPLE, sample.sample_id)});
-            radio.appendTo(row).change(function() { selectSource(SOURCE_LEVELS.SAMPLE, sample.sample_id); });
+            if (pickable) {
+                var radio = $("<input/>", {type: "radio", name: "source-row", disabled: LOCK_INPUT_SOURCES,
+                                           checked: isSelected(SOURCE_LEVELS.SAMPLE, sample.sample_id)});
+                radio.appendTo(row).change(function() { selectSource(SOURCE_LEVELS.SAMPLE, sample.sample_id); });
+            }
             var caret = expandedSamples[sample.sample_id] ? "fa-caret-down" : "fa-caret-right";
             $("<i/>", {"class": "source-expand fa-solid " + caret}).appendTo(row).click(function() {
                 expandedSamples[sample.sample_id] = !expandedSamples[sample.sample_id];
@@ -267,7 +269,9 @@
         } else {
             row.addClass("source-row-excluded");
             $("<span/>", {"class": "source-expand"}).appendTo(row);
-            $("<span/>", {"class": "source-expand"}).appendTo(row);
+            if (pickable) {
+                $("<span/>", {"class": "source-expand"}).appendTo(row);
+            }
         }
         $("<span/>", {"class": "source-row-label", text: sample.sample}).appendTo(row);
         if (sample.included) {
@@ -288,19 +292,14 @@
     }
 
     function renderContainerRow(container, levelLabel, parentInSelection, holder) {
-        container.in_selection = container.level ? inSelection(container.level, container.id, parentInSelection)
-                                                 : parentInSelection;
+        container.in_selection = inSelection(container.level, container.id, parentInSelection);
         var row = $("<div/>", {"class": "source-row source-row-" + levelLabel.toLowerCase()}).appendTo(holder);
         if (!container.in_selection) {
             row.addClass("source-row-unselected");
         }
-        if (container.level) {
-            var radio = $("<input/>", {type: "radio", name: "source-row", disabled: LOCK_INPUT_SOURCES,
-                                       checked: isSelected(container.level, container.id)});
-            radio.appendTo(row).change(function() { selectSource(container.level, container.id); });
-        } else {
-            $("<span/>", {"class": "source-expand"}).appendTo(row);  // Unlinked samples - nothing to pick
-        }
+        var radio = $("<input/>", {type: "radio", name: "source-row", disabled: LOCK_INPUT_SOURCES,
+                                   checked: isSelected(container.level, container.id)});
+        radio.appendTo(row).change(function() { selectSource(container.level, container.id); });
         $("<span/>", {"class": "source-row-label", text: container.label}).appendTo(row);
         if (container.detail) {
             $("<span/>", {"class": "source-row-detail", text: container.detail}).appendTo(row);
@@ -310,12 +309,16 @@
         return container.in_selection;
     }
 
+    function renderSampleRows(samples, parentInSelection, holder, pickable) {
+        $.each(samples, function(i, sample) {
+            sample.in_selection = inSelection(SOURCE_LEVELS.SAMPLE, sample.sample_id, parentInSelection);
+            renderSampleRow(sample, holder, pickable);
+        });
+    }
+
     function renderExtraction(extraction, parentInSelection, holder) {
         var inSel = renderContainerRow(extraction, "Extraction", parentInSelection, holder);
-        $.each(extraction.samples, function(i, sample) {
-            sample.in_selection = inSelection(SOURCE_LEVELS.SAMPLE, sample.sample_id, inSel);
-            renderSampleRow(sample, holder);
-        });
+        renderSampleRows(extraction.samples, inSel, holder, true);
         if (extraction.hidden_count) {
             // Naming samples the user can't view would leak them, so they are a count
             $("<div/>", {"class": "source-row source-row-unselected",
@@ -323,16 +326,14 @@
         }
     }
 
-    function eachSelectedContainer(func) {
+    function eachSampleList(func) {
         if (!sourceTree) {
             return;
         }
         $.each(sourceTree.specimens, function(i, specimen) {
-            $.each(specimen.extractions, function(j, extraction) { func(extraction); });
+            $.each(specimen.extractions, function(j, extraction) { func(extraction.samples); });
         });
-        if (sourceTree.unlinked) {
-            func(sourceTree.unlinked);
-        }
+        func(sourceTree.samples);
     }
 
     function drawSourceTree() {
@@ -342,18 +343,29 @@
             $("#sample-source-summary").empty();
             return;
         }
-        var patientInSel = false;
-        if (sourceTree.patient) {
-            patientInSel = renderContainerRow(sourceTree.patient, "Patient", false, holder);
+
+        if (!sourceTree.patient) {
+            // Nothing to group by, so there is no tree to draw - just say so and show the sample's
+            // own settings, which is the editor a deployment without specimens/extractions wants
+            $("<div/>", {"class": "source-row-detail",
+                         text: "Not linked to a patient - no specimen or extraction to group by"}).appendTo(holder);
+            renderSampleRows(sourceTree.samples, true, holder, false);
+            drawSourceSummary();
+            return;
         }
+
+        var patientInSel = renderContainerRow(sourceTree.patient, "Patient", false, holder);
         $.each(sourceTree.specimens, function(i, specimen) {
             var specimenInSel = renderContainerRow(specimen, "Specimen", patientInSel, holder);
             $.each(specimen.extractions, function(j, extraction) {
                 renderExtraction(extraction, specimenInSel, holder);
             });
         });
-        if (sourceTree.unlinked) {
-            renderExtraction(sourceTree.unlinked, patientInSel, holder);
+        if (sourceTree.samples.length) {
+            // The patient CSV attaches these straight to the patient, with no extraction to sit under
+            $("<div/>", {"class": "source-row source-row-detail",
+                         text: "Not in an extraction"}).appendTo(holder);
+            renderSampleRows(sourceTree.samples, patientInSel, holder, true);
         }
         drawSourceSummary();
     }
@@ -361,8 +373,8 @@
     function drawSourceSummary() {
         var samples = [];
         var skipped = [];
-        eachSelectedContainer(function(container) {
-            $.each(container.samples, function(i, sample) {
+        eachSampleList(function(sampleList) {
+            $.each(sampleList, function(i, sample) {
                 if (!sample.in_selection) {
                     return;
                 }
@@ -426,8 +438,8 @@
             drawSourceTree();  // Flags in_selection, which the auto expand below reads
             // With one sample its own row is the only place the per VCF settings live, so open it
             var selected = [];
-            eachSelectedContainer(function(container) {
-                $.each(container.samples, function(i, sample) {
+            eachSampleList(function(sampleList) {
+                $.each(sampleList, function(i, sample) {
                     if (sample.included && sample.in_selection) {
                         selected.push(sample);
                     }

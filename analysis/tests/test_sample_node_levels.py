@@ -422,6 +422,17 @@ class TestSampleNodeLevels(SampleNodeLevelsTestCase):
                 self.assertEqual(node.get_node_icon().symbol, "node-icon-sample-female")
                 self.assertEqual(node.get_node_strip_label(), strip)
 
+    def test_a_sample_with_no_hierarchy_falls_back_to_the_plain_badge(self):
+        """ Deployments that never set up specimens/extractions still get the sample level node
+            they had before - no patient means no pedigree shape to draw """
+        loose, _ = self._create_vcf_sample("loose_sample", self.grch37, None)
+        node = self._node(SampleSourceLevel.SAMPLE, loose)
+
+        self.assertIsNone(node.get_patient())
+        self.assertEqual(node.get_node_icon(), SampleNode.get_node_class_icon())
+        self.assertEqual([(c.text, c.title) for c in node.get_node_chips()],
+                         [("VCF", str(loose.vcf))])
+
     def test_chips_are_the_hierarchy_from_the_picked_object_down(self):
         sample_chips = self._node(SampleSourceLevel.SAMPLE, self.snv_sample).get_node_chips()
         self.assertEqual([(c.text, c.title) for c in sample_chips],
