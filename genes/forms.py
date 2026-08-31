@@ -30,7 +30,9 @@ class GeneListForm(forms.ModelForm, ROFormMixin):
         fields = ALL_FIELDS
         read_only = ('category', 'import_status', 'error_message', 'locked')
         widgets = {"name": TextInput(),
-                   "url": TextInput()}
+                   "url": TextInput(),
+                   "user": ModelSelect2(url='user_autocomplete',
+                                        attrs={'data-placeholder': 'User...'})}
 
 
 class GeneForm(forms.Form):

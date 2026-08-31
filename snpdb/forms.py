@@ -268,7 +268,9 @@ class VCFForm(forms.ModelForm, ROFormMixin):
         model = models.VCF
         fields = ['name', 'date', 'genome_build', 'user', 'project', 'import_status']
         read_only = ('date', 'import_status')
-        widgets = {'name': TextInput()}
+        widgets = {'name': TextInput(),
+                   'user': ModelSelect2(url='user_autocomplete',
+                                        attrs={'data-placeholder': 'User...'})}
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -668,9 +670,8 @@ class CreateCohortForm(BaseModelForm):
 
     class Meta:
         model = models.Cohort
-        fields = ['user', 'name', "genome_build"]
-        widgets = {'user': HiddenInput(),
-                   'name': TextInput()}
+        fields = ['name', "genome_build"]
+        widgets = {'name': TextInput()}
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -815,7 +816,9 @@ class GenomicIntervalsCollectionForm(forms.ModelForm, ROFormMixin):
         exclude = ['category']
         read_only = ('processed_file', 'processed_records', 'import_status')
         widgets = {'name': TextInput(),
-                   'processed_file': TextInput()}
+                   'processed_file': TextInput(),
+                   'user': ModelSelect2(url='user_autocomplete',
+                                        attrs={'data-placeholder': 'User...'})}
 
     def save(self, commit=True):
         instance = super().save(commit=False)

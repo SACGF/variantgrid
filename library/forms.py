@@ -2,6 +2,8 @@
 From https://djangosnippets.org/snippets/2696/
 """
 
+import itertools
+
 from django import forms
 from django.forms.widgets import TextInput, Widget
 from django.utils.html import format_html
@@ -55,15 +57,33 @@ class StarsWidget(Widget):
                            container_id=container_id, stars=mark_safe("".join(parts)))
 
 
+class ReadOnlyDisplayWidget(Widget):
+    """ Renders the value as plain text instead of a form control - a disabled Select still
+        renders every option, so use this for choice fields with a large pool (eg users) """
+
+    def __init__(self, display, attrs=None):
+        super().__init__(attrs)
+        self.display = display
+
+    def render(self, name, value, attrs=None, renderer=None):
+        return format_html('<span class="form-control-plaintext">{}</span>', self.display)
+
+
 class ROFormMixin(forms.BaseForm):
-    """ Default is make all fields ready only. Use "read_only" tuple for a subset of fields  """
+    """ Default is make all fields ready only. Use "read_only" tuple for a subset of fields.
+        Fields in "read_only_display" are also disabled, and render as plain text """
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        if hasattr(self.Meta, "read_only"):
-            read_only_fields = self.Meta.read_only
-        else:
+        read_only_display_fields = getattr(self.Meta, "read_only_display", ())
+        read_only_fields = getattr(self.Meta, "read_only", None)
+        if read_only_fields is None and not read_only_display_fields:
             read_only_fields = self.fields  # all
 
-        for field in read_only_fields:
+        for field in itertools.chain(read_only_fields or (), read_only_display_fields):
             self.fields[field].disabled = True
+
+        instance = getattr(self, "instance", None)
+        for field_name in read_only_display_fields:
+            value = getattr(instance, field_name, None)
+            self.fields[field_name].widget = ReadOnlyDisplayWidget(str(value) if value is not None else "")
