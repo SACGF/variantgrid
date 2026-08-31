@@ -211,6 +211,7 @@ class LabelledValueTag(template.Node):
         self.show_if = show_if
 
     id_regex = re.compile(r"id=[\"|'](.*?)[\"|']")
+    form_control_id_regex = re.compile(r"<(?:input|select|textarea)\b[^>]*\bid=[\"'](.*?)[\"']", re.IGNORECASE)
     big_zero = re.compile(r"^0([.]0+)?$")
 
     def render(self, context):
@@ -278,11 +279,15 @@ class LabelledValueTag(template.Node):
                 give_div_id = False
 
         div_id = ""
+        if complete_id and give_div_id:
+            div_id = f"id=\"{complete_id}\""
+
+        # Nearly all rows are read-only values - a <label for> pointing at the value div is invalid
+        # and gets announced as a form field, so only use a label when we're wrapping a real control
         for_id = ""
-        if complete_id:
-            if give_div_id:
-                div_id = f"id=\"{complete_id}\""
-            for_id = f"for=\"{complete_id}\""
+        if '<label' not in output:
+            if form_control := LabelledValueTag.form_control_id_regex.search(output):
+                for_id = form_control.group(1)
 
         if output in ("", "None"):
             output = "<span class=\"no-value\">-</span>"
@@ -300,7 +305,10 @@ class LabelledValueTag(template.Node):
             help_attr = f'title=\"{label}\" data-help=\"{help_html}\"'
             # help_tag = f' <i class="fas fa-duotone fa-info-circle hover-detail popover-hover-stay text-info" data-toggle="popover" popover-header="{label}" data-html="true" data-placement="left" data-content="{help_html}"></i>'
 
-        label_tag = f'<label {for_id} class="{label_css}" { help_attr }>{label}</label>'
+        if for_id:
+            label_tag = f'<label for="{for_id}" class="{label_css}" { help_attr }>{label}</label>'
+        else:
+            label_tag = f'<div class="field-label {label_css}" { help_attr }>{label}</div>'
         content = f"""{label_tag}<div {div_id} class="{value_css}">{output}</div>"""
 
         if hint == "inline":

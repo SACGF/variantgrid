@@ -624,7 +624,8 @@ input {
 	display: flex;
 	align-items: center;
 
-	label {
+	label,
+	.field-label {
 		font-weight: bold;
 		width: inherit;
 		padding-right: 6px;
@@ -662,6 +663,7 @@ input {
 		p,
 		input,
 		label:not(:first-child),
+		.field-label:not(:first-child),
 		button,
 		a {
 			margin-left: 12px;
@@ -1148,7 +1150,8 @@ table.dataTable {
 			padding-top: 0;
 
 			>*> {
-				label {
+				label,
+				.field-label {
 					width: 100px;
 				}
 
@@ -1647,7 +1650,8 @@ h4:not(:first-child):not(.popover-header) {
 }
 
 label,
-form label {
+form label,
+.field-label {
 	color: #555;
 	font-weight: 500;
 }

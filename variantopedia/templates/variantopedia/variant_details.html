@@ -630,6 +630,7 @@ function applyVariantValues() {
             </div>
             <form id="variant-tag-form" class="hidden flex-row flex-grow">
                 {% csrf_token %}
+                <label class="sr-only" for="{{ tag_form.tag.id_for_label }}">{{ tag_form.tag.label }}</label>
                 {{ tag_form.tag }}
                 {{ tag_form.media }}
             </form>

@@ -556,7 +556,8 @@ input[type='checkbox'], input[type='radio'] {
   display: flex;
   align-items: center;
 }
-.horizontal-fields label {
+.horizontal-fields label,
+.horizontal-fields .field-label {
   font-weight: bold;
   width: inherit;
   padding-right: 6px;
@@ -583,6 +584,7 @@ input[type='checkbox'], input[type='radio'] {
 .horizontal-fields > p,
 .horizontal-fields > input,
 .horizontal-fields > label:not(:first-child),
+.horizontal-fields > .field-label:not(:first-child),
 .horizontal-fields > button,
 .horizontal-fields > a {
   margin-left: 12px;
@@ -966,7 +968,8 @@ table.dataTable tr.child td.child {
 table.dataTable tr.child td.child fieldset.form-fields {
   padding-top: 0;
 }
-table.dataTable tr.child td.child fieldset.form-fields > * > label {
+table.dataTable tr.child td.child fieldset.form-fields > * > label,
+table.dataTable tr.child td.child fieldset.form-fields > * > .field-label {
   width: 100px;
 }
 table.dataTable tr.child td.child fieldset.form-fields > * > *:nth-child(2) {
@@ -1383,7 +1386,8 @@ h4:not(:first-child):not(.popover-header) {
 }
 
 label,
-form label {
+form label,
+.field-label {
   color: #555;
   font-weight: 500;
 }

@@ -18,19 +18,18 @@
     </p>
     <div class="form-group row">
         <div class="col-3"></div>
-        <div class="col-4 override-header override-value"><label>Default Value</label></div>
-        <div class="col-5 override-header"><label>{{ override_level }} Override</label></div>
+        <div class="col-4 override-header override-value"><span class="field-label">Default Value</span></div>
+        <div class="col-5 override-header"><span class="field-label">{{ override_level }} Override</span></div>
     </div>
 {% endif %}
 
 {% for field in form %}
     <div class="form-group row user-overrides" style="align-items: center">
         {{ field.errors }}
-        {% if field.help_text %}
-            <label class="col-12 col-md-3 text-left text-md-right mt-2 mt-md-0 hover-detail" data-help="{{ field.help_text|safe }}">{{ field.label_tag }}</label>
-        {% else %}
-            <label class="col-12 col-md-3 text-left text-md-right mt-2 mt-md-0">{{ field.label_tag }}</label>
-        {% endif %}
+        <div class="col-12 col-md-3 text-left text-md-right mt-2 mt-md-0{% if field.help_text %} hover-detail{% endif %}"{% if field.help_text %} data-help="{{ field.help_text|safe }}"{% endif %}>
+            {% comment %}Multi-widgets (eg checkbox groups) have no id to point a label at{% endcomment %}
+            {% if field.id_for_label %}{{ field.label_tag }}{% else %}<span class="field-label">{{ field.label }}{{ form.label_suffix }}</span>{% endif %}
+        </div>
 
 
         <div class="col-6 col-md-4">
