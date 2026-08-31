@@ -10,7 +10,6 @@ from annotation.models import VariantTranscriptAnnotation
 from genes.models import CanonicalTranscriptCollection
 from library.django_utils import get_model_fields
 from library.django_utils.grid_export import EXPORT_ROWS_PER_CHUNK, grid_export_csv
-from library.django_utils.jqgrid_view import VARIANT_GRID_LABEL_OVERRIDES
 from library.genomics.vcf_writer import VCFWriter
 from library.utils import StashFile, iter_fixed_chunks
 from patients.models_enums import Zygosity
@@ -37,12 +36,12 @@ def node_grid_get_export_iterator(request, node, export_type, canonical_transcri
         grid_kwargs["af_show_in_percent"] = False
 
     extra_filters = request.GET.get("extra_filters")
-    grid = ExportVariantGrid(request.user, node, extra_filters, **grid_kwargs)
+    grid = ExportVariantGrid(request, node, extra_filters, **grid_kwargs)
 
     if basename is None:
         basename = get_node_export_basename(node)
     sample_ids = node.get_sample_ids_with_genotype()
-    _, _, items = grid.get_items(request)
+    items = grid.iter_export_rows(grid.apply_filters(grid.get_initial_queryset()))
 
     if canonical_transcript_collection:
         basename += f"_{canonical_transcript_collection}"
@@ -53,10 +52,10 @@ def node_grid_get_export_iterator(request, node, export_type, canonical_transcri
     if row_wrapper:
         items = row_wrapper(items)
 
-    colmodels = grid.get_colmodels()
+    colmodels = grid.csv_columns()
 
     if export_type == 'csv':
-        file_iterator = grid_export_csv(colmodels, items, label_overrides=VARIANT_GRID_LABEL_OVERRIDES)
+        file_iterator = grid_export_csv(colmodels, items)
     elif export_type == 'vcf':
         genome_build = node.analysis.genome_build
         values_qs = Sample.objects.filter(id__in=sample_ids).values_list("id", "name")
@@ -252,11 +251,11 @@ def format_items_iterator(items, variant_tags_dict: Optional[dict] = None, tag_s
 
     stale_cutoff = tag_stale_date.date().isoformat() if tag_stale_date else None
     for item in items:
-        if tags_global := item["tags_global"]:
+        # Either column is only here when the collection being exported shows it
+        if tags_global := item.get("tags_global"):
             item["tags_global"] = _summarise_tags_global(tags_global, stale_cutoff)
 
-        variant_id = item["id"]
-        if tags := variant_tags_dict.get(variant_id):
+        if tags := variant_tags_dict.get(item.get("id")):
             item["tags"] = tags
         yield item
 
@@ -276,12 +275,15 @@ def _replace_transcripts_iterator(grid, ctc: CanonicalTranscriptCollection, item
     transcript_fields = set(get_model_fields(VariantTranscriptAnnotation, ignore_fields=["id", "version", "variant"]))
     annotation_prefix = "variantannotation__"
     annotation_prefix_len = len(annotation_prefix)
-    for f in grid.get_field_names():
+    for rc in grid.export_columns():
+        f = rc.name
         if f.startswith(annotation_prefix):
             suffix = f[annotation_prefix_len:]
             tf = suffix.split("__", 1)[0]
             if tf in transcript_fields:
                 transcript_replace_fields[suffix] = f
+    # The replaced values go through the same renderers the export rows they overwrite did
+    replaced_columns = [rc for rc in grid.export_columns() if rc.name in set(transcript_replace_fields.values())]
 
     # We only need things from VariantTranscriptAnnotation - so join there directly
     version = grid.node.analysis.annotation_version.variant_annotation_version
@@ -299,7 +301,8 @@ def _replace_transcripts_iterator(grid, ctc: CanonicalTranscriptCollection, item
                     transcript_item[after] = transcript_data[before]
                 yield transcript_item
 
-        return {item["id"]: item for item in grid.iter_format_items(transcript_items())}
+        return {item["id"]: item
+                for item in grid.render_export_rows(transcript_items(), columns=replaced_columns)}
 
     # Loop through items and changeroo
     for batch in iter_fixed_chunks(items, TRANSCRIPT_REPLACE_BATCH_SIZE):

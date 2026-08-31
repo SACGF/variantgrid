@@ -56,7 +56,7 @@ from analysis.views.views_json import get_sample_patient_gene_disease_data
 from classification.models.classification import Classification
 from classification.views.classification_datatables import ClassificationColumns
 from library.django_utils import highest_pk
-from library.jqgrid.jqgrid import JqGrid
+from library.django_utils import resolve_field_path
 from snpdb.models.models_user_settings import UserSettings
 from snpdb.models.models_variant import Variant
 
@@ -182,10 +182,9 @@ class FilterNodeView(NodeView):
             for i, rule in enumerate(filters['rules']):
                 op, field, data = rule['op'], rule['field'], rule['data']
                 if op == "eq":
-                    # To be able to search JqGrid for isnull, field must have required=False (from blank=True)
-                    # But it can thus send through '' for no value. Some fields can't deal with that - so in those cases
-                    # we convert "equals blank" to "is null"
-                    django_field = JqGrid.lookup_foreign_key_field(opts, field)
+                    # The filter builder sends '' for an empty value box. Some fields can't deal with
+                    # that - so in those cases we convert "equals blank" to "is null"
+                    django_field = resolve_field_path(opts, field)
                     if data == '' and not django_field.empty_strings_allowed:
                         if django_field.null:
                             op = 'nu'

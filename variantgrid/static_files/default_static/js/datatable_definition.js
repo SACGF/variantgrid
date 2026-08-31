@@ -155,8 +155,7 @@ const DataTableDefinition = (function() {
                 params.start = data.start;
                 params.length = data.length;
                 if (self.filterRules && self.filterRules.rules.length) {
-                    // The grid engine's own column filtering - JqGrid.get_filters reads these two
-                    params._search = 'true';
+                    // Column filter rules - @see library/django_utils/filter_rules.py
                     params.filters = JSON.stringify(self.filterRules);
                 }
                 if (data.order && data.order.length) {
@@ -313,7 +312,8 @@ const DataTableDefinition = (function() {
                 columnDefs.push(columnDef);
                 if (col.render) {
                     const rawRenderer = eval(col.render);
-                    // Grid wide metadata + this column's kwargs, closed over at table build time
+                    // Grid wide metadata + this column's own renderer settings, closed over at
+                    // table build time (@see RichColumn client_renderer_kwargs)
                     const renderContext = {extra: defn.extra || {}, kwargs: col.renderKwargs || null};
                     const renderer = (data, type, row) => {
                         const output = rawRenderer(data, type, row, renderContext);
@@ -445,9 +445,8 @@ const DataTableDefinition = (function() {
             }
         },
 
-        /* The column filter dialog, as a panel above the table. Rules go up as '_search'/'filters',
-           which the grid engine turns into a Q object. Page level filters (extra_filters) stack on
-           top of it. */
+        /* The column filter dialog, as a panel above the table. Rules go up as 'filters', which the
+           server turns into a Q object. Page level filters (extra_filters) stack on top of it. */
         setupFilterBuilder: function(toolbar) {
             const defn = this.serverParams;
             if (!defn.filterBuilder || !(defn.filterBuilder.fields || []).length) {
@@ -597,7 +596,7 @@ const DataTableDefinition = (function() {
         },
 
         /* A composite cell draws several values, so its header offers a sort key per value. Each
-           entry names another column - hidden or not - whose colmodel already carries that key's
+           entry names another column - hidden or not - whose own definition carries that key's
            sort index, so picking one is just an order() on that column. */
         setupSortMenus: function() {
             const columns = this.serverParams.columns || [];

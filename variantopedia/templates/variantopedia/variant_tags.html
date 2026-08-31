@@ -43,12 +43,6 @@
         window.location = Urls.variant_tags_export("{{ genome_build.name }}") + "?" + EncodeQueryData(params);
     }
 
-    function downloadTaggedVariantCSV() {
-        const params = {};
-        taggedVariantDatatableFilter(params);
-        window.location = Urls.tagged_variant_export("{{ genome_build.name }}") + "?" + EncodeQueryData(params);
-    }
-
     function showAll() {
         gridParams = {};
         $("#user-filter-banner").hide();
@@ -143,12 +137,8 @@
     (One variant per row, with all associated tags)
 
     <table id="tagged-variants-datatable" class="sticky-header"
-           data-datatable-url="{% url 'tagged_variant_grid' genome_build_name=genome_build.name op='handler' %}"
+           data-datatable-url="{% url 'tagged_variant_grid' genome_build_name=genome_build.name %}"
            data-datatable-data="taggedVariantDatatableFilter"></table>
-    <div data-toolbar-bottom="#tagged-variants-datatable">
-        <a class="btn btn-outline-secondary fas fa-download" href="javascript:downloadTaggedVariantCSV()">CSV</a>
-    </div>
-
     <h3>Tags</h3>
 
     (One tag per row, showing full information)

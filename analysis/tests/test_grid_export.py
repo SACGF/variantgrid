@@ -130,7 +130,7 @@ class GridExportTestCase(TestCase):
         if position_less_than is not None:
             rules = [{"op": "lt", "field": "locus__position", "data": str(position_less_than)}]
         if rules:
-            request.GET = {"_search": "true", "filters": json.dumps({"groupOp": "AND", "rules": rules})}
+            request.GET = {"filters": json.dumps({"groupOp": "AND", "rules": rules})}
         return request
 
     def _export_lines(self, node, export_type="csv", request=None) -> list[str]:
@@ -314,7 +314,7 @@ class TestNodeExportLaunch(GridExportTestCase):
         unfiltered = self._launch_export()
         filters = json.dumps({"groupOp": "AND",
                               "rules": [{"op": "lt", "field": "locus__position", "data": "1500"}]})
-        filtered = self._launch_export(_search="true", filters=filters)
+        filtered = self._launch_export(filters=filters)
         self.assertNotEqual(unfiltered.pk, filtered.pk)
         self.assertEqual(self._num_cached_files(), 2)
 

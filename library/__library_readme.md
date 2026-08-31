@@ -13,12 +13,12 @@ discordances or other lab specific events.
 
 ## Grids
 
-Every grid on the site renders with DataTables. There are two server side implementations:
+Every grid on the site renders with DataTables off one server side engine,
+`snpdb.views.datatable_view.DatatableConfig`, served by `DatabaseTableView`.
 
-* `snpdb.views.datatable_view.DatatableConfig` - use this for new grids.
-* `library.jqgrid.JqGrid` - the older engine, still driving the variant grids (which build their
-  columns dynamically from `CustomColumn`) and the CSV/VCF export. `JqGridDatatableView`
-  (`library/django_utils/jqgrid_datatable_adapter.py`) serves it to the DataTables client.
+* `library.django_utils.filter_rules` - the column filter rule vocabulary the grids' filter builder
+  and FilterNode share, and the rule -> Q conversion both go through.
+* `library.django_utils.grid_export` - streaming CSV for the server side download.
 
 ## Utils directory
 class_utils

@@ -1,17 +1,17 @@
 /* Column filter builder for the variant grids.
 
-   Emits the rule JSON the grid engine already speaks:
+   Emits the rule JSON the server already speaks:
 
      {"groupOp": "AND", "rules": [{"field": "locus__position", "op": "lt", "data": "2500"}]}
 
-   which is what JqGrid.get_q turns into a Q object, what a grid request carries as
-   '_search=true&filters=<json>', and what FilterNode persists as FilterNodeItem rows. Fields,
+   which is what filter_rules.rules_to_q turns into a Q object, what a grid request carries as
+   'filters=<json>', and what FilterNode persists as FilterNodeItem rows. Fields,
    their types and their choices all come from the definition JSON's filterBuilder block
-   (@see datatable_filter_fields_from_colmodels), so the list is whatever the grid can filter on.
+   (@see DatatableConfig.filter_fields), so the list is whatever the grid can filter on.
 
    Two callers:
-     - DataTableDefinition puts one behind the "Filter grid..." toolbar button on any adapter served
-       grid, and sends the rules with the table's ajax params.
+     - DataTableDefinition puts one behind the "Filter grid..." toolbar button on a grid that opted
+       in, and sends the rules with the table's ajax params.
      - The FilterNode editor mounts one directly and POSTs the rules to the node.
 */
 

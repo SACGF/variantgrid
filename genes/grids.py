@@ -1,9 +1,8 @@
 import operator
 import os
-from functools import reduce
+from functools import cached_property, reduce
 from typing import Any, Optional
 
-from django.conf import settings
 from django.core.exceptions import PermissionDenied
 from django.db.models import Count, IntegerField, OuterRef, QuerySet, StringAgg, Subquery, TextField, Value
 from django.http import HttpRequest
@@ -29,10 +28,9 @@ from genes.models import (
     TranscriptVersion,
 )
 from genes.models_enums import AnnotationConsortium, GeneSymbolAliasSource
-from library.utils import pretty_label, update_dict_of_dict_values
-from snpdb.grid_columns.custom_columns import get_custom_column_fields_override_and_sample_position
+from library.utils import pretty_label
 from snpdb.grids import AbstractVariantGrid
-from snpdb.models import ImportStatus, Q, Tag, UserSettings, VariantGridColumn
+from snpdb.models import ImportStatus, Q, Tag, VariantGridColumn
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.variant_queries import (
     get_variant_queryset_for_gene_symbol,
@@ -121,28 +119,35 @@ class GeneListGenesColumns(DatatableConfig[GeneListGeneSymbol]):
 
 class GeneSymbolVariantsGrid(AbstractVariantGrid):
     """ Uses custom columns subtracting away the gene annotations (as they're displayed above) """
-    caption = 'Gene Variants'
+    grid_name = 'Gene Variants'
 
-    def __init__(self, user, gene_symbol, genome_build_name, **kwargs):
-        extra_filters = kwargs.pop("extra_filters", None)
-        self.gene_symbol = get_object_or_404(GeneSymbol, pk=gene_symbol)
-        user_settings = UserSettings.get_for_user(user)
-        genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
-        self.genome_build = genome_build
-        self.annotation_version = AnnotationVersion.latest(genome_build)
-        fields, override, _ = get_custom_column_fields_override_and_sample_position(user_settings.columns,
-                                                                                    self.annotation_version)
-        self.fields = self._get_non_gene_fields(fields)
-        super().__init__(user)
+    def __init__(self, request: HttpRequest, gene_symbol=None, genome_build_name=None,
+                 extra_filters: Optional[dict] = None, **kwargs):
+        url_kwargs = request.resolver_match.kwargs if request.resolver_match else {}
+        self.gene_symbol = get_object_or_404(GeneSymbol, pk=gene_symbol or url_kwargs["gene_symbol"])
+        self.genome_build = GenomeBuild.get_name_or_alias(genome_build_name
+                                                          or url_kwargs["genome_build_name"])
+        self.annotation_version = AnnotationVersion.latest(self.genome_build)
+        self._extra_filters = extra_filters
+        super().__init__(request, **kwargs)
 
-        af_show_in_percent = settings.VARIANT_ALLELE_FREQUENCY_CLIENT_SIDE_PERCENT
-        update_dict_of_dict_values(self._overrides, self._get_standard_overrides(af_show_in_percent))
-        update_dict_of_dict_values(self._overrides, override)
+    @cached_property
+    def extra_filters(self) -> Optional[dict]:
+        """ The page sends its hotspot/tag selection as extra_filters """
+        if self._extra_filters is not None:
+            return self._extra_filters
+        return self.get_query_json("extra_filters")
 
-        self.extra_filters = extra_filters
-        self.extra_config.update({'sortname': "locus__position",
-                                  'sortorder': "asc",
-                                  'shrinkToFit': False})
+    def _get_rich_columns(self) -> list[RichColumn]:
+        """ Drop the gene columns - they'd be the same on every row, and the page shows them above """
+        rich_columns = []
+        for rc in super()._get_rich_columns():
+            if any(gene_field in rc.name for gene_field in ["__transcript_version__", "__gene__"]):
+                continue
+            if rc.name == "locus__position":
+                rc.default_sort = SortOrder.ASC
+            rich_columns.append(rc)
+        return rich_columns
 
     def _get_base_queryset(self) -> QuerySet:
         genes_qs = get_variant_queryset_for_gene_symbol(self.gene_symbol, self.annotation_version)
@@ -150,13 +155,13 @@ class GeneSymbolVariantsGrid(AbstractVariantGrid):
 
     def _get_q(self) -> Optional[Q]:
         q_list = []
-        if self.extra_filters:
+        if extra_filters := self.extra_filters:
             # Hotspot filters
-            if protein_position := self.extra_filters.get("protein_position"):
-                transcript_version = TranscriptVersion.objects.get(pk=self.extra_filters["protein_position_transcript_version_id"])
+            if protein_position := extra_filters.get("protein_position"):
+                transcript_version = TranscriptVersion.objects.get(pk=extra_filters["protein_position_transcript_version_id"])
                 q_list.append(Q(varianttranscriptannotation__transcript_version=transcript_version,
                                 varianttranscriptannotation__protein_position__icontains=protein_position))
-            tag_id = self.extra_filters.get("tag")
+            tag_id = extra_filters.get("tag")
             if tag_id is not None:  # "" for all tags
                 tags_qs = VariantTag.objects.all()
                 if tag_id:
@@ -169,20 +174,6 @@ class GeneSymbolVariantsGrid(AbstractVariantGrid):
         if q_list:
             q = reduce(operator.and_, q_list)
         return q
-
-    @staticmethod
-    def _get_non_gene_fields(fields):
-        """ Remove fields that'll all be the same """
-        non_gene_fields = []
-        for f in fields:
-            keep = True
-            for gene_fields in ["__transcript_version__", "__gene__"]:
-                if gene_fields in f:
-                    keep = False
-                    break
-            if keep:
-                non_gene_fields.append(f)
-        return non_gene_fields
 
 
 def _get_gene_fields():

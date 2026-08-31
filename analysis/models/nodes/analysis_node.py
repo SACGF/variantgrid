@@ -74,6 +74,7 @@ from snpdb.models import (
     Wiki,
 )
 from snpdb.variant_collection import write_sql_to_variant_collection
+from snpdb.views.datatable_view import RichColumn
 
 # How long a node's lease is good for. The window is (re)started when a worker claims the node for
 # loading, so it measures actual load time rather than how long the task sat in the queue.
@@ -747,7 +748,8 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
         # https://docs.djangoproject.com/en/3.0/topics/db/aggregation/#interaction-with-default-ordering-or-order-by
         return qs.order_by()
 
-    def get_extra_grid_config(self):
+    def get_grid_post_data(self) -> dict:
+        """ Per-request state the node grid page sends back as its ajax params """
         return {}
 
     def get_class_name(self):
@@ -925,50 +927,26 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
     def inherits_parent_columns(self):
         return self.min_inputs == 1 and self.max_inputs == 1
 
-    def _get_node_extra_columns(self):
+    def _get_node_extra_columns(self) -> list[RichColumn]:
+        """ Subclasses override to add their own columns to the node grid """
         return []
 
-    def _get_inherited_columns(self):
+    def _get_inherited_columns(self) -> list[RichColumn]:
         extra_columns = []
         if self.inherits_parent_columns():
             parent = self.get_single_parent()
             extra_columns.extend(parent.get_extra_columns())
         return extra_columns
 
-    def get_extra_columns(self):
-        cache_key = self._get_cache_key() + "_extra_columns"
-        extra_columns = cache.get(cache_key)
-        if extra_columns is None:
-            extra_columns = []
-            if self.is_valid:
-                extra_columns.extend(self._get_inherited_columns())
-            # Only add columns that are unique, as otherwise filters get added twice.
-            node_extra_columns = self._get_node_extra_columns()
-            for col in node_extra_columns:
-                if col not in extra_columns:
-                    extra_columns.append(col)
-            cache.set(cache_key, extra_columns)
+    def get_extra_columns(self) -> list[RichColumn]:
+        extra_columns = []
+        if self.is_valid:
+            extra_columns.extend(self._get_inherited_columns())
+        # Only add columns that are unique, as otherwise filters get added twice.
+        for col in self._get_node_extra_columns():
+            if col not in extra_columns:
+                extra_columns.append(col)
         return extra_columns
-
-    def _get_node_extra_colmodel_overrides(self):
-        """ Subclasses should override to add colmodel overrides for the node grid """
-        return {}
-
-    def _get_inherited_colmodel_overrides(self):
-        extra_overrides = {}
-        if self.inherits_parent_columns():
-            parent = self.get_single_parent()
-            extra_overrides.update(parent.get_extra_colmodel_overrides())
-        return extra_overrides
-
-    def get_extra_colmodel_overrides(self):
-        """ Subclasses should override _get_node_extra_colmodel_overrides """
-
-        extra_overrides = {}
-        if self.is_valid and self.uses_parent_queryset:
-            extra_overrides.update(self._get_inherited_colmodel_overrides())
-        extra_overrides.update(self._get_node_extra_colmodel_overrides())
-        return extra_overrides
 
     def get_node_classification(self):
         if self.is_source:

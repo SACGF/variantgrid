@@ -125,11 +125,11 @@ output: a temporary copy, gitignored, and overwritten by the next `manage.py col
 Files like `global.css` are compiled from their `.scss` sources (e.g. `global.scss`) by a PyCharm file watcher — do not run `sassc`/`sass` yourself, as its output formatting differs and creates huge diffs. When changing styles, edit the `.scss` file, then hand-apply the same minimal change to the generated `.css` (matching its existing formatting) so the change works before PyCharm next recompiles. Leave `.css.map` files alone.
 
 ### Grid/table views
-Everything renders with DataTables on the client. Two server side implementations:
-- **`DatatableConfig`** + `RichColumn` in `snpdb/views/datatable_view.py`. Use this for new tables.
-- **`JqGridUserRowConfig`** in `library/jqgrid/` — the older engine, still driving the variant grids
-  (dynamic `CustomColumn` columns) and the CSV/VCF export. `JqGridDatatableView` in
-  `library/django_utils/jqgrid_datatable_adapter.py` serves it to the DataTables client.
+Everything renders with DataTables on the client, off one server side engine:
+**`DatatableConfig`** + `RichColumn` in `snpdb/views/datatable_view.py`, served by `DatabaseTableView`.
+The variant grids (`AbstractVariantGrid` in `snpdb/grids.py` and its subclasses) are `DatatableConfig`s
+whose columns are built per user from a `CustomColumnsCollection`
+(`snpdb/grid_columns/custom_columns.py`), and the same config drives their CSV/VCF exports.
 
 ### Celery task queues
 Four worker queues: `analysis_workers`, `annotation_workers`, `db_workers` (default), `web_workers`, plus `scheduling_single_worker`. Assign tasks to appropriate queues via `@app.task(queue='...')`.

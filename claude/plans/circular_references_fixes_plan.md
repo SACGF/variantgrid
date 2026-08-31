@@ -100,7 +100,6 @@ back up into apps:
 | Import | Fix |
 |---|---|
 | `library.keycloak` → `snpdb.models.models`, `snpdb.models.models_user_settings` | move `library/keycloak.py` → `snpdb/keycloak.py` (3 importers) |
-| `library.jqgrid.jqgrid_user_row_config` → `snpdb.models.UserGridConfig` | move → `snpdb/jqgrid_user_row_config.py` (10 importers) |
 | `library.genomics.vcf_utils` → `snpdb.models` | see below |
 | `library.log_utils` → `eventlog.models.Event` | see below |
 | `library.preview_request` → `variantgrid.perm_path` | leave; see Stage 5 |

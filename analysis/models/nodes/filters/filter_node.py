@@ -8,8 +8,8 @@ from django.db.models.deletion import CASCADE
 
 from analysis.models.nodes.analysis_node import AnalysisNode, NodeAuditLogMixin
 from analysis.models.nodes.node_display import NodeIcon
-from library.jqgrid.jqgrid import JqGrid, format_operation
-from snpdb.models import Variant, VariantGridColumn
+from library.django_utils.filter_rules import format_operation, rules_to_q
+from snpdb.models import VariantGridColumn
 
 
 # TODO: This node has quite a few redundant operations - e.g. it will filter the queryset
@@ -23,24 +23,16 @@ class FilterNode(AnalysisNode):
         return self.filternodeitem_set.exists()
 
     def _get_node_q(self) -> Optional[Q]:
-        class FakeFilterGrid(JqGrid):
-            model = Variant
-            fields = ["id"]
+        # The same rule -> Q conversion the grid's column filters use, so a FilterNode and a grid
+        # column filter on the same rules produce the same queryset
+        return rules_to_q(self.get_filters())
 
-        # Reuse the grid engine's rule -> Q conversion, so a FilterNode and a grid column
-        # filter on the same rules produce the same queryset
-        fake_filter_grid = FakeFilterGrid()
-        return fake_filter_grid.get_q(self.get_filters())
-
-    def get_extra_grid_config(self):
-        existing_extra_config = super().get_extra_grid_config()
-
+    def get_grid_post_data(self) -> dict:
+        post_data = super().get_grid_post_data()
         if self.filternodeitem_set.exists():
             # The grid filters on these rules, and the editor's filter builder loads them back
-            post_data = existing_extra_config.get('postData', {})
-            post_data.update({'filters': self.get_filters_json()})
-            existing_extra_config['postData'] = post_data
-        return existing_extra_config
+            post_data['filters'] = self.get_filters_json()
+        return post_data
 
     def get_rules(self):
         rules = []
@@ -49,7 +41,7 @@ class FilterNode(AnalysisNode):
         return rules
 
     def get_filters_json(self):
-        """ Grid expects quoted json string (so we'll double json this after it is put in dict) """
+        """ The grid sends the rules up as a JSON string, so they go into postData already encoded """
         return json.dumps(self.get_filters())
 
     def get_filters(self):
@@ -82,17 +74,12 @@ class FilterNode(AnalysisNode):
     def get_help_text() -> str:
         return "Filter based on column values"
 
-    def _get_inherited_colmodel_overrides(self):
-        # Don't allow searching on inherited columns, as this causes an extra join
-        extra_overrides = super()._get_inherited_colmodel_overrides()
-        extra_columns = self._get_inherited_columns()
-
-        for col in extra_columns:
-            data = extra_overrides.get(col) or {}
-            data['search'] = False
-            extra_overrides[col] = data
-
-        return extra_overrides
+    def _get_inherited_columns(self):
+        # Don't offer a filter on inherited columns, as this causes an extra join
+        extra_columns = super()._get_inherited_columns()
+        for rich_column in extra_columns:
+            rich_column.column_filter = None
+        return extra_columns
 
     @staticmethod
     def get_node_class_label():
