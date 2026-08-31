@@ -1,4 +1,5 @@
 from enum import Enum
+from typing import Optional
 
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import models
@@ -105,6 +106,24 @@ class BuiltInFilters:
               (CLASSIFIED_TIER_1_2, "#cc99cc"),
               (COSMIC, "#14559f")]
     DEFAULT_NODE_COUNT_FILTERS = [TOTAL, IMPACT_HIGH_OR_MODERATE, CLINVAR]
+
+
+class TagFilter:
+    """ Per-tag node counts / grid filters, eg 'tag_Artifact'. These sit alongside BuiltInFilters
+        wherever a node count label or 'extra_filters' is used - tag names are alphanumeric so the
+        prefix can never collide with a tag, and the label stays a valid URL slug and CSS class """
+    PREFIX = "tag_"
+
+    @staticmethod
+    def label(tag_id: str) -> str:
+        return TagFilter.PREFIX + tag_id
+
+    @staticmethod
+    def get_tag_id(label: str) -> Optional[str]:
+        """ Tag id for a tag node count label, or None if it's not one """
+        if label and label.startswith(TagFilter.PREFIX):
+            return label[len(TagFilter.PREFIX):]
+        return None
 
 
 class VariantsType(models.TextChoices):

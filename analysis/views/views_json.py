@@ -18,9 +18,10 @@ from analysis.models import (
     CandidateSearchRun,
     CandidateStatus,
     NodeCount,
+    TagNode,
     VariantTag,
 )
-from analysis.models.enums import TagLocation
+from analysis.models.enums import TagLocation, TagNodeMode
 from analysis.models.nodes import node_utils
 from analysis.models.nodes.analysis_node import AnalysisEdge, AnalysisNode, NodeStatus, NodeTask, NodeVersion
 from analysis.models.nodes.filter_child import create_filter_child_node
@@ -47,6 +48,7 @@ from library.django_utils import require_superuser
 from ontology.models import OntologyTerm, OntologyVersion
 from ontology.serializers import OntologyTermSerializer
 from snpdb.models import BuiltInFilters, GenomeBuild, Sample, Tag
+from snpdb.models.models_enums import TagFilter
 from variantgrid.celery import app
 
 
@@ -265,6 +267,10 @@ def set_variant_tag(request, location):
         else:
             raise ValueError("Deletion requires either 'analysis_id' or 'variant_tag_id'")
 
+    if analysis:
+        # Tagging can add/remove that tag's own node count, so tell the client what to draw
+        ret["node_count_types"] = analysis.get_node_count_types()
+
     return JsonResponse(ret)
 
 
@@ -306,11 +312,21 @@ def create_filter_child(request, analysis_id, node_id):
 def create_extra_filter_child(request, analysis_id, node_id, extra_filters):
     node = get_node_subclass_or_404(request.user, node_id, write=True)
     x, y = get_child_position(node)
-    filter_node = BuiltInFilterNode.objects.create(analysis=node.analysis,
-                                                   built_in_filter=extra_filters,
-                                                   x=x,
-                                                   y=y,
-                                                   ready=False)
+    if tag_id := TagFilter.get_tag_id(extra_filters):
+        tag_node = TagNode.objects.create(analysis=node.analysis,
+                                          mode=TagNodeMode.THIS_ANALYSIS,
+                                          x=x,
+                                          y=y,
+                                          ready=False)
+        tag_node.tagnodetag_set.create(tag_id=tag_id)
+        # Re-load so the node name picks up the tag - TagNode.tag_ids is cached from the create() above
+        filter_node = TagNode.objects.get(pk=tag_node.pk)
+    else:
+        filter_node = BuiltInFilterNode.objects.create(analysis=node.analysis,
+                                                       built_in_filter=extra_filters,
+                                                       x=x,
+                                                       y=y,
+                                                       ready=False)
     filter_node.add_parent(node)
     filter_node.save()
 
@@ -372,11 +388,17 @@ def analysis_reload(request, analysis_id):
 def nodes_status(request, analysis_id):
     analysis = get_analysis_or_404(request.user, analysis_id)
     nodes = json.loads(request.GET['nodes'])
-    node_counts_qs = NodeCount.objects.filter(node_version__node__in=nodes).select_related("node_version")
+    node_counts_qs = NodeCount.objects.filter(node_version__node__in=nodes)
     node_counts = defaultdict(dict)
-    for node_id, version, label, count in node_counts_qs.values_list("node_version__node_id", "node_version__version",
-                                                                     "label", "count"):
-        node_counts[f"{node_id}_{version}"][label] = count
+    # Tag counts are recalculated without bumping the node version (@see update_analysis_tag_node_counts),
+    # so hand the client the last time the counts changed - that's how it knows a recount landed
+    counts_modified = {}
+    for node_id, version, label, count, modified in node_counts_qs.values_list(
+            "node_version__node_id", "node_version__version", "label", "count", "modified"):
+        key = f"{node_id}_{version}"
+        node_counts[key][label] = count
+        if modified and modified.isoformat() > counts_modified.get(key, ""):
+            counts_modified[key] = modified.isoformat()
 
     node_version_qs = NodeVersion.objects.filter(node__in=nodes)
     live_data_sources = {f"{node_id}_{version}": sources
@@ -395,6 +417,7 @@ def nodes_status(request, analysis_id):
         counts = node_counts.get(f"{node_id}_{version}", {})
         counts[BuiltInFilters.TOTAL] = data["count"]
         data["counts"] = counts
+        data["counts_modified"] = counts_modified.get(f"{node_id}_{version}", "")
         # A node reading mutable tables has an advisory count - the client shows it abbreviated (#235)
         sources = live_data_sources.get(f"{node_id}_{version}") or {}
         data["deterministic"] = not sources

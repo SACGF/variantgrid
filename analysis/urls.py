@@ -52,16 +52,16 @@ urlpatterns = [
     # to make it easier to debug errors if nodes were deleted
 
     # Node editors
-    path('<int:analysis_id>/<int:analysis_version>/node/view/<int:node_id>/<int:node_version>/<slug:extra_filters>/', views.node_view, name='node_view'),
+    path('<int:analysis_id>/<int:analysis_version>/node/view/<int:node_id>/<int:node_version>/<str:extra_filters>/', views.node_view, name='node_view'),
     path('<int:analysis_id>/node_update/<int:node_id>/', views_json.NodeUpdate.as_view(), name='node_update'),
-    path('<int:analysis_id>/<int:analysis_version>/node_debug/<int:node_id>/<int:node_version>/<slug:extra_filters>/', views.node_debug, name='node_debug'),
+    path('<int:analysis_id>/<int:analysis_version>/node_debug/<int:node_id>/<int:node_version>/<str:extra_filters>/', views.node_debug, name='node_debug'),
     path(
-        '<int:analysis_id>/<int:analysis_version>/node_audit_log/<int:node_id>/<int:node_version>/<slug:extra_filters>/',
+        '<int:analysis_id>/<int:analysis_version>/node_audit_log/<int:node_id>/<int:node_version>/<str:extra_filters>/',
         views.node_audit_log, name='node_audit_log'),
     path('<int:analysis_id>/node_doc/<int:node_id>/', views.node_doc, name='node_doc'),
     path('<int:analysis_id>/node_load/<int:node_id>/', views.node_load, name='node_load'),
     path('<int:analysis_id>/node_cancel_load/<int:node_id>/', views.node_cancel_load, name='node_cancel_load'),
-    path('<int:analysis_id>/<int:analysis_version>/node/column_summary/<int:node_id>/<int:node_version>/<slug:extra_filters>/<slug:grid_column_name>/<int:significant_figures>/', views.node_column_summary, name='node_column_summary'),
+    path('<int:analysis_id>/<int:analysis_version>/node/column_summary/<int:node_id>/<int:node_version>/<str:extra_filters>/<slug:grid_column_name>/<int:significant_figures>/', views.node_column_summary, name='node_column_summary'),
     path('<int:analysis_id>/node/node_snp_matrix/<int:node_id>/<int:node_version>/<slug:conversion>/<int:significant_figures>/', views.node_snp_matrix, name='node_snp_matrix'),
     path('<int:analysis_id>/<int:analysis_version>/node/graph/<int:node_id>/<int:node_version>/<slug:graph_type_id>/<slug:cmap>/', views.node_data_graph, name='node_data_graph'),
     path('<int:analysis_id>/node/cohort_zygosity_filters/<int:node_id>/<int:cohort_id>/', views.cohort_zygosity_filters, name='cohort_zygosity_filters'),
@@ -80,7 +80,7 @@ urlpatterns = [
     path('<int:analysis_id>/node/tasks/', views_json.nodes_tasks, name='nodes_tasks'),
 
     path('<int:analysis_id>/create_filter_child/<int:node_id>/', views_json.create_filter_child, name='create_filter_child'),
-    path('<int:analysis_id>/create_extra_filter_child/<int:node_id>/<slug:extra_filters>/', views_json.create_extra_filter_child, name='create_extra_filter_child'),
+    path('<int:analysis_id>/create_extra_filter_child/<int:node_id>/<str:extra_filters>/', views_json.create_extra_filter_child, name='create_extra_filter_child'),
     path('<int:analysis_id>/create_selected_child/<int:node_id>/', views_json.create_selected_child, name='create_selected_child'),
 
     path('<int:analysis_id>/node_versions/', views_json.analysis_node_versions, name='analysis_node_versions'),
@@ -117,9 +117,9 @@ urlpatterns = [
          views.create_classification_for_analysis, name='create_classification_for_analysis'),
 
     # Node Data (bottom right window)
-    path('<int:analysis_id>/<int:analysis_version>/node_data_grid/cfg/<int:node_id>/<int:node_version>/<slug:extra_filters>/', views.node_data_grid, name='node_data_grid'),
-    path('<int:analysis_id>/<int:analysis_version>/node_async_wait/<int:node_id>/<int:node_version>/<slug:extra_filters>/', views.node_async_wait, name='node_async_wait'),
-    path('<int:analysis_id>/<int:analysis_version>/node_errors/<int:node_id>/<int:node_version>/<slug:extra_filters>/', views.node_errors, name='node_errors'),
+    path('<int:analysis_id>/<int:analysis_version>/node_data_grid/cfg/<int:node_id>/<int:node_version>/<str:extra_filters>/', views.node_data_grid, name='node_data_grid'),
+    path('<int:analysis_id>/<int:analysis_version>/node_async_wait/<int:node_id>/<int:node_version>/<str:extra_filters>/', views.node_async_wait, name='node_async_wait'),
+    path('<int:analysis_id>/<int:analysis_version>/node_errors/<int:node_id>/<int:node_version>/<str:extra_filters>/', views.node_errors, name='node_errors'),
     path('<int:analysis_id>/node_method_description/<int:node_id>/<int:node_version>', views.node_method_description, name='node_method_description'),
 
     # Analysis templates
@@ -132,10 +132,10 @@ urlpatterns = [
 
     # Grids
     path('<int:analysis_id>/node_grid/export/', views_grid.node_grid_export, name='node_grid_export'),
-    path('<int:analysis_id>/<int:analysis_version>/node_grid/cfg/<int:node_id>/<int:node_version>/<slug:extra_filters>/', views_grid.NodeGridConfig.as_view(), name='node_grid_config'),
+    path('<int:analysis_id>/<int:analysis_version>/node_grid/cfg/<int:node_id>/<int:node_version>/<str:extra_filters>/', views_grid.NodeGridConfig.as_view(), name='node_grid_config'),
     path('<int:analysis_id>/node_grid/handler/', views_grid.NodeGridHandler.as_view(), name='node_grid_handler'),
 
-    path('<int:analysis_id>/node_column_summary/datatable/<int:node_id>/<int:node_version>/<slug:extra_filters>/<slug:variant_column>/<int:significant_figures>/',
+    path('<int:analysis_id>/node_column_summary/datatable/<int:node_id>/<int:node_version>/<str:extra_filters>/<slug:variant_column>/<int:significant_figures>/',
          DataFrameTableView.as_view(column_class=NodeColumnSummaryConfig), name='node_column_summary_datatable'),
     path('analyses/datatable/', DatabaseTableView.as_view(column_class=AnalysesListColumns), name='analyses_list_datatable'),
     path('analysis_templates/datatable/', DatabaseTableView.as_view(column_class=AnalysisTemplatesColumns),

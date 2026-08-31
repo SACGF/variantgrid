@@ -1081,7 +1081,7 @@ def _settings_override_node_counts_tab(request, settings_override, has_write_per
     fake_analysis = FakeAnalysis()
     from analysis.views.views import _analysis_settings_node_counts_tab  # Circular import
     return _analysis_settings_node_counts_tab(request, fake_analysis,
-                                              pass_analysis_settings=False, has_write_permission=has_write_permission)
+                                              is_analysis=False, has_write_permission=has_write_permission)
 
 
 def view_user(request, pk):

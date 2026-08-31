@@ -585,6 +585,23 @@ function markLiveDataCount(node_counts, deterministic, liveDataSources) {
 	$(".count-value", totalCount).append(" <span class='live-data-marker'>&#9889;</span>");
 }
 
+function setNodeCounts(node, data) {
+	node.attr("counts_modified", data.counts_modified || "");
+	const node_counts = $(".node-counts", node);
+	const counts = data.counts;
+	const deterministic = data.deterministic !== false;
+	for (const c in counts) {
+		const vc = $(".node-count-" + c, node_counts);
+		const count = counts[c];
+		if (count > 0 || vc.hasClass("show-zero")) {
+			setVariantCount(vc, formatNodeCount(count, deterministic));
+		} else {
+			vc.hide();
+		}
+	}
+	markLiveDataCount(node_counts, deterministic, data.live_data_sources);
+}
+
 function updateDirtyNode(node, refresh) {
 	const node_id = node.attr("node_id");
 
@@ -626,18 +643,7 @@ function updateDirtyNode(node, refresh) {
 		}
 
 		if (data.valid) {
-			const counts = data.counts;
-			const deterministic = data.deterministic !== false;
-			for (const c in counts) {
-				const vc = $(".node-count-" + c, node_counts);
-				const count = counts[c];
-				if (count > 0 || vc.hasClass("show-zero")) {
-					setVariantCount(vc, formatNodeCount(count, deterministic));
-				} else {
-					vc.hide();
-				}
-			}
-			markLiveDataCount(node_counts, deterministic, data.live_data_sources);
+			setNodeCounts(node, data);
 		} else {
 			// The counts strip is where the eye is already waiting, so mark the spot the spinner
 			// vacated with a cross rather than leaving it blank
@@ -661,6 +667,40 @@ function clickCounter(evt) {
     $(this).addClass(ACTIVE_NODE_COUNT_CLASS);
 	loadNodeData(nodeId, countType, true);
 } 
+
+
+// Tag counts are recalculated in a task, so wait for the counts to actually change rather than
+// reading them straight back - see AnalysisMessagePoller.observe_counts_changed
+const REFRESH_NODE_COUNTS_TIMEOUT = 30000;
+
+function refreshNodeCounts() {
+	$(".window[output_endpoint=true]").each(function() {
+		const node = $(this);
+		const updateCounts = function(nodeStatus) {
+			// A node that moved on since we asked is about to be redrawn by its own update
+			const latest = getNode(nodeStatus.id);
+			if (latest.length && latest.attr("version_id") == nodeStatus.version && nodeStatus.valid) {
+				setNodeCounts(latest, nodeStatus);
+			}
+		};
+		messagePoller.observe_counts_changed(node.attr("node_id"), node.attr("counts_modified"),
+											 REFRESH_NODE_COUNTS_TIMEOUT, updateCounts);
+	});
+}
+
+
+function updateTagNodeCounts(nodeCountTypes) {
+	// Tagging can add/remove that tag's own node count @see Analysis.node_count_auto_add_tags
+	if (JSON.stringify(nodeCountTypes) != JSON.stringify(ANALYSIS_SETTINGS.node_count_types)) {
+		ANALYSIS_SETTINGS.node_count_types = nodeCountTypes;
+		attachVariantCounters($(".window"), nodeCountTypes);  // Redraws the counters
+	}
+
+	const hasTagCounts = nodeCountTypes.some(function(nct) { return Boolean(nct[1].tag); });
+	if (hasTagCounts) {
+		refreshNodeCounts();
+	}
+}
 
 
 function attachVariantCounters(nodes_selector, nodeCountTypes) {
@@ -994,24 +1034,6 @@ function drawCountLegend(nodeCountTypes) {
 }
 
 
-function get_array_second_dimension_elements(array, element_id) {
-	const element_values = [];
-	for (let i=0 ; i<array.length ; ++i) {
-        element_values.push(array[i][element_id]);
-    }
-    return element_values; 
-}
-
-function get_array_element_keys(array, key_id) {
-	const element_values = [];
-	for (let i=0 ; i<array.length ; ++i) {
-		const value = array[i][key_id];
-		element_values.push(value);
-    }
-    return element_values; 
-}
-
-
 function changeAnalysisSettings(oldAnalysisSettings) {
 	let requireReload = false;
 	variantTagStaleDays = ANALYSIS_SETTINGS.variant_tag_stale_days;
@@ -1024,15 +1046,14 @@ function changeAnalysisSettings(oldAnalysisSettings) {
 	const arraysAreDifferent = true; // TODO: Add a way to test this? Could save a flash of attaching/reattaching counters
 	if (arraysAreDifferent) {
         // If we just removed some it's ok to just change the counters
-        // If there are new ones, need to force reload 
-		const oldCountData = get_array_second_dimension_elements(oldNodeCountTypes, 1);
-		const newCountData = get_array_second_dimension_elements(newNodeCountTypes, 1);
-		const oldTypes = get_array_element_keys(oldCountData, "label");
-		const newTypes = get_array_element_keys(newCountData, "label");
+        // If there are new ones, need to force reload
+		const oldTypeNames = oldNodeCountTypes.map(function(nct) { return nct[0]; });
 
-		for (let i=0 ; i<newTypes.length ; ++i) {
-            const count_type = newTypes[i];
-            if ($.inArray(count_type, oldTypes) == -1) {
+		for (let i=0 ; i<newNodeCountTypes.length ; ++i) {
+            const countType = newNodeCountTypes[i][0];
+            // Tag counts are filled in server side as they're configured, so they don't need a reload
+            const isTagCount = Boolean(newNodeCountTypes[i][1].tag);
+            if (!isTagCount && $.inArray(countType, oldTypeNames) == -1) {
                 requireReload = true;
                 break;
             }

@@ -68,6 +68,10 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel, Previe
     visible = models.BooleanField(default=True)
     template_type = models.CharField(max_length=1, choices=AnalysisTemplateType.choices, null=True, blank=True)
     node_queryset_filter_contigs = models.BooleanField(default=False)
+    node_count_auto_add_tags = models.BooleanField(
+        default=True,
+        help_text="Tagging a variant adds a node count for that tag. "
+                  "Turn this off to choose the tag counts yourself on the Node Counts tab.")
 
     class Meta:
         verbose_name = 'Analysis'
@@ -249,7 +253,7 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel, Previe
         try:
             node_count_config = self.analysisnodecountconfiguration
             for nc in node_count_config.analysisnodecountconfigrecord_set.all().order_by("sort_order"):
-                node_count_labels.append(nc.built_in_filter)
+                node_count_labels.append(nc.node_count_type)
         except AnalysisNodeCountConfiguration.DoesNotExist:
             node_count_labels = BuiltInFilters.DEFAULT_NODE_COUNT_FILTERS
 
@@ -261,6 +265,17 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel, Previe
         record_set = node_count_config.analysisnodecountconfigrecord_set
 
         AbstractNodeCountSettings.save_count_configs_from_array(record_set, node_counts_array)
+
+    def add_node_count_type(self, node_count_type: str):
+        """ Appends a node count, keeping the order of the existing ones """
+        existing_types = [nc[0] for nc in self.get_node_count_types()]
+        if node_count_type not in existing_types:
+            self.set_node_count_types(existing_types + [node_count_type])
+
+    def remove_node_count_type(self, node_count_type: str):
+        existing_types = [nc[0] for nc in self.get_node_count_types()]
+        if node_count_type in existing_types:
+            self.set_node_count_types([nc for nc in existing_types if nc != node_count_type])
 
     def transpose_node_positions(self):
         """ Node positions are laid out for an orientation (vertical DAGs are tall and narrow) so

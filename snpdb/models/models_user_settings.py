@@ -26,7 +26,7 @@ from library.utils import rgb_contrasting_text, string_deterministic_hash
 from snpdb.models import AlleleOriginFilterDefault, UserAwards
 from snpdb.models.models import Lab, Organization, Tag
 from snpdb.models.models_columns import CustomColumn, CustomColumnsCollection
-from snpdb.models.models_enums import BuiltInFilters
+from snpdb.models.models_enums import BuiltInFilters, TagFilter
 from snpdb.models.models_genome import GenomeBuild
 
 
@@ -696,27 +696,43 @@ class NodeCountSettingsCollection(models.Model):
 
     def get_node_count_filters(self):
         qs = self.nodecountsettings_set.all().order_by("sort_order")
-        return [nc.built_in_filter for nc in qs]
+        return [nc.node_count_type for nc in qs]
 
 
 class AbstractNodeCountSettings(models.Model):
-    built_in_filter = models.CharField(max_length=1, choices=BuiltInFilters.CHOICES, null=True)
+    # A BuiltInFilters choice, or a per-tag label @see TagFilter
+    node_count_type = models.CharField(max_length=100, null=True)
     sort_order = models.IntegerField()
 
     class Meta:
         abstract = True
 
     @staticmethod
+    def get_node_count_description(node_count_type: str) -> Optional[str]:
+        """ Human readable name for a node count type, or None if it no longer exists """
+        if tag_id := TagFilter.get_tag_id(node_count_type):
+            if Tag.objects.filter(pk=tag_id).exists():
+                return tag_id
+            return None
+        return dict(BuiltInFilters.CHOICES).get(node_count_type)
+
+    @staticmethod
     def get_types_from_labels(node_count_labels):
         # Convert from labels to types
-        labels = dict(BuiltInFilters.CHOICES)
         node_count_types = []
         for label in node_count_labels:
-            type_info = {"label": labels[label]}
+            description = AbstractNodeCountSettings.get_node_count_description(label)
+            if description is None:
+                continue  # Tag was deleted since it was configured
+            type_info = {"label": description}
             if label == BuiltInFilters.TOTAL:
                 type_info.update({"show_zero": True, "link": False})
             else:
                 type_info.update({"show_zero": False, "link": True})
+            if tag_id := TagFilter.get_tag_id(label):
+                # Adding a tag count doesn't need a node reload, the server fills it in - see
+                # changeAnalysisSettings() in analysis_nodes.js
+                type_info["tag"] = tag_id
 
             node_count_types.append((label, type_info))
         return node_count_types
@@ -725,10 +741,9 @@ class AbstractNodeCountSettings(models.Model):
     def save_count_configs_from_array(record_set, node_counts_array):
         record_set.all().delete()  # Delete and recreate
 
-        valid_choices = dict(BuiltInFilters.CHOICES)
         for i, nc in enumerate(node_counts_array):
-            if nc in valid_choices:
-                record_set.create(built_in_filter=nc,
+            if AbstractNodeCountSettings.get_node_count_description(nc) is not None:
+                record_set.create(node_count_type=nc,
                                   sort_order=i)
 
 

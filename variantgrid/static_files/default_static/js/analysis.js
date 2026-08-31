@@ -728,7 +728,7 @@ function setVariantTag(variantId, nodeId, tagId, successFunc, op) {
         data += '&node_id=' + nodeId;
     }
 
-    const success = function () {
+    const success = function (response) {
         const aWin = getAnalysisWindow();
         const tagList = aWin.variantTags[variantId] || [];
         if (op == 'add') {
@@ -745,6 +745,9 @@ function setVariantTag(variantId, nodeId, tagId, successFunc, op) {
         }
         setNumVariantTags();
         checkAndMarkDirtyNodes(aWin);
+        if (response && response.node_count_types) {
+            aWin.updateTagNodeCounts(response.node_count_types);
+        }
 
         if (successFunc) {
             successFunc();

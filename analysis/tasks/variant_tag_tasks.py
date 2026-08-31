@@ -2,11 +2,12 @@ import celery
 from django.db.models import Q
 
 from analysis.models import Analysis, TagNode, VariantTag
-from analysis.models.nodes.node_utils import update_analysis
+from analysis.models.nodes.node_utils import update_analysis, update_analysis_tag_node_counts
 from library.guardian_utils import admin_bot
 from snpdb.clingen_allele import populate_clingen_alleles_for_variants
 from snpdb.liftover import create_liftover_pipelines
 from snpdb.models import ImportSource, Tag, VariantAllele
+from snpdb.models.models_enums import TagFilter
 
 
 def analysis_tag_nodes_set_dirty(analysis: Analysis, tag: Tag, visible: bool):
@@ -18,6 +19,18 @@ def analysis_tag_nodes_set_dirty(analysis: Analysis, tag: Tag, visible: bool):
         node.save()
 
 
+def update_analysis_tag_node_count_config(analysis: Analysis, tag: Tag):
+    """ Adds/removes the tag's node count (#21). Cheap, and the client needs it in the tagging
+        response to draw the badge, so unlike the recount itself this is done in the request """
+    if not analysis.node_count_auto_add_tags:
+        return
+    label = TagFilter.label(tag.pk)
+    if VariantTag.objects.filter(analysis=analysis, tag=tag).exists():
+        analysis.add_node_count_type(label)
+    else:
+        analysis.remove_node_count_type(label)
+
+
 @celery.shared_task
 def variant_tag_created_task(variant_tag_id):
     """ Do this async to save a few miliseconds when adding/removing tags """
@@ -27,6 +40,7 @@ def variant_tag_created_task(variant_tag_id):
         return  # Deleted before this got run, doesn't matter...
     if variant_tag.analysis:
         analysis_tag_nodes_set_dirty(variant_tag.analysis, variant_tag.tag, visible=False)
+        update_analysis_tag_node_counts(variant_tag.analysis, tag_labels=[TagFilter.label(variant_tag.tag_id)])
         update_analysis(variant_tag.analysis.pk)
     _liftover_variant_tag(variant_tag)
 
@@ -38,6 +52,7 @@ def variant_tag_deleted_in_analysis_task(analysis_id, tag_id):
     analysis = Analysis.objects.get(pk=analysis_id)
     tag = Tag.objects.get(pk=tag_id)
     analysis_tag_nodes_set_dirty(analysis, tag, visible=False)
+    update_analysis_tag_node_counts(analysis, tag_labels=[TagFilter.label(tag_id)])
     update_analysis(analysis.pk)
 
 

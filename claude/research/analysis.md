@@ -60,7 +60,9 @@ Tracks the history of lock and unlock actions on an analysis.
 ### `AnalysisNodeCountConfiguration`
 OneToOne with `Analysis`. Defines which count types are displayed in the node count badges on the graph UI.
 
-**Count types include:** TOTAL, CLINVAR, OMIM, and other domain-specific category counts.
+**Count types include:** TOTAL, CLINVAR, OMIM, and other domain-specific category counts, plus one per
+tag (`tag_<tag id>`, @see `TagFilter`). `Analysis.node_count_auto_add_tags` adds/removes a tag's count as
+variants in the analysis are tagged/untagged (#21).
 
 ---
 
@@ -559,7 +561,9 @@ The analysis app uses three distinct caching levels, each targeting a different 
 
 **Labels:** Configurable per-analysis via `AnalysisNodeCountConfiguration`. Common labels include total count, ClinVar pathogenic count, OMIM gene count.
 
-**Invalidation:** Cascade delete from `NodeVersion` deletion.
+**Invalidation:** Cascade delete from `NodeVersion` deletion. Tag counts are the exception - tagging
+doesn't bump node versions, so `node_utils.update_analysis_tag_node_counts` recounts them in place
+(restricted to the small set of tagged variants) whenever a tag changes.
 
 ---
 

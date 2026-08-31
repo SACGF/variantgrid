@@ -5,7 +5,7 @@ from django import template
 from django.utils.safestring import mark_safe
 
 from analysis.models import VariantTag
-from analysis.models.nodes.node_counts import get_node_count_colors
+from analysis.models.nodes.node_counts import get_node_count_colors, get_tag_node_count_colors
 from annotation.models import AnnotationVersion
 from library import tag_utils
 from library.django_utils import get_field_counts
@@ -17,28 +17,27 @@ from snpdb.variant_queries import get_variant_queryset_for_gene_symbol
 register = template.Library()
 
 
-class AbstractCSSRGBNode(template.Node):
-    """ Renders CSS rule for UserTagColor """
+def render_user_tag_styles(prefix, user_tag_style):
+    """ CSS rules for UserTagColor - .<prefix><tag> > .user-tag-colored """
+    css_string = ''
+    for tag, data in user_tag_style:
+        if data:
+            data_css_lines = []
+            for k, v in data.items():
+                data_css_lines.append(f"{k}: {v} !important;")
 
-    def render_user_tag_styles(self, prefix, user_tag_style):
-        css_string = ''
-        for tag, data in user_tag_style:
-            if data:
-                data_css_lines = []
-                for k, v in data.items():
-                    data_css_lines.append(f"{k}: {v} !important;")
-
-                data_string = '\n'.join(data_css_lines)
-                string = """
-        .%s%s>.user-tag-colored {
-            %s
-        }
-                """
-                css_string += string % (prefix, tag, data_string)
-        return css_string
+            data_string = '\n'.join(data_css_lines)
+            string = """
+    .%s%s>.user-tag-colored {
+        %s
+    }
+            """
+            css_string += string % (prefix, tag, data_string)
+    return css_string
 
 
-class VariableCSSRGBNode(AbstractCSSRGBNode, template.Node):
+class VariableCSSRGBNode(template.Node):
+    """ Renders CSS rules for UserTagColor """
 
     def __init__(self, prefix, user_tag_style):
         self.prefix = template.Variable(prefix)
@@ -47,17 +46,7 @@ class VariableCSSRGBNode(AbstractCSSRGBNode, template.Node):
     def render(self, context):
         prefix = self.prefix.resolve(context)
         user_tag_style = self.user_tag_style.resolve(context)
-        return self.render_user_tag_styles(prefix, user_tag_style)
-
-
-class ArgsCSSRGBNode(AbstractCSSRGBNode, template.Node):
-
-    def __init__(self, prefix, user_tag_style):
-        self.prefix = prefix
-        self.user_tag_style = user_tag_style
-
-    def render(self, context):
-        return self.render_user_tag_styles(self.prefix, self.user_tag_style)
+        return render_user_tag_styles(prefix, user_tag_style)
 
 
 class VariantTagsJSNode(template.Node):
@@ -80,11 +69,14 @@ def render_rgb_css(_parser, token):
     return VariableCSSRGBNode(*tag_utils.get_passed_objects(token))
 
 
-@register.tag
-def render_node_count_colors_css(_parser, _token):
+@register.simple_tag(takes_context=True)
+def render_node_count_colors_css(context):
+    """ Legend swatch colours - the built in filters, plus one per tag in the user's tag colours """
     prefix = 'node-count-legend-'
-    tag_rgb = get_node_count_colors("background-color")
-    return ArgsCSSRGBNode(prefix, tag_rgb)
+    user = context["user"]
+    css = render_user_tag_styles(prefix, get_node_count_colors("background-color"))
+    css += render_user_tag_styles(prefix, get_tag_node_count_colors(user, "background-color"))
+    return mark_safe(css)
 
 
 @register.tag

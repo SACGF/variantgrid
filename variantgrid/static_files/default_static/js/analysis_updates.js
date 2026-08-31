@@ -1,9 +1,11 @@
 
 function AnalysisMessagePoller(node_status_url, task_status_url) {
+	const that = this;
 	this.node_status_url = node_status_url;
 	this.task_status_url = task_status_url;
 	this.update_frequency = 1000;
 	this.observed_nodes = {};
+	this.counts_watches = {};
 	this.update = function() {
 //		console.log("update!");
 		const nodes = Object.keys(this.observed_nodes);
@@ -136,6 +138,14 @@ function AnalysisMessagePoller(node_status_url, task_status_url) {
 
 	this.delete_node = function(node_id) {
 		delete this.observed_nodes[node_id];
+		delete this.counts_watches[node_id];
+	};
+
+	// Tag counts are recalculated in a task after the node has loaded, so they change without the node
+	// version moving. Watch counts_modified to know when that landed - see nodes_status
+	this.observe_counts_changed = function(node_id, baseline, timeout_ms, callback) {
+		this.counts_watches[node_id] = {baseline: baseline, expires: Date.now() + timeout_ms};
+		this.observe_node(node_id, "counts_changed", callback);
 	};
 
 	this.can_dispatch_count = function(node) {
@@ -144,6 +154,20 @@ function AnalysisMessagePoller(node_status_url, task_status_url) {
 
 	this.can_dispatch_ready = function(node) {
 		return node.ready;
+	};
+
+	this.can_dispatch_counts_changed = function(node) {
+		const watch = that.counts_watches[node.id];
+		if (!watch) {
+			return true;
+		}
+		// Give up on the deadline and draw what we have - a node that errored or was deleted will
+		// never write new counts, and we don't want to poll for it forever
+		if (node.counts_modified != watch.baseline || Date.now() > watch.expires) {
+			delete that.counts_watches[node.id];
+			return true;
+		}
+		return false;
 	};
 
 	this.update_loop = function() {
@@ -164,5 +188,6 @@ function AnalysisMessagePoller(node_status_url, task_status_url) {
 	this.can_dispatch = {
 	   count: this.can_dispatch_count,
 	   ready: this.can_dispatch_ready,
+	   counts_changed: this.can_dispatch_counts_changed,
 	};
 }
