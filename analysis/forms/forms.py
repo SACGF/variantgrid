@@ -293,7 +293,7 @@ class AnalysisForm(forms.ModelForm, ROFormMixin):
             with transaction.atomic():
                 instance.save()
                 if "analysis_horizontal_mode" in self.changed_data:
-                    instance.transpose_node_positions()
+                    instance.rotate_node_positions()
         return instance
 
 

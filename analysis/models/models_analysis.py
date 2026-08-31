@@ -10,7 +10,7 @@ from django.apps import apps
 from django.conf import settings
 from django.contrib.auth.models import Group, User
 from django.db import models
-from django.db.models import Count, F, Max, Model, OuterRef, Q, QuerySet, Subquery
+from django.db.models import Count, Max, Model, OuterRef, Q, QuerySet, Subquery
 from django.db.models.deletion import CASCADE, PROTECT, SET_DEFAULT, SET_NULL, ProtectedError
 from django.db.models.signals import pre_delete
 from django.dispatch import receiver
@@ -277,11 +277,35 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel, Previe
         if node_count_type in existing_types:
             self.set_node_count_types([nc for nc in existing_types if nc != node_count_type])
 
-    def transpose_node_positions(self):
+    def rotate_node_positions(self):
         """ Node positions are laid out for an orientation (vertical DAGs are tall and narrow) so
-            switching analysis_horizontal_mode swaps them. Self-inverse - switching back restores the
-            original layout. Doesn't affect queries, so no version bump """
-        self.analysisnode_set.update(x=F("y"), y=F("x"))
+            switching analysis_horizontal_mode turns them a quarter turn to line up with the new flow
+            direction - anti-clockwise going horizontal, so what flowed down now flows right, and
+            clockwise coming back. A turn (rather than a diagonal flip) keeps the layout's handedness,
+            so a Venn's left parent stays on the side its ring and input endpoint are on.
+
+            Self-inverse - switching back restores the original layout. Doesn't affect queries, so no
+            version bump """
+        nodes = list(self.analysisnode_set.all())
+        if not nodes:
+            return
+
+        old_top_left = (min(n.x for n in nodes), min(n.y for n in nodes))
+        anti_clockwise = self.analysis_horizontal_mode
+        for node in nodes:
+            if anti_clockwise:
+                node.x, node.y = node.y, -node.x
+            else:
+                node.x, node.y = -node.y, node.x
+
+        # Turning about the origin swings the layout off the canvas - put it back where it was
+        x_offset = old_top_left[0] - min(n.x for n in nodes)
+        y_offset = old_top_left[1] - min(n.y for n in nodes)
+        for node in nodes:
+            node.x += x_offset
+            node.y += y_offset
+
+        self.analysisnode_set.bulk_update(nodes, ["x", "y"])
 
     def get_samples(self) -> list[Sample]:
         samples = set()

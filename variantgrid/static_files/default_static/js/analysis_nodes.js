@@ -26,7 +26,8 @@ const NODE_ORIENTATIONS = {
 		input: "Left",
 		output: "Right",
 		// The card's rings are rotated anti-clockwise (see analysis_nodes.css), which puts the left
-		// ring at the bottom - so the left input takes the lower endpoint
+		// ring at the bottom - so the left input takes the lower endpoint, and the node positions
+		// turn the same way (see Analysis.rotate_node_positions) to land the left parent below
 		vennInputs: [[0, 0.75, -1, 0], [0, 0.25, -1, 0]],
 	},
 };

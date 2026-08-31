@@ -78,26 +78,38 @@ class AnalysisModelTestCase(TestCase):
         analysis.set_defaults_and_save(self.owner_user)
         self.assertTrue(analysis.analysis_horizontal_mode)
 
-    def test_transpose_node_positions(self):
-        """ Node positions are orientation specific - the swap has to be self-inverse so toggling
+    def test_rotate_node_positions(self):
+        """ Node positions are orientation specific - the turn has to be self-inverse so toggling
             the mode back restores the original layout exactly """
         analysis = Analysis(genome_build=self.grch37)
         analysis.set_defaults_and_save(self.owner_user)
-        node = AllVariantsNode.objects.create(analysis=analysis, x=10, y=200)
+        # A left hand parent above its child, which is what a Venn's left side looks like
+        left = AllVariantsNode.objects.create(analysis=analysis, x=10, y=10)
+        right = AllVariantsNode.objects.create(analysis=analysis, x=110, y=10)
+        child = AllVariantsNode.objects.create(analysis=analysis, x=60, y=110)
 
-        analysis.transpose_node_positions()
-        node.refresh_from_db()
-        self.assertEqual((node.x, node.y), (200, 10))
+        analysis.analysis_horizontal_mode = True
+        analysis.rotate_node_positions()
+        for node in (left, right, child):
+            node.refresh_from_db()
+        # Anti-clockwise: what flowed down now flows right, and the left parent swings to the bottom
+        self.assertGreater(child.x, left.x, "Child is downstream (to the right) of its parents")
+        self.assertGreater(left.y, right.y, "Left parent is below the right one")
 
-        analysis.transpose_node_positions()
-        node.refresh_from_db()
-        self.assertEqual((node.x, node.y), (10, 200))
+        analysis.analysis_horizontal_mode = False
+        analysis.rotate_node_positions()
+        for node in (left, right, child):
+            node.refresh_from_db()
+        self.assertEqual((left.x, left.y), (10, 10))
+        self.assertEqual((right.x, right.y), (110, 10))
+        self.assertEqual((child.x, child.y), (60, 110))
 
-    def test_changing_horizontal_mode_transposes_nodes(self):
+    def test_changing_horizontal_mode_rotates_nodes(self):
         analysis = Analysis(genome_build=self.grch37, name="horizontal mode test")
         analysis.set_defaults_and_save(self.owner_user)
         assign_permission_to_user_and_groups(self.owner_user, analysis.custom_columns_collection)
-        node = AllVariantsNode.objects.create(analysis=analysis, x=10, y=200)
+        parent = AllVariantsNode.objects.create(analysis=analysis, x=10, y=10)
+        child = AllVariantsNode.objects.create(analysis=analysis, x=10, y=210)
 
         data = {k: v for k, v in AnalysisForm(instance=analysis, user=self.owner_user).initial.items()
                 if v is not None}
@@ -106,8 +118,10 @@ class AnalysisModelTestCase(TestCase):
         self.assertTrue(form.is_valid(), form.errors)
         form.save()
 
-        node.refresh_from_db()
-        self.assertEqual((node.x, node.y), (200, 10))
+        parent.refresh_from_db()
+        child.refresh_from_db()
+        self.assertEqual((parent.x, parent.y), (10, 10))
+        self.assertEqual((child.x, child.y), (210, 10))  # downstream is now to the right
 
     def test_invisible_analysis_hides_template_from_lists(self):
         """ Internal auto-analysis templates (eg cohort VCF export) are hidden from template lists

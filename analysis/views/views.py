@@ -973,7 +973,7 @@ def analysis_settings_details_tab(request, analysis_id):
                 if reload_analysis := (old_annotation_version != analysis.annotation_version):
                     node_utils.reload_analysis_nodes(analysis.pk)
                 # The panel layout and node anchors are rendered per orientation, and the save
-                # transposed the node positions - the open page needs to come back as the other mode
+                # turned the node positions - the open page needs to come back as the other mode
                 reload_page = old_horizontal_mode != analysis.analysis_horizontal_mode
 
             add_save_message(request, valid, "Analysis Settings")
