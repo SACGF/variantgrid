@@ -31,9 +31,9 @@ DEFAULT_COLUMN_WIDTH = 150  # for colmodels that don't set one
 # colmodel 'formatter' name -> DataTables client renderer
 # @see variantgrid/static_files/default_static/js/variantgrid_formats.js
 JQGRID_FORMATTER_TO_CLIENT_RENDERER = {
+    "classificationsFormatter": "VariantGridFormat.classifications",
     "clinvarLink": "VariantGridFormat.clinvarLink",
     "cosmicLink": "VariantGridFormat.cosmicLink",
-    "detailsLink": "VariantGridFormat.detailsLink",
     "formatClinGenAlleleId": "VariantGridFormat.clinGenAlleleId",
     "formatDBSNP": "VariantGridFormat.dbsnp",
     "formatMasterMindMMID3": "VariantGridFormat.masterMind",
@@ -43,8 +43,11 @@ JQGRID_FORMATTER_TO_CLIENT_RENDERER = {
     "geneSymbolLink": "VariantGridFormat.geneSymbolLink",
     "geneSymbolNewWindowLink": "VariantGridFormat.geneSymbolNewWindowLink",
     "gnomadFilteredFormatter": "VariantGridFormat.gnomadFiltered",
+    "gnomadPopmaxFormatter": "VariantGridFormat.gnomadPopmax",
+    "impactConsequenceFormatter": "VariantGridFormat.impactConsequence",
     "linkFormatter": "VariantGridFormat.link",
     "omimLink": "VariantGridFormat.omimLink",
+    "representativeVariant": "VariantGridFormat.representativeVariant",
     "tagsFormatter": "VariantGridFormat.tags",
     "tagsGlobalFormatter": "VariantGridFormat.tagsGlobal",
     "unitAsPercentFormatter": "VariantGridFormat.unitAsPercent",
@@ -136,7 +139,11 @@ def datatable_definition(grid, *, download_url: Optional[str] = None, scroll_x: 
                          defer_loading: bool = False, cache_stable_params: bool = True,
                          filter_builder: bool = True, filter_builder_toolbar: bool = True) -> JsonObjType:
     """ The table definition DataTableDefinition builds the table from. Computed per request -
-        hide_non_admin columns and UserGridConfig rows are both per user. """
+        hide_non_admin columns and UserGridConfig rows are both per user.
+
+        A grid offering get_expand_client_renderer adds 'expandClientRenderer' (the JS expression
+        setupClientExpend evals to build a row's child content) and 'expandPrefetch' (whether hovering
+        a row for 500ms fetches that content early). """
     config = grid.get_config()
     colmodels = grid.get_colmodels(remove_server_side_only=True)
 
@@ -157,6 +164,11 @@ def datatable_definition(grid, *, download_url: Optional[str] = None, scroll_x: 
         "compactControls": True,
         "extra": grid.get_datatable_extra(),
     }
+    if expand_client_renderer := getattr(grid, "get_expand_client_renderer", lambda: None)():
+        data["expandClientRenderer"] = expand_client_renderer
+        # Rows are full of links; the arrow makes the affordance clear enough without a hover prefetch
+        # request per row the mouse rests on
+        data["expandPrefetch"] = False
     if filter_builder:
         data["filterBuilder"] = {
             "fields": datatable_filter_fields_from_colmodels(colmodels),

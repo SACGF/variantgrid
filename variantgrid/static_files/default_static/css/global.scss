@@ -994,10 +994,178 @@ table.variantgrid-datatable {
 		line-height: 16px;
 	}
 
-	// detailsLink's boxes are floats, which wrap once the column is narrower than the row of them
+	// Representative variant cell: expand arrow (td.toggle-link:before) · checkbox · label (details link)
 	.variant_id-container {
-		display: flex;
+		display: inline-flex;
 		align-items: center;
+		gap: 4px;
+		min-width: 0;
+		max-width: calc(100% - 16px);  // the arrow's width + margin
+
+		a.rv-label {
+			overflow: hidden;
+			text-overflow: ellipsis;
+			white-space: nowrap;
+			text-decoration: none;
+		}
+	}
+
+	.rv-gene {
+		font-weight: 600;
+	}
+
+	.rv-hgvs {
+		font-family: ui-monospace, Menlo, Consolas, monospace;
+		font-size: 11px;
+	}
+
+	.rv-hgvs-p,
+	.rv-sub {
+		color: #777;
+		font-size: 11px;
+	}
+
+	// ClinVar / germline / somatic each get a fixed share of whatever the cell is, so the three line
+	// up down the column - the eye scans one origin without tracking sideways. Shares rather than
+	// fixed widths: the cell is overflow:hidden, and fixed widths wider than the column silently cut
+	// the last chip off the right edge
+	.cs-chips {
+		display: grid;
+		grid-template-columns: 74fr 52fr 60fr;
+		gap: 3px;
+		align-items: center;
+	}
+
+	.cs-chip {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		box-sizing: border-box;
+		min-width: 0;
+		height: 16px;
+		line-height: 16px;
+		padding: 0 5px;
+		border-radius: 4px;
+		font-size: 10px;
+		font-weight: 700;
+		color: #333;
+		vertical-align: middle;
+		text-decoration: none;
+		overflow: hidden;
+		white-space: nowrap;
+		text-overflow: ellipsis;
+
+		&.cs-chip-empty {
+			background: transparent;
+			border: 1px dashed #ccc;
+			color: #bbb;
+			font-weight: 500;
+		}
+
+		// Same germline / somatic colours as .allele-origin-box, as a left rail
+		&.allele-origin-G {
+			box-shadow: inset 3px 0 0 #88cc88;
+			padding-left: 7px;
+		}
+
+		&.allele-origin-S {
+			box-shadow: inset 3px 0 0 #cc99cc;
+			padding-left: 7px;
+		}
+
+		.cs-chip-src {
+			font-size: 9px;
+			opacity: .6;
+			margin-right: 2px;
+		}
+
+		.cs-chip-stars {
+			color: #d9a400;
+			font-size: 9px;
+			letter-spacing: -1px;
+
+			.off {
+				color: #ccc;
+			}
+		}
+
+		.cs-chip-count {
+			font-size: 9px;
+			background: rgba(0, 0, 0, .08);
+			border-radius: 99px;
+			padding: 0 4px;
+		}
+	}
+
+	// Impact dot + consequence in one cell
+	.impact-consequence {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		min-width: 0;
+
+		.impact-dot {
+			width: 8px;
+			height: 8px;
+			border-radius: 50%;
+			flex: none;
+		}
+
+		.impact-high { background: #cf3f3a; }
+		.impact-moderate { background: #dd8a1c; }
+		.impact-low { background: #3f9a5e; }
+		.impact-modifier { background: #a0a8b3; }
+		.impact-unknown { background: transparent; box-shadow: inset 0 0 0 1px #ccc; }
+	}
+
+	// gnomAD popmax AF, with the population it came from alongside it
+	.gnomad-popmax-pop {
+		color: #777;
+		font-size: 10px;
+	}
+
+	// Only the arrow cell invites a click - the rest of the row is links
+	&.expandable td.toggle-link {
+		cursor: pointer;
+	}
+
+	// The child row's td spans every column of a table that can be thousands of px wide - keep the
+	// detail pinned to the visible left edge of the scroll body
+	.variant-row-detail {
+		position: sticky;
+		left: 0;
+		width: max-content;
+		max-width: 90vw;
+		padding: 6px 10px;
+		font-size: 12px;
+		white-space: normal;
+
+		.variant-row-detail-columns {
+			display: flex;
+			gap: 32px;
+			align-items: flex-start;
+		}
+
+		.variant-row-detail-table th {
+			color: #777;
+			font-weight: 500;
+			padding-right: 10px;
+			white-space: nowrap;
+			text-align: left;
+		}
+
+		.variant-row-detail-table .mono {
+			font-family: ui-monospace, Menlo, Consolas, monospace;
+			font-size: 11px;
+		}
+
+		.variant-row-detail-actions {
+			margin-top: 6px;
+			padding-top: 6px;
+			border-top: 1px solid #e1e5ea;
+			display: flex;
+			gap: 12px;
+		}
 	}
 
 	// One trailing icon per link is unreadable in a cell holding dozens of them
@@ -3221,8 +3389,8 @@ a .c-hgvs-body {
 	}
 }
 
-// Clinical significance colours - shared by classification pills and analysis node chips
-.c-pill, .node-chip {
+// Clinical significance colours - shared by classification pills, analysis node chips and grid chips
+.c-pill, .node-chip, .cs-chip {
 	&.scs-none, &.cs-none {
 		border: none !important;
 		background-color: #eeeeee;

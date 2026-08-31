@@ -35,7 +35,7 @@ from analysis.models.nodes.analysis_node import (
 )
 from analysis.variant_tag_operations import VARIANT_TAG_CLASSIFIED
 from analysis.views.analysis_permissions import get_node_subclass_or_404
-from annotation.models import HumanProteinAtlasAnnotation
+from annotation.models import AnnotationVersion, HumanProteinAtlasAnnotation
 from classification.models import Classification
 from genes.grids import GeneListGenesColumns
 from genes.models import HGNC, GeneList
@@ -116,6 +116,9 @@ class VariantGrid(AbstractVariantGrid):
     def _get_permission_user(self):
         """ We use the analysis user so it's consistent between users """
         return self.node.analysis.user
+
+    def _get_annotation_version(self) -> AnnotationVersion:
+        return self.node.analysis.annotation_version
 
     def _get_base_queryset(self) -> QuerySet:
         return self.node.get_queryset()

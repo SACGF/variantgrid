@@ -71,82 +71,232 @@ const SOMATIC_CLASSIFICATION_BOXES = {
     'U': {display: '', label: 'No tier'},
 };
 
-function internalClassificationBox(title, maxClassification, classifiedSummary, gridColumn, boxLookup, originCssClass) {
-    let linkUrl = null;
-    let contents = '';
-    const extraIconClasses = [originCssClass];  // Standard germline/somatic colour, see global.scss
-    if (maxClassification != null) {  // != also catches undefined (cached grid data w/o new fields)
-        const box = boxLookup[maxClassification] || {display: maxClassification, label: maxClassification};
-        // classifiedSummary is every record's value joined by '|' - show the pretty labels
-        const summaryLabels = (classifiedSummary || '').split('|').map(function(cs) {
-            const summaryBox = boxLookup[cs];
-            return summaryBox ? summaryBox.label : cs;
-        });
-        title += ": " + summaryLabels.join('|');
-        linkUrl = 'javascript:showGridCell("' + gridColumn + '")';
-        contents = box.display;
-        if (contents.length > 1) {  // e.g. Tier "1/2" - shrink to fit the 16px box
-            extraIconClasses.push("grid-link-small-text");
-        }
-    } else {
-        title += ": not classified";
-        extraIconClasses.push("no-entry");
+// Chip text and .cs-*/.scs-* colour class (global.scss) per classification code
+const GERMLINE_CLASSIFICATION_CHIPS = {
+    '0': {text: 'O', css: 'cs-none'},
+    '1': {text: 'B', css: 'cs-b'},
+    '2': {text: 'LB', css: 'cs-lb'},
+    '3': {text: 'VUS', css: 'cs-vus'},
+    '4': {text: 'LP', css: 'cs-lp'},
+    '5': {text: 'P', css: 'cs-p'},
+};
+
+const SOMATIC_CLASSIFICATION_CHIPS = {
+    'tier_1': {text: 'Tier I', css: 'scs-tier_1'},
+    'tier_1_or_2': {text: 'Tier I/II', css: 'scs-tier_1_or_2'},
+    'tier_2': {text: 'Tier II', css: 'scs-tier_2'},
+    'tier_3': {text: 'Tier III', css: 'scs-tier_3'},
+    'tier_4': {text: 'Tier IV', css: 'scs-tier_4'},
+};
+
+const CLINVAR_PATHOGENICITY_CHIPS = {  // ClinVar.highest_pathogenicity (ClinVarPathogenicity)
+    0: {text: 'CV', css: 'cs-none'},
+    1: {text: 'B', css: 'cs-b'},
+    2: {text: 'LB', css: 'cs-lb'},
+    3: {text: 'VUS', css: 'cs-vus'},
+    4: {text: 'LP', css: 'cs-lp'},
+    5: {text: 'P', css: 'cs-p'},
+};
+
+// Each chip sits in a fixed width slot (global.scss) so ClinVar / germline / somatic line up down
+// the column - a reader scans one origin without their eye tracking sideways
+const CLINVAR_CHIP_SLOT = 'cs-chip-clinvar';
+const GERMLINE_CHIP_SLOT = 'cs-chip-germline';
+const SOMATIC_CHIP_SLOT = 'cs-chip-somatic';
+
+function _classificationChip(cssClasses, innerHtml, title, gridColumn) {
+    const href = gridColumn ? `javascript:showGridCell("${gridColumn}")` : 'javascript:void(0)';
+    return `<a class='cs-chip ${cssClasses.join(' ')}' title='${escapeHtml(title)}' href='${href}'>${innerHtml}</a>`;
+}
+
+function _emptyChip(slotCssClass, title) {
+    return _classificationChip([slotCssClass, 'cs-chip-empty'], '&mdash;', title, null);
+}
+
+function _internalClassificationChip(originLabel, originCssClass, slotCssClass, maxClassification,
+                                     classifiedSummary, gridColumn, chipLookup, boxLookup) {
+    // null = not classified; undefined = a row cached before these fields existed - treat the same
+    if (maxClassification == null) {
+        return _emptyChip(slotCssClass, originLabel + ": not classified");
     }
-    return createGridLink(title, linkUrl, contents, [], extraIconClasses);
+    const chip = chipLookup[maxClassification] || {text: maxClassification, css: 'cs-none'};
+    const records = (classifiedSummary || '').split('|');
+    const summaryLabels = records.map(cs => (boxLookup[cs] || {label: cs}).label);
+    let inner = escapeHtml(chip.text);
+    if (records.length > 1) {
+        inner += ` <span class='cs-chip-count'>&times;${records.length}</span>`;
+    }
+    return _classificationChip([slotCssClass, chip.css, originCssClass], inner,
+                               `${originLabel}: ${summaryLabels.join(' | ')}`, gridColumn);
+}
+
+function _clinvarChip(rowData, ctx) {
+    const highestPath = rowData["clinvar__highest_pathogenicity"];
+    if (highestPath == null) {
+        return _emptyChip(CLINVAR_CHIP_SLOT, "ClinVar: not classified");
+    }
+    const chip = CLINVAR_PATHOGENICITY_CHIPS[highestPath] || {text: String(highestPath), css: 'cs-none'};
+    const starsLookup = (ctx && ctx.extra && ctx.extra.clinvarStars) || {};
+    const stars = starsLookup[rowData["clinvar__review_status"]];
+    let inner = `<span class='cs-chip-src'>CV</span>${escapeHtml(chip.text)}`;
+    if (stars !== undefined) {
+        let starHtml = '';
+        for (let i = 0; i < 4; ++i) {
+            starHtml += `<span class='${i < stars ? '' : 'off'}'>&#9733;</span>`;
+        }
+        inner += ` <span class='cs-chip-stars'>${starHtml}</span>`;
+    }
+    const title = "ClinVar: " + (rowData["clinvar__clinical_significance"] || chip.text);
+    return _classificationChip([CLINVAR_CHIP_SLOT, chip.css], inner, title, "clinvar__clinical_significance");
 }
 
 
-VariantGridFormat.detailsLink = (variantId, type, rowData, ctx) => {
-    let nodeVisible = _isNodeVisible(ctx);
-    const kwargs = ctx && ctx.kwargs;
-    if (kwargs) {
-        nodeVisible = kwargs.node_visible;
+// Renderer-only column (no row key of its own) - reads the hidden fields listed in
+// CLASSIFICATIONS_COLUMN_ROW_FIELDS / _ANNOTATIONS (snpdb/grid_columns/custom_columns.py)
+VariantGridFormat.classifications = (_value, type, rowData, ctx) => {
+    // Always three chips in the same order, empty ones included - the .cs-chips grid gives each a
+    // fixed share of the cell, so they line up down the column whatever the column is set to
+    const chips = _clinvarChip(rowData, ctx)
+        + _internalClassificationChip("Internally Classified (Germline)", "allele-origin-G", GERMLINE_CHIP_SLOT,
+            rowData["max_internal_classification"], rowData["internally_classified"],
+            "max_internal_classification", GERMLINE_CLASSIFICATION_CHIPS, GERMLINE_CLASSIFICATION_BOXES)
+        + _internalClassificationChip("Internally Classified (Somatic)", "allele-origin-S", SOMATIC_CHIP_SLOT,
+            rowData["max_internal_somatic_classification"], rowData["internally_classified_somatic"],
+            "max_internal_somatic_classification", SOMATIC_CLASSIFICATION_CHIPS, SOMATIC_CLASSIFICATION_BOXES);
+    return `<span class='cs-chips'>${chips}</span>`;
+};
+
+
+// Impact drives the dot colour; the consequence text is what the cell reads as
+const IMPACT_DOT_CSS = {
+    'HIGH': 'impact-high',
+    'MODERATE': 'impact-moderate',
+    'LOW': 'impact-low',
+    'MODIFIER': 'impact-modifier',
+};
+
+// Impact + Consequence in one cell - reads variantannotation__impact from COMPOSITE_COLUMN_ROW_FIELDS
+// (snpdb/grid_columns/custom_columns.py). Sorts by consequence, the column it lives on.
+VariantGridFormat.impactConsequence = (consequence, type, rowData) => {
+    const impact = rowData["variantannotation__impact"];
+    if (consequence == null && impact == null) {
+        return '';
     }
+    const dotCss = IMPACT_DOT_CSS[impact] || 'impact-unknown';
+    const title = [impact, consequence].filter(v => v != null).join(' · ');
+    return `<span class='impact-consequence' title='${escapeHtml(title)}'>`
+         + `<i class='impact-dot ${dotCss}'></i>${escapeHtml(consequence == null ? '' : consequence)}</span>`;
+};
 
-    const variantBoxes = [];
-    if (nodeVisible) {
-        const variant_selector = "<input type='checkbox' class='variant-select' variant_id=" + variantId + ">";
-        variantBoxes.push(variant_selector);
+// gnomAD popmax AF with the population it came from - reads variantannotation__gnomad_popmax.
+// The AF itself is formatted server side (unit -> percent) so the CSV matches the grid.
+VariantGridFormat.gnomadPopmax = (popmaxAf, type, rowData) => {
+    if (popmaxAf == null || popmaxAf === '') {
+        return '';
     }
-
-    const detailsUrl = "javascript:load_variant_details(" + variantId + ");";
-    const detailsLink = createGridLink('View details', detailsUrl, '', ['variant-link'], ['view-details-link']);
-    variantBoxes.push(detailsLink);
-
-    // ClinVar
-    let cvHighestPath = rowData["clinvar__highest_pathogenicity"];
-    const cvClinSig = rowData["clinvar__clinical_significance"];
-
-    let linkUrl = null;
-    let extraLinkClasses = ['node-count-legend-C'];
-    let extraIconClasses = [];
-    let cvTitle = "ClinVar: ";
-    if (cvHighestPath !== null) {
-        cvTitle += cvClinSig;
-        linkUrl = 'javascript:showGridCell("clinvar__clinical_significance")';
-    } else {
-        cvTitle += "not classified";
-        extraIconClasses.push("no-entry");
-        cvHighestPath = '';
+    const population = rowData["variantannotation__gnomad_popmax"];
+    let html = `<span class='gnomad-popmax-af'>${escapeHtml(popmaxAf)}</span>`;
+    if (population) {
+        html += ` <span class='gnomad-popmax-pop'>${escapeHtml(population)}</span>`;
     }
-    const cvLink = createGridLink(cvTitle, linkUrl, cvHighestPath, extraLinkClasses, extraIconClasses);
-    variantBoxes.push(cvLink);
+    return html;
+};
 
-    // Internally Classified - one box each for germline and somatic, coloured with the standard
-    // clinical significance pill colours (.cs-* / .scs-* in global.scss)
-    variantBoxes.push(internalClassificationBox(
-        "Internally Classified (Germline)", rowData["max_internal_classification"],
-        rowData["internally_classified"], "max_internal_classification",
-        GERMLINE_CLASSIFICATION_BOXES, "allele-origin-G"));
-    variantBoxes.push(internalClassificationBox(
-        "Internally Classified (Somatic)", rowData["max_internal_somatic_classification"],
-        rowData["internally_classified_somatic"], "max_internal_somatic_classification",
-        SOMATIC_CLASSIFICATION_BOXES, "allele-origin-S"));
 
-    const locus = rowData["locus__contig__name"] + ":" + rowData["locus__position"];
-    const igvLink = create_igv_link(locus, 'getBams');
-    variantBoxes.push(igvLink);
-    return "<span class='variant_id-container' variant_id=" + variantId + ">" + variantBoxes.join('') + "</span>";
+// hgvs_c / hgvs_p / hgvs_g are "ACCESSION:change" or "ACCESSION(SYMBOL):change". The change has to
+// start with an HGVS kind so gene-level fusion nomenclature ("BCR::ABL1") isn't split as one
+const HGVS_REGEX = /^([^:(]+)(?:\(([^)]+)\))?:([cgmnopr]\..+)$/;
+const HGVS_NOT_CALCULATED = "HGVS not calculated due to length";  // VariantAnnotation.SV_HGVS_TOO_LONG_MESSAGE
+const REPRESENTATIVE_MAX_ALLELE_BASES = 10;   // longer ref/alt collapse to "[52bp]"
+const REPRESENTATIVE_MAX_HGVS_CHARS = 40;     // longer g.HGVS (inserted sequence spelled out) fall through to the coordinate
+
+function _splitHgvs(hgvs) {
+    const m = hgvs ? String(hgvs).match(HGVS_REGEX) : null;
+    return m ? {accession: m[1], symbol: m[2] || null, change: m[3]} : null;
+}
+
+function _formatAllele(seq) {
+    seq = seq == null ? '' : String(seq);
+    return seq.length > REPRESENTATIVE_MAX_ALLELE_BASES ? `[${seq.length}bp]` : seq;
+}
+
+function _formatBases(bases) {
+    if (bases >= 1e6) {
+        return (bases / 1e6).toFixed(2) + " Mb";
+    }
+    if (bases >= 1e3) {
+        return (bases / 1e3).toFixed(1) + " kb";
+    }
+    return bases + " bp";
+}
+
+// The cascade from the mockup's "Representative variant" card. Returns {html, title}; title is the
+// plain string for the link tooltip. Every key may be undefined on a row cached before these fields
+// existed - each step checks and falls through, ending at the VariantGrid id.
+function _representativeVariantLabel(variantId, rowData) {
+    const chrom = rowData["locus__contig__name"];
+    const position = rowData["locus__position"];
+    const ref = rowData["locus__ref__seq"];
+    const alt = rowData["alt__seq"];
+    const svlen = rowData["svlen"];
+    const hgvsC = rowData["variantannotation__hgvs_c"];
+    const hgvsP = rowData["variantannotation__hgvs_p"];
+    const hgvsG = rowData["variantannotation__hgvs_g"];
+    const symbol = rowData["variantannotation__symbol"];
+
+    // 1. c.HGVS on the representative transcript - gene symbol leads, transcript is in the expanded row
+    if (hgvsC && hgvsC !== HGVS_NOT_CALCULATED) {
+        const c = _splitHgvs(hgvsC);
+        if (!c) {
+            // Gene-level (fusion) nomenclature has no accession prefix - show it whole
+            return {html: `<span class='rv-hgvs'>${escapeHtml(hgvsC)}</span>`, title: hgvsC};
+        }
+        const gene = c.symbol || symbol;
+        let html = gene ? `<span class='rv-gene'>${escapeHtml(gene)}</span> ` : '';
+        html += `<span class='rv-hgvs'>${escapeHtml(c.change)}</span>`;
+        const p = _splitHgvs(hgvsP);
+        if (p) {
+            html += ` <span class='rv-hgvs-p'>${escapeHtml(p.change)}</span>`;
+        }
+        return {html: html, title: hgvsC + (hgvsP ? " " + hgvsP : "")};
+    }
+    // 2. g.HGVS (no transcript - intergenic, or annotation not run yet for this variant)
+    const g = _splitHgvs(hgvsG);
+    if (g && g.change.length <= REPRESENTATIVE_MAX_HGVS_CHARS) {
+        return {html: `<span class='rv-hgvs'>${escapeHtml(g.change)}</span> <span class='rv-sub'>${escapeHtml(chrom)}</span>`,
+                title: hgvsG};
+    }
+    // 3/4. Coordinate - symbolic as a span with the type, otherwise ref>alt with long alleles collapsed
+    if (chrom != null && position != null && alt != null) {
+        if (String(alt).startsWith("<")) {
+            const size = Math.abs(svlen || 0);
+            const end = position + size;
+            const svType = String(alt).slice(1, -1);
+            const html = `<span class='rv-hgvs'>${escapeHtml(chrom)}:${position}-${end}</span> <b>${escapeHtml(svType)}</b>`
+                       + (size ? ` <span class='rv-sub'>${_formatBases(size)}</span>` : '');
+            return {html: html, title: `${chrom}:${position}-${end} ${alt}`};
+        }
+        const title = `${chrom}:${position} ${ref}>${alt}`;
+        return {html: `<span class='rv-hgvs'>${escapeHtml(chrom)}:${position} ${escapeHtml(_formatAllele(ref))}&gt;${escapeHtml(_formatAllele(alt))}</span>`,
+                title: title};
+    }
+    // 5. Last resort while annotation is still running - the id the old details box linked to
+    return {html: `<span class='rv-sub'>v ${variantId}</span>`, title: `VariantGrid variant ${variantId}`};
+}
+
+// Mandatory Variant column. Reads VARIANT_COLUMN_ROW_FIELDS (snpdb/grid_columns/custom_columns.py).
+// Markup contract: .variant_id-container[variant_id] > input.variant-select (analysis only)
+//                  + a.variant-link (details; grid.js swaps its href to the full URL on right click).
+// Clicking the row itself expands it - @see variantGridRowDetail in grid.js
+VariantGridFormat.representativeVariant = (variantId, type, rowData, ctx) => {
+    const parts = [];
+    if (_isNodeVisible(ctx)) {
+        parts.push(`<input type='checkbox' class='variant-select' variant_id='${variantId}'>`);
+    }
+    const label = _representativeVariantLabel(variantId, rowData);
+    const detailsUrl = `javascript:load_variant_details(${variantId});`;
+    parts.push(`<a class='variant-link rv-label' title='${escapeHtml(label.title)}' href='${detailsUrl}' orig_href='${detailsUrl}'>${label.html}</a>`);
+    return `<span class='variant_id-container' variant_id='${variantId}'>${parts.join('')}</span>`;
 };
 
 

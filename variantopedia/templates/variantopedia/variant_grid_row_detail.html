@@ -1,0 +1,20 @@
+<div class="variant-row-detail-columns">
+  <table class="variant-row-detail-table">
+    {% if variant_annotation.hgvs_c %}<tr><th>Transcript</th><td class="mono">{{ variant_annotation.hgvs_c }}</td></tr>{% endif %}
+    {% if variant_annotation.hgvs_p %}<tr><th>Protein</th><td class="mono">{{ variant_annotation.hgvs_p }}</td></tr>{% endif %}
+    {% if variant_annotation.hgvs_g %}<tr><th>Genomic</th><td class="mono">{{ variant_annotation.hgvs_g }}</td></tr>{% endif %}
+    {% for build_variant in build_variants %}
+      <tr><th>{{ build_variant.any_genome_build }}</th><td class="mono">{{ build_variant.full_string }}</td></tr>
+    {% endfor %}
+    {% if clingen_allele %}<tr><th>ClinGen</th><td class="mono">{{ clingen_allele }}</td></tr>{% endif %}
+    <tr><th>VariantGrid</th><td class="mono">v {{ variant.pk }}</td></tr>
+  </table>
+  {% if transcript_annotations %}
+  <table class="variant-row-detail-table">
+    <tr><th colspan="2">Transcripts</th></tr>
+    {% for ta in transcript_annotations %}
+      <tr><td class="mono">{{ ta.hgvs_c }}</td><td class="mono text-muted">{{ ta.hgvs_p|default:"" }}</td></tr>
+    {% endfor %}
+  </table>
+  {% endif %}
+</div>

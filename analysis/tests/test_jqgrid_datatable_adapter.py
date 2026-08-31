@@ -33,7 +33,7 @@ class AdapterColumnsTest(GridExportTestCase):
 
     def test_column_shape(self):
         colmodels = [
-            {"name": "id", "label": "Variant", "formatter": "detailsLink", "width": 110,
+            {"name": "id", "label": "Variant", "formatter": "representativeVariant", "width": 280,
              "headerTitle": "The variant"},
             {"name": "tags_global", "label": "Tags", "classes": "no-word-wrap",
              "formatter": "tagsGlobalFormatter", "sortable": False},
@@ -42,7 +42,7 @@ class AdapterColumnsTest(GridExportTestCase):
         columns = datatable_columns_from_colmodels(colmodels)
 
         self.assertEqual(["id", "tags_global", "secret"], [c["data"] for c in columns])
-        self.assertEqual("VariantGridFormat.detailsLink", columns[0]["render"])
+        self.assertEqual("VariantGridFormat.representativeVariant", columns[0]["render"])
         self.assertEqual("The variant", columns[0]["headerTitle"])
         self.assertTrue(columns[0]["orderable"])  # jqGrid colmodels are sortable unless they say otherwise
 

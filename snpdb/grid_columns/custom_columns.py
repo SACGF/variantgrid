@@ -8,8 +8,41 @@ from annotation import vep_columns
 from annotation.models import AnnotationVersion
 from classification.models import ClassificationModification
 from library.jqgrid.jqgrid_sql import get_overrides
-from snpdb.models import CustomColumn, CustomColumnsCollection
+from snpdb.models import CustomColumn, CustomColumnsCollection, VariantGridColumn
 from snpdb.models.models_enums import ColumnAnnotationLevel
+
+# Row fields the client renderers read whichever columns the collection shows - they ride along hidden.
+# @see VariantGridFormat.representativeVariant / VariantGridFormat.classifications in variantgrid_formats.js
+VARIANT_COLUMN_ROW_FIELDS = [
+    "locus__contig__name",
+    "locus__position",
+    "locus__ref__seq",
+    "alt__seq",
+    "svlen",
+    "variantannotation__symbol",
+    "variantannotation__hgvs_c",
+    "variantannotation__hgvs_p",
+    "variantannotation__hgvs_g",
+]
+CLASSIFICATIONS_COLUMN_ROW_FIELDS = [
+    "clinvar__highest_pathogenicity",
+    "clinvar__clinical_significance",
+    "clinvar__review_status",
+]
+# The partner each composite column renderer pairs with its own value - the impact dot beside the
+# consequence, the population beside the popmax AF
+COMPOSITE_COLUMN_ROW_FIELDS = [
+    "variantannotation__impact",
+    "variantannotation__gnomad_popmax",
+]
+# These come from get_variantgrid_extra_annotate rather than the model, so they are colmodel-only
+# (not in the values() queryset)
+CLASSIFICATIONS_COLUMN_ROW_ANNOTATIONS = [
+    "internally_classified",
+    "max_internal_classification",
+    "internally_classified_somatic",
+    "max_internal_somatic_classification",
+]
 
 
 def get_custom_column_fields_override_and_sample_position(custom_columns_collection: CustomColumnsCollection,
@@ -52,24 +85,20 @@ def get_custom_column_fields_override_and_sample_position(custom_columns_collect
 
         override[f] = col_override
 
-    # Used by detailsLink() in JavaScript
-    ID_FORMATTER_REQUIRED_FIELDS = ["locus__contig__name",
-                                    "locus__position",
-                                    "clinvar__highest_pathogenicity",
-                                    "clinvar__clinical_significance"]
-    # These come from get_variantgrid_extra_annotate rather than the model, so mark them as
-    # annotations so they end up in the colmodel (for detailsLink) but not the values() queryset
-    ID_FORMATTER_REQUIRED_ANNOTATIONS = ["internally_classified",
-                                         "max_internal_classification",
-                                         "internally_classified_somatic",
-                                         "max_internal_somatic_classification"]
-    for field in ID_FORMATTER_REQUIRED_FIELDS + ID_FORMATTER_REQUIRED_ANNOTATIONS:
+    hidden_fields = VARIANT_COLUMN_ROW_FIELDS + CLASSIFICATIONS_COLUMN_ROW_FIELDS + COMPOSITE_COLUMN_ROW_FIELDS
+    # A hidden model field still gets a CSV header - use the catalogue label rather than the model
+    # verbose_name (locus__ref__seq and alt__seq are both 'seq')
+    hidden_labels = dict(VariantGridColumn.objects.filter(variant_column__in=hidden_fields)
+                         .values_list("variant_column", "label"))
+    for field in hidden_fields + CLASSIFICATIONS_COLUMN_ROW_ANNOTATIONS:
         if field not in fields:
             fields.append(field)
-            if field in ID_FORMATTER_REQUIRED_ANNOTATIONS:
+            if field in CLASSIFICATIONS_COLUMN_ROW_ANNOTATIONS:
                 ov = get_overrides([field], [{}], model_field=False, queryset_field=False)[field]
             else:
-                ov = override.get(field, {})
+                ov = {}
+                if label := hidden_labels.get(field):
+                    ov["label"] = label
             ov["hidden"] = True
             override[field] = ov
 

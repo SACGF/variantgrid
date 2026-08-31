@@ -860,8 +860,154 @@ table.variantgrid-datatable tbody td {
   line-height: 16px;
 }
 table.variantgrid-datatable .variant_id-container {
-  display: flex;
+  display: inline-flex;
   align-items: center;
+  gap: 4px;
+  min-width: 0;
+  max-width: calc(100% - 16px);
+}
+table.variantgrid-datatable .variant_id-container a.rv-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-decoration: none;
+}
+table.variantgrid-datatable .rv-gene {
+  font-weight: 600;
+}
+table.variantgrid-datatable .rv-hgvs {
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 11px;
+}
+table.variantgrid-datatable .rv-hgvs-p,
+table.variantgrid-datatable .rv-sub {
+  color: #777;
+  font-size: 11px;
+}
+table.variantgrid-datatable .cs-chips {
+  display: grid;
+  grid-template-columns: 74fr 52fr 60fr;
+  gap: 3px;
+  align-items: center;
+}
+table.variantgrid-datatable .cs-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-width: 0;
+  height: 16px;
+  line-height: 16px;
+  padding: 0 5px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #333;
+  vertical-align: middle;
+  text-decoration: none;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+table.variantgrid-datatable .cs-chip.cs-chip-empty {
+  background: transparent;
+  border: 1px dashed #ccc;
+  color: #bbb;
+  font-weight: 500;
+}
+table.variantgrid-datatable .cs-chip.allele-origin-G {
+  box-shadow: inset 3px 0 0 #88cc88;
+  padding-left: 7px;
+}
+table.variantgrid-datatable .cs-chip.allele-origin-S {
+  box-shadow: inset 3px 0 0 #cc99cc;
+  padding-left: 7px;
+}
+table.variantgrid-datatable .cs-chip .cs-chip-src {
+  font-size: 9px;
+  opacity: 0.6;
+  margin-right: 2px;
+}
+table.variantgrid-datatable .cs-chip .cs-chip-stars {
+  color: #d9a400;
+  font-size: 9px;
+  letter-spacing: -1px;
+}
+table.variantgrid-datatable .cs-chip .cs-chip-stars .off {
+  color: #ccc;
+}
+table.variantgrid-datatable .cs-chip .cs-chip-count {
+  font-size: 9px;
+  background: rgba(0, 0, 0, 0.08);
+  border-radius: 99px;
+  padding: 0 4px;
+}
+table.variantgrid-datatable .impact-consequence {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+table.variantgrid-datatable .impact-consequence .impact-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+}
+table.variantgrid-datatable .impact-consequence .impact-high {
+  background: #cf3f3a;
+}
+table.variantgrid-datatable .impact-consequence .impact-moderate {
+  background: #dd8a1c;
+}
+table.variantgrid-datatable .impact-consequence .impact-low {
+  background: #3f9a5e;
+}
+table.variantgrid-datatable .impact-consequence .impact-modifier {
+  background: #a0a8b3;
+}
+table.variantgrid-datatable .impact-consequence .impact-unknown {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px #ccc;
+}
+table.variantgrid-datatable .gnomad-popmax-pop {
+  color: #777;
+  font-size: 10px;
+}
+table.variantgrid-datatable.expandable td.toggle-link {
+  cursor: pointer;
+}
+table.variantgrid-datatable .variant-row-detail {
+  position: sticky;
+  left: 0;
+  width: max-content;
+  max-width: 90vw;
+  padding: 6px 10px;
+  font-size: 12px;
+  white-space: normal;
+}
+table.variantgrid-datatable .variant-row-detail .variant-row-detail-columns {
+  display: flex;
+  gap: 32px;
+  align-items: flex-start;
+}
+table.variantgrid-datatable .variant-row-detail .variant-row-detail-table th {
+  color: #777;
+  font-weight: 500;
+  padding-right: 10px;
+  white-space: nowrap;
+  text-align: left;
+}
+table.variantgrid-datatable .variant-row-detail .variant-row-detail-table .mono {
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 11px;
+}
+table.variantgrid-datatable .variant-row-detail .variant-row-detail-actions {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid #e1e5ea;
+  display: flex;
+  gap: 12px;
 }
 table.variantgrid-datatable td .external-link::after {
   content: none;
@@ -2771,47 +2917,47 @@ a .c-hgvs-body .c-hgvs-nomen {
   color: #555;
   font-weight: 600;
 }
-.c-pill.scs-none, .node-chip.scs-none, .c-pill.cs-none, .node-chip.cs-none {
+.c-pill.scs-none, .node-chip.scs-none, .cs-chip.scs-none, .c-pill.cs-none, .node-chip.cs-none, .cs-chip.cs-none {
   border: none !important;
   background-color: #eeeeee;
 }
-.c-pill.scs-tier_1, .node-chip.scs-tier_1 {
+.c-pill.scs-tier_1, .node-chip.scs-tier_1, .cs-chip.scs-tier_1 {
   background-color: #ffcccc;
 }
-.c-pill.scs-tier_1_or_2, .node-chip.scs-tier_1_or_2 {
+.c-pill.scs-tier_1_or_2, .node-chip.scs-tier_1_or_2, .cs-chip.scs-tier_1_or_2 {
   background-color: #ffd5d5;
 }
-.c-pill.scs-tier_2, .node-chip.scs-tier_2 {
+.c-pill.scs-tier_2, .node-chip.scs-tier_2, .cs-chip.scs-tier_2 {
   background-color: #ffdddd;
 }
-.c-pill.scs-tier_3, .node-chip.scs-tier_3 {
+.c-pill.scs-tier_3, .node-chip.scs-tier_3, .cs-chip.scs-tier_3 {
   background-color: #dddddd;
 }
-.c-pill.scs-tier_4, .node-chip.scs-tier_4 {
+.c-pill.scs-tier_4, .node-chip.scs-tier_4, .cs-chip.scs-tier_4 {
   background-color: #ccccff;
 }
-.c-pill.cs-b, .node-chip.cs-b {
+.c-pill.cs-b, .node-chip.cs-b, .cs-chip.cs-b {
   background-color: #ccccff;
 }
-.c-pill.cs-lb, .node-chip.cs-lb {
+.c-pill.cs-lb, .node-chip.cs-lb, .cs-chip.cs-lb {
   background-color: #ddddff;
 }
-.c-pill.cs-r, .node-chip.cs-r, .c-pill cs-dr, .node-chip cs-dr {
+.c-pill.cs-r, .node-chip.cs-r, .cs-chip.cs-r, .c-pill cs-dr, .node-chip cs-dr, .cs-chip cs-dr {
   background-color: #eeeeee;
 }
-.c-pill.cs-vus, .node-chip.cs-vus, .c-pill.cs-vus_a, .node-chip.cs-vus_a, .c-pill.cs-vus_b, .node-chip.cs-vus_b, .c-pill.cs-vus_c, .node-chip.cs-vus_c {
+.c-pill.cs-vus, .node-chip.cs-vus, .cs-chip.cs-vus, .c-pill.cs-vus_a, .node-chip.cs-vus_a, .cs-chip.cs-vus_a, .c-pill.cs-vus_b, .node-chip.cs-vus_b, .cs-chip.cs-vus_b, .c-pill.cs-vus_c, .node-chip.cs-vus_c, .cs-chip.cs-vus_c {
   background-color: #dddddd;
 }
-.c-pill.cs-lp, .node-chip.cs-lp, .c-pill.cs-lo, .node-chip.cs-lo {
+.c-pill.cs-lp, .node-chip.cs-lp, .cs-chip.cs-lp, .c-pill.cs-lo, .node-chip.cs-lo, .cs-chip.cs-lo {
   background-color: #ffdddd;
 }
-.c-pill.cs-p, .node-chip.cs-p, .c-pill.cs-o, .node-chip.cs-o {
+.c-pill.cs-p, .node-chip.cs-p, .cs-chip.cs-p, .c-pill.cs-o, .node-chip.cs-o, .cs-chip.cs-o {
   background-color: #ffcccc;
 }
-.c-pill.cs-pending, .node-chip.cs-pending {
+.c-pill.cs-pending, .node-chip.cs-pending, .cs-chip.cs-pending {
   background: repeating-linear-gradient(-45deg, #ddd, #ddd 10px, #eee 10px, #eee 20px);
 }
-.c-pill.cs-withdrawn, .node-chip.cs-withdrawn {
+.c-pill.cs-withdrawn, .node-chip.cs-withdrawn, .cs-chip.cs-withdrawn {
   opacity: 0.5;
 }
 

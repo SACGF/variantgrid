@@ -507,7 +507,12 @@ const DataTableDefinition = (function() {
             const expandFn = eval(this.serverParams.expandClientRenderer);
             const expandData = this.expandData;
 
-            dom.on('click', 'tr', function() {
+            dom.on('click', 'tr', function(event) {
+                // A click on a link or control belongs to it (the variant grids have a details link, a
+                // checkbox and tag links in every row) - only bare row space toggles
+                if ($(event.target).closest('a, input, button, select, label').length) {
+                    return;
+                }
                 const tr = $(this); //.closest('tr');
                 if (!tr.hasClass('odd') && !tr.hasClass('even')) {
                     // not a regular row
@@ -545,6 +550,9 @@ const DataTableDefinition = (function() {
                     tr.addClass('shown');
                 }
             });
+            if (this.serverParams.expandPrefetch === false) {
+                return;
+            }
             // PRE-FETCH data
             // if hovering over a single row for 500ms, pre-fetch the client data ready to display
             dom.on('mouseenter', 'tr', function() {

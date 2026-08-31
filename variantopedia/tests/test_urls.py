@@ -91,6 +91,8 @@ class Test(URLTestCase):
             ("view_allele", {"allele_id": self.allele.pk}, 200),
             ("variant_details_annotation_version", {"variant_id": self.variant.pk,
                                                     "annotation_version_id": self.annotation_version.pk}, 200),
+            ("variant_grid_row_detail", {"variant_id": self.variant.pk,
+                                         "annotation_version_id": self.annotation_version.pk}, 200),
             ('gene_coverage', {"gene_symbol_id": self.gene_symbol.symbol}, 200),
             ("variant_sample_information", {"variant_id": self.variant.pk,
                                             "genome_build_name": self.grch37.name}, 200),

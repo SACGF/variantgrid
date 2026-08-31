@@ -3,7 +3,7 @@ from functools import cached_property, reduce
 from typing import Any, Optional
 
 from django.conf import settings
-from django.db.models import F, IntegerField, OuterRef, QuerySet, StringAgg, Subquery, Value
+from django.db.models import Case, F, IntegerField, OuterRef, QuerySet, StringAgg, Subquery, Value, When
 from django.db.models.aggregates import Count, Max
 from django.db.models.fields import TextField
 from django.db.models.query_utils import Q
@@ -13,7 +13,8 @@ from django.urls import reverse
 from guardian.shortcuts import get_objects_for_user
 
 from annotation.annotation_version_querysets import get_queryset_for_latest_annotation_version
-from annotation.models import PATIENT_ONTOLOGY_TERM_PATH, ManualVariantEntryCollection
+from annotation.models import PATIENT_ONTOLOGY_TERM_PATH, AnnotationVersion, ManualVariantEntryCollection
+from annotation.models.models_enums import ClinVarReviewStatus
 from library.genomics.vcf_enums import INFO_LIFTOVER_SWAPPED_REF_ALT
 from library.jqgrid.jqgrid_user_row_config import JqGridUserRowConfig
 from library.unit_percent import get_allele_frequency_formatter
@@ -491,6 +492,7 @@ def server_side_format_annotsv_pathogenic_overlaps(row, field):
 
 class AbstractVariantGrid(JqGridUserRowConfig):
     model = Variant
+    VARIANT_COLUMN_SIDX = "id"  # the mandatory Variant column's colmodel name/index
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -500,9 +502,14 @@ class AbstractVariantGrid(JqGridUserRowConfig):
         overrides = {
             # Note:     client side formatters should only be used for adding links etc, never conversion of data, such as
             #           unit to percent, as the CSV downloads (w/o JS formatters) won't match the grid.
-            # Width fits detailsLink()'s boxes: select checkbox, details, ClinVar, germline + somatic
-            # internal classifications, IGV
-            'id': {'editable': False, 'width': 110, 'fixed': True, 'formatter': 'detailsLink', 'sorttype': 'int'},
+            # The representative variant cell: expand arrow, select checkbox, cascade label (details link)
+            'id': {'editable': False, 'width': 280, 'fixed': True, 'formatter': 'representativeVariant',
+                   'sorttype': 'int'},
+            'classifications': {
+                'model_field': False, 'queryset_field': False,
+                'name': 'classifications', 'index': 'classifications',
+                'classes': 'no-word-wrap', 'formatter': 'classificationsFormatter', 'sortable': False,
+            },
             'tags_global': {
                 'model_field': False, 'queryset_field': False,
                 'name': 'tags_global', 'index': 'tags_global',
@@ -526,6 +533,9 @@ class AbstractVariantGrid(JqGridUserRowConfig):
             'variantannotation__transcript_version__gene_version__hgnc__omim_ids': {'width': 60,
                                                                                     'formatter': 'omimLink'},
             'variantannotation__gnomad_filtered': {"formatter": "gnomadFilteredFormatter"},
+            # Composite cells - the partner value rides along hidden (COMPOSITE_COLUMN_ROW_FIELDS)
+            'variantannotation__consequence': {'width': 160, 'formatter': 'impactConsequenceFormatter'},
+            'variantannotation__gnomad_popmax_af': {'width': 110, 'formatter': 'gnomadPopmaxFormatter'},
             'variantannotation__exon': {"server_side_formatter": server_side_format_exon_and_intron},
             'variantannotation__intron': {"server_side_formatter": server_side_format_exon_and_intron},
             'variantannotation__mastermind_mmid3': {'formatter': 'formatMasterMindMMID3'},
@@ -558,7 +568,9 @@ class AbstractVariantGrid(JqGridUserRowConfig):
                 'variantannotation__gnomad_sas_af': {'server_side_formatter': server_side_format_unit_af},
                 'variantannotation__topmed_af': {'server_side_formatter': server_side_format_unit_af},
             }
-            overrides.update(af_override)
+            # Merge rather than replace - gnomad_popmax_af already carries its composite formatter
+            for field, field_override in af_override.items():
+                overrides.setdefault(field, {}).update(field_override)
         return overrides
 
     def _get_base_queryset(self) -> QuerySet:
@@ -566,7 +578,32 @@ class AbstractVariantGrid(JqGridUserRowConfig):
 
     def get_datatable_extra(self) -> dict:
         # gnomAD links are per genome build, and the client renderers have no other way to know it
-        return {"genomeBuild": self.genome_build.name}
+        return {"genomeBuild": self.genome_build.name,
+                "clinvarStars": dict(ClinVarReviewStatus.STARS)}
+
+    def _get_annotation_version(self) -> AnnotationVersion:
+        return self.annotation_version
+
+    def get_expand_client_renderer(self) -> str:
+        """ Row expansion (@see DataTableDefinition.setupClientExpend) - variantGridRowDetail in grid.js
+            fetches variant_grid_row_detail for the annotation version this grid is showing """
+        return f"variantGridRowDetail.bind(null, {self._get_annotation_version().pk})"
+
+    def _genomic_order_by(self, items: QuerySet, descending: bool) -> QuerySet:
+        """ The Variant column sorts in genome build order whatever it displays. Contig order is a CASE over
+            the build's standard contigs rather than a join through GenomeBuildContig - MT is shared between
+            builds and the join would return the row once per build. Non-standard contigs sort after, by id """
+        whens = [When(locus__contig_id=contig_id, then=Value(i))
+                 for i, contig_id in enumerate(self.genome_build.standard_contigs.values_list("pk", flat=True))]
+        items = items.annotate(_contig_order=Case(*whens, default=Value(len(whens)), output_field=IntegerField()))
+        fields = ["_contig_order", "locus__contig_id", "locus__position", "locus__ref__seq", "alt__seq", "pk"]
+        prefix = "-" if descending else ""
+        return items.order_by(*[f"{prefix}{f}" for f in fields])
+
+    def _sort_items(self, items, sidx, sord):
+        if sidx == self.VARIANT_COLUMN_SIDX:
+            return self._genomic_order_by(items, descending=sord == "desc")
+        return super()._sort_items(items, sidx, sord)
 
     def _get_permission_user(self):
         return self.user

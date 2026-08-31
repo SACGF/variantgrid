@@ -34,6 +34,7 @@ from annotation.models import (
     ClinVarRecordCollection,
     VariantAnnotation,
     VariantAnnotationVersion,
+    VariantTranscriptAnnotation,
 )
 from annotation.transcripts_annotation_selections import VariantTranscriptSelections
 from classification.enums import AlleleOriginBucket, ShareLevel, SpecialEKeys
@@ -442,6 +443,33 @@ def variant_tag_detail(request, variant_id, tag):
         "tag": tag,
     }
     return render(request, "variantopedia/variant_tag_detail.html", context)
+
+
+VARIANT_GRID_ROW_DETAIL_MAX_TRANSCRIPTS = 20
+
+
+def variant_grid_row_detail(request, variant_id: int, annotation_version_id: int):
+    """ The expanded row under a variant grid row - identifiers for the grid's annotation version.
+        @see variantGridRowDetail in grid.js """
+    variant = get_object_or_404(Variant, pk=variant_id)
+    annotation_version = get_object_or_404(AnnotationVersion, pk=annotation_version_id)
+    vav = annotation_version.variant_annotation_version
+    variant_annotation = VariantAnnotation.objects.filter(variant=variant, version=vav).first()
+    transcript_annotations = VariantTranscriptAnnotation.objects.filter(variant=variant, version=vav) \
+        .exclude(hgvs_c__isnull=True).order_by("hgvs_c").select_related("transcript_version")
+    # The representative transcript first, then the rest by accession
+    representative_transcript_version_id = variant_annotation.transcript_version_id if variant_annotation else None
+    transcript_annotations = sorted(transcript_annotations[:VARIANT_GRID_ROW_DETAIL_MAX_TRANSCRIPTS],
+                                    key=lambda ta: (ta.transcript_version_id != representative_transcript_version_id,
+                                                    ta.hgvs_c))
+    context = {
+        "variant": variant,
+        "variant_annotation": variant_annotation,
+        "transcript_annotations": transcript_annotations,
+        "build_variants": variant.all_build_variants,
+        "clingen_allele": variant.allele.clingen_allele if variant.allele else None,
+    }
+    return render(request, "variantopedia/variant_grid_row_detail.html", context)
 
 
 def view_variant(request, variant_id, genome_build_name=None):

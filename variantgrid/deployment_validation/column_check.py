@@ -12,7 +12,7 @@ def check_variantgrid_columns() -> dict:
         "",  # Blank
         "internally_classified", "internally_classified_labs", "max_internal_classification",
         "internally_classified_somatic", "max_internal_somatic_classification",
-        "tags", "tags_global",
+        "classifications", "tags", "tags_global",
         "global_variant_zygosity__hom_count", "global_variant_zygosity__ref_count",
         "global_variant_zygosity__unk_count", "global_variant_zygosity__het_count",
     }

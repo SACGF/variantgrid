@@ -109,6 +109,30 @@ function load_variant_details(variant_id) {
     editorContainer.load(variant_details_url);
 }
 
+// Expand renderer for the variant grids (@see AbstractVariantGrid.get_expand_client_renderer). The
+// identifiers come from the server for the grid's annotation version; the actions are built here so
+// IGV follows ANALYSIS_SETTINGS.show_igv_links like the rest of the page
+function variantGridRowDetail(annotationVersionId, rowData) {
+    const variantId = rowData["id"];
+    const detail = $('<div>', {class: 'variant-row-detail'});
+    const fragment = $('<div>', {class: 'variant-row-detail-fragment', text: 'Loading...'});
+    loadAjaxBlock(fragment, Urls.variant_grid_row_detail(variantId, annotationVersionId));
+
+    const actions = $('<div>', {class: 'variant-row-detail-actions'});
+    actions.append($('<a>', {href: `javascript:load_variant_details(${variantId});`, text: 'Details'}));
+    actions.append($('<a>', {href: Urls.view_variant(variantId), target: '_blank', text: 'Open in new tab'}));
+    const chrom = rowData["locus__contig__name"];
+    const position = rowData["locus__position"];
+    if (chrom != null && position != null) {
+        const igvUrl = createIgvUrl(`${chrom}:${position}`, 'getBams');  // null unless the analysis shows IGV links
+        if (igvUrl) {
+            actions.append($('<a>', {href: igvUrl, text: 'IGV'}));
+        }
+    }
+    detail.append(fragment, actions);
+    return detail;
+}
+
 function getAnalysisWindow() {
     let aWin = window;
     if (typeof _getAnalysisWindow !== "undefined") {
