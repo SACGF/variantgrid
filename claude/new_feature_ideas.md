@@ -49,29 +49,7 @@ The platform has impressive breadth — 12+ annotation sources, a DAG-based anal
 
 ### 2. Variant Reclassification Analytics Dashboard
 
-**What:** A set of charts and statistics mining the classification history across all labs, covering: VUS reclassification rates over time, inter-lab agreement rates per gene, time-to-reclassification distributions, most disputed variants/genes, and evidence key usage patterns.
-
-**Why this matters:** The "build a database to mine for insights" goal is currently aspirational. VariantGrid stores rich classification history but provides almost no analytical view of it. A research director or clinician can't answer "which genes in our panel have the most VUS?", "how often do we reclassify?", or "which ACMG criteria does our lab apply most differently from others?" without writing SQL queries.
-
-**What already exists:**
-- `ClassificationModification` records every change with timestamp and clinical significance
-- Evidence JSON is stored per modification — key usage is queryable
-- `DiscordanceReport` tracks inter-lab disagreements
-- Lab/organisation hierarchy is in place
-- The classification app already has some graphs (graphs page referenced in issues)
-
-**What needs building:**
-- A dedicated analytics page (or section on the existing graphs page)
-- Pre-computed summary statistics (materialised via Celery beat — expensive to compute on the fly)
-- Charts: VUS reclassification rate by month/gene, lab agreement heatmap by gene, evidence key usage bar chart (which criteria are used most/least)
-- An "insights" panel on the gene page: "15 labs have classified variants in BRCA2 — 40% pathogenic, 35% VUS, 25% benign"
-- Filtering by date range, lab, gene panel, condition
-
-**Effort:** Medium. Most data is in the database. The main work is aggregation queries (with appropriate privacy/permission scoping) and the visualisation layer.
-
-**Benefit:** High for research and quality improvement. Shows the platform is generating knowledge, not just storing it. Valuable for grant reporting, lab audits, and identifying genes that need more consensus work.
-
----
+This has been done
 
 ### 3. Per-Sample QC Dashboard
 
@@ -154,26 +132,7 @@ The platform has impressive breadth — 12+ annotation sources, a DAG-based anal
 
 ### 6. Gene Page: Classification Summary Counts
 
-**What:** Add pathogenicity summary counts (total B / LB / VUS / LP / P) above the existing classification groupings datatable on the gene page.
-
-**Why this matters:** The full classification grid already exists on the gene page — labs can see every classified variant. But there's no at-a-glance answer to "how many pathogenic variants does our database have for BRCA2?" A scientist opening the gene page to classify a new variant wants that number immediately, not after scrolling a potentially long table.
-
-**What already exists:**
-- Full `ClassificationGrouping` datatable on the gene page (rendered via `{% classification_groupings %}` template tag)
-- `ClassificationClassificationBucket` enum with BENIGN / VUS / PATHOGENIC buckets
-- `GeneSymbolViewInfo` cached properties pattern — a natural place to add count queries
-- The data is all queryable via `GeneSymbol` → `Transcript` → `Allele` → `Classification`
-
-**What needs building:**
-- A count query in `GeneSymbolViewInfo` grouped by clinical significance bucket, respecting share-level permissions
-- A small summary row above the datatable: e.g. "Pathogenic: 12 · Likely Pathogenic: 8 · VUS: 34 · Likely Benign: 5 · Benign: 11"
-- Optionally split by allele origin (germline vs. somatic) since the filter already exists on that page
-
-**Effort:** Small. The query is straightforward; the rendering is a few lines of template. The permission scoping is the most careful part.
-
-**Benefit:** Medium-High. High-value information surfaced with minimal effort. Immediately useful when curating a new variant in a gene the lab has history with.
-
----
+Raised as separate issue #1803
 
 ### 7. Classification Completeness Scorer
 
