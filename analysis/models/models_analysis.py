@@ -337,6 +337,15 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel, Previe
                 av.node = new_node
                 av.save()
 
+            if source_config := AnalysisNodeCountConfiguration.objects.filter(analysis_id=analysis_id).first():
+                # An empty record set is a real setting (every count switched off), so copy the
+                # configuration itself - falling back to the defaults would be a different analysis
+                config_copy = AnalysisNodeCountConfiguration.objects.create(analysis=analysis_copy)
+                for record in source_config.analysisnodecountconfigrecord_set.all().order_by("sort_order"):
+                    record.pk = None
+                    record.node_count_config = config_copy
+                    record.save()
+
         return analysis_copy
 
     def get_toolbar_warnings(self, user: User) -> list[str]:

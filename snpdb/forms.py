@@ -361,12 +361,13 @@ EXTRACTION_MATCH_FIELDS = ('extraction_reference', 'extraction_match_status',
 
 class SampleForm(forms.ModelForm, ROFormMixin):
     genome_build = forms.CharField()  # From VCF.genome_build
+    uploaded_by = forms.CharField()  # From VCF.user
     grid_sample_label = forms.CharField(help_text="Calculated from your current user settings. May be different in analysis due to analysis settings")
 
     class Meta:
         model = models.Sample
         exclude = ['vcf', 'has_genotype']
-        read_only = ('genome_build', 'vcf_sample_name', 'import_status',
+        read_only = ('genome_build', 'uploaded_by', 'vcf_sample_name', 'import_status',
                      'grid_sample_label') + EXTRACTION_MATCH_FIELDS
         widgets = {'vcf_sample_name': TextInput(),
                    'name': TextInput(),
@@ -383,6 +384,7 @@ class SampleForm(forms.ModelForm, ROFormMixin):
         super().__init__(*args, **kwargs)
         self.order_fields(self._field_order())
         self.fields['genome_build'].initial = self.instance.vcf.genome_build
+        self.fields['uploaded_by'].initial = self.instance.vcf.user
         self.fields['grid_sample_label'].initial = self._get_sample_label(user, self.instance)
 
     def _field_order(self) -> list[str]:
