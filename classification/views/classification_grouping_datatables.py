@@ -6,6 +6,9 @@ from django.conf import settings
 from django.db.models import Q, QuerySet
 from django.http import HttpRequest
 from more_itertools import first
+from rest_framework.request import Request
+from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from classification.enums import (
     AlleleOriginBucket,
@@ -455,3 +458,16 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
                 default_sort=SortOrder.DESC
             )
         ]
+
+
+class ClassificationGroupingCountsView(APIView):
+    """
+    Clinical significance counts for exactly the rows the grouping datatable would return, so the summary above
+    a grid stays in step with the filters applied to it.
+    """
+
+    def get(self, request: Request, *args, **kwargs) -> Response:
+        columns = ClassificationGroupingColumns(request)
+        qs = columns.filter_queryset(columns.get_initial_queryset())
+        counts = ClassificationGrouping.clinical_significance_counts(qs)
+        return Response({"counts": [count.to_json() for count in counts]})

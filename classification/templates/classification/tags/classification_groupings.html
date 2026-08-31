@@ -7,13 +7,33 @@
 
     function classificationGroupingRedraw() {
         $('#vc-datatable').DataTable().ajax.reload();
+        classificationGroupingSummaryLoad();
     }
     var debounceClassificationGroupingRedraw = debounce(classificationGroupingRedraw);
+
+    function classificationGroupingSummaryLoad() {
+        let summary = $('#classification-grouping-summary');
+        if (!summary.length) {
+            return;
+        }
+        let data = {};
+        classificationGroupingFilter(data);
+        $.getJSON("{% url 'classification_grouping_counts' %}", data, (response) => {
+            summary.empty();
+            for (let entry of response.counts) {
+                $('<div>', {class: 'summary-count'})
+                    .append($('<span>', {class: 'c-pill cs ' + entry.css_class, text: entry.label}))
+                    .append($('<span>', {class: 'count', text: entry.count.toLocaleString()}))
+                    .appendTo(summary);
+            }
+        });
+    }
 
     $(document).ready(() => {
         $('.filter').on("change", function() {
             classificationGroupingRedraw();
         });
+        $('#vc-datatable').on('init.dt', classificationGroupingSummaryLoad);
     });
 
     function classificationGroupingFilter(data) {
@@ -53,6 +73,9 @@
                 <div class="mr-2 mt-1">Allele Origin</div>
                 {% allele_origin_toggle show_label=False %}
             </div>
+        {% endif %}
+        {% if show_summary_counts %}
+            <div id="classification-grouping-summary" class="classification-grouping-summary"></div>
         {% endif %}
         <table id="vc-datatable" data-datatable-data='classificationGroupingFilter' data-datatable-url="{% url 'classification_grouping_datatables' %}?genome_build={{ genome_build.pk }}" class="sticky-header classification-table"></table>
         <div>

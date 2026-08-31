@@ -2803,6 +2803,32 @@ a .c-hgvs-body .c-hgvs-nomen {
   opacity: 0.5;
 }
 
+.classification-grouping-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.classification-grouping-summary .summary-count {
+  display: flex;
+  align-items: stretch;
+  white-space: nowrap;
+}
+.classification-grouping-summary .summary-count .c-pill {
+  width: auto;
+  min-width: 90px;
+  border-radius: 6px 0 0 6px;
+}
+.classification-grouping-summary .summary-count .count {
+  padding: 4px 10px;
+  border: 1px solid #ddd;
+  border-left: none;
+  border-radius: 0 6px 6px 0;
+  background-color: #fafafa;
+  color: #555;
+  font-weight: 600;
+}
+
 .cs-card {
   text-align: center;
   padding: 0 10px 16px 10px;
