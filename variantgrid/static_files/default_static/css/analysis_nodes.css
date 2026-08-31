@@ -894,14 +894,21 @@ span.node-counts {
 }
 
 /* Node counts legend - moved into the toolbar (see layoutAnalysisPanels), so it reads as a single row */
+.analysis-horizontal #analysis-toolbar {
+	position: relative;  /* anchor for the node counts legend */
+}
+
 .analysis-horizontal #node-count-legend {
-	position: static;
-	float: none;  /* #analysis-toolbar floats its divs - this one sits inline after the genome build */
-	display: inline-flex;
+	position: absolute;
+	right: 10px;
+	top: 50%;
+	transform: translateY(-50%);
+	bottom: auto;
+	left: auto;
+	float: none;  /* #analysis-toolbar floats its divs - this one is right justified on its own */
+	display: flex;
 	align-items: center;
-	vertical-align: middle;
 	gap: 12px;
-	margin-left: 15px;
 	height: auto;
 }
 
