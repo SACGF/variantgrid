@@ -150,8 +150,15 @@ class OverlapColumns(DatatableConfig[ClassificationGrouping]):
                     overlap=OuterRef('pk')
                 ).annotate(max_status=Max('next_step')).values_list('max_status')[:1]
             ))
-        elif self.get_query_param("skew_status") == "X":  # show all overlaps
+        elif self.get_query_param("skew_status") == "X":  # show all overlaps (don't care about next step)
             qs = qs.filter(overlap_status__gt=OverlapStatus.SINGLE_SUBMITTER)
+            qs = qs.annotate(skew_status=Subquery(
+                OverlapContributionSkew.objects.filter(lab_filter_q).filter(
+                    overlap=OuterRef('pk')
+                ).annotate(max_status=Max('next_step')).values_list('max_status')[:1]
+            ))
+        elif self.get_query_param("skew_status") == "V":  # V for VUS (don't care about next step)
+            qs = qs.filter(overlap_status__gt=OverlapStatus.SINGLE_SUBMITTER, all_vus=True)
             qs = qs.annotate(skew_status=Subquery(
                 OverlapContributionSkew.objects.filter(lab_filter_q).filter(
                     overlap=OuterRef('pk')

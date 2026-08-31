@@ -148,6 +148,7 @@ class OverlapState(DataClassJsonMixin):
     has_pending_values: bool = False
     override_status: OverlapOverrideStatus = OverlapOverrideStatus.NO_OVERRIDE
     lab_groups: list[str] = field(default_factory=list)
+    all_vus: bool = False
 
     @property
     def label(self):

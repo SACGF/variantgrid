@@ -165,6 +165,7 @@ class OverlapContribution(TimeStampedModel):
     def conditions(self) -> Optional[ConditionResolved]:
         # TODO, should this be cached?
         if classification_grouping := self.classification_grouping:
+            return classification_grouping.conditions_obj
             return ConditionResolved.from_dict(classification_grouping.conditions)
         elif scv := self.scv:
             if record := ClinVarRecord.objects.filter(record_id=scv).first():
@@ -237,6 +238,7 @@ class Overlap(TimeStampedModel, ReviewableModelMixin, PreviewModelMixin):
     tumor_type_category = models.TextField(null=True, blank=True)  # condition isn't always relevant
     overlap_status = IntegerFieldChoices(choices_type=OverlapStatus, default=OverlapStatus.NO_CONTRIBUTIONS.value)  # type:OverlapStatus
     has_pending_values = models.BooleanField(default=False, blank=True)  # if
+    all_vus = models.BooleanField(default=False, blank=True)
 
     overlap_override_status = IntegerFieldChoices(choices_type=OverlapOverrideStatus, default=OverlapOverrideStatus.NO_OVERRIDE)  # type:OverlapOverrideStatus
 
@@ -248,7 +250,6 @@ class Overlap(TimeStampedModel, ReviewableModelMixin, PreviewModelMixin):
 
     @property
     def cached_overlap_state_obj(self) -> OverlapState:
-        print(self.cached_overlap_state)
         return OverlapState.from_dict(self.cached_overlap_state)
 
     @cached_overlap_state_obj.setter

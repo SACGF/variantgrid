@@ -29,9 +29,11 @@ class OverlapCalculatorBase(ABC):
 
     @classmethod
     def calculate_entries(cls, entries: Iterable[OverlapContribution]) -> OverlapState:
+        override_status: Optional[OverlapOverrideStatus] = OverlapOverrideStatus.NO_OVERRIDE
         non_comparable_values: int = 0
         contributing: list[OverlapContribution] = []
         involved_labs: list[str] = []
+        overlap_status: OverlapStatus
 
         for entry in entries:
 
@@ -50,19 +52,18 @@ class OverlapCalculatorBase(ABC):
         has_pending_values = any(con.is_amending for con in contributing)
         if len(contributing) == 0:
             if non_comparable_values > 0:
-                return OverlapState(OverlapStatus.NO_COUNTING_CONTRIBUTIONS, has_pending_values=has_pending_values, lab_groups=involved_labs)
+                overlap_status = OverlapStatus.NO_COUNTING_CONTRIBUTIONS
             else:
-                return OverlapState(OverlapStatus.NO_CONTRIBUTIONS, has_pending_values=has_pending_values, lab_groups=involved_labs)
+                overlap_status = OverlapStatus.NO_CONTRIBUTIONS
         elif len(contributing) == 1:
-            return OverlapState(OverlapStatus.SINGLE_SUBMITTER, has_pending_values=has_pending_values, lab_groups=involved_labs)
+            overlap_status = OverlapStatus.SINGLE_SUBMITTER
         else:
             override_value: OverlapOverrideStatus = OverlapOverrideStatus.NO_OVERRIDE
             all_values = set(con.effective_value for con in contributing)
-            base_value: OverlapStatus
             if len(all_values) == 1:
-                base_value = OverlapStatus.EXACT_AGREEMENT
+                overlap_status = OverlapStatus.EXACT_AGREEMENT
             else:
-                base_value = cls.calculate_status_for_multiple_entries(all_values)
+                overlap_status = cls.calculate_status_for_multiple_entries(all_values)
 
             third_party = [con for con in contributing if con.triage_state_obj.status == TriageStatus.NON_INTERACTIVE_THIRD_PARTY]
             interactive_contributors = [con for con in contributing if con.triage_state_obj.status != TriageStatus.NON_INTERACTIVE_THIRD_PARTY]
@@ -72,10 +73,10 @@ class OverlapCalculatorBase(ABC):
                 all_complex = all(con.triage_state_obj.status == TriageStatus.COMPLEX for con in interactive_contributors)
 
                 if all_complex:
-                    override_value = OverlapOverrideStatus.COMPLEX
-                elif base_value.is_discordant:
+                    override_status = OverlapOverrideStatus.COMPLEX
+                elif overlap_status.is_discordant:
                     if all_matching_reviewed_value:
-                        override_value = OverlapOverrideStatus.CONTINUED_DISCORDANCE
+                        override_status = OverlapOverrideStatus.CONTINUED_DISCORDANCE
                     else:
                         # see if it's ClinVar that's making the over discordant
                         non_clinvar_values = set(con.effective_value for con in interactive_contributors)
@@ -86,11 +87,11 @@ class OverlapCalculatorBase(ABC):
                                 max_clinvar_date = max(con.effective_date_obj for con in third_party)
                                 max_classification_date = max(con.effective_date_obj for con in interactive_contributors)
                                 if max_clinvar_date < max_classification_date:
-                                    override_value = OverlapOverrideStatus.IGNORING_OLD_CLINVAR
+                                    override_status = OverlapOverrideStatus.IGNORING_OLD_CLINVAR
                                 elif all(con.triage_state_obj.status == TriageStatus.REVIEWED_SATISFACTORY for con in interactive_contributors):  # all confident
-                                    override_value = OverlapOverrideStatus.CONFIDENT_VS_CLINVAR
+                                    override_status = OverlapOverrideStatus.CONFIDENT_VS_CLINVAR
 
-            return OverlapState(base_value, has_pending_values, override_value, lab_groups=involved_labs)
+        return OverlapState(status=overlap_status, has_pending_values=has_pending_values, override_status=override_status, lab_groups=involved_labs)
 
     @classmethod
     @abstractmethod
@@ -147,6 +148,29 @@ class OverlapCalculatorOncPath(OverlapCalculatorBase):
     @classmethod
     def value_from_summary(cls, summary: ClassificationSummaryCacheObj) -> Optional[str]:
         return summary.pathogenicity.classification
+
+    @classmethod
+    def calculate_entries(cls, entries: Iterable[OverlapContribution]) -> OverlapState:
+        overlap_state = super().calculate_entries(entries)
+        if OverlapStatus.SINGLE_SUBMITTER <= overlap_state.status <= OverlapStatus.RESOLUTION_DIFFERENCES:
+            all_vus = True
+            for entry in entries:
+                match entry.contribution_status:
+                    case OverlapContributionStatus.CONTRIBUTING:
+                        # checking for text VUS is a little messy
+                        if entry.value and "VUS" not in entry.value.upper():
+                            all_vus = False
+                            break
+
+            if all_vus:
+                overlap_state = OverlapState(
+                    status=overlap_state.status,
+                    has_pending_values=overlap_state.has_pending_values,
+                    override_status=overlap_state.override_status,
+                    lab_groups=overlap_state.lab_groups,
+                    all_vus=True
+                )
+        return overlap_state
 
     @classmethod
     def calculate_status_for_multiple_entries(cls, values: set[str]) -> OverlapStatus:

@@ -375,6 +375,9 @@ class ConditionResolved:
 
     @staticmethod
     def from_dict(condition_dict: ConditionResolvedDict) -> 'ConditionResolved':
+        if not condition_dict:
+            return ConditionResolved(references=[])
+
         join: Optional['MultiCondition'] = None
         plain_text = condition_dict.get("display_text")
 

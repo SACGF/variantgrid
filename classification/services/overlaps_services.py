@@ -301,6 +301,7 @@ class OverlapServices:
             overlap.has_pending_values = overlap_status_calculation.has_pending_values
             overlap.overlap_max_ever_status = max(overlap.overlap_max_ever_status, overlap_status_calculation.status)
             overlap.overlap_override_status = overlap_status_calculation.override_status
+            overlap.all_vus = overlap_status_calculation.all_vus
             overlap.cached_overlap_state_obj = overlap_status_calculation
 
             overlap.overlap_status_change_timestamp = now()
