@@ -215,7 +215,7 @@ class ClinVarNode(SignificanceFilterNodeMixin, AnalysisNode):
     @staticmethod
     def get_help_text() -> str:
         return "Variants ClinVar has a record for. Filters its parent, or set Input to " \
-               "'Matching variants' to read ClinVar directly."
+               "'All records in ClinVar' to read ClinVar directly."
 
     @staticmethod
     def get_node_class_label():

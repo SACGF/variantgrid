@@ -134,3 +134,59 @@ class ClinVarNodeFormVariationIdsTest(AnalysisSetupMixin, TestCase):
     def test_non_numeric_rejected(self):
         form = self._clean_variation_ids("12345, banana")
         self.assertIn("variation_ids", form.errors)
+
+
+class ClinVarNodeFormRememberedPillsTest(AnalysisSetupMixin, TestCase):
+    """ The greyed-out pills for the origin the node isn't filtering on are disabled, so they don't post -
+        the form has to keep the stored values rather than let them clear to False """
+
+    def _save(self, node, allele_origin, **data):
+        form = ClinVarNodeForm(data={"allele_origin": allele_origin,
+                                     "node_input": NodeMatchInput.MATCHING_VARIANTS,
+                                     "stars_min": 0, "variation_ids": "", **data},
+                               instance=node)
+        self.assertTrue(form.is_valid(), form.errors)
+        return form.save()
+
+    def test_germline_pills_survive_saving_in_somatic_mode(self):
+        node = ClinVarNode.objects.create(analysis=self.analysis)
+        self._save(node, AlleleOriginFilterDefault.SHOW_ALL,
+                   germline_pathogenic="on", germline_likely_pathogenic="on",
+                   somatic_tier_1="on", oncogenicity_oncogenic="on")
+        node.refresh_from_db()
+        self.assertFalse(node.germline_uncertain)
+
+        # Somatic mode posts no germline pills at all - they should be left as they were
+        self._save(node, AlleleOriginFilterDefault.SOMATIC, somatic_tier_2="on")
+        node.refresh_from_db()
+        self.assertTrue(node.germline_pathogenic)
+        self.assertTrue(node.germline_likely_pathogenic)
+        self.assertFalse(node.germline_uncertain)
+        self.assertTrue(node.somatic_tier_2)
+        self.assertFalse(node.somatic_tier_1)
+
+    def test_somatic_pills_survive_saving_in_germline_mode(self):
+        node = ClinVarNode.objects.create(analysis=self.analysis)
+        self._save(node, AlleleOriginFilterDefault.SHOW_ALL,
+                   germline_pathogenic="on", somatic_tier_1="on", oncogenicity_oncogenic="on")
+
+        self._save(node, AlleleOriginFilterDefault.GERMLINE, germline_benign="on")
+        node.refresh_from_db()
+        self.assertTrue(node.somatic_tier_1)
+        self.assertTrue(node.oncogenicity_oncogenic)
+        self.assertFalse(node.oncogenicity_benign)
+        self.assertTrue(node.germline_benign)
+        self.assertFalse(node.germline_pathogenic)
+
+    def test_show_all_saves_every_pill(self):
+        node = ClinVarNode.objects.create(analysis=self.analysis)
+        self._save(node, AlleleOriginFilterDefault.SHOW_ALL, germline_pathogenic="on", somatic_tier_1="on")
+        node.refresh_from_db()
+        self.assertTrue(node.germline_pathogenic)
+        self.assertTrue(node.somatic_tier_1)
+        self.assertFalse(node.oncogenicity_oncogenic)
+
+    def test_matching_variants_label_names_the_source(self):
+        form = ClinVarNodeForm(instance=ClinVarNode(analysis=self.analysis))
+        choices = dict(form.fields["node_input"].choices)
+        self.assertEqual(choices[NodeMatchInput.MATCHING_VARIANTS], "All records in ClinVar (no parent)")

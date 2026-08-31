@@ -10,7 +10,7 @@ from django.utils.text import slugify
 
 from analysis import models
 from analysis.models import Analysis, AnalysisNode, AnalysisTemplateType, MOINode
-from analysis.models.enums import SampleNodeSourceLevel
+from analysis.models.enums import NodeMatchInput, SampleNodeSourceLevel
 from analysis.variant_text import resolve_variant_text
 from analysis.models.nodes.analysis_node import NodeAlleleFrequencyFilter, NodeVCFFilter
 from analysis.models.nodes.filters.classifications_node import ClassificationsNode
@@ -48,6 +48,7 @@ from ontology.models import OntologyTerm
 from patients.models_enums import GnomADPopulation
 from snpdb.forms import GenomeBuildAutocompleteForwardMixin
 from snpdb.models import Lab, Sample, Tag, VCFFilter
+from snpdb.models.models_enums import AlleleOriginFilterDefault
 from snpdb.models.models_genome import Contig
 from uicore.widgets.date_widget import NativeDateInput
 
@@ -239,7 +240,40 @@ class BuiltInFilterNodeForm(BaseNodeForm):
                    "cosmic_count_min": HiddenInput(attrs={"min": 0, "max": 50, "step": 1})}
 
 
-class ClassificationsNodeForm(BaseNodeForm):
+class SignificanceFilterFormMixin:
+    """ The editor greys out the pill row for the origin the node isn't filtering on, and disabled pills
+        don't post - keep the stored values so switching the origin back restores what was on """
+    GERMLINE_FIELDS: tuple[str, ...] = ()
+    SOMATIC_FIELDS: tuple[str, ...] = ()
+    MATCHING_VARIANTS_LABEL: str = ""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # The enum is shared, so each node names the source it reads when it has no parent
+        self.fields["node_input"].choices = [
+            (value, self.MATCHING_VARIANTS_LABEL if value == NodeMatchInput.MATCHING_VARIANTS else label)
+            for value, label in NodeMatchInput.choices
+        ]
+
+    def clean(self):
+        cleaned_data = super().clean()
+        allele_origin = cleaned_data.get("allele_origin")
+        if allele_origin == AlleleOriginFilterDefault.SOMATIC:
+            remembered_fields = self.GERMLINE_FIELDS
+        elif allele_origin == AlleleOriginFilterDefault.GERMLINE:
+            remembered_fields = self.SOMATIC_FIELDS
+        else:
+            remembered_fields = ()
+        for field in remembered_fields:
+            cleaned_data[field] = getattr(self.instance, field)
+        return cleaned_data
+
+
+class ClassificationsNodeForm(SignificanceFilterFormMixin, BaseNodeForm):
+    GERMLINE_FIELDS = tuple(ClassificationsNode.FIELD_CLINICAL_SIGNIFICANCE)
+    SOMATIC_FIELDS = tuple(ClassificationsNode.FIELD_SOMATIC_CLINICAL_SIGNIFICANCE)
+    MATCHING_VARIANTS_LABEL = "All classifications in this database (no parent)"
+
     lab = forms.ModelMultipleChoiceField(queryset=Lab.objects.all(),
                                          required=False,
                                          widget=ModelSelect2Multiple(url='lab_autocomplete',
@@ -267,7 +301,11 @@ class ClassificationsNodeForm(BaseNodeForm):
         return node
 
 
-class ClinVarNodeForm(BaseNodeForm):
+class ClinVarNodeForm(SignificanceFilterFormMixin, BaseNodeForm):
+    GERMLINE_FIELDS = tuple(ClinVarNode.FIELD_PATHOGENICITY)
+    SOMATIC_FIELDS = tuple(ClinVarNode.FIELD_SOMATIC_TIER) + tuple(ClinVarNode.FIELD_ONCOGENICITY)
+    MATCHING_VARIANTS_LABEL = "All records in ClinVar (no parent)"
+
     variation_ids = forms.CharField(required=False, label="ClinVar variation IDs",
                                     widget=TextInput(attrs={'placeholder': 'eg 12345, 67890'}))
 

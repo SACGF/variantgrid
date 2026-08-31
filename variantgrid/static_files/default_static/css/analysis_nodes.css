@@ -1087,6 +1087,18 @@ span.node-counts {
 	opacity: 0.35;
 }
 
+/* The row for the origin the node isn't filtering on - greyed off so it's clear it isn't applied */
+.significance-pills.origin-disabled .row-label {
+	opacity: 0.5;
+}
+
+.significance-pills.origin-disabled label.pill-toggle {
+	opacity: 0.3;
+	filter: grayscale(1);
+	cursor: default;
+	pointer-events: none;
+}
+
 .clinvar-row {
 	margin: 4px 0;
 }
