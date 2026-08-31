@@ -15,8 +15,8 @@
 {# venn_intersect.js builds its SVG through svgSelect #}
 <script type="text/javascript" src="{% static 'js/global.js' %}"></script>
 {% include "analysis/analysis_includes.html" %}
-{# Node editor titles use the badge symbols, which normally come from the analysis page #}
-{% include "analysis/tags/node_icon_sprite.html" %}
+{# Node editor titles use the badge symbols, which normally come from the page base #}
+{% include "uicore/tags/svg_icon_sprite.html" %}
 {% endif %}
 <script>
 	var GRID = "grid";

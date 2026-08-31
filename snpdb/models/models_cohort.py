@@ -25,7 +25,7 @@ from library.django_utils.django_partition import RelatedModelsPartitionModel
 from library.django_utils.django_postgres import PostgresRealField
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsAutoInitialSaveMixin
 from library.guardian_utils import DjangoPermission
-from library.preview_request import PreviewKeyValue, PreviewModelMixin
+from library.preview_request import PreviewKeyValue, PreviewModelMixin, SvgSymbolPreviewIconMixin
 from library.utils import invert_dict
 from patients.models_enums import Zygosity
 from snpdb.models.models_enums import CohortGenotypeCollectionType, ImportStatus, ProcessingStatus
@@ -82,7 +82,7 @@ class Cohort(GuardianPermissionsAutoInitialSaveMixin, PreviewModelMixin, SortByP
 
     @classmethod
     def preview_icon(cls) -> str:
-        return "fa-solid fa-people-arrows"
+        return "fa-solid fa-users"  # CohortNode wears this too - see get_node_class_icon
 
     @classmethod
     def preview_if_url_visible(cls) -> str:
@@ -821,7 +821,8 @@ class FamilyGroupMixin:
         return self.name or f"{type(self).__name__} {self.pk}"
 
 
-class Trio(FamilyGroupMixin, GuardianPermissionsAutoInitialSaveMixin, PreviewModelMixin, SortByPKMixin, TimeStampedModel):
+class Trio(FamilyGroupMixin, GuardianPermissionsAutoInitialSaveMixin, SvgSymbolPreviewIconMixin, PreviewModelMixin,
+           SortByPKMixin, TimeStampedModel):
     """ A simple pedigree used frequently for Mendellian disease (TrioNode in analysis)
         and karyomapping """
     name = models.TextField(blank=True)
@@ -832,6 +833,8 @@ class Trio(FamilyGroupMixin, GuardianPermissionsAutoInitialSaveMixin, PreviewMod
     father = models.ForeignKey(CohortSample, related_name='trio_father', on_delete=CASCADE)
     father_affected = models.BooleanField(default=False)
     proband = models.ForeignKey(CohortSample, related_name='trio_proband', on_delete=CASCADE)
+
+    preview_icon_symbol = "node-icon-trio"  # TrioNode wears this too - see get_node_class_icon
 
     @classmethod
     def preview_if_url_visible(cls) -> str:
@@ -847,7 +850,8 @@ class Trio(FamilyGroupMixin, GuardianPermissionsAutoInitialSaveMixin, PreviewMod
         return reverse('trios')
 
 
-class Quad(FamilyGroupMixin, GuardianPermissionsAutoInitialSaveMixin, PreviewModelMixin, SortByPKMixin, TimeStampedModel):
+class Quad(FamilyGroupMixin, GuardianPermissionsAutoInitialSaveMixin, SvgSymbolPreviewIconMixin, PreviewModelMixin,
+           SortByPKMixin, TimeStampedModel):
     """Mother + Father + Proband + Sibling.
 
     Extends the Trio concept to 4 family members. The sibling (typically
@@ -864,6 +868,8 @@ class Quad(FamilyGroupMixin, GuardianPermissionsAutoInitialSaveMixin, PreviewMod
     proband = models.ForeignKey(CohortSample, related_name='quad_proband', on_delete=CASCADE)
     sibling = models.ForeignKey(CohortSample, related_name='quad_sibling', on_delete=CASCADE)
     sibling_affected = models.BooleanField(default=False)
+
+    preview_icon_symbol = "node-icon-quad"  # QuadNode wears this too - see get_node_class_icon
 
     @classmethod
     def preview_if_url_visible(cls) -> str:

@@ -3,6 +3,7 @@
     {% load static %}
     {% load js_tags %}
     {% load related_analyses_tags %}
+    {% load ui_utils %}
     {# styles/code for analysis_output_node_downloads - but display here so only done once #}
     <link rel="stylesheet" href="{% static 'css/analysis_nodes.css' %}">
     <style>
@@ -121,7 +122,7 @@
             <tbody>
         {% for analysis, sample_info in analysis_details %}
             <tr> 
-            <td><i class="{{ analysis.preview_icon }}"></i> <a href="{% url 'analysis' analysis.pk %}">{{ analysis.pk }} - {{ analysis }}</a>
+            <td>{% preview_icon analysis %} <a href="{% url 'analysis' analysis.pk %}">{{ analysis.pk }} - {{ analysis }}</a>
             {% if show_output_nodes %}
                 <td>
                     {% analysis_output_node_downloads analysis %}

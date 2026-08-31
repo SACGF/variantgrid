@@ -10,7 +10,7 @@ from typing import Optional
 
 @dataclass(frozen=True)
 class NodeIcon:
-    """ Set exactly one of fa (FontAwesome classes) or symbol (an id in node_icon_sprite.html) """
+    """ Set exactly one of fa (FontAwesome classes) or symbol (an id in svg_icon_sprite.html) """
     fa: Optional[str] = None
     symbol: Optional[str] = None
 

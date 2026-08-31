@@ -8,6 +8,7 @@ from django.db.models import Model
 from django.dispatch import Signal
 from django.http import JsonResponse
 from django.urls import NoReverseMatch
+from django.utils.html import format_html
 from django.utils.safestring import SafeString
 from threadlocals.threadlocals import get_current_user
 
@@ -26,6 +27,20 @@ preview_extra_signal = Signal()
 Apps can receive this to return PreviewKeyValues for other app models, e.g. Classification can listen to this
 to provide Classification counts to Alleles
 """
+
+
+def _icon_classes(*css_classes: str) -> str:
+    return " ".join(css_class for css_class in css_classes if css_class)
+
+
+def fa_icon_html(fa_class: str, css_class: str = "") -> SafeString:
+    return format_html('<i class="{}"></i>', _icon_classes(fa_class, css_class))
+
+
+def svg_symbol_icon_html(symbol: str, css_class: str = "") -> SafeString:
+    """ Draws a symbol from the sprite in uicore/tags/svg_icon_sprite.html, which the page base includes """
+    return format_html('<svg class="{}"><use href="#{}"></use></svg>',
+                       _icon_classes("svg-symbol-icon", css_class), symbol)
 
 
 @dataclass
@@ -130,6 +145,13 @@ class PreviewModelMixin:
         """
         return "fa-solid fa-circle"
 
+    @classmethod
+    def preview_icon_html(cls, css_class: str = "") -> SafeString:
+        """
+        The icon element itself - render it with {% preview_icon obj %} rather than building the <i> yourself
+        """
+        return fa_icon_html(cls.preview_icon(), css_class)
+
     def preview_with(
             self,
             category: Optional[str] = None,
@@ -170,7 +192,33 @@ class PreviewModelMixin:
         return self.preview_with()
 
 
+class SvgSymbolPreviewIconMixin:
+    """
+    For models whose icon is a shape FontAwesome doesn't have - the analysis node icons, so a Trio page wears
+    the same icon as a TrioNode. preview_icon() is still the FontAwesome stand-in for the places that need a
+    bare class string.
+    """
+    preview_icon_symbol: str
+
+    def get_preview_icon_symbol(self) -> str:
+        """ Override where the shape varies by record, e.g. Sample draws its patient's pedigree notation """
+        return self.preview_icon_symbol
+
+    def preview_icon_html(self, css_class: str = "") -> SafeString:
+        return svg_symbol_icon_html(self.get_preview_icon_symbol(), css_class)
+
+
 PreviewCoordinator = Union[type[PreviewModelMixin], PreviewProxyModel]
+
+
+def preview_coordinator_icon_html(preview_coordinator: PreviewCoordinator, css_class: str = "") -> SafeString:
+    """ Icon for a model, a model class or a PreviewProxyModel - a class only has its class level symbol """
+    if isinstance(preview_coordinator, type):
+        if symbol := getattr(preview_coordinator, "preview_icon_symbol", None):
+            return svg_symbol_icon_html(symbol, css_class)
+    elif hasattr(preview_coordinator, "preview_icon_html"):
+        return preview_coordinator.preview_icon_html(css_class)
+    return fa_icon_html(preview_coordinator.preview_icon(), css_class)
 
 
 @dataclass(eq=True)
@@ -281,6 +329,12 @@ class PreviewData:
                     else:
                         external_extra.extend(response)
         return external_extra
+
+    def icon_html(self, css_class: str = "") -> SafeString:
+        """ The object draws its own icon, unless this preview was given one of its own (e.g. a search operation) """
+        if isinstance(self.obj, PreviewModelMixin) and self.icon == self.obj.preview_icon():
+            return self.obj.preview_icon_html(css_class)
+        return fa_icon_html(self.icon, css_class)
 
     @property
     def html_element(self) -> str:

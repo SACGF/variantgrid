@@ -2,6 +2,7 @@
 {% block related_data %}
 {{ block.super }}
 {% load related_data_tags %}
+{% load ui_utils %}
 
 <div id="samples">
     <h4>Samples for patient</h4>
@@ -19,11 +20,11 @@
             <tbody>
         {% for sample in samples %}
             <tr> 
-            <td><i class="{{ sample.preview_icon }}"></i> <a href="{% url 'view_sample' sample.pk %}">{{ sample.pk }}</a>
+            <td>{% preview_icon sample %} <a href="{% url 'view_sample' sample.pk %}">{{ sample.pk }}</a>
             <td>{{ sample.name }}
-            <td><i class="{{ sample.vcf.preview_icon }}"></i> <a href="{% url 'view_vcf' sample.vcf.pk %}">{{ sample.vcf.name }}</a>
+            <td>{% preview_icon sample.vcf %} <a href="{% url 'view_vcf' sample.vcf.pk %}">{{ sample.vcf.name }}</a>
             <td>{{ sample.vcf.date }}
-            <td>{% if sample.specimen %}<i class="{{ sample.specimen.preview_icon }}"></i> <a href="{{ sample.specimen.get_absolute_url }}">{{ sample.specimen }}</a>{% endif %}
+            <td>{% if sample.specimen %}{% preview_icon sample.specimen %} <a href="{{ sample.specimen.get_absolute_url }}">{{ sample.specimen }}</a>{% endif %}
             </tr>
         {% endfor %}
         </tbody>
@@ -49,7 +50,7 @@
         <tbody>
         {% for case in cases %}
         <tr>
-            <td><i class="{{ case.preview_icon }}"></i> <a href="{{ case.get_absolute_url }}">{{ case }}</a></td>
+            <td>{% preview_icon case %} <a href="{{ case.get_absolute_url }}">{{ case }}</a></td>
             <td>{{ case.lead_scientist }}</td>
             <td>{{ case.result_required }}</td>
             <td>{{ case.report_date }}</td>

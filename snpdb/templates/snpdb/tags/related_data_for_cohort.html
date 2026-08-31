@@ -1,5 +1,6 @@
 {% extends "snpdb/tags/related_data.html" %}
 {% load model_tags %}
+{% load ui_utils %}
 {% block related_data %}
 {{ block.super }}
 
@@ -7,7 +8,7 @@
         <h3>Sub cohorts</h3>
         {% for sub_cohort in sub_cohorts %}
             <div>
-                <i class="{{ sub_cohort.preview_icon }}"></i>
+                {% preview_icon sub_cohort %}
                 <a href="{{ sub_cohort.get_absolute_url }}">{{ sub_cohort }}</a>
             </div>
         {% endfor %}
@@ -18,7 +19,7 @@
         <h3>Trios</h3>
         {% for trio in trios %}
             <div>
-                <i class="{{ trio.preview_icon }}"></i>
+                {% preview_icon trio %}
                 <a href="{% url 'view_trio' trio.pk %}">{{ trio }}</a> - {% trio_short_description trio %}
             </div>
         {% endfor %}
@@ -30,7 +31,7 @@
         <h3>Pedigrees</h3>
         {% for pedigree in pedigrees %}
             <div>
-                <i class="{{ pedigree.preview_icon }}"></i>
+                {% preview_icon pedigree %}
                 <a href="{% url 'view_pedigree' pedigree.pk %}">{{ pedigree }}</a>
             </div>
         {% endfor %}

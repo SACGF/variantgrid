@@ -158,6 +158,7 @@
     {% block head %}{% endblock %}
 </head>
 <body>
+    {% include "uicore/tags/svg_icon_sprite.html" %}
     <nav class="navbar navbar-expand-lg navbar-light bg-theme fixed-top">
         <div id="navbar-brand-background">
             <a class="navbar-brand" href="{% url 'LOGO_VIEW_NAME'|settings_value %}"></a>

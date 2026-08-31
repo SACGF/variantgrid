@@ -1,5 +1,6 @@
 {% load static %}
 {% load analysis_node_tags %}
+{% load ui_utils %}
 <div id='analysis-input-samples'>
     <style>
         #analysis-input-samples .input-node-card {
@@ -69,7 +70,7 @@
                 <span class="input-node-class">{{ ni.class_label }}</span>
                 {% if ni.source %}
                     <span class="input-node-source">
-                        <i class="{{ ni.source.preview_icon }}"></i>
+                        {% preview_icon ni.source %}
                         <span class="input-node-class">{{ ni.source_label }}</span>
                         <a target="_blank" href="{{ ni.source.get_absolute_url }}">{{ ni.source }}</a>
                     </span>

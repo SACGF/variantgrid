@@ -15,7 +15,7 @@ from django.utils.safestring import SafeString
 
 from library.enums.log_level import LogLevel
 from library.log_utils import log_level_to_bootstrap
-from library.preview_request import PreviewModelMixin
+from library.preview_request import PreviewData, PreviewModelMixin, preview_coordinator_icon_html
 from library.utils import diff_text, emoji_to_unicode, format_diff_text, html_id_safe, pretty_label
 from snpdb.admin_utils import get_admin_url
 from uicore.views.ajax_form_view import LazyRender
@@ -720,6 +720,17 @@ def enrich(text: str):
 @register.inclusion_tag("uicore/tags/preview_tag.html")
 def preview(obj: PreviewModelMixin):
     return {"preview": obj.preview}
+
+
+@register.simple_tag
+def preview_icon(preview_coordinator, css_class: str = "") -> SafeString:
+    """ The icon for a model, model class or PreviewData - FontAwesome, or an SVG symbol where the model
+        has one, see PreviewModelMixin.preview_icon_html """
+    if preview_coordinator is None:
+        return SafeString("")
+    if isinstance(preview_coordinator, PreviewData):
+        return preview_coordinator.icon_html(css_class)
+    return preview_coordinator_icon_html(preview_coordinator, css_class)
 
 
 @register.filter(name="field_errors")

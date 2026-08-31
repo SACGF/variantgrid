@@ -1,5 +1,6 @@
 {% extends "snpdb/tags/related_data.html" %}
 {% load model_tags %}
+{% load ui_utils %}
 
 {% block related_data %}
 {{ block.super }}
@@ -16,7 +17,7 @@
     
     {% for cohort, samples in cohorts_and_samples %}
         <tr> 
-        <td><i class="{{ cohort.preview_icon }}"></i> <a class="hover-link" href="{% url 'view_cohort' cohort.pk %}">{{ cohort }}</a>
+        <td>{% preview_icon cohort %} <a class="hover-link" href="{% url 'view_cohort' cohort.pk %}">{{ cohort }}</a>
         {% if samples %}
             <td>{{ samples }}
         {% endif %}
@@ -31,7 +32,7 @@
     <h3>Trios</h3>
     {% for trio, samples in trios_and_samples %}
         <div> 
-            <i class="{{ trio.preview_icon }}"></i>
+            {% preview_icon trio %}
             <a href="{% url 'view_trio' trio.pk %}">{{ trio }}</a> - {% trio_short_description trio %}
         </div>
     {% endfor %}
@@ -51,7 +52,7 @@
     
     {% for pedigree, samples in pedigrees_and_samples %}
         <tr> 
-        <td><i class="{{ pedigree.preview_icon }}"></i> <a href="{% url 'view_pedigree' pedigree.pk %}">{{ pedigree }}</a>
+        <td>{% preview_icon pedigree %} <a href="{% url 'view_pedigree' pedigree.pk %}">{{ pedigree }}</a>
         {% if samples %}
         <td>{{ samples }}
         {% endif %}

@@ -79,7 +79,7 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel, Previe
 
     @classmethod
     def preview_icon(cls) -> str:
-        return "fa-solid fa-diagram-project"
+        return "fa-solid fa-circle-nodes"  # the generic node icon, see AnalysisNode.get_node_class_icon
 
     @classmethod
     def preview_if_url_visible(cls) -> str:

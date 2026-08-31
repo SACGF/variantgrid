@@ -6,7 +6,7 @@ from django.test import TestCase
 from analysis.models.nodes.node_display import NodeChip
 from analysis.models.nodes.node_types import get_node_types_hash
 
-SPRITE_TEMPLATE = "analysis/tags/node_icon_sprite.html"
+SPRITE_TEMPLATE = "uicore/tags/svg_icon_sprite.html"
 
 
 def get_sprite_symbol_ids() -> set[str]:

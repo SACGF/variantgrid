@@ -27,8 +27,9 @@ from library.django_utils.guardian_permissions_mixin import GuardianPermissionsM
 from library.genomics.vcf_enums import VariantClass
 from library.guardian_utils import DjangoPermission
 from library.log_utils import log_traceback
-from library.preview_request import PreviewKeyValue, PreviewModelMixin
+from library.preview_request import PreviewKeyValue, PreviewModelMixin, SvgSymbolPreviewIconMixin
 from patients.models import ExtractionMatchMixin, FakeData, Patient, Specimen
+from patients.models_enums import Sex
 from snpdb.models.models import LabProject
 from snpdb.models.models_enums import (
     ImportStatus,
@@ -320,7 +321,8 @@ class VCFFilter(models.Model):
         return filter_string_formatter
 
 
-class Sample(GuardianPermissionsMixin, SortByPKMixin, PreviewModelMixin, ExtractionMatchMixin, models.Model):
+class Sample(GuardianPermissionsMixin, SortByPKMixin, SvgSymbolPreviewIconMixin, PreviewModelMixin,
+             ExtractionMatchMixin, models.Model):
     """ A VCF sample storing genotype information
         Sample data is stored as packed fields in CohortGenotype (via vcf.cohort.cohortgenotypecollection) """
     vcf = models.ForeignKey(VCF, on_delete=CASCADE)
@@ -332,9 +334,20 @@ class Sample(GuardianPermissionsMixin, SortByPKMixin, PreviewModelMixin, Extract
     import_status = models.CharField(max_length=1, choices=ImportStatus.choices, default=ImportStatus.CREATED)
     variants_type = models.CharField(max_length=1, choices=VariantsType.choices, default=VariantsType.UNKNOWN)
 
+    preview_icon_symbol = "node-icon-sample"  # SampleNode wears this too - see get_node_class_icon
+
     @classmethod
     def preview_icon(cls) -> str:
         return "fa-solid fa-microscope"
+
+    def get_preview_icon_symbol(self) -> str:
+        """ Pedigree notation - square/circle for sex, struck through if deceased """
+        patient = self.patient
+        if patient is None:
+            return self.preview_icon_symbol
+        sex = "female" if patient.sex == Sex.FEMALE else "male"
+        deceased = "-deceased" if patient.deceased else ""
+        return f"node-icon-sample-{sex}{deceased}"
 
     @classmethod
     def preview_if_url_visible(cls) -> Optional[str]:

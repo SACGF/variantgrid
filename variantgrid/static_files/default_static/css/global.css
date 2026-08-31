@@ -2255,6 +2255,14 @@ li.help-item :last-child {
   margin-right: 2px;
 }
 
+/* Icons drawn from the sprite rather than FontAwesome - see SvgSymbolPreviewIconMixin. Sized to sit on
+   the text baseline like a glyph; the symbols are currentColor so they pick up the surrounding colour */
+.svg-symbol-icon {
+  width: 1.25em;
+  height: 1em;
+  vertical-align: -0.125em;
+}
+
 .preview-data .preview-category,
 .preview-data .preview-title {
   font-weight: 500;

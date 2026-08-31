@@ -11,7 +11,7 @@ from library.django_utils.guardian_permissions_mixin import (
     GuardianPermissionsAutoInitialSaveMixin,
     GuardianPermissionsMixin,
 )
-from library.preview_request import PreviewModelMixin
+from library.preview_request import PreviewModelMixin, SvgSymbolPreviewIconMixin
 from patients.models_enums import Sex
 from snpdb.models import Cohort, CohortSample, ImportStatus, Sample, SomalierRelate
 
@@ -119,11 +119,14 @@ def validate(records):
     return errors_list
 
 
-class Pedigree(GuardianPermissionsAutoInitialSaveMixin, PreviewModelMixin, SortByPKMixin, TimeStampedModel):
+class Pedigree(GuardianPermissionsAutoInitialSaveMixin, SvgSymbolPreviewIconMixin, PreviewModelMixin,
+               SortByPKMixin, TimeStampedModel):
     user = models.ForeignKey(User, on_delete=CASCADE)
     name = models.TextField(blank=False)
     cohort = models.ForeignKey(Cohort, on_delete=CASCADE)
     ped_file_family = models.ForeignKey(PedFileFamily, on_delete=CASCADE)
+
+    preview_icon_symbol = "node-icon-pedigree"  # PedigreeNode wears this too - see get_node_class_icon
 
     def get_samples(self, affected=None):
         """ returns a Sample queryset """
