@@ -1,5 +1,6 @@
 
-from django.db import models
+from django.db import connection, models
+from django.db.backends.postgresql.psycopg_any import mogrify
 from django.db.models import Model, sql
 
 # IteratorFile.read() concatenates until it has this much, so big reads go quadratic
@@ -39,16 +40,6 @@ def pg_sql_array(values):
     return f'array[{",".join(values)}]'
 
 
-def _escape_sql_param(param):
-    if param is None:
-        param = 'NULL'
-    elif isinstance(param, list):
-        param = pg_sql_array(_escape_sql_param(v) for v in param)
-    elif isinstance(param, str):
-        return f"'{param}'"
-    return str(param)
-
-
 # noinspection PyProtectedMember
 def model_to_insert_sql(model_list: list[Model], db_table: str = None, ignore_fields: list[str] = None):
     """ From https://stackoverflow.com/a/63715608/295724 """
@@ -70,6 +61,6 @@ def model_to_insert_sql(model_list: list[Model], db_table: str = None, ignore_fi
     raw_statements = compiler.as_sql()
     model._meta.db_table = old_table  # Put table name back
 
-    mixed_statements = [statement % tuple(_escape_sql_param(param) for param in params)
-                        for statement, params in raw_statements]
-    return mixed_statements
+    # mogrify does the client side param binding - it handles the driver specific wrappers Django puts
+    # around params (eg Jsonb for JSONField) as well as quoting
+    return [mogrify(statement, params, connection) for statement, params in raw_statements]
