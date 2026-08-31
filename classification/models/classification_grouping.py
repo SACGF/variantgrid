@@ -1,4 +1,5 @@
 import operator
+from collections import defaultdict
 from dataclasses import dataclass, field
 from functools import cached_property, reduce
 from typing import Optional, Self
@@ -8,7 +9,7 @@ from django.contrib.auth.models import User
 from django.contrib.postgres.fields import ArrayField
 from django.core.exceptions import PermissionDenied
 from django.db import models, transaction
-from django.db.models import CASCADE, SET_NULL, IntegerChoices, Q, QuerySet, TextChoices
+from django.db.models import CASCADE, SET_NULL, Count, IntegerChoices, Q, QuerySet, TextChoices
 from django.urls import reverse
 from django_extensions.db.models import TimeStampedModel
 from frozendict import frozendict
@@ -28,7 +29,7 @@ from classification.models.evidence_mixin_summary_cache import (
     ClassificationSummaryCacheDictSomatic,
 )
 from genes.models import GeneSymbol
-from library.utils import strip_json
+from library.utils import JsonDataType, strip_json
 from ontology.models import OntologyTerm
 from snpdb.models import Allele, Lab
 
@@ -196,6 +197,31 @@ class AlleleOriginGrouping(TimeStampedModel):
 #                 by_status[key] = ClassificationSubGrouping(latest_modification=mod, count=1)
 #         # FIXME sort
 #         return list(by_status.values())
+
+
+@dataclass(frozen=True)
+class ClassificationGroupingCount:
+    """ How many groupings sit at a single clinical significance value - for the summary above a grouping grid """
+    clinical_significance: Optional[str]
+    count: int
+
+    @property
+    def label(self) -> str:
+        e_key = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE)
+        return e_key.pretty_value(self.clinical_significance) or "No Data"
+
+    @property
+    def css_class(self) -> str:
+        """ Class for the .c-pill.cs-* rules in global.scss """
+        return f"cs-{self.clinical_significance.lower()}" if self.clinical_significance else "cs-none"
+
+    def to_json(self) -> JsonDataType:
+        return {
+            "clinical_significance": self.clinical_significance,
+            "label": self.label,
+            "css_class": self.css_class,
+            "count": self.count
+        }
 
 
 class ClassificationGroupingPathogenicDifference(IntegerChoices):
@@ -469,6 +495,32 @@ class ClassificationGrouping(TimeStampedModel):
         else:
             # there are no classifications, time to die
             self.delete()
+
+    VUS_SUB_VALUES = frozenset({"VUS_A", "VUS_B", "VUS_C"})
+
+    @staticmethod
+    def clinical_significance_counts(qs: QuerySet['ClassificationGrouping']) -> list['ClassificationGroupingCount']:
+        """
+        Counts groupings by the clinical significance of their latest classification, VUS sub-levels merged into VUS.
+        Ordered by the evidence key's option order, with values it doesn't know about (and No Data) last.
+        :param qs: Groupings to summarise - already filtered for the user
+        """
+        clin_sig_column = "latest_classification_modification__classification__summary__pathogenicity__classification"
+        counts: dict[Optional[str], int] = defaultdict(int)
+        # some filters (e.g. protein position) join through variants, so only count each grouping once
+        for row in qs.order_by().values(clin_sig_column).annotate(count=Count("pk", distinct=True)):
+            clinical_significance = row[clin_sig_column]
+            if clinical_significance in ClassificationGrouping.VUS_SUB_VALUES:
+                clinical_significance = "VUS"
+            counts[clinical_significance] += row["count"]
+
+        def sort_key(grouping_count: ClassificationGroupingCount):
+            sort_order = classification_sort_order(grouping_count.clinical_significance)
+            return not sort_order, sort_order, grouping_count.label
+
+        return sorted(
+            (ClassificationGroupingCount(clinical_significance=clin_sig, count=count) for clin_sig, count in counts.items()),
+            key=sort_key)
 
     def gene_symbols(self):
         terms = set(self.classificationgroupingsearchterm_set.filter(term_type=ClassificationGroupingSearchTermType.GENE_SYMBOL).values_list("term", flat=True))
