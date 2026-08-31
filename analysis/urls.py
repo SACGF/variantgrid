@@ -91,6 +91,7 @@ urlpatterns = [
     path('<int:analysis_id>/node_populate_clingen_alleles/<int:node_id>/', views_json.node_populate_clingen_alleles,
          name='node_populate_clingen_alleles'),
     path('<int:analysis_id>/settings/lock', views.analysis_settings_lock, name='analysis_settings_lock'),
+    path('<int:analysis_id>/export/', views.analysis_export, name='analysis_export'),
     path('<int:analysis_id>/settings/', views.view_analysis_settings, name='analysis_settings'),
     path('<int:analysis_id>/settings_details_tab/', views.analysis_settings_details_tab, name='analysis_settings_details_tab'),
     path('<int:analysis_id>/settings_node_counts_tab/', views.analysis_settings_node_counts_tab, name='analysis_settings_node_counts_tab'),

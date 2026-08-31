@@ -1,4 +1,6 @@
 
+import json
+
 import pandas as pd
 from django.conf import settings
 
@@ -10,6 +12,7 @@ from upload.import_task_factories.abstract_vcf_import_task_factory import (
 )
 from upload.import_task_factories.import_task_factory import ImportTaskFactory
 from upload.models import (
+    UploadedAnalysis,
     UploadedBed,
     UploadedClassificationImport,
     UploadedFileTypes,
@@ -27,6 +30,7 @@ from upload.models import (
     VCFPipelineStage,
 )
 from upload.tso500 import dragen_all_fusions_parser
+from upload.tasks.import_analysis_task import ImportAnalysisTask
 from upload.tasks.import_bedfile_task import ImportBedFileTask
 from upload.tasks.import_gene_coverage_task import ImportGeneCoverageTask
 from upload.tasks.import_dragen_tso500_all_fusions_task import (
@@ -164,6 +168,32 @@ class DragenTSO500AllFusionsImportTaskFactory(AbstractVCFImportTaskFactory):
         # pipeline_success_task closes the pipeline off the end of the FINISH chain, so nothing here
         # takes it out of PROCESSING before ImportGenotypeVCFSuccessTask releases the VCF
         return [ImportGenotypeVCFSuccessTask]
+
+
+class AnalysisImportTaskFactory(ImportTaskFactory):
+
+    def get_uploaded_file_type(self):
+        return UploadedFileTypes.ANALYSIS
+
+    def get_possible_extensions(self):
+        return ['json']
+
+    def get_data_classes(self):
+        return [UploadedAnalysis]
+
+    def get_processing_ability(self, user, filename, file_extension):
+        # Analysis exports are small, so read it to claim only our own JSON
+        try:
+            with open(filename, encoding="utf-8") as f:
+                analysis_data = json.load(f)
+        except Exception:  # Every JSON factory is asked, so a shape we can't read is someone else's file
+            return 0
+        if isinstance(analysis_data, dict) and {"analysis", "nodes", "edges"} <= analysis_data.keys():
+            return 1
+        return 0
+
+    def create_import_task(self, upload_pipeline):
+        return ImportAnalysisTask.si(upload_pipeline.pk)
 
 
 class GeneCoverageImportTaskFactory(ImportTaskFactory):

@@ -165,6 +165,7 @@ class Test(URLTestCase):
             ('analysis_node_versions', analysis_params, 200),
             ('analysis_editor_and_grid', analysis_params, 200),
             ('analysis_settings', analysis_params, 200),
+            ('analysis_export', analysis_params, 200),
             ('analysis_settings_details_tab', analysis_params, 200),
             ('analysis_settings_node_counts_tab', analysis_params, 200),
             ('analysis_input_samples', analysis_params, 200),

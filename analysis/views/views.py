@@ -22,12 +22,14 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.test.client import RequestFactory
 from django.urls.base import reverse
 from django.utils import timezone
+from django.utils.text import slugify
 from django.views.decorators.cache import cache_page, never_cache
 from django.views.decorators.http import require_POST
 from django.views.decorators.vary import vary_on_cookie
 from htmlmin.decorators import not_minified_response
 
 from analysis import forms
+from analysis.analysis_import_export import analysis_export_to_dict
 from analysis.analysis_templates import (
     get_auto_launch_analysis_template_matches,
     populate_analysis_from_template_run,
@@ -952,6 +954,14 @@ def pedigree_vcf_locus_filters(request, analysis_id, node_id, pedigree_id):
         vcf_id = None
 
     return vcf_locus_filters(request, analysis_id, node_id, vcf_id)
+
+
+def analysis_export(request, analysis_id):
+    analysis = get_analysis_or_404(request.user, analysis_id)
+    filename = f"analysis_{analysis.pk}_{slugify(analysis.name)[:40]}.json"
+    response = JsonResponse(analysis_export_to_dict(analysis))
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    return response
 
 
 def view_analysis_settings(request, analysis_id):

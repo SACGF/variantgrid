@@ -2,6 +2,7 @@ from django.db import models
 
 
 class UploadedFileTypes(models.TextChoices):
+    ANALYSIS = 'N', 'Analysis'
     BED = 'B', 'BED'
     CLINVAR = 'L', 'Clinvar'
     DRAGEN_TSO500_ALL_FUSIONS = 'F', 'DRAGEN TSO500 AllFusions'

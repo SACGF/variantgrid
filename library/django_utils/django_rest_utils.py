@@ -43,4 +43,5 @@ class DynamicFieldsModelSerializer(serializers.ModelSerializer):
                 remove_fields = set(exclude)
 
             for field_name in remove_fields:
-                self.fields.pop(field_name)
+                # exclude lists can span a model hierarchy, so only some apply to any one serializer
+                self.fields.pop(field_name, None)

@@ -1,3 +1,4 @@
+from django.db import models
 from rest_framework import serializers
 
 from analysis.models import (
@@ -17,11 +18,16 @@ from analysis.models import (
     GeneListNodeGeneList,
     IntersectionNode,
     MergeNode,
+    MOINode,
+    MOINodeModeOfInheritance,
+    MOINodeOntologyTerm,
+    MOINodeSubmitter,
     PedigreeNode,
     PhenotypeNode,
     PhenotypeNodeOntologyTerm,
     PopulationNode,
     PopulationNodeGnomADPopulation,
+    QuadNode,
     SampleNode,
     SelectedInParentNode,
     TagNode,
@@ -70,7 +76,7 @@ class AnalysisVariableSerializer(serializers.ModelSerializer):
 class NodeWikiSerializer(serializers.ModelSerializer):
     class Meta:
         model = NodeWiki
-        fields = "__all__"
+        exclude = ("last_edited_by", )  # User PK - AnalysisNodeSerializer.create sets the importing user
 
 
 class AnalysisSerializer(DynamicFieldsModelSerializer):
@@ -114,6 +120,15 @@ class AnalysisNodeSerializer(DynamicFieldsModelSerializer):
         if nodewiki_data:
             NodeWiki.objects.create(node=node, **nodewiki_data)
         return node
+
+    def get_extra_kwargs(self):
+        """ A node the user hasn't configured yet holds Django's implicit '' for its unset text
+            fields, and an export has to be able to bring that back """
+        extra_kwargs = super().get_extra_kwargs()
+        for field in self.Meta.model._meta.fields:
+            if isinstance(field, (models.CharField, models.TextField)) and not field.blank:
+                extra_kwargs.setdefault(field.name, {}).setdefault("allow_blank", True)
+        return extra_kwargs
 
     @staticmethod
     def get_node_serializers() -> dict[str, 'AnalysisNodeSerializer']:
@@ -239,6 +254,61 @@ class MergeNodeSerializer(AnalysisNodeSerializer):
         fields = _analysis_node_fields(model)
 
 
+class MOINodeOntologyTermSerializer(serializers.ModelSerializer):
+    ontology_term = OntologyTermSerializer()
+
+    class Meta:
+        model = MOINodeOntologyTerm
+        exclude = ("node",)
+
+    def to_internal_value(self, data):
+        ontology_term_data = data.get('ontology_term')
+        if isinstance(ontology_term_data, dict):
+            ontology_id = ontology_term_data.get('id')
+            if ontology_id:
+                return {'ontology_term': OntologyTerm.objects.get(pk=ontology_id)}
+        return super().to_internal_value(data)
+
+
+class MOINodeModeOfInheritanceSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = MOINodeModeOfInheritance
+        exclude = ("node",)
+
+
+class MOINodeSubmitterSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = MOINodeSubmitter
+        exclude = ("node",)
+
+
+class MOINodeSerializer(AnalysisNodeSerializer):
+    moinodeontologyterm_set = MOINodeOntologyTermSerializer(many=True)
+    moinodemodeofinheritance_set = MOINodeModeOfInheritanceSerializer(many=True)
+    moinodesubmitter_set = MOINodeSubmitterSerializer(many=True)
+
+    class Meta(AnalysisNodeSerializer.Meta):
+        model = MOINode
+        fields = _analysis_node_fields(model) + ["moinodeontologyterm_set", "moinodemodeofinheritance_set",
+                                                "moinodesubmitter_set"]
+
+    def create(self, validated_data):
+        moinodeontologyterm_set_data = validated_data.pop('moinodeontologyterm_set')
+        moinodemodeofinheritance_set_data = validated_data.pop('moinodemodeofinheritance_set')
+        moinodesubmitter_set_data = validated_data.pop('moinodesubmitter_set')
+
+        node = super().create(validated_data)
+
+        for ontology_data in moinodeontologyterm_set_data:
+            MOINodeOntologyTerm.objects.create(node=node, **ontology_data)
+        for moi_data in moinodemodeofinheritance_set_data:
+            MOINodeModeOfInheritance.objects.create(node=node, **moi_data)
+        for submitter_data in moinodesubmitter_set_data:
+            MOINodeSubmitter.objects.create(node=node, **submitter_data)
+
+        return node
+
+
 class PedigreeNodeSerializer(AnalysisNodeSerializer):
     class Meta(AnalysisNodeSerializer.Meta):
         model = PedigreeNode
@@ -301,6 +371,12 @@ class PopulationNodeSerializer(AnalysisNodeSerializer):
             PopulationNodeGnomADPopulation.objects.create(population_node=node, **pn_gnomad_data)
 
         return node
+
+
+class QuadNodeSerializer(AnalysisNodeSerializer):
+    class Meta(AnalysisNodeSerializer.Meta):
+        model = QuadNode
+        fields = _analysis_node_fields(model)
 
 
 class SampleNodeSerializer(AnalysisNodeSerializer):

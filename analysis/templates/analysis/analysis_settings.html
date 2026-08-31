@@ -99,6 +99,7 @@
 	<hr>
 	<div>
         <button class="btn btn-outline-primary fas fas-fw fa-window-close" id='close-analysis-settings' type='button'>Close</button>
+        <a class="btn btn-outline-primary fas fa-download" href="{% url 'analysis_export' analysis.pk %}">Export</a>
         {% if has_write_permission %}
 		    <button class="btn btn-outline-danger fas fa-redo" id='force-reload-nodes-button' type='button'>Force Reload All Nodes</button>
 		    <button class="btn btn-outline-danger fas fa-redo" id='force-reload-error-nodes-button' type='button'>Force Reload Error Nodes</button>
