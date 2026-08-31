@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>private#223 — SampleNode editor</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+<style>
+/* ---------- page chrome (mockup only) ---------- */
+body { margin: 0; padding: 24px 32px 64px; background: #fafbfc; color: #24292f;
+       font: 14px/1.5 -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+h1 { font-size: 20px; margin: 0 0 4px; }
+h2 { font-size: 15px; margin: 40px 0 8px; padding-bottom: 4px; border-bottom: 1px solid #e4e7ec; }
+p.note { color: #57606a; max-width: 80ch; margin: 4px 0 12px; }
+.row { display: flex; gap: 32px; align-items: flex-start; flex-wrap: wrap; }
+.pill-rec { display: inline-block; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 99px;
+            background: #0e7a4a; color: white; vertical-align: middle; margin-left: 6px; }
+.pill-alt { background: #6b7280; } .pill-today { background: #c6cdd6; color: #24292f; }
+code { background: #f1f3f5; padding: 0 4px; border-radius: 3px; font-size: 12px; }
+.callouts { font-size: 13px; color: #57606a; max-width: 44ch; }
+.callouts li { margin-bottom: 8px; }
+.callouts b { color: #24292f; }
+.num { display: inline-flex; width: 18px; height: 18px; border-radius: 50%; background: #3455a4; color: white; font-size: 11px;
+       font-weight: 700; align-items: center; justify-content: center; margin-right: 4px; vertical-align: middle; }
+.drawer .num { float: left; margin: 4px 6px 0 -4px; }
+
+/* ---------- the drawer, as analysis_nodes.css ---------- */
+.drawer { width: 450px; background: white; border: 1px solid #ccc; box-shadow: -2px 0 8px rgba(0,0,0,.2); font-size: 13px; position: relative; }
+.drawer-header { display: flex; align-items: center; gap: 4px; padding: 4px 6px 4px 12px; border-bottom: 1px solid #ddd; background: #eee; }
+.drawer-title { font-weight: bold; margin-right: 4px; }
+.drawer-tab { padding: 2px 8px; border: 1px solid transparent; border-radius: 4px; color: #333; white-space: nowrap; }
+.drawer-tab.active { background: white; border-color: #ccc; font-weight: 600; }
+.drawer-body { padding: 6px; }
+ul.nav-tabs { list-style: none; display: flex; gap: 2px; margin: 0 0 8px; padding: 0; border-bottom: 1px solid #dee2e6; font-size: 13px; }
+ul.nav-tabs li a { display: block; padding: 1px 12px; line-height: 20px; color: #3455a4; border: 1px solid transparent; border-radius: 4px 4px 0 0; }
+ul.nav-tabs li a.active { color: #495057; background: white; border-color: #dee2e6 #dee2e6 white; }
+h4.node-editor-title { display: flex; align-items: center; gap: 8px; font-size: 16px; margin: 4px 0 10px; }
+h4.node-editor-title .fa-book { color: #6b7280; font-size: 13px; }
+[node_classification="source"] { --node-classification-color: #0e7a4a; }
+.node-icon-badge { width: 22px; height: 22px; border-radius: 50%; color: var(--node-classification-color);
+	display: inline-flex; align-items: center; justify-content: center; font-size: 12px; background: white;
+	box-shadow: 0 0 0 2px var(--node-classification-color), 0 1px 3px rgba(0,0,0,.3); margin-left: 3px; }
+.node-icon-badge svg { width: 15.4px; height: 15.4px; }
+.drawer select, .fake-select { appearance: none; padding: 4px 26px 4px 8px; border: 1px solid #c6cdd6; border-radius: 6px; background: white;
+	font: inherit; font-size: 13px; line-height: 20px; color: #24292f; display: inline-block; position: relative; }
+.fake-select::after { content: "\25BE"; position: absolute; right: 8px; color: #6b7280; font-size: 11px; }
+.select2 { display: flex; align-items: center; gap: 6px; border: 1px solid #c6cdd6; border-radius: 6px; padding: 4px 8px; background: white; line-height: 20px; }
+.select2 .ph { color: #6b7280; }
+.select2 .arrow { margin-left: auto; color: #6b7280; font-size: 11px; }
+.select2 .fa-magnifying-glass { color: #6b7280; font-size: 12px; }
+.cross-link { color: #3455a4; font-size: 12px; margin-left: 6px; text-decoration: none; }
+.frow { margin: 6px 0; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.frow b { font-weight: 600; }
+input.narrow { width: 52px; padding: 2px 4px; border: 1px solid #c6cdd6; border-radius: 4px; font: inherit; font-size: 12px; }
+input.narrow.override { font-weight: 700; border-color: #3455a4; background: #eef2fb; }
+.genotype-row { margin-top: 10px; }
+table.thresholds { border-collapse: collapse; font-size: 12px; width: 100%; }
+table.thresholds th, table.thresholds td { text-align: left; padding: 2px 4px; border-bottom: 1px solid #eee; }
+table.zyg { border-collapse: collapse; text-align: center; font-size: 12px; }
+table.zyg th { border-left: 1px solid black; border-right: 1px solid black; padding: 0 6px; }
+.btn { display: inline-block; padding: 4px 12px; border-radius: 4px; background: #007bff; color: white; font-weight: 400; font-size: 13px; margin-top: 10px; }
+.filters-box { border: 1px solid #e4e7ec; border-radius: 6px; padding: 6px 8px; font-size: 12px; margin-top: 8px; }
+.filters-box label { margin-right: 10px; }
+.preview { font-size: 12px; margin: 6px 0 0 4px; }
+.preview ul { margin: 2px 0 0; padding-left: 18px; }
+.preview .warning { color: #a25e00; }
+.alert { border: 1px solid #f5c6cb; background: #f8d7da; color: #721c24; border-radius: 4px; padding: 4px 8px; font-size: 12px; margin: 6px 0; }
+
+/* ---------- select2 open dropdown with groups ---------- */
+.s2-drop { position: absolute; left: 6px; right: 6px; background: white; border: 1px solid #aaa; border-radius: 0 0 4px 4px; box-shadow: 0 4px 12px rgba(0,0,0,.15); z-index: 4; font-size: 12px; }
+.s2-drop .search { padding: 4px; border-bottom: 1px solid #ddd; }
+.s2-drop .search input { width: 100%; box-sizing: border-box; padding: 3px 6px; border: 1px solid #aaa; font: inherit; }
+.s2-drop .group { padding: 4px 8px 1px; font-weight: 700; color: #6b7280; font-size: 10px; text-transform: uppercase; letter-spacing: .05em; }
+.s2-drop .opt { padding: 3px 8px 3px 18px; display: flex; gap: 6px; align-items: center; }
+.s2-drop .opt i { width: 12px; color: #6b7280; font-size: 11px; }
+.s2-drop .opt.hl { background: #5897fb; color: white; } .s2-drop .opt.hl i { color: white; }
+.s2-drop .opt .dim { color: #8b949e; margin-left: auto; font-size: 11px; } .s2-drop .opt.hl .dim { color: #dbe6ff; }
+
+/* ---------- NEW: the source tree ---------- */
+.source-summary { display: flex; align-items: center; gap: 6px; margin: 10px 0 4px; font-size: 12px; color: #57606a; white-space: nowrap; clear: both; }
+.source-summary b { color: #24292f; }
+.source-summary .warn { color: #7a4b00; background: #fff4dc; border: 1px solid #e6b566; border-radius: 99px; padding: 0 6px; font-weight: 600; }
+.source-tree { border: 1px solid #e4e7ec; border-radius: 6px; padding: 4px 0; font-size: 12px; }
+.tree-row { display: flex; align-items: center; gap: 6px; padding: 2px 8px; min-height: 22px; }
+.tree-row.lvl1 { padding-left: 24px; } .tree-row.lvl2 { padding-left: 40px; } .tree-row.lvl3 { padding-left: 50px; }
+.tree-row .radio { width: 12px; height: 12px; border-radius: 50%; border: 1.5px solid #8b949e; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; background: white; }
+.tree-row .radio.on { border-color: #0e7a4a; } .tree-row .radio.on::after { content: ""; width: 6px; height: 6px; border-radius: 50%; background: #0e7a4a; }
+.tree-row .radio.sq { border-radius: 2px; }
+.tree-row .kind { color: #6b7280; width: 12px; text-align: center; font-size: 11px; flex-shrink: 0; }
+.tree-row .kind svg { width: 11px; height: 11px; vertical-align: -1px; }
+.tree-row .label { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tree-row .meta { color: #6b7280; white-space: nowrap; }
+.tree-row .lvl-tag { font-size: 8px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: white; background: #0e7a4a; padding: 1px 5px; border-radius: 3px; }
+.tree-row .right { margin-left: auto; display: flex; gap: 3px; align-items: center; white-space: nowrap; }
+.tree-row .right input.narrow { width: 28px; padding: 1px 3px; font-size: 11px; text-align: right; }
+.tree-row .right .th { color: #8b949e; font-size: 10px; margin-left: 3px; }
+.tree-row .vc { color: #6b7280; width: 56px; text-align: right; font-size: 11px; }
+.tree-row.lvl3 .label { font-weight: 500; font-size: 11px; }
+.tree-row.selected { background: #e8f3ed; }
+.tree-row.in { }
+.tree-row.out { opacity: .45; }
+.tree-row.excluded .label { text-decoration: line-through; color: #6b7280; }
+.tree-row .reason { color: #7a4b00; background: #fff4dc; border-radius: 3px; padding: 0 4px; font-size: 11px; }
+.tree-row .reason i { margin-right: 2px; }
+.tree-row a.view { color: #3455a4; font-size: 11px; text-decoration: none; margin-left: 4px; }
+.tree-row .connector { color: #c6cdd6; margin-right: -2px; }
+
+.tree-row .chev { color: #8b949e; font-size: 9px; width: 8px; flex-shrink: 0; }
+.tree-row .ovr { font-size: 10px; color: #3455a4; background: #eef2fb; border-radius: 3px; padding: 0 4px; white-space: nowrap; }
+.tree-detail { margin: 0 8px 4px 78px; padding: 6px 8px; border: 1px solid #dfe3e8; border-left: 3px solid #0e7a4a; border-radius: 4px; background: #fafbfc; font-size: 11px; }
+.tree-detail .drow { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 2px 0; }
+.tree-detail .drow b { font-weight: 600; width: 60px; color: #57606a; }
+.tree-detail label { margin-right: 8px; white-space: nowrap; }
+.tree-detail input.narrow { width: 40px; padding: 1px 3px; font-size: 11px; }
+.global-box { border: 1px solid #e4e7ec; border-radius: 6px; padding: 6px 8px; margin-top: 10px; font-size: 12px; }
+.global-box .gtitle { font-weight: 600; margin-bottom: 4px; display: flex; align-items: center; gap: 6px; }
+.global-box .gtitle span { color: #6b7280; font-weight: 400; font-size: 11px; }
+/* ---------- alt B: segmented control ---------- */
+.segmented { display: inline-flex; border: 1px solid #c6cdd6; border-radius: 6px; overflow: hidden; }
+.segmented span { padding: 3px 10px; font-size: 12px; display: inline-flex; gap: 5px; align-items: center; border-right: 1px solid #c6cdd6; color: #3d4550; }
+.segmented span:last-child { border-right: none; }
+.segmented span.on { background: #0e7a4a; color: white; font-weight: 600; }
+.segmented span i, .segmented span svg { font-size: 11px; width: 11px; height: 11px; }
+</style>
+</head>
+<body>
+<svg style="display:none">
+  <symbol id="node-icon-sample-female" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="3"/></symbol>
+  <symbol id="node-icon-sample" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" fill="none" stroke="currentColor" stroke-width="3"/></symbol>
+</svg>
+
+<h1>private#223 — SampleNode editor</h1>
+<p class="note">Drawn at the undocked drawer's 450px width. Same layout applies in the bottom-pane Editor tab.</p>
+
+<!-- ============================================================ -->
+<h2>1. Today <span class="pill-rec pill-today">as shipped in PR #1718</span></h2>
+<p class="note">The level is a dropdown that resubmits the form to swap the widget below it. Two of the four levels are missing,
+and there is nothing telling you what the extraction contains until you have picked it.</p>
+
+<div class="row">
+<div class="drawer">
+  <div class="drawer-header"><span class="drawer-title">Node</span><span class="drawer-tab active">Editor</span><span class="drawer-tab">Grid</span><span style="margin-left:auto;color:#6b7280;font-size:12px"><i class="fa-solid fa-down-left-and-up-right-to-center"></i> dock</span></div>
+  <div class="drawer-body">
+    <ul class="nav-tabs"><li><a class="active">Editor</a></li><li><a>Summary</a></li><li><a>Doc</a></li><li><a>Gene Coverage</a></li></ul>
+    <h4 class="node-editor-title"><span class="node-icon-badge" node_classification="source"><svg><use href="#node-icon-sample"/></svg></span>Sample <i class="fa-solid fa-book"></i></h4>
+    <div class="frow"><b>Source:</b> <span class="fake-select">Extraction</span></div>
+    <div class="frow"><b>Extraction:</b> <span class="select2" style="width:250px"><span>TSO-0412-DNA (DNA) 04/03/2024</span><span class="arrow">&#9660;</span></span><a class="cross-link">View Extraction</a></div>
+    <div class="preview"><b>3</b> sample(s) in <b>3</b> VCF(s) - 113 variants
+      <ul><li>TSO500_DNA_hard-filtered (TSO500_run7_DNA_hard-filtered.vcf) - 93 variants</li>
+          <li>TSO500_DNA_cnv (TSO500_run7_DNA_cnv.vcf) - 16 variants</li>
+          <li>TSO500_DNA_exon_cnv (TSO500_run7_DNA_exon_cnv.vcf) - 4 variants</li></ul></div>
+    <div class="filters-box"><b>VCF filters</b> &nbsp; <label><input type="checkbox" checked> PASS</label><label><input type="checkbox"> LowDepth</label><label><input type="checkbox"> LowUniqueAlignments</label></div>
+    <div class="frow genotype-row"><b title="Allelic Depth">AD</b>&ge;<input class="narrow" value="0"> <b>DP</b>&ge;<input class="narrow" value="0"> <b>GQ</b>&ge;<input class="narrow" value="0"> <b>PL</b>&le;<input class="narrow"></div>
+    <div class="genotype-row"><b>Per sample thresholds</b> - a row applies instead of the values above (sapath#301)
+      <table class="thresholds"><tr><th>Sample<th>VCF<th>AD&ge;<th>DP&ge;<th>GQ&ge;<th>PL&le;</tr>
+        <tr><td>TSO500_DNA_hard-filtered<td>TSO500_run7_DNA_hard-filtered.vcf<td><input class="narrow" value="5"><td><input class="narrow" value="20"><td><input class="narrow" value="0"><td><input class="narrow"></tr>
+        <tr><td>TSO500_DNA_cnv<td>TSO500_run7_DNA_cnv.vcf<td><input class="narrow" value="0"><td><input class="narrow" value="0"><td><input class="narrow" value="0"><td><input class="narrow"></tr>
+        <tr><td>TSO500_DNA_exon_cnv<td>TSO500_run7_DNA_exon_cnv.vcf<td><input class="narrow" value="0"><td><input class="narrow" value="0"><td><input class="narrow" value="0"><td><input class="narrow"></tr>
+      </table></div>
+    <div class="frow genotype-row"><table class="zyg"><tr><th>Ref<th>Het<th>Hom<th>?</tr><tr><td><input type="checkbox"><td><input type="checkbox" checked><td><input type="checkbox" checked><td><input type="checkbox"></tr></table> <a class="cross-link">Allele Frequency...</a></div>
+    <span class="btn">save</span>
+  </div>
+</div>
+<ul class="callouts">
+  <li>"Source" then "Extraction" is two decisions for one thing, and changing the first reloads the panel.</li>
+  <li>Specimen and Patient are hidden from the dropdown because they have no resolver yet.</li>
+  <li>The per-sample table repeats every node default, so you cannot tell an override from an inherited value.</li>
+  <li>The preview only appears after picking — you cannot see the siblings (the RNA arm, the blood specimen) you might have wanted instead.</li>
+</ul>
+</div>
+
+<!-- ============================================================ -->
+<h2>2. Proposed — one picker, one tree <span class="pill-rec">chosen</span></h2>
+<p class="note">Search for any of the four kinds of thing. The tree underneath is always the whole patient, and the radio on a row <em>is</em> the level:
+pick the patient, a specimen, an extraction or a single sample. Everything below the pick is read; everything else is dimmed but still there.
+Filters are <b>global by default</b> — PASS-only, AD/DP/GQ/PL, zygosity, allele frequency — because only PASS means the same thing in every VCF.
+Each VCF's own FILTER codes and threshold overrides live under its sample row, collapsed until you expand it.</p>
+
+<div class="row">
+<div class="drawer" style="position:relative">
+  <div class="drawer-header"><span class="drawer-title">Node</span><span class="drawer-tab active">Editor</span><span class="drawer-tab">Grid</span><span style="margin-left:auto;color:#6b7280;font-size:12px"><i class="fa-solid fa-down-left-and-up-right-to-center"></i> dock</span></div>
+  <div class="drawer-body">
+    <ul class="nav-tabs"><li><a class="active">Editor</a></li><li><a>Summary</a></li><li><a>Doc</a></li><li><a>Patient</a></li><li><a>Gene Coverage</a></li></ul>
+    <h4 class="node-editor-title"><span class="node-icon-badge" node_classification="source"><svg><use href="#node-icon-sample-female"/></svg></span>Specimen <i class="fa-solid fa-book"></i></h4>
+
+    <span class="num">1</span>
+    <div class="select2"><i class="fa-solid fa-magnifying-glass"></i><span class="ph">Find patient, specimen, extraction or sample…</span><span class="arrow">&#9660;</span></div>
+
+    <span class="num">2</span>
+    <div class="source-summary">Reading <b>5 samples</b> in <b>5 VCFs</b> · <b>137</b> variants <span class="warn"><i class="fa-solid fa-triangle-exclamation"></i> 1 skipped</span></div>
+
+    <div class="source-tree">
+      <div class="tree-row out">
+        <span class="radio"></span><span class="kind"><i class="fa-solid fa-user-injured"></i></span>
+        <span class="label">Jane Citizen (F)</span><span class="meta">· 7 samples</span>
+        <span class="right"><span class="lvl-tag" style="background:#8b949e">patient</span></span>
+      </div>
+      <div class="tree-row lvl1 selected">
+        <span class="radio on"></span><span class="kind"><i class="fa-solid fa-droplet"></i></span>
+        <span class="label">Liver biopsy FFPE</span><span class="meta">· Affected · 2024-03-01 · 5 samples</span>
+        <span class="right"><span class="lvl-tag">specimen</span><a class="view" title="View Specimen"><i class="fa-solid fa-arrow-up-right-from-square"></i></a></span>
+      </div>
+      <div class="tree-row lvl2 in">
+        <span class="radio"></span><span class="kind"><i class="fa-solid fa-flask"></i></span>
+        <span class="label">DNA</span><span class="meta">· 2024-03-04 · 3 samples</span>
+      </div>
+      <div class="tree-row lvl3 in">
+        <span class="radio sq"></span><span class="chev">&#9660;</span><span class="kind"><i class="fa-solid fa-file-lines"></i></span>
+        <span class="label" title="TSO500_run7_DNA_hard-filtered.vcf">TSO500_DNA_hard-filtered</span>
+        <span class="right"><span class="ovr">AD≥5 · DP≥20 · +LowDepth</span><span class="vc">93</span></span>
+      </div>
+      <span class="num" style="float:none;position:absolute;left:-26px;margin-top:22px">3</span>
+      <div class="tree-detail">
+        <div class="drow"><b>VCF</b> TSO500_run7_DNA_hard-filtered.vcf <a class="cross-link" style="margin-left:0">view</a></div>
+        <div class="drow"><b>FILTER</b>
+          <label><input type="checkbox" checked disabled> PASS <span style="color:#8b949e">(global)</span></label>
+          <label><input type="checkbox" checked> LowDepth</label>
+          <label><input type="checkbox"> LowUniqueAlignments</label>
+          <label><input type="checkbox"> weak_evidence</label>
+          <label><input type="checkbox"> base_quality</label></div>
+        <div class="drow"><b>Thresholds</b>
+          AD≥<input class="narrow override" value="5"> DP≥<input class="narrow override" value="20"> GQ≥<input class="narrow" placeholder="0"> PL≤<input class="narrow" placeholder="–">
+          <a class="cross-link" style="margin-left:0">reset</a></div>
+      </div>
+      <div class="tree-row lvl3 in">
+        <span class="radio sq"></span><span class="chev">&#9654;</span><span class="kind"><i class="fa-solid fa-file-lines"></i></span>
+        <span class="label">TSO500_DNA_cnv</span>
+        <span class="right"><span class="vc">16</span></span>
+      </div>
+      <div class="tree-row lvl3 in">
+        <span class="radio sq"></span><span class="chev">&#9654;</span><span class="kind"><i class="fa-solid fa-file-lines"></i></span>
+        <span class="label">TSO500_DNA_exon_cnv</span>
+        <span class="right"><span class="vc">4</span></span>
+      </div>
+      <div class="tree-row lvl2 in">
+        <span class="radio"></span><span class="kind"><i class="fa-solid fa-flask"></i></span>
+        <span class="label">RNA</span><span class="meta">· 2024-03-04 · 2 samples</span>
+      </div>
+      <div class="tree-row lvl3 in">
+        <span class="radio sq"></span><span class="chev">&#9654;</span><span class="kind"><i class="fa-solid fa-file-lines"></i></span>
+        <span class="label">TSO500_RNA_splice</span>
+        <span class="right"><span class="ovr">+SpliceLowConf</span><span class="vc">12</span></span>
+      </div>
+      <div class="tree-row lvl3 in">
+        <span class="radio sq"></span><span class="chev">&#9654;</span><span class="kind"><i class="fa-solid fa-file-lines"></i></span>
+        <span class="label">TSO500_RNA_fusions</span>
+        <span class="right"><span class="vc">12</span></span>
+      </div>
+      <div class="tree-row lvl3 in excluded">
+        <span class="radio sq" style="opacity:.3"></span><span class="chev"></span><span class="kind"><i class="fa-solid fa-file-lines"></i></span>
+        <span class="label">TSO500_RNA_cnv</span>
+        <span class="right"><span class="reason"><i class="fa-solid fa-triangle-exclamation"></i>GRCh37 (need GRCh38)</span></span>
+      </div>
+      <div class="tree-row lvl1 out">
+        <span class="radio"></span><span class="kind"><i class="fa-solid fa-droplet"></i></span>
+        <span class="label">Blood</span><span class="meta">· Reference · 2023-11-12 · 2 samples</span>
+      </div>
+      <div class="tree-row lvl2 out">
+        <span class="radio"></span><span class="kind"><i class="fa-solid fa-flask"></i></span>
+        <span class="label">DNA</span><span class="meta">· 2 samples</span>
+      </div>
+      <div class="tree-row lvl3 out">
+        <span class="radio sq"></span><span class="chev">&#9654;</span><span class="kind"><i class="fa-solid fa-file-lines"></i></span>
+        <span class="label">BloodWGS</span><span class="right"><span class="vc">4,102,331</span></span>
+      </div>
+      <div class="tree-row lvl3 out excluded">
+        <span class="radio sq"></span><span class="chev"></span><span class="kind"><i class="fa-solid fa-file-lines"></i></span>
+        <span class="label">BloodWGS_sv</span><span class="right"><span class="reason"><i class="fa-solid fa-triangle-exclamation"></i>VCF archived</span></span>
+      </div>
+    </div>
+
+    <span class="num">4</span>
+    <div class="global-box">
+      <div class="gtitle">Filters — all VCFs <span>a VCF's own FILTER codes and overrides are under its row</span></div>
+      <div class="frow" style="margin:4px 0"><label><input type="checkbox" checked> <b>PASS</b> only</label></div>
+      <div class="frow" style="flex-wrap:nowrap"><b title="Allelic Depth">AD</b>&ge;<input class="narrow" style="width:40px" value="0"> <b>DP</b>&ge;<input class="narrow" style="width:40px" value="0"> <b>GQ</b>&ge;<input class="narrow" style="width:40px" value="0"> <b>PL</b>&le;<input class="narrow" style="width:40px"></div>
+      <div class="frow"><table class="zyg"><tr><th>Ref<th>Het<th>Hom<th>?</tr><tr><td><input type="checkbox"><td><input type="checkbox" checked><td><input type="checkbox" checked><td><input type="checkbox"></tr></table> <a class="cross-link">Allele Frequency...</a></div>
+    </div>
+    <span class="btn">save</span>
+  </div>
+</div>
+
+<ul class="callouts">
+  <li><span class="num">1</span><b>One search box</b> — a grouped select2 (see below). Whatever you pick, the tree shows its whole patient with that row selected.</li>
+  <li><span class="num">2</span><b>The tree is the level control.</b> Circle radios on patient / specimen / extraction rows, square on sample rows. Dimmed rows are not read. Excluded samples stay visible, struck through, with the reason.</li>
+  <li><span class="num">3</span><b>Sample rows are collapsed by default.</b> A row with anything set shows a blue summary (<code>AD≥5 · DP≥20 · +LowDepth</code>). Expand it for that VCF's own FILTER codes — PASS is greyed because it is the global setting — and its threshold overrides (placeholder = inherited global, bold blue = overridden, <i>reset</i> clears them).</li>
+  <li><span class="num">4</span><b>Global filters</b> apply to every VCF read: PASS-only, AD/DP/GQ/PL, zygosity, allele frequency. PASS is the one FILTER value every VCF shares, so it is the only FILTER setting at this level; a VCF with nothing under its row gets exactly these.</li>
+  <li><b>Semantics per VCF:</b> records included are <code>PASS</code> (if global PASS is on) ∪ that VCF's ticked codes. No global PASS and nothing ticked means that VCF is unfiltered.</li>
+  <li><b>Templates with locked inputs</b> render the same tree read-only (no search box, radios disabled); the global filters and per-row overrides stay editable.</li>
+  <li>The editor title badge shows the patient's pedigree glyph, and the title reads the level — matching the card.</li>
+</ul>
+</div>
+
+<h2 style="font-size:13px;border:none;margin-top:24px;color:#57606a">2a. The search box, open</h2>
+<div class="row">
+<div class="drawer" style="height:230px">
+  <div class="drawer-body" style="position:relative">
+    <div class="select2"><i class="fa-solid fa-magnifying-glass"></i><span>liver</span><span class="arrow">&#9650;</span></div>
+    <div class="s2-drop">
+      <div class="group">Patients</div>
+      <div class="opt"><i class="fa-solid fa-user-injured"></i>Liverpool, Jane (F)<span class="dim">7 samples</span></div>
+      <div class="group">Specimens</div>
+      <div class="opt hl"><i class="fa-solid fa-droplet"></i>Liver biopsy FFPE — Jane Citizen<span class="dim">5 samples · 2024-03-01</span></div>
+      <div class="opt"><i class="fa-solid fa-droplet"></i>Liver core #2 — Tom Public<span class="dim">3 samples · 2023-08-19</span></div>
+      <div class="group">Extractions</div>
+      <div class="opt"><i class="fa-solid fa-flask"></i>DNA 2024-03-04 — Liver biopsy FFPE<span class="dim">3 samples</span></div>
+      <div class="opt"><i class="fa-solid fa-flask"></i>RNA 2024-03-04 — Liver biopsy FFPE<span class="dim">2 samples</span></div>
+      <div class="group">Samples</div>
+      <div class="opt"><i class="fa-solid fa-file-lines"></i>TSO500_Liver_DNA_hard-filtered<span class="dim">TSO500_run7_DNA_hard-filtered.vcf</span></div>
+    </div>
+  </div>
+</div>
+<ul class="callouts">
+  <li>Plain select2 groups (<code>children</code> arrays) — no <code>dal_queryset_sequence</code> needed. Ids are <code>&lt;level&gt;:&lt;pk&gt;</code>.</li>
+  <li>Each group is the existing per-model autocomplete's queryset, so permissions, genome build and <code>exclude_archived</code> forwards all apply, capped at ~8 rows per group.</li>
+  <li>Result text carries the parent so two "DNA" extractions are distinguishable; the right-hand hint is the sample count or VCF name.</li>
+</ul>
+</div>
+
+<!-- ============================================================ -->
+<h2>3. Simpler alternative — segmented level + one autocomplete <span class="pill-rec pill-alt">alt</span></h2>
+<p class="note">If the tree is more than you want: replace the dropdown with a segmented control that switches the autocomplete URL client-side (no form resubmit),
+and keep the flat preview list. Same resolvers and endpoints underneath; only the editor template differs. Loses the "see the siblings" and "move a level in one click" properties.</p>
+<div class="row">
+<div class="drawer">
+  <div class="drawer-body">
+    <h4 class="node-editor-title"><span class="node-icon-badge" node_classification="source"><svg><use href="#node-icon-sample-female"/></svg></span>Specimen <i class="fa-solid fa-book"></i></h4>
+    <div class="frow"><span class="segmented">
+      <span><svg><use href="#node-icon-sample"/></svg>Sample</span><span><i class="fa-solid fa-flask"></i>Extraction</span><span class="on"><i class="fa-solid fa-droplet"></i>Specimen</span><span><i class="fa-solid fa-user-injured"></i>Patient</span>
+    </span></div>
+    <div class="frow"><span class="select2" style="width:300px"><i class="fa-solid fa-droplet" style="color:#6b7280;font-size:11px"></i><span>Liver biopsy FFPE — Jane Citizen</span><span class="arrow">&#9660;</span></span><a class="cross-link">View Specimen</a></div>
+    <div class="source-summary">Reading <b>5 samples</b> in <b>5 VCFs</b> · <b>137</b> variants <span class="warn"><i class="fa-solid fa-triangle-exclamation"></i> 1 skipped</span></div>
+    <div class="preview">
+      <ul><li><i class="fa-solid fa-flask" style="color:#6b7280"></i> DNA 2024-03-04 — TSO500_DNA_hard-filtered (93), TSO500_DNA_cnv (16), TSO500_DNA_exon_cnv (4)</li>
+          <li><i class="fa-solid fa-flask" style="color:#6b7280"></i> RNA 2024-03-04 — TSO500_RNA_splice (12), TSO500_RNA_fusions (12)</li>
+          <li class="warning"><i class="fa-solid fa-triangle-exclamation"></i> TSO500_RNA_cnv not included: genome build GRCh37 (need GRCh38)</li></ul></div>
+    <div class="filters-box"><b>VCF filters</b> &nbsp; <label><input type="checkbox" checked> PASS</label><label><input type="checkbox"> LowDepth</label></div>
+    <div class="frow genotype-row"><b>AD</b>&ge;<input class="narrow" value="0"> <b>DP</b>&ge;<input class="narrow" value="0"> <b>GQ</b>&ge;<input class="narrow" value="0"> <b>PL</b>&le;<input class="narrow"></div>
+    <div class="genotype-row"><b>Per sample thresholds</b>
+      <table class="thresholds"><tr><th>Sample<th>AD&ge;<th>DP&ge;<th>GQ&ge;<th>PL&le;</tr>
+        <tr><td>TSO500_DNA_hard-filtered<td><input class="narrow override" value="5"><td><input class="narrow override" value="20"><td><input class="narrow" placeholder="0"><td><input class="narrow" placeholder="–"></tr>
+        <tr><td>TSO500_DNA_cnv<td><input class="narrow" placeholder="0"><td><input class="narrow" placeholder="0"><td><input class="narrow" placeholder="0"><td><input class="narrow" placeholder="–"></tr>
+        <tr><td colspan=5 style="color:#8b949e">… 3 more</td></tr>
+      </table></div>
+    <span class="btn">save</span>
+  </div>
+</div>
+</div>
+
+</body>
+</html>

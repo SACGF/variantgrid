@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>private#223 — SampleNode on the canvas</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+<style>
+/* ---------- page chrome (mockup only) ---------- */
+body { margin: 0; padding: 24px 32px 64px; background: #fafbfc; color: #24292f;
+       font: 14px/1.5 -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+h1 { font-size: 20px; margin: 0 0 4px; }
+h2 { font-size: 15px; margin: 40px 0 8px; padding-bottom: 4px; border-bottom: 1px solid #e4e7ec; }
+h3 { font-size: 13px; margin: 18px 0 6px; color: #57606a; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+p.note { color: #57606a; max-width: 80ch; margin: 4px 0 12px; }
+.row { display: flex; gap: 40px; align-items: flex-start; flex-wrap: wrap; }
+.canvas { position: relative; background: white; border: 1px solid #ddd; border-radius: 6px; padding: 28px 30px 24px;
+          display: flex; gap: 44px; align-items: flex-start;
+          background-image: radial-gradient(#e6e8eb 1px, transparent 1px); background-size: 16px 16px; }
+.zoom { zoom: 2.2; }
+.zoomwrap { overflow-x: auto; }
+.caption { font-size: 12px; color: #57606a; margin-top: 8px; max-width: 26ch; }
+.slot { display: flex; flex-direction: column; align-items: flex-start; }
+.pill-rec { display: inline-block; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 99px;
+            background: #0e7a4a; color: white; vertical-align: middle; margin-left: 6px; }
+.pill-alt { background: #6b7280; }
+.pill-today { background: #c6cdd6; color: #24292f; }
+table.spec { border-collapse: collapse; font-size: 13px; }
+table.spec th, table.spec td { text-align: left; padding: 4px 10px; border-bottom: 1px solid #e4e7ec; vertical-align: top; }
+table.spec th { background: #f4f6f8; font-weight: 600; }
+code { background: #f1f3f5; padding: 0 4px; border-radius: 3px; font-size: 12px; }
+
+/* ---------- real analysis_nodes.css rules, copied ---------- */
+[node_classification="source"] { --node-classification-color: #0e7a4a; }
+[node_classification="filter"] { --node-classification-color: #3455a4; }
+.DamageNode { --node-accent-color: #f2b705; }
+.GeneListNode { --node-accent-color: #6b3fa0; }
+
+.window { box-sizing: unset; position: relative; z-index: 24; cursor: pointer; }
+.window.design-a-node {
+	width: 64px; height: auto; background-color: white;
+	border: 1px solid; color: #aaa;
+	border-radius: 8px; box-shadow: 2px 2px 8px rgba(0, 0, 0, .25);
+	font-family: -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+	font-style: normal; font-size: 10px; text-align: left;
+}
+div.node-overlay { color: black; pointer-events: none; position: relative; }
+.node-icon-badge {
+	width: 22px; height: 22px; border-radius: 50%;
+	color: var(--node-accent-color, var(--node-classification-color));
+	display: inline-flex; align-items: center; justify-content: center; font-size: 12px;
+	box-shadow: 0 0 0 2px var(--node-classification-color), 0 1px 3px rgba(0, 0, 0, .3);
+	background-color: white;
+}
+.design-a-node .node-badge { position: absolute; top: -9px; left: -9px; z-index: 3; }
+.design-a-node .node-klass {
+	display: block; font-size: 7px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+	color: white; background-color: var(--node-classification-color);
+	padding: 2px 4px 1px 15px; border-radius: 7px 7px 0 0;
+	white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.design-a-node .node-name-holder { padding: 4px 5px; min-height: 2.4em; }
+.design-a-node .node-name {
+	display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+	overflow-wrap: anywhere; color: #24292f; font-weight: 600; white-space: pre-line;
+}
+svg.node-icon { width: 15.4px; height: 15.4px; }
+.design-a-node .node-chips { display: flex; flex-wrap: wrap; gap: 2px; padding: 0 4px 4px; }
+.design-a-node .node-chips:empty { display: none; }
+.node-chip {
+	display: inline-flex; align-items: center; gap: 2px; max-width: 100%;
+	font-size: 8px; font-weight: 600; border: 1px solid #c6cdd6; border-radius: 99px; padding: 0 4px;
+	background-color: #f4f6f8; color: #3d4550; pointer-events: auto;
+}
+.node-chip .node-chip-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.node-chip .node-chip-text:empty { display: none; }
+.design-a-node .node-counts-strip { position: relative; min-height: 14px; border-top: 1px solid #e4e7ec; }
+span.node-counts { display: flex; flex-wrap: wrap; }
+.node-count { flex: 1 0 45%; display: block; height: 14px; line-height: 12px; text-align: center;
+              font-size: 8px; font-weight: 700; padding: 1px 0px; overflow: hidden; }
+.node-count-T .count-value { color: #000; } .node-count-I .count-value { color: #aaaaff; }
+.node-count-C .count-value { color: #ff0000; } .node-count-G .count-value { color: #7c26cb; }
+.node-count .live-data-marker { font-size: 0.8em; opacity: 0.7; }
+.node-selected.design-a-node { border-color: red; box-shadow: 0 0 0 2px rgba(255,0,0,.35), 2px 2px 8px rgba(0,0,0,.25); }
+.design-a-node[node_error] .node-counts { visibility: hidden; }
+.design-a-node[node_error] .node-counts-strip::after {
+	content: "\2715"; position: absolute; inset: 0; margin: auto; width: 12px; height: 12px; line-height: 12px;
+	text-align: center; font-size: 11px; font-weight: 700; color: #c02b2b; }
+
+/* ---------- NEW rules proposed by the plan ---------- */
+/* Amber chip: samples the group left out (archived VCF, other build, no permission) */
+.node-chip.node-chip-warning { border-color: #e6b566; background-color: #fff4dc; color: #7a4b00; }
+/* Count bubble inside a chip: how many VCFs that child brings */
+.node-chip .node-chip-count { background: #dfe3e8; color: #3d4550; border-radius: 99px; padding: 0 3px; font-size: 7px; line-height: 9px; margin-left: 1px; }
+.node-chip-warning .node-chip-count { background: #f3d9a4; }
+/* Nested group: a parent (specimen) wrapping its children's chips */
+.node-chip-group { display: flex; flex-wrap: wrap; gap: 2px; align-items: center; width: 100%; box-sizing: border-box;
+	padding: 1px 2px 2px 4px; border: 1px solid #c6cdd6; border-radius: 6px; background: #e9edf1; pointer-events: auto; }
+.node-chip-group .node-chip-group-label { display: inline-flex; align-items: center; gap: 2px; font-size: 8px; font-weight: 600; color: #3d4550; white-space: nowrap; }
+.node-chip-group .node-chip { background: white; }
+.node-chip-group .node-chip-group { background: #f4f6f8; padding-left: 3px; }
+.node-chip-group .node-chip-group .node-chip-group-label { font-weight: 600; }
+/* Option C only: small level glyph tucked on the badge */
+.node-klass.node-klass-long { font-size: 6px; letter-spacing: .02em; }
+.node-badge-sub { position: absolute; right: -5px; bottom: -4px; width: 11px; height: 11px; border-radius: 50%;
+	background: white; color: var(--node-classification-color); font-size: 6px;
+	display: inline-flex; align-items: center; justify-content: center;
+	box-shadow: 0 0 0 1px var(--node-classification-color); }
+
+/* ---------- add-node menu (real rules) ---------- */
+#id_node_types-button { display: flex; align-items: center; width: 180px; padding: 3px 6px; border: 1px solid #c6cdd6;
+	border-radius: 6px; background: white; font-size: 12px; line-height: 20px; color: #24292f; gap: .5em; }
+#id_node_types-button .caret { margin-left: auto; font-size: 9px; color: #6b7280; }
+.node-type-menu { width: 180px; padding: 3px; border: 1px solid #c6cdd6; border-radius: 6px; background: white;
+	box-shadow: 0 4px 12px rgba(0,0,0,.18); font-size: 12px; margin-top: 3px; }
+.node-type-menu .dropdown-item { display: block; padding: 2px 6px; border-radius: 4px; color: #24292f; text-decoration: none; }
+.node-type-menu .dropdown-item.active { background: #eef2fb; }
+.node-type-menu .dropdown-header { margin-top: 4px; padding: 2px 6px; font-size: 9px; font-weight: 700; letter-spacing: .06em;
+	text-transform: uppercase; color: #6b7280; border-bottom: 1px solid #e4e7ec; }
+.node-type-item { display: flex; align-items: center; gap: 0.5em; overflow: hidden; }
+.node-type-item .node-icon { width: 18px; height: 18px; font-size: 14px; text-align: center; flex-shrink: 0;
+	color: var(--node-classification-color); display: inline-flex; align-items: center; justify-content: center; }
+.node-type-item .node-icon svg { width: 15px; height: 15px; }
+.node-type-item .indent { color: #9aa3ad; font-size: 10px; margin-left: 4px; }
+</style>
+</head>
+<body>
+
+<!-- Pedigree sprite, as node_icon_sprite.html -->
+<svg style="display:none">
+  <symbol id="node-icon-sample" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" fill="none" stroke="currentColor" stroke-width="3"/></symbol>
+  <symbol id="node-icon-sample-male" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" fill="none" stroke="currentColor" stroke-width="3"/></symbol>
+  <symbol id="node-icon-sample-female" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="3"/></symbol>
+  <symbol id="node-icon-sample-female-deceased" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="3"><circle cx="12" cy="12" r="8.5"/><path d="M21 3 L3 21"/></g></symbol>
+  <symbol id="node-icon-sample-male-deceased" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="3"><rect x="4" y="4" width="16" height="16"/><path d="M21 3 L3 21"/></g></symbol>
+</svg>
+
+<h1>private#223 — SampleNode on the canvas</h1>
+<p class="note">Cards are drawn with the real <code>analysis_nodes.css</code> rules (64px wide, 10px base font).
+The first strip is actual size; the second is the same DOM at 2.2× so the chips are readable.
+Two new CSS rules are proposed: <code>.node-chip-warning</code> and (option C only) <code>.node-badge-sub</code>.</p>
+
+<!-- ============================================================ -->
+<h2>1. The four levels <span class="pill-rec">recommended</span></h2>
+<p class="note">Same pedigree badge at every level — it has always drawn the <em>patient</em>, and every level resolves to one.
+The class strip says what the node actually is. Chips are the hierarchy from the picked object down, nested the way the
+relations are: specimen <i class="fa-solid fa-droplet"></i> ⊃ extraction <i class="fa-solid fa-flask"></i> ⊃ one <code>VCF ×N</code> leaf.
+The picked object is the outermost chip, so an extraction node carries the flask and a sample node the VCF icon. An amber
+<code>⚠ ×N</code> counts anything left out.</p>
+
+<div class="canvas" id="levels-1x"></div>
+<div class="zoomwrap"><div class="canvas zoom" id="levels-zoom" style="gap:30px"></div></div>
+
+<table class="spec">
+<tr><th>Level</th><th>Badge</th><th>Strip</th><th>Name</th><th>Chips</th></tr>
+<tr><td>Sample</td><td>pedigree of <code>sample.patient</code></td><td>SAMPLE</td><td>sample name (as today)</td><td><i class="fa-solid fa-file-lines"></i> <code>VCF</code> — hover is the VCF it came from</td></tr>
+<tr><td>Extraction</td><td>pedigree of <code>extraction.specimen.patient</code></td><td>EXTRACTION <span style='color:#6b7280'>(6px — see strip row below)</span></td><td><code>str(extraction)</code> + (N samples)</td><td><i class="fa-solid fa-flask"></i> <code>DNA</code> group holding <code>VCF ×3</code>; <code>⚠ ×N</code></td></tr>
+<tr><td>Specimen</td><td>pedigree of <code>specimen.patient</code></td><td>SPECIMEN</td><td><code>str(specimen)</code> + (N samples)</td><td><i class="fa-solid fa-droplet"></i> <code>FFPE</code> group holding one <i class="fa-solid fa-flask"></i> group per extraction, each holding its <code>VCF ×N</code>; ⚠</td></tr>
+<tr><td>Patient</td><td>pedigree of <code>patient</code></td><td>PATIENT</td><td><code>str(patient)</code> + (N samples)</td><td>one <i class="fa-solid fa-droplet"></i> group per specimen, as above; ⚠</td></tr>
+</table>
+<p class="note">Chip icons follow each model's own <code>preview_icon()</code>: specimen <i class="fa-solid fa-droplet"></i> droplet, extraction <i class="fa-solid fa-flask"></i> flask, VCF <i class="fa-solid fa-file-lines"></i>.
+Group labels are the tissue (else status, else reference id) for a specimen and the nucleic acid for an extraction; hover is the full <code>str()</code>.
+VCFs are always one <code>VCF ×N</code> chip whose hover lists the names; the ⚠ chip's hover lists the reasons.
+Above 3 extractions or specimens in one group they collapse to a <code>×N</code> label, the existing <code>MAX_VCF_CHIPS</code> rule applied per group.</p>
+
+<h3>Icon sets side by side — all four levels, actual size</h3>
+<p class="note">Left: today's icons (vial specimen, flask extraction). Right: the chosen set — droplet specimen, flask extraction. Zoom the browser to compare at any scale.</p>
+<div class="row" style="gap:24px">
+  <div class="slot"><div class="canvas" id="set-today" style="gap:28px"></div><div class="caption" style="max-width:none">Today — <i class="fa-solid fa-vial"></i> vial / <i class="fa-solid fa-flask"></i> flask</div></div>
+  <div class="slot"><div class="canvas" id="set-box" style="gap:28px"></div><div class="caption" style="max-width:none">Chosen — <i class="fa-solid fa-droplet"></i> droplet / <i class="fa-solid fa-flask"></i> flask</div></div>
+</div>
+
+<h3>Icon pairs — specimen vs extraction</h3>
+<p class="note">Vial and flask are both glassware. Candidates below, drawn on the specimen card where the two sit together. At chip size what separates icons is silhouette — a blob for the specimen, a stick for the extraction.
+Already taken elsewhere in the app: <i class="fa-solid fa-flask"></i> <code>fa-flask</code> = Lab, <i class="fa-solid fa-dna"></i> <code>fa-dna</code> = Gene,
+<i class="fa-solid fa-microscope"></i> <code>fa-microscope</code> = Sample, <i class="fa-solid fa-lungs"></i> <code>fa-lungs</code> = Tissue node, <i class="fa-solid fa-flask-vial"></i> <code>fa-flask-vial</code> = seqauto.</p>
+<div class="zoomwrap"><div class="canvas zoom" id="icons-zoom" style="gap:26px; flex-wrap:wrap; max-width:520px"></div></div>
+<table class="spec">
+<tr><th>Pair</th><th>Specimen</th><th>Extraction</th><th>Reading</th></tr>
+<tr><td>1 <span class="pill-rec pill-today">today</span></td><td><i class="fa-solid fa-vial"></i> vial</td><td><i class="fa-solid fa-flask"></i> flask</td><td>two containers; flask is also Lab</td></tr>
+<tr><td>2</td><td><i class="fa-solid fa-vial"></i> vial</td><td><i class="fa-solid fa-dna"></i> helix</td><td>helix is Gene in search results and hover cards; the FA glyph is a crossed segment whose outline reads as an hourglass at any size; and a double helix is odd for an RNA extraction</td></tr>
+<tr><td>3</td><td><i class="fa-solid fa-vial"></i> vial</td><td><i class="fa-solid fa-eye-dropper"></i> pipette</td><td>better than today, but at 8px both are thin diagonal sticks</td></tr>
+<tr><td>4</td><td><i class="fa-solid fa-vial"></i> vial</td><td><i class="fa-solid fa-droplet"></i> droplet</td><td>eluate — reads as blood at chip size</td></tr>
+<tr><td>5</td><td><i class="fa-solid fa-cube"></i> block</td><td><i class="fa-solid fa-eye-dropper"></i> pipette</td><td>block suits FFPE, misleads for a blood draw</td></tr>
+<tr><td>6</td><td><i class="fa-solid fa-syringe"></i> syringe</td><td><i class="fa-solid fa-eye-dropper"></i> pipette</td><td>syringe suits blood, misleads for a block; two sticks again</td></tr>
+<tr><td>7</td><td><i class="fa-solid fa-box"></i> box</td><td><i class="fa-solid fa-eye-dropper"></i> pipette</td><td>the collected <em>container</em> (the LIMS word) vs what is pipetted off it; blob vs stick, neither used elsewhere, neutral across block / blood / marrow</td></tr>
+<tr><td>8</td><td><i class="fa-solid fa-disease"></i> tissue</td><td><i class="fa-solid fa-eye-dropper"></i> pipette</td><td>blob vs stick, but says "tumour" for a reference specimen</td></tr>
+<tr><td>9</td><td><i class="fa-solid fa-droplet"></i> droplet</td><td><i class="fa-solid fa-eye-dropper"></i> pipette</td><td>blob vs stick, says "blood" for a block</td></tr>
+<tr><td>10 <span class="pill-rec">chosen</span></td><td><i class="fa-solid fa-droplet"></i> droplet</td><td><i class="fa-solid fa-flask"></i> flask</td><td>biological material vs lab glassware; blob vs stick; flask stays as today (shared with Lab)</td></tr>
+</table>
+<p class="note">Chosen: <code>Specimen.preview_icon()</code> becomes <code>fa-solid fa-droplet</code> in <code>patients/models.py</code>; <code>Extraction.preview_icon()</code> stays <code>fa-solid fa-flask</code>. Chips, hover cards and search then agree.</p>
+
+<h3>Extraction strip label — the 45px problem</h3>
+<p class="note">The strip has ~45px for text at 7px bold, and <code>EXTRACTION</code> doesn't fit. With the flask chip already saying <code>DNA</code>, the 6px strip is the main row's pick.</p>
+<div class="zoomwrap"><div class="canvas zoom" id="strip-zoom"></div></div>
+
+
+
+<!-- ============================================================ -->
+<h2>2. Badge options — what shows the level?</h2>
+<p class="note">All three drawn for the same specimen-level node (female patient, DNA + RNA arms, 5 VCFs, one archived).</p>
+<div class="zoomwrap"><div class="canvas zoom" id="options-zoom"></div></div>
+
+<table class="spec">
+<tr><th></th><th>Badge</th><th>Level shown by</th><th>Trade</th></tr>
+<tr><td><b>A</b> <span class="pill-rec pill-alt">alt</span></td><td>the level's own icon (vial / flask / microscope / user)</td><td>badge</td><td>the pedigree sex/deceased glyph is gone; four badge glyphs to learn</td></tr>
+<tr><td><b>B</b> <span class="pill-rec">recommended</span></td><td>pedigree, at every level</td><td>class strip text + chips</td><td>nothing new to learn — strip is already where a card says its kind; costs one instance hook <code>get_node_strip_label()</code></td></tr>
+<tr><td><b>C</b> <span class="pill-rec pill-alt">alt</span></td><td>pedigree + 11px level glyph on the badge</td><td>badge sub-glyph + strip</td><td>legible at 1×? borderline — 6px icon; one more CSS rule</td></tr>
+</table>
+
+<!-- ============================================================ -->
+<h2>3. Add-node menu</h2>
+<p class="note">Four entries under Source, each creating a <code>SampleNode</code> with <code>source_level</code> stamped.
+Icons in the menu are the models' own so they match the chips. On the canvas the badge is still the pedigree.</p>
+<div class="row">
+  <div>
+    <div id="id_node_types-button"><span class="node-type-item"><span class="node-icon"><svg><use href="#node-icon-sample"/></svg></span><span>Sample</span></span><span class="caret">&#9660;</span></div>
+    <div class="node-type-menu">
+      <h6 class="dropdown-header">Source</h6>
+      <a class="dropdown-item" node_classification="source"><span class="node-type-item"><span class="node-icon"><i class="fa-solid fa-database"></i></span><span>All Variants</span></span></a>
+      <a class="dropdown-item" node_classification="source"><span class="node-type-item"><span class="node-icon"><i class="fa-solid fa-clipboard-check"></i></span><span>Classifications</span></span></a>
+      <a class="dropdown-item" node_classification="source"><span class="node-type-item"><span class="node-icon"><i class="fa-solid fa-book-medical"></i></span><span>ClinVar</span></span></a>
+      <a class="dropdown-item" node_classification="source"><span class="node-type-item"><span class="node-icon"><i class="fa-solid fa-users"></i></span><span>Cohort</span></span></a>
+      <a class="dropdown-item" node_classification="source"><span class="node-type-item"><span class="node-icon"><svg><use href="#node-icon-pedigree"/></svg></span><span>Pedigree</span></span></a>
+      <a class="dropdown-item active" node_classification="source"><span class="node-type-item"><span class="node-icon"><svg><use href="#node-icon-sample"/></svg></span><span>Sample</span></span></a>
+      <a class="dropdown-item" node_classification="source"><span class="node-type-item"><span class="node-icon"><i class="fa-solid fa-flask"></i></span><span>Extraction</span></span></a>
+      <a class="dropdown-item" node_classification="source"><span class="node-type-item"><span class="node-icon"><i class="fa-solid fa-droplet"></i></span><span>Specimen</span></span></a>
+      <a class="dropdown-item" node_classification="source"><span class="node-type-item"><span class="node-icon"><i class="fa-solid fa-user-injured"></i></span><span>Patient</span></span></a>
+      <a class="dropdown-item" node_classification="source"><span class="node-type-item"><span class="node-icon"><svg><use href="#node-icon-trio"/></svg></span><span>Trio</span></span></a>
+      <h6 class="dropdown-header">Filter</h6>
+      <a class="dropdown-item" node_classification="filter"><span class="node-type-item"><span class="node-icon"><i class="fa-solid fa-chart-simple"></i></span><span>Allele Frequency</span></span></a>
+      <a class="dropdown-item" node_classification="filter"><span class="node-type-item"><span class="node-icon"><i class="fa-solid fa-sliders"></i></span><span>Built In Filter</span></span></a>
+      <a class="dropdown-item" node_classification="filter"><span class="node-type-item"><span class="node-icon"><i class="fa-solid fa-bolt"></i></span><span>Effect</span></span></a>
+      <a class="dropdown-item" node_classification="filter"><span class="node-type-item"><span class="node-icon"><i class="fa-solid fa-filter"></i></span><span>Filter</span></span></a>
+    </div>
+  </div>
+  <div class="note" style="max-width:48ch">
+    <p>The entries sit in the alphabetical Source list like any other node, so "Patient" is found where a user
+    looks for it. Menu key is <code>SampleNode:&lt;level&gt;</code>; <code>node_create</code> splits it into class + initial kwargs.</p>
+    <p>A deployment without patient data trims the list with <code>settings.ANALYSIS_SAMPLE_NODE_LEVELS</code>.</p>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<h2>4. In a graph</h2>
+<p class="note">A specimen node feeding the usual filters — the strip and chips are what tell it apart from a plain sample node next to it.</p>
+<div class="zoomwrap"><div class="canvas zoom" id="graph-zoom" style="gap: 30px; padding-right: 60px"></div></div>
+
+<script>
+// --- tiny renderer mirroring analysis_nodes.js createDefaultNode / updateNodeFromData ---
+function icon(ic) {
+  if (ic.symbol) return `<svg class="node-icon"><use href="#${ic.symbol}"/></svg>`;
+  return `<i class="node-icon ${ic.fa}"></i>`;
+}
+function chip(c) {
+  const t = (c.title||'').replace(/"/g,'&quot;');
+  if (c.children) {
+    return `<span class="node-chip-group" title="${t}"><span class="node-chip-group-label">${c.icon ? `<i class="${c.icon}"></i>` : ''}${c.text}</span>${c.children.map(chip).join('')}</span>`;
+  }
+  const count = c.count ? `<span class="node-chip-count">×${c.count}</span>` : '';
+  return `<span class="node-chip ${c.css_class||''}" title="${t}">${c.icon ? `<i class="${c.icon}"></i>` : ''}<span class="node-chip-text">${c.text}</span>${count}</span>`;
+}
+function card(n) {
+  const counts = (n.counts||[]).map(c => `<div class="node-count node-count-${c.t}" title="${c.title}"><div class="user-tag-colored count-value">${c.v}</div></div>`).join('');
+  return `<div class="window design-a-node SampleNode ${n.selected?'node-selected':''}" node_classification="${n.classification||'source'}" ${n.error?'node_error="true"':''} title="${n.name.replace(/\n/g,' ')}">
+    <div class="node-overlay SampleNode output-node">
+      <span class="node-badge node-icon-badge">${icon(n.icon)}${n.sub ? `<span class="node-badge-sub"><i class="${n.sub}"></i></span>` : ''}</span>
+      <span class="node-klass ${n.stripClass||''}">${n.strip}</span>
+      <div class="node-name-holder"><span class="node-name">${n.name}</span></div>
+      <div class="node-chips">${(n.chips||[]).map(chip).join('')}</div>
+      <div class="node-color-overlay"></div>
+    </div>
+    <div class="node-counts-strip"><span class="node-counts">${counts}</span></div>
+  </div>`;
+}
+function slot(n, caption) {
+  return `<div class="slot">${card(n)}${caption ? `<div class="caption">${caption}</div>` : ''}</div>`;
+}
+
+const VCF = (name) => ({text: "VCF", icon: "fa-solid fa-file-lines", title: name});
+const counts4 = [{t:'T',v:'1,214',title:'Total'},{t:'I',v:'88',title:'High or Mod impact'},{t:'C',v:'3',title:'ClinVar'},{t:'G',v:'2',title:'Classified'}];
+
+const LEVELS = [
+  {icon:{symbol:'node-icon-sample-female'}, strip:'Sample', name:'TSO500_DNA_hard-filtered',
+   chips:[{text:'VCF',icon:'fa-solid fa-file-lines',title:'TSO500_run7_DNA_hard-filtered.vcf'}],
+   counts:[{t:'T',v:'93',title:'Total'},{t:'I',v:'41',title:'High or Mod impact'}]},
+  {icon:{symbol:'node-icon-sample-female'}, strip:'Extraction', stripClass:'node-klass-long', name:'DNA 2024-03-04\n(3 samples)',
+   chips:[{text:'DNA',icon:'fa-solid fa-flask',title:'DNA 2024-03-04',children:[{text:'VCF',icon:'fa-solid fa-file-lines',count:3,title:'TSO500_run7_DNA_hard-filtered.vcf\nTSO500_run7_DNA_cnv.vcf\nTSO500_run7_DNA_exon_cnv.vcf'}]}],
+   counts:[{t:'T',v:'113⚡',title:'Total'},{t:'I',v:'44',title:'High or Mod impact'}]},
+  {icon:{symbol:'node-icon-sample-female'}, strip:'Specimen', name:'Liver biopsy FFPE\n(5 samples)',
+   chips:[{text:'FFPE',icon:'fa-solid fa-droplet',title:'Liver biopsy FFPE — Affected / lesional — collected 2024-03-01',children:[{text:'DNA',icon:'fa-solid fa-flask',title:'DNA 2024-03-04',children:[{text:'VCF',icon:'fa-solid fa-file-lines',count:3,title:'TSO500_run7_DNA_hard-filtered.vcf\nTSO500_run7_DNA_cnv.vcf\nTSO500_run7_DNA_exon_cnv.vcf'}]},{text:'RNA',icon:'fa-solid fa-flask',title:'RNA 2024-03-04',children:[{text:'VCF',icon:'fa-solid fa-file-lines',count:2,title:'TSO500_run7_RNA_splice.vcf\nTSO500_run7_RNA_fusions.vcf'}]}]},{text:'',icon:'fa-solid fa-triangle-exclamation',count:1,css_class:'node-chip-warning',title:"Sample 'TSO500_RNA_cnv' not included: genome build GRCh37 (need GRCh38)"}],
+   counts:[{t:'T',v:'137⚡',title:'Total'},{t:'I',v:'52',title:'High or Mod impact'}]},
+  {icon:{symbol:'node-icon-sample-female'}, strip:'Patient', name:'Jane Citizen (F)\n(7 samples)',
+   chips:[{text:'FFPE',icon:'fa-solid fa-droplet',title:'Liver biopsy FFPE — Affected / lesional — collected 2024-03-01',children:[{text:'DNA',icon:'fa-solid fa-flask',title:'DNA 2024-03-04',children:[{text:'VCF',icon:'fa-solid fa-file-lines',count:3,title:'TSO500_run7_DNA_hard-filtered.vcf\nTSO500_run7_DNA_cnv.vcf\nTSO500_run7_DNA_exon_cnv.vcf'}]},{text:'RNA',icon:'fa-solid fa-flask',title:'RNA 2024-03-04',children:[{text:'VCF',icon:'fa-solid fa-file-lines',count:2,title:'TSO500_run7_RNA_splice.vcf\nTSO500_run7_RNA_fusions.vcf'}]}]},{text:'Blood',icon:'fa-solid fa-droplet',title:'Blood — Reference (unaffected) — collected 2023-11-12',children:[{text:'DNA',icon:'fa-solid fa-flask',title:'DNA 2023-11-15',children:[{text:'VCF',icon:'fa-solid fa-file-lines',count:2,title:'BloodWGS.vcf\nBloodWGS_sv.vcf'}]}]},{text:'',icon:'fa-solid fa-triangle-exclamation',count:2,css_class:'node-chip-warning',title:"Sample 'TSO500_RNA_cnv' not included: genome build GRCh37 (need GRCh38)\nSample 'BloodWGS_sv' not included: VCF 'BloodWGS_sv.vcf' data is archived"}],
+   counts:[{t:'T',v:'~4.1M⚡',title:'Total'},{t:'I',v:'~21K',title:'High or Mod impact'}]},
+];
+const LEVEL_CAPTIONS = ['Sample — unchanged from today', 'Extraction — VCF chips as today; the extraction-id chip is gone since the name already says it', 'Specimen — one flask per extraction, VCF total, amber for what was left out', 'Patient — one vial per specimen'];
+
+document.getElementById('levels-1x').innerHTML = LEVELS.map(n => card(n)).join('');
+document.getElementById('levels-zoom').innerHTML = LEVELS.map((n,i) => slot(n, '')).join('');
+
+// --- icon pairs on the specimen card ---
+function withIcons(node, specIcon, extIcon) {
+  const swap = c => Object.assign({}, c, {
+    icon: c.icon === 'fa-solid fa-droplet' ? specIcon : (c.icon === 'fa-solid fa-flask' ? extIcon : c.icon),
+    children: c.children ? c.children.map(swap) : undefined });
+  return Object.assign({}, node, {chips: node.chips.map(swap)});
+}
+document.getElementById('set-today').innerHTML = LEVELS.map(n => card(withIcons(n, 'fa-solid fa-vial', 'fa-solid fa-flask'))).join('');
+document.getElementById('set-box').innerHTML = LEVELS.map(n => card(n)).join('');
+const PAIRS = [['fa-solid fa-vial','fa-solid fa-flask','1 today'],['fa-solid fa-vial','fa-solid fa-dna','2'],['fa-solid fa-vial','fa-solid fa-eye-dropper','3'],
+               ['fa-solid fa-vial','fa-solid fa-droplet','4'],['fa-solid fa-cube','fa-solid fa-eye-dropper','5'],['fa-solid fa-syringe','fa-solid fa-eye-dropper','6'],
+               ['fa-solid fa-box','fa-solid fa-eye-dropper','7'],['fa-solid fa-disease','fa-solid fa-eye-dropper','8'],['fa-solid fa-droplet','fa-solid fa-eye-dropper','9'],
+               ['fa-solid fa-droplet','fa-solid fa-flask','10 chosen']];
+document.getElementById('icons-zoom').innerHTML = PAIRS.map(([sp, ex, cap]) => slot(withIcons(LEVELS[2], sp, ex), cap)).join('');
+
+// --- extraction strip label options ---
+const ext = LEVELS[1];
+document.getElementById('strip-zoom').innerHTML = [
+  slot(Object.assign({}, ext, {strip:'Extraction', stripClass:''}), '"EXTRACTION" — truncates'),
+  slot(Object.assign({}, ext, {strip:'Extract', stripClass:''}), '"EXTRACT" — fits, reads as a verb'),
+  slot(Object.assign({}, ext, {strip:'DNA', stripClass:''}), '"DNA" / "RNA" — the nucleic acid; now redundant with the flask chip'),
+  slot(Object.assign({}, ext, {strip:'Extraction', stripClass:'node-klass-long'}), '"EXTRACTION" at 6px — a .node-klass-long rule for labels over 8 chars'),
+].join('');
+
+// --- option A / B / C for the specimen node ---
+const spec = LEVELS[2];
+const OPTIONS = [
+  Object.assign({}, spec, {icon:{fa:'fa-solid fa-droplet'}}),
+  spec,
+  Object.assign({}, spec, {sub:'fa-solid fa-droplet'}),
+];
+document.getElementById('options-zoom').innerHTML = OPTIONS.map((n,i) => slot(n, ['A — level icon replaces the pedigree','B — pedigree + strip + chips','C — pedigree with a level sub-glyph'][i])).join('');
+
+// --- small graph ---
+const graph = [
+  slot(LEVELS[2], ''),
+  slot({icon:{symbol:'node-icon-sample-male-deceased'}, strip:'Sample', name:'Father_WGS', counts:[{t:'T',v:'~4.2M',title:'Total'}]}, ''),
+  `<div class="slot" style="margin-top:30px">${`<div class="window design-a-node DamageNode" node_classification="filter"><div class="node-overlay DamageNode">
+     <span class="node-badge node-icon-badge"><i class="node-icon fa-solid fa-bolt"></i></span><span class="node-klass">Effect</span>
+     <div class="node-name-holder"><span class="node-name">Effect</span></div>
+     <div class="node-chips">${chip({text:'type',icon:'fa-solid fa-shapes',title:'Variant type: SNV, indel'})}${chip({text:'splice',icon:'fa-solid fa-scissors',title:'Splicing prediction score >= 0.5'})}</div>
+     <div class="node-color-overlay"></div></div><div class="node-counts-strip"><span class="node-counts"><div class="node-count node-count-T"><div class="count-value">61</div></div><div class="node-count node-count-I"><div class="count-value">61</div></div></span></div></div>`}</div>`,
+];
+document.getElementById('graph-zoom').innerHTML = graph.join('');
+</script>
+
+<!-- sprite symbols referenced in the menu -->
+<svg style="display:none">
+  <symbol id="node-icon-pedigree" viewBox="0 0 50 36"><g fill="none" stroke="currentColor" stroke-width="2.5"><rect x="8" y="3" width="10" height="10"/><circle cx="37" cy="8" r="5"/><path d="M18 8h14M25 8v8M12 16h26M12 16v6M38 16v6M25 16v6"/><rect x="7" y="22" width="10" height="10"/><circle cx="25" cy="27" r="5"/><rect x="33" y="22" width="10" height="10"/></g></symbol>
+  <symbol id="node-icon-trio" viewBox="0 0 32 26"><g fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="2" width="9" height="9"/><circle cx="24" cy="6.5" r="4.5"/><path d="M12 6.5h7.5M16 6.5v8M16 14.5v3"/><rect x="11.5" y="15" width="9" height="9"/></g></symbol>
+</svg>
+</body>
+</html>
