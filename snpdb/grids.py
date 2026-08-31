@@ -536,14 +536,46 @@ class AbstractVariantGrid(JqGridUserRowConfig):
             # Still in the catalogue and 'All columns' - a collection that shows it standalone gets
             # the same Pass/Fail gnomAD link the gnomAD AF cell draws
             'variantannotation__gnomad_filtered': {"formatter": "gnomadFilteredFormatter"},
-            # Composite cells - the partner values ride along hidden (COMPOSITE_COLUMN_ROW_FIELDS)
-            'variantannotation__consequence': {'width': 160, 'formatter': 'impactConsequenceFormatter'},
+            # Composite cells - the partner values ride along hidden (COMPOSITE_COLUMN_ROW_FIELDS).
+            # A cell drawing several values carries a sort_menu naming the column each one sorts on
+            'variantannotation__consequence': {
+                'width': 160, 'formatter': 'impactConsequenceFormatter',
+                'sort_menu': [
+                    {"label": "Consequence", "column": "variantannotation__consequence"},
+                    # Impact is stored ascending by severity (@see PathogenicityImpact.CHOICES)
+                    {"label": "Impact", "column": "variantannotation__impact"},
+                ],
+            },
             'variantannotation__gnomad_af': {'width': 130, 'formatter': 'gnomadAfFormatter'},
             'variantannotation__gnomad_popmax_af': {'width': 110, 'formatter': 'gnomadPopmaxFormatter'},
-            'variantannotation__spliceai_max_ds': {'width': 80, 'formatter': 'spliceaiFormatter'},
-            'variantannotation__maxentscan_percent_diff_ref': {'width': 90,
-                                                               'formatter': 'maxentscanFormatter'},
-            'variantannotation__mastermind_count_1_cdna': {'width': 80, 'formatter': 'mastermindFormatter'},
+            'variantannotation__spliceai_max_ds': {
+                'width': 80, 'formatter': 'spliceaiFormatter',
+                'sort_menu': [
+                    {"label": "Max delta score", "column": "variantannotation__spliceai_max_ds"},
+                    {"label": "Acceptor gain", "column": "variantannotation__spliceai_pred_ds_ag"},
+                    {"label": "Acceptor loss", "column": "variantannotation__spliceai_pred_ds_al"},
+                    {"label": "Donor gain", "column": "variantannotation__spliceai_pred_ds_dg"},
+                    {"label": "Donor loss", "column": "variantannotation__spliceai_pred_ds_dl"},
+                ],
+            },
+            'variantannotation__maxentscan_percent_diff_ref': {
+                'width': 90, 'formatter': 'maxentscanFormatter',
+                'sort_menu': [
+                    {"label": "% diff from ref", "column": "variantannotation__maxentscan_percent_diff_ref"},
+                    {"label": "Reference score", "column": "variantannotation__maxentscan_ref"},
+                    {"label": "Alt score", "column": "variantannotation__maxentscan_alt"},
+                    {"label": "Score difference", "column": "variantannotation__maxentscan_diff"},
+                ],
+            },
+            'variantannotation__mastermind_count_1_cdna': {
+                'width': 80, 'formatter': 'mastermindFormatter',
+                'sort_menu': [
+                    {"label": "Variant articles", "column": "variantannotation__mastermind_count_1_cdna"},
+                    {"label": "Variant/protein articles",
+                     "column": "variantannotation__mastermind_count_2_cdna_prot"},
+                    {"label": "AA change articles", "column": "variantannotation__mastermind_count_3_aa_change"},
+                ],
+            },
             'variantannotation__aloft_pred': {
                 'width': 125, 'formatter': 'aloftFormatter',
                 'sort_menu': [
@@ -554,9 +586,24 @@ class AbstractVariantGrid(JqGridUserRowConfig):
                     {"label": "High confidence", "column": "variantannotation__aloft_high_confidence"},
                 ],
             },
-            'variantannotation__predictions_num_pathogenic': {'width': 80,
-                                                              'formatter': 'predictionsFormatter'},
-            'global_variant_zygosity__het_count': {'width': 70, 'formatter': 'dbZygosityCountsFormatter'},
+            'variantannotation__predictions_num_pathogenic': {
+                'width': 80, 'formatter': 'predictionsFormatter',
+                'sort_menu': [
+                    {"label": "Damaging count", "column": "variantannotation__predictions_num_pathogenic"},
+                    {"label": "Benign count", "column": "variantannotation__predictions_num_benign"},
+                ],
+            },
+            # The same cell (and the same menu) the cohort node draws with its own counts
+            # @see CohortNode._get_node_extra_colmodel_overrides
+            'global_variant_zygosity__het_count': {
+                'width': 70, 'formatter': 'dbZygosityCountsFormatter',
+                'sort_menu': [
+                    {"label": "Het count", "column": "global_variant_zygosity__het_count"},
+                    {"label": "Hom count", "column": "global_variant_zygosity__hom_count"},
+                    {"label": "Ref count", "column": "global_variant_zygosity__ref_count"},
+                    {"label": "Unknown count", "column": "global_variant_zygosity__unk_count"},
+                ],
+            },
             'variantannotation__exon': {"server_side_formatter": server_side_format_exon_and_intron},
             'variantannotation__intron': {"server_side_formatter": server_side_format_exon_and_intron},
             'variantannotation__mastermind_mmid3': {'formatter': 'formatMasterMindMMID3'},

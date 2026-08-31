@@ -85,6 +85,23 @@ class RepresentativeVariantColumnTest(GridExportTestCase):
                 ("global_variant_zygosity__het_count", "dbZygosityCountsFormatter")]:
             self.assertEqual(colmodels[name]["formatter"], formatter, name)
 
+    def test_composite_sort_menus_name_columns_in_the_grid(self):
+        """ An entry naming a column this grid doesn't carry is dropped client side, so the menu has
+            to name the composite itself and its (hidden) partners """
+        colmodels = self._colmodels_by_name()
+        menus = {name: cm["sort_menu"] for name, cm in colmodels.items() if cm.get("sort_menu")}
+        self.assertIn("variantannotation__consequence", menus)
+        queryset = self.grid.get_queryset(FakeRequest(user=self.user))
+        for name, sort_menu in menus.items():
+            self.assertEqual(sort_menu[0]["column"], name, name)  # the column's own key leads
+            for entry in sort_menu:
+                column = entry["column"]
+                cm = colmodels.get(column)
+                self.assertIsNotNone(cm, column)
+                self.assertTrue(cm.get("sortable", True), column)
+                # Picking the entry sorts on that column's own sort index - which has to resolve
+                list(self.grid._sort_items(queryset, cm.get("index", column), "asc"))
+
     def test_gnomad_columns_keep_their_server_side_formatting(self):
         """ The gnomAD AFs are formatted server side (unit -> percent) so the CSV matches the grid -
             the client renderers only add the population / the Pass-Fail link beside them """

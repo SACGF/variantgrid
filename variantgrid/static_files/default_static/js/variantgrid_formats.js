@@ -578,6 +578,15 @@ function _formatAllele(seq) {
     return seq.length > REPRESENTATIVE_MAX_ALLELE_BASES ? `[${seq.length}bp]` : seq;
 }
 
+// The contig the way a reader says it - 'chr8' rather than the bare '8' the contig is named
+function _contigLabel(chrom) {
+    if (chrom == null || chrom === '') {
+        return '';
+    }
+    const name = String(chrom);
+    return name.toLowerCase().startsWith('chr') ? name : `chr${name}`;
+}
+
 function _formatBases(bases) {
     if (bases >= 1e6) {
         return (bases / 1e6).toFixed(2) + " Mb";
@@ -622,11 +631,15 @@ function _representativeVariantLabel(variantId, rowData) {
               + (p ? ` <span class='rv-hgvs-p'>${escapeHtml(p.change)}</span>` : '') + '</span>';
         return {html: html, title: hgvsC + (hgvsP ? " " + hgvsP : "")};
     }
-    // 2. g.HGVS (no transcript - intergenic, or annotation not run yet for this variant)
+    // 2. g.HGVS (no transcript - intergenic, or annotation not run yet for this variant). The contig
+    // leads the way the gene symbol does above, and the accession it stands in for moves to line 2
     const g = _splitHgvs(hgvsG);
     if (g && g.change.length <= REPRESENTATIVE_MAX_HGVS_CHARS) {
-        return {html: `<span class='rv-hgvs'>${escapeHtml(g.change)}</span> <span class='rv-sub'>${escapeHtml(chrom)}</span>`,
-                title: hgvsG};
+        const contig = _contigLabel(chrom);
+        const html = (contig ? `<span class='rv-gene'>${escapeHtml(contig)}</span> ` : '')
+                   + `<span class='rv-hgvs'>${escapeHtml(g.change)}</span>`
+                   + `<span class='rv-line2'>${escapeHtml(g.accession)}</span>`;
+        return {html: html, title: hgvsG};
     }
     // 3/4. Coordinate - symbolic as a span with the type, otherwise ref>alt with long alleles collapsed
     if (chrom != null && position != null && alt != null) {
