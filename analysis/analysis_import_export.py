@@ -72,7 +72,7 @@ def analysis_export_to_dict(analysis: Analysis) -> dict:
     analysis_data["edges"] = json.loads(serialize('json', AnalysisEdge.objects.filter(child__analysis=analysis)))
     if node_count_config := AnalysisNodeCountConfiguration.objects.filter(analysis=analysis).first():
         node_counts_qs = node_count_config.analysisnodecountconfigrecord_set.order_by("sort_order")
-        analysis_data["node_counts"] = list(node_counts_qs.values_list("built_in_filter", flat=True))
+        analysis_data["node_counts"] = list(node_counts_qs.values_list("node_count_type", flat=True))
     return analysis_data
 
 
