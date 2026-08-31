@@ -18,6 +18,8 @@ from analysis.related_analyses import (
     get_related_analysis_details_for_samples,
     get_related_analysis_details_for_trio,
 )
+from patients.models_enums import SampleSourceLevel
+from patients.sample_grouping import get_sample_group
 from pedigree.models import Pedigree
 from snpdb.models import Cohort, Trio
 
@@ -121,14 +123,32 @@ def related_analyses_for_pedigree(context, pedigree):
     return context
 
 
-def _source_is_archived(kwargs: dict) -> bool:
+SINGLE_MODEL_ARGS = {"sample", "cohort", "trio", "quad", "pedigree", "extraction", "specimen", "patient"}
+# These reach their samples through the hierarchy rather than owning one VCF
+SAMPLE_GROUP_ARGS = {
+    "extraction": SampleSourceLevel.EXTRACTION,
+    "specimen": SampleSourceLevel.SPECIMEN,
+    "patient": SampleSourceLevel.PATIENT,
+}
+
+
+def _source_is_archived(user, kwargs: dict) -> bool:
     """ True when any sample/cohort/trio/quad/pedigree passed in is archived.
         Each source model implements its own `data_archived` property that walks
-        down to the underlying VCF/CohortGenotypeCollection. """
+        down to the underlying VCF/CohortGenotypeCollection.
+
+        A grouping object is archived only once every sample it reaches is - one live arm is still
+        worth analysing. """
     for key in ("sample", "cohort", "trio", "quad", "pedigree"):
         obj = kwargs.get(key)
         if obj is not None and getattr(obj, "data_archived", False):
             return True
+
+    for key, level in SAMPLE_GROUP_ARGS.items():
+        if obj := kwargs.get(key):
+            group = get_sample_group(user, level, obj)
+            if not group.samples and group.excluded:
+                return True
     return False
 
 
@@ -136,10 +156,10 @@ def _source_is_archived(kwargs: dict) -> bool:
 def analysis_templates_tag(context, genome_build, autocomplete_field=True, has_somatic_sample=False, has_sample_gene_list=False, requires_sample_gene_list=None,
                            **kwargs):
     user = context["user"]
-    single_model_args = {"sample", "cohort", "trio", "quad", "pedigree"}
+    single_model_args = SINGLE_MODEL_ARGS
     params_error_message = f"analysis_templates_tag should be passed dict with exactly one Model value for {','.join(single_model_args)}. Args: {kwargs}"
 
-    if _source_is_archived(kwargs):
+    if _source_is_archived(user, kwargs):
         # Don't offer to create new analyses against archived data.
         return {
             "genome_build": genome_build,

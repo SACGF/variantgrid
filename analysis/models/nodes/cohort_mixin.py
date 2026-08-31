@@ -253,7 +253,7 @@ class CohortMixin:
         vcf = self._get_vcf()
         if vcf:
             if filter_codes := NodeVCFFilter.get_filter_codes(self, vcf):
-                if filter_codes == [None]:  # PASS only
+                if filter_codes == {None}:  # PASS only
                     return 1
                 return 2
         return 0

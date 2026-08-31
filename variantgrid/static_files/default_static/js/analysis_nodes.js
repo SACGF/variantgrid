@@ -65,18 +65,28 @@ function renderNodeIcon(icon) {
 	return $("<i/>", {class: "node-icon " + ((icon && icon.fa) || "")});
 }
 
+// A chip with children is a group - the hierarchy nested the way the relations are, eg a specimen
+// wrapping its extractions wrapping their VCFs
 function renderChip(chip) {
-	const span = $("<span/>", {class: "node-chip"});
+	const group = chip.children && chip.children.length;
+	const span = $("<span/>", {class: group ? "node-chip-group" : "node-chip"});
 	if (chip.css_class) {
 		span.addClass(chip.css_class);
 	}
 	if (chip.title) {
 		span.attr("title", chip.title);
 	}
+	const label = group ? $("<span/>", {class: "node-chip-group-label"}).appendTo(span) : span;
 	if (chip.icon) {
-		$("<i/>", {class: chip.icon}).appendTo(span);
+		$("<i/>", {class: chip.icon}).appendTo(label);
 	}
-	$("<span/>", {class: "node-chip-text", text: chip.text}).appendTo(span);
+	$("<span/>", {class: "node-chip-text", text: chip.text}).appendTo(label);
+	if (chip.count) {
+		$("<span/>", {class: "node-chip-count", text: "\u00d7" + chip.count}).appendTo(label);
+	}
+	if (group) {
+		$.each(chip.children, function() { span.append(renderChip(this)); });
+	}
 	return span;
 }
 
@@ -172,7 +182,9 @@ function updateNodeFromData(node, nodeData) {
 	const nodeOverlay = $(".node-overlay", node);
 	nodeOverlay.attr("class", nodeData.overlay_css_classes);
 	$(".node-name", node).text(nodeData.name);
-	$(".node-klass", node).text(nodeData.class_label_short);
+	// The strip has ~45px of text - a long label (EXTRACTION) needs the smaller rule
+	const classLabel = nodeData.class_label_short || "";
+	$(".node-klass", node).text(classLabel).toggleClass("node-klass-long", classLabel.length > 8);
 	$(".node-badge", node).empty().append(renderNodeIcon(nodeData.icon));
 
 	const chipsHolder = $(".node-chips", node).empty();

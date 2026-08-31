@@ -30,10 +30,25 @@ class NodeDisplayTestCase(TestCase):
 
                 node = node_class()
                 self.assertEqual(icon, node.get_node_icon())
+                self.assertTrue(node.get_node_strip_label())
                 chips = node.get_node_chips()
                 self.assertIsInstance(chips, list)
                 for chip in chips:
                     self.assertIsInstance(chip, NodeChip)
+
+    def test_every_add_node_menu_entry_has_a_usable_icon(self):
+        """ Menu keys are what node_create is passed, so they have to be unique across all classes """
+        sprite_symbols = get_sprite_symbol_ids()
+        seen_keys = set()
+        for label, node_class in get_node_types_hash().items():
+            for entry in node_class.get_menu_entries():
+                with self.subTest(node_class=label, key=entry.key):
+                    self.assertNotIn(entry.key, seen_keys)
+                    seen_keys.add(entry.key)
+                    self.assertTrue(entry.label)
+                    self.assertNotEqual(bool(entry.icon.fa), bool(entry.icon.symbol))
+                    if entry.icon.symbol:
+                        self.assertIn(entry.icon.symbol, sprite_symbols)
 
     def test_sample_node_patient_shape_symbols_exist(self):
         """ SampleNode picks its badge by string, so the sprite has to carry all 4 combinations """

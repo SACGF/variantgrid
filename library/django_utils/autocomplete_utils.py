@@ -50,6 +50,10 @@ class AutocompleteReloadMixin:
         return forms.Media(js=["js/auto_complete_light_reload.js"])
 
 
+class ListSelect2(AutocompleteReloadMixin, autocomplete.ListSelect2):
+    """ For a plain CharField picker - the value isn't one model's pk (see SampleNodeForm.source) """
+
+
 class ModelSelect2(AutocompleteReloadMixin, autocomplete.ModelSelect2):
     pass
 

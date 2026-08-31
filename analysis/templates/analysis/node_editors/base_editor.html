@@ -264,7 +264,8 @@
 
 					<h4 class="node-editor-title">
 						{% render_node_icon_badge node %}
-						{{ node.get_node_class_label }}
+						{# What the node is, matching the card's class strip - see get_node_strip_label() #}
+						{{ node.get_node_strip_label }}
 						<a target="_blank" href="{{ help_url }}analysis/nodes.html#{{ node.get_node_class_label|slugify }}">
 							<i title="Help docs on this node" class="fas fa-book"></i>
 						</a>

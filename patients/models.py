@@ -361,7 +361,8 @@ class Specimen(GuardianPermissionsMixin, ExternallyManagedModel, PreviewModelMix
 
     @classmethod
     def preview_icon(cls) -> str:
-        return "fa-solid fa-vial"
+        # A blob against the extraction's stick - biological material vs the lab glassware taken off it
+        return "fa-solid fa-droplet"
 
     @classmethod
     def preview_if_url_visible(cls) -> Optional[str]:

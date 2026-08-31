@@ -92,5 +92,16 @@
         {% else %}
             <p>No measures recorded for this specimen.</p>
         {% endif %}
+
+        <hr/>
+        <h4>Create analysis</h4>
+        {% load related_analyses_tags %}
+        {% if sample_group_genome_builds %}
+            {% for genome_build in sample_group_genome_builds %}
+                {% analysis_templates_tag genome_build specimen=specimen %}
+            {% endfor %}
+        {% else %}
+            <p>No samples to analyse.</p>
+        {% endif %}
     </div>
 {% endblock submenu_page_content %}

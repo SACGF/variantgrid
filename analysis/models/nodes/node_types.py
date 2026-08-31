@@ -29,37 +29,38 @@ def get_node_types_hash():
     return subclasses
 
 
-def get_node_types_hash_by_class_name():
-    node_types = get_node_types_hash()
-
-    node_types_hash_by_class = {}
-    for node_class in node_types.values():
-        class_name = node_class().__class__.__name__
-        node_types_hash_by_class[class_name] = node_class
-    return node_types_hash_by_class
-
-
 def get_nodes_by_classification() -> dict[str, list]:
-    node_types = get_node_types_hash()
+    """ Add node dropdown rows. A class contributes one row unless it declares several menu entries
+        (SampleNode, one per source level) """
     nodes = defaultdict(list)
 
-    for node_class_label, node_class in node_types.items():
+    for node_class in get_node_types_hash().values():
         node = node_class()
         classification = node.get_node_classification()
-        data = {
-            "class_name": node.get_class_name(),
-            "class_label": node_class_label,
-            "class_label_short": node_class.get_node_class_label_short(),
-            "classification": classification,  # add node dropdown colours icons like the cards
-            "icon": asdict(node_class.get_node_class_icon()),
-        }
-        nodes[classification].append(data)
+        for entry in node_class.get_menu_entries():
+            nodes[classification].append({
+                "key": entry.key,  # What node_create is passed
+                "class_name": node.get_class_name(),  # Picks up the node's accent colour
+                "class_label": entry.label,
+                "class_label_short": node_class.get_node_class_label_short(),
+                "classification": classification,  # add node dropdown colours icons like the cards
+                "icon": asdict(entry.icon),
+            })
 
     return nodes
 
 
-def get_node_display_data_by_class_name() -> dict[str, dict]:
+def get_menu_entries_by_key() -> dict[str, tuple]:
+    """ (node class, initial kwargs) for each add node dropdown row """
+    entries = {}
+    for node_class in get_node_types_hash().values():
+        for entry in node_class.get_menu_entries():
+            entries[entry.key] = (node_class, entry.initial_kwargs)
+    return entries
+
+
+def get_node_display_data_by_menu_key() -> dict[str, dict]:
     """ Icons/labels for the add node dropdown, keyed by the <select> option values """
-    return {data["class_name"]: data
+    return {data["key"]: data
             for nodes in get_nodes_by_classification().values()
             for data in nodes}

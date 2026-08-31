@@ -3,14 +3,15 @@ import re
 
 from dal import forward
 from django import forms
+from django.core.exceptions import PermissionDenied
 from django.db.models import Q
 from django.forms.models import fields_for_model
 from django.forms.widgets import HiddenInput, RadioSelect, TextInput
+from django.http import Http404
 from django.utils.text import slugify
 
 from analysis import models
 from analysis.models import Analysis, AnalysisNode, AnalysisTemplateType, MOINode
-from analysis.models.enums import SampleNodeSourceLevel
 from analysis.variant_text import resolve_variant_text
 from analysis.models.nodes.analysis_node import NodeAlleleFrequencyFilter, NodeVCFFilter
 from analysis.models.nodes.filters.classifications_node import ClassificationsNode
@@ -40,12 +41,13 @@ from annotation.models import VariantAnnotation
 from annotation.pathogenicity_predictions import TOOLS
 from genes.custom_text_gene_list import create_custom_text_gene_list
 from genes.models import CustomTextGeneList, GeneList, GeneListCategory, PanelAppPanel
-from library.django_utils.autocomplete_utils import ModelSelect2, ModelSelect2Multiple
+from library.django_utils.autocomplete_utils import ListSelect2, ModelSelect2, ModelSelect2Multiple
 from library.forms import NumberInput, StarsWidget
 from library.genomics.vcf_enums import VARIANT_CLASS_GROUPS
 from library.utils import sha256sum_str
 from ontology.models import OntologyTerm
-from patients.models_enums import GnomADPopulation
+from patients.models_enums import GnomADPopulation, SampleSourceLevel
+from patients.sample_grouping import SOURCE_LEVEL_MODELS
 from snpdb.forms import GenomeBuildAutocompleteForwardMixin
 from snpdb.models import Lab, Sample, Tag, VCFFilter
 from snpdb.models.models_genome import Contig
@@ -83,7 +85,11 @@ class AlleleFrequencyMixin(forms.Form):
 
 
 class VCFLocusFiltersMixin(forms.Form):
-    """ Hidden Field, automatically populated in base_editor ajaxForm beforeSerialize """
+    """ Hidden Field, automatically populated in base_editor ajaxForm beforeSerialize.
+
+        {"pass": bool, "by_vcf": {"<vcf_id>": ["LowDepth", ...]}} - PASS is global because it is the
+        one FILTER value that means the same thing in every VCF; everything else belongs to the VCF
+        that declared it. A node spanning VCFs stores a row per (vcf, filter). """
     vcf_locus_filters = forms.CharField(widget=HiddenInput())
 
     def clean_vcf_locus_filters(self):
@@ -91,21 +97,23 @@ class VCFLocusFiltersMixin(forms.Form):
         return json.loads(data)
 
     def save_vcf_locus_filters(self, node):
-        # A node may span VCFs - one selection of filter ids, which NodeVCFFilter translates into
-        # each VCF's own codes at query time
-        if vcfs := node.get_vcf_locus_filter_vcfs():
-            vcf_locus_filters = self.cleaned_data["vcf_locus_filters"]
-            NodeVCFFilter.objects.filter(node=node).delete()
+        vcfs = node.get_vcf_locus_filter_vcfs()
+        if not vcfs:
+            return
 
-            if vcf_locus_filters:
-                for filter_id in vcf_locus_filters:
-                    if filter_id == "PASS":
-                        vcf_filter = None
-                    else:
-                        vcf_filter = VCFFilter.objects.filter(vcf__in=vcfs, filter_id=filter_id).first()
-                        if vcf_filter is None:
-                            continue
-                    NodeVCFFilter.objects.create(node=node, vcf_filter=vcf_filter)
+        vcf_locus_filters = self.cleaned_data["vcf_locus_filters"] or {}
+        NodeVCFFilter.objects.filter(node=node).delete()
+
+        if vcf_locus_filters.get("pass"):
+            NodeVCFFilter.objects.create(node=node, vcf_filter=None)
+
+        vcfs_by_id = {str(vcf.pk): vcf for vcf in vcfs}
+        for vcf_id, filter_ids in (vcf_locus_filters.get("by_vcf") or {}).items():
+            vcf = vcfs_by_id.get(str(vcf_id))
+            if vcf is None:
+                continue  # A VCF the node no longer reads
+            for vcf_filter in VCFFilter.objects.filter(vcf=vcf, filter_id__in=filter_ids):
+                NodeVCFFilter.objects.create(node=node, vcf_filter=vcf_filter)
 
 
 class BaseNodeForm(forms.ModelForm):
@@ -116,11 +124,21 @@ class BaseNodeForm(forms.ModelForm):
             m += forms.Media(js=["js/analysis_templates.js"])
         return m
 
+    def get_analysis_variable_field(self, field_name: str) -> str:
+        """ The node field an AnalysisVariable on this form field is keyed on - the same name, unless
+            a form field stands in for one (see SampleNodeForm.source) """
+        return field_name
+
 
 class VCFSourceNodeForm(AlleleFrequencyMixin, VCFLocusFiltersMixin, BaseNodeForm):
 
+    def set_node_fields(self, node):
+        """ Node fields the form works out rather than binding straight to. Runs before the filter
+            and allele frequency rows, which are resolved against what the node now reads """
+
     def save(self, commit=True):
         node = super().save(commit=False)
+        self.set_node_fields(node)
         self.save_allele_frequency(node)
         self.save_vcf_locus_filters(node)
         if commit:
@@ -835,27 +853,27 @@ class SampleThresholdsMixin(forms.Form):
 
 
 class SampleNodeForm(GenomeBuildAutocompleteForwardMixin, SampleThresholdsMixin, VCFSourceNodeForm):
+    """ One picker for all four levels - the editor asks for the thing, not for a level and then a
+        thing. `source` carries "<level>:<pk>"; save() unpacks it into source_level plus one FK. """
+    source = forms.CharField(
+        label="Source",
+        widget=ListSelect2(url='sample_source_autocomplete',
+                           attrs={'data-placeholder': 'Patient, specimen, extraction or sample...'}))
+
     GENOTYPE_FIELDS = ["min_ad", "min_dp", "min_gq", "max_pl",
                        "zygosity_ref", "zygosity_het", "zygosity_hom", "zygosity_unk",
                        "allele_frequency"]
-    LOCKED_INPUT_FIELDS = ['sample', 'extraction', 'restrict_to_qc_gene_list']
+    LOCKED_INPUT_FIELDS = ['source', 'restrict_to_qc_gene_list']
     # Only meaningful over a single sample - hidden at group levels rather than given an invented meaning
-    SAMPLE_LEVEL_FIELDS = ["sample", "sample_gene_list", "restrict_to_qc_gene_list"]
-    SOURCE_LEVEL_FIELDS = {
-        SampleNodeSourceLevel.SAMPLE: "sample",
-        SampleNodeSourceLevel.EXTRACTION: "extraction",
-    }
-    genome_build_fields = ["sample", "extraction"]
+    SAMPLE_LEVEL_FIELDS = ["sample_gene_list", "restrict_to_qc_gene_list"]
+    genome_build_fields = ["source"]
     exclude_archived = True
 
     class Meta:
         model = SampleNode
-        exclude = list(ANALYSIS_NODE_FIELDS) + ["has_gene_coverage", "specimen", "patient"]
+        exclude = list(ANALYSIS_NODE_FIELDS) + ["has_gene_coverage", "source_level",
+                                                "sample", "extraction", "specimen", "patient"]
         widgets = {
-            "sample": ModelSelect2(url='sample_autocomplete',
-                                   attrs={'data-placeholder': 'Sample...'}),
-            "extraction": ModelSelect2(url='extraction_autocomplete',
-                                       attrs={'data-placeholder': 'Extraction...'}),
             "min_ad": WIDGET_INTEGER_MIN_0,
             "min_dp": WIDGET_INTEGER_MIN_0,
             "min_gq": WIDGET_INTEGER_MIN_0,
@@ -868,9 +886,12 @@ class SampleNodeForm(GenomeBuildAutocompleteForwardMixin, SampleThresholdsMixin,
     def __init__(self, *args, has_genotype=True, lock_input_sources=False, **kwargs):
         super().__init__(*args, **kwargs)
 
-        # The levels that have a resolver - Specimen and Patient join them with a wider sample query
-        self.fields["source_level"].choices = [(level, SampleNodeSourceLevel(level).label)
-                                               for level in SampleNodeForm.SOURCE_LEVEL_FIELDS]
+        # A saved node has to round trip - select2 loads its options by ajax, so the current one is
+        # put in as a choice or the box comes back empty
+        if source_object := self.instance.get_source_object():
+            value = f"{self.instance.source_level}:{source_object.pk}"
+            self.fields["source"].initial = value
+            self.fields["source"].widget.choices = [(value, str(source_object))]
 
         remove_fields = []
         if has_genotype is False:
@@ -878,10 +899,6 @@ class SampleNodeForm(GenomeBuildAutocompleteForwardMixin, SampleThresholdsMixin,
 
         if lock_input_sources:
             remove_fields.extend(SampleNodeForm.LOCKED_INPUT_FIELDS)
-
-        for level, field_name in SampleNodeForm.SOURCE_LEVEL_FIELDS.items():
-            if level != self.instance.source_level:
-                remove_fields.append(field_name)
 
         if self.instance.is_group_level:
             remove_fields.extend(SampleNodeForm.SAMPLE_LEVEL_FIELDS)
@@ -896,6 +913,33 @@ class SampleNodeForm(GenomeBuildAutocompleteForwardMixin, SampleThresholdsMixin,
             self.fields["sample_gene_list"].widget.forward = [
                 forward.Const(sample_gl.pk, "category")
             ]
+
+    def get_analysis_variable_field(self, field_name: str) -> str:
+        """ The picker stands in for whichever FK the level uses - that FK is what a template's
+            AnalysisVariable is keyed on, since populate_arguments sets node fields by name """
+        if field_name == "source":
+            return self.instance.source_field
+        return super().get_analysis_variable_field(field_name)
+
+    def clean_source(self):
+        value = self.cleaned_data["source"]
+        if not value:
+            return None
+        level, _, pk = value.partition(":")
+        model = SOURCE_LEVEL_MODELS.get(level)
+        if model is None or level not in SampleNode.implemented_source_levels():
+            raise forms.ValidationError(f"Unknown source level: '{level}'")
+        try:
+            return level, model.get_for_user(self.instance.analysis.user, pk)
+        except (Http404, PermissionDenied, ValueError) as e:
+            raise forms.ValidationError(f"Could not use {model._meta.verbose_name} '{pk}'") from e
+
+    def set_node_fields(self, node):
+        if "source" in self.fields:
+            level, source_object = self.cleaned_data["source"] or (SampleSourceLevel.SAMPLE, None)
+            node.source_level = level
+            for source_level, field_name in SampleNode.SOURCE_LEVEL_FIELDS.items():
+                setattr(node, field_name, source_object if source_level == level else None)
 
     def save(self, commit=True):
         node = super().save(commit=commit)

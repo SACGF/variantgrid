@@ -49,6 +49,18 @@
             <p>This extraction has no samples.</p>
         {% endif %}
 
+
+        <hr/>
+        <h4>Create analysis</h4>
+        {% load related_analyses_tags %}
+        {% if sample_group_genome_builds %}
+            {% for genome_build in sample_group_genome_builds %}
+                {% analysis_templates_tag genome_build extraction=extraction %}
+            {% endfor %}
+        {% else %}
+            <p>No samples to analyse.</p>
+        {% endif %}
+
         {% if sequencing_samples %}
             <h4>Sequencing Samples</h4>
             <table class="table">

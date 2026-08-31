@@ -1,6 +1,6 @@
-{% if vcfs %}
+{% if vcf %}
 {% load js_tags %}
-<div id='vcf-locus-filters'>
+<div id='vcf-locus-filters' vcf_id='{{ vcf.pk }}'>
 <script>
     var vlf_descriptions = {{ vlf_descriptions | jsonify }};
     

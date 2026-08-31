@@ -3,6 +3,7 @@ import mimetypes
 import pandas as pd
 from django.conf import settings
 from django.db.models import Prefetch, Q
+from django.http import Http404
 from django.http.response import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_http_methods, require_POST
@@ -28,11 +29,27 @@ from patients.models import (
     PatientRecords,
     Specimen,
 )
-from patients.models_enums import MatchStatus
-from patients.sample_grouping import get_extraction_sample_group, sample_group_as_json
+from patients.models_enums import MatchStatus, SampleSourceLevel
+from patients.sample_grouping import (
+    SOURCE_LEVEL_MODELS,
+    get_patient_sample_tree,
+    get_sample_group,
+    sample_group_as_json,
+)
 from seqauto.models import SequencingSample
 from snpdb.models import GenomeBuild, Sample
 from uicore.utils.form_helpers import form_helper_horizontal
+
+
+def _sample_group_genome_builds(user, level: str, source) -> list:
+    """ Which builds an analysis template could be launched in - an analysis has exactly one, and a
+        specimen's arms can sit in different ones """
+    group = get_sample_group(user, level, source)
+    builds = []
+    for sample in group.samples:
+        if sample.genome_build not in builds:
+            builds.append(sample.genome_build)
+    return builds
 
 
 def view_patient(request, patient_id):
@@ -60,6 +77,8 @@ def view_patient(request, patient_id):
                "specimens": specimens,
                "existing_files": existing_files,
                "show_read_only_patient_dob": show_read_only_patient_dob,
+               "sample_group_genome_builds": _sample_group_genome_builds(
+                   request.user, SampleSourceLevel.PATIENT, patient),
                "has_write_permission": has_write_permission}
     return render(request, 'patients/view_patient.html', context)
 
@@ -196,6 +215,8 @@ def view_specimen(request, specimen_id):
                "create_extraction_field": CREATE_EXTRACTION,
                "extractions": specimen.extraction_set.order_by("pk").prefetch_related(visible_samples),
                "measures": specimen.specimenmeasure_set.order_by("measure_type", "-measured_date"),
+               "sample_group_genome_builds": _sample_group_genome_builds(
+                   request.user, SampleSourceLevel.SPECIMEN, specimen),
                "has_write_permission": has_write_permission}
     return render(request, 'patients/view_specimen.html', context)
 
@@ -219,24 +240,49 @@ def view_extraction(request, extraction_id):
                "form": form,
                "samples": Sample.filter_for_user(request.user).filter(extraction=extraction).order_by("pk"),
                "sequencing_samples": extraction.sequencingsample_set.order_by("pk"),
+               "sample_group_genome_builds": _sample_group_genome_builds(
+                   request.user, SampleSourceLevel.EXTRACTION, extraction),
                "has_write_permission": has_write_permission}
     return render(request, 'patients/view_extraction.html', context)
 
 
-def extraction_samples(request, extraction_id):
-    """ The samples an analysis grouping node reaches for this extraction, with per sample counts off
-        the stats rows. Keyed on the extraction rather than a node, as it has to answer before a node
+def _get_sample_source(user, level: str, pk: int):
+    """ A level of Patient -> Specimen -> Extraction -> Sample, loaded through its own permissions """
+    model = SOURCE_LEVEL_MODELS.get(level)
+    if model is None:
+        raise Http404(f"Unknown sample source level '{level}'")
+    return model.get_for_user(user, pk)
+
+
+def _get_request_genome_build(request):
+    if genome_build_name := request.GET.get("genome_build"):
+        return GenomeBuild.get_name_or_alias(genome_build_name)
+    return None
+
+
+def sample_group_samples(request, level, pk):
+    """ The samples an analysis grouping node reaches for this object, with per sample counts off
+        the stats rows. Keyed on the object rather than a node, as it has to answer before a node
         is saved.
 
         Pass ?genome_build= to restrict to an analysis' build - what that leaves out comes back in
         'excluded' rather than being quietly dropped. """
-    extraction = Extraction.get_for_user(request.user, extraction_id)
-    genome_build = None
-    if genome_build_name := request.GET.get("genome_build"):
-        genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
-
-    group = get_extraction_sample_group(request.user, extraction, genome_build)
+    source = _get_sample_source(request.user, level, pk)
+    group = get_sample_group(request.user, level, source, _get_request_genome_build(request))
     return JsonResponse(sample_group_as_json(group))
+
+
+def sample_group_tree(request, level, pk):
+    """ The whole patient the object belongs to, with the picked row's subtree flagged - what the
+        SampleNode editor draws so moving up or down a level doesn't need another search """
+    source = _get_sample_source(request.user, level, pk)
+    tree = get_patient_sample_tree(request.user, level, source, _get_request_genome_build(request))
+    return JsonResponse(tree)
+
+
+def extraction_samples(request, extraction_id):
+    """ Extraction arm of sample_group_samples - linked from the extraction page """
+    return sample_group_samples(request, SampleSourceLevel.EXTRACTION, extraction_id)
 
 
 def view_patient_genes(request, patient_id):

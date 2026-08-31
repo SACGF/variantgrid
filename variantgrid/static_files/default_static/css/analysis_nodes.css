@@ -294,6 +294,12 @@ button.add-analysis-variable-button {
 	z-index: 3;
 }
 
+/* EXTRACTION doesn't fit the strip's ~45px at 7px - analysis_nodes.js adds this over 8 characters */
+.design-a-node .node-klass.node-klass-long {
+	font-size: 6px;
+	letter-spacing: .02em;
+}
+
 .design-a-node .node-klass {
 	display: block;
 	font-size: 7px;
@@ -355,6 +361,69 @@ button.add-analysis-variable-button {
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
+}
+
+/* The warning chip is icon + count - see SampleNode.get_node_chips() */
+.node-chip-text:empty {
+	display: none;
+}
+
+/* How many things a chip stands for - the x3 on a "VCF" chip */
+.node-chip-count {
+	background: #dfe3e8;
+	color: #3d4550;
+	border-radius: 99px;
+	padding: 0 3px;
+	font-size: 7px;
+	line-height: 9px;
+	margin-left: 1px;
+}
+
+/* Samples the node's group left out - archived VCF, another build, no permission */
+.node-chip-warning {
+	border-color: #e6b566;
+	background-color: #fff4dc;
+	color: #7a4b00;
+}
+
+.node-chip-warning .node-chip-count {
+	background: #f3d9a4;
+}
+
+/* A chip wrapping its children's chips - specimen holding extractions holding their VCFs */
+.node-chip-group {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 2px;
+	align-items: center;
+	width: 100%;
+	box-sizing: border-box;
+	padding: 1px 2px 2px 4px;
+	border: 1px solid #c6cdd6;
+	border-radius: 6px;
+	background: #e9edf1;
+	/* .node-overlay is pointer-events: none, but chips need hover for their title */
+	pointer-events: auto;
+}
+
+.node-chip-group .node-chip-group-label {
+	display: inline-flex;
+	align-items: center;
+	gap: 2px;
+	font-size: 8px;
+	font-weight: 600;
+	color: #3d4550;
+	white-space: nowrap;
+}
+
+.node-chip-group .node-chip {
+	background: white;
+}
+
+/* A nested group one shade lighter, so the levels read apart */
+.node-chip-group .node-chip-group {
+	background: #f4f6f8;
+	padding-left: 3px;
 }
 
 .design-a-node .node-venn {

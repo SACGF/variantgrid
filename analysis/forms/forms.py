@@ -36,6 +36,7 @@ from library.django_utils import get_models_dict_by_column
 from library.django_utils.autocomplete_utils import ModelSelect2
 from library.forms import NumberInput, ROFormMixin
 from library.guardian_utils import assign_permission_to_user_and_groups
+from patients.models_enums import SampleSourceLevel
 from seqauto.models import EnrichmentKit
 from snpdb.forms import GenomeBuildAutocompleteForwardMixin, UserSettingsGenomeBuildMixin
 from snpdb.models import CustomColumnsCollection, Trio, UserSettings, VariantGridColumn
@@ -82,7 +83,9 @@ class AnalysisNodeClassesForm(forms.Form):
         super().__init__()
         choices = self._get_node_types_choices(source_nodes=source_nodes, filter_nodes=filter_nodes)
         self.fields['node_types'].choices = choices
-        self.fields['node_types'].initial = "SampleNode"
+        all_keys = [key for _, group in choices for key, _ in group]
+        preferred = f"SampleNode:{SampleSourceLevel.SAMPLE}"
+        self.fields['node_types'].initial = preferred if preferred in all_keys else all_keys[0]
 
     @staticmethod
     def _get_node_types_choices(source_nodes=True, filter_nodes=True):
@@ -97,8 +100,9 @@ class AnalysisNodeClassesForm(forms.Form):
         nodes_by_classification = get_nodes_by_classification()
         for classification in node_classifications:
             nodes = nodes_by_classification[classification]
-            node_classes = [(data["class_name"], data["class_label"]) for data in nodes]
-            nc = sorted(node_classes, key=operator.itemgetter(0))
+            # Alphabetical by label, so "Patient" is found where a user looks for it
+            node_classes = [(data["key"], data["class_label"]) for data in nodes]
+            nc = sorted(node_classes, key=operator.itemgetter(1))
             choices.append((classification.title(), tuple(nc)))
 
         return choices

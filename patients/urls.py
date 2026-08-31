@@ -43,6 +43,8 @@ urlpatterns = [
     path('view_specimen/<int:specimen_id>', views.view_specimen, name='view_specimen'),
     path('view_extraction/<int:extraction_id>', views.view_extraction, name='view_extraction'),
     path('extraction/<int:extraction_id>/samples', views.extraction_samples, name='extraction_samples'),
+    path('sample_group/<str:level>/<int:pk>/samples', views.sample_group_samples, name='sample_group_samples'),
+    path('sample_group/<str:level>/<int:pk>/tree', views.sample_group_tree, name='sample_group_tree'),
     path('unmatched_extractions', views.unmatched_extractions, name='unmatched_extractions'),
     path('view_patient/genes/<int:patient_id>', views.view_patient_genes, name='view_patient_genes'),
     path('view_patient/modifications/<int:patient_id>', views.view_patient_modifications, name='view_patient_modifications'),
@@ -85,6 +87,7 @@ urlpatterns = [
     path('autocomplete/Patient/', views_autocomplete.PatientAutocompleteView.as_view(), name='patient_autocomplete'),
     path('autocomplete/Specimen/', views_autocomplete.SpecimenAutocompleteView.as_view(), name='specimen_autocomplete'),
     path('autocomplete/Extraction/', views_autocomplete.ExtractionAutocompleteView.as_view(), name='extraction_autocomplete'),
+    path('autocomplete/SampleSource/', views_autocomplete.SampleSourceAutocompleteView.as_view(), name='sample_source_autocomplete'),
     path('autocomplete/Clinician/', views_autocomplete.ClinicianAutocompleteView.as_view(), name='clinician_autocomplete'),
     path('autocomplete/ExternalPKAutocompleteView', views_autocomplete.ExternalPKAutocompleteView.as_view(), name='external_pk_autocomplete'),
 ]

@@ -20,16 +20,6 @@ class AnalysisTemplateType(models.TextChoices):
     SNAPSHOT = 'S', 'Snapshot'
 
 
-class SampleNodeSourceLevel(models.TextChoices):
-    """ What a SampleNode gathers its samples from. Set explicitly rather than inferred from which FK
-        is set - node_create stamps it from the menu entry, and the editor has to choose a widget
-        before there is any value """
-    SAMPLE = 'S', 'Sample'
-    EXTRACTION = 'E', 'Extraction'
-    SPECIMEN = 'P', 'Specimen'
-    PATIENT = 'T', 'Patient'
-
-
 class SetOperations(models.TextChoices):
     NONE = '0', 'none'
     A_NOT_B = 'l', 'A-B'

@@ -5,6 +5,7 @@ import operator
 from functools import reduce
 
 from django.db.models.query_utils import Q
+from django.http import JsonResponse
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
 from django.views.decorators.vary import vary_on_cookie
@@ -12,19 +13,23 @@ from django.views.decorators.vary import vary_on_cookie
 from library.constants import MINUTE_SECS
 from library.django_utils.autocomplete_utils import AutocompleteView
 from patients.models import Clinician, Extraction, ExternalPK, Patient, Specimen
-from snpdb.views.views_autocomplete import GenomeBuildAutocompleteView
+from patients.models_enums import SampleSourceLevel
+from snpdb.views.views_autocomplete import GenomeBuildAutocompleteView, SampleAutocompleteView
 
 
 @method_decorator([cache_page(MINUTE_SECS), vary_on_cookie], name='dispatch')
-class PatientAutocompleteView(AutocompleteView):
+class PatientAutocompleteView(GenomeBuildAutocompleteView):
     fields = ['patient_code', 'last_name', 'first_name']
 
     def get_user_queryset(self, user):
-        return Patient.filter_for_user(user)
+        qs = Patient.filter_for_user(user)
+        # A patient's samples reach it either way round - the VCF import carries extraction down
+        # without setting sample.patient, the patient CSV sets patient and may leave extraction null
+        return self.filter_to_readable_samples(qs, ["sample", "specimen__extraction__sample"])
 
 
 @method_decorator([cache_page(MINUTE_SECS), vary_on_cookie], name='dispatch')
-class SpecimenAutocompleteView(AutocompleteView):
+class SpecimenAutocompleteView(GenomeBuildAutocompleteView):
     """ Narrows on whichever of Patient -> Specimen -> Extraction a form has already set """
     fields = ['reference_id']
 
@@ -34,7 +39,8 @@ class SpecimenAutocompleteView(AutocompleteView):
             qs = qs.filter(patient=patient)
         if extraction := self.forwarded.get('extraction'):
             qs = qs.filter(extraction=extraction)
-        return qs
+        # An analysis is one genome build, so only offer specimens it can actually read
+        return self.filter_to_readable_samples(qs, ["extraction__sample"])
 
 
 @method_decorator([cache_page(MINUTE_SECS), vary_on_cookie], name='dispatch')
@@ -50,8 +56,7 @@ class ExtractionAutocompleteView(GenomeBuildAutocompleteView):
         if specimen := self.forwarded.get('specimen'):
             qs = qs.filter(specimen=specimen)
         # An analysis is one genome build, so only offer extractions it can actually read
-        qs = self.exclude_archived_if_forwarded(qs, "sample__vcf__data_archived_date")
-        return self.filter_to_genome_build(qs, "sample__vcf__genome_build").distinct()
+        return self.filter_to_readable_samples(qs, ["sample"])
 
 
 @method_decorator(cache_page(MINUTE_SECS), name='dispatch')
@@ -79,3 +84,47 @@ class ExternalPKAutocompleteView(AutocompleteView):
             q = reduce(operator.and_, q_list)
             qs = qs.filter(q)
         return qs
+
+
+def _sample_source_text(level: str, obj) -> str:
+    """ Carries the parent, so two "DNA" extractions are told apart in one flat list """
+    match level:
+        case SampleSourceLevel.SPECIMEN:
+            return f"{obj} \u2014 {obj.patient}"
+        case SampleSourceLevel.EXTRACTION:
+            return f"{obj} \u2014 {obj.specimen}"
+        case SampleSourceLevel.SAMPLE:
+            return f"{obj.name} ({obj.vcf})"
+    return str(obj)
+
+
+class SampleSourceAutocompleteView(AutocompleteView):
+    """ One search box over all four levels of the hierarchy, so the SampleNode editor asks for the
+        thing rather than for a level and then a thing.
+
+        select2 renders a result carrying a `children` array as a group natively, so each group is
+        just the matching model's own autocomplete queryset - permissions, genome build and
+        exclude_archived forwards keep applying. Ids are "<level>:<pk>". """
+    GROUPS = [
+        (SampleSourceLevel.PATIENT, "Patients", PatientAutocompleteView),
+        (SampleSourceLevel.SPECIMEN, "Specimens", SpecimenAutocompleteView),
+        (SampleSourceLevel.EXTRACTION, "Extractions", ExtractionAutocompleteView),
+        (SampleSourceLevel.SAMPLE, "Samples", SampleAutocompleteView),
+    ]
+    MAX_PER_GROUP = 8
+
+    def get_queryset(self):
+        return Patient.objects.none()  # Each group brings its own - see get()
+
+    def get(self, request, *args, **kwargs):
+        results = []
+        for level, label, view_class in self.GROUPS:
+            view = view_class()
+            view.request = request
+            view.q = self.q
+            view.forwarded = self.forwarded
+            children = [{"id": f"{level}:{obj.pk}", "text": _sample_source_text(level, obj)}
+                        for obj in view.get_queryset()[:self.MAX_PER_GROUP]]
+            if children:
+                results.append({"text": label, "children": children})
+        return JsonResponse({"results": results, "pagination": {"more": False}})

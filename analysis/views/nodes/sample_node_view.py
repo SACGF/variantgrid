@@ -1,6 +1,9 @@
 from analysis.forms import SampleNodeForm
+from analysis.forms.forms_nodes import SampleThresholdsMixin
+from analysis.models.nodes.analysis_node import NodeVCFFilter
 from analysis.models.nodes.sources.sample_node import SampleNode
 from analysis.views.nodes import GeneCoverageNodeView
+from patients.models_enums import SampleSourceLevel
 
 
 class SampleNodeView(GeneCoverageNodeView):
@@ -11,6 +14,29 @@ class SampleNodeView(GeneCoverageNodeView):
         if self.object.sample:
             return self.object.sample.get_minimum_coverage_required()
         return super()._get_minimum_coverage_required()
+
+    def _get_sample_threshold_overrides(self) -> dict:
+        """ Only what the user actually typed - the editor shows the node's own values as the
+            placeholder, so an inherited field has to come through as absent rather than as a copy """
+        node_values = {f: getattr(self.object, f) for f in SampleThresholdsMixin.THRESHOLD_FIELDS}
+        overrides = {}
+        for row in self.object.samplenodesamplethreshold_set.all():
+            values = {f: getattr(row, f) for f in SampleThresholdsMixin.THRESHOLD_FIELDS
+                      if getattr(row, f) != node_values[f]}
+            if values:
+                overrides[row.sample_id] = values
+        return overrides
+
+    def _get_vcf_locus_filters(self) -> dict:
+        """ The hidden field's shape - PASS at node level, everything else under its own VCF """
+        nvf_qs = NodeVCFFilter.objects.filter(node=self.object).exclude(vcf_filter__isnull=True)
+        by_vcf = {}
+        for vcf_id, filter_id in nvf_qs.values_list("vcf_filter__vcf_id", "vcf_filter__filter_id"):
+            by_vcf.setdefault(str(vcf_id), []).append(filter_id)
+        return {
+            "pass": NodeVCFFilter.objects.filter(node=self.object, vcf_filter__isnull=True).exists(),
+            "by_vcf": by_vcf,
+        }
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -29,18 +55,21 @@ class SampleNodeView(GeneCoverageNodeView):
         else:
             base_template = "analysis/node_editors/grid_editor.html"
 
-        source_samples = []
         if self.object.is_group_level:
-            group = self.object.get_sample_group()
-            has_genotype = any(s.has_genotype for s in group.samples)
-            for group_sample in group.samples:
-                source_samples.append({"sample": group_sample,
-                                       "thresholds": self.object.get_sample_thresholds(group_sample)})
+            if samples := self.object.get_source_samples():
+                has_genotype = any(s.has_genotype for s in samples)
 
+        source_object = self.object.get_source_object()
         context.update({"base_template": base_template,
                         "sample": sample,
+                        "patient": self.object.get_patient(),
                         "has_genotype": has_genotype,
-                        "source_samples": source_samples,
+                        # The editor tree draws the whole patient, then flags the picked subtree
+                        "source_level": self.object.source_level,
+                        "source_id": source_object.pk if source_object else None,
+                        "source_levels": {level.name: level.value for level in SampleSourceLevel},
+                        "sample_threshold_overrides": self._get_sample_threshold_overrides(),
+                        "vcf_locus_filters": self._get_vcf_locus_filters(),
                         "show_genes_tab": show_genes_tab,
                         "gene_lists": [gene_list]})
         return context

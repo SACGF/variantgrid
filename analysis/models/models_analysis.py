@@ -555,7 +555,9 @@ class AnalysisTemplate(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel
         if not analysis_variables.exists():
             error = "You have not configured any analysis variables."
         else:
-            required_fields = ["pedigree", "trio", "quad", "cohort", "sample"]
+            # A template has to start from something the launch pages can hand it
+            required_fields = ["pedigree", "trio", "quad", "cohort", "sample",
+                               "extraction", "specimen", "patient"]
             if not analysis_variables.filter(field__in=required_fields).exists():
                 error = f"You need at at least one analysis variable of: {', '.join(required_fields)}"
 

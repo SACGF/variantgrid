@@ -9,6 +9,16 @@ class NucleicAcid(models.TextChoices):
     RNA = 'R', 'RNA'
 
 
+class SampleSourceLevel(models.TextChoices):
+    """ A level of the Patient -> Specimen -> Extraction -> Sample hierarchy. Analysis source nodes
+        store one explicitly rather than inferring it from which FK is set - the add node menu stamps
+        it on creation, and the editor has to draw its tree before there is any value """
+    SAMPLE = 'S', 'Sample'
+    EXTRACTION = 'E', 'Extraction'
+    SPECIMEN = 'P', 'Specimen'
+    PATIENT = 'T', 'Patient'
+
+
 class TissueStatus(models.TextChoices):
     """ What role the material plays in the test - the same tissue can be either, eg blood is the
         reference in a solid tumour workup and is the tumour in leukaemia """

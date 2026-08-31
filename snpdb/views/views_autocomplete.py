@@ -1,4 +1,6 @@
+import operator
 from abc import ABC
+from functools import reduce
 
 from django.contrib.auth.models import User
 from django.db.models.functions import Length
@@ -43,6 +45,21 @@ class GenomeBuildAutocompleteView(AutocompleteView, ABC):
         if self.forwarded.get('exclude_archived'):
             qs = qs.filter(**{f"{path_to_archived_date}__isnull": True})
         return qs
+
+    def filter_to_readable_samples(self, qs, sample_paths: list[str]):
+        """ Keep rows reaching a Sample the consumer can actually read - one genome build, and not
+            archived. The paths are OR'd against a single sample queryset, so both conditions have
+            to be met by the same sample rather than by two different ones. """
+        sample_kwargs = {}
+        if genome_build_id := self.forwarded.get('genome_build_id'):
+            sample_kwargs["vcf__genome_build_id"] = genome_build_id
+        if self.forwarded.get('exclude_archived'):
+            sample_kwargs["vcf__data_archived_date__isnull"] = True
+        if not sample_kwargs:
+            return qs
+        sample_qs = Sample.objects.filter(**sample_kwargs)
+        q = reduce(operator.or_, [Q(**{f"{path}__in": sample_qs}) for path in sample_paths])
+        return qs.filter(q).distinct()
 
 
 @method_decorator(cache_page(MINUTE_SECS), name='dispatch')
