@@ -1,6 +1,7 @@
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
+from analysis.models import Analysis
 from analysis.models.enums import NodeMatchInput
 from analysis.models.nodes.filters.classifications_node import ClassificationsNode
 from analysis.models.nodes.node_counts import get_extra_filters_q
@@ -148,6 +149,8 @@ class BuiltInClassificationFilterTest(ClassificationTestDataMixin, TestCase):
         super().setUp()
         grch37 = GenomeBuild.get_name_or_alias("GRCh37")
         self.annotation_version = get_fake_annotation_version(grch37)
+        self.analysis = Analysis(genome_build=grch37)
+        self.analysis.set_defaults_and_save(self.user)
         self.variant_pks = {}
         for position, classification in enumerate([self.germline_p, self.somatic_tier_1, self.somatic_tier_3,
                                                    self.somatic_tier_1_or_2], start=1000):
@@ -157,7 +160,7 @@ class BuiltInClassificationFilterTest(ClassificationTestDataMixin, TestCase):
             self.variant_pks[classification.pk] = variant.pk
 
     def _filter_variant_pks(self, built_in_filter) -> set:
-        q = get_extra_filters_q(self.user, self.annotation_version, built_in_filter)
+        q = get_extra_filters_q(self.analysis, built_in_filter)
         return set(Variant.objects.filter(q).values_list("pk", flat=True))
 
     def test_classified_matches_any_origin(self):

@@ -6,15 +6,18 @@ from dataclasses import asdict
 
 from auditlog.context import disable_auditlog
 from celery.canvas import Signature
+from django.db import IntegrityError, transaction
 from django.db.models import F
 from django.db.models.query_utils import Q
 from django.utils import timezone
 from toposort import toposort
 
 from analysis.models import Analysis, NodeColors, NodeStatus
-from analysis.models.nodes.analysis_node import AnalysisEdge, NodeVersion
+from analysis.models.nodes.analysis_node import AnalysisEdge, NodeCount, NodeVersion
+from analysis.models.nodes.node_counts import get_tag_node_counts_dict
 from analysis.tasks.node_update_tasks import delete_analysis_old_node_versions
 from library.utils import add_exception_note
+from snpdb.models.models_enums import TagFilter
 
 
 def get_nodes_by_id(nodes_qs):
@@ -81,6 +84,34 @@ def update_analysis(analysis_id):
 
     task = Signature("analysis.tasks.analysis_update_tasks.create_and_launch_analysis_tasks", args=(analysis_id,))
     task.apply_async()
+
+
+def update_analysis_tag_node_counts(analysis: Analysis, tag_labels=None):
+    """ Adding/removing a tag doesn't bump node versions, so the usual reload doesn't recount.
+        Recount the tag node counts in place against the versions the nodes are already on.
+        tag_labels - restrict to these (default: every tag node count the analysis has configured) """
+    configured_tag_labels = {label for label, _ in analysis.get_node_count_types() if TagFilter.get_tag_id(label)}
+    if tag_labels is not None:
+        configured_tag_labels &= set(tag_labels)
+    if not configured_tag_labels:
+        return
+
+    node_counts = []
+    for node in analysis.analysisnode_set.filter(status=NodeStatus.READY).select_subclasses():
+        node_version = NodeVersion.objects.filter(node=node, version=node.version).first()
+        if node_version is None:
+            continue  # Node reloaded from under us - it'll count these itself
+        for label, count in get_tag_node_counts_dict(node, configured_tag_labels).items():
+            node_counts.append(NodeCount(node_version=node_version, label=label, count=count))
+
+    if node_counts:
+        try:
+            with transaction.atomic():
+                NodeCount.objects.bulk_create(node_counts, update_conflicts=True, update_fields=["count"],
+                                              unique_fields=["node_version", "label"])
+        except IntegrityError:
+            # A node bumped its version while we were counting - it counts these itself when it reloads
+            logging.info("Analysis %s reloaded while updating tag node counts", analysis.pk)
 
 
 def reload_analysis_nodes(analysis_id, only_errors=False):

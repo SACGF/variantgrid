@@ -77,6 +77,7 @@ from analysis.models.nodes.analysis_node import (
 from analysis.models.nodes.node_counts import (
     get_node_count_colors,
     get_node_counts_mine_and_available,
+    get_tag_node_count_colors,
 )
 from analysis.models.nodes.node_types import get_node_display_data_by_class_name, get_node_types_hash
 from analysis.models.nodes.sources.cohort_node import (
@@ -215,7 +216,7 @@ def view_analysis(request, analysis_id, active_node_id=0):
     context = {
         "node_classes_form": forms.AnalysisNodeClassesForm(**node_classes_kwargs),
         "nodes": nodes,
-        "node_count_colors": get_node_count_colors("color"),
+        "node_count_colors": get_node_count_colors("color") + get_tag_node_count_colors(request.user, "color"),
         "analysis": analysis,
         "analysis_settings": get_analysis_settings(request.user, analysis),
         "analysis_tags_node": analysis_tags_node,
@@ -1012,22 +1013,34 @@ def analysis_settings_node_counts_tab(request, analysis_id):
     return _analysis_settings_node_counts_tab(request, analysis, has_write_permission=analysis.can_write(request.user))
 
 
-def _analysis_settings_node_counts_tab(request, analysis, pass_analysis_settings=True, has_write_permission=True):
+def _analysis_settings_node_counts_tab(request, analysis, is_analysis=True, has_write_permission=True):
+    """ analysis - an Analysis, or the FakeAnalysis (is_analysis=False) the user/lab/org default
+        node counts settings pages use @see snpdb.views.views._settings_override_node_counts_tab """
     if request.method == "POST":
         if has_write_permission is False:
             raise PermissionDenied()
+        if is_analysis:
+            auto_add_tags = bool(request.POST.get("node_count_auto_add_tags"))
+            if auto_add_tags != analysis.node_count_auto_add_tags:
+                analysis.node_count_auto_add_tags = auto_add_tags
+                analysis.save()
         node_counts_str = request.POST.get("node_counts")
         if node_counts_str is not None:
             node_counts_array = node_counts_str.split(',')
             analysis.set_node_count_types(node_counts_array)
+            if is_analysis:
+                # Tag counts are cheap enough to fill in here, so adding one doesn't cost a node reload
+                node_utils.update_analysis_tag_node_counts(analysis)
         add_save_message(request, True, "Node Counts")
 
     my_node_counts_list, available_node_counts_list = get_node_counts_mine_and_available(analysis)
     context = {"my_node_counts_list": my_node_counts_list,
                "available_node_counts_list": available_node_counts_list,
+               "is_analysis": is_analysis,
                "has_write_permission": has_write_permission}
 
-    if pass_analysis_settings:
+    if is_analysis:
+        context["node_count_auto_add_tags"] = analysis.node_count_auto_add_tags
         analysis_settings = get_analysis_settings(request.user, analysis)
         context["new_analysis_settings"] = analysis_settings
 

@@ -2,11 +2,12 @@ import celery
 from django.db.models import Q
 
 from analysis.models import Analysis, TagNode, VariantTag
-from analysis.models.nodes.node_utils import update_analysis
+from analysis.models.nodes.node_utils import update_analysis, update_analysis_tag_node_counts
 from library.guardian_utils import admin_bot
 from snpdb.clingen_allele import populate_clingen_alleles_for_variants
 from snpdb.liftover import create_liftover_pipelines
 from snpdb.models import ImportSource, Tag, VariantAllele
+from snpdb.models.models_enums import TagFilter
 
 
 def analysis_tag_nodes_set_dirty(analysis: Analysis, tag: Tag, visible: bool):
@@ -16,6 +17,18 @@ def analysis_tag_nodes_set_dirty(analysis: Analysis, tag: Tag, visible: bool):
     for node in TagNode.objects.filter(analysis=analysis, visible=visible).filter(tag_filter).distinct():
         node.queryset_dirty = True
         node.save()
+
+
+def sync_analysis_tag_node_counts(analysis: Analysis, tag: Tag):
+    """ Keeps an analysis' node counts in step with the tags used in it (#21). Done in the request
+        (not a task) so the counts are already right when the client asks for them after tagging """
+    label = TagFilter.label(tag.pk)
+    if analysis.node_count_auto_add_tags:
+        if VariantTag.objects.filter(analysis=analysis, tag=tag).exists():
+            analysis.add_node_count_type(label)
+        else:
+            analysis.remove_node_count_type(label)
+    update_analysis_tag_node_counts(analysis, tag_labels=[label])
 
 
 @celery.shared_task

@@ -1463,7 +1463,7 @@ class NodeColumnSummaryCacheCollection(models.Model):
                                                                                 variant_column=variant_column,
                                                                                 extra_filters=extra_filters)
         if created:
-            extra_filters_q = get_extra_filters_q(node.analysis.user, node.analysis.annotation_version, extra_filters)
+            extra_filters_q = get_extra_filters_q(node.analysis, extra_filters)
             queryset = node.get_queryset(extra_filters_q)
             count_qs = queryset.values_list(variant_column).distinct().annotate(Count('id'))
             data_list = []
