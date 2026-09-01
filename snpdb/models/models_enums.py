@@ -51,21 +51,6 @@ class AwardPeriod(models.TextChoices):
         return {AwardPeriod.ALL_TIME: 3, AwardPeriod.MONTH: 2, AwardPeriod.DAY: 1}[self]
 
 
-# Curated so every flair is a single, consistently rendered grapheme
-USER_FLAIR_CHOICES = [(emoji, emoji) for emoji in [
-    # animals
-    "🐱", "🐶", "🐭", "🐹", "🐰", "🦊", "🐻", "🐼", "🐨", "🐯", "🦁", "🐮", "🐷", "🐸", "🐵", "🐔",
-    "🐧", "🐦", "🦉", "🦆", "🦅", "🐺", "🐗", "🐴", "🦄", "🐝", "🐛", "🦋", "🐌", "🐞", "🐢", "🐍",
-    "🦎", "🐙", "🦑", "🦀", "🐠", "🐬", "🐳", "🦈", "🐊", "🐘", "🦒", "🦘", "🐐", "🦥", "🦦",
-    # food
-    "🍎", "🍕", "🍩", "🍪", "🍓", "🥑", "🌶️", "☕", "🍵", "🧁", "🍦", "🥐",
-    # space and nature
-    "🚀", "🛸", "🌙", "⭐", "🌟", "☄️", "🪐", "🌈", "🔥", "❄️", "🌵", "🌻", "🍀", "🌊", "⚡",
-    # objects
-    "🎩", "🎸", "🎲", "🧬", "🔬", "🧪", "🧩", "🎯", "🎨", "🔭", "🧭", "⚗️", "🧲", "🪄",
-]]
-
-
 class ImportSource(models.TextChoices):
     """ Keeps track of where uploaded files came from """
 

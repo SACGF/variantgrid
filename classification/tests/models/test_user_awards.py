@@ -10,7 +10,7 @@ from classification.user_awards import _cold_cases
 
 
 class ColdCaseAwardTest(TestCase):
-    """ cold_case counts a published modification whose previous modification is > 2 years older - #1819 """
+    """ cold_case counts a published modification whose previous modification is > 6 months older - #1819 """
 
     def setUp(self):
         ClassificationTestUtils.setUp()
@@ -30,10 +30,10 @@ class ColdCaseAwardTest(TestCase):
         ClassificationModification.objects.filter(pk=modifications[0].pk).update(created=timezone.now() - gap)
         return classification
 
-    def test_two_year_gap_counts(self):
-        self._classification_with_gap(timedelta(days=3 * 365))
+    def test_year_gap_counts(self):
+        self._classification_with_gap(timedelta(days=365))
         self.assertEqual(_cold_cases(None), {None: {self.user.pk: 1}})
 
-    def test_one_year_gap_ignored(self):
-        self._classification_with_gap(timedelta(days=365))
+    def test_month_gap_ignored(self):
+        self._classification_with_gap(timedelta(days=30))
         self.assertEqual(_cold_cases(None), {})

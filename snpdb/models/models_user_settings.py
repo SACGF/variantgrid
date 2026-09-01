@@ -28,7 +28,7 @@ from library.utils import rgb_contrasting_text, string_deterministic_hash
 from snpdb.models import AlleleOriginFilterDefault, UserAward, UserAwards
 from snpdb.models.models import Lab, Organization, Tag
 from snpdb.models.models_columns import CustomColumn, CustomColumnsCollection
-from snpdb.models.models_enums import USER_FLAIR_CHOICES, BuiltInFilters, TagFilter
+from snpdb.models.models_enums import BuiltInFilters, TagFilter
 from snpdb.models.models_genome import GenomeBuild
 
 
@@ -328,9 +328,6 @@ class UserSettingsOverride(SettingsOverride):
     # Personal (not org/lab) preference - can be turned off from the tip box itself, see set_show_tips
     show_tips = models.BooleanField(default=True, verbose_name="Show Tips",
                                     help_text="Show feature tips on loading screens and blank grids.")
-    # Personal (not org/lab) - shown after the name on the profile, and on grids while holding a title
-    flair = models.CharField(max_length=16, null=True, blank=True, choices=USER_FLAIR_CHOICES,
-                             help_text="An emoji shown next to your name")
 
     def auto_set_default_lab(self):
         user = self.user
@@ -416,10 +413,6 @@ class AvatarDetails:
         return UserAwards(user=self.user)
 
     @cached_property
-    def flair(self) -> Optional[str]:
-        return UserSettingsOverride.objects.filter(user=self.user).values_list("flair", flat=True).first() or None
-
-    @cached_property
     def titles(self) -> list[UserAward]:
         """ Active titles held, ALL_TIME -> MONTH -> DAY. Empty when awards are off for the deployment """
         if not settings.USER_AWARDS_ENABLED:
@@ -439,13 +432,10 @@ class AvatarDetails:
         return bool(self.titles) and viewer_settings.show_user_awards
 
     def grid_label_html(self, viewer_settings: "UserSettings") -> SafeString:
-        """ Plain name, or "<crown> Name <flair>" while holding a title and the viewer wants to see it """
+        """ Plain name, or "<crown> Name" while holding a title and the viewer wants to see it """
         label = escape(self.preferred_label)
         if self.shows_titles_for(viewer_settings):
-            parts = [self.title_icon_html, label]
-            if self.flair:
-                parts.append(escape(self.flair))
-            label = " ".join(parts)
+            label = f"{self.title_icon_html} {label}"
         return SafeString(label)
 
     @cached_property
@@ -532,7 +522,6 @@ class UserSettings:
     timezone: str
     loading_animations: Optional[list[str]]
     show_tips: bool
-    flair: Optional[str]
     _settings_overrides: list[SettingsOverride]
 
     @property

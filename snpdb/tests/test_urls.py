@@ -11,7 +11,6 @@ from snpdb.models.models_cohort import Cohort
 from snpdb.models.models_columns import CustomColumnsCollection
 from snpdb.models.models_enums import AwardPeriod, ImportStatus, UserAwardKind, UserAwardLevel
 from snpdb.models.models_genome import GenomeBuild
-from snpdb.models.models_user_settings import UserSettingsOverride
 from snpdb.models.models_genomic_interval import (
     GenomicIntervalsCategory,
     GenomicIntervalsCollection,
@@ -62,7 +61,6 @@ class Test(URLTestCase):
         UserAward.objects.create(user=cls.user_owner, kind=UserAwardKind.BADGE, definition_key="tagger",
                                  award_text="Tagger", count=150, award_level=UserAwardLevel.BRONZE)
         UserAward.objects.create(user=cls.user_owner, award_text="Thanks for the help")
-        UserSettingsOverride.objects.update_or_create(user=cls.user_owner, defaults={"flair": "🐱"})
 
         cls.PRIVATE_OBJECT_URL_NAMES_AND_KWARGS = [
             ('view_vcf', {"vcf_id": cls.vcf.pk}, 200),

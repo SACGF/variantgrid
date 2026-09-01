@@ -1,8 +1,0 @@
-{% comment %}A flair form field: the current flair as a button, click to open the palette{% endcomment %}
-<button type="button" class="btn btn-outline-secondary flair-current" data-toggle="collapse" data-target="#{{ field.auto_id }}-palette" aria-expanded="false" title="Click to change">{{ field.value|default:"No flair" }}</button>
-<div class="collapse mt-2" id="{{ field.auto_id }}-palette">{{ field }}</div>
-<script>
-    $("#{{ field.auto_id }}-palette input").on("change", function() {
-        $(this).closest(".collapse").prev(".flair-current").text(this.value || "No flair");
-    });
-</script>

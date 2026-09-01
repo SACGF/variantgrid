@@ -59,16 +59,6 @@
             <div class="card-header">Awards</div>
             <div class="card-body">
                 {% award_cabinet other_user %}
-                {% if flair_form %}
-                <form method="post" class="mt-3">
-                    {% csrf_token %}
-                    <input type="hidden" name="action" value="flair"/>
-                    {% labelled label="Flair" admin_only=True %}
-                        {% include "snpdb/tags/flair_picker.html" with field=flair_form.flair %}
-                        <button type="submit" class="btn btn-outline-primary btn-sm mt-2">Set flair</button>
-                    {% endlabelled %}
-                </form>
-                {% endif %}
             </div>
         </div>
         {% endif %}

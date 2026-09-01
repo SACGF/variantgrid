@@ -17,7 +17,6 @@
         {% else %}
             {{ user_details.preferred_label }}
         {% endif %}
-        {% if user_details.show_titles and user_details.avatar.flair %}<span class="user-flair">{{ user_details.avatar.flair }}</span>{% endif %}
         {% if user_details.show_group %}
             <span style="font-size:8pt" class="text-info">{{ user_details.group_str }}</span>
         {% endif %}

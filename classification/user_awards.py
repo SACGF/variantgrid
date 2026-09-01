@@ -11,7 +11,7 @@ from library.utils import ArrayLength
 from snpdb.models.models_enums import AwardPeriod, UserAwardKind
 from snpdb.user_awards import AwardCounts, AwardDefinition, counts_by_user, register_award
 
-COLD_CASE_GAP = timedelta(days=2 * 365)
+COLD_CASE_GAP = timedelta(days=183)
 
 
 def _classifications_published(since: Optional[datetime]) -> AwardCounts:
@@ -27,7 +27,7 @@ def _classifications_created(_since: Optional[datetime]) -> AwardCounts:
 
 def _cold_cases(_since: Optional[datetime]) -> AwardCounts:
     """ Classifications the user published a modification for when the previous modification was
-        more than two years older """
+        more than six months older """
     previous = ClassificationModification.objects.filter(
         classification=OuterRef("classification"), created__lt=OuterRef("created")
     ).order_by("-created").values("created")[:1]
@@ -58,7 +58,7 @@ register_award(AwardDefinition(
     key="cold_case",
     kind=UserAwardKind.BADGE,
     title="Cold case",
-    description="Classifications revisited after more than two years untouched",
+    description="Classifications revisited after more than six months untouched",
     icon="fa-user-secret",
     counter=_cold_cases,
     tiers=(1, 5, 25),

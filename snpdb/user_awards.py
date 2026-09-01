@@ -1,5 +1,5 @@
 """
-Award definitions registry - see claude/plans/1819_user_flair_and_awards_plan.md
+Award definitions registry
 
 Each app declares its awards in <app>/user_awards.py and imports that module from AppConfig.ready()
 (the same way signal receivers are loaded). The nightly/hourly recompute is in

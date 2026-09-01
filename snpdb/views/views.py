@@ -102,7 +102,6 @@ from snpdb.forms import (
     SettingsInitialGroupPermissionForm,
     TagForm,
     UserContactForm,
-    UserFlairForm,
     UserForm,
     UserSettingsOverrideForm,
     VCFChoiceForm,
@@ -1091,19 +1090,8 @@ def view_user(request, pk):
     common_groups = Group.objects.filter(user=user.pk).filter(user=request.user.pk).order_by("name")
     all_groups = user.groups.order_by("name") if request.user.is_superuser else None
 
-    # Admins can hand another user a flair from here (#1819)
-    flair_form = None
-    if request.user.is_superuser and settings.USER_AWARDS_ENABLED:
-        user_settings_override = UserSettingsOverride.objects.get_or_create(user=user)[0]
-        flair_form = UserFlairForm(request.POST or None, instance=user_settings_override)
-        if request.method == "POST" and request.POST.get("action") == "flair":
-            if flair_form.is_valid():
-                flair_form.save()
-            add_save_message(request, flair_form.is_valid(), "Flair")
-
     context = {
         "other_user": user,
-        "flair_form": flair_form,
         'user_contact': user_contact,
         'common_groups': common_groups,
         'all_groups': all_groups,

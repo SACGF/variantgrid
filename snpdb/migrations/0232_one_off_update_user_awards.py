@@ -10,7 +10,7 @@ def _user_awards_enabled(_apps):
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("snpdb", "0231_user_awards_and_flair"),
+        ("snpdb", "0231_user_awards"),
     ]
 
     operations = [

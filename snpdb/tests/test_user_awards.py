@@ -155,17 +155,9 @@ class GridLabelTest(TestCase):
                                  period=AwardPeriod.ALL_TIME, award_text="Top tagger (all time)")
 
     def test_plain_without_title(self):
-        UserSettingsOverride.objects.update_or_create(user=self.user, defaults={"flair": "🐱"})
         self.assertEqual(self._label(), "Evelyn")
 
-    def test_decorated_with_title_and_flair(self):
-        UserSettingsOverride.objects.update_or_create(user=self.user, defaults={"flair": "🐱"})
-        self._give_title()
-        label = self._label()
-        self.assertIn("fa-crown", label)
-        self.assertTrue(label.endswith("Evelyn 🐱"), label)
-
-    def test_title_without_flair(self):
+    def test_decorated_with_title(self):
         self._give_title()
         label = self._label()
         self.assertIn("fa-crown", label)

@@ -394,7 +394,7 @@ class DatatableConfig(Generic[DC]):
 
     def render_user(self, cell: CellData) -> JsonDataType:
         """ For a "<fk>__username" column with extra_columns=["<fk>__id"]: renders the name through
-            AvatarDetails so a title holder gets their crown and flair (#1819). Sort/search/CSV
+            AvatarDetails so a title holder gets their crown (#1819). Sort/search/CSV
             stay on the username """
         user_id = cell.get(cell.key.removesuffix("__username") + "__id")
         if user_id is None:
