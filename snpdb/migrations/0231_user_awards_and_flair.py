@@ -61,6 +61,12 @@ class Migration(migrations.Migration):
             name='subject',
             field=models.TextField(blank=True, null=True),
         ),
+        # Flair was dropped again before release (0233) - kept so deployments that applied this stay consistent
+        migrations.AddField(
+            model_name='usersettingsoverride',
+            name='flair',
+            field=models.CharField(blank=True, max_length=16, null=True),
+        ),
         migrations.AddConstraint(
             model_name='useraward',
             constraint=models.UniqueConstraint(condition=models.Q(('definition_key__isnull', False)), fields=('user', 'definition_key', 'subject', 'period'), name='user_award_unique_computed', nulls_distinct=False),
