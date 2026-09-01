@@ -79,18 +79,6 @@ def get_title_definitions() -> list[AwardDefinition]:
     return [d for d in get_award_definitions() if d.kind == UserAwardKind.TITLE]
 
 
-def counts_by_user(rows, subject_key: Optional[str] = None) -> AwardCounts:
-    """ Turn a .values(user_key, [subject_key]).annotate(count=...) queryset into AwardCounts.
-        Rows need 'user_id' and 'count' keys. With subject_key, each row also lands in the
-        overall (None) subject so 'top overall' comes for free alongside 'top per subject' """
-    counts: AwardCounts = {}
-    for row in rows:
-        user_id = row["user_id"]
-        count = row["count"]
-        if subject_key:
-            counts.setdefault(row[subject_key], {})[user_id] = count
-            overall = counts.setdefault(None, {})
-            overall[user_id] = overall.get(user_id, 0) + count
-        else:
-            counts.setdefault(None, {})[user_id] = count
-    return counts
+def counts_by_user(rows) -> AwardCounts:
+    """ Turn a .values("user_id").annotate(count=...) queryset into un-subjected AwardCounts """
+    return {None: {row["user_id"]: row["count"] for row in rows}}
