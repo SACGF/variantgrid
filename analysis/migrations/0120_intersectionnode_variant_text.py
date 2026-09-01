@@ -85,16 +85,4 @@ class Migration(migrations.Migration):
             ),
         ),
         migrations.RunPython(_convert_to_variant_text, migrations.RunPython.noop),
-        migrations.RemoveField(
-            model_name="intersectionnode",
-            name="genomic_interval",
-        ),
-        migrations.RemoveField(
-            model_name="intersectionnode",
-            name="hgvs_string",
-        ),
-        migrations.RemoveField(
-            model_name="intersectionnode",
-            name="hgvs_variant",
-        ),
     ]
