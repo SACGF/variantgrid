@@ -15,7 +15,7 @@
 
 <div class="mt-4">
 
-    {% ui_register_tab_embedded tab_set="classification_issues" label="Pending/Review/Suggestion" badge=dlab.counts.pending_changes|add:dlab.counts.internal_review|add:dlab.counts.suggestions %}
+    {% ui_register_tab_embedded tab_set="classification_issues" label="Review/Suggestion" badge=dlab.counts.internal_review|add:dlab.counts.suggestions %}
         <table id="classifications-matching" data-datatable-url="{% url 'classification_datatables' %}" class="sticky-header classification-table" data-datatable-data="classificationReviews"></table>
     {% end_ui_register_tab_embedded %}
 

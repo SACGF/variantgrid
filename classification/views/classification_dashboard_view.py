@@ -10,14 +10,14 @@ from django.shortcuts import render
 from django.urls import reverse
 from termsandconditions.decorators import terms_required
 
-from classification.enums import ShareLevel
+from classification.enums import ShareLevel, TriageStatus
 from classification.models import (
     ClinVarExport,
     ConditionText,
     ConditionTextMatch,
     DiscordanceReport,
     DiscordanceReportClassification,
-    classification_flag_types,
+    classification_flag_types, OverlapContribution,
 )
 from classification.models.classification import Classification
 from classification.models.clinvar_export_sync import clinvar_export_sync
@@ -151,7 +151,8 @@ class ClassificationDashboard:
         ])
         internal_review = FlagCollection.filter_for_open_flags(qs=vcqs, flag_types=[classification_flag_types.internal_review])
         significance_change = FlagCollection.filter_for_open_flags(qs=vcqs, flag_types=[classification_flag_types.significance_change])
-        pending_changes = FlagCollection.filter_for_open_flags(qs=vcqs, flag_types=[classification_flag_types.classification_pending_changes])
+        # pending_changes = FlagCollection.filter_for_open_flags(qs=vcqs, flag_types=[classification_flag_types.classification_pending_changes])
+        pending_changes = OverlapContribution.objects.filter(classification_grouping__lab__in=self.labs, triage_state__status=TriageStatus.REVIEWED_WILL_FIX)
 
         unshared = FlagCollection.filter_for_open_flags(qs=vcqs, flag_types=[
             classification_flag_types.unshared_flag
