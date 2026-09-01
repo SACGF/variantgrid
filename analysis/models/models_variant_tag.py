@@ -99,10 +99,9 @@ class VariantTag(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
         if tags_qs is None:
             tags_qs = VariantTag.objects.all()
 
-        va_kwargs = {
-            "genome_build": genome_build,
-            "allele__in": tags_qs.values_list("allele")
-        }
+        # Narrowing this to tags_qs's own alleles only looks like it saves work - the outer filter below
+        # already restricts to them, so it just adds a scan of the whole tag table to every query
+        va_kwargs = {"genome_build": genome_build}
         if variant_qs is not None:
             va_kwargs["variant__in"] = variant_qs
 

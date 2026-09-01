@@ -100,17 +100,29 @@ class GuardianPermissionsMixin:
             # logging.info("%s delegating to %s", cls, klass)
             queryset = klass.filter_for_user(user, queryset=queryset, **kwargs)
         else:
-            if queryset is not None:
-                klass = queryset
-
-            if user and user.is_authenticated:
-                queryset = get_objects_for_user(user, cls.get_read_perm(), klass=klass, accept_global_perms=True)
-            else:
-                # No user - try public (non-logged in users) access
-                group = Group.objects.get(name=settings.PUBLIC_GROUP_NAME)
-                queryset = get_objects_for_group(group, cls.get_read_perm(), klass=klass, accept_global_perms=True)
+            permitted_qs = cls._permitted_for_user_qs(user)
+            if queryset is None:
+                queryset = permitted_qs
+            elif permitted_qs.query.has_filters():
+                queryset = queryset.filter(pk__in=permitted_qs.values("pk"))
+            # An unfiltered permitted_qs means everything is visible (superuser, or a global model
+            # permission) - the caller's queryset already says it all
 
         return cls._filter_from_permission_object_qs(queryset)
+
+    @classmethod
+    def _permitted_for_user_qs(cls, user) -> QuerySet:
+        """ Everything the user can read, resolved off the bare model.
+
+            Guardian embeds whatever queryset it is handed as a subquery inside *both* the user and
+            the group permission lookup (@see guardian.shortcuts.filter_perms_queryset_by_objects),
+            so handing it a grid's annotated queryset has that query's joins planned three times
+            over. Ask it for the permitted records alone and let the caller apply them. """
+        if user and user.is_authenticated:
+            return get_objects_for_user(user, cls.get_read_perm(), klass=cls, accept_global_perms=True)
+        # No user - try public (non-logged in users) access
+        group = Group.objects.get(name=settings.PUBLIC_GROUP_NAME)
+        return get_objects_for_group(group, cls.get_read_perm(), klass=cls, accept_global_perms=True)
 
     @classmethod
     def get_for_user(cls, user, pk, write=False):

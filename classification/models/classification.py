@@ -956,13 +956,16 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
     def filter_for_user(cls, user: User, queryset: Optional[QuerySet] = None, **kwargs) -> QuerySet:
         """ Classification only has write permission, View is based on a version in a point at time
             see ClassificationModification's read permission """
-        klass = queryset if queryset is not None else cls
+        if not (user and user.is_authenticated):
+            return cls.objects.none()
 
-        if user and user.is_authenticated:
-            queryset = get_objects_for_user(user, cls.get_write_perm(), klass=klass, accept_global_perms=True)
-        else:
-            queryset = cls.objects.none()
-
+        # Off the bare model - Guardian embeds a queryset it is handed into both permission lookups
+        # (@see GuardianPermissionsMixin._permitted_for_user_qs)
+        permitted_qs = get_objects_for_user(user, cls.get_write_perm(), klass=cls, accept_global_perms=True)
+        if queryset is None:
+            return permitted_qs
+        if permitted_qs.query.has_filters():
+            return queryset.filter(pk__in=permitted_qs.values("pk"))
         return queryset
 
     @staticmethod
