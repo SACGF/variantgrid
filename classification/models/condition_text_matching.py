@@ -69,6 +69,9 @@ class ConditionText(TimeStampedModel, GuardianPermissionsMixin):
 
     classifications_count = models.IntegerField(default=0)
     classifications_count_outstanding = models.IntegerField(default=0)
+    # set when a new root/gene level appears, drained by the condition_text_automatch_task beat sweep -
+    # automatching can call the external Monarch search API so it can't run in the publishing request (#1780)
+    pending_automatch = models.BooleanField(default=False)
 
     class Meta:
         unique_together = ("normalized_text", "lab")
@@ -441,13 +444,15 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
                 debug_timer.tick("Condition Text Matching - create new entry")
 
             if attempt_automatch and (new_root or new_gene_level):
-                ConditionTextMatch.attempt_automatch(ct, gene_symbol=gene_symbol)
-                debug_timer.tick("Condition Text Matching - auto match")
-            elif update_counts:
+                ct.pending_automatch = True
+
+            if update_counts:
                 ct.classifications_count += 1
                 is_valid = root.is_valid or gene_level.is_valid or mode_of_inheritance_level.is_valid or (existing and existing.is_valid)
                 if not is_valid:
                     ct.classifications_count_outstanding += 1
+
+            if update_counts or ct.pending_automatch:
                 ct.save()
                 debug_timer.tick("Condition Text Matching - update count quick")
 
