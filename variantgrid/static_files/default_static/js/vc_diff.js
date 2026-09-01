@@ -305,22 +305,50 @@ const Diff = (function() {
                 }
                 let content = null;
 
-                clinSigText = [];
+                const triages = v.triages || {};
+                const clinSigText = [];
 
                 const clin_sig_key = this.eKeys.key(SpecialEKeys.CLINICAL_SIGNIFICANCE);
                 const clin_sig = clin_sig_key.prettyValue((v.clinical_significance || {}).value);
                 if (clin_sig.val) {
-                    clinSigText.push(clin_sig.val);
+                    const onco = triages.O;
+                    if (onco && onco.status == "F") {
+                        let amendValue = onco.amend_value;
+                        if (!amendValue) {
+                            amendValue = "In-Review";
+                        } else {
+                            amendValue = clin_sig_key.prettyValue(amendValue);
+                        }
+                        clinSigText.push($('<span>', {class:'strike', text: clin_sig.val}));
+                        clinSigText.push($('<span>', {text: " " + amendValue.val}));
+                    } else {
+                        clinSigText.push($('<span>', {text:clin_sig.val}));
+                    }
                 }
 
                 const somatic_clin_sig_value = v[SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE];
                 if (somatic_clin_sig_value && somatic_clin_sig_value.value) {
                     const somatic_clin_sig_key = this.eKeys.key(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE);
                     const somatic_clin_sig_pretty = somatic_clin_sig_key.prettyValue(somatic_clin_sig_value.value);
-                    clinSigText.push(somatic_clin_sig_pretty.val);
+                    clinSigText.push("<br/>")
+
+                    const somatic = triages.S;
+                    if (somatic && somatic.status == "F") {
+                        let amendValue = somatic.amend_value;
+                        if (!amendValue) {
+                            amendValue = "In-Review";
+                        } else {
+                            amendValue = somatic_clin_sig_key.prettyValue(amendValue);
+                        }
+                        clinSigText.push($('<span>', {class:'strike', text: somatic_clin_sig_pretty.val}));
+                        clinSigText.push($('<span>', {text: " " + amendValue.val}));
+                    } else {
+                        clinSigText.push($('<span>', {text:somatic_clin_sig_pretty.val}));
+                    }
                 }
+
                 headers.push(
-                    $('<div>', {class:'text-center my-1', text: clinSigText.join(" - ")})
+                    $('<div>', {class:'text-center my-1', html: clinSigText})
                 );
 
                 /*
