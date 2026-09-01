@@ -179,7 +179,8 @@ def get_fake_annotation_version(genome_build: GenomeBuild):
     gene_annotation_import = GeneAnnotationImport.objects.get_or_create(genome_build=genome_build,
                                                                         annotation_consortium=AnnotationConsortium.ENSEMBL,
                                                                         url="fake")[0]
-    gene_annotation_release = GeneAnnotationRelease.objects.get_or_create(version="42",  # TextField
+    # Dotted version, like the real NCBI/Ensembl releases - it ends up in labels and column names
+    gene_annotation_release = GeneAnnotationRelease.objects.get_or_create(version="42.20240101",  # TextField
                                                                           genome_build=genome_build,
                                                                           annotation_consortium=AnnotationConsortium.ENSEMBL,
                                                                           defaults={

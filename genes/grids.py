@@ -92,7 +92,8 @@ class GeneListGenesColumns(DatatableConfig[GeneListGeneSymbol]):
         for release in self._get_gene_annotation_releases():
             field_name = f"release_{release.pk}"
             self.annotation_releases[field_name] = release
-            self.rich_columns.append(RichColumn(field_name, name=str(release), orderable=True))
+            # Release names have dots in them (eg "v110.20230601") which DataTables reads as nested data
+            self.rich_columns.append(RichColumn(field_name, label=str(release), orderable=True))
 
     def _get_gene_annotation_releases(self) -> list['GeneAnnotationRelease']:
         return GeneAnnotationRelease.get_for_latest_annotation_versions_for_builds()
