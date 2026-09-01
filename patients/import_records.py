@@ -13,6 +13,7 @@ Imports work by:
 """
 
 import logging
+from collections import Counter
 
 import pandas as pd
 from dateutil import parser
@@ -85,10 +86,13 @@ def parse_date(row, column, validation_messages):
     if date_string and not pd.isnull(date_string):
         if date_string.upper() != UNKNOWN_STRING:
             try:
-                d = parser.parse(date_string)
-            except Exception:
-                message = f"{column}: Could not parse date '{date_string}'"
-                validation_messages.append(message)
+                d = parser.isoparse(date_string)
+            except ValueError:
+                try:
+                    d = parser.parse(date_string, dayfirst=True)  # Column headers say DD-MM-YYYY
+                except Exception:
+                    message = f"{column}: Could not parse date '{date_string}'"
+                    validation_messages.append(message)
 
     return d
 
@@ -117,7 +121,8 @@ def parse_boolean(row, column, validation_messages, nullable=True):
 
 
 def parse_choice(choices, row, column, validation_messages):
-    """ Can be either the key or values in a choice (of any case) """
+    """ Key, label, or the label's first word when that is unambiguous (any case) - so TissueStatus
+        takes 'A', 'Affected / lesional', or the 'Affected' its column header offers """
     choice_string = row[column]
     if choice_string is None:
         return None
@@ -128,7 +133,12 @@ def parse_choice(choices, row, column, validation_messages):
     if choice_string in choice_dict:
         return choice_string
 
-    reverse_choice_dict = {b.upper(): a for a, b in choices}
+    reverse_choice_dict = {label.upper(): key for key, label in choices}
+    first_words = Counter(label.upper().split()[0] for label in choice_dict.values())
+    for key, label in choices:
+        first_word = label.upper().split()[0]
+        if first_words[first_word] == 1:
+            reverse_choice_dict.setdefault(first_word, key)
     value = reverse_choice_dict.get(choice_string)
 
     if value is None:
@@ -445,9 +455,8 @@ def pandas_read_encoded_csv(*args, **kwargs):
 
 def get_patient_record_imports_dataframe(f):
     df = pandas_read_encoded_csv(f, index_col=None, dtype=str)
-    df = df_nan_to_none(df)
-    df = df.applymap(lambda x: x.strip() if isinstance(x, str) else x)
-    return df
+    df = df.map(lambda x: x.strip() if isinstance(x, str) else x)
+    return df_nan_to_none(df)
 
 
 def import_patient_records(patient_records):
@@ -465,7 +474,8 @@ def import_patient_records(patient_records):
 
     items_processed = 0
     patients_to_check_for_phenotype_matches = []
-    for i, row in df.iterrows():
+    # iterrows() would build each row as a str Series, turning df_nan_to_none's None back into NaN
+    for i, row in enumerate(df.to_dict("records")):
         logging.info("import_patient_records, process_record: %s", i)
         patient_with_phenotype = process_record(patient_records, i, row)
         if patient_with_phenotype:
