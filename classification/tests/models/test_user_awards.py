@@ -36,4 +36,4 @@ class ColdCaseAwardTest(TestCase):
 
     def test_month_gap_ignored(self):
         self._classification_with_gap(timedelta(days=30))
-        self.assertEqual(_cold_cases(None), {})
+        self.assertEqual(_cold_cases(None), {None: {}})

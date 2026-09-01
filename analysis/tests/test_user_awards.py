@@ -37,7 +37,7 @@ class TagAwardCountersTest(TestCase):
         self._tag("artefact", when)
         self._tag("pathogenic", when)
         self.assertEqual(_tags_created(None), {None: {self.user.pk: 3}})
-        self.assertEqual(_tags_created(datetime(2026, 4, 1, tzinfo=dt_timezone.utc)), {})
+        self.assertEqual(_tags_created(datetime(2026, 4, 1, tzinfo=dt_timezone.utc)), {None: {}})
 
     def test_night_owl_uses_the_users_timezone(self):
         night_owl = _tags_in_hours({22, 23, 0, 1, 2, 3, 4})
