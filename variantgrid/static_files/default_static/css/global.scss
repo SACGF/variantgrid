@@ -3864,6 +3864,9 @@ a .c-hgvs-body {
 		display: flex;
 		align-items: stretch;
 		white-space: nowrap;
+		cursor: pointer;
+		border-radius: 6px;
+		text-decoration: none;
 
 		.c-pill {
 			width: auto;
@@ -3880,6 +3883,19 @@ a .c-hgvs-body {
 			color: #555;
 			font-weight: 600;
 		}
+
+		&:hover .count {
+			background-color: #eee;
+		}
+
+		&.selected {
+			outline: 2px solid #555;
+			outline-offset: 1px;
+		}
+	}
+
+	&.filtered .summary-count:not(.selected) {
+		opacity: 0.5;
 	}
 }
 
