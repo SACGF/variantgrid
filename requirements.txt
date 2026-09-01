@@ -148,7 +148,7 @@ django-appconf==1.2.0
     #   django-compressor
 django-auditlog==3.4.1
     # via -r requirements.in
-django-autocomplete-light==4.0.3
+django-autocomplete-light==5.0.0
     # via -r requirements.in
 django-avatar==9.0.0
     # via -r requirements.in
