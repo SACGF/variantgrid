@@ -19,7 +19,8 @@
 <script>
     // for showing issues
     function classificationReviews(data) {
-        data.flags = JSON.stringify(['classification_pending_changes', 'classification_internal_review', 'classification_suggestion']);
+        // data.flags = JSON.stringify(['classification_pending_changes', 'classification_internal_review', 'classification_suggestion']);
+        data.pending = "true";
         data.labs = {{ dlab.lab_ids_str | jsonify }};
     }
 

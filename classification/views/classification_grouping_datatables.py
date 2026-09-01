@@ -215,6 +215,12 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
         filters: list[Q] = []
 
         # run the filters that are perma-applied on certain pages
+        if lab_id := self.get_query_param('lab') or self.get_query_param('labs'):
+            lab_list = lab_id.split(",")
+            filters.append(Q(lab_id__in=lab_list))
+
+        if self.get_query_param('pending') == "true":
+            filters.append(Q(overlapcontribution__triage_state__status=TriageStatus.REVIEWED_WILL_FIX))
 
         if allele_id := self.get_query_param('allele_id'):
             filters.append(Q(allele_origin_grouping__allele_id=int(allele_id)))

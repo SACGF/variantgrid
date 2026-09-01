@@ -15,8 +15,8 @@
 
 <div class="mt-4">
 
-    {% ui_register_tab_embedded tab_set="classification_issues" label="Review/Suggestion" badge=dlab.counts.internal_review|add:dlab.counts.suggestions %}
-        <table id="classifications-matching" data-datatable-url="{% url 'classification_datatables' %}" class="sticky-header classification-table" data-datatable-data="classificationReviews"></table>
+    {% ui_register_tab_embedded tab_set="classification_issues" label="Pending Changes" badge=dlab.counts.internal_review|add:dlab.counts.suggestions %}
+        <table id="vc-datatable" data-datatable-data='classificationReviews' data-datatable-url="{% url 'classification_grouping_datatables' %}" class="sticky-header classification-table" data-adjust-columns="false"></table>
     {% end_ui_register_tab_embedded %}
 
     {% ui_register_tab_embedded tab_set="classification_issues" label="Assertion Changes" badge=dlab.counts.significance_change %}
