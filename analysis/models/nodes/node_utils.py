@@ -12,6 +12,7 @@ from django.db.models.query_utils import Q
 from django.utils import timezone
 from toposort import toposort
 
+from analysis.exceptions import NonFatalNodeError
 from analysis.models import Analysis, NodeColors, NodeStatus
 from analysis.models.nodes.analysis_node import AnalysisEdge, NodeCount, NodeVersion
 from analysis.models.nodes.node_counts import get_tag_node_counts_dict, get_tagged_variant_ids_by_label
@@ -106,7 +107,13 @@ def update_analysis_tag_node_counts(analysis: Analysis, tag_labels=None):
         node_version = NodeVersion.objects.filter(node=node, version=node.version).first()
         if node_version is None:
             continue  # Node reloaded from under us - it'll count these itself
-        for label, count in get_tag_node_counts_dict(node, tagged_variant_ids_by_label).items():
+        try:
+            tag_node_counts = get_tag_node_counts_dict(node, tagged_variant_ids_by_label)
+        except NonFatalNodeError:
+            # Node is ready but an ancestor isn't (eg the analysis is mid-reload) so we can't build its
+            # query - it counts these itself when it loads
+            continue
+        for label, count in tag_node_counts.items():
             node_counts.append(NodeCount(node_version=node_version, label=label, count=count))
 
     if node_counts:

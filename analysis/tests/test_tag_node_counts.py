@@ -4,8 +4,10 @@ badge on the nodes, added automatically as variants are tagged.
 """
 from django.urls import reverse
 
-from analysis.models import Analysis, VariantTag
+from analysis.models import Analysis, NodeStatus, VariantTag
+from analysis.models.enums import ZygosityNodeZygosity
 from analysis.models.nodes.analysis_node import NodeCount
+from analysis.models.nodes.filters.zygosity_node import ZygosityNode
 from analysis.models.nodes.node_counts import get_extra_filters_q, get_node_counts_mine_and_available
 from analysis.models.nodes.node_utils import update_analysis_tag_node_counts
 from analysis.tests.test_grid_export import GridExportTestCase
@@ -89,6 +91,22 @@ class TestTagNodeCountValues(TagNodeCountTestCase):
         outside_variant = slowly_create_test_variant("3", 12345, "A", "T", self.genome_build)
         self._tag_variant(outside_variant)
         self.assertEqual(0, self._tag_count(node))
+
+    def test_node_whose_parent_is_not_ready_is_skipped(self):
+        """ Tagging can land while the analysis is reloading - the child counts these when it loads """
+        parent = self._sample_node()
+        child = ZygosityNode.objects.create(analysis=self.analysis, sample=self.sample,
+                                            zygosity=ZygosityNodeZygosity.HET)
+        child.add_parent(parent)
+        child._cached_parents = None  # Clear stale cache from create()'s save()
+        child.save()
+        child.update(status=NodeStatus.READY)
+        parent.update(status=NodeStatus.DIRTY)
+
+        self._tag_variant(self.variants[0])
+        update_analysis_tag_node_counts(self.analysis)
+
+        self.assertFalse(NodeCount.objects.filter(node_version__node=child, label=self.tag_label).exists())
 
     def test_recount_bumps_modified_so_the_client_sees_it(self):
         """ nodes_status hands the client counts_modified - it's how it knows a recount landed """
