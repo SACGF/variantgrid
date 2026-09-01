@@ -42,7 +42,10 @@
         padding: 50px 0px 0px 0px; /* Height of navbar */
         margin: 0px;
 
-        height: 100%;
+        /* base.html wraps .main-content in a plain div, so a percentage height here collapses to the
+           content height - the panels then grow past the window (which is overflow-y: hidden) instead
+           of scrolling their own overflow. @see global.scss, which sizes it the same way */
+        height: 100vh;
         width: 100%;
     }
 
