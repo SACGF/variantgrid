@@ -10,7 +10,7 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
 from django.core.exceptions import PermissionDenied, ValidationError, ObjectDoesNotExist
-from django.db.models import F
+from django.db.models import F, JSONField
 from django.db.models.aggregates import Count, Max
 from django.db.models.base import ModelBase
 from django.db.models.fields.reverse_related import OneToOneRel
@@ -84,6 +84,19 @@ class RequireSuperUserView(View):
 def get_model_fields(model, ignore_fields=None) -> list[str]:
     ignore_fields = set(ignore_fields or [])
     return [f.name for f in model._meta.fields if f.name not in ignore_fields]
+
+
+def resolve_field_path(options, field_name: str):
+    """ Resolve a '__' separated field path (through FK / one-to-one) to the Django field at its end.
+        Stops at a JSONField rather than descending into its keys. """
+    if '__' in field_name:
+        fk_name, field_name = field_name.split('__', 1)
+        field = options.get_field(fk_name)
+        if field:
+            if isinstance(field, JSONField):
+                return field
+            return resolve_field_path(field.related_model._meta, field_name)
+    return options.get_field(field_name)
 
 
 def get_expanded_field(obj, field):
@@ -366,7 +379,7 @@ class UserMatcher:
 
 
 class FakeRequest(HttpRequest):
-    """ Used as a hack for things that require it, eg JqGrid in a celery task """
+    """ Used as a hack for things that require it, eg building a grid config in a celery task """
     def __init__(self, user):
         super().__init__()
         self.user = user

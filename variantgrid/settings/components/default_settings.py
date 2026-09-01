@@ -126,7 +126,7 @@ MAJOR_OPERATION_SLOT_EXPIRE_SECONDS = 10 * 60  # Safety TTL so a crashed request
 CACHE_HOURS = 48
 TIMEOUT = 60 * 60 * CACHE_HOURS
 REDIS_PORT = 6379
-CACHE_VERSION = 50  # increment to flush caches (eg if invalid due to upgrade)
+CACHE_VERSION = 51  # increment to flush caches (eg if invalid due to upgrade)
 if UNIT_TEST:
     # In-process cache, so tests don't read/write the dev Redis (state leaking between runs)
     CACHES = {

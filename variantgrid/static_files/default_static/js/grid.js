@@ -41,8 +41,7 @@ function nodeGridExportInfo(analysisId, nodeId, unique_code, export_type, use_ca
 	delete gridParams['start'];
 	delete gridParams['order[0][column]'];
 	delete gridParams['order[0][dir]'];
-	gridParams['rows'] = 0; // no pagination
-	gridParams['length'] = 0;
+	delete gridParams['length'];  // the export is unpaged
 	gridParams['export_type'] = export_type;
 	if (use_canonical_transcripts) {
 		gridParams['use_canonical_transcripts'] = true;
@@ -469,12 +468,8 @@ function setupNodeGrid(config_url, handler_url, analysisId, nodeId, versionId, u
         definitionUrl: config_url,
         url: handler_url,
         data: function(data) {
-            const postData = $.extend({}, definition.serverParams.postData);
             // FilterNode rules are saved against the node, so they ride along with its other state
-            if (postData.filters) {
-                postData._search = 'true';
-            }
-            return postData;
+            return $.extend({}, definition.serverParams.postData);
         },
         onDefinition: function(defn) {
             if (defn.errors) {

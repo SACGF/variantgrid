@@ -51,15 +51,14 @@ def format_af(value, source_in_percent, dest_in_percent, missing_value=None):
 
 
 def get_allele_frequency_formatter(source_in_percent, dest_in_percent, get_data_func=None, missing_value=None):
+    """ A grid column renderer (@see snpdb.views.datatable_view.RichColumn) - get_data_func pulls the
+        raw value out of the row where it isn't the column's own key (packed genotype columns) """
     formatters = _get_formatters(source_in_percent, dest_in_percent, missing_value=missing_value)
 
-    def format_field(row, field):
-        if get_data_func:
-            val = get_data_func(row, field)
-        else:
-            val = row[field]
+    def format_cell(cell):
+        val = get_data_func(cell) if get_data_func else cell.value
         for f in formatters:
             val = f(val)
         return val
 
-    return format_field
+    return format_cell

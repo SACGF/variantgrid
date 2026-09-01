@@ -1,11 +1,11 @@
 /* Client renderers for the variant grids (the AbstractVariantGrid family).
 
    DataTables renderer signature is (data, type, row, ctx), where ctx is added by DataTableDefinition:
-     ctx.extra    grid wide metadata from the definition JSON (JqGrid.get_datatable_extra)
-     ctx.kwargs   this column's renderKwargs (the colmodel's formatter_kwargs)
+     ctx.extra    grid wide metadata from the definition JSON (DatatableConfig.get_extra)
+     ctx.kwargs   this column's own settings, where it was declared with client_renderer_kwargs
 
    Shared page helpers (createGridLink, IGV, tags, load_variant_details) live in grid.js.
-   @see library/django_utils/jqgrid_datatable_adapter.py for the formatter -> renderer mapping */
+   A column names its renderer in RichColumn(client_renderer=...) - @see snpdb/grids.py */
 
 const VariantGridFormat = (function() {
     "use strict";
@@ -505,7 +505,7 @@ VariantGridFormat.predictions = (numPathogenic, type, rowData) => {
 // Zygosity counts in one cell - hom · het, with the rest in the title. Sorts on the het count, the
 // column it lives on. The row key prefix comes from the countPrefix render kwarg: this database's
 // global counts by default, a cohort node's own counts where it names its own.
-// @see CohortNode._get_node_extra_colmodel_overrides
+// @see CohortNode._get_node_extra_columns
 const DB_ZYGOSITY_COUNT_PREFIX = "global_variant_zygosity__";
 
 VariantGridFormat.dbZygosityCounts = (hetCount, type, rowData, ctx) => {
@@ -532,7 +532,7 @@ VariantGridFormat.dbZygosityCounts = (hetCount, type, rowData, ctx) => {
 
 // The record's VCF FILTER. Nearly every row passed, and a column of 'PASS' is a column of nothing -
 // so a pass fades almost out and only a call that failed something reads.
-// @see CohortMixin._get_node_extra_colmodel_overrides
+// @see CohortMixin._get_node_extra_columns
 VariantGridFormat.vcfFilters = (filters) => {
     if (filters == null || filters === '' || filters === '.') {
         return '';
@@ -970,23 +970,3 @@ VariantGridFormat.masterMind = (value) => {
 };
 
 
-VariantGridFormat.unitAsPercent = (unitValue) => {
-    // Allele Frequency missing data passed as "." to match VCF
-    // Shows falsey values (eg 0.0) or '.' as blank
-    if (!unitValue || unitValue === ".") {
-        return "";
-    }
-    return (100.0 * unitValue).toPrecision(3) + "%";
-};
-
-
-// renderKwargs: url_name, url_object_column, icon_css_class
-VariantGridFormat.link = (cellValue, type, row, ctx) => {
-    const kwargs = (ctx && ctx.kwargs) || {};
-    const cssClasses = ["icon24", "left", "margin-r-5"];
-    const iconList = kwargs.icon_css_class ? [kwargs.icon_css_class] : ["view-details-link"];
-    const icons = iconList.map(icon => `<div class='${cssClasses.concat(icon).join(" ")}'></div>`).join("");
-    const urlObject = kwargs.url_object_column ? row[kwargs.url_object_column] : cellValue;
-    const url = Urls[kwargs.url_name](urlObject);
-    return `<a class='grid-link' href='${url}'>${icons}<div class='display-text'>${cellValue}</div></a>`;
-};

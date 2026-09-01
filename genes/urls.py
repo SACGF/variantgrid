@@ -16,7 +16,6 @@ from genes.views.views_hotspot_graphs import (
     HotspotGraphView,
     PublicRUNX1HotspotGraphView,
 )
-from library.django_utils.jqgrid_datatable_adapter import JqGridDatatableView
 from snpdb.views.datatable_view import DatabaseTableView
 from variantgrid.perm_path import path
 
@@ -73,8 +72,8 @@ urlpatterns = [
     # Grids
     path('wiki/datatable', DatabaseTableView.as_view(column_class=GeneSymbolWikiColumns),
          name='gene_wiki_datatable'),
-    path('gene/grid/<gene_symbol>/<genome_build_name>/<slug:op>/',
-         JqGridDatatableView.as_view(grid=GeneSymbolVariantsGrid, csv_download=True),
+    path('gene/grid/<gene_symbol>/<genome_build_name>/',
+         DatabaseTableView.as_view(column_class=GeneSymbolVariantsGrid),
          name='gene_symbol_variants_grid'),
 
     path('gene_lists/datatable/', DatabaseTableView.as_view(column_class=GeneListColumns),

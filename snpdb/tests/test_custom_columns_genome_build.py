@@ -2,7 +2,7 @@ from django.contrib.auth.models import User
 from django.test import TestCase
 
 from annotation.fake_annotation import get_fake_annotation_version
-from snpdb.grid_columns.custom_columns import get_custom_column_fields_override_and_sample_position
+from snpdb.grid_columns.custom_columns import get_variant_grid_columns
 from snpdb.models import CustomColumn, CustomColumnsCollection, VariantGridColumn
 from snpdb.models.models_genome import GenomeBuild
 
@@ -29,9 +29,8 @@ class CustomColumnsGenomeBuildTest(TestCase):
         vav = annotation_version.variant_annotation_version
         vav.columns_version = 4
         vav.save()
-        fields, _override, _sample_position = \
-            get_custom_column_fields_override_and_sample_position(self.ccc, annotation_version)
-        return fields
+        rich_columns, _sample_position = get_variant_grid_columns(self.ccc, annotation_version, {})
+        return [rc.name for rc in rich_columns]
 
     def test_column_shown_for_annotated_build(self):
         variant_column = VariantGridColumn.objects.get(pk=GRCH38_ONLY_COLUMN).variant_column

@@ -16,6 +16,7 @@ from annotation.models import (
 )
 from annotation.fake_annotation import create_fake_variants, get_fake_annotation_version
 from annotation.tests.test_data_fake_genes import create_fake_transcript_version, create_gata2_transcript_version
+from library.django_utils import FakeRequest
 from library.django_utils.django_partition import temporary_db_table
 from snpdb.models import (
     Allele,
@@ -64,8 +65,10 @@ class TaggedVariantGridTest(TestCase):
                                          genome_build=cls.genome_build, user=user or cls.user)
 
     def _grid_rows(self, extra_filters=None) -> dict[int, dict]:
-        grid = TaggedVariantGrid(self.user, self.genome_build.name, extra_filters=extra_filters)
-        return {row["id"]: row for row in grid.get_queryset(None)}
+        request = FakeRequest(user=self.user)
+        grid = TaggedVariantGrid(request, self.genome_build.name, extra_filters=extra_filters)
+        qs = grid.get_initial_queryset().values(*grid.value_columns())
+        return {row["id"]: row for row in qs}
 
     def _grid_variant_ids(self, extra_filters) -> set[int]:
         return set(self._grid_rows(extra_filters))
@@ -207,7 +210,7 @@ class TaggedVariantGridTest(TestCase):
     def test_user_filter_overrides_show_group_data(self):
         """ An explicit user filter must still show another user's (permission-visible) tags
             even when the grid config is set to only show your own data """
-        for caption in [TaggedVariantGrid.caption, VariantTagsColumns.GRID_NAME]:
+        for caption in [TaggedVariantGrid.grid_name, VariantTagsColumns.GRID_NAME]:
             config = UserGridConfig.get(self.user, caption)
             config.show_group_data = False
             config.save()

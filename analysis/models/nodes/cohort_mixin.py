@@ -10,6 +10,7 @@ from analysis.models.nodes.analysis_node import NodeAlleleFrequencyFilter, NodeV
 from patients.models_enums import Zygosity
 from snpdb.archive import DataArchivedError
 from snpdb.models import Cohort, CohortGenotypeCollection, ImportStatus, Sample, VCFFilter
+from snpdb.views.datatable_view import NullOrder, RichColumn
 from upload.models import UploadedVCF
 
 
@@ -279,31 +280,25 @@ class CohortMixin:
                 return [cgc]
         return []
 
-    def _get_node_extra_columns(self):
+    def _get_node_extra_columns(self) -> list[RichColumn]:
         """ show filters if we have them and they're not filtered away (no point then) """
-        return [f"{cgc.cohortgenotype_alias}__filters" for cgc in self._get_filters_cohort_genotype_collections()]
-
-    def _get_node_extra_colmodel_overrides(self):
-        extra_colmodel_overrides = super()._get_node_extra_colmodel_overrides()
+        extra_columns = super()._get_node_extra_columns()
         cgcs = self._get_filters_cohort_genotype_collections()
         for cgc in cgcs:
             vcf = cgc.cohort.get_vcf()
             filters_column = f"{cgc.cohortgenotype_alias}__filters"
-            overrides = {
-                'name': filters_column,
-                'model_field': False,  # It's an alias
-                'queryset_field': True,
-                'width': 80,
-                'server_side_formatter': VCFFilter.get_formatter(vcf),
+            # Which VCF's FILTER this is only needs saying when there are several
+            label = f"{vcf} Filters" if len(cgcs) > 1 else "Filters"
+            extra_columns.append(RichColumn(
+                key=filters_column, label=label, width=80, orderable=True, search=False,
+                include_in_csv=True,
+                # Expanded to the VCF's own filter descriptions server side, so the CSV matches
+                renderer=VCFFilter.get_formatter(vcf), csv_rendered=True,
                 # Nearly every record passed - the cell fades a pass right down so only a
                 # failure reads. @see VariantGridFormat.vcfFilters
-                'formatter': 'vcfFiltersFormatter',
-            }
-            if len(cgcs) > 1:  # Which VCF's FILTER this is only needs saying when there are several
-                overrides['label'] = f"{vcf} Filters"
-            extra_colmodel_overrides[filters_column] = overrides
-
-        return extra_colmodel_overrides
+                client_renderer='VariantGridFormat.vcfFilters',
+                null_order=NullOrder.FIRST_ON_ASC))
+        return extra_columns
 
     def _get_configuration_check_cohorts(self) -> list:
         """ Cohorts to check for missing/archived genotype data. Nodes spanning VCFs override """

@@ -47,6 +47,7 @@ from snpdb.models import (
     VCFFilter,
 )
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
+from snpdb.views.datatable_view import CellData
 
 
 @override_settings(ANALYSIS_NODE_CACHE_Q=False)
@@ -481,17 +482,17 @@ class TestSampleNodeLevels(SampleNodeLevelsTestCase):
         node.status = NodeStatus.READY
         node.save()
 
-        grid = VariantGrid(self.user, node)
-        self.assertIn(VariantGrid.SOURCE_COLUMN, grid.fields)
+        grid = VariantGrid(FakeRequest(user=self.user), node)
+        source_column = grid.column(VariantGrid.SOURCE_COLUMN)
 
-        formatter = grid.get_override(VariantGrid.SOURCE_COLUMN)["server_side_formatter"]
+        renderer = source_column.renderer
         snv_packed = self.snv_cgc.get_packed_column_alias("samples_zygosity")
         cnv_packed = self.cnv_cgc.get_packed_column_alias("samples_zygosity")
 
-        snv_only = {snv_packed: "E", cnv_packed: "."}
-        both = {snv_packed: "O", cnv_packed: "O"}
-        self.assertEqual(formatter(snv_only, None), str(self.snv_sample.vcf))
-        self.assertEqual(formatter(both, None),
+        snv_only = CellData(all_data={snv_packed: "E", cnv_packed: "."}, key=None)
+        both = CellData(all_data={snv_packed: "O", cnv_packed: "O"}, key=None)
+        self.assertEqual(renderer(snv_only), str(self.snv_sample.vcf))
+        self.assertEqual(renderer(both),
                          f"{self.snv_sample.vcf}, {self.cnv_sample.vcf}")
 
     def test_single_vcf_node_has_no_source_column(self):
@@ -499,7 +500,8 @@ class TestSampleNodeLevels(SampleNodeLevelsTestCase):
         node.count = node.get_queryset().count()
         node.status = NodeStatus.READY
         node.save()
-        self.assertNotIn(VariantGrid.SOURCE_COLUMN, VariantGrid(self.user, node).fields)
+        grid = VariantGrid(FakeRequest(user=self.user), node)
+        self.assertNotIn(VariantGrid.SOURCE_COLUMN, [rc.name for rc in grid.enabled_columns])
 
     def test_exported_rows_carry_their_source_and_each_vcfs_filters(self):
         """ End to end through the grid: each row says which VCF called it, and carries that VCF's

@@ -24,7 +24,7 @@ class VariantGridColumn(models.Model):
     width = models.IntegerField(null=True)
     label = models.TextField()
     description = models.TextField()
-    model_field = models.BooleanField(default=True)  # Standard field, can use Meta inspection to determine colmodel
+    model_field = models.BooleanField(default=True)  # Standard field - resolve it for the column's label/filter
     queryset_field = models.BooleanField(default=True)  # In queryset.values() (field or alias)
 
     # These are required to be in custom columns

@@ -48,7 +48,7 @@
         <div>
             {% if codon.exists %}
                 <table id="nearby-codon-datatable" class="sticky-header"
-                       data-datatable-url="{% url 'nearby_variants_grid' variant_id=variant.pk genome_build_name=genome_build.name region_type='codon' op='handler' %}"></table>
+                       data-datatable-url="{% url 'nearby_variants_grid' variant_id=variant.pk genome_build_name=genome_build.name region_type='codon' %}"></table>
             {% else %}
                 -
             {% endif %}
@@ -59,7 +59,7 @@
         <div>
             {% if exon.exists %}
                 <table id="nearby-exon-datatable" class="sticky-header"
-                       data-datatable-url="{% url 'nearby_variants_grid' variant_id=variant.pk genome_build_name=genome_build.name region_type='exon' op='handler' %}"></table>
+                       data-datatable-url="{% url 'nearby_variants_grid' variant_id=variant.pk genome_build_name=genome_build.name region_type='exon' %}"></table>
             {% else %}
                 -
             {% endif %}
@@ -70,7 +70,7 @@
         <div>
             {% if domain.exists %}
                 <table id="nearby-domain-datatable" class="sticky-header"
-                       data-datatable-url="{% url 'nearby_variants_grid' variant_id=variant.pk genome_build_name=genome_build.name region_type='domain' op='handler' %}"></table>
+                       data-datatable-url="{% url 'nearby_variants_grid' variant_id=variant.pk genome_build_name=genome_build.name region_type='domain' %}"></table>
             {% else %}
                 -
             {% endif %}
@@ -84,7 +84,7 @@
                 <div>
                     {% if gene_nearby.exists %}
                         <table id="nearby-gene-{{ gene_symbol|slugify }}-datatable" class="sticky-header"
-                               data-datatable-url="{% url 'nearby_gene_variants_grid' variant_id=variant.pk genome_build_name=genome_build.name region_type='genes' gene_symbol=gene_symbol op='handler' %}"></table>
+                               data-datatable-url="{% url 'nearby_gene_variants_grid' variant_id=variant.pk genome_build_name=genome_build.name region_type='genes' gene_symbol=gene_symbol %}"></table>
                     {% else %}
                         -
                     {% endif %}
@@ -101,7 +101,7 @@
         <div>
             {% if range.exists %}
                 <table id="nearby-range-datatable" class="sticky-header"
-                       data-datatable-url="{% url 'nearby_variants_grid' variant_id=variant.pk genome_build_name=genome_build.name region_type='range' op='handler' %}"></table>
+                       data-datatable-url="{% url 'nearby_variants_grid' variant_id=variant.pk genome_build_name=genome_build.name region_type='range' %}"></table>
             {% else %}
                 -
             {% endif %}

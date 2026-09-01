@@ -313,12 +313,14 @@ class VCFFilter(models.Model):
 
     @staticmethod
     def get_formatter(vcf: VCF):
+        """ A grid column renderer (@see snpdb.views.datatable_view.RichColumn) - the VCF's filter
+            codes expanded to their descriptions. Per VCF, so the lookup happens once not per row """
         lookup = VCFFilter.get_code_lookup(vcf)
 
-        def filter_string_formatter(row, field):
-            return VCFFilter.format_filter_codes(lookup, row[field])
+        def filter_string_renderer(cell):
+            return VCFFilter.format_filter_codes(lookup, cell.value)
 
-        return filter_string_formatter
+        return filter_string_renderer
 
 
 class Sample(GuardianPermissionsMixin, SortByPKMixin, SvgSymbolPreviewIconMixin, PreviewModelMixin,

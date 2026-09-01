@@ -1,15 +1,20 @@
+from typing import Optional
+
 from django.contrib.auth.models import User
-from django.db.models import F, Max, OuterRef, Q, StringAgg, Subquery, TextField, Value
+from django.db.models import F, Max, OuterRef, Q, StringAgg, Subquery, TextField, Value, fields
 from django.db.models.fields.json import KeyTextTransform, KeyTransform
 from django.db.models.functions import Cast, Coalesce, Concat, TruncDate
+from django.utils.timezone import localtime
 
 from analysis.models import VariantTag
 from annotation import vep_columns
 from annotation.models import AnnotationVersion
 from classification.models import ClassificationModification
-from library.jqgrid.jqgrid_sql import get_overrides
-from snpdb.models import CustomColumn, CustomColumnsCollection, VariantGridColumn
+from library.django_utils import resolve_field_path
+from library.utils import JsonDataType, add_exception_note
+from snpdb.models import CustomColumn, CustomColumnsCollection, Variant, VariantGridColumn
 from snpdb.models.models_enums import ColumnAnnotationLevel
+from snpdb.views.datatable_view import CellData, FilterField, NullOrder, RichColumn
 
 # Row fields the client renderers read whichever columns the collection shows - they ride along hidden.
 # @see VariantGridFormat.representativeVariant / VariantGridFormat.classifications in variantgrid_formats.js
@@ -75,19 +80,105 @@ COMPOSITE_COLUMN_ROW_FIELDS = {
         "global_variant_zygosity__unk_count",
     ],
 }
-# These come from get_variantgrid_extra_annotate rather than the model, so they are colmodel-only
-# (not in the values() queryset)
+# These come from get_variantgrid_extra_annotate rather than the model
 CLASSIFICATIONS_COLUMN_ROW_ANNOTATIONS = [
     "internally_classified",
     "max_internal_classification",
     "internally_classified_somatic",
     "max_internal_somatic_classification",
 ]
+# Every alias get_variantgrid_extra_annotate adds - they're selected out like a model field would be,
+# they just have no Django field to introspect for a label or a filter
+VARIANT_GRID_EXTRA_ANNOTATION_ALIASES = set(CLASSIFICATIONS_COLUMN_ROW_ANNOTATIONS) | {
+    "internally_classified_labs",
+    "tags_global",
+}
 
 
-def get_custom_column_fields_override_and_sample_position(custom_columns_collection: CustomColumnsCollection,
-                                                          annotation_version: AnnotationVersion,
-                                                          analysis_tags=False):
+# Filter type offered for a model field's class (first match wins)
+_FIELD_FILTER_TYPES = [
+    (fields.AutoField, 'int'),
+    (fields.IntegerField, 'int'),
+    (fields.FloatField, 'float'),
+    (fields.DateTimeField, 'date'),
+]
+
+
+def _make_choices_renderer(choices: dict):
+    """ Need this to perform a closure over a loop variable """
+    def choices_renderer(cell: CellData) -> JsonDataType:
+        value = cell.value
+        return choices.get(value, value)
+    return choices_renderer
+
+
+def _render_local_datetime(cell: CellData) -> JsonDataType:
+    if value := cell.value:
+        return localtime(value).strftime("%Y-%m-%d %H:%M")
+    return value
+
+
+def _model_field_column_kwargs(field) -> dict:
+    """ RichColumn kwargs derived from the Django field a column path resolves to - its label, the
+        filter the client should offer, and the server side formatting the CSV shares with the grid """
+    kwargs = {"label": field.verbose_name}
+    if isinstance(field, fields.related.ForeignKey):
+        # A rule on the FK itself would be a type error - use the full path to the final column
+        return kwargs
+
+    if isinstance(field, fields.BooleanField):
+        kwargs["column_filter"] = FilterField('select', {'False': 'False', 'True': 'True'})
+    elif field.choices:
+        kwargs["column_filter"] = FilterField('select', dict(field.choices))
+    else:
+        filter_type = 'text'
+        for field_class, name in _FIELD_FILTER_TYPES:
+            if isinstance(field, field_class):
+                filter_type = name
+                break
+        kwargs["column_filter"] = FilterField(filter_type)
+
+    if isinstance(field, fields.CharField) and field.choices:
+        kwargs["renderer"] = _make_choices_renderer(dict(field.choices))
+        kwargs["csv_rendered"] = True
+    elif isinstance(field, fields.DateTimeField):
+        kwargs["renderer"] = _render_local_datetime
+        kwargs["csv_rendered"] = True
+    return kwargs
+
+
+def variant_column_rich_column(path: str, model_field: bool = True, queryset_field: bool = True,
+                               **overrides) -> RichColumn:
+    """ A variant grid column for a `VariantGridColumn.variant_column` path.
+
+        model_field: resolve the path through the model for its label, filter and formatting.
+        queryset_field: the path (or annotation alias) is selected out - display only columns take
+        their value from a renderer instead. """
+    kwargs = {
+        "key": path if queryset_field else None,
+        "name": path,
+        "orderable": True,
+        "null_order": NullOrder.FIRST_ON_ASC,
+        "search": False,  # the variant grids have no search box - filtering is the filter builder's
+        "include_in_csv": True,
+    }
+    if model_field:
+        kwargs.update(_model_field_column_kwargs(resolve_field_path(Variant._meta, path)))
+    kwargs.update(overrides)
+    if not kwargs.get("key") and not kwargs.get("sort_keys"):
+        kwargs["orderable"] = False  # nothing to order on
+    try:
+        return RichColumn(**kwargs)
+    except ValueError as ve:
+        add_exception_note(ve, f"Building variant grid column '{path}'")
+        raise
+
+
+def get_variant_grid_columns(custom_columns_collection: CustomColumnsCollection,
+                             annotation_version: AnnotationVersion,
+                             column_overrides: dict[str, dict],
+                             analysis_tags=False) -> tuple[list[RichColumn], Optional[int]]:
+    """ (the collection's columns plus the hidden ones the renderers read, where sample columns go) """
     variant_annotation_version = annotation_version.variant_annotation_version
     # A column only annotated for other builds (eg the gnomAD 4 FAFs, GRCh38 only) would always be
     # empty here, so it drops out of the grid (and its exports) for this build
@@ -101,66 +192,58 @@ def get_custom_column_fields_override_and_sample_position(custom_columns_collect
     columns_queryset = CustomColumn.objects.filter(q_columns_this_version,
                                                    custom_columns_collection=custom_columns_collection)
     columns_queryset = columns_queryset.select_related("column").order_by("sort_order").distinct()
-    fields = []
+
+    fields_kwargs: dict[str, dict] = {}  # field path -> RichColumn kwargs, in column order
     sample_columns_position = None
-    override = {}
 
     for field_pos, c in enumerate(columns_queryset):
-        if f := c.column.variant_column:
-            # Tags are only shown in the analysis they are in (otherwise will just show tags_global)
-            if f == "tags" and not analysis_tags:
-                continue
-            fields.append(f)
+        f = c.column.variant_column
+        if not f:
+            continue
+        # Tags are only shown in the analysis they are in (otherwise will just show tags_global)
+        if f == "tags" and not analysis_tags:
+            continue
 
         if c.column.model_field is False:
             if c.column.annotation_level == ColumnAnnotationLevel.SAMPLE_LEVEL:
                 sample_columns_position = field_pos
 
-        col_overrides = get_overrides([f], [{}],
-                                      model_field=c.column.model_field, queryset_field=c.column.queryset_field)
-        col_override = col_overrides[f]
-        description = c.column.description.replace("'", "&#146;")
-        col_override["headerTitle"] = description
-        col_override["label"] = c.column.label
-
+        fields_kwargs[f] = {
+            "model_field": c.column.model_field,
+            "queryset_field": c.column.queryset_field or f in VARIANT_GRID_EXTRA_ANNOTATION_ALIASES,
+            "label": c.column.label,
+            "header_title": c.column.description.replace("'", "&#146;"),
+        }
         if c.column.width is not None:
-            col_override["width"] = c.column.width
-
-        override[f] = col_override
+            fields_kwargs[f]["width"] = c.column.width
 
     composite_partners = [partner for visible, partners in COMPOSITE_COLUMN_ROW_FIELDS.items()
-                          for partner in partners if visible in fields]
+                          for partner in partners if visible in fields_kwargs]
     hidden_fields = VARIANT_COLUMN_ROW_FIELDS + CLASSIFICATIONS_COLUMN_ROW_FIELDS + composite_partners
     # A hidden field still gets a CSV header - use the catalogue label rather than the model
     # verbose_name (locus__ref__seq and alt__seq are both 'seq')
     hidden_columns = {vgc.variant_column: vgc
                       for vgc in VariantGridColumn.objects.filter(variant_column__in=hidden_fields)}
-    for field in hidden_fields:
-        if field not in fields:
-            fields.append(field)
-            vgc = hidden_columns.get(field)
-            if vgc is not None and vgc.model_field is False:
-                # An annotation rather than a model field (the global zygosity counts) - the colmodel
-                # has to say so, or the engine goes looking for a model field of that name
-                ov = get_overrides([field], [{}], model_field=False,
-                                   queryset_field=vgc.queryset_field)[field]
-            else:
-                ov = {}
-            if vgc is not None:
-                ov["label"] = vgc.label
-            ov["hidden"] = True
-            override[field] = ov
+    for path in hidden_fields:
+        if path in fields_kwargs:
+            continue
+        kwargs = {"visible": False}
+        if vgc := hidden_columns.get(path):
+            kwargs["label"] = vgc.label
+            kwargs["model_field"] = vgc.model_field
+            kwargs["queryset_field"] = vgc.queryset_field
+        fields_kwargs[path] = kwargs
 
-    # Grid-only values from get_variantgrid_extra_annotate - not queryset fields, so they need a
-    # colmodel that says so
-    for field in CLASSIFICATIONS_COLUMN_ROW_ANNOTATIONS:
-        if field not in fields:
-            fields.append(field)
-            ov = get_overrides([field], [{}], model_field=False, queryset_field=False)[field]
-            ov["hidden"] = True
-            override[field] = ov
+    # Grid only values from get_variantgrid_extra_annotate - annotation aliases, not model fields
+    for path in CLASSIFICATIONS_COLUMN_ROW_ANNOTATIONS:
+        if path not in fields_kwargs:
+            fields_kwargs[path] = {"visible": False, "model_field": False}
 
-    return fields, override, sample_columns_position
+    rich_columns = []
+    for path, kwargs in fields_kwargs.items():
+        kwargs = {**kwargs, **column_overrides.get(path, {})}
+        rich_columns.append(variant_column_rich_column(path, **kwargs))
+    return rich_columns, sample_columns_position
 
 
 def get_variantgrid_extra_annotate(user: User, exclude_analysis=None) -> dict:

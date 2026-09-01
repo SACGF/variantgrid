@@ -3,6 +3,7 @@ from functools import cached_property, reduce
 from typing import Any, Optional
 
 from django.conf import settings
+from django.contrib.auth.models import User
 from django.db.models import Case, F, IntegerField, OuterRef, QuerySet, StringAgg, Subquery, Value, When
 from django.db.models.aggregates import Count, Max
 from django.db.models.fields import TextField
@@ -16,12 +17,11 @@ from annotation.annotation_version_querysets import get_queryset_for_latest_anno
 from annotation.models import PATIENT_ONTOLOGY_TERM_PATH, AnnotationVersion, ManualVariantEntryCollection
 from annotation.models.models_enums import ClinVarReviewStatus
 from library.genomics.vcf_enums import INFO_LIFTOVER_SWAPPED_REF_ALT
-from library.jqgrid.jqgrid_user_row_config import JqGridUserRowConfig
 from library.unit_percent import get_allele_frequency_formatter
-from library.utils import JsonDataType, calculate_age
+from library.utils import JsonDataType, JsonObjType, calculate_age
 from ontology.models import OntologyService
 from patients.models_enums import Sex
-from snpdb.grid_columns.custom_columns import get_variantgrid_extra_annotate
+from snpdb.grid_columns.custom_columns import get_variant_grid_columns, get_variantgrid_extra_annotate
 from snpdb.models import (
     VCF,
     Allele,
@@ -466,23 +466,23 @@ class CustomColumnsCollectionColumns(NamedCollectionColumns[CustomColumnsCollect
     MODEL = CustomColumnsCollection
 
 
-def server_side_format_clingen_allele(row, field):
-    if ca_id := row[field]:
+def render_clingen_allele(cell: CellData) -> JsonDataType:
+    if ca_id := cell.value:
         ca_id = ClinGenAllele.format_clingen_allele(ca_id)
     return ca_id
 
 
-def server_side_format_exon_and_intron(row, field):
+def render_exon_and_intron(cell: CellData) -> JsonDataType:
     """ MS Excel will turn '8/11' into a date :( """
-    if val := row[field]:
+    if val := cell.value:
         val = val.replace("/", " of ")
     return val
 
 
-def server_side_format_annotsv_pathogenic_overlaps(row, field):
+def render_annotsv_pathogenic_overlaps(cell: CellData) -> JsonDataType:
     """ AnnotSV's nested {event type: {source/phen/hpo/coord}} JSON -> one entry per event type """
     text = None
-    if overlaps := row[field]:
+    if overlaps := cell.value:
         events = []
         for event, data in overlaps.items():
             details = " / ".join(str(v) for v in data.values())
@@ -491,65 +491,107 @@ def server_side_format_annotsv_pathogenic_overlaps(row, field):
     return text
 
 
-class AbstractVariantGrid(JqGridUserRowConfig):
-    model = Variant
-    VARIANT_COLUMN_SIDX = "id"  # the mandatory Variant column's colmodel name/index
+class AbstractVariantGrid(DatatableConfig[Variant]):
+    """ The variant grids - the analysis node grid and the standalone Variant tables. Their columns are
+        built per user from a CustomColumnsCollection (@see snpdb.grid_columns.custom_columns) rather
+        than declared, and the same config serves the grid page and the CSV/VCF exports. """
+    VARIANT_COLUMN_NAME = "id"  # the mandatory Variant column
+    # These grids are wide (dozens of columns) and hold cells with hundreds of links, so the client lays
+    # them out table-layout: fixed and clips each cell to one line. That needs every column to carry a
+    # width. @see .variantgrid-datatable in global.scss
+    table_class = "variantgrid-datatable"
+    default_column_width = 150
+    # Counting the unfiltered queryset is as expensive as the page itself
+    count_unfiltered = False
+    compact_controls = True  # every pixel of chrome is a row the user can't see
+    ajax_type = 'GET'  # keeps @cache_page on a data endpoint working
+    cache_stable_params = True
+    scroll_x = True
+    server_csv_download = True
+    filter_builder = True
+    approximate_count_enabled = True
+    expand_prefetch = False  # rows are full of links; the arrow is affordance enough
+    # The variant grids call the column 'id' - say what it's the id of
+    csv_label_overrides = {VARIANT_COLUMN_NAME: "variant_id"}
+    csv_name = "Variant"
+    analysis_tags = False
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.queryset_is_sorted = False
+    def __init__(self, request: HttpRequest, af_show_in_percent: Optional[bool] = None):
+        super().__init__(request)
+        if af_show_in_percent is None:
+            af_show_in_percent = settings.VARIANT_ALLELE_FREQUENCY_CLIENT_SIDE_PERCENT
+        self.af_show_in_percent = af_show_in_percent
+        self.rich_columns = self._get_rich_columns()
+        # Row expansion (@see DataTableDefinition.setupClientExpend) - variantGridRowDetail in grid.js
+        # fetches variant_grid_row_detail for the annotation version this grid is showing
+        self.expand_client_renderer = \
+            f"variantGridRowDetail.bind(null, {self._get_annotation_version().pk})"
 
-    def _get_standard_overrides(self, af_show_in_percent):
+    def _get_rich_columns(self) -> list[RichColumn]:
+        rich_columns, _sample_columns_position = self._build_variant_grid_columns()
+        return rich_columns
+
+    def _build_variant_grid_columns(self) -> tuple[list[RichColumn], Optional[int]]:
+        """ (this user's columns, where sample columns go) - @see snpdb.grid_columns.custom_columns """
+        return get_variant_grid_columns(self._get_custom_columns_collection(),
+                                        self._get_annotation_version(),
+                                        self._get_standard_overrides(self.af_show_in_percent),
+                                        analysis_tags=self.analysis_tags)
+
+    def _get_custom_columns_collection(self) -> CustomColumnsCollection:
+        return UserSettings.get_for_user(self.user).columns
+
+    def _get_standard_overrides(self, af_show_in_percent: bool) -> dict[str, dict]:
         overrides = {
-            # Note:     client side formatters should only be used for adding links etc, never conversion of data, such as
-            #           unit to percent, as the CSV downloads (w/o JS formatters) won't match the grid.
+            # Note:     client side renderers should only be used for adding links etc, never conversion of data, such as
+            #           unit to percent, as the CSV downloads (w/o JS renderers) won't match the grid.
             # The representative variant cell: expand arrow, select checkbox, cascade label (details link)
-            'id': {'editable': False, 'width': 280, 'fixed': True, 'formatter': 'representativeVariant',
-                   'sorttype': 'int'},
+            'id': {'width': 280, 'client_renderer': 'VariantGridFormat.representativeVariant'},
             'classifications': {
                 'model_field': False, 'queryset_field': False,
-                'name': 'classifications', 'index': 'classifications',
-                'classes': 'no-word-wrap', 'formatter': 'classificationsFormatter', 'sortable': False,
+                'css_class': 'no-word-wrap', 'orderable': False,
+                'client_renderer': 'VariantGridFormat.classifications',
             },
             'tags_global': {
-                'model_field': False, 'queryset_field': False,
-                'name': 'tags_global', 'index': 'tags_global',
-                'classes': 'no-word-wrap', 'formatter': 'tagsGlobalFormatter', 'sortable': False
+                'model_field': False, 'css_class': 'no-word-wrap', 'orderable': False,
+                'client_renderer': 'VariantGridFormat.tagsGlobal',
             },
-            'clinvar__clinvar_variation_id': {'width': 60, 'formatter': 'clinvarLink'},
+            'clinvar__clinvar_variation_id': {'width': 60, 'client_renderer': 'VariantGridFormat.clinvarLink'},
             'variantallele__allele__clingen_allele__id': {
                 'width': 90,
-                "server_side_formatter": server_side_format_clingen_allele,
-                'formatter': 'formatClinGenAlleleId'
+                'renderer': render_clingen_allele, 'csv_rendered': True,
+                'client_renderer': 'VariantGridFormat.clinGenAlleleId',
             },
-            'variantannotation__cosmic_id': {'width': 130, 'formatter': 'cosmicLink'},
-            'variantannotation__cosmic_legacy_id': {'width': 130, 'formatter': 'cosmicLink'},
-            'variantannotation__dbsnp_rs_id': {'width': 130, 'formatter': 'formatDBSNP'},
-            'variantannotation__pubmed': {'formatter': 'formatPubMed'},
-            'variantannotation__gene__geneannotation__hpo_terms': {'formatter': 'formatOntologyTerms'},
-            'variantannotation__gene__geneannotation__mondo_terms': {'formatter': 'formatOntologyTerms'},
-            'variantannotation__gene__geneannotation__omim_terms': {'formatter': 'formatOntologyTerms'},
-            'variantannotation__transcript_version__gene_version__gene_symbol__symbol': {'formatter': 'geneSymbolLink'},
-            'variantannotation__overlapping_symbols': {'formatter': 'geneSymbolNewWindowLink'},
-            'variantannotation__transcript_version__gene_version__hgnc__omim_ids': {'width': 60,
-                                                                                    'formatter': 'omimLink'},
+            'variantannotation__cosmic_id': {'width': 130, 'client_renderer': 'VariantGridFormat.cosmicLink'},
+            'variantannotation__cosmic_legacy_id': {'width': 130, 'client_renderer': 'VariantGridFormat.cosmicLink'},
+            'variantannotation__dbsnp_rs_id': {'width': 130, 'client_renderer': 'VariantGridFormat.dbsnp'},
+            'variantannotation__pubmed': {'client_renderer': 'VariantGridFormat.pubMed'},
+            'variantannotation__gene__geneannotation__hpo_terms': {'client_renderer': 'VariantGridFormat.ontologyTerms'},
+            'variantannotation__gene__geneannotation__mondo_terms': {'client_renderer': 'VariantGridFormat.ontologyTerms'},
+            'variantannotation__gene__geneannotation__omim_terms': {'client_renderer': 'VariantGridFormat.ontologyTerms'},
+            'variantannotation__transcript_version__gene_version__gene_symbol__symbol': {
+                'client_renderer': 'VariantGridFormat.geneSymbolLink'},
+            'variantannotation__overlapping_symbols': {'client_renderer': 'VariantGridFormat.geneSymbolNewWindowLink'},
+            'variantannotation__transcript_version__gene_version__hgnc__omim_ids': {
+                'width': 60, 'client_renderer': 'VariantGridFormat.omimLink'},
             # Still in the catalogue and 'All columns' - a collection that shows it standalone gets
             # the same Pass/Fail gnomAD link the gnomAD AF cell draws
-            'variantannotation__gnomad_filtered': {"formatter": "gnomadFilteredFormatter"},
+            'variantannotation__gnomad_filtered': {'client_renderer': 'VariantGridFormat.gnomadFiltered'},
             # Composite cells - the partner values ride along hidden (COMPOSITE_COLUMN_ROW_FIELDS).
             # A cell drawing several values carries a sort_menu naming the column each one sorts on
             'variantannotation__consequence': {
-                'width': 160, 'formatter': 'impactConsequenceFormatter',
+                'width': 160, 'client_renderer': 'VariantGridFormat.impactConsequence',
                 'sort_menu': [
                     {"label": "Consequence", "column": "variantannotation__consequence"},
                     # Impact is stored ascending by severity (@see PathogenicityImpact.CHOICES)
                     {"label": "Impact", "column": "variantannotation__impact"},
                 ],
             },
-            'variantannotation__gnomad_af': {'width': 130, 'formatter': 'gnomadAfFormatter'},
-            'variantannotation__gnomad_popmax_af': {'width': 110, 'formatter': 'gnomadPopmaxFormatter'},
+            'variantannotation__gnomad_af': {'width': 130, 'client_renderer': 'VariantGridFormat.gnomadAf'},
+            'variantannotation__gnomad_popmax_af': {'width': 110,
+                                                    'client_renderer': 'VariantGridFormat.gnomadPopmax'},
             'variantannotation__spliceai_max_ds': {
-                'width': 80, 'formatter': 'spliceaiFormatter',
+                'width': 80, 'client_renderer': 'VariantGridFormat.spliceai',
                 'sort_menu': [
                     {"label": "Max delta score", "column": "variantannotation__spliceai_max_ds"},
                     {"label": "Acceptor gain", "column": "variantannotation__spliceai_pred_ds_ag"},
@@ -559,7 +601,7 @@ class AbstractVariantGrid(JqGridUserRowConfig):
                 ],
             },
             'variantannotation__maxentscan_percent_diff_ref': {
-                'width': 90, 'formatter': 'maxentscanFormatter',
+                'width': 90, 'client_renderer': 'VariantGridFormat.maxentscan',
                 'sort_menu': [
                     {"label": "% diff from ref", "column": "variantannotation__maxentscan_percent_diff_ref"},
                     {"label": "Reference score", "column": "variantannotation__maxentscan_ref"},
@@ -568,7 +610,7 @@ class AbstractVariantGrid(JqGridUserRowConfig):
                 ],
             },
             'variantannotation__mastermind_count_1_cdna': {
-                'width': 80, 'formatter': 'mastermindFormatter',
+                'width': 80, 'client_renderer': 'VariantGridFormat.mastermind',
                 'sort_menu': [
                     {"label": "Variant articles", "column": "variantannotation__mastermind_count_1_cdna"},
                     {"label": "Variant/protein articles",
@@ -577,7 +619,7 @@ class AbstractVariantGrid(JqGridUserRowConfig):
                 ],
             },
             'variantannotation__aloft_pred': {
-                'width': 125, 'formatter': 'aloftFormatter',
+                'width': 125, 'client_renderer': 'VariantGridFormat.aloft',
                 'sort_menu': [
                     {"label": "Prediction", "column": "variantannotation__aloft_pred"},
                     {"label": "Probability dominant", "column": "variantannotation__aloft_prob_dominant"},
@@ -587,16 +629,16 @@ class AbstractVariantGrid(JqGridUserRowConfig):
                 ],
             },
             'variantannotation__predictions_num_pathogenic': {
-                'width': 80, 'formatter': 'predictionsFormatter',
+                'width': 80, 'client_renderer': 'VariantGridFormat.predictions',
                 'sort_menu': [
                     {"label": "Damaging count", "column": "variantannotation__predictions_num_pathogenic"},
                     {"label": "Benign count", "column": "variantannotation__predictions_num_benign"},
                 ],
             },
             # The same cell (and the same menu) the cohort node draws with its own counts
-            # @see CohortNode._get_node_extra_colmodel_overrides
+            # @see CohortNode._get_node_extra_columns
             'global_variant_zygosity__het_count': {
-                'width': 70, 'formatter': 'dbZygosityCountsFormatter',
+                'width': 70, 'client_renderer': 'VariantGridFormat.dbZygosityCounts',
                 'sort_menu': [
                     {"label": "Het count", "column": "global_variant_zygosity__het_count"},
                     {"label": "Hom count", "column": "global_variant_zygosity__hom_count"},
@@ -604,47 +646,46 @@ class AbstractVariantGrid(JqGridUserRowConfig):
                     {"label": "Unknown count", "column": "global_variant_zygosity__unk_count"},
                 ],
             },
-            'variantannotation__exon': {"server_side_formatter": server_side_format_exon_and_intron},
-            'variantannotation__intron': {"server_side_formatter": server_side_format_exon_and_intron},
-            'variantannotation__mastermind_mmid3': {'formatter': 'formatMasterMindMMID3'},
-            'variantannotation__mavedb_urn': {'formatter': 'formatMavedbUrnLinks'},  # formatMavedbUrnLinks
+            'variantannotation__exon': {'renderer': render_exon_and_intron, 'csv_rendered': True},
+            'variantannotation__intron': {'renderer': render_exon_and_intron, 'csv_rendered': True},
+            'variantannotation__mastermind_mmid3': {'client_renderer': 'VariantGridFormat.masterMind'},
+            'variantannotation__mavedb_urn': {'client_renderer': 'VariantGridFormat.mavedbUrn'},
             'variantannotation__annotsv_pathogenic_overlaps': {
-                "server_side_formatter": server_side_format_annotsv_pathogenic_overlaps
+                'renderer': render_annotsv_pathogenic_overlaps, 'csv_rendered': True,
             },
-            # There is more server side formatting (Unit -> Percent) added in _get_fields_and_overrides
         }
 
         if af_show_in_percent:
             # gnomAD etc are all stored as AF in DB - want to show as percentage on grid
             # But need to be able to turn it off to export VCF as AF
-            server_side_format_unit_af = get_allele_frequency_formatter(source_in_percent=False,
-                                                                        dest_in_percent=af_show_in_percent)
-            af_override = {
-                # Unit -> Percent
-                'variantannotation__af_1kg': {'server_side_formatter': server_side_format_unit_af},
-                'variantannotation__af_uk10k': {'server_side_formatter': server_side_format_unit_af},
-                'variantannotation__gnomad2_liftover_af': {'server_side_formatter': server_side_format_unit_af},
-                'variantannotation__gnomad_af': {'server_side_formatter': server_side_format_unit_af},
-                'variantannotation__gnomad_afr_af': {'server_side_formatter': server_side_format_unit_af},
-                'variantannotation__gnomad_amr_af': {'server_side_formatter': server_side_format_unit_af},
-                'variantannotation__gnomad_asj_af': {'server_side_formatter': server_side_format_unit_af},
-                'variantannotation__gnomad_eas_af': {'server_side_formatter': server_side_format_unit_af},
-                'variantannotation__gnomad_fin_af': {'server_side_formatter': server_side_format_unit_af},
-                'variantannotation__gnomad_nfe_af': {'server_side_formatter': server_side_format_unit_af},
-                'variantannotation__gnomad_oth_af': {'server_side_formatter': server_side_format_unit_af},
-                'variantannotation__gnomad_popmax_af': {'server_side_formatter': server_side_format_unit_af},
-                'variantannotation__gnomad_sas_af': {'server_side_formatter': server_side_format_unit_af},
-                'variantannotation__topmed_af': {'server_side_formatter': server_side_format_unit_af},
-            }
-            # Merge rather than replace - gnomad_popmax_af already carries its composite formatter
-            for field, field_override in af_override.items():
-                overrides.setdefault(field, {}).update(field_override)
+            render_unit_af = get_allele_frequency_formatter(source_in_percent=False,
+                                                            dest_in_percent=af_show_in_percent)
+            af_override = {'renderer': render_unit_af, 'csv_rendered': True}
+            af_columns = [
+                'variantannotation__af_1kg',
+                'variantannotation__af_uk10k',
+                'variantannotation__gnomad2_liftover_af',
+                'variantannotation__gnomad_af',
+                'variantannotation__gnomad_afr_af',
+                'variantannotation__gnomad_amr_af',
+                'variantannotation__gnomad_asj_af',
+                'variantannotation__gnomad_eas_af',
+                'variantannotation__gnomad_fin_af',
+                'variantannotation__gnomad_nfe_af',
+                'variantannotation__gnomad_oth_af',
+                'variantannotation__gnomad_popmax_af',
+                'variantannotation__gnomad_sas_af',
+                'variantannotation__topmed_af',
+            ]
+            # Merge rather than replace - gnomad_popmax_af already carries its composite renderer
+            for column in af_columns:
+                overrides.setdefault(column, {}).update(af_override)
         return overrides
 
     def _get_base_queryset(self) -> QuerySet:
         raise NotImplementedError()
 
-    def get_datatable_extra(self) -> dict:
+    def get_extra(self) -> JsonObjType:
         # gnomAD links are per genome build, and the client renderers have no other way to know it
         extra = {"genomeBuild": self.genome_build.name,
                  "clinvarStars": dict(ClinVarReviewStatus.STARS),
@@ -659,41 +700,46 @@ class AbstractVariantGrid(JqGridUserRowConfig):
             extra["commonGnomadAf"] = common_af
         return extra
 
-    def get_extra_table_classes(self) -> list[str]:
+    def get_table_classes(self) -> list[str]:
         """ Two line rows are a per-user setting. The second line is in the markup either way -
             CSS decides whether it shows, so switching it doesn't need the rows re-rendering """
+        classes = super().get_table_classes()
         if UserSettings.get_for_user(self.user).variant_grid_two_line_rows:
-            return ["two-line-rows"]
-        return []
+            classes.append("two-line-rows")
+        return classes
 
     def _get_annotation_version(self) -> AnnotationVersion:
         return self.annotation_version
 
-    def get_expand_client_renderer(self) -> str:
-        """ Row expansion (@see DataTableDefinition.setupClientExpend) - variantGridRowDetail in grid.js
-            fetches variant_grid_row_detail for the annotation version this grid is showing """
-        return f"variantGridRowDetail.bind(null, {self._get_annotation_version().pk})"
+    def initial_order(self) -> Optional[list]:
+        """ Only a column that asked to be the initial sort - unlike other tables, falling back to
+            the first column would sort the whole variant table on every first load """
+        for rc in self.enabled_columns:
+            if rc.default_sort and rc.visible and rc.orderable:
+                return [[self.column_index(rc), "desc" if rc.default_sort == SortOrder.DESC else "asc"]]
+        return None
 
-    def _genomic_order_by(self, items: QuerySet, descending: bool) -> QuerySet:
+    def _genomic_order_by(self, qs: QuerySet, descending: bool) -> QuerySet:
         """ The Variant column sorts in genome build order whatever it displays. Contig order is a CASE over
             the build's standard contigs rather than a join through GenomeBuildContig - MT is shared between
             builds and the join would return the row once per build. Non-standard contigs sort after, by id """
         whens = [When(locus__contig_id=contig_id, then=Value(i))
                  for i, contig_id in enumerate(self.genome_build.standard_contigs.values_list("pk", flat=True))]
-        items = items.annotate(_contig_order=Case(*whens, default=Value(len(whens)), output_field=IntegerField()))
+        qs = qs.annotate(_contig_order=Case(*whens, default=Value(len(whens)), output_field=IntegerField()))
         fields = ["_contig_order", "locus__contig_id", "locus__position", "locus__ref__seq", "alt__seq", "pk"]
         prefix = "-" if descending else ""
-        return items.order_by(*[f"{prefix}{f}" for f in fields])
+        return qs.order_by(*[f"{prefix}{f}" for f in fields])
 
-    def _sort_items(self, items, sidx, sord):
-        if sidx == self.VARIANT_COLUMN_SIDX:
-            return self._genomic_order_by(items, descending=sord == "desc")
-        return super()._sort_items(items, sidx, sord)
+    def ordering(self, qs: QuerySet) -> QuerySet:
+        for rich_column, desc in self.requested_ordering():
+            if rich_column.name == self.VARIANT_COLUMN_NAME:
+                return self._genomic_order_by(qs, descending=desc)
+        return super().ordering(qs)
 
-    def _get_permission_user(self):
+    def _get_permission_user(self) -> User:
         return self.user
 
-    def get_queryset(self, request):
+    def get_initial_queryset(self) -> QuerySet[Variant]:
         qs = self._get_base_queryset()
         # Restrict the variantallele join to this grid's genome build. Some contigs are shared between builds
         # (e.g. MT / NC_012920 is shared by GRCh37 & GRCh38) so the same Variant has a VariantAllele per build -
@@ -703,37 +749,18 @@ class AbstractVariantGrid(JqGridUserRowConfig):
         qs = qs.filter(Q(variantallele__isnull=True) | Q(variantallele__genome_build=self.genome_build))
         # Annotate so we can use global_variant_zygosity in grid columns
         qs, _ = VariantZygosityCountCollection.annotate_global_germline_counts(qs)
-        # Column filtering is applied by JqGrid.get_items on our result - doing it here as well
+        # Column filter rules are applied by apply_filters on our result - doing it here as well
         # adds a second JOIN per filtered relation, which multiplies rows
         if q := self._get_q():
             qs = qs.filter(q)
+        return qs.annotate(**self._get_grid_only_annotation_kwargs())
 
-        field_names = self.get_queryset_field_names()
-        a_kwargs = self._get_grid_only_annotation_kwargs()
-        qs = qs.annotate(**a_kwargs)
-        field_names.extend(a_kwargs)
-        return qs.values(*field_names)
-
-    def _get_grid_only_annotation_kwargs(self):
+    def _get_grid_only_annotation_kwargs(self) -> dict:
         """ Things not used in counts etc - only to display grid """
-        user = self._get_permission_user()
-        return get_variantgrid_extra_annotate(user)
+        return get_variantgrid_extra_annotate(self._get_permission_user())
 
     def _get_q(self) -> Optional[Q]:
         return None
-
-    def column_in_queryset_fields(self, field):
-        colmodel = self.get_override(field)
-        return colmodel.get("queryset_field", True)
-
-    def get_queryset_field_names(self):
-        field_names = []
-        for f in super().get_field_names():
-            if self.column_in_queryset_fields(f):
-                field_names.append(f)
-
-        return field_names
-
 
 class TagColorsCollectionColumns(NamedCollectionColumns[TagColorsCollection]):
     MODEL = TagColorsCollection

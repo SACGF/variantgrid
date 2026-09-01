@@ -19,6 +19,7 @@ from analysis.models.nodes.zygosity_count_node import AbstractZygosityCountNode
 from analysis.models.nodes.node_display import NodeIcon
 from patients.models_enums import SimpleZygosity, Zygosity
 from snpdb.models import Cohort, CohortGenotypeCollection, CohortSample, VariantsType
+from snpdb.views.datatable_view import NullOrder, RichColumn
 
 
 class AbstractCohortBasedNode(CohortMixin, AnalysisNode):
@@ -315,28 +316,20 @@ class CohortNode(AbstractCohortBasedNode, AbstractZygosityCountNode):
             @see VariantGridFormat.dbZygosityCounts """
         return [self.het_count_column, self.hom_count_column, self.ref_count_column]
 
-    def _get_node_extra_columns(self):
+    def _get_node_extra_columns(self) -> list[RichColumn]:
         extra_columns = super()._get_node_extra_columns()
         if self.cohort and self.count_column_prefix is not None:
-            extra_columns.extend(self._count_columns)
-        return extra_columns
-
-    def _get_node_extra_colmodel_overrides(self):
-        extra_colmodel_overrides = super()._get_node_extra_colmodel_overrides()
-        if self.cohort and self.count_column_prefix is not None:
-            visible = self._count_columns[0]
+            drawn_column = self._count_columns[0]
             for c in self._count_columns:
-                override = extra_colmodel_overrides.get(c, {})
-                override["name"] = c
-                override["model_field"] = False
-                override["queryset_field"] = True
-                if c == visible:
+                kwargs = {"key": c, "orderable": True, "search": False, "include_in_csv": True,
+                          "null_order": NullOrder.FIRST_ON_ASC}
+                if c == drawn_column:
                     # hom · het in the one cell, the counts it doesn't draw on hover
-                    override.update({
+                    kwargs.update({
                         "label": "Cohort Counts",
                         "width": 70,
-                        "formatter": "dbZygosityCountsFormatter",
-                        "formatter_kwargs": {"countPrefix": self.count_column_prefix},
+                        "client_renderer": "VariantGridFormat.dbZygosityCounts",
+                        "client_renderer_kwargs": {"countPrefix": self.count_column_prefix},
                         "sort_menu": [
                             {"label": "Het count", "column": self.het_count_column},
                             {"label": "Hom count", "column": self.hom_count_column},
@@ -344,10 +337,9 @@ class CohortNode(AbstractCohortBasedNode, AbstractZygosityCountNode):
                         ],
                     })
                 else:
-                    override["hidden"] = True
-                extra_colmodel_overrides[c] = override
-
-        return extra_colmodel_overrides
+                    kwargs["visible"] = False
+                extra_columns.append(RichColumn(**kwargs))
+        return extra_columns
 
     def save(self, *args, **kwargs):
         is_new = self.version == 0

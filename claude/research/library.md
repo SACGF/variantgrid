@@ -123,13 +123,15 @@ System for generating rich previews/summaries of data objects.
 
 ## Grid Support
 
-### jqgrid/jqgrid.py
+### django_utils/filter_rules.py
 
-**JqGrid** (base class) — the older of the two grid engines, still driving the variant grids and the
-CSV/VCF export. Served to the DataTables client by `django_utils/jqgrid_datatable_adapter.py`.
-- Fields: queryset, model, fields
-- `json_encode()` — DjangoJSONEncoder wrapper
-- Various operation formatting utilities
+The column filter rule vocabulary shared by the grids' filter builder and FilterNode.
+- `FILTER_OPERATIONS` — the ops offered, and whether each takes a value
+- `rules_to_q()` — a rule set to a Django `Q`
+- `parse_filters()` / `format_operation()`
+
+The grid engine itself is `snpdb.views.datatable_view` (`DatatableConfig`, `RichColumn`,
+`DatabaseTableView`).
 
 ---
 

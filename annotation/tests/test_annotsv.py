@@ -32,9 +32,10 @@ from annotation.vep_annotation import (
     vep_dict_to_variant_annotation_version_kwargs,
 )
 from genes.models_enums import AnnotationConsortium
-from snpdb.grids import server_side_format_annotsv_pathogenic_overlaps
+from snpdb.grids import render_annotsv_pathogenic_overlaps
 from snpdb.models import Variant, VariantGridColumn
 from snpdb.models.models_genome import GenomeBuild
+from snpdb.views.datatable_view import CellData
 from snpdb.tests.utils.vcf_testing_utils import (
     slowly_create_loci_and_variants_for_vcf,
     slowly_create_test_variant,
@@ -525,8 +526,9 @@ class AnnotSVPathogenicOverlapsFormatterTest(TestCase):
     def test_formats_each_event_type(self):
         row = {self.FIELD: {"gain": {"source": "ClinVar", "phen": "Seizures", "coord": "1:100-200"},
                             "loss": {"source": "dbVar"}}}
-        self.assertEqual(server_side_format_annotsv_pathogenic_overlaps(row, self.FIELD),
+        self.assertEqual(render_annotsv_pathogenic_overlaps(CellData(all_data=row, key=self.FIELD)),
                          "gain: ClinVar / Seizures / 1:100-200, loss: dbVar")
 
     def test_empty(self):
-        self.assertIsNone(server_side_format_annotsv_pathogenic_overlaps({self.FIELD: None}, self.FIELD))
+        cell = CellData(all_data={self.FIELD: None}, key=self.FIELD)
+        self.assertIsNone(render_annotsv_pathogenic_overlaps(cell))

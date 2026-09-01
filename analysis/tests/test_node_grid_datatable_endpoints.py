@@ -97,9 +97,9 @@ class NodeGridHandlerTest(NodeGridEndpointTestCase):
         self.assertEqual(2, len(page_two["data"]))
 
     def test_column_filters_narrow_the_rows(self):
-        """ The filter builder's rules ride up as _search/filters and the grid engine parses them """
+        """ The filter builder's rules ride up as 'filters' and the server parses them """
         rules = {"groupOp": "AND", "rules": [{"field": "locus__position", "op": "lt", "data": "1500"}]}
-        data = self._handler(_search="true", filters=json.dumps(rules))
+        data = self._handler(filters=json.dumps(rules))
         self.assertLess(data["recordsFiltered"], self.node.count)
 
 
