@@ -10,6 +10,8 @@ from library.cache import timed_cache
 from library.utils import first
 from snpdb.models import AvatarDetails, Lab
 from snpdb.models.models_user_settings import UserSettings
+from snpdb.user_awards import get_badge_definitions
+from snpdb.user_settings_manager import UserSettingsManager
 
 register = template.Library()
 
@@ -94,6 +96,11 @@ def user(context, u: User,
             return us
 
         @property
+        def show_titles(self) -> bool:
+            """ Title decoration is per viewer (show_user_awards) - the logged in user, not the one shown """
+            return self.avatar.shows_titles_for(UserSettingsManager.get_user_settings())
+
+        @property
         def email_weekly_updates(self):
             return self.user_settings.email_weekly_updates
 
@@ -134,4 +141,18 @@ def settings_override(form, override_level, override_source, override_values):
         "override_level": override_level,
         "override_source": override_source,
         "override_values": override_values
+    }
+
+
+@register.inclusion_tag("snpdb/tags/award_cabinet.html")
+def award_cabinet(u: User):
+    """ Titles held, badges (earned and progress towards the rest) and kudos - the profile pages """
+    avatar = AvatarDetails.avatar_for(u)
+    awards = avatar.awards
+    badge_progress = [p for p in (awards.progress(d) for d in get_badge_definitions()) if p.visible]
+    return {
+        "avatar": avatar,
+        "titles": awards.titles,
+        "badge_progress": badge_progress,
+        "kudos": awards.kudos,
     }

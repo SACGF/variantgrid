@@ -1246,6 +1246,12 @@ VIEW_GENE_WIKI = True
 
 TIPS_ENABLED = True  # Show feature tips in loading screens / blank grids
 
+# User awards (#1819): computed titles (crown/medal/trophy) and badges, plus admin-given kudos.
+# Off = no computation, no decoration on grids, settings UI hidden. Individual definitions
+# (see <app>/user_awards.py) can be switched off by key, e.g. {"top_classifier"}
+USER_AWARDS_ENABLED = True
+USER_AWARDS_DISABLED_KEYS = set()
+
 KEY_CLOAK_REALM = None
 
 UNSHARED_FLAG_ENABLED = False

@@ -121,6 +121,7 @@ CELERY_TASK_ROUTES = {
     'annotation.tasks.annotation_scheduler_task.dispatch_annotation_runs': SCHEDULING_SINGLE_WORKER,
     'upload.tasks.vcf.import_vcf_step_task.schedule_pipeline_stage_steps': SCHEDULING_SINGLE_WORKER,
     'snpdb.tasks.soft_delete_tasks.remove_soft_deleted_vcfs_task': SCHEDULING_SINGLE_WORKER,
+    'snpdb.tasks.user_award_tasks.update_user_awards': SCHEDULING_SINGLE_WORKER,
 
     # Partition archive
     'patients.tasks.extraction_matching_tasks.reconcile_pending_extractions': DB_WORKERS,

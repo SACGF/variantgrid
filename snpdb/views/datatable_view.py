@@ -22,7 +22,7 @@ from library.django_utils.grid_export import csv_streaming_response, grid_export
 from library.django_utils.major_operation import MajorOperationViewMixin
 from library.log_utils import report_exc_info
 from library.utils import JsonDataType, JsonObjType, full_class_name, nice_class_name, pretty_label
-from snpdb.models import UserGridConfig
+from snpdb.models import AvatarDetails, UserGridConfig, UserSettings
 from snpdb.views.datatable_mixins import JSONResponseView
 
 logger = logging.getLogger(__name__)
@@ -386,6 +386,24 @@ class DatatableConfig(Generic[DC]):
         self.user: User = request.user
         self._page_rows: list[dict] = []
         self._page_writable_pks: Optional[set] = None
+        self._user_labels: dict[int, str] = {}
+
+    @cached_property
+    def viewer_settings(self) -> UserSettings:
+        return UserSettings.get_for_user(self.user)
+
+    def render_user(self, cell: CellData) -> JsonDataType:
+        """ For a "<fk>__username" column with extra_columns=["<fk>__id"]: renders the name through
+            AvatarDetails so a title holder gets their crown and flair (#1819). Sort/search/CSV
+            stay on the username """
+        user_id = cell.get(cell.key.removesuffix("__username") + "__id")
+        if user_id is None:
+            return ""
+        if (label := self._user_labels.get(user_id)) is None:
+            user = User.objects.filter(pk=user_id).first()
+            label = str(AvatarDetails.avatar_for(user).grid_label_html(self.viewer_settings)) if user else ""
+            self._user_labels[user_id] = label
+        return label
 
     @cached_property
     def default_sort_order_column(self) -> RichColumn:

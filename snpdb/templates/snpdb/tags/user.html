@@ -4,8 +4,8 @@
 <div class="d-flex">
     <div class="avatar-frame avatar-frame-{{ user_details.size }}">
         {% avatar2 user_details.avatar size=user_details.size %}
-        {% if user_details.avatar.awards %}
-            {{ user_details.avatar.awards.html }}
+        {% if user_details.show_titles %}
+            {{ user_details.avatar.title_icon_html }}
         {% endif %}
     </div>
 
@@ -17,6 +17,7 @@
         {% else %}
             {{ user_details.preferred_label }}
         {% endif %}
+        {% if user_details.show_titles and user_details.avatar.flair %}<span class="user-flair">{{ user_details.avatar.flair }}</span>{% endif %}
         {% if user_details.show_group %}
             <span style="font-size:8pt" class="text-info">{{ user_details.group_str }}</span>
         {% endif %}

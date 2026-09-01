@@ -17,6 +17,7 @@ class SnpdbConfig(AppConfig):
 
         from seqauto.signals.signals_list import backend_vcf_import_success_signal
         from snpdb import checks  # noqa: F401  # registers system checks on import
+        from snpdb import user_award_definitions  # noqa: F401  # registers award definitions on import
         from snpdb.models import Trio
 
         # Registers receivers on import - noqa: F401 keeps the unused-import autofix from

@@ -15,6 +15,8 @@ from django.db import models
 from django.db.models.deletion import CASCADE, SET_NULL
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.html import escape
+from django.utils.safestring import SafeString
 from django_extensions.db.models import TimeStampedModel
 from model_utils.managers import InheritanceManager
 
@@ -23,10 +25,10 @@ from library.django_utils.avatar import SpaceThemedAvatarProvider
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsAutoInitialSaveMixin
 from library.preview_request import PreviewData, PreviewKeyValue, PreviewModelMixin
 from library.utils import rgb_contrasting_text, string_deterministic_hash
-from snpdb.models import AlleleOriginFilterDefault, UserAwards
+from snpdb.models import AlleleOriginFilterDefault, UserAward, UserAwards
 from snpdb.models.models import Lab, Organization, Tag
 from snpdb.models.models_columns import CustomColumn, CustomColumnsCollection
-from snpdb.models.models_enums import BuiltInFilters, TagFilter
+from snpdb.models.models_enums import USER_FLAIR_CHOICES, BuiltInFilters, TagFilter
 from snpdb.models.models_genome import GenomeBuild
 
 
@@ -277,6 +279,9 @@ class SettingsOverride(models.Model):
         help_text="Tag events older than this are considered stale: grids show "
                   "fresh vs total counts and mark tags whose most recent event is older. "
                   "Blank inherits the next level up / disables.")
+    show_user_awards = models.BooleanField(null=True, blank=True,
+                                           help_text="Decorate users currently holding a title (crown, medal, "
+                                                     "trophy) on grids and in user labels")
 
 
 class GlobalSettings(SettingsOverride):
@@ -323,6 +328,9 @@ class UserSettingsOverride(SettingsOverride):
     # Personal (not org/lab) preference - can be turned off from the tip box itself, see set_show_tips
     show_tips = models.BooleanField(default=True, verbose_name="Show Tips",
                                     help_text="Show feature tips on loading screens and blank grids.")
+    # Personal (not org/lab) - shown after the name on the profile, and on grids while holding a title
+    flair = models.CharField(max_length=16, null=True, blank=True, choices=USER_FLAIR_CHOICES,
+                             help_text="An emoji shown next to your name")
 
     def auto_set_default_lab(self):
         user = self.user
@@ -408,6 +416,39 @@ class AvatarDetails:
         return UserAwards(user=self.user)
 
     @cached_property
+    def flair(self) -> Optional[str]:
+        return UserSettingsOverride.objects.filter(user=self.user).values_list("flair", flat=True).first() or None
+
+    @cached_property
+    def titles(self) -> list[UserAward]:
+        """ Active titles held, ALL_TIME -> MONTH -> DAY. Empty when awards are off for the deployment """
+        if not settings.USER_AWARDS_ENABLED:
+            return []
+        return self.awards.titles
+
+    @cached_property
+    def title_icon_html(self) -> SafeString:
+        """ The highest title's icon (crown beats medal beats trophy), tooltip listing every title held """
+        if not (titles := self.titles):
+            return SafeString("")
+        tooltip = escape("\n".join(t.award_text for t in titles))
+        return SafeString(f'<i class="{titles[0].icon_class} user-title" title="{tooltip}"></i>')
+
+    def shows_titles_for(self, viewer_settings: "UserSettings") -> bool:
+        """ Whether this user is decorated for a viewer - the single rule shared by grids and {% user %} """
+        return bool(self.titles) and viewer_settings.show_user_awards
+
+    def grid_label_html(self, viewer_settings: "UserSettings") -> SafeString:
+        """ Plain name, or "<crown> Name <flair>" while holding a title and the viewer wants to see it """
+        label = escape(self.preferred_label)
+        if self.shows_titles_for(viewer_settings):
+            parts = [self.title_icon_html, label]
+            if self.flair:
+                parts.append(escape(self.flair))
+            label = " ".join(parts)
+        return SafeString(label)
+
+    @cached_property
     def preferred_label(self) -> str:
         user = self.user
         preferred_label = user.username
@@ -464,6 +505,7 @@ class UserSettings:
     variant_grid_two_line_rows: bool
     node_grid_auto_load_max_variants: Optional[int]
     variant_tag_stale_days: Optional[int]
+    show_user_awards: bool
 
     @property
     def variant_tag_stale_date(self) -> Optional[datetime]:
@@ -490,6 +532,7 @@ class UserSettings:
     timezone: str
     loading_animations: Optional[list[str]]
     show_tips: bool
+    flair: Optional[str]
     _settings_overrides: list[SettingsOverride]
 
     @property

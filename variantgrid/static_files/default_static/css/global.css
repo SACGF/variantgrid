@@ -251,6 +251,62 @@ i.fas, i.fa-solid {
   transform: scale(0.7);
 }
 
+.user-title.user-award {
+  position: static;
+  font-size: inherit;
+  animation: none;
+  transform: none;
+}
+
+.user-flair {
+  margin-left: 0.25em;
+}
+
+.flair-current {
+  font-size: 1.3rem;
+  min-width: 3rem;
+}
+
+.flair-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  max-width: 32rem;
+}
+.flair-picker > div {
+  display: contents;
+}
+.flair-picker label {
+  cursor: pointer;
+  margin: 0;
+  padding: 0 6px;
+  min-width: 2.2rem;
+  height: 2.2rem;
+  line-height: 2.2rem;
+  text-align: center;
+  font-size: 1.3rem;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  background: #fff;
+}
+.flair-picker label:has(input:checked) {
+  border-color: #007bff;
+  background: #e7f1ff;
+}
+.flair-picker label input {
+  display: none;
+}
+
+.award-cabinet .award-badge {
+  min-width: 12rem;
+}
+.award-cabinet .award-badge.award-locked {
+  opacity: 0.55;
+}
+.award-cabinet .award-badge .progress {
+  height: 6px;
+}
+
 strong {
   font-weight: 500;
 }

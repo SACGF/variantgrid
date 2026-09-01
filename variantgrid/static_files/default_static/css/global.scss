@@ -291,6 +291,72 @@ i {
 	transform: scale(0.7);
 }
 
+// Title icon inline before a name on grids / user labels (#1819) - no avatar overlay positioning
+.user-title.user-award {
+	position: static;
+	font-size: inherit;
+	animation: none;
+	transform: none;
+}
+
+.user-flair {
+	margin-left: 0.25em;
+}
+
+.flair-current {
+	font-size: 1.3rem;
+	min-width: 3rem;
+}
+
+// Emoji flair picker - the RadioSelect's radios become a grid of buttons
+.flair-picker {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px;
+	max-width: 32rem;
+
+	> div {
+		display: contents;
+	}
+
+	label {
+		cursor: pointer;
+		margin: 0;
+		padding: 0 6px;
+		min-width: 2.2rem;
+		height: 2.2rem;
+		line-height: 2.2rem;
+		text-align: center;
+		font-size: 1.3rem;
+		border: 1px solid #ced4da;
+		border-radius: 4px;
+		background: #fff;
+
+		&:has(input:checked) {
+			border-color: #007bff;
+			background: #e7f1ff;
+		}
+
+		input {
+			display: none;
+		}
+	}
+}
+
+.award-cabinet {
+	.award-badge {
+		min-width: 12rem;
+
+		&.award-locked {
+			opacity: 0.55;
+		}
+
+		.progress {
+			height: 6px;
+		}
+	}
+}
+
 ////////////////////////
 // BASIC/SIMPLE CLASS for STYLE or basic style tweak
 ////////////////////////

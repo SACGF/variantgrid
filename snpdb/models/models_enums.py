@@ -26,6 +26,46 @@ class UserAwardLevel(models.TextChoices):
         return self.int_value < other.int_value
 
 
+class UserAwardKind(models.TextChoices):
+    TITLE = "T", "Title"  # Held until someone takes it - crown/medal/trophy
+    BADGE = "B", "Badge"  # Permanent once earned, tiered bronze/silver/gold
+    KUDOS = "K", "Kudos"  # Hand-given by an admin
+
+
+class AwardPeriod(models.TextChoices):
+    ALL_TIME = "A", "all time"
+    MONTH = "M", "this month"
+    DAY = "D", "today"
+
+    @property
+    def icon(self) -> str:
+        return {
+            AwardPeriod.ALL_TIME: "fa-crown",
+            AwardPeriod.MONTH: "fa-medal",
+            AwardPeriod.DAY: "fa-trophy",
+        }[self]
+
+    @property
+    def rank(self) -> int:
+        """ ALL_TIME outranks MONTH outranks DAY """
+        return {AwardPeriod.ALL_TIME: 3, AwardPeriod.MONTH: 2, AwardPeriod.DAY: 1}[self]
+
+
+# Curated so every flair is a single, consistently rendered grapheme
+USER_FLAIR_CHOICES = [(emoji, emoji) for emoji in [
+    # animals
+    "🐱", "🐶", "🐭", "🐹", "🐰", "🦊", "🐻", "🐼", "🐨", "🐯", "🦁", "🐮", "🐷", "🐸", "🐵", "🐔",
+    "🐧", "🐦", "🦉", "🦆", "🦅", "🐺", "🐗", "🐴", "🦄", "🐝", "🐛", "🦋", "🐌", "🐞", "🐢", "🐍",
+    "🦎", "🐙", "🦑", "🦀", "🐠", "🐬", "🐳", "🦈", "🐊", "🐘", "🦒", "🦘", "🐐", "🦥", "🦦",
+    # food
+    "🍎", "🍕", "🍩", "🍪", "🍓", "🥑", "🌶️", "☕", "🍵", "🧁", "🍦", "🥐",
+    # space and nature
+    "🚀", "🛸", "🌙", "⭐", "🌟", "☄️", "🪐", "🌈", "🔥", "❄️", "🌵", "🌻", "🍀", "🌊", "⚡",
+    # objects
+    "🎩", "🎸", "🎲", "🧬", "🔬", "🧪", "🧩", "🎯", "🎨", "🔭", "🧭", "⚗️", "🧲", "🪄",
+]]
+
+
 class ImportSource(models.TextChoices):
     """ Keeps track of where uploaded files came from """
 

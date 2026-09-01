@@ -25,6 +25,11 @@ class LazyUserProperties:
     def avatar_details(self):
         return UserSettingsManager.get_avatar_details()
 
+    @cached_property
+    def show_titles(self) -> bool:
+        """ The navbar decorates the logged in user with their own title (if they hold one and want to see them) """
+        return self.avatar_details.shows_titles_for(UserSettingsManager.get_user_settings())
+
 
 def settings_context_processor(request):
     context = {
