@@ -37,6 +37,19 @@ from snpdb.models import Variant
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_loci_and_variants_for_vcf
 
+# VEP version each columns_version's fixtures were generated against (see the ##VEP= header in
+# annotation/tests/test_data/test_columns_version*.vep_annotated.vcf). VEPColumnDefs are gated on
+# vep_version as well as columns_version, so this has to be pinned alongside the data files below -
+# a developer whose env settings point at an older local VEP install would otherwise silently drop
+# columns from the importer bindings and leave the scores unset.
+FIXTURE_VEP_VERSIONS = {
+    1: "110",
+    2: "110",
+    3: "112",
+    4: "115",
+    5: "116",
+}
+
 
 def get_fake_annotation_settings_dict(columns_version: int) -> dict:
     TEST_IMPORT_PROCESSING_DIR = os.path.join(settings.PRIVATE_DATA_ROOT, 'import_processing',
@@ -125,6 +138,7 @@ def get_fake_annotation_settings_dict(columns_version: int) -> dict:
         "IMPORT_PROCESSING_DIR": TEST_IMPORT_PROCESSING_DIR,
         "VARIANT_ZYGOSITY_GLOBAL_COLLECTION": "global",
         "ANNOTATION_VEP_FAKE_VERSION": True,
+        "ANNOTATION_VEP_VERSION": FIXTURE_VEP_VERSIONS[columns_version],
         # AnnotSV is off in the shipped defaults - pin it so a developer who enables it locally doesn't
         # trip the SV guards. Tests that want it on override at the method level.
         "ANNOTATION_ANNOTSV_ENABLED": False,
