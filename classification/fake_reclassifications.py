@@ -116,8 +116,8 @@ SIGNIFICANCE_SCALE = [
 # Real gene symbols (they need annotated variants to join against), longest tail first - the VUS burden
 # chart is only interesting if a few genes carry far more of it than the rest
 GENES = ["TTN", "BRCA2", "BRCA1", "ATM", "APC", "MSH6", "NF1", "PMS2", "MLH1", "MSH2",
-         "PALB2", "CHEK2", "RYR1", "CFTR", "DMD", "FBN1", "MYBPC3", "SCN1A", "LDLR", "COL4A5",
-         "TP53", "PTEN", "STK11", "CDH1", "RB1", "VHL", "RET", "SDHB", "MUTYH", "BMPR1A"]
+         "PALB2", "CHEK2", "JAK2", "RYR1", "CFTR", "DMD", "FBN1", "MYBPC3", "SCN1A", "LDLR",
+         "COL4A5", "TP53", "PTEN", "STK11", "CDH1", "RB1", "VHL", "RET", "SDHB", "MUTYH", "BMPR1A"]
 
 PATHOGENIC_CRITERIA = {
     "acmg:pvs1": CriteriaEvaluation.PATHOGENIC_VERY_STRONG,
