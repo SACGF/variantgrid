@@ -87,16 +87,13 @@ def get_tag_node_count_colors(user, css_property):
 
 
 def get_node_counts_mine_and_available(analysis):
+    """ (mine, available built in filters, available tags) - mine keeps the user's order, the rest stay
+        in their natural order. Tags are split out as there are far more of them than built in filters """
     node_count_types = analysis.get_node_count_types()
 
     my_choices = [x[0] for x in node_count_types]
-    all_choices = [x[0] for x in BuiltInFilters.CHOICES]
-    all_choices += [TagFilter.label(tag_id) for tag_id in Tag.live_qs().order_by("pk").values_list("pk", flat=True)]
-    # Needs to stay in order.
-    available_choices = []
-    for c in all_choices:
-        if c not in my_choices:
-            available_choices.append(c)
+    filter_choices = [x[0] for x in BuiltInFilters.CHOICES]
+    tag_choices = [TagFilter.label(tag_id) for tag_id in Tag.live_qs().order_by("pk").values_list("pk", flat=True)]
 
     def _node_count_list(choices):
         node_counts_list = []
@@ -104,10 +101,14 @@ def get_node_counts_mine_and_available(analysis):
             if description := AbstractNodeCountSettings.get_node_count_description(node_count):
                 node_counts_list.append({"pk": node_count,
                                          "css_classes": 'node-count-legend-' + node_count,
+                                         "tag_id": TagFilter.get_tag_id(node_count),
                                          "description": description})
         return node_counts_list
 
-    return _node_count_list(my_choices), _node_count_list(available_choices)
+    mine = set(my_choices)
+    return (_node_count_list(my_choices),
+            _node_count_list([c for c in filter_choices if c not in mine]),
+            _node_count_list([c for c in tag_choices if c not in mine]))
 
 
 def get_node_counts_and_labels_dict(node, counts_to_get):

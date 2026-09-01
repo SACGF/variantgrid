@@ -1020,9 +1020,10 @@ def _analysis_settings_node_counts_tab(request, analysis, is_analysis=True, has_
                 node_utils.update_analysis_tag_node_counts(analysis)
         add_save_message(request, True, "Node Counts")
 
-    my_node_counts_list, available_node_counts_list = get_node_counts_mine_and_available(analysis)
-    context = {"my_node_counts_list": my_node_counts_list,
-               "available_node_counts_list": available_node_counts_list,
+    my_list, available_filters_list, available_tags_list = get_node_counts_mine_and_available(analysis)
+    context = {"my_node_counts_list": my_list,
+               "available_node_counts_list": available_filters_list,
+               "available_tag_node_counts_list": available_tags_list,
                "is_analysis": is_analysis,
                "has_write_permission": has_write_permission}
 

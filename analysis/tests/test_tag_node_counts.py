@@ -54,11 +54,13 @@ class TestTagNodeCountConfig(TagNodeCountTestCase):
         self._tag_variant(self.variants[0])
         self.assertNotIn(self.tag_label, self._node_count_types())
 
-    def test_tag_is_offered_as_an_available_node_count(self):
-        _my, available = get_node_counts_mine_and_available(self.analysis)
-        available_by_pk = {nc["pk"]: nc for nc in available}
+    def test_tag_is_offered_in_the_available_tags_column(self):
+        _my, available_filters, available_tags = get_node_counts_mine_and_available(self.analysis)
+        self.assertNotIn(self.tag_label, {nc["pk"] for nc in available_filters})
+        available_by_pk = {nc["pk"]: nc for nc in available_tags}
         self.assertIn(self.tag_label, available_by_pk)
         self.assertEqual(self.tag.pk, available_by_pk[self.tag_label]["description"])
+        self.assertEqual(self.tag.pk, available_by_pk[self.tag_label]["tag_id"])
 
     def test_deleted_tag_drops_out_of_the_node_count_types(self):
         self.analysis.set_node_count_types([BuiltInFilters.TOTAL, TagFilter.label("never_existed")])

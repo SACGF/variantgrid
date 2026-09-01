@@ -38,6 +38,16 @@
         width: 100%;
     }
 
+    /* Tag node counts render as the tag itself, so they stand out from the built in filters */
+    .node-count-filter .grid-tag .user-tag-colored {
+        display: inline-block;
+        white-space: nowrap;
+        padding: 2px 6px;
+        border-radius: 3px;
+        background-color: #888888;
+        color: #ffffff;
+    }
+
     .legend-row {
         margin: 5px;
     }
@@ -53,10 +63,16 @@
        float: left;
     }
 
-    #my_filters_sortable, #available_filters_sortable {
+    #my_filters_sortable, #available_filters_sortable, #available_tags_sortable {
         /* Need somewhere to drag to if empty */
         min-height: 100px;
         user-select: none;
+    }
+
+    #available_tags_sortable {
+        /* There can be a lot of tags - keep the columns beside each other a sane length */
+        max-height: 400px;
+        overflow-y: auto;
     }
 
 
@@ -64,23 +80,25 @@
     {% render_node_count_colors_css %}
 
 </style>
+{% render_tag_styles_and_formatter %}
 <script type="text/javascript" src="{% static 'js/lib/html5sortable/html5sortable.min.js' %}"></script>
 <script>
 	DIV_TO_RELOAD = '#analysis-settings-node-counts-tab';
 	var IN_ANALYSIS = $("#analysis-and-toolbar-container").length > 0;
     var nodeCountsChanged = false;
+    const NODE_COUNT_LISTS = "#my_filters_sortable, #available_filters_sortable, #available_tags_sortable";
 
 	function setupNodeCountsWidget() {
-        // acceptFrom is the whole answer to "can this list take that item", so both lists need
-        // to be named - listing only the other one stops a list accepting its own items
-        sortable("#my_filters_sortable, #available_filters_sortable", {
+        // acceptFrom is the whole answer to "can this list take that item", so every list needs
+        // to be named - leaving one out stops it accepting its own items back
+        sortable(NODE_COUNT_LISTS, {
             items: "li.node-count-filter",
             placeholderClass: "sort_placeholder",
-            acceptFrom: '#my_filters_sortable, #available_filters_sortable',
+            acceptFrom: NODE_COUNT_LISTS,
         });
 
         // html5sortable fires sortupdate on the list the item was dropped into
-        $("#my_filters_sortable, #available_filters_sortable").on("sortupdate", function() {
+        $(NODE_COUNT_LISTS).on("sortupdate", function() {
             nodeCountsChanged = true;
         });
 	}
@@ -145,19 +163,27 @@
         </div>
     {% endif %}
         <div class="row">
-            <div class="col col-md-5">
+            <div class="col col-md-4">
                 <h5>My Node Counts</h5>
                 <ul class="list-group" id="my_filters_sortable">
                     {% for nc in my_node_counts_list %}
-                        <li class="list-group-item node-count-filter cursor-move {{ nc.css_classes }}" id="{{ nc.pk }}" node_count_id="{{ nc.pk }}"><div class='user-tag-colored legend-color-box'></div><div class='legend-label'>{{ nc.description | safe  }}</div><div class='clear'></div></li>
+                        {% include "analysis/node_count_filter.html" %}
                     {% endfor %}
                 </ul>
             </div>
-            <div class="col col-md-5">
+            <div class="col col-md-4">
                 <h5>Available Node Counts</h5>
                 <ul class="list-group" id="available_filters_sortable">
                     {% for nc in available_node_counts_list %}
-                        <li class="list-group-item node-count-filter cursor-move {{ nc.css_classes }}" id="{{ nc.pk }}" node_count_id="{{ nc.pk }}"><div class='user-tag-colored legend-color-box'></div><div class='legend-label'>{{ nc.description | safe  }}</div><div class='clear'></div></li>
+                        {% include "analysis/node_count_filter.html" %}
+                    {% endfor %}
+                </ul>
+            </div>
+            <div class="col col-md-4">
+                <h5>Available Tags</h5>
+                <ul class="list-group" id="available_tags_sortable">
+                    {% for nc in available_tag_node_counts_list %}
+                        {% include "analysis/node_count_filter.html" %}
                     {% endfor %}
                 </ul>
             </div>
