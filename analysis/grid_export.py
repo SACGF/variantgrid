@@ -52,15 +52,15 @@ def node_grid_get_export_iterator(request, node, export_type, canonical_transcri
     if row_wrapper:
         items = row_wrapper(items)
 
-    colmodels = grid.csv_columns()
+    csv_columns = grid.csv_columns()
 
     if export_type == 'csv':
-        file_iterator = grid_export_csv(colmodels, items)
+        file_iterator = grid_export_csv(csv_columns, items)
     elif export_type == 'vcf':
         genome_build = node.analysis.genome_build
         values_qs = Sample.objects.filter(id__in=sample_ids).values_list("id", "name")
         sample_names_by_id = dict(values_qs)
-        file_iterator = _grid_export_vcf(genome_build, colmodels, items, sample_ids, sample_names_by_id)
+        file_iterator = _grid_export_vcf(genome_build, csv_columns, items, sample_ids, sample_names_by_id)
     else:
         raise ValueError(f"unknown export type: '{export_type}'")
 
@@ -93,11 +93,11 @@ def get_node_export_basename(node: AnalysisNode) -> str:
     return "_".join(name_parts)
 
 
-def _grid_export_vcf(genome_build, colmodels, items, sample_ids, sample_names_by_id) -> Iterator[str]:
+def _grid_export_vcf(genome_build, csv_columns, items, sample_ids, sample_names_by_id) -> Iterator[str]:
     samples = [sample_names_by_id[s_id] for s_id in sample_ids]
 
     use_accession = False
-    info_dict = _get_colmodel_info_dict(colmodels)
+    info_dict = _get_vcf_info_dict(csv_columns)
     header_lines = get_vcf_header_from_contigs(genome_build, info_dict, samples, use_accession=use_accession)
 
     pseudo_buffer = StashFile()
@@ -132,11 +132,11 @@ def _get_column_vcf_info():
     return column_vcf_info
 
 
-def _get_colmodel_info_dict(colmodels):
+def _get_vcf_info_dict(csv_columns):
     column_vcf_info = _get_column_vcf_info()
 
     info_dict = {}
-    for c in colmodels:
+    for c in csv_columns:
         name = c['name']
         col_info = column_vcf_info.get(name)
         if col_info:

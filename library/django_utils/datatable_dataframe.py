@@ -161,8 +161,8 @@ class DataFrameTableView(JSONResponseView):
 
     def download_csv(self) -> StreamingHttpResponse:
         df = self._sort(self._dataframe())
-        colmodels = [{"name": key, "label": label} for key, label in self._column_labels(df)]
-        return csv_streaming_response(self._csv_name(), grid_export_csv(colmodels, self._rows(df)))
+        csv_columns = [{"name": key, "label": label} for key, label in self._column_labels(df)]
+        return csv_streaming_response(self._csv_name(), grid_export_csv(csv_columns, self._rows(df)))
 
     def _column_labels(self, df: pd.DataFrame) -> list[tuple[str, str]]:
         config = self.config

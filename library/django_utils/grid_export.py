@@ -22,9 +22,9 @@ def csv_streaming_response(basename: str, csv_iterator: Iterator[str]) -> Stream
     return response
 
 
-def grid_export_csv(colmodels, items, label_overrides: Optional[dict] = None) -> Iterator[str]:
+def grid_export_csv(csv_columns, items, label_overrides: Optional[dict] = None) -> Iterator[str]:
     pseudo_buffer = StashFile()
-    header, labels = colmodel_header_labels(colmodels, label_overrides=label_overrides)
+    header, labels = csv_header_labels(csv_columns, label_overrides=label_overrides)
     # Don't use dictwriter as some sample names may be the same
     writer = csv.writer(pseudo_buffer, dialect='excel', quoting=csv.QUOTE_MINIMAL)
     if header and str(header[0]).upper().startswith("ID"):
@@ -44,11 +44,11 @@ def grid_export_csv(colmodels, items, label_overrides: Optional[dict] = None) ->
         yield remaining
 
 
-def colmodel_header_labels(colmodels, label_overrides: Optional[dict] = None):
+def csv_header_labels(csv_columns, label_overrides: Optional[dict] = None):
     labels = {}
 
     header = []
-    for c in colmodels:
+    for c in csv_columns:
         name = c['name']
         column_label = c.get("label", name)
         if label_overrides:

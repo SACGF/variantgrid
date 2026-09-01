@@ -55,11 +55,11 @@ class TestCsvChunking(SimpleTestCase):
     """ (A5) Rows are buffered into chunks rather than yielded one WSGI chunk at a time """
 
     def test_rows_are_buffered_into_chunks(self):
-        colmodels = [{"name": "id", "label": "id"}, {"name": "value", "label": "value"}]
+        csv_columns = [{"name": "id", "label": "id"}, {"name": "value", "label": "value"}]
         num_rows = EXPORT_ROWS_PER_CHUNK * 2 + 5
         items = ({"id": i, "value": f"row_{i}"} for i in range(num_rows))
 
-        chunks = list(grid_export_csv(colmodels, items))
+        chunks = list(grid_export_csv(csv_columns, items))
         # header, 2 full chunks, then the remainder
         self.assertEqual(len(chunks), 4)
         lines = "".join(chunks).splitlines()
