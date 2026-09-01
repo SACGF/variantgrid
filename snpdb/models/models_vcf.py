@@ -381,6 +381,30 @@ class Sample(GuardianPermissionsMixin, SortByPKMixin, SvgSymbolPreviewIconMixin,
     def data_archived(self) -> bool:
         return self.vcf.data_archived
 
+    def get_genotype_stats(self) -> Optional['CohortGenotypeStats']:
+        """ Per-sample CohortGenotypeStats row (passing_filter=False, no filter_key).
+            None if missing (legacy data, archived, or stats not yet calculated) """
+        if self.data_archived:
+            return None
+        try:
+            cgc = self.vcf.cohort.cohort_genotype_collection
+        except ObjectDoesNotExist:
+            return None
+        return self.cohortgenotypestats_set.filter(cohort_genotype_collection=cgc,
+                                                   filter_key__isnull=True, passing_filter=False).first()
+
+    @cached_property
+    def detected_sex(self) -> Sex:
+        """ Sex we detect from the sample's chrX genotypes - UNKNOWN if we have too little data.
+            Compare against patient.sex (which comes from the patient record system) """
+        if stats := self.get_genotype_stats():
+            return stats.chrx_sex_guess
+        return Sex.UNKNOWN
+
+    @property
+    def patient_sex(self) -> Sex:
+        return Sex(self.patient.sex) if self.patient else Sex.UNKNOWN
+
     @property
     def is_somatic(self):
         return self.variants_type in VariantsType.SOMATIC_TYPES

@@ -27,7 +27,7 @@ from library.django_utils.guardian_permissions_mixin import GuardianPermissionsA
 from library.guardian_utils import DjangoPermission
 from library.preview_request import PreviewKeyValue, PreviewModelMixin, SvgSymbolPreviewIconMixin
 from library.utils import invert_dict
-from patients.models_enums import Zygosity
+from patients.models_enums import Sex, Zygosity
 from snpdb.models.models_enums import CohortGenotypeCollectionType, ImportStatus, ProcessingStatus
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_variant import Variant, VariantCollection
@@ -805,6 +805,13 @@ class FamilyGroupMixin:
     def get_samples(self):
         return Sample.objects.filter(cohortsample__in=self.get_cohort_samples()).order_by("pk")
 
+    @property
+    def effective_proband_sex(self) -> Sex:
+        """ What the scientist chose in the wizard, otherwise what the patient record says """
+        if self.proband_sex:
+            return Sex(self.proband_sex)
+        return self.proband.sample.patient_sex
+
     @staticmethod
     def _member_details(member, affected: bool) -> str:
         return f"{member} ({'affected' if affected else 'unaffected'})"
@@ -833,6 +840,9 @@ class Trio(FamilyGroupMixin, GuardianPermissionsAutoInitialSaveMixin, SvgSymbolP
     father = models.ForeignKey(CohortSample, related_name='trio_father', on_delete=CASCADE)
     father_affected = models.BooleanField(default=False)
     proband = models.ForeignKey(CohortSample, related_name='trio_proband', on_delete=CASCADE)
+    # Set in the trio wizard when the scientist resolves patient.sex vs sample.detected_sex, eg a male
+    # fetus in a prenatal case entered under the mother's record. Null = go by the patient record
+    proband_sex = models.CharField(max_length=1, choices=Sex.choices, null=True, blank=True)
 
     preview_icon_symbol = "node-icon-trio"  # TrioNode wears this too - see get_node_class_icon
 
@@ -867,6 +877,8 @@ class Quad(FamilyGroupMixin, GuardianPermissionsAutoInitialSaveMixin, SvgSymbolP
     father_affected = models.BooleanField(default=False)
     proband = models.ForeignKey(CohortSample, related_name='quad_proband', on_delete=CASCADE)
     sibling = models.ForeignKey(CohortSample, related_name='quad_sibling', on_delete=CASCADE)
+    # Set in the quad wizard when the scientist resolves patient.sex vs sample.detected_sex
+    proband_sex = models.CharField(max_length=1, choices=Sex.choices, null=True, blank=True)
     sibling_affected = models.BooleanField(default=False)
 
     preview_icon_symbol = "node-icon-quad"  # QuadNode wears this too - see get_node_class_icon

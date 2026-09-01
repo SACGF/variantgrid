@@ -36,7 +36,7 @@ from library.django_utils import get_models_dict_by_column
 from library.django_utils.autocomplete_utils import ModelSelect2
 from library.forms import NumberInput, ROFormMixin
 from library.guardian_utils import assign_permission_to_user_and_groups
-from patients.models_enums import SampleSourceLevel
+from patients.models_enums import SampleSourceLevel, Sex
 from seqauto.models import EnrichmentKit
 from snpdb.forms import GenomeBuildAutocompleteForwardMixin, UserSettingsGenomeBuildMixin
 from snpdb.models import CustomColumnsCollection, Trio, UserSettings, VariantGridColumn
@@ -359,6 +359,9 @@ class UserTrioForm(GenomeBuildAutocompleteForwardMixin, forms.Form):
 class UserTrioWizardForm(forms.Form):
     mother_affected = forms.BooleanField(required=False)
     father_affected = forms.BooleanField(required=False)
+    # Only asked for when the patient record and the sample's detected sex disagree
+    proband_sex = forms.ChoiceField(choices=[("", "---")] + [(s, Sex(s).label) for s in Sex.FILLED_IN_CHOICES],
+                                    required=False)
     sample_1 = forms.ChoiceField(choices=TrioSample.choices)
     sample_2 = forms.ChoiceField(choices=TrioSample.choices)
     sample_3 = forms.ChoiceField(choices=TrioSample.choices)
@@ -382,6 +385,9 @@ class UserQuadWizardForm(forms.Form):
     mother_affected  = forms.BooleanField(required=False)
     father_affected  = forms.BooleanField(required=False)
     sibling_affected = forms.BooleanField(required=False)
+    # Only asked for when the patient record and the sample's detected sex disagree
+    proband_sex = forms.ChoiceField(choices=[("", "---")] + [(s, Sex(s).label) for s in Sex.FILLED_IN_CHOICES],
+                                    required=False)
     sample_1 = forms.ChoiceField(choices=QuadSample.choices)
     sample_2 = forms.ChoiceField(choices=QuadSample.choices)
     sample_3 = forms.ChoiceField(choices=QuadSample.choices)

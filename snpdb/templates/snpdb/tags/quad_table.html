@@ -47,6 +47,11 @@
             </div>
         </td>
     </tr>
+{% if quad.proband_sex %}
+    <tr><th>Proband Sex:</th>
+        <td>{{ quad.effective_proband_sex.label }} (set on the quad, overriding the patient record)</td>
+    </tr>
+{% endif %}
     <tr><th>Sibling:</th>
         <td>
             <div class="display-flex flex-row">

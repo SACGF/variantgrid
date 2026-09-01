@@ -15,6 +15,7 @@ from analysis.models.nodes.family_inheritance import (
     AbstractFamilyInheritance,
     _build_family_zyg_q,
     _dominant_requires_affected_parent_error,
+    _pedigree_sex,
     _xlinked_recessive_errors,
 )
 from analysis.models.nodes.node_display import NodeIcon
@@ -203,7 +204,8 @@ class TrioNode(AbstractCohortBasedNode):
                 if err := _dominant_requires_affected_parent_error(trio.mother_affected, trio.father_affected):
                     errors.append(err)
             elif inheritance == TrioInheritance.XLINKED_RECESSIVE:
-                errors.extend(_xlinked_recessive_errors(trio.proband.sample, trio.mother_affected))
+                errors.extend(_xlinked_recessive_errors(trio.proband.sample, trio.effective_proband_sex,
+                                                        trio.mother_affected))
         return errors
 
     def get_errors(self, include_parent_errors=True, flat=False):
@@ -366,8 +368,7 @@ class TrioNode(AbstractCohortBasedNode):
     def get_rendering_args(self):
         if not self.trio:
             return {}
-        proband_sample = self.trio.proband.sample
-        proband_sex = proband_sample.patient.sex if proband_sample.patient else "M"
+        proband_sex = _pedigree_sex(self.trio.effective_proband_sex)
         return {
             "mother_affected": self.trio.mother_affected,
             "father_affected": self.trio.father_affected,

@@ -653,21 +653,6 @@ def _sample_stats(sample) -> tuple[pd.DataFrame, pd.DataFrame]:
     return sample_stats_variant_class_df, sample_stats_zygosity_df
 
 
-def _get_sample_genotype_stats(sample):
-    """ Resolve the per-sample CohortGenotypeStats row (passing_filter=False,
-        filter_key NULL) for the template. Returns None if missing (e.g. legacy data). """
-    try:
-        cgc = sample.vcf.cohort.cohort_genotype_collection
-    except (Cohort.DoesNotExist, CohortGenotypeCollection.DoesNotExist, DataArchivedError):
-        return None
-    try:
-        return CohortGenotypeStats.objects.get(
-            cohort_genotype_collection=cgc, sample=sample,
-            filter_key__isnull=True, passing_filter=False)
-    except ObjectDoesNotExist:
-        return None
-
-
 def view_sample(request, sample_id):
     sample = Sample.get_for_user(request.user, sample_id)
     has_write_permission = sample.can_write(request.user)
@@ -697,7 +682,7 @@ def view_sample(request, sample_id):
         related_samples = SomalierRelatePairs.get_for_sample(sample).order_by("relate")
 
     sample_stats_variant_class_df, sample_stats_zygosity_df = _sample_stats(sample)
-    sample_genotype_stats = _get_sample_genotype_stats(sample)
+    sample_genotype_stats = sample.get_genotype_stats()
 
     # VEP-skipped variants for the latest annotation version (VG only - see issue #1409)
     skipped_annotation_count = _get_vcf_skipped_annotation_count(sample.vcf)

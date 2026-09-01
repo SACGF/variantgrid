@@ -214,9 +214,9 @@ $(document).ready(function() {
             </table>
         {% endif %}
 
-        {% if sex_guess %}
+        {% if sample_genotype_stats %}
         <h4>Sex</h4>
-        {{ sample_genotype_stats.chrx_sex_guess }} (chrX Hom: {{ sample_genotype_stats.x_hom_count }}, Het: {{ sample_genotype_stats.x_het_count }})
+        {{ sample_genotype_stats.chrx_sex_guess.label }} (chrX Hom: {{ sample_genotype_stats.x_hom_count }}, Het: {{ sample_genotype_stats.x_het_count }})
         {% endif %}
         </div>
 	{% endif %}
