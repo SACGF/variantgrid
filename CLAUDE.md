@@ -134,6 +134,14 @@ whose columns are built per user from a `CustomColumnsCollection`
 ### Celery task queues
 Four worker queues: `analysis_workers`, `annotation_workers`, `db_workers` (default), `web_workers`, plus `scheduling_single_worker`. Assign tasks to appropriate queues via `@app.task(queue='...')`.
 
+### Migrations are frozen once pushed
+Assume a pushed migration has been run on a deployment: keep its filename and operations as they
+are, and express any change of mind (a field removed, a default changed) as a new migration on
+top. Renaming or editing an applied migration leaves `django_migrations` pointing at a name that
+no longer exists (`InconsistentMigrationHistory`) and has to be repaired by hand on every
+database. A migration that only exists locally (unpushed) can still be reshaped or regenerated.
+Check with `git log origin/master -- <migration file>`.
+
 ### Manual migrations (management commands on deploy)
 If a new management command needs to be run on existing deployments as part of an upgrade, add a migration containing a `ManualOperation` (from `manual/operations/manual_operations.py`) — the upgrade script surfaces these as required tasks. Use `ManualOperation.task_id_manage(["command_name"])` (or the `operation_manage`/`operation_other` helpers) and pass an optional `test=` callable (receives `apps`) so the task is only registered when the deployment actually has data needing it. Example: `snpdb/migrations/0188_one_off_migrate_common_filter_gnomad_versions.py`.
 

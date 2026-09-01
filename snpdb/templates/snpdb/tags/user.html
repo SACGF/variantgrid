@@ -4,8 +4,8 @@
 <div class="d-flex">
     <div class="avatar-frame avatar-frame-{{ user_details.size }}">
         {% avatar2 user_details.avatar size=user_details.size %}
-        {% if user_details.avatar.awards %}
-            {{ user_details.avatar.awards.html }}
+        {% if user_details.show_titles %}
+            {{ user_details.avatar.title_icon_html }}
         {% endif %}
     </div>
 

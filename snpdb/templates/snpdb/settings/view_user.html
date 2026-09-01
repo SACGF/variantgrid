@@ -3,6 +3,7 @@
 {% load js_tags %}
 {% load static %}
 {% load user_tags %}
+{% load settings_tags %}
 {% block title %}{{ other_user }} user page.{% endblock %}
 
 {% block head %}
@@ -52,6 +53,15 @@
                 {% labelled label="Classifications" %}{{ classifications_count }}{% endlabelled %}
             </div>
         </div>
+        {% settings_value 'USER_AWARDS_ENABLED' as user_awards_enabled %}
+        {% if user_awards_enabled %}
+        <div class="card mt-4" id="user-awards">
+            <div class="card-header">Awards</div>
+            <div class="card-body">
+                {% award_cabinet other_user %}
+            </div>
+        </div>
+        {% endif %}
         {% if url_name_visible.tag_stats %}
         <div class="card mt-4" id="user-tagging">
             <div class="card-header">

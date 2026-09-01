@@ -72,19 +72,12 @@
                     {% labelled id="is_admin" label="Admin" %}True{% endlabelled %}
                 {% endif %}
             </div>
+            {% settings_value 'USER_AWARDS_ENABLED' as user_awards_enabled %}
+            {% if user_awards_enabled %}
             <div id="user-awards">
-                {% if avatar_details.awards.all_awards %}
-                    {% labelled label="Awards" %}
-                        <div class="list-group">
-                            {% for award in avatar_details.awards.all_awards %}
-                            <div class="list-group-item list-group-item-success" {% if not award.active %}style="opacity:0.6"{% endif %}>
-                                {{ award.icon }} {{ award.award_text }}
-                            </div>
-                            {% endfor %}
-                        </div>
-                    {% endlabelled %}
-                {% endif %}
+                {% labelled label="Awards" %}{% award_cabinet user %}{% endlabelled %}
             </div>
+            {% endif %}
 
             <div id="user-group-permissions">
                 {% if group_initial_perm_forms %}

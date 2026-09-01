@@ -20,6 +20,9 @@ from patients.models_enums import Sex
 from snpdb.models.models_enums import ImportStatus
 from snpdb.models.models_vcf import SampleStatsCodeVersion
 
+# Targeted panels can have too few chrX calls for the hom/het ratio to mean anything
+MIN_CHRX_VARIANTS_FOR_SEX_GUESS = 30
+
 
 class CohortGenotypeStats(TimeStampedModel):
     """ Genotype-level counts derived from packed CohortGenotype data —
@@ -105,12 +108,13 @@ class CohortGenotypeStats(TimeStampedModel):
         return count
 
     @property
-    def chrx_sex_guess(self):
-        sex = Sex.UNKNOWN
+    def chrx_sex_guess(self) -> Sex:
+        """ Genetic sex from the chrX hom/het ratio - UNKNOWN if we don't have enough calls to tell """
         if self.x_het_count and self.x_hom_count:
-            ratio = self.x_hom_count / self.x_het_count
-            if ratio < 0.2:
-                sex = Sex.FEMALE
-            elif ratio > 0.8:
-                sex = Sex.MALE
-        return Sex(sex).label
+            if self.x_hom_count + self.x_het_count >= MIN_CHRX_VARIANTS_FOR_SEX_GUESS:
+                ratio = self.x_hom_count / self.x_het_count
+                if ratio < 0.2:
+                    return Sex.FEMALE
+                if ratio > 0.8:
+                    return Sex.MALE
+        return Sex.UNKNOWN

@@ -291,6 +291,28 @@ i {
 	transform: scale(0.7);
 }
 
+// Title icon inline before a name on grids / user labels (#1819) - no avatar overlay positioning
+.user-title.user-award {
+	position: static;
+	font-size: inherit;
+	animation: none;
+	transform: none;
+}
+
+.award-cabinet {
+	.award-badge {
+		min-width: 12rem;
+
+		&.award-locked {
+			opacity: 0.55;
+		}
+
+		.progress {
+			height: 6px;
+		}
+	}
+}
+
 ////////////////////////
 // BASIC/SIMPLE CLASS for STYLE or basic style tweak
 ////////////////////////
@@ -3842,6 +3864,9 @@ a .c-hgvs-body {
 		display: flex;
 		align-items: stretch;
 		white-space: nowrap;
+		cursor: pointer;
+		border-radius: 6px;
+		text-decoration: none;
 
 		.c-pill {
 			width: auto;
@@ -3858,6 +3883,19 @@ a .c-hgvs-body {
 			color: #555;
 			font-weight: 600;
 		}
+
+		&:hover .count {
+			background-color: #eee;
+		}
+
+		&.selected {
+			outline: 2px solid #555;
+			outline-offset: 1px;
+		}
+	}
+
+	&.filtered .summary-count:not(.selected) {
+		opacity: 0.5;
 	}
 }
 

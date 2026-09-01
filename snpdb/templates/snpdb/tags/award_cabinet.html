@@ -1,0 +1,63 @@
+{% load js_tags %}
+<div class="award-cabinet">
+    {% if titles %}
+    <h6 class="mt-3">Titles held</h6>
+    <div class="list-group mb-3">
+        {% for award in titles %}
+        <div class="list-group-item d-flex align-items-center">
+            <span class="mr-2"><i class="{{ award.icon_class }} user-title"></i></span>
+            <span class="flex-grow-1">{{ award.award_text }}</span>
+            <span class="text-muted small text-nowrap ml-2">{{ award.count }} &middot; since {% timestamp award.modified time_ago=True %}</span>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if badge_progress %}
+    <h6 class="mt-3">Badges</h6>
+    <div class="d-flex flex-wrap" style="gap: 8px">
+        {% for progress in badge_progress %}
+        <div class="card award-badge {% if not progress.earned %}award-locked{% endif %}" title="{{ progress.definition.description }}">
+            <div class="card-body p-2">
+                <div class="d-flex align-items-center">
+                    <span class="mr-2" style="font-size: 1.4rem">
+                        {% if progress.earned %}
+                            <i class="{{ progress.award.icon_class }} user-title"></i>
+                        {% else %}
+                            <i class="fa-solid {{ progress.definition.icon }} text-muted"></i>
+                        {% endif %}
+                    </span>
+                    <div class="flex-grow-1">
+                        <div>{{ progress.definition.title }}{% if progress.earned %} <span class="small text-muted">({{ progress.award.get_award_level_display }})</span>{% endif %}</div>
+                        <div class="small text-muted">{{ progress.definition.description }}</div>
+                    </div>
+                </div>
+                {% if progress.next_threshold %}
+                <div class="progress mt-2">
+                    <div class="progress-bar" role="progressbar" style="width: {{ progress.percent }}%" aria-valuenow="{{ progress.count }}" aria-valuemin="0" aria-valuemax="{{ progress.next_threshold }}"></div>
+                </div>
+                <div class="small text-muted">{{ progress.count }} / {{ progress.next_threshold }} for {{ progress.next_tier_name }}</div>
+                {% elif progress.earned %}
+                <div class="small text-muted mt-1">{{ progress.count }} &middot; earned {% timestamp progress.award.created time_ago=True %}</div>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if kudos %}
+    <h6 class="mt-3">Kudos</h6>
+    <div class="list-group">
+        {% for award in kudos %}
+        <div class="list-group-item list-group-item-success">
+            {{ award.icon }} {{ award.award_text }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if not titles and not badge_progress and not kudos %}
+    <span class="text-muted">No awards yet.</span>
+    {% endif %}
+</div>

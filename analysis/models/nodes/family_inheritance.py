@@ -41,11 +41,19 @@ def _dominant_requires_affected_parent_error(mother_affected: bool, father_affec
     return None
 
 
-def _xlinked_recessive_errors(proband_sample, mother_affected: bool) -> list[str]:
+def _pedigree_sex(sex: Sex) -> Sex:
+    """ Sex to draw a family member's pedigree square/circle with - male when we have nothing to go on """
+    return sex if sex != Sex.UNKNOWN else Sex.MALE
+
+
+def _xlinked_recessive_errors(proband_sample, proband_sex: Sex, mother_affected: bool) -> list[str]:
     errors = []
-    proband_is_female = proband_sample.patient and proband_sample.patient.sex == Sex.FEMALE
-    if proband_is_female:
-        errors.append("X-linked recessive inheritance doesn't currently work with female proband")
+    if proband_sex == Sex.FEMALE:
+        error = "X-linked recessive inheritance doesn't currently work with female proband"
+        if proband_sample.detected_sex == Sex.MALE:
+            # eg a male fetus in a prenatal case entered under the mother's record
+            error += " - though chrX genotypes detected male, so set the proband sex in the wizard"
+        errors.append(error)
     elif mother_affected:
         errors.append("X-linked recessive inheritance requires an unaffected mother")
     return errors

@@ -61,6 +61,19 @@ def clone_analysis(request, analysis_id):
     return JsonResponse({"analysis_id": new_analysis.pk})
 
 
+@require_POST
+def analysis_reveal_hidden_nodes(request, analysis_id):
+    """ Running a template hides nodes that error while being configured (and their descendants) -
+        put them back so the user can see the branch and why it failed """
+    analysis = get_analysis_or_404(request.user, analysis_id)
+    analysis.check_can_write(request.user)
+    hidden_qs = analysis.analysisnode_set.filter(visible=False)
+    revealed = hidden_qs.update(visible=True, appearance_version=F("appearance_version") + 1)
+    if revealed:
+        reload_analysis_nodes(analysis.pk)
+    return JsonResponse({"revealed": revealed})
+
+
 @never_cache
 def analysis_node_versions(request, analysis_id):
     """ Returns a dict of {'node_versions' : [node.pk, node.version, node.appearance_version]} """

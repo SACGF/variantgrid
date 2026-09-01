@@ -45,7 +45,8 @@ from library.guardian_utils import admin_bot
 from library.log_utils import AdminNotificationBuilder
 from library.preview_request import PreviewModelMixin
 from library.utils import JsonObjType, import_class
-from snpdb.models.models_enums import UserAwardLevel
+from snpdb.models.models_enums import AwardPeriod, UserAwardKind, UserAwardLevel
+from snpdb.user_awards import get_award_definition
 from user_messages.models import Message
 
 
@@ -870,28 +871,72 @@ class LabHead(models.Model):
 
 
 class UserAward(TimeStampedModel):
+    """ Three kinds (see UserAwardKind). Computed rows (titles/badges) are keyed on
+        (definition_key, subject, period) and reused: 'created' is first earned, 'modified' the last
+        change of holder/tier. See snpdb.user_awards for the definitions and the computation """
     user = models.ForeignKey(User, on_delete=CASCADE)
     award_text = models.TextField(null=False, blank=False)
     award_level = models.TextField(max_length=1, choices=UserAwardLevel.choices, default=UserAwardLevel.GOLD)
     active = models.BooleanField(null=False, blank=True, default=True)
+    kind = models.CharField(max_length=1, choices=UserAwardKind.choices, default=UserAwardKind.KUDOS)
+    definition_key = models.TextField(null=True, blank=True)  # AwardDefinition.key, null for kudos
+    subject = models.TextField(null=True, blank=True)  # e.g. tag name for per-tag titles
+    period = models.CharField(max_length=1, choices=AwardPeriod.choices, null=True, blank=True)  # titles only
+    count = models.IntegerField(null=True, blank=True)  # score (titles) / raw progress (badges)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["user", "definition_key", "subject", "period"],
+                                    condition=models.Q(definition_key__isnull=False),
+                                    nulls_distinct=False,
+                                    name="user_award_unique_computed"),
+        ]
+
+    @property
+    def level_css_class(self) -> str:
+        return f"user-award-{self.get_award_level_display().lower()}"
+
+    @property
+    def icon_name(self) -> str:
+        """ font-awesome icon (without the fa-solid prefix) """
+        if self.kind == UserAwardKind.TITLE and self.period:
+            return AwardPeriod(self.period).icon
+        if self.kind == UserAwardKind.BADGE:
+            if definition := self.definition:
+                return definition.icon
+            return "fa-award"
+        return "fa-trophy"
+
+    @property
+    def definition(self):
+        """ The AwardDefinition this was computed from (None for kudos or a retired definition) """
+        if self.definition_key:
+            return get_award_definition(self.definition_key)
+        return None
 
     @property
     def icon_class(self):
-        return SafeString(f"fa-solid fa-trophy user-award user-award-{self.get_award_level_display().lower()}")
+        return SafeString(f"fa-solid {self.icon_name} user-award {self.level_css_class}")
 
     @property
     def icon(self):
         return SafeString(f"<i class='{self.icon_class}'></i>")
+
+    @property
+    def period_rank(self) -> int:
+        return AwardPeriod(self.period).rank if self.period else 0
 
     def __str__(self):
         return f"{self.get_award_level_display()} {self.user}: {self.award_text}"
 
 
 class UserAwards:
+    """ A user's awards, partitioned by kind. Only titles decorate the user elsewhere on the site
+        (see AvatarDetails) - badges and kudos live on the profile pages """
 
     def __init__(self, user: User):
         award_qs = UserAward.objects.filter(user=user).all()
-        award_list: list[UserAward] = sorted(award_qs, key=lambda x: (not x.active, 100 - UserAwardLevel(x.award_level).int_value, x.award_text))
+        award_list: list[UserAward] = sorted(award_qs, key=lambda x: (not x.active, -x.period_rank, 100 - UserAwardLevel(x.award_level).int_value, x.award_text))
 
         self.all_awards = award_list
         self.awards = [award for award in award_list if award.active]
@@ -900,17 +945,32 @@ class UserAwards:
         return bool(self.awards)
 
     @cached_property
+    def titles(self) -> list[UserAward]:
+        """ Active titles, ALL_TIME -> MONTH -> DAY """
+        return [a for a in self.awards if a.kind == UserAwardKind.TITLE]
+
+    @cached_property
+    def badges(self) -> list[UserAward]:
+        """ Earned badges only - see badge_row() for the progress of unearned ones """
+        return [a for a in self.awards if a.kind == UserAwardKind.BADGE]
+
+    @cached_property
+    def kudos(self) -> list[UserAward]:
+        return [a for a in self.awards if a.kind == UserAwardKind.KUDOS]
+
+    def badge_row(self, definition_key: str) -> Optional[UserAward]:
+        """ The (possibly not yet earned, hence inactive) badge row for a definition """
+        return first((a for a in self.all_awards if a.kind == UserAwardKind.BADGE and a.definition_key == definition_key), None)
+
+    def progress(self, definition) -> "BadgeProgress":
+        return BadgeProgress(definition=definition, award=self.badge_row(definition.key))
+
+    @cached_property
     def highest_award(self) -> Optional[UserAward]:
         return first(self.awards, None)
 
     @property
     def award_text_html(self):
-        def icon_for_award(award):
-            icon = "fa-trophy"
-            if award.award_level == UserAwardLevel.BRONZE:
-                icon = "fa-award"
-            return f"<i class='fa-solid {icon} user-award-{award.get_award_level_display().lower()}'></i>"
-
         return "<br/>".join([f"<i class='{award.icon_class}'></i>" + escape(award.award_text) for award in self.awards])
 
     @property
@@ -927,6 +987,43 @@ class UserAwards:
 
     def __getitem__(self, item):
         return self.awards[item]
+
+
+@dataclass(frozen=True)
+class BadgeProgress:
+    """ Where a user is on a badge's bronze/silver/gold ladder - for the profile page """
+    definition: object  # AwardDefinition
+    award: Optional[UserAward]
+
+    @property
+    def count(self) -> int:
+        return (self.award.count if self.award else None) or 0
+
+    @property
+    def earned(self) -> bool:
+        return bool(self.award and self.award.active)
+
+    @property
+    def next_threshold(self) -> Optional[int]:
+        """ The next tier's threshold, None once gold """
+        return first((t for t in self.definition.tiers if t > self.count), None)
+
+    @property
+    def next_tier_name(self) -> Optional[str]:
+        if (threshold := self.next_threshold) is None:
+            return None
+        return ["bronze", "silver", "gold"][self.definition.tiers.index(threshold)]
+
+    @property
+    def percent(self) -> int:
+        if (threshold := self.next_threshold) is None:
+            return 100
+        return min(100, int(100 * self.count / threshold))
+
+    @property
+    def visible(self) -> bool:
+        """ Hidden definitions (Night Owl etc) only show once earned """
+        return self.earned or not self.definition.hidden
 
 
 class LabProject(models.Model):

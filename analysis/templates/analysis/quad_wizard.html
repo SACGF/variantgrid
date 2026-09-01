@@ -52,8 +52,10 @@ tr:last-child td.patient-phenotype {
 }
 </style>
 <script src="{% static 'js/patient_phenotype.js' %}"></script>
+<script src="{% static 'js/proband_sex_mismatch.js' %}"></script>
 <script>
 var patient_description_results = {{ patient_description_results | jsonify }};
+var sample_sexes = {{ sample_sexes | jsonify }};
 
 function setProbandPhenoText() {
     var pp = $("#proband-phenos");
@@ -96,6 +98,8 @@ function setProbandPhenoText() {
         }
     }
 
+    setupProbandSexMismatch(sample_sexes);
+
     $("#create-quad-button").click(function() {
         setProbandPhenoText();
         $("#form-submitted-dialog").modal("show");
@@ -136,6 +140,11 @@ function setProbandPhenoText() {
                 <td> {{ sample_4.patient | default_if_none:"" }}
                 <td id='patient-results-4' class='patient-phenotype'>
         </table>
+
+        <div id='proband-sex-mismatch' class="alert alert-warning" style="display: none;">
+            <div id='proband-sex-message'></div>
+            {{ form.proband_sex }}{{ form.proband_sex.errors }}
+        </div>
 
         {% if form.non_field_errors %}
             <ul class='messages'>

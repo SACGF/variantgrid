@@ -541,6 +541,7 @@ class SettingsOverrideForm(BaseModelForm):
             "grid_sample_label_template": TextInput(),
             "initially_show_zygosity_table": BlankNullBooleanSelect(),
             "variant_grid_two_line_rows": BlankNullBooleanSelect(),
+            "show_user_awards": BlankNullBooleanSelect(),
         }
         labels = {
             "email_weekly_updates": "Email Regular Updates",
@@ -564,6 +565,7 @@ class SettingsOverrideForm(BaseModelForm):
             "variant_grid_two_line_rows": "Variant Grid Two Line Rows",
             "node_grid_auto_load_max_variants": "Node Grid Auto Load Max Variants",
             "variant_tag_stale_days": "Variant Tags Stale After",
+            "show_user_awards": "Show User Awards",
         }
 
     def __init__(self, *args, **kwargs):
@@ -622,6 +624,7 @@ class SettingsOverrideForm(BaseModelForm):
             "variant_grid_two_line_rows": settings_config.analysis_enabled,
             "node_grid_auto_load_max_variants": settings_config.analysis_enabled,
             "variant_tag_stale_days": settings_config.analysis_enabled,
+            "show_user_awards": settings.USER_AWARDS_ENABLED,
         }
 
         for f, visible in field_visibility.items():

@@ -69,8 +69,16 @@ class ClassificationClassificationBucket(TextChoices):
         # this goes a little against the buckets that we store directly into
 
 
-def classification_sort_order(clin_sig: str) -> int:
-    return EvidenceKeyMap.instance().get(SpecialEKeys.CLINICAL_SIGNIFICANCE).option_indexes.get(clin_sig, 0)
+def classification_significance_sort_key(clin_sig: Optional[str]) -> tuple[bool, int, int]:
+    """
+    Orders clinical significance values most significant first (P/LP/VUS/LB/B, with the oncogenic values
+    alongside their germline equivalents), values the evidence key doesn't rank last.
+    """
+    e_key = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE)
+    significance = e_key.option_dictionary_property("sort_order").get(clin_sig)
+    # ties (P/O, LP/LO) fall back to the option order, which lists the germline value first
+    option_index = (e_key.option_indexes or {}).get(clin_sig, 0)
+    return significance is None, -(significance or 0), option_index
 
 
 class OverlapStatus(IntegerChoices):
@@ -497,15 +505,18 @@ class ClassificationGrouping(TimeStampedModel):
             self.delete()
 
     VUS_SUB_VALUES = frozenset({"VUS_A", "VUS_B", "VUS_C"})
+    CLINICAL_SIGNIFICANCE_COLUMN = "latest_classification_modification__classification__summary__pathogenicity__classification"
+    NO_CLINICAL_SIGNIFICANCE = "none"
+    """ Filter value for the "No Data" summary count, as the significance itself is absent """
 
     @staticmethod
     def clinical_significance_counts(qs: QuerySet['ClassificationGrouping']) -> list['ClassificationGroupingCount']:
         """
         Counts groupings by the clinical significance of their latest classification, VUS sub-levels merged into VUS.
-        Ordered by the evidence key's option order, with values it doesn't know about (and No Data) last.
+        Ordered most significant first, with values the evidence key doesn't rank (and No Data) last.
         :param qs: Groupings to summarise - already filtered for the user
         """
-        clin_sig_column = "latest_classification_modification__classification__summary__pathogenicity__classification"
+        clin_sig_column = ClassificationGrouping.CLINICAL_SIGNIFICANCE_COLUMN
         counts: dict[Optional[str], int] = defaultdict(int)
         # some filters (e.g. protein position) join through variants, so only count each grouping once
         for row in qs.order_by().values(clin_sig_column).annotate(count=Count("pk", distinct=True)):
@@ -514,13 +525,23 @@ class ClassificationGrouping(TimeStampedModel):
                 clinical_significance = "VUS"
             counts[clinical_significance] += row["count"]
 
-        def sort_key(grouping_count: ClassificationGroupingCount):
-            sort_order = classification_sort_order(grouping_count.clinical_significance)
-            return not sort_order, sort_order, grouping_count.label
-
         return sorted(
             (ClassificationGroupingCount(clinical_significance=clin_sig, count=count) for clin_sig, count in counts.items()),
-            key=sort_key)
+            key=lambda grouping_count: classification_significance_sort_key(grouping_count.clinical_significance))
+
+    @staticmethod
+    def clinical_significance_q(clinical_significance: str) -> Q:
+        """
+        Filters to the groupings behind one of the summary counts, so clicking a count matches the number it showed.
+        :param clinical_significance: a value of the clinical significance evidence key, or NO_CLINICAL_SIGNIFICANCE
+        """
+        clin_sig_column = ClassificationGrouping.CLINICAL_SIGNIFICANCE_COLUMN
+        if clinical_significance == ClassificationGrouping.NO_CLINICAL_SIGNIFICANCE:
+            return Q(**{f"{clin_sig_column}__isnull": True})
+        values = [clinical_significance]
+        if clinical_significance == "VUS":
+            values += sorted(ClassificationGrouping.VUS_SUB_VALUES)
+        return Q(**{f"{clin_sig_column}__in": values})
 
     def gene_symbols(self):
         terms = set(self.classificationgroupingsearchterm_set.filter(term_type=ClassificationGroupingSearchTermType.GENE_SYMBOL).values_list("term", flat=True))

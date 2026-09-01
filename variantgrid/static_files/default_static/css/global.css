@@ -251,6 +251,23 @@ i.fas, i.fa-solid {
   transform: scale(0.7);
 }
 
+.user-title.user-award {
+  position: static;
+  font-size: inherit;
+  animation: none;
+  transform: none;
+}
+
+.award-cabinet .award-badge {
+  min-width: 12rem;
+}
+.award-cabinet .award-badge.award-locked {
+  opacity: 0.55;
+}
+.award-cabinet .award-badge .progress {
+  height: 6px;
+}
+
 strong {
   font-weight: 500;
 }
@@ -3286,6 +3303,9 @@ a .c-hgvs-body .c-hgvs-nomen {
   display: flex;
   align-items: stretch;
   white-space: nowrap;
+  cursor: pointer;
+  border-radius: 6px;
+  text-decoration: none;
 }
 .classification-grouping-summary .summary-count .c-pill {
   width: auto;
@@ -3300,6 +3320,16 @@ a .c-hgvs-body .c-hgvs-nomen {
   background-color: #fafafa;
   color: #555;
   font-weight: 600;
+}
+.classification-grouping-summary .summary-count:hover .count {
+  background-color: #eee;
+}
+.classification-grouping-summary .summary-count.selected {
+  outline: 2px solid #555;
+  outline-offset: 1px;
+}
+.classification-grouping-summary.filtered .summary-count:not(.selected) {
+  opacity: 0.5;
 }
 
 .cs-card {

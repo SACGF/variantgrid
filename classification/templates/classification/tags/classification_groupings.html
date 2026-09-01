@@ -11,6 +11,13 @@
     }
     var debounceClassificationGroupingRedraw = debounce(classificationGroupingRedraw);
 
+    var classificationGroupingClinicalSignificance = null;
+
+    function classificationGroupingClinicalSignificanceSelect(clinicalSignificance) {
+        classificationGroupingClinicalSignificance = clinicalSignificance;
+        classificationGroupingRedraw();
+    }
+
     function classificationGroupingSummaryLoad() {
         let summary = $('#classification-grouping-summary');
         if (!summary.length) {
@@ -19,11 +26,21 @@
         let data = {};
         classificationGroupingFilter(data);
         $.getJSON("{% url 'classification_grouping_counts' %}", data, (response) => {
-            summary.empty();
+            summary.empty().toggleClass('filtered', !!classificationGroupingClinicalSignificance);
             for (let entry of response.counts) {
-                $('<div>', {class: 'summary-count'})
+                let clinicalSignificance = entry.clinical_significance || 'none';
+                let selected = classificationGroupingClinicalSignificance === clinicalSignificance;
+                $('<a>', {
+                        class: 'summary-count' + (selected ? ' selected' : ''),
+                        href: '#',
+                        title: selected ? 'Show all classifications' : 'Only show ' + entry.label
+                    })
                     .append($('<span>', {class: 'c-pill cs ' + entry.css_class, text: entry.label}))
                     .append($('<span>', {class: 'count', text: entry.count.toLocaleString()}))
+                    .on('click', (event) => {
+                        event.preventDefault();
+                        classificationGroupingClinicalSignificanceSelect(selected ? null : clinicalSignificance);
+                    })
                     .appendTo(summary);
             }
         });
@@ -37,6 +54,9 @@
     });
 
     function classificationGroupingFilter(data) {
+        if (classificationGroupingClinicalSignificance) {
+            data.clinical_significance = classificationGroupingClinicalSignificance;
+        }
         let allele_origin_filter_value = blankToNull($("input[name='allele-origin-toggle']:checked").val());
         if (allele_origin_filter_value) {
             data.allele_origin = allele_origin_filter_value;

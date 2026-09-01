@@ -61,11 +61,15 @@ def _get_unannotated_count_min_max(annotation_version, search_min: int,
     unannotated_count = 0
     min_variant_id = None
     max_variant_id = None
+    if variant_max is None:  # No variants on system yet
+        return unannotated_count, min_variant_id, max_variant_id
+
     while True:
-        remaining_max = annotation_batch_max - unannotated_count
-        search_max = min(variant_max, search_min + remaining_max)
         if search_min > variant_max:
             break
+
+        remaining_max = annotation_batch_max - unannotated_count
+        search_max = min(variant_max, search_min + remaining_max)
 
         logging.debug("Searching for unannotated variants in range: %d-%d", search_min, search_max)
         qs = get_variants_qs_for_annotation(annotation_version, min_variant_id=search_min, max_variant_id=search_max)

@@ -15,6 +15,7 @@ from analysis.models.nodes.family_inheritance import (
     AbstractFamilyInheritance,
     _build_family_zyg_q,
     _dominant_requires_affected_parent_error,
+    _pedigree_sex,
     _xlinked_recessive_errors,
 )
 from analysis.models.nodes.node_display import NodeIcon
@@ -217,7 +218,8 @@ class QuadNode(AbstractCohortBasedNode):
                     errors.append(err)
             elif inheritance == QuadInheritance.XLINKED_RECESSIVE:
                 errors.extend(
-                    _xlinked_recessive_errors(quad.proband.sample, quad.mother_affected)
+                    _xlinked_recessive_errors(quad.proband.sample, quad.effective_proband_sex,
+                                              quad.mother_affected)
                 )
         return errors
 
@@ -270,10 +272,9 @@ class QuadNode(AbstractCohortBasedNode):
     def get_rendering_args(self):
         if not self.quad:
             return {}
-        proband_sample = self.quad.proband.sample
-        proband_sex = proband_sample.patient.sex if proband_sample.patient else "M"
+        proband_sex = _pedigree_sex(self.quad.effective_proband_sex)
         sibling_sample = self.quad.sibling.sample
-        sibling_sex = sibling_sample.patient.sex if sibling_sample.patient else "M"
+        sibling_sex = _pedigree_sex(sibling_sample.patient_sex)
         return {
             "mother_affected":  self.quad.mother_affected,
             "father_affected":  self.quad.father_affected,

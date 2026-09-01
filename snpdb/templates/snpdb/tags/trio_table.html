@@ -50,6 +50,12 @@
         </td>
     </tr>
 
+{% if trio.proband_sex %}
+    <tr><th>Proband Sex:</th>
+        <td>{{ trio.effective_proband_sex.label }} (set on the trio, overriding the patient record)</td>
+    </tr>
+{% endif %}
+
 {% if trio.genomekaryomappingcounts  %}
     <tr><th>Whole sample karyomapping counts</th>
         <td>{% genome_karyomapping_counts_summary trio.genomekaryomappingcounts %}</td>

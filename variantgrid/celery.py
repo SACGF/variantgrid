@@ -91,6 +91,19 @@ app.conf.beat_schedule['clear-old-node-export-cached-generated-files'] = {
     'schedule': crontab(hour=3, minute=15),
 }
 
+# User awards (#1819). The "today" trophy should move during the day; crowns, medals and badges
+# nightly. Raw seconds rather than crontab - see the timezone note above.
+if settings.USER_AWARDS_ENABLED:
+    app.conf.beat_schedule['user-awards-daily'] = {
+        'task': 'snpdb.tasks.user_award_tasks.update_user_awards',
+        'schedule': HOUR_SECS,
+        'kwargs': {'periods': ['D']},
+    }
+    app.conf.beat_schedule['user-awards-nightly'] = {
+        'task': 'snpdb.tasks.user_award_tasks.update_user_awards',
+        'schedule': HOUR_SECS * 24,
+        'kwargs': {'periods': ['A', 'M'], 'badges': True},
+    }
 
 # send update emails once a day (if there has been activity)
 if settings.DISCORDANCE_EMAIL:
