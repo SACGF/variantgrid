@@ -135,6 +135,12 @@
         overflow: scroll;
     }
 
+    #right-panel {
+        /* The grid scrolls its own rows (see resizeGrid), so only show the panel's bars when
+           something actually overflows it */
+        overflow: auto;
+    }
+
 	{% render_rgb_css 'node-count-' node_count_colors %}
     {% render_node_count_colors_css %}
 </style>

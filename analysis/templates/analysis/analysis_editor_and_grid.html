@@ -91,6 +91,11 @@
     position: relative; /* so a grid-only loading overlay fills just this section, leaving the editor usable */
     min-height: 200px;  /* keep the grid area (and its loading overlay/helix) from collapsing while a deferred grid loads */
 }
+/* Horizontal mode sizes the grid to the pane (see resizeGrid) - the margin would just push it past the
+   bottom and give the panel a scroll bar of its own */
+.analysis-horizontal #node-grid-container {
+    margin-bottom: 0;
+}
 #grid-loading-overlay {
     position: absolute;
     top: 0;
