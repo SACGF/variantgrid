@@ -255,6 +255,41 @@
 
     {% else %}
        <div class="card mt-4">
+            <div class="card-header">2 September 2026</div>
+            <div class="card-body">
+                <h4>Analysis</h4>
+                <ul>
+                    <li>#1789 - ClassificationsNode split into separate Classifications and ClinVar nodes</li>
+                    <li>#1789 - IntersectionNode - paste variants/regions as text (anything search understands)</li>
+                    <li>#1789 - DamageNode - filter on variant class</li>
+                    <li>#1791 - ClinVar node - somatic tier and oncogenicity pills, review stars chip</li>
+                    <li>#1808 - EffectNode - filter on the VEP 116 scores (EVE, popEVE, ProtVar ddG, PromoterAI)</li>
+                    <li>#21 - A node count badge per tag - click to filter the grid or make a TagNode</li>
+                    <li>private#223 - SampleNode at patient / specimen / extraction level, with a patient tree picker</li>
+                </ul>
+                <h4>Annotation</h4>
+                <ul>
+                    <li>#1791 - ClinVar somatic clinical impact + oncogenicity columns, existing versions backfilled</li>
+                    <li>#1808 - New columns - EVE class, popEVE, ProtVar ddG, PromoterAI</li>
+                </ul>
+                <h4>Classification</h4>
+                <ul>
+                    <li>#1803 - Gene page - clinical significance summary counts above the groupings grid</li>
+                    <li>Grouping summary counts sorted most significant first, click one to filter the grid</li>
+                </ul>
+                <h4>Patients</h4>
+                <ul>
+                    <li>#1745 - Patient records CSV upload repaired (pandas 3, DD-MM-YYYY dates, tissue status)</li>
+                </ul>
+                <h4>User Interface</h4>
+                <ul>
+                    <li>private#686 - Variant grids - composite columns, sample glyphs, 2 line rows, sort menus</li>
+                    <li>#1819 - User awards - computed badges for analysis, classification, tags etc</li>
+                </ul>
+            </div>
+       </div>
+
+       <div class="card mt-4">
             <div class="card-header">28 August 2026</div>
             <div class="card-body">
                 <h4>Analysis</h4>
