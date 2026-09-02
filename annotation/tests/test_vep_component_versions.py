@@ -1,7 +1,9 @@
 import importlib
 
 from django.conf import settings
-from django.test import TestCase
+from django.contrib import admin
+from django.contrib.auth.models import User
+from django.test import RequestFactory, TestCase
 from django.test.utils import override_settings
 
 from annotation.fake_annotation import get_fake_annotation_settings_dict, get_fake_vep_version
@@ -202,3 +204,32 @@ class VEPComponentVersionBackfillTests(TestCase):
         vav.refresh_from_db()
         for field in self.PIN_FIELDS:
             self.assertIsNone(getattr(vav, field), field)
+
+
+@override_settings(**get_fake_annotation_settings_dict(columns_version=2))
+class AdminBlankPinTests(TestCase):
+    """ Blanking a nullable TextField in the admin gives '' - which isn't the None the pins are
+        derived as for "not configured", so the version would stop matching current VEP """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.grch37 = GenomeBuild.get_name_or_alias("GRCh37")
+        cls.admin_user = User.objects.create_superuser(username="admin", email="a@example.com", password="x")
+
+    def test_blanked_pin_still_matches_current_vep(self):
+        kwargs = get_fake_vep_version(self.grch37, AnnotationConsortium.ENSEMBL, 2)
+        kwargs.pop("id")
+        kwargs["pick_order"] = None
+        vav = VariantAnnotationVersion.objects.create(**kwargs)
+
+        model_admin = admin.site._registry[VariantAnnotationVersion]
+        request = RequestFactory().get("/")
+        request.user = self.admin_user
+        pick_order_field = model_admin.get_form(request, vav, change=True).base_fields["pick_order"]
+
+        vav.pick_order = pick_order_field.clean("")  # blanked out by an admin edit
+        vav.save()
+        vav.refresh_from_db()
+        self.assertIsNone(vav.pick_order)
+        _, created = VariantAnnotationVersion.objects.get_or_create(**kwargs)
+        self.assertFalse(created, "Edited version still matches current VEP, rather than reannotating")
