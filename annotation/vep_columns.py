@@ -1086,6 +1086,16 @@ VEP_COLUMNS: tuple[VEPColumnDef, ...] = (
         formatter=fmt.format_pick_highest_float_na,
     ),
     VEPColumnDef(
+        # Same source field as above, stored raw so the details page can zip the per-record arrays
+        source_field='OpenTargets_gwasLocusToGeneScore',
+        variant_grid_columns=('open_targets_gwas_l2g_scores',),
+        category=ColumnAnnotationCategory.GENE_ANNOTATIONS,
+        vep_plugin=VEPPlugin.OPEN_TARGETS,
+        genome_builds=GRCH38,
+        pipeline_types=STANDARD,
+        min_columns_version=5,
+    ),
+    VEPColumnDef(
         source_field='OpenTargets_gwasGeneId',
         variant_grid_columns=('open_targets_gwas_gene_id',),
         category=ColumnAnnotationCategory.GENE_ANNOTATIONS,

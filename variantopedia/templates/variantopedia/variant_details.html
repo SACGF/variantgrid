@@ -1136,18 +1136,83 @@ function applyVariantValues() {
                 <div class="card">
                     <div class="card-header">Open Targets</div>
                     <div class="card-body">
-                        {% labelled id='open_targets_gwas_l2g_score' visible_fields=visible_fields label='GWAS L2G score' help=annotation_description.open_targets_gwas_l2g_score hint="tiny" value_css="text-monospace" %}{{ variant_annotation.open_targets_gwas_l2g_score }}{% endlabelled %}
-                        {% labelled id='open_targets_gwas_gene_id' visible_fields=visible_fields label='GWAS gene' help=annotation_description.open_targets_gwas_gene_id hint="tiny" value_css="text-monospace" %}{{ variant_annotation.open_targets_gwas_gene_id }}{% endlabelled %}
-                        {% labelled id='open_targets_gwas_diseases' visible_fields=visible_fields label='GWAS diseases' help=annotation_description.open_targets_gwas_diseases hint="tiny" %}{{ variant_annotation.open_targets_gwas_diseases }}{% endlabelled %}
-                        {% labelled id='open_targets_study_type' visible_fields=visible_fields label='Study type' help=annotation_description.open_targets_study_type hint="tiny" %}{{ variant_annotation.open_targets_study_type }}{% endlabelled %}
-                        {% labelled id='open_targets_qtl_gene_id' visible_fields=visible_fields label='QTL gene' help=annotation_description.open_targets_qtl_gene_id hint="tiny" value_css="text-monospace" %}{{ variant_annotation.open_targets_qtl_gene_id }}{% endlabelled %}
-                        {% labelled id='open_targets_qtl_biosample' visible_fields=visible_fields label='QTL biosample' help=annotation_description.open_targets_qtl_biosample hint="tiny" %}{{ variant_annotation.open_targets_qtl_biosample }}{% endlabelled %}
-                        {% if variant_annotation.open_targets_variant_id %}
-                            {% labelled id='open_targets_variant_id' visible_fields=visible_fields label='Variant' help=annotation_description.open_targets_variant_id hint="tiny" %}<a target="_blank" class='hover-link' href="https://platform.opentargets.org/variant/{{ variant_annotation.open_targets_variant_id }}">{{ variant_annotation.open_targets_variant_id }}</a>{% endlabelled %}
-                        {% endif %}
-                        {% if variant_annotation.open_targets_study_id %}
-                            {% labelled id='open_targets_study_id' visible_fields=visible_fields label='Study' help=annotation_description.open_targets_study_id hint="tiny" %}<a target="_blank" class='hover-link' href="https://platform.opentargets.org/study/{{ variant_annotation.open_targets_study_id }}">{{ variant_annotation.open_targets_study_id }}</a>{% endlabelled %}
-                        {% endif %}
+                        {% labelled id='open_targets_gwas_l2g_score' visible_fields=visible_fields label='Max GWAS L2G score' help=annotation_description.open_targets_gwas_l2g_score hint="tiny" value_css="text-monospace" %}{{ variant_annotation.open_targets_gwas_l2g_score|default_if_none:"" }}{% endlabelled %}
+                        {% with open_targets_variant=variant_annotation.open_targets_variant %}
+                            {% if open_targets_variant %}
+                                {% labelled id='open_targets_variant_id' visible_fields=visible_fields label='Variant' help=annotation_description.open_targets_variant_id hint="tiny" %}<a target="_blank" class='hover-link' href="{{ open_targets_variant.url }}">{{ open_targets_variant.id }}</a>{% endlabelled %}
+                            {% endif %}
+                        {% endwith %}
+
+                        {% with gwas_genes=variant_annotation.open_targets_gwas_genes %}
+                            {% if gwas_genes %}
+                                <table class="table table-sm mt-2">
+                                    <thead>
+                                        <tr>
+                                            <th title="{{ annotation_description.open_targets_gwas_gene_id }}">GWAS gene</th>
+                                            <th class="text-right" title="{{ annotation_description.open_targets_gwas_l2g_score }}">L2G</th>
+                                            <th title="{{ annotation_description.open_targets_gwas_diseases }}">Diseases</th>
+                                            <th class="text-right" title="{{ annotation_description.open_targets_study_id }}">Studies</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                    {% for gene in gwas_genes %}
+                                        <tr>
+                                            <td>
+                                                <a class="hover-link" href="{{ gene.gene_url }}">{{ gene.gene_symbol }}</a>
+                                                {% if gene.gene_symbol != gene.gene_id %}<div class="text-monospace text-muted">{{ gene.gene_id }}</div>{% endif %}
+                                            </td>
+                                            <td class="text-right text-monospace">{{ gene.l2g_score|floatformat:3|default_if_none:"" }}</td>
+                                            <td>
+                                                {% for disease in gene.diseases|slice:":8" %}
+                                                    <a target="_blank" class='hover-link badge badge-secondary' href="{{ disease.url }}">{{ disease.name }}</a>
+                                                {% endfor %}
+                                                {% if gene.diseases|length > 8 %}
+                                                    <a data-toggle="collapse" class="hover-link" href="#open-targets-diseases-{{ gene.gene_id }}">
+                                                        <i class="fas fa-caret-right"></i> and {{ gene.diseases|length|add:"-8" }} more
+                                                    </a>
+                                                    <div id="open-targets-diseases-{{ gene.gene_id }}" class="collapse">
+                                                        {% for disease in gene.diseases|slice:"8:" %}
+                                                            <a target="_blank" class='hover-link badge badge-secondary' href="{{ disease.url }}">{{ disease.name }}</a>
+                                                        {% endfor %}
+                                                    </div>
+                                                {% endif %}
+                                            </td>
+                                            <td class="text-right">{{ gene.study_count }}</td>
+                                        </tr>
+                                    {% endfor %}
+                                    </tbody>
+                                </table>
+                            {% endif %}
+                        {% endwith %}
+
+                        {% with qtl_genes=variant_annotation.open_targets_qtl_genes %}
+                            {% if qtl_genes %}
+                                <table class="table table-sm mt-2">
+                                    <thead>
+                                        <tr>
+                                            <th title="{{ annotation_description.open_targets_qtl_gene_id }}">QTL gene</th>
+                                            <th title="{{ annotation_description.open_targets_study_type }}">Study type</th>
+                                            <th title="{{ annotation_description.open_targets_qtl_biosample }}">Biosamples</th>
+                                            <th class="text-right" title="{{ annotation_description.open_targets_study_id }}">Studies</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                    {% for gene in qtl_genes %}
+                                        <tr>
+                                            <td>
+                                                <a class="hover-link" href="{{ gene.gene_url }}">{{ gene.gene_symbol }}</a>
+                                                {% if gene.gene_symbol != gene.gene_id %}<div class="text-monospace text-muted">{{ gene.gene_id }}</div>{% endif %}
+                                            </td>
+                                            <td>{{ gene.study_type_label }}</td>
+                                            <td>{{ gene.biosamples|join:", " }}</td>
+                                            <td class="text-right">{{ gene.study_count }}</td>
+                                        </tr>
+                                    {% endfor %}
+                                    </tbody>
+                                </table>
+                            {% endif %}
+                        {% endwith %}
+
                         <div class="text-right mt-2"><i class="text-secondary">Source: <a target="_blank" class='hover-link' href="https://platform.opentargets.org/">Open Targets</a></i></div>
                     </div>
                 </div>

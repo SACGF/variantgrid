@@ -2,6 +2,7 @@ from django.conf import settings
 from django.test import TestCase
 from django.test.utils import override_settings
 
+from annotation import vep_columns
 from annotation.fake_annotation import get_fake_annotation_settings_dict
 from annotation.models import VariantAnnotationVersion
 from annotation.models.models_enums import VariantAnnotationPipelineType
@@ -125,6 +126,21 @@ class GetVepCommandColumnsVersion5Tests(TestCase):
         self.assertTrue(any(p.startswith("OpenTargets,file=") and "cols=all" in p for p in plugins))
         self.assertTrue(any(p.startswith("EVE,file=") and "popeve_file=" in p for p in plugins))
         self.assertTrue(any(p.startswith("PromoterAI,file=") for p in plugins))
+
+    def test_open_targets_l2g_scores_grch38_only(self):
+        """ #1822 - the raw per-record L2G array is a second column off the same source field """
+        for build_name, expected in [("GRCh38", True), ("GRCh37", False)]:
+            with self.subTest(build_name):
+                columns = vep_columns.visible_columns_for(
+                    genome_build_name=build_name, columns_version=5,
+                    pipeline_type=VariantAnnotationPipelineType.STANDARD)
+                self.assertEqual("open_targets_gwas_l2g_scores" in columns, expected)
+
+    def test_open_targets_l2g_scores_not_in_columns_version_4(self):
+        columns = vep_columns.visible_columns_for(
+            genome_build_name="GRCh38", columns_version=4,
+            pipeline_type=VariantAnnotationPipelineType.STANDARD)
+        self.assertNotIn("open_targets_gwas_l2g_scores", columns)
 
     def test_vep115_omits_eve_and_promoterai(self):
         with override_settings(**_v5_settings(vep_version="115")):
