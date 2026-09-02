@@ -201,13 +201,14 @@ class OverlapColumns(DatatableConfig[ClassificationGrouping]):
         if not self.lab_picker.is_admin_mode:
             contributions = contributions.filter(classification_grouping__lab__in=self.lab_picker.lab_ids)
 
+        results = set()
         for contribution in contributions:
             if grouping := contribution.classification_grouping:
                 if allele_info := grouping.latest_allele_info:
                     # TODO imported value or resolved value?
                     if c_hgvs := allele_info.preferred_c_hgvs_obj(genome_build=GenomeBuildManager.get_current_genome_build()):
-                        return HGVSDisplay(c_hgvs).to_json()
-        return None
+                        results.add(HGVSDisplay(c_hgvs))
+        return list(c_hgvs.to_json() for c_hgvs in sorted(results))
 
     def render_context(self, cell: CellData[Overlap]):
 
@@ -308,7 +309,7 @@ class OverlapColumns(DatatableConfig[ClassificationGrouping]):
                 label="c.HGVS",
                 # sort_keys=["latest_allele_info__grch38__genomic_sort"],
                 renderer=self.render_c_hgvs,
-                client_renderer='VCTable.hgvs'
+                client_renderer=RichColumn.client_renderer_repeat({'formatter': 'VCTable.hgvs', 'groupCSS': 'd-inline'})
             ),
 
             RichColumn(
