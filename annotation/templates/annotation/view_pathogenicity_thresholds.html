@@ -18,7 +18,8 @@
         </p>
         <p class="text-muted">
             These thresholds drive the colour bands on the analysis Effect (Damage) node sliders and the
-            Pathogenicity card on the variant details page.
+            Pathogenicity card on the variant details page. Every coloured number on the variant details
+            page comes from this page - a field that isn't listed here is shown plain.
         </p>
 
         <div class="card mt-3">
@@ -60,6 +61,68 @@
                                         <a class="hover-link" href="{{ t.source_url }}" target="_blank" title="{{ t.source_detail }}">{{ t.source }}</a>
                                     {% else %}
                                         {{ t.source }}
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <h4 class="mt-4">Rankscores</h4>
+        <p>
+            Rankscores are each tool's raw score expressed as its rank among all dbNSFP variants, so one
+            pair of cutoffs bands them all: benign supporting <span class="threshold threshold-low">&le; {{ max_benign_rankscore }}</span>
+            and pathogenic supporting <span class="threshold threshold-high">&ge; {{ min_pathogenic_rankscore }}</span>
+            (settings <span class="text-monospace">ANNOTATION_MAX_BENIGN_RANKSCORE</span> /
+            <span class="text-monospace">ANNOTATION_MIN_PATHOGENIC_RANKSCORE</span>). Banded rankscore columns:
+            {% for t in rankscore_tools %}<span class="text-monospace">{{ t.rankscore_field }}</span>{% if not forloop.last %}, {% endif %}{% endfor %}.
+        </p>
+
+        <h4 class="mt-4">Conservation, splicing and amino acid change</h4>
+        <p>
+            These aren't missense pathogenicity predictors and have no PP3/BP4 calibration, so they take no
+            part in the damage count - they are coloured on the variant details page only. Where only a
+            pathogenic cutoff is given, the rest of the scale is left plain rather than coloured benign.
+        </p>
+
+        <div class="card mt-3">
+            <div class="card-body">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Field</th>
+                            <th class="text-monospace">Benign</th>
+                            <th class="text-monospace">Damaging</th>
+                            <th>Source</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for b in colour_bands %}
+                            <tr>
+                                <th>
+                                    {{ b.name }}
+                                    <div class="text-muted small font-weight-normal mt-1">
+                                        {% for field in b.fields %}<span class="text-monospace">{{ field }}</span>{% if not forloop.last %}, {% endif %}{% endfor %}
+                                    </div>
+                                    {% if b.note %}<div class="text-muted small font-weight-normal mt-1">{{ b.note }}</div>{% endif %}
+                                </th>
+                                <td class="text-monospace">
+                                    {% if b.max_benign_threshold is not None %}
+                                        <span class="threshold threshold-low">{% if b.magnitude %}|score| {% endif %}&le; {{ b.max_benign_threshold }}</span>
+                                    {% else %}&mdash;{% endif %}
+                                </td>
+                                <td class="text-monospace">
+                                    {% if b.pathogenic_threshold is not None %}
+                                        <span class="threshold threshold-high">{% if b.magnitude %}|score| {% endif %}&ge; {{ b.pathogenic_threshold }}</span>
+                                    {% else %}&mdash;{% endif %}
+                                </td>
+                                <td>
+                                    {% if b.source_url %}
+                                        <a class="hover-link" href="{{ b.source_url }}" target="_blank" title="{{ b.source_detail }}">{{ b.source }}</a>
+                                    {% else %}
+                                        {{ b.source }}
                                     {% endif %}
                                 </td>
                             </tr>

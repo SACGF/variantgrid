@@ -277,6 +277,23 @@ TOOLS: tuple[PathogenicityTool, ...] = (
         source="Pejaver 2022", source_detail=_PEJAVER_2022[0], source_url=_PEJAVER_2022[1],
     ),
 
+    # MetaLR - Dong 2015, Hum Mol Genet (DOI 10.1093/hmg/ddu733). dbNSFP ensemble score; we only
+    # store the rankscore, so there is no raw slider - it bands off the site-wide rankscore settings.
+    PathogenicityTool(
+        name="MetaLR",
+        rankscore_field="metalr_rankscore",
+        raw_field=None,
+        pred_field=None,
+        raw_min=None, raw_max=None, raw_step=None,
+        raw_max_benign_threshold=None,
+        raw_pathogenic_threshold=None,
+        source="Dong 2015",
+        source_detail="Dong C, Wei P, Jian X, et al. Comparison and integration of deleteriousness "
+                      "prediction methods for nonsynonymous SNVs in whole exome sequencing studies. "
+                      "Hum Mol Genet. 2015;24(8):2125-2137.",
+        source_url="https://doi.org/10.1093/hmg/ddu733",
+    ),
+
     # ---- Not missense pathogenicity predictors: no PP3/BP4 cutoff, no colour band, and they sit
     # outside predictions_num_pathogenic. Offered as Effect node filters only (#1808). ----
     # ProtVar ddG - protein stability change in kcal/mol from the ProtVar plugin. Not a pathogenicity
@@ -320,6 +337,146 @@ TOOLS: tuple[PathogenicityTool, ...] = (
         note="Promoter (non-coding) expression effect, not a missense pathogenicity prediction. The score "
              "is signed for direction of expression change, so the slider filters on |score|. "
              "No ClinGen-calibrated PP3/BP4 cutoff.",
+    ),
+)
+
+
+
+@dataclass(frozen=True)
+class ColourBand:
+    """ Colour band for a variant details field that isn't a missense pathogenicity predictor, so it
+        has no PP3/BP4 cutoff and takes no part in the damage count. Same green / amber / red bands as
+        TOOLS, listed on the Pathogenicity Thresholds page so every coloured number has a stated source.
+        max_benign_threshold None colours only the damaging end - the rest of the scale stays plain. """
+    name: str
+    fields: tuple[str, ...]
+    max_benign_threshold: Optional[float]
+    pathogenic_threshold: Optional[float]
+    direction: RawScoreDirection = RawScoreDirection.HIGHER
+    source: str = ""
+    source_detail: str = ""
+    source_url: str = ""
+    note: str = ""
+
+    @property
+    def magnitude(self) -> bool:
+        """ Band on |score| - the field is signed but only the size of the change matters """
+        return self.direction == RawScoreDirection.MAGNITUDE
+
+
+_VG_DEFAULT = "VariantGrid default"
+
+COLOUR_BANDS: tuple[ColourBand, ...] = (
+    # SpliceAI - Jaganathan 2019 gives 0.2 (high recall), 0.5 (recommended) and 0.8 (high precision)
+    # delta score cutoffs; we band on the first two.
+    ColourBand(
+        name="SpliceAI delta scores",
+        fields=("spliceai_pred_ds_ag", "spliceai_pred_ds_al", "spliceai_pred_ds_dg", "spliceai_pred_ds_dl"),
+        max_benign_threshold=0.2,
+        pathogenic_threshold=0.5,
+        source="Jaganathan 2019",
+        source_detail="Jaganathan K, Kyriazopoulou Panagiotopoulou S, McRae JF, et al. Predicting Splicing "
+                      "from Primary Sequence with Deep Learning. Cell. 2019;176(3):535-548. Delta score "
+                      "cutoffs 0.2 (high recall), 0.5 (recommended), 0.8 (high precision).",
+        source_url="https://doi.org/10.1016/j.cell.2018.12.015",
+    ),
+    # dbscSNV - Jian 2014 recommends 0.6 for both ensemble scores. No benign cutoff published.
+    ColourBand(
+        name="dbscSNV (ada / rf)",
+        fields=("dbscsnv_ada_score", "dbscsnv_rf_score"),
+        max_benign_threshold=None,
+        pathogenic_threshold=0.6,
+        source="Jian 2014",
+        source_detail="Jian X, Boerwinkle E, Liu X. In silico prediction of splice-altering single "
+                      "nucleotide variants in the human genome. Nucleic Acids Res. 2014;42(22):13534-13544. "
+                      "Both ensemble scores are called splice-altering at 0.6.",
+        source_url="https://doi.org/10.1093/nar/gku1206",
+    ),
+    # MaxEntScan - the score is a signed % change against the reference site, and it is the size of the
+    # change that matters, in either direction (a weakened native site or a strengthened cryptic one).
+    ColourBand(
+        name="MaxEntScan % diff vs ref",
+        fields=("maxentscan_percent_diff_ref",),
+        max_benign_threshold=70.0,
+        pathogenic_threshold=150.0,
+        direction=RawScoreDirection.MAGNITUDE,
+        source=_VG_DEFAULT,
+        source_detail="Yeo G, Burge CB. Maximum entropy modeling of short sequence motifs with applications "
+                      "to RNA splicing signals. J Comput Biol. 2004;11(2-3):377-394. The band sizes are a "
+                      "VariantGrid display choice - the paper sets no % change cutoff.",
+        source_url="https://doi.org/10.1089/1066527041410418",
+        note="Signed % change against the reference splice site, so the band is on |% diff|.",
+    ),
+    # Conservation - a conserved base is worth flagging, but a poorly conserved one is not benign
+    # evidence on its own, so these colour the conserved end only.
+    ColourBand(
+        name="phastCons (100 way vertebrate, 46 way mammalian, 30 way mammalian)",
+        fields=("phastcons_100_way_vertebrate", "phastcons_46_way_mammalian", "phastcons_30_way_mammalian"),
+        max_benign_threshold=None,
+        pathogenic_threshold=0.85,
+        source=_VG_DEFAULT,
+        source_detail="Siepel A, Bejerano G, Pedersen JS, et al. Evolutionarily conserved elements in "
+                      "vertebrate, insect, worm, and yeast genomes. Genome Res. 2005;15(8):1034-1050. "
+                      "phastCons is a probability of lying in a conserved element; the 0.85 cutoff is a "
+                      "VariantGrid display choice.",
+        source_url="https://doi.org/10.1101/gr.3715005",
+    ),
+    ColourBand(
+        name="phyloP 100 way vertebrate",
+        fields=("phylop_100_way_vertebrate",),
+        max_benign_threshold=None,
+        pathogenic_threshold=1.4,
+        source=_VG_DEFAULT,
+        source_detail="Pollard KS, Hubisz MJ, Rosenbloom KR, Siepel A. Detection of nonneutral substitution "
+                      "rates on mammalian phylogenies. Genome Res. 2010;20(1):110-121. Cutoff is a "
+                      "VariantGrid display choice.",
+        source_url="https://doi.org/10.1101/gr.097857.109",
+    ),
+    ColourBand(
+        name="phyloP 30 way mammalian",
+        fields=("phylop_30_way_mammalian",),
+        max_benign_threshold=None,
+        pathogenic_threshold=1.0,
+        source=_VG_DEFAULT,
+        source_detail="Pollard 2010 (as above). Cutoff is a VariantGrid display choice.",
+        source_url="https://doi.org/10.1101/gr.097857.109",
+    ),
+    ColourBand(
+        name="phyloP 46 way mammalian",
+        fields=("phylop_46_way_mammalian",),
+        max_benign_threshold=None,
+        pathogenic_threshold=None,
+        source=_VG_DEFAULT,
+        source_detail="Pollard 2010 (as above).",
+        note="Left uncoloured - the 46 way alignment scores run on a different scale to the 100 way and "
+             "30 way sets, and we have no cutoff for it.",
+        source_url="https://doi.org/10.1101/gr.097857.109",
+    ),
+    # Grantham - chemical distance between the reference and alternate amino acid, not a prediction.
+    ColourBand(
+        name="Grantham distance",
+        fields=("grantham",),
+        max_benign_threshold=57.0,
+        pathogenic_threshold=105.0,
+        source=_VG_DEFAULT,
+        source_detail="Grantham R. Amino acid difference formula to help explain protein evolution. "
+                      "Science. 1974;185(4154):862-864. Distance 0-215 between the reference and alternate "
+                      "residue; the band edges are a VariantGrid display choice.",
+        source_url="https://doi.org/10.1126/science.185.4154.862",
+        note="Chemical difference between amino acids, not a pathogenicity prediction.",
+    ),
+    # GERP++ RS - conserved end only, as for phastCons / phyloP.
+    ColourBand(
+        name="GERP++ RS",
+        fields=("gerp_pp_rs",),
+        max_benign_threshold=None,
+        pathogenic_threshold=3.0,
+        source=_VG_DEFAULT,
+        source_detail="Davydov EV, Goode DL, Sirota M, et al. Identifying a high fraction of the human "
+                      "genome to be under selective constraint using GERP++. PLoS Comput Biol. "
+                      "2010;6(12):e1001025. Rejected-substitutions score, range -12 to 6.8; the cutoff is a "
+                      "VariantGrid display choice.",
+        source_url="https://doi.org/10.1371/journal.pcbi.1001025",
     ),
 )
 

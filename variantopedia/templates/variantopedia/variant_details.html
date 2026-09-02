@@ -81,41 +81,10 @@ function gnomadGeneConstraintRetrieval(content) {
     return retrievalSummary;
 }
 
-var pathogenicity_rankscore_threshold = [
-    {% settings_value 'ANNOTATION_MAX_BENIGN_RANKSCORE' %},
-    {% settings_value 'ANNOTATION_MIN_PATHOGENIC_RANKSCORE' %}
-]
+// {field: {benign, pathogenic, magnitude}} from the TOOLS / COLOUR_BANDS registries - see the
+// Pathogenicity Thresholds page for the cutoffs and their sources
+var CODE_THRESHOLDS = {% pathogenicity_thresholds %};
 
-var PATHOGENICITY_THRESHOLDS = {% pathogenicity_thresholds %};
-
-var CODE_THRESHOLDS = {
-    ...PATHOGENICITY_THRESHOLDS,
-    "grantham": [57, 105],
-    "gerp_pp_rs": [0, 3],
-    //
-    "alphamissense_rankscore": pathogenicity_rankscore_threshold,
-    "cadd_raw_rankscore": pathogenicity_rankscore_threshold,
-    "revel_rankscore": pathogenicity_rankscore_threshold,
-    "bayesdel_noaf_rankscore": pathogenicity_rankscore_threshold,
-    "clinpred_rankscore": pathogenicity_rankscore_threshold,
-    "vest4_rankscore": pathogenicity_rankscore_threshold,
-    "metalr_rankscore": pathogenicity_rankscore_threshold,
-    "maxentscan_percent_diff_ref": [-150, -70, 70, 150],
-    "phastcons_100_way_vertebrate": [0.85],
-    "phastcons_46_way_mammalian": [0.85],
-    "phastcons_30_way_mammalian": [0.85],
-    "phylop_100_way_vertebrate": [1.4],
-    // TODO: can't find what the ranges are...
-    // "phylop_46_way_mammalian": [1],
-    "phylop_30_way_mammalian": [1],
-    "spliceai_pred_ds_ag": [0.2, 0.6],
-    "spliceai_pred_ds_al": [0.2, 0.6],
-    "spliceai_pred_ds_dg": [0.2, 0.6],
-    "spliceai_pred_ds_dl": [0.2, 0.6],
-    "dbscsnv_ada_score": [0.2, 0.6],
-    "dbscsnv_rf_score": [0.2, 0.6],
-    "cosmic_count": [2, 10]
-};
 // These are looked up in lower case
 var CODE_WORDS = {
     "tolerated": "low",
@@ -177,6 +146,24 @@ function formatNumberSigDigits(value) {
     }
 }
 
+/** Green / amber / red band for a score, or null where the field has no band (or the value sits
+    below the only cutoff it has). Matches the Pathogenicity Thresholds page: at or above the
+    pathogenic cutoff supports pathogenic, at or below the benign one supports benign. */
+function thresholdBand(name, value) {
+    const band = CODE_THRESHOLDS[name];
+    if (!band) {
+        return null;
+    }
+    const score = band.magnitude ? Math.abs(value) : value;
+    if (score >= band.pathogenic) {
+        return "threshold-high";
+    }
+    if (band.benign === undefined) {
+        return null;
+    }
+    return score <= band.benign ? "threshold-low" : "threshold-med";
+}
+
 function applyValue(name, value) {
     let transcriptInfoTable = $('#transcript-info');
     let hasValue = true;
@@ -184,39 +171,11 @@ function applyValue(name, value) {
         hasValue = false;
         value = $('<span>', {class: 'no-value', text:'-'});
     } else if (typeof value === "number") {
-        let threshold = CODE_THRESHOLDS[name];
         let cssClasses = ["text-monospace"];
-        if (threshold) {
-            if (threshold.length == 1) {
-                if (value >= threshold[0]) {
-                    cssClasses.push("threshold");
-                    cssClasses.push("threshold-high");
-                }
-            } else if (threshold.length == 2) {
-                cssClasses.push("threshold");
-                if (value < threshold[0]) {
-                    cssClasses.push("threshold-low");
-                } else if (value <= threshold[1]) {
-                    cssClasses.push("threshold-med");
-                } else {
-                    cssClasses.push("threshold-high");
-                }
-            } else if (threshold.length == 4) {
-                cssClasses.push("threshold");
-                if (value < threshold[0]) {
-                    cssClasses.push("threshold-high");
-                } else if (value <= threshold[1]) {
-                    cssClasses.push("threshold-med");
-                } else if (value <= threshold[2]) {
-                     cssClasses.push("threshold-low");
-                } else if (value <= threshold[3]) {
-                    cssClasses.push("threshold-med");
-                } else {
-                    cssClasses.push("threshold-med");
-                }
-            }
-        }
-        if (value === 0) {
+        let band = thresholdBand(name, value);
+        if (band) {
+            cssClasses.push("threshold", band);
+        } else if (value === 0) {
             cssClasses.push("text-secondary");
         }
         value = $('<span>', {"class": cssClasses.join(" "), text: formatNumberSigDigits(value)});
@@ -226,8 +185,7 @@ function applyValue(name, value) {
             value = $('<span>', {"class": `threshold threshold-${threshold}`, text: value});
         }
     } else if (typeof value === "boolean") {
-        let threshold = value? "high" : "low";
-        value = $('<span>', {"class": `threshold threshold-${threshold}`, text: value});
+        value = $('<span>', {"class": "text-monospace", text: value});
     }
     let htmlDom = $("#" + name, transcriptInfoTable);
 

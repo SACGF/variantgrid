@@ -1,3 +1,4 @@
+import itertools
 import logging
 from collections import Counter, defaultdict
 
@@ -35,7 +36,7 @@ from annotation.models.models_citations import CitationFetchRequest
 from annotation.models.models_enums import AnnotationStatus, VariantAnnotationPipelineType
 from annotation.pipelines import get_pipeline, get_runner, versioned_pipeline_types, vep_pipeline_types
 from annotation.models.models_version_diff import VersionDiff
-from annotation.pathogenicity_predictions import TOOLS
+from annotation.pathogenicity_predictions import COLOUR_BANDS, TOOLS
 from annotation.tasks.annotate_variants import annotation_run_retry
 from annotation.tasks.annotation_scheduler_task import (
     annotation_scheduler,
@@ -787,15 +788,21 @@ def view_annotation_descriptions(request, genome_build_name=None):
 
 
 def view_pathogenicity_thresholds(request):
-    """ Reference page for the ClinGen-calibrated PP3/BP4 raw-score cutoffs used by DamageNode and
-    the variant details page - driven by the TOOLS registry so it stays in sync with the filters. """
+    """ Reference page for every cutoff that colours a number on the variant details page: the
+    ClinGen-calibrated PP3/BP4 raw-score cutoffs DamageNode also filters on (TOOLS), the rankscore
+    bands, and the conservation / splicing / amino acid bands (COLOUR_BANDS). """
     tools = [t for t in TOOLS if t.raw_field]
+    rankscore_tools = [t for t in TOOLS if t.rankscore_field]
     references = {}  # source_detail -> source_url, first-seen order, for the citations section
-    for t in tools:
+    for t in itertools.chain(tools, rankscore_tools, COLOUR_BANDS):
         if t.source_detail and t.source_detail not in references:
             references[t.source_detail] = t.source_url
     context = {
         "tools": tools,
+        "rankscore_tools": rankscore_tools,
+        "colour_bands": COLOUR_BANDS,
+        "max_benign_rankscore": settings.ANNOTATION_MAX_BENIGN_RANKSCORE,
+        "min_pathogenic_rankscore": settings.ANNOTATION_MIN_PATHOGENIC_RANKSCORE,
         "references": references,
     }
     return render(request, "annotation/view_pathogenicity_thresholds.html", context)
