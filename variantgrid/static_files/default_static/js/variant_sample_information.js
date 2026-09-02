@@ -166,7 +166,7 @@ var VariantSampleInformation = (function () {
         if (type !== 'display' || !hasDetails(row)) {
             return '';
         }
-        return $('<i>', {class: 'fas fa-plus-circle', title: 'Patient / specimen details'}).prop('outerHTML');
+        return $('<i>', {class: 'fas fa-chevron-right', title: 'Patient / specimen details'}).prop('outerHTML');
     }
 
     function detailsList(row) {
@@ -195,7 +195,7 @@ var VariantSampleInformation = (function () {
         } else {
             row.child(detailsList(row.data())).show();
         }
-        $(this).find('i').toggleClass('fa-plus-circle fa-minus-circle');
+        $(this).find('i').toggleClass('fa-chevron-right fa-chevron-down');
     }
 
     function columns() {
