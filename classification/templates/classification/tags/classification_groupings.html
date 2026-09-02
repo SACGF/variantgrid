@@ -95,7 +95,7 @@
             </div>
         {% endif %}
         {% if show_summary_counts %}
-            <div id="classification-grouping-summary" class="classification-grouping-summary"></div>
+            <div id="classification-grouping-summary" class="summary-counts"></div>
         {% endif %}
         <table id="vc-datatable" data-datatable-data='classificationGroupingFilter' data-datatable-url="{% url 'classification_grouping_datatables' %}?genome_build={{ genome_build.pk }}" class="sticky-header classification-table"></table>
         <div>

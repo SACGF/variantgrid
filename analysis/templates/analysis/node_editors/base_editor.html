@@ -254,7 +254,14 @@
 			<div class="tab-pane show active" role="tabpanel" id="node-grid">
 				{% block node_filter_info %}
 					{% if extra_filters_label %}
-						<b>Filtering to:</b> <span class="node-count-{{ extra_filters }}"><span class='user-tag-colored'>{{ extra_filters_label }}</span> - <a href="javascript:createExtraFilterChild()">create child node.</a></span>
+						<b>Filtering to:</b>
+						{% if extra_filters_tags %}
+							{# A selection can be several tags, each in its own colour #}
+							{% for tag_id, tag_label in extra_filters_tags %}<span class="node-count-{{ tag_label }}"><span class='user-tag-colored'>{{ tag_id }}</span></span>{% if not forloop.last %}, {% endif %}{% endfor %}
+							- <a href="javascript:createExtraFilterChild()">create child node.</a>
+						{% else %}
+							<span class="node-count-{{ extra_filters }}"><span class='user-tag-colored'>{{ extra_filters_label }}</span> - <a href="javascript:createExtraFilterChild()">create child node.</a></span>
+						{% endif %}
 					{% endif %}
 
 					{% if node.analysis.lock_input_sources and not node.has_input %}

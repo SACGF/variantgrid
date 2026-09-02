@@ -30,7 +30,7 @@ from genes.models import (
 from genes.models_enums import AnnotationConsortium, GeneSymbolAliasSource
 from library.utils import pretty_label
 from snpdb.grids import AbstractVariantGrid
-from snpdb.models import ImportStatus, Q, Tag, VariantGridColumn
+from snpdb.models import ImportStatus, Q, VariantGridColumn
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.variant_queries import (
     get_variant_queryset_for_gene_symbol,
@@ -162,12 +162,9 @@ class GeneSymbolVariantsGrid(AbstractVariantGrid):
                 transcript_version = TranscriptVersion.objects.get(pk=extra_filters["protein_position_transcript_version_id"])
                 q_list.append(Q(varianttranscriptannotation__transcript_version=transcript_version,
                                 varianttranscriptannotation__protein_position__icontains=protein_position))
-            tag_id = extra_filters.get("tag")
-            if tag_id is not None:  # "" for all tags
-                tags_qs = VariantTag.objects.all()
-                if tag_id:
-                    tag = get_object_or_404(Tag, pk=tag_id)
-                    tags_qs = tags_qs.filter(tag=tag)
+            if tag_ids := extra_filters.get("tags"):
+                # Any of the tags - @see the tag counts summary above the grid
+                tags_qs = VariantTag.objects.filter(tag__in=tag_ids)
                 alleles_qs = tags_qs.values_list("variant__variantallele__allele")
                 q_list.append(Q(variantallele__allele__in=alleles_qs))
 

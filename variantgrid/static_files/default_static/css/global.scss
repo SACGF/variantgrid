@@ -3854,7 +3854,8 @@ a .c-hgvs-body {
 }
 
 // Clinical significance counts above a classification grouping grid
-.classification-grouping-summary {
+// Pill + count toggles that filter the grid below - classification groupings, analysis/gene tag counts
+.summary-counts {
 	display: flex;
 	flex-wrap: wrap;
 	gap: 6px;
@@ -3896,6 +3897,24 @@ a .c-hgvs-body {
 
 	&.filtered .summary-count:not(.selected) {
 		opacity: 0.5;
+	}
+
+	// Tag counts sit above a grid rather than heading a page, so they run smaller
+	&.tag-counts-summary {
+		align-items: center;
+
+		.summary-count {
+			.c-pill {
+				min-width: 60px;
+				padding: 2px 8px;
+				font-size: 11px;
+			}
+
+			.count {
+				padding: 2px 8px;
+				font-size: 11px;
+			}
+		}
 	}
 }
 

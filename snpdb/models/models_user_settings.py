@@ -744,10 +744,12 @@ class AbstractNodeCountSettings(models.Model):
 
     @staticmethod
     def get_node_count_description(node_count_type: str) -> Optional[str]:
-        """ Human readable name for a node count type, or None if it no longer exists """
-        if tag_id := TagFilter.get_tag_id(node_count_type):
-            if Tag.objects.filter(pk=tag_id).exists():
-                return tag_id
+        """ Human readable name for a node count type (or an extra_filters selection of several
+            tags), or None if it no longer exists """
+        if tag_ids := TagFilter.get_tag_ids(node_count_type):
+            existing = set(Tag.objects.filter(pk__in=tag_ids).values_list("pk", flat=True))
+            if description := ", ".join(t for t in tag_ids if t in existing):
+                return description
             return None
         return dict(BuiltInFilters.CHOICES).get(node_count_type)
 

@@ -136,12 +136,19 @@ class BuiltInFilters:
 class TagFilter:
     """ Per-tag node counts / grid filters, eg 'tag_Artifact'. These sit alongside BuiltInFilters
         wherever a node count label or 'extra_filters' is used - tag names are alphanumeric so the
-        prefix can never collide with a tag, and the label stays a valid URL slug and CSS class """
+        prefix and separator can never collide with a tag, and the label stays a valid URL slug and
+        CSS class. A node count is always a single tag, an 'extra_filters' selection can be several
+        (comma joined, meaning a variant carrying any of them) """
     PREFIX = "tag_"
+    SEPARATOR = ","
 
     @staticmethod
     def label(tag_id: str) -> str:
         return TagFilter.PREFIX + tag_id
+
+    @staticmethod
+    def label_for_tags(tag_ids: list[str]) -> str:
+        return TagFilter.SEPARATOR.join(TagFilter.label(tag_id) for tag_id in tag_ids)
 
     @staticmethod
     def get_tag_id(label: str) -> Optional[str]:
@@ -149,6 +156,17 @@ class TagFilter:
         if label and label.startswith(TagFilter.PREFIX):
             return label[len(TagFilter.PREFIX):]
         return None
+
+    @staticmethod
+    def get_tag_ids(label: str) -> list[str]:
+        """ Tag ids for a (possibly multi-tag) label, or [] if it's not one """
+        tag_ids = []
+        for part in (label or "").split(TagFilter.SEPARATOR):
+            tag_id = TagFilter.get_tag_id(part)
+            if not tag_id:
+                return []
+            tag_ids.append(tag_id)
+        return tag_ids
 
 
 class VariantsType(models.TextChoices):

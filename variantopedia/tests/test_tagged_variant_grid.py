@@ -1,3 +1,5 @@
+import json
+
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.db import connection
@@ -89,6 +91,13 @@ class TaggedVariantGridTest(TestCase):
     def test_multiple_tags_require_all(self):
         """ The co-occurrence card links here expecting variants carrying every tag, not any of them """
         self.assertEqual(self._grid_variant_ids({"tags": ["Artefact", "SomaticReportable"]}),
+                         {self.both_variant.pk})
+
+    def test_any_tags_filter_is_the_union(self):
+        """ The tag counts summary toggles mean "carries any of these", unlike "tags" """
+        self.assertEqual(self._grid_variant_ids({"any_tags": ["Artefact", "SomaticReportable"]}),
+                         {self.both_variant.pk, self.artefact_variant.pk, self.other_user_variant.pk})
+        self.assertEqual(self._tags_grid_variant_ids({"any_tags": json.dumps(["SomaticReportable"])}),
                          {self.both_variant.pk})
 
     def test_tag_count_column(self):

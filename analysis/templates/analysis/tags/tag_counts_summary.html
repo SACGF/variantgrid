@@ -1,0 +1,11 @@
+{% if tag_counts %}
+    <div class="summary-counts tag-counts-summary{% if selected %} filtered{% endif %}" data-tag-counts-summary>
+        <button type="button" class="btn btn-outline-secondary btn-sm all-tags"><i class="fas fa-tags"></i> All tags</button>
+        <button type="button" class="btn btn-outline-secondary btn-sm clear-tags"{% if not selected %} hidden{% endif %}>Clear</button>
+        {% for tag, label, count in tag_counts %}
+            <a href="#" class="summary-count tagged-{{ tag }}{% if tag in selected %} selected{% endif %}" data-tag="{{ tag }}" data-tag-label="{{ label }}" title="Tagged {{ tag }}">
+                <span class="c-pill user-tag-colored">{{ tag }}</span><span class="count">{{ count|default_if_none:"" }}</span>
+            </a>
+        {% endfor %}
+    </div>
+{% endif %}

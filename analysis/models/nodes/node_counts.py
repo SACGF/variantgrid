@@ -1,8 +1,10 @@
 import logging
+from typing import Optional
 
 from django.db.models import Count
 from django.db.models.query_utils import Q
 
+from analysis.exceptions import NonFatalNodeError
 from annotation.models import AnnotationVersion, GeneAnnotation
 from annotation.models.damage_enums import PathogenicityImpact
 from annotation.models.models_enums import ClinVarOncogenicity, ClinVarPathogenicity
@@ -27,18 +29,23 @@ def get_omim_q(annotation_version: AnnotationVersion) -> Q:
     return Q(variantannotation__gene__in=gene_annotation_qs.values_list("gene_id", flat=True))
 
 
-def get_analysis_tagged_variant_ids(analysis, tag_id: str) -> list[int]:
-    """ Variants tagged with tag_id in this analysis. Tagging is manual so this stays small - small
-        enough to pass around as a list, @see TagNode._get_node_q which does the same """
+def get_analysis_tagged_variant_ids(analysis, tag_ids: list[str]) -> list[int]:
+    """ Variants carrying any of tag_ids in this analysis. Tagging is manual so this stays small -
+        small enough to pass around as a list, @see TagNode.tagged_variants_q which does the same """
     # Go via Variant rather than VariantTag as analysis.models.models_variant_tag imports AnalysisNode,
     # which imports this module
-    tagged_qs = Variant.objects.filter(varianttag__analysis=analysis, varianttag__tag=tag_id)
-    return list(tagged_qs.values_list("pk", flat=True))
+    tagged_qs = Variant.objects.filter(varianttag__analysis=analysis, varianttag__tag__in=tag_ids)
+    return list(tagged_qs.values_list("pk", flat=True).distinct())
+
+
+def is_extra_filter(extra_filters) -> bool:
+    """ Whether extra_filters narrows the node - "default" (and None) mean show the whole thing """
+    return bool(TagFilter.get_tag_ids(extra_filters)) or extra_filters in dict(BuiltInFilters.FILTER_CHOICES)
 
 
 def get_extra_filters_q(analysis, extra_filters) -> Q:
-    if tag_id := TagFilter.get_tag_id(extra_filters):
-        return Q(pk__in=get_analysis_tagged_variant_ids(analysis, tag_id))
+    if tag_ids := TagFilter.get_tag_ids(extra_filters):
+        return Q(pk__in=get_analysis_tagged_variant_ids(analysis, tag_ids))
 
     user = analysis.user
     annotation_version = analysis.annotation_version
@@ -67,6 +74,40 @@ def get_extra_filters_q(analysis, extra_filters) -> Q:
         logging.warning("get_extra_filters_q, unknown filter '%s'", extra_filters)
         q = Q(pk__isnull=False)  # No op
     return q
+
+
+def get_node_extra_filters_q(node, extra_filters) -> Optional[Q]:
+    """ The node's own filter for an 'extra_filters' selection, or None if it selects everything.
+        A global TagNode's tags reach outside the analysis, so it decides its own tag scope -
+        everything else is analysis-scoped, which is what the DAG's node counts are """
+    if not is_extra_filter(extra_filters):
+        return None
+    if tag_ids := TagFilter.get_tag_ids(extra_filters):
+        if (node_tag_q := node.get_extra_filters_tag_q(tag_ids)) is not None:
+            return node_tag_q
+    return get_extra_filters_q(node.analysis, extra_filters)
+
+
+def get_extra_filters_count(node, extra_filters) -> Optional[int]:
+    """ How many rows the node shows under extra_filters, or None if we can't say cheaply. There
+        being no filter is one of those - the node's own count is what covers that.
+        NodeCount is reached through the node version rather than imported - analysis_node imports us """
+    if not is_extra_filter(extra_filters):
+        return None
+    tag_ids = TagFilter.get_tag_ids(extra_filters)
+    node_tag_q = node.get_extra_filters_tag_q(tag_ids) if tag_ids else None
+    if node_tag_q is None:
+        # Stored counts are analysis-scoped, so they only speak for an analysis-scoped filter
+        if node_count := node.node_version.nodecount_set.filter(label=extra_filters).first():
+            return node_count.count
+    if tag_ids:
+        # Tags narrow the node to a handful of variants, so counting them exactly here is cheap
+        q = node_tag_q if node_tag_q is not None else get_extra_filters_q(node.analysis, extra_filters)
+        try:
+            return node.get_queryset(inner_query_distinct=True).filter(q).count()
+        except NonFatalNodeError:
+            pass  # An ancestor isn't ready - the count comes back when the node reloads
+    return None
 
 
 def get_node_count_colors(css_property):
@@ -123,7 +164,7 @@ def get_node_counts_and_labels_dict(node, counts_to_get):
 def get_tagged_variant_ids_by_label(analysis, tag_labels) -> dict[str, list[int]]:
     """ The tagged variants behind each tag node count label. The same for every node in the analysis,
         so look them up once and pass them to get_tag_node_counts_dict() per node """
-    return {label: get_analysis_tagged_variant_ids(analysis, TagFilter.get_tag_id(label))
+    return {label: get_analysis_tagged_variant_ids(analysis, [TagFilter.get_tag_id(label)])
             for label in tag_labels}
 
 

@@ -17,6 +17,7 @@
         open_variant_details_in_new_window: true,
     };
 
+    const TAG_COUNTS_SUMMARY = "[data-tag-counts-summary]";
     const initialTags = {{ initial_tags|jsonify }};
     const filterUserId = {% if filter_user %}{{ filter_user.pk }}{% else %}null{% endif %};
     // Shared filter state - both tables on this page read it
@@ -45,6 +46,7 @@
 
     function showAll() {
         gridParams = {};
+        clearTagCountsSummary(TAG_COUNTS_SUMMARY);
         $("#user-filter-banner").hide();
         $("#id_user").val(null).trigger('change.select2'); // clear without firing our change handler
         reloadGrid();
@@ -58,9 +60,10 @@
         }
     }
 
-    function tagClick(tagId) {
+    // The toggles mean "carries any of these" - the co-occurrence links' "tags" means all of them
+    function tagsChanged(tagIds) {
         const userId = gridParams["user"];
-        gridParams = {"tag" : tagId};
+        gridParams = tagIds.length ? {"any_tags": tagIds} : {};
         if (userId) {
             gridParams["user"] = userId;
         }
@@ -68,6 +71,7 @@
     }
 
     $(document).ready(function() {
+        setupTagCountsSummary(TAG_COUNTS_SUMMARY, tagsChanged);
         {% if filter_user %}
             setAutocompleteValue("#id_user", filterUserId, "{{ filter_user.username }}");
         {% endif %}
@@ -125,7 +129,7 @@
     <a class="btn btn-outline-secondary fas fa-tags" href="{% url 'tag_settings' %}">Tag Settings</a>
     <a class="btn btn-outline-secondary fas fa-chart-bar" href="{% url 'tag_stats' %}">Tag Stats</a>
 
-    {% tag_counts_filter genome_build=genome_build tag_counts=tag_counts click_func='tagClick' show_all_func='showAll' any_tag_button=False %}
+    {% tag_counts_summary genome_build=genome_build tag_counts=tag_counts %}
 
     <div class="form-inline my-2">
         <label class="mr-2">Filter to user:</label>

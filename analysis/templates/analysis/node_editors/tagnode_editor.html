@@ -4,6 +4,7 @@
 {% load settings_tags %}
 {% load tz %}
 {% load ui_utils %}
+{% load user_tag_color_tags %}
 {% block node_editor_not_visible_tab_links %}
     <li class="nav-item"><a class="nav-link" data-toggle="tab" role="tab" href="#tag-classification">Classifications</a></li>
 {% endblock node_editor_not_visible_tab_links %}
@@ -50,8 +51,30 @@ $(document).ready(function() {
     vcDatatable.on('draw.dt', () => {
         Flags.instance.init({userId: '{{user.id}}'});
     });
+
+    {% if show_tag_counts %}
+        const tagCountsSummary = $("[data-tag-counts-summary]", "#node-editor-wrapper");
+        setupTagCountsSummary(tagCountsSummary, function() {
+            // Same path as clicking a count on the node card - the editor comes back with the
+            // toggles selected, and the grid, its exports and the create child node banner follow
+            loadNodeData({{ node.pk }}, getTagCountsSummaryFilter(tagCountsSummary));
+        });
+        {% if not global_tag_counts %}
+            fillTagCountsFromNode(tagCountsSummary, {{ node.pk }});
+        {% endif %}
+    {% endif %}
 });
 </script>
+{% if show_tag_counts %}
+    {% tag_counts_summary tag_counts=tag_counts selected=selected_tag_ids %}
+    {% if tag_counts_auto_add_tags is False %}
+        <div class="text-muted small mb-2">
+            Counting only the tags in
+            <a href="javascript:getAnalysisWindow().analysisSettings()">Node Counts</a> -
+            "automatically add tags" is off for this analysis.
+        </div>
+    {% endif %}
+{% endif %}
 <div>
 	<form id="tag-node-form" method="post" action="{{ request.path }}">
         {% csrf_token %}

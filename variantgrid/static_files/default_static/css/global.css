@@ -3293,13 +3293,13 @@ a .c-hgvs-body .c-hgvs-nomen {
   opacity: 0.5;
 }
 
-.classification-grouping-summary {
+.summary-counts {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
   margin-bottom: 8px;
 }
-.classification-grouping-summary .summary-count {
+.summary-counts .summary-count {
   display: flex;
   align-items: stretch;
   white-space: nowrap;
@@ -3307,12 +3307,12 @@ a .c-hgvs-body .c-hgvs-nomen {
   border-radius: 6px;
   text-decoration: none;
 }
-.classification-grouping-summary .summary-count .c-pill {
+.summary-counts .summary-count .c-pill {
   width: auto;
   min-width: 90px;
   border-radius: 6px 0 0 6px;
 }
-.classification-grouping-summary .summary-count .count {
+.summary-counts .summary-count .count {
   padding: 4px 10px;
   border: 1px solid #ddd;
   border-left: none;
@@ -3321,15 +3321,27 @@ a .c-hgvs-body .c-hgvs-nomen {
   color: #555;
   font-weight: 600;
 }
-.classification-grouping-summary .summary-count:hover .count {
+.summary-counts .summary-count:hover .count {
   background-color: #eee;
 }
-.classification-grouping-summary .summary-count.selected {
+.summary-counts .summary-count.selected {
   outline: 2px solid #555;
   outline-offset: 1px;
 }
-.classification-grouping-summary.filtered .summary-count:not(.selected) {
+.summary-counts.filtered .summary-count:not(.selected) {
   opacity: 0.5;
+}
+.summary-counts.tag-counts-summary {
+  align-items: center;
+}
+.summary-counts.tag-counts-summary .summary-count .c-pill {
+  min-width: 60px;
+  padding: 2px 8px;
+  font-size: 11px;
+}
+.summary-counts.tag-counts-summary .summary-count .count {
+  padding: 2px 8px;
+  font-size: 11px;
 }
 
 .cs-card {

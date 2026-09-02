@@ -78,9 +78,11 @@ from analysis.models.nodes.analysis_node import (
     NodeVCFFilter,
 )
 from analysis.models.nodes.node_counts import (
+    get_extra_filters_count,
     get_node_count_colors,
     get_node_counts_mine_and_available,
     get_tag_node_count_colors,
+    is_extra_filter,
 )
 from analysis.models.nodes.node_types import get_node_display_data_by_menu_key, get_node_types_hash
 from analysis.models.nodes.sources.cohort_node import (
@@ -645,11 +647,12 @@ def node_data_grid(request, analysis_id, analysis_version, node_id, node_version
         }
         return HttpResponseRedirect(reverse("node_load", kwargs=kwargs))
 
-    # Use the count for the view being shown - if an extra filter (eg clinvar) is selected, that filtered
-    # count (not the whole node's count) decides auto-load/sorting. Mirrors VariantGrid._grid_row_count().
-    try:
-        grid_row_count = NodeCount.load_for_node(node, extra_filters).count
-    except NodeCount.DoesNotExist:
+    # Use the count for the view being shown - if an extra filter (eg clinvar, a tag selection) is
+    # selected, that filtered count (not the whole node's) decides auto-load/sorting.
+    # Mirrors VariantGrid._grid_row_count().
+    if is_extra_filter(extra_filters):
+        grid_row_count = get_extra_filters_count(node, extra_filters)
+    else:
         grid_row_count = node.count
 
     max_variants = (UserSettings.get_for_user(request.user).node_grid_auto_load_max_variants

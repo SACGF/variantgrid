@@ -1,4 +1,5 @@
 {% load static %}
+{% load user_tag_color_tags %}
 <div id="analysis-editor-and-grid">
 
 <link href="{% static 'css/fonts.css' %}" rel="stylesheet">
@@ -17,6 +18,8 @@
 {% include "analysis/analysis_includes.html" %}
 {# Node editor titles use the badge symbols, which normally come from the page base #}
 {% include "uicore/tags/svg_icon_sprite.html" %}
+{# Tag colours and the tag counts summary component, which analysis.html loads for the main window #}
+{% render_tag_styles_and_formatter %}
 {% endif %}
 <script>
 	var GRID = "grid";

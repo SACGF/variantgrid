@@ -331,6 +331,9 @@ class VariantTagsColumns(DatatableConfig[VariantTag]):
         if tag_ids := self.get_query_json("tags"):
             qs = qs.filter(tag__in=tag_ids)
 
+        if any_tag_ids := self.get_query_json("any_tags"):
+            qs = qs.filter(tag__in=any_tag_ids)
+
         filter_user_id = self.get_query_param("user")
         if filter_user_id:
             qs = qs.filter(user_id=filter_user_id)
@@ -373,6 +376,9 @@ class TaggedVariantGrid(AbstractVariantGrid):
             if all_tag_ids := extra_filters.get("tags"):
                 tag_ids.extend(all_tag_ids)
                 require_all_tags = True
+            # Variants carrying ANY of these tags - @see the tag counts summary above the grid
+            if any_tag_ids := extra_filters.get("any_tags"):
+                tag_ids.extend(any_tag_ids)
             filter_user_id = extra_filters.get("user")
         self.tag_ids = tag_ids
         self.require_all_tags = require_all_tags

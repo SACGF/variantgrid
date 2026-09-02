@@ -24,13 +24,14 @@ from analysis.models import (
     CandidateSearchType,
     CandidateStatus,
     GroupOperation,
-    NodeCount,
     NodeStatus,
 )
 from analysis.models.models_karyomapping import KaryomappingAnalysis
-from analysis.models.nodes.analysis_node import (
-    NodeColumnSummaryCacheCollection,
-    get_extra_filters_q,
+from analysis.models.nodes.analysis_node import NodeColumnSummaryCacheCollection
+from analysis.models.nodes.node_counts import (
+    get_extra_filters_count,
+    get_node_extra_filters_q,
+    is_extra_filter,
 )
 from analysis.variant_tag_operations import VARIANT_TAG_CLASSIFIED
 from analysis.views.analysis_permissions import get_node_subclass_or_404
@@ -90,11 +91,8 @@ class VariantGrid(AbstractVariantGrid):
         # column name -> the expression its sort alias is annotated with (@see ordering)
         self._genotype_sort_funcs: dict[str, Any] = {}
 
-        try:
-            node_count = NodeCount.load_for_node(node, extra_filters)
-        except NodeCount.DoesNotExist:
-            node_count = None
-        self.node_count = node_count
+        # The rows this view shows - an extra filter (eg clinvar, a tag selection) narrows the node
+        self.extra_filters_count = get_extra_filters_count(node, extra_filters)
 
         super().__init__(request, af_show_in_percent=af_show_in_percent)
 
@@ -137,8 +135,8 @@ class VariantGrid(AbstractVariantGrid):
 
     def _grid_row_count(self) -> Optional[int]:
         """ Current view's row count, or None if unknown """
-        if self.node_count:
-            return self.node_count.count
+        if is_extra_filter(self.extra_filters):
+            return self.extra_filters_count  # None where we'd have to count the filtered rows
         return self.node.count
 
     def sorting_disabled(self) -> bool:
@@ -155,10 +153,7 @@ class VariantGrid(AbstractVariantGrid):
         return extra
 
     def _get_q(self) -> Optional[Q]:
-        q = None
-        if self.node_count:
-            q = get_extra_filters_q(self.node.analysis, self.node_count.label)
-        return q
+        return get_node_extra_filters_q(self.node, self.extra_filters)
 
     def _get_grid_only_annotation_kwargs(self):
         """ Things not used in counts etc - only to display grid """

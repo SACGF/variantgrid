@@ -10,6 +10,7 @@ from analysis.models import AnalysisTemplateType
 from analysis.models.nodes.node_utils import update_analysis
 from library.django_utils import set_form_read_only
 from snpdb.archive import DataArchivedError
+from snpdb.models.models_enums import TagFilter
 from snpdb.models.models_user_settings import AbstractNodeCountSettings, UserSettings
 from snpdb.utils import get_all_tags_and_user_colors
 
@@ -36,6 +37,9 @@ class NodeView(UpdateView):
             "annotation_version": self.object.analysis.annotation_version,
             "extra_filters": extra_filters,
             "extra_filters_label": AbstractNodeCountSettings.get_node_count_description(extra_filters),
+            # (tag, node count label) so the banner can colour each tag of a multi-tag selection
+            "extra_filters_tags": [(tag_id, TagFilter.label(tag_id))
+                                   for tag_id in TagFilter.get_tag_ids(extra_filters)],
             'has_write_permission': self.object.analysis.can_write(self.request.user),
             "node_warnings": self.object.get_warnings(),
             "node_live_data_notes": self.object.get_live_data_notes(),

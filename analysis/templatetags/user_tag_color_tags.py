@@ -10,6 +10,7 @@ from annotation.models import AnnotationVersion
 from library import tag_utils
 from library.django_utils import get_field_counts
 from snpdb.models import GenomeBuild
+from snpdb.models.models_enums import TagFilter
 from snpdb.models.models_user_settings import UserSettings
 from snpdb.utils import get_tag_sort_order_by_tag, get_tag_styles_and_colors
 from snpdb.variant_queries import get_variant_queryset_for_gene_symbol
@@ -107,11 +108,13 @@ def tag_colors_collection_link(context):
     return {"tag_colors_collection": user_settings.tag_colors}
 
 
-@register.inclusion_tag("analysis/tags/tag_counts_filter.html", takes_context=True)
-def tag_counts_filter(context, genome_build: GenomeBuild,
-                      click_func=None, show_all_func=None, gene_symbol=None, any_tag_button=True,
-                      tag_counts=None):
-    """ tag_counts - pass these in if the page has already counted them, it's an expensive count """
+@register.inclusion_tag("analysis/tags/tag_counts_summary.html", takes_context=True)
+def tag_counts_summary(context, genome_build: GenomeBuild = None, gene_symbol=None,
+                       tag_counts=None, selected=None):
+    """ Pill + count toggles that filter the grid below them - the page wires them up with
+        setupTagCountsSummary(). tag_counts is a (tag, count) list - pass it in if the page has
+        already counted them, it's an expensive count. A None count leaves the box for the client
+        to fill in (@see setTagCountsSummaryCounts) """
     if tag_counts is None:
         tag_kwargs = {}
         if gene_symbol:
@@ -120,12 +123,14 @@ def tag_counts_filter(context, genome_build: GenomeBuild,
                                                                    traverse_aliases=True)
             tag_kwargs["variant_qs"] = gene_variant_qs
         variant_tags_qs = VariantTag.get_for_build(genome_build=genome_build, **tag_kwargs)
-        tag_counts = sorted(get_field_counts(variant_tags_qs, "tag").items())
+        tag_counts = get_field_counts(variant_tags_qs, "tag").items()
+
+    sort_order_by_tag = get_tag_sort_order_by_tag(context["user"])
+    tag_counts = sorted(tag_counts, key=lambda tc: (sort_order_by_tag.get(tc[0], 0), tc[0]))
     return {
-        "any_tag_button": any_tag_button,
-        "tag_counts": tag_counts,
-        "click_func": click_func,
-        "show_all_func": show_all_func,
+        # The label is what the analysis grid takes as its extra_filters @see TagFilter
+        "tag_counts": [(tag, TagFilter.label(tag), count) for tag, count in tag_counts],
+        "selected": selected or [],
     }
 
 

@@ -48,7 +48,7 @@ from analysis.models.enums import (
     NodeStatus,
 )
 from analysis.models.models_analysis import Analysis
-from analysis.models.nodes.node_counts import get_extra_filters_q, get_node_counts_and_labels_dict
+from analysis.models.nodes.node_counts import get_node_counts_and_labels_dict, get_node_extra_filters_q
 from analysis.models.nodes.node_display import NodeChip, NodeIcon, NodeMenuEntry
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
 from classification.models import Classification
@@ -675,6 +675,11 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
         return None
 
     def _get_node_q(self) -> Optional[Q]:
+        return None
+
+    def get_extra_filters_tag_q(self, tag_ids: list[str]) -> Optional[Q]:
+        """ Tag scope for a tag 'extra_filters' selection, or None to use the analysis-scoped
+            default @see get_node_extra_filters_q """
         return None
 
     @staticmethod
@@ -1464,7 +1469,7 @@ class NodeColumnSummaryCacheCollection(models.Model):
                                                                                 variant_column=variant_column,
                                                                                 extra_filters=extra_filters)
         if created:
-            extra_filters_q = get_extra_filters_q(node.analysis, extra_filters)
+            extra_filters_q = get_node_extra_filters_q(node, extra_filters)
             queryset = node.get_queryset(extra_filters_q)
             count_qs = queryset.values_list(variant_column).distinct().annotate(Count('id'))
             data_list = []

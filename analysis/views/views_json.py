@@ -326,14 +326,19 @@ def create_filter_child(request, analysis_id, node_id):
 def create_extra_filter_child(request, analysis_id, node_id, extra_filters):
     node = get_node_subclass_or_404(request.user, node_id, write=True)
     x, y = get_child_position(node)
-    if tag_id := TagFilter.get_tag_id(extra_filters):
+    if tag_ids := TagFilter.get_tag_ids(extra_filters):
+        tag_kwargs = {"mode": TagNodeMode.THIS_ANALYSIS}
+        if isinstance(node, TagNode):
+            # The parent's scope and cutoff are what produced the rows being filtered - keep them
+            tag_kwargs = {"mode": node.mode, "tagged_within_days": node.tagged_within_days}
         tag_node = TagNode.objects.create(analysis=node.analysis,
-                                          mode=TagNodeMode.THIS_ANALYSIS,
                                           x=x,
                                           y=y,
-                                          ready=False)
-        tag_node.tagnodetag_set.create(tag_id=tag_id)
-        # Re-load so the node name picks up the tag - TagNode.tag_ids is cached from the create() above
+                                          ready=False,
+                                          **tag_kwargs)
+        for tag_id in tag_ids:
+            tag_node.tagnodetag_set.create(tag_id=tag_id)
+        # Re-load so the node name picks up the tags - TagNode.tag_ids is cached from the create() above
         filter_node = TagNode.objects.get(pk=tag_node.pk)
     else:
         filter_node = BuiltInFilterNode.objects.create(analysis=node.analysis,

@@ -484,16 +484,23 @@
 
                     function clearGeneVariantsGrid() {
                         geneVariantsGridParams = {};
+                        clearTagCountsSummary(GENE_VARIANTS_TAG_COUNTS);
                         reloadGeneVariantsTable();
                         $("#gene-variants-grid-filtering-message").empty().parent().hide();
                     }
 
-                    function tagClick(tagId) {
-                        geneVariantsGridParams = {"tag" : tagId};
+                    function geneVariantsTagsChanged(tagIds) {
+                        geneVariantsGridParams = tagIds.length ? {"tags": tagIds} : {};
                         reloadGeneVariantsTable();
                     }
+
+                    const GENE_VARIANTS_TAG_COUNTS = "[data-tag-counts-summary]";
+
+                    $(document).ready(() => {
+                        setupTagCountsSummary(GENE_VARIANTS_TAG_COUNTS, geneVariantsTagsChanged);
+                    });
                 </script>
-                {% tag_counts_filter genome_build=genome_build gene_symbol=gene_symbol click_func='tagClick' show_all_func='clearGeneVariantsGrid' %}
+                {% tag_counts_summary genome_build=genome_build gene_symbol=gene_symbol %}
                 <table id="gene-variants-datatable" class="sticky-header"
                        data-datatable-url="{% url 'gene_symbol_variants_grid' gene_symbol=gene_symbol.pk genome_build_name=genome_build.name %}"
                        data-datatable-data="geneVariantsDatatableFilter"></table>

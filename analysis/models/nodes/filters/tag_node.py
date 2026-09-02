@@ -5,16 +5,19 @@ from typing import Optional
 
 from auditlog.registry import auditlog
 from django.db import models
+from django.db.models import Count
 from django.db.models.deletion import CASCADE, SET_NULL
 from django.db.models.query_utils import Q
 from django.utils import timezone
 from django.utils.timezone import localtime
 
+from analysis.exceptions import NonFatalNodeError
 from analysis.models.enums import TagNodeInput, TagNodeMode
 from analysis.models.models_variant_tag import VariantTag
 from analysis.models.nodes.analysis_node import AnalysisNode, NodeAuditLogMixin, NodeVersion
 from analysis.models.nodes.node_display import NodeIcon
 from snpdb.models import Tag
+from snpdb.utils import get_tag_sort_order_by_tag
 
 
 class TagNode(AnalysisNode):
@@ -56,14 +59,15 @@ class TagNode(AnalysisNode):
         anchor = node_version.created if node_version else timezone.now()
         return anchor - timedelta(days=self.tagged_within_days)
 
-    def _get_node_q(self) -> Q:
-        cutoff = self.tagged_within_cutoff
+    def tagged_variants_q(self, tag_ids: list[str], cutoff: Optional[datetime] = None) -> Q:
+        """ Variants carrying any of tag_ids (any tag at all if empty), within this node's tag scope.
+            The one place local vs global tags is decided """
         # Pull in tags from this analysis - use variant query
         # VariantTags are same build as analysis, so use this not Allele as it avoids a race condition where
         # tagging a variant w/o an Allele takes a few seconds to create one via liftover pipelines
         variants_with_tags = VariantTag.objects.filter(analysis=self.analysis)
-        if self.tag_ids:
-            variants_with_tags = variants_with_tags.filter(tag__in=self.tag_ids)
+        if tag_ids:
+            variants_with_tags = variants_with_tags.filter(tag__in=tag_ids)
         if cutoff:
             variants_with_tags = variants_with_tags.filter(created__gte=cutoff)
         # Tagging is done manually so this will only ever be small - much faster to convert to list
@@ -77,9 +81,45 @@ class TagNode(AnalysisNode):
             if cutoff:
                 tags_qs = tags_qs.filter(created__gte=cutoff)
             # Builds from different analyses (maybe diff builds) - so do query using Allele
-            q_list.append(VariantTag.variants_for_build_q(self.analysis.genome_build, tags_qs, self.tag_ids))
+            q_list.append(VariantTag.variants_for_build_q(self.analysis.genome_build, tags_qs, tag_ids))
 
-        q = reduce(operator.or_, q_list)
+        return reduce(operator.or_, q_list)
+
+    def get_extra_filters_tag_q(self, tag_ids: list[str]) -> Optional[Q]:
+        """ A global node's tags reach outside the analysis, so the analysis-scoped default is wrong """
+        if self.mode == TagNodeMode.ALL_TAGS:
+            return self.tagged_variants_q(tag_ids)
+        return None
+
+    def get_global_tag_counts(self) -> list[tuple[str, int]]:
+        """ (tag, count) for the tags this node's variants carry, in the user's tag order. ALL_TAGS
+            mode only - the DAG's per-tag node counts are analysis-scoped, so they'd be wrong here.
+            The tagged_within_days cutoff decides which variants enter the node, not which tags to
+            count, so it's left out """
+        if self.mode != TagNodeMode.ALL_TAGS:
+            return []
+
+        sort_order_by_tag = get_tag_sort_order_by_tag(self.analysis.user)
+        tag_ids = sorted(Tag.objects.values_list("pk", flat=True),
+                         key=lambda tag_id: (sort_order_by_tag.get(tag_id, 0), tag_id))
+        if not tag_ids:
+            return []
+
+        # Tag ids are user supplied so they can't be aggregate kwargs - index them instead
+        aggregate_kwargs = {f"tag_count_{i}": Count("pk", filter=self.tagged_variants_q([tag_id]),
+                                                    empty_result_set_value=0)
+                            for i, tag_id in enumerate(tag_ids)}
+        try:
+            # Restricting to tagged variants first makes this far cheaper than a scan of the node
+            qs = self.get_queryset(inner_query_distinct=True).filter(self.tagged_variants_q([]))
+            counts = qs.aggregate(**aggregate_kwargs)
+        except NonFatalNodeError:
+            return []  # An ancestor isn't ready - the editor re-renders when it is
+        tag_counts = [(tag_id, counts[f"tag_count_{i}"] or 0) for i, tag_id in enumerate(tag_ids)]
+        return [(tag_id, count) for tag_id, count in tag_counts if count]
+
+    def _get_node_q(self) -> Q:
+        q = self.tagged_variants_q(self.tag_ids, self.tagged_within_cutoff)
         if self.node_input == TagNodeInput.PARENT_NOT_TAGGED:
             q = ~q
         return q
