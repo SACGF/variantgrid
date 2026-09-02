@@ -205,6 +205,9 @@ const DataTableDefinition = (function() {
                 ajax: {
                     url: this.url,
                     type: defn.ajaxType || 'POST',
+                    // DataTables defaults to cache: false, which appends _=timestamp to a GET and
+                    // gives a @cache_page endpoint a fresh key every request
+                    cache: Boolean(defn.cacheStableParams),
                     error: function(jqXHR, textStatus, errorThrown) {
                         if (self.onLoadError) {
                             self.onLoadError(jqXHR, textStatus, errorThrown);
