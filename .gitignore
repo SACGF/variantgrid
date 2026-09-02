@@ -49,3 +49,6 @@ eslint.txt
 /.idea/pyLspTools.xml
 /.claude/scheduled_tasks.lock
 /.idea/pyProjectModel.xml
+
+# vg import-graph cache (library/vg/import_graph.py)
+/.vg_cache/
