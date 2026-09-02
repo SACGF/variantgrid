@@ -1053,7 +1053,7 @@ def analysis_settings_node_counts_tab(request, analysis_id):
 
 def _analysis_settings_node_counts_tab(request, analysis, is_analysis=True, has_write_permission=True):
     """ analysis - an Analysis, or the FakeAnalysis (is_analysis=False) the user/lab/org default
-        node counts settings pages use @see snpdb.views.views._settings_override_node_counts_tab """
+        node counts settings pages use @see snpdb.views.views_user_settings._settings_override_node_counts_tab """
     if request.method == "POST":
         if has_write_permission is False:
             raise PermissionDenied()
