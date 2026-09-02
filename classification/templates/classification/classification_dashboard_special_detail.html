@@ -15,7 +15,7 @@
 
 <div class="mt-4">
 
-    {% ui_register_tab_embedded tab_set="classification_issues" label="Pending Changes" badge=dlab.counts.internal_review|add:dlab.counts.suggestions %}
+    {% ui_register_tab_embedded tab_set="classification_issues" label="Pending Changes" badge=dlab.counts.pending_changes %}
         <table id="vc-datatable" data-datatable-data='classificationReviews' data-datatable-url="{% url 'classification_grouping_datatables' %}" class="sticky-header classification-table" data-adjust-columns="false"></table>
     {% end_ui_register_tab_embedded %}
 
