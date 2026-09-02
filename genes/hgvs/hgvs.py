@@ -89,7 +89,7 @@ class HGVSComponents:
     """
     HGVS_REGEX = re.compile('(.*?)(?:[(](.*?)[)])?:([a-z][.].*)')
     NUM_PART = re.compile('^[a-z][.]([0-9]+)(.*?)$')
-    DEL_NUC = re.compile('^(.*del)([ATCG]+)$')
+    DEL_DUP_NUC = re.compile('^(.*(?:del|dup))([ATCG]+)$')
 
     def __init__(self, full_hgvs: str, transcript: str = None):
         if transcript:
@@ -133,8 +133,8 @@ class HGVSComponents:
         return self._with_transcript(self.transcript_parts.identifier)
 
     @property
-    def without_explicit_del_nucleotides(self) -> 'HGVSComponents':
-        if match := HGVSComponents.DEL_NUC.match(self.full_hgvs):
+    def without_explicit_del_or_dup_nucleotides(self) -> 'HGVSComponents':
+        if match := HGVSComponents.DEL_DUP_NUC.match(self.full_hgvs):
             return HGVSComponents(match.group(1))
         return self
 
@@ -287,7 +287,7 @@ class HGVSDisplay:
         transcript_versions: dict[HGVSComponents, list[HGVSDisplay]] = defaultdict(list)
         for c_hgvs_display in hgvs_displays:
             transcript_versions[
-                c_hgvs_display.components.without_transcript_version.without_explicit_del_nucleotides
+                c_hgvs_display.components.without_transcript_version.without_explicit_del_or_dup_nucleotides
             ].append(c_hgvs_display)
 
         max_versions: list[HGVSDisplay] = []
