@@ -107,13 +107,13 @@ const CLINVAR_ONCOGENICITY_CHIPS = {  // ClinVar.highest_oncogenicity (ClinVarOn
 };
 
 // ClinVar.somatic_tier (SomaticClinicalSignificance) - the AMP tier, in the short form the chip has
-// room for
+// room for. It's a choice field, so unlike the internal tiers above the row carries the label
 const CLINVAR_SOMATIC_TIER_CHIPS = {
-    'tier_1': {text: 'I', css: 'scs-tier_1'},
-    'tier_1_or_2': {text: 'I/II', css: 'scs-tier_1_or_2'},
-    'tier_2': {text: 'II', css: 'scs-tier_2'},
-    'tier_3': {text: 'III', css: 'scs-tier_3'},
-    'tier_4': {text: 'IV', css: 'scs-tier_4'},
+    'Tier I': {text: 'I', css: 'scs-tier_1'},
+    'Tier I/II': {text: 'I/II', css: 'scs-tier_1_or_2'},
+    'Tier II': {text: 'II', css: 'scs-tier_2'},
+    'Tier III': {text: 'III', css: 'scs-tier_3'},
+    'Tier IV': {text: 'IV', css: 'scs-tier_4'},
 };
 
 // Each chip sits in a fixed slot (global.scss) so the four origins line up down the column - a
@@ -161,6 +161,8 @@ function _clinvarChip(rowData, ctx) {
     return _classificationChip([CLINVAR_CHIP_SLOT, chip.css], inner, title, "clinvar__clinical_significance");
 }
 
+// clinvarStars is keyed by the review status label, which is what the choice field's column carries
+// @see variant_grid_client_extra
 function _clinvarStarsHtml(reviewStatus, ctx) {
     const starsLookup = (ctx && ctx.extra && ctx.extra.clinvarStars) || {};
     const stars = starsLookup[reviewStatus];

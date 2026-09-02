@@ -591,7 +591,10 @@ def variant_grid_client_extra(genome_build: GenomeBuild) -> JsonObjType:
         variantgrid_formats.js """
     # gnomAD links are per genome build, and the client renderers have no other way to know it
     extra = {"genomeBuild": genome_build.name,
-             "clinvarStars": dict(ClinVarReviewStatus.STARS),
+             # The ClinVar review status columns are choice fields, so the row carries the display
+             # label the CSV and the standalone column share - key the stars by what the client gets
+             "clinvarStars": {ClinVarReviewStatus(review_status).label: stars
+                              for review_status, stars in ClinVarReviewStatus.STARS.items()},
              # What counts as a bad GQ/PL in the sample genotype cell
              "genotypeQuality": settings.VARIANT_GRID_GENOTYPE_QUALITY_THRESHOLDS}
     # The AF the import 'common' filter uses, in the units the grid shows AFs in - the gnomAD

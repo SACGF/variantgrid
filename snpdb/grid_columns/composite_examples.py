@@ -49,7 +49,7 @@ COMPOSITE_EXAMPLE_ROWS: dict[str, dict[str, Any]] = {
     "classifications": {
         **_clinvar(
             highest_pathogenicity=4,
-            review_status="M",  # Criteria provided - multiple submitters w/no conflicts (2 stars)
+            review_status="Criteria provided - multiple submitters w/no conflicts",  # 2 stars
             clinical_significance="Likely pathogenic",
             conflicting_clinical_significance=None,
             clinvar_variation_id=123456,
@@ -62,8 +62,8 @@ COMPOSITE_EXAMPLE_ROWS: dict[str, dict[str, Any]] = {
             highest_oncogenicity=None,
             oncogenic_classification=None,
             oncogenic_review_status=None,
-            somatic_tier="tier_3",
-            somatic_review_status="S",  # Criteria provided - single submitter (1 star)
+            somatic_tier="Tier III",
+            somatic_review_status="Criteria provided - single submitter",  # 1 star
         ),
         "max_internal_classification": "3",
         "internally_classified": "3",
