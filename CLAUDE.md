@@ -171,6 +171,13 @@ wrote it, e.g. `Written by Claude Fable 5 (claude-fable-5), 2026-08-31` — so w
 later it is clear which model's judgement it reflects. Update the line if a different model revises the
 plan.
 
+Put the data front and centre. Code can be changed later; data stays in the database for years and
+limits what can be built on it, so the database models are what the reviewer most wants to see. When a
+plan adds or changes a Django model, show the model as a code block with just its fields, relations,
+constraints and `Meta` — near the top of the plan, before the code that uses it. Same for a dataclass or
+other data holder: show the member variables only. Leave methods and properties out of the plan; they
+belong in the implementation.
+
 ## Implementation Prompts
 
 When asked to draft a prompt for an agent to implement a plan in another conversation:
