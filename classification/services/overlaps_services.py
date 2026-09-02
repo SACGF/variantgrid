@@ -580,7 +580,7 @@ class OverlapGrouping3:
             for entry in reversed(buffer):
                 if contribution_status_change := entry.changes_dict.get("contribution_status"):
                     if contribution_status_change[1] == OverlapContributionStatus.NO_VALUE:
-                        is_withdrawn=True
+                        is_withdrawn = True
                     break
 
             if found_value:

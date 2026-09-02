@@ -6,7 +6,6 @@ from django.conf import settings
 from django.db.models import CASCADE, QuerySet, SET_NULL, JSONField
 from django.db import models
 from django.db.models.enums import IntegerChoices
-from django.dispatch.dispatcher import receiver
 from django.urls import reverse
 from django.utils.safestring import mark_safe
 from django_extensions.db.models import TimeStampedModel
@@ -18,12 +17,11 @@ from classification.models import ClassificationGrouping, EvidenceKeyMap, Condit
 from classification.enums.overlaps_enums import OverlapType, OverlapContributionStatus, OverlapEntrySourceTextChoices, \
     TriageState, TriageComment
 from genes.hgvs import HGVSComponents, HGVSDisplay
-from library.guardian_utils import admin_bot
 from library.preview_request import PreviewModelMixin, PreviewKeyValue
 from library.utils import first, AuditUtils, AuditSingleChange
 from library.utils.database_utils import TextFieldChoices, IntegerFieldChoices
 from ontology.models import OntologyTerm
-from review.models import ReviewableModelMixin, Review, review_detail_signal
+from review.models import ReviewableModelMixin, Review
 from snpdb.models import Allele, Lab, GenomeBuild, LabLike, CLINVAR_EXPERT_PANEL_LAB
 
 IN_REVIEW_VALUE = "in-review"
@@ -33,7 +31,6 @@ class OverlapContribution(TimeStampedModel):
     """
     Represents a record that will contribute to one or multiple overlaps.
     (An overlap being records that should be compared for discordances, primarily an Allele and a Testing Context).
-
     """
     history = AuditlogHistoryField()
 
@@ -55,14 +52,13 @@ class OverlapContribution(TimeStampedModel):
 
     review_agreed_value = models.TextField(null=True, blank=True)
     """
-    If this is not None, if it matches the effective_value, and every other OverlapContribution in the Overlap has their
-    final reviewed value matching their 
+    If this is not None and it matches the effective_value and every other OverlapContribution in the Overlap has their
+    final reviewed value matching their value - the Overlap is marked as continued discordance.
     """
 
     def is_review_agreed_value_met(self) -> bool:
         """
         Was there a review where there was going to be continued discordance
-        :return:
         """
         if review_agreed_value := self.review_agreed_value:
             return review_agreed_value == self.effective_value
@@ -71,6 +67,9 @@ class OverlapContribution(TimeStampedModel):
 
     @property
     def lab_like(self) -> LabLike:
+        """
+        Workaround to bridge gap between labs and ClinVar
+        """
         if cg := self.classification_grouping:
             return cg.lab
         elif self.scv:
@@ -82,8 +81,8 @@ class OverlapContribution(TimeStampedModel):
     def effective_date_obj(self) -> EffectiveDate:
         try:
             return EffectiveDate.from_dict(self.effective_date)
-        except Exception as ex:
-            return EffectiveDate(date=self.effective_date)
+        except Exception:
+            return EffectiveDate(date=self.effective_date)  # there were some cases where effective date is just a str instead of dict
 
     @effective_date_obj.setter
     def effective_date_obj(self, value: EffectiveDate):
@@ -107,6 +106,7 @@ class OverlapContribution(TimeStampedModel):
 
     @cached_property
     def last_comment(self) -> AuditSingleChange[TriageComment]:
+        # Often want to show the most recent comment made on a Contribution
         if last_comment := AuditUtils.last_change_for(self, "comment", is_json=True, parser=lambda x: TriageComment.from_dict(x)):
             if last_comment.value.count != 0:
                 return last_comment
@@ -124,6 +124,7 @@ class OverlapContribution(TimeStampedModel):
 
     @property
     def effective_value(self):
+        # If there's a pending value to change to (and it's not None) return that, else return the relevant value
         return self.triage_state_obj.amend_value or self.value
 
     @property
@@ -163,10 +164,8 @@ class OverlapContribution(TimeStampedModel):
 
     @cached_property
     def conditions(self) -> Optional[ConditionResolved]:
-        # TODO, should this be cached?
         if classification_grouping := self.classification_grouping:
             return classification_grouping.conditions_obj
-            return ConditionResolved.from_dict(classification_grouping.conditions)
         elif scv := self.scv:
             if record := ClinVarRecord.objects.filter(record_id=scv).first():
                 if condition_strs := record.conditions:
@@ -276,7 +275,7 @@ class Overlap(TimeStampedModel, ReviewableModelMixin, PreviewModelMixin):
     @property
     def derived_overlap_state(self):
         """
-        Cached overlap_state is pure JSON, but dervied does also blend key values
+        Cached overlap_state is pure JSON, but derived does also blend key values
         It's a bit redundant but cached is used to see if we need to send out notifications
         whereas the database values and derived are used for rendering
         """
@@ -340,7 +339,7 @@ class Overlap(TimeStampedModel, ReviewableModelMixin, PreviewModelMixin):
             # the lab doesn't actually have a horse in this game
             lab_classification_grouping = self.contributions.filter(classification_grouping__isnull=False).first()
         if not lab_classification_grouping:
-            return HGVSDisplay(components=HGVSComponents())  # got nothing to work with in this overlap
+            return HGVSDisplay(components=HGVSComponents(full_hgvs=""))  # got nothing to work with in this overlap
         if genome_build:
             return lab_classification_grouping.classification_grouping.latest_allele_info.preferred_c_hgvs_obj(genome_build)
         else:
