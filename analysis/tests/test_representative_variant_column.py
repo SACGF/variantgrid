@@ -2,7 +2,7 @@
 Tests for the representative Variant column and the Classifications column (variantgrid_private#686).
 
 The renderers are client side, so what's tested here is what the server has to get right for them:
-the hidden row fields riding along, the columns, the genomic sort and the expanded row.
+the members riding along hidden, the columns, the genomic sort and the expanded row.
 """
 from django.test.client import Client
 from django.urls.base import reverse
@@ -12,14 +12,8 @@ from analysis.grids import VariantGrid
 from analysis.models.nodes.sources.cohort_node import CohortNode
 from analysis.tests.test_grid_export import GridExportTestCase
 from library.django_utils import FakeRequest
-from snpdb.grid_columns.custom_columns import (
-    CLASSIFICATIONS_COLUMN_ROW_ANNOTATIONS,
-    CLASSIFICATIONS_COLUMN_ROW_FIELDS,
-    COMPOSITE_COLUMN_ROW_FIELDS,
-    VARIANT_COLUMN_ROW_FIELDS,
-)
 from snpdb.grid_columns.grid_sample_columns import get_available_format_columns
-from snpdb.models import CustomColumnsCollection, UserSettings
+from snpdb.models import CompositeColumnMember, CustomColumnsCollection, UserSettings
 from snpdb.views.datatable_view import datatable_definition, datatable_response
 
 
@@ -48,71 +42,76 @@ class RepresentativeVariantColumnTest(GridExportTestCase):
         self.assertEqual([(v.locus.contig.name, v.locus.position) for v in qs][:2],
                          [("10", 1000), ("10", 500)])
 
+    def _member_paths(self, composite_id: str) -> list[str]:
+        return list(CompositeColumnMember.objects.filter(composite_id=composite_id)
+                    .values_list("column__variant_column", flat=True))
+
     def test_renderer_fields_ride_along_hidden(self):
+        """ A member rides along hidden while the collection shows the cell that draws it - unless
+            it isn't annotated for this columns version, where there would be nothing to draw """
         columns = self._columns_by_name()
         self.assertEqual(columns["id"].client_renderer, "VariantGridFormat.representativeVariant")
-        for field in (VARIANT_COLUMN_ROW_FIELDS + CLASSIFICATIONS_COLUMN_ROW_FIELDS
-                      + CLASSIFICATIONS_COLUMN_ROW_ANNOTATIONS):
-            self.assertIn(field, columns)
-        for visible, partners in COMPOSITE_COLUMN_ROW_FIELDS.items():
-            # A partner only rides along while the collection shows the column that reads it
-            for partner in partners:
-                self.assertEqual(visible in columns, partner in columns, partner)
+        for composite_id, path in [("variant", "id"), ("classifications", "classifications"),
+                                   ("gnomad", "gnomad"), ("spliceai", "spliceai")]:
+            self.assertIn(path, columns, composite_id)
+            drawn = [m for m in self._member_paths(composite_id) if m in columns]
+            self.assertIn(self._member_paths(composite_id)[0], drawn, composite_id)  # the headline
+            for member in drawn:
+                self.assertEqual(member == path, columns[member].visible, member)
+        for composite_id in ["annotsv_omim", "denovo_db"]:  # not in the default collection
+            for member in self._member_paths(composite_id):
+                self.assertNotIn(member, columns, member)
         # Not in the default collection, so hidden, and labelled from the catalogue for the CSV header
         self.assertFalse(columns["locus__ref__seq"].visible)
         self.assertEqual(columns["locus__ref__seq"].label, "Reference")
         self.assertEqual(columns["alt__seq"].label, "Alt")
 
     def test_rows_carry_renderer_fields(self):
+        columns = self._columns_by_name()
         self.grid.request.GET = {"length": "1"}
         row = datatable_response(self.grid)["data"][0]
-        composite_partners = [p for visible, partners in COMPOSITE_COLUMN_ROW_FIELDS.items()
-                              for p in partners if visible in row]
-        for field in VARIANT_COLUMN_ROW_FIELDS + CLASSIFICATIONS_COLUMN_ROW_FIELDS + composite_partners:
-            self.assertIn(field, row)
+        for composite_id in ["variant", "classifications", "gnomad"]:
+            for member in self._member_paths(composite_id):
+                if member in columns:
+                    self.assertIn(member, row, member)
         self.assertIsNone(row["classifications"])  # renderer-only column, like tags
-
-    def test_classifications_column_is_not_sortable(self):
-        rc = self._columns_by_name()["classifications"]
-        self.assertEqual(rc.client_renderer, "VariantGridFormat.classifications")
-        self.assertFalse(rc.orderable)
 
     def test_composite_columns_carry_their_renderers(self):
         columns = self._columns_by_name()
         for name, client_renderer in [
-                ("variantannotation__consequence", "VariantGridFormat.impactConsequence"),
-                ("variantannotation__spliceai_max_ds", "VariantGridFormat.spliceai"),
-                ("variantannotation__maxentscan_percent_diff_ref", "VariantGridFormat.maxentscan"),
-                ("variantannotation__mastermind_count_1_cdna", "VariantGridFormat.mastermind"),
-                ("variantannotation__aloft_pred", "VariantGridFormat.aloft"),
-                ("variantannotation__predictions_num_pathogenic", "VariantGridFormat.predictions"),
-                ("global_variant_zygosity__het_count", "VariantGridFormat.dbZygosityCounts")]:
+                ("classifications", "VariantGridFormat.classifications"),
+                ("consequence_impact", "VariantGridFormat.impactConsequence"),
+                ("gnomad", "VariantGridFormat.gnomad"),
+                ("spliceai", "VariantGridFormat.spliceai"),
+                ("maxentscan", "VariantGridFormat.maxentscan"),
+                ("mastermind", "VariantGridFormat.mastermind"),
+                ("aloft", "VariantGridFormat.aloft"),
+                ("predictions", "VariantGridFormat.predictions"),
+                ("db_zygosity", "VariantGridFormat.dbZygosityCounts")]:
             self.assertEqual(columns[name].client_renderer, client_renderer, name)
 
     def test_composite_sort_menus_name_columns_in_the_grid(self):
         """ An entry naming a column this grid doesn't carry is dropped client side, so the menu has
-            to name the composite itself and its (hidden) partners """
+            to name the composite's (hidden) members """
         columns = self._columns_by_name()
         menus = {name: rc.sort_menu for name, rc in columns.items() if rc.sort_menu}
-        self.assertIn("variantannotation__consequence", menus)
+        self.assertIn("consequence_impact", menus)
         for name, sort_menu in menus.items():
-            self.assertEqual(sort_menu[0]["column"], name, name)  # the column's own key leads
-            for entry in sort_menu:
-                column = entry["column"]
-                rc = columns.get(column)
-                self.assertIsNotNone(rc, column)
-                self.assertTrue(rc.orderable, column)
+            # An entry for a member this columns version doesn't annotate is dropped client side
+            offered = [entry["column"] for entry in sort_menu if entry["column"] in columns]
+            self.assertTrue(offered, name)
+            for column in offered:
+                self.assertTrue(columns[column].orderable, column)
                 # Picking the entry sorts on that column - which has to resolve
                 list(self._order_by_column(column)[:1])
 
-    def test_gnomad_columns_keep_their_server_side_formatting(self):
+    def test_gnomad_members_keep_their_server_side_formatting(self):
         """ The gnomAD AFs are formatted server side (unit -> percent) so the CSV matches the grid -
-            the client renderers only add the population / the Pass-Fail link beside them """
+            the client renderer only lays them out and adds the Pass/Fail link """
         columns = self._columns_by_name()
-        for name, client_renderer in [("variantannotation__gnomad_popmax_af", "VariantGridFormat.gnomadPopmax"),
-                                      ("variantannotation__gnomad_af", "VariantGridFormat.gnomadAf")]:
+        for name in ["variantannotation__gnomad_popmax_af", "variantannotation__gnomad_af"]:
             rc = columns[name]
-            self.assertEqual(rc.client_renderer, client_renderer)
+            self.assertFalse(rc.visible, "Drawn inside the gnomAD cell")
             self.assertIsNotNone(rc.renderer)
             self.assertTrue(rc.csv_rendered, "Server rendered value is what goes in the CSV")
 
@@ -163,15 +162,14 @@ class RepresentativeVariantColumnTest(GridExportTestCase):
                        .order_by("sort_order").values_list("column_id", flat=True))
         self.assertEqual(columns[:4], ["variant", "classifications", "tags", "tags_global"])
         # Coordinates now live in the Variant cell; the rest inside their composite cells
-        for removed in ["chrom", "position", "ref", "alt", "svlen", "hgvs_g", "impact", "gnomad_popmax",
-                        "gnomad_filtered", "spliceai_pred_ds_ag", "spliceai_pred_dp_dl", "maxentscan_ref",
-                        "maxentscan_alt", "maxentscan_diff", "mastermind_mmid3", "predictions_num_benign",
-                        "total_db_hom", "total_db_ref", "total_db_unk", "aloft_prob_dominant",
-                        "aloft_high_confidence", "aloft_ensembl_transcript"]:
+        for removed in ["chrom", "position", "ref", "alt", "svlen", "hgvs_g", "consequence", "impact",
+                        "gnomad_af", "gnomad_popmax", "gnomad_filtered", "spliceai_max_ds",
+                        "spliceai_pred_ds_ag", "maxentscan_ref", "mastermind_count_1_cdna",
+                        "predictions_num_benign", "total_db_het", "total_db_hom", "aloft_pred"]:
             self.assertNotIn(removed, columns)
-        for merged in ["spliceai_max_ds", "maxentscan_percent_diff_ref", "mastermind_count_1_cdna",
-                       "predictions_num_pathogenic", "total_db_het", "aloft_pred"]:
-            self.assertIn(merged, columns)
+        for composite in ["consequence_impact", "gnomad", "spliceai", "maxentscan", "mastermind",
+                          "predictions", "db_zygosity", "aloft"]:
+            self.assertIn(composite, columns)
 
 
 class CohortNodeCompositeColumnsTest(GridExportTestCase):

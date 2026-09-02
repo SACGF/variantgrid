@@ -554,8 +554,7 @@ class AbstractVariantGrid(DatatableConfig[Variant]):
             # The representative variant cell: expand arrow, select checkbox, cascade label (details link)
             'id': {'width': 280, 'client_renderer': 'VariantGridFormat.representativeVariant'},
             'classifications': {
-                'model_field': False, 'queryset_field': False,
-                'css_class': 'no-word-wrap', 'orderable': False,
+                'css_class': 'no-word-wrap',
                 'client_renderer': 'VariantGridFormat.classifications',
             },
             'tags_global': {
@@ -580,78 +579,20 @@ class AbstractVariantGrid(DatatableConfig[Variant]):
             'variantannotation__overlapping_symbols': {'client_renderer': 'VariantGridFormat.geneSymbolNewWindowLink'},
             'variantannotation__transcript_version__gene_version__hgnc__omim_ids': {
                 'width': 60, 'client_renderer': 'VariantGridFormat.omimLink'},
-            # Still in the catalogue and 'All columns' - a collection that shows it standalone gets
-            # the same Pass/Fail gnomAD link the gnomAD AF cell draws
+            # A member shown standalone keeps its own link - and the composite cells reuse these
             'variantannotation__gnomad_filtered': {'client_renderer': 'VariantGridFormat.gnomadFiltered'},
-            # Composite cells - the partner values ride along hidden (COMPOSITE_COLUMN_ROW_FIELDS).
-            # A cell drawing several values carries a sort_menu naming the column each one sorts on
-            'variantannotation__consequence': {
-                'width': 160, 'client_renderer': 'VariantGridFormat.impactConsequence',
-                'sort_menu': [
-                    {"label": "Consequence", "column": "variantannotation__consequence"},
-                    # Impact is stored ascending by severity (@see PathogenicityImpact.CHOICES)
-                    {"label": "Impact", "column": "variantannotation__impact"},
-                ],
-            },
-            'variantannotation__gnomad_af': {'width': 130, 'client_renderer': 'VariantGridFormat.gnomadAf'},
-            'variantannotation__gnomad_popmax_af': {'width': 110,
-                                                    'client_renderer': 'VariantGridFormat.gnomadPopmax'},
-            'variantannotation__spliceai_max_ds': {
-                'width': 80, 'client_renderer': 'VariantGridFormat.spliceai',
-                'sort_menu': [
-                    {"label": "Max delta score", "column": "variantannotation__spliceai_max_ds"},
-                    {"label": "Acceptor gain", "column": "variantannotation__spliceai_pred_ds_ag"},
-                    {"label": "Acceptor loss", "column": "variantannotation__spliceai_pred_ds_al"},
-                    {"label": "Donor gain", "column": "variantannotation__spliceai_pred_ds_dg"},
-                    {"label": "Donor loss", "column": "variantannotation__spliceai_pred_ds_dl"},
-                ],
-            },
-            'variantannotation__maxentscan_percent_diff_ref': {
-                'width': 90, 'client_renderer': 'VariantGridFormat.maxentscan',
-                'sort_menu': [
-                    {"label": "% diff from ref", "column": "variantannotation__maxentscan_percent_diff_ref"},
-                    {"label": "Reference score", "column": "variantannotation__maxentscan_ref"},
-                    {"label": "Alt score", "column": "variantannotation__maxentscan_alt"},
-                    {"label": "Score difference", "column": "variantannotation__maxentscan_diff"},
-                ],
-            },
-            'variantannotation__mastermind_count_1_cdna': {
-                'width': 80, 'client_renderer': 'VariantGridFormat.mastermind',
-                'sort_menu': [
-                    {"label": "Variant articles", "column": "variantannotation__mastermind_count_1_cdna"},
-                    {"label": "Variant/protein articles",
-                     "column": "variantannotation__mastermind_count_2_cdna_prot"},
-                    {"label": "AA change articles", "column": "variantannotation__mastermind_count_3_aa_change"},
-                ],
-            },
-            'variantannotation__aloft_pred': {
-                'width': 125, 'client_renderer': 'VariantGridFormat.aloft',
-                'sort_menu': [
-                    {"label": "Prediction", "column": "variantannotation__aloft_pred"},
-                    {"label": "Probability dominant", "column": "variantannotation__aloft_prob_dominant"},
-                    {"label": "Probability recessive", "column": "variantannotation__aloft_prob_recessive"},
-                    {"label": "Probability tolerant", "column": "variantannotation__aloft_prob_tolerant"},
-                    {"label": "High confidence", "column": "variantannotation__aloft_high_confidence"},
-                ],
-            },
-            'variantannotation__predictions_num_pathogenic': {
-                'width': 80, 'client_renderer': 'VariantGridFormat.predictions',
-                'sort_menu': [
-                    {"label": "Damaging count", "column": "variantannotation__predictions_num_pathogenic"},
-                    {"label": "Benign count", "column": "variantannotation__predictions_num_benign"},
-                ],
-            },
+            # Composite cells, keyed by the composite column's own name - the members they draw
+            # ride along hidden and their sort menus come from CompositeColumnMember
+            'consequence_impact': {'client_renderer': 'VariantGridFormat.impactConsequence'},
+            'gnomad': {'client_renderer': 'VariantGridFormat.gnomad'},
+            'spliceai': {'client_renderer': 'VariantGridFormat.spliceai'},
+            'maxentscan': {'client_renderer': 'VariantGridFormat.maxentscan'},
+            'mastermind': {'client_renderer': 'VariantGridFormat.mastermind'},
+            'aloft': {'client_renderer': 'VariantGridFormat.aloft'},
+            'predictions': {'client_renderer': 'VariantGridFormat.predictions'},
             # The same cell (and the same menu) the cohort node draws with its own counts
             # @see CohortNode._get_node_extra_columns
-            'global_variant_zygosity__het_count': {
-                'width': 70, 'client_renderer': 'VariantGridFormat.dbZygosityCounts',
-                'sort_menu': [
-                    {"label": "Het count", "column": "global_variant_zygosity__het_count"},
-                    {"label": "Hom count", "column": "global_variant_zygosity__hom_count"},
-                    {"label": "Ref count", "column": "global_variant_zygosity__ref_count"},
-                    {"label": "Unknown count", "column": "global_variant_zygosity__unk_count"},
-                ],
-            },
+            'db_zygosity': {'client_renderer': 'VariantGridFormat.dbZygosityCounts'},
             'variantannotation__exon': {'renderer': render_exon_and_intron, 'csv_rendered': True},
             'variantannotation__intron': {'renderer': render_exon_and_intron, 'csv_rendered': True},
             'variantannotation__mastermind_mmid3': {'client_renderer': 'VariantGridFormat.masterMind'},
@@ -683,7 +624,6 @@ class AbstractVariantGrid(DatatableConfig[Variant]):
                 'variantannotation__gnomad_sas_af',
                 'variantannotation__topmed_af',
             ]
-            # Merge rather than replace - gnomad_popmax_af already carries its composite renderer
             for column in af_columns:
                 overrides.setdefault(column, {}).update(af_override)
         return overrides

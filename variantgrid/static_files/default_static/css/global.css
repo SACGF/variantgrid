@@ -1048,9 +1048,23 @@ table.variantgrid-datatable .gnomad-af-cell .gnomad-af {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+table.variantgrid-datatable .gnomad-af-cell .gnomad-popmax-af {
+  color: #777;
+  font-size: 11px;
+  flex: none;
+}
 table.variantgrid-datatable .gnomad-af-cell .gnomad-link {
   margin-left: auto;
   flex: none;
+}
+table.variantgrid-datatable .composite-cell {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+table.variantgrid-datatable .composite-empty-headline {
+  color: #bbb;
 }
 table.variantgrid-datatable .spliceai {
   display: inline-flex;
@@ -1813,6 +1827,34 @@ select[disabled] {
     transform: rotate(360deg);
   }
 }
+#columns-widget .composite-shows,
+#columns-widget .composite-inside {
+  color: #777;
+  font-size: 11px;
+}
+#columns-widget li.composite-column .column-name:before {
+  content: "composite";
+  margin-right: 5px;
+  padding: 0 4px;
+  border-radius: 2px;
+  background: #e4e8ee;
+  color: #555;
+  font-size: 10px;
+  font-weight: normal;
+}
+#columns-widget #available_columns li.composite-member {
+  display: none;
+}
+#columns-widget.show-members #available_columns li.composite-member {
+  display: block;
+}
+
+#show-members-label {
+  display: block;
+  margin: 5px;
+  font-size: 12px;
+}
+
 .list-group-item .user-award {
   text-shadow: #fff 0px 0 4px;
 }

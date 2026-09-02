@@ -12,74 +12,10 @@ from annotation.models import AnnotationVersion
 from classification.models import ClassificationModification
 from library.django_utils import resolve_field_path
 from library.utils import JsonDataType, add_exception_note
-from snpdb.models import CustomColumn, CustomColumnsCollection, Variant, VariantGridColumn
+from snpdb.models import CustomColumn, CustomColumnsCollection, Variant
 from snpdb.models.models_enums import ColumnAnnotationLevel
 from snpdb.views.datatable_view import CellData, FilterField, NullOrder, RichColumn
 
-# Row fields the client renderers read whichever columns the collection shows - they ride along hidden.
-# @see VariantGridFormat.representativeVariant / VariantGridFormat.classifications in variantgrid_formats.js
-VARIANT_COLUMN_ROW_FIELDS = [
-    "locus__contig__name",
-    "locus__position",
-    "locus__ref__seq",
-    "alt__seq",
-    "svlen",
-    "variantannotation__symbol",
-    "variantannotation__hgvs_c",
-    "variantannotation__hgvs_p",
-    "variantannotation__hgvs_g",
-]
-CLASSIFICATIONS_COLUMN_ROW_FIELDS = [
-    "clinvar__highest_pathogenicity",
-    "clinvar__clinical_significance",
-    "clinvar__review_status",
-    "clinvar__highest_oncogenicity",
-    "clinvar__oncogenic_classification",
-    "clinvar__oncogenic_review_status",
-    "clinvar__somatic_tier",
-    "clinvar__somatic_review_status",
-]
-# Composite cells: the visible column the renderer sits on -> the partner values it draws alongside.
-# The partners ride along hidden, and only while the collection actually shows the column that reads
-# them. @see _get_standard_overrides in snpdb/grids.py for the renderer each one is paired with
-COMPOSITE_COLUMN_ROW_FIELDS = {
-    "variantannotation__consequence": ["variantannotation__impact"],
-    "variantannotation__gnomad_af": ["variantannotation__gnomad_filtered"],
-    "variantannotation__gnomad_popmax_af": ["variantannotation__gnomad_popmax"],
-    "variantannotation__spliceai_max_ds": [
-        "variantannotation__spliceai_pred_ds_ag",
-        "variantannotation__spliceai_pred_ds_al",
-        "variantannotation__spliceai_pred_ds_dg",
-        "variantannotation__spliceai_pred_ds_dl",
-        "variantannotation__spliceai_pred_dp_ag",
-        "variantannotation__spliceai_pred_dp_al",
-        "variantannotation__spliceai_pred_dp_dg",
-        "variantannotation__spliceai_pred_dp_dl",
-    ],
-    "variantannotation__maxentscan_percent_diff_ref": [
-        "variantannotation__maxentscan_ref",
-        "variantannotation__maxentscan_alt",
-        "variantannotation__maxentscan_diff",
-    ],
-    "variantannotation__mastermind_count_1_cdna": [
-        "variantannotation__mastermind_count_2_cdna_prot",
-        "variantannotation__mastermind_count_3_aa_change",
-        "variantannotation__mastermind_mmid3",
-    ],
-    "variantannotation__aloft_pred": [
-        "variantannotation__aloft_high_confidence",
-        "variantannotation__aloft_prob_tolerant",
-        "variantannotation__aloft_prob_recessive",
-        "variantannotation__aloft_prob_dominant",
-        "variantannotation__aloft_ensembl_transcript",
-    ],
-    "variantannotation__predictions_num_pathogenic": ["variantannotation__predictions_num_benign"],
-    "global_variant_zygosity__het_count": [
-        "global_variant_zygosity__hom_count",
-        "global_variant_zygosity__ref_count",
-        "global_variant_zygosity__unk_count",
-    ],
-}
 # These come from get_variantgrid_extra_annotate rather than the model
 CLASSIFICATIONS_COLUMN_ROW_ANNOTATIONS = [
     "internally_classified",
@@ -174,6 +110,44 @@ def variant_column_rich_column(path: str, model_field: bool = True, queryset_fie
         raise
 
 
+def _catalogue_column_kwargs(column) -> dict:
+    """ RichColumn kwargs a VariantGridColumn carries whether it's shown or riding along hidden - a
+        hidden member still gets a CSV header, and the catalogue label beats the model verbose_name
+        (locus__ref__seq and alt__seq are both 'seq') """
+    kwargs = {
+        "model_field": column.model_field,
+        "queryset_field": column.queryset_field or column.variant_column in VARIANT_GRID_EXTRA_ANNOTATION_ALIASES,
+        "label": column.label,
+        "header_title": column.description.replace("'", "&#146;"),
+    }
+    if column.width is not None:
+        kwargs["width"] = column.width
+    return kwargs
+
+
+def _composite_column_kwargs(column, members: list, column_overrides: dict[str, dict]) -> dict:
+    """ The extras a composite cell needs on top of its catalogue kwargs - the members it draws, the
+        sort keys its header offers, and the generic renderer unless an override names a bespoke one.
+        `members` are the ones annotated for this version, so nothing named here is missing from the row """
+    def member_entry(member) -> dict:
+        entry = {"path": member.column.variant_column, "label": member.column.label}
+        if renderer := column_overrides.get(member.column.variant_column, {}).get("client_renderer"):
+            entry["renderer"] = renderer
+        return entry
+
+    kwargs = {
+        "client_renderer": "VariantGridFormat.composite",
+        "client_renderer_kwargs": {"members": [member_entry(m) for m in members]},
+        "sort_menu": [{"label": m.column.label, "column": m.column.variant_column}
+                      for m in members if m.in_sort_menu],
+        "orderable": True,
+    }
+    if not column.queryset_field:
+        # Display only - nothing of its own to sort on, so it sorts on the value the cell reads as
+        kwargs["sort_keys"] = [members[0].column.variant_column]
+    return kwargs
+
+
 def get_variant_grid_columns(custom_columns_collection: CustomColumnsCollection,
                              annotation_version: AnnotationVersion,
                              column_overrides: dict[str, dict],
@@ -192,52 +166,45 @@ def get_variant_grid_columns(custom_columns_collection: CustomColumnsCollection,
     columns_queryset = CustomColumn.objects.filter(q_columns_this_version,
                                                    custom_columns_collection=custom_columns_collection)
     columns_queryset = columns_queryset.select_related("column").order_by("sort_order").distinct()
+    columns_queryset = columns_queryset.prefetch_related("column__composite_members__column")
+
+    def annotated_for_this_version(column) -> bool:
+        return column.pk not in ever_referenced or column.pk in in_version_vgcs
+
+    shown_columns = []  # (column, the members it draws that this version annotates)
+    for c in columns_queryset:
+        column = c.column
+        if not column.variant_column:
+            continue
+        # Tags are only shown in the analysis they are in (otherwise will just show tags_global)
+        if column.variant_column == "tags" and not analysis_tags:
+            continue
+        members = [m for m in column.composite_members.all() if annotated_for_this_version(m.column)]
+        if column.is_composite and not members:
+            continue  # nothing this version annotates for the cell to draw
+        shown_columns.append((column, members))
+    shown_paths = {column.variant_column for column, _ in shown_columns}
 
     fields_kwargs: dict[str, dict] = {}  # field path -> RichColumn kwargs, in column order
     sample_columns_position = None
 
-    for field_pos, c in enumerate(columns_queryset):
-        f = c.column.variant_column
-        if not f:
-            continue
-        # Tags are only shown in the analysis they are in (otherwise will just show tags_global)
-        if f == "tags" and not analysis_tags:
-            continue
-
-        if c.column.model_field is False:
-            if c.column.annotation_level == ColumnAnnotationLevel.SAMPLE_LEVEL:
+    for field_pos, (column, members) in enumerate(shown_columns):
+        if column.model_field is False:
+            if column.annotation_level == ColumnAnnotationLevel.SAMPLE_LEVEL:
                 sample_columns_position = field_pos
 
-        fields_kwargs[f] = {
-            "model_field": c.column.model_field,
-            "queryset_field": c.column.queryset_field or f in VARIANT_GRID_EXTRA_ANNOTATION_ALIASES,
-            "label": c.column.label,
-            "header_title": c.column.description.replace("'", "&#146;"),
-        }
-        if c.column.width is not None:
-            fields_kwargs[f]["width"] = c.column.width
+        kwargs = _catalogue_column_kwargs(column)
+        if members:
+            kwargs.update(_composite_column_kwargs(column, members, column_overrides))
+        fields_kwargs[column.variant_column] = kwargs
 
-    composite_partners = [partner for visible, partners in COMPOSITE_COLUMN_ROW_FIELDS.items()
-                          for partner in partners if visible in fields_kwargs]
-    hidden_fields = VARIANT_COLUMN_ROW_FIELDS + CLASSIFICATIONS_COLUMN_ROW_FIELDS + composite_partners
-    # A hidden field still gets a CSV header - use the catalogue label rather than the model
-    # verbose_name (locus__ref__seq and alt__seq are both 'seq')
-    hidden_columns = {vgc.variant_column: vgc
-                      for vgc in VariantGridColumn.objects.filter(variant_column__in=hidden_fields)}
-    for path in hidden_fields:
-        if path in fields_kwargs:
-            continue
-        kwargs = {"visible": False}
-        if vgc := hidden_columns.get(path):
-            kwargs["label"] = vgc.label
-            kwargs["model_field"] = vgc.model_field
-            kwargs["queryset_field"] = vgc.queryset_field
-        fields_kwargs[path] = kwargs
-
-    # Grid only values from get_variantgrid_extra_annotate - annotation aliases, not model fields
-    for path in CLASSIFICATIONS_COLUMN_ROW_ANNOTATIONS:
-        if path not in fields_kwargs:
-            fields_kwargs[path] = {"visible": False, "model_field": False}
+        # The members the cell draws ride along hidden, right after it - unless the collection shows
+        # one standalone, where it is simply visible, once, in its own place
+        for member in members:
+            if member.column.variant_column in shown_paths:
+                continue
+            fields_kwargs[member.column.variant_column] = {**_catalogue_column_kwargs(member.column),
+                                                           "visible": False}
 
     rich_columns = []
     for path, kwargs in fields_kwargs.items():

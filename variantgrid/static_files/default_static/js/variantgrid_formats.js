@@ -202,8 +202,8 @@ function _clinvarSomaticChip(rowData, ctx) {
 }
 
 
-// Renderer-only column (no row key of its own) - reads the hidden fields listed in
-// CLASSIFICATIONS_COLUMN_ROW_FIELDS / _ANNOTATIONS (snpdb/grid_columns/custom_columns.py)
+// Renderer-only column (no row key of its own) - reads its member columns, which ride along hidden
+// @see CompositeColumnMember
 VariantGridFormat.classifications = (_value, type, rowData, ctx) => {
     // Always four chips in the same order, empty ones included - germline pair then somatic pair.
     // The .cs-chips grid gives each a fixed share of the cell, so they line up down the column
@@ -220,6 +220,47 @@ VariantGridFormat.classifications = (_value, type, rowData, ctx) => {
 };
 
 
+// The generic composite cell: the first member is what the cell reads as, every other non-blank
+// member goes on hover as "label: value". A group whose members are all blank draws nothing, which
+// is what lets the eye skip down a sparse column.
+// Members (path, label, and the client renderer the member carries standalone) come from the
+// members render kwarg - @see _composite_column_kwargs in snpdb/grid_columns/custom_columns.py
+function _compositeMemberHtml(member, value, type, rowData, ctx) {
+    if (member.renderer) {
+        return eval(member.renderer)(value, type, rowData, ctx);
+    }
+    return escapeHtml(String(value));
+}
+
+function _isBlank(value) {
+    return value == null || value === '';
+}
+
+VariantGridFormat.composite = (_value, type, rowData, ctx) => {
+    const members = (ctx && ctx.kwargs && ctx.kwargs.members) || [];
+    if (!members.length) {
+        return '';
+    }
+    const detail = [];
+    for (let i = 1; i < members.length; ++i) {
+        const value = rowData[members[i].path];
+        if (!_isBlank(value)) {
+            detail.push(`${members[i].label}: ${value}`);
+        }
+    }
+    const headline = rowData[members[0].path];
+    if (_isBlank(headline) && !detail.length) {
+        return '';
+    }
+    // A group with detail but no headline still has to be hoverable, so it keeps a muted placeholder
+    const cell = _isBlank(headline)
+        ? `<span class='composite-empty-headline'>&middot;</span>`
+        : _compositeMemberHtml(members[0], headline, type, rowData, ctx);
+    const title = [`${members[0].label}: ${_isBlank(headline) ? '' : headline}`].concat(detail).join(' \u00b7 ');
+    return `<span class='composite-cell' title='${escapeHtml(title)}'>${cell}</span>`;
+};
+
+
 // Impact drives the dot colour; the consequence text is what the cell reads as
 const IMPACT_DOT_CSS = {
     'HIGH': 'impact-high',
@@ -228,9 +269,9 @@ const IMPACT_DOT_CSS = {
     'MODIFIER': 'impact-modifier',
 };
 
-// Impact + Consequence in one cell - reads variantannotation__impact from COMPOSITE_COLUMN_ROW_FIELDS
-// (snpdb/grid_columns/custom_columns.py). Sorts by consequence, the column it lives on.
-VariantGridFormat.impactConsequence = (consequence, type, rowData) => {
+// Impact + Consequence in one cell. Sorts by consequence, its headline member.
+VariantGridFormat.impactConsequence = (_value, type, rowData) => {
+    const consequence = rowData["variantannotation__consequence"];
     const impact = rowData["variantannotation__impact"];
     if (consequence == null && impact == null) {
         return '';
@@ -349,7 +390,7 @@ VariantGridFormat.sampleZygosity = (zygosity, type, rowData, ctx) => {
 
 // SpliceAI: the max delta score with a dot at the standard 0.2 / 0.5 / 0.8 cutoffs, and the position
 // offset of whichever of the four predictions the max came from. Reads the eight spliceai_pred_*
-// ride-alongs; sorts on spliceai_max_ds, the indexed column it lives on.
+// members riding along; sorts on spliceai_max_ds, its headline member.
 const SPLICEAI_PREDICTIONS = [
     ["ag", "acceptor gain"],
     ["al", "acceptor loss"],
@@ -370,7 +411,8 @@ function _spliceaiThresholdCss(maxDs) {
     return 'spliceai-none';
 }
 
-VariantGridFormat.spliceai = (maxDs, type, rowData) => {
+VariantGridFormat.spliceai = (_value, type, rowData) => {
+    const maxDs = rowData["variantannotation__spliceai_max_ds"];
     if (maxDs == null || maxDs === '') {
         return '';
     }
@@ -391,7 +433,8 @@ VariantGridFormat.spliceai = (maxDs, type, rowData) => {
 
 // MaxEntScan: the drop from the reference splice site score, with the raw ref -> alt scores in the
 // title. Negative means the variant weakens the site, which is the direction that matters.
-VariantGridFormat.maxentscan = (percentDiffRef, type, rowData) => {
+VariantGridFormat.maxentscan = (_value, type, rowData) => {
+    const percentDiffRef = rowData["variantannotation__maxentscan_percent_diff_ref"];
     if (percentDiffRef == null || percentDiffRef === '') {
         return '';
     }
@@ -413,8 +456,8 @@ VariantGridFormat.maxentscan = (percentDiffRef, type, rowData) => {
 
 // Mastermind's three granularities in one cell - cDNA · cDNA+protein · AA change - linked to the
 // article list through the MMID3 ride-along.
-VariantGridFormat.mastermind = (cdnaCount, type, rowData) => {
-    const counts = [cdnaCount,
+VariantGridFormat.mastermind = (_value, type, rowData) => {
+    const counts = [rowData["variantannotation__mastermind_count_1_cdna"],
                     rowData["variantannotation__mastermind_count_2_cdna_prot"],
                     rowData["variantannotation__mastermind_count_3_aa_change"]];
     if (counts.every(c => c == null || c === '')) {
@@ -435,8 +478,8 @@ VariantGridFormat.mastermind = (cdnaCount, type, rowData) => {
 
 // ALoFT's whole call in one cell - the prediction, a dot for how damaging it is and the probability
 // behind it. A low confidence call (ALoFT's p >= 0.05) recedes rather than reading as a firm answer.
-// Reads the probabilities, the confidence flag and the chosen transcript from
-// COMPOSITE_COLUMN_ROW_FIELDS (snpdb/grid_columns/custom_columns.py); sorts on the prediction.
+// Reads the probabilities, the confidence flag and the chosen transcript from its members;
+// sorts on the prediction, its headline member.
 // The choices are expanded server side, so the value here is 'Tolerant' / 'Recessive' / 'Dominant'
 const ALOFT_PREDICTIONS = {
     'dominant': {css: 'aloft-dominant', field: 'variantannotation__aloft_prob_dominant'},
@@ -449,7 +492,8 @@ const ALOFT_PROBABILITIES = [
     ["Dom", "variantannotation__aloft_prob_dominant"],
 ];
 
-VariantGridFormat.aloft = (prediction, type, rowData) => {
+VariantGridFormat.aloft = (_value, type, rowData) => {
+    const prediction = rowData["variantannotation__aloft_pred"];
     if (prediction == null || prediction === '') {
         return '';
     }
@@ -486,9 +530,18 @@ VariantGridFormat.aloft = (prediction, type, rowData) => {
 
 
 // Pathogenicity predictions as a segmented meter - one segment per tool that made a call, damaging
-// first. Reads variantannotation__predictions_num_benign; sorts on the damaging count.
-VariantGridFormat.predictions = (numPathogenic, type, rowData) => {
-    const damaging = Number(numPathogenic) || 0;
+// first, with the call each tool made on hover. Sorts on the damaging count, its headline member.
+const PREDICTION_TOOL_CALLS = [
+    ["SIFT", "variantannotation__sift"],
+    ["Polyphen2 HVAR", "variantannotation__polyphen2_hvar_pred_most_damaging"],
+    ["Mutation Taster", "variantannotation__mutation_taster_pred_most_damaging"],
+    ["Mutation Assessor", "variantannotation__mutation_assessor_pred_most_damaging"],
+    ["FATHMM", "variantannotation__fathmm_pred_most_damaging"],
+    ["MetaLR rankscore", "variantannotation__metalr_rankscore"],
+];
+
+VariantGridFormat.predictions = (_value, type, rowData) => {
+    const damaging = Number(rowData["variantannotation__predictions_num_pathogenic"]) || 0;
     const benign = Number(rowData["variantannotation__predictions_num_benign"]) || 0;
     const total = damaging + benign;
     if (!total) {
@@ -496,7 +549,11 @@ VariantGridFormat.predictions = (numPathogenic, type, rowData) => {
     }
     const segments = '<i class="pred-damaging"></i>'.repeat(damaging)
                    + '<i class="pred-benign"></i>'.repeat(benign);
-    const title = `${damaging} damaging · ${benign} benign of ${total} prediction tools`;
+    const calls = PREDICTION_TOOL_CALLS
+        .filter(([, field]) => rowData[field] != null && rowData[field] !== '')
+        .map(([label, field]) => `${label} ${rowData[field]}`);
+    const title = [`${damaging} damaging \u00b7 ${benign} benign of ${total} prediction tools`]
+        .concat(calls).join(', ');
     return `<span class='predictions' title='${escapeHtml(title)}'>${segments}`
          + `<span class='predictions-count'>${damaging}/${total}</span></span>`;
 };
@@ -508,8 +565,9 @@ VariantGridFormat.predictions = (numPathogenic, type, rowData) => {
 // @see CohortNode._get_node_extra_columns
 const DB_ZYGOSITY_COUNT_PREFIX = "global_variant_zygosity__";
 
-VariantGridFormat.dbZygosityCounts = (hetCount, type, rowData, ctx) => {
+VariantGridFormat.dbZygosityCounts = (_value, type, rowData, ctx) => {
     const prefix = (ctx && ctx.kwargs && ctx.kwargs.countPrefix) || DB_ZYGOSITY_COUNT_PREFIX;
+    const hetCount = rowData[`${prefix}het_count`];
     const hom = rowData[`${prefix}hom_count`];
     if ((hetCount == null || hetCount === '') && (hom == null || hom === '')) {
         return '';
@@ -543,21 +601,6 @@ VariantGridFormat.vcfFilters = (filters) => {
     }
     return `<span class='vcf-filter-failed' title='${escapeHtml(`Filtered: ${text}`)}'>`
          + `<i class='fa-solid fa-triangle-exclamation'></i>${escapeHtml(text)}</span>`;
-};
-
-
-// gnomAD popmax AF with the population it came from - reads variantannotation__gnomad_popmax.
-// The AF itself is formatted server side (unit -> percent) so the CSV matches the grid.
-VariantGridFormat.gnomadPopmax = (popmaxAf, type, rowData) => {
-    if (popmaxAf == null || popmaxAf === '') {
-        return '';
-    }
-    const population = rowData["variantannotation__gnomad_popmax"];
-    let html = `<span class='gnomad-popmax-af'>${escapeHtml(popmaxAf)}</span>`;
-    if (population) {
-        html += ` <span class='gnomad-popmax-pop'>${escapeHtml(population)}</span>`;
-    }
-    return html;
 };
 
 
@@ -659,7 +702,7 @@ function _representativeVariantLabel(variantId, rowData) {
     return {html: `<span class='rv-sub'>v ${variantId}</span>`, title: `VariantGrid variant ${variantId}`};
 }
 
-// Mandatory Variant column. Reads VARIANT_COLUMN_ROW_FIELDS (snpdb/grid_columns/custom_columns.py).
+// Mandatory Variant column. Reads the members riding along hidden - @see CompositeColumnMember.
 // Markup contract: .variant_id-container[variant_id] > input.variant-select (analysis only)
 //                  + a.variant-link (details; grid.js swaps its href to the full URL on right click).
 // Clicking the row itself expands it - @see variantGridRowDetail in grid.js
@@ -903,26 +946,76 @@ VariantGridFormat.gnomadFiltered = (gnomadFilteredCellValue, type, rowData, ctx)
 };
 
 
-// gnomAD AF with the gnomAD Pass/Fail link beside it - reads variantannotation__gnomad_filtered from
-// COMPOSITE_COLUMN_ROW_FIELDS (snpdb/grid_columns/custom_columns.py). The AF is formatted server side
-// (unit -> percent) so the CSV matches the grid. Sorts by frequency, the column it lives on.
-VariantGridFormat.gnomadAf = (af, type, rowData, ctx) => {
+// The whole gnomAD read on the variant in one cell: the overall AF, the popmax AF with the
+// population it came from, and the Pass/Fail link on the cell's right edge. The per-population
+// frequencies, allele counts, homozygotes and FAFs are on hover.
+// The AFs are formatted server side (unit -> percent) so the CSV matches the grid. Sorts on
+// gnomad_af, its headline member.
+const GNOMAD_DETAIL = [
+    ["AC", "variantannotation__gnomad_ac"],
+    ["AN", "variantannotation__gnomad_an"],
+    ["Hom alt", "variantannotation__gnomad_hom_alt"],
+    ["Hemi", "variantannotation__gnomad_hemi_count"],
+    ["PopMax AC", "variantannotation__gnomad_popmax_ac"],
+    ["PopMax AN", "variantannotation__gnomad_popmax_an"],
+    ["PopMax hom alt", "variantannotation__gnomad_popmax_hom_alt"],
+    ["AFR", "variantannotation__gnomad_afr_af"],
+    ["AMR", "variantannotation__gnomad_amr_af"],
+    ["ASJ", "variantannotation__gnomad_asj_af"],
+    ["EAS", "variantannotation__gnomad_eas_af"],
+    ["FIN", "variantannotation__gnomad_fin_af"],
+    ["MID", "variantannotation__gnomad_mid_af"],
+    ["NFE", "variantannotation__gnomad_nfe_af"],
+    ["OTH", "variantannotation__gnomad_oth_af"],
+    ["SAS", "variantannotation__gnomad_sas_af"],
+    ["XY AF", "variantannotation__gnomad_xy_af"],
+    ["XY AC", "variantannotation__gnomad_xy_ac"],
+    ["XY AN", "variantannotation__gnomad_xy_an"],
+    ["non-PAR", "variantannotation__gnomad_non_par"],
+    ["FAF95", "variantannotation__gnomad_faf95"],
+    ["FAF99", "variantannotation__gnomad_faf99"],
+    ["FAF95 max", "variantannotation__gnomad_fafmax_faf95_max"],
+    ["FAF99 max", "variantannotation__gnomad_fafmax_faf99_max"],
+    ["gnomAD2 AF", "variantannotation__gnomad2_liftover_af"],
+];
+
+VariantGridFormat.gnomad = (_value, type, rowData, ctx) => {
+    const af = rowData["variantannotation__gnomad_af"];
+    const popmaxAf = rowData["variantannotation__gnomad_popmax_af"];
+    const population = rowData["variantannotation__gnomad_popmax"];
     const filteredLink = VariantGridFormat.gnomadFiltered(rowData["variantannotation__gnomad_filtered"],
                                                           type, rowData, ctx);
-    if (af == null || af === '') {
+    const detail = [];
+    if (af != null && af !== '') {
+        detail.push(`AF ${af}`);
+    }
+    if (popmaxAf != null && popmaxAf !== '') {
+        detail.push(`PopMax ${popmaxAf}${population ? ` (${population})` : ''}`);
+    }
+    for (const [label, field] of GNOMAD_DETAIL) {
+        const value = rowData[field];
+        if (value != null && value !== '') {
+            detail.push(`${label} ${value}`);
+        }
+    }
+    if (!detail.length) {
         return filteredLink ? `<span class='gnomad-af-cell'>${filteredLink}</span>` : '';
     }
+
     // At or above the import 'common' filter's AF the variant is one everybody carries - mute it so
     // the rare frequencies down the column are the ones that catch the eye
     const commonAf = ctx && ctx.extra && ctx.extra.commonGnomadAf;
     const common = commonAf != null && parseFloat(af) >= commonAf ? ' gnomad-af-common' : '';
-    const afHtml = `<span class='gnomad-af${common}'>${escapeHtml(af)}</span>`;
-    if (!filteredLink) {
-        return afHtml;
+    let html = af == null || af === '' ? '' : `<span class='gnomad-af${common}'>${escapeHtml(af)}</span>`;
+    if (popmaxAf != null && popmaxAf !== '') {
+        html += `<span class='gnomad-popmax-af'>${escapeHtml(popmaxAf)}</span>`;
+        if (population) {
+            html += `<span class='gnomad-popmax-pop'>${escapeHtml(population)}</span>`;
+        }
     }
     // The Pass/Fail goes to the cell's right edge, so they line up down the column whatever width
-    // the frequency beside them takes
-    return `<span class='gnomad-af-cell'>${afHtml}${filteredLink}</span>`;
+    // the frequencies beside them take
+    return `<span class='gnomad-af-cell' title='${escapeHtml(detail.join(' \u00b7 '))}'>${html}${filteredLink}</span>`;
 };
 
 

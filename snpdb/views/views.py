@@ -1312,12 +1312,14 @@ def custom_columns(request):
 def view_custom_columns(request, custom_columns_collection_id):
     ccc = CustomColumnsCollection.get_for_user(request.user, custom_columns_collection_id)
 
-    custom_columns_qs = VariantGridColumn.objects.filter(customcolumn__custom_columns_collection=ccc)
-    my_columns = list(custom_columns_qs.order_by("customcolumn__sort_order"))
-    available_columns = list(VariantGridColumn.objects.exclude(grid_column_name__in=my_columns))
-    variant_grid_columns = {}
-    for vgc in VariantGridColumn.objects.all():
-        variant_grid_columns[vgc.pk] = vgc
+    # One pass over the catalogue with the composites prefetched - the page draws every column, and
+    # each card needs to know whether it is a composite or is drawn inside one
+    variant_grid_columns = {vgc.pk: vgc for vgc in
+                            VariantGridColumn.objects.prefetch_related("composite_members__column")}
+    VariantGridColumn.annotate_composite_membership(variant_grid_columns.values())
+    my_column_ids = list(ccc.customcolumn_set.order_by("sort_order").values_list("column_id", flat=True))
+    my_columns = [variant_grid_columns[column_id] for column_id in my_column_ids]
+    available_columns = [vgc for pk, vgc in variant_grid_columns.items() if pk not in set(my_column_ids)]
 
     has_write_permission = ccc.can_write(request.user)
     if not has_write_permission:

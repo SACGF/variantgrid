@@ -92,6 +92,12 @@
 	$(document).ready(function() {
 		$("#clone-button").click(cloneCustomColumns);
 
+		// Members are in the catalogue for filter nodes and evidence keys, but are drawn inside their
+		// composite - only a lab that wants one standalone needs to see them in the available list
+		$("#show-members-checkbox").change(function() {
+			$("#columns-widget").toggleClass("show-members", this.checked);
+		});
+
 	{% if has_write_permission %}
         $("button#change-name-button").click(function() {
             let nameInput = $("#custom-columns-name");
@@ -207,6 +213,12 @@
 			<li class="{{ column.get_css_classes }} cursor-move" id="{{ column.pk }}" column_id="{{ column.pk }}">
 				<div class="column-name">{{ column.pk }}</div>
 				<div class="column-description">{{ column.description | safe }}</div>
+				{% if column.is_composite %}
+				<div class="composite-shows">shows: {% for member in column.member_columns %}{{ member.label }}{% if not forloop.last %} &middot; {% endif %}{% endfor %}</div>
+				{% endif %}
+				{% if column.composite_of %}
+				<div class="composite-inside">shown inside <b>{{ column.composite_of.label }}</b></div>
+				{% endif %}
 				{% if column.columns_version_description %}
 				<div>Note: <b>{{ column.columns_version_description }}</b> only</div>
 				{% endif %}
@@ -215,12 +227,19 @@
 		</ul>
 	</div>
 	<div id="available_columns" class="columns-list">
+		<label id="show-members-label"><input type="checkbox" id="show-members-checkbox" /> Show columns already inside a composite</label>
 		<ul id="available_columns_sortable">
 			<li id="inactive_placeholder" class="list_placeholder"><h2>Available Columns</h2></li>
 			{% for column in available_columns_list %}
 			<li class="{{ column.get_css_classes }} cursor-move" id="{{ column.pk }}" column_id="{{ column.pk }}">
 				<div class="column-name">{{ column.pk }}</div>
 				<div class="column-description">{{ column.description | safe }}</div>
+				{% if column.is_composite %}
+				<div class="composite-shows">shows: {% for member in column.member_columns %}{{ member.label }}{% if not forloop.last %} &middot; {% endif %}{% endfor %}</div>
+				{% endif %}
+				{% if column.composite_of %}
+				<div class="composite-inside">shown inside <b>{{ column.composite_of.label }}</b></div>
+				{% endif %}
 				{% if column.columns_version_description %}
 				<div>Note: <b>{{ column.columns_version_description }}</b> only</div>
 				{% endif %}

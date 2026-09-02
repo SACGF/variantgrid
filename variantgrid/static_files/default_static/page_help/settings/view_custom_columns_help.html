@@ -15,3 +15,14 @@ Drag and drop columns to add/remove and change ordering.
 <li><b>My Columns</b> - active columns. Top to bottom order is shown left to right in the grid.
 <li><b>Available columns</b> - unused columns
 </ul>
+
+<h3>Composite columns</h3>
+
+<p>Some columns draw several values in the one cell - the SpliceAI cell shows the maximum delta score
+and the individual predictions on hover, the gnomAD cell shows the overall and popmax frequencies with
+the rest of the population data on hover. A composite card lists what it shows, and its header offers
+the values it draws as alternative sort keys.
+
+<p>The columns drawn inside a composite are still exported and still available to filter nodes, so
+there is normally no need to add them separately. Tick <b>Show columns already inside a composite</b>
+to add one as a column of its own.</p>

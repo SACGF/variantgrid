@@ -1213,7 +1213,7 @@ table.variantgrid-datatable {
 	}
 
 	// The Pass/Fail sits on the cell's right edge so the badges line up down the column, whatever
-	// width the frequency beside them takes
+	// width the frequencies beside them take
 	.gnomad-af-cell {
 		display: flex;
 		align-items: center;
@@ -1225,10 +1225,30 @@ table.variantgrid-datatable {
 			text-overflow: ellipsis;
 		}
 
+		// The popmax frequency is context for the overall AF, not a second headline
+		.gnomad-popmax-af {
+			color: #777;
+			font-size: 11px;
+			flex: none;
+		}
+
 		.gnomad-link {
 			margin-left: auto;
 			flex: none;
 		}
+	}
+
+	// The generic composite cell - the headline member, everything else on hover
+	.composite-cell {
+		display: inline-block;
+		max-width: 100%;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+
+	// Nothing to headline but detail to hover - keep the cell there to hover over
+	.composite-empty-headline {
+		color: #bbb;
 	}
 
 	// SpliceAI max delta, dot at the 0.2 / 0.5 / 0.8 cutoffs
@@ -2154,6 +2174,43 @@ select[disabled] {
 }
 
 ////////////////////////
+// Custom columns arrange page. A composite is what a reader drags; the columns it draws are still
+// in the catalogue (filter nodes and evidence keys key on them) but stay out of the way until the
+// "show columns already inside a composite" checkbox asks for them
+#columns-widget {
+	.composite-shows,
+	.composite-inside {
+		color: #777;
+		font-size: 11px;
+	}
+
+	li.composite-column .column-name:before {
+		content: 'composite';
+		margin-right: 5px;
+		padding: 0 4px;
+		border-radius: 2px;
+		background: #e4e8ee;
+		color: #555;
+		font-size: 10px;
+		font-weight: normal;
+	}
+
+	#available_columns li.composite-member {
+		display: none;
+	}
+
+	&.show-members #available_columns li.composite-member {
+		display: block;
+	}
+}
+
+#show-members-label {
+	display: block;
+	margin: 5px;
+	font-size: 12px;
+}
+
+
 // CARDS, HEADERS, CONTENT LAYOUT
 ////////////////////////
 
