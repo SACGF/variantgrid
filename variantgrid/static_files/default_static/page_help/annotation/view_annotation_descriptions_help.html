@@ -1,9 +1,17 @@
 Want to add a new annotation? Contact the VariantGrid development team with suggestions.
 
+<b>Composite cells</b> draw several columns at once: the first member is the headline the cell reads as
+and sorts by, the rest are on hover, and the <b>&#9662;</b> in the column header sorts the grid by any of
+them. A member riding along inside a cell is still written to the CSV and still offered in the filter
+builder, and you can show any of them standalone from
+<a class="hover-link" href="/snpdb/settings/custom_columns/">VariantGrid Columns</a>. The example cells here are
+drawn by the grid's own renderers from made up data - no real variant, sample or lab appears on this page.
+
 Variant and transcript level annotations come from an annotation run. Each column lists the tool it came from:
 
 <ul>
 <li><b>VEP</b> - Ensembl Variant Effect Predictor, including its <a href="https://asia.ensembl.org/info/docs/tools/vep/script/vep_plugins.html">plugins</a> and custom data files, eg <a href="https://drive.google.com/file/d/1HPcIEE1USiwCPzRFFwZhTZagka1uyUV1/view">dbNSFP</a> - a collection of many different resources
 <li><b>AnnotSV</b> - <a href="https://lbgi.fr/AnnotSV/">AnnotSV</a> annotates structural variants (so these columns are populated for SVs only)
 <li><b>VariantGrid</b> - calculated by VariantGrid while importing annotation
+<li><b>VCF</b> - a FORMAT field read straight off the imported VCF
 </ul>

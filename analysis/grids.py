@@ -52,6 +52,8 @@ from ontology.models import GeneDiseaseClassification, OntologyTermRelation, Ont
 from patients.models_enums import Zygosity
 from snpdb.grid_columns.custom_columns import get_variantgrid_extra_annotate
 from snpdb.grid_columns.grid_sample_columns import (
+    SAMPLE_COMPOSITE_COLUMNS,
+    SAMPLE_SORT_KEY_LABELS,
     get_available_format_columns,
     get_variantgrid_zygosity_annotation_kwargs,
 )
@@ -311,21 +313,6 @@ class VariantGrid(AbstractVariantGrid):
             'samples_genotype_quality': ('GQ', '%(label)s %(sample)s', 25),
             'samples_phred_likelihood': ('PL', '%(label)s %(sample)s', 25),
             'samples_filters': ('FT', '%(label)s %(sample)s', 100),
-        }
-        # The sample's whole call is drawn in the one zygosity cell - glyph, frequency, depths, then
-        # GQ/PL as quality marks and the sample filters. The rest ride along hidden and stay in the
-        # CSV. @see VariantGridFormat.sampleZygosity. The header's sort menu offers whichever of them
-        # the sample's VCF actually has
-        SAMPLE_COMPOSITE_COLUMNS = ['samples_allele_depth', 'samples_allele_frequency', 'samples_read_depth',
-                                    'samples_genotype_quality', 'samples_phred_likelihood', 'samples_filters']
-        SAMPLE_SORT_KEY_LABELS = {
-            'samples_zygosity': 'Zygosity',
-            'samples_allele_frequency': 'Allele frequency',
-            'samples_allele_depth': 'Allele depth',
-            'samples_read_depth': 'Read depth',
-            'samples_genotype_quality': 'Genotype quality',
-            'samples_phred_likelihood': 'Phred likelihood',
-            'samples_filters': 'Filters',
         }
         packed_data_replace = dict(Zygosity.CHOICES)
         # Some legacy data (Missing data in FreeBayes before PythonKnownVariantsImporter v12) has -2147483647 for

@@ -497,6 +497,113 @@ def render_annotsv_pathogenic_overlaps(cell: CellData) -> JsonDataType:
     return text
 
 
+# Allele frequencies held in the database as a unit value (0-1). The grid formats them server side so
+# its CSV/VCF exports match what it draws - and the annotation descriptions page formats its example
+# cells the same way. @see get_standard_overrides
+AF_UNIT_COLUMNS = [
+    'variantannotation__af_1kg',
+    'variantannotation__af_uk10k',
+    'variantannotation__gnomad2_liftover_af',
+    'variantannotation__gnomad_af',
+    'variantannotation__gnomad_afr_af',
+    'variantannotation__gnomad_amr_af',
+    'variantannotation__gnomad_asj_af',
+    'variantannotation__gnomad_eas_af',
+    'variantannotation__gnomad_fin_af',
+    'variantannotation__gnomad_nfe_af',
+    'variantannotation__gnomad_oth_af',
+    'variantannotation__gnomad_popmax_af',
+    'variantannotation__gnomad_sas_af',
+    'variantannotation__topmed_af',
+]
+
+
+def get_standard_overrides(af_show_in_percent: bool) -> dict[str, dict]:
+    """ Per column RichColumn kwargs the variant grids apply on top of the catalogue - the client
+        renderers, the server side formatting the CSV shares, and the AF unit/percent conversion """
+    overrides = {
+        # Note:     client side renderers should only be used for adding links etc, never conversion of data, such as
+        #           unit to percent, as the CSV downloads (w/o JS renderers) won't match the grid.
+        # The representative variant cell: expand arrow, select checkbox, cascade label (details link)
+        'id': {'width': 280, 'client_renderer': 'VariantGridFormat.representativeVariant'},
+        'classifications': {
+            'css_class': 'no-word-wrap',
+            'client_renderer': 'VariantGridFormat.classifications',
+        },
+        'tags_global': {
+            'model_field': False, 'css_class': 'no-word-wrap', 'orderable': False,
+            'client_renderer': 'VariantGridFormat.tagsGlobal',
+        },
+        'clinvar__clinvar_variation_id': {'width': 60, 'client_renderer': 'VariantGridFormat.clinvarLink'},
+        'variantallele__allele__clingen_allele__id': {
+            'width': 90,
+            'renderer': render_clingen_allele, 'csv_rendered': True,
+            'client_renderer': 'VariantGridFormat.clinGenAlleleId',
+        },
+        'variantannotation__cosmic_id': {'width': 130, 'client_renderer': 'VariantGridFormat.cosmicLink'},
+        'variantannotation__cosmic_legacy_id': {'width': 130, 'client_renderer': 'VariantGridFormat.cosmicLink'},
+        'variantannotation__dbsnp_rs_id': {'width': 130, 'client_renderer': 'VariantGridFormat.dbsnp'},
+        'variantannotation__pubmed': {'client_renderer': 'VariantGridFormat.pubMed'},
+        'variantannotation__gene__geneannotation__hpo_terms': {'client_renderer': 'VariantGridFormat.ontologyTerms'},
+        'variantannotation__gene__geneannotation__mondo_terms': {'client_renderer': 'VariantGridFormat.ontologyTerms'},
+        'variantannotation__gene__geneannotation__omim_terms': {'client_renderer': 'VariantGridFormat.ontologyTerms'},
+        'variantannotation__transcript_version__gene_version__gene_symbol__symbol': {
+            'client_renderer': 'VariantGridFormat.geneSymbolLink'},
+        'variantannotation__overlapping_symbols': {'client_renderer': 'VariantGridFormat.geneSymbolNewWindowLink'},
+        'variantannotation__transcript_version__gene_version__hgnc__omim_ids': {
+            'width': 60, 'client_renderer': 'VariantGridFormat.omimLink'},
+        # A member shown standalone keeps its own link - and the composite cells reuse these
+        'variantannotation__gnomad_filtered': {'client_renderer': 'VariantGridFormat.gnomadFiltered'},
+        # Composite cells, keyed by the composite column's own name - the members they draw
+        # ride along hidden and their sort menus come from CompositeColumnMember
+        'consequence_impact': {'client_renderer': 'VariantGridFormat.impactConsequence'},
+        'gnomad': {'client_renderer': 'VariantGridFormat.gnomad'},
+        'spliceai': {'client_renderer': 'VariantGridFormat.spliceai'},
+        'maxentscan': {'client_renderer': 'VariantGridFormat.maxentscan'},
+        'mastermind': {'client_renderer': 'VariantGridFormat.mastermind'},
+        'aloft': {'client_renderer': 'VariantGridFormat.aloft'},
+        'predictions': {'client_renderer': 'VariantGridFormat.predictions'},
+        # The same cell (and the same menu) the cohort node draws with its own counts
+        # @see CohortNode._get_node_extra_columns
+        'db_zygosity': {'client_renderer': 'VariantGridFormat.dbZygosityCounts'},
+        'variantannotation__exon': {'renderer': render_exon_and_intron, 'csv_rendered': True},
+        'variantannotation__intron': {'renderer': render_exon_and_intron, 'csv_rendered': True},
+        'variantannotation__mastermind_mmid3': {'client_renderer': 'VariantGridFormat.masterMind'},
+        'variantannotation__mavedb_urn': {'client_renderer': 'VariantGridFormat.mavedbUrn'},
+        'variantannotation__annotsv_pathogenic_overlaps': {
+            'renderer': render_annotsv_pathogenic_overlaps, 'csv_rendered': True,
+        },
+    }
+
+    if af_show_in_percent:
+        # gnomAD etc are all stored as AF in DB - want to show as percentage on grid
+        # But need to be able to turn it off to export VCF as AF
+        render_unit_af = get_allele_frequency_formatter(source_in_percent=False,
+                                                        dest_in_percent=af_show_in_percent)
+        af_override = {'renderer': render_unit_af, 'csv_rendered': True}
+        for column in AF_UNIT_COLUMNS:
+            overrides.setdefault(column, {}).update(af_override)
+    return overrides
+
+
+def variant_grid_client_extra(genome_build: GenomeBuild) -> JsonObjType:
+    """ Grid wide metadata the client renderers read off the table definition - @see ctx.extra in
+        variantgrid_formats.js """
+    # gnomAD links are per genome build, and the client renderers have no other way to know it
+    extra = {"genomeBuild": genome_build.name,
+             "clinvarStars": dict(ClinVarReviewStatus.STARS),
+             # What counts as a bad GQ/PL in the sample genotype cell
+             "genotypeQuality": settings.VARIANT_GRID_GENOTYPE_QUALITY_THRESHOLDS}
+    # The AF the import 'common' filter uses, in the units the grid shows AFs in - the gnomAD
+    # cell mutes at or above it so rare variants keep the reader's full attention
+    if cf_data := settings.VCF_IMPORT_COMMON_FILTERS.get(genome_build.name):
+        common_af = cf_data["gnomad_af_min"]
+        if settings.VARIANT_ALLELE_FREQUENCY_CLIENT_SIDE_PERCENT:
+            common_af *= 100
+        extra["commonGnomadAf"] = common_af
+    return extra
+
+
 class AbstractVariantGrid(DatatableConfig[Variant]):
     """ The variant grids - the analysis node grid and the standalone Variant tables. Their columns are
         built per user from a CustomColumnsCollection (@see snpdb.grid_columns.custom_columns) rather
@@ -548,103 +655,14 @@ class AbstractVariantGrid(DatatableConfig[Variant]):
         return UserSettings.get_for_user(self.user).columns
 
     def _get_standard_overrides(self, af_show_in_percent: bool) -> dict[str, dict]:
-        overrides = {
-            # Note:     client side renderers should only be used for adding links etc, never conversion of data, such as
-            #           unit to percent, as the CSV downloads (w/o JS renderers) won't match the grid.
-            # The representative variant cell: expand arrow, select checkbox, cascade label (details link)
-            'id': {'width': 280, 'client_renderer': 'VariantGridFormat.representativeVariant'},
-            'classifications': {
-                'css_class': 'no-word-wrap',
-                'client_renderer': 'VariantGridFormat.classifications',
-            },
-            'tags_global': {
-                'model_field': False, 'css_class': 'no-word-wrap', 'orderable': False,
-                'client_renderer': 'VariantGridFormat.tagsGlobal',
-            },
-            'clinvar__clinvar_variation_id': {'width': 60, 'client_renderer': 'VariantGridFormat.clinvarLink'},
-            'variantallele__allele__clingen_allele__id': {
-                'width': 90,
-                'renderer': render_clingen_allele, 'csv_rendered': True,
-                'client_renderer': 'VariantGridFormat.clinGenAlleleId',
-            },
-            'variantannotation__cosmic_id': {'width': 130, 'client_renderer': 'VariantGridFormat.cosmicLink'},
-            'variantannotation__cosmic_legacy_id': {'width': 130, 'client_renderer': 'VariantGridFormat.cosmicLink'},
-            'variantannotation__dbsnp_rs_id': {'width': 130, 'client_renderer': 'VariantGridFormat.dbsnp'},
-            'variantannotation__pubmed': {'client_renderer': 'VariantGridFormat.pubMed'},
-            'variantannotation__gene__geneannotation__hpo_terms': {'client_renderer': 'VariantGridFormat.ontologyTerms'},
-            'variantannotation__gene__geneannotation__mondo_terms': {'client_renderer': 'VariantGridFormat.ontologyTerms'},
-            'variantannotation__gene__geneannotation__omim_terms': {'client_renderer': 'VariantGridFormat.ontologyTerms'},
-            'variantannotation__transcript_version__gene_version__gene_symbol__symbol': {
-                'client_renderer': 'VariantGridFormat.geneSymbolLink'},
-            'variantannotation__overlapping_symbols': {'client_renderer': 'VariantGridFormat.geneSymbolNewWindowLink'},
-            'variantannotation__transcript_version__gene_version__hgnc__omim_ids': {
-                'width': 60, 'client_renderer': 'VariantGridFormat.omimLink'},
-            # A member shown standalone keeps its own link - and the composite cells reuse these
-            'variantannotation__gnomad_filtered': {'client_renderer': 'VariantGridFormat.gnomadFiltered'},
-            # Composite cells, keyed by the composite column's own name - the members they draw
-            # ride along hidden and their sort menus come from CompositeColumnMember
-            'consequence_impact': {'client_renderer': 'VariantGridFormat.impactConsequence'},
-            'gnomad': {'client_renderer': 'VariantGridFormat.gnomad'},
-            'spliceai': {'client_renderer': 'VariantGridFormat.spliceai'},
-            'maxentscan': {'client_renderer': 'VariantGridFormat.maxentscan'},
-            'mastermind': {'client_renderer': 'VariantGridFormat.mastermind'},
-            'aloft': {'client_renderer': 'VariantGridFormat.aloft'},
-            'predictions': {'client_renderer': 'VariantGridFormat.predictions'},
-            # The same cell (and the same menu) the cohort node draws with its own counts
-            # @see CohortNode._get_node_extra_columns
-            'db_zygosity': {'client_renderer': 'VariantGridFormat.dbZygosityCounts'},
-            'variantannotation__exon': {'renderer': render_exon_and_intron, 'csv_rendered': True},
-            'variantannotation__intron': {'renderer': render_exon_and_intron, 'csv_rendered': True},
-            'variantannotation__mastermind_mmid3': {'client_renderer': 'VariantGridFormat.masterMind'},
-            'variantannotation__mavedb_urn': {'client_renderer': 'VariantGridFormat.mavedbUrn'},
-            'variantannotation__annotsv_pathogenic_overlaps': {
-                'renderer': render_annotsv_pathogenic_overlaps, 'csv_rendered': True,
-            },
-        }
-
-        if af_show_in_percent:
-            # gnomAD etc are all stored as AF in DB - want to show as percentage on grid
-            # But need to be able to turn it off to export VCF as AF
-            render_unit_af = get_allele_frequency_formatter(source_in_percent=False,
-                                                            dest_in_percent=af_show_in_percent)
-            af_override = {'renderer': render_unit_af, 'csv_rendered': True}
-            af_columns = [
-                'variantannotation__af_1kg',
-                'variantannotation__af_uk10k',
-                'variantannotation__gnomad2_liftover_af',
-                'variantannotation__gnomad_af',
-                'variantannotation__gnomad_afr_af',
-                'variantannotation__gnomad_amr_af',
-                'variantannotation__gnomad_asj_af',
-                'variantannotation__gnomad_eas_af',
-                'variantannotation__gnomad_fin_af',
-                'variantannotation__gnomad_nfe_af',
-                'variantannotation__gnomad_oth_af',
-                'variantannotation__gnomad_popmax_af',
-                'variantannotation__gnomad_sas_af',
-                'variantannotation__topmed_af',
-            ]
-            for column in af_columns:
-                overrides.setdefault(column, {}).update(af_override)
-        return overrides
+        """ Subclasses add the columns only they draw - @see VariantGrid for the analysis' own tags """
+        return get_standard_overrides(af_show_in_percent)
 
     def _get_base_queryset(self) -> QuerySet:
         raise NotImplementedError()
 
     def get_extra(self) -> JsonObjType:
-        # gnomAD links are per genome build, and the client renderers have no other way to know it
-        extra = {"genomeBuild": self.genome_build.name,
-                 "clinvarStars": dict(ClinVarReviewStatus.STARS),
-                 # What counts as a bad GQ/PL in the sample genotype cell
-                 "genotypeQuality": settings.VARIANT_GRID_GENOTYPE_QUALITY_THRESHOLDS}
-        # The AF the import 'common' filter uses, in the units the grid shows AFs in - the gnomAD
-        # cell mutes at or above it so rare variants keep the reader's full attention
-        if cf_data := settings.VCF_IMPORT_COMMON_FILTERS.get(self.genome_build.name):
-            common_af = cf_data["gnomad_af_min"]
-            if settings.VARIANT_ALLELE_FREQUENCY_CLIENT_SIDE_PERCENT:
-                common_af *= 100
-            extra["commonGnomadAf"] = common_af
-        return extra
+        return variant_grid_client_extra(self.genome_build)
 
     def get_table_classes(self) -> list[str]:
         """ Two line rows are a per-user setting. The second line is in the markup either way -

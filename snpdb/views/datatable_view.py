@@ -717,6 +717,32 @@ def datatable_response(config: DatatableConfig, draw: Optional[str] = None) -> J
     return data
 
 
+def rich_column_json(rc: RichColumn, default_column_width: Optional[int] = None) -> JsonObjType:
+    """ One column of the table definition - what DataTableDefinition builds a column (and its cell
+        renderer) from. @see the annotation descriptions page, which draws example cells from these """
+    column: JsonObjType = {
+        "data": rc.name,
+        "label": rc.label,
+        "render": rc.client_renderer,
+        "createdCell": rc.client_renderer_td,
+        "orderable": rc.orderable,
+        "orderSequence": [x.value for x in rc.order_sequence],
+        "className": rc.css_classes,
+        "visible": rc.visible,
+    }
+    if width := (rc.width or default_column_width):
+        column["width"] = f"{width}px"
+    if rc.header_title:
+        column["headerTitle"] = rc.header_title
+    if rc.client_renderer_kwargs:
+        column["renderKwargs"] = rc.client_renderer_kwargs
+    if rc.sort_menu:
+        # Alternative sort keys for a composite cell - each names another column whose own
+        # definition already carries the sort key. @see DataTableDefinition.setupSortMenus
+        column["sortMenu"] = rc.sort_menu
+    return column
+
+
 def datatable_definition(config: DatatableConfig, download_url: Optional[str] = None) -> JsonObjType:
     """ The table definition DataTableDefinition builds the table from. Computed per request -
         column visibility and UserGridConfig rows are both per user """
@@ -763,30 +789,7 @@ def datatable_definition(config: DatatableConfig, download_url: Optional[str] = 
     if (order := config.initial_order()) is not None:
         data["order"] = order
 
-    columns: list[JsonObjType] = []
-    for rc in config.enabled_columns:
-        column: JsonObjType = {
-            "data": rc.name,
-            "label": rc.label,
-            "render": rc.client_renderer,
-            "createdCell": rc.client_renderer_td,
-            "orderable": rc.orderable,
-            "orderSequence": [x.value for x in rc.order_sequence],
-            "className": rc.css_classes,
-            "visible": rc.visible,
-        }
-        if width := (rc.width or config.default_column_width):
-            column["width"] = f"{width}px"
-        if rc.header_title:
-            column["headerTitle"] = rc.header_title
-        if rc.client_renderer_kwargs:
-            column["renderKwargs"] = rc.client_renderer_kwargs
-        if rc.sort_menu:
-            # Alternative sort keys for a composite cell - each names another column whose own
-            # definition already carries the sort key. @see DataTableDefinition.setupSortMenus
-            column["sortMenu"] = rc.sort_menu
-        columns.append(column)
-    data["columns"] = columns
+    data["columns"] = [rich_column_json(rc, config.default_column_width) for rc in config.enabled_columns]
     return data
 
 

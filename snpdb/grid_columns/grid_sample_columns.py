@@ -11,6 +11,22 @@ from django.db.models.functions import Coalesce
 
 from snpdb.models import VCF, Cohort, CohortGenotype
 
+# The sample's whole call is drawn in the one zygosity cell - glyph, frequency, depths, then GQ/PL
+# as quality marks and the sample filters. The rest ride along hidden and stay in the CSV.
+# @see VariantGridFormat.sampleZygosity
+SAMPLE_COMPOSITE_COLUMNS = ['samples_allele_depth', 'samples_allele_frequency', 'samples_read_depth',
+                            'samples_genotype_quality', 'samples_phred_likelihood', 'samples_filters']
+# What the zygosity header's sort menu offers - whichever of them the sample's VCF actually has
+SAMPLE_SORT_KEY_LABELS = {
+    'samples_zygosity': 'Zygosity',
+    'samples_allele_frequency': 'Allele frequency',
+    'samples_allele_depth': 'Allele depth',
+    'samples_read_depth': 'Read depth',
+    'samples_genotype_quality': 'Genotype quality',
+    'samples_phred_likelihood': 'Phred likelihood',
+    'samples_filters': 'Filters',
+}
+
 
 def get_available_format_columns(cohorts):
     available_format_columns = {

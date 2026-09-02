@@ -3283,6 +3283,113 @@ li.help-item {
 	}
 }
 
+// The annotation descriptions page draws each composite cell exactly as the grid does, so its example
+// tables carry the grid's own classes (@see table.variantgrid-datatable). Only what a one row, one
+// column picture of a cell needs on top of that lives here.
+.annotation-descriptions {
+	.composite-section {
+		padding: 12px 0;
+		border-top: 1px solid #e5e5e5;
+	}
+
+	.composite-section:first-of-type {
+		border-top: none;
+	}
+
+	.composite-section-header {
+		display: flex;
+		align-items: flex-start;
+		gap: 16px;
+	}
+
+	.composite-section-title {
+		flex: 1;
+		min-width: 0;
+	}
+
+	// Beside a line of text rather than heading a card
+	.composite-section-title .color-box {
+		width: 14px;
+		height: 14px;
+		float: none;
+		margin-right: 0;
+	}
+
+	// The cell is a picture - it sits at the width its column asked for and nothing in it is clickable
+	table.composite-example {
+		flex: none;
+		margin-top: 0 !important;
+
+		th {
+			font-size: 12px;
+			border-bottom: 1px solid #ccc;
+			cursor: default;
+		}
+
+		td {
+			height: 22px;
+			border: none;
+		}
+
+		a {
+			cursor: default;
+		}
+	}
+
+	.annotation-grid-column-name {
+		font-size: 11px;
+		font-weight: normal;
+	}
+
+	.annotation-member-level {
+		font-size: 11px;
+		padding-top: 4px;
+		white-space: nowrap;
+	}
+
+	.annotation-member-level .color-box {
+		width: 12px;
+		height: 12px;
+		float: none;
+		display: inline-block;
+		margin-right: 4px;
+		vertical-align: text-bottom;
+	}
+
+	// What a member contributes to its cell - headline, an alternative sort key, or hover detail
+	.annotation-role {
+		border-radius: 5px;
+		white-space: nowrap;
+		text-align: center;
+		padding: 2px;
+		font-size: 11px;
+	}
+
+	.annotation-role-headline {
+		background-color: #333333;
+		color: #fff;
+	}
+
+	.annotation-role-sort {
+		background-color: #cccccc;
+		color: #333333;
+	}
+
+	.annotation-role-hover {
+		background-color: #eeeeee;
+		color: #666666;
+	}
+
+	.annotation-source-composite {
+		background-color: #6A5ACD;
+	}
+
+	.annotation-source-vcf {
+		background-color: #B8860B;
+	}
+}
+
+
 ////////////////////////
 // MISC 3rd PARTY icons
 ////////////////////////

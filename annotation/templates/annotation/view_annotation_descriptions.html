@@ -115,9 +115,71 @@
         .annotation-category-V {
         }
     </style>
+    <script>
+        // Each example cell is drawn by the grid's own client renderer from the column definition and
+        // fictional row the view built - the same path DataTableDefinition takes, minus DataTables
+        // @see snpdb/grid_columns/composite_examples.py
+        const EXAMPLE_EXTRA = {{ example_extra|jsonify }};
+
+        function setupExampleCell(table) {
+            const col = table.data("columnJson");
+            const row = table.data("rowJson");
+            const th = table.find("thead th");
+            th.text(col.label);
+            if (col.headerTitle) {
+                th.attr("title", col.headerTitle);
+            }
+            if (col.width) {
+                th.css("width", col.width);
+            }
+
+            let html = row[col.data];
+            if (col.render) {
+                html = eval(col.render)(row[col.data], "display", row, {extra: EXAMPLE_EXTRA, kwargs: col.renderKwargs || null});
+                if (html instanceof jQuery) {
+                    html = html.prop("outerHTML");
+                }
+            }
+            const td = table.find("tbody td");
+            td.html(html == null ? "" : String(html));
+            // The cell is a picture of a fictional variant - nothing in it goes anywhere
+            td.find("a").removeAttr("href").removeAttr("target").removeAttr("orig_href");
+
+            if (!col.sortMenu || !col.sortMenu.length) {
+                return;
+            }
+            const menu = $('<span>', {class: 'dt-sort-menu'});
+            const toggle = $('<a>', {class: 'dt-sort-menu-toggle', href: 'javascript:void(0)',
+                                     title: 'Sort this column by', text: '\u25be'});
+            const items = $('<div>', {class: 'dropdown-menu dt-sort-menu-items'});
+            for (const entry of col.sortMenu) {
+                $('<a>', {class: 'dropdown-item', href: 'javascript:void(0)', text: entry.label})
+                    .on('click', function(event) {
+                        event.stopPropagation();
+                        FloatingPanel.hide();
+                    }).appendTo(items);
+            }
+            toggle.on('click', function(event) {
+                event.stopPropagation();
+                if (FloatingPanel.isShowing(items)) {
+                    FloatingPanel.hide();
+                } else {
+                    FloatingPanel.show(items, this, {alignRight: true});
+                }
+            });
+            menu.append(toggle);
+            th.append(menu);
+        }
+
+        $(document).ready(() => {
+            $("table.composite-example").each(function() {
+                setupExampleCell($(this));
+            });
+        });
+    </script>
 {% endblock head %}
 {% block content %}
-    <div class="container">
+    <div class="container annotation-descriptions">
     {% genome_build_url_arg genome_build 'view_annotation_descriptions_genome_build' %}
 
 	{% page_help page_id='annotation/view_annotation_descriptions_help' title="VariantGrid Annotations"%}
@@ -129,56 +191,58 @@
 
     <div>
         <div class="card">
-            <div class="card-header d-flex align-center">
-                <div class="color-box genotype-column">&nbsp;</div>
-                <div class="annotation-level-title"><b>Sample Level</b> Imported VCF sample/genotype fields</div>
+            <div class="card-header align-center">
+                <div class="annotation-level-title"><b>Composite cells</b> Several columns drawn in the one cell</div>
             </div>
-            <!-- Hardcode Sample level special fields -->
             <div class="card-body">
-                <table class='annotations-table table'>
-                    <tr>
-                        <th>Sample Zygosity</th>
-                        <td>Zygosity call (HET/HOM_ALT/REF or Unknown)</td>
-                    </tr>
-                    <tr>
-                        <th>AD (Allele Depth)</th>
-                        <td>
-                            Unfiltered allele depth, the number of reads that support each of the reported alleles. All reads at the position
-                            (including reads that did not pass the variant caller’s filters) are included in this number, except reads that were
-                            considered uninformative. Reads are considered uninformative when they do not provide enough statistical evidence
-                            to support one allele over another.
-                        </td>
-                    </tr>
-
-                    <tr>
-                        <th>AF (Allele Frequency)</th>
-                        <td>Unit value (0-1) of Allele Frequency. From "AF" FORMAT field if present in VCF otherwise calculated for each allele as <code>AD / (sum of all AD for that locus)</code>. See "VCF Info" tab on VCF page to see which was used for a particular file.</td>
-                    </tr>
-
-                    <tr>
-                        <th>DP (Depth)</th>
-                        <td>
-                            Filtered depth, at the sample level. This gives you the number of filtered reads that support each of the reported alleles.
-                            You can check the variant caller’s documentation to see which filters are applied by default. Only reads that passed the variant
-                            caller’s filters are included in this number. However, unlike the AD calculation, uninformative reads are included in DP.
-                        </td>
-                    </tr>
-
-                    <tr>
-                        <th>GQ (Genotype Quality)</th>
-                        <td>
-                            Genotype Quality, the Phred-scaled marginal (or unconditional) probability of the called genotype.
-                        </td>
-                    </tr>
-
-                    <tr>
-                        <th>PL (Phred Likelihood)</th>
-                        <td>Normalised, Phred-scaled likelihoods for genotypes as defined in the VCF specification</td>
-                    </tr>
-                </table>
+                <p>
+                    A composite cell draws several columns at once. The first is the headline - what the
+                    cell reads as and sorts by - the rest are on hover, and the <b>&#9662;</b> in the header
+                    sorts the grid by any of them. Every member is still exported to CSV and offered in the
+                    filter builder. The example cells below are drawn by the grid&#146;s own renderers from
+                    made up data - no real variant, sample or lab appears on this page.
+                </p>
+                {% for section in composite_sections %}
+                    <div class="composite-section" id="composite-{{ section.column.pk }}">
+                        <div class="composite-section-header">
+                            <table class="variantgrid-datatable dataTable composite-example"
+                                   data-column-json="{{ section.column_json }}"
+                                   data-row-json="{{ section.row_json }}">
+                                <thead><tr><th class="sorting"></th></tr></thead>
+                                <tbody><tr><td></td></tr></tbody>
+                            </table>
+                            <div class="composite-section-title">
+                                <div class="d-flex align-items-center">
+                                    <b>{{ section.column.label }}</b>
+                                    <div class="annotation-source annotation-source-composite ml-2">Composite</div>
+                                    {% if section.level %}
+                                        <div class="color-box {{ section.level_css }}-column ml-2">&nbsp;</div>
+                                        <div class="ml-1">{{ section.level }} level</div>
+                                    {% endif %}
+                                </div>
+                                <div>{{ section.column.description | safe }}</div>
+                                <div class="text-muted">Sorts by {{ section.sort_by }}. Hover the cell for the detail.</div>
+                            </div>
+                        </div>
+                        <table class='annotations-table table'>
+                        <tr>
+                            <th>Name</th>
+                            <th>Role</th>
+                            <th>Source</th>
+                            <th>Category</th>
+                            <th>Source field</th>
+                            <th>Details</th>
+                        </tr>
+                        {% for row in section.rows %}
+                            {% include "annotation/tags/annotation_column_row.html" with row=row show_role=True %}
+                        {% endfor %}
+                        </table>
+                    </div>
+                {% endfor %}
             </div>
         </div>
 
+        {% if variantgrid_columns_by_annotation_level.D %}
         <div class="card mt-4">
             <div class="card-header d-flex align-center">
                 <div class="color-box database-column">&nbsp;</div>
@@ -187,14 +251,18 @@
             <div class="card-body">
                 <table class='annotations-table table'>
                 {% for v in variantgrid_columns_by_annotation_level.D %}
-                    <tr>
-                        <th>{{ v.pk }}</th>
+                    <tr class='annotation-row'>
+                        <th>
+                            <div><b>{{ v.label }}</b></div>
+                            <div class="text-muted annotation-grid-column-name">{{ v.pk }}</div>
+                        </th>
                         <td>{{ v.description | safe }}</td>
                     </tr>
                 {% endfor %}
                 </table>
             </div>
         </div>
+        {% endif %}
 
         {% for annotation_level, columns in columns_by_annotation_level.items %}
             <div class='card mt-4'>
@@ -216,51 +284,14 @@
                         <th>Details</th>
                     </tr>
                     {% for row in columns %}
-                        <tr class='annotation-row'>
-                            <th>{{ row.column.pk }}
-                            <td>
-                                <div class='annotation-source annotation-source-{{ row.source|lower }}'>{{ row.source }}</div>
-                                {% if row.source_detail %}
-                                    <div class='annotation-source-detail'>{{ row.source_detail }}</div>
-                                {% endif %}
-                            </td>
-                            <td>
-                            {% if row.category %}
-                                <div class='annotation-category annotation-category-{{ row.category }}'>
-                                    {{ row.category.label }}
-                                </div>
-                            {% endif %}
-                            </td>
-                            <td>
-                            {% if row.source_field %}
-                                <div class='source-field'>
-                                    {{ row.source_field }}
-                                    {% if row.source_field_processing_description %}
-                                        ({{ row.source_field_processing_description }})
-                                    {% endif %}
-                                </div>
-                            {% endif %}
-                            </td>
-                            <td>{{ row.column.description | safe }}
-                            {% if row.vep.min_columns_version or row.vep.max_columns_version %}
-                                <div>
-                                    Note:
-                                    <b>{{ row.vep.columns_version_description }}</b> only
-                                </div>
-                            {% endif %}
-                            {% if row.vep.vep_plugin == 'd' %}
-                                <div>
-                                Note: Values from dbNSFP are for non-synonymous SNVs only (no indels or intergenic)
-                                </div>
-                            {% endif %}
-                            </td>
-                         </tr>
+                        {% include "annotation/tags/annotation_column_row.html" with row=row %}
                     {% endfor %}
                     </table>
                 </div>
             </div>
         {% endfor %}
 
+        {% if variantgrid_columns_by_annotation_level.H %}
         <div class="card mt-4">
             <div class="card-header align-center">
                 <div class="color-box hgnc-column">&nbsp;</div>
@@ -269,15 +300,20 @@
             <div class="card-body">
                 <table class='annotations-table table'>
                 {% for v in variantgrid_columns_by_annotation_level.H %}
-                    <tr>
-                        <th>{{ v.pk }}</th>
+                    <tr class='annotation-row'>
+                        <th>
+                            <div><b>{{ v.label }}</b></div>
+                            <div class="text-muted annotation-grid-column-name">{{ v.pk }}</div>
+                        </th>
                         <td>{{ v.description | safe }}</td>
                     </tr>
                 {% endfor %}
                 </table>
             </div>
         </div>
+        {% endif %}
 
+        {% if variantgrid_columns_by_annotation_level.U %}
         <div class="card mt-4">
             <div class="card-header align-center">
                 <div class="color-box uniprot-column">&nbsp;</div>
@@ -286,15 +322,20 @@
             <div class="card-body">
                 <table class='annotations-table table'>
                 {% for v in variantgrid_columns_by_annotation_level.U %}
-                    <tr>
-                        <th>{{ v.pk }}</th>
+                    <tr class='annotation-row'>
+                        <th>
+                            <div><b>{{ v.label }}</b></div>
+                            <div class="text-muted annotation-grid-column-name">{{ v.pk }}</div>
+                        </th>
                         <td>{{ v.description | safe }}</td>
                     </tr>
                 {% endfor %}
                 </table>
             </div>
         </div>
+        {% endif %}
 
+        {% if variantgrid_columns_by_annotation_level.C %}
         <div class="card mt-4">
             <div class="card-header align-center">
                 <div class="color-box clinvar-column">&nbsp;</div>
@@ -303,15 +344,20 @@
             <div class="card-body">
                 <table class='annotations-table table'>
                 {% for v in variantgrid_columns_by_annotation_level.C %}
-                    <tr>
-                        <th>{{ v.pk }}</th>
+                    <tr class='annotation-row'>
+                        <th>
+                            <div><b>{{ v.label }}</b></div>
+                            <div class="text-muted annotation-grid-column-name">{{ v.pk }}</div>
+                        </th>
                         <td>{{ v.description | safe }}</td>
                     </tr>
                 {% endfor %}
                 </table>
             </div>
         </div>
+        {% endif %}
 
+        {% if variantgrid_columns_by_annotation_level.G %}
         <div class="card mt-4">
             <div class="card-header align-center">
                 <div class="color-box gene-column">&nbsp;</div>
@@ -320,12 +366,18 @@
             <div class="card-body">
                 <table class='annotations-table table'>
                 {% for v in variantgrid_columns_by_annotation_level.G %}
-                    <tr>
-                        <th>{{ v.pk }}</th>
+                    <tr class='annotation-row'>
+                        <th>
+                            <div><b>{{ v.label }}</b></div>
+                            <div class="text-muted annotation-grid-column-name">{{ v.pk }}</div>
+                        </th>
                         <td>{{ v.description | safe }}</td>
                     </tr>
                 {% endfor %}
+                </table>
             </div>
         </div>
+        {% endif %}
+    </div>
     </div>
 {% endblock content %}

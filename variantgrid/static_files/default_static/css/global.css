@@ -2812,6 +2812,88 @@ li.help-item :last-child {
   padding: 2px 12px;
 }
 
+.annotation-descriptions .composite-section {
+  padding: 12px 0;
+  border-top: 1px solid #e5e5e5;
+}
+.annotation-descriptions .composite-section:first-of-type {
+  border-top: none;
+}
+.annotation-descriptions .composite-section-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+.annotation-descriptions .composite-section-title {
+  flex: 1;
+  min-width: 0;
+}
+.annotation-descriptions .composite-section-title .color-box {
+  width: 14px;
+  height: 14px;
+  float: none;
+  margin-right: 0;
+}
+.annotation-descriptions table.composite-example {
+  flex: none;
+  margin-top: 0 !important;
+}
+.annotation-descriptions table.composite-example th {
+  font-size: 12px;
+  border-bottom: 1px solid #ccc;
+  cursor: default;
+}
+.annotation-descriptions table.composite-example td {
+  height: 22px;
+  border: none;
+}
+.annotation-descriptions table.composite-example a {
+  cursor: default;
+}
+.annotation-descriptions .annotation-grid-column-name {
+  font-size: 11px;
+  font-weight: normal;
+}
+.annotation-descriptions .annotation-member-level {
+  font-size: 11px;
+  padding-top: 4px;
+  white-space: nowrap;
+}
+.annotation-descriptions .annotation-member-level .color-box {
+  width: 12px;
+  height: 12px;
+  float: none;
+  display: inline-block;
+  margin-right: 4px;
+  vertical-align: text-bottom;
+}
+.annotation-descriptions .annotation-role {
+  border-radius: 5px;
+  white-space: nowrap;
+  text-align: center;
+  padding: 2px;
+  font-size: 11px;
+}
+.annotation-descriptions .annotation-role-headline {
+  background-color: #333333;
+  color: #fff;
+}
+.annotation-descriptions .annotation-role-sort {
+  background-color: #cccccc;
+  color: #333333;
+}
+.annotation-descriptions .annotation-role-hover {
+  background-color: #eeeeee;
+  color: #666666;
+}
+.annotation-descriptions .annotation-source-composite {
+  background-color: #6A5ACD;
+}
+.annotation-descriptions .annotation-source-vcf {
+  background-color: #B8860B;
+}
+
+
 .gnomad-link {
   text-decoration: none;
 }

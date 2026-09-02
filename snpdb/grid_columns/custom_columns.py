@@ -148,6 +148,15 @@ def _composite_column_kwargs(column, members: list, column_overrides: dict[str, 
     return kwargs
 
 
+def composite_rich_column(column, members: list, column_overrides: dict[str, dict]) -> RichColumn:
+    """ The grid column for a composite cell drawing `members` - the catalogue's label/width/tooltip,
+        the members and sort keys the cell needs, and whatever the deployment overrides on it """
+    kwargs = _catalogue_column_kwargs(column)
+    kwargs.update(_composite_column_kwargs(column, members, column_overrides))
+    kwargs.update(column_overrides.get(column.variant_column, {}))
+    return variant_column_rich_column(column.variant_column, **kwargs)
+
+
 def get_variant_grid_columns(custom_columns_collection: CustomColumnsCollection,
                              annotation_version: AnnotationVersion,
                              column_overrides: dict[str, dict],
@@ -186,6 +195,7 @@ def get_variant_grid_columns(custom_columns_collection: CustomColumnsCollection,
     shown_paths = {column.variant_column for column, _ in shown_columns}
 
     fields_kwargs: dict[str, dict] = {}  # field path -> RichColumn kwargs, in column order
+    composites: dict[str, tuple] = {}  # field path -> (column, the members its cell draws)
     sample_columns_position = None
 
     for field_pos, (column, members) in enumerate(shown_columns):
@@ -193,10 +203,9 @@ def get_variant_grid_columns(custom_columns_collection: CustomColumnsCollection,
             if column.annotation_level == ColumnAnnotationLevel.SAMPLE_LEVEL:
                 sample_columns_position = field_pos
 
-        kwargs = _catalogue_column_kwargs(column)
+        fields_kwargs[column.variant_column] = _catalogue_column_kwargs(column)
         if members:
-            kwargs.update(_composite_column_kwargs(column, members, column_overrides))
-        fields_kwargs[column.variant_column] = kwargs
+            composites[column.variant_column] = (column, members)
 
         # The members the cell draws ride along hidden, right after it - unless the collection shows
         # one standalone, where it is simply visible, once, in its own place
@@ -208,8 +217,10 @@ def get_variant_grid_columns(custom_columns_collection: CustomColumnsCollection,
 
     rich_columns = []
     for path, kwargs in fields_kwargs.items():
-        kwargs = {**kwargs, **column_overrides.get(path, {})}
-        rich_columns.append(variant_column_rich_column(path, **kwargs))
+        if composite := composites.get(path):
+            rich_columns.append(composite_rich_column(*composite, column_overrides))
+        else:
+            rich_columns.append(variant_column_rich_column(path, **{**kwargs, **column_overrides.get(path, {})}))
     return rich_columns, sample_columns_position
 
 

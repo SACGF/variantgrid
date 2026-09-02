@@ -1,0 +1,56 @@
+{% comment %}
+One column of an annotations table - shared by the level cards and the composite member tables.
+show_role adds the member's role in its composite cell, and its own annotation level colour box
+{% endcomment %}
+<tr class='annotation-row'>
+    <th>
+        <div><b>{{ row.column.label }}</b></div>
+        <div class="text-muted annotation-grid-column-name">{{ row.column.pk }}</div>
+    </th>
+    {% if show_role %}
+        <td>
+            <div class='annotation-role annotation-role-{{ row.role }}'>{{ row.role }}</div>
+            {% if row.level %}
+                <div class="annotation-member-level">
+                    <div class="color-box {{ row.level|lower }}-column">&nbsp;</div>{{ row.level }}
+                </div>
+            {% endif %}
+        </td>
+    {% endif %}
+    <td>
+        <div class='annotation-source annotation-source-{{ row.source|lower }}'>{{ row.source }}</div>
+        {% if row.source_detail %}
+            <div class='annotation-source-detail'>{{ row.source_detail }}</div>
+        {% endif %}
+    </td>
+    <td>
+    {% if row.category %}
+        <div class='annotation-category annotation-category-{{ row.category }}'>
+            {{ row.category.label }}
+        </div>
+    {% endif %}
+    </td>
+    <td>
+    {% if row.source_field %}
+        <div class='source-field'>
+            {{ row.source_field }}
+            {% if row.source_field_processing_description %}
+                ({{ row.source_field_processing_description }})
+            {% endif %}
+        </div>
+    {% endif %}
+    </td>
+    <td>{{ row.column.description | safe }}
+    {% if row.vep.min_columns_version or row.vep.max_columns_version %}
+        <div>
+            Note:
+            <b>{{ row.vep.columns_version_description }}</b> only
+        </div>
+    {% endif %}
+    {% if row.vep.vep_plugin == 'd' %}
+        <div>
+        Note: Values from dbNSFP are for non-synonymous SNVs only (no indels or intergenic)
+        </div>
+    {% endif %}
+    </td>
+</tr>
