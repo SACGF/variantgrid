@@ -930,5 +930,5 @@ def overlap_row_email(overlap: Overlap, lab: Lab, genome_build: GenomeBuild):
     return {
         "date_str": date_str,
         "overlap": overlap,
-        "c_hgvs": overlap.c_hgvs(lab, genome_build)
+        "c_hgvs": overlap.c_hgvs(lab=lab, genome_build=genome_build)
     }

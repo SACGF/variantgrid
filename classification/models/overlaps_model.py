@@ -1,3 +1,4 @@
+from collections import defaultdict
 from functools import reduce, cached_property
 from typing import Any, Optional
 from auditlog.models import AuditlogHistoryField
@@ -22,6 +23,7 @@ from library.utils import first, AuditUtils, AuditSingleChange
 from library.utils.database_utils import TextFieldChoices, IntegerFieldChoices
 from ontology.models import OntologyTerm
 from review.models import ReviewableModelMixin, Review
+from snpdb.lab_picker import LabPickerData, LabSelection
 from snpdb.models import Allele, Lab, GenomeBuild, LabLike, CLINVAR_EXPERT_PANEL_LAB
 
 IN_REVIEW_VALUE = "in-review"
@@ -332,25 +334,35 @@ class Overlap(TimeStampedModel, ReviewableModelMixin, PreviewModelMixin):
         return list(sorted(c_hgvses))
 
     def c_hgvs(self, lab: Lab, genome_build: Optional[GenomeBuild] = None) -> HGVSDisplay:
-        # if no genome_build provided, use the imported value
-        # TODO, if there are multiple contributions from the same lab, should we get multiple c.HGVSs?
-        lab_classification_grouping = self.contributions.filter(classification_grouping__lab=lab).first()
-        if not lab_classification_grouping:
-            # the lab doesn't actually have a horse in this game
-            lab_classification_grouping = self.contributions.filter(classification_grouping__isnull=False).first()
-        if not lab_classification_grouping:
-            return HGVSDisplay(components=HGVSComponents(full_hgvs=""))  # got nothing to work with in this overlap
-        if genome_build:
-            return lab_classification_grouping.classification_grouping.latest_allele_info.preferred_c_hgvs_obj(genome_build)
-        else:
-            return lab_classification_grouping.classification_grouping.latest_allele_info.imported_c_hgvs_obj
+        return first(self.c_hgvs_all(
+            lab_picker=LabPickerData(lab_selection=LabSelection.single_lab(lab)),
+            genome_build=genome_build
+        ))
 
-    def c_hgvs_all(self, genome_build: GenomeBuild) -> list[HGVSDisplay]:
+    def c_hgvs_all(self, lab_picker: Optional[LabPickerData], genome_build: GenomeBuild) -> list[HGVSDisplay]:
         results = set()
         for contribution in self.contributions_list:
             if classification_grouping := contribution.classification_grouping:
-                results.add(classification_grouping.latest_allele_info.preferred_c_hgvs_obj(genome_build))
-        return list(sorted(results))
+                if classification_grouping.lab_id in lab_picker.lab_ids:
+                    results.add(classification_grouping.latest_allele_info.preferred_c_hgvs_obj(genome_build))
+        if not results and lab_picker:
+            return self.c_hgvs_all(genome_build=genome_build, lab_picker=None)
+        elif results:
+            # only return one CHGVS Display per c.HGVS where they only differ in transcript versions
+            transcript_versions: dict[HGVSComponents, list[HGVSDisplay]] = defaultdict(list)
+            for c_hgvs_display in results:
+                transcript_versions[c_hgvs_display.components.without_transcript_version].append(c_hgvs_display)
+
+            max_versions: list[HGVSDisplay] = []
+            for versions in transcript_versions.values():
+                max_version = max(versions, key=lambda hgvs: hgvs.components.transcript_parts.version or 0)
+                max_versions.append(max_version)
+            return list(sorted(max_versions))
+
+        else:
+            return [HGVSDisplay(HGVSComponents("-"), is_normalised=False)]
+
+
 
     # have to cache the values
     # contributions = models.ManyToManyField(OverlapContribution)

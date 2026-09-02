@@ -687,17 +687,19 @@ class ImportedAlleleInfo(TimeStampedModel):
     def imported_c_hgvs_obj(self) -> Optional[HGVSComponents]:
         if self.imported_c_hgvs:
             return HGVSComponents(self.imported_c_hgvs)
+        return None
 
     @property
     def imported_g_hgvs_obj(self) -> Optional[HGVSComponents]:
         if self.imported_g_hgvs:
             return HGVSComponents(self.imported_g_hgvs)
+        return None
 
-    def imported_hgvs_obj(self) -> Optional[HGVSComponents]:
+    def imported_hgvs_obj(self) -> Optional[HGVSDisplay]:
         if c_hgvs := self.imported_c_hgvs_obj:
             return c_hgvs
         if g_hgvs := self.imported_g_hgvs_obj:
-            return g_hgvs
+            return HGVSDisplay(g_hgvs)
         return None
 
     @property
@@ -706,7 +708,7 @@ class ImportedAlleleInfo(TimeStampedModel):
         if imported_c_hgvs := self.imported_c_hgvs:
             c_hgvs = HGVSComponents(imported_c_hgvs)
             if imported_genome_build := self.imported_genome_build:
-                return HGVSDisplay(c_hgvs, genome_build=imported_genome_build)
+                return HGVSDisplay(c_hgvs, genome_build=imported_genome_build, is_normalised=False)
             return HGVSDisplay(c_hgvs)
         else:
             return None
@@ -726,7 +728,15 @@ class ImportedAlleleInfo(TimeStampedModel):
                             is_desired_build=False,
                             genome_build=genome_build
                         )
-        return self.imported_hgvs_obj()
+
+        imported_hgvs = self.imported_hgvs_obj()
+        if imported_hgvs.genome_build and imported_hgvs.genome_build != genome_build:
+            imported_hgvs = HGVSDisplay(
+                imported_hgvs.components,
+                is_desired_build=False,
+                is_normalised=False,
+                genome_build=imported_hgvs.genome_build)
+        return imported_hgvs
 
     @staticmethod
     def all_chgvs(allele: Allele) -> list[HGVSDisplay]:

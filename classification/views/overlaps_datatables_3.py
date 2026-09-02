@@ -196,25 +196,7 @@ class OverlapColumns(DatatableConfig[ClassificationGrouping]):
         return self.cross_cotext_allele_to_overlap.get((overlap.allele_id, overlap.value_type))
 
     def render_c_hgvs(self, cell: CellData[Overlap]):
-        # TODO be able to sort by this
-        contributions = cell.obj.contributions
-        if not self.lab_picker.is_admin_mode:
-            contributions = contributions.filter(classification_grouping__lab__in=self.lab_picker.lab_ids)
-
-        transcript_versions: dict[HGVSComponents, list[HGVSDisplay]] = defaultdict(list)
-        for contribution in contributions:
-            if grouping := contribution.classification_grouping:
-                if allele_info := grouping.latest_allele_info:
-                    # TODO imported value or resolved value?
-                    if c_hgvs := allele_info.preferred_c_hgvs_obj(genome_build=GenomeBuildManager.get_current_genome_build()):
-                        transcript_versions[c_hgvs.components.without_transcript_version].append(c_hgvs)
-
-        max_versions: list[HGVSDisplay] = []
-        for versions in transcript_versions.values():
-            max_version = max(versions, key=lambda hgvs: hgvs.components.transcript_parts.version or 0)
-            max_versions.append(max_version)
-
-        return list(c_hgvs.to_json() for c_hgvs in sorted(max_versions))
+        return list(c_hgvs.to_json() for c_hgvs in cell.obj.c_hgvs_all(lab_picker=self.lab_picker, genome_build=GenomeBuildManager.get_current_genome_build(self.user)))
 
     def render_context(self, cell: CellData[Overlap]):
 

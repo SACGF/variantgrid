@@ -349,7 +349,10 @@ class OverlapDownloadRow(ExportRow):
 
     @export_column("c.HGVS")
     def c_hgvs(self):
-        return "\n".join([str(chgvs) for chgvs in self.overlap.c_hgvs_all(GenomeBuildManager.get_current_genome_build())])
+        return "\n".join([str(chgvs) for chgvs in self.overlap.c_hgvs_all(
+            lab_picker=self.lab_picker,
+            genome_build=GenomeBuildManager.get_current_genome_build()
+        )])
 
     @export_column("Priority & Status")
     def overlap_status(self):
