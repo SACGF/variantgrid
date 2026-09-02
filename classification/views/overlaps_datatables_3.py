@@ -1,4 +1,4 @@
-from collections import Counter
+from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from functools import cached_property
 from typing import Optional, Set
@@ -14,7 +14,7 @@ from classification.models import ClassificationGrouping, Overlap, OverlapType, 
     ClassificationResultValue, OverlapContributionStatus, OverlapContributionSkew, TriageNextStep, EvidenceKey, \
     EvidenceKeyMap, IN_REVIEW_VALUE
 from classification.services.overlap_calculator import OVERLAP_CLIN_SIG_ENABLED
-from genes.hgvs import HGVSDisplay
+from genes.hgvs import HGVSDisplay, HGVSComponents
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.lab_picker import LabPickerData
 from snpdb.models import Lab
@@ -201,14 +201,20 @@ class OverlapColumns(DatatableConfig[ClassificationGrouping]):
         if not self.lab_picker.is_admin_mode:
             contributions = contributions.filter(classification_grouping__lab__in=self.lab_picker.lab_ids)
 
-        results = set()
+        transcript_versions: dict[HGVSComponents, list[HGVSDisplay]] = defaultdict(list)
         for contribution in contributions:
             if grouping := contribution.classification_grouping:
                 if allele_info := grouping.latest_allele_info:
                     # TODO imported value or resolved value?
                     if c_hgvs := allele_info.preferred_c_hgvs_obj(genome_build=GenomeBuildManager.get_current_genome_build()):
-                        results.add(HGVSDisplay(c_hgvs))
-        return list(c_hgvs.to_json() for c_hgvs in sorted(results))
+                        transcript_versions[c_hgvs.components.without_transcript_version].append(c_hgvs)
+
+        max_versions: list[HGVSDisplay] = []
+        for versions in transcript_versions.values():
+            max_version = max(versions, key=lambda hgvs: hgvs.components.transcript_parts.version or 0)
+            max_versions.append(max_version)
+
+        return list(c_hgvs.to_json() for c_hgvs in sorted(max_versions))
 
     def render_context(self, cell: CellData[Overlap]):
 
