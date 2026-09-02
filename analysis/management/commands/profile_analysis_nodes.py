@@ -4,7 +4,7 @@ See https://github.com/SACGF/variantgrid/issues/1494
 
 Usage:
     python3 manage.py profile_analysis_nodes \\
-        --analysis 12345 67890 \\
+        --analysis 12345,67890 \\
         --sample 555 \\
         --rerun --explain \\
         --out /tmp/prof_$(date +%Y%m%d_%H%M%S)
@@ -78,18 +78,39 @@ CSV_FIELDS = [
 SQL_TRUNCATE = 1000
 
 
+def _parse_ids(values):
+    """ IDs can be space and/or comma separated, and the switch can be repeated,
+        ie "--analysis 1 2,3 --analysis 4" """
+    ids = []
+    for value in values or []:
+        for part in value.split(","):
+            part = part.strip()
+            if not part:
+                continue
+            try:
+                ids.append(int(part))
+            except ValueError:
+                raise CommandError(f"Expected an integer ID, got '{part}'")
+    return ids
+
+
 class Command(BaseCommand):
     help = "Profile AnalysisNode querysets per-node and emit a CSV + EXPLAIN plans"
 
     def add_arguments(self, parser):
-        parser.add_argument("--analysis", type=int, nargs="*", default=[],
-                            help="Analysis ID(s) — every node in each analysis is profiled")
-        parser.add_argument("--sample", type=int, nargs="*", default=[],
-                            help="Sample ID(s) — synthetic canonical single-node patterns are run per sample")
-        parser.add_argument("--trio", type=int, nargs="*", default=[],
-                            help="Trio ID(s) — multi-sample regex vs substr-AND comparison (de novo pattern)")
-        parser.add_argument("--cohort", type=int, nargs="*", default=[],
-                            help="Cohort ID(s) — multi-sample regex vs substr-AND comparison (random ~half carriers, plus exclude lookahead vs substr-OR)")
+        parser.add_argument("--analysis", nargs="*", action="extend", default=None,
+                            help="Analysis ID(s), space and/or comma separated — every node in "
+                                 "each analysis is profiled")
+        parser.add_argument("--sample", nargs="*", action="extend", default=None,
+                            help="Sample ID(s), space and/or comma separated — synthetic canonical "
+                                 "single-node patterns are run per sample")
+        parser.add_argument("--trio", nargs="*", action="extend", default=None,
+                            help="Trio ID(s), space and/or comma separated — multi-sample regex vs "
+                                 "substr-AND comparison (de novo pattern)")
+        parser.add_argument("--cohort", nargs="*", action="extend", default=None,
+                            help="Cohort ID(s), space and/or comma separated — multi-sample regex vs "
+                                 "substr-AND comparison (random ~half carriers, plus exclude lookahead "
+                                 "vs substr-OR)")
         parser.add_argument("--cohort-seed", type=int, default=42,
                             help="Seed for deterministic cohort sample-half selection (default 42)")
         parser.add_argument("--rerun", action="store_true",
@@ -133,6 +154,9 @@ class Command(BaseCommand):
                                  "under the bump (#546). Default 10000. Survey is read-only — no SQL re-execution.")
 
     def handle(self, *args, **options):
+        for id_option in ["analysis", "sample", "trio", "cohort"]:
+            options[id_option] = _parse_ids(options[id_option])
+
         if not (options["analysis"] or options["sample"] or options["trio"] or options["cohort"]):
             raise CommandError("Provide at least one of --analysis / --sample / --trio / --cohort")
 
