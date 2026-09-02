@@ -1006,10 +1006,16 @@ class QCColumn(models.Model):
 def get_samples_by_sequencing_sample(sequencing_samples, vcf):
     """ sequencing_samples is the candidate pool - a sample sheet's rows, or the explicit members
         of a joint call that spans runs """
-    sequencing_samples_by_name = {ss.sample_name: ss for ss in sequencing_samples}
 
     def clean_sample_name(s):
         return s.upper().replace("-", "_")
+
+    # Sample names either match the sample sheet name, or have bcl2fastq's "_S<sample number>" suffix appended
+    sequencing_samples_by_cleaned_name = {}
+    for ss in sequencing_samples:
+        cleaned_name = clean_sample_name(ss.sample_name)
+        sequencing_samples_by_cleaned_name[cleaned_name] = ss
+        sequencing_samples_by_cleaned_name[f"{cleaned_name}_S{ss.sample_number}"] = ss
 
     samples = list(vcf.sample_set.all())
     potential_samples_by_name = {
@@ -1021,12 +1027,8 @@ def get_samples_by_sequencing_sample(sequencing_samples, vcf):
 
     samples_by_sequencing_sample = {}
     for sample_name, sample in potential_samples_by_name.items():
-        # Do a startswith match rather than hash lookup as it's less strict (diff naming conventions etc)
-        for sequencing_sample_name, sequencing_sample in sequencing_samples_by_name.items():
-            cleaned_sample_name = clean_sample_name(sample_name)
-            cleaned_sequencing_sample_name = clean_sample_name(sequencing_sample_name)
-            if cleaned_sample_name.startswith(cleaned_sequencing_sample_name):
-                samples_by_sequencing_sample[sequencing_sample] = sample
+        if sequencing_sample := sequencing_samples_by_cleaned_name.get(clean_sample_name(sample_name)):
+            samples_by_sequencing_sample[sequencing_sample] = sample
     return samples_by_sequencing_sample
 
 
