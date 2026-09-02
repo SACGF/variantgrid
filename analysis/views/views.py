@@ -217,7 +217,7 @@ def view_analysis(request, analysis_id, active_node_id=0):
     context = {
         "node_classes_form": forms.AnalysisNodeClassesForm(**node_classes_kwargs),
         "nodes": nodes,
-        "node_count_colors": get_node_count_colors("color") + get_tag_node_count_colors(request.user, "color"),
+        "node_count_colors": get_node_count_colors("color") + get_tag_node_count_colors(request.user, "background-color"),
         "analysis": analysis,
         "analysis_settings": get_analysis_settings(request.user, analysis),
         "analysis_tags_node": analysis_tags_node,

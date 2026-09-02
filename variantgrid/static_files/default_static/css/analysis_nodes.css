@@ -719,27 +719,40 @@ span.node-counts {
 	overflow: hidden;
 }
 
-/* Tag counts sit below the built-in counts, behind a tag icon so it's clear they're tags */
+/* Tag counts sit below the built-in counts, drawn as the same tag-coloured pills as the grid
+   (.grid-tag .user-tag-colored in global.scss, at node scale) so it's clear they're tags */
 .node-tag-counts {
 	align-items: center;
 	border-top: 1px dotted #e4e7ec;
-}
-
-.node-tag-counts .tag-counts-icon {
-	flex: 0 0 auto;
-	font-size: 8px;
-	line-height: 12px;
-	padding: 0 2px 0 1px;
-	color: #98a2b3;
 }
 
 /* A tag count is a handful of variants at most, so pack them in at their own width - a node with
    a dozen tags reads as a row of colours rather than six rows of two */
 .node-tag-counts .node-count {
 	flex: 0 0 auto;
+	height: 14px;
+	line-height: 12px;
+	padding: 1px 1px;
+}
+
+/* The tag colour lands on the pill background (see get_tag_node_count_colors), so the number stays dark */
+.node-tag-counts .count-value {
+	display: inline-block;
 	height: 12px;
 	line-height: 12px;
-	padding: 0 2px;
+	padding: 0 5px;
+	border-radius: 6px;
+	background: #eceff3;
+	color: #333;
+}
+
+.node-tag-counts .count-value::before {
+	content: "\f02b";
+	font-family: 'Font Awesome 6 Free', 'FontAwesome';
+	font-weight: 900;
+	font-size: 7px;
+	margin-right: 2px;
+	opacity: 0.7;
 }
 
 /* Counts are unknown until the node update comes back (updateDirtyNode sets loading), so spin

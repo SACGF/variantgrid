@@ -760,8 +760,8 @@ function attachVariantCounters(nodes_selector, nodeCountTypes) {
 		}
 
 		if (tagCountTypes.length) {
-			// Tag counts get their own row behind a tag icon, so they read as tags not built-in filters
-			const tag_counts = $("<span class='node-counts node-tag-counts'><i class='fa-solid fa-tags tag-counts-icon'></i></span>").appendTo(strip);
+			// Tag counts get their own row, drawn as tag pills so they read as tags not built-in filters
+			const tag_counts = $("<span class='node-counts node-tag-counts'></span>").appendTo(strip);
 			for (let i=0 ; i<tagCountTypes.length ; ++i) {
 				createNodeCountDiv(tagCountTypes[i]).appendTo(tag_counts);
 			}
