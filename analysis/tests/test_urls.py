@@ -10,6 +10,8 @@ from django.utils import timezone
 
 from analysis.models import (
     Analysis,
+    AnalysisTemplate,
+    AnalysisTemplateType,
     GeneListNode,
     GeneListNodeGeneList,
     KaryomappingAnalysis,
@@ -118,6 +120,12 @@ class Test(URLTestCase):
         cls.gene_list_node = GeneListNode.objects.create(analysis=cls.analysis)
         GeneListNodeGeneList.objects.create(gene_list_node=cls.gene_list_node, gene_list=gene_list)
 
+        template_analysis = Analysis(genome_build=grch37, template_type=AnalysisTemplateType.TEMPLATE)
+        template_analysis.set_defaults_and_save(cls.user_owner)
+        cls.analysis_template = AnalysisTemplate.objects.create(name="test_urls template",
+                                                                user=cls.user_owner,
+                                                                analysis=template_analysis)
+
         cls.karyomapping_analysis = KaryomappingAnalysis.objects.create(user=cls.user_owner,
                                                                         name="test karyomapping",
                                                                         trio=cls.trio)
@@ -133,8 +141,7 @@ class Test(URLTestCase):
         cls.PRIVATE_OBJECT_URL_NAMES_AND_KWARGS = [
             ('analysis', {"analysis_id": cls.analysis.pk}, 200),
 
-            # analysis templates - TODO: Need to make Template and verify it is kept private
-            # ('analysis_template_settings', {"analysis_template_id": cls.analysis.pk}, 200),
+            ('analysis_template_settings', {"pk": cls.analysis_template.pk}, 200),
 
             # Node editor
             ('node_view', analysis_version_and_node_version_params, 200),

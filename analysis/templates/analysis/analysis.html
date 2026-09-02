@@ -265,18 +265,25 @@
                         {% if analysis.template_type == 'S' %}
                         <label>Version:</label> <span>{{ analysis.analysistemplateversion.version }}</span>
                         {% else %}
-                            {% with latest=analysis.template.latest_version_obj %}
+                            {% with latest=analysis.template.latest_version_obj active=analysis.template.active %}
                                 {% if latest %}
                                     <label>Latest Version:</label>
-                                    <span id="latest-template-version">v.{{ latest.version }} saved {{ latest.created|localtime|date:"Y-m-d H:i" }}</span>
+                                    <span id="latest-template-version">v.{{ latest.version }} ({% if latest.active %}active{% else %}draft{% endif %}) saved {{ latest.created|localtime|date:"Y-m-d H:i" }}</span>
+                                    {% if not latest.active and has_write_permission %}
+                                        <a href="{% url 'analysis_template_settings' analysis.template.pk %}" target="_blank">make active in Template settings</a>
+                                    {% endif %}
+                                    {% if active and active.pk != latest.pk %}
+                                        <div><label>Active:</label> <span>v.{{ active.version }}</span></div>
+                                    {% endif %}
                                 {% else %}
-                                    <span id="latest-template-version"><em>No saved versions - click "save version" to create an official version</em></span>
+                                    <span id="latest-template-version"><em>No saved versions - click "save draft" to create an official version</em></span>
                                 {% endif %}
                             {% endwith %}
                         {% endif %}
                         <div class="display-flex">
                             {% if analysis.template_type != 'S' and has_write_permission %}
-                            <button id="analysis-template-save-version" class="btn btn-outline-primary btn-sm">save version</button>
+                            <button id="analysis-template-save-version" class="btn btn-outline-primary btn-sm">save draft</button>
+                            <button id="analysis-template-save-active" class="btn btn-primary btn-sm">save &amp; make active</button>
                             {% endif %}
                             <a href="{%  url 'analysis_template_settings' analysis.template.pk %}" target="_blank">
                                 <span class="toolbar-button"><i class="fa-solid fa-gear"></i></span>

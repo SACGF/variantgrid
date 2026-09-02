@@ -26,4 +26,4 @@ class Command(BaseCommand):
                     reload_analysis_nodes(analysis.pk)
 
                     analysis_name_template = analysis_template.default_name_template()
-                    analysis_template.new_version(analysis_name_template)
+                    analysis_template.new_version(analysis_name_template).activate()

@@ -11,7 +11,7 @@ from django.utils.safestring import mark_safe
 
 from analysis.forms import get_analysis_template_form_for_variables_only_of_class
 from annotation.models.models_gene_counts import GeneCountType
-from analysis.models import Analysis, AnalysisTemplate, MutationalSignature
+from analysis.models import Analysis, AnalysisTemplateVersion, MutationalSignature
 from analysis.models.models_analysis import (
     ANALYSIS_TEMPLATE_SAMPLE_GROUP_FIELDS,
     ANALYSIS_TEMPLATE_SOURCE_FIELDS,
@@ -170,7 +170,7 @@ def analysis_templates_tag(context, genome_build, autocomplete_field=True, has_s
             "flattened_uuid": "",
             "autocomplete_field": autocomplete_field,
             "analysis_template_form": None,
-            "analysis_template_links": AnalysisTemplate.objects.none(),
+            "analysis_template_links": AnalysisTemplateVersion.objects.none(),
             "hidden_inputs": {},
             "missing_templates": "",
             "source_archived": True,
@@ -214,10 +214,11 @@ def analysis_templates_tag(context, genome_build, autocomplete_field=True, has_s
                                                                                   requires_sample_somatic=requires_sample_somatic,
                                                                                   requires_sample_gene_list=requires_sample_gene_list)
 
-    analysis_template_links = AnalysisTemplate.filter(user, class_name=class_name,
-                                                      requires_sample_somatic=requires_sample_somatic,
-                                                      requires_sample_gene_list=requires_sample_gene_list,
-                                                      atv_kwargs={"appears_in_links": True})
+    analysis_template_links = AnalysisTemplateVersion.filter_for_user(
+        user, class_name=class_name,
+        requires_sample_somatic=requires_sample_somatic,
+        requires_sample_gene_list=requires_sample_gene_list,
+        appears_in_links=True).select_related("template")
 
     flattened_uuid = str(uuid.uuid4()).replace("-", "_")
     return {

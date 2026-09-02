@@ -71,7 +71,8 @@ def get_analysis_template_form_for_variables_only_of_class(class_name, autocompl
         widget = forms.HiddenInput()
 
     class _AnalysisTemplateForm(forms.Form):
-        analysis_template = forms.ModelChoiceField(queryset=AnalysisTemplate.objects.all(), widget=widget)
+        analysis_template_version = forms.ModelChoiceField(queryset=AnalysisTemplateVersion.objects.all(),
+                                                           widget=widget)
 
     return _AnalysisTemplateForm
 

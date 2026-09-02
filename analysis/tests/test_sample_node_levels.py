@@ -24,7 +24,13 @@ from analysis.grid_export import node_grid_get_export_iterator
 from analysis.forms.forms_nodes import SampleNodeForm
 from analysis.grids import VariantGrid
 from analysis.analysis_templates import run_analysis_template
-from analysis.models import Analysis, AnalysisTemplate, AnalysisTemplateType, AnalysisVariable
+from analysis.models import (
+    Analysis,
+    AnalysisTemplate,
+    AnalysisTemplateType,
+    AnalysisTemplateVersion,
+    AnalysisVariable,
+)
 from analysis.models.enums import NodeStatus
 from analysis.models.nodes.analysis_node import NodeVCFFilter
 from analysis.models.nodes.sources.sample_node import SampleNode
@@ -691,7 +697,7 @@ class TestAnalysisTemplatesTag(SampleNodeLevelsTestCase):
                 context = self._tag(**{key: source})
                 self.assertEqual(context["hidden_inputs"], {key: source.pk})
                 self.assertNotIn("source_archived", context)
-                self.assertEqual(list(AnalysisTemplate.filter(self.user, class_name=class_name)), [])
+                self.assertEqual(list(AnalysisTemplateVersion.filter_for_user(self.user, class_name=class_name)), [])
 
     def test_the_page_block_renders_once_per_build_the_source_reaches(self):
         """ The shared Create analysis block - one analysis_templates_tag per genome build """
@@ -756,7 +762,7 @@ class TestSampleNodeAnalysisVariables(SampleNodeLevelsTestCase):
 
         template = AnalysisTemplate.objects.create(name="specimen template", user=self.user,
                                                    analysis=analysis)
-        template.new_version()
+        template.new_version().activate()
         template_run = run_analysis_template(template, self.grch37, user=self.user,
                                              specimen=self.specimen)
 

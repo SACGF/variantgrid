@@ -55,6 +55,7 @@ class Command(BaseCommand):
                                                    version=1,
                                                    analysis_name_template=analysis_name_template,
                                                    analysis_snapshot=analysis_snapshot,
+                                                   active=True,
                                                    appears_in_autocomplete=not hidden)
 
             print(f"Created template: {analysis_template}")

@@ -46,6 +46,8 @@ urlpatterns = [
     path('analysis_template/<pk>/save/', views_json.analysis_template_save, name='analysis_template_save'),
     path('analysis_template/<pk>/settings/', views.analysis_template_settings, name='analysis_template_settings'),
     path('analysis_template/<pk>/clone/', views_json.analysis_template_clone, name='analysis_template_clone'),
+    path('analysis_template_version/<int:pk>/activate/', views.analysis_template_version_activate,
+         name='analysis_template_version_activate'),
 
 
     # For node views below - a Node contains the analysis ID - so we don't need to pass analysis_id, but do so

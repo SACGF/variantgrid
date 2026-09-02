@@ -510,10 +510,19 @@ def analysis_template_variable(request, analysis_id, node_id):
 def analysis_template_save(request, pk):
     """ Creates a new AnalysisTemplateVersion for an AnalysisTemplate """
     analysis_template = AnalysisTemplate.get_for_user(request.user, pk, write=True)
+    analysis_name_template = request.POST.get("analysis_name_template")
+    activate = request.POST.get("activate") not in (None, "", "0", "false")
 
     try:
-        atv = analysis_template.new_version()
-        return JsonResponse({"version": atv.version, "created": atv.created.isoformat()})
+        previously_active = analysis_template.active
+        atv = analysis_template.new_version(analysis_name_template)
+        replaced_version = None
+        if activate:
+            atv.activate()
+            if previously_active:
+                replaced_version = previously_active.version
+        return JsonResponse({"version": atv.version, "created": atv.created.isoformat(),
+                             "active": atv.active, "replaced_version": replaced_version})
     except ValueError:
         return JsonResponse({
             "error": f"Could not create new analysis template version for '{analysis_template}'"

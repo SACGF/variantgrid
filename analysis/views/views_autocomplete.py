@@ -2,7 +2,7 @@ from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
 from django.views.decorators.vary import vary_on_cookie
 
-from analysis.models import Analysis, AnalysisTemplate
+from analysis.models import Analysis, AnalysisTemplateVersion
 from library.constants import MINUTE_SECS
 from library.django_utils.autocomplete_utils import AutocompleteView
 
@@ -21,11 +21,15 @@ class AnalysisAutocompleteView(AutocompleteView):
 
 
 class AnalysisTemplateAutocompleteView(AutocompleteView):
-    fields = ['name']
+    fields = ['template__name']
+
+    def sort_queryset(self, qs):
+        return qs.order_by("template__name", "-version")
 
     def get_user_queryset(self, user):
-        return AnalysisTemplate.filter(user,
-                                       requires_sample_somatic=self.forwarded.get("requires_sample_somatic"),
-                                       requires_sample_gene_list=self.forwarded.get("requires_sample_gene_list"),
-                                       class_name=self.forwarded.get("class_name"),
-                                       atv_kwargs={"appears_in_autocomplete": True})
+        return AnalysisTemplateVersion.filter_for_user(
+            user,
+            requires_sample_somatic=self.forwarded.get("requires_sample_somatic"),
+            requires_sample_gene_list=self.forwarded.get("requires_sample_gene_list"),
+            class_name=self.forwarded.get("class_name"),
+            appears_in_autocomplete=True)

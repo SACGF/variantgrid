@@ -12,6 +12,7 @@ from analysis.models import (
     AnalysisTemplate,
     AnalysisTemplateRun,
     AnalysisTemplateRunArgument,
+    AnalysisTemplateVersion,
     AutoLaunchAnalysisTemplate,
     CohortAnalysisTemplateRun,
     SampleAnalysisTemplateRun,
@@ -26,8 +27,10 @@ from snpdb.models import Cohort, GenomeBuild, Sample
 def run_analysis_template(analysis_template: AnalysisTemplate,
                           genome_build: GenomeBuild,
                           user: User = None,
+                          template_version: AnalysisTemplateVersion = None,
                           **kwargs) -> AnalysisTemplateRun:
-    template_run = AnalysisTemplateRun.create(analysis_template, genome_build, user=user)
+    template_run = AnalysisTemplateRun.create(analysis_template, genome_build, user=user,
+                                              template_version=template_version)
     template_run.populate_arguments(kwargs)
     populate_analysis_from_template_run(template_run)
     return template_run
@@ -80,13 +83,16 @@ def _get_single_template_run_analysis(klass, analysis_template: AnalysisTemplate
         field_name: obj,
     }
 
+    template_version = analysis_template.active
+    if template_version is None:
+        raise ValueError(f"{analysis_template} has no active version")
+
     try:
-        satr = klass.objects.get(analysis_template_run__template_version__template=analysis_template,
-                                 analysis_template_run__template_version__version=analysis_template.latest_version(),
-                                 **kwargs)
+        satr = klass.objects.get(analysis_template_run__template_version=template_version, **kwargs)
         return satr.analysis_template_run.analysis
     except klass.DoesNotExist:
-        at_run = run_analysis_template(analysis_template, obj.genome_build, **kwargs)
+        at_run = run_analysis_template(analysis_template, obj.genome_build,
+                                       template_version=template_version, **kwargs)
         at_run.analysis.visible = False
         at_run.analysis.save()
         add_public_group_read_permission(at_run.analysis)
@@ -154,6 +160,11 @@ def auto_launch_analysis_templates_for_sample(user, sample, analysis_description
     for analysis_template in _get_auto_launch_analysis_templates_for_sample(user, sample,
                                                                             skip_already_analysed=skip_already_analysed):
         template_version = analysis_template.active
+        if template_version is None:
+            logging.warning("Skipping auto analysis '%s' for sample: %s. Template has no active version",
+                            analysis_template, sample)
+            continue
+
         template_arguments = {"sample": sample}
         if template_version.requires_sample_gene_list:
             try:
@@ -161,7 +172,8 @@ def auto_launch_analysis_templates_for_sample(user, sample, analysis_description
             except ActiveSampleGeneList.DoesNotExist:
                 logging.warning("Skipping auto analysis '%s' for sample: %s. Will try again if QC Gene Lists created", analysis_template, sample)
                 continue
-        template_run = AnalysisTemplateRun.create(analysis_template, sample.genome_build, user=user)
+        template_run = AnalysisTemplateRun.create(analysis_template, sample.genome_build, user=user,
+                                                  template_version=template_version)
         if analysis_description:
             template_run.analysis.description = analysis_description
             template_run.analysis.save()

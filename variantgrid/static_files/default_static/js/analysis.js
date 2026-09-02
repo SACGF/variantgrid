@@ -847,9 +847,11 @@ function addAnalysisVariableButton(nodeId, field, readOnly) {
     checkTemplateSave();
 }
 
+const ANALYSIS_TEMPLATE_SAVE_BUTTONS = "button#analysis-template-save-version, button#analysis-template-save-active";
+
 function checkTemplateSave() {
     const analysisVariables = $(".analysis-variable-node", "#analysis-variables");
-    const templateSave = $("button#analysis-template-save-version", "#analysis-template-version");
+    const templateSave = $(ANALYSIS_TEMPLATE_SAVE_BUTTONS, "#analysis-template-version");
     if (analysisVariables.length) {
         templateSave.prop("disabled", false);
         templateSave.prop("title", "");
@@ -862,8 +864,9 @@ function checkTemplateSave() {
 function setupAnalysisTemplateTopBar(analysisTemplateId) {
     const templateInfo = $("#analysis-template-info");
     const atVersion = $("#analysis-template-version");
-    $("button#analysis-template-save-version", atVersion).click(function() {
+    $(ANALYSIS_TEMPLATE_SAVE_BUTTONS, atVersion).click(function() {
         const analysisNameTemplate = $("#id_analysis_name_template").val();
+        const activate = this.id === "analysis-template-save-active" ? 1 : 0;
 
         atVersion.hide();
         const savingMessage = $("<div />").html("saving...");
@@ -871,7 +874,7 @@ function setupAnalysisTemplateTopBar(analysisTemplateId) {
 
         $.ajax({
             type: "POST",
-            data: {analysis_name_template: analysisNameTemplate},
+            data: {analysis_name_template: analysisNameTemplate, activate: activate},
             url: Urls.analysis_template_save(analysisTemplateId),
             success: function(data) {
                 savingMessage.remove();
@@ -881,8 +884,19 @@ function setupAnalysisTemplateTopBar(analysisTemplateId) {
 
                 if (data.version) {
                     const savedDate = data.created ? new Date(data.created).toLocaleString() : "";
-                    const versionText = "v." + data.version + (savedDate ? " saved " + savedDate : "");
+                    const state = data.active ? " (active)" : " (draft)";
+                    const versionText = "v." + data.version + state + (savedDate ? " saved " + savedDate : "");
                     $("#latest-template-version").html(versionText);
+
+                    if (data.active) {
+                        message = "v." + data.version + " is now active";
+                        if (data.replaced_version) {
+                            message += " (was v." + data.replaced_version + ")";
+                        }
+                    } else {
+                        message = "Draft v." + data.version + " saved - make it active from Template settings when ready";
+                        messageTime = 5000;
+                    }
                 }
                 if (data.error) {
                     message = data.error;

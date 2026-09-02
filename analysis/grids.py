@@ -515,6 +515,7 @@ class AnalysisTemplatesColumns(DatatableConfig[AnalysisTemplate]):
             RichColumn(key="user__username", label="Created by", orderable=True,
                        extra_columns=["user__id"], renderer=self.render_user),
             RichColumn(key="latest_version", label="Latest version", orderable=True),
+            RichColumn(key="active_version", label="Active version", orderable=True),
             RichColumn(key="id", name="clone", label="", orderable=False,
                        renderer=self._render_clone, client_renderer='renderCloneRow'),
             RichColumn(key="id", name="delete", label="", orderable=False,
@@ -534,7 +535,9 @@ class AnalysisTemplatesColumns(DatatableConfig[AnalysisTemplate]):
 
     def get_initial_queryset(self) -> QuerySet[AnalysisTemplate]:
         qs = AnalysisTemplate.filter_for_user(self.user)
-        return qs.annotate(latest_version=Max("analysistemplateversion__version"))
+        q_active = Q(analysistemplateversion__active=True)
+        return qs.annotate(latest_version=Max("analysistemplateversion__version"),
+                           active_version=Max("analysistemplateversion__version", filter=q_active))
 
     def filter_queryset(self, qs: QuerySet[AnalysisTemplate]) -> QuerySet[AnalysisTemplate]:
         user_grid_config = UserGridConfig.get(self.user, 'Analysis Templates')

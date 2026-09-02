@@ -55,6 +55,7 @@ from analysis.models import (
     AnalysisTemplate,
     AnalysisTemplateRun,
     AnalysisTemplateRunArgument,
+    AnalysisTemplateVersion,
     AnalysisVariable,
     NodeGraphType,
     TagNode,
@@ -245,12 +246,15 @@ def view_active_node(analysis, active_node=None):
 def create_analysis_from_template(request, genome_build_name):
     data = request.POST.dict()
     tag_uuid = data.pop("tag_uuid")
-    analysis_template_key = f"{tag_uuid}-analysis_template"
-    analysis_template_id = data.pop(analysis_template_key)
-    analysis_template = AnalysisTemplate.get_for_user(request.user, analysis_template_id)
+    analysis_template_version_key = f"{tag_uuid}-analysis_template_version"
+    analysis_template_version_id = data.pop(analysis_template_version_key)
+    template_version = get_object_or_404(AnalysisTemplateVersion, pk=analysis_template_version_id)
+    # A draft is only for the people who can change the template - the active version is for everyone
+    template_version.template.check_permission(request.user, write=not template_version.active)
 
     genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
-    template_run = AnalysisTemplateRun.create(analysis_template, genome_build, user=request.user)
+    template_run = AnalysisTemplateRun.create(template_version.template, genome_build, user=request.user,
+                                              template_version=template_version)
     template_run.populate_arguments(data)
 
     # Block creation against archived sources. populate_arguments has already resolved
@@ -460,13 +464,16 @@ def analysis_template_settings(request, pk):
     at_form = _get_form(request, AnalysisTemplateForm, 'at-pre', instance=analysis_template)
     formset_data = request.POST if 'auto-launch' in request.POST else None
     formset = AutoLaunchFormSet(formset_data, prefix='auto-launch', instance=analysis_template)
-    atv_form = None
-    if atv := analysis_template.active:
-        atv_form = _get_form(request, AnalysisTemplateVersionForm, 'atv-pre', instance=atv)
+
+    # The draft's settings need to be editable before it goes live, so it gets a form as well
+    editable_versions = [atv for atv in (analysis_template.active, analysis_template.draft) if atv]
+    atv_forms = {atv.pk: _get_form(request, AnalysisTemplateVersionForm, f"atv-{atv.pk}", instance=atv)
+                 for atv in editable_versions}
 
     if not has_write_permission:
         set_form_read_only(at_form)
-        set_form_read_only(atv_form)
+        for atv_form in atv_forms.values():
+            set_form_read_only(atv_form)
         set_form_read_only(formset)
         messages.add_message(request, messages.WARNING, "You can view but not modify this data.")
 
@@ -488,21 +495,33 @@ def analysis_template_settings(request, pk):
                 formset = AutoLaunchFormSet(prefix='auto-launch', instance=analysis_template)
             add_save_message(request, valid, "Auto Launch Config")
 
-        if atv_form and atv_form.is_bound:
-            valid = atv_form.is_valid()
-            if valid:
-                atv_form.save()
-            add_save_message(request, valid, "Active Template Version")
+        for atv in editable_versions:
+            atv_form = atv_forms[atv.pk]
+            if atv_form.is_bound:
+                valid = atv_form.is_valid()
+                if valid:
+                    atv_form.save()
+                add_save_message(request, valid, f"Template Version v.{atv.version}")
 
+    versions = analysis_template.analysistemplateversion_set.order_by("-version")
     context = {
         "analysis_template": analysis_template,
-        "analysis_template_versions": analysis_template.analysistemplateversion_set.order_by("-pk"),
+        "analysis_template_versions": [(atv, atv_forms.get(atv.pk)) for atv in versions],
+        "has_versions": versions.exists(),
         "at_form": at_form,
         "at_formset": formset,
-        "atv_form": atv_form,
         "has_write_permission": has_write_permission,
     }
     return render(request, 'analysis/analysis_template_settings.html', context)
+
+
+@require_POST
+def analysis_template_version_activate(request, pk):
+    atv = get_object_or_404(AnalysisTemplateVersion, pk=pk)
+    atv.template.check_can_write(request.user)
+    atv.activate()
+    messages.add_message(request, messages.SUCCESS, f"v.{atv.version} is now the active version")
+    return redirect("analysis_template_settings", pk=atv.template_id)
 
 
 def get_node_views_by_class():

@@ -9,8 +9,8 @@ from auditlog.registry import auditlog
 from django.apps import apps
 from django.conf import settings
 from django.contrib.auth.models import Group, User
-from django.db import models
-from django.db.models import Count, Max, Model, OuterRef, Q, QuerySet, Subquery
+from django.db import models, transaction
+from django.db.models import Count, F, Max, Model, OuterRef, Q, QuerySet, Subquery
 from django.db.models.deletion import CASCADE, PROTECT, SET_DEFAULT, SET_NULL, ProtectedError
 from django.db.models.signals import pre_delete
 from django.dispatch import receiver
@@ -516,53 +516,31 @@ class AnalysisTemplate(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel
     def latest_version_obj(self):
         return self.analysistemplateversion_set.order_by("-pk").first()
 
+    @property
+    def draft(self) -> Optional['AnalysisTemplateVersion']:
+        """ The latest version, when it hasn't been made active - only writers can run it """
+        latest = self.latest_version_obj
+        if latest and not latest.active:
+            return latest
+        return None
+
     @classmethod
     def filter_for_user(cls, user, queryset=None, **kwargs):
         """ Hides deleted objects """
         qs = super().filter_for_user(user, queryset=queryset, **kwargs)
         return qs.filter(deleted=False)
 
-    @staticmethod
-    def filter(user: User, requires_sample_somatic=None, requires_sample_gene_list=None, class_name=None, atv_kwargs=None):
-        """ requires_sample_somatic/requires_sample_gene_list - leave None for all """
-        if atv_kwargs is None:
-            atv_kwargs = {}
-
-        qs = AnalysisTemplateVersion.objects.filter(active=True, **atv_kwargs)
-
-        if requires_sample_somatic is not None:
-            qs = qs.filter(requires_sample_somatic=requires_sample_somatic)
-
-        if requires_sample_gene_list is not None:
-            qs = qs.filter(requires_sample_gene_list=requires_sample_gene_list)
-
-        if class_name:
-            # Must not have any other types not supported
-            supported_types = {class_name}
-            EXTRA_PROVIDED_TYPES = {
-                'snpdb.Sample': {'genes.SampleGeneList'},
-                'snpdb.Trio': {'snpdb.Sample'},
-                'snpdb.Quad': {'snpdb.Sample'},
-            }
-
-            if extra_types := EXTRA_PROVIDED_TYPES.get(class_name):
-                supported_types.update(extra_types)
-            q_provided_types = Q(analysis_snapshot__analysisnode__analysisvariable__class_name__in=supported_types)
-            count_kwargs = {"filter": ~q_provided_types}
-
-            count_unsupported = Count("analysis_snapshot__analysisnode__analysisvariable__class_name", **count_kwargs)
-            qs = qs.annotate(unsupported_args=count_unsupported).filter(unsupported_args=0)
-            # Required to take main type as variable
-            qs = qs.filter(analysis_snapshot__analysisnode__analysisvariable__class_name=class_name)
-
-        return AnalysisTemplate.filter_for_user(user).filter(analysistemplateversion__in=qs)
+    @classmethod
+    def filter_writable_for_user(cls, user):
+        """ Hides deleted objects """
+        return super().filter_writable_for_user(user).filter(deleted=False)
 
     def default_name_template(self):
         """ The initial analysis_name_template in form for save version """
         analysis_name_template = "%(template)s for %(input)s"  # default
-        if self.active:
+        if latest := self.latest_version_obj:
             # Use last value if available
-            analysis_name_template = self.active.analysis_name_template
+            analysis_name_template = latest.analysis_name_template
         return analysis_name_template
 
     @staticmethod
@@ -593,9 +571,6 @@ class AnalysisTemplate(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel
         if error:
             raise ValueError(error)
 
-        # Mark all previous as inactive
-        self.analysistemplateversion_set.all().update(active=False)
-
         analysis_snapshot = self.analysis.clone()
         analysis_snapshot.visible = False
         analysis_snapshot.template_type = AnalysisTemplateType.SNAPSHOT
@@ -612,7 +587,7 @@ class AnalysisTemplate(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel
                                                       version=version,
                                                       analysis_name_template=analysis_name_template,
                                                       analysis_snapshot=analysis_snapshot,
-                                                      active=True,
+                                                      active=False,
                                                       requires_sample_gene_list=requires_sample_gene_list)
 
     def clone(self, user: User = None):
@@ -654,7 +629,7 @@ class AnalysisTemplateVersion(TimeStampedModel):
     version = models.IntegerField()
     analysis_name_template = models.TextField(null=True)  # Python string template
     analysis_snapshot = models.OneToOneField(Analysis, null=True, on_delete=PROTECT)
-    active = models.BooleanField(default=True)
+    active = models.BooleanField(default=False)
     appears_in_autocomplete = models.BooleanField(default=True)
     appears_in_links = models.BooleanField(default=False)
     requires_sample_somatic = models.BooleanField(default=False)
@@ -663,8 +638,76 @@ class AnalysisTemplateVersion(TimeStampedModel):
     class Meta:
         unique_together = ('template', 'version')
 
+    @transaction.atomic
+    def activate(self):
+        """ Make this the one version everyone who can view the template runs """
+        self.template.analysistemplateversion_set.update(active=False)
+        self.active = True
+        self.save()
+
+    @property
+    def is_draft(self) -> bool:
+        """ The latest saved version, before it's been made active - only writers can run it """
+        if self.active:
+            return False
+        latest = self.template.latest_version_obj
+        return latest is not None and latest.pk == self.pk
+
+    @property
+    def status_label(self) -> str:
+        if self.active:
+            return "Active"
+        if self.is_draft:
+            return "Draft"
+        return ""
+
+    @classmethod
+    def filter_for_user(cls, user: User, requires_sample_somatic=None, requires_sample_gene_list=None,
+                        class_name=None, **kwargs) -> QuerySet['AnalysisTemplateVersion']:
+        """ The versions a user can launch - the active one of any template they can see, plus the
+            draft of any template they can write.
+            requires_sample_somatic/requires_sample_gene_list - leave None for all """
+        qs = cls.objects.filter(**kwargs)
+
+        if requires_sample_somatic is not None:
+            qs = qs.filter(requires_sample_somatic=requires_sample_somatic)
+
+        if requires_sample_gene_list is not None:
+            qs = qs.filter(requires_sample_gene_list=requires_sample_gene_list)
+
+        if class_name:
+            # Must not have any other types not supported
+            supported_types = {class_name}
+            EXTRA_PROVIDED_TYPES = {
+                'snpdb.Sample': {'genes.SampleGeneList'},
+                'snpdb.Trio': {'snpdb.Sample'},
+                'snpdb.Quad': {'snpdb.Sample'},
+            }
+
+            if extra_types := EXTRA_PROVIDED_TYPES.get(class_name):
+                supported_types.update(extra_types)
+            q_provided_types = Q(analysis_snapshot__analysisnode__analysisvariable__class_name__in=supported_types)
+            count_kwargs = {"filter": ~q_provided_types}
+
+            count_unsupported = Count("analysis_snapshot__analysisnode__analysisvariable__class_name", **count_kwargs)
+            qs = qs.annotate(unsupported_args=count_unsupported).filter(unsupported_args=0)
+            # Required to take main type as variable
+            qs = qs.filter(analysis_snapshot__analysisnode__analysisvariable__class_name=class_name)
+
+        # Subquery rather than Max() - an aggregate here would multiply out against unsupported_args
+        latest_version = Subquery(cls.objects.filter(template=OuterRef("template"))
+                                  .order_by("-version").values("version")[:1])
+        qs = qs.annotate(latest_version=latest_version)
+        q_active = Q(active=True, template__in=AnalysisTemplate.filter_for_user(user))
+        q_draft = Q(active=False, version=F("latest_version"),
+                    template__in=AnalysisTemplate.filter_writable_for_user(user))
+        return qs.filter(q_active | q_draft)
+
     def __str__(self):
-        return f"{self.template} v.{self.version}"
+        s = f"{self.template} v.{self.version}"
+        if self.is_draft:
+            s += " (draft)"
+        return s
 
 
 class AnalysisTemplateRun(TimeStampedModel):
@@ -672,11 +715,16 @@ class AnalysisTemplateRun(TimeStampedModel):
     analysis = models.OneToOneField(Analysis, on_delete=CASCADE)  # Created new analysis
 
     @staticmethod
-    def create(analysis_template: AnalysisTemplate, genome_build: GenomeBuild, user: User = None):
+    def create(analysis_template: AnalysisTemplate, genome_build: GenomeBuild, user: User = None,
+               template_version: 'AnalysisTemplateVersion' = None):
         if user is None:
             user = admin_bot()
 
-        template_version = analysis_template.active
+        if template_version is None:
+            template_version = analysis_template.active
+            if template_version is None:
+                raise ValueError(f"{analysis_template} has no active version")
+
         analysis = template_version.analysis_snapshot.clone()
         analysis.user = user
         analysis.genome_build = genome_build

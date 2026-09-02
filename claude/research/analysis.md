@@ -86,10 +86,11 @@ A locked-down, reusable analysis workflow.
 - `analysis` (OneToOne FK to `Analysis`): The live template analysis (with `template_type=TEMPLATE`).
 - `user` (FK): Owner/author.
 - `deleted` (bool): Soft-delete flag.
-- `active` (bool): Whether the template is currently available for use.
+- `active` (property): The `AnalysisTemplateVersion` with `active=True`, or `None`.
+- `draft` (property): The latest version when it hasn't been activated, or `None`.
 
 **Key Methods:**
-- `new_version()`: Creates an immutable snapshot of the current template state and registers it as a new `AnalysisTemplateVersion`. The snapshot has `template_type=SNAPSHOT`.
+- `new_version()`: Creates an immutable snapshot of the current template state and registers it as a new `AnalysisTemplateVersion`. The snapshot has `template_type=SNAPSHOT`. The new version is a **draft** - `activate()` is what makes it live.
 - `requires_sample_somatic` (property): Whether any source node requires a somatic sample.
 - `requires_sample_gene_list` (property): Whether any source node requires a gene list.
 
@@ -101,7 +102,7 @@ Represents a specific versioned snapshot of an `AnalysisTemplate`.
 **Fields:**
 - `version` (int): Monotonically increasing version number within the template.
 - `analysis_snapshot` (OneToOne FK to `Analysis`): The immutable snapshot analysis.
-- `active` (bool): Only one version per template can be active at a time.
+- `active` (bool): Only one version per template can be active at a time - the one everyone who can view the template runs. `activate()` is the only thing that sets it, clearing the flag on the template's other versions. A version that isn't active but is the latest is a **draft** (`is_draft`), runnable only by people who can write the template. `filter_for_user()` returns exactly those two sets.
 - `analysis_name_template` (str): A Python string template used to name analyses created from this version. Example: `"%(template)s for %(input)s"`.
 - `appears_in_autocomplete` (bool): Controls whether this template version shows up in autocomplete suggestions.
 - `appears_in_links` (bool): Controls whether this template version appears in quick-launch link lists.
