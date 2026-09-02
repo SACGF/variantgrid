@@ -205,6 +205,24 @@ class BackfillColumnRoundTripTests(TestCase):
 
         self.assertEqual(self._cosmic_counts(), [None, 5, 3])
 
+    def test_not_null_skips_variants_the_source_never_matched(self):
+        """ cosmic_legacy_id stands in for a sibling column the same source writes - only variants
+            holding one can gain a count, so the rest stay out of the dump """
+        VariantAnnotation.objects.filter(version=self.vav, variant=self.variants[1]) \
+                                 .update(cosmic_legacy_id=None)
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            dump_filename = os.path.join(tmp_dir, "dump.vcf")
+            count = dump_annotated_variants(self.vav, dump_filename, targets=self.targets,
+                                            only_missing=True, not_null_columns=["cosmic_legacy_id"])
+        self.assertEqual(count, 1)
+
+    def test_not_null_rejects_a_column_that_is_not_a_field(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            dump_filename = os.path.join(tmp_dir, "dump.vcf")
+            with self.assertRaises(BackfillColumnError):
+                dump_annotated_variants(self.vav, dump_filename, targets=self.targets,
+                                        not_null_columns=["not_a_column"])
+
     def test_batches_smaller_than_the_file(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
             counts = {v.pk: str(i + 1) for i, v in enumerate(self.variants)}

@@ -47,6 +47,10 @@ class Command(BaseCommand):
         parser.add_argument("--output", help="--dump: VCF to write (.gz writes bgzip, which tabix can index)")
         parser.add_argument("--only-missing", action="store_true",
                             help="--dump: only variants where every --columns value is null")
+        parser.add_argument("--not-null", dest="not_null",
+                            help="--dump: only variants that already have a value for these comma "
+                                 "separated columns, eg a sibling column the same source writes - "
+                                 "keeps the dump to the variants that source can say anything about")
         parser.add_argument("--min-variant-id", type=int,
                             help="--dump: split a large dump into pieces that can be annotated in parallel")
         parser.add_argument("--max-variant-id", type=int, help="--dump: see --min-variant-id")
@@ -114,10 +118,15 @@ class Command(BaseCommand):
         if not output_filename:
             raise CommandError("--dump requires --output")
 
-        count = dump_annotated_variants(variant_annotation_version, output_filename, targets=targets,
-                                        only_missing=options["only_missing"],
-                                        min_variant_id=options["min_variant_id"],
-                                        max_variant_id=options["max_variant_id"])
+        not_null_columns = [c.strip() for c in (options["not_null"] or "").split(",") if c.strip()]
+        try:
+            count = dump_annotated_variants(variant_annotation_version, output_filename, targets=targets,
+                                            only_missing=options["only_missing"],
+                                            not_null_columns=not_null_columns,
+                                            min_variant_id=options["min_variant_id"],
+                                            max_variant_id=options["max_variant_id"])
+        except BackfillColumnError as e:
+            raise CommandError(str(e))
         self.stdout.write(f"Dumped {count} variants annotated by {variant_annotation_version} "
                           f"to '{output_filename}'")
 

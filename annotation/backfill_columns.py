@@ -162,14 +162,26 @@ def resolve_backfill_columns(variant_annotation_version: VariantAnnotationVersio
     return targets
 
 
+def _validate_annotation_columns(columns: Iterable[str]) -> list[str]:
+    columns = list(columns or [])
+    if unknown := set(columns) - set(get_model_fields(VariantAnnotation)):
+        raise BackfillColumnError(f"Not fields of VariantAnnotation: {', '.join(sorted(unknown))}")
+    return columns
+
+
 def dump_annotated_variants(variant_annotation_version: VariantAnnotationVersion, output_filename: str,
                             targets: list[BackfillTarget] = None, only_missing: bool = False,
+                            not_null_columns: Iterable[str] = None,
                             min_variant_id: int = None, max_variant_id: int = None) -> int:
     """ Write the variants annotated in this version to a VCF carrying variant_id in INFO, ready to be
         annotated externally. Returns the number of records written.
 
         only_missing restricts to rows where every target column is null - the common backfill shape, and
-        much smaller than a full dump. """
+        much smaller than a full dump.
+
+        not_null_columns restricts to rows that already have a value for those columns. A source writes
+        all of its columns together, so a sibling column being null rules the variant out - #1822's Open
+        Targets score only needed the 465k variants the plugin matched, not the version's 8.4M. """
     annotation_version = variant_annotation_version.get_any_annotation_version()
     qs = get_variants_qs_for_annotation(annotation_version, annotated=True,
                                         min_variant_id=min_variant_id, max_variant_id=max_variant_id)
@@ -183,6 +195,8 @@ def dump_annotated_variants(variant_annotation_version: VariantAnnotationVersion
             raise ValueError("only_missing requires the resolved targets")
         for target in targets:
             annotation_filter[f"variantannotation__{target.column}__isnull"] = True
+    for column in _validate_annotation_columns(not_null_columns):
+        annotation_filter[f"variantannotation__{column}__isnull"] = False
     qs = qs.filter(**annotation_filter)
 
     return write_qs_to_vcf(output_filename, variant_annotation_version.genome_build, qs)

@@ -109,3 +109,7 @@ class ManualOperation(Operation):
     @staticmethod
     def task_id_manage(args: Union[str, list[str]]) -> str:
         return ManualOperation._task_id_generate(category="manage", args=args)
+
+    @staticmethod
+    def task_id_other(args: Union[str, list[str]]) -> str:
+        return ManualOperation._task_id_generate(category="other", args=args)
