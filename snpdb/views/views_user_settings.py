@@ -15,7 +15,7 @@ from django.urls.base import reverse
 from django.views.decorators.http import require_POST
 
 from analysis.models import Analysis
-from analysis.views.views import _analysis_settings_node_counts_tab
+from analysis.views.views_analysis_settings import analysis_settings_node_counts_tab_for
 from classification.models import Classification
 from library.django_utils import (
     add_save_message,
@@ -198,7 +198,7 @@ def organization_settings_node_counts_tab(request, pk):
 
 
 def _settings_override_node_counts_tab(request, settings_override, has_write_permission=True):
-    # This calls _analysis_settings_node_counts_tab with a FakeAnalysis object that
+    # This calls analysis_settings_node_counts_tab_for with a FakeAnalysis object that
     # handles loading/saving a global one against User settings objects instead of analysis
     class FakeAnalysis:
 
@@ -216,7 +216,7 @@ def _settings_override_node_counts_tab(request, settings_override, has_write_per
             return AbstractNodeCountSettings.get_types_from_labels(node_count_filters)
 
     fake_analysis = FakeAnalysis()
-    return _analysis_settings_node_counts_tab(request, fake_analysis,
+    return analysis_settings_node_counts_tab_for(request, fake_analysis,
                                               is_analysis=False, has_write_permission=has_write_permission)
 
 

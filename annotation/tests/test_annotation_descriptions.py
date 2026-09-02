@@ -9,7 +9,7 @@ from library.django_utils.unittest_utils import URLTestCase
 
 
 class AnnotationDescriptionsTest(URLTestCase):
-    """ The composite cells card - @see annotation.views.view_annotation_descriptions """
+    """ The composite cells card - @see annotation.views_descriptions.view_annotation_descriptions """
 
     # The response goes through htmlmin, which picks the attribute quoting - so match either
     SECTION_RE = re.compile(

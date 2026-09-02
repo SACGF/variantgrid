@@ -229,7 +229,7 @@ class PromotePipelineVersionViewTest(TestCase):
         self.assertContains(response, f"promote-pipeline-version-{self.new.pk}")
 
     def test_promoting_activates_and_queues_the_scheduler(self):
-        with mock.patch("annotation.views.annotation_scheduler") as scheduler:
+        with mock.patch("annotation.views_annotation_runs.annotation_scheduler") as scheduler:
             response = self.client.post(reverse("variant_annotation_runs"),
                                         {f"promote-pipeline-version-{self.new.pk}": "1"})
         self.assertEqual(response.status_code, 200)
@@ -262,7 +262,7 @@ class RegisterPipelineVersionViewTest(TestCase):
     def test_registering_creates_active_version_and_queues_the_scheduler(self):
         with mock.patch("annotation.pipelines.annotsv.get_annotsv_command_line_version",
                         return_value="3.5.10"), \
-                mock.patch("annotation.views.annotation_scheduler") as scheduler:
+                mock.patch("annotation.views_annotation_runs.annotation_scheduler") as scheduler:
             response = self.client.post(reverse("variant_annotation_runs"), {self.post_name: "1"})
         self.assertEqual(response.status_code, 200)
         pipeline_version = AnnotationPipelineVersion.get_active(ANNOTSV, self.genome_build)

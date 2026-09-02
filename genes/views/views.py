@@ -1,17 +1,11 @@
-import operator
 from collections import defaultdict
-from collections.abc import Iterable
 from dataclasses import dataclass
-from datetime import datetime, timedelta
-from functools import cached_property, reduce
 from itertools import combinations
-from typing import Any, Optional, Union
+from typing import Any, Optional
 
 from django.conf import settings
 from django.contrib import messages
-from django.db.models import QuerySet
 from django.db.models.aggregates import Count
-from django.db.models.query_utils import Q
 from django.http.response import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -19,62 +13,41 @@ from django.utils.datastructures import OrderedSet
 from django.views.decorators.cache import cache_page
 from django.views.decorators.http import require_POST
 
-from analysis.models import VariantTag
-from annotation.models import Citation
-from annotation.models.models import (
-    AnnotationVersion,
-    DBNSFPGeneAnnotation,
-    DBNSFPGeneAnnotationVersion,
-)
-from classification.models import ClassificationModification
-from classification.models.classification_utils import classification_gene_symbol_filter
+from annotation.models.models import AnnotationVersion
 from classification.views.exports import ClassificationExportFormatterCSV
 from classification.views.exports.classification_export_filter import ClassificationFilter
 from classification.views.exports.classification_export_formatter_csv import FormatDetailsCSV
-from genes.custom_text_gene_list import create_custom_text_gene_list
 from genes.forms import (
-    CustomGeneListForm,
     GeneAnnotationReleaseGenomeBuildForm,
     GeneListForm,
     GeneSymbolForm,
     NamedCustomGeneListForm,
     UserGeneListForm,
 )
+from genes.gene_symbol_view_info import GeneSymbolViewInfo
 from genes.graphs.gene_list_chromosome_graph import GeneListChromosomeGraph
 from genes.hgvs import HGVSMatcher
 from genes.models import (
-    HGNC,
     CanonicalTranscriptCollection,
-    CustomTextGeneList,
     Gene,
-    GeneCoverage,
-    GeneCoverageCanonicalTranscript,
-    GeneCoverageCollection,
     GeneList,
     GeneListCategory,
     GeneSymbol,
-    GeneVersion,
-    GnomADGeneConstraint,
     NoTranscript,
-    PanelAppServer,
     SampleGeneList,
     Transcript,
     TranscriptVersion,
     TranscriptVersionSequenceInfo,
 )
-from genes.models_enums import AnnotationConsortium
 from genes.serializers import SampleGeneListSerializer
 from library.constants import WEEK_SECS
 from library.django_utils import add_save_message, get_field_counts
-from library.utils import LazyAttribute, defaultdict_to_dict, full_class_name
-from ontology.models import OntologyService, OntologySnake, OntologyTerm
-from seqauto.models import EnrichmentKit
+from library.utils import LazyAttribute, full_class_name
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.graphs import graphcache
-from snpdb.models import Sample, VariantGridColumn, VariantZygosityCountCollection
+from snpdb.models import Sample
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_user_settings import UserSettings
-from snpdb.variant_queries import get_has_classifications_q, get_variant_queryset_for_gene_symbol
 
 
 def genes(request, genome_build_name=None):
@@ -148,233 +121,6 @@ def view_gene(request, gene_id):
     }
     return render(request, "genes/view_gene.html", context)
 
-
-def _get_omim_and_hpo_for_gene_symbol(gene_symbol: GeneSymbol) -> list[tuple[OntologyTerm, list[OntologyTerm]]]:
-    omim_and_hpo_for_gene = []
-    try:
-        # max_depth = 0 for direct links only
-        for omim in OntologySnake.terms_for_gene_symbol(gene_symbol, OntologyService.OMIM, max_depth=0).leafs():
-            hpo_list = OntologySnake.snake_from(omim, OntologyService.HPO, max_depth=0).leafs()
-            omim_and_hpo_for_gene.append((omim, hpo_list))
-    except ValueError:  # in case we don't have this gene symbol available
-        pass
-
-    return omim_and_hpo_for_gene
-
-
-@dataclass(frozen=True)
-class HasVariants:
-    has_tagged_variants: bool
-    has_observed_variants: bool
-    has_classified_variants: bool
-
-    @property
-    def has_variants(self) -> bool:
-        return self.has_tagged_variants or self.has_observed_variants or self.has_classified_variants
-
-    def __bool__(self):
-        return self.has_variants
-
-
-class GeneSymbolViewInfo:
-
-    def __init__(self, gene_symbol: GeneSymbol, desired_genome_build: Optional[GenomeBuild], user,
-                 tool_tips=None):
-        self.gene_symbol = gene_symbol
-        self.desired_genome_build = desired_genome_build
-        self.tool_tips = tool_tips
-        if user is not None:
-            self.user = user
-            if self.tool_tips is None:
-                user_settings = UserSettings.get_for_user(user)
-                self.tool_tips = user_settings.tool_tips
-
-    @cached_property
-    def omim_and_hpo_for_gene(self) -> list[tuple[OntologyTerm, list[OntologyTerm]]]:
-        return _get_omim_and_hpo_for_gene_symbol(self.gene_symbol)
-
-    @cached_property
-    def hgnc(self) -> Optional[HGNC]:
-        return self.gene_symbol.hgnc_set.order_by("status").first()
-
-    @cached_property
-    def citations_ids(self) -> list[str]:
-        return sorted(set(Citation.objects.filter(genesymbolcitation__gene_symbol=self.gene_symbol).values_list('id', flat=True)))
-
-    @cached_property
-    def dbnsfp_gene_annotation(self) -> Optional[DBNSFPGeneAnnotation]:
-        dga = None
-        if dbnsfp_gene_version := DBNSFPGeneAnnotationVersion.latest():
-            dga = self.gene_symbol.dbnsfpgeneannotation_set.filter(version=dbnsfp_gene_version).first()
-        return dga
-
-    @cached_property
-    def gene_constraint(self) -> Optional[GnomADGeneConstraint]:
-        return GnomADGeneConstraint.objects.filter(gene_symbol=self.gene_symbol).order_by("-mane_select").first()
-
-    @cached_property
-    def gene_summary(self) -> Optional[str]:
-        refseq_gene: Gene
-        if refseq_gene := Gene.objects.filter(annotation_consortium=AnnotationConsortium.REFSEQ,
-                                              geneversion__gene_symbol=self.gene_symbol).first():
-            return refseq_gene.summary
-        return None
-
-    @cached_property
-    def gene_version(self) -> Optional[GeneVersion]:
-        gene_versions = self.gene_symbol.geneversion_set.all()
-        if gene_versions.exists():
-            # This page is shown using the users default genome build
-            # However - it's possible the gene doesn't exist for a particular genome build.
-            # If gene has a version for a build in user settings, use that and show a warning message
-            gene_version = gene_versions.filter(genome_build=self.desired_genome_build).first()
-            if not gene_version:
-                gene_version = gene_versions.first()  # Try another build
-            return gene_version
-        return None
-
-    @cached_property
-    def genome_build(self) -> GenomeBuild:
-        if gene_version := self.gene_version:
-            return gene_version.genome_build
-        return self.desired_genome_build
-
-    def warnings(self) -> list[str]:
-        warnings = []
-        if self.gene_version:
-            # This page is shown using the users default genome build
-            # However - it's possible the gene doesn't exist for a particular genome build.
-            # If gene has a version for a build in user settings, use that and show a warning message
-            if self.genome_build != self.desired_genome_build:
-                warnings.append(f"This symbol is not associated with any genes in build {self.desired_genome_build}, viewing in build {self.genome_build}")
-        else:
-            warnings.append("There are no genes linked against this symbol")
-        return warnings
-
-    @cached_property
-    def has_variants(self) -> HasVariants:
-
-        has_tagged_variants = False
-        has_observed_variants = False
-        has_classified_variants = False
-
-        if self.gene_version:
-            annotation_version = AnnotationVersion.latest(self.genome_build)
-            gene_variant_qs = get_variant_queryset_for_gene_symbol(self.gene_symbol, annotation_version,
-                                                                   traverse_aliases=True)
-            gene_variant_qs, vzcc = VariantZygosityCountCollection.annotate_global_germline_counts(gene_variant_qs)
-            has_observed_variants = gene_variant_qs.filter(**{f"{vzcc.non_ref_call_alias}__gt": 0}).exists()
-
-            has_tagged_variants = VariantTag.get_for_build(self.genome_build, variant_qs=gene_variant_qs).exists()
-
-            # has classifications isn't 100% in sync with the classification table: this code looks at VariantAlleles
-            # wheras the classification table will filter on gene symbol and transcript evidence keys
-            q = get_has_classifications_q(self.genome_build)
-            has_classified_variants = gene_variant_qs.filter(q).exists()
-
-        return HasVariants(
-            has_tagged_variants=has_tagged_variants,
-            has_observed_variants=has_observed_variants,
-            has_classified_variants=has_classified_variants)
-
-    @property
-    def has_classified_variants(self):
-        return self.has_variants.has_classified_variants
-
-    @cached_property
-    def consortium_genes_and_aliases(self) -> dict[str, set[str]]:
-        consortium_genes_and_aliases = defaultdict(lambda: defaultdict(set))
-        gene: Gene
-        for gene in self.gene_symbol.genes:
-            aliases = consortium_genes_and_aliases[gene.get_annotation_consortium_display()][gene.identifier]
-            aliases.update(gene.get_symbols().exclude(symbol=self.gene_symbol))
-        return defaultdict_to_dict(consortium_genes_and_aliases)
-
-    @cached_property
-    def gene_external_urls(self) -> dict[str, str]:
-        gene_external_urls: dict[str, str] = {}
-        for gene in self.gene_symbol.genes:
-            gene_external_urls[gene.identifier] = gene.get_external_url()
-        return gene_external_urls
-
-    @cached_property
-    def annotation_description(self):
-        descriptions = {}
-        if self.tool_tips:
-            descriptions = VariantGridColumn.get_column_descriptions()
-            descriptions["gnomad_gene_constraint"] = """
-            constraint score shown in gnomAD is the ratio of the observed / expected (oe) number of loss-of-function
-            variants in that gene. The expected counts are based on a mutational model that takes sequence context,
-            coverage and methylation into account. Low oe values are indicative of strong intolerance. Range is 90%
-            confidence interval. <a href='http://gnomad-sg.org/help/constraint'>Details at gnomAD</a> """
-            descriptions["essential_gene"] = f"""
-                <p><b>CRISPR:</b> {descriptions['essential_gene_crispr']}</p>
-                <p><b>CRISPR2:</b>{descriptions['essential_gene_crispr2']}</p>
-                <p><b>Gene Trap:</b>{descriptions['essential_gene_gene_trap']}</p>
-            """
-        return descriptions
-
-    @cached_property
-    def has_gene_coverage(self) -> bool:
-        if not settings.VIEW_GENE_SYMBOL_SHOW_GENE_COVERAGE:
-            return False
-        has_gene_coverage = GeneCoverage.get_for_symbol(self.genome_build, self.gene_symbol).exists()
-        if has_gene_coverage:
-            return True
-        has_canonical_gene_coverage = GeneCoverageCanonicalTranscript.get_for_symbol(self.genome_build, self.gene_symbol).exists()
-        return has_canonical_gene_coverage
-
-    @property
-    def has_samples_in_other_builds(self) -> bool:
-        return Sample.objects.exclude(vcf__genome_build=self.genome_build).exists()
-
-    @cached_property
-    def gene_in_gene_lists(self) -> bool:
-        gene_lists_qs = GeneList.filter_for_user(self.user)
-        gene_in_gene_lists = GeneList.visible_gene_lists_containing_gene_symbol(gene_lists_qs, self.gene_symbol).exists()
-        return gene_in_gene_lists
-
-    @cached_property
-    def classifications(self) -> QuerySet[ClassificationModification]:
-        # Note this is loaded in Ajax
-        classifications_qs = ClassificationModification.objects.none()
-        if filters := classification_gene_symbol_filter(self.gene_symbol):
-            classifications = ClassificationModification.objects.filter(filters).filter(
-                is_last_published=True).exclude(classification__withdrawn=True)
-            classifications_qs = ClassificationModification.filter_for_user(user=self.user, queryset=classifications)
-
-        classifications_qs = classifications_qs.select_related('classification', 'classification__lab', 'classification__allele', 'classification__allele__clingen_allele')
-        return classifications_qs
-
-    @cached_property
-    def unmatched_classifications(self) -> QuerySet[ClassificationModification]:
-        "Only return classifications with no grouping"
-        evidence_q_list = []
-        for symbol in self.gene_symbol.alias_meta.alias_symbol_strs:
-            evidence_q_list.append(Q(published_evidence__gene_symbol__value__iexact=symbol))
-        classifications_qs = ClassificationModification.objects.filter(
-            classification__allele_info__allele__isnull=True,
-            classification__withdrawn=False,
-            is_last_published=True,
-            classification__created__lte=datetime.now() - timedelta(minutes=1),
-        ).filter(reduce(operator.or_, evidence_q_list))
-        classifications_qs = ClassificationModification.filter_for_user(user=self.user, queryset=classifications_qs)
-        classifications_qs = classifications_qs.select_related('classification', 'classification__lab')
-        return sorted(classifications_qs[0:100], key=lambda c: c.curated_date_check, reverse=True)
-
-    @cached_property
-    def unmatched_classifications_title(self):
-        if count := len(self.unmatched_classifications):
-            return f"{count} Unmatched Classification{'s' if count > 1 else ''} for {self.gene_symbol}"
-
-    def panel_app_servers(self) -> Union[QuerySet, Iterable[PanelAppServer]]:
-        return PanelAppServer.objects.order_by("pk")
-
-    def show_classifications_hotspot_graph(self) -> bool:
-        return settings.VIEW_GENE_HOTSPOT_GRAPH_CLASSIFICATIONS and self.has_variants.has_classified_variants
-
-    def show_hotspot_graph(self) -> bool:
-        return settings.VIEW_GENE_HOTSPOT_GRAPH and self.has_variants.has_observed_variants
 
 
 def export_classifications_gene_symbol(request, gene_symbol: str, genome_build_name: str):
@@ -714,89 +460,6 @@ def canonical_transcripts(request):
     context = {"default_ctc": default_ctc}
     return render(request, 'genes/canonical_transcripts.html', context)
 
-
-def gene_coverage_graphs(request, genome_build, gene_symbols: Iterable[str]):
-    NON_KIT_NAME = "Other / No enrichment kit"
-    fields = ("mean", "percent_20x")
-    enrichment_kits = EnrichmentKit.get_enrichment_kits(settings.SEQAUTO_COVERAGE_ENRICHMENT_KITS)
-    # field_enrichment_kit_gene_json = { field_name : {'enrichment_kit' : {"gene1" : list, "gene2" : list}} }
-    field_enrichment_kit_gene_json = defaultdict(lambda: defaultdict(dict))
-    enrichment_kit_names = list(map(str, enrichment_kits))
-    has_non_kit_coverage = GeneCoverageCollection.objects.filter(qcgenecoverage__isnull=True).exists()
-    has_coverage = has_non_kit_coverage
-
-    if has_non_kit_coverage:
-        enrichment_kit_names.append(NON_KIT_NAME)
-
-    for gene_symbol in gene_symbols:
-        base_gene_coverage_qs = GeneCoverageCanonicalTranscript.get_for_symbol(genome_build, gene_symbol)
-        has_coverage = has_coverage or base_gene_coverage_qs.exists()
-
-        for enrichment_kit in enrichment_kits:
-            filter_q = Q(gene_coverage_collection__qcgenecoverage__qc__bam_file__sequencing_sample__enrichment_kit=enrichment_kit)
-            enrichment_kit_data = get_coverage_stats(base_gene_coverage_qs, filter_q, fields)
-            enrichment_kit_name = str(enrichment_kit)
-            for field_name in fields:
-                field_enrichment_kit_gene_json[field_name][enrichment_kit_name][gene_symbol] = enrichment_kit_data.get(field_name, [])
-
-        if has_non_kit_coverage:
-            filter_q = Q(gene_coverage_collection__qcgenecoverage__qc__isnull=True)
-            other_data = get_coverage_stats(base_gene_coverage_qs, filter_q, fields)
-            for field_name in fields:
-                field_enrichment_kit_gene_json[field_name][NON_KIT_NAME][gene_symbol] = other_data.get(field_name, [])
-
-    context = {'has_coverage': has_coverage,
-               'fields': fields,
-               'enrichment_kits_list': enrichment_kit_names,
-               'gene_symbols': gene_symbols,
-               'field_enrichment_kit_gene': field_enrichment_kit_gene_json}
-    return render(request, 'genes/coverage/gene_coverage_graphs.html', context)
-
-
-def get_coverage_stats(base_gene_coverage_qs, filter_q, fields):
-    gene_coverage_qs = base_gene_coverage_qs.filter(filter_q)
-
-    values = defaultdict(list)
-    for data in gene_coverage_qs.values(*fields):
-        for k, v in data.items():
-            values[k].append(v)
-    return values
-
-
-def qc_coverage(request, genome_build_name=None):
-    SPECIAL_COVERAGE_CUSTOM_GENE_LIST = f"__QC_COVERAGE_CUSTOM_GENE_LIST__{request.user}"
-    custom_text_gene_list, _ = CustomTextGeneList.objects.get_or_create(name=SPECIAL_COVERAGE_CUSTOM_GENE_LIST)
-
-    genome_build = UserSettings.get_genome_build_or_default(request.user, genome_build_name)
-    custom_gene_list_form = CustomGeneListForm(request.POST or None,
-                                               initial={"custom_gene_list_text": custom_text_gene_list.text})
-    if custom_gene_list_form.is_valid():
-        custom_text_gene_list.text = custom_gene_list_form.cleaned_data['custom_gene_list_text']
-        custom_text_gene_list.save()
-        create_custom_text_gene_list(custom_text_gene_list, request.user, GeneListCategory.QC_COVERAGE_CUSTOM_TEXT, hidden=True)
-        gene_list_id = custom_text_gene_list.gene_list.pk
-    else:
-        gene_list_id = None
-
-    context = {"genome_build": genome_build,
-               'gene_symbol_form': GeneSymbolForm(),
-               'gene_list_id': gene_list_id,
-               'gene_list_form': UserGeneListForm(),
-               'custom_gene_list_form': custom_gene_list_form}
-    return render(request, 'genes/coverage/qc_coverage.html', context)
-
-
-def gene_coverage_collection_graphs(request, genome_build_name, gene_symbol):
-    gene_symbol = get_object_or_404(GeneSymbol, pk=gene_symbol)
-    genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
-    return gene_coverage_graphs(request, genome_build, [gene_symbol.symbol])
-
-
-def qc_gene_list_coverage_graphs(request, genome_build_name, gene_list_id):
-    gene_list = GeneList.get_for_user(request.user, gene_list_id)
-    genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
-    gene_symbols = list(gene_list.get_gene_names())
-    return gene_coverage_graphs(request, genome_build, gene_symbols)
 
 
 def sample_gene_lists_tab(request, sample_id):

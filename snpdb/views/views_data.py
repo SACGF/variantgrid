@@ -39,7 +39,7 @@ from library.django_utils import (
 )
 from library.utils import full_class_name
 from patients.forms import PatientForm
-from patients.views import get_patient_upload_csv
+from patients.views_json import get_patient_upload_csv
 from snpdb import forms
 from snpdb.archive import (
     ArchivePreconditionError,
@@ -74,7 +74,7 @@ from snpdb.models.models_enums import (
 from snpdb.tasks.vcf_archive_tasks import archive_vcf_task
 from upload.models import UploadedVCF
 from upload.uploaded_file_type import retry_upload_pipeline
-from upload.views.views import get_remaining_annotation_runs
+from upload.views.views_json import get_remaining_annotation_runs
 
 
 def data(request):

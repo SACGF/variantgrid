@@ -78,7 +78,7 @@ class UploadFileAPITest(UploadAPITestBase):
         content = _vcf_bytes("newupload")
         expected_hash = sha256(content).hexdigest()
 
-        with patch("upload.views.views.upload_processing.process_uploaded_file"):
+        with patch("upload.views.views_json.upload_processing.process_uploaded_file"):
             response = self.client.post(
                 reverse("api_file_upload"),
                 {"file": SimpleUploadedFile("newupload.vcf", content)},
@@ -97,7 +97,7 @@ class UploadFileAPITest(UploadAPITestBase):
         file_upload = self._create_vcf_upload("alias")
         self.client.force_authenticate(user=self.owner)
 
-        with patch("upload.views.views.upload_processing.process_uploaded_file"):
+        with patch("upload.views.views_json.upload_processing.process_uploaded_file"):
             upload_response = self.client.post(
                 reverse("api_file_upload"),
                 {"file": SimpleUploadedFile("alias_new.vcf", _vcf_bytes("alias_new"))},
@@ -151,7 +151,7 @@ class UploadMetadataAPITest(UploadAPITestBase):
 
     def _upload(self, marker: str, query_string: str = ""):
         self.client.force_authenticate(user=self.owner)
-        with patch("upload.views.views.upload_processing.process_uploaded_file"):
+        with patch("upload.views.views_json.upload_processing.process_uploaded_file"):
             return self.client.post(
                 reverse("api_file_upload") + query_string,
                 {"file": SimpleUploadedFile(f"{marker}.vcf", _vcf_bytes(marker))},

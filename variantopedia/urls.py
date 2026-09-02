@@ -1,6 +1,6 @@
 from snpdb.views.datatable_view import DatabaseTableView
 from variantgrid.perm_path import path
-from variantopedia import views, views_tag_stats
+from variantopedia import views, views_allele, views_server_status, views_tag_stats
 from variantopedia.grids import (
     AllVariantsGrid,
     NearbyVariantsGrid,
@@ -16,12 +16,12 @@ urlpatterns = [
     path('variants/<genome_build_name>', views.variants, name='genome_build_variants'),
 
     path('dashboard', views.dashboard, name='dashboard'),
-    path('server_status', views.server_status, name='server_status'),
-    path('server_status_activity/detail/<int:days_ago>', views.server_status_activity,
+    path('server_status', views_server_status.server_status, name='server_status'),
+    path('server_status_activity/detail/<int:days_ago>', views_server_status.server_status_activity,
          name='server_status_activity_detail'),
-    path('server_status_settings/detail', views.server_status_settings, name='server_status_settings_detail'),
-    path('health_check_details', views.health_check_details, name='health_check_details'),
-    path('database_statistics/detail', views.database_statistics, name='database_statistics_detail'),
+    path('server_status_settings/detail', views_server_status.server_status_settings, name='server_status_settings_detail'),
+    path('health_check_details', views_server_status.health_check_details, name='health_check_details'),
+    path('database_statistics/detail', views_server_status.database_statistics, name='database_statistics_detail'),
     # Tagging
     path('variant_tags/', views.variant_tags, name='variant_tags'),
     path('variant_tags/stats/', views_tag_stats.tag_stats, name='tag_stats'),
@@ -52,12 +52,12 @@ urlpatterns = [
 
     path('view_allele_from_variant/<int:variant_id>', views.view_allele_from_variant,
          name='view_allele_from_variant'),
-    path('view_allele/<int:allele_id>', views.view_allele, name='view_allele'),
-    path('a<int:allele_id>', views.view_allele, name='view_allele_compact'),
-    path('view_allele/<int:allele_id>/classifications_download', views.export_classifications_allele,
+    path('view_allele/<int:allele_id>', views_allele.view_allele, name='view_allele'),
+    path('a<int:allele_id>', views_allele.view_allele, name='view_allele_compact'),
+    path('view_allele/<int:allele_id>/classifications_download', views_allele.export_classifications_allele,
          name='allele_classifications_download'),
     path('allele/<allele_id>/create_variant/<genome_build_name>',
-         views.create_variant_for_allele, name='create_variant_for_allele'),
+         views_allele.create_variant_for_allele, name='create_variant_for_allele'),
     path('view/<int:variant_id>/<int:annotation_version_id>', views.variant_details_annotation_version,
          name='variant_details_annotation_version'),
     path('nearby_tab/<int:variant_id>/<int:annotation_version_id>', views.nearby_variants_tab,
