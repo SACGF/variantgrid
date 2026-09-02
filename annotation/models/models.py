@@ -2058,7 +2058,9 @@ class VariantAnnotation(AbstractVariantAnnotation):
 
     @property
     def has_gnomad(self) -> bool:
-        return bool(self.gnomad_af or self.gnomad2_liftover_af)
+        """ A gnomAD site with AC=0 has a real af of 0.0, so test for a value not a truthy one -
+            'absent from gnomAD' and 'present, never observed' are different answers """
+        return self.gnomad_af is not None or self.gnomad2_liftover_af is not None
 
     @property
     def annotsv_acmg_clinical_significance(self) -> Optional[str]:
@@ -2230,8 +2232,10 @@ class VariantAnnotation(AbstractVariantAnnotation):
         return list(records.values())
 
     def has_spliceai(self):
-        return any((self.spliceai_pred_ds_ag, self.spliceai_pred_ds_al,
-                    self.spliceai_pred_ds_dg, self.spliceai_pred_ds_dl))
+        """ SpliceAI scoring a variant 0 for all 4 deltas is a prediction (no splicing impact),
+            not missing data - only a null means VEP found no SpliceAI record """
+        return any(ds is not None for ds in (self.spliceai_pred_ds_ag, self.spliceai_pred_ds_al,
+                                             self.spliceai_pred_ds_dg, self.spliceai_pred_ds_dl))
 
     def highest_spliceai(self) -> int|None:
         values = []

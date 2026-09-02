@@ -502,6 +502,8 @@ function applyVariantValues() {
         applyValue("spliceai_pred_ds_al", {{ variant_annotation.spliceai_pred_ds_al | jsonify }});
         applyValue("spliceai_pred_ds_dg", {{ variant_annotation.spliceai_pred_ds_dg | jsonify }});
         applyValue("spliceai_pred_ds_dl", {{ variant_annotation.spliceai_pred_ds_dl | jsonify }});
+    {% endif %}
+    {% if variant_annotation.has_cosmic %}
         applyValue("cosmic_count", {{ variant_annotation.cosmic_count | jsonify }});
     {% endif %}
 }
