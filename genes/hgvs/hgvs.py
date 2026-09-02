@@ -1,8 +1,9 @@
 import enum
 import re
+from collections import defaultdict
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Optional, Self, Union
+from typing import Optional, Self, Union, Iterable
 from genes.transcript_parts import TranscriptParts, get_transcript_id_and_version
 from genes.transcripts_utils import clean_transcript_accession
 from snpdb.models.models_genome import GenomeBuild
@@ -88,6 +89,7 @@ class HGVSComponents:
     """
     HGVS_REGEX = re.compile('(.*?)(?:[(](.*?)[)])?:([a-z][.].*)')
     NUM_PART = re.compile('^[a-z][.]([0-9]+)(.*?)$')
+    DEL_NUC = re.compile('^(.*del)([ATCG]+)$')
 
     def __init__(self, full_hgvs: str, transcript: str = None):
         if transcript:
@@ -129,6 +131,12 @@ class HGVSComponents:
     @cached_property
     def without_transcript_version(self) -> 'HGVSComponents':
         return self._with_transcript(self.transcript_parts.identifier)
+
+    @property
+    def without_explicit_del_nucleotides(self) -> 'HGVSComponents':
+        if match := HGVSComponents.DEL_NUC.match(self.full_hgvs):
+            return HGVSComponents(match.group(1))
+        return self
 
     def _with_transcript(self, transcript: Optional[str]) -> 'HGVSComponents':
         if transcript and self.nomen:
@@ -272,3 +280,18 @@ class HGVSDisplay:
 
     def __str__(self):
         return self.full_hgvs
+
+    @staticmethod
+    def select_distinct(hgvs_displays: Iterable['HGVSDisplay']) -> list['HGVSDisplay']:
+        # only return one CHGVS Display per c.HGVS where they only differ in transcript versions
+        transcript_versions: dict[HGVSComponents, list[HGVSDisplay]] = defaultdict(list)
+        for c_hgvs_display in hgvs_displays:
+            transcript_versions[
+                c_hgvs_display.components.without_transcript_version.without_explicit_del_nucleotides
+            ].append(c_hgvs_display)
+
+        max_versions: list[HGVSDisplay] = []
+        for versions in transcript_versions.values():
+            max_version = max(versions, key=lambda hgvs: hgvs.components.transcript_parts.version or 0)
+            max_versions.append(max_version)
+        return list(sorted(max_versions))

@@ -349,15 +349,7 @@ class Overlap(TimeStampedModel, ReviewableModelMixin, PreviewModelMixin):
             return self.c_hgvs_all(genome_build=genome_build, lab_picker=None)
         elif results:
             # only return one CHGVS Display per c.HGVS where they only differ in transcript versions
-            transcript_versions: dict[HGVSComponents, list[HGVSDisplay]] = defaultdict(list)
-            for c_hgvs_display in results:
-                transcript_versions[c_hgvs_display.components.without_transcript_version].append(c_hgvs_display)
-
-            max_versions: list[HGVSDisplay] = []
-            for versions in transcript_versions.values():
-                max_version = max(versions, key=lambda hgvs: hgvs.components.transcript_parts.version or 0)
-                max_versions.append(max_version)
-            return list(sorted(max_versions))
+            return HGVSDisplay.select_distinct(results)
 
         else:
             return [HGVSDisplay(HGVSComponents("-"), is_normalised=False)]
