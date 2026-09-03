@@ -377,7 +377,7 @@ class OverlapDownloadRow(ExportRow):
     def values(self):
         return ", ".join(self.overlap.relevant_values())
 
-    @export_column("Next Step", categories={"solved": False})
+    @export_column("Next Step", categories={"outstanding": True})
     def next_step(self):
         relevant = [x for x in self.overlap.contributions_list if x.classification_grouping and x.classification_grouping.lab_id in self.lab_picker.lab_ids]
         skews = list(self.overlap.overlapcontributionskew_set.filter(contribution__in=relevant).all())
@@ -440,10 +440,15 @@ def download_overlaps(request, lab_id: str):
     qs = qs.order_by("-overlap_status", "-skew_status", "-overlap_status_change_timestamp", "-overlap_override_status")
 
     qs = qs.prefetch_related("overlapcontributionskew_set")
+    categories: dict
+    if solved_mode:
+        categories = {"solved": True}
+    else:
+        categories = {"outstanding": True}
 
     return OverlapDownloadRow.streaming_csv(
         data=qs.iterator(chunk_size=1000),
-        filename="discordance_reports",
-        export_tweak=ExportTweak(categories={"solved": solved_mode}),
+        filename=f"discordance_reports_{'solved' if solved_mode else 'outstanding'}",
+        export_tweak=ExportTweak(categories=categories),
         transformer=lambda x: OverlapDownloadRow(x, lab_picker)
     )
