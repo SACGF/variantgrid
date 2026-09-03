@@ -1360,8 +1360,21 @@ table.variantgrid-datatable .variant-row-detail {
 }
 table.variantgrid-datatable .variant-row-detail .variant-row-detail-columns {
   display: flex;
-  gap: 32px;
+  flex-wrap: wrap;
+  gap: 12px 32px;
   align-items: flex-start;
+}
+table.variantgrid-datatable .variant-row-detail .variant-row-detail-table {
+  max-width: 420px;
+}
+table.variantgrid-datatable .variant-row-detail .variant-row-detail-table th,
+table.variantgrid-datatable .variant-row-detail .variant-row-detail-table td {
+  overflow: visible;
+  text-overflow: clip;
+}
+table.variantgrid-datatable .variant-row-detail .variant-row-detail-table td {
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 table.variantgrid-datatable .variant-row-detail .variant-row-detail-table th {
   color: #777;

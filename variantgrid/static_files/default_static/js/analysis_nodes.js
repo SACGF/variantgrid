@@ -609,7 +609,9 @@ function setNodeCounts(node, data) {
 	for (const c in counts) {
 		const vc = $(".node-count-" + c, node_counts);
 		const count = counts[c];
-		if (count > 0 || vc.hasClass("show-zero")) {
+		if (count === null || count === undefined) {
+			setVariantCount(vc, '?');  // Node hasn't finished counting - @see updateDirtyNode
+		} else if (count > 0 || vc.hasClass("show-zero")) {
 			setVariantCount(vc, formatNodeCount(count, deterministic), count);
 		} else {
 			vc.hide();

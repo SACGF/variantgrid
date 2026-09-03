@@ -1,4 +1,5 @@
 {% load clinvar_tags %}
+{% load classification_tags %}
 {% load english_tags %}
 <div class="variant-row-detail-columns">
   <table class="variant-row-detail-table">
@@ -50,8 +51,8 @@
         <td>{% clinvar_stars clinvar.somatic_stars clinvar.get_somatic_review_status_display %}{{ clinvar.somatic_clinical_significance|code_to_english }}{% if clinvar.somatic_tier_label %} ({{ clinvar.somatic_tier_label }}){% endif %}</td>
       </tr>
     {% endif %}
-    {% if clinvar.preferred_disease_name %}
-      <tr><th>Condition</th><td>{{ clinvar.preferred_disease_name }}</td></tr>
+    {% if clinvar.preferred_disease_names %}
+      <tr><th>Condition</th><td>{% for disease_name in clinvar.preferred_disease_names %}{% if not forloop.first %}, {% endif %}{{ disease_name }}{% endfor %}</td></tr>
     {% endif %}
     <tr><th>Origin</th><td>{{ clinvar.get_allele_origins_display }}</td></tr>
     {% if clinvar.clinical_sources_list %}
@@ -65,9 +66,12 @@
     <tr><th colspan="2">Classifications</th></tr>
     {% for cm in classifications %}
       <tr>
-        <td><a href="{{ cm.get_absolute_url }}">{{ cm.classification.lab }}</a></td>
-        <td class="text-muted">{{ cm.classification.get_clinical_significance_display|default:"No data" }}</td>
+        <td><a href="{{ cm.get_absolute_url }}">{{ cm.classification.friendly_label }}</a></td>
+        <td>{% clinical_significance_values cm %}</td>
       </tr>
+      {% if cm.classification.condition_resolution_obj %}
+        <tr><th>Condition</th><td>{% condition cm.classification.condition_resolution_obj show_link=False %}</td></tr>
+      {% endif %}
     {% endfor %}
   </table>
   {% endif %}

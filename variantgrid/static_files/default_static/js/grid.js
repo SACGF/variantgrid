@@ -372,9 +372,11 @@ function showTagAutocomplete(variantId) {
    redraws its list on every keystroke, so watch it rather than decorating once */
 function colorTagAutocompleteResults(tagSelect) {
     function decorate(resultsList) {
+        // select2 keeps a result's data in its own cache keyed off data-select2-id, not jQuery's store
+        const select2Utils = $.fn.select2.amd.require("select2/utils");
         $("li.select2-results__option", resultsList).each(function() {
             const option = $(this);
-            const tag = (option.data("data") || {}).id;
+            const tag = (select2Utils.GetData(this, "data") || {}).id;
             if (!tag || option.children(".grid-tag").length) {
                 return;  // a message row ("Searching...", "No results"), or already drawn
             }

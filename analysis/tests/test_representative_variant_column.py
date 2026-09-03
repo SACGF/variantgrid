@@ -13,9 +13,12 @@ from analysis.models.nodes.sources.cohort_node import CohortNode
 from analysis.tests.test_grid_export import GridExportTestCase
 from annotation.models import ClinVar
 from annotation.models.models_enums import ClinVarReviewStatus
+from classification.enums import SpecialEKeys, SubmissionSource
+from classification.models.classification import Classification
 from library.django_utils import FakeRequest
 from snpdb.grid_columns.grid_sample_columns import get_available_format_columns
-from snpdb.models import CompositeColumnMember, CustomColumnsCollection, UserSettings
+from snpdb.models import CompositeColumnMember, Country, CustomColumnsCollection, Lab, Organization, UserSettings
+from snpdb.tests.utils.vcf_testing_utils import create_mock_allele
 from snpdb.views.datatable_view import datatable_definition, datatable_response
 
 
@@ -245,3 +248,47 @@ class VariantGridRowDetailViewTest(GridExportTestCase):
         self.assertContains(response, "Likely Pathogenic")
         self.assertContains(response, "Cystic fibrosis")
         self.assertContains(response, "germline")
+
+    def test_row_detail_splits_clinvar_conditions(self):
+        """ CLNDN arrives as one pipe joined run of underscored words - a hundred characters of it
+            would push the tables beside it off the screen """
+        variant = self.variants[1]
+        annotation_version = self.analysis.annotation_version
+        ClinVar.objects.create(version=annotation_version.clinvar_version, variant=variant,
+                               clinvar_variation_id=999, clinvar_allele_id=888,
+                               preferred_disease_name="Melanoma|_not_provided|Cardio-facio-cutaneous_syndrome",
+                               review_status=ClinVarReviewStatus.CRITERIA_PROVIDED_SINGLE_SUBMITTER,
+                               clinical_significance="Likely_pathogenic", highest_pathogenicity=4,
+                               origin=1)
+        client = Client()
+        client.force_login(self.user)
+        url = reverse("variant_grid_row_detail",
+                      kwargs={"variant_id": variant.pk,
+                              "annotation_version_id": annotation_version.pk})
+        response = client.get(url)
+        self.assertContains(response, "Melanoma, not provided, Cardio-facio-cutaneous syndrome")
+
+    def test_row_detail_names_classifications(self):
+        """ The link needs to say which record it goes to, and how it was classified """
+        variant = self.variants[2]
+        allele = create_mock_allele(variant, self.genome_build)
+        organization = Organization.objects.create(name="RowDetailOrg", group_name="rowdetailorg")
+        lab = Lab.objects.create(name="RowDetailLab", organization=organization, city="CityA",
+                                 country=Country.objects.get_or_create(name="CountryA")[0],
+                                 group_name="rowdetailorg/rowdetaillab")
+        self.user.groups.add(lab.group)
+        classification = Classification.create(user=self.user, lab=lab, save=True,
+                                               source=SubmissionSource.API,
+                                               data={SpecialEKeys.CLINICAL_SIGNIFICANCE: "VUS"})
+        classification.allele = allele
+        classification.save()
+        classification.publish_latest(user=self.user)  # The summary the pills read is written on publish
+
+        client = Client()
+        client.force_login(self.user)
+        url = reverse("variant_grid_row_detail",
+                      kwargs={"variant_id": variant.pk,
+                              "annotation_version_id": self.analysis.annotation_version_id})
+        response = client.get(url)
+        self.assertContains(response, escape(classification.friendly_label))
+        self.assertContains(response, "VUS")

@@ -290,6 +290,18 @@ class ClinVar(models.Model):
         return []
 
     @property
+    def preferred_disease_names(self) -> list[str]:
+        """ CLNDN packs every condition into one pipe joined run of underscored words - split it
+            back out so it reads as a list and wraps """
+        return ClinVar._pipe_names(self.preferred_disease_name)
+
+    @staticmethod
+    def _pipe_names(value: Optional[str]) -> list[str]:
+        if not value:
+            return []
+        return [name.lstrip("_").replace("_", " ").strip() for name in value.split("|")]
+
+    @property
     def stars(self):
         """
         deprecated - use .germline_stars

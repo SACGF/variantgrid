@@ -1595,8 +1595,26 @@ table.variantgrid-datatable {
 
 		.variant-row-detail-columns {
 			display: flex;
-			gap: 32px;
+			flex-wrap: wrap;
+			gap: 12px 32px;
 			align-items: flex-start;
+		}
+
+		// Grid cells are single line with an ellipsis, which the detail tables inherit through the
+		// descendant selector - here there's room to wrap, and a ClinVar condition is a dozen
+		// disease names that would otherwise push everything after it off to the right
+		.variant-row-detail-table {
+			max-width: 420px;
+
+			th, td {
+				overflow: visible;
+				text-overflow: clip;
+			}
+
+			td {
+				white-space: normal;
+				overflow-wrap: anywhere;
+			}
 		}
 
 		.variant-row-detail-table th {
