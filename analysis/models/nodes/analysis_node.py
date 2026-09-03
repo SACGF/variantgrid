@@ -1526,15 +1526,18 @@ class NodeVCFFilter(NodeAuditLogMixin, models.Model):
         return list(nvf_qs.values_list("vcf_filter__vcf_id", "vcf_filter__filter_id"))
 
     @staticmethod
-    def get_filter_codes(node, vcf):
+    def get_filter_codes(node, vcf, pass_only: Optional[bool] = None):
         """ What this VCF lets through: its own ticked codes, plus PASS if the node's PASS row is set.
 
             PASS is the one FILTER value that means the same thing in every VCF, so a code is never
             translated across them - 'LowDepth' in a DRAGEN small variant VCF is not 'LowDepth' in
-            its CNV VCF. """
+            its CNV VCF. pass_only stands in for the node's PASS row, which is how SampleNode lets
+            one of its samples decide for itself. """
         nvf_qs = NodeVCFFilter.objects.filter(node_id=node.pk, vcf_filter__vcf=vcf)
         filter_codes = set(nvf_qs.values_list("vcf_filter__filter_code", flat=True))
-        if NodeVCFFilter.has_pass(node):
+        if pass_only is None:
+            pass_only = NodeVCFFilter.has_pass(node)
+        if pass_only:
             filter_codes.add(None)
         return filter_codes
 

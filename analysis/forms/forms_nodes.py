@@ -893,49 +893,57 @@ class PopulationNodeForm(BaseNodeForm):
         return node
 
 
-class SampleThresholdsMixin(forms.Form):
+class SampleFiltersMixin(forms.Form):
     """ Hidden field, automatically populated in base_editor ajaxForm beforeSerialize.
 
-        Per sample threshold overrides - what sapath#301 asked for, different cutoffs per caller. A
-        row is only stored where the user overrode the node's own values, so a sample linked to the
-        extraction later gets the node defaults rather than nothing """
-    sample_thresholds = forms.CharField(widget=HiddenInput(), required=False)
-    THRESHOLD_FIELDS = ["min_ad", "min_dp", "min_gq", "max_pl"]
+        Per sample overrides of the node's genotype filters - what sapath#301 asked for, different
+        settings per caller. Only the fields the user set are sent and stored, so anything else
+        follows the node, including for a sample linked to the extraction later.
 
-    def clean_sample_thresholds(self):
-        data = self.cleaned_data["sample_thresholds"]
+        {"<sample_id>": {"min_ad": 10, "zygosity": "EO", "pass_only": true, "af_min": 0.2}} """
+    sample_filters = forms.CharField(widget=HiddenInput(), required=False)
+    OVERRIDE_FIELDS = list(SampleNode.THRESHOLD_FIELDS) + ["zygosity", "pass_only", "af_min", "af_max"]
+
+    def clean_sample_filters(self):
+        data = self.cleaned_data["sample_filters"]
         if not data:
             return {}
         return {int(sample_id): values for sample_id, values in json.loads(data).items()}
 
     @staticmethod
-    def get_saved_sample_thresholds(node) -> dict:
-        """ What save_sample_thresholds wrote - only the fields that differ from the node's own
-            values, since the editor shows those as the placeholder and a blank input inherits """
-        node_values = {f: getattr(node, f) for f in SampleThresholdsMixin.THRESHOLD_FIELDS}
+    def get_saved_sample_filters(node) -> dict:
+        """ What save_sample_filters wrote, in the shape the editor posts back - only what was
+            overridden, since a field the row leaves out is one the editor shows as inherited """
         overrides = {}
-        for row in node.samplenodesamplethreshold_set.all():
-            values = {f: getattr(row, f) for f in SampleThresholdsMixin.THRESHOLD_FIELDS
-                      if getattr(row, f) != node_values[f]}
+        for row in node.samplenodesamplefilter_set.all():
+            values = {f: value for f in SampleFiltersMixin.OVERRIDE_FIELDS
+                      if (value := getattr(row, f)) is not None}
             if values:
                 overrides[row.sample_id] = values
         return overrides
 
-    def save_sample_thresholds(self, node):
-        sample_thresholds: dict = self.cleaned_data.get("sample_thresholds") or {}
-        threshold_set = node.samplenodesamplethreshold_set
-        threshold_set.all().delete()
+    def save_sample_filters(self, node):
+        sample_filters: dict = self.cleaned_data.get("sample_filters") or {}
+        filter_set = node.samplenodesamplefilter_set
+        filter_set.all().delete()
 
-        node_values = {f: getattr(node, f) for f in SampleThresholdsMixin.THRESHOLD_FIELDS}
-        for sample in node.get_source_samples():
-            if (values := sample_thresholds.get(sample.pk)) is None:
-                continue
-            values = {f: values.get(f, node_values[f]) for f in SampleThresholdsMixin.THRESHOLD_FIELDS}
-            if values != node_values:  # Only store what's actually an override
-                threshold_set.create(sample=sample, **values)
+        samples = node.get_source_samples()
+        if len(samples) < 2:
+            # Reading one sample, the node's own fields are that sample's settings - which is what
+            # the editor shows, so a row overriding them would win over what the user can see
+            node.__dict__.pop("_sample_filters", None)
+            return
+
+        for sample in samples:
+            posted = sample_filters.get(sample.pk) or {}
+            values = {f: value for f in SampleFiltersMixin.OVERRIDE_FIELDS
+                      if (value := posted.get(f)) is not None}
+            if values:
+                filter_set.create(sample=sample, **values)
+        node.__dict__.pop("_sample_filters", None)  # Rows just changed under the cached lookup
 
 
-class SampleNodeForm(GenomeBuildAutocompleteForwardMixin, SampleThresholdsMixin, VCFSourceNodeForm):
+class SampleNodeForm(GenomeBuildAutocompleteForwardMixin, SampleFiltersMixin, VCFSourceNodeForm):
     """ One picker for all four levels - the editor asks for the thing, not for a level and then a
         thing. `source` carries "<level>:<pk>"; save() unpacks it into source_level plus one FK. """
     source = forms.CharField(
@@ -1024,10 +1032,13 @@ class SampleNodeForm(GenomeBuildAutocompleteForwardMixin, SampleThresholdsMixin,
             node.source_level = level
             for source_level, field_name in SampleNode.SOURCE_LEVEL_FIELDS.items():
                 setattr(node, field_name, source_object if source_level == level else None)
+            # The filter and allele frequency rows below are resolved against what the node now
+            # reads, so the group this node resolved before the pick changed has to go
+            node.__dict__.pop("_sample_group", None)
 
     def save(self, commit=True):
         node = super().save(commit=commit)
-        self.save_sample_thresholds(node)
+        self.save_sample_filters(node)
         return node
 
 

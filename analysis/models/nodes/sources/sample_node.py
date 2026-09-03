@@ -14,6 +14,7 @@ from analysis.models.nodes.analysis_node import (
     AnalysisNode,
     NodeAlleleFrequencyFilter,
     NodeAuditLogMixin,
+    NodeVCFFilter,
     annotate_and_filter_queryset,
     queryset_to_pk_in_q,
 )
@@ -67,9 +68,16 @@ class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
     restrict_to_qc_gene_list = models.BooleanField(default=False)
 
     FIELDS_THAT_CHANGE_QUERYSET = ("min_ad", "min_dp", "min_gq", "max_pl", "restrict_to_qc_gene_list")
+    THRESHOLD_FIELDS = ("min_ad", "min_dp", "min_gq", "max_pl")
     SAMPLE_FIELD_MAPPINGS = [("ad", "allele_depth"),
                              ("dp", "read_depth"),
                              ("gq", "genotype_quality")]
+    # The node's zygosity checkboxes, and the code each stands for - a sample's override stores the
+    # whole set as one string of these
+    ZYGOSITY_FIELD_CODES = [("zygosity_ref", Zygosity.HOM_REF),
+                            ("zygosity_het", Zygosity.HET),
+                            ("zygosity_hom", Zygosity.HOM_ALT),
+                            ("zygosity_unk", Zygosity.UNKNOWN_ZYGOSITY)]
     # Levels that resolve to a set of samples. Specimen/Patient join here with their own resolvers
     SOURCE_LEVEL_FIELDS = {
         SampleSourceLevel.SAMPLE: "sample",
@@ -192,15 +200,42 @@ class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
             cache_key = "_".join(parts)
         return cache_key
 
-    # ── Thresholds, per sample ────────────────────────────────────────────────
+    # ── Filters, per sample ───────────────────────────────────────────────────
+
+    @cached_property
+    def _sample_filters(self) -> dict[int, "SampleNodeSampleFilter"]:
+        """ Overrides by sample pk - the query build asks once per sample, and so does the editor.
+            A node being built in an analysis template has no pk to hang rows off yet """
+        if not self.pk:
+            return {}
+        return {sf.sample_id: sf for sf in self.samplenodesamplefilter_set.all()}
+
+    def get_sample_filter(self, sample: Sample) -> Optional["SampleNodeSampleFilter"]:
+        return self._sample_filters.get(sample.pk)
 
     def get_sample_thresholds(self, sample: Sample) -> dict:
-        """ The node's own values, overridden where the user set a row for this sample. A sample
-            attached to the extraction after the node was configured gets the node defaults """
-        thresholds = {f: getattr(self, f) for f in ("min_ad", "min_dp", "min_gq", "max_pl")}
-        if override := self.samplenodesamplethreshold_set.filter(sample=sample).first():
-            thresholds.update({f: getattr(override, f) for f in thresholds})
+        """ The node's own values, overridden where the sample's row sets one. A sample attached to
+            the extraction after the node was configured gets the node defaults """
+        thresholds = {f: getattr(self, f) for f in self.THRESHOLD_FIELDS}
+        if override := self.get_sample_filter(sample):
+            thresholds.update({f: value for f in thresholds
+                               if (value := getattr(override, f)) is not None})
         return thresholds
+
+    @cached_property
+    def _node_pass_only(self) -> bool:
+        return NodeVCFFilter.has_pass(self)
+
+    def get_sample_pass_only(self, sample: Sample) -> bool:
+        """ PASS is the one FILTER value that means the same thing in every VCF, so it is the one a
+            sample can override - the rest are picked against the VCF that declared them """
+        if (override := self.get_sample_filter(sample)) and override.pass_only is not None:
+            return override.pass_only
+        return self._node_pass_only
+
+    def get_node_zygosity(self) -> str:
+        """ The node's own selection, in the code string form a sample's override holds """
+        return ''.join(code for field, code in self.ZYGOSITY_FIELD_CODES if getattr(self, field))
 
     # ── Query ─────────────────────────────────────────────────────────────────
 
@@ -209,22 +244,28 @@ class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
         if sample and sample.has_genotype is False:
             return [Zygosity.UNKNOWN_ZYGOSITY]
 
-        ZYGOSITY_LOOKUP = [
-            (self.zygosity_ref, Zygosity.HOM_REF),
-            (self.zygosity_het, Zygosity.HET),
-            (self.zygosity_hom, Zygosity.HOM_ALT),
-            (self.zygosity_unk, Zygosity.UNKNOWN_ZYGOSITY),
-        ]
-        return [z for s, z in ZYGOSITY_LOOKUP if s]
+        if sample and (override := self.get_sample_filter(sample)) and override.zygosity is not None:
+            return list(override.zygosity)
+        return list(self.get_node_zygosity())
 
-    def get_zygosity_description(self):
-        zygosities = self._get_zygosities(self.sample)
+    def get_zygosity_description(self, sample: Optional[Sample] = None):
+        zygosities = self._get_zygosities(sample or self.sample)
         if len(zygosities) != len(Zygosity.CHOICES):  # Subset
             zyg_dict = dict(Zygosity.CHOICES)
             zyg = ','.join([zyg_dict[z] for z in zygosities])
         else:
             zyg = ''  # Any
         return zyg
+
+    def _get_sample_allele_frequency_arg_q_dict(self, sample: Sample) -> dict[Optional[str], dict[str, Q]]:
+        """ The node's ranges, unless the sample's row sets its own - a caller that reports allele
+            frequency differently is what that override is for """
+        if (override := self.get_sample_filter(sample)) and override.has_allele_frequency:
+            alias, allele_frequency_path = sample.get_cohort_genotype_alias_and_field("allele_frequency")
+            if q := override.get_allele_frequency_q(allele_frequency_path, sample.vcf.allele_frequency_percent):
+                return {alias: {str(q): q}}
+            return {}
+        return NodeAlleleFrequencyFilter.get_sample_arg_q_dict(self, sample)
 
     def _get_sample_arg_q_dict(self, sample: Sample) -> dict[Optional[str], dict[str, Q]]:
         """ The genotype filters for one sample - zygosity, thresholds and allele frequency """
@@ -248,7 +289,7 @@ class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
                 q = Q(**{f"{pl_path}__lte": max_pl})
                 self.merge_arg_q_dicts(arg_q_dict, {alias: {str(q): q}})
 
-            if sample_arg_q_dict := NodeAlleleFrequencyFilter.get_sample_arg_q_dict(self, sample):
+            if sample_arg_q_dict := self._get_sample_allele_frequency_arg_q_dict(sample):
                 self.merge_arg_q_dicts(arg_q_dict, sample_arg_q_dict)
 
         self.merge_arg_q_dicts(arg_q_dict, self.get_vcf_locus_filters_arg_q_dict_for_sample(sample))
@@ -299,7 +340,8 @@ class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
         if not self.has_filters:
             return {}
         alias = sample.cohort_genotype_collection.cohortgenotype_alias
-        return self._get_vcf_locus_filters_arg_q_dict(sample.vcf, alias)
+        return self._get_vcf_locus_filters_arg_q_dict(sample.vcf, alias,
+                                                      pass_only=self.get_sample_pass_only(sample))
 
     def get_vcf_locus_filters_arg_q_dict(self) -> dict[Optional[str], dict[str, Q]]:
         # Group levels apply these per sample inside each subquery
@@ -334,9 +376,13 @@ class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
                 sample_description += f" {node_field.upper()}>={min_value}"
         if (max_pl := thresholds["max_pl"]) is not None:
             sample_description += f" PL<={max_pl}"
+        if self.has_filters and self.get_sample_pass_only(sample):
+            sample_description += " PASS"
+        if (override := self.get_sample_filter(sample)) and override.has_allele_frequency:
+            sample_description += f" AF {override.get_allele_frequency_description()}"
 
         if sample.has_genotype:
-            if zyg := self.get_zygosity_description():
+            if zyg := self.get_zygosity_description(sample):
                 sample_description += f" ({zyg})"
         return f"{sample_description}, from VCF {sample.vcf}"
 
@@ -383,6 +429,10 @@ class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
         return gene_lists
 
     def _has_filters_that_affect_label_counts(self):
+        # A sample filtered differently to the node is off the cached stats no matter what it sets
+        if self._sample_filters:
+            return True
+
         # This returns None if no filters to apply
         if NodeAlleleFrequencyFilter.get_sample_arg_q_dict(self, self.sample):
             return True
@@ -574,27 +624,36 @@ class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
         return super().get_warnings() + self.get_sample_group().warnings
 
     def save_clone(self):
-        thresholds = list(self.samplenodesamplethreshold_set.all())
+        sample_filters = list(self.samplenodesamplefilter_set.all())
 
         copy = super().save_clone()
-        for threshold in thresholds:
-            threshold.pk = None
-            threshold.node = copy
-            threshold.save()
+        for sample_filter in sample_filters:
+            sample_filter.pk = None
+            sample_filter.node = copy
+            sample_filter.save()
         return copy
 
 
 
-class SampleNodeSampleThreshold(NodeAuditLogMixin, models.Model):
-    """ Per sample threshold overrides, so an extraction can apply a different min_ad per caller
-        (sapath#301). The node's own fields stay the value for any sample without a row - so a sample
-        reconcile attaches after the node was configured gets the node default rather than nothing """
+class SampleNodeSampleFilter(NodeAuditLogMixin, models.Model):
+    """ Per sample overrides of the node's genotype filters, so an extraction can apply a different
+        min_ad per caller (sapath#301). Null is inherit: the node's own value is what any sample
+        without a row gets, including one a reconcile attaches after the node was configured.
+
+        Zygosity is the whole set in one column rather than a boolean each - it is one choice, and a
+        row overriding HET while silently inheriting HOM is not a thing worth being able to store """
     node = models.ForeignKey(SampleNode, on_delete=CASCADE)
     sample = models.ForeignKey(Sample, on_delete=CASCADE)
-    min_ad = models.IntegerField(default=0)
-    min_dp = models.IntegerField(default=0)
-    min_gq = models.IntegerField(default=0)
+    min_ad = models.IntegerField(null=True, blank=True)
+    min_dp = models.IntegerField(null=True, blank=True)
+    min_gq = models.IntegerField(null=True, blank=True)
     max_pl = models.IntegerField(null=True, blank=True)
+    zygosity = models.CharField(max_length=4, null=True, blank=True)  # Zygosity codes to keep
+    pass_only = models.BooleanField(null=True)
+    # One range, where the node holds a list of them - a caller that reports allele frequency
+    # differently is what this is for, not a different group operation
+    af_min = models.FloatField(null=True, blank=True)
+    af_max = models.FloatField(null=True, blank=True)
 
     class Meta:
         unique_together = ("node", "sample")
@@ -602,9 +661,41 @@ class SampleNodeSampleThreshold(NodeAuditLogMixin, models.Model):
     def _get_node(self):
         return self.node
 
+    @property
+    def has_allele_frequency(self) -> bool:
+        return self.af_min is not None or self.af_max is not None
+
+    def get_allele_frequency_q(self, allele_frequency_path: str, allele_frequency_percent: bool) -> Optional[Q]:
+        """ A full 0-1 range is no filter, the same as the node's own ranges """
+        af_min = self.af_min if self.af_min is not None else 0
+        af_max = self.af_max if self.af_max is not None else 1
+        and_filters = []
+        if af_min > 0:
+            min_value = af_min * 100.0 if allele_frequency_percent else af_min
+            and_filters.append(Q(**{f"{allele_frequency_path}__gte": min_value}))
+        if af_max < 1:
+            max_value = af_max * 100.0 if allele_frequency_percent else af_max
+            and_filters.append(Q(**{f"{allele_frequency_path}__lte": max_value}))
+        if and_filters:
+            return reduce(operator.and_, and_filters)
+        return None
+
+    def get_allele_frequency_description(self) -> str:
+        af_min = self.af_min if self.af_min is not None else 0
+        af_max = self.af_max if self.af_max is not None else 1
+        return f"{af_min}-{af_max}"
+
     def __str__(self):
-        return f"{self.sample}: AD>={self.min_ad} DP>={self.min_dp} GQ>={self.min_gq} PL<={self.max_pl}"
+        thresholds = {"AD>=": self.min_ad, "DP>=": self.min_dp, "GQ>=": self.min_gq, "PL<=": self.max_pl}
+        parts = [f"{label}{value}" for label, value in thresholds.items() if value is not None]
+        if self.zygosity is not None:
+            parts.append(f"zygosity={self.zygosity}")
+        if self.pass_only is not None:
+            parts.append(f"pass_only={self.pass_only}")
+        if self.has_allele_frequency:
+            parts.append(f"AF {self.get_allele_frequency_description()}")
+        return f"{self.sample}: {' '.join(parts) or 'no overrides'}"
 
 
 auditlog.register(SampleNode)
-auditlog.register(SampleNodeSampleThreshold)
+auditlog.register(SampleNodeSampleFilter)

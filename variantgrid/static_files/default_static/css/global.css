@@ -1210,15 +1210,9 @@ table.variantgrid-datatable .vcf-filter-pass {
 table.variantgrid-datatable .vcf-filter-failed {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
   min-width: 0;
-  color: #cf3f3a;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-table.variantgrid-datatable .vcf-filter-failed i {
-  font-size: 10px;
-  flex: none;
 }
 table.variantgrid-datatable .sample-zygosity {
   display: inline-flex;

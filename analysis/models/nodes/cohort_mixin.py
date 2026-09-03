@@ -210,10 +210,12 @@ class CohortMixin:
             q_and.append(GroupOperation.reduce(filters, naff.group_operation))
         return q_and
 
-    def _get_vcf_locus_filters_arg_q_dict(self, vcf, alias: str) -> dict[Optional[str], dict[str, Q]]:
-        """ Filter ids are stored on the node - they resolve into each VCF's own codes here """
+    def _get_vcf_locus_filters_arg_q_dict(self, vcf, alias: str,
+                                          pass_only: Optional[bool] = None) -> dict[Optional[str], dict[str, Q]]:
+        """ Filter ids are stored on the node - they resolve into each VCF's own codes here.
+            pass_only lets a caller decide PASS for itself (see SampleNode's per sample overrides) """
         arg_q_dict = {}
-        filter_codes = NodeVCFFilter.get_filter_codes(self, vcf)
+        filter_codes = NodeVCFFilter.get_filter_codes(self, vcf, pass_only=pass_only)
         if filter_codes:
             q_or = []
             if None in filter_codes:  # Pass

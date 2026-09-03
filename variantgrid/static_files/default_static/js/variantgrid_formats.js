@@ -740,7 +740,7 @@ VariantGridFormat.dbZygosityCounts = (_value, type, rowData, ctx) => {
 
 
 // The record's VCF FILTER. Nearly every row passed, and a column of 'PASS' is a column of nothing -
-// so a pass fades almost out and only a call that failed something reads.
+// so a pass fades almost out and the codes a record failed read as ordinary text.
 // @see CohortMixin._get_node_extra_columns
 VariantGridFormat.vcfFilters = (filters) => {
     if (filters == null || filters === '' || filters === '.') {
@@ -750,8 +750,7 @@ VariantGridFormat.vcfFilters = (filters) => {
     if (text.toUpperCase() === 'PASS') {
         return `<span class='vcf-filter-pass' title='Passed every VCF filter'>PASS</span>`;
     }
-    return `<span class='vcf-filter-failed' title='${escapeHtml(`Filtered: ${text}`)}'>`
-         + `<i class='fa-solid fa-triangle-exclamation'></i>${escapeHtml(text)}</span>`;
+    return `<span class='vcf-filter-failed' title='${escapeHtml(`Filtered: ${text}`)}'>${escapeHtml(text)}</span>`;
 };
 
 

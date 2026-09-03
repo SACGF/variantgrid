@@ -77,14 +77,22 @@
         margin: 0 8px 0 0;
     }
 
-    /* Placeholder = the global value below the tree, so a blank input is an inherited one */
+    /* Placeholder = the node's value above the tree, so a blank input is an inherited one */
     input.sample-threshold, input.node-threshold {
         width: 4em;
     }
 
-    input.sample-threshold.threshold-overridden {
+    input.sample-af {
+        width: 5em;
+    }
+
+    .sample-overridden {
         font-weight: bold;
         color: #0d6efd;
+    }
+
+    #node-settings-heading {
+        margin-top: 6px;
     }
 
     .source-expand {
@@ -103,6 +111,9 @@
     var GENOME_BUILD = "{{ node.analysis.genome_build }}";
     var THRESHOLD_FIELDS = [{name: "min_ad", label: "AD\u2265"}, {name: "min_dp", label: "DP\u2265"},
                             {name: "min_gq", label: "GQ\u2265"}, {name: "max_pl", label: "PL\u2264"}];
+    var ZYGOSITY_FIELDS = {{ zygosity_fields|jsonify }};
+    var AF_FIELDS = [{name: "af_min", label: "\u2265", placeholder: "0"},
+                     {name: "af_max", label: "\u2264", placeholder: "1"}];
     var SOURCE_VIEW_URLS = {};
     SOURCE_VIEW_URLS[SOURCE_LEVELS.SAMPLE] = Urls.view_sample;
     SOURCE_VIEW_URLS[SOURCE_LEVELS.EXTRACTION] = Urls.view_extraction;
@@ -113,9 +124,13 @@
     // only re-fetched when the search box finds a different patient
     var sourceSelection = {level: "{{ source_level }}", id: {{ source_id|default:"null" }}};
     var sourceTree = null;
-    var sampleThresholds = {{ sample_threshold_overrides|jsonify }};
+    var sampleFilters = {{ sample_filter_overrides|jsonify }};
     var vcfLocusFilters = {{ vcf_locus_filters|jsonify }};
     var expandedSamples = {};
+    // Which VCFs have had their FILTER codes opened up - keyed by VCF, as the codes are
+    var expandedFilters = {};
+    // A node reading one sample has no defaults to differ from - its settings are the ones above the tree
+    var multiSample = false;
     var HAS_GENOTYPE = {% if has_genotype %}true{% else %}false{% endif %};
     var LOCK_INPUT_SOURCES = {% if node.analysis.lock_input_sources and not node.analysis.template_type %}true{% else %}false{% endif %};
 
@@ -128,88 +143,255 @@
         return parentInSelection || isSelected(level, id);
     }
 
-    // Blank in the tree means inherit, so its placeholders are whatever the global inputs hold now
+    // Blank in the tree means inherit, so its placeholders are whatever the node's inputs hold now
     function nodeThresholdValue(fieldName) {
         var input = $("#id_" + fieldName);
         return input.length ? input.val() : "";
     }
 
-    function getSampleThresholds() {
-        // Only what the user actually typed reaches the server - the node's own values are what any
-        // other sample gets, including one linked to the extraction after this was configured
-        var thresholds = {};
-        $.each(sampleThresholds, function(sampleId, values) {
-            if (values && Object.keys(values).length) {
-                thresholds[sampleId] = values;
+    function nodeZygosity() {
+        var codes = "";
+        $.each(ZYGOSITY_FIELDS, function(i, zygosityField) {
+            if ($("#id_" + zygosityField.field).is(":checked")) {
+                codes += zygosityField.code;
             }
         });
-        return thresholds;
+        return codes;
+    }
+
+    function nodePassOnly() {
+        return !!vcfLocusFilters["pass"];
+    }
+
+    function sampleOverrides(sampleId) {
+        return sampleFilters[sampleId] || {};
+    }
+
+    // An override set back to the node's own value stops being one, so that sample follows it again
+    function setOverrides(sampleId, values) {
+        var overrides = sampleOverrides(sampleId);
+        $.each(values, function(field, value) {
+            if (value === null) {
+                delete overrides[field];
+            } else {
+                overrides[field] = value;
+            }
+        });
+        if (Object.keys(overrides).length) {
+            sampleFilters[sampleId] = overrides;
+        } else {
+            delete sampleFilters[sampleId];
+        }
+        drawSourceTree();
+    }
+
+    function setOverride(sampleId, field, value) {
+        var values = {};
+        values[field] = value;
+        setOverrides(sampleId, values);
+    }
+
+    function getSampleFilters() {
+        // Only what the user actually set reaches the server - the node's own values are what any
+        // other sample gets, including one linked to the extraction after this was configured
+        var filters = {};
+        $.each(sampleFilters, function(sampleId, values) {
+            if (values && Object.keys(values).length) {
+                filters[sampleId] = values;
+            }
+        });
+        return filters;
     }
 
     nodeEditorHooks.getVCFLocusFilters = function() {
         return vcfLocusFilters;
     };
 
-    function renderSampleVCFFilters(sample, detail) {
-        if (!sample.vcf_filters.length) {
-            return;
+    function setNodePassOnly(passOnly) {
+        vcfLocusFilters["pass"] = passOnly;
+        $("#pass-only").prop("checked", passOnly);
+        drawSourceTree();
+    }
+
+    function samplePassOnly(sample) {
+        var overrides = sampleOverrides(sample.sample_id);
+        if (multiSample && overrides["pass_only"] !== undefined) {
+            return overrides["pass_only"];
         }
+        return nodePassOnly();
+    }
+
+    // PASS is the one FILTER value that means the same thing in every VCF, so it is the one a
+    // sample can set for itself - the rest are this VCF's own codes. It reads as one more of them,
+    // since "passed, or only failed this one" is what ticking it alongside a code asks for
+    function renderSamplePass(sample, filterLine) {
+        var overrides = sampleOverrides(sample.sample_id);
+        var overridden = multiSample && overrides["pass_only"] !== undefined;
+        var label = $("<label/>", {title: "Only records that passed every filter"}).appendTo(filterLine);
+        var checkbox = $("<input/>", {type: "checkbox", checked: samplePassOnly(sample)});
+        checkbox.appendTo(label);
+        label.append(document.createTextNode(" PASS"));
+        if (overridden) {
+            label.addClass("sample-overridden");
+        }
+        checkbox.change(function() {
+            var passOnly = $(this).is(":checked");
+            expandedFilters[sample.vcf_id] = true;  // Unticking it would otherwise fold the list up
+            if (multiSample) {
+                setOverride(sample.sample_id, "pass_only", passOnly === nodePassOnly() ? null : passOnly);
+            } else {
+                // One sample's row is the node's own setting - there is no defaults block to hold it
+                setNodePassOnly(passOnly);
+            }
+        });
+    }
+
+    function renderVCFFilterCode(sample, vcfFilter, filterLine) {
+        var selected = vcfLocusFilters["by_vcf"][sample.vcf_id] || [];
+        var label = $("<label/>", {title: vcfFilter.description}).appendTo(filterLine);
+        var checkbox = $("<input/>", {type: "checkbox",
+                                      checked: selected.indexOf(vcfFilter.filter_id) !== -1});
+        checkbox.appendTo(label);
+        label.append(document.createTextNode(" " + vcfFilter.filter_id));
+        checkbox.change(function() {
+            var codes = vcfLocusFilters["by_vcf"][sample.vcf_id] || [];
+            removeItemFromArray(vcfFilter.filter_id, codes);
+            if ($(this).is(":checked")) {
+                codes.push(vcfFilter.filter_id);
+            }
+            vcfLocusFilters["by_vcf"][sample.vcf_id] = codes;
+            expandedFilters[sample.vcf_id] = true;  // Unticking the last one folds the list up otherwise
+            drawSourceTree();
+        });
+    }
+
+    function showVCFFilterCodes(vcfId, show) {
+        expandedFilters[vcfId] = show;
+        drawSourceTree();
+    }
+
+    function noVCFFiltersSelected(sample) {
+        var selected = vcfLocusFilters["by_vcf"][sample.vcf_id] || [];
+        return !selected.length && !samplePassOnly(sample);
+    }
+
+    // FILTER belongs to the VCF, so the sample's own row is where all of it is set. A VCF can
+    // declare heaps of codes and most of the time none of them are wanted, so the list stays behind
+    // a link until it is - nothing ticked means every variant comes through
+    function renderSampleVCFFilters(sample, detail) {
         var filterLine = $("<div/>").appendTo(detail);
         $("<b/>", {text: "FILTER "}).appendTo(filterLine);
-        // PASS is the one value every VCF shares, so it is set globally below the tree
-        var passLabel = $("<label/>").appendTo(filterLine);
-        $("<input/>", {type: "checkbox", disabled: true, checked: !!vcfLocusFilters["pass"]}).appendTo(passLabel);
-        passLabel.append(document.createTextNode(" PASS (global)"));
 
-        var selected = vcfLocusFilters["by_vcf"][sample.vcf_id] || [];
+        var nothingSelected = noVCFFiltersSelected(sample);
+        if (nothingSelected && !expandedFilters[sample.vcf_id]) {
+            $("<span/>", {"class": "source-row-detail", text: "showing all variants "}).appendTo(filterLine);
+            $("<a/>", {href: "javascript:void(0)", text: "select filters"}).click(function() {
+                showVCFFilterCodes(sample.vcf_id, true);
+            }).appendTo(filterLine);
+            return;
+        }
+
+        renderSamplePass(sample, filterLine);
         $.each(sample.vcf_filters, function(i, vcfFilter) {
-            var label = $("<label/>", {title: vcfFilter.description}).appendTo(filterLine);
-            var checkbox = $("<input/>", {type: "checkbox",
-                                          checked: selected.indexOf(vcfFilter.filter_id) !== -1});
-            checkbox.appendTo(label);
-            label.append(document.createTextNode(" " + vcfFilter.filter_id));
-            checkbox.change(function() {
-                var codes = vcfLocusFilters["by_vcf"][sample.vcf_id] || [];
-                removeItemFromArray(vcfFilter.filter_id, codes);
-                if ($(this).is(":checked")) {
-                    codes.push(vcfFilter.filter_id);
-                }
-                vcfLocusFilters["by_vcf"][sample.vcf_id] = codes;
-                drawSourceTree();
-            });
+            renderVCFFilterCode(sample, vcfFilter, filterLine);
         });
+        if (nothingSelected) {
+            $("<a/>", {href: "javascript:void(0)", text: "hide"}).click(function() {
+                showVCFFilterCodes(sample.vcf_id, false);
+            }).appendTo(filterLine);
+        }
     }
 
     function renderSampleThresholds(sample, detail) {
         var thresholdLine = $("<div/>").appendTo(detail);
         $("<b/>", {text: "Thresholds "}).appendTo(thresholdLine);
-        var overrides = sampleThresholds[sample.sample_id] || {};
+        var overrides = sampleOverrides(sample.sample_id);
         $.each(THRESHOLD_FIELDS, function(i, field) {
             thresholdLine.append(document.createTextNode(" " + field.label + " "));
             var value = overrides[field.name] === undefined ? "" : overrides[field.name];
             var input = $("<input/>", {"class": "sample-threshold", type: "number", min: 0, step: 1,
                                        placeholder: nodeThresholdValue(field.name), value: value});
             if (value !== "") {
-                input.addClass("threshold-overridden");
+                input.addClass("sample-overridden");
             }
             input.appendTo(thresholdLine);
             input.change(function() {
                 var typed = $(this).val();
-                var sampleOverrides = sampleThresholds[sample.sample_id] || {};
-                if (typed === "") {
-                    delete sampleOverrides[field.name];
-                } else {
-                    sampleOverrides[field.name] = parseInt(typed);
-                }
-                sampleThresholds[sample.sample_id] = sampleOverrides;
-                drawSourceTree();
+                setOverride(sample.sample_id, field.name, typed === "" ? null : parseInt(typed));
             });
         });
-        thresholdLine.append(document.createTextNode(" "));
-        $("<a/>", {href: "javascript:void(0)", text: "reset"}).click(function() {
-            delete sampleThresholds[sample.sample_id];
+    }
+
+    function renderSampleZygosity(sample, detail) {
+        var overrides = sampleOverrides(sample.sample_id);
+        var overridden = overrides["zygosity"] !== undefined;
+        var codes = overridden ? overrides["zygosity"] : nodeZygosity();
+        var zygosityLine = $("<div/>").appendTo(detail);
+        $("<b/>", {text: "Zygosity "}).appendTo(zygosityLine);
+
+        var checkboxes = [];
+        $.each(ZYGOSITY_FIELDS, function(i, zygosityField) {
+            var label = $("<label/>").appendTo(zygosityLine);
+            if (overridden) {
+                label.addClass("sample-overridden");
+            }
+            var checkbox = $("<input/>", {type: "checkbox", checked: codes.indexOf(zygosityField.code) !== -1});
+            checkbox.appendTo(label);
+            label.append(document.createTextNode(" " + zygosityField.label));
+            checkboxes.push({input: checkbox, code: zygosityField.code});
+        });
+        $.each(checkboxes, function(i, entry) {
+            entry.input.change(function() {
+                // The four are one selection, so the row stores the whole set or none of it
+                var selected = "";
+                $.each(checkboxes, function(j, other) {
+                    if (other.input.is(":checked")) {
+                        selected += other.code;
+                    }
+                });
+                setOverride(sample.sample_id, "zygosity", selected === nodeZygosity() ? null : selected);
+            });
+        });
+    }
+
+    function renderSampleAlleleFrequency(sample, detail) {
+        var overrides = sampleOverrides(sample.sample_id);
+        var afLine = $("<div/>").appendTo(detail);
+        $("<b/>", {text: "Allele frequency "}).appendTo(afLine);
+
+        var inputs = {};
+        $.each(AF_FIELDS, function(i, field) {
+            afLine.append(document.createTextNode(" " + field.label + " "));
+            var value = overrides[field.name] === undefined ? "" : overrides[field.name];
+            var input = $("<input/>", {"class": "sample-af", type: "number", min: 0, max: 1, step: 0.01,
+                                       placeholder: field.placeholder, value: value});
+            if (value !== "") {
+                input.addClass("sample-overridden");
+            }
+            input.appendTo(afLine);
+            inputs[field.name] = input;
+        });
+        $.each(AF_FIELDS, function(i, field) {
+            inputs[field.name].change(function() {
+                // The pair is one range - a blank end is that end of it, and both blank inherits
+                var values = {};
+                $.each(AF_FIELDS, function(j, other) {
+                    var typed = inputs[other.name].val();
+                    values[other.name] = typed === "" ? null : parseFloat(typed);
+                });
+                setOverrides(sample.sample_id, values);
+            });
+        });
+    }
+
+    function renderSampleReset(sample, detail) {
+        if (!sampleFilters[sample.sample_id]) {
+            return;
+        }
+        $("<a/>", {href: "javascript:void(0)", text: "Follow the node's settings"}).click(function() {
+            delete sampleFilters[sample.sample_id];
             drawSourceTree();
-        }).appendTo(thresholdLine);
+        }).appendTo($("<div/>").appendTo(detail));
     }
 
     function renderExpandedSample(sample) {
@@ -221,8 +403,15 @@
         $("<b/>", {text: "VCF "}).appendTo(vcfLine);
         $("<a/>", {target: "_blank", href: Urls.view_vcf(sample.vcf_id), text: sample.vcf}).appendTo(vcfLine);
         renderSampleVCFFilters(sample, detail);
-        if (HAS_GENOTYPE) {
-            renderSampleThresholds(sample, detail);
+        // Reading one sample, the settings above the tree are that sample's - showing them again here
+        // would be the same controls twice
+        if (multiSample) {
+            if (HAS_GENOTYPE && sample.has_genotype) {
+                renderSampleThresholds(sample, detail);
+                renderSampleZygosity(sample, detail);
+                renderSampleAlleleFrequency(sample, detail);
+            }
+            renderSampleReset(sample, detail);
         }
         return detail;
     }
@@ -230,12 +419,30 @@
     // A collapsed row still has to say it is doing something - see the mockup's blue summary
     function sampleOverrideSummary(sample) {
         var parts = [];
-        var overrides = sampleThresholds[sample.sample_id] || {};
+        // Reading one sample, its settings are the node's own - nothing here is an override
+        var overrides = multiSample ? sampleOverrides(sample.sample_id) : {};
         $.each(THRESHOLD_FIELDS, function(i, field) {
             if (overrides[field.name] !== undefined) {
                 parts.push(field.label + overrides[field.name]);
             }
         });
+        if (overrides["zygosity"] !== undefined) {
+            var zygosityLabels = [];
+            $.each(ZYGOSITY_FIELDS, function(i, zygosityField) {
+                if (overrides["zygosity"].indexOf(zygosityField.code) !== -1) {
+                    zygosityLabels.push(zygosityField.label);
+                }
+            });
+            parts.push(zygosityLabels.length ? zygosityLabels.join(",") : "any zygosity");
+        }
+        if (overrides["pass_only"] !== undefined) {
+            parts.push(overrides["pass_only"] ? "PASS" : "any FILTER");
+        }
+        if (overrides["af_min"] !== undefined || overrides["af_max"] !== undefined) {
+            var afMin = overrides["af_min"] === undefined ? 0 : overrides["af_min"];
+            var afMax = overrides["af_max"] === undefined ? 1 : overrides["af_max"];
+            parts.push("AF " + afMin + "-" + afMax);
+        }
         $.each(vcfLocusFilters["by_vcf"][sample.vcf_id] || [], function(i, filterId) {
             parts.push("+" + filterId);
         });
@@ -283,9 +490,8 @@
         }
     }
 
-    function renderContainerRow(container, parentInSelection, holder) {
+    function renderContainerRow(container, holder) {
         var levelLabel = SOURCE_LEVEL_LABELS[container.level];
-        container.in_selection = inSelection(container.level, container.id, parentInSelection);
         var row = $("<div/>", {"class": "source-row"}).appendTo(holder);
         if (!container.in_selection) {
             row.addClass("source-row-unselected");
@@ -299,19 +505,17 @@
         }
         $("<span/>", {"class": "source-row-count",
                       text: levelLabel + " \u00b7 " + container.sample_count + " sample(s)"}).appendTo(row);
-        return container.in_selection;
     }
 
-    function renderSampleRows(samples, parentInSelection, holder, pickable) {
+    function renderSampleRows(samples, holder, pickable) {
         $.each(samples, function(i, sample) {
-            sample.in_selection = inSelection(SOURCE_LEVELS.SAMPLE, sample.sample_id, parentInSelection);
             renderSampleRow(sample, holder, pickable);
         });
     }
 
-    function renderExtraction(extraction, parentInSelection, holder) {
-        var inSel = renderContainerRow(extraction, parentInSelection, holder);
-        renderSampleRows(extraction.samples, inSel, holder, true);
+    function renderExtraction(extraction, holder) {
+        renderContainerRow(extraction, holder);
+        renderSampleRows(extraction.samples, holder, true);
         if (extraction.hidden_count) {
             // Naming samples the user can't view would leak them, so they are a count
             $("<div/>", {"class": "source-row source-row-unselected",
@@ -329,51 +533,95 @@
         func(sourceTree.samples);
     }
 
+    // Which rows the pick reads, worked out before anything is drawn - the sample rows need to know
+    // whether the node is reading more than one of them before they render
+    function flagSelection() {
+        var patientInSelection = true;
+        if (sourceTree.patient) {
+            sourceTree.patient.in_selection = isSelected(sourceTree.patient.level, sourceTree.patient.id);
+            patientInSelection = sourceTree.patient.in_selection;
+        }
+        $.each(sourceTree.specimens, function(i, specimen) {
+            specimen.in_selection = inSelection(specimen.level, specimen.id, patientInSelection);
+            $.each(specimen.extractions, function(j, extraction) {
+                extraction.in_selection = inSelection(extraction.level, extraction.id, specimen.in_selection);
+                $.each(extraction.samples, function(k, sample) {
+                    sample.in_selection = inSelection(SOURCE_LEVELS.SAMPLE, sample.sample_id,
+                                                      extraction.in_selection);
+                });
+            });
+        });
+        $.each(sourceTree.samples, function(i, sample) {
+            sample.in_selection = inSelection(SOURCE_LEVELS.SAMPLE, sample.sample_id, patientInSelection);
+        });
+    }
+
+    function selectedSamples() {
+        var samples = [];
+        eachSampleList(function(sampleList) {
+            $.each(sampleList, function(i, sample) {
+                if (sample.in_selection && sample.included) {
+                    samples.push(sample);
+                }
+            });
+        });
+        return samples;
+    }
+
+    // Reading one sample, the settings above the tree are that sample's own, so they only appear as
+    // defaults when there is more than one sample for them to be the default for. FILTER is set in
+    // the sample rows either way, so the defaults block is the only place it doubles up
+    function setNodeSettingsLabels() {
+        $("#node-settings-heading").toggle(multiSample);
+        $("#node-filters").toggle(multiSample);
+    }
+
     function drawSourceTree() {
         var holder = $("#sample-source-tree").empty();
         if (!sourceTree) {
             holder.text("Nothing selected");
             $("#sample-source-summary").empty();
+            multiSample = false;
+            setNodeSettingsLabels();
             return;
         }
+
+        flagSelection();
+        multiSample = selectedSamples().length > 1;
+        setNodeSettingsLabels();
 
         if (!sourceTree.patient) {
             // Nothing to group by, so there is no tree to draw - just say so and show the sample's
             // own settings, which is the editor a deployment without specimens/extractions wants
             $("<div/>", {"class": "source-row-detail",
                          text: "Not linked to a patient - no specimen or extraction to group by"}).appendTo(holder);
-            renderSampleRows(sourceTree.samples, true, holder, false);
+            renderSampleRows(sourceTree.samples, holder, false);
             drawSourceSummary();
             return;
         }
 
-        var patientInSel = renderContainerRow(sourceTree.patient, false, holder);
+        renderContainerRow(sourceTree.patient, holder);
         $.each(sourceTree.specimens, function(i, specimen) {
-            var specimenInSel = renderContainerRow(specimen, patientInSel, holder);
+            renderContainerRow(specimen, holder);
             $.each(specimen.extractions, function(j, extraction) {
-                renderExtraction(extraction, specimenInSel, holder);
+                renderExtraction(extraction, holder);
             });
         });
         if (sourceTree.samples.length) {
             // The patient CSV attaches these straight to the patient, with no extraction to sit under
             $("<div/>", {"class": "source-row source-row-detail",
                          text: "Not in an extraction"}).appendTo(holder);
-            renderSampleRows(sourceTree.samples, patientInSel, holder, true);
+            renderSampleRows(sourceTree.samples, holder, true);
         }
         drawSourceSummary();
     }
 
     function drawSourceSummary() {
-        var samples = [];
+        var samples = selectedSamples();
         var skipped = [];
         eachSampleList(function(sampleList) {
             $.each(sampleList, function(i, sample) {
-                if (!sample.in_selection) {
-                    return;
-                }
-                if (sample.included) {
-                    samples.push(sample);
-                } else {
+                if (sample.in_selection && !sample.included) {
                     skipped.push(sample.sample + ": " + sample.reason);
                 }
             });
@@ -430,14 +678,7 @@
             sourceTree = data;
             drawSourceTree();  // Flags in_selection, which the auto expand below reads
             // With one sample its own row is the only place the per VCF settings live, so open it
-            var selected = [];
-            eachSampleList(function(sampleList) {
-                $.each(sampleList, function(i, sample) {
-                    if (sample.included && sample.in_selection) {
-                        selected.push(sample);
-                    }
-                });
-            });
+            var selected = selectedSamples();
             if (selected.length === 1) {
                 expandedSamples[selected[0].sample_id] = true;
                 drawSourceTree();
@@ -451,7 +692,7 @@
 
     var sampleForm = $("form#sample-form");
     ajaxForm(sampleForm, function() {
-        $("input#id_sample_thresholds").val(JSON.stringify(getSampleThresholds()));
+        $("input#id_sample_filters").val(JSON.stringify(getSampleFilters()));
     });
 
     // The search box finds a different patient, so the tree comes back from the server
@@ -464,11 +705,13 @@
         }
     });
 
-    // The tree's placeholders are the global values, so they redraw when those change
+    // A sample row shows the node's values and compares against them, so it redraws when they change
     $("#id_min_ad, #id_min_dp, #id_min_gq, #id_max_pl").change(drawSourceTree);
+    $.each(ZYGOSITY_FIELDS, function(i, zygosityField) {
+        $("#id_" + zygosityField.field).change(drawSourceTree);
+    });
     $("#pass-only").change(function() {
-        vcfLocusFilters["pass"] = $(this).is(":checked");
-        drawSourceTree();
+        setNodePassOnly($(this).is(":checked"));
     });
 
     loadSourceTree();
@@ -570,10 +813,14 @@ table.zygosity-table tr.top-header th {
             </div>
         {% endif %}
 
-        <div>
-            <b>Filters - all VCFs</b>
+        <div id='node-settings-heading' style='display: none'>
+            <b>Defaults for all samples</b>
+            <span class='source-row-detail'>expand a sample row above to give it its own</span>
+        </div>
+        <div id='node-filters' style='display: none'>
+            <b>FILTER</b>
             <label title='Only records that passed every filter. The one FILTER value that means the same thing in every VCF - the rest are under their own sample row'>
-                <input type='checkbox' id='pass-only' {% if vcf_locus_filters.pass %}checked{% endif %} /> PASS only
+                <input type='checkbox' id='pass-only' {% if vcf_locus_filters.pass %}checked{% endif %} /> PASS
             </label>
         </div>
     {% if has_genotype %}

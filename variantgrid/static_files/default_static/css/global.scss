@@ -1411,16 +1411,9 @@ table.variantgrid-datatable {
 	.vcf-filter-failed {
 		display: inline-flex;
 		align-items: center;
-		gap: 4px;
 		min-width: 0;
-		color: #cf3f3a;
 		overflow: hidden;
 		text-overflow: ellipsis;
-
-		i {
-			font-size: 10px;
-			flex: none;
-		}
 	}
 
 	// The sample's whole call in one cell: zygosity glyph, allele frequency over alt/total reads,

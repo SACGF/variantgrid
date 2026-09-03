@@ -1,8 +1,8 @@
 from analysis.forms import SampleNodeForm
-from analysis.forms.forms_nodes import SampleThresholdsMixin, VCFLocusFiltersMixin
+from analysis.forms.forms_nodes import SampleFiltersMixin, VCFLocusFiltersMixin
 from analysis.models.nodes.sources.sample_node import SampleNode
 from analysis.views.nodes import GeneCoverageNodeView
-from patients.models_enums import SampleSourceLevel
+from patients.models_enums import SampleSourceLevel, Zygosity
 
 
 class SampleNodeView(GeneCoverageNodeView):
@@ -21,6 +21,12 @@ class SampleNodeView(GeneCoverageNodeView):
             samples = self.object.get_source_samples()
             return any(s.has_genotype for s in samples) if samples else True
         return self.object.sample.has_genotype if self.object.sample else True
+
+    @staticmethod
+    def _get_zygosity_fields() -> list[dict]:
+        labels = dict(Zygosity.CHOICES)
+        return [{"field": field, "code": code, "label": labels[code]}
+                for field, code in SampleNode.ZYGOSITY_FIELD_CODES]
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -48,8 +54,10 @@ class SampleNodeView(GeneCoverageNodeView):
                         "source_levels": {level.name: level.value for level in SampleSourceLevel},
                         "source_level_labels": dict(SampleSourceLevel.choices),
                         # Read back through the mixins that own these hidden fields' formats
-                        "sample_threshold_overrides": SampleThresholdsMixin.get_saved_sample_thresholds(self.object),
+                        "sample_filter_overrides": SampleFiltersMixin.get_saved_sample_filters(self.object),
                         "vcf_locus_filters": VCFLocusFiltersMixin.get_saved_vcf_locus_filters(self.object),
+                        # The zygosity checkboxes, so a sample row can draw and compare the same set
+                        "zygosity_fields": self._get_zygosity_fields(),
                         "show_genes_tab": show_genes_tab,
                         "gene_lists": [gene_list]})
         return context
