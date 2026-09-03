@@ -4,11 +4,7 @@
     {{ block.super }}
 
     #restrict-to-qc-gene-listmessage {
-        color: #118811;
-    }
-
-    #view-allele-frequency-filter-link {
-        margin-left: 10px;
+        color: #2a9d5c;
     }
 
     #sample-source-summary {
@@ -92,7 +88,13 @@
     }
 
     #node-settings-heading {
-        margin-top: 6px;
+        margin-top: 8px;
+    }
+
+    #node-settings-heading .source-row-detail {
+        text-transform: none;
+        letter-spacing: 0;
+        font-weight: normal;
     }
 
     .source-expand {
@@ -731,8 +733,8 @@
     {{ block.super }}
 
     {% if node.sample_gene_list and node.restrict_to_qc_gene_list %}
-        <div>
-        <span id='restrict-to-qc-gene-listmessage'>Sample restricted to GeneList ({{ node.sample_gene_list.gene_list }}) (see Genes tab for details)</span>
+        <div class="editor-note">
+        <span id='restrict-to-qc-gene-listmessage'>Sample restricted to gene list {{ node.sample_gene_list.gene_list }} - see the Genes tab for details</span>
         </div>
     {% endif %}
 
@@ -743,124 +745,109 @@
 
 	{% if patient %}
 		<div class="tab-pane" role="tabpanel" id="node-patient">
-			<p>
-			<b>Patient: </b>{{ patient }} <a target='_blank' href="{% url 'view_patient' patient.pk %}">Edit Patient</a>
-			</p>
+			<div class="editor-row">
+				<span class="editor-label">Patient</span>
+				{{ patient }}
+				<a class="cross-link" target='_blank' href="{% url 'view_patient' patient.pk %}">Edit Patient</a>
+			</div>
 			{% if patient.patientphenotype_set.all %}
-				<p>
-				<b>Phenotypes:</b>
-				{% for pp in patient.patientphenotype_set.all %}
-					{{ pp.hpo }}
-				{% endfor %}
-				</p>
+				<div class="editor-row editor-row-top">
+				<span class="editor-label">Phenotypes</span>
+				<span>{% for pp in patient.patientphenotype_set.all %}{{ pp.hpo }}{% if not forloop.last %}, {% endif %}{% endfor %}</span>
+				</div>
 			{% endif %}
 			{% if patient.patientmim_set.all %}
-				<p>
-				<b>OMIM:</b>
-				{% for mim in patient.patientmim_set.all %}
-					{{ mim.mim_morbid_alias.description }}
-				{% endfor %}
-				</p>
+				<div class="editor-row editor-row-top">
+				<span class="editor-label">OMIM</span>
+				<span>{% for mim in patient.patientmim_set.all %}{{ mim.mim_morbid_alias.description }}{% if not forloop.last %}, {% endif %}{% endfor %}</span>
+				</div>
 			{% endif %}
-			</p>
 		</div>
 	{% endif %}
 {% endblock node_editor_tabs_second %}
 
 {% block content %}
-<style>
-table.zygosity-table {
-	text-align: center;
-	border-collapse: collapse;
-	border-spacing: 0px;
-}
-
-table.zygosity-table tr.top-header th {
-	border-left: 1px solid black;
-	border-right: 1px solid black;
-	padding-left: 5px;
-	padding-right: 5px;
-	margin: 0px;
-}
-
-</style>
-
-<div>
-	<form id="sample-form" method="post" action="{{ request.path }}">
+<form id="sample-form" method="post" action="{{ request.path }}">
     {% csrf_token %}
     {% for hidden in form.hidden_fields %}
         {{ hidden }}
     {% endfor %}
-    <div>
-        <div>
-            {% if form.source %}
-                {{ form.source }}
-            {% else %}
-                <b>{{ node.get_source_level_display }}:</b> {{ node.get_source_object }}
-            {% endif %}
-            <a class="cross-link" id="source-link" target='_blank'>View {{ node.get_source_level_display }}</a>
-        </div>
-        <div id='sample-source-summary'></div>
-        <div id='sample-source-tree'></div>
-
-        {% if node.analysis.template_type %}
-            <!-- We never set this manually, but show so it can be set as an analysis variable via template -->
-            <div>
-                <span id='sample-gene-list'> <b>Sample Gene List:</b> {{ form.sample_gene_list }} </span>
-            </div>
-            <div>
-                <span id='qc-gene-list'> <b>Restrict to Sample Gene List:</b> {{ form.restrict_to_qc_gene_list }} </span>
-            </div>
+    <div class="editor-row">
+        {% if form.source %}
+            <label class="editor-label" for="{{ form.source.id_for_label }}">Source</label>
+            {{ form.source }}
+        {% else %}
+            <span class="editor-label">{{ node.get_source_level_display }}</span>
+            {{ node.get_source_object }}
         {% endif %}
+        <a class="cross-link" id="source-link" target='_blank'>View {{ node.get_source_level_display }}</a>
+    </div>
+    <div id='sample-source-summary' class="editor-help"></div>
+    <div id='sample-source-tree'></div>
 
-        <div id='node-settings-heading' style='display: none'>
-            <b>Defaults for all samples</b>
-            <span class='source-row-detail'>expand a sample row above to give it its own</span>
+    {% if node.analysis.template_type %}
+        <!-- We never set this manually, but show so it can be set as an analysis variable via template -->
+        <div class="editor-row" id='sample-gene-list'>
+            <label class="editor-label" for="{{ form.sample_gene_list.id_for_label }}">Sample gene list</label>
+            {{ form.sample_gene_list }}
         </div>
-        <div id='node-filters' style='display: none'>
-            <b>FILTER</b>
-            <label title='Only records that passed every filter. The one FILTER value that means the same thing in every VCF - the rest are under their own sample row'>
-                <input type='checkbox' id='pass-only' {% if vcf_locus_filters.pass %}checked{% endif %} /> PASS
-            </label>
-        </div>
-    {% if has_genotype %}
-        <div class='genotype-row'>
-            <b title='Allelic Depth'>AD</b>&ge;{{ form.min_ad }}
-            <b title='Read Depth'>DP</b>&ge;{{ form.min_dp }}
-            <b title='Genotype Quality'>GQ</b>&ge;{{ form.min_gq }}
-            <b title='Phred-scaled Likelihoods for Genotypes'>PL</b>&le; {{ form.max_pl }}
-        </div>
-        <div class='genotype-row'>
-            <table class='zygosity-table left' style='text-align: center'>
-                <tr class='top-header'>
-                    <th>Ref
-                    <th>Het
-                    <th>Hom
-                    <th>?
-                <tr><td> {{ form.zygosity_ref }}
-                    <td> {{ form.zygosity_het }}
-                    <td> {{ form.zygosity_hom }}
-                    <td> {{ form.zygosity_unk }}
-            </table>
-            <a id='view-allele-frequency-filter-link' class='left' href='javascript:viewAlleleFrequencyFilter()'>Allele Frequency...</a>
-            <div class='clear'></div>
-        </div>
-        {% load allele_frequency_tags %}
-        {% allele_frequency_controls node %}
-    {% else %}
-        <div class='no-genotype-row'>
-            <b>Note:</b>VCF had no sample/genotype columns, so no sample information will appear in the grid.
+        <div class="editor-row" id='qc-gene-list'>
+            <span class="editor-label">Restrict</span>
+            <label for="{{ form.restrict_to_qc_gene_list.id_for_label }}">{{ form.restrict_to_qc_gene_list }} Restrict to sample gene list</label>
         </div>
     {% endif %}
-    	</div>
-        {# Analysis template "add output node" checkbox #}
-        {% if form.output_node  %}
-            <p>{{ form.output_node.label }}{{ form.output_node }}</p>
-        {% endif %}
+
+    <div id='node-settings-heading' class="editor-section-title" style='display: none'>
+        Defaults for all samples
+        <span class='source-row-detail'>expand a sample row above to give it its own</span>
+    </div>
+    <div id='node-filters' class="editor-row" style='display: none'>
+        <span class="editor-label">FILTER</span>
+        <label title='Only records that passed every filter. The one FILTER value that means the same thing in every VCF - the rest are under their own sample row'>
+            <input type='checkbox' id='pass-only' {% if vcf_locus_filters.pass %}checked{% endif %} /> PASS
+        </label>
+    </div>
+{% if has_genotype %}
+    <div class='genotype-row'>
+        <span class="genotype-field"><b title='Allelic Depth'>AD</b>&ge;{{ form.min_ad }}</span>
+        <span class="genotype-field"><b title='Read Depth'>DP</b>&ge;{{ form.min_dp }}</span>
+        <span class="genotype-field"><b title='Genotype Quality'>GQ</b>&ge;{{ form.min_gq }}</span>
+        <span class="genotype-field"><b title='Phred-scaled Likelihoods for Genotypes'>PL</b>&le;{{ form.max_pl }}</span>
+    </div>
+    <div class='genotype-row'>
+        <table class='editor-table zygosity-table'>
+            <tr class='editor-table-head'>
+                <th class="zygosity-sample">Zygosity</th>
+                <th>Ref
+                <th>Het
+                <th>Hom
+                <th title="No zygosity call in sample">?
+            <tr><th class="zygosity-sample"></th>
+                <td> {{ form.zygosity_ref }}
+                <td> {{ form.zygosity_het }}
+                <td> {{ form.zygosity_hom }}
+                <td> {{ form.zygosity_unk }}
+        </table>
+        <a id='view-allele-frequency-filter-link' class="hover-link" href='javascript:viewAlleleFrequencyFilter()'>Allele Frequency...</a>
+    </div>
+    {% load allele_frequency_tags %}
+    {% allele_frequency_controls node %}
+{% else %}
+    <div class='editor-note no-genotype-row'>
+        VCF had no sample/genotype columns, so no sample information will appear in the grid.
+    </div>
+{% endif %}
+    {# Analysis template "add output node" checkbox #}
+    {% if form.output_node %}
+        <div class="editor-row">
+            <label for="{{ form.output_node.id_for_label }}">{{ form.output_node }} {{ form.output_node.label }}</label>
+        </div>
+    {% endif %}
+    <div class="editor-actions">
         {% if has_write_permission %}
-        	<button id='sample-save' class="btn btn-primary">save</button>
+            <button id='sample-save' class="btn btn-primary">Save</button>
         {% endif %}
-	    {{ form.media }}
-	</form>
-</div>
+    </div>
+    {{ form.media }}
+</form>
 {% endblock content %}

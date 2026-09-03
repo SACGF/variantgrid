@@ -5,23 +5,22 @@
 {% endblock docreadyjs %}
 
 {% block content %}
-<div>
-	<form id="zygosity-node-form" method="post" action="{{ request.path }}">
-        {% csrf_token %}
-		<table>
-		<tr>
-		<td><b>Sample:</b> {{ form.sample }}
-		</tr>
-		<tr>
-		<td>
-		<b>Genotype:</b> {{ form.zygosity }} <b>Exclude:</b> {{ form.exclude }}
+<form id="zygosity-node-form" method="post" action="{{ request.path }}">
+    {% csrf_token %}
+    <div class="editor-row">
+        <label class="editor-label" for="{{ form.sample.id_for_label }}">Sample</label>
+        {{ form.sample }}
+    </div>
+    <div class="editor-row">
+        <label class="editor-label" for="{{ form.zygosity.id_for_label }}">Genotype</label>
+        {{ form.zygosity }}
+        <label for="{{ form.exclude.id_for_label }}">{{ form.exclude }} Exclude</label>
+    </div>
+    <div class="editor-actions">
         {% if has_write_permission %}
-		    <button id='zygosity-node-save' class="btn btn-primary">save</button>
+            <button id='zygosity-node-save' class="btn btn-primary">Save</button>
         {% endif %}
-		</td>
-		</tr>
-		</table>
-        {{ form.media }}
-	</form>
-</div>
+    </div>
+    {{ form.media }}
+</form>
 {% endblock content %}

@@ -144,116 +144,101 @@
 
 
 {% block content %}
-<style>
-	#accordion-container {
-		width: 100% !important;
-	}
-</style>
-<div>
-	<form id="cohort-form" method="post" action="{{ request.path }}">
-        {% csrf_token %}
-        {% for hidden in form.hidden_fields %}
-            {{ hidden }}
-        {% endfor %}
+<form id="cohort-form" method="post" action="{{ request.path }}">
+    {% csrf_token %}
+    {% for hidden in form.hidden_fields %}
+        {{ hidden }}
+    {% endfor %}
 
-		<div>
-            <div>
-                <b>Cohort:</b> {{ form.cohort }} <a class="cross-link" id="cohort-link" target="_blank" >View Cohort</a>
-            </div>
-            <div>
-                {% load vcf_locus_filter_tags %}
-                {% vcf_locus_filter node node.cohort.vcf %}
-            </div>
-            <div class='genotype-row'>
-                <b title='Allelic Depth'>AD</b>&ge;{{ form.min_ad }} {{ form.min_ad_op }}
-                <b title='Read Depth'>DP</b>&ge;{{ form.min_dp }} {{ form.min_dp_op }}
-                <b title='Genotype Quality'>GQ</b>&ge;{{ form.min_gq }} {{ form.min_gq_op }}
-                <b title='Phred-scaled Likelihoods for Genotypes'>PL</b>&le; {{ form.max_pl }} {{ form.max_pl_op }}
-            </div>
-            <div>
-                <a id='view-allele-frequency-filter-link' href='javascript:viewAlleleFrequencyFilter()'>Allele Frequency...</a>
-                {% load allele_frequency_tags %}
-                {% allele_frequency_controls node %}
-            </div>
-		</div>
+    <div class="editor-row">
+        <label class="editor-label" for="{{ form.cohort.id_for_label }}">Cohort</label>
+        {{ form.cohort }}
+        <a class="cross-link" id="cohort-link" target="_blank">View Cohort</a>
+    </div>
+    {% load vcf_locus_filter_tags %}
+    {% vcf_locus_filter node node.cohort.vcf %}
+    <div class='genotype-row'>
+        <span class="genotype-field"><b title='Allelic Depth'>AD</b>&ge;{{ form.min_ad }} {{ form.min_ad_op }}</span>
+        <span class="genotype-field"><b title='Read Depth'>DP</b>&ge;{{ form.min_dp }} {{ form.min_dp_op }}</span>
+        <span class="genotype-field"><b title='Genotype Quality'>GQ</b>&ge;{{ form.min_gq }} {{ form.min_gq_op }}</span>
+        <span class="genotype-field"><b title='Phred-scaled Likelihoods for Genotypes'>PL</b>&le;{{ form.max_pl }} {{ form.max_pl_op }}</span>
+    </div>
+    <div>
+        <a id='view-allele-frequency-filter-link' class="hover-link" href='javascript:viewAlleleFrequencyFilter()'>Allele Frequency...</a>
+        {% load allele_frequency_tags %}
+        {% allele_frequency_controls node %}
+    </div>
 
-        <div id="cohort-node-notes"></div>
+    <div id="cohort-node-notes"></div>
 
-		<div id="accordion-container">
-			<div class="accordion node-editor-accordion" id="cohort-node-accordion">
-                <div class="card">
-                <div class="card-header" data-toggle="collapse" data-target="#cohort-panel-counts">Counts</div>
-                <div id="cohort-panel-counts" class="collapse" data-parent="#cohort-node-accordion">
-                <div class="card-body">
-                    <table>
-                        <tr>
-                            <th></th>
-                            <th>Min</th>
-                            <th>Max</th>
-                        </tr>
-                        <tr>
-                            <th>Het or Hom</th>
-                            <td>{{ form.min_het_or_hom_count }}</td>
-                            <td>{{ form.max_het_or_hom_count }} of <span class='num_samples'>{{ num_samples }}</span> samples.</td>
-                        </tr>
-                    </table>
-
-                    <table>
-                        <tr>
-                            <th></th>
-                            <th>Min</th>
-                            <th>Max</th>
-                        </tr>
-                        <tr>
-                            <th>Unknown</th>
-                            <td>{{ form.min_unk_count }}</td>
-                            <td>{{ form.max_unk_count }} of <span class='num_samples'>{{ num_samples }}</span> samples.</td>
-                        </tr>
-                        <tr>
-                            <th>Ref</th>
-                            <td>{{ form.min_ref_count }}</td>
-                            <td>{{ form.max_ref_count }} of <span class='num_samples'>{{ num_samples }}</span> samples.</td>
-                        </tr>
-                        <tr>
-                            <th>Het</th>
-                            <td>{{ form.min_het_count }}</td>
-                            <td>{{ form.max_het_count }} of <span class='num_samples'>{{ num_samples }}</span> samples.</td>
-                        </tr>
-                        <tr>
-                            <th>Hom Alt</th>
-                            <td>{{ form.min_hom_count }}</td>
-                            <td>{{ form.max_hom_count }} of <span class='num_samples'>{{ num_samples }}</span> samples.</td>
-                        </tr>
-                    </table>
-                </div>
-                </div>
-                </div>
-				<div class="card">
-		        <div class="card-header" data-toggle="collapse" data-target="#cohort-panel-simple-zygosity">Simple Zygosity</div>
-		        <div id="cohort-panel-simple-zygosity" class="collapse" data-parent="#cohort-node-accordion">
-		        <div class="card-body">
-                    <div>
-                    <b>Genotype:</b> {{ form.zygosity }} for {{ form.zygosity_op }} samples.
-                    </div>
-                    <div class='text-muted'>
-                        "Any zygosity call" means Ref, Het or Hom Alt - samples with no zygosity call ("?") don't count.
-                    </div>
-		        </div>
-		        </div>
-		        </div>
-		        <div class="card">
-		        <div class="card-header" data-toggle="collapse" data-target="#cohort-panel-per-sample-zygosity">Per Sample Zygosity</div>
-		        <div id="cohort-panel-per-sample-zygosity" class="collapse" data-parent="#cohort-node-accordion">
-		        <div class="card-body" id='per-sample-zygosity-container'>
-		        </div>
-		        </div>
-		        </div>
-			</div>
-		</div>
+    <div class="accordion node-editor-accordion" id="cohort-node-accordion">
+        <div class="card">
+        <div class="card-header" data-toggle="collapse" data-target="#cohort-panel-counts">Counts</div>
+        <div id="cohort-panel-counts" class="collapse" data-parent="#cohort-node-accordion">
+        <div class="card-body">
+            <div class="editor-help">Of <span class='num_samples'>{{ num_samples }}</span> samples in the cohort.</div>
+            <table class="editor-table">
+                <tr class="editor-table-head">
+                    <th></th>
+                    <th>Min</th>
+                    <th>Max</th>
+                </tr>
+                <tr>
+                    <th>Het or Hom</th>
+                    <td>{{ form.min_het_or_hom_count }}</td>
+                    <td>{{ form.max_het_or_hom_count }}</td>
+                </tr>
+                <tr>
+                    <th>Unknown</th>
+                    <td>{{ form.min_unk_count }}</td>
+                    <td>{{ form.max_unk_count }}</td>
+                </tr>
+                <tr>
+                    <th>Ref</th>
+                    <td>{{ form.min_ref_count }}</td>
+                    <td>{{ form.max_ref_count }}</td>
+                </tr>
+                <tr>
+                    <th>Het</th>
+                    <td>{{ form.min_het_count }}</td>
+                    <td>{{ form.max_het_count }}</td>
+                </tr>
+                <tr>
+                    <th>Hom Alt</th>
+                    <td>{{ form.min_hom_count }}</td>
+                    <td>{{ form.max_hom_count }}</td>
+                </tr>
+            </table>
+        </div>
+        </div>
+        </div>
+        <div class="card">
+        <div class="card-header" data-toggle="collapse" data-target="#cohort-panel-simple-zygosity">Simple Zygosity</div>
+        <div id="cohort-panel-simple-zygosity" class="collapse" data-parent="#cohort-node-accordion">
+        <div class="card-body">
+            <div class="editor-row">
+                <label class="editor-label" for="{{ form.zygosity.id_for_label }}">Genotype</label>
+                {{ form.zygosity }} for {{ form.zygosity_op }} samples
+            </div>
+            <div class='editor-help'>
+                "Any zygosity call" means Ref, Het or Hom Alt - samples with no zygosity call ("?") don't count.
+            </div>
+        </div>
+        </div>
+        </div>
+        <div class="card">
+        <div class="card-header" data-toggle="collapse" data-target="#cohort-panel-per-sample-zygosity">Per Sample Zygosity</div>
+        <div id="cohort-panel-per-sample-zygosity" class="collapse" data-parent="#cohort-node-accordion">
+        <div class="card-body" id='per-sample-zygosity-container'>
+        </div>
+        </div>
+        </div>
+    </div>
+    <div class="editor-actions">
         {% if has_write_permission %}
-    		<button id='cohort-save' class="btn btn-primary">save</button>
+            <button id='cohort-save' class="btn btn-primary">Save</button>
         {% endif %}
+    </div>
     {{ form.media }}
-	</form>
-</div>
+</form>
 {% endblock content %}

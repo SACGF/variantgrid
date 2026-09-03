@@ -207,10 +207,6 @@
 
 	</script>
 	<style>
-	#locked-warning-icon {
-		font-size: 18px;
-	}
-
 	{% block style %}
 	{% endblock style %}
 	</style>
@@ -242,6 +238,7 @@
 			<div class="tab-pane show active" role="tabpanel" id="node-grid">
 				{% block node_filter_info %}
 					{% if extra_filters_label %}
+						<div class="node-editor-filter-info">
 						<b>Filtering to:</b>
 						{% if extra_filters_tags %}
 							{# A selection can be several tags, each in its own colour #}
@@ -250,10 +247,11 @@
 						{% else %}
 							<span class="node-count-{{ extra_filters }}"><span class='user-tag-colored'>{{ extra_filters_label }}</span> - <a href="javascript:createExtraFilterChild()">create child node.</a></span>
 						{% endif %}
+						</div>
 					{% endif %}
 
 					{% if node.analysis.lock_input_sources and not node.has_input %}
-						<div>
+						<div class="editor-warning">
 						<i id='locked-warning-icon' class="fas fa-exclamation-triangle text-warning"></i>
 						<b>Analysis locked</b> - you cannot change samples.</div>
 					{% endif %}
@@ -305,24 +303,22 @@
 					<div class="tab-pane show active" role="tabpanel" id='column-summary-editor'>
 						<form id='column-summary-form'>
 							{% csrf_token %}
-							<div>
-							<div>
-							<span>{{ column_summary_form.column }}</span>
-							<span><button id='column-summary-button'  class="btn btn-outline-primary" type='button'>view</button></span>
-							</div>
+							<div class="editor-row">
+								<label class="editor-label" for="{{ column_summary_form.column.id_for_label }}">Column</label>
+								{{ column_summary_form.column }}
+								<button id='column-summary-button' class="btn btn-sm btn-outline-primary" type='button'>View</button>
 							</div>
 						</form>
 					</div>
 					<div class="tab-pane" role="tabpanel" id='snp-matrix-editor'>
 						<form id='snp-matrix-form'>
 							{% csrf_token %}
-							<table>
-							<tr>
-							<td>{{ snp_matrix_form.conversion }}</td>
-							<td><div id='significant-figures-container'>Sig figs: {{ snp_matrix_form.significant_figures }}</div></td>
-							<td><button id='snp-matrix-button' type='button' class="btn btn-outline-primary">view</button></td>
-							</tr>
-							</table>
+							<div class="editor-row">
+								<label class="editor-label" for="{{ snp_matrix_form.conversion.id_for_label }}">Conversion</label>
+								{{ snp_matrix_form.conversion }}
+								<span id='significant-figures-container'>Sig figs {{ snp_matrix_form.significant_figures }}</span>
+								<button id='snp-matrix-button' type='button' class="btn btn-sm btn-outline-primary">View</button>
+							</div>
 						</form>
 					</div>
 					</div>
@@ -333,9 +329,13 @@
 				<div class="tab-pane" role="tabpanel" id="node-graphs">
 					<form id="graph-node-form">
 						{% csrf_token %}
-						Graph: {{ graph_form.graph_type }}
-						Colormap: {{ graph_form.cmap }}
-						<button id='node-graph-editor-button' type='button' class="btn btn-outline-primary">view</button>
+						<div class="editor-row">
+							<label class="editor-label" for="{{ graph_form.graph_type.id_for_label }}">Graph</label>
+							{{ graph_form.graph_type }}
+							<label for="{{ graph_form.cmap.id_for_label }}">Colormap</label>
+							{{ graph_form.cmap }}
+							<button id='node-graph-editor-button' type='button' class="btn btn-sm btn-outline-primary">View</button>
+						</div>
 					</form>
 				</div>
 				{% endif %}

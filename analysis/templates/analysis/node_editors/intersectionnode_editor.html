@@ -10,75 +10,75 @@
 
 {% block content %}
 <style>
-	#accordion-container {
-		width: 100% !important;
-	}
-	
 	#intersectionnode-variants textarea {
-		width: 400px;
+		width: 100%;
+		max-width: 400px;
 	}
-
-
 </style>
 
-<div>
-	<form id="intersection-node-form" method="post" action="{{ request.path }}">
-        {% csrf_token %}
-        {% for hidden in form.hidden_fields %}
-            {{ hidden }}
-        {% endfor %}
+<form id="intersection-node-form" method="post" action="{{ request.path }}">
+    {% csrf_token %}
+    {% for hidden in form.hidden_fields %}
+        {{ hidden }}
+    {% endfor %}
 
-		<div id="accordion-container">
-			<div class="accordion node-editor-accordion" id="intersection-node-accordion">
-                <div class="card">
-		        <div class="card-header" data-toggle="collapse" data-target="#intersection-panel-intervals">Genomic Intervals</div>
-		        <div id="intersection-panel-intervals" class="collapse" data-parent="#intersection-node-accordion">
-		        <div class="card-body">
-					<div><b>GenomicIntervals:</b> {{ form.genomic_intervals_collection }}</div>
-		        </div>
-		        </div>
-		        </div>
-                <div class="card">
-                <div class="card-header" data-toggle="collapse" data-target="#intersection-panel-variants">Variants</div>
-                <div id="intersection-panel-variants" class="collapse" data-parent="#intersection-node-accordion">
-                    <div class="card-body" id='intersectionnode-variants'>
-                    {{ form.variant_text.errors }}{{ form.variant_text }}
-                    <div class="text-muted">
-                        dbSNP IDs, HGVS, variant coordinates, loci, ClinGen allele IDs, COSMIC IDs
-                        and regions (chr:start-end) - one per line.
-                    </div>
-                    </div>
+    <div class="accordion node-editor-accordion" id="intersection-node-accordion">
+        <div class="card">
+        <div class="card-header" data-toggle="collapse" data-target="#intersection-panel-intervals">Genomic Intervals</div>
+        <div id="intersection-panel-intervals" class="collapse" data-parent="#intersection-node-accordion">
+        <div class="card-body">
+            <div class="editor-row">
+                <label class="editor-label" for="{{ form.genomic_intervals_collection.id_for_label }}">Intervals</label>
+                {{ form.genomic_intervals_collection }}
+            </div>
+        </div>
+        </div>
+        </div>
+        <div class="card">
+        <div class="card-header" data-toggle="collapse" data-target="#intersection-panel-variants">Variants</div>
+        <div id="intersection-panel-variants" class="collapse" data-parent="#intersection-node-accordion">
+            <div class="card-body" id='intersectionnode-variants'>
+            {{ form.variant_text.errors }}{{ form.variant_text }}
+            <div class="editor-help">
+                dbSNP IDs, HGVS, variant coordinates, loci, ClinGen allele IDs, COSMIC IDs
+                and regions (chr:start-end) - one per line.
+            </div>
+            </div>
+        </div>
+        </div>
+        <div class="card">
+        <div class="card-header" data-toggle="collapse" data-target="#intersection-panel-enrichment-kit">Enrichment Kit</div>
+        <div id="intersection-panel-enrichment-kit" class="collapse" data-parent="#intersection-node-accordion">
+        <div class="card-body">
+            {% if enrichment_kit %}
+                <div class="editor-row">
+                    <span class="editor-label">Enrichment kit</span>
+                    {{ enrichment_kit }}
                 </div>
+            {% else %}
+                <div class="editor-help">Can't determine the enrichment kit from the input samples.</div>
+            {% endif %}
+        </div>
+        </div>
+        </div>
+        <div class="card">
+        <div class="card-header" data-toggle="collapse" data-target="#intersection-panel-contig">Contig</div>
+        <div id="intersection-panel-contig" class="collapse" data-parent="#intersection-node-accordion">
+            <div class="card-body" id='intersectionnode-contig'>
+                <div class="editor-row editor-row-top">
+                    <label class="editor-label" for="{{ form.contigs.id_for_label }}">Chromosomes</label>
+                    {{ form.contigs.errors }}{{ form.contigs }}
                 </div>
-                <div class="card">
-                <div class="card-header" data-toggle="collapse" data-target="#intersection-panel-enrichment-kit">EnrichmentKit</div>
-                <div id="intersection-panel-enrichment-kit" class="collapse" data-parent="#intersection-node-accordion">
-                <div class="card-body">
-                    {% if enrichment_kit %}
-                        <b>EnrichmentKit:</b>{{ enrichment_kit }}
-                    {% else %}
-                        Can't determine enrichment_kit from input samples
-                    {% endif %}
-                </div>
-                </div>
-                </div>
-                <div class="card">
-                <div class="card-header" data-toggle="collapse" data-target="#intersection-panel-contig">Contig</div>
-                <div id="intersection-panel-contig" class="collapse" data-parent="#intersection-node-accordion">
-                    <div class="card-body" id='intersectionnode-contig'>
-                    {{ form.contigs.errors }}
-                    <label for="{{ form.contigs.id_for_label }}">Chromosomes:</label>
-                    {{ form.contigs }}
-                    </div>
-                </div>
-                </div>
-			</div>
-		</div>
-        {{ form.non_field_errors }}
-		<div>
-			<button id='intersection-save' class="btn btn-primary">save</button>
-		</div>
-        {{ form.media }}
-	</form>
-</div>
+            </div>
+        </div>
+        </div>
+    </div>
+    {{ form.non_field_errors }}
+    <div class="editor-actions">
+        {% if has_write_permission %}
+            <button id='intersection-save' class="btn btn-primary">Save</button>
+        {% endif %}
+    </div>
+    {{ form.media }}
+</form>
 {% endblock content %}

@@ -113,81 +113,75 @@
 
 
 {% block content %}
-<div>
-	<form id="trio-form" method="post" action="{{ request.path }}">
-        {% csrf_token %}
-        {% for hidden in form.hidden_fields %}
-            {{ hidden }}
-        {% endfor %}
-		<div>
-            <div>
-                <b>Trio:</b> {{ form.trio }}{{ form.trio.errors }} <a class="cross-link" id="trio-link" target="_blank">View Trio</a>
-            </div>
-            <div id='trio-load-error' class='text-danger' style='display: none;'></div>
-            <div id='trio-info'>
-                <table>
-                <tr>
-                    <th>Mother:
-                    <td><span class='mother'></span> (<span class='affected mother_affected'></span>)
-                </tr>
-                <tr>
-                    <th>Father:
-                    <td><span class='father'></span> (<span class='affected father_affected'></span>)
-                </tr>
-                <tr>
-                    <th>Proband:
-                    <td><span class='proband'></span>
-                </tr>
-                </table>
-            </div>
-            <div>
-    		  <b>Inheritance:</b> {{ form.inheritance }}{{ form.inheritance.errors }}
-              <label class="ml-2" title="Save and run even though the inheritance mode doesn't fit this family - the reasons show as warnings">{{ form.ignore_field_errors }} {{ form.ignore_field_errors.label }}</label>
-              <label class="ml-2">{{ form.require_zygosity }} Require Parent Zygosity Calls</label>{{ form.require_zygosity.errors }}
-            </div>
-            {{ zygosity_table_data|json_script:"zygosity-data" }}
-            <div>
-                <a data-toggle="collapse" data-target="#zygosity-table-collapse"
-                   aria-expanded="{{ initially_show_zygosity_table|yesno:'true,false' }}"
-                   aria-controls="zygosity-table-collapse" href="#zygosity-table-collapse">
-                    Zygosity Requirements...
-                </a>
-                <div class="collapse {% if initially_show_zygosity_table %}show{% endif %}"
-                     id="zygosity-table-collapse">
-                    <table class="table table-sm table-bordered mt-1" id="zygosity-table">
-                        <thead>
-                            <tr><th>Member</th><th>Expected Zygosity</th><th>Other Filters</th></tr>
-                        </thead>
-                        <tbody>
-                            <tr><td>Mother</td><td class="zyg-mother" style="white-space: pre-line"></td><td class="other-mother"></td></tr>
-                            <tr><td>Father</td><td class="zyg-father" style="white-space: pre-line"></td><td class="other-father"></td></tr>
-                            <tr><td>Proband</td><td class="zyg-proband" style="white-space: pre-line"></td><td class="other-proband"></td></tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-            <div>
-                {% load vcf_locus_filter_tags %}
-                {% vcf_locus_filter node node.trio.cohort.vcf %}
-            </div>
-            <div class='genotype-row'>
-                <b title='Allelic Depth'>AD</b>&ge;{{ form.min_ad }} {{ form.min_ad_op }}
-                <b title='Read Depth'>DP</b>&ge;{{ form.min_dp }} {{ form.min_dp_op }}
-                <b title='Genotype Quality'>GQ</b>&ge;{{ form.min_gq }} {{ form.min_gq_op }}
-                <b title='Phred-scaled Likelihoods for Genotypes'>PL</b>&le; {{ form.max_pl }} {{ form.max_pl_op }}
-            </div>
-            <div>
-                <a id='view-allele-frequency-filter-link' href='javascript:viewAlleleFrequencyFilter()'>Allele Frequency...</a>
-                {% load allele_frequency_tags %}
-                {% allele_frequency_controls node %}
-            </div>
-    		<div>
-                {% if has_write_permission %}
-    		        <button id='trio-save' class="btn btn-primary">save</button>
-                {% endif %}
-    		</div>
-		</div>
-    {{ form.media }} 
-	</form>
-</div>
+<form id="trio-form" method="post" action="{{ request.path }}">
+    {% csrf_token %}
+    {% for hidden in form.hidden_fields %}
+        {{ hidden }}
+    {% endfor %}
+    <div class="editor-row">
+        <label class="editor-label" for="{{ form.trio.id_for_label }}">Trio</label>
+        {{ form.trio }}{{ form.trio.errors }}
+        <a class="cross-link" id="trio-link" target="_blank">View Trio</a>
+    </div>
+    <div id='trio-load-error' class='editor-warning' style='display: none;'></div>
+    <div id='trio-info' class="editor-section">
+        <div class="editor-section-title">Family</div>
+        <table class="editor-table">
+                <tr><th>Mother</th><td><span class='mother'></span> <span class='editor-help'>(<span class='affected mother_affected'></span>)</span></td></tr>
+                <tr><th>Father</th><td><span class='father'></span> <span class='editor-help'>(<span class='affected father_affected'></span>)</span></td></tr>
+                <tr><th>Proband</th><td><span class='proband'></span></td></tr>
+        </table>
+    </div>
+    <div class="editor-row">
+        <label class="editor-label" for="{{ form.inheritance.id_for_label }}">Inheritance</label>
+        {{ form.inheritance }}{{ form.inheritance.errors }}
+    </div>
+    <div class="editor-row">
+        <span class="editor-label"></span>
+        <span class="editor-checks">
+            <label for="{{ form.ignore_field_errors.id_for_label }}" title="Save and run even though the inheritance mode doesn't fit this family - the reasons show as warnings">{{ form.ignore_field_errors }} {{ form.ignore_field_errors.label }}</label>
+            <label for="{{ form.require_zygosity.id_for_label }}">{{ form.require_zygosity }} Require parent zygosity calls</label>{{ form.require_zygosity.errors }}
+        </span>
+    </div>
+    {{ zygosity_table_data|json_script:"zygosity-data" }}
+    <div>
+        <a class="hover-link" data-toggle="collapse" data-target="#zygosity-table-collapse"
+           aria-expanded="{{ initially_show_zygosity_table|yesno:'true,false' }}"
+           aria-controls="zygosity-table-collapse" href="#zygosity-table-collapse">
+            Zygosity requirements...
+        </a>
+        <div class="collapse {% if initially_show_zygosity_table %}show{% endif %}"
+             id="zygosity-table-collapse">
+            <table class="editor-table" id="zygosity-table">
+                <thead>
+                    <tr><th>Member</th><th>Expected zygosity</th><th>Other filters</th></tr>
+                </thead>
+                <tbody>
+                        <tr><th>Mother</th><td class="zyg-mother" style="white-space: pre-line"></td><td class="other-mother"></td></tr>
+                        <tr><th>Father</th><td class="zyg-father" style="white-space: pre-line"></td><td class="other-father"></td></tr>
+                        <tr><th>Proband</th><td class="zyg-proband" style="white-space: pre-line"></td><td class="other-proband"></td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% load vcf_locus_filter_tags %}
+    {% vcf_locus_filter node node.trio.cohort.vcf %}
+    <div class='genotype-row'>
+        <span class="genotype-field"><b title='Allelic Depth'>AD</b>&ge;{{ form.min_ad }} {{ form.min_ad_op }}</span>
+        <span class="genotype-field"><b title='Read Depth'>DP</b>&ge;{{ form.min_dp }} {{ form.min_dp_op }}</span>
+        <span class="genotype-field"><b title='Genotype Quality'>GQ</b>&ge;{{ form.min_gq }} {{ form.min_gq_op }}</span>
+        <span class="genotype-field"><b title='Phred-scaled Likelihoods for Genotypes'>PL</b>&le;{{ form.max_pl }} {{ form.max_pl_op }}</span>
+    </div>
+    <div>
+        <a id='view-allele-frequency-filter-link' class="hover-link" href='javascript:viewAlleleFrequencyFilter()'>Allele Frequency...</a>
+        {% load allele_frequency_tags %}
+        {% allele_frequency_controls node %}
+    </div>
+    <div class="editor-actions">
+        {% if has_write_permission %}
+            <button id='trio-save' class="btn btn-primary">Save</button>
+        {% endif %}
+    </div>
+    {{ form.media }}
+</form>
 {% endblock content %}

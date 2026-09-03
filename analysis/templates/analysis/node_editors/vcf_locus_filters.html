@@ -53,21 +53,21 @@
     });
     
 </script>
-<div>
+<div class="editor-row editor-row-top">
+<span class="editor-label">VCF filters</span>
 {% if has_filters %}
-<div id='no-filters'><b>VCF Filters:</b> Showing all variants <a href='javascript:showVCFFilters()'>Select filters</a> </div>
+<span id='no-filters'>Showing all variants <a class="hover-link" href='javascript:showVCFFilters()'>Select filters</a></span>
 <div id='vcf-filters'>
-    <b>VCF Filters:</b>
-    <span id='showing-all-filters'>Showing all variants <a href='javascript:hideVCFFilters()'>Hide filters</a></span>
+    <span id='showing-all-filters'>Showing all variants <a class="hover-link" href='javascript:hideVCFFilters()'>Hide filters</a></span>
     <form>
-    <table id='vcf-filter-table'>
-    <tr><td><td><input id='vcf-filters-all' type='checkbox' /><td> (De)Select All. No filters shows all results.  
+    <table id='vcf-filter-table' class="editor-table vcf-filter-table">
+    <tr><td><td><input id='vcf-filters-all' type='checkbox' title="(De)select all" /><td class="editor-table-help">(De)select all - no filters shows all results
     {{ vlf_form.as_table }}
     </table>
     </form>
 </div>
 {% else %}
-    <b>VCF Filters:</b> No filters, showing all variants.
+    <span class="editor-help">No filters, showing all variants</span>
 {% endif %}
 </div>
 </div>

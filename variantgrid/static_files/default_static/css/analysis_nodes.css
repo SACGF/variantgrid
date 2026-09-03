@@ -565,6 +565,18 @@ svg.node-icon {
 	display: flex;
 	align-items: center;
 	gap: 8px;
+	margin: 4px 0 8px;
+	font-size: 15px;
+	font-weight: 600;
+}
+
+.node-editor-title a {
+	color: #6b7280;
+	font-size: 13px;
+}
+
+.node-editor-title a:hover {
+	color: #3455a4;
 }
 
 /* Node editor selects - same chrome as the add-node dropdown. Select2 hides its original select
@@ -865,11 +877,6 @@ span.node-counts {
 	display: none;
 }
 
-#node-editor-container .warning {
-    width: 500px;
-    padding: 20px;
-    margin: 10px;
-}
 
 /* Deleted nodes fade out together with their endpoints/connectors - see fadeOutAndRemoveNode() */
 .node-deleting {
@@ -1156,9 +1163,10 @@ span.node-counts {
 
 .significance-pills .row-label {
 	display: inline-block;
-	width: 110px;
+	min-width: 90px;
+	margin-right: 8px;
 	font-weight: 600;
-	color: #666;
+	color: #3d4550;
 }
 
 .significance-pills label.pill-toggle {
@@ -1199,4 +1207,515 @@ span.node-counts {
 .clinvar-row label {
 	font-weight: normal;
 	margin-right: 6px;
+}
+
+/*
+	Node editor forms - one look for every editor under #node-editor-wrapper, sharing the chrome of
+	the selects above. The building blocks the editor templates are written in:
+	  .editor-row       a label and its control on one line (.editor-label is the label)
+	  .editor-section   a titled group of rows (.editor-section-title)
+	  .editor-table     a compact table of settings (min/max counts, slider rows)
+	  .editor-note      an inline message; .editor-warning / .warning for something to act on
+	  .editor-actions   the save row, with .editor-meta for "last saved" style detail
+	  .editor-checks    a run of checkbox/radio labels; .editor-choices for Django's widget wrapper
+	  .slider-container the range slider + readout used by the Damage/Conservation/Built-in editors
+*/
+#node-editor-wrapper {
+	font-size: 13px;
+	color: #24292f;
+}
+
+#node-editor-wrapper > #node-editor-tabs > .tab-content > .tab-pane {
+	padding: 6px 4px;
+}
+
+#node-editor-wrapper label {
+	margin-bottom: 0;
+	font-weight: normal;
+}
+
+#node-editor-wrapper .editor-label {
+	font-weight: 600;
+}
+
+#node-editor-wrapper b,
+#node-editor-wrapper th {
+	font-weight: 600;
+}
+
+#node-editor-wrapper input[type=checkbox],
+#node-editor-wrapper input[type=radio] {
+	margin: 0 3px 0 0;
+	vertical-align: -1px;
+	accent-color: #3455a4;
+}
+
+#node-editor-wrapper input[type=text],
+#node-editor-wrapper input[type=number],
+#node-editor-wrapper input[type=date],
+#node-editor-wrapper textarea {
+	max-width: 100%;
+	padding: 3px 8px;
+	border: 1px solid #c6cdd6;
+	border-radius: 6px;
+	background-color: white;
+	font-family: inherit;
+	font-size: 13px;
+	line-height: 20px;
+	color: #24292f;
+}
+
+#node-editor-wrapper input[type=number] {
+	width: 5em;
+	padding-right: 4px;
+}
+
+#node-editor-wrapper input[type=text]:focus,
+#node-editor-wrapper input[type=number]:focus,
+#node-editor-wrapper input[type=date]:focus,
+#node-editor-wrapper textarea:focus {
+	outline: none;
+	border-color: #3455a4;
+	box-shadow: 0 0 0 3px rgba(52, 85, 164, .15);
+}
+
+#node-editor-wrapper input:disabled,
+#node-editor-wrapper textarea:disabled {
+	background-color: #f4f6f8;
+	color: #6b7280;
+}
+
+#node-editor-wrapper .select2-container {
+	max-width: 100%;
+}
+
+/* select2 sizes its box from the original select, which is tiny in a flex row - let it fill the row */
+#node-editor-wrapper .editor-row > .select2-container,
+#node-editor-wrapper .editor-row > span > .select2-container {
+	flex: 1 1 160px;
+	min-width: 160px;
+}
+
+#node-editor-wrapper .editor-row > span:has(> .select2-container) {
+	display: flex;
+	flex: 1 1 160px;
+	min-width: 160px;
+}
+
+.editor-row {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 4px 8px;
+	margin: 5px 0;
+}
+
+.editor-row.editor-row-top {
+	align-items: flex-start;
+}
+
+.editor-label {
+	flex: 0 0 auto;
+	min-width: 90px;
+	font-weight: 600;
+	color: #3d4550;
+}
+
+.editor-row .editor-label {
+	margin: 0;
+}
+
+.editor-help {
+	margin: 2px 0;
+	color: #6b7280;
+	font-size: 12px;
+}
+
+.editor-row .editor-help {
+	margin: 0;
+}
+
+.editor-section {
+	margin: 8px 0;
+	padding: 6px 10px 8px;
+	border: 1px solid #e3e7ec;
+	border-radius: 6px;
+	background-color: white;
+}
+
+.editor-section-title {
+	margin: 0 0 4px;
+	font-size: 11px;
+	font-weight: 600;
+	letter-spacing: .04em;
+	text-transform: uppercase;
+	color: #6b7280;
+}
+
+.editor-section-title .hover-link,
+.editor-section-title a {
+	text-transform: none;
+	letter-spacing: 0;
+	font-weight: normal;
+	margin-left: 6px;
+}
+
+/* Inline messages. .warning is what base_editor and the per-node warnings already use */
+.editor-note,
+#node-editor-wrapper .warning:not(.alert-warning),
+#node-editor-wrapper .editor-warning,
+#node-editor-wrapper .live-data-note {
+	width: auto;
+	margin: 6px 0;
+	padding: 5px 10px;
+	border-left: 3px solid #3455a4;
+	border-radius: 0 6px 6px 0;
+	background-color: #f4f6f8;
+	color: #24292f;
+}
+
+#node-editor-wrapper .warning:not(.alert-warning),
+#node-editor-wrapper .editor-warning {
+	border-left-color: #d97706;
+	background-color: #fff7e6;
+}
+
+#node-editor-wrapper .live-data-note {
+	border-left-color: #2a9d5c;
+	background-color: #edf9f1;
+}
+
+#node-editor-wrapper .alert {
+	padding: 6px 10px;
+	margin: 6px 0;
+	font-size: 13px;
+}
+
+#node-editor-wrapper .alert .errorlist {
+	margin: 0;
+	padding-left: 16px;
+}
+
+#node-editor-wrapper .errorlist {
+	margin: 2px 0;
+	padding-left: 16px;
+	color: #b42318;
+	font-size: 12px;
+}
+
+/* Save row */
+.editor-actions {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	margin-top: 10px;
+	padding-top: 8px;
+	border-top: 1px solid #e3e7ec;
+}
+
+.editor-actions .btn {
+	padding: 3px 16px;
+	font-size: 13px;
+	border-radius: 6px;
+}
+
+.editor-meta {
+	margin-left: auto;
+	color: #6b7280;
+	font-size: 12px;
+}
+
+/* Settings tables - min/max counts, slider rows, family members */
+.editor-table {
+	border-collapse: collapse;
+	margin: 4px 0;
+}
+
+.editor-table th,
+.editor-table td {
+	padding: 3px 8px 3px 0;
+	vertical-align: middle;
+	text-align: left;
+}
+
+.editor-table th {
+	font-weight: 600;
+	color: #3d4550;
+	white-space: nowrap;
+}
+
+.editor-table thead th,
+.editor-table tr.editor-table-head th,
+.editor-table tr.editor-table-head td {
+	padding-bottom: 2px;
+	font-size: 11px;
+	font-weight: 600;
+	letter-spacing: .04em;
+	text-transform: uppercase;
+	color: #6b7280;
+	border-bottom: 1px solid #e3e7ec;
+}
+
+.editor-table td.editor-table-help {
+	color: #6b7280;
+	font-size: 12px;
+}
+
+.editor-table.editor-table-centered th,
+.editor-table.editor-table-centered td {
+	text-align: center;
+	padding: 3px 8px;
+}
+
+.editor-table.editor-table-centered th:first-child,
+.editor-table.editor-table-centered td:first-child {
+	text-align: left;
+	padding-left: 0;
+}
+
+/* Checkbox and radio runs - Django renders each choice in its own div */
+.editor-checks,
+.editor-choices > div {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 2px 12px;
+}
+
+.editor-choices > div > div {
+	display: inline-flex;
+	align-items: center;
+}
+
+.editor-choices.editor-choices-stacked > div {
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 2px;
+}
+
+.editor-checks label,
+.editor-choices label {
+	display: inline-flex;
+	align-items: center;
+	white-space: nowrap;
+}
+
+.editor-checks label .editor-help {
+	margin-left: 4px;
+}
+
+/* Genotype thresholds (AD/DP/GQ/PL) shared by the VCF source nodes */
+.genotype-row {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 4px 12px;
+	margin: 5px 0;
+}
+
+.genotype-row b {
+	color: #3d4550;
+}
+
+.genotype-row input[type=number] {
+	width: 4.5em;
+	margin: 0 4px 0 2px;
+}
+
+/* One threshold (label, input, all/any) wraps as a unit */
+.genotype-field {
+	display: inline-flex;
+	align-items: center;
+	white-space: nowrap;
+}
+
+/* Range sliders (scoped - genes/hotspot_graph.html has its own .slider-container) - setupSlider() writes the readout into .slider-value and the ends into .min-value/.max-value */
+#node-editor-wrapper .slider-container {
+	display: inline-block;
+	margin-left: 4px;
+	vertical-align: middle;
+}
+
+#node-editor-wrapper .slider-container .slider,
+#node-editor-wrapper .slider-container .slider-track {
+	display: inline-block;
+	width: 150px;
+	vertical-align: middle;
+}
+
+#node-editor-wrapper .slider-container .slider {
+	margin: 0;
+	accent-color: #3455a4;
+}
+
+#node-editor-wrapper .slider-container .slider-track {
+	position: relative;
+}
+
+#node-editor-wrapper .slider-container .slider-track .slider {
+	display: block;
+	height: 20px;
+}
+
+#node-editor-wrapper .slider-container .slider-labels {
+	display: flex;
+	justify-content: space-between;
+	width: 150px;
+	font-size: 11px;
+	color: #6b7280;
+}
+
+#node-editor-wrapper .slider-container .slider-labels .label {
+	float: none;
+	font-weight: normal;
+}
+
+#node-editor-wrapper .slider-container .slider-value {
+	display: inline-block;
+	min-width: 40px;
+	margin-left: 8px;
+	font-weight: 600;
+	font-variant-numeric: tabular-nums;
+}
+
+#node-editor-wrapper .slider-container .slider:disabled {
+	opacity: 0.4;
+}
+
+#node-editor-wrapper .enable-slider {
+	margin-right: 4px;
+	vertical-align: middle;
+}
+
+/* The tick and its slider stay on one line */
+.editor-table td:has(> .enable-slider) {
+	white-space: nowrap;
+}
+
+/* Allele frequency ranges (allele_frequency_tag.html) */
+#allele-frequency-filter {
+	margin: 4px 0;
+}
+
+#af-tool-container {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin-bottom: 6px;
+}
+
+.af-slider-row {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin: 4px 0 10px;
+}
+
+.af-slider-row .af-slider {
+	width: 200px;
+	margin: 0 8px; /* noUiSlider's handles overhang its track */
+}
+
+.af-slider-row .slider-label {
+	min-width: 36px;
+	font-variant-numeric: tabular-nums;
+	color: #3d4550;
+}
+
+.af-slider-row .slider-max {
+	text-align: right;
+}
+
+#allele-frequency-filter .noUi-connect {
+	background-color: #3455a4;
+}
+
+#allele-frequency-filter .noUi-horizontal {
+	height: 10px;
+}
+
+#allele-frequency-filter .noUi-horizontal .noUi-handle {
+	width: 18px;
+	height: 18px;
+	top: -5px;
+	right: -9px;
+	border-radius: 50%;
+	box-shadow: 0 1px 2px rgba(0, 0, 0, .2);
+}
+
+#allele-frequency-filter .noUi-handle:before,
+#allele-frequency-filter .noUi-handle:after {
+	display: none;
+}
+
+.btn-icon {
+	padding: 0 7px;
+	line-height: 20px;
+	border-radius: 6px;
+}
+
+/* Zygosity tick tables - the Sample node's own row and the Cohort node's per-sample rows */
+.zygosity-table th,
+.zygosity-table td {
+	text-align: center;
+	padding: 2px 10px;
+}
+
+.zygosity-table th.zygosity-sample {
+	text-align: left;
+	padding-left: 0;
+}
+
+.zygosity-table tr.editor-table-head th {
+	text-align: center;
+}
+
+.zygosity-table tr.editor-table-head th.zygosity-sample {
+	text-align: left;
+}
+
+.zygosity-table td.zygosity-toggle {
+	text-align: left;
+	font-style: italic;
+	color: #6b7280;
+}
+
+.zygosity-table th.zygosity-toggle {
+	color: #6b7280;
+	font-weight: normal;
+	font-style: italic;
+	text-align: left;
+}
+
+/* Accordion panels get the section chrome rather than Bootstrap's card padding */
+.node-editor-accordion {
+	margin: 8px 0;
+}
+
+.node-editor-accordion .card-header {
+	padding: 6px 12px;
+	font-size: 13px;
+}
+
+.node-editor-accordion .card-body {
+	padding: 8px 12px 10px;
+}
+
+/* Summary / graph tabs */
+#node-summary-tabs form {
+	padding: 4px 0;
+}
+
+#node-editor-wrapper .vertical-tabs > ul.nav-tabs {
+	font-size: 13px;
+}
+
+/* Filtering-to line and the locked notice above the editor title */
+.node-editor-filter-info {
+	margin: 4px 0;
+}
+
+#locked-warning-icon {
+	font-size: 15px;
+	margin-right: 4px;
 }

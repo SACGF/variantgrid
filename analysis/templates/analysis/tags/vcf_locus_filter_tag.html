@@ -6,7 +6,7 @@
                 const URL = func({{ node.analysis_id }}, {{ node.pk }}, pk);
                 container.load(URL);
             } else {
-                container.html("No input selected");
+                container.html('<div class="editor-help">No input selected</div>');
             }
         }
 

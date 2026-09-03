@@ -1,46 +1,13 @@
 {% extends "analysis/node_editors/grid_editor.html" %}
 
 {% block content %}
-<style>
-	.slider-container {
-		margin-left: 10px;
-		display: inline-block;
-	}
-
-	.slider {
-		display: inline-block;
-		width: 200px;
-		vertical-align: middle;
-	}
-
-	.slider-labels {
-		width: 200px;
-	}
-
-	.label {
-		font-weight: bold;
-	}
-
-	.slider-value {
-        min-width: 50px;
-        height: 25px;
-		margin-left: 15px;
-	}
-
-</style>
 <script>
     function setupClinVarStars(bifSelect) {
         // StarsWidget renders the zero option itself - we only show/hide the whole thing
-        let starsContainer = $("#stars-clinvar_stars_min").parents(".stars-input-container");
+        let starsRow = $("#clinvar-stars-row");
 
         function checkClinVarStarsVisibility() {
-            if (bifSelect.val() == 'C') {
-                $("label[for=id_clinvar_stars_min]").show();
-                starsContainer.show();
-            } else {
-                $("label[for=id_clinvar_stars_min]").hide();
-                starsContainer.hide();
-            }
+            starsRow.toggle(bifSelect.val() == 'C');
         }
 
         bifSelect.change(checkClinVarStarsVisibility);
@@ -49,12 +16,7 @@
 
     function setupCOSMICCount(bifSelect) {
         function checkCOSMICCount() {
-            let ccw = $("#cosmic-count-widget");
-            if (bifSelect.val() === 'M') {
-                ccw.show();
-            } else {
-                ccw.hide();
-            }
+            $("#cosmic-count-widget").toggle(bifSelect.val() === 'M');
         }
 
         bifSelect.change(checkCOSMICCount);
@@ -70,30 +32,39 @@
         ajaxForm(bifForm);
     });
 </script>
-<div>
-	<form id="built-in-filter" method="post" action="{{ request.path }}">
-        {% csrf_token %}
-        {{ form.as_p }}
-
-        <div id="cosmic-count-widget">
-            <label>COSMIC count min</label>
-            <div class='slider-container'>
-                <div class="display-flex">
-                    <input type="range" id="cosmic-count-slider" class='slider' />
-                    <div class='label slider-value'></div>
-                </div>
-                <div class='slider-labels'>
-                    <span class='label min-value left'></span>
-                    <span class='label max-value right'></span>
-                </div>
+<form id="built-in-filter" method="post" action="{{ request.path }}">
+    {% csrf_token %}
+    {{ form.non_field_errors }}
+    {% for hidden in form.hidden_fields %}
+        {{ hidden }}
+    {% endfor %}
+    <div class="editor-row">
+        <label class="editor-label" for="{{ form.built_in_filter.id_for_label }}">Filter</label>
+        {{ form.built_in_filter.errors }}{{ form.built_in_filter }}
+    </div>
+    <div class="editor-row" id="clinvar-stars-row">
+        <label class="editor-label" for="{{ form.clinvar_stars_min.id_for_label }}">Min ClinVar stars</label>
+        {{ form.clinvar_stars_min.errors }}{{ form.clinvar_stars_min }}
+    </div>
+    <div class="editor-row" id="cosmic-count-widget">
+        <span class="editor-label">COSMIC count min</span>
+        <span class='slider-container'>
+            <div class="display-flex">
+                <input type="range" id="cosmic-count-slider" class='slider' />
+                <div class='label slider-value'></div>
             </div>
-        </div>
+            <div class='slider-labels'>
+                <span class='label min-value left'></span>
+                <span class='label max-value right'></span>
+            </div>
+        </span>
+    </div>
 
+    <div class="editor-actions">
         {% if has_write_permission %}
-		    <button id='built-in-filter-save' class="btn btn-primary">save</button>
+            <button id='built-in-filter-save' class="btn btn-primary">Save</button>
         {% endif %}
-        {{ form.media }}
-	</form>
-</div>
-
+    </div>
+    {{ form.media }}
+</form>
 {% endblock content %}

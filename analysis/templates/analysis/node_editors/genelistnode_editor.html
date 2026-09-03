@@ -72,95 +72,101 @@
 </style>
 {% endif %}
 
-<div>
-	<form id="node-gene-list-form" method="post" action="{{ request.path }}">
-        {% csrf_token %}
-        {% for hidden in form.hidden_fields %}
-            {{ hidden }}
+<form id="node-gene-list-form" method="post" action="{{ request.path }}">
+    {% csrf_token %}
+    {% for hidden in form.hidden_fields %}
+        {{ hidden }}
+    {% endfor %}
+
+    <div class="accordion node-editor-accordion" id="gene-list-node-accordion">
+        <div class="card">
+        <div class="card-header" data-toggle="collapse" data-target="#gene-list-panel-named">Named Gene Lists</div>
+        <div id="gene-list-panel-named" class="collapse" data-parent="#gene-list-node-accordion">
+        <div class="card-body">
+            <div class="editor-row editor-row-top">
+                <label class="editor-label" for="{{ form.gene_list.id_for_label }}">Gene lists</label>
+                {{ form.gene_list }}
+            </div>
+            <div class="editor-row">
+                <span class="editor-label">Exclude</span>
+                <label for="{{ form.exclude.id_for_label }}">{{ form.exclude }} Filter <b>out</b> these genes</label>
+            </div>
+        </div>
+        </div>
+        </div>
+        <div class="card">
+        <div class="card-header" data-toggle="collapse" data-target="#gene-list-panel-custom">Custom Gene List</div>
+        <div id="gene-list-panel-custom" class="collapse" data-parent="#gene-list-node-accordion">
+            <div class="card-body" id='custom-gene-list-form'>
+                <div>{{ form.custom_gene_list_text }}</div>
+                <div class="editor-row">
+                    <span class="editor-label">Exclude</span>
+                    <label><input id='mirror-exclude' type='checkbox'> Filter <b>out</b> these genes</label>
+                </div>
+            </div>
+        </div>
+        </div>
+        <div class="card" id='sample-qc-gene-list'>
+        <div class="card-header" data-toggle="collapse" data-target="#gene-list-panel-sample-qc">Sample QC Gene List</div>
+        <div id="gene-list-panel-sample-qc" class="collapse" data-parent="#gene-list-node-accordion">
+        <div class="card-body">
+            <div class="editor-row">
+                <label class="editor-label" for="{{ form.sample.id_for_label }}">Sample</label>
+                {{ form.sample }}
+            </div>
+        </div>
+        </div>
+        </div>
+        <div class="card" id='pathology-test-gene-list'>
+        <div class="card-header" data-toggle="collapse" data-target="#gene-list-panel-pathology-test">{{ pathology_test_category.name }}</div>
+        <div id="gene-list-panel-pathology-test" class="collapse" data-parent="#gene-list-node-accordion">
+        <div class="card-body">
+            <div class="editor-row editor-row-top">
+                <div class='gene-list-icon icon48 {{ pathology_test_category.icon_css_class }}'></div>
+                <div>{{ form.pathology_test_version }}</div>
+                <div id="pathology-test-info" class="editor-help"></div>
+            </div>
+        </div>
+        </div>
+        </div>
+        <div class="card">
+            <div class="card-header" data-toggle="collapse" data-target="#gene-list-panel-panel-app">PanelApp Panels</div>
+            <div id="gene-list-panel-panel-app" class="collapse" data-parent="#gene-list-node-accordion">
+            <div class="card-body">
+                <div class="editor-row">
+                    <label class="editor-label" for="{{ form.min_panel_app_confidence.id_for_label }}">Min confidence</label>
+                    {{ form.min_panel_app_confidence.errors }}{{ form.min_panel_app_confidence }}
+                </div>
+                <div class="editor-row editor-row-top">
+                    <label class="editor-label" for="{{ form.panel_app_panel_aus.id_for_label }}">PanelApp Australia</label>
+                    {{ form.panel_app_panel_aus.errors }}{{ form.panel_app_panel_aus }}
+                </div>
+                <div class="editor-row editor-row-top">
+                    <label class="editor-label" for="{{ form.panel_app_panel_eng.id_for_label }}">PanelApp England</label>
+                    {{ form.panel_app_panel_eng.errors }}{{ form.panel_app_panel_eng }}
+                </div>
+            </div>
+            </div>
+        </div>
+    </div>
+    {% if node.accordion_panel == 4 and panel_app_warnings %}
+        {% for w in panel_app_warnings %}
+            <div class='warning'>{{ w }}</div>
         {% endfor %}
+        <div class="editor-help">Save this node to check/update PanelApp panels</div>
+    {% endif %}
 
-		<div id="accordion-container">
-			<div class="accordion node-editor-accordion" id="gene-list-node-accordion">
-                <div class="card">
-                <div class="card-header" data-toggle="collapse" data-target="#gene-list-panel-named">Named Gene Lists</div>
-                <div id="gene-list-panel-named" class="collapse" data-parent="#gene-list-node-accordion">
-                <div class="card-body">
-                    <div><b>Gene List:</b> {{ form.gene_list }}</div>
-                    <div><b>Exclude:</b> {{ form.exclude }} (filter OUT these genes)</div>
-                </div>
-                </div>
-                </div>
-                <div class="card">
-                <div class="card-header" data-toggle="collapse" data-target="#gene-list-panel-custom">Custom Gene List</div>
-                <div id="gene-list-panel-custom" class="collapse" data-parent="#gene-list-node-accordion">
-                    <div class="card-body" id='custom-gene-list-form'>
-                        <div>{{ form.custom_gene_list_text }}</div>
-                        <div><b>Exclude:</b> <input id='mirror-exclude' type='checkbox'> (filter OUT these genes)</div>
-
-                    </div>
-                </div>
-                </div>
-                <div class="card" id='sample-qc-gene-list'>
-                <div class="card-header" data-toggle="collapse" data-target="#gene-list-panel-sample-qc">Sample QC Gene List</div>
-                <div id="gene-list-panel-sample-qc" class="collapse" data-parent="#gene-list-node-accordion">
-                <div class="card-body">Sample: {{ form.sample  }}
-                </div>
-                </div>
-                </div>
-                <div class="card" id='pathology-test-gene-list'>
-                <div class="card-header" data-toggle="collapse" data-target="#gene-list-panel-pathology-test">{{ pathology_test_category.name }}</div>
-                <div id="gene-list-panel-pathology-test" class="collapse" data-parent="#gene-list-node-accordion">
-                <div class="card-body">
-                    <div style="display: flex; align-items: flex-start; gap: 10px;">
-                        <div class='gene-list-icon icon48 {{ pathology_test_category.icon_css_class }}'></div>
-                        <div>{{ form.pathology_test_version }}</div>
-                        <div id="pathology-test-info"></div>
-                    </div>
-                </div>
-                </div>
-                </div>
-                <div class="card">
-                    <div class="card-header" data-toggle="collapse" data-target="#gene-list-panel-panel-app">PanelApp Panels</div>
-                    <div id="gene-list-panel-panel-app" class="collapse" data-parent="#gene-list-node-accordion">
-                    <div class="card-body">
-                        <div class="fieldWrapper">
-                            {{ form.min_panel_app_confidence.errors }}
-                            <label for="{{ form.min_panel_app_confidence.id_for_label }}">Min PanelApp Confidence:</label>
-                            {{ form.min_panel_app_confidence }}
-                        </div>
-
-                        <div class="fieldWrapper">
-                            {{ form.panel_app_panel_aus.errors }}
-                            <label for="{{ form.panel_app_panel_aus.id_for_label }}">PanelApp Australia:</label>
-                            {{ form.panel_app_panel_aus }}
-                        </div>
-                        <div class="fieldWrapper">
-                            {{ form.panel_app_panel_eng.errors }}
-                            <label for="{{ form.panel_app_panel_eng.id_for_label }}">PanelApp England :</label>
-                            {{ form.panel_app_panel_eng }}
-                        </div>
-                    </div>
-                    </div>
-                </div>
-			</div>
-		</div>
-        <div>
-        {% if node.accordion_panel == 4 and panel_app_warnings %}
-            {% for w in panel_app_warnings %}
-                <div class='warning'>{{ w }}</div>
-            {% endfor %}
-            Save this node to check/update PanelApp panels
-        {% endif %}
-		</div>
-
-        {# Analysis template "add output node" checkbox #}
-        {% if form.output_node  %}
-            <p>{{ form.output_node.label }}{{ form.output_node }}</p>
-        {% endif %}
+    {# Analysis template "add output node" checkbox #}
+    {% if form.output_node %}
+        <div class="editor-row">
+            <label for="{{ form.output_node.id_for_label }}">{{ form.output_node }} {{ form.output_node.label }}</label>
+        </div>
+    {% endif %}
+    <div class="editor-actions">
         {% if has_write_permission %}
-    		<button id="gene-list-button" class="btn btn-primary">save</button>
+            <button id="gene-list-button" class="btn btn-primary">Save</button>
         {% endif %}
-		{{ form.media }}
-	</form>
-</div>
+    </div>
+    {{ form.media }}
+</form>
 {% endblock content %}
