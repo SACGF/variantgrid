@@ -5,81 +5,94 @@
 
 {% block head %}
 <style>
+/* Pedigree figure - the same sprite symbol the QuadNode wears, with the parents/sibling filling in as
+   they're marked affected (see --pedigree-*-fill in uicore/tags/svg_icon_sprite.html) */
+.pedigree-figure {
+    width: 168px;
+    height: 122px;
+    color: #495057;
+    /* the sprite's stroke is weighted for a 15px badge - lighten it at this size */
+    --pedigree-stroke-width: 1.5;
+}
+
+.pedigree-figure.mother-affected {
+    --pedigree-mother-fill: currentColor;
+}
+
+.pedigree-figure.father-affected {
+    --pedigree-father-fill: currentColor;
+}
+
+.pedigree-figure.sibling-affected {
+    --pedigree-sibling-fill: currentColor;
+}
+
+#quad-heading-icon {
+    margin-right: 0.35em;
+    width: 1.7em;
+    height: 1.2em;
+    vertical-align: -0.15em;
+    color: #495057;
+}
+
+#quad-table td {
+    vertical-align: middle;
+}
+
+#quad-table .role-cell {
+    width: 150px;
+}
+
+#quad-table .affected-cell {
+    width: 110px;
+}
+
+/* The switch sits in a table cell - drop the paragraph spacing so the row keeps its height */
+#quad-table .custom-switch {
+    margin-bottom: 0;
+}
+
+/* Stands in for the switch on the proband's row, which is affected by definition */
+#quad-table .proband-affected {
+    display: none;
+}
+
 #form-submitted-dialog {
     text-align: center;
-}
-
-#quad-title {
-    float: left;
-}
-
-#quad-logo {
-    float: left;
-}
-
-#quad-table {
-  border-collapse: collapse;
-}
-
-td.patient-phenotype {
-  border: solid;
-  border-width: 1px 0;
-  padding: 5px;
-}
-
-tr:first-child td.patient-phenotype {
-  border-top: none;
-}
-
-tr:last-child td.patient-phenotype {
-  border-bottom: none;
-}
-
-#form-submitted-dialog .QuadNode {
-    margin: 0 auto;
 }
 
 #proband-description {
     text-align: left;
 }
-
-.QuadNode {
-    background-image: url({% static 'images/node_icons/quad.png' %});
-    width: 118px;
-    height: 100px;
-    background-repeat: no-repeat;
-    background-size: contain;
-}
 </style>
 <script src="{% static 'js/patient_phenotype.js' %}"></script>
 <script src="{% static 'js/proband_sex_mismatch.js' %}"></script>
+<script src="{% static 'js/family_wizard_roles.js' %}"></script>
 <script>
-var patient_description_results = {{ patient_description_results | jsonify }};
-var sample_sexes = {{ sample_sexes | jsonify }};
+const patient_description_results = {{ patient_description_results | jsonify }};
+const sample_sexes = {{ sample_sexes | jsonify }};
 
 function setProbandPhenoText() {
-    var pp = $("#proband-phenos");
+    const pp = $("#proband-phenos");
     pp.empty();
-    var i = 0;
-    var displayedTerms = new Set();
+    const displayedTerms = new Set();
 
-    $("select", ".sample-select").each(function() {
-        if ($(this).val() == 'P') {
-            var results = patient_description_results[i][1];
+    $("select", ".sample-select").each(function(i) {
+        if ($(this).val() === 'P') {
+            const results = patient_description_results[i][1];
             if (results) {
                 $("#proband-text").html("Using proband phenotypes:");
-                for (var m = 0; m < results.length; ++m) {
-                    var result = results[m];
-                    var ontologyService = result["ontology_service"];
-                    var resultMatch = result["match"];
-                    if (!displayedTerms.has(resultMatch) && (ontologyService == 'HPO' || ontologyService == 'OMIM')) {
-                        pp.append($("<li>" + resultMatch + "</li>"));
+                for (let m = 0; m < results.length; ++m) {
+                    const result = results[m];
+                    const ontologyService = result["ontology_service"];
+                    const resultMatch = result["match"];
+                    if (!displayedTerms.has(resultMatch) && (ontologyService === 'HPO' || ontologyService === 'OMIM')) {
+                        pp.append($("<li>").text(resultMatch));
                         displayedTerms.add(resultMatch);
                     }
                 }
             }
         }
-        i++;
     });
 }
 </script>
@@ -87,13 +100,13 @@ function setProbandPhenoText() {
 
 {% block jsdocumentready %}
 
-    for (var i = 0; i < patient_description_results.length; ++i) {
-        var pdr = patient_description_results[i];
-        var phenotypeText = pdr[0];
-        var phenotypeMatches = pdr[1];
+    for (let i = 0; i < patient_description_results.length; ++i) {
+        const pdr = patient_description_results[i];
+        const phenotypeText = pdr[0];
+        const phenotypeMatches = pdr[1];
 
         if (phenotypeText) {
-            var resultSelector = $("#patient-results-" + (i + 1));
+            const resultSelector = $("#patient-results-" + (i + 1));
             displayPhenotypeMatches(resultSelector, phenotypeText, phenotypeMatches);
         }
     }
@@ -105,41 +118,99 @@ function setProbandPhenoText() {
         $("#form-submitted-dialog").modal("show");
     });
 
+    setupFamilyRoles(sample_sexes,
+                     {"M": "mother-affected", "F": "father-affected", "S": "sibling-affected"});
+
 {% endblock jsdocumentready %}
 
 {% block submenu_page_content %}
-    <div>
-        <div id='quad-logo' class="QuadNode"></div>
-        <h3 id="quad-title">Create Quad Wizard</h3>
-        <div class='clear'></div>
-    </div>
+    <h3>
+        <svg id="quad-heading-icon"><use href="#node-icon-quad"></use></svg> Create Quad
+    </h3>
+    <p class="text-muted">
+        From cohort <a href="{{ cohort.get_absolute_url }}">{{ cohort }}</a> - give each sample a role
+        in the family, and tick the members that are affected.
+    </p>
 
     <form id="quad-form" method="post">
         {% csrf_token %}
-        <div>
-            <b>Mother Affected:</b> {{ form.mother_affected }}{{ form.mother_affected.errors }}
-            <b>Father Affected:</b> {{ form.father_affected }}{{ form.father_affected.errors }}
-            <b>Sibling Affected:</b> {{ form.sibling_affected }}{{ form.sibling_affected.errors }}
-        </div>
 
-        <table id='quad-table'>
-            <tr><td> {{ sample_1.name }}
-                <td class='sample-select'> {{ form.sample_1 }}{{ form.sample_1.errors }}
-                <td> {{ sample_1.patient | default_if_none:"" }}
-                <td id='patient-results-1' class='patient-phenotype'>
-            <tr><td> {{ sample_2.name }}
-                <td class='sample-select'> {{ form.sample_2 }}{{ form.sample_2.errors }}
-                <td> {{ sample_2.patient | default_if_none:"" }}
-                <td id='patient-results-2' class='patient-phenotype'>
-            <tr><td> {{ sample_3.name }}
-                <td class='sample-select'> {{ form.sample_3 }}{{ form.sample_3.errors }}
-                <td> {{ sample_3.patient | default_if_none:"" }}
-                <td id='patient-results-3' class='patient-phenotype'>
-            <tr><td> {{ sample_4.name }}
-                <td class='sample-select'> {{ form.sample_4 }}{{ form.sample_4.errors }}
-                <td> {{ sample_4.patient | default_if_none:"" }}
-                <td id='patient-results-4' class='patient-phenotype'>
-        </table>
+        <div class="row">
+            <div class="col-lg-8">
+                <div class="card mb-3">
+                    <div class="card-header">Samples</div>
+                    <table id='quad-table' class="table table-sm mb-0">
+                        <thead>
+                            <tr><th>Sample</th><th>Role</th><th>Affected</th><th>Patient</th><th>Phenotype</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>{{ sample_1.name }}</td>
+                                <td class='sample-select role-cell'>{{ form.sample_1 }}{{ form.sample_1.errors }}</td>
+                                <td class='sample-affected affected-cell'>
+                                    <div class="custom-control custom-switch">
+                                        {{ form.sample_1_affected }}
+                                        <label class="custom-control-label" for="{{ form.sample_1_affected.id_for_label }}"></label>
+                                    </div>
+                                    <span class="proband-affected text-muted small">Always</span>
+                                </td>
+                                <td>{{ sample_1.patient | default_if_none:"" }}</td>
+                                <td id='patient-results-1'></td>
+                            </tr>
+                            <tr>
+                                <td>{{ sample_2.name }}</td>
+                                <td class='sample-select role-cell'>{{ form.sample_2 }}{{ form.sample_2.errors }}</td>
+                                <td class='sample-affected affected-cell'>
+                                    <div class="custom-control custom-switch">
+                                        {{ form.sample_2_affected }}
+                                        <label class="custom-control-label" for="{{ form.sample_2_affected.id_for_label }}"></label>
+                                    </div>
+                                    <span class="proband-affected text-muted small">Always</span>
+                                </td>
+                                <td>{{ sample_2.patient | default_if_none:"" }}</td>
+                                <td id='patient-results-2'></td>
+                            </tr>
+                            <tr>
+                                <td>{{ sample_3.name }}</td>
+                                <td class='sample-select role-cell'>{{ form.sample_3 }}{{ form.sample_3.errors }}</td>
+                                <td class='sample-affected affected-cell'>
+                                    <div class="custom-control custom-switch">
+                                        {{ form.sample_3_affected }}
+                                        <label class="custom-control-label" for="{{ form.sample_3_affected.id_for_label }}"></label>
+                                    </div>
+                                    <span class="proband-affected text-muted small">Always</span>
+                                </td>
+                                <td>{{ sample_3.patient | default_if_none:"" }}</td>
+                                <td id='patient-results-3'></td>
+                            </tr>
+                            <tr>
+                                <td>{{ sample_4.name }}</td>
+                                <td class='sample-select role-cell'>{{ form.sample_4 }}{{ form.sample_4.errors }}</td>
+                                <td class='sample-affected affected-cell'>
+                                    <div class="custom-control custom-switch">
+                                        {{ form.sample_4_affected }}
+                                        <label class="custom-control-label" for="{{ form.sample_4_affected.id_for_label }}"></label>
+                                    </div>
+                                    <span class="proband-affected text-muted small">Always</span>
+                                </td>
+                                <td>{{ sample_4.patient | default_if_none:"" }}</td>
+                                <td id='patient-results-4'></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="col-lg-4">
+                <div class="card mb-3">
+                    <div class="card-header">Pedigree</div>
+                    <div class="card-body text-center">
+                        <svg class="pedigree-figure"><use href="#node-icon-quad"></use></svg>
+                        <div class="text-muted small">Filled symbols are affected</div>
+                    </div>
+                </div>
+            </div>
+        </div>
 
         <div id='proband-sex-mismatch' class="alert alert-warning" style="display: none;">
             <div id='proband-sex-message'></div>
@@ -162,8 +233,8 @@ function setProbandPhenoText() {
         <div class="modal-dialog" role="document">
             <div class="modal-content">
                 <div class="modal-body">
-                    <div><i class="fa fa-spinner"></i> Creating Quad...</div>
-                    <div class="QuadNode"></div>
+                    <div><i class="fa fa-spinner fa-spin"></i> Creating Quad...</div>
+                    <svg class="pedigree-figure"><use href="#node-icon-quad"></use></svg>
                     <div id='proband-description'>
                         <div id='proband-text'></div>
                         <ul id='proband-phenos'></ul>

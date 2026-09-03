@@ -62,6 +62,9 @@ class Test(URLTestCase):
 
         mother_sample = Sample.objects.create(name="mother", vcf=cls.vcf)
         father_sample = Sample.objects.create(name="father", vcf=cls.vcf)
+        sibling_sample = Sample.objects.create(name="sibling", vcf=cls.vcf)
+        for family_sample in (mother_sample, father_sample, sibling_sample):
+            assign_permission_to_user_and_groups(cls.user_owner, family_sample)
         cls.cohort = Cohort.objects.create(name="test_urls_cohort", user=cls.user_owner,
                                            vcf=cls.vcf, genome_build=grch37,
                                            import_status=ImportStatus.SUCCESS)
@@ -72,6 +75,8 @@ class Test(URLTestCase):
                                                 cohort_genotype_packed_field_index=1, sort_order=2)
         father_cs = CohortSample.objects.create(cohort=cls.cohort, sample=father_sample,
                                                 cohort_genotype_packed_field_index=2, sort_order=3)
+        cls.sibling_cs = CohortSample.objects.create(cohort=cls.cohort, sample=sibling_sample,
+                                                     cohort_genotype_packed_field_index=3, sort_order=4)
 
         assign_permission_to_user_and_groups(cls.user_owner, cls.cohort)
 
@@ -97,12 +102,12 @@ class Test(URLTestCase):
                                       het_count=1,
                                       hom_count=1,
                                       filters="&",
-                                      samples_zygosity="ERO",
-                                      samples_allele_depth=[42, 22, 32],
-                                      samples_allele_frequency=[100, 100, 100],
-                                      samples_read_depth=[42, 22, 32],
-                                      samples_genotype_quality=[20, 20, 20],
-                                      samples_phred_likelihood=[0, 0, 0])
+                                      samples_zygosity="EROR",
+                                      samples_allele_depth=[42, 22, 32, 28],
+                                      samples_allele_frequency=[100, 100, 100, 100],
+                                      samples_read_depth=[42, 22, 32, 28],
+                                      samples_genotype_quality=[20, 20, 20, 20],
+                                      samples_phred_likelihood=[0, 0, 0, 0])
 
         # Auto cohorts don't show on list
         cls.cohort2 = Cohort.objects.create(name="blah cohort", user=cls.user_owner,
@@ -184,6 +189,16 @@ class Test(URLTestCase):
             ('node_method_description', node_version_params, 200),
 
             ('view_karyomapping_analysis', {"pk": cls.karyomapping_analysis.pk}, 200),
+
+            ('trio_wizard', {"cohort_id": cls.cohort.pk,
+                             "sample1_id": cls.trio.proband.sample_id,
+                             "sample2_id": cls.trio.mother.sample_id,
+                             "sample3_id": cls.trio.father.sample_id}, 200),
+            ('quad_wizard', {"cohort_id": cls.cohort.pk,
+                             "sample1_id": cls.trio.proband.sample_id,
+                             "sample2_id": cls.trio.mother.sample_id,
+                             "sample3_id": cls.trio.father.sample_id,
+                             "sample4_id": cls.sibling_cs.sample_id}, 200),
         ]
 
     def testUrls(self):

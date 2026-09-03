@@ -3,7 +3,28 @@ from django.shortcuts import redirect, render
 
 from analysis.forms import UserQuadWizardForm, UserTrioWizardForm
 from analysis.models.enums import QuadSample, TrioSample
+from patients.models_enums import Sex
 from snpdb.models import Cohort, ImportStatus, Quad, Sample, Trio
+
+
+def _confident_sex(sample: Sample) -> Sex:
+    """ The sex we'll hold the wizard's roles to: the patient record, or the chrX call when there is no
+        record. Disagreement means we don't know - the proband sex mismatch warning asks about that """
+    patient_sex = sample.patient_sex
+    detected_sex = sample.detected_sex
+    if patient_sex == Sex.UNKNOWN:
+        return detected_sex
+    if detected_sex in (Sex.UNKNOWN, patient_sex):
+        return patient_sex
+    return Sex.UNKNOWN
+
+
+def _sample_sexes(samples: list[Sample]) -> list[dict]:
+    """ The proband and the roles on offer are picked client side, so hand the JS every sample's sexes """
+    return [{"patient_sex": s.patient_sex.value, "patient_sex_label": s.patient_sex.label,
+             "detected_sex": s.detected_sex.value, "detected_sex_label": s.detected_sex.label,
+             "sex": _confident_sex(s).value}
+            for s in samples]
 
 
 def trio_wizard(request, cohort_id, sample1_id, sample2_id, sample3_id):
@@ -30,22 +51,16 @@ def trio_wizard(request, cohort_id, sample1_id, sample2_id, sample3_id):
             pass
         patient_description_results.append([description, results])
 
-    # The proband is picked client side, so hand the JS every sample's sexes to compare
-    sample_sexes = [{"patient_sex": s.patient_sex.value, "patient_sex_label": s.patient_sex.label,
-                     "detected_sex": s.detected_sex.value, "detected_sex_label": s.detected_sex.label}
-                    for s in samples]
+    sample_sexes = _sample_sexes(samples)
 
-    form = UserTrioWizardForm(request.POST or None)
+    form = UserTrioWizardForm(request.POST or None,
+                              sample_sexes=[Sex(ss["sex"]) for ss in sample_sexes])
     if request.method == "POST":
         if form.is_valid():
-            mother_affected = form.cleaned_data['mother_affected']
-            father_affected = form.cleaned_data['father_affected']
+            affected_by_role = form.affected_by_role
+            mother_affected = affected_by_role[TrioSample.MOTHER]
+            father_affected = affected_by_role[TrioSample.FATHER]
             proband_sex = form.cleaned_data['proband_sex'] or None
-            sample_1_person = form.cleaned_data['sample_1']
-            sample_2_person = form.cleaned_data['sample_2']
-            sample_3_person = form.cleaned_data['sample_3']
-
-            people = [sample_1_person, sample_2_person, sample_3_person]
 
             mother_cs = None
             father_cs = None
@@ -54,7 +69,7 @@ def trio_wizard(request, cohort_id, sample1_id, sample2_id, sample3_id):
             def get_cohort_sample(sample):
                 return cohort.cohortsample_set.get(sample=sample)
 
-            for s, p in zip(samples, people):
+            for s, p in zip(samples, form.roles):
                 if p == TrioSample.FATHER:
                     father_cs = get_cohort_sample(s)
                 elif p == TrioSample.MOTHER:
@@ -109,25 +124,23 @@ def quad_wizard(request, cohort_id, sample1_id, sample2_id, sample3_id, sample4_
             pass
         patient_description_results.append([description, results])
 
-    # The proband is picked client side, so hand the JS every sample's sexes to compare
-    sample_sexes = [{"patient_sex": s.patient_sex.value, "patient_sex_label": s.patient_sex.label,
-                     "detected_sex": s.detected_sex.value, "detected_sex_label": s.detected_sex.label}
-                    for s in samples]
+    sample_sexes = _sample_sexes(samples)
 
-    form = UserQuadWizardForm(request.POST or None)
+    form = UserQuadWizardForm(request.POST or None,
+                              sample_sexes=[Sex(ss["sex"]) for ss in sample_sexes])
     if request.method == "POST":
         if form.is_valid():
-            mother_affected  = form.cleaned_data['mother_affected']
-            father_affected  = form.cleaned_data['father_affected']
-            sibling_affected = form.cleaned_data['sibling_affected']
+            affected_by_role = form.affected_by_role
+            mother_affected = affected_by_role[QuadSample.MOTHER]
+            father_affected = affected_by_role[QuadSample.FATHER]
+            sibling_affected = affected_by_role[QuadSample.SIBLING]
             proband_sex = form.cleaned_data['proband_sex'] or None
-            sample_roles = [form.cleaned_data[f'sample_{i}'] for i in range(1, 5)]
 
             def get_cohort_sample(sample):
                 return cohort.cohortsample_set.get(sample=sample)
 
             mother_cs = father_cs = proband_cs = sibling_cs = None
-            for sample, role in zip(samples, sample_roles):
+            for sample, role in zip(samples, form.roles):
                 cs = get_cohort_sample(sample)
                 if role == QuadSample.MOTHER:
                     mother_cs = cs

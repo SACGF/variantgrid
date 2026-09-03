@@ -38,24 +38,28 @@ their own viewBox, so <use> scales them to whatever width/height the <svg class=
         </g>
     </symbol>
 
-    {# Trio - two parents and an affected proband #}
+    {% comment %}
+    Trio - two parents and an affected proband. The parents fill in when the page marks them affected:
+    set --pedigree-father-fill / --pedigree-mother-fill on the svg that uses this symbol. The stroke is
+    weighted for badge size, so a page drawing it large wants --pedigree-stroke-width around 1.5.
+    {% endcomment %}
     <symbol id="node-icon-trio" viewBox="0 0 32 26">
-        <g fill="none" stroke="currentColor" stroke-width="2.6">
-            <rect x="2" y="2" width="8" height="8"/>
-            <circle cx="26" cy="6" r="4.5"/>
+        <g fill="none" stroke="currentColor" stroke-width="var(--pedigree-stroke-width, 2.6)">
+            <rect x="2" y="2" width="8" height="8" fill="var(--pedigree-father-fill, none)"/>
+            <circle cx="26" cy="6" r="4.5" fill="var(--pedigree-mother-fill, none)"/>
             <path d="M10 6 H21.5 M16 6 V15"/>
             <circle cx="16" cy="20" r="4.5" fill="currentColor"/>
         </g>
     </symbol>
 
-    {# Quad - trio plus a sibling #}
+    {# Quad - trio plus a sibling, same affected fills as Trio plus --pedigree-sibling-fill #}
     <symbol id="node-icon-quad" viewBox="0 0 36 26">
-        <g fill="none" stroke="currentColor" stroke-width="2.6">
-            <rect x="2" y="2" width="8" height="8"/>
-            <circle cx="30" cy="6" r="4.5"/>
+        <g fill="none" stroke="currentColor" stroke-width="var(--pedigree-stroke-width, 2.6)">
+            <rect x="2" y="2" width="8" height="8" fill="var(--pedigree-father-fill, none)"/>
+            <circle cx="30" cy="6" r="4.5" fill="var(--pedigree-mother-fill, none)"/>
             <path d="M10 6 H25.5 M18 6 V13 M10 13 H26 M10 13 V16 M26 13 V16"/>
             <circle cx="10" cy="20" r="4.5" fill="currentColor"/>
-            <rect x="21.5" y="15.5" width="9" height="9"/>
+            <rect x="21.5" y="15.5" width="9" height="9" fill="var(--pedigree-sibling-fill, none)"/>
         </g>
     </symbol>
 
