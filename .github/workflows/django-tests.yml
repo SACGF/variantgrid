@@ -102,6 +102,8 @@ jobs:
 
       - name: Run unit tests
         # data/ is PRIVATE_DATA_ROOT (untracked) - some upload tests write output files there
+        # --parallel 4: the runner clones the test DB per worker; the whole suite ran clean this way
+        # on vg-test2 in ~2 min (claude/guides/testing.md#running-tests)
         run: |
           mkdir -p data media_root
-          .venv/bin/python manage.py test
+          .venv/bin/python manage.py test --parallel 4

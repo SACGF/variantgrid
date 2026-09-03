@@ -23,7 +23,31 @@ python3 manage.py test --keepdb snpdb.tests.test_variant
 
 # Run a specific test class or method
 python3 manage.py test --keepdb snpdb.tests.test_variant.VariantTest.test_something
+
+# Only the test modules a change puts at risk (prints the manage.py test line; --run executes it)
+scripts/vg tests --explain
+
+# Whole suite in ~2 minutes instead of ~25 (2,741 tests, verified on vg-test2)
+python3 manage.py test --keepdb --parallel 4
 ```
+
+`claude/guides/testing.md` is the fixture index: how to build a Variant / Trio / Classification / Analysis in a test.
+
+### Agent introspection (`vg`)
+
+`manage.py vg` (also `scripts/vg`, which skips the Django boot where it can) answers the questions that
+otherwise cost a grep campaign - see `claude/plans/agent_system.md` §4.2:
+
+```bash
+scripts/vg map                       # regenerate claude/maps/*.md (models, urls, commands, tasks, signals, settings)
+scripts/vg map --check               # CI fails when a committed map is stale - run after changing a model/url/task
+python3 manage.py vg page /variantopedia/dashboard --queries   # render a page as claude_agent: status, templates, outline, N+1s
+python3 manage.py vg page view_variant --kwargs variant_id=123 --text
+```
+
+`claude/maps/` are generated facts; never edit them by hand. Per-app rules live in `<app>/CLAUDE.md`
+(snpdb, genes, annotation, analysis, classification, upload, uicore, library) and load automatically when
+you work under that directory.
 
 ### Linting
 ```bash
@@ -148,8 +172,9 @@ If a new management command needs to be run on existing deployments as part of a
 ### Preview system
 Models implement `PreviewModelMixin` to support hover-card previews. Apps connect to `preview_request_signal` and `preview_extra_signal` (in `library/preview_request.py`) to register their handlers. The `PreviewKeyValue` dataclass carries key/value pairs for the preview.
 
-### Model readmes
+### Model readmes and app notes
 Several apps have `__<app>_readme.md` files documenting architecture (e.g., `snpdb/__snpdb_readme.md`, `classification/__classification_readme.md`).
+The rule-shaped agent notes are `<app>/CLAUDE.md`; a gotcha learned the hard way goes there, not here.
 
 ## Git Commits
 
@@ -224,4 +249,5 @@ PostgreSQL via `psqlextra` backend (`psqlextra.backend`), which adds PostgreSQL-
 
 ## Classification App Notes
 
-`Classification` records store evidence as JSON keyed by `EvidenceKey` slugs. Each edit creates a `ClassificationModification`. Only "published" modifications are visible outside the owning lab. The `ImportedAlleleInfo` model resolves HGVS → `Allele` during import. Discordance is auto-detected when classifications for the same allele span multiple clinical significance buckets (B/LB vs VUS vs LP/P).
+See `classification/CLAUDE.md` (evidence JSON keyed by `EvidenceKey`, `ClassificationModification` per edit,
+published-only visibility outside the lab, `ImportedAlleleInfo`, discordance buckets).

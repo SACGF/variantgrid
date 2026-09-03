@@ -1,0 +1,93 @@
+#!/usr/bin/env python3
+"""
+scripts/vg — thin dispatcher for `manage.py vg` (see snpdb/management/commands/vg.py).
+
+Subcommands that need no Django (`tests`, and the static maps: signals, settings, tasks) run here in
+well under a second. Everything else delegates to `manage.py vg` with the repo's virtualenv, and
+`map` is run under the canonical CI settings module so the committed maps are deterministic.
+"""
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(REPO_ROOT))
+
+from library.vg import maps  # noqa: E402
+from library.vg.test_selection import select_tests  # noqa: E402
+
+CANONICAL_SETTINGS_MODULE = "variantgrid.settings.env.github_actions"
+CI_SETTINGS_CONFIG = REPO_ROOT / "config" / "ci" / "settings_config.json"
+
+
+def _venv_python() -> str:
+    candidate = REPO_ROOT / ".venv" / "bin" / "python"
+    return str(candidate) if candidate.exists() else sys.executable
+
+
+def _delegate(argv: list[str], canonical_settings: bool) -> int:
+    env = dict(os.environ)
+    if canonical_settings:
+        env["DJANGO_SETTINGS_MODULE"] = CANONICAL_SETTINGS_MODULE
+        env.setdefault("SETTINGS_CONFIG", str(CI_SETTINGS_CONFIG))
+    return subprocess.call([_venv_python(), str(REPO_ROOT / "manage.py"), "vg", *argv], cwd=REPO_ROOT, env=env)
+
+
+def _static_tests(argv: list[str]) -> int:
+    base = None
+    if "--base" in argv:
+        base = argv[argv.index("--base") + 1]
+    selection = select_tests(base=base)
+    if not selection.changed:
+        print("No changed files.")
+        return 0
+    if "--explain" in argv:
+        for label in selection.labels:
+            print(f"{label}  <- {', '.join(selection.reasons[label])}")
+        print()
+    if not selection.labels:
+        print(f"{len(selection.changed)} changed file(s) select no tests.")
+        return 0
+    test_args = ["test", "--keepdb", *selection.labels]
+    if "--parallel" in argv:
+        test_args += ["--parallel", argv[argv.index("--parallel") + 1]]
+    print(f"{len(selection.labels)} test label(s) for {len(selection.changed)} changed file(s):")
+    print("python3 manage.py " + " ".join(test_args), flush=True)
+    if "--run" in argv:
+        return subprocess.call([_venv_python(), str(REPO_ROOT / "manage.py"), *test_args], cwd=REPO_ROOT)
+    return 0
+
+
+def _static_map(argv: list[str]) -> int:
+    name = argv[1]
+    if "--check" in argv:
+        stale = maps.check([name])
+        if stale:
+            print(f"Stale maps: {', '.join(stale)} — run `scripts/vg map` and commit claude/maps/")
+            return 1
+        print(f"Maps up to date: {name}")
+        return 0
+    if "--json" in argv or "--print" in argv:
+        print(maps.render(name, as_json="--json" in argv), end="")
+        return 0
+    changed = maps.write_map(name)
+    print(f"claude/maps/{name}.md: {'updated' if changed else 'unchanged'}")
+    return 0
+
+
+def main(argv: list[str]) -> int:
+    if not argv:
+        return _delegate(["--help"], canonical_settings=False)
+    subcommand = argv[0]
+    if subcommand == "tests":
+        return _static_tests(argv[1:])
+    if subcommand == "map":
+        if len(argv) > 1 and argv[1] in maps.STATIC_MAPS and "--app" not in argv:
+            return _static_map(argv)
+        return _delegate(argv, canonical_settings=True)
+    return _delegate(argv, canonical_settings=False)
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
