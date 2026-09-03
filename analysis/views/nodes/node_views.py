@@ -29,7 +29,7 @@ from analysis.forms.forms_nodes import (
     ZygosityNodeForm,
 )
 from analysis.models import MOINode, OntologyTerm, TagNode
-from analysis.models.enums import NodeStatus, SetOperations, TagNodeInput, TagNodeMode
+from analysis.models.enums import NodeStatus, SetOperations, TagNodeInput
 from analysis.models.nodes.filters.allele_frequency_node import AlleleFrequencyNode
 from analysis.models.nodes.filters.built_in_filter_node import BuiltInFilterNode
 from analysis.models.nodes.filters.classifications_node import ClassificationsNode
@@ -331,22 +331,11 @@ class TagNodeView(NodeView):
         if node.node_input == TagNodeInput.PARENT_NOT_TAGGED or not NodeStatus.is_ready(node.status):
             return {"show_tag_counts": False}
 
-        global_tag_counts = node.mode == TagNodeMode.ALL_TAGS
-        context = {
+        return {
             "show_tag_counts": True,
-            "global_tag_counts": global_tag_counts,
+            "tag_counts": node.get_tag_counts(),
             "selected_tag_ids": TagFilter.get_tag_ids(self.kwargs.get("extra_filters")),
         }
-        if global_tag_counts:
-            context["tag_counts"] = node.get_global_tag_counts()
-        else:
-            # The analysis' own tag node counts - the DAG has already counted these, so the counts
-            # come from the node card client side @see fillTagCountsFromNode
-            tag_ids = [tag_id for label, _ in node.analysis.get_node_count_types()
-                       if (tag_id := TagFilter.get_tag_id(label))]
-            context["tag_counts"] = [(tag_id, None) for tag_id in tag_ids]
-            context["tag_counts_auto_add_tags"] = node.analysis.node_count_auto_add_tags
-        return context
 
     def _get_form_initial(self):
         form_initial = super()._get_form_initial()

@@ -568,11 +568,9 @@ function intWithCommas(x) {
     return x.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 }
 
-function setVariantCount(variant_count_selector, count, rawCount) {
+function setVariantCount(variant_count_selector, count) {
 	const countValue = $('.count-value', variant_count_selector);
 	countValue.html(count);
-	// The card abbreviates counts above 10k - keep the exact number for the TagNode editor's toggles
-	variant_count_selector.attr("data-count", rawCount === undefined ? "" : rawCount);
 	variant_count_selector.show();
 }
 
@@ -612,7 +610,7 @@ function setNodeCounts(node, data) {
 		if (count === null || count === undefined) {
 			setVariantCount(vc, '?');  // Node hasn't finished counting - @see updateDirtyNode
 		} else if (count > 0 || vc.hasClass("show-zero")) {
-			setVariantCount(vc, formatNodeCount(count, deterministic), count);
+			setVariantCount(vc, formatNodeCount(count, deterministic));
 		} else {
 			vc.hide();
 		}
@@ -622,26 +620,6 @@ function setNodeCounts(node, data) {
 	// Most nodes have no tagged variants - don't leave them showing a bare tag icon
 	const tag_counts = $(".node-tag-counts", node).show();  // Un-hide so :visible reflects this update's counts
 	tag_counts.toggle(tag_counts.find(".node-count:visible").length > 0);
-
-	// A TagNode editor's toggles show these same counts - push them across so tagging in the grid
-	// updates the open editor without a request
-	const gew = getGridAndEditorWindow();
-	if (gew.updateTagCountsSummary) {
-		gew.updateTagCountsSummary(node.attr("node_id"), getNodeTagCounts(node));
-	}
-}
-
-// The per-tag counts the DAG holds for a node, as {tagId: count} - @see TagFilter for the label
-function getNodeTagCounts(node) {
-	const tagCounts = {};
-	$(".node-count", $(".node-tag-counts", node)).each(function() {
-		const countType = $(this).attr("count_type") || "";
-		if (countType.startsWith(TAG_NODE_COUNT_PREFIX)) {
-			const dataCount = $(this).attr("data-count");
-			tagCounts[countType.substring(TAG_NODE_COUNT_PREFIX.length)] = parseInt(dataCount) || 0;
-		}
-	});
-	return tagCounts;
 }
 
 function updateDirtyNode(node, refresh) {

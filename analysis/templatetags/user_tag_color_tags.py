@@ -113,8 +113,7 @@ def tag_counts_summary(context, genome_build: GenomeBuild = None, gene_symbol=No
                        tag_counts=None, selected=None):
     """ Pill + count toggles that filter the grid below them - the page wires them up with
         setupTagCountsSummary(). tag_counts is a (tag, count) list - pass it in if the page has
-        already counted them, it's an expensive count. A None count leaves the box for the client
-        to fill in (@see setTagCountsSummaryCounts) """
+        already counted them, it's an expensive count """
     if tag_counts is None:
         tag_kwargs = {}
         if gene_symbol:

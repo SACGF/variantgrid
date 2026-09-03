@@ -91,16 +91,19 @@ class TagNode(AnalysisNode):
             return self.tagged_variants_q(tag_ids)
         return None
 
-    def get_global_tag_counts(self) -> list[tuple[str, int]]:
-        """ (tag, count) for the tags this node's variants carry, in the user's tag order. ALL_TAGS
-            mode only - the DAG's per-tag node counts are analysis-scoped, so they'd be wrong here.
+    def get_tag_counts(self) -> list[tuple[str, int]]:
+        """ (tag, count) for the tags this node's variants carry, in the user's tag order. Counted
+            here rather than read off the DAG's per-tag node counts, which are analysis-scoped (so
+            wrong for a global node) and only exist for the tags the analysis has configured.
             The tagged_within_days cutoff decides which variants enter the node, not which tags to
             count, so it's left out """
-        if self.mode != TagNodeMode.ALL_TAGS:
-            return []
+        if self.mode == TagNodeMode.ALL_TAGS:
+            tags_qs = Tag.objects.all()
+        else:
+            tags_qs = Tag.objects.filter(varianttag__analysis=self.analysis).distinct()
 
         sort_order_by_tag = get_tag_sort_order_by_tag(self.analysis.user)
-        tag_ids = sorted(Tag.objects.values_list("pk", flat=True),
+        tag_ids = sorted(tags_qs.values_list("pk", flat=True),
                          key=lambda tag_id: (sort_order_by_tag.get(tag_id, 0), tag_id))
         if not tag_ids:
             return []

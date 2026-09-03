@@ -30,24 +30,6 @@ function loadNodeData(nodeId, extra_filters, fromSelectNode) {
     win.loadGridAndEditorForNode(nodeId, extra_filters, fromSelectNode);
 }
 
-/* The TagNode editor's toggles show the node's own per-tag counts, which the DAG has already
-   counted - fill them in from the node card, and keep them live while the editor is open.
-   @see setNodeCounts, which calls updateTagCountsSummary after every recount */
-function fillTagCountsFromNode(container, nodeId) {
-    const aWin = getAnalysisWindow();
-    setTagCountsSummaryCounts(container, aWin.getNodeTagCounts(aWin.getNode(nodeId)));
-}
-
-function updateTagCountsSummary(nodeId, tagCounts) {
-    if (nodeId != getLoadedNodeId()) {
-        return;  // The editor showing belongs to some other node
-    }
-    const container = $("[data-tag-counts-summary]");
-    if (container.length) {
-        setTagCountsSummaryCounts(container, tagCounts);
-    }
-}
-
 function isHorizontalMode() {
     return typeof ANALYSIS_HORIZONTAL_MODE !== "undefined" && ANALYSIS_HORIZONTAL_MODE;
 }

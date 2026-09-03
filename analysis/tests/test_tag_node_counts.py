@@ -269,7 +269,7 @@ class TestGlobalTagNodeCounts(TagNodeCountTestCase):
     def test_counts_a_tag_made_in_another_analysis(self):
         self._tag_in_other_analysis(self.variants[0])
         node = self._tag_node(mode=TagNodeMode.ALL_TAGS)
-        self.assertEqual([(self.tag.pk, 1)], node.get_global_tag_counts())
+        self.assertEqual([(self.tag.pk, 1)], node.get_tag_counts())
 
     def test_ignores_the_tagged_within_days_cutoff(self):
         """ The cutoff decides which variants enter the node, not which tags to count """
@@ -277,12 +277,12 @@ class TestGlobalTagNodeCounts(TagNodeCountTestCase):
         node = self._tag_node(mode=TagNodeMode.ALL_TAGS)
         node.tagged_within_days = 0
         node.save()
-        self.assertEqual([(self.tag.pk, 1)], node.get_global_tag_counts())
+        self.assertEqual([(self.tag.pk, 1)], node.get_tag_counts())
 
-    def test_local_mode_has_no_global_counts(self):
+    def test_local_mode_does_not_count_another_analysis_tag(self):
         self._tag_in_other_analysis(self.variants[0])
         node = self._tag_node()
-        self.assertEqual([], node.get_global_tag_counts())
+        self.assertEqual([], node.get_tag_counts())
 
     def test_local_node_filters_to_this_analysis_only(self):
         self._tag_in_other_analysis(self.variants[0])
@@ -326,12 +326,28 @@ class TestTagNodeEditorCounts(TagNodeCountTestCase):
         self.assertEqual(200, response.status_code)
         return response.content.decode()
 
-    def test_local_mode_renders_a_pill_per_tag_node_count(self):
+    def test_local_mode_renders_a_pill_per_tag_in_the_analysis(self):
         self._tag_variant(self.variants[0])
         node = self._tag_node()
         html = self._editor_html(node)
         self.assertIn(f'data-tag="{self.tag.pk}"', html)
         self.assertNotIn(f'data-tag="{self.other_tag.pk}"', html)
+
+    def test_counts_come_from_the_node_not_the_configured_node_counts(self):
+        """ Tags applied before the analysis had that tag's node count still get a pill (#1820) """
+        self._tag_variant(self.variants[0])
+        self.analysis.set_node_count_types([BuiltInFilters.TOTAL])
+        node = self._tag_node()
+        html = self._editor_html(node)
+        self.assertIn(f'data-tag="{self.tag.pk}"', html)
+        self.assertIn('<span class="count">1</span>', html)
+
+    def test_clear_is_disabled_rather_than_hidden_with_nothing_selected(self):
+        """ A hidden button would shift the pills along as tags are toggled """
+        self._tag_variant(self.variants[0])
+        node = self._tag_node()
+        self.assertIn('clear-tags" disabled', self._editor_html(node))
+        self.assertNotIn('clear-tags" disabled', self._editor_html(node, self.tag_label))
 
     def test_selected_tags_come_back_selected(self):
         self._tag_variant(self.variants[0])

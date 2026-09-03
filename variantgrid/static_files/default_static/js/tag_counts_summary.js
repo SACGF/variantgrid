@@ -9,7 +9,9 @@ function getTagCountsSummarySelected(container) {
 function _tagCountsSummaryUpdated(container) {
 	const selected = getTagCountsSummarySelected(container);
 	container.toggleClass("filtered", selected.length > 0);
-	$(".clear-tags", container).prop("hidden", selected.length === 0);
+	// Disabled rather than hidden - the pills would shift along as the button came and went
+	$(".clear-tags", container).prop("disabled", selected.length === 0);
+	$(".all-tags", container).prop("disabled", selected.length === $(".summary-count", container).length);
 	return selected;
 }
 
@@ -50,15 +52,4 @@ function clearTagCountsSummary(container) {
 	container = $(container);
 	$(".summary-count", container).removeClass("selected");
 	_tagCountsSummaryUpdated(container);
-}
-
-/* Fill in counts ({tagId: count}) the server left blank, hiding the tags this view has none of -
-   a selected tag stays put so you can always toggle it back off */
-function setTagCountsSummaryCounts(container, counts) {
-	$(".summary-count", container).each(function() {
-		const summaryCount = $(this);
-		const count = counts[summaryCount.attr("data-tag")];
-		summaryCount.toggle(Boolean(count) || summaryCount.hasClass("selected"));
-		$(".count", summaryCount).text(count === undefined ? "" : count.toLocaleString());
-	});
 }
