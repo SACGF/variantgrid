@@ -1012,7 +1012,7 @@ function _geneSymbolLink(geneSymbolColumn, filterChildLink) {
                 const filterGeneLink = "javascript:createFilterChild(\"gene_symbol\", \"" + geneSymbol + "\");";
                 // The gene list node's own badge glyph - the child this makes is a GeneListNode
                 geneLinkString = "<a class='grid-link' title='Gene list node for " + geneSymbol + "' href='" + filterGeneLink + "'>"
-                               + "<svg class='gene-list-node-icon'><use href='#node-icon-gene-list'></use></svg></a>";
+                               + "<svg class='gene-list-node-icon' width='14' height='14' viewBox='0 0 18 20'><use href='#node-icon-gene-list'></use></svg></a>";
                 geneLinkString += " <a class='left' target='_blank' title='View gene in new window' href='" + Urls.view_gene_symbol(geneSymbol) + "'>" + geneSymbol + "</a> ";
             } else {
                 // not left
