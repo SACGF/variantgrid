@@ -1,5 +1,6 @@
 <!-- Needs plotly and plotly_helpers included -->
 {% load js_tags %}
+{% if counts %}
 <script>
 // This is in plotly_helpers - delete when cache expired...
 function plotHBarArrays(selector, title, x, y, width, height, color, margin) {
@@ -40,4 +41,6 @@ $(document).ready(function() {
     
 });
 </script>
-<div id='patient-match-graph-{{ uuid }}' class='matches-graph'></div>
+<!-- Plotly sets height:100% on its inner .plot-container, so the div needs the graph's size -->
+<div id='patient-match-graph-{{ uuid }}' class='matches-graph' style='width: {{ graph_width }}px; height: {{ graph_height }}px;'></div>
+{% endif %}
