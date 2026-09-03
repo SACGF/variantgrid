@@ -1,8 +1,8 @@
 # analysis — agent notes
-Owns: Analysis (a DAG of AnalysisNode subclasses filtering Variants), AnalysisEdge, NodeVersion/NodeCount/NodeCache/NodeTask,
+Owns: Analysis (a DAG of AnalysisNode subclasses filtering Variants), AnalysisEdge, NodeVersion/NodeCache/NodeTask,
 the lease-based node scheduler, templates (AnalysisTemplate/Version/Run, AnalysisVariable), VariantTag, node editors, node grid + export.
 Start with:
-- models/nodes/analysis_node.py — AnalysisNode base (Q composition, versioning, load/counts, save cascade) + NodeVersion/Cache/Count/Task
+- models/nodes/analysis_node.py — AnalysisNode base (Q composition, versioning, load/counts, save cascade) + NodeVersion/Cache/Task
 - models/nodes/sources/*.py, models/nodes/filters/*.py — one module per concrete node
 - models/models_analysis.py — Analysis (locking, can_write), AnalysisTemplate/Version/Run
 - tasks/analysis_update_tasks.py + tasks/node_update_tasks.py — dispatcher and the per-node celery tasks
@@ -21,8 +21,8 @@ Patterns here:
   reuse the parent's counts and cache (`analysis/models/nodes/filters/gene_list_node.py:GeneListNode.modifies_parents`).
 - Editing a node: set `queryset_dirty = True`, `save()`, then `analysis/models/nodes/node_utils.py:update_analysis`.
   `analysis/models/nodes/analysis_node.py:AnalysisNode._save` bumps `version`, sets DIRTY, cascades the bump to every
-  descendant and creates the NodeVersion row. Everything version-scoped (Redis Q cache keyed on NodeVersion pk, NodeCount,
-  NodeCache, NodeTask) cascades from NodeVersion; `analysis/tasks/node_update_tasks.py:delete_analysis_old_node_versions`
+  descendant and creates the NodeVersion row. Everything version-scoped (Redis Q cache keyed on NodeVersion pk, NodeCache,
+  NodeTask) cascades from NodeVersion; `analysis/tasks/node_update_tasks.py:delete_analysis_old_node_versions`
   drops the old ones. Move/connect edits go through `analysis/views/views_json.py:NodeUpdate`.
 - Scheduling is state-driven, not a prebuilt chain: `analysis/tasks/analysis_update_tasks.py:create_and_launch_analysis_tasks`
   (on `scheduling_single_worker`) calls `analysis/tasks/analysis_update_tasks.py:lease_ready_nodes`, which claims DIRTY
@@ -32,6 +32,9 @@ Patterns here:
 - Node-specific load work goes in `_load`, returning a dict of fields to persist;
   `analysis/models/nodes/analysis_node.py:AnalysisNode.load` then runs `node_counts` (one aggregate per configured count
   label, plus the exact pk list for nodes under `ANALYSIS_NODE_STORE_ID_SIZE_MAX`) and writes via `AnalysisNode.update`.
+  The load's products live on the NodeVersion row: `variant_ids` (the pk list) and `load_data` — `{"counts": {label: count}}`
+  plus whatever `_get_load_data()` contributes (TagNode snapshots its editor's `tag_counts` there, as counting them in
+  global mode is slow). Every write of those goes through `.update()`/raw SQL, so it sets `modified` explicitly.
 - Expensive set operations materialise instead of composing: override `use_cache`/`write_cache` to fill a VariantCollection
   (`analysis/models/nodes/filters/intersection_node.py:IntersectionNode.use_cache`); VennNode keeps its own
   `analysis/models/nodes/filters/venn_node.py:VennNodeCache` keyed on the two parent NodeVersions.
@@ -51,11 +54,13 @@ Gotchas:
   `analysis/models/nodes/node_utils.py:reload_analysis_nodes` when writing a new bulk bump.
 - The Q-object cache is on by default (`ANALYSIS_NODE_CACHE_Q`) and keyed only on NodeVersion pk. A test that changes a
   node and expects a different queryset without saving needs `@override_settings(ANALYSIS_NODE_CACHE_Q=False)`.
-- Small parents are inlined as `Q(pk__in=[...])` from the pks stored in NodeCount
+- Small parents are inlined as `Q(pk__in=[...])` from `NodeVersion.variant_ids`
   (`analysis/models/nodes/analysis_node.py:AnalysisNode.get_small_parent_arg_q_dict`, issue #546); a parent loaded before
   those pks were stored falls back to the subquery — a count mismatch between the two paths is a real bug.
 - Tagging does not bump versions: `analysis/signals/signal_handlers.py:variant_tag_create` marks tag nodes dirty and
-  `analysis/models/nodes/node_utils.py:update_analysis_tag_node_counts` recounts tag labels in place on the existing NodeVersion.
+  `analysis/models/nodes/node_utils.py:update_analysis_tag_node_counts` recounts tag labels in place on the existing
+  NodeVersion. It runs concurrently with loads and only computes the tag labels, so it merges into `load_data["counts"]`
+  DB-side (`jsonb_set` + `||`) rather than writing the whole dict.
 - Counts are sanity-checked at load (`analysis/models/nodes/analysis_node.py:AnalysisNode._raise_or_warn_count_mismatch`):
   any label count > total, or a single-parent node with more variants than its parent. A filter that fans out over a
   multi-valued join (transcript annotation, gene lists) must set `queryset_requires_distinct` or use a subquery.

@@ -8,7 +8,7 @@ from django.urls import reverse
 from analysis.grids import VariantGrid
 from analysis.models import Analysis, NodeStatus, TagNode, VariantTag
 from analysis.models.enums import TagNodeInput, TagNodeMode, ZygosityNodeZygosity
-from analysis.models.nodes.analysis_node import NodeCount
+from analysis.models.nodes.analysis_node import NodeVersion
 from analysis.models.nodes.filters.zygosity_node import ZygosityNode
 from analysis.models.nodes.node_counts import (
     get_extra_filters_count,
@@ -90,9 +90,12 @@ class TestTagNodeCountConfig(TagNodeCountTestCase):
 class TestTagNodeCountValues(TagNodeCountTestCase):
     """ The recount runs in a task after tagging, so call it directly rather than through celery """
 
+    def _node_version(self, node) -> NodeVersion:
+        return NodeVersion.objects.get(node=node, version=node.version)
+
     def _tag_count(self, node) -> int:
         update_analysis_tag_node_counts(self.analysis)
-        return NodeCount.objects.get(node_version=node.node_version, label=self.tag_label).count
+        return self._node_version(node).counts[self.tag_label]
 
     def test_counts_tagged_variants_in_the_node(self):
         node = self._sample_node()
@@ -128,19 +131,34 @@ class TestTagNodeCountValues(TagNodeCountTestCase):
         self._tag_variant(self.variants[0])
         update_analysis_tag_node_counts(self.analysis)
 
-        self.assertFalse(NodeCount.objects.filter(node_version__node=child, label=self.tag_label).exists())
+        self.assertNotIn(self.tag_label, self._node_version(child).counts)
 
     def test_recount_bumps_modified_so_the_client_sees_it(self):
         """ nodes_status hands the client counts_modified - it's how it knows a recount landed """
         node = self._sample_node()
         self._tag_variant(self.variants[0])
         update_analysis_tag_node_counts(self.analysis)
-        node_count = NodeCount.objects.get(node_version=node.node_version, label=self.tag_label)
-        first_modified = node_count.modified
+        node_version = self._node_version(node)
+        first_modified = node_version.modified
 
         update_analysis_tag_node_counts(self.analysis)
-        node_count.refresh_from_db()
-        self.assertGreater(node_count.modified, first_modified)
+        node_version.refresh_from_db()
+        self.assertGreater(node_version.modified, first_modified)
+
+    def test_recount_keeps_the_rest_of_the_load_data(self):
+        """ The recount only computes tag labels - it merges into what the load wrote """
+        node = self._sample_node()
+        node_version = self._node_version(node)
+        node_version.load_data = {"counts": {BuiltInFilters.TOTAL: 7}, "tag_counts": {self.tag.pk: 1}}
+        node_version.save()
+        self._tag_variant(self.variants[0])
+
+        update_analysis_tag_node_counts(self.analysis)
+
+        node_version.refresh_from_db()
+        self.assertEqual(1, node_version.counts[self.tag_label])
+        self.assertEqual(7, node_version.counts[BuiltInFilters.TOTAL])
+        self.assertEqual({self.tag.pk: 1}, node_version.load_data["tag_counts"])
 
 
 class TestTagExtraFiltersQ(TagNodeCountTestCase):
@@ -212,7 +230,7 @@ class TestMultiTagExtraFilters(TagNodeCountTestCase):
                          set(Variant.objects.filter(q).values_list("pk", flat=True)))
 
     def test_grid_filters_and_counts_without_a_stored_node_count(self):
-        """ A compound selection never has a NodeCount row - the grid counts it exactly instead """
+        """ A compound selection is never a stored count - the grid counts it exactly instead """
         node = self._sample_node()
         self._tag_variant(self.variants[0])
         self._tag_variant(self.variants[1], tag=self.other_tag)
@@ -269,7 +287,7 @@ class TestGlobalTagNodeCounts(TagNodeCountTestCase):
     def test_counts_a_tag_made_in_another_analysis(self):
         self._tag_in_other_analysis(self.variants[0])
         node = self._tag_node(mode=TagNodeMode.ALL_TAGS)
-        self.assertEqual([(self.tag.pk, 1)], node.get_tag_counts())
+        self.assertEqual({self.tag.pk: 1}, node.get_tag_counts())
 
     def test_ignores_the_tagged_within_days_cutoff(self):
         """ The cutoff decides which variants enter the node, not which tags to count """
@@ -277,12 +295,12 @@ class TestGlobalTagNodeCounts(TagNodeCountTestCase):
         node = self._tag_node(mode=TagNodeMode.ALL_TAGS)
         node.tagged_within_days = 0
         node.save()
-        self.assertEqual([(self.tag.pk, 1)], node.get_tag_counts())
+        self.assertEqual({self.tag.pk: 1}, node.get_tag_counts())
 
     def test_local_mode_does_not_count_another_analysis_tag(self):
         self._tag_in_other_analysis(self.variants[0])
         node = self._tag_node()
-        self.assertEqual([], node.get_tag_counts())
+        self.assertEqual({}, node.get_tag_counts())
 
     def test_local_node_filters_to_this_analysis_only(self):
         self._tag_in_other_analysis(self.variants[0])
@@ -298,10 +316,12 @@ class TestGlobalTagNodeCounts(TagNodeCountTestCase):
                          set(node.get_queryset().filter(q).values_list("pk", flat=True)))
 
     def test_global_node_ignores_its_analysis_scoped_stored_count(self):
-        """ NodeCounts are analysis-scoped, so they disagree with a global node's own filter """
+        """ Stored counts are analysis-scoped, so they disagree with a global node's own filter """
         self._tag_in_other_analysis(self.variants[0])
         node = self._tag_node(mode=TagNodeMode.ALL_TAGS)
-        NodeCount.objects.create(node_version=node.node_version, label=self.tag_label, count=99)
+        node_version = node.node_version
+        node_version.load_data = {"counts": {self.tag_label: 99}}
+        node_version.save()
         self.assertEqual(1, get_extra_filters_count(node, self.tag_label))
 
     def test_no_extra_filter_shows_the_whole_node(self):
