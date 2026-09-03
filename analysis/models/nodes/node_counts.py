@@ -16,8 +16,7 @@ from snpdb.models.models_user_settings import AbstractNodeCountSettings
 from snpdb.utils import get_tag_styles_and_colors
 
 # Tags the user hasn't given a colour still need a visible legend swatch
-# Tag counts are drawn as tag-coloured pills like the grid tags, so an uncoloured tag gets the grid's default pill grey
-DEFAULT_TAG_NODE_COUNT_COLOR = "#eceff3"
+DEFAULT_TAG_NODE_COUNT_COLOR = "#888888"
 
 
 def get_omim_q(annotation_version: AnnotationVersion) -> Q:

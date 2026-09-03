@@ -1668,6 +1668,17 @@ table.variantgrid-datatable {
 	}
 }
 
+// The tag autocomplete's entries are grid tag markup (@see colorTagAutocompleteResults) but select2
+// draws its dropdown outside the grid that shapes them - give them the same rounded pill here
+.select2-results__option .grid-tag .user-tag-colored {
+	display: inline-block;
+	padding: 1px 8px;
+	border-radius: 9px;
+	font-size: 11px;
+	background: #eceff3;
+	color: #333;
+}
+
 table {
 	&.sticky-header thead th {
 		background-color: white;
