@@ -41,6 +41,7 @@ $(document).ready(function() {
     
 });
 </script>
+{% if heading %}<h4>{{ heading }}</h4>{% endif %}
 <!-- Plotly sets height:100% on its inner .plot-container, so the div needs the graph's size -->
 <div id='patient-match-graph-{{ uuid }}' class='matches-graph' style='width: {{ graph_width }}px; height: {{ graph_height }}px;'></div>
 {% endif %}
