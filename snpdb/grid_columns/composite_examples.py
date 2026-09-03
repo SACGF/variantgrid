@@ -191,6 +191,7 @@ COMPOSITE_EXAMPLE_ROWS: dict[str, dict[str, Any]] = {
         open_targets_qtl_gene_id="ENSG00000123456",
         open_targets_study_id="GCST000001",
         open_targets_study_type="gwas",
+        open_targets_is_lead="true",
         open_targets_variant_id="12_12345678_C_T",
         open_targets_gwas_l2g_scores="ENSG00000123456:0.63",
     ),

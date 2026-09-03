@@ -249,7 +249,9 @@ def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, an
         if vc.columns_version >= 5:
             plugin_data_func.update({
                 VEPPlugin.PROTVAR: lambda: f"ProtVar,db={vc['protvar']}",
-                VEPPlugin.OPEN_TARGETS: lambda: f"OpenTargets,file={vc['open_targets']},cols=all",
+                # lead_variants_only defaults to 1 in the plugin, which drops every association where
+                # the variant isn't the credible set lead - ie most of a variant's GWAS L2G scores (#1822)
+                VEPPlugin.OPEN_TARGETS: lambda: f"OpenTargets,file={vc['open_targets']},cols=all,lead_variants_only=0",
             })
             # EVE and PromoterAI are only available in VEP >= 116
             if vc.vep_version >= 116:

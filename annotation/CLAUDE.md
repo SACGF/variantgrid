@@ -62,6 +62,10 @@ Gotchas:
   variants; they never get rows, so any "unannotated" count must apply it.
 - annotation/models/models.py:AnnotationRun.get_for_variant matches by range-lock bounds and pipeline_type: a variant
   inside a lock's range with no annotation row reads as "in progress", not "missing".
+- The OpenTargets VEP plugin defaults to lead_variants_only=1, which returns only the credible sets a variant leads —
+  annotation/vep_annotation.py passes lead_variants_only=0 so a variant that is merely a member still gets its GWAS L2G
+  score. The open_targets_* columns are '&'-joined parallel arrays zipped by
+  annotation/models/models.py:VariantAnnotation.open_targets_records, so they are only ever written together.
 - settings.ANNOTATION_GENE_ANNOTATION_VERSION_ENABLED gates whether gene_annotation_version joins the partition SQL
   (annotation/models/models.py:AnnotationVersion.sub_annotations_inheritance_partitioning); validate() still checks it.
 Tests:

@@ -1563,6 +1563,7 @@ OPEN_TARGETS_GWAS = "gwas"
 OPEN_TARGETS_RECORD_FIELDS = {
     "open_targets_study_type": "study_type",
     "open_targets_study_id": "study_id",
+    "open_targets_is_lead": "is_lead",
     "open_targets_variant_id": "variant_id",
     "open_targets_gwas_gene_id": "gwas_gene_id",
     "open_targets_gwas_l2g_scores": "l2g_score",
@@ -1868,6 +1869,8 @@ class VariantAnnotation(AbstractVariantAnnotation):
     open_targets_gwas_diseases = models.TextField(null=True, blank=True)
     open_targets_study_type = models.TextField(null=True, blank=True)
     open_targets_study_id = models.TextField(null=True, blank=True)  # external lookup key
+    # 'true'/'false' per record - whether this variant is the credible set's lead, or just a member
+    open_targets_is_lead = models.TextField(null=True, blank=True)
     open_targets_variant_id = models.TextField(null=True, blank=True)  # external lookup key
     open_targets_qtl_gene_id = models.TextField(null=True, blank=True)  # Ensembl gene id
     open_targets_qtl_biosample = models.TextField(null=True, blank=True)
@@ -2341,6 +2344,8 @@ class VariantAnnotation(AbstractVariantAnnotation):
                 record["qtl_biosample"] = biosample.replace("_", " ")  # VEP escapes whitespace
             if score := record["l2g_score"]:
                 record["l2g_score"] = float(score)
+            if (is_lead := record["is_lead"]) is not None:
+                record["is_lead"] = is_lead == "true"  # None where the column predates the record
         return records
 
     def _open_targets_gene_details(self, gene_ids: Iterable[str]) -> dict[str, dict]:
@@ -2398,12 +2403,15 @@ class VariantAnnotation(AbstractVariantAnnotation):
             if record["study_type"] != OPEN_TARGETS_GWAS:
                 continue
             if gene_id := record["gwas_gene_id"]:
-                gene = genes.setdefault(gene_id, {"scores": [], "diseases": set(), "study_ids": set()})
+                gene = genes.setdefault(gene_id, {"scores": [], "diseases": set(), "study_ids": set(),
+                                                  "lead_study_ids": set()})
                 if (score := record["l2g_score"]) is not None:
                     gene["scores"].append(score)
                 gene["diseases"].update(record["diseases"])
                 if study_id := record["study_id"]:
                     gene["study_ids"].add(study_id)
+                    if record["is_lead"]:
+                        gene["lead_study_ids"].add(study_id)
 
         gene_details = self._open_targets_gene_details(genes)
         gwas_genes = []
@@ -2413,6 +2421,7 @@ class VariantAnnotation(AbstractVariantAnnotation):
                 "l2g_score": max(gene["scores"]) if gene["scores"] else None,
                 "diseases": self._open_targets_diseases(gene["diseases"]),
                 "study_count": len(gene["study_ids"]),
+                "lead_study_count": len(gene["lead_study_ids"]),
             })
         gwas_genes.sort(key=lambda g: (g["l2g_score"] is None, -(g["l2g_score"] or 0)))
         return gwas_genes
@@ -2427,11 +2436,14 @@ class VariantAnnotation(AbstractVariantAnnotation):
             if not study_type or study_type == OPEN_TARGETS_GWAS:
                 continue
             if gene_id := record["qtl_gene_id"]:
-                gene = genes.setdefault((gene_id, study_type), {"biosamples": set(), "study_ids": set()})
+                gene = genes.setdefault((gene_id, study_type), {"biosamples": set(), "study_ids": set(),
+                                                                "lead_study_ids": set()})
                 if biosample := record["qtl_biosample"]:
                     gene["biosamples"].add(biosample)
                 if study_id := record["study_id"]:
                     gene["study_ids"].add(study_id)
+                    if record["is_lead"]:
+                        gene["lead_study_ids"].add(study_id)
 
         gene_details = self._open_targets_gene_details({gene_id for gene_id, _ in genes})
         qtl_genes = []
@@ -2442,6 +2454,7 @@ class VariantAnnotation(AbstractVariantAnnotation):
                 "study_type_label": OPEN_TARGETS_STUDY_TYPE_LABELS.get(study_type, study_type),
                 "biosamples": sorted(gene["biosamples"]),
                 "study_count": len(gene["study_ids"]),
+                "lead_study_count": len(gene["lead_study_ids"]),
             })
         qtl_genes.sort(key=lambda g: (g["gene_symbol"], g["study_type"]))
         return qtl_genes

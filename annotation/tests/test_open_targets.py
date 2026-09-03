@@ -88,6 +88,34 @@ class OpenTargetsRecordsTests(TestCase):
         self.assertIsNone(gwas_genes[0]["l2g_score"])
         self.assertEqual(gwas_genes[0]["study_count"], 2)
 
+    def test_lead_studies_counted_per_gene(self):
+        """ #1822 - lead_variants_only=0 brings in the credible sets the variant only belongs to,
+            so each row says how many of its studies the variant actually leads """
+        va = _variant_annotation(
+            open_targets_study_type="gwas&gwas&eqtl",
+            open_targets_study_id="GCST1&GCST2&eqtl_study",
+            open_targets_is_lead="false&true&false",
+            open_targets_gwas_gene_id="ENSG00000117713&ENSG00000117713&NA",
+            open_targets_gwas_l2g_scores="0.24&0.76&NA",
+            open_targets_gwas_diseases="EFO_0004527&EFO_0004527&NA",
+            open_targets_qtl_gene_id="NA&NA&ENSG00000117713",
+            open_targets_qtl_biosample="NA&NA&liver",
+        )
+        gwas_gene = va.open_targets_gwas_genes[0]
+        self.assertEqual(gwas_gene["study_count"], 2)
+        self.assertEqual(gwas_gene["lead_study_count"], 1)
+        self.assertEqual(va.open_targets_qtl_genes[0]["lead_study_count"], 0)
+
+    def test_is_lead_null_before_backfill(self):
+        """ Rows annotated before the column existed can't claim the variant leads nothing """
+        va = _variant_annotation(
+            open_targets_study_type="gwas",
+            open_targets_study_id="GCST1",
+            open_targets_gwas_gene_id="ENSG00000117713",
+        )
+        self.assertIsNone(va.open_targets_records[0]["is_lead"])
+        self.assertEqual(va.open_targets_gwas_genes[0]["lead_study_count"], 0)
+
     def test_variant_link_uses_a_single_id(self):
         va = _variant_annotation(
             open_targets_study_type="gwas&gwas",

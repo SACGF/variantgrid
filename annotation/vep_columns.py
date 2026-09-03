@@ -1132,6 +1132,15 @@ VEP_COLUMNS: tuple[VEPColumnDef, ...] = (
         min_columns_version=5,
     ),
     VEPColumnDef(
+        source_field='OpenTargets_isLead',
+        variant_grid_columns=('open_targets_is_lead',),
+        category=ColumnAnnotationCategory.GENE_ANNOTATIONS,
+        vep_plugin=VEPPlugin.OPEN_TARGETS,
+        genome_builds=GRCH38,
+        pipeline_types=STANDARD,
+        min_columns_version=5,
+    ),
+    VEPColumnDef(
         source_field='OpenTargets_variantId',
         variant_grid_columns=('open_targets_variant_id',),
         category=ColumnAnnotationCategory.EXTERNAL_ID,

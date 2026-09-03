@@ -1177,7 +1177,10 @@ function applyVariantValues() {
                                                     </div>
                                                 {% endif %}
                                             </td>
-                                            <td class="text-right">{{ gene.study_count }}</td>
+                                            <td class="text-right">
+                                                {{ gene.study_count }}
+                                                {% if gene.lead_study_count %}<div class="text-muted" title="{{ annotation_description.open_targets_is_lead }}">{{ gene.lead_study_count }} lead</div>{% endif %}
+                                            </td>
                                         </tr>
                                     {% endfor %}
                                     </tbody>
@@ -1205,7 +1208,10 @@ function applyVariantValues() {
                                             </td>
                                             <td>{{ gene.study_type_label }}</td>
                                             <td>{{ gene.biosamples|join:", " }}</td>
-                                            <td class="text-right">{{ gene.study_count }}</td>
+                                            <td class="text-right">
+                                                {{ gene.study_count }}
+                                                {% if gene.lead_study_count %}<div class="text-muted" title="{{ annotation_description.open_targets_is_lead }}">{{ gene.lead_study_count }} lead</div>{% endif %}
+                                            </td>
                                         </tr>
                                     {% endfor %}
                                     </tbody>
