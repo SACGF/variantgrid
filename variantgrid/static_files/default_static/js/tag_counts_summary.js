@@ -1,4 +1,5 @@
-// Pill + count toggles that filter the grid below them - @see the tag_counts_summary template tag
+// Pill + count toggles - pages wire the selection to a grid filter or a form via
+// setupTagCountsSummary(). @see the tag_counts_summary template tag
 
 function getTagCountsSummarySelected(container) {
 	return $(".summary-count.selected", container).map(function() {
@@ -36,15 +37,6 @@ function setupTagCountsSummary(container, onChange) {
 		changed();
 	});
 	_tagCountsSummaryUpdated(container);
-}
-
-/* The selection as a node count / extra_filters label - "default" when nothing is picked.
-   @see TagFilter, which parses it back into tags server side */
-function getTagCountsSummaryFilter(container) {
-	const labels = $(".summary-count.selected", container).map(function() {
-		return $(this).attr("data-tag-label");
-	}).get();
-	return labels.length ? labels.join(",") : "default";
 }
 
 // Deselect everything without firing onChange - for pages that clear their filters some other way

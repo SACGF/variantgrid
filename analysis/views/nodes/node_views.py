@@ -29,7 +29,7 @@ from analysis.forms.forms_nodes import (
     ZygosityNodeForm,
 )
 from analysis.models import MOINode, OntologyTerm, TagNode
-from analysis.models.enums import NodeStatus, SetOperations, TagNodeInput
+from analysis.models.enums import NodeStatus, SetOperations
 from analysis.models.nodes.filters.allele_frequency_node import AlleleFrequencyNode
 from analysis.models.nodes.filters.built_in_filter_node import BuiltInFilterNode
 from analysis.models.nodes.filters.classifications_node import ClassificationsNode
@@ -57,7 +57,6 @@ from classification.models.classification import Classification
 from classification.views.classification_datatables import ClassificationColumns
 from library.django_utils import highest_pk
 from library.django_utils import resolve_field_path
-from snpdb.models.models_enums import TagFilter
 from snpdb.models.models_user_settings import UserSettings
 from snpdb.models.models_variant import Variant
 
@@ -325,16 +324,16 @@ class TagNodeView(NodeView):
         return context
 
     def _get_tag_counts_context(self) -> dict:
-        """ The pills above the form - each toggles its tag into the grid's extra_filters. Excluding
-            tagged variants leaves every count at zero, so there's nothing to show """
+        """ The pills above the form are the node's tag picker - toggling one updates the form's
+            tags, applied on save like the rest of the editor """
         node = self.object
-        if node.node_input == TagNodeInput.PARENT_NOT_TAGGED or not NodeStatus.is_ready(node.status):
+        if not NodeStatus.is_ready(node.status):
             return {"show_tag_counts": False}
 
         return {
             "show_tag_counts": True,
             "tag_counts": node.get_tag_counts(),
-            "selected_tag_ids": TagFilter.get_tag_ids(self.kwargs.get("extra_filters")),
+            "selected_tag_ids": node.tag_ids,
         }
 
     def _get_form_initial(self):

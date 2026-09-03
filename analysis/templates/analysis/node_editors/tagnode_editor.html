@@ -32,14 +32,6 @@ function classifyAndCloseButton(tagId) {
 $(document).ready(function() {
     const tagNodeForm = $("form#tag-node-form");
     ajaxForm(tagNodeForm);
-    const tagSelect = $("select#id_tag");
-
-    // Set dropdown options to have tag colors
-	$("option", tagSelect).each(function() {
-		if (this.value) {
-			$(this).addClass("tagged-" + this.value);
-		}
-	});
 
     {%  if not requires_classification_tags %}
         {% if not node.analysis.analysisclassification_set.exists %}
@@ -52,27 +44,38 @@ $(document).ready(function() {
         Flags.instance.init({userId: '{{user.id}}'});
     });
 
-    {% if show_tag_counts %}
+    {% if show_tag_counts and has_write_permission %}
+        // The pills are the node's tag picker - a toggle lands in the form's hidden inputs
+        // and applies on save, like the rest of the editor
         const tagCountsSummary = $("[data-tag-counts-summary]", "#node-editor-wrapper");
-        setupTagCountsSummary(tagCountsSummary, function() {
-            // Same path as clicking a count on the node card - the editor comes back with the
-            // toggles selected, and the grid, its exports and the create child node banner follow
-            loadNodeData({{ node.pk }}, getTagCountsSummaryFilter(tagCountsSummary));
+        const tagsHolder = $("#tag-node-tags", tagNodeForm);
+        setupTagCountsSummary(tagCountsSummary, function(selectedTagIds) {
+            tagsHolder.empty();
+            for (const tagId of selectedTagIds) {
+                $("<input>", {type: "hidden", name: "tags", value: tagId}).appendTo(tagsHolder);
+            }
         });
     {% endif %}
 });
 </script>
-{% if show_tag_counts %}
-    {% tag_counts_summary tag_counts=tag_counts selected=selected_tag_ids %}
-{% endif %}
 <div>
 	<form id="tag-node-form" method="post" action="{{ request.path }}">
         {% csrf_token %}
         {% for hidden in form.hidden_fields %}
-            {{ hidden }}
+            {% if hidden.name != "tags" %}{{ hidden }}{% endif %}
         {% endfor %}
 		<div>
-    		<b>Tag:</b> {{ form.tags }}
+    		<b>Tags:</b> <span class="text-muted">(no selection = any tag)</span>
+            {% if show_tag_counts %}
+                {% if tag_counts %}
+                    {% tag_counts_summary tag_counts=tag_counts selected=selected_tag_ids %}
+                {% else %}
+                    <div class="text-muted">Nothing tagged yet</div>
+                {% endif %}
+            {% else %}
+                <div class="text-muted">The tag picker appears once the node has loaded</div>
+            {% endif %}
+            <span id="tag-node-tags">{{ form.tags }}</span>
 		</div>
         {% if node.visible %}
             <div class="display-flex">
@@ -93,7 +96,6 @@ $(document).ready(function() {
         {% if has_write_permission %}
             <button id='tag-node-save' class="btn btn-primary">save</button>
         {% endif %}
-        {{ form.media }}
 	</form>
 </div>
 {% endblock content %}

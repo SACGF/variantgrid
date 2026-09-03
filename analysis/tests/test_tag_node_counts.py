@@ -1,7 +1,7 @@
 """
 Tests for per-tag node counts (issue #21) - every tag used in an analysis can have its own count
 badge on the nodes, added automatically as variants are tagged - and the TagNode editor's tag
-count toggles (issue #1820), which filter the grid on any of the selected tags.
+pills (issue #1820), the node's tag picker.
 """
 from django.urls import reverse
 
@@ -313,7 +313,8 @@ class TestGlobalTagNodeCounts(TagNodeCountTestCase):
 
 
 class TestTagNodeEditorCounts(TagNodeCountTestCase):
-    """ The pills above the TagNode form - toggling one reloads the editor at that extra_filters """
+    """ The pills above the TagNode form are the node's tag picker - selection comes from the
+        node's configuration, counts from its input scope """
 
     def _editor_html(self, node, extra_filters="default") -> str:
         self.client.force_login(self.user)
@@ -347,19 +348,36 @@ class TestTagNodeEditorCounts(TagNodeCountTestCase):
         self._tag_variant(self.variants[0])
         node = self._tag_node()
         self.assertIn('clear-tags" disabled', self._editor_html(node))
-        self.assertNotIn('clear-tags" disabled', self._editor_html(node, self.tag_label))
+        node.tagnodetag_set.create(tag=self.tag)
+        self.assertNotIn('clear-tags" disabled', self._editor_html(node))
 
-    def test_selected_tags_come_back_selected(self):
+    def test_configured_tags_come_back_selected(self):
         self._tag_variant(self.variants[0])
         self._tag_variant(self.variants[1], tag=self.other_tag)
         node = self._tag_node()
-        html = self._editor_html(node, TagFilter.label_for_tags([self.tag.pk, self.other_tag.pk]))
+        node.tagnodetag_set.create(tag=self.tag)
+        node.tagnodetag_set.create(tag=self.other_tag)
+        html = self._editor_html(node)
         self.assertEqual(2, html.count("summary-count tagged-"))
         self.assertEqual(2, html.count(" selected\""))
 
-    def test_excluding_tagged_variants_has_no_counts(self):
+    def test_configured_tag_keeps_its_pill_at_zero_count(self):
+        """ Dropping the pill would silently drop the tag on the next save """
+        node = self._tag_node()
+        node.tagnodetag_set.create(tag=self.tag)
+        self.assertIn(f'data-tag="{self.tag.pk}"', self._editor_html(node))
+
+    def test_counts_cover_the_input_so_other_tags_stay_pickable(self):
+        """ The node's output only carries its configured tags - the picker counts its input """
+        self._tag_variant(self.variants[0])
+        self._tag_variant(self.variants[1], tag=self.other_tag)
+        node = self._tag_node()
+        node.tagnodetag_set.create(tag=self.tag)
+        html = self._editor_html(node)
+        self.assertIn(f'data-tag="{self.other_tag.pk}"', html)
+
+    def test_exclude_mode_keeps_the_pills(self):
         self._tag_variant(self.variants[0])
         node = self._tag_node()
-        node.node_input = TagNodeInput.PARENT_NOT_TAGGED
-        node.save()
-        self.assertNotIn("tag-counts-summary", self._editor_html(node))
+        node.update(node_input=TagNodeInput.PARENT_NOT_TAGGED)
+        self.assertIn("tag-counts-summary", self._editor_html(node))

@@ -1069,10 +1069,10 @@ class SelectedInParentNodeForm(BaseNodeForm):
 
 
 class TagNodeForm(BaseNodeForm):
+    # The editor's tag pills are the picker - they maintain the selection as hidden inputs
     tags = forms.ModelMultipleChoiceField(required=False,
                                           queryset=Tag.objects.none(),
-                                          widget=ModelSelect2Multiple(url='tag_autocomplete',
-                                                                      attrs={'data-placeholder': 'Tags...'}))
+                                          widget=forms.MultipleHiddenInput)
 
     class Meta:
         model = TagNode
@@ -1087,8 +1087,9 @@ class TagNodeForm(BaseNodeForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Retired tags aren't offered, but a node already filtering on one has to keep validating
-        q_selectable = Q(retired__isnull=True)
+        # Everything the pills can offer has to validate: a retired tag still tagged in this
+        # analysis, or one the node already filters on
+        q_selectable = Q(retired__isnull=True) | Q(varianttag__analysis=self.instance.analysis)
         if self.instance.pk:
             q_selectable |= Q(tagnodetag__tag_node=self.instance)
         self.fields["tags"].queryset = Tag.objects.filter(q_selectable).distinct()

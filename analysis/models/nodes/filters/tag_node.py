@@ -92,15 +92,20 @@ class TagNode(AnalysisNode):
         return None
 
     def get_tag_counts(self) -> list[tuple[str, int]]:
-        """ (tag, count) for the tags this node's variants carry, in the user's tag order. Counted
-            here rather than read off the DAG's per-tag node counts, which are analysis-scoped (so
-            wrong for a global node) and only exist for the tags the analysis has configured.
-            The tagged_within_days cutoff decides which variants enter the node, not which tags to
-            count, so it's left out """
+        """ (tag, count) for the editor's tag picker, in the user's tag order. Counted over the
+            node's input rather than its output, so every tag stays pickable however the node is
+            currently configured. Counted here rather than read off the DAG's per-tag node counts,
+            which are analysis-scoped (so wrong for a global node) and only exist for the tags the
+            analysis has configured. The tagged_within_days cutoff decides which variants enter the
+            node, not which tags to count, so it's left out """
+        # A tag already configured on the node always keeps its pill - dropping it would silently
+        # drop the tag on the next save
+        q_configured = Q(tagnodetag__tag_node=self)
         if self.mode == TagNodeMode.ALL_TAGS:
-            tags_qs = Tag.objects.all()
+            tags_qs = Tag.objects.filter(Q(retired__isnull=True) | q_configured)
         else:
-            tags_qs = Tag.objects.filter(varianttag__analysis=self.analysis).distinct()
+            tags_qs = Tag.objects.filter(Q(varianttag__analysis=self.analysis) | q_configured)
+        tags_qs = tags_qs.distinct()
 
         sort_order_by_tag = get_tag_sort_order_by_tag(self.analysis.user)
         tag_ids = sorted(tags_qs.values_list("pk", flat=True),
@@ -113,13 +118,16 @@ class TagNode(AnalysisNode):
                                                     empty_result_set_value=0)
                             for i, tag_id in enumerate(tag_ids)}
         try:
-            # Restricting to tagged variants first makes this far cheaper than a scan of the node
-            qs = self.get_queryset(inner_query_distinct=True).filter(self.tagged_variants_q([]))
-            counts = qs.aggregate(**aggregate_kwargs)
+            # The input scope: the parent's queryset, or every variant for a source node.
+            # Restricting to tagged variants first makes this far cheaper than a scan
+            arg_q_dict = self.get_parent_arg_q_dict() if self.has_input() else {None: {}}
+            qs = self.get_queryset(arg_q_dict=arg_q_dict, inner_query_distinct=True)
+            counts = qs.filter(self.tagged_variants_q([])).aggregate(**aggregate_kwargs)
         except NonFatalNodeError:
             return []  # An ancestor isn't ready - the editor re-renders when it is
+        configured = set(self.tag_ids)
         tag_counts = [(tag_id, counts[f"tag_count_{i}"] or 0) for i, tag_id in enumerate(tag_ids)]
-        return [(tag_id, count) for tag_id, count in tag_counts if count]
+        return [(tag_id, count) for tag_id, count in tag_counts if count or tag_id in configured]
 
     def _get_node_q(self) -> Q:
         q = self.tagged_variants_q(self.tag_ids, self.tagged_within_cutoff)
