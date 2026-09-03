@@ -208,7 +208,7 @@ class VariantGrid(AbstractVariantGrid):
         def insert_columns(columns: list[RichColumn], new_columns: list[RichColumn]) -> list[RichColumn]:
             # Put extra columns after sample (they are all usually to do with sample/vcf etc info)
             new_columns = [rc for rc in new_columns if rc not in columns]
-            if sample_cols_pos:
+            if sample_cols_pos is not None:
                 return columns[:sample_cols_pos] + new_columns + columns[sample_cols_pos:]
             return columns + new_columns
 

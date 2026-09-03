@@ -14,13 +14,13 @@ from django.urls import reverse
 from guardian.shortcuts import get_objects_for_user
 
 from annotation.annotation_version_querysets import get_queryset_for_latest_annotation_version
-from annotation.models import PATIENT_ONTOLOGY_TERM_PATH, AnnotationVersion, ManualVariantEntryCollection
+from annotation.models import PATIENT_ONTOLOGY_TERM_PATH, AnnotationVersion, ManualVariantEntryCollection, VariantAnnotation
 from annotation.models.models_enums import ClinVarReviewStatus
 from library.genomics.vcf_enums import INFO_LIFTOVER_SWAPPED_REF_ALT
 from library.unit_percent import get_allele_frequency_formatter
 from library.utils import JsonDataType, JsonObjType, calculate_age
 from ontology.models import OntologyService
-from patients.models_enums import Sex
+from patients.models_enums import GnomADPopulation, Sex
 from snpdb.grid_columns.custom_columns import get_variant_grid_columns, get_variantgrid_extra_annotate
 from snpdb.models import (
     VCF,
@@ -554,6 +554,8 @@ def get_standard_overrides(af_show_in_percent: bool) -> dict[str, dict]:
             'width': 60, 'client_renderer': 'VariantGridFormat.omimLink'},
         # A member shown standalone keeps its own link - and the composite cells reuse these
         'variantannotation__gnomad_filtered': {'client_renderer': 'VariantGridFormat.gnomadFiltered'},
+        'variantannotation__transcript_version__gene_version__hgnc__uniprot__accession': {
+            'client_renderer': 'VariantGridFormat.uniprotLink'},
         # Composite cells, keyed by the composite column's own name - the members they draw
         # ride along hidden and their sort menus come from CompositeColumnMember
         'consequence_impact': {'client_renderer': 'VariantGridFormat.impactConsequence'},
@@ -563,6 +565,9 @@ def get_standard_overrides(af_show_in_percent: bool) -> dict[str, dict]:
         'mastermind': {'client_renderer': 'VariantGridFormat.mastermind'},
         'aloft': {'client_renderer': 'VariantGridFormat.aloft'},
         'predictions': {'client_renderer': 'VariantGridFormat.predictions'},
+        'pop_freq_other': {'client_renderer': 'VariantGridFormat.popFreqOther'},
+        'uniprot': {'client_renderer': 'VariantGridFormat.uniprot'},
+        'conservation': {'client_renderer': 'VariantGridFormat.conservation'},
         # The same cell (and the same menu) the cohort node draws with its own counts
         # @see CohortNode._get_node_extra_columns
         'db_zygosity': {'client_renderer': 'VariantGridFormat.dbZygosityCounts'},
@@ -596,7 +601,15 @@ def variant_grid_client_extra(genome_build: GenomeBuild) -> JsonObjType:
              "clinvarStars": {ClinVarReviewStatus(review_status).label: stars
                               for review_status, stars in ClinVarReviewStatus.STARS.items()},
              # What counts as a bad GQ/PL in the sample genotype cell
-             "genotypeQuality": settings.VARIANT_GRID_GENOTYPE_QUALITY_THRESHOLDS}
+             "genotypeQuality": settings.VARIANT_GRID_GENOTYPE_QUALITY_THRESHOLDS,
+             # The popmax population arrives as its label (a choice field) - the gnomAD cell draws the
+             # code and keeps the label for the hover
+             "gnomadPopulationCodes": {label: code for code, label in GnomADPopulation.choices},
+             # Each conservation score's range and where it reads as conserved, keyed the way the
+             # conservation cell's members arrive on the row
+             "conservation": {f"variantannotation__{field}": {"min": stats["min"], "max": stats["max"],
+                                                              "conserved": stats["conserved"]}
+                              for field, stats in VariantAnnotation.CONSERVATION_SCORES.items()}}
     # The AF the import 'common' filter uses, in the units the grid shows AFs in - the gnomAD
     # cell mutes at or above it so rare variants keep the reader's full attention
     if cf_data := settings.VCF_IMPORT_COMMON_FILTERS.get(genome_build.name):

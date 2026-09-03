@@ -184,6 +184,8 @@ def get_variant_grid_columns(custom_columns_collection: CustomColumnsCollection,
     for c in columns_queryset:
         column = c.column
         if not column.variant_column:
+            if column.annotation_level == ColumnAnnotationLevel.SAMPLE_LEVEL:
+                shown_columns.append((column, []))  # marks where the per-sample columns go
             continue
         # Tags are only shown in the analysis they are in (otherwise will just show tags_global)
         if column.variant_column == "tags" and not analysis_tags:
@@ -192,16 +194,18 @@ def get_variant_grid_columns(custom_columns_collection: CustomColumnsCollection,
         if column.is_composite and not members:
             continue  # nothing this version annotates for the cell to draw
         shown_columns.append((column, members))
-    shown_paths = {column.variant_column for column, _ in shown_columns}
+    shown_paths = {column.variant_column for column, _ in shown_columns if column.variant_column}
 
     fields_kwargs: dict[str, dict] = {}  # field path -> RichColumn kwargs, in column order
     composites: dict[str, tuple] = {}  # field path -> (column, the members its cell draws)
     sample_columns_position = None
 
-    for field_pos, (column, members) in enumerate(shown_columns):
-        if column.model_field is False:
-            if column.annotation_level == ColumnAnnotationLevel.SAMPLE_LEVEL:
-                sample_columns_position = field_pos
+    for column, members in shown_columns:
+        if not column.variant_column:
+            # The Sample marker - an index into the columns built below, so it counts the members
+            # riding along hidden behind everything before it
+            sample_columns_position = len(fields_kwargs)
+            continue
 
         fields_kwargs[column.variant_column] = _catalogue_column_kwargs(column)
         if members:

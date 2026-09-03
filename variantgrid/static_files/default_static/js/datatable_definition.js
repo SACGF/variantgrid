@@ -648,6 +648,59 @@ const DataTableDefinition = (function() {
             });
         },
 
+        /* Drag a header's right edge to widen a column for a closer look. Nothing is saved - the next
+           load is back to the catalogue widths. Only the fixed-layout grids take part (the ones that
+           summed a tableWidth): their column widths are whatever the header cells say, and the table
+           grows by the same amount so the other columns keep theirs. With scrollX the header is a
+           separate table above the body, and the body's own (cloned) header is what table-layout
+           sizes from, so a drag moves both */
+        setupColumnResize: function() {
+            if (!this.tableWidth) {
+                return;
+            }
+            const defn = this;
+            this.dataTable.columns().every(function() {
+                const column = this;
+                const handle = $('<span>', {class: 'dt-col-resize', title: 'Drag to resize'});
+                handle.on('mousedown', function(event) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    defn.dragColumnWidth(column, event.pageX);
+                });
+                $(column.header()).append(handle);
+            });
+        },
+
+        dragColumnWidth: function(column, startX) {
+            const defn = this;
+            const header = $(column.header());
+            const headerTable = header.closest('table');
+            const bodyTable = $(this.dataTable.table().node());
+            const tables = headerTable.add(bodyTable);
+            const bodyHeader = bodyTable.find('thead th').eq(column.index('visible'));
+            const startWidth = header.outerWidth();
+            const startTableWidth = bodyTable.outerWidth();
+            $('body').addClass('dt-col-resizing');
+
+            $(document).on('mousemove.dtColResize', function(event) {
+                const width = Math.max(30, startWidth + event.pageX - startX);
+                header.css('width', width);
+                bodyHeader.css('width', width);
+                tables.css('width', startTableWidth + width - startWidth);
+            }).on('mouseup.dtColResize', function() {
+                $(document).off('.dtColResize');
+                $('body').removeClass('dt-col-resizing');
+                // Every draw (paging, sorting) re-applies each column's sWidth to the body table's
+                // cloned header and sizes the real header from it, so the new width has to go there
+                defn.dataTable.settings()[0].aoColumns[column.index()].sWidth = header[0].style.width;
+                // The header cell is the sort toggle, and the click that ends a drag lands on it -
+                // swallow just that one
+                const swallow = (event) => event.stopPropagation();
+                header[0].addEventListener('click', swallow, true);
+                window.setTimeout(() => header[0].removeEventListener('click', swallow, true), 0);
+            });
+        },
+
         /* Resolves with this definition once the table is built, so a caller can wire up row
            interactions or announce itself (the analysis editor waits on its grid) */
         setup: function() {
@@ -665,6 +718,7 @@ const DataTableDefinition = (function() {
                     this.setupClientExpend();
                     this.setupResponsiveExpand();
                     this.setupSortMenus();
+                    this.setupColumnResize();
                     return this;
                 });
             });

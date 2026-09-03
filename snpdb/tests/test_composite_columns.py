@@ -13,6 +13,7 @@ from django.urls.base import reverse
 from annotation.fake_annotation import get_fake_annotation_version
 from library.django_utils.composite_columns import collapse_into_composite
 from snpdb.grid_columns.custom_columns import get_variant_grid_columns
+from snpdb.grids import variant_grid_client_extra
 from snpdb.models import CompositeColumnMember, CustomColumn, CustomColumnsCollection, VariantGridColumn
 from snpdb.models.models_genome import GenomeBuild
 
@@ -41,6 +42,16 @@ class CompositeColumnGridTest(TestCase):
         rich_columns, _ = get_variant_grid_columns(self._collection(column_ids),
                                                    self.annotation_version, {})
         return rich_columns
+
+    def test_sample_columns_go_where_the_sample_marker_sits(self):
+        """ The position indexes the built columns, so the classification members riding along hidden
+            ahead of the marker count """
+        rich_columns, position = get_variant_grid_columns(
+            self._collection(["variant", "classifications", "Sample", "spliceai"]), self.annotation_version, {})
+        names = [rc.name for rc in rich_columns]
+        self.assertEqual("spliceai", names[position])
+        self.assertGreater(position, 3, "the hidden classification members sit before the marker")
+        self.assertNotIn("", names)
 
     def test_composite_draws_its_members_hidden(self):
         columns = self._columns(["spliceai"])
@@ -172,3 +183,17 @@ class CustomColumnsArrangePageTest(TestCase):
         self.assertIn('composite-column cursor-move" column_id="spliceai"', content)
         self.assertIn('composite-member cursor-move" column_id="spliceai_max_ds"', content)
         self.assertIn("Show columns already inside a composite", content)
+
+
+class ConservationCellScalesTest(TestCase):
+    """ The conservation cell colours each dot off ctx.extra.conservation - a member without a scale
+        there draws muted whatever its score """
+
+    def test_every_member_has_a_scale_its_threshold_sits_inside(self):
+        scales = variant_grid_client_extra(GenomeBuild.grch38())["conservation"]
+        composite = VariantGridColumn.objects.prefetch_related("composite_members__column").get(pk="conservation")
+        for member in composite.member_columns:
+            with self.subTest(member=member.pk):
+                scale = scales[member.variant_column]
+                self.assertLess(scale["min"], scale["conserved"])
+                self.assertLessEqual(scale["conserved"], scale["max"])

@@ -561,6 +561,124 @@ VariantGridFormat.predictions = (_value, type, rowData) => {
 };
 
 
+// The population frequencies other than gnomAD - 1000 Genomes, UK10K, TOPMed - as the highest of them
+// with which one it came from, each on hover. The members this version annotates (and their labels)
+// come from the members render kwarg; their values arrive formatted server side, in the deployment's
+// unit or percent, so they compare as numbers and print as they are. Sorts on the headline member.
+VariantGridFormat.popFreqOther = (_value, type, rowData, ctx) => {
+    const members = (ctx && ctx.kwargs && ctx.kwargs.members) || [];
+    const detail = [];
+    let highest = null;
+    for (const member of members) {
+        const value = rowData[member.path];
+        if (_isBlank(value)) {
+            continue;
+        }
+        detail.push(`${member.label} ${value}`);
+        if (highest === null || parseFloat(value) > parseFloat(highest.value)) {
+            highest = {source: member.label.replace(/ AF$/, ''), value};
+        }
+    }
+    if (highest === null) {
+        return '';
+    }
+    return `<span class='pop-freq-other' title='${escapeHtml(detail.join(' · '))}'>`
+         + `${escapeHtml(highest.value)}<span class='pop-freq-source'>${escapeHtml(highest.source)}</span></span>`;
+};
+
+
+// UniProt accession, linked to the entry. The uniprot cell reuses it for its headline
+const UNIPROT_ACCESSION = "variantannotation__transcript_version__gene_version__hgnc__uniprot__accession";
+const UNIPROT_FUNCTION = "variantannotation__transcript_version__gene_version__hgnc__uniprot__function";
+
+VariantGridFormat.uniprotLink = (accession) => {
+    if (_isBlank(accession)) {
+        return '';
+    }
+    const url = `https://www.uniprot.org/uniprotkb/${encodeURIComponent(String(accession))}/entry`;
+    return `<a class='uniprot-link' href='${escapeHtml(url)}' target='_blank'>${escapeHtml(accession)}</a>`;
+};
+
+// The gene's UniProt entry in one cell - the linked accession with the function summary running on
+// after it, and the function, pathway, tissue specificity and Reactome pathways on hover
+VariantGridFormat.uniprot = (_value, type, rowData, ctx) => {
+    const members = (ctx && ctx.kwargs && ctx.kwargs.members) || [];
+    const accession = rowData[UNIPROT_ACCESSION];
+    const detail = [];
+    for (const member of members) {
+        const value = rowData[member.path];
+        if (member.path !== UNIPROT_ACCESSION && !_isBlank(value)) {
+            detail.push(`${member.label}: ${value}`);
+        }
+    }
+    if (_isBlank(accession) && !detail.length) {
+        return '';
+    }
+    const func = rowData[UNIPROT_FUNCTION];
+    const funcHtml = _isBlank(func) ? '' : `<span class='uniprot-function'>${escapeHtml(func)}</span>`;
+    return `<span class='uniprot' title='${escapeHtml(detail.join(' · '))}'>`
+         + `${VariantGridFormat.uniprotLink(accession)}${funcHtml}</span>`;
+};
+
+
+// Conservation as a row of dots, one per score this version annotates, in member order - filled where
+// the score reaches its conserved threshold, muted below it, hollow where the position has no score.
+// The cell carries a detail table that the hover handler below floats under it: each score between
+// its (faded) minimum and maximum. Ranges and thresholds come from ctx.extra.conservation
+// (@see VariantAnnotation.CONSERVATION_SCORES); sorts on PhyloP 100 way, its headline member.
+function _conservationRange(value) {
+    return value == null ? '' : String(Math.round(value * 100) / 100);
+}
+
+// Scores come out of a float4 column, so 0.314 arrives as 0.314000010490417
+function _conservationScore(value) {
+    const score = Number(value);
+    return isFinite(score) ? String(parseFloat(score.toPrecision(3))) : String(value);
+}
+
+VariantGridFormat.conservation = (_value, type, rowData, ctx) => {
+    const members = (ctx && ctx.kwargs && ctx.kwargs.members) || [];
+    const scales = (ctx && ctx.extra && ctx.extra.conservation) || {};
+    let dots = '';
+    let rows = '';
+    let anyScore = false;
+    for (const member of members) {
+        const value = rowData[member.path];
+        const scale = scales[member.path] || {};
+        let css = 'cons-none';
+        let valueHtml = `<span class='cons-blank'>–</span>`;
+        if (!_isBlank(value)) {
+            anyScore = true;
+            const conserved = scale.conserved != null && parseFloat(value) >= scale.conserved;
+            css = conserved ? 'cons-conserved' : 'cons-not-conserved';
+            valueHtml = escapeHtml(_conservationScore(value));
+        }
+        dots += `<i class='cons-dot ${css}'></i>`;
+        rows += `<tr><th>${escapeHtml(member.label)}</th>`
+              + `<td class='cons-range'>${escapeHtml(_conservationRange(scale.min))}</td>`
+              + `<td class='cons-value'><i class='cons-dot ${css}'></i>${valueHtml}</td>`
+              + `<td class='cons-range'>${escapeHtml(_conservationRange(scale.max))}</td></tr>`;
+    }
+    if (!anyScore) {
+        return '';
+    }
+    return `<span class='conservation'>${dots}<table class='conservation-detail'>${rows}</table></span>`;
+};
+
+// The conservation cell's hover - its detail table, floated below the cell. A panel a reader opened
+// on purpose (a header sort menu) stays put
+$(document).on('mouseenter', '.conservation', function() {
+    if (FloatingPanel.panel && !FloatingPanel.panel.hasClass('conservation-detail')) {
+        return;
+    }
+    FloatingPanel.show($(this).children('.conservation-detail').clone(), this);
+}).on('mouseleave', '.conservation', function() {
+    if (FloatingPanel.panel && FloatingPanel.panel.hasClass('conservation-detail')) {
+        FloatingPanel.hide();
+    }
+});
+
+
 // Zygosity counts in one cell - hom · het, with the rest in the title. Sorts on the het count, the
 // column it lives on. The row key prefix comes from the countPrefix render kwarg: this database's
 // global counts by default, a cohort node's own counts where it names its own.
@@ -1012,7 +1130,8 @@ VariantGridFormat.gnomad = (_value, type, rowData, ctx) => {
     if (popmaxAf != null && popmaxAf !== '') {
         html += `<span class='gnomad-popmax-af'>${escapeHtml(popmaxAf)}</span>`;
         if (population) {
-            html += `<span class='gnomad-popmax-pop'>${escapeHtml(population)}</span>`;
+            const codes = (ctx && ctx.extra && ctx.extra.gnomadPopulationCodes) || {};
+            html += `<span class='gnomad-popmax-pop'>${escapeHtml(codes[population] || population)}</span>`;
         }
     }
     // The Pass/Fail goes to the cell's right edge, so they line up down the column whatever width

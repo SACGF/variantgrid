@@ -103,6 +103,8 @@ COMPOSITE_EXAMPLE_ROWS: dict[str, dict[str, Any]] = {
         gnomad_fafmax_faf99_max=0.00034,
         gnomad2_liftover_af=0.00011,
     ),
+    # TOPMed's larger cohort has seen it more often than the other two
+    "pop_freq_other": _va(af_1kg=0.0002, af_uk10k=0.00013, topmed_af=0.00031),
     # An acceptor loss 3 bases into the intron carries the max delta score
     "spliceai": _va(
         spliceai_max_ds=0.62,
@@ -165,13 +167,26 @@ COMPOSITE_EXAMPLE_ROWS: dict[str, dict[str, Any]] = {
         **_dbnsfp_gene(gnomad_pli=0.97, gnomad_pnull=0.01, gnomad_prec=0.02),
         "variantannotation__gene__geneannotation__gnomad_oe_lof": 0.12,
     },
+    "uniprot": {
+        "variantannotation__transcript_version__gene_version__hgnc__uniprot__accession": "P00001",
+        "variantannotation__transcript_version__gene_version__hgnc__uniprot__function":
+            "Catalyses the example reaction in the cytosol. Required for normal development of the "
+            "example tissue",
+        "variantannotation__transcript_version__gene_version__hgnc__uniprot__pathway":
+            "Example biosynthesis; example-1 from example-2: step 1/3",
+        "variantannotation__transcript_version__gene_version__hgnc__uniprot__tissue_specificity":
+            "Expressed in liver and kidney",
+        "variantannotation__transcript_version__gene_version__hgnc__uniprot__reactome":
+            "R-HSA-000001;Example pathway",
+    },
     # The overlap columns are text - AnnotSV reports them per overlapping SV
     "gnomad_sv": _va(gnomad_sv_overlap_af="0.0021", gnomad_sv_overlap_percent="94.5",
                      gnomad_sv_overlap_name="gnomAD-SV_v3_DEL_12_00001",
                      gnomad_sv_overlap_coords="12:12300000-12400000"),
+    # Conserved on every score bar PhyloP 30 way, so the cell draws one muted dot among the filled ones
     "conservation": _va(
         phylop_100_way_vertebrate=7.85,
-        phylop_30_way_mammalian=1.21,
+        phylop_30_way_mammalian=0.62,
         phylop_46_way_mammalian=2.03,
         phastcons_100_way_vertebrate=1.0,
         phastcons_30_way_mammalian=0.99,

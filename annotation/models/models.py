@@ -1979,11 +1979,17 @@ class VariantAnnotation(AbstractVariantAnnotation):
         "DL": ("spliceai_pred_ds_dl", "spliceai_pred_dp_dl"),
     }
 
+    # 'conserved' is where a score starts to read as conserved - the variant grid conservation cell
+    # fills a dot at or above it. GERP++ and PhyloP 46 way are the deleterious thresholds from
+    # https://academic.oup.com/hmg/article/24/8/2125/651446, PhyloP 100 way and PhastCons the ones the
+    # conservation filter node was built around (@see ConservationNode). PhyloP 30 way has no published
+    # cutoff - 1.0 is ~75% of the way to its 1.312 ceiling, in line with the PhyloP 100 way cutoff
     CONSERVATION_SCORES = {
         "gerp_pp_rs": {
             # UCSC says RS scores range from a maximum of 6.18 down to a below-zero minimum, which we cap at -12.36
             "min": -12.36,
             "max": 6.18,
+            "conserved": 4.4,
         },
         # BigWig stats obtained via kent-335 bigWigInfo
         "phylop_30_way_mammalian": {
@@ -1991,36 +1997,42 @@ class VariantAnnotation(AbstractVariantAnnotation):
             "min": -20.0,
             "max": 1.312,
             "std": 0.727453,
+            "conserved": 1.0,
         },
         "phylop_46_way_mammalian": {
             "mean": 0.035934,
             "min": -13.796,
             "max": 2.941,
             "std": 0.779426,
+            "conserved": 1.6,
         },
         "phylop_100_way_vertebrate": {
             "mean": 0.093059,
             "min": -20.0,
             "max": 10.003,
             "std": 1.036944,
+            "conserved": 1.4,
         },
         "phastcons_30_way_mammalian": {
             "mean": 0.128025,
             "min": 0.0,
             "max": 1.0,
             "std": 0.247422,
+            "conserved": 0.85,
         },
         "phastcons_46_way_mammalian": {
             "mean": 0.088576,
             "min": 0.0,
             "max": 1.0,
             "std": 0.210242,
+            "conserved": 0.85,
         },
         "phastcons_100_way_vertebrate": {
             "mean": 0.101765,
             "min": 0.0,
             "max": 1.0,
             "std": 0.237072,
+            "conserved": 0.85,
         }
     }
 
