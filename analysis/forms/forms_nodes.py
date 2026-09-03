@@ -127,6 +127,23 @@ class VCFLocusFiltersMixin(forms.Form):
 
 
 class BaseNodeForm(forms.ModelForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if ignorable_fields := self.instance.get_ignorable_error_fields():
+            label = f"Ignore {', '.join(ignorable_fields)} errors"
+            self.fields["ignore_field_errors"] = forms.BooleanField(required=False, label=label,
+                                                                    initial=self.instance.ignore_field_errors)
+
+    def _post_clean(self):
+        """ The instance now carries the submitted values, so the node's own field checks can run """
+        super()._post_clean()
+        if "ignore_field_errors" in self.cleaned_data:
+            self.instance.ignore_field_errors = self.cleaned_data["ignore_field_errors"]
+        for field, errors in self.instance.get_field_errors().items():
+            if field in self.fields:
+                for error in errors:
+                    self.add_error(field, error)
+
     @property
     def media(self):
         m = super().media
@@ -193,6 +210,7 @@ class AnalysisNodeForm(BaseNodeForm):
 
         if self.instance.analysis.template_type != AnalysisTemplateType.TEMPLATE:
             del self.fields['hide_node_and_descendants_upon_template_configuration_error']
+        self.fields.pop("ignore_field_errors", None)  # Set from the node's own editor
 
 
 class AnalysisOutputNodeChoiceForm(forms.Form):
@@ -1119,17 +1137,6 @@ class TrioNodeForm(GenomeBuildAutocompleteForwardMixin, VCFSourceNodeForm):
             "max_pl": WIDGET_INTEGER_MIN_0,
         }
 
-    def clean(self):
-        cleaned_data = super().clean()
-        trio = cleaned_data.get("trio")
-        inheritance = cleaned_data.get("inheritance")
-
-        # Don't perform validation on template - so we can configure how we like
-        if self.instance.analysis.template_type != AnalysisTemplateType.TEMPLATE:
-            if trio and inheritance:
-                for error in TrioNode.get_trio_inheritance_errors(trio, inheritance):
-                    self.add_error("inheritance", error)
-
 
 class QuadNodeForm(GenomeBuildAutocompleteForwardMixin, VCFSourceNodeForm):
     genome_build_fields = ["quad"]
@@ -1146,16 +1153,6 @@ class QuadNodeForm(GenomeBuildAutocompleteForwardMixin, VCFSourceNodeForm):
             "min_gq": WIDGET_INTEGER_MIN_0,
             "max_pl": WIDGET_INTEGER_MIN_0,
         }
-
-    def clean(self):
-        cleaned_data = super().clean()
-        quad = cleaned_data.get("quad")
-        inheritance = cleaned_data.get("inheritance")
-        # Don't perform validation on template - so we can configure how we like
-        if self.instance.analysis.template_type != AnalysisTemplateType.TEMPLATE:
-            if quad and inheritance:
-                for error in QuadNode.get_quad_inheritance_errors(quad, inheritance):
-                    self.add_error("inheritance", error)
 
 
 class ZygosityNodeForm(BaseNodeForm):

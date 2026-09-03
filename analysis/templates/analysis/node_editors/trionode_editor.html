@@ -95,11 +95,15 @@
     function setDominantSelectAvailable(one_affected) {
         var inheritance_select = $("#id_inheritance", trioForm);
         var dominant_option = $("option[value=D]", inheritance_select);
-        if (!one_affected) {
+        var available = one_affected || $("#id_ignore_field_errors", trioForm).is(":checked");
+        if (!available) {
             dominant_option.removeAttr("selected");
         }
-        dominant_option.attr("disabled", !one_affected);
+        dominant_option.attr("disabled", !available);
     }
+    $("#id_ignore_field_errors", trioForm).change(function() {
+        setDominantSelectAvailable(motherAffected || fatherAffected);
+    });
 
     changeTrio();
     updateZygosityTable();
@@ -138,7 +142,8 @@
             </div>
             <div>
     		  <b>Inheritance:</b> {{ form.inheritance }}{{ form.inheritance.errors }}
-              <b>Require Parent Zygosity Calls:</b> {{ form.require_zygosity }}{{ form.require_zygosity.errors }}
+              <label class="ml-2" title="Save and run even though the inheritance mode doesn't fit this family - the reasons show as warnings">{{ form.ignore_field_errors }} {{ form.ignore_field_errors.label }}</label>
+              <label class="ml-2">{{ form.require_zygosity }} Require Parent Zygosity Calls</label>{{ form.require_zygosity.errors }}
             </div>
             {{ zygosity_table_data|json_script:"zygosity-data" }}
             <div>

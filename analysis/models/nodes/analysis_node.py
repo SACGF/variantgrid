@@ -164,6 +164,8 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
     auto_node_name = models.BooleanField(default=True)
     output_node = models.BooleanField(default=False)
     hide_node_and_descendants_upon_template_configuration_error = models.BooleanField(default=False)
+    # Waives the errors on get_ignorable_error_fields() - they're reported as warnings instead
+    ignore_field_errors = models.BooleanField(default=False)
     ready = models.BooleanField(default=True)
     valid = models.BooleanField(default=False)
     visible = models.BooleanField(default=True)
@@ -876,11 +878,38 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
             errors = AnalysisNode.flatten_errors(errors)
         return errors
 
-    def get_warnings(self) -> list[str]:
+    def get_ignorable_error_fields(self) -> list[str]:
+        """ Fields whose _get_field_errors() the user may waive with ignore_field_errors """
         return []
 
-    def get_errors(self, include_parent_errors=True, flat=False):
-        """ returns a tuple of (NodeError, str) unless flat=True where it's only string """
+    def _get_field_errors(self) -> dict[str, list[str]]:
+        """ Configuration errors keyed by the node field at fault, so the editor shows them against
+            that field. Templates are exempt - they're configured however the author likes """
+        return {}
+
+    def _get_ignored_error_fields(self) -> set[str]:
+        if self.ignore_field_errors:
+            return set(self.get_ignorable_error_fields())
+        return set()
+
+    def get_field_errors(self) -> dict[str, list[str]]:
+        """ The field errors that stop the node running """
+        if self.analysis.template_type == AnalysisTemplateType.TEMPLATE:
+            return {}
+        ignored = self._get_ignored_error_fields()
+        return {field: errors for field, errors in self._get_field_errors().items()
+                if errors and field not in ignored}
+
+    def get_ignored_field_errors(self) -> list[str]:
+        if self.analysis.template_type == AnalysisTemplateType.TEMPLATE:
+            return []
+        ignored = self._get_ignored_error_fields()
+        return [e for field, errors in self._get_field_errors().items() if field in ignored for e in errors]
+
+    def get_warnings(self) -> list[str]:
+        return list(self.get_ignored_field_errors())
+
+    def _get_non_field_errors(self, include_parent_errors=True) -> list[tuple[NodeErrorSource, str]]:
         errors = self.get_analysis_errors()
         _, parent_errors = self.get_parents_and_errors()
         if include_parent_errors:
@@ -888,9 +917,24 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
         if self.errors:
             errors.append((NodeErrorSource.INTERNAL_ERROR, self.errors))
         errors.extend((NodeErrorSource.CONFIGURATION, ce) for ce in self._get_configuration_errors())
+        return errors
+
+    def get_errors(self, include_parent_errors=True, flat=False):
+        """ returns a tuple of (NodeError, str) unless flat=True where it's only string """
+        errors = self._get_non_field_errors(include_parent_errors=include_parent_errors)
+        errors.extend((NodeErrorSource.CONFIGURATION, e) for field_errors in self.get_field_errors().values()
+                      for e in field_errors)
         if flat:
             errors = AnalysisNode.flatten_errors(errors)
         return errors
+
+    def can_ignore_errors(self) -> bool:
+        """ Everything wrong with the node is a field error ignore_field_errors would waive - what the
+            Template tab offers when it reveals a branch the template run hid """
+        field_errors = self.get_field_errors()
+        if not field_errors or self._get_non_field_errors():
+            return False
+        return set(field_errors) <= set(self.get_ignorable_error_fields())
 
     @staticmethod
     def flatten_errors(errors):

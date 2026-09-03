@@ -9,6 +9,7 @@ from cache_memoize import cache_memoize
 from django.db.models import Count
 from django.db.models.query_utils import Q
 
+from analysis.models.enums import NodeColors
 from annotation.models.models import VariantTranscriptAnnotation
 from library.constants import DAY_SECS
 from patients.models_enums import Sex, Zygosity
@@ -57,6 +58,30 @@ def _xlinked_recessive_errors(proband_sample, proband_sex: Sex, mother_affected:
     elif mother_affected:
         errors.append("X-linked recessive inheritance requires an unaffected mother")
     return errors
+
+
+class FamilyInheritanceNodeMixin:
+    """ Mix into TrioNode/QuadNode: the inheritance mode is checked against the family's affected
+        status and proband sex, and those checks are the ones ignore_field_errors can waive """
+
+    @abstractmethod
+    def _get_inheritance_errors(self) -> list[str]:
+        pass
+
+    def get_ignorable_error_fields(self) -> list[str]:
+        return ["inheritance"]
+
+    def _get_field_errors(self) -> dict[str, list[str]]:
+        field_errors = super()._get_field_errors()
+        field_errors["inheritance"] = self._get_inheritance_errors()
+        return field_errors
+
+    def _load(self):
+        update_kwargs = super()._load() or {}
+        # Keep self in sync - update_node_task clears a stale ERROR shadow after load() based on this
+        self.shadow_color = NodeColors.WARNING if self.get_warnings() else NodeColors.VALID
+        update_kwargs["shadow_color"] = self.shadow_color
+        return update_kwargs
 
 
 class AbstractFamilyInheritance(ABC):

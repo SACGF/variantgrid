@@ -64,8 +64,12 @@ def clone_analysis(request, analysis_id):
 @require_POST
 def node_reveal_hidden(request, analysis_id, node_id):
     """ Running a template hides a node that errors while being configured, and everything below it -
-        put that branch back so the user can see it and why it failed """
+        waive the node's errors (see AnalysisNode.can_ignore_errors) and put that branch back """
     node = get_node_subclass_or_404(request.user, node_id, write=True)
+    if node.can_ignore_errors():
+        node.ignore_field_errors = True
+        node.queryset_dirty = True
+        node.save()
     branch_node_ids = {node.pk} | {n.pk for n in node.descendants_set()}
     hidden_qs = AnalysisNode.objects.filter(pk__in=branch_node_ids, visible=False)
     revealed_ids = list(hidden_qs.values_list("pk", flat=True))

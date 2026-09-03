@@ -138,7 +138,8 @@ def analysis_settings_template_tab(request, analysis_id):
     if hasattr(analysis, 'analysistemplaterun'):
         analysis_template_run = analysis.analysistemplaterun
         node_variables = defaultdict(list)
-        for node in analysis.analysisnode_set.filter(analysisvariable__isnull=False).distinct().order_by("y"):
+        nodes_qs = analysis.analysisnode_set.filter(analysisvariable__isnull=False).distinct().order_by("y")
+        for node in nodes_qs.select_subclasses():
             for av in node.analysisvariable_set.all().order_by("field"):
                 node_variables[node].append(av)
         context["analysis_template_run"] = analysis_template_run

@@ -8,11 +8,12 @@ from django.db import models
 from django.db.models.deletion import SET_NULL
 from django.db.models.query_utils import Q
 
-from analysis.models.enums import AnalysisTemplateType, NodeErrorSource, QuadInheritance
+from analysis.models.enums import QuadInheritance
 from analysis.models.nodes.sources import AbstractCohortBasedNode
 from analysis.models.nodes.family_inheritance import (
     AbstractCompHetInheritance,
     AbstractFamilyInheritance,
+    FamilyInheritanceNodeMixin,
     _build_family_zyg_q,
     _dominant_requires_affected_parent_error,
     _pedigree_sex,
@@ -182,7 +183,7 @@ class QuadAnyAffected(AbstractQuadInheritance):
         return f"Variant present in at least one affected family member ({', '.join(names)})"
 
 
-class QuadNode(AbstractCohortBasedNode):
+class QuadNode(FamilyInheritanceNodeMixin, AbstractCohortBasedNode):
     INHERITANCE_CLASSES = {
         QuadInheritance.COMPOUND_HET:      QuadCompHet,
         QuadInheritance.RECESSIVE:         QuadRecessive,
@@ -223,14 +224,8 @@ class QuadNode(AbstractCohortBasedNode):
                 )
         return errors
 
-    def get_errors(self, include_parent_errors=True, flat=False):
-        errors = super().get_errors(include_parent_errors=include_parent_errors)
-        if self.analysis.template_type != AnalysisTemplateType.TEMPLATE:
-            if quad_errors := self.get_quad_inheritance_errors(self.quad, self.inheritance):
-                errors.extend((NodeErrorSource.CONFIGURATION, e) for e in quad_errors)
-        if flat:
-            errors = self.flatten_errors(errors)
-        return errors
+    def _get_inheritance_errors(self) -> list[str]:
+        return self.get_quad_inheritance_errors(self.quad, self.inheritance)
 
     def _get_cohort(self):
         return self.quad.cohort if self.quad else None

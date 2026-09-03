@@ -6,8 +6,9 @@ from django.test import TestCase
 from django.urls import reverse
 from guardian.shortcuts import assign_perm
 
+from analysis.forms.forms_nodes import TrioNodeForm
 from analysis.models import Analysis, QuadNode, TrioNode
-from analysis.models.enums import QuadInheritance, TrioInheritance, TrioSample
+from analysis.models.enums import AnalysisTemplateType, QuadInheritance, TrioInheritance, TrioSample
 from annotation.fake_annotation import get_fake_annotation_version
 from library.guardian_utils import assign_permission_to_user_and_groups
 from patients.models import Patient
@@ -187,3 +188,100 @@ class TestRevealHiddenNodes(TestCase):
         self.assertEqual(403, response.status_code)
         self.node.refresh_from_db()
         self.assertFalse(self.node.visible)
+
+
+class TestIgnoreFieldErrors(TestCase):
+    """ ignore_field_errors turns the inheritance checks into warnings so the node can save and run """
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.user = User.objects.get_or_create(username='testuser_ignore_field_errors')[0]
+        cls.genome_build = GenomeBuild.get_name_or_alias("GRCh37")
+        get_fake_annotation_version(cls.genome_build)
+        cls.trio = create_fake_trio(cls.user, cls.genome_build)  # mother affected - fails X-linked recessive
+        cls.analysis = Analysis(genome_build=cls.genome_build)
+        cls.analysis.set_defaults_and_save(cls.user)
+
+    def _make_node(self, **kwargs):
+        return TrioNode.objects.create(analysis=self.analysis, trio=self.trio,
+                                       inheritance=TrioInheritance.XLINKED_RECESSIVE, **kwargs)
+
+    def test_inheritance_error_blocks_node(self):
+        node = self._make_node()
+        self.assertEqual({"inheritance"}, set(node.get_field_errors()))
+        self.assertEqual(1, len(node.get_errors(include_parent_errors=False)))
+        self.assertEqual([], node.get_warnings())
+        self.assertTrue(node.can_ignore_errors())
+
+    def test_ignored_error_becomes_warning(self):
+        node = self._make_node(ignore_field_errors=True)
+        self.assertEqual([], node.get_errors(include_parent_errors=False))
+        self.assertEqual(1, len(node.get_warnings()))
+        self.assertIn("unaffected mother", node.get_warnings()[0])
+        self.assertFalse(node.can_ignore_errors())
+
+    def test_other_errors_cannot_be_ignored(self):
+        node = TrioNode.objects.create(analysis=self.analysis, trio=None,
+                                       inheritance=TrioInheritance.XLINKED_RECESSIVE)
+        self.assertFalse(node.can_ignore_errors())
+
+    def test_template_skips_checks(self):
+        template_analysis = Analysis(genome_build=self.genome_build, template_type=AnalysisTemplateType.TEMPLATE)
+        template_analysis.set_defaults_and_save(self.user)
+        node = TrioNode.objects.create(analysis=template_analysis, trio=self.trio,
+                                       inheritance=TrioInheritance.XLINKED_RECESSIVE)
+        self.assertEqual({}, node.get_field_errors())
+        self.assertEqual([], node.get_warnings())
+
+    def _form(self, ignore):
+        node = self._make_node()
+        data = {"trio": self.trio.pk, "inheritance": TrioInheritance.XLINKED_RECESSIVE}
+        if ignore:
+            data["ignore_field_errors"] = "on"
+        form = TrioNodeForm(data=data, instance=node)
+        form.is_valid()
+        return form
+
+    def test_form_reports_inheritance_error(self):
+        form = self._form(ignore=False)
+        self.assertIn("inheritance", form.errors)
+        self.assertFalse(form.instance.ignore_field_errors)
+
+    def test_form_ignore_lets_inheritance_through(self):
+        form = self._form(ignore=True)
+        self.assertNotIn("inheritance", form.errors)
+        self.assertTrue(form.instance.ignore_field_errors)
+
+
+class TestRevealHiddenNodesIgnoresErrors(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.user = User.objects.get_or_create(username='testuser_reveal_ignore')[0]
+        cls.genome_build = GenomeBuild.get_name_or_alias("GRCh37")
+        get_fake_annotation_version(cls.genome_build)
+        cls.trio = create_fake_trio(cls.user, cls.genome_build)
+        cls.analysis = Analysis(genome_build=cls.genome_build)
+        cls.analysis.set_defaults_and_save(cls.user)
+
+    def _reveal(self, node):
+        self.client.force_login(self.user)
+        url = reverse('node_reveal_hidden', kwargs={"analysis_id": self.analysis.pk, "node_id": node.pk})
+        self.assertEqual(200, self.client.post(url).status_code)
+        node.refresh_from_db()
+        return node
+
+    def test_ignorable_errors_waived(self):
+        node = TrioNode.objects.create(analysis=self.analysis, visible=False, trio=self.trio,
+                                       inheritance=TrioInheritance.XLINKED_RECESSIVE)
+        node = self._reveal(node)
+        self.assertTrue(node.visible)
+        self.assertTrue(node.ignore_field_errors)
+        self.assertTrue(node.valid)
+
+    def test_other_errors_left_alone(self):
+        node = TrioNode.objects.create(analysis=self.analysis, visible=False, trio=None)
+        node = self._reveal(node)
+        self.assertTrue(node.visible)
+        self.assertFalse(node.ignore_field_errors)

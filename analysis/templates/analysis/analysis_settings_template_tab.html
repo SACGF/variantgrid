@@ -23,10 +23,10 @@
                     {{ node }}
                     {% if not node.visible %}
                         <span class="badge badge-light">hidden</span>
-                        {% if has_write_permission %}
+                        {% if has_write_permission and node.can_ignore_errors %}
                             <button class="btn btn-sm btn-outline-primary reveal-hidden-nodes" type="button"
                                     data-href="{% url 'node_reveal_hidden' analysis.pk node.pk %}"
-                                    title="Show this node and everything hidden below it">Show hidden nodes</button>
+                                    title="Ignore the errors on this node and show it and everything hidden below it">Ignore errors and show hidden nodes</button>
                         {% endif %}
                     {% endif %}
                 </legend>
