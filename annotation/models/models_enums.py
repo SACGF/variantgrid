@@ -114,6 +114,7 @@ class ColumnAnnotationCategory(models.TextChoices):
     PROTEIN_DOMAINS = 'D', "Protein Domains"
     SEQUENCE = 'Q', "Sequence"
     SPLICING_PREDICTIONS = 'S', "Splicing Predictions"
+    CLASSIFICATIONS = 'K', "Classifications"
     VARIANT_DATA = 'V', "Variant Data"
 
 

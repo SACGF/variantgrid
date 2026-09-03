@@ -7,11 +7,18 @@ builder, and you can show any of them standalone from
 <a class="hover-link" href="/snpdb/settings/custom_columns/">VariantGrid Columns</a>. The example cells here are
 drawn by the grid's own renderers from made up data - no real variant, sample or lab appears on this page.
 
-Variant and transcript level annotations come from an annotation run. Each column lists the tool it came from:
+Variant and transcript level annotations come from an annotation run. Each run writes a numbered
+<b>columns version</b> - a newer version adds columns and can read a column from a different source (eg gnomAD v3
+to v4). The toggle at the top shows the columns as one version writes them, or every version at once with each
+row noting the versions it applies to.
+
+Each column lists the tool it came from:
 
 <ul>
+<li><b>Variant</b> - the variant's own coordinates, and what follows straight from them (g.HGVS)
 <li><b>VEP</b> - Ensembl Variant Effect Predictor, including its <a href="https://asia.ensembl.org/info/docs/tools/vep/script/vep_plugins.html">plugins</a> and custom data files, eg <a href="https://drive.google.com/file/d/1HPcIEE1USiwCPzRFFwZhTZagka1uyUV1/view">dbNSFP</a> - a collection of many different resources
 <li><b>AnnotSV</b> - <a href="https://lbgi.fr/AnnotSV/">AnnotSV</a> annotates structural variants (so these columns are populated for SVs only)
-<li><b>VariantGrid</b> - calculated by VariantGrid while importing annotation
+<li><b>ClinVar</b> - the <a href="https://www.ncbi.nlm.nih.gov/clinvar/intro/">ClinVar</a> record for the variant, loaded separately from VEP
+<li><b>VariantGrid</b> - calculated by VariantGrid while importing annotation, or from its own records (classifications, tags)
 <li><b>VCF</b> - a FORMAT field read straight off the imported VCF
 </ul>

@@ -7,6 +7,8 @@ from django.views.decorators.cache import cache_page
 from django.views.decorators.vary import vary_on_cookie
 
 from annotation import annotsv_columns, vep_columns
+from annotation.models import VariantAnnotationVersion
+from annotation.models.models_enums import ColumnAnnotationCategory, VariantAnnotationPipelineType
 from annotation.vep_annotation import VEPConfig
 from library.constants import WEEK_SECS
 from library.unit_percent import get_allele_frequency_formatter
@@ -102,6 +104,8 @@ def _sample_composite_section(format_afs) -> dict:
             "source_field": source_field,
             "source_field_processing_description": None,
             "vep": None,
+            "min_columns_version": None,
+            "max_columns_version": None,
             "level": ColumnAnnotationLevel.SAMPLE_LEVEL.label,
             "role": "headline" if i == 0 else "sort",
         })
@@ -137,13 +141,22 @@ def view_annotation_descriptions(request, genome_build_name=None):
     vep_config = VEPConfig(genome_build)
     vep_referenced = vep_columns.all_variant_grid_column_ids()
 
-    def _first_for_build(vgc_id, build_name):
-        for c in vep_columns.for_variant_grid_column(vgc_id, vep_config=vep_config):
-            # cosmic_version so cosmic_count describes the INFO field the installed COSMIC release
-            # actually carries the count in (#1673)
-            if c.applies_to(genome_build_name=build_name, cosmic_version=vep_config.cosmic_version):
-                return c
-        return None
+    def _is_sv_only(vep) -> bool:
+        return bool(vep.pipeline_types) and VariantAnnotationPipelineType.STANDARD not in vep.pipeline_types
+
+    def _defs_for_build(vgc_id):
+        """ Every def that writes this column under the installed VEP and this build's data files, one per
+            columns version range, newest first. The page lists them all and the reader picks the version.
+            The structural variant run writes the gnomAD columns too, from gnomAD SV - that def only stands
+            in for a column nothing else writes """
+        defs = [c for c in vep_columns.for_variant_grid_column(vgc_id, vep_config=vep_config)
+                # cosmic_version so cosmic_count describes the INFO field the installed COSMIC release
+                # actually carries the count in (#1673)
+                if c.applies_to(genome_build_name=genome_build.name, vep_version=vep_config.vep_version,
+                                cosmic_version=vep_config.cosmic_version)]
+        if any(not _is_sv_only(c) for c in defs):
+            defs = [c for c in defs if not _is_sv_only(c)]
+        return sorted(defs, key=lambda c: (c.min_columns_version or 0, c.max_columns_version or 0), reverse=True)
 
     def _vep_source_detail(vep) -> str:
         details = []
@@ -151,43 +164,69 @@ def view_annotation_descriptions(request, genome_build_name=None):
             details.append(f"Plugin: {vep.vep_plugin.label}")
         if vep.vep_custom:
             details.append("custom")
+        if _is_sv_only(vep):
+            details.append("structural variants")
         return ", ".join(details)
 
-    def _column_row(vgc):
-        """ Where a column's value comes from - None for a VEP column this build doesn't populate """
-        if vep := _first_for_build(vgc.pk, genome_build.name):
-            row = {
-                "source": "VEP",
-                "source_detail": _vep_source_detail(vep),
-                "category": vep.category,
-                "source_field": vep.source_field,
-                "source_field_processing_description": vep.source_field_processing_description,
-                "vep": vep,
-            }
+    def _vep_row(vep) -> dict:
+        return {
+            "source": "VEP",
+            "source_detail": _vep_source_detail(vep),
+            "category": vep.category,
+            "source_field": vep.source_field,
+            "source_field_processing_description": vep.source_field_processing_description,
+            "vep": vep,
+            "min_columns_version": vep.min_columns_version,
+            "max_columns_version": vep.max_columns_version,
+        }
+
+    def _local_row(vgc, composite) -> dict:
+        """ A column VariantGrid fills without an annotation tool - the variant's own coordinates, ClinVar,
+            or something calculated during annotation import """
+        if composite is not None and composite.pk == "variant":
+            source = "Variant"
+        elif vgc.annotation_level == ColumnAnnotationLevel.CLINVAR_LEVEL:
+            source = "ClinVar"
+        else:
+            source = "VariantGrid"
+        category = None
+        if composite is not None and composite.pk == "classifications":
+            category = ColumnAnnotationCategory.CLASSIFICATIONS
+        return {
+            "source": source,
+            "source_detail": "",
+            "category": category,
+            "source_field": None,
+            "source_field_processing_description": None,
+            "vep": None,
+            "min_columns_version": None,
+            "max_columns_version": None,
+        }
+
+    def _column_rows(vgc, composite=None) -> list[dict]:
+        """ Where a column's value comes from - a row per columns version range for a VEP column, and
+            nothing at all for a VEP column this build doesn't populate """
+        if defs := _defs_for_build(vgc.pk):
+            rows = [_vep_row(vep) for vep in defs]
         elif vgc.pk in vep_referenced:
-            return None  # VEP column that isn't populated in this build
+            return []
         elif annotsv := annotsv_columns.for_variant_grid_column(vgc.pk):
-            row = {
+            rows = [{
                 "source": "AnnotSV",
                 "source_detail": "",
                 "category": annotsv.category,
                 "source_field": annotsv.source_field,
                 "source_field_processing_description": annotsv.source_field_processing_description,
                 "vep": None,
-            }
+                "min_columns_version": None,
+                "max_columns_version": None,
+            }]
         else:
-            # Calculated during annotation import rather than read from an annotation tool's output
-            row = {
-                "source": "VariantGrid",
-                "source_detail": "",
-                "category": None,
-                "source_field": None,
-                "source_field_processing_description": None,
-                "vep": None,
-            }
-        row["column"] = vgc
-        row["level"] = vgc.get_annotation_level_display()
-        return row
+            rows = [_local_row(vgc, composite)]
+        for row in rows:
+            row["column"] = vgc
+            row["level"] = vgc.get_annotation_level_display()
+        return rows
 
     # The grid formats unit AFs server side so its CSV matches what it draws - the example rows hold
     # unit values and go through the same formatter, so they follow the deployment's percent setting
@@ -218,20 +257,22 @@ def view_annotation_descriptions(request, genome_build_name=None):
             "column": vgc,
             "level": vgc.get_annotation_level_display() or "",
             "level_css": (vgc.get_annotation_level_display() or "").lower(),
-            "rows": [row for _, row in member_rows],
+            "rows": [row for _, rows in member_rows for row in rows],
             "sort_by": members[0].column.label,
             "column_json": json.dumps(rich_column_json(rich_column, AbstractVariantGrid.default_column_width)),
             "row_json": json.dumps(row),
         }
 
-    # (composite, [(member, its row)]) for the cells this build has anything to draw in - a composite
+    # (composite, [(member, its rows)]) for the cells this build has anything to draw in - a composite
     # whose members are all unannotated here isn't in the grid either, so the page doesn't list it
     drawn_composites = []
     for vgc in variant_grid_columns:
         if not vgc.is_composite:
             continue
-        member_rows = [(m, dict(row, role=_member_role(m))) for m in vgc.composite_members.all()
-                       if (row := _column_row(m.column)) is not None]
+        member_rows = []
+        for m in vgc.composite_members.all():
+            if rows := _column_rows(m.column, composite=vgc):
+                member_rows.append((m, [dict(row, role=_member_role(m)) for row in rows]))
         if member_rows:
             drawn_composites.append((vgc, member_rows))
 
@@ -252,10 +293,16 @@ def view_annotation_descriptions(request, genome_build_name=None):
         if vgc.is_composite or vgc.composite_of:
             continue  # members are documented in their composite's section
         if vgc.annotation_level in annotation_run_levels:
-            if row := _column_row(vgc):
-                columns_by_annotation_level[vgc.get_annotation_level_display()].append(row)
+            columns_by_annotation_level[vgc.get_annotation_level_display()].extend(_column_rows(vgc))
         else:
             variantgrid_columns_by_annotation_level[vgc.annotation_level].append(vgc)
+
+    # The versions a reader can pick between - every columns version an annotation run has written for
+    # this build, and the one the next run will write
+    latest_columns_version = vep_config.columns_version
+    run_columns_versions = VariantAnnotationVersion.objects.filter(genome_build=genome_build) \
+        .values_list("columns_version", flat=True)
+    columns_versions = sorted(set(run_columns_versions) | {latest_columns_version})
 
     context = {
         "genome_build": genome_build,
@@ -263,5 +310,7 @@ def view_annotation_descriptions(request, genome_build_name=None):
         "example_extra": variant_grid_client_extra(genome_build),
         "variantgrid_columns_by_annotation_level": variantgrid_columns_by_annotation_level,
         "columns_by_annotation_level": columns_by_annotation_level,
+        "columns_versions": columns_versions,
+        "latest_columns_version": latest_columns_version,
     }
     return render(request, "annotation/view_annotation_descriptions.html", context)

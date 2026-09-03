@@ -1,8 +1,9 @@
 {% comment %}
 One column of an annotations table - shared by the level cards and the composite member tables.
-show_role adds the member's role in its composite cell, and its own annotation level colour box
+show_role adds the member's role in its composite cell, and its own annotation level colour box.
+data-min-cv / data-max-cv carry the columns version range the row is written in, for the page's toggle
 {% endcomment %}
-<tr class='annotation-row'>
+<tr class='annotation-row' data-min-cv="{{ row.min_columns_version|default_if_none:'' }}" data-max-cv="{{ row.max_columns_version|default_if_none:'' }}">
     <th>
         <div><b>{{ row.column.label }}</b></div>
         <div class="text-muted annotation-grid-column-name">{{ row.column.pk }}</div>
@@ -25,7 +26,7 @@ show_role adds the member's role in its composite cell, and its own annotation l
     </td>
     <td>
     {% if row.category %}
-        <div class='annotation-category annotation-category-{{ row.category }}'>
+        <div class='annotation-category annotation-category-{{ row.category.name|lower }}'>
             {{ row.category.label }}
         </div>
     {% endif %}
@@ -42,7 +43,7 @@ show_role adds the member's role in its composite cell, and its own annotation l
     </td>
     <td>{{ row.column.description | safe }}
     {% if row.vep.min_columns_version or row.vep.max_columns_version %}
-        <div>
+        <div class="annotation-columns-version-note">
             Note:
             <b>{{ row.vep.columns_version_description }}</b> only
         </div>

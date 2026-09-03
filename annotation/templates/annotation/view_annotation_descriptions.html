@@ -58,61 +58,89 @@
             background-color: #555555;
         }
 
+        .annotation-source-variant {
+            background-color: #5F81A9;
+        }
+
+        .annotation-source-clinvar {
+            background-color: #cc0000;
+        }
+
         .annotation-source-detail {
             padding-top: 2px;
             text-align: center;
         }
 
-        .annotation-category-C {
-            background-color: #02599C;
+        /* Category colours follow the analysis node accents where the two share a concept
+           (@see analysis_nodes.css) - population frequency teal blue, phenotype magenta - and the
+           classification colours where they share one. Keyed by the category's name - the page has no
+           doctype, so quirks mode matches classes case-insensitively */
+        .annotation-category-conservation {
+            background-color: #6b7d1a;
         }
 
-        .annotation-category-E {
+        .annotation-category-external_id {
             background-color: #333333;
         }
 
-        .annotation-category-F {
-            background-color: #FF7F50;
+        .annotation-category-frequency_data {
+            background-color: #1e88a8;
         }
 
-        .annotation-category-G {
+        .annotation-category-functional_effect {
+            background-color: #b8860b;
+        }
+
+        .annotation-category-gene_annotations {
             background-color: #97f988;
             color: #680677;
         }
 
-        .annotation-category-H {
-            background-color: #9400D3;
+        .annotation-category-hgvs {
+            background-color: #546e7a;
         }
 
-        .annotation-category-L {
-            background-color: #6A5ACD;
+        /* The germline green of the allele origin boxes and chip rails (@see .allele-origin-G) */
+        .annotation-category-classifications {
+            background-color: #88cc88;
+            color: #333333;
         }
 
-        .annotation-category-N {
+        .annotation-category-literature {
+            background-color: #6b3fa0;
+        }
+
+        .annotation-category-nearby_features {
             background-color: #E75480;
         }
 
-        .annotation-category-P {
-            background-color: #1E90FF;
+        .annotation-category-pathogenicity_predictions {
+            background-color: #c62828;
         }
 
-        .annotation-category-Y {
-            background-color: ;
+        .annotation-category-phenotype {
+            background-color: #c2185b;
         }
 
-        .annotation-category-D {
-            background-color: #ff9900;
+        .annotation-category-protein_domains {
+            background-color: #e07a2f;
         }
 
-        .annotation-category-Q {
+        .annotation-category-sequence {
             background-color: #5F81A9;
         }
 
-        .annotation-category-S {
-            background-color: red;
+        .annotation-category-splicing_predictions {
+            background-color: #24567a;
         }
 
-        .annotation-category-V {
+        .annotation-category-variant_data {
+            background-color: #6c757d;
+        }
+
+        /* Which columns version a row is written in only matters when every version is on show */
+        .annotation-columns-version-note {
+            display: none;
         }
     </style>
     <script>
@@ -171,16 +199,52 @@
             th.append(menu);
         }
 
+        // Each row carries the columns version range its definition is written in - a row without one
+        // is written in every version. Sections left with nothing to show for the chosen version go too
+        function showColumnsVersion(version) {
+            const showAll = version === "all";
+            $(".annotation-row").each(function() {
+                const row = $(this);
+                const minVersion = parseInt(row.attr("data-min-cv"));
+                const maxVersion = parseInt(row.attr("data-max-cv"));
+                row.toggle(showAll || ((isNaN(minVersion) || version >= minVersion) &&
+                                       (isNaN(maxVersion) || version <= maxVersion)));
+            });
+            $(".annotation-columns-version-note").toggle(showAll);
+            $(".composite-section, .annotation-level-card").each(function() {
+                $(this).toggle($(this).find(".annotation-row:visible").length > 0);
+            });
+            $(".columns-version-toggle .btn").removeClass("active");
+            $(".columns-version-toggle .btn").filter(function() {
+                return $(this).data("columnsVersion") === version;
+            }).addClass("active");
+        }
+
         $(document).ready(() => {
             $("table.composite-example").each(function() {
                 setupExampleCell($(this));
             });
+            $(".columns-version-toggle .btn").on("click", function() {
+                showColumnsVersion($(this).data("columnsVersion"));
+            });
+            showColumnsVersion({{ latest_columns_version }});
         });
     </script>
 {% endblock head %}
 {% block content %}
     <div class="container annotation-descriptions">
-    {% genome_build_url_arg genome_build 'view_annotation_descriptions_genome_build' %}
+    <div class="d-flex align-items-center flex-wrap" style="gap: 8px">
+        {% genome_build_url_arg genome_build 'view_annotation_descriptions_genome_build' %}
+        <div class="btn-group columns-version-toggle"
+             title="Which set of columns an annotation run writes - a newer version adds columns and can read a column from a different source">
+            {% for cv in columns_versions %}
+                <a href="javascript:void(0)" class="btn btn-outline-secondary" data-columns-version="{{ cv }}">
+                    Columns v{{ cv }}{% if cv == latest_columns_version %} (latest){% endif %}
+                </a>
+            {% endfor %}
+            <a href="javascript:void(0)" class="btn btn-outline-secondary" data-columns-version="all">All versions</a>
+        </div>
+    </div>
 
 	{% page_help page_id='annotation/view_annotation_descriptions_help' title="VariantGrid Annotations"%}
 
@@ -265,7 +329,7 @@
         {% endif %}
 
         {% for annotation_level, columns in columns_by_annotation_level.items %}
-            <div class='card mt-4'>
+            <div class='card mt-4 annotation-level-card'>
                 <div class="card-header align-center">
                     <div class="color-box {{ annotation_level|lower }}-column">&nbsp;</div>
                     <div class="annotation-level-title"><b>{{ annotation_level }} Level</b> Annotated by a <a class="hover-link" href="{% url 'variant_annotation_runs' %}">Variant Annotation Run</a>
