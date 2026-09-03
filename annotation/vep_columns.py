@@ -46,6 +46,9 @@ class VEPColumnDef:
     summary_stats: Optional[str] = None
     source_field_processing_description: Optional[str] = None
     formatter: Optional[Callable] = None   # value -> value cleaning for this column
+    # What the stored value joins multiple values with - VEP's own '&', or whatever a plugin uses.
+    # The grid cell splits on it so a multi-value cell reads as a list (@see VariantGridFormat.separated)
+    separator: Optional[str] = None
 
     @property
     def vep_info_field(self) -> Optional[str]:
@@ -311,6 +314,7 @@ VEP_COLUMNS: tuple[VEPColumnDef, ...] = (
         source_field='Interpro_domain',
         variant_grid_columns=('interpro_domain',),
         category=ColumnAnnotationCategory.PROTEIN_DOMAINS,
+        separator=fmt.VEP_SEPARATOR,
         vep_plugin=VEPPlugin.DBNSFP,
         genome_builds=GRCH37_38,
         pipeline_types=STANDARD,
@@ -350,7 +354,8 @@ VEP_COLUMNS: tuple[VEPColumnDef, ...] = (
                formatter=fmt.get_most_damaging_func(MetaRNNPrediction)),
     _dbnsfp_v4('MetaRNN_score',              'metarnn_score'),
     _dbnsfp_v4('MutPred2_score',             'mutpred2_score'),
-    _dbnsfp_v4('MutPred2_top5_mechanisms',   'mutpred2_top5_mechanisms', formatter=fmt.remove_empty_multiples),
+    _dbnsfp_v4('MutPred2_top5_mechanisms',   'mutpred2_top5_mechanisms', formatter=fmt.remove_empty_multiples,
+               separator=fmt.VEP_SEPARATOR),
     _dbnsfp_v4('PrimateAI_pred',             'primateai_pred',
                formatter=fmt.get_most_damaging_func(PrimateAIPrediction)),
     _dbnsfp_v4('PrimateAI_score',            'primateai_score'),
@@ -373,6 +378,7 @@ VEP_COLUMNS: tuple[VEPColumnDef, ...] = (
         source_field='Interpro_domain',
         variant_grid_columns=('interpro_domain',),
         category=ColumnAnnotationCategory.PROTEIN_DOMAINS,
+        separator=fmt.VEP_SEPARATOR,
         vep_plugin=VEPPlugin.DBNSFP,
         genome_builds=GRCH37_38_T2T,
         pipeline_types=STANDARD,
@@ -639,6 +645,7 @@ VEP_COLUMNS: tuple[VEPColumnDef, ...] = (
         vep_plugin=VEPPlugin.MASTERMIND,
         genome_builds=GRCH37_38,
         pipeline_types=STANDARD,
+        separator=fmt.VEP_SEPARATOR,
     ),
 
     # ---------- PhastCons / PhyloP (VEP-version split, max() for indels) ---
@@ -788,13 +795,14 @@ VEP_COLUMNS: tuple[VEPColumnDef, ...] = (
     VEPColumnDef(source_field='Amino_acids',     variant_grid_columns=('amino_acids',),   category=ColumnAnnotationCategory.GENE_ANNOTATIONS),
     VEPColumnDef(source_field='CANONICAL',       variant_grid_columns=('canonical',),     category=ColumnAnnotationCategory.GENE_ANNOTATIONS, formatter=fmt.format_canonical),
     VEPColumnDef(source_field='Codons',          variant_grid_columns=('codons',),        category=ColumnAnnotationCategory.GENE_ANNOTATIONS),
-    VEPColumnDef(source_field='Consequence',     variant_grid_columns=('consequence',),   category=ColumnAnnotationCategory.GENE_ANNOTATIONS),
+    VEPColumnDef(source_field='Consequence',     variant_grid_columns=('consequence',),   category=ColumnAnnotationCategory.GENE_ANNOTATIONS, separator=fmt.VEP_SEPARATOR),
     VEPColumnDef(
         source_field='Existing_variation',
         variant_grid_columns=('cosmic_id',),
         category=ColumnAnnotationCategory.EXTERNAL_ID,
         source_field_processing_description='Extract COSMIC IDs',
         formatter=fmt.extract_cosmic,
+        separator=fmt.VEP_SEPARATOR,
     ),
     VEPColumnDef(
         source_field='Existing_variation',
@@ -802,9 +810,10 @@ VEP_COLUMNS: tuple[VEPColumnDef, ...] = (
         category=ColumnAnnotationCategory.EXTERNAL_ID,
         source_field_processing_description='Extract rsIDs',
         formatter=fmt.extract_dbsnp,
+        separator=fmt.VEP_SEPARATOR,
     ),
     VEPColumnDef(source_field='DISTANCE',        variant_grid_columns=('distance',),      category=ColumnAnnotationCategory.NEARBY_FEATURES),
-    VEPColumnDef(source_field='DOMAINS',         variant_grid_columns=('domains',),       category=ColumnAnnotationCategory.PROTEIN_DOMAINS),
+    VEPColumnDef(source_field='DOMAINS',         variant_grid_columns=('domains',),       category=ColumnAnnotationCategory.PROTEIN_DOMAINS, separator=fmt.VEP_SEPARATOR),
     VEPColumnDef(source_field='ENSP',            variant_grid_columns=('ensembl_protein',), category=ColumnAnnotationCategory.EXTERNAL_ID),
     VEPColumnDef(source_field='EXON',            variant_grid_columns=('exon',),          category=ColumnAnnotationCategory.GENE_ANNOTATIONS),
     VEPColumnDef(source_field='FLAGS',           variant_grid_columns=('flags',),         category=ColumnAnnotationCategory.GENE_ANNOTATIONS),
@@ -814,7 +823,7 @@ VEP_COLUMNS: tuple[VEPColumnDef, ...] = (
     VEPColumnDef(source_field='IMPACT',          variant_grid_columns=('impact',),        category=ColumnAnnotationCategory.PATHOGENICITY_PREDICTIONS, formatter=_format_impact),
     VEPColumnDef(source_field='INTRON',          variant_grid_columns=('intron',),        category=ColumnAnnotationCategory.GENE_ANNOTATIONS),
     VEPColumnDef(source_field='Protein_position', variant_grid_columns=('protein_position',), category=ColumnAnnotationCategory.GENE_ANNOTATIONS),
-    VEPColumnDef(source_field='PUBMED',          variant_grid_columns=('pubmed',),        category=ColumnAnnotationCategory.LITERATURE),
+    VEPColumnDef(source_field='PUBMED',          variant_grid_columns=('pubmed',),        category=ColumnAnnotationCategory.LITERATURE, separator=fmt.VEP_SEPARATOR),
     VEPColumnDef(
         source_field='SIFT',
         variant_grid_columns=('sift',),
@@ -887,12 +896,14 @@ VEP_COLUMNS: tuple[VEPColumnDef, ...] = (
         source_field_has_custom_prefix=True,
         pipeline_types=STANDARD,
         formatter=fmt.remove_empty_multiples,
+        separator=fmt.VEP_SEPARATOR,
     ),
     VEPColumnDef(
         source_field='REPEAT_MASKER',
         variant_grid_columns=('repeat_masker',),
         category=ColumnAnnotationCategory.SEQUENCE,
         vep_custom=VEPCustom.REPEAT_MASKER,
+        separator=fmt.VEP_SEPARATOR,
     ),
     VEPColumnDef(
         source_field='TOPMED',
@@ -908,6 +919,7 @@ VEP_COLUMNS: tuple[VEPColumnDef, ...] = (
     VEPColumnDef(
         source_field='StudyName',
         variant_grid_columns=('denovo_db_studies',),
+        separator=fmt.VEP_SEPARATOR,
         category=ColumnAnnotationCategory.LITERATURE,
         vep_custom=VEPCustom.DENOVO_DB,
         source_field_has_custom_prefix=True,
@@ -918,6 +930,7 @@ VEP_COLUMNS: tuple[VEPColumnDef, ...] = (
     VEPColumnDef(
         source_field='PubmedID',
         variant_grid_columns=('denovo_db_pubmed_ids',),
+        separator=fmt.VEP_SEPARATOR,
         category=ColumnAnnotationCategory.LITERATURE,
         vep_custom=VEPCustom.DENOVO_DB,
         source_field_has_custom_prefix=True,
@@ -928,6 +941,7 @@ VEP_COLUMNS: tuple[VEPColumnDef, ...] = (
     VEPColumnDef(
         source_field='PrimaryPhenotype',
         variant_grid_columns=('denovo_db_primary_phenotypes',),
+        separator=fmt.VEP_SEPARATOR,
         category=ColumnAnnotationCategory.PHENOTYPE,
         vep_custom=VEPCustom.DENOVO_DB,
         source_field_has_custom_prefix=True,
@@ -996,6 +1010,7 @@ VEP_COLUMNS: tuple[VEPColumnDef, ...] = (
         source_field='MaveDB_urn',
         variant_grid_columns=('mavedb_urn',),
         category=ColumnAnnotationCategory.FUNCTIONAL_EFFECT,
+        separator=fmt.VEP_SEPARATOR,
         vep_plugin=VEPPlugin.MAVEDB,
         genome_builds=GRCH38,
         pipeline_types=STANDARD,
@@ -1046,6 +1061,7 @@ VEP_COLUMNS: tuple[VEPColumnDef, ...] = (
         category=ColumnAnnotationCategory.SPLICING_PREDICTIONS,
         vep_plugin=VEPPlugin.SPLICEREGION,
         pipeline_types=STANDARD,
+        separator=fmt.VEP_SEPARATOR,
     ),
 
     # ---------- ProtVar (all builds, columns_version >= 5) ------------------
@@ -1337,6 +1353,17 @@ def for_variant_grid_column(vgc_id: str, *, vep_config: Optional[VEPConfig] = No
 
 def all_variant_grid_column_ids() -> frozenset[str]:
     return frozenset(vgc for c in VEP_COLUMNS for vgc in c.variant_grid_columns)
+
+
+def separators_by_variant_grid_column() -> dict[str, str]:
+    """ VariantGrid column name -> what its stored value joins multiple values with.
+        Same column across builds/versions carries the same separator, so the first one wins. """
+    separators = {}
+    for c in VEP_COLUMNS:
+        if c.separator:
+            for vgc in c.variant_grid_columns:
+                separators.setdefault(vgc, c.separator)
+    return separators
 
 
 def visible_columns_for(**kwargs) -> frozenset[str]:

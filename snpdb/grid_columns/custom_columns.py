@@ -31,6 +31,10 @@ VARIANT_GRID_EXTRA_ANNOTATION_ALIASES = set(CLASSIFICATIONS_COLUMN_ROW_ANNOTATIO
 }
 
 
+# VariantGrid column name -> the separator its stored value joins multiple values with. The cell
+# splits on it so a multi-value column reads as a list; the raw value is what the exports carry
+COLUMN_SEPARATORS = vep_columns.separators_by_variant_grid_column()
+
 # Filter type offered for a model field's class (first match wins)
 _FIELD_FILTER_TYPES = [
     (fields.AutoField, 'int'),
@@ -122,6 +126,11 @@ def _catalogue_column_kwargs(column) -> dict:
     }
     if column.width is not None:
         kwargs["width"] = column.width
+    if separator := COLUMN_SEPARATORS.get(column.pk):
+        # A column with a link renderer of its own overrides the renderer but keeps the kwarg -
+        # they all take the separator the same way (@see get_standard_overrides)
+        kwargs["client_renderer"] = "VariantGridFormat.separated"
+        kwargs["client_renderer_kwargs"] = {"separator": separator}
     return kwargs
 
 
@@ -133,6 +142,8 @@ def _composite_column_kwargs(column, members: list, column_overrides: dict[str, 
         entry = {"path": member.column.variant_column, "label": member.column.label}
         if renderer := column_overrides.get(member.column.variant_column, {}).get("client_renderer"):
             entry["renderer"] = renderer
+        if separator := COLUMN_SEPARATORS.get(member.column.pk):
+            entry["separator"] = separator
         return entry
 
     kwargs = {

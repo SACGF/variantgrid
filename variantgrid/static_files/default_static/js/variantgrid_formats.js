@@ -35,20 +35,33 @@ function _genomeBuildName(ctx) {
 }
 
 
-function splitAndLink(rawValue, split, buildLinkFunc) {
-    let formattedValue = '';
-    if (rawValue) {
-        const raw_value_list = rawValue.split(split);
-        const links = [];
-        for(let i=0 ; i<raw_value_list.length ; ++i) {
-            const value = raw_value_list[i];
-            links.push(buildLinkFunc(value));
-        }
-        formattedValue = links.join();
-    }
-    return formattedValue;
+// Multi-value columns arrive joined by the separator their VEP column declares (@see
+// VEPColumnDef.separator) - the exports carry the raw value, the cell reads as a list
+const VEP_SEPARATOR = "&";  // what a column falls back to, @see vep_field_formatters.VEP_SEPARATOR
+const VALUE_JOIN = ", ";
+
+function _separator(ctx) {
+    return (ctx && ctx.kwargs && ctx.kwargs.separator) || VEP_SEPARATOR;
 }
 
+function splitValues(rawValue, separator) {
+    return String(rawValue).split(separator || VEP_SEPARATOR).filter(v => v !== '');
+}
+
+function splitAndLink(rawValue, separator, buildLinkFunc) {
+    if (!rawValue) {
+        return '';
+    }
+    return splitValues(rawValue, separator).map(buildLinkFunc).join(VALUE_JOIN);
+}
+
+// Columns with nothing to link - the value is just easier to read split up
+VariantGridFormat.separated = (value, type, rowData, ctx) => {
+    if (value == null || value === '') {
+        return '';
+    }
+    return escapeHtml(splitValues(value, _separator(ctx)).join(VALUE_JOIN));
+};
 
 // Keys are Classification.clinical_significance codes / somatic summary tiers - values give the box
 // contents and tooltip label
@@ -123,17 +136,18 @@ const GERMLINE_CHIP_SLOT = 'cs-chip-germline';
 const CLINVAR_SOMATIC_CHIP_SLOT = 'cs-chip-clinvar-somatic';
 const SOMATIC_CHIP_SLOT = 'cs-chip-somatic';
 
-function _classificationChip(cssClasses, innerHtml, title, gridColumn) {
-    const href = gridColumn ? `javascript:showGridCell("${gridColumn}")` : 'javascript:void(0)';
-    return `<a class='cs-chip ${cssClasses.join(' ')}' title='${escapeHtml(title)}' href='${href}'>${innerHtml}</a>`;
+// Chips are spans rather than links, so a click on one falls through to the row click handler and
+// expands the row - where the full ClinVar and classification detail is (@see variantGridRowDetail)
+function _classificationChip(cssClasses, innerHtml, title) {
+    return `<span class='cs-chip ${cssClasses.join(' ')}' title='${escapeHtml(title)}'>${innerHtml}</span>`;
 }
 
 function _emptyChip(slotCssClass, title) {
-    return _classificationChip([slotCssClass, 'cs-chip-empty'], '&mdash;', title, null);
+    return _classificationChip([slotCssClass, 'cs-chip-empty'], '&mdash;', title);
 }
 
 function _internalClassificationChip(originLabel, originCssClass, slotCssClass, maxClassification,
-                                     classifiedSummary, gridColumn, chipLookup, boxLookup) {
+                                     classifiedSummary, chipLookup, boxLookup) {
     // null = not classified; undefined = a row cached before these fields existed - treat the same
     if (maxClassification == null) {
         return _emptyChip(slotCssClass, originLabel + ": not classified");
@@ -146,7 +160,7 @@ function _internalClassificationChip(originLabel, originCssClass, slotCssClass, 
         inner += ` <span class='cs-chip-count'>&times;${records.length}</span>`;
     }
     return _classificationChip([slotCssClass, chip.css, originCssClass], inner,
-                               `${originLabel}: ${summaryLabels.join(' | ')}`, gridColumn);
+                               `${originLabel}: ${summaryLabels.join(' | ')}`);
 }
 
 function _clinvarChip(rowData, ctx) {
@@ -158,7 +172,7 @@ function _clinvarChip(rowData, ctx) {
     const inner = `<span class='cs-chip-src'>CV</span>${escapeHtml(chip.text)}`
                 + _clinvarStarsHtml(rowData["clinvar__review_status"], ctx);
     const title = "ClinVar: " + (rowData["clinvar__clinical_significance"] || chip.text);
-    return _classificationChip([CLINVAR_CHIP_SLOT, chip.css], inner, title, "clinvar__clinical_significance");
+    return _classificationChip([CLINVAR_CHIP_SLOT, chip.css], inner, title);
 }
 
 // clinvarStars is keyed by the review status label, which is what the choice field's column carries
@@ -196,11 +210,10 @@ function _clinvarSomaticChip(rowData, ctx) {
     const chip = oncChip || tierChip;
     const reviewStatus = oncChip ? rowData["clinvar__oncogenic_review_status"]
                                  : rowData["clinvar__somatic_review_status"];
-    const gridColumn = oncChip ? "clinvar__highest_oncogenicity" : "clinvar__somatic_tier";
     const inner = `<span class='cs-chip-src'>CV</span>${escapeHtml(chip.text)}`
                 + _clinvarStarsHtml(reviewStatus, ctx);
     return _classificationChip([CLINVAR_SOMATIC_CHIP_SLOT, chip.css], inner,
-                               "ClinVar somatic: " + titleParts.join(", "), gridColumn);
+                               "ClinVar somatic: " + titleParts.join(", "));
 }
 
 
@@ -213,11 +226,11 @@ VariantGridFormat.classifications = (_value, type, rowData, ctx) => {
     const chips = _clinvarChip(rowData, ctx)
         + _internalClassificationChip("Internally Classified (Germline)", "allele-origin-G", GERMLINE_CHIP_SLOT,
             rowData["max_internal_classification"], rowData["internally_classified"],
-            "max_internal_classification", GERMLINE_CLASSIFICATION_CHIPS, GERMLINE_CLASSIFICATION_BOXES)
+            GERMLINE_CLASSIFICATION_CHIPS, GERMLINE_CLASSIFICATION_BOXES)
         + _clinvarSomaticChip(rowData, ctx)
         + _internalClassificationChip("Internally Classified (Somatic)", "allele-origin-S", SOMATIC_CHIP_SLOT,
             rowData["max_internal_somatic_classification"], rowData["internally_classified_somatic"],
-            "max_internal_somatic_classification", SOMATIC_CLASSIFICATION_CHIPS, SOMATIC_CLASSIFICATION_BOXES);
+            SOMATIC_CLASSIFICATION_CHIPS, SOMATIC_CLASSIFICATION_BOXES);
     return `<span class='cs-chips'>${chips}</span>`;
 };
 
@@ -225,13 +238,27 @@ VariantGridFormat.classifications = (_value, type, rowData, ctx) => {
 // The generic composite cell: the first member is what the cell reads as, every other non-blank
 // member goes on hover as "label: value". A group whose members are all blank draws nothing, which
 // is what lets the eye skip down a sparse column.
-// Members (path, label, and the client renderer the member carries standalone) come from the
-// members render kwarg - @see _composite_column_kwargs in snpdb/grid_columns/custom_columns.py
+// Members (path, label, the client renderer the member carries standalone, and its separator where
+// it holds multiple values) come from the members render kwarg
+// @see _composite_column_kwargs in snpdb/grid_columns/custom_columns.py
 function _compositeMemberHtml(member, value, type, rowData, ctx) {
     if (member.renderer) {
-        return eval(member.renderer)(value, type, rowData, ctx);
+        // The member's own separator, not the composite's
+        const memberCtx = {...ctx, kwargs: {...(ctx && ctx.kwargs), separator: member.separator}};
+        return eval(member.renderer)(value, type, rowData, memberCtx);
     }
-    return escapeHtml(String(value));
+    return escapeHtml(_memberText(member, value));
+}
+
+function _memberText(member, value) {
+    return member.separator ? splitValues(value, member.separator).join(VALUE_JOIN) : String(value);
+}
+
+// The separator declared by the composite member reading `path`
+function _memberSeparator(ctx, path) {
+    const members = (ctx && ctx.kwargs && ctx.kwargs.members) || [];
+    const member = members.find(m => m.path === path);
+    return member && member.separator;
 }
 
 function _isBlank(value) {
@@ -247,7 +274,7 @@ VariantGridFormat.composite = (_value, type, rowData, ctx) => {
     for (let i = 1; i < members.length; ++i) {
         const value = rowData[members[i].path];
         if (!_isBlank(value)) {
-            detail.push(`${members[i].label}: ${value}`);
+            detail.push(`${members[i].label}: ${_memberText(members[i], value)}`);
         }
     }
     const headline = rowData[members[0].path];
@@ -258,7 +285,8 @@ VariantGridFormat.composite = (_value, type, rowData, ctx) => {
     const cell = _isBlank(headline)
         ? `<span class='composite-empty-headline'>&middot;</span>`
         : _compositeMemberHtml(members[0], headline, type, rowData, ctx);
-    const title = [`${members[0].label}: ${_isBlank(headline) ? '' : headline}`].concat(detail).join(' \u00b7 ');
+    const headlineText = _isBlank(headline) ? '' : _memberText(members[0], headline);
+    const title = [`${members[0].label}: ${headlineText}`].concat(detail).join(' \u00b7 ');
     return `<span class='composite-cell' title='${escapeHtml(title)}'>${cell}</span>`;
 };
 
@@ -272,17 +300,20 @@ const IMPACT_DOT_CSS = {
 };
 
 // Impact + Consequence in one cell. Sorts by consequence, its headline member.
-VariantGridFormat.impactConsequence = (_value, type, rowData) => {
-    const consequence = rowData["variantannotation__consequence"];
+VariantGridFormat.impactConsequence = (_value, type, rowData, ctx) => {
+    const rawConsequence = rowData["variantannotation__consequence"];
     const impact = rowData["variantannotation__impact"];
-    if (consequence == null && impact == null) {
+    if (rawConsequence == null && impact == null) {
         return '';
     }
+    // VEP gives every consequence the variant hits, joined - "missense_variant, splice_region_variant"
+    const consequence = rawConsequence == null
+        ? '' : splitValues(rawConsequence, _memberSeparator(ctx, "variantannotation__consequence")).join(VALUE_JOIN);
     const dotCss = IMPACT_DOT_CSS[impact] || 'impact-unknown';
-    const title = [impact, consequence].filter(v => v != null).join(' · ');
+    const title = [impact, consequence].filter(v => v !== '' && v != null).join(' · ');
     const impactWord = impact == null ? '' : `<span class='ic-line2'>${escapeHtml(impact)}</span>`;
     return `<span class='impact-consequence' title='${escapeHtml(title)}'>`
-         + `<i class='impact-dot ${dotCss}'></i>${escapeHtml(consequence == null ? '' : consequence)}`
+         + `<i class='impact-dot ${dotCss}'></i>${escapeHtml(consequence)}`
          + `${impactWord}</span>`;
 };
 
@@ -934,13 +965,13 @@ VariantGridFormat.clinvarLink = (clinvar_variation_id) => {
 };
 
 
-VariantGridFormat.cosmicLink = (cosmic_ids) => {
+VariantGridFormat.cosmicLink = (cosmic_ids, type, rowData, ctx) => {
     const COSMIC_PREFIX = "COSV";
     const COSMIC_LEGACY_PREFIX = "COSM";
 
     let cosmic_string = '';
     if (cosmic_ids) {
-        const cosmic_ids_list = cosmic_ids.split("&");
+        const cosmic_ids_list = splitValues(cosmic_ids, _separator(ctx));
         const cosmic_links = [];
         for(let i=0 ; i<cosmic_ids_list.length ; ++i) {
             let cosmic_id = cosmic_ids_list[i];
@@ -954,7 +985,7 @@ VariantGridFormat.cosmicLink = (cosmic_ids) => {
             cosmic_links.push(cosmic_id);
         }
 
-        cosmic_string = cosmic_links.join();
+        cosmic_string = cosmic_links.join(VALUE_JOIN);
     }
     return cosmic_string;
 };
@@ -979,7 +1010,9 @@ function _geneSymbolLink(geneSymbolColumn, filterChildLink) {
             let geneLinkString = '';
             if (filterChildLink) {
                 const filterGeneLink = "javascript:createFilterChild(\"gene_symbol\", \"" + geneSymbol + "\");";
-                geneLinkString = "<a class='grid-link' title='Filter to " + geneSymbol + "' href='" + filterGeneLink + "'><i class='fa-solid fa-list-check gene-list-node-icon'></i></a>";
+                // The gene list node's own badge glyph - the child this makes is a GeneListNode
+                geneLinkString = "<a class='grid-link' title='Gene list node for " + geneSymbol + "' href='" + filterGeneLink + "'>"
+                               + "<svg class='gene-list-node-icon'><use href='#node-icon-gene-list'></use></svg></a>";
                 geneLinkString += " <a class='left' target='_blank' title='View gene in new window' href='" + Urls.view_gene_symbol(geneSymbol) + "'>" + geneSymbol + "</a> ";
             } else {
                 // not left
@@ -1150,19 +1183,19 @@ VariantGridFormat.clinGenAlleleId = (cellValue) => {
 };
 
 
-VariantGridFormat.dbsnp = (dbsnp_rs_ids) => {
+VariantGridFormat.dbsnp = (dbsnp_rs_ids, type, rowData, ctx) => {
     function buildDBSNPLink(dbsnp_id) {
         return "<a title='View dbSNP in new window' target='_blank' href='https://www.ncbi.nlm.nih.gov/snp/" + dbsnp_id + "'>" + dbsnp_id + "</a>";
     }
-    return splitAndLink(dbsnp_rs_ids, "&", buildDBSNPLink);
+    return splitAndLink(dbsnp_rs_ids, _separator(ctx), buildDBSNPLink);
 };
 
 
-VariantGridFormat.pubMed = (pubmed) => {
+VariantGridFormat.pubMed = (pubmed, type, rowData, ctx) => {
     function buildPubMedLink(pubmed_id) {
         return "<a title='View PubMed article in new window' target='_blank' href='https://pubmed.ncbi.nlm.nih.gov/" + pubmed_id + "'>" + pubmed_id + "</a>";
     }
-    return splitAndLink(pubmed, "&", buildPubMedLink);
+    return splitAndLink(pubmed, _separator(ctx), buildPubMedLink);
 };
 
 
@@ -1176,11 +1209,11 @@ VariantGridFormat.ontologyTerms = (ontology_terms) => {
 };
 
 
-VariantGridFormat.masterMind = (value) => {
+VariantGridFormat.masterMind = (value, type, rowData, ctx) => {
     function buildMasterMindLink(mmid3) {
         return "<a title='View MasterMind in new window' target='_blank' href='https://mastermind.genomenon.com/detail?mutation=" + mmid3 + "'>" + mmid3 + "</a>";
     }
-    return splitAndLink(value, "&", buildMasterMindLink);
+    return splitAndLink(value, _separator(ctx), buildMasterMindLink);
 };
 
 

@@ -303,12 +303,20 @@ function create_igv_link(locus, getBamsFuncString) {
     return '';
 }
 
-function showGridCell(gridColumn) {
-    // The adapter names each cell with a dt-<column> class
-    const selector = $("td.dt-" + gridColumn);
-    if (selector.length) {
-        selector[0].scrollIntoView();
+/* Filter child nodes are raised from cells in the grid (gene symbols) and from the column summary
+   table, so the node comes from whichever node the data container is showing rather than from the
+   editor that happens to be loaded */
+function createFilterChild(columnName, columnFilter) {
+    const nodeId = $("#node-data-container").attr("node_id");
+    if (!nodeId) {
+        return;
     }
+    $.ajax({
+        type: "POST",
+        data: {column_name: columnName, column_filter: columnFilter},
+        url: Urls.create_filter_child(ANALYSIS_ID, nodeId),
+        success: getAnalysisWindow().addConnectedNode,
+    });
 }
 
 function inAnalysis() {
@@ -326,13 +334,15 @@ function showTagAutocomplete(variantId) {
     const nodeId = addTagButton.parents("#node-data-container").attr("node_id");
 
     const panel = $("<div/>", {"class": "variant-tag-entry"});
-    addTagButton.hide();
+    // The panel is anchored off the button's rect, so it can only be hidden once that has been taken
     FloatingPanel.show(panel, addTagButton[0], {onHide: function() {
         addTagButton.show();
     }});
+    addTagButton.hide();
 
     panel.load(Urls.tag_autocomplete_form(), function() {
         const tagSelect = $("select#id_tag", panel);
+        colorTagAutocompleteResults(tagSelect);
         tagSelect.change(function() {
             const tag = $(this).val();
             if (tag) {
@@ -352,6 +362,39 @@ function showTagAutocomplete(variantId) {
             if (e.detail.element == tagSelect[0]) {
                 tagSelect.select2("open").trigger("focus");
             }
+        });
+    });
+}
+
+
+/* Tag colours are CSS (.tagged-<tag> > .user-tag-colored - @see render_tag_styles_and_formatter), so a
+   dropdown entry draws in its tag's colour once it carries the same markup a grid tag does. select2
+   redraws its list on every keystroke, so watch it rather than decorating once */
+function colorTagAutocompleteResults(tagSelect) {
+    function decorate(resultsList) {
+        $("li.select2-results__option", resultsList).each(function() {
+            const option = $(this);
+            const tag = (option.data("data") || {}).id;
+            if (!tag || option.children(".grid-tag").length) {
+                return;  // a message row ("Searching...", "No results"), or already drawn
+            }
+            option.empty().append($("<span/>", {class: "grid-tag tagged-" + tag})
+                                      .append($("<span/>", {class: "user-tag-colored", text: tag})));
+        });
+    }
+
+    tagSelect.on("select2:open", function() {
+        const resultsList = $("#select2-" + tagSelect.attr("id") + "-results");
+        if (!resultsList.length) {
+            return;
+        }
+        decorate(resultsList);
+        const observer = new MutationObserver(function() {
+            decorate(resultsList);
+        });
+        observer.observe(resultsList[0], {childList: true});
+        tagSelect.one("select2:close", function() {
+            observer.disconnect();
         });
     });
 }

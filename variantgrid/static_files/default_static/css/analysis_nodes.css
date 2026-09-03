@@ -206,10 +206,12 @@ button.add-analysis-variable-button {
     color: var(--node-classification-color);
 }
 
-/* Analysis grid create gene list child icon */
+/* Analysis grid create gene list child icon - the sprite symbol the GeneListNode badge draws */
 .gene-list-node-icon {
-    font-size: 16px;
-    vertical-align: middle;
+    width: 14px;
+    height: 14px;
+    vertical-align: -2px;
+    color: #6b3fa0;  /* .GeneListNode's --node-accent-color, which is scoped to the node card */
 }
 
 /*

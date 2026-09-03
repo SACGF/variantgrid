@@ -11,6 +11,8 @@ from django.utils.html import escape
 from analysis.grids import VariantGrid
 from analysis.models.nodes.sources.cohort_node import CohortNode
 from analysis.tests.test_grid_export import GridExportTestCase
+from annotation.models import ClinVar
+from annotation.models.models_enums import ClinVarReviewStatus
 from library.django_utils import FakeRequest
 from snpdb.grid_columns.grid_sample_columns import get_available_format_columns
 from snpdb.models import CompositeColumnMember, CustomColumnsCollection, UserSettings
@@ -222,3 +224,24 @@ class VariantGridRowDetailViewTest(GridExportTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, f"v {variant.pk}")
         self.assertContains(response, escape(variant.full_string))  # HGVS/coordinate '>' is escaped
+
+    def test_row_detail_shows_clinvar(self):
+        """ The Classifications chips are a summary - the expanded row is where the ClinVar detail is """
+        variant = self.variants[0]
+        annotation_version = self.analysis.annotation_version
+        ClinVar.objects.create(version=annotation_version.clinvar_version, variant=variant,
+                               clinvar_variation_id=12345, clinvar_allele_id=678,
+                               preferred_disease_name="Cystic fibrosis",
+                               review_status=ClinVarReviewStatus.CRITERIA_PROVIDED_SINGLE_SUBMITTER,
+                               clinical_significance="Likely_pathogenic", highest_pathogenicity=4,
+                               origin=1)
+        client = Client()
+        client.force_login(self.user)
+        url = reverse("variant_grid_row_detail",
+                      kwargs={"variant_id": variant.pk,
+                              "annotation_version_id": annotation_version.pk})
+        response = client.get(url)
+        self.assertContains(response, "clinvar/variation/12345")
+        self.assertContains(response, "Likely Pathogenic")
+        self.assertContains(response, "Cystic fibrosis")
+        self.assertContains(response, "germline")

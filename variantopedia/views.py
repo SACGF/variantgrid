@@ -19,6 +19,7 @@ from annotation.models import (
     AnnotationVersion,
     Classification,
     ClassificationModification,
+    ClinVar,
     ClinVarRecordCollection,
     VariantAnnotation,
     VariantTranscriptAnnotation,
@@ -146,6 +147,9 @@ def variant_grid_row_detail(request, variant_id: int, annotation_version_id: int
     if variant.is_symbolic and variant_annotation:
         overlapping_symbols = variant_annotation.overlapping_symbols
 
+    # What the Classifications column's ClinVar chips summarise
+    clinvar = ClinVar.objects.filter(variant=variant, version=annotation_version.clinvar_version).first()
+
     context = {
         "variant": variant,
         "variant_annotation": variant_annotation,
@@ -153,6 +157,7 @@ def variant_grid_row_detail(request, variant_id: int, annotation_version_id: int
         "build_variants": variant.all_build_variants,
         "clingen_allele": variant.allele.clingen_allele if variant.allele else None,
         "classifications": classifications,
+        "clinvar": clinvar,
         "overlapping_symbols": overlapping_symbols,
     }
     return render(request, "variantopedia/variant_grid_row_detail.html", context)

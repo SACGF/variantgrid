@@ -142,18 +142,6 @@
 	}
 
 
-	function createFilterChild(columnName, columnFilter) {
-		const CREATE_FILTER_CHILD_URL = "{% url 'create_filter_child' node.analysis_id node.id %}";
-		const data = 'column_name=' + columnName + '&column_filter=' + encodeURIComponent(columnFilter);
-		$.ajax({
-			type: "POST",
-			data: data,
-			url: CREATE_FILTER_CHILD_URL,
-			success: getAnalysisWindow().addConnectedNode,
-		});
-	}
-
-
 	function createExtraFilterChild(columnName, columnFilter) {
 		const CREATE_EXTRA_FILTER_CHILD_URL = "{% url 'create_extra_filter_child' node.analysis_id node.id extra_filters %}";
 		$.ajax({

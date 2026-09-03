@@ -1,3 +1,5 @@
+{% load clinvar_tags %}
+{% load english_tags %}
 <div class="variant-row-detail-columns">
   <table class="variant-row-detail-table">
     {% if variant_annotation.hgvs_c %}<tr><th>Transcript</th><td class="mono">{{ variant_annotation.hgvs_c }}</td></tr>{% endif %}
@@ -16,6 +18,46 @@
     {% for ta in transcript_annotations %}
       <tr><td class="mono">{{ ta.hgvs_c }}</td><td class="mono text-muted">{{ ta.hgvs_p|default:"" }}</td></tr>
     {% endfor %}
+  </table>
+  {% endif %}
+  {% if clinvar %}
+  {# What the Classifications column's ClinVar chips summarise - the row is where you come for the detail #}
+  <table class="variant-row-detail-table">
+    <tr><th colspan="2">ClinVar</th></tr>
+    <tr>
+      <th>Variation</th>
+      <td><a class="external-link" target="_blank"
+             href="https://www.ncbi.nlm.nih.gov/clinvar/variation/{{ clinvar.clinvar_variation_id }}">{{ clinvar.clinvar_variation_id }}</a></td>
+    </tr>
+    {% if clinvar.clinical_significance %}
+      <tr>
+        <th>Germline</th>
+        <td>{% clinvar_stars clinvar.germline_stars clinvar.get_review_status_display %}{{ clinvar.clinical_significance|code_to_english }}</td>
+      </tr>
+    {% endif %}
+    {% if clinvar.conflicting_clinical_significance %}
+      <tr><th>Conflicting</th><td>{{ clinvar.conflicting_clinical_significance|code_to_english }}</td></tr>
+    {% endif %}
+    {% if clinvar.oncogenic_classification %}
+      <tr>
+        <th>Oncogenicity</th>
+        <td>{% clinvar_stars clinvar.oncogenic_stars clinvar.get_oncogenic_review_status_display %}{{ clinvar.oncogenic_classification|code_to_english }}</td>
+      </tr>
+    {% endif %}
+    {% if clinvar.somatic_clinical_significance %}
+      <tr>
+        <th>Somatic</th>
+        <td>{% clinvar_stars clinvar.somatic_stars clinvar.get_somatic_review_status_display %}{{ clinvar.somatic_clinical_significance|code_to_english }}{% if clinvar.somatic_tier_label %} ({{ clinvar.somatic_tier_label }}){% endif %}</td>
+      </tr>
+    {% endif %}
+    {% if clinvar.preferred_disease_name %}
+      <tr><th>Condition</th><td>{{ clinvar.preferred_disease_name }}</td></tr>
+    {% endif %}
+    <tr><th>Origin</th><td>{{ clinvar.get_allele_origins_display }}</td></tr>
+    {% if clinvar.clinical_sources_list %}
+      <tr><th>Sources</th><td>{% for source in clinvar.clinical_sources_list %}{% if not forloop.first %}, {% endif %}{{ source|code_to_english }}{% endfor %}</td></tr>
+    {% endif %}
+    {% if clinvar.drug_response %}<tr><th>Drug response</th><td>Yes</td></tr>{% endif %}
   </table>
   {% endif %}
   {% if classifications %}
