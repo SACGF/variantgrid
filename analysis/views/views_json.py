@@ -62,16 +62,25 @@ def clone_analysis(request, analysis_id):
 
 
 @require_POST
-def analysis_reveal_hidden_nodes(request, analysis_id):
-    """ Running a template hides nodes that error while being configured (and their descendants) -
-        put them back so the user can see the branch and why it failed """
-    analysis = get_analysis_or_404(request.user, analysis_id)
-    analysis.check_can_write(request.user)
-    hidden_qs = analysis.analysisnode_set.filter(visible=False)
-    revealed = hidden_qs.update(visible=True, appearance_version=F("appearance_version") + 1)
-    if revealed:
-        reload_analysis_nodes(analysis.pk)
-    return JsonResponse({"revealed": revealed})
+def node_reveal_hidden(request, analysis_id, node_id):
+    """ Running a template hides a node that errors while being configured, and everything below it -
+        put that branch back so the user can see it and why it failed """
+    node = get_node_subclass_or_404(request.user, node_id, write=True)
+    branch_node_ids = {node.pk} | {n.pk for n in node.descendants_set()}
+    hidden_qs = AnalysisNode.objects.filter(pk__in=branch_node_ids, visible=False)
+    revealed_ids = list(hidden_qs.values_list("pk", flat=True))
+    if revealed_ids:
+        hidden_qs.update(visible=True, appearance_version=F("appearance_version") + 1)
+        reload_analysis_nodes(node.analysis_id)
+
+    # Same shape as nodes_copy, so the page can drop the branch onto the canvas without a reload
+    nodes = []
+    edges = []
+    for revealed in AnalysisNode.objects.filter(pk__in=revealed_ids).select_subclasses():
+        nodes.append(get_rendering_dict(revealed))
+        for parent in revealed.analysisnode_ptr.parents():
+            edges.append(revealed.get_connection_data(parent))
+    return JsonResponse({"nodes": nodes, "edges": edges})
 
 
 @never_cache

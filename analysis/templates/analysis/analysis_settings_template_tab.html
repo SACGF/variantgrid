@@ -19,7 +19,17 @@
         <div>
         {% for node, analysis_variables_list in node_variables.items %}
             <fieldset class="form-fields">
-                <legend>{{ node }}</legend>
+                <legend>
+                    {{ node }}
+                    {% if not node.visible %}
+                        <span class="badge badge-light">hidden</span>
+                        {% if has_write_permission %}
+                            <button class="btn btn-sm btn-outline-primary reveal-hidden-nodes" type="button"
+                                    data-href="{% url 'node_reveal_hidden' analysis.pk node.pk %}"
+                                    title="Show this node and everything hidden below it">Show hidden nodes</button>
+                        {% endif %}
+                    {% endif %}
+                </legend>
                 {% for av in analysis_variables_list %}
                     <p>
                         <label title="{{ av.class_name }}">{{ av.field }}</label>
@@ -37,6 +47,27 @@
             </fieldset>
         {% endfor %}
         </div>
+        <script>
+            $(document).ready(function() {
+                $(".reveal-hidden-nodes").click(function() {
+                    const legend = $(this).closest("legend");
+                    $.post($(this).data("href"), function(data) {
+                        if (!IN_ANALYSIS) {
+                            window.location.reload();
+                            return;
+                        }
+                        // Leave the branch selected so it can be dragged somewhere sensible in one go
+                        unselectActive();
+                        for (const nodeData of data.nodes) {
+                            addNewNodeToPage(nodeData).addClass(ACTIVE_CLASS);
+                        }
+                        attatchAnalysisNodeConnections(data.edges);
+                        checkAndMarkDirtyNodes();
+                        $(".badge, button", legend).remove();
+                    });
+                });
+            });
+        </script>
     </div>
     {% endif %}
 

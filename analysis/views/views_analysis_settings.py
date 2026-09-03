@@ -1,5 +1,6 @@
 import json
 from collections import defaultdict
+from typing import Optional
 
 from auditlog.models import LogEntry
 from django.contrib import messages
@@ -11,7 +12,7 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from analysis import forms
-from analysis.models import AnalysisLock, AnalysisTemplateRunArgument
+from analysis.models import AnalysisLock
 from analysis.models.enums import AnalysisTemplateType
 from analysis.models.nodes import node_utils
 from analysis.models.nodes.analysis_node import NodeCount
@@ -30,18 +31,18 @@ def view_analysis_settings(request, analysis_id):
     context = {"analysis": analysis,
                "new_analysis_settings": analysis_settings,
                "has_write_permission": analysis.can_write(request.user),
-               "can_unlock": analysis.can_unlock(request.user)}
+               "can_unlock": analysis.can_unlock(request.user),
+               "hidden_badge": _get_hidden_badge(analysis)}
     return render(request, 'analysis/analysis_settings.html', context)
 
 
-def _get_hidden_nodes(analysis) -> list[dict]:
-    """ Nodes a template run hid due to configuration errors, with the reason it stored against them """
-    hidden_qs = analysis.analysisnode_set.filter(visible=False).order_by("pk")
-    errors_by_node_id = defaultdict(list)
-    args_qs = AnalysisTemplateRunArgument.objects.filter(variable__node__in=hidden_qs, error__isnull=False)
-    for node_id, error in args_qs.values_list("variable__node_id", "error"):
-        errors_by_node_id[node_id].append(error)
-    return [{"name": node.name, "errors": errors_by_node_id[node.pk]} for node in hidden_qs]
+def _get_hidden_badge(analysis) -> Optional[str]:
+    """ Counts the template variable nodes that failed to configure - the descendants hidden
+        along with them are revealed from the Template tab, but aren't worth a number here """
+    hidden_qs = analysis.analysisnode_set.filter(visible=False, analysisvariable__isnull=False).distinct()
+    if num_hidden := hidden_qs.count():
+        return f"hidden: {num_hidden}"
+    return None
 
 
 def analysis_settings_details_tab(request, analysis_id):
@@ -81,7 +82,6 @@ def analysis_settings_details_tab(request, analysis_id):
                "form": form,
                "new_analysis_settings": analysis_settings,
                "has_write_permission": has_write_permission,
-               "hidden_nodes": _get_hidden_nodes(analysis),
                "reload_analysis": reload_analysis,
                "reload_page": reload_page}
     return render(request, 'analysis/analysis_settings_details_tab.html', context)
@@ -131,7 +131,8 @@ def analysis_settings_node_counts_tab_for(request, analysis, is_analysis=True, h
 def analysis_settings_template_tab(request, analysis_id):
     analysis = get_analysis_or_404(request.user, analysis_id)
 
-    context = {"analysis": analysis}
+    context = {"analysis": analysis,
+               "has_write_permission": analysis.can_write(request.user)}
 
     # Template run info (if this analysis was generated from a template)
     if hasattr(analysis, 'analysistemplaterun'):

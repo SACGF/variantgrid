@@ -67,7 +67,7 @@
             {% ui_register_tab tab_set="analysis_tab" url='view_annotation_version_details' param=analysis.annotation_version.pk label="Annotation Version" %}
         {% endif %}
         {% if analysis.analysistemplaterun or analysis.template_type != 'T' %}
-            {% ui_register_tab tab_set="analysis_tab" url='analysis_settings_template_tab' param=analysis.pk label="Template" %}
+            {% ui_register_tab tab_set="analysis_tab" url='analysis_settings_template_tab' param=analysis.pk label="Template" badge=hidden_badge badge_status="light" %}
         {% endif %}
         {% if analysis.has_audit_log %}
             {% ui_register_tab tab_set="analysis_tab" url='analysis_settings_audit_log_tab' param=analysis.pk label="Audit Log" %}

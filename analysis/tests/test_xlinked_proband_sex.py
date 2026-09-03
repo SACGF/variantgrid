@@ -160,14 +160,25 @@ class TestRevealHiddenNodes(TestCase):
 
     def setUp(self):
         self.node = TrioNode.objects.create(analysis=self.analysis, visible=False)
-        self.url = reverse('analysis_reveal_hidden_nodes', kwargs={"analysis_id": self.analysis.pk})
+        self.child = TrioNode.objects.create(analysis=self.analysis, visible=False)
+        self.node.add_child(self.child)
+        self.sibling = TrioNode.objects.create(analysis=self.analysis, visible=False)
+        self.url = reverse('node_reveal_hidden', kwargs={"analysis_id": self.analysis.pk, "node_id": self.node.pk})
 
-    def test_reveals_hidden_nodes(self):
+    def test_reveals_node_and_descendants(self):
         self.client.force_login(self.user)
         response = self.client.post(self.url)
         self.assertEqual(200, response.status_code)
         self.node.refresh_from_db()
+        self.child.refresh_from_db()
+        self.sibling.refresh_from_db()
         self.assertTrue(self.node.visible)
+        self.assertTrue(self.child.visible)
+        self.assertFalse(self.sibling.visible)
+
+        data = response.json()
+        self.assertEqual({self.node.pk, self.child.pk}, {n["attributes"]["node_id"] for n in data["nodes"]})
+        self.assertEqual([{"source_id": self.node.get_css_id(), "target_id": self.child.get_css_id()}], data["edges"])
 
     def test_read_only_user_denied(self):
         assign_perm(self.analysis.get_read_perm(), self.other_user, self.analysis)

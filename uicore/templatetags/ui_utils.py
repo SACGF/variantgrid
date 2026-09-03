@@ -3,7 +3,7 @@ import re
 import uuid
 from collections.abc import Iterable
 from html import escape
-from typing import Any, Optional
+from typing import Any, Optional, Union
 
 from django import template
 from django.contrib.auth.models import User
@@ -486,7 +486,8 @@ def danger_badge(count: Optional[int]) -> str:
 
 
 @register.filter()
-def badge(count: Optional[int], status: Optional[str] = None) -> str:
+def badge(count: Union[int, str, None], status: Optional[str] = None) -> str:
+    """ count is usually a number, but can be a short label such as "hidden: 1" """
     if count is None:
         return ""
     if status is None:
