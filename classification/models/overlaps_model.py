@@ -188,6 +188,8 @@ class OverlapContribution(TimeStampedModel):
 
     @property
     def pretty_effective_value(self):
+        if self.pending_value == IN_REVIEW_VALUE:
+            return "In-Review"
         return OverlapContribution.pretty_value_for(self.effective_value, self.value_type)
 
     @property
@@ -494,15 +496,6 @@ class Overlap(TimeStampedModel, ReviewableModelMixin, PreviewModelMixin):
         for entry in self.contributions.all():
             if entry.contribution_status == OverlapContributionStatus.CONTRIBUTING:
                 relevant_values.add(entry.effective_value)
-        # for cg in self.classificationgroupingoverlapcontribution_set.filter(contribution_status=OverlapContributionStatus.CONTRIBUTING):
-        #     # FIXME check triages
-        #     # FIXME should this entire method
-        #     if self.value_type == ClassificationResultValue.ONC_PATH:
-        #         if value := cg.classification_grouping.latest_cached_summary.get("pathogenicity", {}).get("classification"):
-        #             relevant_values.add(value)
-        #     elif self.value_type == ClassificationResultValue.CLINICAL_SIGNIFICANCE:
-        #         if value := cg.classification_grouping.latest_cached_summary.get("somatic", {}).get("clinical_significance"):
-        #             relevant_values.add(value)
 
         if self.value_type == ClassificationResultValue.ONC_PATH:
             return list(val.replace('_', '-') for val in EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE).sort_values(relevant_values))

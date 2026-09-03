@@ -389,7 +389,17 @@ class OverlapDownloadRow(ExportRow):
     def detail(self):
         rows = []
         for cont in self.overlap.contributions_list:
-            rows.append(f"{cont.lab_like} : {cont.pretty_effective_value}")
+            if cont.is_amending:
+                value = f"{cont.lab_like} : {cont.pretty_value} -> {cont.pretty_effective_value}"
+            else:
+                value = f"{cont.lab_like} : {cont.pretty_effective_value}"
+            rows.append(value)
+            if last_comment_entry := cont.last_comment:
+                if last_comment := last_comment_entry.value:
+                    if text := last_comment.text:
+                        rows.append(f"    \"{text}\" - {last_comment_entry.user}")
+                        rows.append("")
+
         return "\n".join(rows)
 
 
