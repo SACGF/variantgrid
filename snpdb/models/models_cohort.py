@@ -778,9 +778,16 @@ class FamilyGroupMixin:
     def get_permission_class(cls):
         return Cohort
 
+    pedigree_icon_members = ("mother", "father")  # Quad adds the sibling
+
     @classmethod
     def preview_icon(cls) -> str:
         return "fa-solid fa-people-roof"
+
+    def get_preview_icon_css_class(self) -> str:
+        """ Blacken the affected members, the way the pedigree figure on the view page does """
+        return " ".join(f"{member}-affected" for member in self.pedigree_icon_members
+                        if getattr(self, f"{member}_affected"))
 
     @property
     def preview(self) -> 'PreviewData':
@@ -882,6 +889,7 @@ class Quad(FamilyGroupMixin, GuardianPermissionsAutoInitialSaveMixin, SvgSymbolP
     sibling_affected = models.BooleanField(default=False)
 
     preview_icon_symbol = "node-icon-quad"  # QuadNode wears this too - see get_node_class_icon
+    pedigree_icon_members = ("mother", "father", "sibling")
 
     @classmethod
     def preview_if_url_visible(cls) -> str:

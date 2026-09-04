@@ -3306,6 +3306,21 @@ li.help-item {
 	vertical-align: -0.125em;
 }
 
+/* Blackens a member of the Trio/Quad pedigree symbols - see --pedigree-*-fill in
+   uicore/tags/svg_icon_sprite.html. Set on the <svg> by the page, or by Trio/Quad's
+   get_preview_icon_css_class() so a listed trio wears its affected status */
+.mother-affected {
+	--pedigree-mother-fill: currentColor;
+}
+
+.father-affected {
+	--pedigree-father-fill: currentColor;
+}
+
+.sibling-affected {
+	--pedigree-sibling-fill: currentColor;
+}
+
 .preview-data {
 	.preview-category,
 	.preview-title {

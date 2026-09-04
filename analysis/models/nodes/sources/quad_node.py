@@ -278,6 +278,12 @@ class QuadNode(FamilyInheritanceNodeMixin, AbstractCohortBasedNode):
             "sibling_sex":      sibling_sex,
         }
 
+    def get_css_classes(self):
+        css_classes = super().get_css_classes()
+        if self.quad:
+            css_classes.extend(self.quad.get_preview_icon_css_class().split())
+        return css_classes
+
     @staticmethod
     def get_help_text() -> str:
         return (

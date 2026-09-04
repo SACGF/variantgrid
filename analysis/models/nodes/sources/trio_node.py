@@ -372,10 +372,7 @@ class TrioNode(FamilyInheritanceNodeMixin, AbstractCohortBasedNode):
     def get_css_classes(self):
         css_classes = super().get_css_classes()
         if self.trio:
-            if self.trio.mother_affected:
-                css_classes.append("mother-affected")
-            if self.trio.father_affected:
-                css_classes.append("father-affected")
+            css_classes.extend(self.trio.get_preview_icon_css_class().split())
         return css_classes
 
     @staticmethod
