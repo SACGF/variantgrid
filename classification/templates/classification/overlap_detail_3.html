@@ -85,7 +85,7 @@
             {% endfor %}
             <div {% if overlap_grouping.overlap.has_reviews %}class="mt-2"{% endif %}>
             {% if overlap_grouping.overlap.has_outstanding_triages %}
-                Still waiting on all labs to triage. <a class="hover-link" href="{% url 'overlap_report_review' overlap_id=overlap_grouping.overlap.pk %}">Click here</a> to discuss anyway.
+                <span class="no-value">Still waiting on all labs to triage. <a class="hover-link" href="{% url 'overlap_report_review' overlap_id=overlap_grouping.overlap.pk %}">Click here</a> to discuss anyway.</span>
             {% else %}
                 <a class="hover-link" href="{% url 'overlap_report_review' overlap_id=overlap_grouping.overlap.pk %}"><i class="fa-solid fa-message" style="opacity:0.5; position:relative;top:1px"></i> Start Multi-Lab Discussion Discussion</a>
             {% endif %}

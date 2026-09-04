@@ -520,8 +520,8 @@ class TriageNextStep(IntegerChoices):
     PENDING_CALCULATION = 1, "Pending Calculation"
     AWAITING_OTHER_LAB = 2, "Awaiting Other Lab"
     AWAITING_YOUR_TRIAGE = 3, "Awaiting Your Triage"
-    AWAITING_YOUR_TRIAGE_OTHERS_TRIAGED = 4, "Awaiting your Triage - others have triaged"
-    AWAITING_YOUR_AMEND = 5, "Pending Your Amendment"
+    AWAITING_YOUR_TRIAGE_OTHERS_TRIAGED = 4, "Awaiting Your Triage - others have triaged"
+    AWAITING_YOUR_AMEND = 5, "Awaiting Your Amendment"
     UNANIMOUSLY_COMPLEX = 6, "Unanimously Complex"
     TO_DISCUSS = 7, "To Discuss"
 
