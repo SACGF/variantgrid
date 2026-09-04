@@ -8,6 +8,7 @@
 {% load text_tags %}
 {% load tz %}
 {% load crispy_forms_tags %}
+{% load humanize %}
 {% load model_tags %}
 {% load ui_utils %}
 
@@ -22,6 +23,43 @@
 
 	#sample-stats {
 		margin-bottom: 20px;
+	}
+
+	#sample-stats .stats-cards {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: flex-start;
+		gap: 20px;
+	}
+
+	#sample-stats .stats-card {
+		max-width: 100%;
+	}
+
+	/* Each stats table is only as wide as its numbers, rather than stretching over the page */
+	#sample-stats .card-body {
+		padding: 0;
+		overflow-x: auto;
+	}
+
+	#sample-stats table.table {
+		width: auto;
+		margin-bottom: 0;
+	}
+
+	#sample-stats table.df-table th {
+		text-align: left;
+		font-weight: 500;
+	}
+
+	#sample-stats table.df-table thead th {
+		text-align: right;
+	}
+
+	#sample-stats table.df-table td,
+	#sample-stats table.df-table th {
+		padding: 0.4rem 0.9rem;
+		white-space: nowrap;
 	}
 
     #sample-grid-container {
@@ -188,40 +226,70 @@ $(document).ready(function() {
         </div>
     {% if sample_genotype_stats.import_status == 'S' %}
         <div class="tab-pane" role="tabpanel" id="sample-stats">
+        <div class="stats-cards">
         {% if not sample_stats_variant_class_df.empty %}
-            <h4>Variant Class</h4>
-            {% render_dataframe sample_stats_variant_class_df 1 %}
+            <div class="card stats-card">
+                <div class="card-header">Variant Class</div>
+                <div class="card-body">{% render_dataframe sample_stats_variant_class_df 1 %}</div>
+            </div>
         {% endif %}
 
         {% if not sample_stats_zygosity_df.empty %}
-            <h4>Zygosity</h4>
-            {% render_dataframe sample_stats_zygosity_df 1 %}
+            <div class="card stats-card">
+                <div class="card-header">Zygosity</div>
+                <div class="card-body">{% render_dataframe sample_stats_zygosity_df 1 %}</div>
+            </div>
+        {% endif %}
+
+        {% if not sample_stats_annotated_df.empty %}
+            <div class="card stats-card">
+                <div class="card-header">Annotated</div>
+                <div class="card-body">{% render_dataframe sample_stats_annotated_df 1 %}</div>
+            </div>
         {% endif %}
 
         {% if sample_locus_count %}
-            <h4>Ploidy</h4>
-            <table class="table df-table">
-                <thead>
-                    <tr><th>Locus Count <th> Count
-                </thead>
-                <tbody>
-                {% for slc in sample_locus_count %}
-                    <tr><td>{{ slc.locus_count }}
-                            {% if slc.locus_count == 1 %}
-                                (HOM)
-                            {% elif slc.locus_count == 2 %}
-                                (HET)
-                            {% endif %}
-                        <td>{{ slc.count }}
-                {% endfor %}
-                </tbody>
-            </table>
+            <div class="card stats-card">
+                <div class="card-header">Ploidy</div>
+                <div class="card-body">
+                    <table class="table df-table">
+                        <thead>
+                            <tr><th>Locus Count <th> Count
+                        </thead>
+                        <tbody>
+                        {% for slc in sample_locus_count %}
+                            <tr><th>{{ slc.locus_count }}
+                                    {% if slc.locus_count == 1 %}
+                                        (HOM)
+                                    {% elif slc.locus_count == 2 %}
+                                        (HET)
+                                    {% endif %}
+                                <td>{{ slc.count|intcomma }}
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         {% endif %}
 
         {% if sample_genotype_stats %}
-        <h4>Sex</h4>
-        {{ sample_genotype_stats.chrx_sex_guess.label }} (chrX Hom: {{ sample_genotype_stats.x_hom_count }}, Het: {{ sample_genotype_stats.x_het_count }})
+            <div class="card stats-card">
+                <div class="card-header" data-help="{% detected_sex_help sample_genotype_stats %}">Sex</div>
+                <div class="card-body">
+                    <table class="table df-table">
+                        <tbody>
+                            <tr><th>Detected Sex<td>{{ sample_genotype_stats.chrx_sex_guess.label }}
+                            <tr><th>chrX Hom<td>{{ sample_genotype_stats.x_hom_count|intcomma }}
+                            <tr><th>chrX Het<td>{{ sample_genotype_stats.x_het_count|intcomma }}
+                            <tr><th>chrX unknown zygosity<td>{{ sample_genotype_stats.x_unk_count|intcomma }}
+                            <tr><th>chrX calls used (Hom + Het)<td>{{ sample_genotype_stats.chrx_genotyped_count|intcomma }}
+                            <tr><th>chrX Hom/Het ratio<td>{{ sample_genotype_stats.chrx_hom_het_ratio|floatformat:2|default:"-" }}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         {% endif %}
+        </div>
         </div>
 	{% endif %}
 

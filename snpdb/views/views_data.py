@@ -336,13 +336,13 @@ def get_patient_upload_csv_for_vcf(request, pk):
     return get_patient_upload_csv(filename, sample_qs)
 
 
-def _sample_stats(sample) -> tuple[pd.DataFrame, pd.DataFrame]:
+def _sample_stats(sample) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     annotation_version = AnnotationVersion.latest(sample.genome_build)
     try:
         cohort = sample.vcf.cohort
         cgc = cohort.cohort_genotype_collection
     except (Cohort.DoesNotExist, CohortGenotypeCollection.DoesNotExist, DataArchivedError):
-        return pd.DataFrame(), pd.DataFrame()
+        return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
 
     STATS = {
         "Total": (CohortGenotypeStats, set()),
@@ -353,9 +353,13 @@ def _sample_stats(sample) -> tuple[pd.DataFrame, pd.DataFrame]:
 
     VARIANT_CLASS = ["variant", "snp", "insertions", "deletions"]
     ZYGOSITY = ["ref", "het", "hom", "unk"]
+    # Counts that are neither a variant class nor a zygosity - the number of variants in a gene
+    # (ie VEP gave them a transcript) and the number with a ClinVar record
+    ANNOTATED = {"gene_count": "in gene", "clinvar_count": "in clinvar"}
 
     variant_class_data = {}
     zygosity_data = {}
+    annotated_data = {}
     missing_stats = False
     for name, (stats_klass, shared_fields) in STATS.items():
         base_kwargs = {
@@ -368,17 +372,18 @@ def _sample_stats(sample) -> tuple[pd.DataFrame, pd.DataFrame]:
 
         objs = {}
         try:
-            objs[name] = stats_klass.objects.get(passing_filter=False, **base_kwargs)
+            objs[False] = stats_klass.objects.get(passing_filter=False, **base_kwargs)
         except ObjectDoesNotExist:
             # Stats absent for the latest annotation version (eg it was bumped since import)
             missing_stats = True
 
         try:
-            objs[f"{name} PASS filters"] = stats_klass.objects.get(passing_filter=True, **base_kwargs)
+            objs[True] = stats_klass.objects.get(passing_filter=True, **base_kwargs)
         except ObjectDoesNotExist:
             pass
 
-        for n, o in objs.items():
+        for passing_filter, o in objs.items():
+            n = f"{name} PASS filters" if passing_filter else name
             obj_variant_class_data = {}
             for field in get_model_fields(o):
                 for k in VARIANT_CLASS:
@@ -397,17 +402,24 @@ def _sample_stats(sample) -> tuple[pd.DataFrame, pd.DataFrame]:
             if obj_zygosity_data:
                 zygosity_data[n] = obj_zygosity_data
 
+            # Each of these lives on a single stats model, so column by filter rather than by model
+            annotated_column = "PASS filters" if passing_filter else "Total"
+            for field in get_model_fields(o):
+                if annotated_row := ANNOTATED.get(field):
+                    annotated_data.setdefault(annotated_column, {})[annotated_row] = getattr(o, field)
+
     sample_stats_variant_class_df = pd.DataFrame.from_dict(variant_class_data).reindex(VARIANT_CLASS)
     if "Total" in sample_stats_variant_class_df.columns:
         total = sample_stats_variant_class_df["Total"]
         sample_stats_variant_class_df["Total %"] = 100 * total / total["variant"]
 
     sample_stats_zygosity_df = pd.DataFrame.from_dict(zygosity_data).reindex(ZYGOSITY)
+    sample_stats_annotated_df = pd.DataFrame.from_dict(annotated_data).reindex(list(ANNOTATED.values()))
 
     if missing_stats:
         enqueue_cohort_stats_recompute(cohort, annotation_version)
 
-    return sample_stats_variant_class_df, sample_stats_zygosity_df
+    return sample_stats_variant_class_df, sample_stats_zygosity_df, sample_stats_annotated_df
 
 
 def view_sample(request, sample_id):
@@ -438,7 +450,7 @@ def view_sample(request, sample_id):
     if settings.SOMALIER.get("enabled"):
         related_samples = SomalierRelatePairs.get_for_sample(sample).order_by("relate")
 
-    sample_stats_variant_class_df, sample_stats_zygosity_df = _sample_stats(sample)
+    sample_stats_variant_class_df, sample_stats_zygosity_df, sample_stats_annotated_df = _sample_stats(sample)
     sample_genotype_stats = sample.get_genotype_stats()
 
     # VEP-skipped variants for the latest annotation version (VG only - see issue #1409)
@@ -465,6 +477,7 @@ def view_sample(request, sample_id):
         "bam_list": sample.get_bam_files(),
         "sample_stats_variant_class_df": sample_stats_variant_class_df,
         "sample_stats_zygosity_df": sample_stats_zygosity_df,
+        "sample_stats_annotated_df": sample_stats_annotated_df,
         "sample_genotype_stats": sample_genotype_stats,
         "related_samples": related_samples,
         "skipped_annotation_count": skipped_annotation_count,

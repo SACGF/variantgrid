@@ -119,6 +119,11 @@ class CohortGenotypeStats(TimeStampedModel):
         return count
 
     @property
+    def chrx_genotyped_count(self) -> int:
+        """ chrX calls the sex guess is made on - unknown-zygosity calls tell us nothing """
+        return self.x_hom_count + self.x_het_count
+
+    @property
     def chrx_hom_het_ratio(self) -> Optional[float]:
         if self.x_het_count:
             return self.x_hom_count / self.x_het_count
@@ -128,7 +133,7 @@ class CohortGenotypeStats(TimeStampedModel):
     def chrx_sex_guess(self) -> Sex:
         """ Genetic sex from the chrX hom/het ratio - UNKNOWN if we don't have enough calls to tell """
         if self.x_het_count and self.x_hom_count:
-            if self.x_hom_count + self.x_het_count >= MIN_CHRX_VARIANTS_FOR_SEX_GUESS:
+            if self.chrx_genotyped_count >= MIN_CHRX_VARIANTS_FOR_SEX_GUESS:
                 ratio = self.chrx_hom_het_ratio
                 if ratio < CHRX_FEMALE_MAX_HOM_HET_RATIO:
                     return Sex.FEMALE
