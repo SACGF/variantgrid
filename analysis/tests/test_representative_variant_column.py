@@ -165,7 +165,7 @@ class RepresentativeVariantColumnTest(GridExportTestCase):
     def test_system_default_collection(self):
         columns = list(CustomColumnsCollection.get_system_default().customcolumn_set
                        .order_by("sort_order").values_list("column_id", flat=True))
-        self.assertEqual(columns[:4], ["variant", "classifications", "tags", "tags_global"])
+        self.assertEqual(columns[:5], ["variant", "classifications", "tags", "tags_global", "Sample"])
         # Coordinates now live in the Variant cell; the rest inside their composite cells
         for removed in ["chrom", "position", "ref", "alt", "svlen", "hgvs_g", "consequence", "impact",
                         "gnomad_af", "gnomad_popmax", "gnomad_filtered", "spliceai_max_ds",
