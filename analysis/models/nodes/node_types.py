@@ -29,37 +29,27 @@ def get_node_types_hash():
     return subclasses
 
 
-def _walk_menu_entries():
-    """ (node class, node instance, menu entry) for every add node dropdown row """
-    for node_class in get_node_types_hash().values():
-        node = node_class()
-        for entry in node_class.get_menu_entries():
-            yield node_class, node, entry
+def get_node_types_hash_by_class_name():
+    return {node_class.__name__: node_class for node_class in get_node_types_hash().values()}
 
 
 def get_nodes_by_classification() -> dict[str, list]:
-    """ Add node dropdown rows. A class contributes one row unless it declares several menu entries
-        (SampleNode, one per source level) """
+    """ Add node dropdown rows - one per node class """
     nodes = defaultdict(list)
-    for _node_class, node, entry in _walk_menu_entries():
+    for class_label, node_class in get_node_types_hash().items():
+        node = node_class()
         classification = node.get_node_classification()
         nodes[classification].append({
-            "key": entry.key,  # What node_create is passed
-            "class_name": node.get_class_name(),  # Picks up the node's accent colour
-            "class_label": entry.label,
+            "class_name": node.get_class_name(),  # What node_create is passed, and the accent colour
+            "class_label": class_label,
             "classification": classification,  # add node dropdown colours icons like the cards
-            "icon": asdict(entry.icon),
+            "icon": asdict(node_class.get_node_class_icon()),
         })
     return nodes
 
 
-def get_menu_entries_by_key() -> dict[str, tuple]:
-    """ (node class, menu entry) for each add node dropdown row """
-    return {entry.key: (node_class, entry) for node_class, _node, entry in _walk_menu_entries()}
-
-
-def get_node_display_data_by_menu_key() -> dict[str, dict]:
+def get_node_display_data_by_class_name() -> dict[str, dict]:
     """ Icons/labels for the add node dropdown, keyed by the <select> option values """
-    return {data["key"]: data
+    return {data["class_name"]: data
             for nodes in get_nodes_by_classification().values()
             for data in nodes}

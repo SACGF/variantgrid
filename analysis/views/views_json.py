@@ -27,7 +27,7 @@ from analysis.models.nodes.filter_child import create_filter_child_node
 from analysis.models.nodes.filters.built_in_filter_node import BuiltInFilterNode
 from analysis.models.nodes.filters.selected_in_parent_node import NodeVariant, SelectedInParentNode
 from analysis.models.nodes.filters.venn_node import VennNode
-from analysis.models.nodes.node_types import get_menu_entries_by_key
+from analysis.models.nodes.node_types import get_node_types_hash_by_class_name
 from analysis.models.nodes.node_utils import (
     get_child_position,
     get_rendering_dict,
@@ -130,7 +130,7 @@ class NodeUpdate(NodeJSONPostView):
         return {}
 
 
-MENU_ENTRIES_BY_KEY = None
+NODE_TYPES_HASH = None
 
 
 @never_cache
@@ -141,14 +141,13 @@ def node_data(request, analysis_id, node_id):
 
 @require_POST
 def node_create(request, analysis_id, node_type):
-    global MENU_ENTRIES_BY_KEY
-    if MENU_ENTRIES_BY_KEY is None:
-        MENU_ENTRIES_BY_KEY = get_menu_entries_by_key()
+    global NODE_TYPES_HASH
+    if NODE_TYPES_HASH is None:
+        NODE_TYPES_HASH = get_node_types_hash_by_class_name()
 
     analysis = get_analysis_or_404(request.user, analysis_id, write=True)
 
-    # A menu entry is a class plus the field values it stamps on the new node (eg a source level)
-    node_class, menu_entry = MENU_ENTRIES_BY_KEY[node_type]
+    node_class = NODE_TYPES_HASH[node_type]
     # New nodes go at the start of the flow - the top in vertical mode, the left edge in horizontal
     if analysis.analysis_horizontal_mode:
         x = 50 + random.random() * 20
@@ -156,7 +155,7 @@ def node_create(request, analysis_id, node_type):
     else:
         x = 10 + random.random() * 50
         y = 50 + random.random() * 20
-    node = node_class.objects.create(analysis=analysis, x=x, y=y, **menu_entry.initial_kwargs)
+    node = node_class.objects.create(analysis=analysis, x=x, y=y)
     update_analysis(node.analysis_id)
     return JsonResponse(get_rendering_dict(node))
 

@@ -718,31 +718,6 @@ class TestSampleNodeForm(SampleNodeLevelsTestCase):
                 self.assertIn(f"{level}:{source.pk}", content)
 
 
-class TestSampleNodeMenu(SampleNodeLevelsTestCase):
-    """ A user looking for "Patient" finds it in the add node list, not behind a dropdown """
-
-    def test_one_menu_entry_per_level(self):
-        entries = SampleNode.get_menu_entries()
-        self.assertEqual([e.key for e in entries],
-                         [f"SampleNode:{level}" for level in
-                          [SampleSourceLevel.SAMPLE, SampleSourceLevel.EXTRACTION,
-                           SampleSourceLevel.SPECIMEN, SampleSourceLevel.PATIENT]])
-        self.assertEqual([e.label for e in entries], ["Sample", "Extraction", "Specimen", "Patient"])
-
-    @override_settings(ANALYSIS_SAMPLE_NODE_LEVELS=["S"])
-    def test_a_deployment_without_patients_data_offers_only_the_sample(self):
-        self.assertEqual([e.key for e in SampleNode.get_menu_entries()], ["SampleNode:S"])
-
-    def test_node_create_stamps_the_entrys_level(self):
-        self.client.force_login(self.user)
-        url = reverse("node_create", kwargs={"analysis_id": self.analysis.pk,
-                                             "node_type": f"SampleNode:{SampleSourceLevel.PATIENT}"})
-        response = self.client.post(url)
-        self.assertEqual(response.status_code, 200)
-        node = SampleNode.objects.get(pk=json.loads(response.content)["attributes"]["node_id"])
-        self.assertEqual(node.source_level, SampleSourceLevel.PATIENT)
-
-
 class TestAnalysisTemplatesTag(SampleNodeLevelsTestCase):
     """ The extraction / specimen / patient pages launch templates the same way a sample page does """
 
