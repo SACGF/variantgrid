@@ -1,6 +1,6 @@
 {# Analysis can be turned off in that case URLs won't resolve so just skip #}
 {% if url_name_visible.analysis and url_name_visible.trio_wizard %}
-    {% load static %}
+    {% load ui_utils %}
     {% if cohort.cohort_genotype_collection and sample_count >= 3 %}
     <style>
     #create-trio-button {
@@ -9,6 +9,12 @@
     
     .trio-button-component {
         float: left;
+    }
+
+    svg.trio-button-component {
+        width: 2em;
+        height: 1.5em;
+        margin-right: 0.4em;
     }
     </style>
     <script>
@@ -57,7 +63,7 @@
     });
     </script>
     <button id='create-trio-button' disabled class="btn btn-outline-primary" type="button">
-      <img id="trio-icon" class="trio-button-component" alt="Trio" src="{% static 'images/node_icons/trio.png' %}" width="28" height="28" />
+      {% preview_icon_for_model "snpdb.Trio" "trio-button-component" %}
       Perform trio analysis using template
     </button>
     {% if sample_count > 3 %}

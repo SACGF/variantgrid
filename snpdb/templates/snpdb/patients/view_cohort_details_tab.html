@@ -1,3 +1,4 @@
+{% load ui_utils %}
 <form>
 
 <table>
@@ -6,11 +7,11 @@
 <tr>
     <td><input class='sample-select' sample_id='{{ cs.sample.pk }}' type='checkbox' />
     <td>
-        <div class="left icon32 sample-icon"></div>
+        {% preview_icon cs.sample %}
         <a href="{% url 'view_sample' cs.sample.pk %}">{{ cs.sample }}</a>
     <td>
         {% if cs.sample.patient %}
-            <div class="left icon32 patient-icon"></div>
+            {% preview_icon cs.sample.patient %}
             <a href="{% url 'view_patient' cs.sample.patient_id %}">{{ cs.sample.patient }}</a>
         {% endif %}
 </tr>

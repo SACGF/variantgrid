@@ -1,6 +1,6 @@
 {# Analysis can be turned off in that case URLs won't resolve so just skip #}
 {% if url_name_visible.analysis and url_name_visible.quad_wizard %}
-    {% load static %}
+    {% load ui_utils %}
     {% if cohort.cohort_genotype_collection and sample_count >= 4 %}
     <style>
     #create-quad-button {
@@ -9,6 +9,12 @@
 
     .quad-button-component {
         float: left;
+    }
+
+    svg.quad-button-component {
+        width: 2em;
+        height: 1.5em;
+        margin-right: 0.4em;
     }
     </style>
     <script>
@@ -55,7 +61,7 @@
     });
     </script>
     <button id='create-quad-button' disabled class="btn btn-outline-primary" type="button">
-      <img id="quad-icon" class="quad-button-component" alt="Quad" src="{% static 'images/node_icons/quad.png' %}" width="28" height="28" />
+      {% preview_icon_for_model "snpdb.Quad" "quad-button-component" %}
       Perform quad analysis using template
     </button>
     {% if sample_count > 4 %}

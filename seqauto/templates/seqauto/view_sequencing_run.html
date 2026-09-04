@@ -2,6 +2,7 @@
 {% load static %}
 {% load model_helpers %}
 {% load help_tags %}
+{% load ui_utils %}
 {% block title %}{{ sequencing_run.name }}{% endblock %}
 {% block head %}
 	<link rel="stylesheet" href="{% static 'css/graphs.css' %}" />
@@ -61,14 +62,6 @@
             height: 24px;
             background-size: 24px 24px;
             background-image: url({% static 'icons/vcf_64.png' %});
-            float: left;
-        }
-
-        .patient-icon {
-            width: 24px;
-            height: 24px;
-            background-size: 24px 24px;
-            background-image: url({% static 'icons/patient-icon-png-3.png' %});
             float: left;
         }
 
@@ -254,7 +247,8 @@
                 </td>
                 <td>
                     {% if ss.patient %}
-                        <a href="{% url 'view_patient' ss.patient.pk %}"><div class='patient-icon'></div>{{ ss.patient }}</a>
+                        {% preview_icon ss.patient %}
+                        <a href="{% url 'view_patient' ss.patient.pk %}">{{ ss.patient }}</a>
                     {% endif %}
                 </td>
                 {% if has_sequencing_sample_data %}

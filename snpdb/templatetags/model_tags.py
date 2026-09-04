@@ -23,7 +23,14 @@ def trio_table(trio: Trio):
 
 @register.inclusion_tag("snpdb/tags/quad_table.html", takes_context=False)
 def quad_table(quad: Quad):
-    return {"quad": quad}
+    """ Quad details + a row per family member - the proband is affected by definition """
+    members = [
+        {"role": "Proband", "cohort_sample": quad.proband, "affected": True},
+        {"role": "Mother", "cohort_sample": quad.mother, "affected": quad.mother_affected},
+        {"role": "Father", "cohort_sample": quad.father, "affected": quad.father_affected},
+        {"role": "Sibling", "cohort_sample": quad.sibling, "affected": quad.sibling_affected},
+    ]
+    return {"quad": quad, "members": members}
 
 
 @register.simple_tag

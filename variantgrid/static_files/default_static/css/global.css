@@ -3106,16 +3106,8 @@ a.clinical-context {
   min-width: 106px;
 }
 
-.sample-icon {
-  background-image: url(/static/icons/samples_icon.png);
-}
-
 .bed-icon {
   background-image: url(/static/images/node_icons/intersection.png);
-}
-
-.analysis-icon {
-  background-image: url(/static/images/node_icons/analysis_node.png);
 }
 
 .clingen-icon {
@@ -3150,22 +3142,6 @@ a.clinical-context {
 
 .iseq-100 {
   background-image: url(/static/icons/sequencers/iseq_icon.png);
-}
-
-.patient-icon {
-  background-image: url(/static/icons/patient-icon-png-3.png);
-}
-
-.cohort-icon {
-  background-image: url(/static/images/node_icons/cohort.png);
-}
-
-.pedigree-icon {
-  background-image: url(/static/images/node_icons/pedigree.png);
-}
-
-.trio-icon {
-  background-image: url(/static/images/node_icons/trio.png);
 }
 
 .gold-standard-icon {

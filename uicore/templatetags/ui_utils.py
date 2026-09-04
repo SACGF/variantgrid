@@ -6,6 +6,7 @@ from html import escape
 from typing import Any, Optional, Union
 
 from django import template
+from django.apps import apps
 from django.contrib.auth.models import User
 from django.db.models import Model
 from django.forms.utils import ErrorList
@@ -732,6 +733,12 @@ def preview_icon(preview_coordinator, css_class: str = "") -> SafeString:
     if isinstance(preview_coordinator, PreviewData):
         return preview_coordinator.icon_html(css_class)
     return preview_coordinator_icon_html(preview_coordinator, css_class)
+
+
+@register.simple_tag
+def preview_icon_for_model(model_label: str, css_class: str = "") -> SafeString:
+    """ The icon for a model named "app_label.ModelName" - for labelling a control rather than a record """
+    return preview_coordinator_icon_html(apps.get_model(model_label), css_class)
 
 
 @register.filter(name="field_errors")

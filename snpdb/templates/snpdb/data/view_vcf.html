@@ -7,6 +7,7 @@
 {% load settings_tags %}
 {% load crispy_forms_tags %}
 {% load model_tags %}
+{% load ui_utils %}
 
 {% block title %}{{ vcf.name }}{% endblock %}
 {% block head %}
@@ -405,8 +406,10 @@ $(document).ready(function() {
                     <td>
                         <div class="display-flex flex-row">
                             <input class='sample-select' sample_id='{{ form.id.value }}' type='checkbox' />
-                            <div class="icon24 sample-icon"></div>
-                            <a href="{% url 'view_sample' form.id.value %}">Sample {{ form.id.value }}</a>
+                            <div>
+                                {% preview_icon form.instance %}
+                                <a href="{% url 'view_sample' form.id.value %}">Sample {{ form.id.value }}</a>
+                            </div>
                         </div>
                     </td>
                 {% if vcf.import_status == 'S' %}
@@ -430,7 +433,7 @@ $(document).ready(function() {
                     <td>{% detected_sex sample_genotype_stats|get_item:form.instance.pk %}</td>
                     <td>
                         <div class="sample-patient display-flex">
-                            <div class="icon24 patient-icon"></div>
+                            {% preview_icon_for_model "patients.Patient" %}
                             <div class="flex-grow">
                             {{ form.patient }}{{ form.patient.errors }}
                             </div>
@@ -459,7 +462,7 @@ $(document).ready(function() {
 
         {% if vcf.import_status == 'S' and vcf.cohort %}
             <button id='sub-cohort-button' type='button' class="btn btn-outline-primary">
-              <img id="cohort-icon" class="sub-cohort-button-component" src="{% static 'images/node_icons/cohort.png' %}" width="28" height="28" />
+              {% preview_icon_for_model "snpdb.Cohort" "sub-cohort-button-component" %}
               <div class='sub-cohort-button-component'> Create cohort from selected samples</div>
             </button>
 
