@@ -17,7 +17,6 @@ from analysis.models.models_variant_tag import VariantTag
 from analysis.models.nodes.analysis_node import AnalysisNode, NodeAuditLogMixin, NodeVersion
 from analysis.models.nodes.node_display import NodeIcon
 from snpdb.models import Tag
-from snpdb.utils import get_tag_sort_order_by_tag
 
 
 class TagNode(AnalysisNode):
@@ -91,8 +90,13 @@ class TagNode(AnalysisNode):
             return self.tagged_variants_q(tag_ids)
         return None
 
-    def get_tag_counts(self) -> list[tuple[str, int]]:
-        """ (tag, count) for the editor's tag picker, in the user's tag order. Counted over the
+    def _get_load_data(self) -> dict:
+        """ The editor's tag picker, snapshotted at load - it's the expensive part of rendering the
+            editor, and in global mode the query reaches across every analysis """
+        return {"tag_counts": self.get_tag_counts()}
+
+    def get_tag_counts(self) -> dict[str, int]:
+        """ {tag: count} for the editor's tag picker, which sorts and labels them. Counted over the
             node's input rather than its output, so every tag stays pickable however the node is
             currently configured. Counted here rather than read off the DAG's per-tag node counts,
             which are analysis-scoped (so wrong for a global node) and only exist for the tags the
@@ -105,13 +109,9 @@ class TagNode(AnalysisNode):
             tags_qs = Tag.objects.filter(Q(retired__isnull=True) | q_configured)
         else:
             tags_qs = Tag.objects.filter(Q(varianttag__analysis=self.analysis) | q_configured)
-        tags_qs = tags_qs.distinct()
-
-        sort_order_by_tag = get_tag_sort_order_by_tag(self.analysis.user)
-        tag_ids = sorted(tags_qs.values_list("pk", flat=True),
-                         key=lambda tag_id: (sort_order_by_tag.get(tag_id, 0), tag_id))
+        tag_ids = sorted(tags_qs.distinct().values_list("pk", flat=True))
         if not tag_ids:
-            return []
+            return {}
 
         # Tag ids are user supplied so they can't be aggregate kwargs - index them instead
         aggregate_kwargs = {f"tag_count_{i}": Count("pk", filter=self.tagged_variants_q([tag_id]),
@@ -124,10 +124,10 @@ class TagNode(AnalysisNode):
             qs = self.get_queryset(arg_q_dict=arg_q_dict, inner_query_distinct=True)
             counts = qs.filter(self.tagged_variants_q([])).aggregate(**aggregate_kwargs)
         except NonFatalNodeError:
-            return []  # An ancestor isn't ready - the editor re-renders when it is
+            return {}  # An ancestor isn't ready - the editor re-renders when it is
         configured = set(self.tag_ids)
-        tag_counts = [(tag_id, counts[f"tag_count_{i}"] or 0) for i, tag_id in enumerate(tag_ids)]
-        return [(tag_id, count) for tag_id, count in tag_counts if count or tag_id in configured]
+        tag_counts = {tag_id: counts[f"tag_count_{i}"] or 0 for i, tag_id in enumerate(tag_ids)}
+        return {tag_id: count for tag_id, count in tag_counts.items() if count or tag_id in configured}
 
     def _get_node_q(self) -> Q:
         q = self.tagged_variants_q(self.tag_ids, self.tagged_within_cutoff)

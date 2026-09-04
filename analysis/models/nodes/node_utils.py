@@ -1,3 +1,4 @@
+import json
 import logging
 import random
 import time
@@ -6,7 +7,7 @@ from dataclasses import asdict
 
 from auditlog.context import disable_auditlog
 from celery.canvas import Signature
-from django.db import IntegrityError, transaction
+from django.db import connection
 from django.db.models import F
 from django.db.models.query_utils import Q
 from django.utils import timezone
@@ -14,7 +15,7 @@ from toposort import toposort
 
 from analysis.exceptions import NonFatalNodeError
 from analysis.models import Analysis, NodeColors, NodeStatus
-from analysis.models.nodes.analysis_node import AnalysisEdge, NodeCount, NodeVersion
+from analysis.models.nodes.analysis_node import AnalysisEdge, NodeVersion
 from analysis.models.nodes.node_counts import get_tag_node_counts_dict, get_tagged_variant_ids_by_label
 from analysis.tasks.node_update_tasks import delete_analysis_old_node_versions
 from library.utils import add_exception_note
@@ -102,30 +103,31 @@ def update_analysis_tag_node_counts(analysis: Analysis, tag_labels=None):
     # The tagged variants are the same for every node, so look them up once for the whole analysis
     tagged_variant_ids_by_label = get_tagged_variant_ids_by_label(analysis, configured_tag_labels)
 
-    node_counts = []
+    counts_by_node_version_id = {}
     for node in analysis.analysisnode_set.filter(status=NodeStatus.READY).select_subclasses():
         node_version = NodeVersion.objects.filter(node=node, version=node.version).first()
         if node_version is None:
             continue  # Node reloaded from under us - it'll count these itself
         try:
-            tag_node_counts = get_tag_node_counts_dict(node, tagged_variant_ids_by_label)
+            counts_by_node_version_id[node_version.pk] = get_tag_node_counts_dict(node, tagged_variant_ids_by_label)
         except NonFatalNodeError:
             # Node is ready but an ancestor isn't (eg the analysis is mid-reload) so we can't build its
             # query - it counts these itself when it loads
             continue
-        for label, count in tag_node_counts.items():
-            node_counts.append(NodeCount(node_version=node_version, label=label, count=count))
 
-    if node_counts:
-        try:
-            with transaction.atomic():
-                # "modified" is the client's signal that this recount landed @see nodes_status
-                NodeCount.objects.bulk_create(node_counts, update_conflicts=True,
-                                              update_fields=["count", "modified"],
-                                              unique_fields=["node_version", "label"])
-        except IntegrityError:
-            # A node bumped its version while we were counting - it counts these itself when it reloads
-            logging.info("Analysis %s reloaded while updating tag node counts", analysis.pk)
+    # Merge into the labels the load wrote rather than replacing them - this runs concurrently with
+    # loads, and only computes the tag labels. A node that bumped its version while we were counting
+    # has had this row deleted, so its UPDATE matches nothing and it counts these itself when it reloads.
+    # "modified" is the client's signal that this recount landed @see nodes_status
+    sql = """UPDATE analysis_nodeversion
+             SET load_data = jsonb_set(load_data, '{counts}',
+                                       COALESCE(load_data->'counts', '{}'::jsonb) || %s::jsonb),
+                 modified = %s
+             WHERE id = %s"""
+    now = timezone.now()
+    with connection.cursor() as cursor:
+        for node_version_id, tag_node_counts in counts_by_node_version_id.items():
+            cursor.execute(sql, [json.dumps(tag_node_counts), now, node_version_id])
 
 
 def reload_analysis_nodes(analysis_id, only_errors=False):
