@@ -12,6 +12,7 @@ from django.db.models.query_utils import Q
 from analysis.models.enums import DuoInheritance
 from analysis.models.nodes.sources import AbstractCohortBasedNode
 from analysis.models.nodes.family_inheritance import (
+    MOSAIC_PARENT_WARNINGS,
     AbstractCompHetInheritance,
     AbstractFamilyInheritance,
     FamilyInheritanceNodeMixin,
@@ -19,6 +20,8 @@ from analysis.models.nodes.family_inheritance import (
     _dominant_requires_affected_parent_error,
     _pedigree_sex,
     _xlinked_recessive_errors,
+    mosaic_evidence_description,
+    mosaic_evidence_q,
 )
 from analysis.models.nodes.node_display import NodeIcon
 from patients.models_enums import Zygosity
@@ -72,6 +75,32 @@ class DuoDominant(SimpleDuoInheritance):
     def _get_parent_proband_zygosities(self) -> tuple[set, set]:
         parent_zyg = self.UNAFFECTED_AND_AFFECTED_ZYGOSITIES[int(self.node.duo.parent_affected)]
         return parent_zyg, self.HAS_VARIANT
+
+
+class DuoMosaicParent(AbstractDuoInheritance):
+    """ Dominant where the parent is mosaic - the proband is a constitutional HET and the parent
+        carries the variant in a fraction of cells, called either HOM_REF with a handful of alt
+        reads or HET at a low VAF. With one parent there's no other parent to require clean, so
+        this is the single side of the Trio mode. @see issue #1830 """
+
+    def get_arg_q_dict(self) -> dict[Optional[str], dict[str, Q]]:
+        duo = self.node.duo
+        cgc = duo.cohort.cohort_genotype_collection
+        q = self._get_zyg_q(cgc, (self.MOSAIC_ZYGOSITIES, self.HAS_VARIANT))
+        q &= mosaic_evidence_q(cgc, duo.parent.sample, self.node.mosaic_max_af,
+                               self.node.mosaic_min_alt_reads)
+        return {cgc.cohortgenotype_alias: {str(q): q}}
+
+    def _evidence_description(self) -> str:
+        return mosaic_evidence_description(self.node.mosaic_max_af, self.node.mosaic_min_alt_reads)
+
+    def get_method(self) -> str:
+        zygosities = self.get_zygosities_method(self.MOSAIC_ZYGOSITIES, self.HAS_VARIANT)
+        return f"{zygosities}, with the {self.parent_label.lower()} having {self._evidence_description()}"
+
+    def get_other_filters_description(self) -> str:
+        # The thresholds themselves are the editor's own inputs, right above the table
+        return "Parent has alt reads at a low AF"
 
 
 class DuoAbsentInParent(SimpleDuoInheritance):
@@ -196,6 +225,7 @@ class DuoNode(FamilyInheritanceNodeMixin, AbstractCohortBasedNode):
         DuoInheritance.RECESSIVE: DuoRecessive,
         DuoInheritance.ALL_RECESSIVE: DuoAllRecessive,
         DuoInheritance.DOMINANT: DuoDominant,
+        DuoInheritance.MOSAIC_PARENT: DuoMosaicParent,
         DuoInheritance.ABSENT_IN_PARENT: DuoAbsentInParent,
         DuoInheritance.XLINKED_RECESSIVE: DuoXLinkedRecessive,
         DuoInheritance.ANY_AFFECTED: DuoAnyAffected,
@@ -204,6 +234,9 @@ class DuoNode(FamilyInheritanceNodeMixin, AbstractCohortBasedNode):
     duo = models.ForeignKey(Duo, null=True, on_delete=SET_NULL)
     inheritance = models.CharField(max_length=1, choices=DuoInheritance.choices, default=DuoInheritance.RECESSIVE)
     require_zygosity = models.BooleanField(default=True)  # parent only - proband always required (#947)
+    # Mosaic parent mode only - the low VAF band the parent's alt reads have to fall in (#1830)
+    mosaic_max_af = models.FloatField(default=0.35)
+    mosaic_min_alt_reads = models.IntegerField(default=2)
 
     @property
     def min_inputs(self):
@@ -234,12 +267,15 @@ class DuoNode(FamilyInheritanceNodeMixin, AbstractCohortBasedNode):
         return self.get_duo_inheritance_errors(self.duo, self.inheritance)
 
     def get_warnings(self) -> list[str]:
-        """ "Absent in parent" is the best a duo can do towards de novo - say so every time """
+        """ Both of these modes promise less than their name suggests - say so every time """
         warnings = super().get_warnings()
-        if self.duo and self.inheritance == DuoInheritance.ABSENT_IN_PARENT:
-            missing = self.duo.missing_parent_label.lower()
-            warnings.append(f"One parent only - de novo cannot be confirmed; variant may be inherited "
-                            f"from the missing {missing}")
+        if self.duo:
+            if self.inheritance == DuoInheritance.ABSENT_IN_PARENT:
+                missing = self.duo.missing_parent_label.lower()
+                warnings.append(f"One parent only - de novo cannot be confirmed; variant may be inherited "
+                                f"from the missing {missing}")
+            elif self.inheritance == DuoInheritance.MOSAIC_PARENT:
+                warnings.extend(MOSAIC_PARENT_WARNINGS)
         return warnings
 
     def _get_cohort(self):
@@ -297,7 +333,9 @@ class DuoNode(FamilyInheritanceNodeMixin, AbstractCohortBasedNode):
         return (
             "Proband + one parent - filter for recessive/dominant inheritance, or variants absent in "
             "the parent. 'Any Affected' returns variants present in at least one affected family "
-            "member (collapsing to proband alone if the parent is unaffected)."
+            "member (collapsing to proband alone if the parent is unaffected). "
+            "'Dominant (mosaic parent)' looks for parental alt reads at a low allele frequency, "
+            "so it catches a mosaic parent the germline caller wrote off as 0/0."
         )
 
     @staticmethod
@@ -354,6 +392,12 @@ class DuoNode(FamilyInheritanceNodeMixin, AbstractCohortBasedNode):
                         entry[f"other_filters_{member}_{relationship.value}"] = description
                 data[mode] = entry
                 continue
+            elif klass is DuoMosaicParent:
+                handler = klass(stub_node)
+                data[mode] = {
+                    'parent': fmt(klass.MOSAIC_ZYGOSITIES),
+                    'proband': fmt(klass.HAS_VARIANT),
+                }
             elif klass is DuoAnyAffected:
                 handler = klass(stub_node)
                 has_variant = fmt(DuoAnyAffected.HAS_VARIANT)

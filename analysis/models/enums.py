@@ -43,6 +43,7 @@ class TrioInheritance(models.TextChoices):
     ALL_RECESSIVE = 'A', 'All Recessive (AR + XLR)'
     COMPOUND_HET = 'C', 'C. Het'
     DOMINANT = 'D', 'Dominant'
+    MOSAIC_PARENT = 'M', 'Dominant (mosaic parent)'
     DENOVO = 'N', "Denovo"
     XLINKED_RECESSIVE = 'X', "X-Linked Recessive"
     ANY_AFFECTED = 'Y', 'Any Affected (variant in ≥1 affected)'
@@ -65,6 +66,7 @@ class DuoInheritance(models.TextChoices):
     ALL_RECESSIVE = 'A', 'All Recessive (AR + XLR)'
     COMPOUND_HET = 'C', 'C. Het (half phased)'
     DOMINANT = 'D', 'Dominant'
+    MOSAIC_PARENT = 'M', 'Dominant (mosaic parent)'
     ABSENT_IN_PARENT = 'N', 'Absent in parent'
     XLINKED_RECESSIVE = 'X', 'X-Linked Recessive'
     ANY_AFFECTED = 'Y', 'Any Affected (variant in ≥1 affected)'

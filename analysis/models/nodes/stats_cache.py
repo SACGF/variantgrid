@@ -99,6 +99,15 @@ class TrioInheritanceHandler(FilterKeyHandler):
         return [None] + [inheritance_filter_key(m, trio) for m in self.CACHED_MODES.values()]
 
 
+class DuoInheritanceHandler(FilterKeyHandler):
+    """ Nothing is precomputed for duos - the buckets are built off a cohort's Trio (@see
+        _trio_predicates), so every DuoNode counts live rather than reading the raw cohort row,
+        which knows nothing about its inheritance mode. """
+
+    def filter_key_for_node(self, node) -> FilterKey:
+        return UNCACHEABLE
+
+
 def inheritance_filter_key(mode: str, trio) -> str:
     """ The key a mode's bucket is stored under - the writer and the readers both come through here
         so they can't drift apart. autosomal_dominant's predicate branches on which parents are
@@ -118,6 +127,7 @@ def _cohort_trio(cohort):
 def get_handler_for_node(node) -> FilterKeyHandler:
     # Local imports avoid eager imports of node modules during stats_cache import.
     from analysis.models.nodes.sources.cohort_node import CohortNode
+    from analysis.models.nodes.sources.duo_node import DuoNode
     from analysis.models.nodes.sources.pedigree_node import PedigreeNode
     from analysis.models.nodes.sources.sample_node import SampleNode
     from analysis.models.nodes.sources.trio_node import TrioNode
@@ -126,6 +136,7 @@ def get_handler_for_node(node) -> FilterKeyHandler:
         SampleNode: SampleNodeHandler(),
         CohortNode: NoFilterHandler(),
         TrioNode: TrioInheritanceHandler(),
+        DuoNode: DuoInheritanceHandler(),
         PedigreeNode: NoFilterHandler(),
     }
     return handlers.get(type(node), NoFilterHandler())

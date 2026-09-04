@@ -60,6 +60,7 @@ from uicore.widgets.date_widget import NativeDateInput
 ANALYSIS_NODE_FIELDS = fields_for_model(AnalysisNode)
 WIDGET_INTEGER_MIN_0 = NumberInput(attrs={'class': 'narrow', 'min': '0', 'step': '1'})
 WIDGET_INTEGER_MIN_1 = NumberInput(attrs={'class': 'narrow', 'min': '1', 'step': '1'})
+WIDGET_UNIT_INTERVAL = NumberInput(attrs={'class': 'narrow', 'min': '0', 'max': '1', 'step': '0.01'})
 
 
 class AlleleFrequencyMixin(forms.Form):
@@ -1137,6 +1138,8 @@ class TrioNodeForm(GenomeBuildAutocompleteForwardMixin, VCFSourceNodeForm):
             "min_dp": WIDGET_INTEGER_MIN_0,
             "min_gq": WIDGET_INTEGER_MIN_0,
             "max_pl": WIDGET_INTEGER_MIN_0,
+            "mosaic_max_af": WIDGET_UNIT_INTERVAL,
+            "mosaic_min_alt_reads": WIDGET_INTEGER_MIN_1,
         }
 
 
@@ -1171,6 +1174,8 @@ class DuoNodeForm(GenomeBuildAutocompleteForwardMixin, VCFSourceNodeForm):
             "min_dp": WIDGET_INTEGER_MIN_0,
             "min_gq": WIDGET_INTEGER_MIN_0,
             "max_pl": WIDGET_INTEGER_MIN_0,
+            "mosaic_max_af": WIDGET_UNIT_INTERVAL,
+            "mosaic_min_alt_reads": WIDGET_INTEGER_MIN_1,
         }
 
 

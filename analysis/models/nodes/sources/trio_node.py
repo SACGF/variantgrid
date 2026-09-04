@@ -11,6 +11,7 @@ from django.db.models.query_utils import Q
 from analysis.models.enums import TrioInheritance
 from analysis.models.nodes.sources import AbstractCohortBasedNode
 from analysis.models.nodes.family_inheritance import (
+    MOSAIC_PARENT_WARNINGS,
     AbstractCompHetInheritance,
     AbstractFamilyInheritance,
     FamilyInheritanceNodeMixin,
@@ -18,6 +19,9 @@ from analysis.models.nodes.family_inheritance import (
     _dominant_requires_affected_parent_error,
     _pedigree_sex,
     _xlinked_recessive_errors,
+    mosaic_absent_q,
+    mosaic_evidence_description,
+    mosaic_evidence_q,
 )
 from analysis.models.nodes.node_display import NodeIcon
 from patients.models_enums import Zygosity
@@ -67,6 +71,45 @@ class Dominant(SimpleTrioInheritance):
         mother_zyg = self.UNAFFECTED_AND_AFFECTED_ZYGOSITIES[int(self.node.trio.mother_affected)]
         father_zyg = self.UNAFFECTED_AND_AFFECTED_ZYGOSITIES[int(self.node.trio.father_affected)]
         return mother_zyg, father_zyg, self.HAS_VARIANT
+
+
+class MosaicParent(AbstractTrioInheritance):
+    """ Dominant where a parent is mosaic - the proband is a constitutional HET and one parent
+        carries the variant in a fraction of cells, called either HOM_REF with a handful of alt
+        reads or HET at a low VAF. Either parent can be the mosaic one, so this is an OR of the two
+        sides, with the other parent required clean. @see issue #1830 """
+
+    def _side_q(self, cgc, zyg_data, mosaic_sample, other_sample) -> Q:
+        node = self.node
+        q = self._get_zyg_q(cgc, zyg_data)
+        q &= mosaic_evidence_q(cgc, mosaic_sample, node.mosaic_max_af, node.mosaic_min_alt_reads)
+        q &= mosaic_absent_q(cgc, other_sample, node.mosaic_min_alt_reads)
+        return q
+
+    def get_arg_q_dict(self) -> dict[Optional[str], dict[str, Q]]:
+        trio = self.node.trio
+        cgc = trio.cohort.cohort_genotype_collection
+        mother_mosaic = self._side_q(cgc, (self.MOSAIC_ZYGOSITIES, self.NO_VARIANT, self.HAS_VARIANT),
+                                     trio.mother.sample, trio.father.sample)
+        father_mosaic = self._side_q(cgc, (self.NO_VARIANT, self.MOSAIC_ZYGOSITIES, self.HAS_VARIANT),
+                                     trio.father.sample, trio.mother.sample)
+        combined = mother_mosaic | father_mosaic
+        return {cgc.cohortgenotype_alias: {str(combined): combined}}
+
+    def _evidence_description(self) -> str:
+        return mosaic_evidence_description(self.node.mosaic_max_af, self.node.mosaic_min_alt_reads)
+
+    def get_method(self) -> str:
+        allow_unknown = not self.node.require_zygosity
+        proband = self._zygosity_options(self.HAS_VARIANT)
+        mosaic = self._zygosity_options(self.MOSAIC_ZYGOSITIES, allow_unknown)
+        other = self._zygosity_options(self.NO_VARIANT, allow_unknown)
+        return (f"Proband: {proband}, and either parent ({mosaic}) with {self._evidence_description()} "
+                f"while the other ({other}) has <{self.node.mosaic_min_alt_reads} alt reads")
+
+    def get_other_filters_description(self) -> str:
+        # The thresholds themselves are the editor's own inputs, right above the table
+        return "One parent has alt reads at a low AF, the other has none"
 
 
 class Denovo(SimpleTrioInheritance):
@@ -178,6 +221,7 @@ class TrioNode(FamilyInheritanceNodeMixin, AbstractCohortBasedNode):
         TrioInheritance.RECESSIVE: Recessive,
         TrioInheritance.ALL_RECESSIVE: TrioAllRecessive,
         TrioInheritance.DOMINANT: Dominant,
+        TrioInheritance.MOSAIC_PARENT: MosaicParent,
         TrioInheritance.DENOVO: Denovo,
         TrioInheritance.XLINKED_RECESSIVE: XLinkedRecessive,
         TrioInheritance.ANY_AFFECTED: TrioAnyAffected,
@@ -186,6 +230,9 @@ class TrioNode(FamilyInheritanceNodeMixin, AbstractCohortBasedNode):
     trio = models.ForeignKey(Trio, null=True, on_delete=SET_NULL)
     inheritance = models.CharField(max_length=1, choices=TrioInheritance.choices, default=TrioInheritance.RECESSIVE)
     require_zygosity = models.BooleanField(default=True)
+    # Mosaic parent mode only - the low VAF band a mosaic parent's alt reads have to fall in (#1830)
+    mosaic_max_af = models.FloatField(default=0.35)
+    mosaic_min_alt_reads = models.IntegerField(default=2)
 
     @property
     def min_inputs(self):
@@ -211,6 +258,13 @@ class TrioNode(FamilyInheritanceNodeMixin, AbstractCohortBasedNode):
 
     def _get_inheritance_errors(self) -> list[str]:
         return self.get_trio_inheritance_errors(self.trio, self.inheritance)
+
+    def get_warnings(self) -> list[str]:
+        """ Mosaic detection depends on the data as much as the filter - say so every time """
+        warnings = super().get_warnings()
+        if self.trio and self.inheritance == TrioInheritance.MOSAIC_PARENT:
+            warnings.extend(MOSAIC_PARENT_WARNINGS)
+        return warnings
 
     def _get_cohort(self):
         cohort = None
@@ -280,7 +334,9 @@ class TrioNode(FamilyInheritanceNodeMixin, AbstractCohortBasedNode):
         return (
             "Mother/Father/Proband - filter for recessive/dominant/denovo inheritance. "
             "'Any Affected' returns variants present in at least one affected family "
-            "member (collapsing to proband alone if no parent is affected)."
+            "member (collapsing to proband alone if no parent is affected). "
+            "'Dominant (mosaic parent)' looks for parental alt reads at a low allele frequency, "
+            "so it catches a mosaic parent the germline caller wrote off as 0/0."
         )
 
     @staticmethod
@@ -332,6 +388,13 @@ class TrioNode(FamilyInheritanceNodeMixin, AbstractCohortBasedNode):
                     'mother':  f"AR: {fmt(ar_zyg[0])}\nXLR: {fmt(xlr_zyg[0])}",
                     'father':  f"AR: {fmt(ar_zyg[1])}\nXLR: --",
                     'proband': f"AR: {fmt(ar_zyg[2])}\nXLR: {fmt(xlr_zyg[2])}",
+                }
+            elif klass is MosaicParent:
+                handler = klass(stub_node)
+                data[mode] = {
+                    'mother': fmt(klass.MOSAIC_ZYGOSITIES),
+                    'father': fmt(klass.MOSAIC_ZYGOSITIES),
+                    'proband': fmt(klass.HAS_VARIANT),
                 }
             elif klass is TrioAnyAffected:
                 handler = klass(stub_node)
