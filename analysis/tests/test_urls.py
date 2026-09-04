@@ -204,6 +204,7 @@ class Test(URLTestCase):
     def testUrls(self):
         URL_NAMES_AND_KWARGS = [
             ("analyses", {}, 200),
+            ("analysis_list_tag_counts", {}, 200),
             ("analysis_templates", {}, 200),
             ("karyomapping_analyses", {}, 200),
         ]

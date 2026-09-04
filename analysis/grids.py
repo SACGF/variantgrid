@@ -25,6 +25,7 @@ from analysis.models import (
     CandidateStatus,
     GroupOperation,
     NodeStatus,
+    VariantTag,
 )
 from analysis.models.models_karyomapping import KaryomappingAnalysis
 from analysis.models.nodes.analysis_node import NodeColumnSummaryCacheCollection
@@ -413,6 +414,8 @@ class ExportVariantGrid(VariantGrid):
 
 class AnalysesListColumns(DatatableConfig[Analysis]):
     server_csv_download = True
+    search_box_enabled = True
+    search_pk_enabled = True
     # The unfiltered count is over the tag aggregate and the lock join, and only feeds the
     # "(filtered from N total)" text
     count_unfiltered = False
@@ -423,22 +426,23 @@ class AnalysesListColumns(DatatableConfig[Analysis]):
 
         self.genome_builds = list(GenomeBuild.builds_with_annotation())
         self.rich_columns = [
-            RichColumn(key="id", label="ID", orderable=True, extra_columns=["analysislock__locked"],
+            RichColumn(key="id", label="ID", orderable=True, search=False,
+                       extra_columns=["analysislock__locked"],
                        renderer=self._render_analysis, client_renderer='renderAnalysisLink'),
             RichColumn(key="name", label="Name", orderable=True),
-            RichColumn(key="created", label="Created", orderable=True,
+            RichColumn(key="created", label="Created", orderable=True, search=False,
                        client_renderer='TableFormat.timestamp'),
             RichColumn(key="modified", label="Modified", orderable=True, default_sort=SortOrder.DESC,
-                       client_renderer='TableFormat.timestamp'),
+                       search=False, client_renderer='TableFormat.timestamp'),
             RichColumn(key="genome_build__name", label="Genome Build", orderable=True,
                        enabled=len(self.genome_builds) > 1),
-            RichColumn(key="analysis_type", label="Type", orderable=True,
+            RichColumn(key="analysis_type", label="Type", orderable=True, search=False,
                        client_renderer=RichColumn.choices_client_renderer(AnalysisType.choices)),
             RichColumn(key="description", label="Description", orderable=True),
             RichColumn(key="user__username", label="Created by", orderable=True,
                        extra_columns=["user__id"], renderer=self.render_user),
-            RichColumn(key="tags", label="Tags", client_renderer='renderAnalysisTags'),
-            RichColumn(key="id", name="actions", label="", orderable=False,
+            RichColumn(key="tags", label="Tags", search=False, client_renderer='renderAnalysisTags'),
+            RichColumn(key="id", name="actions", label="", orderable=False, search=False,
                        renderer=self._render_actions, client_renderer='renderRowActions'),
         ]
 
@@ -472,9 +476,20 @@ class AnalysesListColumns(DatatableConfig[Analysis]):
         return qs.annotate(tags=StringAgg("varianttag__tag", delimiter=Value('|')))
 
     def filter_queryset(self, qs: QuerySet[Analysis]) -> QuerySet[Analysis]:
+        qs = self.filter_analyses(qs)
+        if tags := self.get_query_json("tags"):
+            # VariantTag is large (400k+ on some deployments) so keep it a subquery rather than a join
+            qs = qs.filter(pk__in=VariantTag.objects.filter(tag__in=tags).values("analysis"))
+        return qs
+
+    def filter_analyses(self, qs: QuerySet[Analysis]) -> QuerySet[Analysis]:
+        """ Everything the page filters on bar the tag selection - the tag count pills count over
+            this, so their counts stay put as tags are selected """
         user_grid_config = UserGridConfig.get(self.user, 'Analyses')
         if not user_grid_config.show_group_data:
             qs = qs.filter(user=self.user)
+        if genome_build_name := self.get_query_param("genome_build_name"):
+            qs = qs.filter(genome_build=GenomeBuild.get_name_or_alias(genome_build_name))
         return qs
 
 

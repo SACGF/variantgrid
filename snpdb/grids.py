@@ -63,34 +63,37 @@ def url_if_visible(url_name: str, **kwargs) -> Optional[str]:
 
 class VCFListColumns(DatatableConfig[VCF]):
     server_csv_download = True
+    search_box_enabled = True
+    search_pk_enabled = True
 
     def __init__(self, request: HttpRequest):
         super().__init__(request)
         self.scroll_x = True
 
         self.rich_columns = [
-            RichColumn(key="id", visible=False),
+            RichColumn(key="id", visible=False, search=False),
             RichColumn(key="name", label="Name", orderable=True,
                        renderer=self.view_primary_key, client_renderer='TableFormat.linkUrl'),
-            RichColumn(key="date", label="Date", orderable=True, default_sort=SortOrder.DESC,
+            RichColumn(key="date", label="Date", orderable=True, default_sort=SortOrder.DESC, search=False,
                        css_class="text-nowrap", client_renderer='TableFormat.timestamp'),
-            RichColumn(key="import_status", label="Import Status", orderable=True,
+            RichColumn(key="import_status", label="Import Status", orderable=True, search=False,
                        client_renderer=RichColumn.choices_client_renderer(ImportStatus.choices)),
-            RichColumn(key="data_archived_date", label="Archived", orderable=True,
+            RichColumn(key="data_archived_date", label="Archived", orderable=True, search=False,
                        css_class="text-nowrap", client_renderer='TableFormat.timestamp'),
             RichColumn(key="genome_build__name", label="Genome Build", orderable=True),
             RichColumn(key="user__username", label="Uploaded by", orderable=True,
                        extra_columns=["user__id"], renderer=self.render_user),
             RichColumn(key="source", label="VCF source", orderable=True),
             RichColumn(key="uploadedvcf__file_upload__import_source", label="Import Source", orderable=True,
+                       search=False,
                        client_renderer=RichColumn.choices_client_renderer(ImportSource.choices)),
-            RichColumn(key="genotype_samples", label="Genotype Samples", orderable=True),
+            RichColumn(key="genotype_samples", label="Genotype Samples", orderable=True, search=False),
             RichColumn(key="project__name", label="Project", orderable=True),
             RichColumn(key="uploadedvcf__vcf_importer__name", label="VCF Importer", orderable=True,
                        enabled=self.user.is_superuser),
             RichColumn(key="uploadedvcf__vcf_importer__version", label="VCF Importer Version", orderable=True,
-                       enabled=self.user.is_superuser),
-            RichColumn(key="id", name="delete", label="", orderable=False,
+                       search=False, enabled=self.user.is_superuser),
+            RichColumn(key="id", name="delete", label="", orderable=False, search=False,
                        renderer=self.render_delete, client_renderer='TableFormat.deleteRow'),
         ]
 
@@ -109,6 +112,8 @@ class VCFListColumns(DatatableConfig[VCF]):
 
 class SamplesListColumns(DatatableConfig[Sample]):
     server_csv_download = True
+    search_box_enabled = True
+    search_pk_enabled = True
     # The unfiltered count is over a correlated subquery and a group by, and only feeds the
     # "(filtered from N total)" text
     count_unfiltered = False
@@ -133,16 +138,17 @@ class SamplesListColumns(DatatableConfig[Sample]):
             dob_client_renderer = 'TableFormat.timestamp'
 
         self.rich_columns = [
-            RichColumn(key="id", visible=False),
+            RichColumn(key="id", visible=False, search=False),
             RichColumn(key="name", label="Name", orderable=True,
                        renderer=self.view_primary_key, client_renderer='TableFormat.linkUrl'),
-            RichColumn(key="het_hom_count", label="Het/Hom Count", orderable=True),
+            RichColumn(key="het_hom_count", label="Het/Hom Count", orderable=True, search=False),
             RichColumn(key="vcf__date", label="Date", orderable=True, default_sort=SortOrder.DESC,
+                       search=False,
                        css_class="text-nowrap", client_renderer='TableFormat.timestamp'),
-            RichColumn(key="import_status", label="Import Status", orderable=True,
+            RichColumn(key="import_status", label="Import Status", orderable=True, search=False,
                        client_renderer=RichColumn.choices_client_renderer(ImportStatus.choices)),
             RichColumn(key="vcf__genome_build__name", label="Genome Build", orderable=True),
-            RichColumn(key="variants_type", label="Variants Type", orderable=True,
+            RichColumn(key="variants_type", label="Variants Type", orderable=True, search=False,
                        client_renderer=RichColumn.choices_client_renderer(VariantsType.choices)),
             RichColumn(key="vcf__user__username", label="Uploaded by", orderable=True,
                        extra_columns=["vcf__user__id"], renderer=self.render_user),
@@ -151,23 +157,26 @@ class SamplesListColumns(DatatableConfig[Sample]):
                        renderer=self._render_vcf, client_renderer='renderOptionalLink'),
             RichColumn(key="vcf__project__name", label="Project", orderable=True),
             RichColumn(key="vcf__uploadedvcf__file_upload__import_source", label="Import Source", orderable=True,
+                       search=False,
                        client_renderer=RichColumn.choices_client_renderer(ImportSource.choices)),
-            RichColumn(key="sample_gene_list_count", label="# Sample GeneLists", orderable=True,
+            RichColumn(key="sample_gene_list_count", label="# Sample GeneLists", orderable=True, search=False,
                        extra_columns=["activesamplegenelist__id"], enabled=has_sample_gene_lists,
                        renderer=self._render_sample_gene_list_count,
                        client_renderer='renderSampleGeneListCount'),
             RichColumn(key="mutationalsignature__summary", label="Mutational Signature", orderable=True,
+                       search=False,
                        extra_columns=["mutationalsignature__id"], enabled=has_mutational_signature,
                        renderer=self._render_mutational_signature, client_renderer='renderOptionalLink'),
             RichColumn(key="somaliersampleextract__somalierancestry__predicted_ancestry",
-                       label="Predicted Ancestry", orderable=True, enabled=has_somalier_ancestry,
+                       label="Predicted Ancestry", orderable=True, search=False,
+                       enabled=has_somalier_ancestry,
                        client_renderer=RichColumn.choices_client_renderer(SuperPopulationCode.choices)),
             RichColumn(key="patient__patient_code", label="Patient Code", orderable=True),
             RichColumn(key="patient__first_name", label="First Name", orderable=True),
             RichColumn(key="patient__last_name", label="Last Name", orderable=True),
-            RichColumn(key="patient__sex", label="Sex", orderable=True,
+            RichColumn(key="patient__sex", label="Sex", orderable=True, search=False,
                        client_renderer=RichColumn.choices_client_renderer(Sex.choices)),
-            RichColumn(key="patient__date_of_birth", label=dob_label, orderable=True,
+            RichColumn(key="patient__date_of_birth", label=dob_label, orderable=True, search=False,
                        renderer=dob_renderer, client_renderer=dob_client_renderer),
             RichColumn(key="extraction__specimen__reference_id", label="Specimen", orderable=True,
                        extra_columns=["extraction__specimen__id"],
@@ -179,8 +188,9 @@ class SamplesListColumns(DatatableConfig[Sample]):
                        renderer=self._render_extraction, client_renderer='renderOptionalLink'),
             RichColumn(key="extraction__specimen__tissue__name", label="Tissue", orderable=True),
             RichColumn(key="extraction__specimen__collection_date", label="Collected", orderable=True,
+                       search=False,
                        css_class="text-nowrap", client_renderer='TableFormat.timestamp'),
-            RichColumn(key="id", name="delete", label="", orderable=False,
+            RichColumn(key="id", name="delete", label="", orderable=False, search=False,
                        renderer=self.render_delete, client_renderer='TableFormat.deleteRow'),
         ]
 

@@ -7,6 +7,7 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import user_passes_test
 from django.core.exceptions import PermissionDenied
+from django.db.models import Count
 from django.http.response import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls.base import reverse
@@ -15,6 +16,7 @@ from django.views.decorators.http import require_POST
 
 from analysis import forms
 from analysis.analysis_import_export import analysis_export_to_dict
+from analysis.grids import AnalysesListColumns
 from analysis.analysis_templates import (
     get_auto_launch_analysis_template_matches,
     populate_analysis_from_template_run,
@@ -73,8 +75,23 @@ def analysis_list(request):
         add_save_message(request, False, "Analysis")
 
     context = {"create_analysis_form": form,
-               "analysis_choice_form": AnalysisChoiceForm()}
+               "analysis_choice_form": AnalysisChoiceForm(),
+               "multiple_genome_builds": len(GenomeBuild.builds_with_annotation()) > 1}
     return render(request, 'analysis/analyses.html', context)
+
+
+def analysis_list_tag_counts(request):
+    """ Ajax - the tag count pills above the analyses grid. Counting distinct analyses per tag is a
+        group by over every tag in the visible analyses (~0.3 sec against 400k tags), so the page
+        only asks for it once the filter is opened """
+    config = AnalysesListColumns(request)
+    analysis_qs = config.filter_analyses(config.get_initial_queryset())
+    tag_counts = (VariantTag.objects.filter(analysis__in=analysis_qs)
+                  .values_list("tag")
+                  .annotate(count=Count("analysis", distinct=True)))
+    context = {"tag_counts": tag_counts,
+               "selected": request.GET.getlist("tag")}
+    return render(request, 'analysis/tags/analyses_tag_counts.html', context)
 
 
 def analysis_templates(request):

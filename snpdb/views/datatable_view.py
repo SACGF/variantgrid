@@ -304,6 +304,9 @@ class DatatableConfig(Generic[DC]):
     and how the server will send data to it via ajax (via BaseDatatableView)
     """
     search_box_enabled = False
+    # Also match a row by its exact pk when the search box is handed a number - people write record
+    # IDs down, and an integer column can't take the icontains the text columns are searched with
+    search_pk_enabled = False
     download_csv_button_enabled = False
     # Streams every row's raw values from the server, rather than the client side button which pulls
     # the rendered rows back through the ajax endpoint - use it on anything that can grow large
@@ -429,6 +432,14 @@ class DatatableConfig(Generic[DC]):
         filters: list[Q] = []
         for search_col in search_cols:
             filters.append(Q(**{f'{search_col}__icontains': search_string}))
+
+        if self.search_pk_enabled and search_string.isdigit():
+            pk = int(search_string)
+            if pk < 2 ** 63:  # anything wider than a bigint is an error rather than a miss
+                filters.append(Q(pk=pk))
+
+        if not filters:
+            return qs
         or_filter = reduce(operator.or_, filters)
         qs = qs.filter(or_filter)
         return qs

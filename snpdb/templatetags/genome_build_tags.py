@@ -8,6 +8,13 @@ from snpdb.models import GenomeBuild
 register = Library()
 
 
+@register.inclusion_tag("snpdb/tags/genome_build_grid_filter.html")
+def genome_build_grid_filter():
+    """ Radio toggle that filters a datatable to one build. The page owns the change handler - it
+        sets 'genome_build_name' in its own grid params (@see vcf_grid_filter, analyses.html) """
+    return {"genome_builds": GenomeBuild.builds_with_annotation()}
+
+
 @register.inclusion_tag("snpdb/tags/genome_build_url_arg.html")
 def genome_build_url_arg(genome_build, url_name, **url_kwargs):
     """ Generates links for user to switch page to their active genome builds

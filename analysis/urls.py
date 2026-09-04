@@ -142,6 +142,7 @@ urlpatterns = [
     path('<int:analysis_id>/node_column_summary/datatable/<int:node_id>/<int:node_version>/<str:extra_filters>/<slug:variant_column>/<int:significant_figures>/',
          DataFrameTableView.as_view(column_class=NodeColumnSummaryConfig), name='node_column_summary_datatable'),
     path('analyses/datatable/', DatabaseTableView.as_view(column_class=AnalysesListColumns), name='analyses_list_datatable'),
+    path('analyses/tag_counts/', views.analysis_list_tag_counts, name='analysis_list_tag_counts'),
     path('analysis_templates/datatable/', DatabaseTableView.as_view(column_class=AnalysisTemplatesColumns),
          name='analysis_templates_datatable'),
     path('analysis_issues/datatables/',

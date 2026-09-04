@@ -4,6 +4,7 @@
 {% load crispy_forms_field %}
 {% load crispy_forms_tags %}
 {% load datatable_tags %}
+{% load genome_build_tags %}
 {% load user_tag_color_tags %}
 
 {% block submenu %}{% menu_bar_analysis %}{% endblock %}
@@ -12,6 +13,11 @@
     {{ block.super }}
     {% render_tag_styles_and_formatter %}
     <script>
+        const TAG_COUNTS_SUMMARY = "#analyses-tag-counts";
+        // Shared filter state - the build toggle and the tag pills both write to it
+        let gridParams = {};
+        let tagCountsRequest = null;
+
         function renderAnalysisLink(data, type, row) {
             const dom = $('<span>');
             if (data.locked) {
@@ -29,10 +35,94 @@
             return VariantGridFormat.tagsGlobal(data, null, {id: row.id.text});
         }
 
+        // Called by DataTables before each ajax call - lists go down as JSON, everything else as a plain param
+        function analysesDatatableFilter(data) {
+            for (const [key, value] of Object.entries(gridParams)) {
+                data[key] = Array.isArray(value) ? JSON.stringify(value) : value;
+            }
+        }
+
+        function reloadAnalysesGrid() {
+            $("#analyses-datatable").DataTable().ajax.reload();
+        }
+
+        /* Counting tags over every visible analysis is a group by across the whole tag table, so the
+           pills are only fetched once the filter is opened, and recounted when the grid's contents change */
+        function loadTagCounts() {
+            const container = $(TAG_COUNTS_SUMMARY);
+            const selected = gridParams["tags"] || [];
+            container.html("<i class='fas fa-spinner fa-spin'></i> Counting tags...");
+            return $.ajax({
+                url: "{% url 'analysis_list_tag_counts' %}",
+                data: {genome_build_name: gridParams["genome_build_name"] || "", tag: selected},
+                traditional: true,
+            }).done(function(html) {
+                container.html(html);
+                setupTagCountsSummary(container, tagsChanged);
+                // A tag with nothing left to match isn't offered, so drop it rather than leave an invisible filter
+                const stillSelected = getTagCountsSummarySelected(container);
+                if (stillSelected.length !== selected.length) {
+                    tagsChanged(stillSelected);
+                }
+            });
+        }
+
+        function ensureTagCounts() {
+            if (!tagCountsRequest) {
+                tagCountsRequest = loadTagCounts();
+            }
+            return tagCountsRequest;
+        }
+
+        function refreshTagCounts() {
+            if (tagCountsRequest) {
+                tagCountsRequest = loadTagCounts();
+            }
+        }
+
+        /* Multiple tags mean "carries any of these" */
+        function tagsChanged(tagIds) {
+            if (tagIds.length) {
+                gridParams["tags"] = tagIds;
+            } else {
+                delete gridParams["tags"];
+            }
+            reloadAnalysesGrid();
+        }
+
         $(document).ready(() => {
             $('#id_analysis').change(function () {
                 const analysisId = $("#id_analysis").val();
                 window.location = Urls.analysis(analysisId);
+            });
+
+            $("#analyses-grid-filter input[name=genome_build_filter]").change(function() {
+                const genomeBuildName = $(this).val();
+                if (genomeBuildName) {
+                    gridParams["genome_build_name"] = genomeBuildName;
+                } else {
+                    delete gridParams["genome_build_name"];
+                }
+                refreshTagCounts();
+                reloadAnalysesGrid();
+            });
+
+            $("#analyses-tag-filter").on("show.bs.collapse", ensureTagCounts);
+
+            // Show Group Data changes which analyses the grid holds, so recount once it has reloaded
+            $("#user-data-filter-analyses-datatable input[type=checkbox]").change(function() {
+                $("#analyses-datatable").one("xhr.dt", refreshTagCounts);
+            });
+
+            // Clicking a tag on a row filters to it, the same as picking its pill
+            $("#analyses-datatable").on("click", ".grid-tag", function() {
+                const tag = $(this).attr("tag_id");
+                $("#analyses-tag-filter").collapse("show");
+                ensureTagCounts().done(function() {
+                    const container = $(TAG_COUNTS_SUMMARY);
+                    $(".summary-count[data-tag='" + tag + "']", container).addClass("selected");
+                    tagsChanged(getTagCountsSummarySelected(container));
+                });
             });
         });
     </script>
@@ -73,7 +163,20 @@
     </div>
 
     <div class="container-table">
+        <div id="analyses-grid-filter" class="form-inline">
+            {% if multiple_genome_builds %}
+                {% labelled label="Genome Build" %}{% genome_build_grid_filter %}{% endlabelled %}
+            {% endif %}
+            <button class="btn btn-outline-secondary m-2" type="button" data-toggle="collapse"
+                    data-target="#analyses-tag-filter" aria-expanded="false">
+                <i class="fas fa-tags"></i> Filter by Tag
+            </button>
+        </div>
+        <div class="collapse" id="analyses-tag-filter">
+            <div id="analyses-tag-counts" class="mb-2"></div>
+        </div>
         {% datatable_user_data_filter 'analyses-datatable' 'Analyses' %}
-        <table id="analyses-datatable" class="sticky-header" data-datatable-url="{% url 'analyses_list_datatable' %}"></table>
+        <table id="analyses-datatable" class="sticky-header" data-datatable-url="{% url 'analyses_list_datatable' %}"
+               data-datatable-data="analysesDatatableFilter"></table>
     </div>
 {% endblock content %}

@@ -48,34 +48,36 @@ class ExperimentColumns(DatatableConfig[Experiment]):
 
 
 class SequencingRunColumns(DatatableConfig[SequencingRun]):
+    search_box_enabled = True
+
     def __init__(self, request: HttpRequest):
         super().__init__(request)
         self.scroll_x = True
 
         self.rich_columns = [
-            RichColumn(key="date", label="Date", orderable=True, default_sort=SortOrder.DESC,
+            RichColumn(key="date", label="Date", orderable=True, default_sort=SortOrder.DESC, search=False,
                        css_class="text-nowrap", client_renderer='TableFormat.timestamp'),
             RichColumn(key="name", label="Name", orderable=True,
                        renderer=self.view_primary_key, client_renderer='TableFormat.linkUrl'),
-            RichColumn(key="sample_count", label="Sample Count", orderable=True),
+            RichColumn(key="sample_count", label="Sample Count", orderable=True, search=False),
             RichColumn(key="sequencer__sequencer_model__model", label="Model", orderable=True),
             RichColumn(key="sequencer__name", label="Sequencer", orderable=True),
             RichColumn(key="experiment__name", label="Experiment", orderable=True),
             RichColumn(key="enrichment_kit__name", label="EnrichmentKit", orderable=True),
-            RichColumn(key="enrichment_kit__version", label="Kit version", orderable=True),
-            RichColumn(key="gold_standard", label="Gold", orderable=True,
+            RichColumn(key="enrichment_kit__version", label="Kit version", orderable=True, search=False),
+            RichColumn(key="gold_standard", label="Gold", orderable=True, search=False,
                        client_renderer=_icon_flag_renderer("grid-link-icon gold-standard-icon", "Gold Standard")),
-            RichColumn(key="legacy", label="Legacy", orderable=True,
+            RichColumn(key="legacy", label="Legacy", orderable=True, search=False,
                        client_renderer='TableFormat.boolean.bind(null, "standard")'),
-            RichColumn(key="hidden", label="Hidden", orderable=True,
+            RichColumn(key="hidden", label="Hidden", orderable=True, search=False,
                        client_renderer=_icon_flag_renderer("grid-link-icon hidden-eye-icon", "Hidden")),
-            RichColumn(key="bad", label="Bad", orderable=True,
+            RichColumn(key="bad", label="Bad", orderable=True, search=False,
                        client_renderer=_icon_flag_renderer("fas fa-times-circle text-danger",
                                                            "Run marked as bad")),
-            RichColumn(key="vcf_ids", label="VCF",
+            RichColumn(key="vcf_ids", label="VCF", search=False,
                        extra_columns=["vcf_variant_caller", "vcf_import_status"],
                        renderer=self._render_vcfs, client_renderer='renderSequencingRunVCFs'),
-            RichColumn(key="name", name="external_links", label="External Links",
+            RichColumn(key="name", name="external_links", label="External Links", search=False,
                        extra_columns=["date", "enrichment_kit__name"],
                        enabled=bool(settings.SEQAUTO_SEQUENCING_RUN_EXTERNAL_LINKS),
                        renderer=self._render_external_links, client_renderer='renderExternalLinks'),
