@@ -25,6 +25,7 @@ NON_PORTABLE_NODE_FIELDS = [
     "cloned_from",
     "cohort",
     "custom_text_gene_list",
+    "duo",
     "extraction",
     "genomic_intervals_collection",
     "max_variant",

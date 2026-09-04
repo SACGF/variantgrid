@@ -63,6 +63,25 @@ their own viewBox, so <use> scales them to whatever width/height the <svg class=
         </g>
     </symbol>
 
+    {% comment %}
+    Duo - one parent above an affected proband. Both parent shapes are drawn and the page blanks out
+    the one its relationship rules out with duo-mother/duo-father (see --pedigree-duo-* in
+    global.scss); parent-affected fills the one that's left. With neither class the overlapped square
+    and circle read as "a parent", which is what the empty DuoNode icon wants.
+    {% endcomment %}
+    <symbol id="node-icon-duo" viewBox="0 0 20 26">
+        <g fill="none" stroke="currentColor" stroke-width="var(--pedigree-stroke-width, 2.6)">
+            <rect x="6" y="2" width="8" height="8"
+                  fill="var(--pedigree-duo-square-fill, var(--pedigree-parent-fill, none))"
+                  stroke="var(--pedigree-duo-square-stroke, currentColor)"/>
+            <circle cx="10" cy="6" r="4.5"
+                    fill="var(--pedigree-duo-circle-fill, var(--pedigree-parent-fill, none))"
+                    stroke="var(--pedigree-duo-circle-stroke, currentColor)"/>
+            <path d="M10 10.5 V15.5"/>
+            <circle cx="10" cy="20" r="4.5" fill="currentColor"/>
+        </g>
+    </symbol>
+
     {# Pedigree - three generations, which is what tells it apart from Trio/Quad #}
     <symbol id="node-icon-pedigree" viewBox="0 0 50 36">
         <g fill="none" stroke="currentColor" stroke-width="2.4">

@@ -34,6 +34,7 @@ from analysis.models.nodes.sources.cohort_node import (
     CohortNodeZygosityFilter,
     CohortNodeZygosityFiltersCollection,
 )
+from analysis.models.nodes.sources.duo_node import DuoNode
 from analysis.models.nodes.sources.pedigree_node import PedigreeNode
 from analysis.models.nodes.sources.quad_node import QuadNode
 from analysis.models.nodes.sources.sample_node import SampleNode
@@ -1149,6 +1150,23 @@ class QuadNodeForm(GenomeBuildAutocompleteForwardMixin, VCFSourceNodeForm):
         widgets = {
             "quad": ModelSelect2(url='quad_autocomplete',
                                  attrs={'data-placeholder': 'Quad...'}),
+            "min_ad": WIDGET_INTEGER_MIN_0,
+            "min_dp": WIDGET_INTEGER_MIN_0,
+            "min_gq": WIDGET_INTEGER_MIN_0,
+            "max_pl": WIDGET_INTEGER_MIN_0,
+        }
+
+
+class DuoNodeForm(GenomeBuildAutocompleteForwardMixin, VCFSourceNodeForm):
+    genome_build_fields = ["duo"]
+    exclude_archived = True
+
+    class Meta:
+        model = DuoNode
+        exclude = ANALYSIS_NODE_FIELDS
+        widgets = {
+            "duo": ModelSelect2(url='duo_autocomplete',
+                                attrs={'data-placeholder': 'Duo...'}),
             "min_ad": WIDGET_INTEGER_MIN_0,
             "min_dp": WIDGET_INTEGER_MIN_0,
             "min_gq": WIDGET_INTEGER_MIN_0,

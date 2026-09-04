@@ -1,6 +1,6 @@
 """ Invalidate analysis-node caches when their underlying input data is deleted.
 
-When a Sample / Cohort / Trio / Pedigree / Quad row is deleted, any analysis source
+When a Sample / Cohort / Duo / Trio / Pedigree / Quad row is deleted, any analysis source
 node that pinned it would otherwise keep returning a stale cached arg_q_dict that
 references annotations (e.g. cohortgenotype_<id>) that no longer exist - producing a
 FieldError at queryset build time.
@@ -84,3 +84,7 @@ def handle_pedigree_pre_delete(sender, instance, **kwargs):
 
 def handle_quad_pre_delete(sender, instance, **kwargs):
     _schedule_analysis_updates(_bump_nodes(Q(quadnode__quad=instance)))
+
+
+def handle_duo_pre_delete(sender, instance, **kwargs):
+    _schedule_analysis_updates(_bump_nodes(Q(duonode__duo=instance)))

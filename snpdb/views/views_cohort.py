@@ -35,6 +35,7 @@ from snpdb.models import (
     Cohort,
     CohortGenotypeCollection,
     CohortSample,
+    Duo,
     Quad,
     Trio,
     UserGridConfig,
@@ -238,6 +239,19 @@ def view_quad(request, pk):
     context = {"quad": quad,
                "has_write_permission": quad.cohort.can_write(request.user)}
     return render(request, 'snpdb/patients/view_quad.html', context)
+
+
+def duos(request):
+    show_group_data = UserGridConfig.get(request.user, 'Duos').show_group_data
+    context = {"show_group_data": show_group_data}
+    return render(request, 'snpdb/patients/duos.html', context)
+
+
+def view_duo(request, pk):
+    duo = Duo.get_for_user(request.user, pk)
+    context = {"duo": duo,
+               "has_write_permission": duo.cohort.can_write(request.user)}
+    return render(request, 'snpdb/patients/view_duo.html', context)
 
 
 def cohort_sort(request, cohort_id):

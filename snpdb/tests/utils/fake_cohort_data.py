@@ -8,6 +8,8 @@ from snpdb.models import (
     Cohort,
     CohortGenotypeCollection,
     CohortSample,
+    Duo,
+    DuoRelationship,
     GenomeBuild,
     ImportStatus,
     Quad,
@@ -108,6 +110,47 @@ def create_fake_quad(user: User, genome_build: GenomeBuild, sibling_affected: bo
         father=father_cs, father_affected=False,
         proband=proband_cs,
         sibling=sibling_cs, sibling_affected=sibling_affected,
+    )
+
+
+def create_fake_duo(user: User, genome_build: GenomeBuild,
+                    relationship: str = DuoRelationship.MOTHER,
+                    parent_affected: bool = False) -> Duo:
+    """2-sample Cohort (proband, parent) + a Duo."""
+    vcf = VCF.objects.create(
+        name="test_duo_vcf", genotype_samples=1, genome_build=genome_build,
+        import_status=ImportStatus.SUCCESS, user=user, date=timezone.now()
+    )
+    proband_sample = Sample.objects.create(name="proband", vcf=vcf, import_status=ImportStatus.SUCCESS)
+    parent_sample = Sample.objects.create(name="parent", vcf=vcf)
+
+    assign_permission_to_user_and_groups(user, vcf)
+    assign_permission_to_user_and_groups(user, proband_sample)
+
+    cohort = Cohort.objects.create(
+        name="test_duo_cohort", user=user, vcf=vcf,
+        genome_build=genome_build, import_status=ImportStatus.SUCCESS
+    )
+    for i, sample in enumerate([proband_sample, parent_sample]):
+        CohortSample.objects.create(
+            cohort=cohort, sample=sample,
+            cohort_genotype_packed_field_index=i, sort_order=i
+        )
+    assign_permission_to_user_and_groups(user, cohort)
+
+    CohortGenotypeCollection.objects.create(
+        cohort=cohort, cohort_version=cohort.version,
+        num_samples=cohort.cohortsample_set.count()
+    )
+
+    return Duo.objects.create(
+        name="test_duo",
+        user=user,
+        cohort=cohort,
+        proband=cohort.cohortsample_set.get(sample__name='proband'),
+        parent=cohort.cohortsample_set.get(sample__name='parent'),
+        relationship=relationship,
+        parent_affected=parent_affected,
     )
 
 

@@ -13,6 +13,7 @@ from analysis.forms.forms_nodes import (
     CohortNodeForm,
     ConservationNodeForm,
     DamageNodeForm,
+    DuoNodeForm,
     FilterNodeForm,
     IntersectionNodeForm,
     MergeNodeForm,
@@ -49,6 +50,7 @@ from analysis.models.nodes.filters.zygosity_node import ZygosityNode
 from analysis.models.nodes.node_utils import update_analysis
 from analysis.models.nodes.sources.all_variants_node import AllVariantsNode
 from analysis.models.nodes.sources.cohort_node import CohortNode
+from analysis.models.nodes.sources.duo_node import DuoNode
 from analysis.models.nodes.sources.pedigree_node import PedigreeNode
 from analysis.models.nodes.sources.quad_node import QuadNode
 from analysis.models.nodes.sources.trio_node import TrioNode
@@ -399,6 +401,21 @@ class QuadNodeView(ZygosityTableMixin, NodeView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["quad_loadable"] = _source_visible_to_user(self.object.quad, self.request.user)
+        return context
+
+
+class DuoNodeView(ZygosityTableMixin, NodeView):
+    model = DuoNode
+    form_class = DuoNodeForm
+
+    def get_form_kwargs(self):
+        form_kwargs = super().get_form_kwargs()
+        form_kwargs["genome_build"] = self.object.analysis.genome_build
+        return form_kwargs
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["duo_loadable"] = _source_visible_to_user(self.object.duo, self.request.user)
         return context
 
 

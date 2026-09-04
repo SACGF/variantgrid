@@ -1,0 +1,9 @@
+{% extends "analysis/tags/base_related_analyses.html" %}
+{% block create_analyses %}
+{% if duo.cohort.import_status == "S" %}
+
+    {% load related_analyses_tags %}
+    {% analysis_templates_tag duo.genome_build duo=duo %}
+
+{% endif %}
+{% endblock create_analyses %}

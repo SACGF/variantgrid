@@ -1,10 +1,10 @@
 from django.core.exceptions import PermissionDenied
 from django.shortcuts import redirect, render
 
-from analysis.forms import UserQuadWizardForm, UserTrioWizardForm
-from analysis.models.enums import QuadSample, TrioSample
+from analysis.forms import UserDuoWizardForm, UserQuadWizardForm, UserTrioWizardForm
+from analysis.models.enums import DuoSample, QuadSample, TrioSample
 from patients.models_enums import Sex
-from snpdb.models import Cohort, ImportStatus, Quad, Sample, Trio
+from snpdb.models import Cohort, Duo, ImportStatus, Quad, Sample, Trio
 
 
 def _confident_sex(sample: Sample) -> Sex:
@@ -181,3 +181,71 @@ def quad_wizard(request, cohort_id, sample1_id, sample2_id, sample3_id, sample4_
         "patient_description_results": patient_description_results,
     }
     return render(request, 'analysis/quad_wizard.html', context)
+
+
+def duo_wizard(request, cohort_id, sample1_id, sample2_id):
+    cohort = Cohort.get_for_user(request.user, cohort_id)
+
+    if cohort.import_status != ImportStatus.SUCCESS:
+        import_status = cohort.get_import_status_display()
+        msg = f"Can't create analysis for {cohort} of status {import_status}"
+        raise PermissionDenied(msg)
+
+    samples = [Sample.get_for_user(request.user, sid) for sid in [sample1_id, sample2_id]]
+
+    patient_description_results = []
+    for sample in samples:
+        description = ''
+        results = []
+        try:
+            description = sample.patient.phenotype
+            results = sample.patient.patient_text_phenotype.phenotype_description.get_results()
+        except:
+            pass
+        patient_description_results.append([description, results])
+
+    sample_sexes = _sample_sexes(samples)
+
+    form = UserDuoWizardForm(request.POST or None,
+                             sample_sexes=[Sex(ss["sex"]) for ss in sample_sexes])
+    if request.method == "POST":
+        if form.is_valid():
+            parent_affected = form.affected_by_role[DuoSample.PARENT]
+            relationship = form.parent_relationship
+            proband_sex = form.cleaned_data['proband_sex'] or None
+
+            def get_cohort_sample(sample):
+                return cohort.cohortsample_set.get(sample=sample)
+
+            parent_cs = proband_cs = None
+            for sample, role in zip(samples, form.roles):
+                cs = get_cohort_sample(sample)
+                if role == DuoSample.PARENT:
+                    parent_cs = cs
+                elif role == DuoSample.PROBAND:
+                    proband_cs = cs
+
+            duo_name = f"{parent_cs.name}/{proband_cs.name} from {cohort}"
+            duo, created = Duo.objects.get_or_create(
+                cohort=cohort,
+                user=request.user,
+                proband=proband_cs,
+                parent=parent_cs,
+                relationship=relationship,
+                parent_affected=parent_affected,
+                defaults={"name": duo_name, "proband_sex": proband_sex},
+            )
+            if not created and duo.proband_sex != proband_sex:
+                duo.proband_sex = proband_sex
+                duo.save()
+            return redirect(duo)
+
+    context = {
+        "cohort": cohort,
+        "sample_1": samples[0],
+        "sample_2": samples[1],
+        "form": form,
+        "sample_sexes": sample_sexes,
+        "patient_description_results": patient_description_results,
+    }
+    return render(request, 'analysis/duo_wizard.html', context)

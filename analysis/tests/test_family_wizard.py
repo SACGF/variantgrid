@@ -1,11 +1,16 @@
 from types import SimpleNamespace
 
+from django.contrib.auth.models import User
 from django.test import TestCase
+from django.urls import reverse
 
-from analysis.forms import UserQuadWizardForm, UserTrioWizardForm
-from analysis.models.enums import QuadSample, TrioSample
+from analysis.forms import UserDuoWizardForm, UserQuadWizardForm, UserTrioWizardForm
+from analysis.models.enums import DuoSample, QuadSample, TrioSample
 from analysis.views.views_wizard import _confident_sex
+from library.django_utils.unittest_utils import URLTestCase
 from patients.models_enums import Sex
+from snpdb.models import Duo, DuoRelationship, GenomeBuild
+from snpdb.tests.utils.fake_cohort_data import create_fake_duo
 
 
 class ConfidentSexTest(TestCase):
@@ -82,3 +87,63 @@ class QuadWizardFormTest(TestCase):
         self.assertTrue(form.is_valid(), form.errors)
         self.assertTrue(form.affected_by_role[QuadSample.SIBLING])
         self.assertFalse(form.affected_by_role[QuadSample.MOTHER])
+
+
+class DuoWizardFormTest(TestCase):
+    """ A duo's roles are open to either sex - which parent it is comes from its own radio """
+
+    def _form(self, data=None):
+        return UserDuoWizardForm(data, sample_sexes=[Sex.FEMALE, Sex.MALE])
+
+    def test_either_sample_can_take_either_role(self):
+        form = self._form()
+        for field in ("sample_1", "sample_2"):
+            roles = [value for value, _ in form.fields[field].choices]
+            self.assertEqual([DuoSample.PARENT, DuoSample.PROBAND], roles)
+
+    def test_parent_relationship_and_affected_come_off_the_form(self):
+        form = self._form({"sample_1": DuoSample.PARENT,
+                           "sample_2": DuoSample.PROBAND,
+                           "sample_1_affected": "on",
+                           "relationship": DuoRelationship.FATHER})
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual({DuoSample.PARENT: True, DuoSample.PROBAND: True}, form.affected_by_role)
+        self.assertEqual(DuoRelationship.FATHER, form.parent_relationship)
+
+    def test_two_samples_in_the_same_role_is_rejected(self):
+        form = self._form({"sample_1": DuoSample.PROBAND,
+                           "sample_2": DuoSample.PROBAND,
+                           "relationship": DuoRelationship.MOTHER})
+        self.assertFalse(form.is_valid())
+
+
+class DuoWizardViewTest(URLTestCase):
+    """ The wizard hands back roles, not samples - check they land on the right side of the Duo """
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.user = User.objects.get_or_create(username='testuser_duo_wizard')[0]
+        # Borrow the fixture's cohort, then drop its Duo so the wizard makes its own
+        fixture_duo = create_fake_duo(cls.user, GenomeBuild.get_name_or_alias("GRCh37"))
+        cls.cohort = fixture_duo.cohort
+        cls.proband_sample_id = fixture_duo.proband.sample_id
+        cls.parent_sample_id = fixture_duo.parent.sample_id
+        fixture_duo.delete()
+
+    def test_post_creates_duo_from_roles(self):
+        self.client.force_login(self.user)
+        url = reverse("duo_wizard", kwargs={"cohort_id": self.cohort.pk,
+                                            "sample1_id": self.proband_sample_id,
+                                            "sample2_id": self.parent_sample_id})
+        response = self.client.post(url, {"sample_1": DuoSample.PROBAND,
+                                          "sample_2": DuoSample.PARENT,
+                                          "sample_2_affected": "on",
+                                          "relationship": DuoRelationship.FATHER,
+                                          "proband_sex": ""})
+        duo = Duo.objects.get(cohort=self.cohort)
+        self.assertEqual(response.url, duo.get_absolute_url())
+        self.assertEqual(duo.parent.sample_id, self.parent_sample_id)
+        self.assertEqual(duo.proband.sample_id, self.proband_sample_id)
+        self.assertEqual(duo.relationship, DuoRelationship.FATHER)
+        self.assertTrue(duo.parent_affected)

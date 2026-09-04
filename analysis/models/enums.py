@@ -12,6 +12,7 @@ class AnalysisType(models.TextChoices):
     COHORT = 'C', 'Cohort'
     TRIO = 'T', 'Trio'
     QUAD = 'Q', 'Quad'
+    DUO = 'U', 'Duo'
     PEDIGREE = 'P', 'Pedigree'
 
 
@@ -53,6 +54,18 @@ class QuadInheritance(models.TextChoices):
     COMPOUND_HET = 'C', 'C. Het'
     DOMINANT = 'D', 'Dominant'
     DENOVO = 'N', 'Denovo'
+    XLINKED_RECESSIVE = 'X', 'X-Linked Recessive'
+    ANY_AFFECTED = 'Y', 'Any Affected (variant in ≥1 affected)'
+
+
+class DuoInheritance(models.TextChoices):
+    """ Trio's modes with the missing parent's constraint dropped - same letters where they mean the
+        same thing, so 'N' (Trio's Denovo) is the one-parent "absent in parent" """
+    RECESSIVE = 'R', 'Recessive'
+    ALL_RECESSIVE = 'A', 'All Recessive (AR + XLR)'
+    COMPOUND_HET = 'C', 'C. Het (half phased)'
+    DOMINANT = 'D', 'Dominant'
+    ABSENT_IN_PARENT = 'N', 'Absent in parent'
     XLINKED_RECESSIVE = 'X', 'X-Linked Recessive'
     ANY_AFFECTED = 'Y', 'Any Affected (variant in ≥1 affected)'
 
@@ -159,6 +172,11 @@ class QuadSample(models.TextChoices):
     FATHER  = 'F', 'Father'
     PROBAND = 'P', 'Proband'
     SIBLING = 'S', 'Sibling'
+
+
+class DuoSample(models.TextChoices):
+    PARENT = 'A', 'Parent'
+    PROBAND = 'P', 'Proband'
 
 
 class TagNodeMode(models.TextChoices):

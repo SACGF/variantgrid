@@ -2832,6 +2832,20 @@ li.help-item :last-child {
   --pedigree-sibling-fill: currentColor;
 }
 
+.parent-affected {
+  --pedigree-parent-fill: currentColor;
+}
+
+.duo-mother {
+  --pedigree-duo-square-fill: none;
+  --pedigree-duo-square-stroke: none;
+}
+
+.duo-father {
+  --pedigree-duo-circle-fill: none;
+  --pedigree-duo-circle-stroke: none;
+}
+
 .preview-data .preview-category,
 .preview-data .preview-title {
   font-weight: 500;

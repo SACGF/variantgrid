@@ -5,7 +5,7 @@ from django.utils.html import escape
 from django.utils.safestring import mark_safe
 
 from patients.models_enums import Sex
-from snpdb.models import DETECTED_SEX_HELP, CohortGenotypeStats, Quad, Trio
+from snpdb.models import DETECTED_SEX_HELP, CohortGenotypeStats, Duo, Quad, Trio
 
 register = Library()
 
@@ -31,6 +31,16 @@ def quad_table(quad: Quad):
         {"role": "Sibling", "cohort_sample": quad.sibling, "affected": quad.sibling_affected},
     ]
     return {"quad": quad, "members": members}
+
+
+@register.inclusion_tag("snpdb/tags/duo_table.html", takes_context=False)
+def duo_table(duo: Duo):
+    """ Duo details + a row per family member - the proband is affected by definition """
+    members = [
+        {"role": "Proband", "cohort_sample": duo.proband, "affected": True},
+        {"role": duo.relationship_label, "cohort_sample": duo.parent, "affected": duo.parent_affected},
+    ]
+    return {"duo": duo, "members": members}
 
 
 @register.simple_tag

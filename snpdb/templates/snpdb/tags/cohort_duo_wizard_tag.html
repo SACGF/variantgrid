@@ -1,0 +1,72 @@
+{# Analysis can be turned off in that case URLs won't resolve so just skip #}
+{% if url_name_visible.analysis and url_name_visible.duo_wizard %}
+    {% load ui_utils %}
+    {% if cohort.cohort_genotype_collection and sample_count >= 2 %}
+    <style>
+    #create-duo-button {
+        float: left;
+    }
+
+    .duo-button-component {
+        float: left;
+    }
+
+    svg.duo-button-component {
+        width: 1.4em;
+        height: 1.5em;
+        margin-right: 0.4em;
+    }
+    </style>
+    <script>
+    function getDuoUrl(requireChecked) {
+        const sampleIdList = [];
+        $(".sample-select").each(function() {
+            if (!requireChecked || $(this).is(":checked")) {
+                const sampleId = $(this).attr("sample_id");
+                sampleIdList.push(sampleId);
+            }
+        });
+
+        let COHORT_ID = {{ cohort.pk }};
+        return Urls.duo_wizard(COHORT_ID, sampleIdList[0], sampleIdList[1]);
+    }
+
+    function duoClick() {
+        window.location = getDuoUrl(true);
+    }
+
+    function setupDuoButton() {
+        const numSelectedSamples = $("input.sample-select:checked").length;
+        $("#num-selected-samples-duo").html(numSelectedSamples);
+
+        const buttonEnabled = numSelectedSamples === 2;
+        $("#create-duo-button").prop("disabled", !buttonEnabled);
+    }
+
+    function initDuo() {
+        $("#create-duo-button").click(duoClick);
+        $(".sample-select").change(setupDuoButton);
+        setupDuoButton();
+    }
+
+    $(document).ready(function() {
+    {% if sample_count == 2 %}
+        const allSamplesUrl = getDuoUrl(false);
+        $("#create-duo-button").prop("disabled", false).click(function() {
+            window.location = allSamplesUrl;
+        });
+    {% else %}
+        initDuo();
+    {% endif %}
+    });
+    </script>
+    <button id='create-duo-button' disabled class="btn btn-outline-primary" type="button">
+      {% preview_icon_for_model "snpdb.Duo" "duo-button-component" %}
+      Perform duo analysis using template
+    </button>
+    {% if sample_count > 2 %}
+        <span>&gt;2 samples to choose from - select exactly 2 using checkboxes on the left to create Duo. <span id='num-selected-samples-duo'></span> samples selected. </span>
+    {% endif %}
+    <div class='clear'></div>
+    {% endif %}
+{% endif %}
