@@ -1,11 +1,58 @@
 {% extends menu_patients_base %}
 {% load model_tags %}
+{% load ui_utils %}
 {% load related_data_tags %}
 {% load related_analyses_tags %}
 
 {% block title %}Trio {{ trio }}{% endblock %}
 
+{% block head %}
+<style>
+/* Pedigree figure - the same sprite symbol the TrioNode and trio wizard wear */
+.pedigree-figure {
+    width: 150px;
+    height: 122px;
+    color: #495057;
+    /* the sprite's stroke is weighted for a 15px badge - lighten it at this size */
+    --pedigree-stroke-width: 1.5;
+}
+
+.pedigree-figure.mother-affected {
+    --pedigree-mother-fill: currentColor;
+}
+
+.pedigree-figure.father-affected {
+    --pedigree-father-fill: currentColor;
+}
+
+#trio-heading .svg-symbol-icon {
+    margin-right: 0.35em;
+    width: 1.5em;
+    height: 1.2em;
+    vertical-align: -0.15em;
+    color: #495057;
+}
+
+#details .card table th {
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+#details .trio-details-table th {
+    width: 1%;
+}
+
+#details .card td, #details .card th {
+    vertical-align: middle;
+}
+</style>
+{% endblock head %}
+
 {% block submenu_page_content %}
+
+    <h3 id="trio-heading">
+        {% preview_icon trio %} Trio: {{ trio }}
+    </h3>
 
     <div id="trio-tabs">
         <ul class="nav nav-tabs mb-4" role="tablist">
@@ -16,7 +63,20 @@
         </ul>
         <div class="tab-content">
             <div class="tab-pane show active" role="tabpanel" id="details">
-                {% trio_table trio %}
+                <div class="row">
+                    <div class="col-lg-8">
+                        {% trio_table trio %}
+                    </div>
+                    <div class="col-lg-4">
+                        <div class="card mb-3">
+                            <div class="card-header">Pedigree</div>
+                            <div class="card-body text-center">
+                                <svg class="pedigree-figure {% if trio.mother_affected %}mother-affected{% endif %} {% if trio.father_affected %}father-affected{% endif %}"><use href="#node-icon-trio"></use></svg>
+                                <div class="text-muted small">Filled symbols are affected</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
             {% if has_write_permission %}
             <div class="tab-pane" role="tabpanel" id="trio-permissions"></div>
@@ -30,5 +90,3 @@
     </div>
 
 {% endblock %}
-
-

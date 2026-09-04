@@ -12,7 +12,13 @@ register = Library()
 
 @register.inclusion_tag("snpdb/tags/trio_table.html", takes_context=False)
 def trio_table(trio: Trio):
-    return {"trio": trio}
+    """ Trio details + a row per family member - the proband is affected by definition """
+    members = [
+        {"role": "Proband", "cohort_sample": trio.proband, "affected": True},
+        {"role": "Mother", "cohort_sample": trio.mother, "affected": trio.mother_affected},
+        {"role": "Father", "cohort_sample": trio.father, "affected": trio.father_affected},
+    ]
+    return {"trio": trio, "members": members}
 
 
 @register.inclusion_tag("snpdb/tags/quad_table.html", takes_context=False)
