@@ -143,7 +143,7 @@ function setProbandPhenoText() {
                         </thead>
                         <tbody>
                             <tr>
-                                <td>{{ sample_1.name }}</td>
+                                <td><a href="{{ sample_1.get_absolute_url }}">{{ sample_1.name }}</a></td>
                                 <td class='sample-select role-cell'>{{ form.sample_1 }}{{ form.sample_1.errors }}</td>
                                 <td class='sample-affected affected-cell'>
                                     <div class="custom-control custom-switch">
@@ -152,11 +152,11 @@ function setProbandPhenoText() {
                                     </div>
                                     <span class="proband-affected text-muted small">Always</span>
                                 </td>
-                                <td>{{ sample_1.patient | default_if_none:"" }}</td>
+                                <td>{% if sample_1.patient %}<a href="{{ sample_1.patient.get_absolute_url }}">{{ sample_1.patient }}</a>{% endif %}</td>
                                 <td id='patient-results-1'></td>
                             </tr>
                             <tr>
-                                <td>{{ sample_2.name }}</td>
+                                <td><a href="{{ sample_2.get_absolute_url }}">{{ sample_2.name }}</a></td>
                                 <td class='sample-select role-cell'>{{ form.sample_2 }}{{ form.sample_2.errors }}</td>
                                 <td class='sample-affected affected-cell'>
                                     <div class="custom-control custom-switch">
@@ -165,11 +165,11 @@ function setProbandPhenoText() {
                                     </div>
                                     <span class="proband-affected text-muted small">Always</span>
                                 </td>
-                                <td>{{ sample_2.patient | default_if_none:"" }}</td>
+                                <td>{% if sample_2.patient %}<a href="{{ sample_2.patient.get_absolute_url }}">{{ sample_2.patient }}</a>{% endif %}</td>
                                 <td id='patient-results-2'></td>
                             </tr>
                             <tr>
-                                <td>{{ sample_3.name }}</td>
+                                <td><a href="{{ sample_3.get_absolute_url }}">{{ sample_3.name }}</a></td>
                                 <td class='sample-select role-cell'>{{ form.sample_3 }}{{ form.sample_3.errors }}</td>
                                 <td class='sample-affected affected-cell'>
                                     <div class="custom-control custom-switch">
@@ -178,7 +178,7 @@ function setProbandPhenoText() {
                                     </div>
                                     <span class="proband-affected text-muted small">Always</span>
                                 </td>
-                                <td>{{ sample_3.patient | default_if_none:"" }}</td>
+                                <td>{% if sample_3.patient %}<a href="{{ sample_3.patient.get_absolute_url }}">{{ sample_3.patient }}</a>{% endif %}</td>
                                 <td id='patient-results-3'></td>
                             </tr>
                         </tbody>
