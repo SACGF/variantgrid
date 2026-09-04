@@ -27,6 +27,17 @@
                  {% timestamp overlap.overlap_status_change_timestamp time_ago=True %}
                 {% endlabelled %}
             {% endif %}
+            {% if overlap.overlap_status.is_discordant %}
+            {% labelled label="Next Step" %}
+                {% if overlap_grouping.skews|length == 1 %}
+                    {{ overlap_grouping.skews.0.next_step.label }}
+                {% else %}
+                    {% for skew in overlap_grouping.skews %}
+                        <div>{% lab skew.contribution.classification_grouping.lab %} - <span style="font-weight:500">{{ skew.next_step.label }}</span></div>
+                    {% endfor %}
+                {% endif %}
+            {% endlabelled %}
+            {% endif %}
             {% labelled label="Context" %}
                 {% for testing_context in overlap.testing_contexts_objs %}{% if not forloop.first %}/{% endif %}<span class="testing-context-box testing-context-{{ testing_context.value }}">{{ testing_context.name | pretty_label:"lower" }}</span>{% endfor %}
                 {{ overlap.value_type_label }}

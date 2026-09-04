@@ -373,6 +373,7 @@ class ImportedAlleleInfoDownload(ExportRow):
     def allele_url(self):
         if allele := self.allele_info.allele:
             return get_url_from_view_path(allele.get_absolute_url())
+        return None
 
     @export_column(label="Involved Labs")
     def involved_labs(self):

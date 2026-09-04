@@ -18,11 +18,11 @@ CRITERIA_NEUTRAL = 'N'
 
 class OverlapOverrideStatus(IntegerChoices):
     # TODO resolution might be a better term, or ongoing
-    NO_OVERRIDE = 0, "No override"
+    NO_OVERRIDE = 0, "No Override"
     COMPLEX = 10, "Complex"
-    CONTINUED_DISCORDANCE = 20, "Continued discordance"
+    CONTINUED_DISCORDANCE = 20, "Continued Discordance"
     CONFIDENT_VS_CLINVAR = 30, "Confident vs ClinVar"
-    IGNORING_OLD_CLINVAR = 40, "Ignoring older ClinVar records"
+    IGNORING_OLD_CLINVAR = 40, "Ignoring Older ClinVar Records"
 
     @property
     def is_auto_review(self):
