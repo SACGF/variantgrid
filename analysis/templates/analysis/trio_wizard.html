@@ -1,6 +1,7 @@
 {% extends menu_analysis_base %}
 {% load static %}
 {% load js_tags %}
+{% load model_tags %}
 {% block title %}Trio Wizard{% endblock title %}
 
 {% block head %}
@@ -139,7 +140,7 @@ function setProbandPhenoText() {
                     <div class="card-header">Samples</div>
                     <table id='trio-table' class="table table-sm mb-0">
                         <thead>
-                            <tr><th>Sample</th><th>Role</th><th>Affected</th><th>Patient</th><th>Phenotype</th></tr>
+                            <tr><th>Sample</th><th>Role</th><th>Affected</th><th data-help="{% detected_sex_help %}">Detected Sex</th><th>Patient</th><th>Phenotype</th></tr>
                         </thead>
                         <tbody>
                             <tr>
@@ -152,6 +153,7 @@ function setProbandPhenoText() {
                                     </div>
                                     <span class="proband-affected text-muted small">Always</span>
                                 </td>
+                                <td>{% detected_sex sample_1.get_genotype_stats %}</td>
                                 <td>{% if sample_1.patient %}<a href="{{ sample_1.patient.get_absolute_url }}">{{ sample_1.patient }}</a>{% endif %}</td>
                                 <td id='patient-results-1'></td>
                             </tr>
@@ -165,6 +167,7 @@ function setProbandPhenoText() {
                                     </div>
                                     <span class="proband-affected text-muted small">Always</span>
                                 </td>
+                                <td>{% detected_sex sample_2.get_genotype_stats %}</td>
                                 <td>{% if sample_2.patient %}<a href="{{ sample_2.patient.get_absolute_url }}">{{ sample_2.patient }}</a>{% endif %}</td>
                                 <td id='patient-results-2'></td>
                             </tr>
@@ -178,6 +181,7 @@ function setProbandPhenoText() {
                                     </div>
                                     <span class="proband-affected text-muted small">Always</span>
                                 </td>
+                                <td>{% detected_sex sample_3.get_genotype_stats %}</td>
                                 <td>{% if sample_3.patient %}<a href="{{ sample_3.patient.get_absolute_url }}">{{ sample_3.patient }}</a>{% endif %}</td>
                                 <td id='patient-results-3'></td>
                             </tr>

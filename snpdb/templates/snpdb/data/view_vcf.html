@@ -6,6 +6,7 @@
 {% load js_tags %}
 {% load settings_tags %}
 {% load crispy_forms_tags %}
+{% load model_tags %}
 
 {% block title %}{{ vcf.name }}{% endblock %}
 {% block head %}
@@ -393,6 +394,7 @@ $(document).ready(function() {
                     {% endif %}
                     <th>VCF Sample Name
                     <th>Name
+                    <th data-help="{% detected_sex_help %}">Detected Sex</th>
                     <th>Patient
                     <th>Extraction
                 </tr>
@@ -425,6 +427,7 @@ $(document).ready(function() {
                 {% endif %}
                     <td class="vcf-sample-name">{{ form.vcf_sample_name }}{{ form.vcf_sample_name.errors }}</td>
                     <td class="sample-name">{{ form.name }}{{ form.name.errors }}</td>
+                    <td>{% detected_sex sample_genotype_stats|get_item:form.instance.pk %}</td>
                     <td>
                         <div class="sample-patient display-flex">
                             <div class="icon24 patient-icon"></div>

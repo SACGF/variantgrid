@@ -11,6 +11,8 @@
     See annotation/models/models_cohort_stats.py for the annotation-version-keyed
     counterparts.
 """
+from typing import Optional
+
 from django.db import models
 from django.db.models.deletion import CASCADE
 from django.db.models.query_utils import Q
@@ -22,6 +24,15 @@ from snpdb.models.models_vcf import SampleStatsCodeVersion
 
 # Targeted panels can have too few chrX calls for the hom/het ratio to mean anything
 MIN_CHRX_VARIANTS_FOR_SEX_GUESS = 30
+CHRX_FEMALE_MAX_HOM_HET_RATIO = 0.2
+CHRX_MALE_MIN_HOM_HET_RATIO = 0.8
+
+DETECTED_SEX_HELP = (
+    "Sex called from the sample's chrX hom/het genotype ratio - males are hemizygous so have almost "
+    f"no heterozygous chrX calls. Above {CHRX_MALE_MIN_HOM_HET_RATIO} is male, below "
+    f"{CHRX_FEMALE_MAX_HOM_HET_RATIO} is female, in between is unknown, and it takes at least "
+    f"{MIN_CHRX_VARIANTS_FOR_SEX_GUESS} chrX calls to call it at all."
+)
 
 
 class CohortGenotypeStats(TimeStampedModel):
@@ -108,13 +119,28 @@ class CohortGenotypeStats(TimeStampedModel):
         return count
 
     @property
+    def chrx_hom_het_ratio(self) -> Optional[float]:
+        if self.x_het_count:
+            return self.x_hom_count / self.x_het_count
+        return None
+
+    @property
     def chrx_sex_guess(self) -> Sex:
         """ Genetic sex from the chrX hom/het ratio - UNKNOWN if we don't have enough calls to tell """
         if self.x_het_count and self.x_hom_count:
             if self.x_hom_count + self.x_het_count >= MIN_CHRX_VARIANTS_FOR_SEX_GUESS:
-                ratio = self.x_hom_count / self.x_het_count
-                if ratio < 0.2:
+                ratio = self.chrx_hom_het_ratio
+                if ratio < CHRX_FEMALE_MAX_HOM_HET_RATIO:
                     return Sex.FEMALE
-                if ratio > 0.8:
+                if ratio > CHRX_MALE_MIN_HOM_HET_RATIO:
                     return Sex.MALE
         return Sex.UNKNOWN
+
+    @property
+    def chrx_sex_detail(self) -> str:
+        """ The chrX counts chrx_sex_guess was made on - shown alongside DETECTED_SEX_HELP """
+        detail = f"This sample: {self.x_hom_count} hom / {self.x_het_count} het"
+        ratio = self.chrx_hom_het_ratio
+        if ratio is not None:
+            detail += f", ratio {ratio:.2f}"
+        return detail

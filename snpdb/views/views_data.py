@@ -111,6 +111,18 @@ def _get_vcf_sample_stats(vcf, passing_filter: bool):
     return sample_stats_het_hom_count, sample_names, tuple(sample_zygosities.items())
 
 
+def _get_vcf_sample_genotype_stats(vcf: VCF) -> dict[int, CohortGenotypeStats]:
+    """ Sample ID -> per-sample stats row, so the samples table can show detected sex without an N+1 """
+    try:
+        cgc = vcf.cohort.cohort_genotype_collection
+    except (Cohort.DoesNotExist, CohortGenotypeCollection.DoesNotExist, DataArchivedError):
+        return {}
+
+    stats_qs = CohortGenotypeStats.objects.filter(cohort_genotype_collection=cgc, sample__vcf=vcf,
+                                                  filter_key__isnull=True, passing_filter=False)
+    return {ss.sample_id: ss for ss in stats_qs}
+
+
 def _get_vcf_length_stats(vcf: VCF) -> dict:
     vcf_length_stats = {}
     try:
@@ -160,6 +172,7 @@ def view_vcf(request, vcf_id):
 
     sample_stats_het_hom_count, sample_names, sample_zygosities = _get_vcf_sample_stats(vcf, passing_filter=False)
     sample_stats_pass_het_hom_count, _, sample_zygosities_pass = _get_vcf_sample_stats(vcf, passing_filter=True)
+    sample_genotype_stats = _get_vcf_sample_genotype_stats(vcf)
 
     VCFSampleFormSet = inlineformset_factory(VCF, Sample, extra=0, can_delete=False,
                                              fields=["vcf_sample_name", "name", "patient", "extraction"],
@@ -249,6 +262,7 @@ def view_vcf(request, vcf_id):
         'vcf': vcf,
         'sample_stats_het_hom_count': sample_stats_het_hom_count,
         'sample_stats_pass_het_hom_count': sample_stats_pass_het_hom_count,
+        'sample_genotype_stats': sample_genotype_stats,
         'sample_names': sample_names,
         'sample_zygosities': sample_zygosities,
         'vcf_form': vcf_form,

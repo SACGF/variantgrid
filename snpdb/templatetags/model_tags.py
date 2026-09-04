@@ -1,8 +1,11 @@
+from typing import Optional
+
 from django.template.library import Library
 from django.utils.html import escape
 from django.utils.safestring import mark_safe
 
-from snpdb.models import Quad, Trio
+from patients.models_enums import Sex
+from snpdb.models import DETECTED_SEX_HELP, CohortGenotypeStats, Quad, Trio
 
 register = Library()
 
@@ -21,3 +24,20 @@ def quad_table(quad: Quad):
 def trio_short_description(trio: Trio):
     params = (escape(trio.mother_details), escape(trio.father_details), escape(trio.proband))
     return mark_safe("<b>M:</b> %s/<b>F:</b> %s/<b>P:</b> %s" % params)
+
+
+@register.simple_tag
+def detected_sex_help(stats: Optional[CohortGenotypeStats] = None):
+    """ Tooltip explaining how Sample.detected_sex is worked out - hang it off a label or column header.
+        Pass the sample's stats to have the chrX counts it was called on spelled out too """
+    if stats:
+        return f"{DETECTED_SEX_HELP} {stats.chrx_sex_detail}"
+    return DETECTED_SEX_HELP
+
+
+@register.inclusion_tag("snpdb/tags/detected_sex.html", takes_context=False)
+def detected_sex(stats: Optional[CohortGenotypeStats]):
+    """ Detected sex as a table cell value, with this sample's chrX counts on hover """
+    sex = stats.chrx_sex_guess if stats else Sex.UNKNOWN
+    detail = stats.chrx_sex_detail if stats else "No chrX genotype counts for this sample"
+    return {"sex": sex, "detail": detail}
