@@ -458,7 +458,11 @@ class OverlapGrouping3:
 
     @cached_property
     def skews(self) -> list[OverlapContributionSkew]:
-        relevant_skews = list(self.overlap.overlapcontributionskew_set.filter(contribution__classification_grouping__lab__in=Lab.valid_labs_qs(self.user, admin_check=True)))
+        relevant_skews = list(
+            self.overlap.overlapcontributionskew_set.filter(
+                contribution__contribution_status=OverlapContributionStatus.CONTRIBUTING,
+                contribution__classification_grouping__lab__in=Lab.valid_labs_qs(self.user, admin_check=True))
+        )
         sorted_by_lab = list(sorted(relevant_skews, key=lambda ocs: ocs.contribution.classification_grouping.lab))
         return sorted_by_lab
 
