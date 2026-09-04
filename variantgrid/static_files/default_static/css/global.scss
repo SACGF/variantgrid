@@ -1007,6 +1007,37 @@ table.as_table {
 	}
 }
 
+// Every tag on the site is this markup (@see getVariantTagHtml) - the grids, the tags pages, the
+// node counts lists and the tag autocomplete - so the pill is shaped once here. Tag colours come
+// from UserTagColor (@see render_rgb_css), which is why the background is only a fallback.
+// Sized to sit inside a grid row's line box, so tagging a variant doesn't make its row taller
+// than every other row in the grid.
+.grid-tag {
+	position: relative;
+	display: inline-block;
+	// top, not middle - a 16px box aligned to the middle of a 16px line box makes the line
+	// (and so every tagged row) taller than the rest of the grid
+	vertical-align: top;
+
+	// Capped so one long tag name can't take the whole cell (and push the X out of the clipped
+	// cell with it) - the full name is in the tag's title
+	.user-tag-colored {
+		display: inline-block;
+		max-width: 130px;
+		height: 16px;
+		line-height: 16px;
+		margin: 0 3px 0 0;
+		padding: 0 6px;
+		border-radius: 8px;
+		font-size: 10px;
+		background: #eceff3;
+		color: #333;
+		overflow: hidden;
+		white-space: nowrap;
+		text-overflow: ellipsis;
+	}
+}
+
 // The variant grids (@see AbstractVariantGrid in snpdb/grids.py) are dozens of columns wide and hold
 // cells with hundreds of links. Every column carries a width (RichColumn.width, falling back to
 // default_column_width), so lay the table out from those and clip each cell to one line, rather than
@@ -1495,34 +1526,6 @@ table.variantgrid-datatable {
 		}
 	}
 
-	// Tags sit inside the row's line box, so tagging a variant doesn't make its row taller than
-	// every other row in the grid. @see VariantGridFormat.tags
-	.grid-tag {
-		position: relative;
-		display: inline-block;
-		// top, not middle - a 16px box aligned to the middle of a 16px line box makes the line
-		// (and so every tagged row) taller than the rest of the grid
-		vertical-align: top;
-
-		// Capped so one long tag name can't take the whole cell (and push the X out of the clipped
-		// cell with it) - the full name is in the tag's title
-		.user-tag-colored {
-			display: inline-block;
-			max-width: 130px;
-			height: 16px;
-			line-height: 16px;
-			margin: 0 3px 0 0;
-			padding: 0 6px;
-			border-radius: 8px;
-			font-size: 10px;
-			background: #eceff3;
-			color: #333;
-			overflow: hidden;
-			white-space: nowrap;
-			text-overflow: ellipsis;
-		}
-	}
-
 	.grid-tag-deletable .user-tag-colored {
 		cursor: pointer;
 	}
@@ -1659,17 +1662,6 @@ table.variantgrid-datatable {
 	&.dataTable thead > tr > th::after {
 		right: 2px !important;
 	}
-}
-
-// The tag autocomplete's entries are grid tag markup (@see colorTagAutocompleteResults) but select2
-// draws its dropdown outside the grid that shapes them - give them the same rounded pill here
-.select2-results__option .grid-tag .user-tag-colored {
-	display: inline-block;
-	padding: 1px 8px;
-	border-radius: 9px;
-	font-size: 11px;
-	background: #eceff3;
-	color: #333;
 }
 
 table {

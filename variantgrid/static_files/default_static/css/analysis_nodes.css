@@ -806,15 +806,6 @@ span.node-counts {
 	opacity: 0.7;
 }
 
-.grid-tag .user-tag-colored {
-    margin: 2px;
-    padding: 2px;
-    display: inline-block;
-    white-space: nowrap;
-    cursor: pointer;
-}
-
-
 @keyframes redpulse {
   0% {
     box-shadow: 0 0 0 0 rgba(255, 100, 100, 0.4); }

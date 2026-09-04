@@ -38,21 +38,10 @@
         width: 100%;
     }
 
-    /* Tag node counts render as the tag itself, drawn as the same pill the grid uses
-       (@see table.variantgrid-datatable .grid-tag in global.scss) so they read as tags */
+    /* The list is as wide as the tab, so let a long tag name have all of it rather than the
+       width a grid cell can spare (@see .grid-tag in global.scss) */
     .node-count-filter .grid-tag .user-tag-colored {
-        display: inline-block;
         max-width: 100%;
-        height: 16px;
-        line-height: 16px;
-        padding: 0 6px;
-        border-radius: 8px;
-        font-size: 10px;
-        background: #eceff3;
-        color: #333;
-        overflow: hidden;
-        white-space: nowrap;
-        text-overflow: ellipsis;
     }
 
     .node-count-filter .grid-tag .tag-icon {

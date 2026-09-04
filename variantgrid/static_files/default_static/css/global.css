@@ -873,6 +873,27 @@ table.as_table td {
   border: none;
 }
 
+.grid-tag {
+  position: relative;
+  display: inline-block;
+  vertical-align: top;
+}
+.grid-tag .user-tag-colored {
+  display: inline-block;
+  max-width: 130px;
+  height: 16px;
+  line-height: 16px;
+  margin: 0 3px 0 0;
+  padding: 0 6px;
+  border-radius: 8px;
+  font-size: 10px;
+  background: #eceff3;
+  color: #333;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
 table.variantgrid-datatable {
   table-layout: fixed;
   width: auto;
@@ -1282,26 +1303,6 @@ table.variantgrid-datatable td.dt-tags_global:hover > .grid-tags {
   z-index: 3;
   background: #f8f8f8;
 }
-table.variantgrid-datatable .grid-tag {
-  position: relative;
-  display: inline-block;
-  vertical-align: top;
-}
-table.variantgrid-datatable .grid-tag .user-tag-colored {
-  display: inline-block;
-  max-width: 130px;
-  height: 16px;
-  line-height: 16px;
-  margin: 0 3px 0 0;
-  padding: 0 6px;
-  border-radius: 8px;
-  font-size: 10px;
-  background: #eceff3;
-  color: #333;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
 table.variantgrid-datatable .grid-tag-deletable .user-tag-colored {
   cursor: pointer;
 }
@@ -1403,15 +1404,6 @@ table.variantgrid-datatable.dataTable thead > tr > th.sorting_disabled {
 table.variantgrid-datatable.dataTable thead > tr > th::before,
 table.variantgrid-datatable.dataTable thead > tr > th::after {
   right: 2px !important;
-}
-
-.select2-results__option .grid-tag .user-tag-colored {
-  display: inline-block;
-  padding: 1px 8px;
-  border-radius: 9px;
-  font-size: 11px;
-  background: #eceff3;
-  color: #333;
 }
 
 table.sticky-header thead th {
