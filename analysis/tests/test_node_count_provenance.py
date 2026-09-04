@@ -7,7 +7,7 @@ from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 
 from analysis.models import Analysis
-from analysis.models.nodes.analysis_node import AnalysisNode, NodeCount, NodeVersion
+from analysis.models.nodes.analysis_node import AnalysisNode, NodeVersion
 from analysis.models.nodes.filters.population_node import PopulationNode
 from analysis.models.nodes.sources.sample_node import SampleNode
 from annotation.fake_annotation import get_fake_annotation_version
@@ -118,17 +118,17 @@ class TestNodeCountProvenance(TestCase):
 
     def test_small_node_stores_its_variant_ids(self):
         node = self._source_node()
-        node_count = NodeCount.load_for_node(node, BuiltInFilters.TOTAL)
+        node_version = NodeVersion.objects.get(node=node, version=node.version)
 
         expected_pks = set(node.get_queryset().values_list("pk", flat=True))
-        self.assertEqual(expected_pks, set(node_count.variant_ids))
-        self.assertEqual(node_count.count, len(node_count.variant_ids))
-        self.assertEqual(node.count, len(node_count.variant_ids))
+        self.assertEqual(expected_pks, set(node_version.variant_ids))
+        self.assertEqual(node_version.counts[BuiltInFilters.TOTAL], len(node_version.variant_ids))
+        self.assertEqual(node.count, len(node_version.variant_ids))
 
     @override_settings(ANALYSIS_NODE_STORE_ID_SIZE_MAX=0)
     def test_large_node_stores_no_variant_ids(self):
         node = self._source_node()
-        self.assertIsNone(NodeCount.load_for_node(node, BuiltInFilters.TOTAL).variant_ids)
+        self.assertIsNone(NodeVersion.objects.get(node=node, version=node.version).variant_ids)
         self.assertIsNone(AnalysisNode.get_cached_node_pks(node))
         self.assertIsNone(AnalysisNode.get_small_parent_arg_q_dict(node),
                           "Caller falls back to the parent subquery")

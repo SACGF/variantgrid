@@ -116,7 +116,7 @@ class TestExplicitPkSubstitution(TestCase):
     @staticmethod
     def _ready(node):
         """ Run the node's counts as the load pipeline would, so children can compose it - and so the
-            TOTAL NodeCount holds the PK set the substitution path reads. """
+            NodeVersion holds the PK set the substitution path reads. """
         status, count = node.node_counts()
         node.update(status=status, count=count)
         node.status = status

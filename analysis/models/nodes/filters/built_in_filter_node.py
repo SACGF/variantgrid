@@ -4,7 +4,7 @@ from auditlog.registry import auditlog
 from django.db import models
 from django.db.models import Q
 
-from analysis.models.nodes.analysis_node import AnalysisNode, NodeCount
+from analysis.models.nodes.analysis_node import AnalysisNode
 from analysis.models.nodes.node_counts import get_extra_filters_q
 from analysis.models.nodes.node_display import NodeIcon
 from annotation.models import ClinVarReviewStatus
@@ -79,8 +79,7 @@ class BuiltInFilterNode(AnalysisNode):
             if label in [BuiltInFilters.TOTAL, self.built_in_filter]:
                 try:
                     parent = self.get_single_parent()
-                    parent_node_count = NodeCount.load_for_node(parent, self.built_in_filter)
-                    count = parent_node_count.count
+                    count = parent.node_version.counts.get(self.built_in_filter)
                 except Exception:
                     pass
         return count

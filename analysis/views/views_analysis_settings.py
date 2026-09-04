@@ -15,7 +15,7 @@ from analysis import forms
 from analysis.models import AnalysisLock
 from analysis.models.enums import AnalysisTemplateType
 from analysis.models.nodes import node_utils
-from analysis.models.nodes.analysis_node import NodeCount
+from analysis.models.nodes.analysis_node import NodeVersion
 from analysis.models.nodes.node_counts import get_node_counts_mine_and_available
 from analysis.views.analysis_permissions import get_analysis_or_404
 from analysis.views.views import get_analysis_settings
@@ -198,11 +198,11 @@ def analysis_settings_benchmark_tab(request, analysis_id):
         })
     node_rows.sort(key=lambda r: (r["load_seconds"] is None, -(r["load_seconds"] or 0.0)))
 
-    nc_times = list(NodeCount.objects.filter(node_version__node__analysis=analysis)
-                    .values_list("created", flat=True))
-    if nc_times:
-        wall_start = min(nc_times)
-        wall_end = max(nc_times)
+    # A node version's modified is when its load wrote the counts (a later tag recount bumps it too)
+    load_times = list(NodeVersion.objects.filter(node__analysis=analysis).values_list("modified", flat=True))
+    if load_times:
+        wall_start = min(load_times)
+        wall_end = max(load_times)
         wall_seconds = (wall_end - wall_start).total_seconds()
     else:
         wall_start = None
@@ -218,7 +218,7 @@ def analysis_settings_benchmark_tab(request, analysis_id):
         "wall_seconds": wall_seconds,
         "wall_start": wall_start,
         "wall_end": wall_end,
-        "node_count_sample_size": len(nc_times),
+        "node_version_sample_size": len(load_times),
     }
     return render(request, 'analysis/analysis_settings_benchmark_tab.html', context)
 

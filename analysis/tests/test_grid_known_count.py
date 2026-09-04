@@ -8,7 +8,6 @@ from django.db import connection
 from django.test.utils import CaptureQueriesContext
 
 from analysis.grids import VariantGrid
-from analysis.models.nodes.analysis_node import NodeCount
 from analysis.tests.test_grid_export import GridExportTestCase
 from snpdb.models.models_enums import BuiltInFilters
 from snpdb.views.datatable_view import datatable_response
@@ -32,9 +31,11 @@ class NodeGridKnownCountTest(GridExportTestCase):
         self.assertEqual([], count_queries)
 
     def test_extra_filter_uses_its_node_count(self):
-        """ NodeCount is keyed on (node_version, label), so the stored count already matches the filter """
+        """ Counts are stored per node version and label, so the stored count already matches the filter """
         node = self._sample_node()
-        NodeCount.objects.create(node_version=node.node_version, label=BuiltInFilters.CLINVAR, count=42)
+        node_version = node.node_version
+        node_version.load_data = {"counts": {BuiltInFilters.CLINVAR: 42}}
+        node_version.save()
         grid = VariantGrid(self._request(), node, extra_filters=BuiltInFilters.CLINVAR)
         data, count_queries = self._get_data(grid)
         self.assertEqual(42, data["recordsFiltered"])
