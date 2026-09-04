@@ -44,7 +44,12 @@ def cached_generated_file_check(request, cgf_id):
     if cgf.exception:
         data["exception"] = str(cgf.exception)
     elif cgf.task_status == "SUCCESS":
-        if cgf.filename:
+        if cgf.file_missing:
+            # Pollers that go via a generator view have had the row dropped already - this is for
+            # anyone holding onto a cgf_id (@see analysis_downloads.js)
+            data["status"] = "FAILURE"
+            data["exception"] = "Generated file is no longer available"
+        elif cgf.filename:
             data["url"] = cgf.get_media_url()
         else:
             # File generation still in progress - task_status was set before filename was saved

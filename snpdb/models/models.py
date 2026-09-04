@@ -113,10 +113,26 @@ class CachedGeneratedFile(TimeStampedModel):
             raise ValueError(f"{self}.filename is None")
         return get_url_from_media_root_filename(self.filename)
 
+    @property
+    def file_missing(self) -> bool:
+        """ We generated a file but it's not there anymore - eg media_root cleaned up, or the database
+            was copied from a deployment with a different MEDIA_ROOT """
+        if not self.filename:
+            return False  # Still generating - nothing promised yet
+        if not self.filename.startswith(os.path.join(settings.MEDIA_ROOT, "")):
+            return True
+        return not os.path.exists(self.filename)
+
     @staticmethod
     def get_or_create_and_launch(generator, params_hash, task: signature) -> 'CachedGeneratedFile':
         cgf, created = CachedGeneratedFile.objects.get_or_create(generator=generator,
                                                                  params_hash=params_hash)
+        if cgf.file_missing:
+            # Drop the row so the get_or_create below regenerates it lazily
+            logging.info("Discarding CachedGeneratedFile %s - %s is gone", cgf.pk, cgf.filename)
+            cgf.delete()
+            cgf, created = CachedGeneratedFile.objects.get_or_create(generator=generator,
+                                                                     params_hash=params_hash)
         if created or not cgf.task_id:
             logging.debug("Launching Celery Job for CachedGeneratedFile(generator=%s, params_hash=%s)",
                           generator, params_hash)

@@ -137,7 +137,7 @@ $(document).ready(function() {
         {% if cgf %}
             {% if cgf.exception %}
                 afd.setError()
-            {% elif cgf.status == "SUCCESS" %}
+            {% elif cgf.task_status == "SUCCESS" %}
                 afd.setDownloadLink("{{ cgf.get_media_url  }}");
             {% else %}
                 afd.setPolling(false);

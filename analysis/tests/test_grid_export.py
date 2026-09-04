@@ -310,6 +310,28 @@ class TestNodeExportLaunch(GridExportTestCase):
         current = self._launch_export()
         self.assertEqual(stale.pk, current.pk)
 
+    def test_missing_file_is_regenerated(self):
+        """ A cached row whose file is gone - media cleaned up, or a database copied from a deployment
+            with a different MEDIA_ROOT - is dropped so the next request generates it again """
+        first = self._launch_export()
+        CachedGeneratedFile.objects.filter(pk=first.pk).update(task_status="SUCCESS",
+                                                               filename="/gone/annotated.csv.zip")
+        second = self._launch_export()
+        self.assertNotEqual(first.pk, second.pk)
+        self.assertFalse(CachedGeneratedFile.objects.filter(pk=first.pk).exists())
+        self.assertEqual(self._num_cached_files(), 1)
+
+    def test_poll_reports_missing_file_as_failure(self):
+        """ Pollers holding a cgf_id (@see analysis_downloads.js) don't go through the launch view,
+            so the poll has to tell them the file is gone rather than blowing up making its URL """
+        cgf = self._launch_export()
+        CachedGeneratedFile.objects.filter(pk=cgf.pk).update(task_status="SUCCESS",
+                                                             filename="/gone/annotated.csv.zip")
+        url = reverse("cached_generated_file_check", kwargs={"cgf_id": cgf.pk})
+        data = self.client.get(url).json()
+        self.assertEqual(data["status"], "FAILURE")
+        self.assertIn("no longer available", data["exception"])
+
     def test_different_grid_filters_are_separate_downloads(self):
         unfiltered = self._launch_export()
         filters = json.dumps({"groupOp": "AND",

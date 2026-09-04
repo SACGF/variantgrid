@@ -34,18 +34,24 @@ NODE_WAIT_TIME_BETWEEN_CHECKS = [5, 5, 10, 10, 30, 30, 60, MINUTE_SECS * 2]
 NODE_EXPORT_GENERATOR = "export_node_to_downloadable_file"
 
 
+def _get_usable_cgf(generator, pk, export_type) -> Optional[CachedGeneratedFile]:
+    """ A cached file whose output is gone is no better than never having generated it - return None so
+        the page offers the generate link, and get_or_create_and_launch drops the row when they click """
+    params_hash = get_grid_downloadable_file_params_hash(pk, export_type)
+    cgf = CachedGeneratedFile.objects.filter(generator=generator, params_hash=params_hash).first()
+    if cgf and cgf.file_missing:
+        cgf = None
+    return cgf
+
+
 def get_annotated_download_files_cgf(generator, pk) -> dict[str, Optional[CachedGeneratedFile]]:
     annotated_download_files = {}
     try:
         AnalysisTemplate.get_template_from_setting("ANALYSIS_TEMPLATES_AUTO_COHORT_EXPORT")
-        params_hash_vcf = get_grid_downloadable_file_params_hash(pk, "vcf")
-        cgf_vcf = CachedGeneratedFile.objects.filter(generator=generator,
-                                                     params_hash=params_hash_vcf).first()
-        params_hash_csv = get_grid_downloadable_file_params_hash(pk, "csv")
-        cgf_csv = CachedGeneratedFile.objects.filter(generator=generator,
-                                                     params_hash=params_hash_csv).first()
-
-        annotated_download_files = {"vcf": cgf_vcf, "csv": cgf_csv}
+        annotated_download_files = {
+            "vcf": _get_usable_cgf(generator, pk, "vcf"),
+            "csv": _get_usable_cgf(generator, pk, "csv"),
+        }
     except ValueError:
         pass
 
