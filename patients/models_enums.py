@@ -11,8 +11,8 @@ class NucleicAcid(models.TextChoices):
 
 class SampleSourceLevel(models.TextChoices):
     """ A level of the Patient -> Specimen -> Extraction -> Sample hierarchy. Analysis source nodes
-        store one explicitly rather than inferring it from which FK is set - the add node menu stamps
-        it on creation, and the editor has to draw its tree before there is any value """
+        store one explicitly rather than inferring it from which FK is set - the editor has to draw
+        its tree before there is any value """
     SAMPLE = 'S', 'Sample'
     EXTRACTION = 'E', 'Extraction'
     SPECIMEN = 'P', 'Specimen'

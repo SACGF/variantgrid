@@ -19,7 +19,7 @@ from analysis.models.nodes.analysis_node import (
     queryset_to_pk_in_q,
 )
 from analysis.models.nodes.cohort_mixin import SampleMixin
-from analysis.models.nodes.node_display import NodeChip, NodeIcon, NodeMenuEntry
+from analysis.models.nodes.node_display import NodeChip, NodeIcon
 from analysis.models.nodes.stats_cache import (
     get_cached_label_count_for_cohort,
     get_handler_for_node,
@@ -473,16 +473,6 @@ class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
     @classmethod
     def get_node_class_icon(cls) -> NodeIcon:
         return NodeIcon(symbol="node-icon-sample")
-
-    @classmethod
-    def get_menu_entries(cls) -> list[NodeMenuEntry]:
-        """ One row per level, so a user looking for "Patient" finds it where they look for it.
-            The menu shows each level's own model icon; the card still draws the pedigree badge. """
-        return [NodeMenuEntry(key=f"{cls.__name__}:{level}",
-                              label=SampleSourceLevel(level).label,
-                              icon=cls.SOURCE_LEVEL_ICONS[level],
-                              initial_kwargs={"source_level": level})
-                for level in cls.implemented_source_levels()]
 
     def get_node_icon(self) -> NodeIcon:
         """ Pedigree notation on the badge - square/circle for sex, struck through if deceased.

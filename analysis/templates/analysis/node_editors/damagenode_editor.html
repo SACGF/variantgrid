@@ -2,55 +2,38 @@
 {% load js_tags %}
 {% block content %}
 <style>
-	.slider-container {
-		margin-left: 10px;
-		display: inline-block;
-	}
-
-	.slider {
-		display: block;
-		width: 200px;
-		height: 20px;
-		margin: 0;
-	}
-
-	/* Positioning context for the cutoff bands drawn over the range input's track */
-	.slider-track {
-		position: relative;
-		display: inline-block;
-		width: 200px;
-		vertical-align: middle;
-	}
-
-	.slider-labels {
-		width: 200px;
-	}
-
-	.label {
-		font-weight: bold;
-	}
-
-	.slider-value {
-        min-width: 50px;
-        height: 25px;
-		margin-left: 15px;
-	}
-
 	.individual-pathogenic-prediction {
 	    display: none;
 	}
 
 	#variant-class-individual {
 	    display: none;
+	    margin-top: 4px;
 	}
 
 	.variant-class-group-classes {
-	    margin-top: 4px;
+	    display: flex;
+	    flex-wrap: wrap;
+	    align-items: center;
+	    gap: 2px 10px;
+	    margin-top: 3px;
+	}
+
+	.variant-class-group-classes .label {
+	    min-width: 70px;
+	    color: #6b7280;
+	    font-size: 12px;
 	}
 
 	.variant-class-group-label, .variant-class-label, .variant-class-exclude-label {
 	    margin-right: 10px;
 	    font-weight: normal;
+	    white-space: nowrap;
+	}
+
+	#damage-table th.filter-required,
+	#damage-table td.filter-required {
+	    text-align: center;
 	}
 
 	/* Calibrated ClinGen PP3/BP4 cutoff bands drawn over the raw-score slider track */
@@ -284,13 +267,9 @@
     });
 </script>
 <div>
-    <div>
-        <p>
-            Shows variants meeting meeting <b>ANY</b> of the below filters, unless some are made mandatory via 'required'.
-        </p>
-        <p>
-            Check the left box to enable sliders (to distinguish between not selected and a minimum of 0)
-        </p>
+    <div class="editor-help">
+        Shows variants meeting <b>any</b> of the filters below, unless some are made mandatory via 'Required'.
+        Tick the box beside a slider to enable it - that tells "not set" apart from a minimum of 0.
     </div>
 
 	<form id="damage-filter" method="post" action="{{ request.path }}">
@@ -300,10 +279,10 @@
         {% endfor %}
 
 		{{ form.non_field_errors }}
-        <table>
-            <tr>
-                <td></td>
-                <td></td>
+        <table class="editor-table" id="damage-table">
+            <tr class="editor-table-head">
+                <th></th>
+                <th></th>
                 <th><a class="hover-link" href="javascript:toggleRequiredFilter()">Required</a></th>
                 <th class="collapse filter-required">Allow Null</th>
             </tr>
@@ -320,7 +299,7 @@
                         <label class="variant-class-exclude-label" title="Show everything except the selected types">
                             {{ form.variant_class_exclude }} exclude
                         </label>
-                        <a class="hover-link" href="javascript:toggleVariantClasses()">Show individual variant classes</a>
+                        <a class="hover-link" href="javascript:toggleVariantClasses()">Individual variant classes...</a>
                     </div>
                     <div id="variant-class-individual">
                         {% for group_name, subwidgets in form.get_variant_class_groups %}
@@ -385,7 +364,7 @@
             </tr>
             <tr id="show-individual-pathogenic-prediction">
                 <td colspan="2">
-                    <a class="hover-link" href="javascript:showIndividualPathogenicPredictions()">Show Individual Pathogenic Predictions</a>
+                    <a class="hover-link" href="javascript:showIndividualPathogenicPredictions()">Show individual pathogenicity predictions</a>
                 </td>
                 <td></td>
                 <td></td>
@@ -655,26 +634,23 @@
             </tr>
         </table>
 
-        {% if has_write_permission %}
-    		<button id='damage-save' class="btn btn-primary">save</button>
-        {% endif %}
+        <div class="editor-note">
+            {% if node.columns_version == 1%}
+                Damage, CADD and REVEL only apply to non-synonymous SNVs (ie not indels or intergenic).
+            {% else %}
+                Pathogenicity predictions only apply to non-synonymous SNVs (ie not indels or intergenic).
+            {% endif %}
+            MODERATE* does not include missense variants, so use MODERATE* together with one or more
+            of the pathogenicity predictors to include damaging missense variants.
+            <a target="_blank" href="{{ help_url }}analysis/nodes.html#{{ node.get_node_class_label|slugify }}">See help for details.</a>
+            <a target="_blank" href="{% url 'pathogenicity_thresholds' %}">Pathogenicity thresholds &amp; sources.</a>
+        </div>
+        <div class="editor-actions">
+            {% if has_write_permission %}
+                <button id='damage-save' class="btn btn-primary">Save</button>
+            {% endif %}
+        </div>
 	    {{ form.media }}
 	</form>
-
-    <div>
-        Note:
-        {% if node.columns_version == 1%}
-            Damage, CADD and REVEL only apply to non-synonymous SNVs (ie not indels or intergenic)
-        {% else %}
-            Pathogenicity predictions only apply to non-synonymous SNVs (ie not indels or intergenic)
-        {% endif %}
-        MODERATE* does not include missense variants, so we suggest you use MODERATE* in combination with one or more
-        of the Pathogenicity Predictors to include damaging missense variants.
-        <a target="_blank" href="{{ help_url }}analysis/nodes.html#{{ node.get_node_class_label|slugify }}">
-            See help for details.
-        </a>
-        <a target="_blank" href="{% url 'pathogenicity_thresholds' %}">See pathogenicity thresholds &amp; sources.</a>
-    </div>
-
 </div>
 {% endblock content %}

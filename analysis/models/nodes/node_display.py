@@ -4,7 +4,7 @@
     node_utils.get_rendering_dict() for what gets serialized and analysis_nodes.js for the DOM.
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Optional
 
 
@@ -27,17 +27,6 @@ class NodeChip:
     row_break: bool = False  # draw this chip and the ones after it on a new line
     # Chips nested the way the relations are - a specimen wrapping its extractions wrapping their VCFs
     children: tuple["NodeChip", ...] = ()
-
-
-@dataclass(frozen=True)
-class NodeMenuEntry:
-    """ A row in the add node dropdown. A class usually has one, but a class configurable enough that
-        a user would look for its configurations by name (SampleNode's levels) declares several,
-        each stamping its own initial field values on the created node. """
-    key: str  # What node_create is passed - the class name, or "<ClassName>:<something>"
-    label: str
-    icon: NodeIcon
-    initial_kwargs: dict = field(default_factory=dict)
 
 
 def significance_chips(selected: list, field_count: int, short_labels: dict, long_labels: dict,

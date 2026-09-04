@@ -49,7 +49,7 @@ from analysis.models.enums import (
 )
 from analysis.models.models_analysis import Analysis
 from analysis.models.nodes.node_counts import get_node_counts_and_labels_dict, get_node_extra_filters_q
-from analysis.models.nodes.node_display import NodeChip, NodeIcon, NodeMenuEntry
+from analysis.models.nodes.node_display import NodeChip, NodeIcon
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
 from classification.models import Classification
 from library.constants import DAY_SECS, MINUTE_SECS
@@ -829,13 +829,6 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
     def get_node_class_icon(cls) -> NodeIcon:
         """ Badge icon for a node of this class - also what the create node dropdown shows """
         return NodeIcon(fa="fa-solid fa-circle-nodes")
-
-    @classmethod
-    def get_menu_entries(cls) -> list[NodeMenuEntry]:
-        """ The add node dropdown rows this class provides. One per class unless a class is
-            configurable enough that users look for its configurations by name """
-        return [NodeMenuEntry(key=cls.__name__, label=cls.get_node_class_label(),
-                              icon=cls.get_node_class_icon())]
 
     def get_node_icon(self) -> NodeIcon:
         """ Badge icon for this node - the class default unless config changes it (eg SampleNode

@@ -7,23 +7,22 @@
 {% endblock docreadyjs %}
 
 {% block content %}
-<div>
-    <form id="allele-frequency-node-form" method="post" action="{{ request.path }}">
-        {% csrf_token %}
-        {% for hidden in form.hidden_fields %}
-            {{ hidden }}
-        {% endfor %}
-        <div>
-            <b>Sample:</b> {{ form.sample }}
-            <div>
-            {% load allele_frequency_tags %}
-            {% allele_frequency_controls node %}
-            </div>
-            {% if has_write_permission %}
-                <button id='allele-frequency-node-save' class="btn btn-primary">save</button>
-            {% endif %}
-        </div>
-        {{ form.media }}
-    </form>
-</div>
+<form id="allele-frequency-node-form" method="post" action="{{ request.path }}">
+    {% csrf_token %}
+    {% for hidden in form.hidden_fields %}
+        {{ hidden }}
+    {% endfor %}
+    <div class="editor-row">
+        <label class="editor-label" for="{{ form.sample.id_for_label }}">Sample</label>
+        {{ form.sample }}
+    </div>
+    {% load allele_frequency_tags %}
+    {% allele_frequency_controls node %}
+    <div class="editor-actions">
+        {% if has_write_permission %}
+            <button id='allele-frequency-node-save' class="btn btn-primary">Save</button>
+        {% endif %}
+    </div>
+    {{ form.media }}
+</form>
 {% endblock content %}

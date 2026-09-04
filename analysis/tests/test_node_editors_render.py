@@ -11,6 +11,7 @@ from analysis.models.nodes.filters.clinvar_node import ClinVarNode
 from analysis.models.nodes.filters.damage_node import DamageNode
 from analysis.models.nodes.filters.intersection_node import IntersectionNode
 from analysis.tests.utils import AnalysisSetupMixin
+from analysis.views.views_node import NODE_DISPATCHER
 from library.genomics.vcf_enums import VariantClass
 from library.guardian_utils import assign_permission_to_user_and_groups
 
@@ -74,6 +75,13 @@ class NodeEditorRenderTest(AnalysisSetupMixin, TestCase):
         response = client.get(url)
         self.assertEqual(200, response.status_code)
         return response
+
+    def test_every_node_editor_renders(self):
+        # A freshly added node has nothing configured yet - every editor has to cope with that
+        for node_class in NODE_DISPATCHER:
+            with self.subTest(node_class=node_class.__name__):
+                node = node_class.objects.create(analysis=self.analysis)
+                self._get_editor(node)
 
     def test_damage_node_variant_class_groups(self):
         node = DamageNode.objects.create(analysis=self.analysis, variant_class=[VariantClass.SNV])

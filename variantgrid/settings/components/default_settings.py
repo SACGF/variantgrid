@@ -550,8 +550,8 @@ ANALYSIS_DUAL_SCREEN_MODE_FEATURE_ENABLED = False  # Currently broken
 ANALYSIS_TEMPLATES_AUTO_SAMPLE = "Sample tab auto analysis"
 ANALYSIS_TEMPLATES_AUTO_COHORT_EXPORT = "Cohort VCF Export auto analysis"
 ANALYSIS_WARN_IF_NO_QC_GENE_LIST_MESSAGE = None  # disabled by default
-# Which Patient -> Specimen -> Extraction -> Sample levels a SampleNode can read from - one add node
-# menu entry each. A deployment with no patient data trims this down to just the sample
+# Which Patient -> Specimen -> Extraction -> Sample levels a SampleNode can be pointed at in its
+# editor. A deployment with no patient data trims this down to just the sample
 ANALYSIS_SAMPLE_NODE_LEVELS = ["S", "E", "P", "T"]
 ANALYSIS_NODE_CACHE_Q = True
 # Node dispatch throttles (see analysis.tasks.analysis_update_tasks). A single dispatch leases at

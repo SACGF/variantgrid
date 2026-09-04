@@ -101,8 +101,7 @@ class AnalysisNodeClassesForm(forms.Form):
         nodes_by_classification = get_nodes_by_classification()
         for classification in node_classifications:
             nodes = nodes_by_classification[classification]
-            # Alphabetical by label, so "Patient" is found where a user looks for it
-            node_classes = [(data["key"], data["class_label"]) for data in nodes]
+            node_classes = [(data["class_name"], data["class_label"]) for data in nodes]
             nc = sorted(node_classes, key=operator.itemgetter(1))
             choices.append((classification.title(), tuple(nc)))
 

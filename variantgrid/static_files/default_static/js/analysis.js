@@ -638,10 +638,9 @@ function setupErrorHandlers() {
 }
 
 function setupNodeTypeSelect() {
-    // Icon and source/filter colour come from NODE_TYPES - see node_types.get_node_display_data_by_menu_key()
-    // A menu key is a node class, or a class plus the configuration the entry stamps (eg "SampleNode:E")
-    function renderNodeTypeItem(menuKey, label) {
-        const nodeType = NODE_TYPES[menuKey];
+    // Icon and source/filter colour come from NODE_TYPES - see node_types.get_node_display_data_by_class_name()
+    function renderNodeTypeItem(className, label) {
+        const nodeType = NODE_TYPES[className];
         // Class name on the row picks up the node's accent colour - see analysis_nodes.css
         const wrapper = $("<div>", {"class": "node-type-item " + ((nodeType && nodeType.class_name) || "")});
         if (nodeType) {

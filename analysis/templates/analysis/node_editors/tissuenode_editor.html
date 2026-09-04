@@ -10,16 +10,22 @@
 
 {% if node.uses_hpa %}
 	{% if annotation_version.human_protein_atlas_version and node.tissue_sample %}
-		<b>Human Protein Atlas Tissue:</b> {{ node.tissue_sample.name }} (Abundance >= {{ node.min_abundance }})
+		<div class="editor-row">
+			<span class="editor-label">Human Protein Atlas tissue</span>
+			{{ node.tissue_sample.name }} <span class="editor-help">(abundance &ge; {{ node.min_abundance }})</span>
+		</div>
 
 		<table id="node-tissue-expression-genes-datatable"
 		       data-datatable-url="{% url 'node_tissue_expression_genes_datatable' node.analysis_id node.pk node.version %}"
 		       class="sticky-header"></table>
 	{% else %}
-		No tissue sample selected.
+		<div class="editor-help">No tissue sample selected.</div>
 	{% endif %}
 {% elif node.text_tissue %}
-	<b>UniProt Tissue Specificity:</b> {{ node.text_tissue }}
+	<div class="editor-row">
+		<span class="editor-label">UniProt tissue specificity</span>
+		{{ node.text_tissue }}
+	</div>
 
 	<table id="node-tissue-uniprot-genes-datatable"
 	       data-datatable-url="{% url 'node_tissue_uniprot_genes_datatable' node.analysis_id node.pk node.version %}"
@@ -30,42 +36,48 @@
 {% endblock gene_list_grid %}
 
 {% block content %}
-<style>
-#text-explaination {
-	font-size: 0.8em;
-}
-</style>
-<div>
-	<form id="tissue-node" method="post" action="{{ request.path }}">
-        {% csrf_token %}
-        {% for hidden in form.hidden_fields %}
-            {{ hidden }}
-        {% endfor %}
-		<div id="accordion-container">
-			<div class="accordion node-editor-accordion" id="tissue-node-accordion">
-				<div class="card">
-					<div class="card-header" data-toggle="collapse" data-target="#tissue-panel-hpa">Human Protein Atlas</div>
-					<div id="tissue-panel-hpa" class="collapse" data-parent="#tissue-node-accordion">
-					<div class="card-body">
-					<div><b>Tissue:</b> {{ form.tissue_sample }}</div>
-					<div><b>Min Abundance:</b> {{ form.min_abundance }}</div>
-					</div>
-					</div>
-		        </div>
-		        <div class="card">
-					<div class="card-header" data-toggle="collapse" data-target="#tissue-panel-uniprot">Tissue Specificity from UniprotKB</div>
-					<div id="tissue-panel-uniprot" class="collapse" data-parent="#tissue-node-accordion">
-					<div class="card-body"><b>Text Search:</b> {{ form.text_tissue }} containing {{ form.group_operation }} words.
-						<div id='text-explaination'>This is a <b>case-insensitive</b> search for words in <b>any order</b>, eg "fetal lung" <b>ALL words</b> would match "Fetal Lung", "Fetal Brain and Lung" and "Adult Lung and Fetal Brain". <b>ANY</b> words would match "Fetal Brain" and "Adult Lung"</div>
-					</div>
-					</div>
-		        </div>
-			</div>
-		</div>
+<form id="tissue-node" method="post" action="{{ request.path }}">
+    {% csrf_token %}
+    {% for hidden in form.hidden_fields %}
+        {{ hidden }}
+    {% endfor %}
+    <div class="accordion node-editor-accordion" id="tissue-node-accordion">
+        <div class="card">
+            <div class="card-header" data-toggle="collapse" data-target="#tissue-panel-hpa">Human Protein Atlas</div>
+            <div id="tissue-panel-hpa" class="collapse" data-parent="#tissue-node-accordion">
+            <div class="card-body">
+                <div class="editor-row">
+                    <label class="editor-label" for="{{ form.tissue_sample.id_for_label }}">Tissue</label>
+                    {{ form.tissue_sample }}
+                </div>
+                <div class="editor-row">
+                    <label class="editor-label" for="{{ form.min_abundance.id_for_label }}">Min abundance</label>
+                    {{ form.min_abundance }}
+                </div>
+            </div>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-header" data-toggle="collapse" data-target="#tissue-panel-uniprot">Tissue Specificity from UniProtKB</div>
+            <div id="tissue-panel-uniprot" class="collapse" data-parent="#tissue-node-accordion">
+            <div class="card-body">
+                <div class="editor-row">
+                    <label class="editor-label" for="{{ form.text_tissue.id_for_label }}">Text search</label>
+                    {{ form.text_tissue }} containing {{ form.group_operation }} words
+                </div>
+                <div id='text-explaination' class="editor-help">
+                    A case-insensitive search for words in any order, eg "fetal lung" with <b>ALL</b> words matches
+                    "Fetal Lung", "Fetal Brain and Lung" and "Adult Lung and Fetal Brain"; <b>ANY</b> words also
+                    matches "Fetal Brain" and "Adult Lung".
+                </div>
+            </div>
+            </div>
+        </div>
+    </div>
+    <div class="editor-actions">
         {% if has_write_permission %}
-    		<button id='tissue-node-save' class="btn btn-primary">save</button>
+            <button id='tissue-node-save' class="btn btn-primary">Save</button>
         {% endif %}
-	</form>
-</div>
-
+    </div>
+</form>
 {% endblock content %}
