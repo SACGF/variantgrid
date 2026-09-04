@@ -220,7 +220,11 @@ COMPOSITE_EXAMPLE_ROWS: dict[str, dict[str, Any]] = {
                                    essential_gene_crispr2="Essential",
                                    essential_gene_gene_trap="Non-essential phenotype-changing"),
     "annotsv_acmg": _va(annotsv_acmg_class=4, annotsv_acmg_score=0.9,
-                        annotsv_acmg_criteria="1A,2C,5F"),
+                        annotsv_acmg_criteria="1A,2C,5F",
+                        annotsv_pathogenic_overlaps="loss: ClinVar / Example syndrome / "
+                                                    "HP:0000001 / chr12:12000000-12500000"),
+    "annotsv_gene_effect": _va(annotsv_exons_spanned=3, annotsv_frameshift=True,
+                               annotsv_re_gene="EXAMPL1"),
     "annotsv_benign_af": _va(annotsv_b_loss_af_max=0.012, annotsv_b_gain_af_max=0.004,
                              annotsv_b_ins_af_max=0.0, annotsv_b_inv_af_max=0.0),
     "annotsv_omim": _va(annotsv_omim_morbid=True, annotsv_omim_id="600001",
