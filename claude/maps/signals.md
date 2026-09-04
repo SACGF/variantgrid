@@ -83,6 +83,7 @@ Receivers of Django / third-party signals (post_save, pre_delete, m2m_changed, u
 | post_save | UploadSettings | `upload.models.models:upload_settings_post_save_handler` |
 | post_save | Message | `user_messages.apps:email_new_message_handler` |
 | pre_delete | Cohort | `analysis.apps:handle_cohort_pre_delete` |
+| pre_delete | Duo | `analysis.apps:handle_duo_pre_delete` |
 | pre_delete | Pedigree | `analysis.apps:handle_pedigree_pre_delete` |
 | pre_delete | Quad | `analysis.apps:handle_quad_pre_delete` |
 | pre_delete | Sample | `analysis.apps:handle_sample_pre_delete` |

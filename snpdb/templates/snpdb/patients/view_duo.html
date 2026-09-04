@@ -1,0 +1,82 @@
+{% extends menu_patients_base %}
+{% load model_tags %}
+{% load ui_utils %}
+{% load related_analyses_tags %}
+
+{% block title %}Duo {{ duo }}{% endblock %}
+
+{% block head %}
+<style>
+/* Pedigree figure - the same sprite symbol the DuoNode and duo wizard wear */
+.pedigree-figure {
+    width: 100px;
+    height: 108px;
+    color: #495057;
+    /* the sprite's stroke is weighted for a 15px badge - lighten it at this size */
+    --pedigree-stroke-width: 1.5;
+}
+
+#duo-heading .svg-symbol-icon {
+    margin-right: 0.35em;
+    width: 1.1em;
+    height: 1.2em;
+    vertical-align: -0.15em;
+    color: #495057;
+}
+
+#details .card table th {
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+#details .duo-details-table th {
+    width: 1%;
+}
+
+#details .card td, #details .card th {
+    vertical-align: middle;
+}
+</style>
+{% endblock head %}
+
+{% block submenu_page_content %}
+
+    <h3 id="duo-heading">
+        {% preview_icon duo %} Duo: {{ duo }}
+    </h3>
+
+    <div id="duo-tabs">
+        <ul class="nav nav-tabs mb-4" role="tablist">
+            <li class="nav-item"><a id='details-tab' class="nav-link show active" data-toggle="tab" role="tab" href="#details">Details</a></li>
+            {% if has_write_permission %}
+            <li class="nav-item"><a class="nav-link" data-toggle="tab" role="tab" href="#duo-permissions" data-href="{% url 'group_permissions' 'snpdb.models.Duo' duo.pk %}">Sharing / Permissions</a></li>
+            {% endif %}
+        </ul>
+        <div class="tab-content">
+            <div class="tab-pane show active" role="tabpanel" id="details">
+                <div class="row">
+                    <div class="col-lg-8">
+                        {% duo_table duo %}
+                    </div>
+                    <div class="col-lg-4">
+                        <div class="card mb-3">
+                            <div class="card-header">Pedigree</div>
+                            <div class="card-body text-center">
+                                <svg class="pedigree-figure {{ duo.get_preview_icon_css_class }}"><use href="#node-icon-duo"></use></svg>
+                                <div class="text-muted small">Filled symbols are affected</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% if has_write_permission %}
+            <div class="tab-pane" role="tabpanel" id="duo-permissions"></div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div id='related-data-container'>
+    {% related_analyses_for_duo duo %}
+    </div>
+
+{% endblock %}

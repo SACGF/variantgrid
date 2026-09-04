@@ -44,6 +44,7 @@ urlpatterns = [
     path('create_analysis_from_template/<genome_build_name>', views.create_analysis_from_template, name='create_analysis_from_template'),
     path('trio_wizard/<int:cohort_id>/<int:sample1_id>/<int:sample2_id>/<int:sample3_id>/', views_wizard.trio_wizard, name='trio_wizard'),
     path('quad_wizard/<int:cohort_id>/<int:sample1_id>/<int:sample2_id>/<int:sample3_id>/<int:sample4_id>/', views_wizard.quad_wizard, name='quad_wizard'),
+    path('duo_wizard/<int:cohort_id>/<int:sample1_id>/<int:sample2_id>/', views_wizard.duo_wizard, name='duo_wizard'),
 
     # Templates
     path('analysis_template/<pk>/save/', views_json.analysis_template_save, name='analysis_template_save'),

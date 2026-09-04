@@ -1,0 +1,188 @@
+{% extends "analysis/node_editors/grid_editor.html" %}
+{% load static %}
+{% block docreadyjs %}
+    var duoForm = $("#duo-form");
+    var ZYGOSITY_MAP = JSON.parse(document.getElementById('zygosity-data').textContent);
+    // Until a Duo loads, preview the modes as they'd read with the mother
+    var parentAffected = false, relationship = 'M';
+    var duoLoadable = {{ duo_loadable|yesno:"true,false" }};
+
+    function getDuoId() {
+       return $("#id_duo", duoForm).find(":selected").val();
+    }
+
+    function updateZygosityTable() {
+        var mode = $("#id_inheritance").val();
+        var map = ZYGOSITY_MAP[mode];
+        if (!map) return;
+
+        var requireZyg = $("#id_require_zygosity").is(":checked");
+
+        // Most rows are a plain key; some vary with the parent's affected status, and All Recessive
+        // varies with which parent we have (no XLR branch through the father)
+        function lookup(prefix, key, affected) {
+            var candidates = [key + '_' + relationship, key + (affected ? '_affected' : '_unaffected'), key];
+            for (var i = 0; i < candidates.length; ++i) {
+                var name = prefix + candidates[i];
+                if (name in map) return map[name];
+            }
+            return undefined;
+        }
+
+        function memberZyg(key, affected, require) {
+            var val = lookup('', key, affected);
+            if (val === undefined || val === null) return '';
+            if (!val) return '--';
+            if (!require && key !== 'proband') val += ', ?';
+            return val;
+        }
+
+        function otherFilters(key) {
+            return lookup('other_filters_', key, parentAffected) || '';
+        }
+
+        $(".zyg-parent").text(memberZyg('parent', parentAffected, requireZyg));
+        $(".zyg-proband").text(memberZyg('proband', false, true));
+        $(".other-parent").text(otherFilters('parent'));
+        $(".other-proband").text(otherFilters('proband'));
+    }
+
+    function displayDuoInfo(data) {
+        var duoInfo = $("#duo-info");
+        $(".parent", duoInfo).text(data.parent);
+        $(".proband", duoInfo).text(data.proband);
+        $(".parent_affected", duoInfo).text(data.parent_affected ? "affected" : "unaffected");
+        $(".parent-role", duoInfo).text(data.relationship_label);
+        $(".parent-role-zyg").text(data.relationship_label);
+
+        parentAffected = data.parent_affected;
+        relationship = data.relationship;
+        duoInfo.show();
+        setModeAvailability();
+        loadCohortVCFLocusFilter(data.cohort);
+        updateZygosityTable();
+    }
+
+    function showDuoLoadError() {
+        $("#duo-load-error").text("Unable to load this Duo - see node errors for details.").show();
+    }
+
+    function changeDuo() {
+        $("#duo-info").hide();
+        $("#duo-load-error").hide();
+        var duoId = getDuoId();
+        if (duoId) {
+            setCrossLink($("#duo-link"), Urls.view_duo, duoId);
+            if (duoLoadable) {
+                $.ajax({
+                    url: Urls.api_view_duo(duoId),
+                    success: displayDuoInfo,
+                    error: showDuoLoadError,
+                });
+            } else {
+                showDuoLoadError();
+            }
+        }
+    }
+    $("#id_duo").change(function() {
+        duoLoadable = true;  // Only the autocomplete's own choices get here, and they're all visible
+        changeDuo();
+    });
+    $("#id_inheritance").change(updateZygosityTable);
+    $("#id_require_zygosity").change(updateZygosityTable);
+
+    /* Dominant needs an affected parent, and X-linked recessive needs the mother - offer them only
+       when the loaded duo fits, or when the user has ticked "ignore" to run them anyway */
+    function setModeAvailability() {
+        var inheritanceSelect = $("#id_inheritance", duoForm);
+        var ignoring = $("#id_ignore_field_errors", duoForm).is(":checked");
+        var available = {"D": parentAffected, "X": relationship === 'M'};
+        for (var value in available) {
+            var option = $("option[value=" + value + "]", inheritanceSelect);
+            var enabled = available[value] || ignoring;
+            if (!enabled) {
+                option.removeAttr("selected");
+            }
+            option.attr("disabled", !enabled);
+        }
+    }
+    $("#id_ignore_field_errors", duoForm).change(setModeAvailability);
+
+    changeDuo();
+    updateZygosityTable();
+
+    ajaxForm(duoForm);
+{% endblock docreadyjs %}
+
+
+{% block content %}
+<form id="duo-form" method="post" action="{{ request.path }}">
+    {% csrf_token %}
+    {% for hidden in form.hidden_fields %}
+        {{ hidden }}
+    {% endfor %}
+    <div class="editor-row">
+        <label class="editor-label" for="{{ form.duo.id_for_label }}">Duo</label>
+        {{ form.duo }}{{ form.duo.errors }}
+        <a class="cross-link" id="duo-link" target="_blank">View Duo</a>
+    </div>
+    <div id='duo-load-error' class='editor-warning' style='display: none;'></div>
+    <div id='duo-info' class="editor-section">
+        <div class="editor-section-title">Family</div>
+        <table class="editor-table">
+                <tr><th class='parent-role'>Parent</th><td><span class='parent'></span> <span class='editor-help'>(<span class='affected parent_affected'></span>)</span></td></tr>
+                <tr><th>Proband</th><td><span class='proband'></span></td></tr>
+        </table>
+    </div>
+    <div class="editor-row">
+        <label class="editor-label" for="{{ form.inheritance.id_for_label }}">Inheritance</label>
+        {{ form.inheritance }}{{ form.inheritance.errors }}
+    </div>
+    <div class="editor-row">
+        <span class="editor-label"></span>
+        <span class="editor-checks">
+            <label for="{{ form.ignore_field_errors.id_for_label }}" title="Save and run even though the inheritance mode doesn't fit this family - the reasons show as warnings">{{ form.ignore_field_errors }} {{ form.ignore_field_errors.label }}</label>
+            <label for="{{ form.require_zygosity.id_for_label }}">{{ form.require_zygosity }} Require parent zygosity calls</label>{{ form.require_zygosity.errors }}
+        </span>
+    </div>
+    {{ zygosity_table_data|json_script:"zygosity-data" }}
+    <div>
+        <a class="hover-link" data-toggle="collapse" data-target="#zygosity-table-collapse"
+           aria-expanded="{{ initially_show_zygosity_table|yesno:'true,false' }}"
+           aria-controls="zygosity-table-collapse" href="#zygosity-table-collapse">
+            Zygosity requirements...
+        </a>
+        <div class="collapse {% if initially_show_zygosity_table %}show{% endif %}"
+             id="zygosity-table-collapse">
+            <table class="editor-table" id="zygosity-table">
+                <thead>
+                    <tr><th>Member</th><th>Expected zygosity</th><th>Other filters</th></tr>
+                </thead>
+                <tbody>
+                        <tr><th class='parent-role-zyg'>Parent</th><td class="zyg-parent" style="white-space: pre-line"></td><td class="other-parent"></td></tr>
+                        <tr><th>Proband</th><td class="zyg-proband" style="white-space: pre-line"></td><td class="other-proband"></td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% load vcf_locus_filter_tags %}
+    {% vcf_locus_filter node node.duo.cohort.vcf %}
+    <div class='genotype-row'>
+        <span class="genotype-field"><b title='Allelic Depth'>AD</b>&ge;{{ form.min_ad }} {{ form.min_ad_op }}</span>
+        <span class="genotype-field"><b title='Read Depth'>DP</b>&ge;{{ form.min_dp }} {{ form.min_dp_op }}</span>
+        <span class="genotype-field"><b title='Genotype Quality'>GQ</b>&ge;{{ form.min_gq }} {{ form.min_gq_op }}</span>
+        <span class="genotype-field"><b title='Phred-scaled Likelihoods for Genotypes'>PL</b>&le;{{ form.max_pl }} {{ form.max_pl_op }}</span>
+    </div>
+    <div>
+        <a id='view-allele-frequency-filter-link' class="hover-link" href='javascript:viewAlleleFrequencyFilter()'>Allele Frequency...</a>
+        {% load allele_frequency_tags %}
+        {% allele_frequency_controls node %}
+    </div>
+    <div class="editor-actions">
+        {% if has_write_permission %}
+            <button id='duo-save' class="btn btn-primary">Save</button>
+        {% endif %}
+    </div>
+    {{ form.media }}
+</form>
+{% endblock content %}

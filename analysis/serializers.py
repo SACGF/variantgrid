@@ -12,6 +12,7 @@ from analysis.models import (
     ClinVarNode,
     CohortNode,
     DamageNode,
+    DuoNode,
     FilterNode,
     FilterNodeItem,
     GeneListNode,
@@ -194,6 +195,12 @@ class FilterNodeItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = FilterNodeItem
         exclude = ("filter_node",)
+
+
+class DuoNodeSerializer(AnalysisNodeSerializer):
+    class Meta(AnalysisNodeSerializer.Meta):
+        model = DuoNode
+        fields = _analysis_node_fields(model)
 
 
 class FilterNodeSerializer(AnalysisNodeSerializer):

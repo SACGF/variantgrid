@@ -3298,8 +3298,8 @@ li.help-item {
 	vertical-align: -0.125em;
 }
 
-/* Blackens a member of the Trio/Quad pedigree symbols - see --pedigree-*-fill in
-   uicore/tags/svg_icon_sprite.html. Set on the <svg> by the page, or by Trio/Quad's
+/* Blackens a member of the Duo/Trio/Quad pedigree symbols - see --pedigree-*-fill in
+   uicore/tags/svg_icon_sprite.html. Set on the <svg> by the page, or by Duo/Trio/Quad's
    get_preview_icon_css_class() so a listed trio wears its affected status */
 .mother-affected {
 	--pedigree-mother-fill: currentColor;
@@ -3311,6 +3311,21 @@ li.help-item {
 
 .sibling-affected {
 	--pedigree-sibling-fill: currentColor;
+}
+
+.parent-affected {
+	--pedigree-parent-fill: currentColor;
+}
+
+/* node-icon-duo draws both parent shapes - blank out the one the relationship rules out */
+.duo-mother {
+	--pedigree-duo-square-fill: none;
+	--pedigree-duo-square-stroke: none;
+}
+
+.duo-father {
+	--pedigree-duo-circle-fill: none;
+	--pedigree-duo-circle-stroke: none;
 }
 
 .preview-data {

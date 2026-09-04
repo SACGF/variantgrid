@@ -15,7 +15,7 @@ from snpdb.models.models_genomic_interval import (
     GenomicIntervalsCategory,
     GenomicIntervalsCollection,
 )
-from snpdb.tests.utils.fake_cohort_data import create_fake_quad, create_fake_trio
+from snpdb.tests.utils.fake_cohort_data import create_fake_duo, create_fake_quad, create_fake_trio
 
 
 class Test(URLTestCase):
@@ -38,6 +38,7 @@ class Test(URLTestCase):
         cls.trio = create_fake_trio(cls.user_owner, grch37)
         cls.cohort = cls.trio.cohort
         cls.quad = create_fake_quad(cls.user_owner, grch37)
+        cls.duo = create_fake_duo(cls.user_owner, grch37)
         cls.vcf = cls.cohort.vcf
         cls.sample = cls.vcf.sample_set.first()
 
@@ -81,9 +82,10 @@ class Test(URLTestCase):
             ('cohort_sample_count', {"cohort_id": cls.cohort.pk}, 200),
             ('cohort_sample_edit', {"cohort_id": cls.cohort.pk}, 200),
 
-            # Trio / Quad
+            # Duo / Trio / Quad
             ('view_trio', {"pk": cls.trio.pk}, 200),
             ('view_quad', {"pk": cls.quad.pk}, 200),
+            ('view_duo', {"pk": cls.duo.pk}, 200),
 
             # Data objects
             ('view_genomic_intervals', {"genomic_intervals_collection_id": cls.genomic_intervals_collection.pk}, 200),
@@ -95,6 +97,7 @@ class Test(URLTestCase):
             ('sample_autocomplete', cls.sample, {"q": cls.sample.name}),
             ('cohort_autocomplete', cls.cohort, {"q": cls.cohort.name}),
             ('trio_autocomplete', cls.trio, {"q": cls.trio.name}),
+            ('duo_autocomplete', cls.duo, {"q": cls.duo.name}),
         ]
 
         cls.PRIVATE_DATATABLES_GRID_LIST_URLS = [
@@ -105,6 +108,7 @@ class Test(URLTestCase):
             ("cohort_datatable", {}, cls.cohort2),
             ("trio_datatable", {}, cls.trio),
             ("quad_datatable", {}, cls.quad),
+            ("duo_datatable", {}, cls.duo),
             ("genomic_intervals_datatable", {}, cls.genomic_intervals_collection),
             ("cohort_sample_datatable", {"cohort_id": cls.cohort.pk}, None),
         ]
@@ -119,6 +123,7 @@ class Test(URLTestCase):
             ("cohorts", {}, 200),
             ("trios", {}, 200),
             ("quads", {}, 200),
+            ("duos", {}, 200),
             ("manual_variant_entry", {}, 200),
             ("custom_columns", {}, 200),
             ("tag_settings", {}, 200),

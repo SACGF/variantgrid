@@ -561,7 +561,7 @@ class SettingsOverrideForm(BaseModelForm):
             "allele_origin_focus": "Allele Origin focus",
             "allele_origin_exclude_filter": "Allele Origin (filter by default)",
             "grid_sample_label_template": "Grid Sample Label Template",
-            "initially_show_zygosity_table": "Initially Show Trio/Quad Zygosity Table",
+            "initially_show_zygosity_table": "Initially Show Duo/Trio/Quad Zygosity Table",
             "variant_grid_two_line_rows": "Variant Grid Two Line Rows",
             "node_grid_auto_load_max_variants": "Node Grid Auto Load Max Variants",
             "variant_tag_stale_days": "Variant Tags Stale After",

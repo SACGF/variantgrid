@@ -459,7 +459,7 @@ class AnalysisVariable(models.Model):
 
 # What a template can be launched from - the source node fields the launch pages hand it. VCF backed
 # sources first, then the Patient -> Specimen -> Extraction levels that resolve to a set of samples
-ANALYSIS_TEMPLATE_VCF_SOURCE_FIELDS = ("pedigree", "trio", "quad", "cohort", "sample")
+ANALYSIS_TEMPLATE_VCF_SOURCE_FIELDS = ("pedigree", "trio", "quad", "duo", "cohort", "sample")
 ANALYSIS_TEMPLATE_SAMPLE_GROUP_FIELDS = ("extraction", "specimen", "patient")
 ANALYSIS_TEMPLATE_SOURCE_FIELDS = ANALYSIS_TEMPLATE_VCF_SOURCE_FIELDS + ANALYSIS_TEMPLATE_SAMPLE_GROUP_FIELDS
 
@@ -682,6 +682,7 @@ class AnalysisTemplateVersion(TimeStampedModel):
                 'snpdb.Sample': {'genes.SampleGeneList'},
                 'snpdb.Trio': {'snpdb.Sample'},
                 'snpdb.Quad': {'snpdb.Sample'},
+                'snpdb.Duo': {'snpdb.Sample'},
             }
 
             if extra_types := EXTRA_PROVIDED_TYPES.get(class_name):
@@ -785,14 +786,14 @@ class AnalysisTemplateRun(TimeStampedModel):
     def populate_analysis_name(self):
         """ Populate analysis_name_template with params based on AnalysisVariable fields, and the magic values:
                 * template - TemplateVersion string representation
-                * input - 1st we find of "pedigree", "trio", "cohort", "sample" """
+                * input - 1st we find of "pedigree", "trio", "quad", "duo", "cohort", "sample" """
 
         params = {"template": str(self.template_version)}
         for arg in self.analysistemplaterunargument_set.all():
             params[arg.variable.field] = arg.value
 
-        # Do trio/quad before sample so it's used first (trio/quad set proband as sample)
-        for field in ["pedigree", "trio", "quad", "cohort", "sample"]:
+        # Do the family sources before sample so they're used first (they set proband as sample)
+        for field in ["pedigree", "trio", "quad", "duo", "cohort", "sample"]:
             if field in params:
                 params["input"] = params[field]
                 break

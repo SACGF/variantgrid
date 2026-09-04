@@ -39,6 +39,8 @@
                     <li>New analysis type - Quad (a trio plus an affected sibling). Has its own creation wizard and page, and the
                         Trio/Quad nodes show a table of zygosities, with options for combined recessive filtering, "any affected",
                         and requiring the affected sibling's zygosity</li>
+                    <li>New analysis type - Duo (a proband plus one sequenced parent, where the other isn't available).
+                        Own wizard, page and node, with the inheritance modes that make sense with one parent</li>
                     <li>Analysis templates can be configured to auto-launch when a sample is imported</li>
                     <li>Audit log - records which nodes were added/configured, by who and when</li>
                     <li>All Variants node - filter by variant type (eg symbolic) and by chromosome/contig</li>
@@ -254,6 +256,16 @@
 
 
     {% else %}
+       <div class="card mt-4">
+            <div class="card-header">4 September 2026</div>
+            <div class="card-body">
+                <h4>Analysis</h4>
+                <ul>
+                    <li>#1829 - Duo analysis (proband + one parent) - wizard, Duo page and DuoNode</li>
+                </ul>
+            </div>
+       </div>
+
        <div class="card mt-4">
             <div class="card-header">3 September 2026</div>
             <div class="card-body">

@@ -3,7 +3,7 @@ Owns: Variant/Allele/Locus/Sequence, GenomeBuild/Contig, VCF/Sample/Cohort/Trio,
 Start with:
 - models/models_variant.py — Sequence, Locus, Variant, VariantCoordinate, Allele, VariantAllele, LiftoverRun, AlleleLiftover
 - models/models_genome.py — GenomeBuild, Contig, GenomeBuildContig, GenomeFasta
-- models/models_vcf.py — VCF, Sample, VCFFilter; models/models_cohort.py — Cohort, CohortSample, CohortGenotypeCollection, CohortGenotype, Trio, Quad
+- models/models_vcf.py — VCF, Sample, VCFFilter; models/models_cohort.py — Cohort, CohortSample, CohortGenotypeCollection, CohortGenotype, Duo, Trio, Quad
 - liftover.py — allele liftover pipelines; clingen_allele.py — ClinGen Allele Registry linking
 - views/datatable_view.py — DatatableConfig, RichColumn, DatabaseTableView; grids.py — AbstractVariantGrid and the list grids
 - Import models from `snpdb.models` (the package re-exports every models_*.py); `snpdb/models.py` exists only for PyCharm.

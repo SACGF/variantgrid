@@ -299,3 +299,9 @@ class DataState(models.TextChoices):
 class CohortGenotypeCollectionType(models.TextChoices):
     COMMON = "C", "Common"
     UNCOMMON = "U", "Uncommon"
+
+
+class DuoRelationship(models.TextChoices):
+    """ Which parent of the proband a Duo's single parent is """
+    MOTHER = 'M', 'Mother'
+    FATHER = 'F', 'Father'

@@ -199,6 +199,9 @@ class Test(URLTestCase):
                              "sample2_id": cls.trio.mother.sample_id,
                              "sample3_id": cls.trio.father.sample_id,
                              "sample4_id": cls.sibling_cs.sample_id}, 200),
+            ('duo_wizard', {"cohort_id": cls.cohort.pk,
+                            "sample1_id": cls.trio.proband.sample_id,
+                            "sample2_id": cls.trio.mother.sample_id}, 200),
         ]
 
     def testUrls(self):

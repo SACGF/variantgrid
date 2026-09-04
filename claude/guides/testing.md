@@ -50,6 +50,7 @@ Almost everything wants a `GenomeBuild` and a `User`; get them with
 - `snpdb/tests/utils/fake_cohort_data.py:create_fake_cohort(user, genome_build)` → `Cohort` of 3 samples (`proband`, `mother`, `father`) on one `VCF` (`genotype_samples=1`, import SUCCESS, a `VCFFilter`), with a `CohortGenotypeCollection`; permissions assigned to `user`.
 - `snpdb/tests/utils/fake_cohort_data.py:create_fake_trio(user, genome_build)` → `Trio` (mother affected, father not) over `create_fake_cohort`.
 - `snpdb/tests/utils/fake_cohort_data.py:create_fake_quad(user, genome_build, sibling_affected=False)` → `Quad` over its own 4-sample cohort (`proband`, `mother`, `father`, `sibling`).
+- `snpdb/tests/utils/fake_cohort_data.py:create_fake_duo(user, genome_build, relationship=DuoRelationship.MOTHER, parent_affected=False)` → `Duo` over its own 2-sample cohort (`proband`, `parent`).
 - `snpdb/tests/utils/fake_cohort_data.py:create_fake_pedigree(user, genome_build)` → `Pedigree` (`PedFile` + `PedFileFamily`) over `create_fake_cohort`.
 - `analysis/tests/inheritance_node_mixin.py:make_cohort_genotype(cgc, variant, samples_zygosity)` → None; writes one `CohortGenotype` row for `cgc` (`trio.cohort.cohort_genotype_collection`). Zygosity string per sample in cohort order: `E`=HET, `R`=HOM_REF, `O`=HOM_ALT, `U`=UNKNOWN, `.`=MISSING, so a trio `"ERR"` is a het de novo.
 - Single-sample VCF + `CohortGenotypeCollection`: copy `_create_vcf_sample` from `analysis/tests/test_sample_node_levels.py` (private, but the canonical 12 lines).
@@ -74,7 +75,7 @@ Almost everything wants a `GenomeBuild` and a `User`; get them with
 ### Analyses, nodes, tags
 - `analysis/tests/utils.py:AnalysisSetupMixin` → mix into a `TestCase`: its `setUpTestData` sets `cls.grch37`, calls `get_fake_annotation_version`, and saves `cls.analysis` for a per-class user. Extend, then add samples/nodes.
 - By hand: `analysis = Analysis(genome_build=grch37); analysis.set_defaults_and_save(user)` (needs an `AnnotationVersion` for the build). Nodes are plain creates, `SampleNode.objects.create(analysis=analysis, sample=sample)`, `TrioNode.objects.create(analysis=..., trio=..., inheritance=...)`; chain with `child.add_parent(parent)` then `child.save()` (see `_create_child_node` in `analysis/tests/test_models.py`).
-- `analysis/tests/inheritance_node_mixin.py:InheritanceNodeTestsMixin` → shared inheritance-mode assertions for `TrioNode` / `QuadNode`; subclass sets `INHERITANCE`, `NODE_CLASS`, `REQUIRE_PARENT_ZYGOSITY`, `SHARED_ZYGOSITIES` and calls `cls.create_shared_variants(cgc)`.
+- `analysis/tests/inheritance_node_mixin.py:InheritanceNodeTestsMixin` → shared inheritance-mode assertions for `TrioNode` / `QuadNode`; subclass sets `INHERITANCE`, `NODE_CLASS`, `REQUIRE_PARENT_ZYGOSITY`, `SHARED_ZYGOSITIES` and calls `cls.create_shared_variants(cgc)`. `DuoNode` has its own `analysis/tests/test_duo_node.py` - one parent means a different mode set and a `parent`-keyed zygosity table.
 - Tags: `Tag.objects.get_or_create(pk="artefact")[0]` then `VariantTag.objects.create(genome_build=, analysis=, variant=, tag=, user=)` (`analysis/tests/test_variant_tags.py`). `analysis/fake_variant_tags.py:FakeVariantTags` is the `create_fake_data tags` subcommand for dev boxes.
 
 ### Mocks and recorded data

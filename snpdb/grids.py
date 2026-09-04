@@ -31,6 +31,8 @@ from snpdb.models import (
     Cohort,
     CohortGenotypeStats,
     CustomColumnsCollection,
+    Duo,
+    DuoRelationship,
     GenomeBuild,
     GenomicIntervalsCollection,
     ImportSource,
@@ -382,7 +384,7 @@ class CohortListColumns(DatatableConfig[Cohort]):
 
 
 class FamilyGroupListColumns(DatatableConfig[DC]):
-    """ Trios/Quads listing - same grid bar the extra family members """
+    """ Duos/Trios/Quads listing - same grid bar the family members """
     MODEL: type[DC]
     GRID_NAME: str
     # (field prefix, label, has an affected column)
@@ -430,6 +432,19 @@ class QuadsListColumns(FamilyGroupListColumns[Quad]):
     MODEL = Quad
     GRID_NAME = 'Quads'
     FAMILY_MEMBERS = [*FamilyGroupListColumns.FAMILY_MEMBERS, ("sibling", "Sibling", True)]
+
+
+class DuosListColumns(FamilyGroupListColumns[Duo]):
+    MODEL = Duo
+    GRID_NAME = 'Duos'
+    FAMILY_MEMBERS = [("parent", "Parent", True), ("proband", "Proband", False)]
+
+    def __init__(self, request: HttpRequest):
+        super().__init__(request)
+        relationship_column = RichColumn(key='relationship', label='Relationship', orderable=True,
+                                         client_renderer=RichColumn.choices_client_renderer(DuoRelationship.choices))
+        parent_affected = next(i for i, rc in enumerate(self.rich_columns) if rc.key == 'parent_affected')
+        self.rich_columns.insert(parent_affected + 1, relationship_column)
 
 
 class GenomicIntervalsListColumns(DatatableConfig[GenomicIntervalsCollection]):

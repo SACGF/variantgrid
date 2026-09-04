@@ -25,6 +25,7 @@ from analysis.models import (
 from analysis.models.enums import (
     AnalysisTemplateType,
     AnalysisType,
+    DuoSample,
     QuadSample,
     SNPMatrix,
     TrioSample,
@@ -39,7 +40,7 @@ from library.guardian_utils import assign_permission_to_user_and_groups
 from patients.models_enums import SampleSourceLevel, Sex
 from seqauto.models import EnrichmentKit
 from snpdb.forms import GenomeBuildAutocompleteForwardMixin, UserSettingsGenomeBuildMixin
-from snpdb.models import CustomColumnsCollection, Trio, UserSettings, VariantGridColumn
+from snpdb.models import CustomColumnsCollection, DuoRelationship, Trio, UserSettings, VariantGridColumn
 from uicore.utils.form_helpers import form_helper_horizontal
 
 
@@ -443,6 +444,24 @@ class UserQuadWizardForm(FamilyWizardForm):
     sample_3_affected = forms.BooleanField(required=False, widget=_affected_widget())
     sample_4 = forms.ChoiceField(choices=QuadSample.choices, widget=_family_role_widget())
     sample_4_affected = forms.BooleanField(required=False, widget=_affected_widget())
+
+
+class UserDuoWizardForm(FamilyWizardForm):
+    """ Only Parent/Proband to assign - which parent it is comes from its own radio, so a duo can be
+        made from two samples of any sex """
+    ROLE_ENUM = DuoSample
+    SAMPLE_FIELDS = ["sample_1", "sample_2"]
+
+    sample_1 = forms.ChoiceField(choices=DuoSample.choices, widget=_family_role_widget())
+    sample_1_affected = forms.BooleanField(required=False, widget=_affected_widget())
+    sample_2 = forms.ChoiceField(choices=DuoSample.choices, widget=_family_role_widget())
+    sample_2_affected = forms.BooleanField(required=False, widget=_affected_widget())
+    relationship = forms.ChoiceField(choices=DuoRelationship.choices, initial=DuoRelationship.MOTHER,
+                                     widget=forms.RadioSelect(attrs={"class": "duo-relationship"}))
+
+    @property
+    def parent_relationship(self) -> str:
+        return self.cleaned_data["relationship"]
 
 
 class KaryomappingGeneForm(forms.ModelForm):
