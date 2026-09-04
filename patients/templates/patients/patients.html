@@ -234,32 +234,6 @@ $(document).ready(function() {
     loadPatientOnSearchSelect();
     filterGridOnTermSearchSelect();
 
-    const patientSearchForm = $('#patient-search-form');
-    $("#patient-grid-filter", patientSearchForm).click(function () {
-        const familyCode = $("#id_family_code", patientSearchForm).val();
-        const patientPhenotype = $("#id_phenotype", patientSearchForm).val();
-        const filterMessages = [];
-        if (familyCode) {
-            filterMessages.push("FamilyCode: '" + familyCode + "'");
-            filterFields["family_code"] = familyCode;
-        } else {
-            delete filterFields["family_code"];
-        }
-        if (patientPhenotype) {
-            filterMessages.push("Phenotype/Description contains: '" + patientPhenotype + "'");
-            filterFields["phenotype"] = patientPhenotype;
-        } else {
-            delete filterFields["phenotype"];
-        }
-
-        const filterMessage = filterMessages.join(", ");
-        const msgBox = $("#grid-filter-message");
-        msgBox.html("Filtering grid to " + filterMessage + " ... <a href='javascript:resetGrid()'>show all</a>");
-        msgBox.show();
-
-        reloadPatientTable();
-    });
-
     $("button#create-new-patient").click(showCreatePatientForm);
 });
 </script>
@@ -342,16 +316,6 @@ $(document).ready(function() {
                     {{ patient_search_form.patient }}
                 </p>
             </div>
-            <div class="horizontal-fields">
-                <p>
-                    <label for="id_family_code">Family Code</label>
-                    {{ patient_search_form.family_code }}
-                </p>
-                <p><label for="id_phenotype">Phenotype</label>
-                {{ patient_search_form.phenotype }}
-                </p>
-                <input class="btn btn-outline-secondary" type='button' id='patient-grid-filter' value='Filter'></input>
-                </div>
             {{ patient_search_form.media }}
         </form>
       </div>

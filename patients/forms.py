@@ -116,8 +116,6 @@ class PatientSearchForm(forms.Form):
     patient = forms.ModelChoiceField(queryset=Patient.objects.all(),
                                      widget=ModelSelect2(url='patient_autocomplete',
                                                          attrs={'data-placeholder': 'Patient...'}))
-    family_code = forms.CharField(widget=TextInput(attrs={'placeholder': 'Family Code'}))
-    phenotype = forms.CharField(widget=TextInput(attrs={'placeholder': 'Phenotype text'}))
 
 
 # Tissue has no way to be created yet (#1747), so both editors here leave out a dropdown that
