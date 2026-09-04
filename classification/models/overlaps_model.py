@@ -328,7 +328,7 @@ class Overlap(TimeStampedModel, ReviewableModelMixin, PreviewModelMixin):
         )
 
     @cached_property
-    def c_hgvses(self):
+    def c_hgvses(self) -> list[HGVSDisplay]:
         c_hgvses = set()
         for entry in self.contributions_list:
             if cg := entry.classification_grouping:

@@ -43,7 +43,7 @@
                 {% for c_hgvs in overlap.c_hgvses %}
                     <div>
                         {% if overlap_grouping.overlap.allele %}
-                            <a class="hover-link" href="{{ overlap_grouping.overlap.allele.get_absolute_url }}">{% c_hgvs c_hgvs %}</a>
+                            <a class="hover-link" href="{{ overlap_grouping.overlap.allele.get_absolute_url }}">{% c_hgvs c_hgvs show_genome_build=True %}</a>
                         {% else %}
                             {% c_hgvs c_hgvs %}
                         {% endif %}
@@ -76,7 +76,7 @@
         {% endlabelled %}
     {% endif %}
 
-    {% if overlap_grouping.overlap.has_reviews or overlap_grouping.overlap_status.is_discordant %}
+    {% if overlap_grouping.overlap.has_reviews or overlap_grouping.overlap.overlap_status.is_discordant %}
         {% labelled label="Multi-Lab Discussions" %}
             {% for review in overlap_grouping.overlap.reviews_all %}
                 <div class="my-1">
