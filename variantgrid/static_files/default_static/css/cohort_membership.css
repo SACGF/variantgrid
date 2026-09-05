@@ -1,0 +1,135 @@
+/* Cohort membership editor - see js/cohort_membership.js */
+
+#cohort-membership .membership-table {
+    margin-bottom: 0;
+}
+
+#cohort-membership .membership-table td {
+    vertical-align: middle;
+}
+
+#cohort-membership .drag-handle {
+    cursor: grab;
+    color: #6c757d;
+    user-select: none;
+    width: 24px;
+    text-align: center;
+}
+
+#cohort-membership .num {
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+#cohort-membership tr.pending-add td {
+    background-color: #e2f2e9;
+}
+
+#cohort-membership tr.pending-remove td {
+    background-color: #f6e7e4;
+}
+
+#cohort-membership tr.pending-remove .sample-name,
+#cohort-membership tr.pending-remove .vcf-name,
+#cohort-membership tr.pending-remove .num {
+    text-decoration: line-through;
+    opacity: 0.6;
+}
+
+#cohort-membership tr.dragging {
+    opacity: 0.4;
+}
+
+#cohort-membership tr.candidate-heading td {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #64737f;
+    background-color: #f1f4f7;
+}
+
+#cohort-membership tr.candidate-row .sample-name,
+#cohort-membership tr.candidate-row .vcf-name,
+#cohort-membership tr.candidate-row .num {
+    opacity: 0.65;
+}
+
+#cohort-membership .membership-add-row {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    margin: 14px 0 4px;
+}
+
+#cohort-membership .membership-add-field {
+    flex: 0 1 340px;
+}
+
+#cohort-membership .membership-add-field label {
+    margin-bottom: 2px;
+}
+
+#cohort-membership .save-bar {
+    margin-top: 18px;
+    padding: 12px 14px;
+    border: 1px solid #d8e0e6;
+    border-radius: 5px;
+    background-color: #f1f4f7;
+}
+
+#cohort-membership .save-bar-top {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+}
+
+#cohort-membership .save-bar-actions {
+    margin-left: auto;
+    display: flex;
+    gap: 8px;
+}
+
+#cohort-membership .diff-pill {
+    font-weight: 600;
+}
+
+#cohort-membership .diff-added {
+    color: #1f7a4d;
+}
+
+#cohort-membership .diff-removed {
+    color: #b04434;
+}
+
+#cohort-membership .diff-order {
+    color: #2f6f9f;
+}
+
+#cohort-membership .mode-line {
+    margin-top: 8px;
+    color: #64737f;
+}
+
+#cohort-membership .mode-line.mode-sub b {
+    color: #1f7a4d;
+}
+
+#cohort-membership .mode-line.mode-rebuild b {
+    color: #8a5f1a;
+}
+
+#cohort-membership .mode-line.mode-empty b {
+    color: #b04434;
+}
+
+#cohort-membership .family-group-warning {
+    margin-top: 8px;
+    color: #8a5f1a;
+    font-weight: 600;
+}
+
+#cohort-membership .save-bar-status:not(:empty) {
+    margin-top: 8px;
+}

@@ -176,6 +176,54 @@ class Cohort(GuardianPermissionsAutoInitialSaveMixin, PreviewModelMixin, SortByP
             # Will call increment_version() to bump cohort
         return ss
 
+    def set_samples(self, ordered_sample_ids: list[int]):
+        """ Replace membership with ordered_sample_ids (in display order) under a single version bump.
+
+            CohortGenotype packs every sample into fixed width arrays, so any membership change costs a
+            full rebuild regardless of how many samples moved - edits are batched and committed in one go.
+            Goes around CohortSample.save()/delete() as those bump the version per row. """
+        sample_ids = list(dict.fromkeys(ordered_sample_ids))
+        if not sample_ids:
+            raise ValueError("A cohort needs at least one sample")
+        sample_id_set = set(sample_ids)
+
+        cohort_sample_by_sample_id = {cs.sample_id: cs for cs in self.cohortsample_set.all()}
+        if removed_sample_ids := set(cohort_sample_by_sample_id) - sample_id_set:
+            self.cohortsample_set.filter(sample_id__in=removed_sample_ids).delete()
+
+        parent_packed_index = {}
+        if self.parent_cohort:
+            # Sub cohorts share the parent's packing so the parent's CohortGenotype rows stay usable
+            parent_packed_index = dict(self.parent_cohort.cohortsample_set.values_list(
+                "sample_id", "cohort_genotype_packed_field_index"))
+
+        used_packed_indexes = {cs.cohort_genotype_packed_field_index
+                               for sample_id, cs in cohort_sample_by_sample_id.items() if sample_id in sample_id_set}
+        next_packed_index = max(used_packed_indexes, default=-1) + 1
+
+        new_cohort_samples = []
+        resorted_cohort_samples = []
+        for sort_order, sample_id in enumerate(sample_ids):
+            if cohort_sample := cohort_sample_by_sample_id.get(sample_id):
+                if cohort_sample.sort_order != sort_order:
+                    cohort_sample.sort_order = sort_order
+                    resorted_cohort_samples.append(cohort_sample)
+                continue
+
+            packed_index = parent_packed_index.get(sample_id)
+            if packed_index is None or packed_index in used_packed_indexes:
+                while next_packed_index in used_packed_indexes:
+                    next_packed_index += 1
+                packed_index = next_packed_index
+            used_packed_indexes.add(packed_index)
+            new_cohort_samples.append(CohortSample(cohort=self, sample_id=sample_id,
+                                                   cohort_genotype_packed_field_index=packed_index,
+                                                   sort_order=sort_order))
+
+        CohortSample.objects.bulk_create(new_cohort_samples)
+        CohortSample.objects.bulk_update(resorted_cohort_samples, ["sort_order"])
+        self.increment_version()
+
     def get_cohort_samples(self):
         return self.cohortsample_set.all().select_related("sample", "sample__vcf").order_by("sort_order")
 

@@ -3,11 +3,12 @@ import logging
 
 from django.core.exceptions import PermissionDenied
 from django.http.response import (
-    HttpResponse,
     HttpResponseRedirect,
+    JsonResponse,
 )
 from django.shortcuts import redirect, render
 from django.urls.base import reverse
+from django.views.decorators.http import require_POST
 
 from annotation.forms import GeneCountTypeChoiceForm
 from annotation.models import (
@@ -25,25 +26,21 @@ from library.django_utils import (
     add_save_message,
 )
 from snpdb import forms
-from snpdb.archive import (
-    DataArchivedError,
-)
-from snpdb.forms import (
-    SampleChoiceForm,
-)
 from snpdb.models import (
     Cohort,
-    CohortGenotypeCollection,
-    CohortSample,
     Duo,
     Quad,
+    Sample,
     Trio,
     UserGridConfig,
     UserSettings,
 )
 from snpdb.models.models_enums import (
+    ImportStatus,
     ProcessingStatus,
 )
+from snpdb.views.vcf_cohort_page import sample_membership_rows, vcf_cohort_page_context
+from snpdb.views.views_json import cohort_genotype_json_response
 from snpdb.views.views_sample_gene_matrix import sample_gene_matrix
 
 
@@ -66,69 +63,61 @@ def cohorts(request):
     return render(request, 'snpdb/patients/cohorts.html', context)
 
 
-def view_cohort_details_tab(request, cohort_id):
-    cohort = Cohort.get_for_user(request.user, cohort_id)
-    has_write_permission = cohort.can_write(request.user) and not cohort.data_archived
-    context = {"cohort": cohort,
-               "has_write_permission": has_write_permission}
-    return render(request, 'snpdb/patients/view_cohort_details_tab.html', context)
-
-
 def view_cohort(request, cohort_id):
     cohort = Cohort.get_for_user(request.user, cohort_id)
     if cohort.vcf:
         return redirect('view_vcf', vcf_id=cohort.vcf.pk)
 
-    try:
-        cohort_genotype_collection = cohort.cohort_genotype_collection
-    except (CohortGenotypeCollection.DoesNotExist, DataArchivedError):
-        cohort_genotype_collection = None
-
     has_write_permission = cohort.can_write(request.user) and not cohort.data_archived
-
-    form = forms.CohortForm(request.POST or None, instance=cohort)
+    cohort_form = forms.CohortForm(request.POST or None, instance=cohort)
     if request.method == "POST":
         if not has_write_permission:
             raise PermissionDenied()
-        if valid := form.is_valid():
-            cohort = form.save()
+        if valid := cohort_form.is_valid():
+            cohort = cohort_form.save()
         add_save_message(request, valid, "Cohort")
 
-    sample_form = SampleChoiceForm(genome_build=cohort.genome_build)
-    sample_form.fields['sample'].required = False
-
-    context = {"form": form,
-               "sample_form": sample_form,
-               "cohort": cohort,
-               "cohort_genotype_collection": cohort_genotype_collection,
-               "has_write_permission": has_write_permission}
-    return render(request, 'snpdb/patients/view_cohort.html', context)
+    context = vcf_cohort_page_context(cohort, has_write_permission)
+    context["cohort_form"] = cohort_form
+    return render(request, 'snpdb/data/view_vcf_cohort.html', context)
 
 
-def cohort_sample_edit(request, cohort_id):
+def cohort_sample_rows(request, cohort_id):
+    """ Membership editor rows for samples being staged - by 'vcf_id' (add all from a VCF) or 'sample_ids' """
     cohort = Cohort.get_for_user(request.user, cohort_id)
+    sample_qs = Sample.filter_for_user(request.user).filter(vcf__genome_build=cohort.genome_build,
+                                                            import_status=ImportStatus.SUCCESS)
+    if vcf_id := request.GET.get("vcf_id"):
+        sample_qs = sample_qs.filter(vcf_id=vcf_id)
+    elif sample_ids := request.GET.get("sample_ids"):
+        sample_qs = sample_qs.filter(pk__in=json.loads(sample_ids))
+    else:
+        sample_qs = sample_qs.none()
+
+    samples = list(sample_qs.select_related("vcf").order_by("pk"))
+    return JsonResponse({"samples": sample_membership_rows(samples)})
+
+
+@require_POST
+def cohort_sample_edit(request, cohort_id):
+    """ Batch membership save - 'sample_ids' is the whole desired membership, in display order.
+        Applies the diff in one version bump then builds the genotype data (a cohort that now lives
+        inside a single VCF converts to a sub cohort instead of rebuilding) """
+    cohort = Cohort.get_for_user(request.user, cohort_id, write=True)
     if cohort.data_archived:
         raise PermissionDenied("Underlying VCF data is archived; cohort is read-only.")
 
-    if request.method == "POST":
-        cohort_op = request.POST['cohort_op']
-        sample_ids_str = request.POST['sample_ids']
-        sample_ids = json.loads(sample_ids_str)
-        if cohort_op == 'add':
-            for sample_id in sample_ids:
-                cohort.add_sample(sample_id)
-        elif cohort_op == 'remove':
-            for sample_id in sample_ids:
-                try:
-                    cohort_sample = CohortSample.objects.get(cohort=cohort, sample_id=sample_id)
-                    cohort_sample.delete()
-                    logging.info("Removed: %s", sample_id)
-                except CohortSample.DoesNotExist:
-                    pass
-        else:
-            raise ValueError(f"Unknown cohort_op '{cohort_op}'")
+    sample_ids = json.loads(request.POST["sample_ids"])
+    ordered_sample_ids = []
+    for sample_id in sample_ids:
+        sample = Sample.get_for_user(request.user, sample_id)
+        if sample.vcf.genome_build != cohort.genome_build:
+            raise ValueError(f"{sample} is {sample.vcf.genome_build}, cohort is {cohort.genome_build}")
+        ordered_sample_ids.append(sample.pk)
 
-    return HttpResponse()
+    cohort.set_samples(ordered_sample_ids)
+    logging.info("Cohort %s membership set to %d samples", cohort.pk, len(ordered_sample_ids))
+    return cohort_genotype_json_response(cohort)
 
 
 def cohort_hotspot(request, cohort_id):
@@ -252,24 +241,3 @@ def view_duo(request, pk):
     context = {"duo": duo,
                "has_write_permission": duo.cohort.can_write(request.user)}
     return render(request, 'snpdb/patients/view_duo.html', context)
-
-
-def cohort_sort(request, cohort_id):
-    cohort = Cohort.get_for_user(request.user, cohort_id)
-    if cohort.data_archived:
-        raise PermissionDenied("Underlying VCF data is archived; cohort is read-only.")
-    if request.method == "POST":
-        cohort_samples_str = request.POST.get("cohort_samples")
-        cohort_samples_ids = cohort_samples_str.split(',') if cohort_samples_str else []
-        cohort_samples = []
-        for i, cs_id in enumerate(cohort_samples_ids):
-            cohort_sample = CohortSample.objects.get(pk=cs_id, cohort=cohort)
-            cohort_sample.sort_order = i
-            cohort_sample.save()
-            cohort_samples.append(cohort_sample)
-    else:
-        cohort_samples = cohort.get_cohort_samples()
-
-    context = {'cohort': cohort,
-               'cohort_samples': cohort_samples}
-    return render(request, 'snpdb/patients/cohort_sort.html', context)

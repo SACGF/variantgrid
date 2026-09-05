@@ -74,13 +74,11 @@ class Test(URLTestCase):
             ('sample_graphs_tab', {"sample_id": cls.sample.pk}, 200),
             ('sample_permissions_tab', {"sample_id": cls.sample.pk}, 200),
             # Cohort
-            ('view_cohort_details_tab', {"cohort_id": cls.cohort.pk}, 200),
             ('view_cohort', {"cohort_id": cls.cohort.pk}, 302),
             ('cohort_hotspot', {"cohort_id": cls.cohort.pk}, 200),
             ('cohort_gene_counts', {"cohort_id": cls.cohort.pk}, 200),
-            ('cohort_sort', {"cohort_id": cls.cohort.pk}, 200),
             ('cohort_sample_count', {"cohort_id": cls.cohort.pk}, 200),
-            ('cohort_sample_edit', {"cohort_id": cls.cohort.pk}, 200),
+            ('cohort_sample_rows', {"cohort_id": cls.cohort.pk}, 200),
 
             # Duo / Trio / Quad
             ('view_trio', {"pk": cls.trio.pk}, 200),

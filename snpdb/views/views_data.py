@@ -72,6 +72,7 @@ from snpdb.models.models_enums import (
     ImportStatus,
 )
 from snpdb.tasks.vcf_archive_tasks import archive_vcf_task
+from snpdb.views.vcf_cohort_page import vcf_cohort_page_context
 from upload.models import UploadedVCF
 from upload.uploaded_file_type import retry_upload_pipeline
 from upload.views.views_json import get_remaining_annotation_runs
@@ -195,16 +196,17 @@ def view_vcf(request, vcf_id):
 
         add_save_message(request, valid, "VCF")
 
+    cohort = None
     cohort_id = None
     try:
         # Some legacy data was too hard to fix and relies on being re-imported
-        _ = vcf.cohort
-        cohort_id = vcf.cohort.pk
-        _ = vcf.cohort.cohort_genotype_collection
+        cohort = vcf.cohort
+        cohort_id = cohort.pk
+        _ = cohort.cohort_genotype_collection
     except (Cohort.DoesNotExist, CohortGenotypeCollection.DoesNotExist):
         messages.add_message(request, messages.ERROR, "This legacy VCF is missing data and needs to be reloaded.")
     except DataArchivedError:
-        # Banner from _data_archived_banner.html shows the message; cohort_id stays set if available.
+        # Banner from _data_archived_banner.html shows the message; cohort stays set if available.
         pass
 
     if reload_vcf:
@@ -258,8 +260,8 @@ def view_vcf(request, vcf_id):
     if vcf.data_restorable_from and vcf.data_restorable_from.startswith(settings.PARTITION_ARCHIVE_DIR):
         restore_source_kind = "backend"
 
-    context = {
-        'vcf': vcf,
+    context = vcf_cohort_page_context(cohort, has_write_permission, vcf=vcf)
+    context.update({
         'sample_stats_het_hom_count': sample_stats_het_hom_count,
         'sample_stats_pass_het_hom_count': sample_stats_pass_het_hom_count,
         'sample_genotype_stats': sample_genotype_stats,
@@ -268,7 +270,6 @@ def view_vcf(request, vcf_id):
         'vcf_form': vcf_form,
         'samples_form': samples_form,
         'patient_form': PatientForm(user=request.user),  # blank
-        'has_write_permission': has_write_permission,
         'can_view_upload_pipeline': can_view_upload_pipeline,
         'annotated_download_files': annotated_download_files,
         "variant_zygosity_count_collections": variant_zygosity_count_collections,
@@ -277,8 +278,8 @@ def view_vcf(request, vcf_id):
         "restore_source_exists": restore_source_exists,
         "restore_source_kind": restore_source_kind,
         "skipped_annotation_count": skipped_annotation_count,
-    }
-    return render(request, 'snpdb/data/view_vcf.html', context)
+    })
+    return render(request, 'snpdb/data/view_vcf_cohort.html', context)
 
 
 def archive_vcf_view(request, vcf_id):

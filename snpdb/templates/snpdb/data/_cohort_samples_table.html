@@ -1,0 +1,98 @@
+{% load static %}
+{% load help_tags %}
+{% load js_tags %}
+{% load model_tags %}
+{% load ui_utils %}
+{% if vcf %}
+    {# VCF mode - the file fixes which samples exist, so the table edits their details #}
+    <div id="samples">
+        <div id='sample-list-top-links'>
+            <div>
+                <a href="{% url 'get_patient_upload_csv_for_vcf' vcf.pk %}"><img width=24px height=24px src="{% static 'icons/report_icon.jpg' %}" /> Patient record upload CSV template.</a>
+            </div>
+        </div>
+
+        {{ samples_form.management_form }}
+        <table id='sample-formset' class="table">
+        <thead>
+            <tr>
+                <th>Sample
+                {% if vcf.import_status == 'S' %}
+                    <th>Het/Hom Variants
+                    {% if vcf.vcffiltercollection %}
+                    (passed)
+                    {% endif %}
+                {% endif %}
+                <th>VCF Sample Name
+                <th>Name
+                <th data-help="{% detected_sex_help %}">Detected Sex</th>
+                <th>Patient
+                <th>Extraction
+            </tr>
+        </thead>
+        {% for form in samples_form %}
+            <tr class="sample-row">
+                {{ form.id }}
+                <td>
+                    <div class="display-flex flex-row">
+                        <input class='sample-select' sample_id='{{ form.id.value }}' type='checkbox' />
+                        <div>
+                            {% preview_icon form.instance %}
+                            <a href="{% url 'view_sample' form.id.value %}">Sample {{ form.id.value }}</a>
+                        </div>
+                    </div>
+                </td>
+            {% if vcf.import_status == 'S' %}
+                <td>
+                {% with ss=sample_stats_het_hom_count|get_item:form.instance.pk %}
+                    {% if ss %}
+                        {{ ss }}
+                        {% with sspf=sample_stats_pass_het_hom_count|get_item:form.instance.pk %}
+                            {% if sspf %}
+                                ({{ sspf }})
+                            {% endif %}
+                        {% endwith %}
+                    {% else %}
+                        N/A
+                    {% endif %}
+                {% endwith %}
+                </td>
+            {% endif %}
+                <td class="vcf-sample-name">{{ form.vcf_sample_name }}{{ form.vcf_sample_name.errors }}</td>
+                <td class="sample-name">{{ form.name }}{{ form.name.errors }}</td>
+                <td>{% detected_sex sample_genotype_stats|get_item:form.instance.pk %}</td>
+                <td>
+                    <div class="sample-patient display-flex">
+                        {% preview_icon_for_model "patients.Patient" %}
+                        <div class="flex-grow">
+                        {{ form.patient }}{{ form.patient.errors }}
+                        </div>
+                    </div>
+                </td>
+                <td>{{ form.extraction }}{{ form.extraction.errors }}</td>
+            </tr>
+        {% endfor %}
+        {{ samples_form.media }}
+        </table>
+    </div>
+{% else %}
+    {# Cohort mode - membership is the thing being edited, so the table is the editor #}
+    {% page_help user 'patients/view_cohort_help' %}
+    <div id="cohort-membership">
+        <div id="cohort-membership-table"></div>
+        {% if has_write_permission %}
+        <div class="membership-add-row">
+            <div class="membership-add-field">
+                <label for="id_sample">Add sample</label>
+                {{ sample_form.sample }}
+            </div>
+            <div class="membership-add-field">
+                <label for="id_vcf">or add every sample from</label>
+                {{ vcf_form.vcf }}
+            </div>
+            {{ sample_form.media }}
+        </div>
+        {% endif %}
+        <div id="cohort-membership-save-bar"></div>
+    </div>
+{% endif %}

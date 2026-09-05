@@ -58,12 +58,9 @@ def cached_generated_file_check(request, cgf_id):
     return JsonResponse(data)
 
 
-@require_POST
-def create_cohort_genotype(request, cohort_id):
-    cohort = Cohort.get_for_user(request.user, cohort_id)
-    if cohort.data_archived:
-        raise PermissionDenied("Underlying VCF data is archived; cohort is read-only.")
-
+def cohort_genotype_json_response(cohort: Cohort) -> JsonResponse:
+    """ Build the cohort's genotype data - 'status' when it was free (sub cohort conversion),
+        otherwise 'celery_task' for the client to poll """
     status, celery_task = create_cohort_genotype_and_launch_task(cohort)
 
     data = {}
@@ -72,6 +69,15 @@ def create_cohort_genotype(request, cohort_id):
     elif celery_task:
         data["celery_task"] = celery_task
     return JsonResponse(data)
+
+
+@require_POST
+def create_cohort_genotype(request, cohort_id):
+    cohort = Cohort.get_for_user(request.user, cohort_id, write=True)
+    if cohort.data_archived:
+        raise PermissionDenied("Underlying VCF data is archived; cohort is read-only.")
+
+    return cohort_genotype_json_response(cohort)
 
 
 @require_POST
