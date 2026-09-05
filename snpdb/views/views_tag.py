@@ -34,6 +34,7 @@ from snpdb.tag_operations import (
     reinstate_tag,
     retire_tag,
     set_tag_allele_origin,
+    set_tag_requires_classification,
 )
 from snpdb.utils import get_tag_styles_and_colors
 
@@ -147,6 +148,21 @@ def tag_set_allele_origin(request, tag_id):
                              f"'{tag}' allele origin is now {tag.get_allele_origin_bucket_display()}")
     except ValueError as ve:
         messages.add_message(request, messages.ERROR, str(ve))
+    return redirect('tag_settings')
+
+
+@require_superuser
+@require_POST
+def tag_set_requires_classification(request, tag_id):
+    """ Whether tagging a variant with this puts it in the sample/patient page's classify queue """
+    tag = get_object_or_404(Tag, pk=tag_id)
+    requires_classification = bool(request.POST.get("requires_classification"))
+    set_tag_requires_classification(tag, requires_classification, request.user)
+    if requires_classification:
+        message = f"Variants tagged '{tag}' now show up as needing classification"
+    else:
+        message = f"Variants tagged '{tag}' no longer show up as needing classification"
+    messages.add_message(request, messages.INFO, message)
     return redirect('tag_settings')
 
 

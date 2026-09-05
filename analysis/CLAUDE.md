@@ -42,6 +42,12 @@ Patterns here:
   with `model` set + template `analysis/node_editors/<classname>_editor.html`.
   `analysis/views/views_node.py:get_node_views_by_class` finds the view by `model`, so defining the class registers it;
   `analysis/views/nodes/node_view.py:NodeView.form_valid` does the dirty/save/update_analysis dance for you.
+- The sample / patient page's Classify & Report tab is `analysis/classify_report.py` +
+  `analysis/views/views_classify_report.py` (it lives here because it is built on VariantTag - analysis may import
+  classification, never the other way round). A tagging is in a case's queue when `Tag.requires_classification` and it
+  resolves to one of the case's samples: its own `VariantTag.sample`, else the analysis it was made in contains the
+  sample and the sample carries the variant. "Done" is never stored on the tagging - it is inferred from a
+  non-withdrawn classification of the same allele on one of the case's samples, so withdrawing puts the tag back.
 - Load nodes with `AnalysisNode.objects.get_subclass(pk=...)` / `.select_subclasses()` (`analysis/models/nodes/analysis_node.py:NodeInheritanceManager`);
   in views use `analysis/views/analysis_permissions.py:get_node_subclass_or_404`, which enforces
   `analysis/models/models_analysis.py:Analysis.can_write` (locked analyses and template snapshots are read-only).

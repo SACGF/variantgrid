@@ -9,7 +9,7 @@ from analysis.models.enums import TagLocation
 from analysis.models.models_analysis import Analysis
 from analysis.models.nodes.analysis_node import AnalysisNode, NodeVersion
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsAutoInitialSaveMixin
-from snpdb.models import Allele, GenomeBuild, Tag, Variant, VariantAllele
+from snpdb.models import Allele, GenomeBuild, Sample, Tag, Variant, VariantAllele
 
 
 class VariantTagsImport(TimeStampedModel):
@@ -52,6 +52,9 @@ class VariantTag(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
     # NodeVersion rows are deleted when a node reloads, so the sources the node was showing when this tag
     # was made are copied here - the tag is the audit record of what the tagger actually saw
     node_live_data_sources = models.JSONField(default=dict)
+    # Which sample the tagging is about - filled in at tag time when it's unambiguous, left null otherwise
+    # (never prompted for). Null tags are resolved to a case by looking at the analysis @see get_sample_for_variant_tag
+    sample = models.ForeignKey(Sample, null=True, blank=True, on_delete=SET_NULL)
     user = models.ForeignKey(User, on_delete=CASCADE)
 
     def __str__(self):

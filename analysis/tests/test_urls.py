@@ -182,6 +182,8 @@ class Test(URLTestCase):
             ('analysis_settings_node_counts_tab', analysis_params, 200),
             ('analysis_input_samples', analysis_params, 200),
 
+            ('sample_classify_report_tab', {"sample_id": cls.sample.pk}, 200),
+
             # Node data
             ('node_data_grid', analysis_version_and_node_version_params, 200),
             ('node_async_wait', analysis_version_and_node_version_params, 200),

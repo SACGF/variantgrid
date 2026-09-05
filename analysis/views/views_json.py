@@ -37,6 +37,7 @@ from analysis.models.nodes.node_utils import (
 )
 from analysis.serializers import CandidateSearchRunSerializer, VariantTagSerializer
 from analysis.tasks.analysis_update_tasks import populate_clingen_alleles_from_analysis_node
+from analysis.variant_tag_operations import get_sample_for_variant_tag
 from analysis.views.analysis_permissions import (
     get_analysis_or_404,
     get_node_subclass_or_404,
@@ -270,6 +271,10 @@ def set_variant_tag(request, location):
                                                           version=F("node__version")).first()
                 variant_tag.node_version = node_version
                 variant_tag.node_live_data_sources = node_version.live_data_sources if node_version else {}
+            if created:
+                # Tagging is one click - the sample is only filled in where it's unambiguous
+                variant_tag.sample = get_sample_for_variant_tag(variant_tag)
+            if node_id or created:
                 variant_tag.save()
         else:
             if genome_build_name is None:

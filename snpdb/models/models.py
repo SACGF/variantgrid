@@ -67,6 +67,9 @@ class Tag(models.Model):
     merged_into = models.ForeignKey('self', null=True, blank=True, on_delete=SET_NULL)
     allele_origin_bucket = models.CharField(max_length=1, choices=TAG_ALLELE_ORIGIN_CHOICES,
                                             default=AlleleOriginBucket.UNKNOWN)
+    # Tagging a variant with this is asking for it to be classified - it shows up in the classify queue
+    # on the sample/patient page until a classification exists for the case
+    requires_classification = models.BooleanField(default=False)
 
     @classmethod
     def live_qs(cls) -> QuerySet['Tag']:

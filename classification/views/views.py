@@ -15,7 +15,7 @@ from django.core.exceptions import PermissionDenied
 from django.db.models import QuerySet
 from django.http import Http404, StreamingHttpResponse
 from django.http.request import HttpRequest
-from django.http.response import HttpResponse
+from django.http.response import HttpResponse, HttpResponseBase, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.timezone import now
@@ -374,7 +374,20 @@ class AutopopulateView(APIView):
 
 @require_POST
 def create_classification(request):
-    return redirect(create_classification_object(request).get_edit_url())
+    return classification_created_response(request, create_classification_object(request))
+
+
+def classification_created_response(request, classification: Classification) -> HttpResponseBase:
+    """ The web form sends the user straight to the new record. The classify queue on the sample/patient page
+        asks for JSON instead, so it can put a link to the record in the row it just actioned """
+    if request.POST.get("response_format") == "json":
+        return JsonResponse({
+            "classification_id": classification.pk,
+            "label": classification.friendly_label,
+            "url": classification.get_absolute_url(),
+            "edit_url": classification.get_edit_url(),
+        })
+    return redirect(classification.get_edit_url())
 
 
 def create_classification_object(request) -> Classification:

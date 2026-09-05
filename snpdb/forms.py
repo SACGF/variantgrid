@@ -768,6 +768,9 @@ class CreateTagForm(forms.Form):
     tag = forms.CharField(widget=forms.TextInput(attrs={'placeholder': 'New Tag Name...'}), required=True)
     allele_origin_bucket = forms.ChoiceField(choices=TAG_ALLELE_ORIGIN_CHOICES, label="Allele origin",
                                              initial=AlleleOriginBucket.UNKNOWN, required=True)
+    requires_classification = forms.BooleanField(label="Classify queue", required=False,
+                                                 help_text="Tagged variants are listed as needing classification "
+                                                           "on the sample and patient pages")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -776,6 +779,7 @@ class CreateTagForm(forms.Form):
         helper.layout = Layout(
             FieldWithButtons('tag', Submit(name="Create", value="create", css_class="btn btn-primary")),
             Field('allele_origin_bucket'),
+            Field('requires_classification'),
         )
         self.helper = helper
 
@@ -792,7 +796,8 @@ class CreateTagForm(forms.Form):
 
     def save(self) -> Tag:
         return Tag.objects.create(pk=self.cleaned_data['tag'],
-                                  allele_origin_bucket=self.cleaned_data['allele_origin_bucket'])
+                                  allele_origin_bucket=self.cleaned_data['allele_origin_bucket'],
+                                  requires_classification=self.cleaned_data['requires_classification'])
 
 
 class UserSettingsGenomeBuildMixin:
