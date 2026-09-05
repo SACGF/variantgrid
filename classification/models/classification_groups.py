@@ -9,7 +9,7 @@ from django.contrib.auth.models import User
 from more_itertools import first
 
 from classification.criteria_strengths import CriteriaStrength
-from classification.enums import CriteriaEvaluation, ShareLevel, SpecialEKeys
+from classification.enums import ShareLevel, SpecialEKeys
 from classification.models import (
     ClassificationModification,
     ConditionResolved,
@@ -371,25 +371,7 @@ class ClassificationGroup:
 
     @cached_property
     def acmg_criteria(self) -> MultiValues[CriteriaStrength]:
-
-        def criteria_converter(cm: ClassificationModification) -> set[CriteriaStrength]:
-            strengths: set[CriteriaStrength] = set()
-            for e_key in EvidenceKeyMap.cached().criteria():
-                strength = cm.get(e_key.key)
-                if CriteriaEvaluation.is_met(strength):
-                    strengths.add(CriteriaStrength(e_key, strength))
-            for amp_level, letter in SpecialEKeys.AMP_LEVELS_TO_LEVEL.items():
-                if value := cm.get_value_list(amp_level):
-                    e_key = EvidenceKeyMap.cached_key(amp_level)
-                    for sub_value in value:
-                        sub_value_label = e_key.pretty_value(sub_value)
-                        strengths.add(CriteriaStrength(
-                            ekey=EvidenceKeyMap.cached_key(amp_level),
-                            custom_strength=f"{letter}_{sub_value_label}")
-                        )
-            return strengths
-        output = MultiValues.convert([criteria_converter(cm) for cm in self.modifications])
-        return output
+        return MultiValues.convert([cm.met_criteria_strengths() for cm in self.modifications])
 
     def _evidence_key_set(self, key: str) -> list[str]:
         all_values = set()
