@@ -1,6 +1,7 @@
 # Somalier fixes (#183, #162, #196, #393, #432, #1147, SACGF/variantgrid_com#78)
 
-Written by Claude Fable 5.1 (claude-fable-5-1), 2026-09-04
+Written by Claude Fable 5.1 (claude-fable-5-1), 2026-09-04; §1/§2 revised by Claude Fable 5
+(claude-fable-5), 2026-09-05 — export real depths so somalier applies its own QC, instead of GT-only
 
 ## Diagnosis in one paragraph
 
@@ -18,6 +19,17 @@ is wrong for merged VCFs that contain only variant calls (lipo: 7.3M `./.`, zero
 it was removed from the import pipeline (#393), ancestry crashes on a VCF with zero usable sites and
 takes the cohort relate down with it, and `somalier_vcf_id` catches only `CalledProcessError`.
 
+The remedy is not to hide the depths: VariantGrid never QC'd incoming genotype calls (we take the
+VCF's GT as-is, however low the depth or GQ), so the export should hand somalier *correct* depths
+and let `somalier relate` apply its own QC — `--min-depth` (default 7) and `--min-ab` (default
+0.3); somalier never reads GQ. How somalier genotypes is a per-file decision made from the header
+(v0.2.12 `get_ref_alt_counts` in `src/somalier.nim`): with a FORMAT `AD` line it genotypes every
+sample from AD, and a missing/`.` AD yields counts 0,0 (negatives are clamped), so that
+sample/site fails min-depth and is unknown; with no AD line it trusts GT at pseudo-depths 20,0 /
+10,10 / 0,20. So each exported VCF picks one of two honest formats: `GT:AD` with real depths when
+the import recorded them, `GT` only when it didn't (nothing exists to QC with, and declaring AD
+would zero out every sample).
+
 Somalier stage timings measured locally (166 samples): DB export 1.8s for a 3.9M-variant VCF,
 `extract` 0.2s, `relate` 0.1s, `ancestry` 34s (it reads the 2,504 1kg `.somalier` files each run).
 Ancestry is the cost in #1147.
@@ -29,17 +41,32 @@ schedule.
 
 ### Somalier extract VCF (generated per VCF, `import_processing/somalier_vcf_extract_<pk>/`)
 
+With depth data (`vcf.allele_depth_field` and one of `read_depth_field` / `allele_frequency_field`):
+
 ```
 ##fileformat=VCFv4.2
 ##contig=<ID=1,length=248956422,assembly=GRCh38>        # contig names, matching the records and the sites file
 ##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
+##FORMAT=<ID=AD,Number=R,Type=Integer,Description="Allelic depths for the ref and alt alleles">
 #CHROM  POS  ID  REF  ALT  QUAL  FILTER  INFO  FORMAT  <slug>_<sample_pk> ...
-1       965125  <variant_pk>  G  C  .  .  .  GT  0/1  ./.  1/1
+1       965125  <variant_pk>  G  C  .  .  .  GT:AD  0/1:12,10  ./.:.  1/1:0,25
 ```
 
-`GT` is the only FORMAT field. Somalier then genotypes from `GT` (its own fallback: 20,0 / 10,10 /
-0,20 pseudo-depths), so the calls VariantGrid imported and QC'd are the calls somalier relates on.
-Verified locally: a GT-only export of HG001 gives somalier exactly the 6,723 hets stored in the DB.
+Somalier genotypes every sample from `AD` and applies its own QC at relate time (`--min-depth` 7,
+`--min-ab` 0.3): a low-depth call VariantGrid imported without question, and any sample whose AD
+we couldn't derive (`.`), drops out as unknown instead of being counted.
+
+Without depth data (source VCF gave us nothing to derive real depths from):
+
+```
+##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
+...  GT  0/1  ./.  1/1
+```
+
+`GT` is the only FORMAT field, so somalier falls back to the imported genotypes at pseudo-depths
+(20,0 / 10,10 / 0,20) — no depth QC is possible for these files. Verified locally: a GT-only
+export of HG001 gives somalier exactly the 6,723 hets stored in the DB (in the `GT:AD` case
+somalier's counts are expected to sit below the DB's — that's the QC working).
 
 ### Settings (`variantgrid/settings/components/default_settings.py`)
 
@@ -76,16 +103,27 @@ if settings.SOMALIER["enabled"] and settings.SOMALIER["all_samples_relate_hour"]
 Route `snpdb.tasks.somalier_tasks.somalier_all_samples` to `SCHEDULING_SINGLE_WORKER` in
 `celery_settings.py` so two nightly runs can never overlap.
 
-## §1 Export genotypes somalier will trust (#183)
+## §1 Export real depths so somalier can QC the calls (#183)
 
 `snpdb/variants_to_vcf.py:vcf_export_to_file` (somalier is its only caller):
 
-1. Write `FORMAT=GT` and the genotype string only. Keep the per-sample zygosity counting exactly as
-   is, since `SomalierSampleExtract` is populated from it.
-2. Build the header with `get_vcf_header_from_contigs(..., use_accession=False)` so `##contig` IDs
+1. Decide the format once per VCF: `GT:AD` when `vcf.allele_depth_field` is set and at least one
+   of `vcf.read_depth_field` / `vcf.allele_frequency_field` is (a ref depth is derivable), else
+   `GT` only. Drop `DP` from the format either way — somalier only reads it on gVCF records,
+   which we never write.
+2. Per sample in the `GT:AD` case, treat `None` and `-1` (`CohortGenotype.MISSING_NUMBER_VALUE`)
+   both as missing for `ad`/`dp`/`af`. We only store the alt depth (`samples_allele_depth`), so
+   derive ref: `ref = max(0, dp - alt_ad)` when `dp` is present, else
+   `ref = max(0, round(alt_ad * (1 - af) / af))` when `af > 0` (convert first when
+   `vcf.allele_frequency_percent`). When `alt_ad` is missing, or ref is underivable (no `dp`,
+   and `af` missing or 0 — e.g. a hom-ref call with no DP), write `.` for AD: somalier zeroes
+   that sample's counts and min-depth marks the site unknown, which is the QC doing its job.
+   This replaces the `.,alt` / `ref,-1` / `2×DP,alt` garbage from the diagnosis.
+3. Keep the per-sample zygosity counting exactly as is, since `SomalierSampleExtract` is
+   populated from it.
+4. Build the header with `get_vcf_header_from_contigs(..., use_accession=False)` so `##contig` IDs
    match the record `CHROM` values and the `nochr` sites file.
-3. Select only the columns the export now uses (`id`, contig name, position, ref, alt, zygosity).
-4. Keep the `filters__isnull=True` restriction (somalier only counts PASS sites).
+5. Keep the `filters__isnull=True` restriction (somalier only counts PASS sites).
 
 ## §2 Decide `--unknown` from the data, not the file count (#183)
 
@@ -133,11 +171,15 @@ In `snpdb/tasks/somalier_tasks.py`:
 
 1. `related_samples_help.html` describes the thresholds in words and the sample page renders the
    live numbers from `settings.SOMALIER["relatedness"]` next to the table heading.
-2. Document `--unknown` in the help: relatedness between samples from different VCFs, or from a
+2. Document the genotype QC in the help: VariantGrid imports calls unfiltered, so somalier
+   re-genotypes from the exported depths and only counts sites with depth ≥ 7 and het allele
+   balance 0.3–0.7; a VCF imported without depth data is related on its genotypes as called,
+   unfiltered.
+3. Document `--unknown` in the help: relatedness between samples from different VCFs, or from a
    VCF without hom-ref calls, is understated relative to a jointly called VCF (the HSS2008 trio
    measured 0.51 joint vs 0.33 with `--unknown`), so duplicates still show near 1.0 but
    parent/child pairs may sit in the 0.3–0.5 band.
-3. Add a wiki page `Install-Somalier.md`: binary + `sites.*.vcf.gz` + `1kg-somalier` +
+4. Add a wiki page `Install-Somalier.md`: binary + `sites.*.vcf.gz` + `1kg-somalier` +
    `ancestry-labels-1kg.tsv` under `SOMALIER["annotation_base_dir"]`, the sites VCFs imported with
    their file name unchanged (the `deployment_check` command verifies this), the `enabled` flag,
    the `somalier_existing_vcfs --clear` backfill, and a note that local disk matters for ancestry.
@@ -166,9 +208,12 @@ In `snpdb/tasks/somalier_tasks.py`:
 
 Worth keeping:
 
-1. `vcf_export_to_file` writes `GT` only, contig names in header and body, `./.` for unknown
-   zygosity, and returns zygosity counts per whitelisted sample (build a small VCF with the
-   `snpdb/tests/utils` fixtures; a hom-ref, het, hom-alt and unknown call per sample).
+1. `vcf_export_to_file` format decision and depth derivation (build a small VCF with the
+   `snpdb/tests/utils` fixtures; a hom-ref, het, hom-alt and unknown call per sample):
+   `GT:AD` with `ref = dp - alt_ad` when the VCF has AD+DP; ref from AF when DP is absent;
+   AD `.` when a depth is `-1`/missing or ref is underivable; `GT` only (no AD header line)
+   when the VCF has no depth fields; contig names in header and body; `./.` for unknown
+   zygosity; zygosity counts returned per whitelisted sample.
 2. `has_hom_ref_calls`: true for a VCF whose extracts have `ref_count > 0`, false when any is 0.
 3. `somalier_vcf_id` with the somalier binary replaced by a failing command records `ERROR` on the
    extract and returns without raising; with a fresh `PROCESSING` extract it returns early.
