@@ -2,7 +2,7 @@ from typing import Union
 
 from django.contrib.auth.models import Group, User
 from django.db import models
-from django.db.models import CASCADE, PROTECT, SET_NULL, Count, Max, Q, QuerySet
+from django.db.models import CASCADE, PROTECT, SET_NULL, Count, Exists, Max, OuterRef, Q, QuerySet
 from django_extensions.db.models import TimeStampedModel
 
 from analysis.models.enums import TagLocation
@@ -99,14 +99,13 @@ class VariantTag(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
         if tags_qs is None:
             tags_qs = VariantTag.objects.all()
 
-        # Narrowing this to tags_qs's own alleles only looks like it saves work - the outer filter below
-        # already restricts to them, so it just adds a scan of the whole tag table to every query
-        va_kwargs = {"genome_build": genome_build}
+        # This has to be a correlated EXISTS - an IN-subquery inside the OR below can't become a
+        # semi-join, so Postgres hashes every VariantAllele in the build on each query
+        va_kwargs = {"genome_build": genome_build, "allele": OuterRef("allele")}
         if variant_qs is not None:
             va_kwargs["variant__in"] = variant_qs
 
-        va_qs = VariantAllele.objects.filter(**va_kwargs)
-        q_allele = Q(allele__in=va_qs.values_list("allele", flat=True))
+        q_allele = Q(Exists(VariantAllele.objects.filter(**va_kwargs)))
 
         # Tags in our own build are matched on variant, so they show up straight away - allele is assigned
         # asynchronously (@see analysis.tasks.variant_tag_tasks._liftover_variant_tag)
