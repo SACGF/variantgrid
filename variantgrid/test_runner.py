@@ -3,6 +3,8 @@ import json
 import os
 
 import cdot.hgvs.dataproviders.fasta_seqfetcher as fasta_seqfetcher
+from django.db import connections
+from django.db.migrations.loader import MigrationLoader
 from django.test.runner import DiscoverRunner
 
 import library.genomics.fasta_wrapper as fasta_wrapper
@@ -22,6 +24,39 @@ class VariantGridTestRunner(DiscoverRunner):
         super().setup_test_environment(**kwargs)
         ClinGenAlleleRegistryAPI.override_class = MockClinGenAlleleRegistryAPI
         TranscriptSequenceFetcher.override_class = MockTranscriptSequenceFetcher
+
+    def setup_databases(self, **kwargs):
+        if self.keepdb and self.parallel > 1:
+            self._drop_test_db_clones()
+        old_config = super().setup_databases(**kwargs)
+        if self.keepdb:
+            self._check_kept_test_db_matches_disk()
+        return old_config
+
+    def _check_kept_test_db_matches_disk(self):
+        """ --keepdb only migrates forwards: a migration applied while another branch was checked out keeps
+            its schema and its django_migrations row after switching back, and the failures that causes
+            (IntegrityError on a column the model no longer has) look nothing like the cause. """
+        for connection in connections.all():
+            loader = MigrationLoader(connection)
+            orphans = sorted(loader.applied_migrations.keys() - loader.disk_migrations.keys())
+            if orphans:
+                test_db_name = connection.settings_dict["NAME"]
+                orphan_list = "\n".join(f"  {app}.{name}" for app, name in orphans)
+                raise SystemExit(f"Test database '{test_db_name}' has migrations applied that are not on disk "
+                                 f"(applied on another branch?):\n{orphan_list}\n"
+                                 f"Recreate it by running once without --keepdb.")
+
+    def _drop_test_db_clones(self):
+        """ --keepdb migrates the kept main test database but reuses an existing per-worker clone untouched,
+            so the clones fall behind as migrations land. Cloning is a few seconds, so start them fresh. """
+        for connection in connections.all():
+            creation = connection.creation
+            test_db_name = creation._get_test_db_name()
+            with creation._nodb_cursor() as cursor:
+                for index in range(self.parallel):
+                    clone_name = connection.ops.quote_name(f"{test_db_name}_{index + 1}")
+                    cursor.execute(f"DROP DATABASE IF EXISTS {clone_name}")
 
 
 class FastaRecordingRunner(VariantGridTestRunner):

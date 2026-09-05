@@ -514,6 +514,8 @@ stream-zip==0.0.84
     # via -r requirements.in
 tabulate==0.10.0
     # via yoyo-migrations
+tblib==3.2.2
+    # via -r requirements.in
 tomlkit==0.15.0
     # via pylint
 toposort==1.10

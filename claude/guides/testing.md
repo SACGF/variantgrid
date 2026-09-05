@@ -23,9 +23,14 @@ python3 manage.py vg tests --changed                                        # on
   `scripts/vg tests --explain` shows which changed file selected each label without booting Django; `--run`
   executes them.
 - `--parallel 4 --keepdb` runs the whole suite (2,741 tests) in about 2 minutes wall on vg-test2 with nothing
-  failing (2026-09-02); Django clones `test_snpdb` into `test_snpdb_1..4` and keeps the clones. CI runs it the
-  same way (`.github/workflows/django-tests.yml`). A test that fails only in parallel is sharing a file under
-  `data/` or a fixed temp path - give it its own directory rather than marking it serial.
+  failing (2026-09-02); Django clones `test_snpdb` into `test_snpdb_1..4`. `VariantGridTestRunner` drops the
+  clones before each `--keepdb` run (about 3 s each to recreate) because Django would otherwise reuse them
+  unmigrated. CI runs it the same way (`.github/workflows/django-tests.yml`). A test that fails only in parallel
+  is sharing a file under `data/` or a fixed temp path - give it its own directory rather than marking it serial.
+  `tblib` (in requirements) lets a worker ship a failing test's traceback back to the parent; without it any
+  error under `--parallel` aborts the whole run with `cannot pickle 'traceback' object`.
+- Every app package needs an `__init__.py`: `manage.py test <app>.tests` fails at discovery with
+  `expected str ... not NoneType` when the app is an implicit namespace package.
 - `TEST_RUNNER` is `variantgrid/test_runner.py:VariantGridTestRunner` (see External services below).
 
 ## Fixture builders
