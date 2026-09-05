@@ -12,11 +12,13 @@
 {% block title %}{{ page_title }}{% endblock %}
 {% block head %}
 {{ block.super }}
-{% if vcf %}
+{% if show_stats_tab %}
 <script type="text/javascript" src="{% static 'js/lib/plotly-custom-3.7.0.min.js' %}"></script>
+<script type="text/javascript" src="{% static 'js/plotly_helper.js' %}"></script>
+{% endif %}
+{% if vcf %}
 <script type="text/javascript" src="{% static 'js/cached_generated_files.js' %}"></script>
 <script type="text/javascript" src="{% static 'js/annotated_file_download.js' %}"></script>
-<script type="text/javascript" src="{% static 'js/plotly_helper.js' %}"></script>
 <style>
 #bulk-set-form-container {
     display: none;
@@ -176,17 +178,6 @@ function toggleVCFSection(id) {
     $("#" + id).slideToggle();
 }
 
-function drawStatsGraphs() {
-    drawZygosityGraphs();
-    drawLengthHistograms();
-}
-
-function drawZygosityGraphs() {
-    const sample_zygosities = {{ sample_zygosities | jsonify }};
-    const sample_names = {{ sample_names | jsonify }};
-    showStackedBar('sample-zygosities-graph', 'Sample Zygosities', 500, 500, sample_zygosities, sample_names);
-}
-
 function drawLengthHistograms() {
         const histoData = {{ vcf_length_stats | jsonify }};
         let container = $("#vcf-length-stats-graph-container");
@@ -246,7 +237,7 @@ $(document).ready(function() {
     });
 {% endif %}
 
-    drawStatsGraphs();
+    drawLengthHistograms();
 
     $("button#vcf-populate-clingen-alleles").click(function () {
         let btn = $(this);
@@ -312,6 +303,10 @@ $(document).ready(function() {
 {% endblock %}
 
 {% block jsdocumentready %}
+{% if sample_zygosities %}
+    showStackedBar('sample-zygosities-graph', 'Sample Zygosities', 500, 500,
+                   {{ sample_zygosities|jsonify }}, {{ sample_names|jsonify }});
+{% endif %}
 {% if not vcf %}
     new CohortMembershipEditor({{ membership_config|jsonify }}, {{ cohort_sample_rows|jsonify }}).init();
 {% endif %}
@@ -347,8 +342,10 @@ $(document).ready(function() {
 <div id="vcf-cohort-tabs">
     <ul class="nav nav-tabs mb-4" role="tablist">
         <li class="nav-item"><a class="nav-link show active" data-toggle="tab" role="tab" href="#details">Details</a></li>
+        {% if show_stats_tab %}
+        <li class="nav-item"><a class="nav-link" data-toggle="tab" role="tab" href="#stats">Stats</a></li>
+        {% endif %}
         {% if vcf %}
-        <li class="nav-item"><a class="nav-link" data-toggle="tab" role="tab" href="#vcf-stats">Stats</a></li>
         <li class="nav-item"><a class="nav-link" data-toggle="tab" role="tab" href="#vcf-info">VCF Info</a></li>
         {% if somalier_enabled and vcf.cohort.somaliercohortrelate %}
         <li class="nav-item"><a class="nav-link" data-toggle="tab" role="tab" href="#vcf-relate">Relate</a></li>
@@ -450,11 +447,20 @@ $(document).ready(function() {
     {% endif %}
     </div>
 
-    {% if vcf %}
-    <div class="tab-pane" role="tabpanel" id="vcf-stats">
+    {% if show_stats_tab %}
+    <div class="tab-pane" role="tabpanel" id="stats">
+        {% if stats_pending %}
+            <p class="text-muted">
+                <i class="fas fa-spinner fa-spin"></i>
+                Sample stats are being calculated for this cohort - reload the page shortly.
+            </p>
+        {% endif %}
         <div id="sample-zygosities-graph"></div>
-        <div id="vcf-length-stats-graph-container"></div>
+        {% if vcf %}<div id="vcf-length-stats-graph-container"></div>{% endif %}
     </div>
+    {% endif %}
+
+    {% if vcf %}
     <div class="tab-pane" role="tabpanel" id="vcf-info">
         <fieldset class="form-fields">
             {% if vcf.uploadedvcf.file_upload.uploadpipeline %}

@@ -1,11 +1,21 @@
+from unittest.mock import patch
+
 from django.contrib.auth.models import User
 from django.test import TestCase
 
 from annotation.fake_annotation import get_fake_annotation_version
-from snpdb.models import Cohort, CohortGenotypeCollection, CohortSample, GenomeBuild, Trio
+from snpdb.models import (
+    Cohort,
+    CohortGenotypeCollection,
+    CohortGenotypeStats,
+    CohortSample,
+    GenomeBuild,
+    SampleStatsCodeVersion,
+    Trio,
+)
 from snpdb.tasks.cohort_genotype_tasks import create_cohort_genotype_and_launch_task
 from snpdb.tests.utils.fake_cohort_data import create_fake_trio
-from snpdb.views.vcf_cohort_page import _family_groups_by_sample_id
+from snpdb.views.vcf_cohort_page import _family_groups_by_sample_id, cohort_zygosity_stats
 
 
 class CohortGenotypeTestCase(TestCase):
@@ -114,6 +124,42 @@ class CohortGenotypeTestCase(TestCase):
         self.assertEqual({s.pk for s in samples}, set(family_groups))
         for labels in family_groups.values():
             self.assertEqual([f"Trio '{trio.name}'"], labels)
+
+    def _create_genotype_stats(self, cgc, samples):
+        code_version = SampleStatsCodeVersion.objects.get_or_create(name="SampleStats", version=1,
+                                                                    code_git_hash="test")[0]
+        for i, sample in enumerate(samples):
+            CohortGenotypeStats.objects.create(cohort_genotype_collection=cgc, sample=sample,
+                                               code_version=code_version, ref_count=i, het_count=10 + i,
+                                               hom_count=20 + i, unk_count=30 + i)
+
+    def test_cohort_zygosity_stats_sub_cohort_shows_only_its_samples(self):
+        """ A sub cohort's CGC is its parent's, so the graph has to be cut back to its own members """
+        parent_cohort = self.trio1.cohort
+        parent_samples = list(parent_cohort.get_samples())
+        self._create_genotype_stats(parent_cohort.cohort_genotype_collection, parent_samples)
+
+        sub_cohort = parent_cohort.create_sub_cohort(self.user_owner, parent_samples[:2])
+        sub_cohort_samples = [cs.sample for cs in sub_cohort.get_cohort_samples()]
+        sample_names, sample_zygosities, stats_pending = cohort_zygosity_stats(sub_cohort, sub_cohort_samples)
+
+        self.assertFalse(stats_pending)
+        self.assertEqual([s.name for s in sub_cohort_samples], sample_names)
+        self.assertEqual(["ref_count", "het_count", "hom_count", "unk_count"], [z[0] for z in sample_zygosities])
+        for _, counts in sample_zygosities:
+            self.assertEqual(len(sub_cohort_samples), len(counts))
+
+    @patch("snpdb.views.vcf_cohort_page.enqueue_cohort_stats_recompute")
+    def test_cohort_zygosity_stats_recomputes_against_cgc_owner(self, mock_enqueue):
+        """ Recompute rewrites every row on the CGC, so a sub cohort has to queue its parent """
+        parent_cohort = self.trio1.cohort
+        parent_samples = list(parent_cohort.get_samples())
+        sub_cohort = parent_cohort.create_sub_cohort(self.user_owner, parent_samples[:2])
+        sub_cohort_samples = [cs.sample for cs in sub_cohort.get_cohort_samples()]
+
+        _, _, stats_pending = cohort_zygosity_stats(sub_cohort, sub_cohort_samples)
+        self.assertTrue(stats_pending)
+        self.assertEqual(parent_cohort, mock_enqueue.call_args.args[0])
 
     def test_cohort_genotype_packed_field_index(self):
         """ Add/Remove CohortSamples - ensure cohort_genotype_packed_field_index stays in range """

@@ -10,6 +10,8 @@ from django.db.models import ForeignKey
 from django.db.models.expressions import F
 from django.urls.base import reverse
 
+from annotation.models import AnnotationVersion
+from annotation.tasks.calculate_sample_stats import enqueue_cohort_stats_recompute
 from patients.models_enums import Sex
 from snpdb.archive import DataArchivedError
 from snpdb.forms import SampleChoiceForm, VCFChoiceForm
@@ -52,6 +54,41 @@ def sample_membership_rows(samples: list[Sample]) -> list[dict]:
             "sex": (stats.chrx_sex_guess if stats else Sex.UNKNOWN).label,
         })
     return rows
+
+
+def cohort_zygosity_stats(cohort: Cohort, cohort_samples: list[Sample]) -> tuple[list[str], tuple, bool]:
+    """ Per-sample zygosity counts shaped for showStackedBar, in the cohort's display order.
+
+        A sub cohort's CGC is its parent's, so the rows are filtered to this cohort's own samples.
+        Returns (sample_names, sample_zygosities, stats_pending) - stats_pending when a sample has no
+        row yet, which also queues a recompute against the cohort that owns the CGC. """
+    try:
+        cgc = cohort.cohort_genotype_collection
+    except (CohortGenotypeCollection.DoesNotExist, DataArchivedError):
+        return [], (), False
+
+    ss_fields = ("sample_id", "sample__name", "ref_count", "het_count", "hom_count", "unk_count")
+    stats_by_sample_id = {}
+    for value_dict in CohortGenotypeStats.objects.filter(cohort_genotype_collection=cgc,
+                                                         sample__in=cohort_samples,
+                                                         filter_key__isnull=True,
+                                                         passing_filter=False).values(*ss_fields):
+        stats_by_sample_id[value_dict.pop("sample_id")] = value_dict
+
+    sample_names = []
+    sample_zygosities = defaultdict(list)
+    for sample in cohort_samples:
+        if value_dict := stats_by_sample_id.get(sample.pk):
+            sample_names.append(value_dict.pop("sample__name"))
+            for zygosity, count in value_dict.items():
+                sample_zygosities[zygosity].append(count)
+
+    stats_pending = len(sample_names) < len(cohort_samples)
+    if stats_pending:
+        # Stats are per (CGC, annotation version), so a version bump or a fresh rebuild leaves gaps
+        base_cohort = cohort.get_base_cohort()
+        enqueue_cohort_stats_recompute(base_cohort, AnnotationVersion.latest(cohort.genome_build))
+    return sample_names, tuple(sample_zygosities.items()), stats_pending
 
 
 def _family_groups_by_sample_id(cohort: Cohort) -> dict[int, list[str]]:
@@ -125,6 +162,7 @@ def vcf_cohort_page_context(cohort: Cohort, has_write_permission: bool, vcf: VCF
         "source_vcf_count": len({sample.vcf_id for sample in cohort_samples}),
         "permission_class": "snpdb.models.VCF" if vcf else "snpdb.models.Cohort",
         "permission_pk": vcf.pk if vcf else (cohort.pk if cohort else None),
+        "show_stats_tab": bool(vcf) or cohort_genotype_collection is not None,
     }
 
     if vcf:
@@ -133,4 +171,10 @@ def vcf_cohort_page_context(cohort: Cohort, has_write_permission: bool, vcf: VCF
         context["page_title"] = "Cohort"
         context.update(_membership_editor_context(cohort, cohort_samples, cohort_genotype_collection,
                                                   has_write_permission))
+        sample_names, sample_zygosities, stats_pending = cohort_zygosity_stats(cohort, cohort_samples)
+        context.update({
+            "sample_names": sample_names,
+            "sample_zygosities": sample_zygosities,
+            "stats_pending": stats_pending,
+        })
     return context
