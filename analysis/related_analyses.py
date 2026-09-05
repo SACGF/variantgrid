@@ -6,6 +6,12 @@ from analysis.models.nodes.sources.duo_node import DuoNode
 from analysis.models.nodes.sources.quad_node import QuadNode
 
 
+def _related_analyses_ids(user):
+    """ A template's source node keeps whatever sample it was built from as an example - that doesn't
+        make the template related to the sample """
+    return Analysis.filter_for_user(user).filter(template_type__isnull=True).values_list("pk", flat=True)
+
+
 def sort_analyses_by_date_and_merge_details(all_analysis_details) -> list[tuple[Analysis, str]]:
     sorted_analyses = sorted(all_analysis_details.keys(), key=lambda x: x.created)
 
@@ -19,7 +25,7 @@ def sort_analyses_by_date_and_merge_details(all_analysis_details) -> list[tuple[
 
 def get_related_analysis_details_for_samples(user, samples) -> list[tuple[Analysis, str]]:
     all_analysis_details = defaultdict(set)
-    analyses_ids = Analysis.filter_for_user(user).values_list("pk", flat=True)
+    analyses_ids = _related_analyses_ids(user)
 
     for sn in SampleNode.objects.filter(analysis__in=analyses_ids,
                                         sample__in=samples).select_related("analysis", "sample"):
@@ -30,7 +36,7 @@ def get_related_analysis_details_for_samples(user, samples) -> list[tuple[Analys
 
 def get_related_analysis_details_for_cohort(user, cohorts) -> list[tuple[Analysis, str]]:
     all_analysis_details = defaultdict(set)
-    analyses_ids = Analysis.filter_for_user(user).values_list("pk", flat=True)
+    analyses_ids = _related_analyses_ids(user)
 
     for cohort_node in CohortNode.objects.filter(analysis__in=analyses_ids,
                                                  cohort__in=cohorts).select_related("analysis", "cohort"):
@@ -40,7 +46,7 @@ def get_related_analysis_details_for_cohort(user, cohorts) -> list[tuple[Analysi
 
 def get_related_analysis_details_for_trio(user, trios) -> list[tuple[Analysis, str]]:
     all_analysis_details = defaultdict(set)
-    analyses_ids = Analysis.filter_for_user(user).values_list("pk", flat=True)
+    analyses_ids = _related_analyses_ids(user)
     for trio_node in TrioNode.objects.filter(analysis__in=analyses_ids,
                                              trio__in=trios).select_related("analysis", "trio"):
         all_analysis_details[trio_node.analysis].add(str(trio_node.trio))
@@ -50,7 +56,7 @@ def get_related_analysis_details_for_trio(user, trios) -> list[tuple[Analysis, s
 
 def get_related_analysis_details_for_quad(user, quads) -> list[tuple[Analysis, str]]:
     all_analysis_details = defaultdict(set)
-    analyses_ids = Analysis.filter_for_user(user).values_list("pk", flat=True)
+    analyses_ids = _related_analyses_ids(user)
     for quad_node in QuadNode.objects.filter(analysis__in=analyses_ids,
                                              quad__in=quads).select_related("analysis", "quad"):
         all_analysis_details[quad_node.analysis].add(str(quad_node.quad))
@@ -59,7 +65,7 @@ def get_related_analysis_details_for_quad(user, quads) -> list[tuple[Analysis, s
 
 def get_related_analysis_details_for_duo(user, duos) -> list[tuple[Analysis, str]]:
     all_analysis_details = defaultdict(set)
-    analyses_ids = Analysis.filter_for_user(user).values_list("pk", flat=True)
+    analyses_ids = _related_analyses_ids(user)
     for duo_node in DuoNode.objects.filter(analysis__in=analyses_ids,
                                            duo__in=duos).select_related("analysis", "duo"):
         all_analysis_details[duo_node.analysis].add(str(duo_node.duo))
@@ -68,7 +74,7 @@ def get_related_analysis_details_for_duo(user, duos) -> list[tuple[Analysis, str
 
 def get_related_analysis_details_for_pedigree(user, pedigrees) -> list[tuple[Analysis, str]]:
     all_analysis_details = defaultdict(set)
-    analyses_ids = Analysis.filter_for_user(user).values_list("pk", flat=True)
+    analyses_ids = _related_analyses_ids(user)
     for pedigree_node in PedigreeNode.objects.filter(analysis__in=analyses_ids,
                                                      pedigree__in=pedigrees).select_related("analysis", "pedigree"):
         all_analysis_details[pedigree_node.analysis].add(str(pedigree_node.pedigree))
