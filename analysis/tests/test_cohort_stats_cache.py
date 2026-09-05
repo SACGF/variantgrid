@@ -13,12 +13,14 @@ from unittest.mock import patch
 from django.contrib.auth.models import User
 from django.test import TestCase
 
+from analysis.models import DuoNode, QuadNode
 from analysis.models.enums import TrioInheritance
 from analysis.models.nodes.stats_cache import (
     UNCACHEABLE,
     NoFilterHandler,
     TrioInheritanceHandler,
     get_filter_keys_to_precompute_for_cohort,
+    get_handler_for_node,
     inheritance_filter_key,
 )
 from annotation.fake_annotation import get_fake_annotation_version
@@ -125,6 +127,13 @@ class TestFilterKeyHandlerRoundTrip(TestCase):
             n.require_zygosity = False
             n.trio = _FakeTrio()
             self.assertIs(handler.filter_key_for_node(n), UNCACHEABLE)
+
+    def test_family_nodes_without_precomputed_buckets_are_uncacheable(self):
+        """ The buckets are built off a cohort's Trio, so a Duo/Quad node has to count live rather
+            than read the raw cohort row, which knows nothing about its inheritance mode """
+        for node in (DuoNode(), QuadNode()):
+            handler = get_handler_for_node(node)
+            self.assertIs(handler.filter_key_for_node(node), UNCACHEABLE, str(type(node)))
 
     def test_no_filter_handler_returns_none_only(self):
         handler = NoFilterHandler()

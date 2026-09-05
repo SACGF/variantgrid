@@ -108,6 +108,15 @@ class DuoInheritanceHandler(FilterKeyHandler):
         return UNCACHEABLE
 
 
+class QuadInheritanceHandler(FilterKeyHandler):
+    """ Nothing is precomputed for quads - the buckets are built off a cohort's Trio (@see
+        _trio_predicates), so every QuadNode counts live rather than reading the raw cohort row,
+        which knows nothing about its inheritance mode. """
+
+    def filter_key_for_node(self, node) -> FilterKey:
+        return UNCACHEABLE
+
+
 def inheritance_filter_key(mode: str, trio) -> str:
     """ The key a mode's bucket is stored under - the writer and the readers both come through here
         so they can't drift apart. autosomal_dominant's predicate branches on which parents are
@@ -129,6 +138,7 @@ def get_handler_for_node(node) -> FilterKeyHandler:
     from analysis.models.nodes.sources.cohort_node import CohortNode
     from analysis.models.nodes.sources.duo_node import DuoNode
     from analysis.models.nodes.sources.pedigree_node import PedigreeNode
+    from analysis.models.nodes.sources.quad_node import QuadNode
     from analysis.models.nodes.sources.sample_node import SampleNode
     from analysis.models.nodes.sources.trio_node import TrioNode
 
@@ -137,6 +147,7 @@ def get_handler_for_node(node) -> FilterKeyHandler:
         CohortNode: NoFilterHandler(),
         TrioNode: TrioInheritanceHandler(),
         DuoNode: DuoInheritanceHandler(),
+        QuadNode: QuadInheritanceHandler(),
         PedigreeNode: NoFilterHandler(),
     }
     return handlers.get(type(node), NoFilterHandler())

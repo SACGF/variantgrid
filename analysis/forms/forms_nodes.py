@@ -1157,6 +1157,8 @@ class QuadNodeForm(GenomeBuildAutocompleteForwardMixin, VCFSourceNodeForm):
             "min_dp": WIDGET_INTEGER_MIN_0,
             "min_gq": WIDGET_INTEGER_MIN_0,
             "max_pl": WIDGET_INTEGER_MIN_0,
+            "mosaic_max_af": WIDGET_UNIT_INTERVAL,
+            "mosaic_min_alt_reads": WIDGET_INTEGER_MIN_1,
         }
 
 

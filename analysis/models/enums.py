@@ -54,6 +54,7 @@ class QuadInheritance(models.TextChoices):
     ALL_RECESSIVE = 'A', 'All Recessive (AR + XLR)'
     COMPOUND_HET = 'C', 'C. Het'
     DOMINANT = 'D', 'Dominant'
+    MOSAIC_PARENT = 'M', 'Dominant (mosaic parent)'
     DENOVO = 'N', 'Denovo'
     XLINKED_RECESSIVE = 'X', 'X-Linked Recessive'
     ANY_AFFECTED = 'Y', 'Any Affected (variant in ≥1 affected)'

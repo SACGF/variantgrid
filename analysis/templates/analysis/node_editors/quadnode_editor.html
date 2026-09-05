@@ -10,6 +10,10 @@
        return $("#id_quad", quadForm).find(":selected").val();
     }
 
+    function updateMosaicFields() {
+        $("#mosaic-fields").toggle($("#id_inheritance").val() === 'M');
+    }
+
     function updateZygosityTable() {
         var mode = $("#id_inheritance").val();
         var map = ZYGOSITY_MAP[mode];
@@ -93,7 +97,10 @@
         quadLoadable = true;  // Only the autocomplete's own choices get here, and they're all visible
         changeQuad();
     });
-    $("#id_inheritance").change(updateZygosityTable);
+    $("#id_inheritance").change(function() {
+        updateZygosityTable();
+        updateMosaicFields();
+    });
     $("#id_require_parent_zygosity").change(updateZygosityTable);
     $("#id_require_sibling_zygosity").change(updateZygosityTable);
 
@@ -112,6 +119,7 @@
 
     changeQuad();
     updateZygosityTable();
+    updateMosaicFields();
 
     ajaxForm(quadForm);
 {% endblock docreadyjs %}
@@ -174,6 +182,11 @@
     </div>
     {% load vcf_locus_filter_tags %}
     {% vcf_locus_filter node node.quad.cohort.vcf %}
+    <div class='genotype-row' id='mosaic-fields' style='display: none'>
+        <label class="editor-label" for="{{ form.mosaic_min_alt_reads.id_for_label }}">Mosaic parent</label>
+        <span class="genotype-field"><b title="Alt reads the mosaic parent needs at the proband's site">Alt reads</b>&ge;{{ form.mosaic_min_alt_reads }}{{ form.mosaic_min_alt_reads.errors }}</span>
+        <span class="genotype-field"><b title="Ceiling on the parent's VAF - a full HET parent is plain dominant, not mosaic">AF</b>&le;{{ form.mosaic_max_af }}{{ form.mosaic_max_af.errors }}</span>
+    </div>
     <div class='genotype-row'>
         <span class="genotype-field"><b title='Allelic Depth'>AD</b>&ge;{{ form.min_ad }} {{ form.min_ad_op }}</span>
         <span class="genotype-field"><b title='Read Depth'>DP</b>&ge;{{ form.min_dp }} {{ form.min_dp_op }}</span>

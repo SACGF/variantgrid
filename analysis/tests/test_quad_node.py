@@ -5,7 +5,8 @@ from django.test import TestCase, override_settings
 
 from analysis.models import Analysis, QuadNode
 from analysis.models.enums import QuadInheritance
-from analysis.tests.inheritance_node_mixin import InheritanceNodeTestsMixin, make_cohort_genotype
+from analysis.tests.inheritance_node_mixin import (DEFAULT_GENOTYPE_VALUES, InheritanceNodeTestsMixin,
+                                                   make_cohort_genotype)
 from annotation.fake_annotation import get_fake_annotation_version
 from snpdb.models import GenomeBuild
 from snpdb.models.models_cohort import CohortGenotypeCollection
@@ -77,10 +78,49 @@ class TestQuadNodeInheritance(InheritanceNodeTestsMixin, TestCase):
         # when sibling zygosity is not required.
         cls.recessive_sib_unknown_v = cls._make_variant(cls.cgc_aff, 8300, "OEEU")
 
+        # Mosaic parent (#1830) - AD/AF matter as much as the call. [proband, mother, father, sibling]
+        # Unaffected-sibling quad: mother called HOM_REF with 3 alt reads at 6%, sibling clean
+        cls.mosaic_mother_v = cls._make_variant(cls.cgc, 8000, "ERRR", [15, 3, 0, 0],
+                                                [0.5, 0.06, 0.0, 0.0])
+        # Father called HET, but at 15% - too low to be constitutional
+        cls.mosaic_father_v = cls._make_variant(cls.cgc, 8100, "ERER", [15, 0, 4, 0],
+                                                [0.5, 0.0, 0.15, 0.0])
+        # Father is a full HET - inherited dominant, not mosaic
+        cls.inherited_het_v = cls._make_variant(cls.cgc, 8200, "ERER", [15, 0, 14, 0],
+                                                [0.5, 0.0, 0.48, 0.0])
+        # A single alt read in each parent - below the evidence threshold
+        cls.single_alt_read_v = cls._make_variant(cls.cgc, 8300, "ERRR", [15, 1, 1, 0],
+                                                  [0.5, 0.02, 0.02, 0.0])
+        # Reads in both parents - noise rather than one mosaic parent
+        cls.both_parents_reads_v = cls._make_variant(cls.cgc, 8400, "ERRR", [15, 3, 3, 0],
+                                                     [0.5, 0.06, 0.06, 0.0])
+        # Mosaic mother, but the proband doesn't carry it
+        cls.mother_mosaic_no_proband_v = cls._make_variant(cls.cgc, 8500, "RRRR", [0, 3, 0, 0],
+                                                           [0.0, 0.06, 0.0, 0.0])
+        # AF FORMAT field present but no value for this record - the missing number
+        cls.mosaic_missing_af_v = cls._make_variant(cls.cgc, 8600, "ERRR", [15, 3, 0, 0],
+                                                    [-1, -1, -1, -1])
+        # VCF had no AF FORMAT field at all, so the whole column is NULL
+        cls.mosaic_null_af_v = cls._make_variant(cls.cgc, 8700, "ERRR", [15, 3, 0, 0],
+                                                 allele_frequency=None)
+        # Mosaic mother with the sibling carrying it too - the two-affected-sibs case
+        cls.mosaic_sibling_het_v = cls._make_variant(cls.cgc, 8800, "ERRE", [15, 3, 0, 15],
+                                                     [0.5, 0.06, 0.0, 0.5])
+        # ...and the same, in the affected-sibling quad
+        cls.mosaic_aff_sibling_het_v = cls._make_variant(cls.cgc_aff, 8800, "ERRE", [15, 3, 0, 15],
+                                                         [0.5, 0.06, 0.0, 0.5])
+        # Mosaic mother, sibling HOM_REF, in the affected-sibling quad
+        cls.mosaic_aff_sibling_ref_v = cls._make_variant(cls.cgc_aff, 8900, "ERRR", [15, 3, 0, 0],
+                                                         [0.5, 0.06, 0.0, 0.0])
+        # Mosaic mother, sibling is a no-call
+        cls.mosaic_sibling_unknown_v = cls._make_variant(cls.cgc, 9200, "ERRU", [15, 3, 0, 0],
+                                                         [0.5, 0.06, 0.0, 0.0])
+
     @classmethod
-    def _make_variant(cls, cgc, position, samples_zygosity):
+    def _make_variant(cls, cgc, position, samples_zygosity, allele_depth=DEFAULT_GENOTYPE_VALUES,
+                      allele_frequency=DEFAULT_GENOTYPE_VALUES):
         variant = slowly_create_test_variant("3", position, "A", "T", cls.grch37)
-        make_cohort_genotype(cgc, variant, samples_zygosity)
+        make_cohort_genotype(cgc, variant, samples_zygosity, allele_depth, allele_frequency)
         return variant
 
     def _make_node(self, inheritance, quad=None, **kwargs):
@@ -130,6 +170,84 @@ class TestQuadNodeInheritance(InheritanceNodeTestsMixin, TestCase):
         node = self._make_node(QuadInheritance.RECESSIVE, quad=self.quad_aff,
                                require_parent_zygosity=False, require_sibling_zygosity=True)
         self.assertNotIn(self.recessive_sib_unknown_v.pk, self._filter_variants(node))
+
+    # ── Dominant (mosaic parent) ──────────────────────────────────────────────
+
+    def test_mosaic_matches_alt_reads_in_a_hom_ref_called_mother(self):
+        node = self._make_node(QuadInheritance.MOSAIC_PARENT)
+        self.assertIn(self.mosaic_mother_v.pk, self._filter_variants(node))
+
+    def test_mosaic_matches_low_vaf_het_called_father(self):
+        node = self._make_node(QuadInheritance.MOSAIC_PARENT)
+        self.assertIn(self.mosaic_father_v.pk, self._filter_variants(node))
+
+    def test_mosaic_excludes_full_het_parent(self):
+        """ A parent at 48% is a constitutional het - that's plain dominant, not mosaic """
+        node = self._make_node(QuadInheritance.MOSAIC_PARENT)
+        self.assertNotIn(self.inherited_het_v.pk, self._filter_variants(node))
+
+    def test_mosaic_excludes_parent_below_min_alt_reads(self):
+        node = self._make_node(QuadInheritance.MOSAIC_PARENT)
+        self.assertNotIn(self.single_alt_read_v.pk, self._filter_variants(node))
+
+    def test_mosaic_excludes_alt_reads_in_both_parents(self):
+        """ Only one parent can be the mosaic one - reads in both is noise """
+        node = self._make_node(QuadInheritance.MOSAIC_PARENT)
+        self.assertNotIn(self.both_parents_reads_v.pk, self._filter_variants(node))
+
+    def test_mosaic_excludes_variants_the_proband_lacks(self):
+        node = self._make_node(QuadInheritance.MOSAIC_PARENT)
+        self.assertNotIn(self.mother_mosaic_no_proband_v.pk, self._filter_variants(node))
+
+    def test_mosaic_matches_when_the_allele_frequency_is_missing(self):
+        node = self._make_node(QuadInheritance.MOSAIC_PARENT)
+        self.assertIn(self.mosaic_missing_af_v.pk, self._filter_variants(node))
+
+    def test_mosaic_matches_when_the_vcf_has_no_allele_frequency_field(self):
+        """ AD carries the mode on its own - AF is only stored when the VCF has the FORMAT field """
+        node = self._make_node(QuadInheritance.MOSAIC_PARENT)
+        self.assertIn(self.mosaic_null_af_v.pk, self._filter_variants(node))
+
+    def test_mosaic_min_alt_reads_raises_the_bar(self):
+        node = self._make_node(QuadInheritance.MOSAIC_PARENT, mosaic_min_alt_reads=4)
+        self.assertNotIn(self.mosaic_mother_v.pk, self._filter_variants(node))
+
+    def test_mosaic_max_af_lets_a_higher_vaf_parent_in(self):
+        node = self._make_node(QuadInheritance.MOSAIC_PARENT, mosaic_max_af=0.6)
+        self.assertIn(self.inherited_het_v.pk, self._filter_variants(node))
+
+    def test_mosaic_always_warns_about_the_data_it_needs(self):
+        node = self._make_node(QuadInheritance.MOSAIC_PARENT)
+        self.assertTrue(node.get_warnings())
+        self.assertEqual(self._make_node(QuadInheritance.RECESSIVE).get_warnings(), [])
+
+    def test_mosaic_needs_no_affected_parent(self):
+        # Both quads have unaffected parents - the mosaic one usually is
+        self.assertEqual(self._get_inheritance_errors(QuadInheritance.MOSAIC_PARENT), [])
+
+    # ── Dominant (mosaic parent) - the sibling ────────────────────────────────
+
+    def test_mosaic_unaffected_sibling_excluded_when_carrying_the_variant(self):
+        node = self._make_node(QuadInheritance.MOSAIC_PARENT, quad=self.quad)
+        self.assertNotIn(self.mosaic_sibling_het_v.pk, self._filter_variants(node))
+
+    def test_mosaic_affected_sibling_matches_when_carrying_the_variant(self):
+        """ Two affected sibs sharing a variant both parents were called 0/0 for - the case
+            that motivates the mode """
+        node = self._make_node(QuadInheritance.MOSAIC_PARENT, quad=self.quad_aff)
+        self.assertIn(self.mosaic_aff_sibling_het_v.pk, self._filter_variants(node))
+
+    def test_mosaic_affected_sibling_excluded_without_the_variant(self):
+        node = self._make_node(QuadInheritance.MOSAIC_PARENT, quad=self.quad_aff)
+        self.assertNotIn(self.mosaic_aff_sibling_ref_v.pk, self._filter_variants(node))
+
+    def test_mosaic_require_sibling_zygosity_true_excludes_unknown_sibling(self):
+        node = self._make_node(QuadInheritance.MOSAIC_PARENT, require_sibling_zygosity=True)
+        self.assertNotIn(self.mosaic_sibling_unknown_v.pk, self._filter_variants(node))
+
+    def test_mosaic_require_sibling_zygosity_false_includes_unknown_sibling(self):
+        node = self._make_node(QuadInheritance.MOSAIC_PARENT, require_sibling_zygosity=False)
+        self.assertIn(self.mosaic_sibling_unknown_v.pk, self._filter_variants(node))
 
     # ── Validation ────────────────────────────────────────────────────────────
 
@@ -211,3 +329,8 @@ class TestQuadNodeInheritance(InheritanceNodeTestsMixin, TestCase):
     def test_zygosity_table_all_recessive_sibling_two_line_cell(self):
         data = QuadNode.get_zygosity_table_data()
         self.assertIn('AR:', data[QuadInheritance.ALL_RECESSIVE]['sibling'])
+
+    def test_zygosity_table_mosaic_sibling_varies_with_affected_status(self):
+        entry = QuadNode.get_zygosity_table_data()[QuadInheritance.MOSAIC_PARENT]
+        self.assertNotEqual(entry['sibling_affected'], entry['sibling_unaffected'])
+        self.assertIn('alt reads', entry['other_filters_mother'])

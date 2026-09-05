@@ -11,6 +11,7 @@ from django.db.models.query_utils import Q
 from analysis.models.enums import QuadInheritance
 from analysis.models.nodes.sources import AbstractCohortBasedNode
 from analysis.models.nodes.family_inheritance import (
+    MOSAIC_PARENT_WARNINGS,
     AbstractCompHetInheritance,
     AbstractFamilyInheritance,
     FamilyInheritanceNodeMixin,
@@ -18,6 +19,9 @@ from analysis.models.nodes.family_inheritance import (
     _dominant_requires_affected_parent_error,
     _pedigree_sex,
     _xlinked_recessive_errors,
+    mosaic_absent_q,
+    mosaic_evidence_description,
+    mosaic_evidence_q,
 )
 from analysis.models.nodes.node_display import NodeIcon
 from patients.models_enums import Zygosity
@@ -69,6 +73,54 @@ class QuadDominant(SimpleQuadInheritance):
         father_zyg = self.UNAFFECTED_AND_AFFECTED_ZYGOSITIES[int(quad.father_affected)]
         sibling_zyg = self.UNAFFECTED_AND_AFFECTED_ZYGOSITIES[int(quad.sibling_affected)]
         return mother_zyg, father_zyg, self.HAS_VARIANT, sibling_zyg
+
+
+class QuadMosaicParent(AbstractQuadInheritance):
+    """ Dominant where a parent is mosaic - the proband is a constitutional HET and one parent
+        carries the variant in a fraction of cells, called either HOM_REF with a handful of alt
+        reads or HET at a low VAF. Either parent can be the mosaic one, so this is an OR of the two
+        sides, with the other parent required clean. The sibling is constitutional either way, so
+        its own call carries the affected-status rule. @see issue #1830 """
+
+    def _sibling_zyg(self) -> set:
+        return self.UNAFFECTED_AND_AFFECTED_ZYGOSITIES[int(self.node.quad.sibling_affected)]
+
+    def _side_q(self, cgc, zyg_data, mosaic_sample, other_sample) -> Q:
+        node = self.node
+        q = self._get_zyg_q(cgc, zyg_data)
+        q &= mosaic_evidence_q(cgc, mosaic_sample, node.mosaic_max_af, node.mosaic_min_alt_reads)
+        q &= mosaic_absent_q(cgc, other_sample, node.mosaic_min_alt_reads)
+        return q
+
+    def get_arg_q_dict(self) -> dict[Optional[str], dict[str, Q]]:
+        quad = self.node.quad
+        cgc = quad.cohort.cohort_genotype_collection
+        sibling_zyg = self._sibling_zyg()
+        mother_mosaic = self._side_q(
+            cgc, (self.MOSAIC_ZYGOSITIES, self.NO_VARIANT, self.HAS_VARIANT, sibling_zyg),
+            quad.mother.sample, quad.father.sample)
+        father_mosaic = self._side_q(
+            cgc, (self.NO_VARIANT, self.MOSAIC_ZYGOSITIES, self.HAS_VARIANT, sibling_zyg),
+            quad.father.sample, quad.mother.sample)
+        combined = mother_mosaic | father_mosaic
+        return {cgc.cohortgenotype_alias: {str(combined): combined}}
+
+    def _evidence_description(self) -> str:
+        return mosaic_evidence_description(self.node.mosaic_max_af, self.node.mosaic_min_alt_reads)
+
+    def get_method(self) -> str:
+        allow_unknown = not self.node.require_parent_zygosity
+        proband = self._zygosity_options(self.HAS_VARIANT)
+        mosaic = self._zygosity_options(self.MOSAIC_ZYGOSITIES, allow_unknown)
+        other = self._zygosity_options(self.NO_VARIANT, allow_unknown)
+        sibling = self._zygosity_options(self._sibling_zyg(), not self.node.require_sibling_zygosity)
+        return (f"Proband: {proband}, and either parent ({mosaic}) with {self._evidence_description()} "
+                f"while the other ({other}) has <{self.node.mosaic_min_alt_reads} alt reads; "
+                f"Sibling: {sibling}")
+
+    def get_other_filters_description(self) -> str:
+        # The thresholds themselves are the editor's own inputs, right above the table
+        return "One parent has alt reads at a low AF, the other has none"
 
 
 class QuadDenovo(SimpleQuadInheritance):
@@ -189,6 +241,7 @@ class QuadNode(FamilyInheritanceNodeMixin, AbstractCohortBasedNode):
         QuadInheritance.RECESSIVE:         QuadRecessive,
         QuadInheritance.ALL_RECESSIVE:     QuadAllRecessive,
         QuadInheritance.DOMINANT:          QuadDominant,
+        QuadInheritance.MOSAIC_PARENT:     QuadMosaicParent,
         QuadInheritance.DENOVO:            QuadDenovo,
         QuadInheritance.XLINKED_RECESSIVE: QuadXLinkedRecessive,
         QuadInheritance.ANY_AFFECTED:      QuadAnyAffected,
@@ -199,6 +252,9 @@ class QuadNode(FamilyInheritanceNodeMixin, AbstractCohortBasedNode):
                                    default=QuadInheritance.RECESSIVE)
     require_parent_zygosity = models.BooleanField(default=True)
     require_sibling_zygosity = models.BooleanField(default=True)
+    # Mosaic parent mode only - the low VAF band a mosaic parent's alt reads have to fall in (#1830)
+    mosaic_max_af = models.FloatField(default=0.35)
+    mosaic_min_alt_reads = models.IntegerField(default=2)
 
     @property
     def min_inputs(self):
@@ -226,6 +282,13 @@ class QuadNode(FamilyInheritanceNodeMixin, AbstractCohortBasedNode):
 
     def _get_inheritance_errors(self) -> list[str]:
         return self.get_quad_inheritance_errors(self.quad, self.inheritance)
+
+    def get_warnings(self) -> list[str]:
+        """ Mosaic detection depends on the data as much as the filter - say so every time """
+        warnings = super().get_warnings()
+        if self.quad and self.inheritance == QuadInheritance.MOSAIC_PARENT:
+            warnings.extend(MOSAIC_PARENT_WARNINGS)
+        return warnings
 
     def _get_cohort(self):
         return self.quad.cohort if self.quad else None
@@ -289,7 +352,9 @@ class QuadNode(FamilyInheritanceNodeMixin, AbstractCohortBasedNode):
         return (
             "Mother/Father/Proband/Sibling - filter for recessive/dominant/denovo inheritance. "
             "'Any Affected' returns variants present in at least one affected family "
-            "member (collapsing to proband alone if no other member is affected)."
+            "member (collapsing to proband alone if no other member is affected). "
+            "'Dominant (mosaic parent)' looks for parental alt reads at a low allele frequency, "
+            "so it catches a mosaic parent the germline caller wrote off as 0/0."
         )
 
     @staticmethod
@@ -355,6 +420,18 @@ class QuadNode(FamilyInheritanceNodeMixin, AbstractCohortBasedNode):
                     'proband': f"AR: {fmt(ar_zyg[2])}\nXLR: {fmt(xlr_zyg[2])}",
                     'sibling': f"AR: {fmt(ar_zyg[3])}\nXLR: {fmt(xlr_zyg[3])}",
                 }
+            elif klass is QuadMosaicParent:
+                entry = {
+                    'mother': fmt(klass.MOSAIC_ZYGOSITIES),
+                    'father': fmt(klass.MOSAIC_ZYGOSITIES),
+                    'proband': fmt(klass.HAS_VARIANT),
+                }
+                for affected_val in (False, True):
+                    stub_node.quad.sibling_affected = affected_val
+                    handler = klass(stub_node)
+                    suffix = '_affected' if affected_val else '_unaffected'
+                    entry['sibling' + suffix] = fmt(handler._sibling_zyg())
+                data[mode] = entry
             elif klass is QuadAnyAffected:
                 handler = klass(stub_node)
                 has_variant = fmt(QuadAnyAffected.HAS_VARIANT)
