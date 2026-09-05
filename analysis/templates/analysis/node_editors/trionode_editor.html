@@ -10,6 +10,10 @@
        return $("#id_trio", trioForm).find(":selected").val();
     }
 
+    function updateMosaicFields() {
+        $("#mosaic-fields").toggle($("#id_inheritance").val() === 'M');
+    }
+
     function updateZygosityTable() {
         var mode = $("#id_inheritance").val();
         var map = ZYGOSITY_MAP[mode];
@@ -89,7 +93,10 @@
         trioLoadable = true;  // Only the autocomplete's own choices get here, and they're all visible
         changeTrio();
     });
-    $("#id_inheritance").change(updateZygosityTable);
+    $("#id_inheritance").change(function() {
+        updateZygosityTable();
+        updateMosaicFields();
+    });
     $("#id_require_zygosity").change(updateZygosityTable);
 
     function setDominantSelectAvailable(one_affected) {
@@ -107,6 +114,7 @@
 
     changeTrio();
     updateZygosityTable();
+    updateMosaicFields();
 
     ajaxForm(trioForm);
 {% endblock docreadyjs %}
@@ -142,6 +150,11 @@
             <label for="{{ form.ignore_field_errors.id_for_label }}" title="Save and run even though the inheritance mode doesn't fit this family - the reasons show as warnings">{{ form.ignore_field_errors }} {{ form.ignore_field_errors.label }}</label>
             <label for="{{ form.require_zygosity.id_for_label }}">{{ form.require_zygosity }} Require parent zygosity calls</label>{{ form.require_zygosity.errors }}
         </span>
+    </div>
+    <div class='genotype-row' id='mosaic-fields' style='display: none'>
+        <label class="editor-label" for="{{ form.mosaic_min_alt_reads.id_for_label }}">Mosaic parent</label>
+        <span class="genotype-field"><b title="Alt reads the mosaic parent needs at the proband's site">Alt reads</b>&ge;{{ form.mosaic_min_alt_reads }}{{ form.mosaic_min_alt_reads.errors }}</span>
+        <span class="genotype-field"><b title="Ceiling on the parent's VAF - a full HET parent is plain dominant, not mosaic">AF</b>&le;{{ form.mosaic_max_af }}{{ form.mosaic_max_af.errors }}</span>
     </div>
     {{ zygosity_table_data|json_script:"zygosity-data" }}
     <div>

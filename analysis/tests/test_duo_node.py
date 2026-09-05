@@ -16,7 +16,7 @@ from django.test import TestCase, override_settings
 
 from analysis.models import Analysis, DuoNode
 from analysis.models.enums import DuoInheritance
-from analysis.tests.inheritance_node_mixin import make_cohort_genotype
+from analysis.tests.inheritance_node_mixin import DEFAULT_GENOTYPE_VALUES, make_cohort_genotype
 from annotation.fake_annotation import get_fake_annotation_version
 from patients.models_enums import Sex
 from snpdb.models import Duo, DuoRelationship, GenomeBuild, Variant
@@ -53,10 +53,27 @@ class TestDuoNodeInheritance(TestCase):
         cls.dominant_v = cls._make_variant("3", 7000, "EE")        # both have it
         cls.xlinked_v = cls._make_variant("X", 1000, "OE")
 
+        # Mosaic parent (#1830) - AD/AF matter as much as the call. [proband, parent]
+        # Parent called HOM_REF but with 3 alt reads at 6%
+        cls.mosaic_parent_v = cls._make_variant("3", 8000, "ER", [15, 3], [0.5, 0.06])
+        # Parent called HET, but at 15% - too low to be constitutional
+        cls.mosaic_het_parent_v = cls._make_variant("3", 8100, "EE", [15, 4], [0.5, 0.15])
+        # Parent is a full HET - inherited dominant, not mosaic
+        cls.inherited_het_v = cls._make_variant("3", 8200, "EE", [15, 14], [0.5, 0.48])
+        # A single alt read in the parent - below the evidence threshold
+        cls.single_alt_read_v = cls._make_variant("3", 8300, "ER", [15, 1], [0.5, 0.02])
+        # Mosaic parent, but the proband doesn't carry it
+        cls.parent_mosaic_no_proband_v = cls._make_variant("3", 8400, "RR", [0, 3], [0.0, 0.06])
+        # AF FORMAT field present but no value for this record - the missing number
+        cls.mosaic_missing_af_v = cls._make_variant("3", 8500, "ER", [15, 3], [-1, -1])
+        # VCF had no AF FORMAT field at all, so the whole column is NULL
+        cls.mosaic_null_af_v = cls._make_variant("3", 8600, "ER", [15, 3], allele_frequency=None)
+
     @classmethod
-    def _make_variant(cls, chrom, position, samples_zygosity):
+    def _make_variant(cls, chrom, position, samples_zygosity, allele_depth=DEFAULT_GENOTYPE_VALUES,
+                      allele_frequency=DEFAULT_GENOTYPE_VALUES):
         variant = slowly_create_test_variant(chrom, position, "A", "T", cls.grch37)
-        make_cohort_genotype(cls.cgc, variant, samples_zygosity)
+        make_cohort_genotype(cls.cgc, variant, samples_zygosity, allele_depth, allele_frequency)
         return variant
 
     def _make_node(self, inheritance, duo=None, **kwargs):
@@ -126,6 +143,52 @@ class TestDuoNodeInheritance(TestCase):
             self.assertNotIn(self.absent_v.pk, ids)
         finally:
             self.duo.parent_affected = False
+
+    # ── Dominant (mosaic parent) ──────────────────────────────────────────────
+
+    def test_mosaic_matches_alt_reads_in_a_hom_ref_called_parent(self):
+        node = self._make_node(DuoInheritance.MOSAIC_PARENT)
+        self.assertIn(self.mosaic_parent_v.pk, self._filter_variants(node))
+
+    def test_mosaic_matches_low_vaf_het_called_parent(self):
+        node = self._make_node(DuoInheritance.MOSAIC_PARENT)
+        self.assertIn(self.mosaic_het_parent_v.pk, self._filter_variants(node))
+
+    def test_mosaic_excludes_full_het_parent(self):
+        """ A parent at 48% is a constitutional het - that's plain dominant, not mosaic """
+        node = self._make_node(DuoInheritance.MOSAIC_PARENT)
+        self.assertNotIn(self.inherited_het_v.pk, self._filter_variants(node))
+
+    def test_mosaic_excludes_parent_below_min_alt_reads(self):
+        node = self._make_node(DuoInheritance.MOSAIC_PARENT)
+        self.assertNotIn(self.single_alt_read_v.pk, self._filter_variants(node))
+
+    def test_mosaic_excludes_variants_the_proband_lacks(self):
+        node = self._make_node(DuoInheritance.MOSAIC_PARENT)
+        self.assertNotIn(self.parent_mosaic_no_proband_v.pk, self._filter_variants(node))
+
+    def test_mosaic_matches_when_the_allele_frequency_is_missing(self):
+        node = self._make_node(DuoInheritance.MOSAIC_PARENT)
+        self.assertIn(self.mosaic_missing_af_v.pk, self._filter_variants(node))
+
+    def test_mosaic_matches_when_the_vcf_has_no_allele_frequency_field(self):
+        """ AD carries the mode on its own - AF is only stored when the VCF has the FORMAT field """
+        node = self._make_node(DuoInheritance.MOSAIC_PARENT)
+        self.assertIn(self.mosaic_null_af_v.pk, self._filter_variants(node))
+
+    def test_mosaic_min_alt_reads_raises_the_bar(self):
+        node = self._make_node(DuoInheritance.MOSAIC_PARENT, mosaic_min_alt_reads=4)
+        self.assertNotIn(self.mosaic_parent_v.pk, self._filter_variants(node))
+
+    def test_mosaic_max_af_lets_a_higher_vaf_parent_in(self):
+        node = self._make_node(DuoInheritance.MOSAIC_PARENT, mosaic_max_af=0.6)
+        self.assertIn(self.inherited_het_v.pk, self._filter_variants(node))
+
+    def test_mosaic_always_warns_about_the_data_it_needs(self):
+        self.assertTrue(self._make_node(DuoInheritance.MOSAIC_PARENT).get_warnings())
+
+    def test_mosaic_needs_no_affected_parent(self):
+        self.assertEqual(DuoNode.get_duo_inheritance_errors(self.duo, DuoInheritance.MOSAIC_PARENT), [])
 
     # ── X-linked recessive ────────────────────────────────────────────────────
 

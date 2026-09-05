@@ -37,6 +37,45 @@ def _build_family_zyg_q(cohort_genotype_collection, sample_zyg_require: list[tup
     )
 
 
+MOSAIC_PARENT_WARNINGS = [
+    "Mosaic parent needs a joint called (multi-sample) VCF - per sample VCFs merged into a cohort "
+    "have no parent record at the proband's site, so there's no parental allele depth to read",
+    "A 5% mosaic at 30x is ~1.5 reads - this is meaningful at ~100x+ / targeted panels, and mostly "
+    "sequencing noise on standard WGS. Sort by the parent's allele depth column to triage",
+    "Blood mosaicism is not gonadal mosaicism - absent signal in blood doesn't rule out germline "
+    "mosaicism. A recurrence risk hint, not a rule out",
+]
+
+
+def _packed_sample_q(cohort_genotype_collection, sample, column: str, lookup: str, value) -> Q:
+    """ Q against one sample's slot in a packed CohortGenotype array, eg samples_allele_depth[2] >= 3 """
+    index = cohort_genotype_collection.get_array_index_for_sample_id(sample.pk)
+    path = f"{cohort_genotype_collection.cohortgenotype_alias}__{column}__{index}__{lookup}"
+    return Q(**{path: value})
+
+
+def mosaic_evidence_q(cohort_genotype_collection, sample, max_af: float, min_alt_reads: int) -> Q:
+    """ What a mosaic parent leaves at the proband's site - alt reads, at a low VAF.
+
+        AD is the robust half: AF is only stored when the VCF has an AF FORMAT field, and a missing
+        value is -1, so the AF ceiling lets those (and a VCF with no AF at all) through. """
+    if sample.vcf.allele_frequency_percent:
+        max_af *= 100.0
+    q_ad = _packed_sample_q(cohort_genotype_collection, sample, "samples_allele_depth", "gte", min_alt_reads)
+    q_af = _packed_sample_q(cohort_genotype_collection, sample, "samples_allele_frequency", "lte", max_af)
+    q_no_af = _packed_sample_q(cohort_genotype_collection, sample, "samples_allele_frequency", "isnull", True)
+    return q_ad & (q_af | q_no_af)
+
+
+def mosaic_absent_q(cohort_genotype_collection, sample, min_alt_reads: int) -> Q:
+    """ The other parent is clean - fewer alt reads than we'd count as mosaic evidence """
+    return _packed_sample_q(cohort_genotype_collection, sample, "samples_allele_depth", "lt", min_alt_reads)
+
+
+def mosaic_evidence_description(max_af: float, min_alt_reads: int) -> str:
+    return f"\u2265{min_alt_reads} alt reads at AF \u2264 {max_af}"
+
+
 def _dominant_requires_affected_parent_error(mother_affected: bool, father_affected: bool):
     if not (mother_affected or father_affected):
         return "Dominant inheritance requires an affected parent"
@@ -90,6 +129,9 @@ class AbstractFamilyInheritance(ABC):
     NO_VARIANT = {Zygosity.MISSING, Zygosity.HOM_REF}  # 2 different het would be "missing" (as has no ref)
     HAS_VARIANT = {Zygosity.HET, Zygosity.HOM_ALT}
     UNAFFECTED_AND_AFFECTED_ZYGOSITIES = [NO_VARIANT, HAS_VARIANT]
+    # A mosaic parent carries the variant in a fraction of cells - any call short of a full HOM_ALT.
+    # The mosaic modes lean on allele depth rather than the call itself @see issue #1830
+    MOSAIC_ZYGOSITIES = NO_VARIANT | {Zygosity.HET}
 
     def __init__(self, node):
         self.node = node

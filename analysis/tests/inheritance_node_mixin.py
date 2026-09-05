@@ -23,7 +23,12 @@ SHARED_VARIANTS = [
 ]
 
 
-def make_cohort_genotype(cgc, variant, samples_zygosity: str):
+DEFAULT_GENOTYPE_VALUES = object()  # so a test can ask for a NULL array, eg a VCF with no AF field
+
+
+def make_cohort_genotype(cgc, variant, samples_zygosity: str,
+                         allele_depth=DEFAULT_GENOTYPE_VALUES, allele_frequency=DEFAULT_GENOTYPE_VALUES):
+    """ allele_depth/allele_frequency are per sample, in packed order - the mosaic modes read them """
     n = len(samples_zygosity)
     CohortGenotype.objects.create(
         collection=cgc,
@@ -32,8 +37,8 @@ def make_cohort_genotype(cgc, variant, samples_zygosity: str):
         het_count=samples_zygosity.count('E'),
         hom_count=samples_zygosity.count('O'),
         samples_zygosity=samples_zygosity,
-        samples_allele_depth=[20] * n,
-        samples_allele_frequency=[100] * n,
+        samples_allele_depth=[20] * n if allele_depth is DEFAULT_GENOTYPE_VALUES else allele_depth,
+        samples_allele_frequency=[100] * n if allele_frequency is DEFAULT_GENOTYPE_VALUES else allele_frequency,
         samples_read_depth=[30] * n,
         samples_genotype_quality=[30] * n,
         samples_phred_likelihood=[0] * n,

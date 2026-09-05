@@ -41,6 +41,9 @@
                         and requiring the affected sibling's zygosity</li>
                     <li>New analysis type - Duo (a proband plus one sequenced parent, where the other isn't available).
                         Own wizard, page and node, with the inheritance modes that make sense with one parent</li>
+                    <li>Trio/Duo nodes - new "Dominant (mosaic parent)" inheritance, which finds a parent carrying the
+                        variant in a fraction of cells by their alt reads at a low allele frequency, rather than by
+                        the germline caller's genotype</li>
                     <li>Analysis templates can be configured to auto-launch when a sample is imported</li>
                     <li>Audit log - records which nodes were added/configured, by who and when</li>
                     <li>All Variants node - filter by variant type (eg symbolic) and by chromosome/contig</li>
@@ -262,6 +265,7 @@
                 <h4>Analysis</h4>
                 <ul>
                     <li>#1829 - Duo analysis (proband + one parent) - wizard, Duo page and DuoNode</li>
+                    <li>#1830 - Trio/Duo nodes - "Dominant (mosaic parent)" inheritance mode</li>
                 </ul>
             </div>
        </div>
