@@ -6,6 +6,9 @@ Issues: sacgf/variantgrid_sapath#246 (SomaticReportable — easy classifications
 SACGF/variantgrid#444 (Multi-variant Classification + Reporting).
 
 Clickable mockup (agreed design): https://claude.ai/code/artifact/64f391ea-fa7f-496d-a59c-5264d647d28b
+— a copy is checked in at `claude/plans/246_classify_report_mockup.html` (open in a browser; it is
+self-contained). It shows the agreed layout, labels and interactions; the real page uses the
+project's Bootstrap 4 styling, not the mockup's CSS.
 
 ## Summary
 

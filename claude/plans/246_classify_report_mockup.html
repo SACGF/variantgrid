@@ -1,0 +1,721 @@
+<title>Classify &amp; Report Workbench</title>
+<style>
+:root {
+  --bg: #f4f5f7;
+  --surface: #ffffff;
+  --surface-2: #f8f9fa;
+  --border: #d9dde3;
+  --text: #212529;
+  --text-muted: #6c757d;
+  --primary: #0b6cbf;
+  --primary-soft: #e3f0fa;
+  --success: #218739;
+  --success-soft: #e6f4ea;
+  --warning: #b8860b;
+  --warning-soft: #fdf6e3;
+  --danger: #c0392b;
+  --tag-somatic: #8e44ad;
+  --tag-somatic-soft: #f3eaf8;
+  --tag-requires: #c0392b;
+  --tag-requires-soft: #fbeae8;
+  --shadow: 0 2px 8px rgba(20, 30, 40, 0.10);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #181c20;
+    --surface: #22272c;
+    --surface-2: #1d2226;
+    --border: #3a4148;
+    --text: #dde2e7;
+    --text-muted: #97a1ab;
+    --primary: #58a6e0;
+    --primary-soft: #1d3244;
+    --success: #57b96d;
+    --success-soft: #1e3326;
+    --warning: #d9a83f;
+    --warning-soft: #37301c;
+    --danger: #e07060;
+    --tag-somatic: #b57ed4;
+    --tag-somatic-soft: #35263f;
+    --tag-requires: #e07060;
+    --tag-requires-soft: #3d2521;
+    --shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #181c20;
+  --surface: #22272c;
+  --surface-2: #1d2226;
+  --border: #3a4148;
+  --text: #dde2e7;
+  --text-muted: #97a1ab;
+  --primary: #58a6e0;
+  --primary-soft: #1d3244;
+  --success: #57b96d;
+  --success-soft: #1e3326;
+  --warning: #d9a83f;
+  --warning-soft: #37301c;
+  --danger: #e07060;
+  --tag-somatic: #b57ed4;
+  --tag-somatic-soft: #35263f;
+  --tag-requires: #e07060;
+  --tag-requires-soft: #3d2521;
+  --shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.5 -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  margin: 0;
+}
+.page { max-width: 1080px; margin: 0 auto; padding: 20px 24px 60px; }
+
+.mock-note {
+  background: var(--warning-soft); color: var(--warning);
+  border: 1px solid var(--warning); border-radius: 4px;
+  padding: 6px 12px; font-size: 12.5px; margin-bottom: 16px;
+}
+
+/* ---- sample page header ---- */
+.crumbs { font-size: 12.5px; color: var(--text-muted); margin-bottom: 6px; }
+.crumbs a { color: var(--primary); text-decoration: none; }
+h1 { font-size: 21px; font-weight: 600; margin: 0 0 2px; }
+.subhead { color: var(--text-muted); font-size: 13px; margin-bottom: 18px; }
+.subhead b { color: var(--text); font-weight: 600; }
+
+/* ---- tabs ---- */
+.nav-tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--border); margin-bottom: 20px; flex-wrap: wrap; }
+.nav-tabs span, .nav-tabs a {
+  padding: 8px 14px; font-size: 13.5px; color: var(--text-muted);
+  border: 1px solid transparent; border-bottom: none;
+  border-radius: 5px 5px 0 0; cursor: default; text-decoration: none;
+}
+.nav-tabs .active {
+  background: var(--surface); border-color: var(--border);
+  color: var(--text); font-weight: 600; position: relative; top: 1px;
+}
+.nav-tabs .active .badge-count {
+  background: var(--primary); color: #fff; border-radius: 9px;
+  font-size: 11px; padding: 1px 7px; margin-left: 6px; font-weight: 600;
+}
+
+/* ---- funnel strip ---- */
+.funnel {
+  display: flex; align-items: stretch; gap: 0; margin-bottom: 22px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
+  box-shadow: var(--shadow); overflow: hidden;
+}
+.funnel-step { flex: 1; padding: 12px 18px; display: flex; flex-direction: column; gap: 1px; }
+.funnel-step + .funnel-step { border-left: 1px solid var(--border); }
+.funnel-step .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-muted); }
+.funnel-step .value { font-size: 20px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.funnel-step .hint { font-size: 12px; color: var(--text-muted); }
+.funnel-step.done .value { color: var(--success); }
+
+/* ---- panels ---- */
+.panel { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; box-shadow: var(--shadow); margin-bottom: 26px; }
+.panel-head {
+  display: flex; align-items: baseline; gap: 10px;
+  padding: 12px 18px; border-bottom: 1px solid var(--border);
+}
+.panel-head h2 { font-size: 15px; font-weight: 600; margin: 0; }
+.panel-head .sub { font-size: 12.5px; color: var(--text-muted); }
+.panel-head .spacer { flex: 1; }
+
+table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+th {
+  text-align: left; font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.05em;
+  color: var(--text-muted); font-weight: 600; padding: 8px 14px;
+  border-bottom: 1px solid var(--border); background: var(--surface-2);
+}
+td { padding: 10px 14px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+tr:last-child td { border-bottom: none; }
+tr.row-done td:not(:last-child) { opacity: 0.55; }
+tr.row-done .hgvs { text-decoration: line-through; }
+.table-wrap { overflow-x: auto; }
+
+.hgvs { font-family: ui-monospace, "Cascadia Mono", Menlo, Consolas, monospace; font-size: 12.5px; white-space: nowrap; }
+.gene { font-weight: 650; }
+.vaf { font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+.tag-pill {
+  display: inline-block; padding: 2px 10px; border-radius: 11px;
+  font-size: 11.5px; font-weight: 600; white-space: nowrap;
+}
+.tag-somatic { background: var(--tag-somatic-soft); color: var(--tag-somatic); }
+.tag-requires { background: var(--tag-requires-soft); color: var(--tag-requires); }
+
+.prior { font-size: 12.5px; }
+.prior .cls { font-weight: 650; }
+.prior .meta { color: var(--text-muted); }
+.prior-none { color: var(--text-muted); font-size: 12.5px; }
+
+button {
+  font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer;
+  border-radius: 4px; padding: 5px 12px; border: 1px solid transparent;
+  white-space: nowrap;
+}
+button:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+.btn-apply { background: var(--success); color: #fff; }
+.btn-classify { background: var(--primary); color: #fff; }
+.btn-outline { background: var(--surface); color: var(--primary); border-color: var(--primary); }
+.btn-plain { background: var(--surface-2); color: var(--text); border-color: var(--border); }
+button:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.done-chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  color: var(--success); font-size: 12.5px; font-weight: 600;
+}
+.rec-link {
+  color: var(--primary); text-decoration: none; font-weight: 650;
+  font-family: ui-monospace, "Cascadia Mono", Menlo, Consolas, monospace; font-size: 12px;
+  white-space: nowrap;
+}
+.rec-link:hover { text-decoration: underline; }
+
+.queue-clear {
+  padding: 22px 18px; text-align: center; color: var(--success);
+  font-weight: 600; font-size: 14px;
+}
+
+/* ---- classifications panel ---- */
+.cls-badge {
+  display: inline-block; padding: 2px 9px; border-radius: 4px;
+  font-size: 11.5px; font-weight: 700; white-space: nowrap;
+}
+.cls-tier { background: var(--tag-somatic-soft); color: var(--tag-somatic); }
+.cls-acmg { background: var(--primary-soft); color: var(--primary); }
+.cls-new { background: var(--success-soft); color: var(--success); font-size: 10.5px; padding: 1px 7px; border-radius: 9px; margin-left: 6px; }
+input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--primary); }
+
+.report-bar {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 18px; border-top: 1px solid var(--border); background: var(--surface-2);
+  border-radius: 0 0 6px 6px;
+}
+.report-bar .count { font-size: 13px; color: var(--text-muted); }
+.report-bar select {
+  font: inherit; font-size: 13px; padding: 5px 8px;
+  border: 1px solid var(--border); border-radius: 4px;
+  background: var(--surface); color: var(--text);
+}
+
+/* ---- modals ---- */
+.overlay {
+  position: fixed; inset: 0; background: rgba(10, 15, 20, 0.45);
+  display: flex; align-items: flex-start; justify-content: center;
+  padding: 40px 16px; overflow-y: auto; z-index: 50;
+}
+.modal {
+  background: var(--surface); border-radius: 7px; box-shadow: 0 12px 40px rgba(0,0,0,0.3);
+  width: 640px; max-width: 100%;
+}
+.modal-head {
+  display: flex; align-items: center; padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
+}
+.modal-head h3 { font-size: 15.5px; margin: 0; font-weight: 600; }
+.modal-head .queue-pos { margin-left: 10px; font-size: 12px; color: var(--text-muted); }
+.modal-head .close { margin-left: auto; background: none; border: none; font-size: 18px; color: var(--text-muted); padding: 0 4px; }
+.modal-body { padding: 18px 20px; display: grid; gap: 13px; }
+.modal-foot { display: flex; gap: 10px; padding: 14px 20px; border-top: 1px solid var(--border); justify-content: flex-end; }
+
+.field { display: grid; gap: 4px; }
+.field label { font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); font-weight: 600; }
+.field .val, .field input, .field select, .field textarea {
+  font: inherit; font-size: 13.5px; color: var(--text);
+  border: 1px solid var(--border); border-radius: 4px;
+  padding: 7px 10px; background: var(--surface);
+}
+.field .val.readonly { background: var(--surface-2); }
+.field textarea { resize: vertical; min-height: 64px; }
+.field .prefill { font-size: 11.5px; color: var(--success); }
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 13px; }
+@media (max-width: 560px) { .two-col { grid-template-columns: 1fr; } }
+
+.priors-list { display: grid; gap: 6px; max-height: 260px; overflow-y: auto; }
+.prior-card {
+  border: 1px solid var(--border); border-radius: 5px; padding: 8px 11px;
+  display: flex; gap: 9px; align-items: baseline; flex-wrap: wrap;
+  background: var(--surface);
+}
+.prior-card .cond { font-weight: 650; font-size: 13px; }
+.prior-card .meta { color: var(--text-muted); font-size: 12px; }
+.prior-card .summary { flex-basis: 100%; font-size: 12px; color: var(--text-muted); }
+.prior-card .use { margin-left: auto; }
+
+/* report preview */
+.report-gene-group { border: 1px solid var(--border); border-radius: 5px; overflow: hidden; }
+.report-gene-head {
+  background: var(--surface-2); padding: 8px 13px; font-weight: 650; font-size: 13.5px;
+  border-bottom: 1px solid var(--border);
+}
+.report-variant { padding: 9px 13px; display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+.report-variant + .report-variant { border-top: 1px solid var(--border); }
+.report-variant .summary { flex-basis: 100%; font-size: 12.5px; color: var(--text-muted); }
+
+/* toast */
+.toast {
+  position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+  background: var(--text); color: var(--bg); padding: 9px 18px;
+  border-radius: 5px; font-size: 13px; box-shadow: var(--shadow);
+  opacity: 0; transition: opacity 0.25s; pointer-events: none; z-index: 99;
+}
+.toast.show { opacity: 1; }
+@media (prefers-reduced-motion: reduce) { .toast { transition: none; } }
+[hidden] { display: none !important; }
+</style>
+
+<div class="page">
+  <div class="mock-note">Mockup v9 (2026-09-05) with example data — workflow prototype for variantgrid_sapath #246 / variantgrid #444. Buttons are clickable; nothing is saved.</div>
+
+  <div class="crumbs"><a>Data</a> › <a>Samples</a> › T-25-0387</div>
+  <h1>Sample T-25-0387</h1>
+  <div class="subhead">
+    Patient <b>ONC-2025-118</b> · Lung adenocarcinoma (FFPE) · VCF <b>T-25-0387.tso500.vcf</b> · GRCh38
+    · from analyses <b>#4112 Somatic panel</b>, <b>#4113 Germline incidental</b>
+  </div>
+
+  <nav class="nav-tabs">
+    <span>Details</span><span>Stats</span><span>Files</span><span>Variants</span><span>Graphs</span>
+    <span class="active">Classify &amp; Report <span class="badge-count" id="tab-count">5</span></span>
+    <span>Permissions</span>
+  </nav>
+
+  <div class="funnel" role="group" aria-label="Workflow progress">
+    <div class="funnel-step" id="funnel-tags">
+      <span class="label">Tags to action</span>
+      <span class="value" id="funnel-tags-n">5</span>
+      <span class="hint">4 SomaticReportable · 1 RequiresClassification</span>
+    </div>
+    <div class="funnel-step" id="funnel-cls">
+      <span class="label">Classifications on this case</span>
+      <span class="value" id="funnel-cls-n">0</span>
+      <span class="hint" id="funnel-cls-hint">created from tags below</span>
+    </div>
+    <div class="funnel-step" id="funnel-report">
+      <span class="label">Report</span>
+      <span class="value" id="funnel-report-n">—</span>
+      <span class="hint">select classifications, then build</span>
+    </div>
+  </div>
+
+  <!-- ================= TAG QUEUE ================= -->
+  <div class="panel">
+    <div class="panel-head">
+      <h2>Tags awaiting classification</h2>
+      <span class="sub">a tag is cleared once a matching classification exists for this case</span>
+      <span class="spacer"></span>
+      <button class="btn-outline" id="btn-classify-all">Classify all (wizard)</button>
+    </div>
+    <div class="table-wrap">
+      <table id="queue-table">
+        <thead>
+          <tr>
+            <th>Variant</th><th>Gene</th><th>Tag</th><th>VAF</th>
+            <th>Previous classifications (your lab)</th><th style="text-align:right">Action</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="queue-clear" id="queue-clear" hidden>✓ All tags actioned — ready to report</div>
+  </div>
+
+  <!-- ================= CLASSIFICATIONS ================= -->
+  <div class="panel">
+    <div class="panel-head">
+      <h2>Classifications</h2>
+      <span class="sub">tick the ones to include in the report</span>
+    </div>
+    <div class="table-wrap">
+      <table id="cls-table">
+        <thead>
+          <tr><th style="width:34px"><input type="checkbox" id="check-all" aria-label="Select all"></th>
+          <th>Variant</th><th>Gene</th><th>Classification</th><th>Condition</th><th>Record</th></tr>
+        </thead>
+        <tbody>
+          <tr id="cls-empty"><td colspan="6" style="color:var(--text-muted); text-align:center; padding:20px">
+            No classifications yet — work through the tag queue above
+          </td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="report-bar">
+      <span class="count" id="sel-count">0 selected</span>
+      <span class="spacer" style="flex:1"></span>
+      <label for="tpl" style="font-size:12.5px; color:var(--text-muted)">Template</label>
+      <select id="tpl">
+        <option>SA Path — Somatic NGS panel</option>
+        <option>SA Path — Germline incidental findings</option>
+        <option>Generic multi-variant</option>
+      </select>
+      <button class="btn-classify" id="btn-report" disabled>Create report (0)</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= CLASSIFY MODAL ================= -->
+<div class="overlay" id="modal-classify" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="mc-title">
+    <div class="modal-head">
+      <h3 id="mc-title">New somatic classification</h3>
+      <span class="queue-pos" id="mc-pos"></span>
+      <button class="close" id="mc-close" aria-label="Close">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="two-col">
+        <div class="field"><label>Variant</label><span class="val readonly hgvs" id="mc-variant"></span></div>
+        <div class="field"><label>Zygosity / VAF</label><span class="val readonly" id="mc-vaf"></span></div>
+      </div>
+      <div class="two-col">
+        <div class="field">
+          <label>Sample</label>
+          <select id="mc-sample"><option>T-25-0387 (this sample)</option><option>N-25-0388 (germline pair)</option></select>
+          <span class="prefill">prefilled from tag</span>
+        </div>
+        <div class="field"><label>Transcript</label><span class="val readonly hgvs" id="mc-transcript"></span></div>
+      </div>
+      <div class="field" id="mc-priors-wrap" hidden>
+        <label id="mc-priors-label">Prior classifications for this allele</label>
+        <div class="priors-list" id="mc-priors"></div>
+        <span class="prefill" style="color:var(--text-muted)">
+          Applying copies the previous classification's consensus into a new classification for this sample.
+        </span>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-plain" id="mc-skip">Skip</button>
+      <button class="btn-classify" id="mc-full-form">New classification — full form ⧉</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= REPORT MODAL ================= -->
+<div class="overlay" id="modal-report" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="mr-title">
+    <div class="modal-head">
+      <h3 id="mr-title">Multi-variant report — ONC-2025-118</h3>
+      <button class="close" id="mr-close" aria-label="Close">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="field"><label>Template</label><span class="val readonly" id="mr-template"></span></div>
+      <div class="field"><label>Grouped by gene</label></div>
+      <div id="mr-groups" style="display:grid; gap:12px"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-plain" id="mr-back">Back</button>
+      <button class="btn-classify" id="mr-generate">Generate report</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+"use strict";
+
+// Previous classifications are the lab's existing ones for the same allele. Their conditions won't
+// reliably match the patient record, so whether one applies is always the scientist's call.
+const TAGS = [
+  { id: 1, chgvs: "NM_005228.5(EGFR):c.2573T>G", phgvs: "p.(Leu858Arg)",
+    gene: "EGFR", tag: "SomaticReportable", vaf: "31% (412x)", tier: "Tier IA",
+    priors: [
+      { cls: "Tier IA", condition: "Lung adenocarcinoma", when: "Jun 2025", by: "KR",
+        summary: "EGFR L858R is a well-characterised activating mutation predictive of response to EGFR TKIs (osimertinib). Tier IA per AMP/ASCO/CAP." },
+      { cls: "Tier IA", condition: "Non-small cell lung carcinoma", when: "Nov 2024", by: "AL",
+        summary: "Activating kinase-domain mutation; predictive biomarker for EGFR TKI therapy in NSCLC." },
+      { cls: "Tier IIC", condition: "Colorectal carcinoma", when: "Mar 2024", by: "MS",
+        summary: "EGFR L858R in CRC context; limited therapeutic evidence outside lung." },
+    ] },
+  { id: 2, chgvs: "NM_000546.6(TP53):c.818G>A", phgvs: "p.(Arg273His)",
+    gene: "TP53", tag: "SomaticReportable", vaf: "44% (388x)", tier: "Tier IIC",
+    priors: [
+      { cls: "Tier IIC", condition: "Colorectal carcinoma", when: "Jul 2025", by: "KR",
+        summary: "Recurrent hotspot DNA-binding-domain mutation; prognostic in CRC." },
+      { cls: "Tier IIC", condition: "Breast carcinoma", when: "May 2025", by: "AL",
+        summary: "Hotspot R273H; associated with poorer prognosis in breast carcinoma." },
+      { cls: "Tier IIC", condition: "Glioblastoma", when: "Feb 2025", by: "AL",
+        summary: "R273H common in GBM; prognostic significance." },
+      { cls: "Tier IID", condition: "Ovarian carcinoma", when: "Oct 2024", by: "MS",
+        summary: "Hotspot variant; HGSOC context." },
+      { cls: "Tier IIC", condition: "Pancreatic carcinoma", when: "Jun 2024", by: "KR",
+        summary: "R273H in pancreatic adenocarcinoma." },
+    ] },
+  { id: 3, chgvs: "NM_004985.5(KRAS):c.34G>T", phgvs: "p.(Gly12Cys)",
+    gene: "KRAS", tag: "SomaticReportable", vaf: "8% (502x)", tier: "Tier IA",
+    priors: [] },
+  { id: 4, chgvs: "NM_004333.6(BRAF):c.1799T>A", phgvs: "p.(Val600Glu)",
+    gene: "BRAF", tag: "SomaticReportable", vaf: "6% (455x)", tier: "Tier IIC",
+    priors: [
+      { cls: "Tier IA", condition: "Melanoma", when: "Aug 2025", by: "KR",
+        summary: "BRAF V600E predictive of response to BRAF/MEK inhibition in melanoma. Tier IA in that context." },
+    ] },
+  { id: 5, chgvs: "NM_000059.4(BRCA2):c.5946del", phgvs: "p.(Ser1982ArgfsTer22)",
+    gene: "BRCA2", tag: "RequiresClassification", vaf: "het (48%)", tier: "Pathogenic",
+    priors: [
+      { cls: "Pathogenic", condition: "Hereditary breast-ovarian cancer", when: "Nov 2024", by: "MS",
+        summary: "BRCA2 c.5946del (founder) frameshift, established pathogenic for HBOC. Germline incidental finding — confirm on blood." },
+    ] },
+];
+
+
+const AMP_TIERS = ["Tier IA", "Tier IB", "Tier IIC", "Tier IID", "Tier III", "Tier IV"];
+
+const state = { classified: new Set(), classifications: [], wizard: null, current: null, nextRec: 10241 };
+const $ = id => document.getElementById(id);
+
+function toast(msg) {
+  const t = $("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(t._h);
+  t._h = setTimeout(() => t.classList.remove("show"), 2600);
+}
+
+function tagPill(tag) {
+  const cls = tag === "SomaticReportable" ? "tag-somatic" : "tag-requires";
+  return `<span class="tag-pill ${cls}">${tag}</span>`;
+}
+
+function renderQueue() {
+  const tbody = $("queue-table").querySelector("tbody");
+  tbody.innerHTML = "";
+  let remaining = 0;
+  for (const t of TAGS) {
+    const done = state.classified.has(t.id);
+    if (!done) remaining++;
+    const tr = document.createElement("tr");
+    if (done) tr.className = "row-done";
+    let priorHtml;
+    if (!t.priors.length) {
+      priorHtml = `<span class="prior-none">none for this allele</span>`;
+    } else {
+      const conditions = [...new Set(t.priors.map(p => p.condition))];
+      priorHtml = `<span class="prior"><span class="cls">${t.priors.length} previous</span><br>
+         <span class="meta">${conditions.join(", ")}</span></span>`;
+    }
+    let action;
+    if (done) {
+      const c = state.classifications.find(x => x.id === t.id);
+      action = `<span class="done-chip">✓ Classified ${c ? recLink(c) : ""}</span>`;
+    } else if (t.priors.length) {
+      action = `<button class="btn-classify" data-classify="${t.id}">Classify — check previous…</button>`;
+    } else {
+      const label = t.tag === "SomaticReportable" ? "New somatic classification" : "New classification";
+      action = `<button class="btn-classify" data-classify="${t.id}">${label}</button>`;
+    }
+    tr.innerHTML = `
+      <td><span class="hgvs">${t.chgvs}</span><br><span class="hgvs" style="color:var(--text-muted)">${t.phgvs}</span></td>
+      <td class="gene">${t.gene}</td>
+      <td>${tagPill(t.tag)}</td>
+      <td class="vaf">${t.vaf}</td>
+      <td>${priorHtml}</td>
+      <td style="text-align:right; display:flex; gap:6px; justify-content:flex-end; flex-wrap:wrap">${action}</td>`;
+    tbody.appendChild(tr);
+  }
+  $("queue-clear").hidden = remaining > 0;
+  $("btn-classify-all").disabled = remaining === 0;
+  $("tab-count").textContent = remaining;
+  $("funnel-tags-n").textContent = remaining;
+  $("funnel-tags").classList.toggle("done", remaining === 0);
+  $("funnel-cls-n").textContent = state.classifications.length;
+  $("funnel-cls-hint").textContent = state.classifications.length
+    ? state.classifications.map(c => c.gene).join(", ") : "created from tags below";
+}
+
+function renderClassifications() {
+  const tbody = $("cls-table").querySelector("tbody");
+  tbody.querySelectorAll("tr:not(#cls-empty)").forEach(tr => tr.remove());
+  $("cls-empty").hidden = state.classifications.length > 0;
+  for (const c of state.classifications) {
+    const badgeCls = AMP_TIERS.includes(c.cls) ? "cls-tier" : "cls-acmg";
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td><input type="checkbox" data-sel="${c.id}" checked aria-label="Include ${c.gene}"></td>
+      <td><span class="hgvs">${c.chgvs}</span></td>
+      <td class="gene">${c.gene}</td>
+      <td><span class="cls-badge ${badgeCls}">${c.cls}</span><span class="cls-new">new</span></td>
+      <td>${c.condition}</td>
+      <td>${recLink(c)}<br><span style="color:var(--text-muted); font-size:12px">just now (${c.via})</span></td>`;
+    tbody.appendChild(tr);
+  }
+  updateSelection();
+}
+
+function selectedIds() {
+  return [...document.querySelectorAll("[data-sel]:checked")].map(cb => +cb.dataset.sel);
+}
+
+function updateSelection() {
+  const n = selectedIds().length;
+  $("sel-count").textContent = `${n} selected`;
+  $("btn-report").disabled = n === 0;
+  $("btn-report").textContent = `Create report (${n})`;
+  $("funnel-report-n").textContent = n || "—";
+}
+
+function completeTag(tag, cls, via, condition, summary) {
+  state.classified.add(tag.id);
+  const record = {
+    id: tag.id, recId: `CR_${state.nextRec++}`, chgvs: tag.chgvs, gene: tag.gene, cls,
+    condition: condition || (tag.tag === "SomaticReportable" ? "Lung adenocarcinoma" : "HBOC"),
+    summary: summary || tag.summary, via,
+  };
+  state.classifications.push(record);
+  renderQueue();
+  renderClassifications();
+  return record;
+}
+
+function recLink(c) {
+  return `<a href="#" class="rec-link" data-rec="${c.recId}">${c.recId} ⧉</a>`;
+}
+
+/* ---- prior picker ---- */
+function renderPriors(t) {
+  $("mc-priors-wrap").hidden = false;
+  $("mc-priors-label").textContent =
+    `Previous classifications for this allele — your call whether one applies to this patient`;
+  $("mc-priors").innerHTML = t.priors.map((p, i) => `
+    <div class="prior-card">
+      <span class="cls-badge ${AMP_TIERS.includes(p.cls) ? "cls-tier" : "cls-acmg"}">${p.cls}</span>
+      <span class="cond">${p.condition}</span>
+      <span class="meta">${p.when} · ${p.by}</span>
+      <button class="btn-apply use" data-prior-apply="${i}">Apply to this sample</button>
+      <span class="summary">${p.summary}</span>
+    </div>`).join("");
+}
+
+/* ---- classify modal ---- */
+function openClassify(tagId, wizard) {
+  const t = TAGS.find(x => x.id === tagId);
+  state.current = t;
+  state.wizard = wizard || null;
+  if (!t.priors.length) { launchFullForm(t); return; }
+  const somatic = t.tag === "SomaticReportable";
+  $("mc-title").textContent = somatic ? "New somatic classification (AMP)" : "New classification (ACMG)";
+  if (wizard) {
+    const pos = wizard.order.indexOf(tagId) + 1;
+    $("mc-pos").textContent = `tag ${pos} of ${wizard.order.length}`;
+  } else {
+    $("mc-pos").textContent = "";
+  }
+  $("mc-variant").textContent = t.chgvs;
+  $("mc-transcript").textContent = t.chgvs.match(/^(NM_[^(]+)/)[1];
+  $("mc-vaf").textContent = t.vaf;
+  $("mc-full-form").textContent = somatic
+    ? "New somatic classification — full form ⧉" : "New classification — full form ⧉";
+  renderPriors(t);
+  $("mc-skip").hidden = !state.wizard;
+  $("modal-classify").hidden = false;
+  $("mc-full-form").focus();
+}
+
+function launchFullForm(t) {
+  const c = completeTag(t, "Draft", "full form", "—", "");
+  toast(`(mock) Created ${c.recId} and opened the full classification form in a new tab — variant, sample and transcript prefilled.`);
+  if (state.wizard) advanceWizard(); else closeClassify();
+}
+
+function closeClassify() {
+  $("modal-classify").hidden = true;
+  state.current = null;
+  state.wizard = null;
+}
+
+function advanceWizard() {
+  const next = state.wizard && state.wizard.order.find(id => !state.classified.has(id));
+  if (next) openClassify(next, state.wizard);
+  else { closeClassify(); toast("Queue worked through — select classifications and build the report"); }
+}
+
+/* ---- report modal ---- */
+function openReport() {
+  const ids = selectedIds();
+  const chosen = state.classifications.filter(c => ids.includes(c.id));
+  $("mr-template").textContent = $("tpl").value;
+  const byGene = {};
+  for (const c of chosen) (byGene[c.gene] = byGene[c.gene] || []).push(c);
+  $("mr-groups").innerHTML = Object.entries(byGene).map(([gene, list]) => `
+    <div class="report-gene-group">
+      <div class="report-gene-head">${gene}</div>
+      ${list.map(c => {
+        const badgeCls = AMP_TIERS.includes(c.cls) ? "cls-tier" : "cls-acmg";
+        return `<div class="report-variant">
+          <span class="hgvs">${c.chgvs}</span>
+          <span class="cls-badge ${badgeCls}">${c.cls}</span>
+          <span style="font-size:12.5px; color:var(--text-muted)">${c.condition}</span>
+          <span class="summary">${c.summary || "Interpretation summary to be completed."}</span>
+        </div>`;
+      }).join("")}
+    </div>`).join("");
+  $("modal-report").hidden = false;
+}
+
+/* ---- events ---- */
+document.addEventListener("click", e => {
+  const classify = e.target.closest("[data-classify]");
+  if (classify) { openClassify(+classify.dataset.classify); return; }
+  const rec = e.target.closest(".rec-link");
+  if (rec) {
+    e.preventDefault();
+    toast(`(mock) opens classification ${rec.dataset.rec} in a new tab`);
+    return;
+  }
+  if (e.target.closest("[data-sel]")) updateSelection();
+});
+
+$("mc-priors").addEventListener("click", e => {
+  const t = state.current;
+  if (!t) return;
+  const applyBtn = e.target.closest("[data-prior-apply]");
+  if (applyBtn) {
+    const p = t.priors[+applyBtn.dataset.priorApply];
+    document.querySelectorAll("[data-prior-apply]").forEach(b => { b.disabled = true; });
+    applyBtn.textContent = "Creating…";
+    setTimeout(() => {
+      const c = completeTag(t, p.cls, "copied from previous", p.condition, p.summary);
+      toast(`${t.gene}: created ${c.recId} for this sample, copied from ${p.cls} (${p.condition})`);
+      if (state.wizard) advanceWizard(); else closeClassify();
+    }, 800);
+  }
+});
+
+$("mc-full-form").addEventListener("click", () => launchFullForm(state.current));
+
+$("check-all").addEventListener("change", e => {
+  document.querySelectorAll("[data-sel]").forEach(cb => { cb.checked = e.target.checked; });
+  updateSelection();
+});
+
+$("btn-classify-all").addEventListener("click", () => {
+  const order = TAGS.filter(t => !state.classified.has(t.id)).map(t => t.id);
+  if (order.length) openClassify(order[0], { order });
+});
+
+$("mc-close").addEventListener("click", closeClassify);
+$("mc-skip").addEventListener("click", () => {
+  if (!state.wizard) return closeClassify();
+  const t = state.current;
+  const next = state.wizard.order.find(id => id !== t.id && !state.classified.has(id) &&
+    state.wizard.order.indexOf(id) > state.wizard.order.indexOf(t.id));
+  if (next) openClassify(next, state.wizard); else closeClassify();
+});
+
+$("btn-report").addEventListener("click", openReport);
+$("mr-close").addEventListener("click", () => { $("modal-report").hidden = true; });
+$("mr-back").addEventListener("click", () => { $("modal-report").hidden = true; });
+$("mr-generate").addEventListener("click", () => {
+  $("modal-report").hidden = true;
+  toast("Report generated (mock) — this would render the ClassificationReportTemplate");
+});
+
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape") { $("modal-classify").hidden = true; $("modal-report").hidden = true; }
+});
+
+renderQueue();
+renderClassifications();
+</script>
