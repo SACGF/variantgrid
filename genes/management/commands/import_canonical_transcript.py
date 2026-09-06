@@ -12,6 +12,7 @@ from snpdb.models import AnnotationConsortium, GenomeBuild
 
 
 class Command(BaseCommand):
+    category = "import"
 
     def add_arguments(self, parser):
         consortia = [ac[1] for ac in AnnotationConsortium.choices]

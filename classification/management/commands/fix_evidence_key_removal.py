@@ -31,6 +31,7 @@ def remove_evidence_key(key: str):
 
 
 class Command(BaseCommand):
+    category = "one-off"
 
     def add_arguments(self, parser):
         parser.add_argument('--key', type=str, default=False)

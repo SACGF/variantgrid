@@ -264,6 +264,7 @@ class Command(BaseCommand):
     Only use this to backport somatic curation functionality to VG3 (or to undo the backport)
     Not to be used with VG4 onwards
     """
+    category = "one-off"
 
     def add_arguments(self, parser):
         parser.add_argument('-direction', type=str, required=True, help='backport or forwardport (backport to add somatic functionality to VG3, forwardport once on VG4)')

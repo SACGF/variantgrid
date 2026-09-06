@@ -1,717 +1,289 @@
-# Classification App: Detailed Technical Reference
-
-## Purpose
-
-The `classification` app is the largest and most complex app in VariantGrid. It implements a full **variant classification workflow** for clinical and research genomics:
-
-- Curate genetic variant interpretations using ACMG/AMP and custom evidence schemas
-- Manage versioned, audited classification records with multi-lab sharing controls
-- Detect and resolve conflicting classifications between labs (discordance)
-- Submit classifications to ClinVar
-- Match variant conditions to standardized disease ontology terms
-- Import/export classifications in multiple formats (CSV, REDCap, JSON, ClinVar XML)
-
-In clinical genomics, a "classification" is a formal assessment of whether a genetic variant is: **Benign (B)**, **Likely Benign (LB)**, **Variant of Uncertain Significance (VUS)**, **Likely Pathogenic (LP)**, or **Pathogenic (P)** — or for somatic variants, an AMP Tier (I–IV).
-
----
-
-## Directory Structure
-
-```
-classification/
-├── admin/                            # Django admin interfaces (12+ admin classes)
-├── autopopulate_evidence_keys/       # Auto-fill evidence from variant annotation
-├── enums/                            # Enums (clinical significance, share levels, discordance)
-├── management/commands/              # Django management commands
-├── migrations/                       # Database migrations
-├── models/                           # Core models (30+ files)
-├── signals/                          # Django signal handlers
-├── tasks/                            # Celery async tasks (4 task files)
-├── templates/classification/         # Django HTML templates
-├── templatetags/                     # Custom template tags
-├── tests/                            # Unit and integration tests
-├── utils/                            # Utilities (ClinVar matcher, HGVS, etc.)
-├── views/                            # Views and API endpoints (28+ view modules)
-├── forms.py                          # Django forms
-├── serializers.py                    # DRF serializers
-├── urls.py                           # URL routing (100+ patterns)
-├── apps.py                           # App config
-├── classification_changes.py         # Change tracking for activity log
-├── classification_import.py          # Import processing
-├── classification_stats.py           # Statistics computation
-├── criteria_strengths.py             # ACMG criteria strength handling
-├── evidence_key_rename.py            # Evidence key refactoring utilities
-└── variant_card.py                   # Summary card generation
-```
-
----
-
-## Core Models
-
-### `Classification` (`models/classification.py`)
-
-The primary record for a variant classification. Key fields:
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `lab` | FK → Lab | Which lab created this classification |
-| `variant` | FK → Variant | The genetic variant being classified |
-| `sample` | FK → Sample (nullable) | Optional sample context |
-| `genome_build` | FK → GenomeBuild | Target genome build |
-| `allele` | FK → Allele (nullable) | Cross-build allele link |
-| `submission_source` | CharField | How it was created (API, form, import, etc.) |
-| `evidence` | JSONField | All evidence key/value pairs (see Evidence System) |
-| `clinical_significance` | CharField | Cached current significance (B/LB/VUS/LP/P) |
-| `share_level` | CharField | Visibility (user/lab/institution/public) |
-| `withdrawn` | BooleanField | Soft-deleted flag |
-| `user` | FK → User | Creator |
-| `last_edited_version` | FK → ClassificationModification | Current version |
-| `last_published_version` | FK → ClassificationModification | Last published snapshot |
-
-**Key behaviors:**
-- All data changes create a new `ClassificationModification` (versioned immutably)
-- Publishing broadcasts to a share level; can't be revoked, only withdrawn
-- Auto-populates evidence fields from variant annotation on creation
-- Linked to `ClinicalContext` for discordance tracking
-
----
-
-### `ClassificationModification` (`models/classification.py`)
-
-Immutable snapshot of a classification at a point in time:
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `classification` | FK → Classification | Parent classification |
-| `evidence` | JSONField | Full evidence blob at this point |
-| `is_last_edited` | BooleanField | Most recent edit |
-| `is_last_published` | BooleanField | Most recent published version |
-| `publish_level` | CharField | Share level when published |
-| `previous` | FK → ClassificationModification | Linked list of history |
-| `created` | DateTimeField | Timestamp |
-| `user` | FK → User | Who made this change |
-
-Used for diffs, history views, reverting, and regulatory audit trails.
-
----
-
-### `EvidenceKey` (`models/evidence_key.py`)
-
-Defines the schema for all evidence fields on a classification. Each `EvidenceKey` represents one field in the evidence JSON blob.
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `key` | CharField | Unique string identifier (e.g., `"clinical_significance"`) |
-| `value_type` | CharField | Type of value (see EvidenceKeyValueType enum) |
-| `evidence_category` | CharField | Grouping category |
-| `mandatory` | BooleanField | Must be populated before sharing |
-| `options` | JSONField | Predefined choices for select fields |
-| `default_crit_evaluation` | CharField | ACMG strength default |
-| `max_share_level` | CharField | Restricts visibility |
-| `hide` | BooleanField | Hide from UI |
-| `immutable` | BooleanField | Can't be changed after creation |
-| `namespaces` | ManyToMany | Namespace groupings |
-| `order` | IntegerField | Display ordering |
-| `help_text` | TextField | Field description |
-
-**EvidenceKeyValueType** options:
-- `free` — Free text entry
-- `textarea` — Multi-line text
-- `select` — Single choice from options
-- `multiselect` — Multiple choices
-- `boolean` — Yes/No
-- `date` — Date picker
-- `age` — Age with units
-- `criteria` — ACMG criteria strength (BA1, BS1, etc.)
-- `user` — User selector
-- `unit` — Float 0.0–1.0
-- `integer` — Integer
-- `float` — Floating point
-- `phenotype` — HPO phenotype term
-
----
-
-### `EvidenceMixin` (`models/evidence_mixin.py`)
-
-Base class used by `Classification` and `ClassificationModification`. Provides:
-
-- Evidence CRUD (get/set/delete individual keys)
-- ACMG criteria evaluation (computing classification from evidence)
-- Patch operations (merge evidence dicts)
-- Validation logic
-- Blob structure with `value`, `note`, `explain`, `db_refs`, `validation`
-
-**Evidence blob structure per key:**
-```json
-{
-  "clinical_significance": {
-    "value": "LP",
-    "note": "Met PM1, PM2, PP2, PP3",
-    "explain": "See literature review",
-    "db_refs": [{"db": "PubMed", "id": "12345678", "url": "...", "summary": "..."}],
-    "validation": [{"code": "warning", "message": "..."}]
-  }
-}
-```
-
----
-
-## The Evidence Key System
-
-Evidence keys are the core schema for classifications. They define what data fields exist and how they behave.
-
-### Special Evidence Keys (`enums/SpecialEKeys`)
-
-These keys have hardcoded behavior in the system:
-
-| Key | Description |
-|-----|-------------|
-| `variant_coordinate` | Genomic coordinate (chr:pos ref>alt) |
-| `c_hgvs` | Coding HGVS notation |
-| `g_hgvs` | Genomic HGVS notation |
-| `p_hgvs` | Protein HGVS notation |
-| `clinical_significance` | Main classification (B/LB/VUS/LP/P) |
-| `somatic_clinical_significance` | Somatic tier |
-| `allele_origin` | Germline / Somatic / Unknown |
-| `condition` | Disease/phenotype text |
-| `gene_symbol` | Gene symbol |
-| `transcript` | Transcript accession |
-| `clingen_allele_id` | ClinGen Allele Registry ID |
-| `gnomad_af` | gnomAD allele frequency |
-| `spliceai` | SpliceAI prediction score |
-| `mode_of_inheritance` | Inheritance pattern |
-| `zygosity` | Observed zygosity |
-| `sample_id` | Sample identifier |
-| `patient_id` | Patient identifier |
-| `age`, `sex` | Patient demographics |
-| ACMG criteria | `pvs1`, `ps1`–`ps4`, `pm1`–`pm6`, `pp1`–`pp5`, `ba1`, `bs1`–`bs4`, `bp1`–`bp7` |
-
-### Lab Configuration of Evidence Keys
-
-Labs can customize evidence keys via `EvidenceKeyOverrides`:
-- Override visibility, options, defaults
-- Enable/disable namespaces (e.g., disable ACMG criteria for somatic model)
-- Configuration merges: Organization → Institution → Lab level
-
-### `EvidenceKeyMap`
-
-Singleton cache of all evidence keys with lab/org overrides applied. Used throughout the app for key lookup, option resolution, and namespace filtering.
-
----
-
-## Share Levels
-
-Classifications have a `share_level` controlling visibility:
-
-| Level | Description |
-|-------|-------------|
-| `user` | Visible only to the creating user |
-| `lab` | Visible to all lab members |
-| `institution` | Visible to the institution |
-| `logged_in_users` | Visible to all authenticated users |
-| `public` | Publicly visible (no login required) |
-
-Fields themselves can also have `max_share_level` to restrict sensitive data (e.g., patient info) even when the classification is public.
-
----
-
-## Versioning System
-
-### Publish Flow
-
-```
-[Draft evidence edits] → patch → [ClassificationModification (is_last_edited)]
-                ↓
-         [Publish at share level]
-                ↓
-         [ClassificationModification (is_last_published)] ← locked snapshot
-```
-
-- Publishing is one-way (can't revert to draft)
-- Multiple draft edits before publishing accumulate in history
-- Withdrawing soft-deletes the whole classification (visible to lab, hidden to others)
-- Full history accessible via linked list of `ClassificationModification` records
-- Diffs generated between any two versions
-
----
-
-## Clinical Context and Discordance
-
-### `ClinicalContext` (`models/clinical_context_models.py`)
-
-Groups all classifications for the **same allele** in order to detect discordance. Each allele can have multiple clinical contexts (e.g., one per disease condition).
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `allele` | FK → Allele | The variant being assessed |
-| `name` | CharField | Context name (often the condition) |
-| `condition` | FK → ConditionTextMatch | Linked ontology term |
-| `pending_cause` | CharField | Why recalculation is pending |
-| `discordance_status` | CharField | Current discordance level |
-
-When a classification is published or changed, `ClinicalContext.recalculate()` runs:
-- If all classifications agree → Concordant
-- If classifications disagree → Discordant → triggers `DiscordanceReport`
-
-### `DiscordanceReport` (`models/discordance_models.py`)
-
-Tracks a detected discordance between labs:
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `clinical_context` | FK → ClinicalContext | Context where discordance was found |
-| `resolution` | CharField | Ongoing / Concordant / Continued Discordance |
-| `cause_text` | TextField | Admin explanation of resolution |
-| `closed_by` | FK → User | Who resolved it |
-| `closed` | DateTimeField | When resolved |
-| `report_started_date` | DateField | When discordance was detected |
-
-### `DiscordanceReportClassification` (`models/discordance_models.py`)
-
-Links specific classifications to a discordance report, with their significance at time of detection.
-
-### `DiscordanceReportTriage` (`models/discordance_models.py`)
-
-Per-lab response to a discordance report:
-- Labs can acknowledge, note planned review, or mark as acceptable
-- Tracks which lab has triaged and what action they plan
-
-### Discordance Levels (Enum)
-
-```
-No entries → Single submission → Concordant → Discordant
-```
-
-Discordant sub-types exist for B vs P extremes vs VUS ranges.
-
----
-
-## Condition Matching System
-
-### `ConditionText` (`models/condition_text_matching.py`)
-
-A normalized free-text condition string entered by a lab. Unique per lab + text. Tracks how many classifications reference it.
-
-### `ConditionTextMatch` (`models/condition_text_matching.py`)
-
-Hierarchical mapping of condition text to ontology terms:
-
-```
-ConditionText (root)
-├── ConditionTextMatch (gene-level) — matches for this condition + gene
-│   └── ConditionTextMatch (classification-level) — specific classification override
-```
-
-Each match can reference:
-- One or more ontology terms (MONDO, OMIM, HPO, Orphanet)
-- Mode of inheritance refinement
-- Multi-condition logic: `AND` / `OR` / `NOT_DECIDED`
-
-### Matching Algorithm (`utils/ontology_matching.py`)
-
-1. Normalize text (lowercase, strip punctuation)
-2. Search ontology via fuzzy matching
-3. Walk ontology relationships (ancestors/descendants)
-4. Support multi-condition strings (comma-separated, "Condition A and Condition B")
-5. Manual curation workflows for unmatched terms
-
----
-
-## ClinVar Integration
-
-### `ClinVarAllele` (`models/clinvar_export_models.py`)
-
-Wraps an `Allele` for ClinVar submission purposes. Tracks all ClinVar exports for that allele.
-
-### `ClinVarExport` (`models/clinvar_export_models.py`)
-
-Represents one unique ClinVar submission: a combination of Lab + Allele + Condition. Key fields:
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `clinvar_allele` | FK → ClinVarAllele | The allele being submitted |
-| `condition` | FK → ConditionTextMatch | Resolved condition term |
-| `classification_based_on` | FK → ClassificationModification | Source classification version |
-| `status` | CharField | Pending / In Batch / Submitted / Error |
-| `scv` | CharField | ClinVar SCV accession returned after submission |
-
-### `ClinVarExportBatch` (`models/clinvar_export_models.py`)
-
-Groups multiple `ClinVarExport` records for a single batch API submission.
-
-### `ClinVarExportSubmission` (`models/clinvar_export_models.py`)
-
-Immutable record of data sent and response received for one submission attempt.
-
-### ClinVar Export Convertor (`utils/clinvar_export_convertor.py`)
-
-Maps VariantGrid evidence keys to ClinVar's XML/JSON submission format:
-- Maps clinical significance values
-- Converts condition terms to MedGen IDs
-- Handles inheritance mode mapping
-- Generates assertion method references
-- Packages citation/pubmed references
-
-### ClinVar Matching (`utils/clinvar_matcher.py`)
-
-For labs joining Shariant that had prior ClinVar submissions: matches existing ClinVar records to newly created Shariant classifications based on variant, condition, and lab.
-
----
-
-## Import System
-
-### Upload Pipeline
-
-```
-User uploads file (Excel/CSV/ClinVar XML/etc.)
-        ↓
-UploadedClassificationsUnmapped — stores file, status = Pending
-        ↓
-[Celery Task] ClassificationImportMapInsertTask
-        ↓
-omni_importer — external tool maps file to VG JSON format
-        ↓
-BulkClassificationInserter — creates/updates Classification records
-        ↓
-VariantResolver — matches HGVS/coords to database Variant records
-        ↓
-[VCF pipeline] — new variants inserted if not found
-        ↓
-[Liftover] — coordinates lifted over to other genome builds
-```
-
-### `ImportedAlleleInfo` (`models/classification_variant_info_models.py`)
-
-Central tracker for a variant being imported:
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `imported_genome_build` | FK → GenomeBuild | Build the HGVS/coord was provided in |
-| `imported_c_hgvs` | CharField | HGVS as imported |
-| `imported_g_hgvs` | CharField | Genomic HGVS as imported |
-| `status` | CharField | Matching status (Unresolved/Matched/Failed) |
-| `grch37` | FK → ResolvedVariantInfo | Resolved GRCh37 info |
-| `grch38` | FK → ResolvedVariantInfo | Resolved GRCh38 info |
-| `allele` | FK → Allele | Matched allele (once resolved) |
-
-### `ResolvedVariantInfo` (`models/classification_variant_info_models.py`)
-
-Per-build resolution cache: HGVS → Variant mapping with validation status.
-
-### `ClassificationImportRun` (`models/classification_import_run.py`)
-
-Tracks import statistics per run: rows processed, created, updated, errors, warnings.
-
-### `BulkClassificationInserter` (`classification_inserter.py` / `classification_patcher.py`)
-
-- Accepts JSON payload conforming to EvidenceKey schema
-- Creates or updates Classification records
-- Validates field values against EvidenceKey definitions
-- Handles publication at specified share level
-- Returns validation responses per-record
-
----
-
-## Export System
-
-### CSV Export
-
-Full or filtered export of classifications as CSV. Configurable columns.
-
-### REDCap Export
-
-Generates REDCap data dictionary + export format for research data capture.
-
-### ClinVar Export
-
-See ClinVar Integration section above.
-
-### API Export (`ClassificationApiExportView`)
-
-REST endpoint returning classifications in versioned JSON format (v1, v2, v3).
-
----
-
-## API Endpoints
-
-The classification REST API is versioned (v1, v2, v3) for backward compatibility.
-
-### Key Endpoints
-
-```
-GET  /api/classifications/v1/<classification_id>   — Retrieve single classification
-POST /api/classifications/v1/                      — Create classification
-PUT  /api/classifications/v1/<classification_id>   — Update classification
-GET  /api/classifications/v2/export/               — Bulk export with filtering
-```
-
-### Serialization
-
-`serializers.py` provides DRF serializers for:
-- Classification detail (full evidence)
-- ClassificationModification (versioned snapshot)
-- EvidenceKey definitions
-
----
-
-## Celery Tasks
-
-| Task | File | Description |
-|------|------|-------------|
-| `process_classification_import_task` | `classification_import_task.py` | Main import task for a `ClassificationImport` batch |
-| `ClassificationImportMapInsertTask` | `classification_import_map_and_insert_task.py` | Runs omni_importer mapping then insert |
-| `ClassificationImportProcessVariantsTask` | `classification_import_process_variants_task.py` | Processes VCF-inserted variants, links to classifications, triggers liftover |
-| `ClassificationCandidateSearchTask` | `classification_candidate_search_tasks.py` | Finds classifications needing evidence updates or cross-sample review |
-
----
-
-## Auto-Population System (`autopopulate_evidence_keys/`)
-
-When a classification is created or a variant is resolved, evidence fields are automatically populated from:
-
-- **Variant annotation** (VEP output): gnomAD AF, SpliceAI, SIFT, PolyPhen, consequence, etc.
-- **ClinVar data**: ClinVar clinical significance, star rating, condition
-- **Gene data**: Gene symbol, canonical transcript
-- **ClinGen**: ClinGen allele ID
-
-Configuration (`ClassificationEvidenceUpdateForm`) lets labs set thresholds:
-- Minimum gnomAD AF to auto-apply BA1
-- Minimum ClinVar star count to use
-- Whether to overwrite existing values
-
-Auto-population logic lives in `autopopulate_evidence_keys/` with one module per source.
-
----
-
-## Grouping Models
-
-### `ClassificationGrouping` (`models/classification_grouping.py`)
-
-Database-backed grouping of classifications for the same variant/allele. Used for:
-- Showing "all classifications for this allele" across labs
-- Computing consensus significance
-- Detecting discordance
-
-### `AlleleGrouping` (`models/classification_grouping.py`)
-
-Groups by allele origin (germline vs somatic). A single allele can have both germline and somatic classifications.
-
-### `ClassificationLabSummary` (`models/classification_lab_summaries.py`)
-
-Cached per-lab statistics:
-- Total classifications by significance
-- Classification trends over time
-- Used for dashboard graphs
-
-### `DiscordanceLabSummary` (`models/discordance_lab_summaries.py`)
-
-Cached discordance statistics per lab for the dashboard.
-
----
-
-## Admin Interfaces
-
-All major models have Django admin classes for operational management:
-
-- `ClassificationAdmin` — Create/edit/delete classifications
-- `EvidenceKeyAdmin` — Define evidence schema
-- `ClinicalContextAdmin` — Manage discordance contexts
-- `DiscordanceReportAdmin` / `DiscordanceReportTriageAdmin` — Manage discordances
-- `ClinVarExportAdmin` / `ClinVarAlleleAdmin` — Manage ClinVar submissions
-- `ConditionTextAdmin` — Manage condition matching
-- `ImportedAlleleInfoAdmin` / `ImportedAlleleInfoValidationAdmin` — Debug imports
-- `ClassificationImportRunAdmin` — Track import runs
-- `ClassificationReportTemplateAdmin` — Manage report templates
-
----
-
-## Views Overview
-
-### Core CRUD Views (`views/views.py`)
-
-- Classification list with filtering
-- Create classification (form or API)
-- View individual classification (full evidence, history, diffs)
-- History and version diff views
-- Withdraw classification
-
-### Dashboard (`views/classification_dashboard_view.py`)
-
-- Lab statistics and trends
-- Classification counts by significance
-- Discordance overview
-- VUS accumulation graphs
-
-### Export (`views/classification_export_view.py`)
-
-- CSV export with filter options
-- REDCap data dictionary download
-- API export endpoint
-
-### ClinVar (`views/clinvar_export_view.py`)
-
-- ClinVar export summary and detail
-- Batch submission management
-- Legacy ClinVar matching UI
-
-### Discordance (`views/discordance_report_views.py`)
-
-- List all discordance reports
-- View individual report with classifications
-- Triage/resolution UI for lab members
-- Export discordance data
-
-### Condition Matching (`views/condition_matching_view.py`)
-
-- UI for matching condition text to ontology
-- Testing matching algorithms
-- Handling obsolete ontology terms
-
-### Overlaps (`views/classification_overlaps_view.py`)
-
-- Shows classifications shared between labs for same variants
-- Lab agreement/disagreement analysis
-- Patient overlap detection
-
-### Candidate Search (`views/classification_candidate_search_view.py`)
-
-- Finds classifications that may need review
-- Searches for same variants classified differently in other samples
-
-### Evidence Keys (`views/evidence_keys_view.py`)
-
-- Browse all available evidence keys
-- Lab-specific configuration
-
----
-
-## URL Patterns (Key Groups)
-
-```
-/classification/activity/              — Activity logs
-/classification/classifications/       — Classification list/search
-/classification/create/                — Create new classification
-/classification/<id>/                  — View classification detail
-/classification/<id>/history/          — Version history
-/classification/<id>/diff/             — Version diff
-/classification/export/                — Data exports
-/classification/import/                — Import tool
-/classification/evidence_keys/         — Evidence key browser
-/classification/clinvar_export/        — ClinVar export management
-/classification/clinvar_match/         — Legacy ClinVar matching
-/classification/condition_matching/    — Condition text matching
-/classification/discordance_report/    — Discordance tracking
-/classification/overlaps/             — Lab overlap analysis
-/classification/dashboard/             — Analytics dashboard
-/classification/groupings/            — Classification groupings
-/classification/api/v1/               — REST API v1
-/classification/api/v2/               — REST API v2
-/classification/api/v3/               — REST API v3
-```
-
----
-
-## Forms
-
-| Form | Purpose |
-|------|---------|
-| `EvidenceKeyForm` | Select evidence key + provide value |
-| `ClassificationAlleleOriginForm` | Choose germline/somatic/other |
-| `ClinicalSignificanceForm` | Filter by significance checkboxes |
-| `ClassificationEvidenceUpdateForm` | Configure auto-population thresholds (gnomAD AF, ClinVar stars, etc.) |
-
----
-
-## Templates (Key)
-
-```
-templates/classification/
-├── classification_view.html          — Full classification detail view
-├── classification_diff.html          — Version diff view
-├── classification_history.html       — Version history list
-├── classifications_legacy.html       — Classification list table
-├── classification_export.html        — Export tool UI
-├── classification_import_tool.html   — Import interface
-├── evidence_keys.html                — Evidence key reference
-├── classification_dashboard*.html    — Analytics dashboards
-├── classification_groupings.html     — Grouped classifications
-├── clinvar_export.html               — ClinVar export management
-├── clinvar_export_detail.html        — ClinVar submission detail
-├── clinvar_match_detail.html         — Legacy ClinVar matching
-├── discordance_reports.html          — Discordance report list
-├── discordance_report.html           — Report detail
-├── discordance_report_triage_detail.html — Triage interface
-├── condition_matching.html           — Condition text matching UI
-├── imported_allele_info.html         — Import allele resolution detail
-├── uploaded_classifications_unmapped.html — Upload status
-└── emails/
-    ├── classification_summary_email.html — HTML summary email
-    └── classification_summary_email.txt  — Plain text summary email
-```
-
----
-
-## Key Enums
-
-### `ClinicalSignificance` (`enums/classification_enums.py`)
-
-| Code | Label |
-|------|-------|
-| `B` | Benign |
-| `LB` | Likely Benign |
-| `VUS` | Variant of Uncertain Significance |
-| `LP` | Likely Pathogenic |
-| `P` | Pathogenic |
-
-### `SomaticClinicalSignificance`
-
-AMP Tier system (Tier I–IV with levels A–D).
-
-### `AlleleOriginBucket`
-
-`Germline` / `Somatic` / `Unknown`
-
-### `DiscordanceLevel`
-
-```
-no_entries → single_submission → concordant → discordant_minor → discordant_major
-```
-
-### `DiscordanceReportResolution`
-
-`Ongoing` / `Concordant` / `Continued Discordance`
-
-### `ShareLevel`
-
-`user` → `lab` → `institution` → `logged_in_users` → `public`
-
----
-
-## Signal Handlers (`signals/`)
-
-Django signals trigger cascading updates:
-
-- On `Classification` publish → recalculate `ClinicalContext` discordance
-- On `ClassificationModification` save → update `ClassificationLabSummary` cache
-- On allele resolved → link classification to allele, trigger liftover
-- On condition text match updated → refresh related classifications
-
----
-
-## Key Architectural Patterns
-
-1. **Versioned Immutability** — `ClassificationModification` provides a complete, auditable history. The current `Classification` is a mutable pointer; history records are immutable.
-
-2. **Evidence as Flexible JSON** — All classification data stored as key/value pairs in a JSON blob, governed by `EvidenceKey` definitions. This allows labs to have different fields without schema changes.
-
-3. **Multi-level Sharing** — `ShareLevel` controls who sees what. Fields also have `max_share_level` for fine-grained control (e.g., patient data never shown to public even on public classifications).
-
-4. **Async Variant Resolution** — Variant matching (HGVS → database variant) is async via Celery. `ImportedAlleleInfo` tracks pending/resolved status.
-
-5. **Lab Collaboration via Clinical Context** — `ClinicalContext` aggregates all classifications for an allele; discordance is computed automatically on any change.
-
-6. **Ontology Standardization** — Condition text entered by labs is mapped to standard ontology terms (MONDO, HPO, OMIM) for cross-lab comparison and ClinVar submission.
-
-7. **Auto-population from Annotation** — Evidence fields are pre-filled from VEP annotation data, reducing manual entry for computational criteria (gnomAD AF, SpliceAI, etc.).
-
-8. **REST API Versioning** — Three API versions (v1, v2, v3) maintained for backward compatibility with lab integrations and Shariant.
+# classification — research notes
+
+Verified against 7c4408c62 on 2026-09-06
+
+The classification app is a lab's record of what a variant means for a condition, and everything Shariant built around
+sharing those records between labs: versioned evidence, share levels, allele resolution, per-allele grouping, discordance
+detection and resolution, condition matching to ontology terms, and outbound ClinVar submission. This is the long story
+behind the rules in `classification/CLAUDE.md`; the vocabulary is in `claude/domain.md#classification-classification`,
+and the model, URL, task, signal and command inventories are the generated maps (`claude/maps/models.md#classification`,
+`claude/maps/urls.md#classification`, `claude/maps/tasks.md#classification`, `claude/maps/signals.md#first-party`,
+`claude/maps/commands.md`). The two readmes, `classification/__classification_readme.md` and
+`classification/__discordance_readme.md`, are the original author's summary.
+
+## Flows
+
+### A record arrives
+
+Every write, whatever the door, ends in `classification/models/classification_inserter.py:BulkClassificationInserter.insert`.
+The DRF endpoint `classification/views/classification_view.py:ClassificationView.post` feeds it one record (the web form)
+or a `records` list with an `import_id` (OmniImporter and `sync`); the same view is mounted at v1, v2 and v3 paths
+(`claude/maps/urls.md#classification`), the version only changing the response shape via `api_version`. A file upload
+from a lab's curation system lands as `classification/models/uploaded_classifications_unmapped.py:UploadedClassificationsUnmapped`
+and `classification/tasks/classification_import_map_and_insert_task.py:ClassificationImportMapInsertTask` shells out to
+the external OmniImporter (`settings.CLASSIFICATION_OMNI_IMPORTER_APP_DIR`) to map it to VariantGrid JSON before calling
+the same inserter. `csv_classification_inserter` (`claude/maps/commands.md`, #1481) is the command-line
+door. Each record is addressed by `classification/models/classification_ref.py:ClassificationRef.init_from_str` -
+`org/lab/lab_record_id.version` - and `lab_record_id` is unique per lab, so a re-import of the same file updates rather
+than duplicates.
+
+`insert` pops the control keys (`publish`/`share`, `delete`, `delete_reason`, `source`, `editable`, `return_data`) off
+the payload and treats what is left as evidence. A new record goes through
+`classification/models/classification.py:Classification.create_with_response`; an existing one through
+`classification/models/classification.py:Classification.patch_value`. Records that arrive with `source: api` and no
+`editable` flag have every patched field marked immutable at API level, which is what stops a curator editing a value in
+the web form that the lab's system will overwrite on the next sync (`classification/enums/classification_enums.py:SubmissionSource.can_edit`).
+A bulk import wraps the rows in a `classification/models/classification_import_run.py:ClassificationImportRun` keyed by
+`username#import_id`, whose `ONGOING` status is the guard the rest of the app checks before doing per-record work.
+
+### Evidence is patched, not assigned
+
+`Classification.patch_value` is the only mutator. It normalises the incoming dict into a
+`classification/models/evidence_key.py:VCDataDict` of `VCDataCell`s, uppercases the gene symbol, strips whitespace from
+the c.HGVS, sends `classification/models/classification.py:classification_validation_signal` (receivers in
+`classification/models/classification_variant_fields_validation.py:validate_variant_fields` and friends attach
+per-key validation messages), then diffs each cell against the current evidence and keeps only what changed. A cell whose
+existing immutability outranks the submission source is dropped with an `immutable` warning rather than raising. What
+survives becomes the `delta` of a new `classification/models/classification.py:ClassificationModification`, unless
+`classification/models/classification.py:ClassificationModification.is_edit_appendable` says the last unpublished
+modification is by the same user and source within a minute, in which case the delta is merged into it - this is why a
+curator typing in the form for a minute makes one version, not thirty. The patch also refreshes the denormalised
+`clinical_significance` and `allele_origin_bucket` columns, and on a first save with `requires_auto_population` set,
+fills annotation-derived keys through `classification/autopopulate_evidence_keys/autopopulate_evidence_keys.py:classification_auto_populate_fields`.
+
+### Resolving the variant
+
+A classification never links to a Variant directly. `classification/models/classification.py:Classification.ensure_allele_info_with_created`
+calls `classification/models/classification_variant_info_models.py:ImportedAlleleInfo.get_or_create` with exactly what
+the lab sent (c.HGVS or g.HGVS, transcript, genome build patch version), unique on an md5 of that text because Postgres
+cannot index a 3 kb HGVS (#753). The first time an ImportedAlleleInfo is created it derives a `VariantCoordinate` from the
+HGVS (or, since #1506, recognises a `BCR::ABL1` gene pair as a gene-level fusion) and records validation; then
+`classification/models/variant_resolver.py:VariantResolver.queue_resolve` attaches it to a per-build
+`classification/models/classification.py:ClassificationImport` and, when the inserter finishes or 100 are queued, fires
+`classification/tasks/classification_import_task.py:process_classification_import_task`.
+
+That task runs `classification/classification_import.py:process_classification_import`: known coordinates are matched in
+bulk through `VariantPKLookup`; unknown ones are written to a synthetic VCF and pushed through the ordinary upload
+pipeline (`classification/classification_import.py:_classification_upload_pipeline`, gene-level coordinates on their own
+pipeline) so that variant insertion stays behind the single `variant_id_single_worker`. After insertion
+`classification/tasks/classification_import_process_variants_task.py:ClassificationImportProcessVariantsTask` links the
+new Variants back, populates ClinGen allele ids and schedules liftover (`settings.LIFTOVER_CLASSIFICATIONS`). Each step
+that produces a Variant ends in `classification/models/classification_variant_info_models.py:ImportedAlleleInfo.set_variant_and_save`,
+which fills the per-build `classification/models/classification_variant_info_models.py:ResolvedVariantInfo` caches
+(c.HGVS per build, transcript version, gene symbol - what the grids sort on), recomputes validation, sets the status and
+sends `classification/models/classification_variant_info_models.py:allele_info_changed_signal`. Receivers of that signal
+copy the allele onto every classification sharing the ImportedAlleleInfo, reassign groupings and recalculate clinical
+contexts. `classification/signals/classification_liftover.py:liftover_run_complete_handler` does the last pass with
+`force_complete=True`, so a build still missing after liftover is recorded as unattainable rather than pending (#1420).
+
+Validation is a versioned row, `classification/models/classification_variant_info_models.py:ImportedAlleleInfoValidation`,
+with tags for normalisation diffs, liftover diffs, missing builds and unsupported transcripts; any `E` severity sets
+`include=False` and `classification/models/classification.py:Classification.include_based_on_allele_info` keeps the
+record out of exports until a human confirms it (`confirmed_by`) or the match is redone.
+`ImportedAlleleInfo.hgvs_converter_version` records which resolver and cdot data produced the match (#1321), so a later
+HGVS library upgrade can be audited with `classification/models/classification_variant_info_models.py:ImportedAlleleInfo.dirty_check`.
+
+### Publish and share
+
+Nothing outside the owning lab sees an unpublished modification. `classification/models/classification.py:Classification.publish_latest`
+hands the last edited modification to `classification/models/classification.py:ClassificationModification.publish`, which
+snapshots `published_evidence`, flips `is_last_published` from the previous version, grants the ShareLevel's Guardian
+group read permission on the modification, rewrites `Classification.summary` through
+`classification/models/evidence_mixin_summary_cache.py:ClassificationSummaryCalculator`, and sends
+`classification/models/classification.py:classification_post_publish_signal`. That one signal drives most of the app
+(the receiver list is in `claude/maps/signals.md#first-party`): the submitted flag and clinical-context recalculation,
+grouping assignment, condition text sync, ClinVar exclusion patterns, the significance-change flag, common-variant
+partition moves in snpdb, and gene-count refresh in annotation.
+
+Share levels are `classification/enums/classification_enums.py:ShareLevel` - user, lab, organisation, logged-in users,
+public - and only the last two are `is_discordant_level`, i.e. count as "shared" for discordance, grouping visibility
+and export. The web form republishes at the record's current level (`classification/views/views.py:create_classification_object`)
+and the inserter refuses to go lower, republishing at the current level with a `shared_higher` warning, but the model has
+no constraint: the ratchet is convention. `user` is never a publish target - the inserter maps it to "do not publish".
+Per-key visibility is separate: `classification/models/evidence_key.py:EvidenceKey.max_share_level` and
+`classification/models/classification.py:Classification.get_visible_evidence` blank out keys such as patient identifiers
+for anyone whose `lowest_share_level` is below the key's ceiling, even on a public record.
+
+### Withdrawal and deletion
+
+`classification/models/classification.py:Classification.set_withdrawn` is the soft delete: it sets `withdrawn` with a
+`classification/enums/classification_enums.py:WithdrawReason`, opens the withdrawn flag and sends
+`classification/models/classification.py:classification_withdraw_signal`, which removes the record from its grouping
+and recalculates its clinical context. The inserter's `delete: true` withdraws a shared record and hard-deletes an unshared
+one (unless `settings.CLASSIFICATION_ALLOW_DELETE` is off, as it is on Shariant); `delete: "withdraw"` always withdraws;
+`delete: false` un-withdraws. Since #1481 a re-imported withdrawn record stays withdrawn and returns a `withdrawn` warning
+instead of silently resurrecting.
+
+### Grouping
+
+`classification/models/classification_grouping.py:ClassificationGrouping` is the per-lab, per-allele-origin-bucket,
+per-share-level roll-up that the listing grids read, under an `AlleleOriginGrouping` and `AlleleGrouping` per allele.
+`classification/models/classification_grouping.py:ClassificationGrouping.assign_grouping_for_classification` runs on
+publish, withdraw, allele change and condition change; it moves the record's `ClassificationGroupingEntry` and marks the
+old and new groupings dirty. `classification/models/classification_grouping.py:ClassificationGrouping.update` rebuilds the
+cached latest modification, condition terms, zygosities and pathogenic/somatic difference; it runs immediately for a
+grouping's first record and otherwise waits for `classification/signals/classification_hooks_grouping.py:_instant_undirty_check`,
+which does nothing while an import run is ongoing and lets `classification_imports_complete` do one sweep instead.
+`classification/models/classification_grouping.py:ClassificationGroupingSearchTerm` rows (gene symbol, condition terms,
+SCV) are fed by `classification_grouping_search_term_signal` so the grid's search never touches evidence JSON.
+`settings.CLASSIFICATION_NEW_GROUPING` (on for Shariant) switches the listing pages to these groupings.
+
+### Discordance
+
+Publishing at a discordant level calls `classification/models/clinical_context_utils.py:update_clinical_context`, which
+places the record in the `classification/models/clinical_context_models.py:ClinicalContext` for its allele, allele-origin
+bucket and name (`default` unless a user moved it) and calls
+`classification/models/clinical_context_models.py:ClinicalContext.recalc_and_save`. The verdict comes from
+`classification/models/clinical_context_models.py:DiscordanceStatus.calculate`: each shared, non-withdrawn modification's
+clinical significance is mapped to a bucket via `classification/models/evidence_key.py:EvidenceKeyMap.clinical_significance_to_bucket`,
+and two buckets among the counted records is `DiscordanceLevel.DISCORDANT`; VUS-A/B/C differences and B-vs-LB are the
+"concordant with differences" levels, and a somatic bucket is always `MULTIPLE_RECORDS_DISCORDANCE_NOT_SUPPORTED`. If the
+context is discordant but open pending-change flags would resolve it, `pending_concordance` is set - a live calculation,
+never stored, which is why `DiscordanceReportTriage.is_outstanding` recomputes it.
+
+`recalc_and_save` stores `last_evaluation` and, when no import is ongoing, sends `clinical_context_signal`; with
+`settings.DISCORDANCE_ENABLED` (off by default, on for Shariant) the receiver calls
+`classification/models/discordance_models.py:DiscordanceReport.update_latest`. A context that turns discordant opens a
+`DiscordanceReport` with a `DiscordanceReportClassification` per shared record (original modification, final filled on
+close); each later recalc `update`s it, and the moment the context is concordant again it `close`s as `CONCORDANT`.
+A report closed as `CONTINUED_DISCORDANCE` reopens only if a new lab joins or the context becomes concordant
+(`classification/models/discordance_models.py:DiscordanceReport.should_reopen_continued_discordance`). Flags follow the
+report: `classification/models/discordance_models.py:DiscordanceReport.apply_flags_to_context` is the one place the
+discordant flags on the context and on each classification are opened and closed. `discordance_change_signal` fans out to
+per-lab `DiscordanceNotification` rows (batched into one email per lab per import, #3384) and to
+`classification/models/discordance_models.py:ensure_discordance_report_triages_for`, which keeps a
+`DiscordanceReportTriage` per actively involved lab (#3486; triage statuses "will amend", "for discussion", "confident").
+The discussion itself is a `review` (see `claude/research/review.md`); its outcome view
+`classification/views/discordance_report_views.py:action_discordance_report_review` raises the pending-changes flag with
+`{"to_clin_sig": ...}` on the classifications a lab agreed to change, and
+`classification/signals/classification_hooks_significant_change.py:clinical_significance_change_check` closes it when the
+republished value arrives.
+
+### Condition matching
+
+Labs send condition as free text; ClinVar and cross-lab comparison need ontology terms. On publish,
+`classification/models/condition_text_matching.py:ConditionTextMatch.sync_condition_text_classification` normalises the
+text into a per-lab `classification/models/condition_text_matching.py:ConditionText` and ensures the hierarchy root →
+gene symbol → mode of inheritance → classification exists as `ConditionTextMatch` rows. Terms set at any level apply to
+every classification below it that has no override; `classification/models/condition_text_matching.py:apply_condition_resolution_to_classifications`
+walks the tree on save and `classification/models/condition_text_matching.py:apply_condition_resolution` writes the
+result into `Classification.condition_resolution`, raises the condition-resolution flag (history, #881) and sends
+`condition_set_signal`. `classification/models/condition_text_matching.py:ConditionTextMatch.attempt_automatch` assigns
+only what `classification/models/condition_text_matching.py:ConditionMatchingSuggestion.is_auto_assignable` is certain
+of - an embedded id such as `MONDO:0005021` at the root, or a single leaf term with a known gene relationship at gene
+level; everything else waits for a curator on the condition matching page. Multiple terms carry a
+`classification/models/condition_text_matching.py:MultiCondition` of uncertain or co-occurring.
+
+### ClinVar export
+
+`classification/models/clinvar_export_prepare.py:ClinvarExportPrepare.update_export_records` (the `clinvar_export`
+command, or the button on the export page) walks each ClinVarKey's shared, condition-resolved modifications per allele
+and lets `classification/models/clinvar_export_prepare.py:ClinVarConsolidatingMerger` decide one
+`classification/models/clinvar_export_models.py:ClinVarExport` per key + allele + condition, choosing the most recent
+record and merging conditions that are the same or more specific. `classification/models/clinvar_export_convertor.py:ClinVarExportConverter.convert`
+renders the submission as `ValidatedJson`: open flags (withdrawn, discordant, internal review, outstanding edits, pending
+changes, "don't share with ClinVar"), unconfirmed variant matching and a somatic bucket all become embedded errors, and
+an export with errors is `IN_ERROR` and skipped rather than raising. `classification/models/clinvar_export_models.py:ClinVarExportBatch.create_batches`
+groups valid `NEW_SUBMISSION`/`CHANGES_PENDING` exports by key, allele-origin bucket and assertion criteria (10,000 per
+batch) into `ClinVarExportSubmission` snapshots; `classification/models/clinvar_export_sync.py:ClinVarExportSync.next_request`
+then drives one batch through submit → poll → fetch response file against the test or production API
+(`settings.CLINVAR_EXPORT`), storing every exchange as a `ClinVarExportRequest` and writing returned SCVs back so the
+next submission is an update rather than a novel record. `classification/models/clinvar_export_exclude_utils.py:published`
+applies a key's `ClinVarKeyExcludePattern`s at publish time by opening the not-public flag.
+
+## Why it is shaped this way
+
+**Evidence is JSON with an EvidenceKey schema.** Labs disagree on which fields exist, what they are called and which
+options they take, and Shariant onboarded them one at a time. A column per field would have meant a migration per lab.
+`classification/models/evidence_key.py:EvidenceKey` rows carry type, options, category, order, `max_share_level`,
+`mandatory`, `immutable` and `variantgrid_column` (which annotation column auto-populates it), so the form, the validator,
+the CSV/REDCap exporters and the ClinVar mapping are all generated from the same rows, and adding a key is a data
+migration (`ls classification/migrations | grep ekey`). `classification/models/evidence_key.py:EvidenceKeyOverrides`
+layers lab and organisation config (hide a key, change options, enable a namespace such as `somatic:` or `acmg:`) on top,
+merged by `classification/models/evidence_key.py:EvidenceKeyOverrides.merge` and cached per lab through
+`classification/models/evidence_key.py:EvidenceKeyMap.with_overrides`. Each value is a `classification/models/evidence_mixin.py:VCBlobDict`
+of value / note / explain / db_refs / validation / immutable, so a note and its provenance travel with the value.
+
+**Every edit is a modification.** A classification is a clinical opinion that gets reported on and re-examined years
+later; auditors ask what a lab said on a date, and discordance reports need to compare the version each lab had published
+at detection against what they publish now. Storing deltas (`ClassificationModification.delta`) with a snapshot at publish
+(`published_evidence`) gives both cheaply, and the read permission living on the modification rather than the
+classification is what makes "you can see what was published, not what is being edited" a property of the data instead
+of every view. The cost is that `Classification.evidence` is a denormalised copy that must be kept in step, which is why
+the app insists on `patch_value`.
+
+**Buckets come from key metadata, not the enum.** `classification/enums/classification_enums.py:ClinicalSignificance`
+only knows B/LB/VUS/LP/P, but deployments add VUS-A/B/C, oncogenic tiers, risk alleles and "other" as options on the
+`clinical_significance` key, and which of those count as the same bucket is a policy each deployment sets in the option's
+`bucket` attribute. Reading the bucket from `EvidenceKeyMap` means a new option is a data change, not code, and the
+`bucket` on `allele_origin` options is what `classification/enums/classification_enums.py:AlleleOriginBucket.bucket_for_allele_origin`
+uses to split germline from somatic contexts.
+
+**Allele resolution is shared and asynchronous.** Thousands of records cite the same HGVS; resolving once per distinct
+input (`ImportedAlleleInfo`) rather than per classification made re-matching after a transcript or cdot upgrade tractable
+(`classification_re_matching`, `fix_variant_matching` in `claude/maps/commands.md`). Matching goes through
+the VCF pipeline because that is the only path allowed to create Variants, and liftover is a separate task chain because
+it can take hours on a big import - so a classification has a nullable `variant` and `allele` for as long as that takes.
+
+**Imports defer the expensive work.** One file can touch thousands of records, and recalculating discordance, groupings
+and common-variant filters per row was both slow and noisy (an allele can flip discordant and back within one import).
+`classification/models/classification_import_run.py:ClassificationImportRun.ongoing_imports` gates all three; the
+`classification_imports_complete_signal` sweep does the work once, and `ClinicalContext.pending_cause` remembers what to
+say in the notification. #1725 dates the guard to 2021-12 ("delay discordances until import completes").
+
+**Discordance is per ClinicalContext, not per allele.** Two labs can legitimately classify the same allele differently
+for different conditions (or germline vs somatic), so the unit of comparison is allele + allele-origin bucket + a name a
+user can split records into, with `default` as the name nearly every record has.
+
+## History
+
+The models date from the 2020 rewrite (`7a00283d9`, "renamed lots of things, re-did flags"), with condition matching
+reworked into a hierarchy that December. ClinVar export arrived in 2021-08 against ClinVar's test API; the import-run
+guard in 2021-12; `UploadedClassificationsUnmapped` and the OmniImporter task in 2022-03; `ImportedAlleleInfo` in 2022-11,
+replacing per-classification matching flags with `ImportedAlleleInfoValidation` rows in 2023-01. 2023 added the review
+app and discordance triage (2023-08), medically-significant prioritisation and bulk discordance emails (#3486, #3384),
+and condition resolution history (#881). Somatic support split the significance axis in 2024-02 ("classification" vs
+"somatic clinical significance"), and `allele_origin` became mandatory in 2024-11 (variantgrid_private#2926).
+`ClassificationGrouping` landed in 2025-02 for the listing grids. 2026 renamed the `institution` share level to
+`organisation` (#1472, with `ShareLevel._missing_` accepting the old value), allowed g.HGVS-only imports (#1063), recorded
+the HGVS converter version (#1321), made gene fusions first-class variants (#1506), added the external-lab filter (#394),
+the CSV inserter (#1481), the `ReclassificationEvent` timeline behind the reclassification analytics page
+(`classification/models/classification_reclassification_models.py:ReclassificationEventBuilder`, #1523), and the
+denormalised `summary` JSON with its `summary__p_sort_idx` index that the grids sort on.
+
+## Traps
+
+- `Classification.variant` and `.allele` are nullable and are being retired in favour of `allele_object` (which reads
+  `allele_info.allele`). Queries such as `ClassificationModification.latest_for_user(allele=...)` still go through
+  `classification__variant__in`, so a record whose allele info resolved but whose `variant` column was never copied is
+  invisible to them; `fix_allele_info` and `classification_ensure_alleles_and_liftover` repair that.
+- `latest_for_user` without `published=True` and without a single `classification` filters on `is_last_edited`, which
+  drops records that have an unpublished edit the caller could not see anyway; the FIXME in the method is real.
+- `ClinicalContext.classifications_qs` excludes research labs unless `settings.DISCORDANCE_RESEARCH_ENABLED`, so a
+  research lab's record can be in a context yet not counted - `lab_count_all` vs `lab_count` on `DiscordanceStatus`.
+- `DiscordanceStatus._calculate_rows` silently ignores a clinical significance with no bucket (`has_ignored_clin_sigs`);
+  a new option added without a `bucket` attribute makes records vanish from discordance rather than fail.
+- `EvidenceKeyMap.instance` and `clinical_significance_to_bucket` are 60-second `timed_cache`s: a data migration that
+  edits a key is not seen by a running worker for a minute, and tests that create keys in `setUp` must not rely on the
+  cache having been warmed by an earlier test.
+- Unknown keys are accepted by default (`settings.CLASSIFICATION_ALLOW_UNKNOWN_KEYS`, kept True so instances can sync from
+  each other); `unknown_evidence_key_cleaner` is how they are found later. Shariant turns it off.
+- `ImportedAlleleInfo.get_or_create` strips spaces from the HGVS before hashing but nothing else - `NM_000059.3:c.1A>G `
+  and `nm_000059.3:c.1A>G` are two rows resolving to one allele.
+- `ClassificationImportRun.record_classification_import` reuses an ONGOING run of the same identifier only if it was
+  modified within `MAX_IMPORT_AGE` (5 minutes); a client that pauses longer starts a second run, and a run never marked
+  `complete` is only closed by the next call's `cleanup`. Until then everything gated on `ongoing_imports` is deferred.
+- `ClassificationModification.publish` compares the requested level with the record's current one and returns False when
+  nothing changed - so a caller that patched and then asked to publish at the same level with no delta gets no new
+  version and no signal; `BulkClassificationInserter.insert` relies on this to avoid empty republishes.
+- The web form and API both go through `ClassificationView`, which is under the login-exempt `/classification/api/`
+  prefix; keep any new view there a DRF `APIView` (`claude/guides/operations.md#authentication-surface`).
+- ClinVar batches are germline only: `ClinVarExportSync.next_request` raises `NOT_SUPPORTED_YET` for any other
+  `allele_origin_bucket`, and the converter marks somatic exports as errors first, so they never reach a batch.
+- `ClassificationRef.init_from_str` treats a numeric id as a `Classification.pk` and anything else as `org/lab/record`;
+  a lab whose `lab_record_id`s are integers must always be addressed with the lab prefix.
+- Tests: `classification/tests/models/test_utils.py:ClassificationTestUtils` builds the lab/user pairs;
+  `classification/tests/utils/test_urls.py` is the URLTestCase with `LIFTOVER_CLASSIFICATIONS=False`;
+  `classification/tests/views/test_query_scaling.py` guards the grid query count. There are no tests for the OmniImporter
+  path or ClinVar sync beyond `classification/tests/models/test_clinvar_export_sync.py` and
+  `classification/tests/utils/test_clinvar_prepare.py`.

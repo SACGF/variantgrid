@@ -8,6 +8,7 @@ from library.utils import batch_iterator
 
 
 class Command(BaseCommand):
+    category = "import"
 
     def add_arguments(self, parser):
         parser.add_argument('--load', action='store_true', default=False, help='Pre-emptively load all citations not yet loaded')

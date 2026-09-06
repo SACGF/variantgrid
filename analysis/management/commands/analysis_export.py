@@ -7,6 +7,8 @@ from analysis.models.models_analysis import Analysis
 
 
 class Command(BaseCommand):
+    category = "dev"
+
     def add_arguments(self, parser):
         parser.add_argument('--analysis-id', type=int, required=True, help='Analysis PK')
 

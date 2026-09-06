@@ -3,7 +3,7 @@
 Written by Claude Fable 5 (claude-fable-5), 2026-08-31
 
 Issue: https://github.com/SACGF/variantgrid/issues/1816
-Status: in progress - Phase 1 landed 4e1a406fb (2026-09-02); Phase 0 landed 2026-09-06; Phase 2 next. See §6.1.
+Status: in progress - Phase 1 landed 4e1a406fb (2026-09-02); Phase 0 landed 7c4408c62 (2026-09-06); Phase 2 core landed 2026-09-06 (§6.1); remaining Phase 2 items run in series per §6.2.
 
 This is written from the driver's seat: what I, as the agent doing most of the commits on this repo,
 would need to understand a situation accurately, act on it with confidence, verify cheaply, and leave the
@@ -88,7 +88,7 @@ Where the friction concentrates:
 | Fact | Consequence for me |
 |---|---|
 | 97 / 749 non-test modules have a module docstring (13%) | I infer a module's contract from its imports and callers, every time |
-| 5 files over 2,000 lines (`classification/models/classification.py` 2,873; `annotation/models/models.py` 2,814; `genes/models.py` 2,764; `snpdb/views/views.py` 2,235) | reading to find one thing costs 30k+ tokens or a grep guessing game |
+| 5 files over 2,000 lines (`classification/models/classification.py` 2,873; `annotation/models/models.py` 2,814; `genes/models/models_gene.py` 1,535; `snpdb/views/views.py` 2,235) | reading to find one thing costs 30k+ tokens or a grep guessing game |
 | 155 management commands, ~70 named `fix_*` / `one_off_*` | discovery by listing is useless; the signal is buried |
 | 754 URL patterns, 624 templates, 18k lines of first-party JS; browser tests live in `variantgrid_autotests` and run against deployments | during a change, UI work is verified by reasoning about the template, not by looking |
 | 32 `Signal()` definitions, 6+ celery task decorators across several patterns | cross-app wiring is invisible without a grep campaign |
@@ -146,7 +146,7 @@ that routes by task:
 
 | If the task is about… | Read | Then use |
 |---|---|---|
-| a variant / allele / liftover | `snpdb/CLAUDE.md`, `claude/domain.md#variant` | `vg inspect variant <id>` |
+| a variant / allele / liftover | `snpdb/CLAUDE.md`, `claude/domain.md` | `vg inspect variant <id>` |
 | an analysis node | `analysis/CLAUDE.md` | `vg inspect analysis <id>`, `profile_analysis_nodes` |
 | a classification | `classification/CLAUDE.md` | `vg inspect classification <id>` |
 | a grid / table | `uicore/CLAUDE.md#grids` | `vg page <url> --queries` |
@@ -313,7 +313,7 @@ Specifics:
   net: it needs a running instance, an `.ini` per target and a Selenium driver, so it belongs after a
   deploy to a test instance, not inside the edit loop. Two things make it agent-usable: a line in the
   "This box" section saying how to run it against `vg-test2` (config name, keyword selection with
-  `+edit` / `-edit`), and a `claude/maps/autotests.md` listing which scenarios cover which URL names, so
+  `+edit` / `-edit`), and a generated claude/maps/autotests.md listing which scenarios cover which URL names, so
   `vg tests --changed` can also name the autotest keywords a change touches.
 
 ### 4.4 Runtime / operations layer — treating this box as the lab it is
@@ -344,7 +344,7 @@ Committed, so it applies to every session and every teammate's agent:
     `claude/plans/` — orientation for free, no Django boot.
   - Permission allowlist for the read-only set (git read commands, ruff, `manage.py vg *`,
     `manage.py test --keepdb *`, `gh issue view`, `gh pr view`).
-- **Skills** (`.claude/skills/`), few and sharp:
+- **Skills** (under .claude/skills/), few and sharp:
   - `vg-plan` – the plan format from CLAUDE.md, the "Written by" header, the issue link, and the habit
     of citing symbols so `vg docs check` covers plans too.
   - `vg-implement` – the implementation-prompt style (positive phrasing, plan is the spec).
@@ -352,7 +352,7 @@ Committed, so it applies to every session and every teammate's agent:
     against the current doc, rewrite only what changed, bump `Verified against`.
   - `vg-run` – what the built-in `run` skill looks for first: how to render/inspect a page here
     (`vg page`, `vg browse`) instead of starting a second server.
-- **Subagents** (`.claude/agents/`), two:
+- **Subagents** (under .claude/agents/), two:
   - `db-analyst` – read-only; `vg sql --explain`, row counts, index usage on real data; returns a plan
     summary, never a table dump.
   - `page-checker` – given URLs, renders each with `vg page --queries` before and after a change and
@@ -395,7 +395,7 @@ fail on regressions for the cheap ones (dead citations, stale maps) once they re
   the way `snpdb/models/` and `analysis/models/nodes/` already do — a package with one concept per
   module. `classification/models/classification.py` and `annotation/models/models.py` are the two whose
   splits would pay back soonest.
-- **Consistent app skeleton**: document the expected layout once in `claude/guides/app_layout.md`
+- **Consistent app skeleton**: document the expected layout once in a new claude/guides/app_layout.md
   (`models/`, `views/`, `tasks/`, `management/commands/`, `tests/` with `utils/`, `templates/<app>/`,
   `static_files/default_static/js/<app>/`) and have `vg map apps` list deviations rather than fixing
   them all at once.
@@ -445,8 +445,52 @@ fail on regressions for the cheap ones (dead citations, stale maps) once they re
   reason for restarts, migrate, annotation and destructive git/SQL), the SessionStart orientation and the read-only
   allowlist; `claude/domain.md` (~45 nouns); `claude/guides/operations.md` seeded from the four project memories, which
   were then deleted; `vg status`, `vg outline`, `vg settings` (`library/vg/status.py`, `outline.py`, `settings_chain.py`).
-- **Phase 2 open items**: `vg inspect`, `vg logs`, `vg browse`, `vg sql --explain`, `vg docs check`, `vg health`, the
-  research-doc rewrite, top-80 module docstrings, skills and the two subagents, `create_fake_data vcf|classifications|analysis`.
+- **Phase 2 core landed** (2026-09-06): `vg docs check` (`library/vg/docs.py`: every backticked path, bare path-colon-symbol spellings
+  and Markdown link in `claude/**`, `*/CLAUDE.md`, `*/__*_readme.md` and root `CLAUDE.md` resolved by AST; plans checked
+  while their `Status:` is draft / approved / in progress; `claude/maps/` left to `vg map --check`; runs from `scripts/vg`
+  in under a second and in the `agent-maps.yml` job) - 600 dead citations on the first run, 0 outside the research docs
+  after fixing the guides, the plan and the app notes. `vg inspect <kind> <key>` (`library/vg/inspect/`, one module per
+  kind: variant, allele, sample, vcf, classification, analysis, gene, transcript, user, lab; a shared renderer, `--depth`,
+  capped lists with a `truncated` count, `--json`, always inside a rolled-back transaction) - about 4 s per call on vg-test2,
+  3.7 s of it Django boot. Every management command declares `category` (ops 29, import 18, maintenance 36, one-off 59,
+  dev 15) and `claude/maps/commands.md` is grouped by it; retirement of the one-offs waits for the major deploy.
+  Contract docstrings on the top-80 fan-in modules (`vg outline --coverage`: 17% → 23% of 1,142 modules; all of the top
+  80 documented). Research docs rewritten as narrative with a `Verified against <sha>` header and 0 dead citations:
+  annotation, classifications, email_manager, eventlog, upload, snpdb, analysis, genes, ontology, library (the rest are
+  still the old field-by-field docs - see the list below).
+- **Phase 2 open items**, in the order to do them (§6.2 says how):
+  1. Research docs still to rewrite, one app per run: variantgrid, uicore, variantopedia, seqauto, patients, pedigree,
+     pathtests, review, flags, sync, vcauth_oidc_auth. `vg docs check` reports the 5 dead citations they still carry, so
+     CI's docs step fails until they are done (or those five lines are patched).
+  2. `vg health`: the ratchet numbers in one place (`vg outline --coverage` already gives docstring coverage; add dead
+     citations, stale maps, one-off command count, lint line count, last suite wall time).
+  3. `vg logs`, then `vg sql --explain`, then `vg browse` (Playwright is installed on vg-test2).
+  4. Skills (`vg-plan`, `vg-implement`, `vg-research`, `vg-run`) and the two subagents; `vg-research` is the research-doc
+     recipe from §6.2 written down so the remaining docs and future refreshes cost one prompt.
+  5. `create_fake_data vcf | classifications | analysis`.
+
+### 6.2 How to run the remaining work (learned 2026-09-06)
+
+- **One agent at a time, in series.** Six research-doc agents launched in parallel hit the account's session rate limit
+  mid-write; four died before writing anything and their tokens were lost. Run one app per agent, wait for its report,
+  then launch the next. The main session does independent work (checks, small edits) while it runs.
+- **Write the file to disk early.** Tell the agent to produce a complete first draft within its first few edits and then
+  refine in place, so an interruption leaves a usable doc rather than nothing. The Write tool refuses `.md` targets for
+  subagents; a shell heredoc works.
+- **The research-doc recipe.** Read `CLAUDE.md` (Start here, Definition of done), `claude/domain.md`,
+  `claude/research/annotation.md` (a finished example), the app's `CLAUDE.md` and readme, then the old doc as leads only.
+  Header `# <app> — research notes` and `Verified against <sha> on <date>`; sections Flows / Why it is shaped this way /
+  History / Traps; every paragraph cites the symbol as a backticked path plus colon plus symbol (see `claude/domain.md` for the style) from the repo root; field, URL, command,
+  task and signal listings link to `claude/maps/` instead of being restated (`commands.md` is grouped by category, so link
+  it without an anchor; `models.md`, `urls.md`, `tasks.md` have `#<app>` anchors, `signals.md` has none). Finish when
+  `scripts/vg docs check claude/research/<app>.md` reports 0 dead. Ask for: line count before and after, the stale claims
+  found, the final check line.
+- **Verify with the existing loops.** `scripts/vg docs check`, `scripts/vg map --check`,
+  `python3 manage.py test --keepdb --parallel 4` (2,945 tests in about 75 s on vg-test2), `scripts/vg outline --coverage`.
+- **Two facts the tools now encode.** `library/vg/inspect/__init__.py:inspect` calls `transaction.set_rollback(True)`
+  only after the inspector returns - marking rollback first makes Django refuse every query in the block. A bare
+  filename with a source extension in prose is a citation to `vg docs check` (resolved anywhere in the tree), so name real files or use no
+  extension.
 
 **Phase 3 — ongoing ratchets**
 - After the major deploy: retire finished one-off commands, squash migrations; categorise the commands

@@ -1,3 +1,9 @@
+"""
+Django admin conventions for the project: every ModelAdmin extends ModelAdminBasics (or
+GuardedModelAdminBasics for guardian models) to get the CSV export action, `@admin_model_action`
+model-level actions and `@admin_list_column` computed columns; AllValuesChoicesFieldListFilter shows
+choice labels in filters; get_admin_url / get_admin_model_url build links.
+"""
 import inspect
 from collections.abc import Iterator
 from functools import cached_property

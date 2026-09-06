@@ -9,6 +9,8 @@ from snpdb.models import TagColorsCollection
 
 
 class Command(BaseCommand):
+    category = "one-off"
+
     def handle(self, *args, **options):
         for collection in TagColorsCollection.objects.all():
             if collection.user:

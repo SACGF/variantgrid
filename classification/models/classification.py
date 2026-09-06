@@ -1,3 +1,13 @@
+"""
+Classification and ClassificationModification: a lab's record for an allele + condition, whose
+evidence is JSON validated against EvidenceKey, with every edit kept as a modification. Change
+evidence through Classification.patch_value, publish through ClassificationModification.publish,
+and read what a user may see through ClassificationModification.latest_for_user; allele resolution
+is delegated to ImportedAlleleInfo (classification_variant_info_models.py). Also here:
+ClassificationImport and the allele sources that drive matching and liftover, ConditionResolved,
+ClassificationConsensus and CuratedDate. classification/CLAUDE.md has the rules. Large: use
+`scripts/vg outline`.
+"""
 import copy
 import logging
 import re

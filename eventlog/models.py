@@ -1,3 +1,10 @@
+"""
+The event log: Event (severity, app, name, details - what `vg status` lists as recent errors),
+ViewEvent (one row per page view, the `claude_agent` user included) and IntegrationActivity (a
+rolling last-seen per external system, updated in place through `IntegrationActivity.track`).
+Write events with create_event / create_login_event; the logging handler and middleware in this
+app fill the rest.
+"""
 import inspect
 import logging
 from contextlib import contextmanager

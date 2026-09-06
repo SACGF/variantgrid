@@ -7,6 +7,7 @@ from snpdb.models import UserSettings
 
 
 class Command(BaseCommand):
+    category = "ops"
 
     def handle(self, *args, **options):
         for user in User.objects.filter(is_active=True):

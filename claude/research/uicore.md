@@ -42,7 +42,7 @@ Builder for Crispy Forms FormHelper instances.
 
 ### RadioOtherWidget / CheckboxOtherWidget
 Custom radio/checkbox widgets with "other" option.
-- Templates: `uicore/widgets/radio_other_widget.html`, `uicore/widgets/checkbox_other_widget.html`
+- Templates: `uicore/templates/uicore/widgets/radio_other_widget.html`, `uicore/templates/uicore/widgets/checkbox_other_widget.html`
 - **ValuesMissingOther** — wrapper for "other" selected but no value provided (triggers validation error)
 - **OptionData** (frozen dataclass) — represents a single option: name, label, value, selected, index
 

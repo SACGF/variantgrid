@@ -6,6 +6,7 @@ from ontology.models import AncestorCalculator, OntologySnake
 
 
 class Command(BaseCommand):
+    category = "maintenance"
 
     def handle(self, *args, **options):
         print("ClinVar\tAllele\tCount\tSCVs\tConditions\tUmbrella\tMax steps to Umbrella\tJSON")

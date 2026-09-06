@@ -1,3 +1,11 @@
+"""
+The classification vocabulary: SpecialEKeys (the evidence keys code refers to by name - use these,
+never string literals), ShareLevel (lab -> institution -> logged-in users -> public, with which levels
+count toward discordance), AlleleOriginBucket, ClinicalSignificance / SomaticClinicalSignificance
+value helpers, EvidenceCategory and EvidenceKeyValueType (the EvidenceKey schema), CriteriaEvaluation
+(ACMG strengths), SubmissionSource, ValidationCode and WithdrawReason. Buckets and option metadata
+come from EvidenceKey rows, not from these enums.
+"""
 import typing
 from enum import Enum
 from functools import total_ordering

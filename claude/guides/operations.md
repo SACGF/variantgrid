@@ -9,11 +9,11 @@ what the command cannot know. Verified against vg-test2 on 2026-09-06.
 | Deployment | Hostname → settings file | Notes |
 |---|---|---|
 | vg-test2 (test.variantgrid.com) | `variantgrid/settings/env/vgtest2.py` | The lab box this repo is usually driven from; see "This box" in `CLAUDE.md` |
-| variantgrid.com | `env/vgaws.py` | Public instance on AWS |
-| Shariant (test / demo / prod) | `env/shariantcommon.py` + `sharianttest.py` / `shariantdemo.py` / `shariant.py` / `shariantsecurity.py` | Australian classification sharing; patients and analysis URLs unregistered |
+| variantgrid.com | `variantgrid/settings/env/vgaws.py` | Public instance on AWS |
+| Shariant (test / demo / prod) | `variantgrid/settings/env/shariantcommon.py` + `sharianttest.py` / `shariantdemo.py` / `shariant.py` / `shariantsecurity.py` alongside it | Australian classification sharing; patients and analysis URLs unregistered |
 | SA Pathology | private repo `variantgrid_sapath` (settings and site-specific apps live there) | Largest production data; clinical use |
-| runx1db | `env/runx1db2.py` | Gene-specific public database |
-| CI | `env/github_actions.py` with `config/ci/settings_config.json` | Also the canonical module for `vg map` |
+| runx1db | `variantgrid/settings/env/runx1db2.py` | Gene-specific public database |
+| CI | `variantgrid/settings/env/github_actions.py` with `config/ci/settings_config.json` | Also the canonical module for `vg map` |
 
 Settings resolve by hostname: `variantgrid/settings/__init__.py` lowercases the short hostname, strips `-`, and imports
 `env_developers/<name>.py` if it exists, else `env/<name>.py`. Each env file star-imports the components (`default_settings`,
@@ -113,7 +113,7 @@ and many more variants and samples.
 ## Testing pipeline
 
 CI (`.github/workflows/django-tests.yml`) runs the suite with `--parallel 4 --keepdb` against Postgres 16, Redis and
-RabbitMQ service containers under `env/github_actions.py`, skipping pushes that only touch `*.md` or `claude/**`;
+RabbitMQ service containers under `variantgrid/settings/env/github_actions.py`, skipping pushes that only touch `*.md` or `claude/**`;
 `.github/workflows/agent-maps.yml` runs `vg map --check` on every push without a database. Browser regression tests live in
 the private [variantgrid_autotests](https://github.com/SACGF/variantgrid_autotests) repo (Selenium, run with
 `run_tests.py <instance.ini> [test | +keyword | -keyword]` against a deployed instance) - the after-deploy net, not the edit

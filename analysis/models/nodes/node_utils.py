@@ -1,3 +1,10 @@
+"""
+Node graph operations that span the whole analysis: get_toposorted_nodes (parents before children),
+get_nodes_by_id, reload_analysis_nodes (bump versions and requeue, optionally only error nodes),
+update_analysis_tag_node_counts (tags do not bump versions, so tag nodes recount here) and
+get_rendering_dict for the DAG canvas. The per-node lifecycle is analysis_node.py; scheduling is
+analysis/tasks/.
+"""
 import json
 import logging
 import random

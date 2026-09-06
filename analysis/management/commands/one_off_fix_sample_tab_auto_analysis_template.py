@@ -10,6 +10,8 @@ from analysis.models.nodes.node_utils import reload_analysis_nodes
 
 
 class Command(BaseCommand):
+    category = "one-off"
+
     def handle(self, *args, **options):
         if analysis_template := AnalysisTemplate.objects.filter(name=settings.ANALYSIS_TEMPLATES_AUTO_SAMPLE).first():
             analysis = analysis_template.analysis

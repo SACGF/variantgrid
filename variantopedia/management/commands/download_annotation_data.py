@@ -20,6 +20,7 @@ def _is_directory_archive(key):
 
 
 class Command(BaseCommand):
+    category = "ops"
     help = "Check for missing annotation data files and download them from variantgrid.com"
 
     def add_arguments(self, parser):

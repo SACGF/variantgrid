@@ -1,3 +1,12 @@
+"""
+The DataTables engine every list page uses. A DatatableConfig subclass declares RichColumn objects
+(key, renderer, sorting, search, column_filter) and the config both defines the client table and
+answers its ajax requests; DatabaseTableView serves one config as JSON or a streamed CSV. Filtering
+funnels through DatatableConfig.apply_filters (config filter, search box, client column rules),
+ordering always ends in a pk tie-breaker, and known_count / approximate_count let expensive tables
+skip an exact count. uicore/CLAUDE.md#grids has the recipe; the variant grids build on it in
+snpdb/grids.py.
+"""
 import enum
 import itertools
 import logging

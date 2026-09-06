@@ -1,99 +1,75 @@
-# VariantGrid Eventlog App — Reference Document
+# eventlog — research notes
 
-## Purpose and Overview
+Verified against 7c4408c62 on 2026-09-06
 
-The `eventlog` app provides comprehensive activity logging, recording both automatic view access events and explicit business logic events. Creates an audit trail of user actions for compliance, debugging, and analytics.
+Three kinds of record live here (`claude/maps/models.md#eventlog`). `eventlog/models.py:Event` is an explicit application
+event - a login, a search, an import, an error - written through `create_event` or the logging handler. `ViewEvent` is a page
+view captured by middleware on deployments that ask for it, and feeds the classification view-metrics pages.
+`IntegrationActivity` is a one-row-per-integration "last seen" for external systems, updated in place, which the server
+status page and nightly digest read. `vg status` lists the last ten `Event` rows at ERROR (`library/vg/status.py`). The
+readme is `eventlog/__eventlog_readme.md`; the pages are `claude/maps/urls.md#eventlog`.
 
-**Key Design:** Middleware-based automatic view logging + explicit API for business events; superuser sees all, non-staff sees own only.
+## Flows
 
----
+`eventlog/models.py:create_event` writes an `Event` with `date=now`, inferring `app_name` from the caller's module via
+`inspect.stack()` when none is given, and by default also emits the row through Python `logging` at the matching level.
+About 25 call sites use it (VCF archive, partition archive, zygosity count repair, classification import, graph generation).
+`eventlog/models.py:create_login_event` is wired to `user_logged_in` at import time, which is where the "logins" filter on
+the log page gets its rows. The browser can also post one: `eventlog/views.py:create_event` is `@require_POST`, validates the
+severity against `LogLevel.CHOICES`, and trims `app_name`, `name` and `details` to fixed lengths with a `[trimmed …]` footer
+(#1519); `analysis.js` uses it for analysis-editor events. `eventlog/views.py:eventlog_view` is a decorator that records a
+view hit as an Event - its own docstring says not to use it, because it costs a write per request.
 
-## Models
+The second writer is the logging handler. `variantgrid/settings/components/default_settings.py` attaches
+`eventlog/loggers.py:EventLogHandler` as the `db` handler of the `django` logger, so every `django.request` warning or error
+raised while serving a request becomes an `Event` named `django_exception` with the message and traceback in `details`. The
+handler imports the model by string at emit time because logging is configured before apps load, returns without writing
+when the record carries no authenticated `request.user`, and drops the "Not Found: …js.map" noise.
 
-### ViewEvent
-Automatically recorded HTTP request events.
-- Fields: user FK (nullable), view_name (text), args (JSON), path (text), method (text), referer (text, nullable)
-- Properties: `is_get` — True if method is GET or empty
-- Ignored paths: api, datatable, citations_json; text: detail, metrics; AJAX requests; URL suffixes: _detail, _autocomplete
+Page views: `eventlog/middleware.py:PageViewsMiddleware.process_view` builds a `ViewEvent` for non-AJAX requests whose first
+path segment is in `settings.LOG_ACTIVITY_APPS`, skipping `IGNORE_SEGMENTS` (api, datatable, citations_json), any path
+containing `detail` or `metrics`, and view names ending `_detail` / `_autocomplete`. The view kwargs plus GET and POST are
+flattened into `args`, booleans and ints coerced, `csrfmiddlewaretoken` dropped, ontology terms un-mangled back to `MONDO:…`,
+and a `classification_id` of the form `id.timestamp` split into `classification_id` and `modification_timestamp`. The row is
+only saved in `PageViewsMiddleware.__call__` after the view returns, and redirects are discarded except for
+`variantopedia:search`, so a search that jumped straight to a result still counts. Only `shariantcommon.py` installs the
+middleware and defines `LOG_ACTIVITY_APPS`. Readers are `classification/views/classification_view_metrics.py:ViewEventCounts`
+and `classification/views/search_view_metrics.py`, plus `eventlog/admin.py:ViewEventAdmin` with its lab, organisation and
+"exclude admin/test users" filters.
 
-### Event
-Explicit business logic events created via API.
-- Fields: user FK (nullable), date (DateTimeField), app_name (text), name (text), details (text, nullable), severity (LogLevel: I/W/E/D), filename (text, nullable)
-- Methods: `can_write(user_or_group)` — True if superuser or owns event
+Integrations: `eventlog/models.py:IntegrationActivity.record` and the `IntegrationActivity.track` context manager stamp
+`last_attempt` / `last_success` / `last_change` / `last_error` on one row keyed by a string, with counters through `F()` so
+concurrent workers add up and `_upsert` doing a single UPDATE once the row exists. `eventlog/middleware.py:IntegrationApiMiddleware`
+does the same for inbound API prefixes named in `settings.INTEGRATION_API_TRACKING`, recording a 4xx/5xx as an error and any
+successful non-GET as a change. `eventlog/signals/integration_activity_status.py:integration_activity_status` turns every row
+into an `IntegrationStatus` for the server status page with no further registration, including a "Dismiss error" trigger
+that sets `last_error_acknowledged` so a failure that has been seen goes quiet until a newer one arrives.
 
----
+Reading: `eventlog/grids.py:EventColumns` shows own events only unless the user is a superuser, supports the page's
+`filter` (logins, errors, warnings_and_errors, events, searches) and `exclude_admin` (drops superusers, bots and user-less
+rows), and expands rows through `eventlog/views.py:eventlog_detail`, which checks superuser-or-owner.
+`eventlog/signals/active_users_health_check.py:active_users_health_check` answers the nightly health check by counting
+distinct users with an `Event` or `ViewEvent` in the window, admins on their own line.
 
-## Views and URL Patterns
+## Why it is shaped this way
 
-```
-''                 → eventlog()                — Main event log page
-'detail/<int:pk>'  → eventlog_detail()         — Event detail view
-'create_event'     → create_event()            — POST endpoint to create events
-'datatable'        → DatabaseTableView(EventColumns) — AJAX datatable
-```
+`Event` predates Rollbar and Slack and is now mostly an in-database audit trail; the Slack and email paths in
+`library/log_utils.py` cover alerting. `ViewEvent` exists for Shariant's usage reporting, which is why it is opt-in per
+deployment and skips the noisy paths. `IntegrationActivity` was added because outbound and inbound integrations (Alissa,
+the SA Pathology Mocha API) left nothing behind but the records they wrote, so "when did this last run" had no answer; one
+mutable row per integration keeps the table bounded however chatty the integration is.
 
-### Key Views
-- `eventlog(request)` — Renders main event log template with datatable
-- `eventlog_detail(request, pk)` — Full details, filename, metadata for single event
-- `create_event(request)` — POST only; accepts app_name, event_name, details, severity; creates Event record
-- `@eventlog_view` decorator — Optional decorator to record view access; adds ~100ms per request
+## History
 
----
+Security fixes (#3819, March 2026) added the owner check to `eventlog_detail`, restricted the grid to superusers rather than
+staff, and made `create_event` validate its inputs. #1519 (May 2026) added the length caps. `IntegrationActivity`,
+`IntegrationApiMiddleware` and the dismiss trigger arrived with the server status integration panel in August 2026. Emoji in
+event details render since #1098 (`eventlog/grids.py:EventColumns.render_data` runs `emoji_to_unicode`).
 
-## Middleware and Logging
+## Traps
 
-### PageViewsMiddleware
-Automatically records HTTP requests as ViewEvent entries.
-
-**process_view() — Before view:**
-1. Skip AJAX requests
-2. Check if app in LOG_ACTIVITY_APPS setting
-3. Resolve URL to view name
-4. Extract and normalize parameters (bool/int conversion, strip csrfmiddlewaretoken, URL-decode ontology terms)
-5. Create ViewEvent and attach to request
-
-**__call__() — After view:**
-1. Save ViewEvent if attached to request
-2. Skip redirect responses (except search)
-
-### EventLogHandler
-Custom Python logging handler that persists log records to Event model.
-- Maps log level → LogLevel enum
-- Extracts request object and user
-- Filters out missing .js.map file errors
-- Creates Event record with exception traceback if present
-
----
-
-## Datatable Configuration (EventColumns)
-
-Columns: date (desc default), severity (custom renderer), user, app_name, name, data (truncated 75 chars), id (hidden).
-
-Filtering:
-- Non-staff: own events only
-- Query param `filter`: logins, errors, warnings_and_errors, events, searches
-- `exclude_admin` JSON param removes superusers and bots
-
----
-
-## Health Check Integration
-
-**active_users_health_check()** — Queries Event and ViewEvent for activity in time window; separates superusers from regular users; returns HealthCheckRecentActivity with counts and usernames.
-
-**email_health_check()** — Queries EmailLog for recent emails; counts by subject; shows summary.
-
----
-
-## Integration Points
-
-| App | Integration |
-|-----|-------------|
-| All apps | Any view can call create_event() to log explicit events |
-| Email manager | email_health_check signal receiver queries EmailLog |
-| Library | health_check signal integration |
-
----
-
-## Settings
-
-- `LOG_ACTIVITY_APPS` — List of app names to automatically log view access for
+`settings.LOG_ACTIVITY_APPS` has no default: `PageViewsMiddleware` raises `AttributeError` on a deployment that installs it
+without defining the set. The middleware infers the app from the first URL segment, which is not the Django app name.
+`EventLogHandler` swallows anonymous-request errors entirely - a 500 on a public path is in Rollbar, not the event log.
+`Event.can_write` is superuser-or-owner and an `Event` with `user=None` is writable by admins only. Tests:
+`eventlog/tests/test_integration_activity.py`, `eventlog/tests/test_integration_api_middleware.py`, `eventlog/tests/test_models.py`.

@@ -18,6 +18,7 @@ class Command(BaseCommand):
         annotation migration 0102, but the queryable somatic_tier / highest_oncogenicity columns are
         only written by imports from 0176 on. Derives them for the versions already loaded.
     """
+    category = "one-off"
 
     def add_arguments(self, parser):
         parser.add_argument('--clinvar-version', type=int,

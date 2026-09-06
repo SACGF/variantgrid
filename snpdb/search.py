@@ -1,3 +1,11 @@
+"""
+The search engine: SearchInput sends search_signal, every function decorated with
+`@search_receiver(...)` answers with a SearchResponse, and SearchResponsesCombined ranks and merges
+them (single_preferred_result is the auto-jump). The decorator owns the shared behaviour - admin
+gating, preview_enabled, the regex pattern, result caps, error capture and the variant-to-allele
+conversion under settings.PREFER_ALLELE_LINKS. Receivers live in each app's signals/ package
+(snpdb/signals/variant_search.py is the largest) and register on import.
+"""
 import itertools
 import logging
 import operator

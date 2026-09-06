@@ -16,6 +16,8 @@ from snpdb.variant_zygosity_count import (
 
 
 class Command(BaseCommand):
+    category = "one-off"
+
     def add_arguments(self, parser):
         parser.add_argument('--name', required=True, help="Variant Zygosity Count Collection name")
         parser.add_argument('--clear', action='store_true')

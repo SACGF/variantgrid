@@ -1,3 +1,11 @@
+"""
+GuardianPermissionsMixin: the object-permission API every user-owned model exposes - can_view,
+can_write, check_can_write, get_for_user, filter_for_user, filter_writable_for_user - over
+django-guardian read/write perms, with get_permission_class / get_permission_object for models
+that delegate to another object's permissions. GuardianPermissionsAutoInitialSaveMixin grants the
+owner's initial groups on first save. filter_for_user resolves pks on the bare model, so pass an
+annotated queryset as `queryset=` rather than the class.
+"""
 from typing import Union
 
 from django.conf import settings

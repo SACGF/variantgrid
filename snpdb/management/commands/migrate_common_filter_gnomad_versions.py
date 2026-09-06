@@ -33,6 +33,8 @@ BATCH_SIZE = 1000
 
 
 class Command(BaseCommand):
+    category = "one-off"
+
     def add_arguments(self, parser):
         parser.add_argument('--genome-build', help="Only process this genome build (default: all in settings)")
         parser.add_argument('--dry-run', action='store_true',

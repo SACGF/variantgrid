@@ -1,3 +1,9 @@
+"""
+Ordered pathogenicity scales for the prediction columns VEP and dbNSFP fill: AbstractPathogenicity
+subclasses (impact, SIFT, PolyPhen2, MutationTaster, FATHMM, MutationAssessor and the rest) declare
+CHOICES in ascending order of damage so filters can say 'at least this bad'. Keep that order when
+adding a value.
+"""
 from django.db import models
 from django.db.models.query_utils import Q
 

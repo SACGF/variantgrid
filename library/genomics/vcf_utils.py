@@ -1,3 +1,9 @@
+"""
+VCF reading and writing helpers shared by import and export: iterate cyvcf2 records as
+VariantCoordinates, detect the caller and version from the header, VCFSortChecker (streaming
+sort check), vcf_get_ref_alt_svlen_and_modification (undo bcftools norm's old-record tag), contig
+header lines per build, write_cleaned_vcf_header and a last-resort INFO column parser.
+"""
 import logging
 import operator
 import os

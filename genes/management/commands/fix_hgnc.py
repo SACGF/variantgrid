@@ -14,6 +14,8 @@ Ensures:
 
 
 class Command(BaseCommand):
+    category = "one-off"
+
     def handle(self, *args, **options):
 
         # Make sure gene symbols are matched to genes in each release

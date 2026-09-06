@@ -22,6 +22,7 @@ class RematchLevel(StrEnum):
 
 
 class Command(BaseCommand):
+    category = "maintenance"
 
     def add_arguments(self, parser):
         parser.add_argument('--link_unlinked', action='store_true',

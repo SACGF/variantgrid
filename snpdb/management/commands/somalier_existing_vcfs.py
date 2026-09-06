@@ -6,6 +6,8 @@ from snpdb.tasks.somalier_tasks import somalier_all_samples, somalier_vcf_id
 
 
 class Command(BaseCommand):
+    category = "one-off"
+
     def add_arguments(self, parser):
         parser.add_argument("--genome-build")
         parser.add_argument('--clear', action='store_true')

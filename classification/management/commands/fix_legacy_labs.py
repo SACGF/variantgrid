@@ -6,6 +6,7 @@ from snpdb.models import Lab, Organization
 
 
 class Command(BaseCommand):
+    category = "one-off"
 
     def add_arguments(self, parser):
         parser.add_argument('--delete', action='store_true', default=False)

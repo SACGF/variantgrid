@@ -41,7 +41,9 @@ Route by task. The app notes (`<app>/CLAUDE.md`) load automatically when you wor
 | writing a test | `claude/guides/testing.md` (fixture index) | `scripts/vg tests --explain` |
 | where a URL / task / signal / command lives | `claude/maps/*.md` (generated, never hand-edited) | `scripts/vg map --check` |
 
-`claude/research/<app>.md` are longer narratives from an earlier model; treat a claim there as a lead to verify, not a fact.
+`claude/research/<app>.md` are the longer narratives - flows, why, history, traps - each with a `Verified against <sha>` header
+and citations that `scripts/vg docs check` keeps live. A research doc still without that header is from an earlier model:
+treat a claim there as a lead to verify, not a fact.
 Deeper still: `<app>/__<app>_readme.md`. Plans live in `claude/plans/`, runbooks in `claude/runbooks/`, mockups in
 `claude/mockups/`; `claude/plans/agent_system.md` is the design behind `vg`, the maps and these notes.
 
@@ -62,9 +64,13 @@ Row counts, data roots, logs and the deploy procedure are in `claude/guides/oper
 
 ```bash
 python3 manage.py vg status                       # what is running: db, VAV per build, services, queues, errors, disk
+python3 manage.py vg inspect variant 123          # one object's whole graph by domain kind (allele, sample, vcf,
+                                                  #   classification, analysis, gene, transcript, user, lab); --json
 python3 manage.py vg settings NAME [--diff]       # resolved value and every settings file that assigned it
 scripts/vg outline <file.py> [--min-lines N]      # classes/functions with line numbers, no Django boot
+scripts/vg outline --coverage                     # module docstring coverage per package (the ratchet)
 scripts/vg tests --explain [--run]                # only the test modules a change puts at risk
+scripts/vg docs check [doc.md]                    # every path / path:Symbol citation in the docs resolves; CI runs it
 python3 manage.py vg page /variantopedia/dashboard --queries   # render a page as claude_agent: status, outline, N+1s
 scripts/vg map [--check]                          # regenerate claude/maps/*.md; --check is what CI runs
 python3 manage.py test --keepdb [label]           # --keepdb always; whole suite: --parallel 4 (~2 min)
@@ -204,7 +210,9 @@ When asked to draft a prompt for an agent to implement a plan in another convers
 1. `scripts/vg tests --explain` names the tests at risk and they pass; the ones kept earn their keep (Testing, above).
 2. A new module has a docstring stating what it owns and its entry points. A gotcha learned the hard way is one line in
    the app's `CLAUDE.md`, next to the code it is about - not a memory, not this file.
-3. `scripts/vg map --check` passes when a model, URL, task, signal, setting or command changed (CI enforces it).
+3. `scripts/vg map --check` passes when a model, URL, task, signal, setting or command changed, and `scripts/vg docs check`
+   passes after any doc edit (CI enforces both). A citation is a repo path or `snpdb/models/models_variant.py:Variant`-style path:Symbol in backticks; a plan is checked while
+   its `Status:` is draft, approved or in progress.
 4. The plan file's `Status:` line records the outcome; a landed plan whose knowledge has moved into docs is deleted.
 5. The report-back ends with what the next agent should know, one to three lines; a durable project fact among them goes
    into the repo in the same change.

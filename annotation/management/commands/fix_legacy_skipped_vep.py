@@ -6,6 +6,8 @@ from annotation.vcf_files.import_vcf_annotations import handle_vep_skipped
 
 
 class Command(BaseCommand):
+    category = "one-off"
+
     def handle(self, *args, **options):
         for ar in AnnotationRun.objects.filter(vep_skipped_count__isnull=True):
             bulk_inserter = BulkVEPVCFAnnotationInserter(ar, validate_columns=False)

@@ -1,3 +1,7 @@
+"""
+Where an import pipeline's scratch files go: get_import_processing_dir / get_import_processing_filename
+under settings.PRIVATE_DATA_ROOT, keyed on the pipeline pk.
+"""
 import os
 
 from django.conf import settings

@@ -5,6 +5,7 @@ from genes.hgvs import HGVSMatcher
 
 
 class Command(BaseCommand):
+    category = "dev"
 
     def handle(self, *args, **options):
         vc: Classification

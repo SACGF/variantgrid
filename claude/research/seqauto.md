@@ -188,7 +188,7 @@ FastQC report metrics for a FASTQ file.
 - `filtered_sequences`: Filtered sequence count
 - `gc`: GC content percentage
 
-Parsed from `fastqc_data.txt` output files.
+Parsed from FastQC fastqc_data.txt output files.
 
 ### UnalignedReads
 
@@ -262,7 +262,7 @@ Groups all QC records for a single sample.
 
 ### QCExecSummary
 
-Comprehensive QC metrics parsed from an `exec_summary.txt` file. Contains 30+ numeric fields including:
+Comprehensive QC metrics parsed from an exec_summary.txt file. Contains 30+ numeric fields including:
 
 **Key fields:**
 - `deduplicated_reads`: Read count after deduplication

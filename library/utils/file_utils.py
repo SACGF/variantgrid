@@ -1,3 +1,8 @@
+"""
+File helpers: open_handle_gzip (plain or gzipped by extension), IteratorFile / StashFile for
+streaming writes and Postgres COPY, mk_path_for_file, name_from_filename, file permission fixes and
+the DiskUsage / get_disk_usage_for_directory checks that health checks and `vg status` use.
+"""
 import gzip
 import logging
 import os

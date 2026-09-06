@@ -1,3 +1,10 @@
+"""
+django-guardian plumbing: DjangoPermission builds the `app.read_model` / `app.write_model` permission
+strings, the standard groups (all_users_group, public_group, bot_group) and the `admin_bot` system
+user are looked up here, and assign_permission_to_user_and_groups grants a new object's read/write
+perms from the user's UserSettings initial groups (the one sanctioned import of snpdb from library).
+Models check permissions through library/django_utils/guardian_permissions_mixin.py, not directly here.
+"""
 from functools import lru_cache
 from typing import Union
 

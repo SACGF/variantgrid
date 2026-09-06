@@ -24,6 +24,7 @@ from snpdb.models.models_genome import GenomeBuild
 
 
 class Command(BaseCommand):
+    category = "one-off"
     help = "Dump/import a VCF to backfill VariantAnnotation columns (#1675)"
 
     def add_arguments(self, parser):

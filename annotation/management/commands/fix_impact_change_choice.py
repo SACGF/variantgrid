@@ -12,6 +12,8 @@ from annotation.models import (
 
 class Command(BaseCommand):
     """ Do this as a management command not migration so its not in a transaction (which got too big) """
+    category = "one-off"
+
     def add_arguments(self, parser):
         parser.add_argument('--small_updates', action='store_true',
                             help="Do update in small chunks (to reduce transaction size)")

@@ -202,6 +202,7 @@ class Command(BaseCommand):
         This can be re-triggered, but that may alter the classification's variant. This tool allows checking without
         altering the classification
     """
+    category = "maintenance"
 
     def _get_last_modified(self):
         qs = ImportedAlleleInfo.objects.all()

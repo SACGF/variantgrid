@@ -1,3 +1,9 @@
+"""
+The health check page and its Slack summary: an app answers health_check_signal with
+HealthCheckRecentActivity / HealthCheckTotalAmount / HealthCheckCapacity / HealthCheckAge stats
+for the HealthCheckRequest window, and populate_health_check gathers them into the notification.
+Uptime probes are library/uptime_check.py.
+"""
 import itertools
 from abc import ABC
 from dataclasses import dataclass

@@ -1,3 +1,9 @@
+"""
+Raw-SQL helpers: queryset_to_sql and get_queryset_select_from_where_parts turn a QuerySet into SQL
+text to embed in COPY / INSERT statements, dictfetchall / iter_dictfetchall / iter_db_results read
+cursors, sql_delete_qs deletes by a queryset's WHERE without loading rows (dangerous - read it first)
+and postgres_arrays formats array literals.
+"""
 import contextlib
 from collections.abc import Iterable
 from typing import Any, Optional

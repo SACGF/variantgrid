@@ -6,8 +6,10 @@ manage.py vg — introspection for driving VariantGrid from an agent or a termin
     vg tests [--changed] [--base REF] [--run] [--parallel N] [--explain]
     vg page <url-or-url-name> [--as USER] [--kwargs k=v ...] [--text|--html|--links|--forms|--json] [--queries]
     vg page --create-user
-    vg outline <file.py> [--min-lines N]
+    vg outline <file.py> [--min-lines N] | vg outline --coverage [package ...]
     vg settings [NAME] [--diff] [--json]
+    vg docs check [doc.md|dir ...] [--all-plans]
+    vg inspect <kind> <id> [--depth N] [--json]
 
 All logic lives in library/vg/; this file only parses arguments. See claude/plans/agent_system.md §4.2.
 """
@@ -23,7 +25,9 @@ from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 
 from library.vg import maps
-from library.vg.outline import outline, render_outline
+from library.vg.docs import check_docs, render_report
+from library.vg.inspect import KINDS, inspect, render_inspection
+from library.vg.outline import outline, render_coverage, render_outline
 from library.vg.page import AgentUserMissing, create_agent_user, render_page
 from library.vg.repo import REPO_ROOT
 from library.vg.settings_chain import (
@@ -78,8 +82,20 @@ class Command(BaseCommand):
         output.add_argument("--json", action="store_true", help="Everything as JSON")
 
         outline_parser = subparsers.add_parser("outline", help="Classes/functions of a module with line numbers and doc lines")
-        outline_parser.add_argument("file")
+        outline_parser.add_argument("file", nargs="*", help="Module to outline (or packages, with --coverage)")
         outline_parser.add_argument("--min-lines", type=int, default=0, help="Hide methods shorter than this")
+        outline_parser.add_argument("--coverage", action="store_true", help="Module docstring coverage per package")
+
+        docs_parser = subparsers.add_parser("docs", help="Check that every path / path:Symbol citation in the docs resolves")
+        docs_parser.add_argument("action", choices=["check"])
+        docs_parser.add_argument("paths", nargs="*", help="Docs or directories to check (default: all agent docs)")
+        docs_parser.add_argument("--all-plans", action="store_true", help="Also check landed / superseded / unstatused plans")
+
+        inspect_parser = subparsers.add_parser("inspect", help="An object's whole graph by domain kind: " + ", ".join(KINDS))
+        inspect_parser.add_argument("kind", choices=list(KINDS))
+        inspect_parser.add_argument("key", help="pk, or a natural key (CA id, gene symbol, transcript accession, username, lab group name)")
+        inspect_parser.add_argument("--depth", type=int, default=2, help="How far to follow relations (default 2)")
+        inspect_parser.add_argument("--json", action="store_true")
 
         settings_parser = subparsers.add_parser("settings", help="Resolved value of a setting and every file that assigned it")
         settings_parser.add_argument("name", nargs="?", help="Setting name; omit to list the settings chain for this box")
@@ -181,11 +197,33 @@ class Command(BaseCommand):
 
     # --- outline ---
 
-    def handle_outline(self, file, min_lines, **_):
-        path = Path(file)
+    def handle_outline(self, file, min_lines, coverage, **_):
+        if coverage:
+            self.stdout.write(render_coverage(file or None))
+            return
+        if not file:
+            raise CommandError("Give a module to outline, or --coverage")
+        path = Path(file[0])
         if not path.exists():
-            raise CommandError(f"No such file: {file}")
+            raise CommandError(f"No such file: {file[0]}")
         self.stdout.write(render_outline(path.relative_to(REPO_ROOT) if path.is_absolute() else path, outline(path), min_lines))
+
+    # --- docs ---
+
+    def handle_docs(self, paths, all_plans, **_):
+        report = check_docs(paths or None, all_plans=all_plans)
+        self.stdout.write(render_report(report))
+        if not report.ok:
+            raise CommandError(f"{len(report.dead)} dead citation(s)")
+
+    # --- inspect ---
+
+    def handle_inspect(self, kind, key, depth, json: bool, **_):  # pylint: disable=redefined-outer-name
+        try:
+            inspection = inspect(kind, key, depth=depth)
+        except LookupError as e:
+            raise CommandError(str(e)) from e
+        self.stdout.write(_json_dumps(inspection) if json else render_inspection(inspection))
 
     # --- settings ---
 

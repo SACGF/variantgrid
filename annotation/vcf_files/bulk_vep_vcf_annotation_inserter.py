@@ -1,3 +1,11 @@
+"""
+Loading a VEP-annotated VCF into the annotation tables. BulkVEPVCFAnnotationInserter reads the CSQ
+field through the VEPColumnDef registry (vep_columns.py) into CSVs for COPY, choosing the
+representative transcript row for VariantAnnotation and every transcript for
+VariantTranscriptAnnotation, adding the PTC / NMD columns (add_calculated_ptc) and gene overlaps;
+SVOverlapProcessor and SVGeneOverlapResolver handle the structural variants VEP skipped or annotated
+via --custom. Runs inside an AnnotationRun's upload step.
+"""
 import logging
 import operator
 import os

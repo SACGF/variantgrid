@@ -1,7 +1,7 @@
 """
 Tests for the DB-free parts of `manage.py vg` (library/vg): import resolution, test selection rules,
-the AST parsers behind the tasks / signals / settings maps, Markdown rendering, module outlines and the
-settings chain.
+the AST parsers behind the tasks / signals / settings maps, Markdown rendering, module outlines, the
+settings chain, doc citation checking and the inspect renderer.
 """
 import ast
 import tempfile
@@ -9,6 +9,8 @@ from pathlib import Path
 
 from django.test import SimpleTestCase
 
+from library.vg import docs
+from library.vg import inspect as inspect_pkg
 from library.vg.import_graph import (
     ImportGraph,
     iter_import_statements,
@@ -20,6 +22,7 @@ from library.vg.maps import signals as signals_map
 from library.vg.maps import tasks as tasks_map
 from library.vg.markdown import MapTable, render_markdown
 from library.vg.outline import module_doc, outline, render_outline
+from library.vg.repo import REPO_ROOT
 from library.vg.settings_chain import (
     assignments,
     flattened_hostname,
@@ -197,3 +200,81 @@ class SettingsChainTest(SimpleTestCase):
         self.assertEqual(found[0].path.name, "annotation_settings.py")
         self.assertFalse(found[0].mutated)
         self.assertTrue(all(a.mutated for a in found if a.path.name == "vgtest2.py"))
+
+
+class DocsCheckTest(SimpleTestCase):
+    """ `vg docs check`: what counts as a citation and how one resolves (library/vg/docs.py) """
+
+    def _doc(self, text: str, directory=None) -> Path:
+        directory = directory or REPO_ROOT / "claude"
+        with tempfile.NamedTemporaryFile("w", suffix=".md", dir=directory, delete=False) as f:
+            f.write(text)
+        self.addCleanup(Path(f.name).unlink)
+        return Path(f.name)
+
+    def test_backticked_paths_and_symbols_are_citations_but_commands_and_urls_are_not(self):
+        doc = self._doc("See `snpdb/models/models_variant.py:Variant.get_contigs_q`, `library/vg/repo.py`, "
+                        "`claude/maps/models.md#snpdb`, `vg page /variantopedia/dashboard`, `settings.UNIT_TEST`, "
+                        "`org/lab`, `.scss` and [ops](guides/operations.md#scale).\n"
+                        "```\nsnpdb/does_not_exist.py\n```\n")
+        citations = docs.citations_in(doc)
+        self.assertEqual([c.text for c in citations],
+                         ["snpdb/models/models_variant.py:Variant.get_contigs_q", "library/vg/repo.py",
+                          "claude/maps/models.md#snpdb", "guides/operations.md#scale"])
+        self.assertEqual([docs.check_citation(c) for c in citations], [None] * 4)
+
+    def test_bare_module_symbol_and_relative_path_resolve_against_the_doc_directory(self):
+        doc = self._doc("Uses models/models_variant.py:Variant.REFERENCE_ALT and `vg/docs.py:check_docs`.",
+                        directory=REPO_ROOT / "snpdb")
+        citations = docs.citations_in(doc)
+        self.assertEqual([c.symbol for c in citations], ["check_docs", "Variant.REFERENCE_ALT"])
+        self.assertEqual(docs.check_citation(citations[1]), None)          # relative to snpdb/
+        self.assertEqual(docs.check_citation(citations[0]), "no such file")  # library/vg is not under snpdb/
+
+    def test_dead_file_symbol_member_and_anchor_are_reported(self):
+        doc = self._doc("`snpdb/models/nope.py`, `library/vg/repo.py:no_such_function`, "
+                        "`library/vg/outline.py:OutlineEntry.no_member`, `claude/domain.md#no-such-heading`")
+        reasons = [docs.check_citation(c) for c in docs.citations_in(doc)]
+        self.assertEqual(reasons[0], "no such file")
+        self.assertEqual(reasons[1], "no top-level `no_such_function`")
+        self.assertEqual(reasons[2], "`OutlineEntry` has no member `no_member` defined in this module")
+        self.assertIn("no heading or anchor", reasons[3])
+
+    def test_bare_filename_resolves_anywhere_in_the_repo(self):
+        doc = self._doc("`default_settings.py` and `not_a_real_file_anywhere.py`")
+        reasons = [docs.check_citation(c) for c in docs.citations_in(doc)]
+        self.assertEqual(reasons, [None, "no such file"])
+
+    def test_only_live_plans_are_checked(self):
+        live = self._doc("Status: in progress\n`nope/missing.py`", directory=REPO_ROOT / "claude" / "plans")
+        landed = self._doc("Status: landed abc123\n`nope/missing.py`", directory=REPO_ROOT / "claude" / "plans")
+        report = docs.check_docs([live, landed])
+        self.assertEqual(len(report.dead), 1)
+        self.assertEqual(list(report.unchecked_plans.values()), ["landed abc123"])
+        self.assertEqual(len(docs.check_docs([live, landed], all_plans=True).dead), 2)
+
+
+class InspectRenderTest(SimpleTestCase):
+    """ The shared `vg inspect` renderer and list cap (library/vg/inspect/__init__.py) """
+
+    def test_capped_list_carries_truncated_count(self):
+        result = inspect_pkg.capped(list(range(15)), lambda x: x, cap=10)
+        self.assertEqual((result["count"], len(result["items"]), result["truncated"]), (15, 10, 5))
+        self.assertNotIn("truncated", inspect_pkg.capped([1, 2], lambda x: x))
+
+    def test_render_shows_refs_inline_and_truncation_in_the_heading(self):
+        data = {"kind": "variant", "id": 1, "variant": "1:965125 G>C", "svlen": None,
+                "allele": {"kind": "allele", "id": 9, "label": "Allele 9"},
+                "annotation": {"GRCh38": {"vav": 8, "gene": "KLHL17", "gnomad_af": 0.257811}},
+                "samples": {"count": 12, "items": [{"kind": "sample", "id": 4, "label": "s4", "zygosity": "E"}], "truncated": 11}}
+        rendered = inspect_pkg.render_inspection(data)
+        self.assertNotIn("kind: variant", rendered)
+        self.assertIn("svlen: -", rendered)
+        self.assertIn("allele: allele 9  Allele 9", rendered)
+        self.assertIn("gnomad_af=0.2578", rendered)
+        self.assertIn("samples (12)  showing 1, 11 more", rendered)
+        self.assertIn("  - sample 4  s4, zygosity=E", rendered)
+
+    def test_unknown_kind_is_a_lookup_error(self):
+        with self.assertRaises(LookupError):
+            inspect_pkg.inspect("planet", "1")

@@ -1,3 +1,9 @@
+"""
+Enums for analyses and nodes: NodeStatus (the load lifecycle, with LOADING / CLAIMABLE / ERROR
+sets the scheduler reads), the inheritance modes for Trio, Quad and Duo nodes, set and group
+operations, tag-node modes, node error sources and colours. Stored codes: add values, never
+renumber.
+"""
 import operator
 from functools import reduce
 

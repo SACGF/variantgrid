@@ -1,3 +1,9 @@
+"""
+Pedigrees over PED files: PedFile / PedFileFamily / PedFileRecord hold the parsed file, Pedigree links
+a family to a Cohort through CohortSamplePedFileRecord (one per record, or the pedigree is invalid -
+see validate), and create_automatch_pedigree builds one by matching sample names. Trio / Duo / Quad in
+snpdb are the fixed-shape alternatives.
+"""
 from collections.abc import Iterable
 
 from django.contrib.auth.models import User

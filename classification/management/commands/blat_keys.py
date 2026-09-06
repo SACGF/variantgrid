@@ -22,6 +22,7 @@ from library.utils import local_date_string
 
 
 class Command(BaseCommand):
+    category = "maintenance"
     EMPTY_MIGRATION_LINES = 14
 
     def add_arguments(self, parser):

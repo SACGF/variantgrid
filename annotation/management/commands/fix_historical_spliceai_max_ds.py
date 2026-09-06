@@ -7,6 +7,7 @@ from annotation.models.models import VariantAnnotation, VariantAnnotationVersion
 
 
 class Command(BaseCommand):
+    category = "one-off"
     help = ("Backfill VariantAnnotation.spliceai_max_ds. Idempotent. "
             "By default only processes ACTIVE (latest/current) versions per genome build - "
             "historical versions are archived or use the slower DamageNode fallback. "

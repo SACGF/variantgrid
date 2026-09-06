@@ -1,3 +1,10 @@
+"""
+Hover previews and search summaries: a model implements PreviewModelMixin (preview_category,
+preview_icon, preview) and returns PreviewData; other apps add rows with
+`@receiver(preview_extra_signal, sender=Model)` returning PreviewKeyValue. SvgSymbolPreviewIconMixin
+is for icons FontAwesome lacks (pedigree shapes). PreviewRequest resolves a `category:pk` from the
+search page into the same PreviewData.
+"""
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime

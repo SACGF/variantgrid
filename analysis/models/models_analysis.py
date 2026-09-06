@@ -1,3 +1,10 @@
+"""
+Analysis (a DAG of nodes over one build and AnnotationVersion, Guardian-permissioned, with a
+version that invalidates every node cache) and its template machinery: AnalysisTemplate /
+AnalysisTemplateVersion snapshot an analysis, AnalysisVariable exposes node fields as parameters,
+AnalysisTemplateRun records a run and its arguments, and Sample/CohortAnalysisTemplateRun plus
+AutoLaunchAnalysisTemplate drive the auto-analyses on import. Nodes are in nodes/analysis_node.py.
+"""
 from collections import defaultdict
 from datetime import datetime, timedelta
 from functools import cached_property

@@ -12,6 +12,8 @@ class Command(BaseCommand):
     """
 
     """
+    category = "one-off"
+
     @staticmethod
     def fix_csv(csv_file, fixed_csv_filename):
         reader = csv.reader(csv_file.read().decode('utf-8').splitlines(), dialect='excel', escapechar='\\',
