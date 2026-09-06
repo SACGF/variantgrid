@@ -6,6 +6,7 @@ biopython>=1.81
 cdot>=0.2.31
 celery
 ConfigArgParse
+dataclasses-json
 crispy-bootstrap4
 cryptography>=50.0.0
 cyvcf2>=0.30.14

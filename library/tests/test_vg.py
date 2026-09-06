@@ -1,6 +1,7 @@
 """
 Tests for the DB-free parts of `manage.py vg` (library/vg): import resolution, test selection rules,
-the AST parsers behind the tasks / signals / settings maps, and Markdown rendering.
+the AST parsers behind the tasks / signals / settings maps, Markdown rendering, module outlines and the
+settings chain.
 """
 import ast
 import tempfile
@@ -18,6 +19,14 @@ from library.vg.maps import settings as settings_map
 from library.vg.maps import signals as signals_map
 from library.vg.maps import tasks as tasks_map
 from library.vg.markdown import MapTable, render_markdown
+from library.vg.outline import module_doc, outline, render_outline
+from library.vg.settings_chain import (
+    assignments,
+    flattened_hostname,
+    resolved_settings_module,
+    settings_chain,
+    trail,
+)
 from library.vg.test_selection import select_tests
 
 
@@ -135,3 +144,56 @@ class MarkdownTest(SimpleTestCase):
     def test_empty_table_renders_placeholder(self):
         rendered = render_markdown("h", "intro", [MapTable(title="Empty", columns=["A"])])
         self.assertIn("(none)", rendered)
+
+
+class OutlineTest(SimpleTestCase):
+
+    def test_outline_lists_classes_methods_and_first_doc_line(self):
+        source = ('"""Module doc.\n\nMore."""\n\nclass Variant(models.Model):\n    """Variants represent alleles.\n\n    Long."""\n'
+                  "    def save(self):\n        pass\n\n    def _q(self):\n        def inner():\n            pass\n\n"
+                  "def helper():\n    return 1\n")
+        with tempfile.NamedTemporaryFile("w", suffix=".py", delete=False) as f:
+            f.write(source)
+        entries = outline(f.name)
+        self.assertEqual([(e.kind, e.name, e.depth) for e in entries],
+                         [("class", "Variant", 0), ("def", "save", 1), ("def", "_q", 1), ("def", "helper", 0)])
+        self.assertEqual(entries[0].doc, "Variants represent alleles.")
+        self.assertEqual(entries[0].bases, ["models.Model"])
+        self.assertEqual(module_doc(f.name), "Module doc.")
+        rendered = render_outline(f.name, entries, min_lines=3)
+        self.assertNotIn(" def save", rendered)   # 2-line method hidden by min_lines
+        self.assertIn("def helper", rendered)      # module level is never hidden
+
+
+class SettingsChainTest(SimpleTestCase):
+
+    def test_flattened_hostname_matches_settings_init(self):
+        self.assertEqual(flattened_hostname("vg-test2"), "vgtest2")
+        self.assertEqual(flattened_hostname("Shariant.Prod.local"), "shariant")
+        self.assertEqual(flattened_hostname("1box"), "s1box")
+
+    def test_explicit_settings_module_wins_over_hostname(self):
+        self.assertEqual(resolved_settings_module({"DJANGO_SETTINGS_MODULE": "variantgrid.settings.env.github_actions"}),
+                         "variantgrid.settings.env.github_actions")
+
+    def test_chain_is_post_order_of_star_imports(self):
+        chain = [p.name for p in settings_chain("variantgrid.settings.env.github_actions")]
+        self.assertEqual(chain[-1], "github_actions.py")
+        self.assertIn("default_settings.py", chain)
+        self.assertLess(chain.index("default_settings.py"), chain.index("github_actions.py"))
+        self.assertEqual(len(chain), len(set(chain)))
+
+    def test_assignments_inside_if_and_try_blocks_are_module_level(self):
+        source = ("if UNIT_TEST:\n    BROKER = 'memory://'\nelse:\n    BROKER = get_secret('x')\n"
+                  "try:\n    import thing\n    HAS_THING = True\nexcept ImportError:\n    HAS_THING = False\n"
+                  "def f():\n    NOT_A_SETTING = 1\n")
+        with tempfile.NamedTemporaryFile("w", suffix=".py", delete=False) as f:
+            f.write(source)
+        names = [(name, a.lineno, a.mutated) for name, a in assignments(Path(f.name))]
+        self.assertEqual(names, [("BROKER", 2, False), ("BROKER", 4, False), ("HAS_THING", 7, False), ("HAS_THING", 9, False)])
+
+    def test_trail_orders_component_before_env_and_marks_mutation(self):
+        found = trail("ANNOTATION", "variantgrid.settings.env.vgtest2")
+        self.assertEqual(found[0].path.name, "annotation_settings.py")
+        self.assertFalse(found[0].mutated)
+        self.assertTrue(all(a.mutated for a in found if a.path.name == "vgtest2.py"))

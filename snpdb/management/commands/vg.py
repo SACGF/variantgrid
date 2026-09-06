@@ -1,35 +1,52 @@
 """
 manage.py vg — introspection for driving VariantGrid from an agent or a terminal.
 
+    vg status [--json]
     vg map [models|urls|commands|tasks|signals|settings|all] [--check] [--json] [--app X] [--counts]
     vg tests [--changed] [--base REF] [--run] [--parallel N] [--explain]
     vg page <url-or-url-name> [--as USER] [--kwargs k=v ...] [--text|--html|--links|--forms|--json] [--queries]
     vg page --create-user
+    vg outline <file.py> [--min-lines N]
+    vg settings [NAME] [--diff] [--json]
 
 All logic lives in library/vg/; this file only parses arguments. See claude/plans/agent_system.md §4.2.
 """
 import json
 import os
+import re
 import subprocess
 import sys
 from dataclasses import asdict
+from pathlib import Path
 
+from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 
 from library.vg import maps
+from library.vg.outline import outline, render_outline
 from library.vg.page import AgentUserMissing, create_agent_user, render_page
 from library.vg.repo import REPO_ROOT
+from library.vg.settings_chain import (
+    names_assigned_in,
+    resolved_settings_module,
+    settings_chain,
+    trail,
+)
+from library.vg.status import gather_status, render_status
 from library.vg.test_selection import select_tests
 
 MAP_CHOICES = [*maps.MAP_GENERATORS, "all"]
 
 
 class Command(BaseCommand):
-    help = "Agent introspection: generated maps, changed-file test selection, page rendering"
+    help = "Agent introspection: box status, generated maps, changed-file test selection, page rendering, outlines, settings"
     category = "dev"
 
     def add_arguments(self, parser):
         subparsers = parser.add_subparsers(dest="subcommand", required=True)
+
+        status_parser = subparsers.add_parser("status", help="What is running on this box: db, builds, services, queues, errors")
+        status_parser.add_argument("--json", action="store_true")
 
         map_parser = subparsers.add_parser("map", help="Generate claude/maps/*.md (or --check them)")
         map_parser.add_argument("name", nargs="?", default="all", choices=MAP_CHOICES)
@@ -60,8 +77,23 @@ class Command(BaseCommand):
         output.add_argument("--forms", action="store_true", help="Forms and their fields")
         output.add_argument("--json", action="store_true", help="Everything as JSON")
 
+        outline_parser = subparsers.add_parser("outline", help="Classes/functions of a module with line numbers and doc lines")
+        outline_parser.add_argument("file")
+        outline_parser.add_argument("--min-lines", type=int, default=0, help="Hide methods shorter than this")
+
+        settings_parser = subparsers.add_parser("settings", help="Resolved value of a setting and every file that assigned it")
+        settings_parser.add_argument("name", nargs="?", help="Setting name; omit to list the settings chain for this box")
+        settings_parser.add_argument("--diff", action="store_true", help="List the settings this box's env file overrides")
+        settings_parser.add_argument("--json", action="store_true")
+
     def handle(self, *args, **options):
         getattr(self, f"handle_{options['subcommand']}")(**options)
+
+    # --- status ---
+
+    def handle_status(self, json: bool, **_):  # pylint: disable=redefined-outer-name
+        status = gather_status()
+        self.stdout.write(_json_dumps(asdict(status)) if json else render_status(status))
 
     # --- map ---
 
@@ -146,6 +178,77 @@ class Command(BaseCommand):
             self.stdout.write(f"queries: {result.production_queries} production ({result.total_queries} total)")
             for sql, n in result.repeated[:10]:
                 self.stdout.write(f"  x{n}: {sql[:200]}")
+
+    # --- outline ---
+
+    def handle_outline(self, file, min_lines, **_):
+        path = Path(file)
+        if not path.exists():
+            raise CommandError(f"No such file: {file}")
+        self.stdout.write(render_outline(path.relative_to(REPO_ROOT) if path.is_absolute() else path, outline(path), min_lines))
+
+    # --- settings ---
+
+    def handle_settings(self, name, diff, json: bool, **_):  # pylint: disable=redefined-outer-name
+        module = resolved_settings_module()
+        chain = settings_chain(module)
+        if not chain:
+            raise CommandError(f"{module} is not a file under variantgrid/settings/, so there is no chain to walk")
+        if diff:
+            env_path = chain[-1]
+            overridden = names_assigned_in(env_path)
+            if json:
+                self.stdout.write(_json_dumps({"module": module, "file": str(env_path.relative_to(REPO_ROOT)),
+                                               "overrides": {n: _setting_repr(n) for n in overridden}}))
+            else:
+                self.stdout.write(f"{env_path.relative_to(REPO_ROOT)} sets or mutates {len(overridden)} settings:")
+                for setting_name in overridden:
+                    self.stdout.write(f"  {setting_name} = {_setting_repr(setting_name)}")
+            return
+        if not name:
+            self.stdout.write(f"DJANGO_SETTINGS_MODULE resolves to {module}; assignments take effect in this order:")
+            for path in chain:
+                self.stdout.write(f"  {path.relative_to(REPO_ROOT)}")
+            return
+        name = name.upper()
+        found = trail(name, module)
+        if json:
+            self.stdout.write(_json_dumps({"name": name, "value": _setting_repr(name),
+                                           "trail": [{"file": a.label, "mutated": a.mutated, "source": a.source} for a in found]}))
+            return
+        self.stdout.write(f"{name} = {_setting_repr(name)}")
+        if not found:
+            self.stdout.write("  (no assignment found in variantgrid/settings/ - a Django default, or set outside the package)")
+        for assignment in found:
+            self.stdout.write(f"  {assignment.label}  {'~ ' if assignment.mutated else ''}{assignment.source}")
+
+
+_SECRET_MARKERS = ("SECRET", "PASSWORD", "TOKEN", "KEY", "CREDENTIAL")
+_URL_CREDENTIALS_RE = re.compile(r"://[^/@\s]+:[^/@\s]+@")
+
+
+def _is_secret_name(name: str) -> bool:
+    return any(marker in name.upper() for marker in _SECRET_MARKERS)
+
+
+def _mask(value):
+    """ Hides secret-looking dict keys at any depth and credentials embedded in URLs """
+    if isinstance(value, dict):
+        return {k: "(hidden)" if isinstance(k, str) and _is_secret_name(k) else _mask(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return type(value)(_mask(v) for v in value)
+    if isinstance(value, str):
+        return _URL_CREDENTIALS_RE.sub("://***@", value)
+    return value
+
+
+def _setting_repr(name: str, limit: int = 400) -> str:
+    if not hasattr(settings, name):
+        return "(not set)"
+    if _is_secret_name(name):
+        return "(secret, hidden)"
+    value = repr(_mask(getattr(settings, name)))
+    return value if len(value) <= limit else value[:limit] + f"… ({len(value)} chars)"
 
 
 def _json_dumps(data) -> str:

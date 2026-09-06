@@ -3,6 +3,7 @@
 Written by Claude Fable 5 (claude-fable-5), 2026-08-31
 
 Issue: https://github.com/SACGF/variantgrid/issues/1816
+Status: in progress - Phase 1 landed 4e1a406fb (2026-09-02); Phase 0 landed 2026-09-06; Phase 2 next. See §6.1.
 
 This is written from the driver's seat: what I, as the agent doing most of the commits on this repo,
 would need to understand a situation accurately, act on it with confidence, verify cheaply, and leave the
@@ -429,6 +430,23 @@ fail on regressions for the cheap ones (dead citations, stale maps) once they re
 - Module contract docstrings for the top-80 fan-in modules.
 - Skills (`vg-plan`, `vg-implement`, `vg-research`, `vg-run`) and the two subagents.
 - `create_fake_data vcf | classifications | analysis`.
+
+### 6.1 Progress
+
+- **Phase 1 landed first** (4e1a406fb, 2026-09-02): `vg map` (six maps, `--check` in the DB-free `agent-maps.yml` job),
+  `vg page --queries` with the `claude_agent` user, `vg tests --changed` over the AST import graph (`scripts/vg` runs it
+  without Django), `--parallel 4 --keepdb` proven (2,741 tests in ~2 min, now what CI runs), eight `<app>/CLAUDE.md`
+  notes and `claude/guides/testing.md`. Drafting the notes surfaced ~40 stale claims in `claude/research/*.md` (field
+  names, removed models, split views) - those docs are the Phase 2 "narrative + Verified against" rewrite, and root
+  CLAUDE.md tells readers to treat them as leads until then.
+- **Phase 0 landed second** (2026-09-06): root `CLAUDE.md` restructured to the Appendix B shape (Start here, This box,
+  Definition of done, Memory policy; detail moved to the app notes and `claude/guides/operations.md`);
+  `.claude/settings.json` with the edit hook (ruff / eslint / SCSS reminder), the Bash guard (confirmation prompt with a
+  reason for restarts, migrate, annotation and destructive git/SQL), the SessionStart orientation and the read-only
+  allowlist; `claude/domain.md` (~45 nouns); `claude/guides/operations.md` seeded from the four project memories, which
+  were then deleted; `vg status`, `vg outline`, `vg settings` (`library/vg/status.py`, `outline.py`, `settings_chain.py`).
+- **Phase 2 open items**: `vg inspect`, `vg logs`, `vg browse`, `vg sql --explain`, `vg docs check`, `vg health`, the
+  research-doc rewrite, top-80 module docstrings, skills and the two subagents, `create_fake_data vcf|classifications|analysis`.
 
 **Phase 3 — ongoing ratchets**
 - After the major deploy: retire finished one-off commands, squash migrations; categorise the commands

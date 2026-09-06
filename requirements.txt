@@ -100,6 +100,8 @@ cycler==0.12.1
     # via matplotlib
 cyvcf2==0.33.0
     # via -r requirements.in
+dataclasses-json==0.6.7
+    # via -r requirements.in
 decorator==5.3.1
     # via ipython
 deepdiff==9.1.0
@@ -295,6 +297,8 @@ markdown==3.10.2
     #   martor
 markdown-it-py==4.2.0
     # via rich
+marshmallow==3.26.2
+    # via dataclasses-json
 martor==1.8.1
     # via -r requirements.in
 matplotlib==3.11.0
@@ -316,7 +320,9 @@ msgspec==0.21.1
 mypy==2.1.0
     # via -r requirements.in
 mypy-extensions==1.1.0
-    # via mypy
+    # via
+    #   mypy
+    #   typing-inspect
 nameparser==1.2.0
     # via -r requirements.in
 networkx==3.6.1
@@ -347,6 +353,7 @@ packaging==26.2
     #   django-js-reverse
     #   gunicorn
     #   kombu
+    #   marshmallow
     #   matplotlib
     #   pytest
 pandas==3.0.3
@@ -546,7 +553,10 @@ typing-extensions==4.15.0
     #   pydantic
     #   pydantic-core
     #   referencing
+    #   typing-inspect
     #   typing-inspection
+typing-inspect==0.9.0
+    # via dataclasses-json
 typing-inspection==0.4.2
     # via pydantic
 tzdata==2026.2

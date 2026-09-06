@@ -30,14 +30,17 @@ class VariantGridTestRunner(DiscoverRunner):
             self._drop_test_db_clones()
         old_config = super().setup_databases(**kwargs)
         if self.keepdb:
-            self._check_kept_test_db_matches_disk()
+            self._check_kept_test_db_matches_disk([connection for connection, _old_name, _destroy in old_config])
         return old_config
 
-    def _check_kept_test_db_matches_disk(self):
+    def _check_kept_test_db_matches_disk(self, test_connections):
         """ --keepdb only migrates forwards: a migration applied while another branch was checked out keeps
             its schema and its django_migrations row after switching back, and the failures that causes
-            (IntegrityError on a column the model no longer has) look nothing like the cause. """
-        for connection in connections.all():
+            (IntegrityError on a column the model no longer has) look nothing like the cause.
+
+            Only the connections setup_databases actually pointed at a test database are checked: a run of
+            SimpleTestCase-only modules sets none up, and the real database keeps rows for apps long removed. """
+        for connection in test_connections:
             loader = MigrationLoader(connection)
             orphans = sorted(loader.applied_migrations.keys() - loader.disk_migrations.keys())
             if orphans:
