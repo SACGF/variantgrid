@@ -13,7 +13,7 @@ from analysis.tests.inheritance_node_mixin import make_cohort_genotype
 from analysis.variant_tag_operations import (
     VARIANT_TAG_CLASSIFIED,
     get_sample_for_variant_tag,
-    retire_requires_classification_tags_for_samples,
+    resolve_requires_classification_tags_for_samples,
 )
 from annotation.fake_annotation import create_fake_variants, get_fake_annotation_version
 from classification.enums import SpecialEKeys, SubmissionSource
@@ -62,59 +62,71 @@ class ClassifyReportTestCase(TestCase):
         assign_permission_to_user_and_groups(self.user, analysis)
         return analysis
 
+    def _create_cohort_analysis(self) -> Analysis:
+        """ Three samples and no proband - the tagging can't say who it's about """
+        analysis = self._create_analysis()
+        CohortNode.objects.create(analysis=analysis, cohort=self.cohort)
+        return analysis
+
     def _create_variant_tag(self, analysis=None, node=None, variant=None, sample=None) -> VariantTag:
         return VariantTag.objects.create(variant=variant or self.variant, tag=self.tag, sample=sample,
                                          genome_build=self.genome_build, analysis=analysis, node=node,
                                          user=self.user)
 
+    def _classify(self, sample, variant=None, **kwargs) -> Classification:
+        return Classification.create(user=self.user, lab=self.lab, sample=sample,
+                                     source=SubmissionSource.VARIANT_GRID,
+                                     variant=variant or self.variant, **kwargs)
+
 
 class VariantTagSampleTest(ClassifyReportTestCase):
-    """ Which sample a tagging is about, worked out without asking the user """
+    """ Which sample a tagging is about - the study's proband, not whoever happens to carry the variant """
 
-    def test_single_sample_node_gives_its_sample(self):
+    def test_node_proband_is_the_taggings_sample(self):
         analysis = self._create_analysis()
         node = SampleNode.objects.create(analysis=analysis, sample=self.mother)
         # The mother doesn't carry the variant - the node she was tagged in still says who it's about
         variant_tag = self._create_variant_tag(analysis=analysis, node=node)
         self.assertEqual(get_sample_for_variant_tag(variant_tag), self.mother)
 
-    def test_single_carrier_in_analysis(self):
-        analysis = self._create_analysis()
-        CohortNode.objects.create(analysis=analysis, cohort=self.cohort)
-        variant_tag = self._create_variant_tag(analysis=analysis)
-        self.assertEqual(get_sample_for_variant_tag(variant_tag), self.proband)
-
-    def test_two_carriers_stays_ambiguous(self):
-        analysis = self._create_analysis()
-        CohortNode.objects.create(analysis=analysis, cohort=self.cohort)
-        variant_tag = self._create_variant_tag(analysis=analysis, variant=self.shared_variant)
+    def test_cohort_node_has_no_proband(self):
+        analysis = self._create_cohort_analysis()
+        node = analysis.analysisnode_set.get()
+        # Only the proband carries it, but being the one carrier is not what makes it their to-do
+        variant_tag = self._create_variant_tag(analysis=analysis, node=node)
         self.assertIsNone(get_sample_for_variant_tag(variant_tag))
 
 
 class ClassifyQueueTest(ClassifyReportTestCase):
 
-    def _queue_variant_tags(self, sample=None) -> list[VariantTag]:
-        case = ClassifyReportCase.for_sample(self.user, sample or self.proband)
-        return [row.variant_tag for row in case.queue_rows()]
+    def _queue_rows(self, sample=None):
+        return ClassifyReportCase.for_sample(self.user, sample or self.proband).queue_rows()
 
-    def _classify(self, sample, variant=None) -> Classification:
-        return Classification.create(user=self.user, lab=self.lab, sample=sample,
-                                     source=SubmissionSource.VARIANT_GRID,
-                                     data={SpecialEKeys.CLINICAL_SIGNIFICANCE: {"value": "VUS"}},
-                                     variant=variant or self.variant)
+    def _queue_variant_tags(self, sample=None) -> list[VariantTag]:
+        return [row.variant_tag for row in self._queue_rows(sample)]
 
     def test_tag_with_sample_is_in_that_sample_queue(self):
         variant_tag = self._create_variant_tag(sample=self.proband)
         self.assertEqual(self._queue_variant_tags(), [variant_tag])
         self.assertEqual(self._queue_variant_tags(sample=self.mother), [])
 
-    def test_tag_resolved_through_its_analysis(self):
-        analysis = self._create_analysis()
-        CohortNode.objects.create(analysis=analysis, cohort=self.cohort)
+    def test_tag_without_a_sample_is_shown_to_carriers_for_them_to_choose(self):
+        analysis = self._create_cohort_analysis()
         variant_tag = self._create_variant_tag(analysis=analysis)
-        # The proband is the only carrier, so this is the proband's tag - not the mother's
-        self.assertEqual(self._queue_variant_tags(), [variant_tag])
+
+        rows = self._queue_rows()
+        self.assertEqual([row.variant_tag for row in rows], [variant_tag])
+        self.assertIsNone(rows[0].sample)
+        # The mother doesn't carry it, so it can't be about her
         self.assertEqual(self._queue_variant_tags(sample=self.mother), [])
+
+    def test_a_variant_several_relatives_carry_is_offered_to_each_of_them(self):
+        analysis = self._create_cohort_analysis()
+        variant_tag = self._create_variant_tag(analysis=analysis, variant=self.shared_variant)
+
+        for sample in (self.mother, self.father):
+            self.assertEqual(self._queue_variant_tags(sample=sample), [variant_tag])
+        self.assertEqual(self._queue_variant_tags(sample=self.proband), [])
 
     def test_tag_of_a_retired_tag_is_not_queued(self):
         self._create_variant_tag(sample=self.proband)
@@ -125,39 +137,53 @@ class ClassifyQueueTest(ClassifyReportTestCase):
         variant_tag = self._create_variant_tag(sample=self.proband)
         classification = self._classify(self.proband)
         classification.publish_latest(self.user)
+        resolve_requires_classification_tags_for_samples(classification, [self.proband], self.user)
 
-        rows = ClassifyReportCase.for_sample(self.user, self.proband).queue_rows()
+        rows = self._queue_rows()
         self.assertEqual([row.variant_tag for row in rows], [variant_tag])
         self.assertTrue(rows[0].done)
-        self.assertEqual(rows[0].classification, classification)
 
         classification.set_withdrawn(self.user, True)
-        rows = ClassifyReportCase.for_sample(self.user, self.proband).queue_rows()
-        self.assertFalse(rows[0].done)
+        self.assertFalse(self._queue_rows()[0].done)
+
+    def test_a_classification_nobody_has_matched_up_offers_the_button(self):
+        analysis = self._create_cohort_analysis()
+        self._create_variant_tag(analysis=analysis)
+        classification = self._classify(self.proband)
+        resolve_requires_classification_tags_for_samples(classification, [self.proband], self.user)
+
+        row = self._queue_rows()[0]
+        self.assertFalse(row.done)
+        self.assertTrue(row.can_resolve)
+        self.assertEqual(row.classification, classification)
 
     def test_another_samples_classification_does_not_clear_the_tag(self):
         self._create_variant_tag(sample=self.proband)
         classification = self._classify(self.mother)
         classification.publish_latest(self.user)
 
-        rows = ClassifyReportCase.for_sample(self.user, self.proband).queue_rows()
-        self.assertFalse(rows[0].done)
+        row = self._queue_rows()[0]
+        self.assertFalse(row.done)
+        self.assertFalse(row.can_resolve)
 
 
-class RetireRequiresClassificationTagsForSamplesTest(ClassifyReportTestCase):
+class ResolveRequiresClassificationTagsForSamplesTest(ClassifyReportTestCase):
 
-    def test_retires_the_case_tagging_with_an_audit_entry(self):
+    def test_resolves_the_case_tagging_with_an_audit_entry(self):
         analysis = self._create_analysis()
         variant_tag = self._create_variant_tag(analysis=analysis, sample=self.proband)
-        classification = Classification.create(user=self.user, lab=self.lab, sample=self.proband,
-                                               source=SubmissionSource.VARIANT_GRID, variant=self.variant)
+        classification = self._classify(self.proband)
 
-        retired = retire_requires_classification_tags_for_samples(classification, [self.proband], self.user)
+        resolved = resolve_requires_classification_tags_for_samples(classification, [self.proband], self.user)
 
-        self.assertEqual(retired, 1)
-        self.assertFalse(VariantTag.objects.filter(pk=variant_tag.pk).exists())
+        self.assertEqual([vt.pk for vt in resolved], [variant_tag.pk])
+        variant_tag.refresh_from_db()
+        self.assertTrue(variant_tag.is_resolved)
+        self.assertEqual(variant_tag.resolved_classification, classification)
+        self.assertEqual(variant_tag.resolved_by, self.user)
+
         log_entry = LogEntry.objects.filter(object_pk=str(variant_tag.pk),
-                                            action=LogEntry.Action.DELETE).first()
+                                            action=LogEntry.Action.UPDATE).first()
         self.assertIsNotNone(log_entry)
         self.assertEqual(log_entry.additional_data["operation"], VARIANT_TAG_CLASSIFIED)
         self.assertEqual(log_entry.additional_data["analysis_id"], analysis.pk)
@@ -165,13 +191,22 @@ class RetireRequiresClassificationTagsForSamplesTest(ClassifyReportTestCase):
 
     def test_leaves_another_cases_tagging_alone(self):
         variant_tag = self._create_variant_tag(sample=self.mother)
-        classification = Classification.create(user=self.user, lab=self.lab, sample=self.proband,
-                                               source=SubmissionSource.VARIANT_GRID, variant=self.variant)
+        classification = self._classify(self.proband)
 
-        retired = retire_requires_classification_tags_for_samples(classification, [self.proband], self.user)
+        self.assertEqual(resolve_requires_classification_tags_for_samples(classification, [self.proband],
+                                                                         self.user), [])
+        variant_tag.refresh_from_db()
+        self.assertFalse(variant_tag.is_resolved)
 
-        self.assertEqual(retired, 0)
-        self.assertTrue(VariantTag.objects.filter(pk=variant_tag.pk).exists())
+    def test_leaves_an_ambiguous_tagging_for_the_scientist(self):
+        analysis = self._create_cohort_analysis()
+        variant_tag = self._create_variant_tag(analysis=analysis)
+        classification = self._classify(self.proband)
+
+        self.assertEqual(resolve_requires_classification_tags_for_samples(classification, [self.proband],
+                                                                         self.user), [])
+        variant_tag.refresh_from_db()
+        self.assertFalse(variant_tag.is_resolved)
 
 
 @override_settings(CELERY_TASK_ALWAYS_EAGER=True, LIFTOVER_CLASSIFICATIONS=False,
@@ -183,9 +218,12 @@ class CreateClassificationForCaseTest(ClassifyReportTestCase):
         super().setUp()
         self.client.force_login(self.user)
         self.variant_tag = self._create_variant_tag(sample=self.proband)
-        self.url = reverse("create_classification_for_case",
-                           kwargs={"case_type": "sample", "case_id": self.proband.pk,
-                                   "variant_tag_id": self.variant_tag.pk})
+        self.url = self._classify_url(self.variant_tag)
+
+    def _classify_url(self, variant_tag) -> str:
+        return reverse("create_classification_for_case",
+                       kwargs={"case_type": "sample", "case_id": self.proband.pk,
+                               "variant_tag_id": variant_tag.pk})
 
     def _post_data(self, **kwargs) -> dict:
         data = {
@@ -209,10 +247,9 @@ class CreateClassificationForCaseTest(ClassifyReportTestCase):
         self.assertEqual(data["url"], classification.get_absolute_url())
 
     def test_copies_the_chosen_previous_classification(self):
-        previous = Classification.create(user=self.user, lab=self.lab, sample=self.mother,
-                                         source=SubmissionSource.VARIANT_GRID, variant=self.variant,
-                                         data={SpecialEKeys.CLINICAL_SIGNIFICANCE: {"value": "VUS"},
-                                               SpecialEKeys.INTERPRETATION_SUMMARY: {"value": "Seen before"}})
+        previous = self._classify(self.mother,
+                                  data={SpecialEKeys.CLINICAL_SIGNIFICANCE: {"value": "VUS"},
+                                        SpecialEKeys.INTERPRETATION_SUMMARY: {"value": "Seen before"}})
         previous.publish_latest(self.user)
 
         response = self.client.post(self.url, self._post_data(copy_from_vcm_id=previous.last_published_version.pk))
@@ -221,14 +258,32 @@ class CreateClassificationForCaseTest(ClassifyReportTestCase):
         classification = Classification.objects.get(pk=data["classification_id"])
         self.assertEqual(classification.get(SpecialEKeys.INTERPRETATION_SUMMARY), "Seen before")
 
-    def test_retires_the_tagging_it_satisfied(self):
-        self.client.post(self.url, self._post_data())
-        self.assertFalse(VariantTag.objects.filter(pk=self.variant_tag.pk).exists())
+    def test_clears_the_tagging_it_satisfied(self):
+        response = self.client.post(self.url, self._post_data())
+
+        self.assertTrue(json.loads(response.content)["resolved"])
+        self.variant_tag.refresh_from_db()
+        self.assertTrue(self.variant_tag.is_resolved)
+
+    def test_ambiguous_tagging_waits_for_the_button(self):
+        analysis = self._create_cohort_analysis()
+        variant_tag = self._create_variant_tag(analysis=analysis)
+
+        response = self.client.post(self._classify_url(variant_tag), self._post_data())
+
+        self.assertFalse(json.loads(response.content)["resolved"])
+        variant_tag.refresh_from_db()
+        self.assertFalse(variant_tag.is_resolved)
+
+        resolve_url = reverse("resolve_variant_tag_for_case",
+                              kwargs={"case_type": "sample", "case_id": self.proband.pk,
+                                      "variant_tag_id": variant_tag.pk})
+        self.assertEqual(self.client.post(resolve_url).status_code, 200)
+        variant_tag.refresh_from_db()
+        self.assertTrue(variant_tag.is_resolved)
 
     def test_dialog_offers_the_previous_classifications_of_the_allele(self):
-        previous = Classification.create(user=self.user, lab=self.lab, sample=self.mother,
-                                         source=SubmissionSource.VARIANT_GRID, variant=self.variant,
-                                         data={SpecialEKeys.CLINICAL_SIGNIFICANCE: {"value": "VUS"}})
+        previous = self._classify(self.mother, data={SpecialEKeys.CLINICAL_SIGNIFICANCE: {"value": "VUS"}})
         previous.publish_latest(self.user)
 
         url = reverse("classify_report_tag_dialog",
@@ -245,9 +300,7 @@ class CreateClassificationForCaseTest(ClassifyReportTestCase):
             name="test template",
             template="{% for group in gene_groups %}[{{ group.gene_symbol }}"
                      "={{ group.classifications|length }}]{% endfor %}")
-        classification = Classification.create(user=self.user, lab=self.lab, sample=self.proband,
-                                               source=SubmissionSource.VARIANT_GRID, variant=self.variant,
-                                               data={SpecialEKeys.GENE_SYMBOL: {"value": "RUNX1"}})
+        classification = self._classify(self.proband, data={SpecialEKeys.GENE_SYMBOL: {"value": "RUNX1"}})
         classification.publish_latest(self.user)
 
         url = reverse("multi_classification_report",
@@ -261,9 +314,7 @@ class CreateClassificationForCaseTest(ClassifyReportTestCase):
         self.assertContains(response, "[RUNX1=1]")
 
     def test_tab_lists_the_classifications_made_for_the_case(self):
-        classification = Classification.create(user=self.user, lab=self.lab, sample=self.proband,
-                                               source=SubmissionSource.VARIANT_GRID, variant=self.variant,
-                                               data={SpecialEKeys.GENE_SYMBOL: {"value": "RUNX1"}})
+        classification = self._classify(self.proband, data={SpecialEKeys.GENE_SYMBOL: {"value": "RUNX1"}})
         classification.publish_latest(self.user)
 
         response = self.client.get(reverse("sample_classify_report_tab", kwargs={"sample_id": self.proband.pk}))

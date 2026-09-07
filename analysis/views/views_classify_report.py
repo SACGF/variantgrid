@@ -6,8 +6,9 @@ and classification must not depend on analysis.
 
 @see analysis/classify_report.py for the queue itself.
 """
+from django.core.exceptions import PermissionDenied
 from django.http import Http404
-from django.http.response import HttpResponseBase
+from django.http.response import HttpResponseBase, JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.views.decorators.http import require_POST
 
@@ -16,7 +17,8 @@ from analysis.models import VariantTag
 from analysis.models.nodes.analysis_node import AnalysisClassification
 from analysis.variant_tag_operations import (
     get_sample_genotype_for_variant_tag,
-    retire_requires_classification_tags_for_samples,
+    resolve_requires_classification_tags_for_samples,
+    resolve_variant_tag,
 )
 from annotation.transcripts_annotation_selections import VariantTranscriptSelections
 from classification.models import Classification, ClassificationReportTemplate
@@ -113,8 +115,26 @@ def create_classification_for_case(request, case_type: str, case_id: int, varian
     if analysis := variant_tag.analysis:
         if analysis.can_write(request.user):
             AnalysisClassification.objects.create(analysis=analysis, classification=classification)
-    retire_requires_classification_tags_for_samples(classification, case.samples, request.user)
-    return classification_created_response(request, classification)
+    resolved = resolve_requires_classification_tags_for_samples(classification, case.samples, request.user)
+    # The queue row shows the link either way - unresolved it also offers the button that says this is the person
+    return classification_created_response(request, classification,
+                                           {"resolved": variant_tag.pk in {vt.pk for vt in resolved}})
+
+
+@require_POST
+def resolve_variant_tag_for_case(request, case_type: str, case_id: int, variant_tag_id: int) -> HttpResponseBase:
+    """ The scientist saying the case's classification is what this tagging was asking for - needed when the
+        tagging never knew whose it was, so it couldn't be resolved automatically """
+    case = _get_case(request.user, case_type, case_id)
+    variant_tag = VariantTag.get_for_user(request.user, variant_tag_id)
+    if not variant_tag.can_write(request.user):
+        raise PermissionDenied(f"You have read-only access to VariantTag {variant_tag_id}")
+
+    row = case.queue_row(variant_tag)
+    if row.classification is None:
+        raise Http404("This case has no classification for the tagged variant")
+    resolve_variant_tag(variant_tag, row.classification, request.user)
+    return JsonResponse({"resolved": True})
 
 
 @require_POST

@@ -3,12 +3,14 @@ The Classify & Report tab on the sample and patient pages - tags that are asking
 classifications made for the case, and what's needed to turn one into the other.
 
 A case is a set of samples (one for a sample page, the patient's samples for a patient page). A tagging is in
-the case's queue when its tag is in the classify queue vocabulary (Tag.requires_classification) and it resolves
-to one of the case's samples - either by its own sample FK, or by having been made in an analysis one of the
-case's samples is in and carrying the variant there.
+the case's queue when its tag is in the classify queue vocabulary (Tag.requires_classification) and it belongs
+to one of the case's samples - either by its own sample FK, or by having been made in an analysis whose proband
+is one of them.
 
-Whether a tagging is done is never stored on it - it's done once a classification for the same allele exists
-against one of the case's samples, so withdrawing that classification puts the tagging back in the queue.
+A tagging is done once it is resolved against a classification (@see analysis.variant_tag_operations), which
+happens by itself when the classification is of the tagging's own sample and by the row's button otherwise.
+The queue also shows a classification the case already has for the allele, so a variant classified outside this
+tab arrives with the link and the button rather than looking untouched.
 
 @see https://github.com/SACGF/variantgrid_sapath/issues/246
 """
@@ -18,7 +20,7 @@ from functools import cached_property
 from typing import Optional
 
 from django.contrib.auth.models import User
-from django.db.models import Q
+from django.db.models import Q, QuerySet
 
 from analysis.models import Analysis, VariantTag
 from analysis.variant_tag_operations import sample_carries_variant
@@ -53,7 +55,12 @@ class ClassifyQueueRow:
 
     @property
     def done(self) -> bool:
-        return self.classification is not None
+        return self.variant_tag.is_resolved
+
+    @property
+    def can_resolve(self) -> bool:
+        """ The row has something to point the to-do at, but nobody has said it is the right person yet """
+        return self.classification is not None and not self.done
 
     @property
     def conditions(self) -> list[str]:
@@ -122,21 +129,15 @@ class ClassifyReportCase:
                 samples_by_analysis[analysis.pk] = ours
         return samples_by_analysis
 
-    def _carrier_sample(self, variant_tag: VariantTag,
-                        candidates: Optional[list[Sample]] = None) -> Optional[Sample]:
-        """ The case's sample a tagging with no sample of its own is about, when only one of them has the variant """
-        if candidates is None:
-            candidates = self._analysis_samples([variant_tag.analysis_id]).get(variant_tag.analysis_id, [])
-        carriers = [s for s in candidates if sample_carries_variant(s, variant_tag)]
-        if len(carriers) == 1:
-            return carriers[0]
-        return None
+    def _shown_to_carriers(self, variant_tag: VariantTag, candidates: list[Sample]) -> bool:
+        """ Whether a tagging whose proband we don't know is worth showing this case. Carrying the variant
+            doesn't make it a sample's to-do - a relative can be HET for the proband's variant - it just keeps
+            the row off the pages it cannot be about. The sample stays unset, so the scientist picks """
+        return any(sample_carries_variant(s, variant_tag) for s in candidates)
 
     def queue_row(self, variant_tag: VariantTag) -> ClassifyQueueRow:
         """ One tagging's row - what the classify dialog is built from """
         sample = variant_tag.sample if variant_tag.sample_id in self.sample_ids else None
-        if sample is None:
-            sample = self._carrier_sample(variant_tag)
         classification = None
         classifications_by_key = self._classifications_by_allele_key()
         for key in _allele_keys(variant_tag.allele_id, variant_tag.variant_id):
@@ -146,17 +147,16 @@ class ClassifyReportCase:
                                 previous=self._previous_by_tag([variant_tag]).get(variant_tag.pk, []))
 
     def variant_tags(self) -> list[tuple[VariantTag, Optional[Sample]]]:
-        """ The case's taggings, each with the sample it's about where that's unambiguous """
+        """ The case's taggings, each with the sample it is about where the tagging knows """
         tags_qs = self._visible_variant_tags()
         rows = [(vt, vt.sample) for vt in tags_qs.filter(sample__in=self.samples)]
 
-        unresolved = list(tags_qs.filter(sample__isnull=True, analysis__isnull=False))
-        samples_by_analysis = self._analysis_samples({vt.analysis_id for vt in unresolved})
-        for variant_tag in unresolved:
+        no_sample = list(tags_qs.filter(sample__isnull=True, analysis__isnull=False))
+        samples_by_analysis = self._analysis_samples({vt.analysis_id for vt in no_sample})
+        for variant_tag in no_sample:
             candidates = samples_by_analysis.get(variant_tag.analysis_id, [])
-            carriers = [s for s in candidates if sample_carries_variant(s, variant_tag)]
-            if carriers:
-                rows.append((variant_tag, carriers[0] if len(carriers) == 1 else None))
+            if candidates and self._shown_to_carriers(variant_tag, candidates):
+                rows.append((variant_tag, None))
 
         return rows
 
@@ -166,10 +166,17 @@ class ClassifyReportCase:
                                                         classification__sample__in=self.samples)
         return qs.order_by("classification__pk")
 
+    def _case_classifications(self) -> QuerySet[Classification]:
+        """ What the case has classified - the published records the user can see plus their own lab's work in
+            progress, because a record created from this queue is unpublished until they fill it in """
+        published = self.classification_modifications().values_list("classification_id", flat=True)
+        own = Classification.filter_for_user(self.user).values("pk")
+        return Classification.objects.filter(sample__in=self.samples, withdrawn=False) \
+            .filter(Q(pk__in=published) | Q(pk__in=own))
+
     def _classifications_by_allele_key(self) -> dict[tuple[str, int], Classification]:
         by_key = {}
-        for cm in self.classification_modifications():
-            classification = cm.classification
+        for classification in self._case_classifications():
             for key in _allele_keys(classification.allele_id, classification.variant_id):
                 by_key[key] = classification
         return by_key

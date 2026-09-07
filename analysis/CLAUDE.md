@@ -45,9 +45,14 @@ Patterns here:
 - The sample / patient page's Classify & Report tab is `analysis/classify_report.py` +
   `analysis/views/views_classify_report.py` (it lives here because it is built on VariantTag - analysis may import
   classification, never the other way round). A tagging is in a case's queue when `Tag.requires_classification` and it
-  resolves to one of the case's samples: its own `VariantTag.sample`, else the analysis it was made in contains the
-  sample and the sample carries the variant. "Done" is never stored on the tagging - it is inferred from a
-  non-withdrawn classification of the same allele on one of the case's samples, so withdrawing puts the tag back.
+  belongs to one of the case's samples: its own `VariantTag.sample` (the study's proband, from
+  `analysis/models/nodes/analysis_node.py:AnalysisNode.get_proband_sample` at tag time), else the analysis it was made
+  in contains the sample. Carrying the variant is only a display filter for a tagging with no sample - a relative who is
+  HET for the proband's variant does not need their own classification, so it never assigns ownership.
+- A to-do tagging is resolved against a classification rather than deleted
+  (`analysis/variant_tag_operations.py:resolve_variant_tag`), so it stays as the record of what was flagged. That happens
+  by itself when the classification is of the tagging's own sample and via the queue row's "Clear tag" button otherwise.
+  A withdrawn `resolved_classification` puts the to-do back (`VariantTag.is_resolved`).
 - Load nodes with `AnalysisNode.objects.get_subclass(pk=...)` / `.select_subclasses()` (`analysis/models/nodes/analysis_node.py:NodeInheritanceManager`);
   in views use `analysis/views/analysis_permissions.py:get_node_subclass_or_404`, which enforces
   `analysis/models/models_analysis.py:Analysis.can_write` (locked analyses and template snapshots are read-only).

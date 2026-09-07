@@ -48,10 +48,18 @@
 
             function markRowClassified(variantTagId, data) {
                 const row = $(`.classify-queue-row[data-variant-tag-id='${variantTagId}']`, container);
-                row.addClass("classified table-success");
-                $(".classify-action", row).html(
-                    $("<span>", {class: "text-success mr-2", text: "✓ Classified"})).append(
+                const action = $(".classify-action", row);
+                action.html($("<span>", {class: "text-success mr-2", text: "✓ Classified"})).append(
                     $("<a>", {href: data.url, target: "_blank", text: data.label}));
+                // A tagging that never knew whose it was stays outstanding until someone says this is the person
+                if (data.resolved) {
+                    row.addClass("classified table-success");
+                } else {
+                    action.append($("<button>", {
+                        type: "button", class: "btn btn-outline-success btn-sm ml-2 resolve-tag",
+                        title: "Say this classification is what the tag was asking for", text: "Clear tag"
+                    }));
+                }
                 reloadWhenDone = true;
             }
 
@@ -92,6 +100,20 @@
                 window.setTimeout(function() {
                     $("#classify-modal").modal("hide");
                 }, 500);
+            });
+
+            container.on("click", ".resolve-tag", function() {
+                const button = $(this);
+                const row = button.closest(".classify-queue-row");
+                button.prop("disabled", true);
+                $.post($(".classify-action", row).data("resolveUrl"), function() {
+                    button.remove();
+                    row.addClass("classified table-success");
+                    reloadWhenDone = true;
+                }).fail(function() {
+                    button.prop("disabled", false);
+                    window.alert("Could not clear the tag.");
+                });
             });
 
             container.on("click", ".classify-tag", function() {
@@ -175,7 +197,7 @@
         <div class="card mb-3">
             <div class="card-header d-flex align-items-center">
                 <span>Tags awaiting classification</span>
-                <span class="text-muted small ml-2">a tag is cleared once a matching classification exists for this case</span>
+                <span class="text-muted small ml-2">classifying clears the tag when the record is for the tag's own sample - otherwise clear it yourself</span>
                 {% if can_create_classifications and outstanding %}
                     <button type="button" class="btn btn-outline-primary btn-sm ml-auto" id="classify-all">Classify all (wizard)</button>
                 {% endif %}
@@ -210,10 +232,16 @@
                                 <span class="text-muted">none for this allele</span>
                             {% endif %}
                         </td>
-                        <td class="text-right classify-action">
+                        <td class="text-right classify-action"
+                            data-resolve-url="{% url 'resolve_variant_tag_for_case' case_type case_id row.variant_tag.pk %}">
                             {% if row.done %}
                                 <span class="text-success mr-2">&#10003; Classified</span>
+                                <a href="{{ row.variant_tag.resolved_classification.get_absolute_url }}" target="_blank">{{ row.variant_tag.resolved_classification.friendly_label }}</a>
+                            {% elif row.can_resolve %}
+                                <span class="text-success mr-2">&#10003; Classified</span>
                                 <a href="{{ row.classification.get_absolute_url }}" target="_blank">{{ row.classification.friendly_label }}</a>
+                                <button type="button" class="btn btn-outline-success btn-sm ml-2 resolve-tag"
+                                        title="Say this classification is what the tag was asking for">Clear tag</button>
                             {% elif can_create_classifications %}
                                 <button type="button" class="btn btn-primary btn-sm classify-tag">
                                     {% if row.previous %}Classify &ndash; check previous&hellip;{% else %}New classification{% endif %}

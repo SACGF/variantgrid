@@ -1,6 +1,7 @@
 # Tags → Classifications → Multi-variant Report (sample/patient page)
 
-Written by Claude Fable 5 (claude-fable-5), 2026-09-05
+Written by Claude Fable 5 (claude-fable-5), 2026-09-05; revised by Claude Opus 5 (claude-opus-5), 2026-09-07
+Status: in progress
 
 Issues: sacgf/variantgrid_sapath#246 (SomaticReportable — easy classifications),
 SACGF/variantgrid#444 (Multi-variant Classification + Reporting).
@@ -57,50 +58,60 @@ class Tag(models.Model):  # existing model, snpdb/models/models.py
 ```python
 class VariantTag(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):  # existing model
     ...existing fields...
-    # NEW: which sample the tagging is about. Filled silently at tag time when unambiguous,
-    # left null otherwise - never prompted for. Nullable forever (old/ambiguous tags).
+    # NEW: which sample the tagging is about - the study's proband, from the node it was made in.
+    # Filled silently at tag time, left null otherwise - never prompted for. Nullable forever.
     sample = models.ForeignKey(Sample, null=True, blank=True, on_delete=SET_NULL)
+    # NEW: the classification that satisfied this to-do. The tagging is resolved rather than deleted,
+    # so it stays as the record of what was flagged and what it turned into.
+    resolved = models.DateTimeField(null=True, blank=True)
+    resolved_by = models.ForeignKey(User, null=True, blank=True, on_delete=SET_NULL,
+                                    related_name="resolved_variant_tags")
+    resolved_classification = models.ForeignKey(Classification, null=True, blank=True, on_delete=SET_NULL)
 ```
+
+Whose tagging it is comes from the study, not from who carries the variant: a relative who is HET for the
+proband's variant does not need their own classification. `AnalysisNode.get_proband_sample()` already answers
+this (it is what `AncestorSampleMixin` nodes auto-populate from) and returns None when a node's ancestors
+disagree.
 
 ### Migrations
 
-1. Schema: add both fields.
+1. Schema: add the new fields.
 2. Data: set `requires_classification=True` on `settings.TAG_REQUIRES_CLASSIFICATION` and
    `SomaticReportable` where those tags exist; set `SomaticReportable.allele_origin_bucket` to
    SOMATIC if still UNKNOWN.
-3. Data: backfill `VariantTag.sample` — rule (a) the tag's node has exactly one sample →
-   that sample; rule (b) otherwise, exactly one of the analysis's samples has the variant
-   (zygosity not ref/missing) → that sample; else leave null.
+3. Data: backfill `VariantTag.sample` from the tagged node's `get_proband_sample()`, leaving null
+   where the node has none.
 
 No new models. Classifications, report templates and the copy machinery already exist.
 
 ## Queue semantics
 
 **Queue membership** (per sample): `VariantTag` rows where `tag.requires_classification`, the tag
-is live, and the tag resolves to this sample — `sample` FK matches, or `sample` is null and the
-tag's analysis contains this sample among its `get_samples()` and the sample carries the variant.
-Patient page: union over the patient's samples.
+is live, and the tagging belongs to this sample — `sample` FK matches, or `sample` is null and the
+tag's analysis contains this sample among its `get_samples()`. A null-sample tagging is shown only
+to the case's samples that carry the variant, which keeps the row off the pages it cannot be about
+without claiming it is theirs — the row's sample stays unset and the dialog's dropdown makes the
+scientist choose. Patient page: union over the patient's samples.
 
-**Done** is inferred, never stored on the tag: a classification exists for the tag's allele with
-`Classification.sample` among the case's samples. A null-sample (ambiguous) tag counts as done
-once *any* of its analysis's samples has a matching classification. Withdrawn classifications
-don't count, so the tag reappears if one is withdrawn.
+**Done** is `VariantTag.is_resolved` — the tagging carries the classification that satisfied it, and
+a withdrawn `resolved_classification` puts it back in the queue. The row also shows a classification
+the case already has for the allele, so a variant classified elsewhere arrives with the link.
 
-**After classification**, existing behaviour per tag is kept:
-- RequiresClassification is a to-do — retired (deleted with audit log) via
-  `analysis.variant_tag_operations.retire_requires_classification_tags`. That function filters by
-  analysis; extend it (or add a sibling) to retire by variant + case samples when triggered from
-  the sample page.
-- SomaticReportable stays (somatic labs use it for tracking) — its queue row renders as
-  "✓ Classified" with a link to the classification.
+**After classification**, a `requires_classification` tagging is resolved rather than deleted, so it
+stays visible everywhere a tagging shows (which is what `SomaticReportable` already did):
+- Resolution is automatic when the classification is of the tagging's own sample, or the analysis is
+  about one person — `analysis.variant_tag_operations.classification_resolves_tag`.
+- Otherwise the queue row renders "✓ Classified" with the link and a **Clear tag** button, so the
+  scientist says which person the classification was for. A relative's HET is exactly this case.
+- The audit `LogEntry` is now an UPDATE; the analysis audit log reads "Cleared - classified as …".
 
 ## Phases
 
 ### Phase 1 — models and tag-time sample capture
 
 Migrations above. Then in `set_variant_tag` (analysis/views/views_json.py), fill
-`VariantTag.sample` at creation using backfill rules (a)/(b). No UI change; tagging stays
-one click.
+`VariantTag.sample` at creation from the node's proband. No UI change; tagging stays one click.
 
 ### Phase 2 — the Classify & Report tab
 
@@ -143,10 +154,11 @@ this plan — selection at report time covers the reporting need without new dat
 
 ## Testing
 
-- Backfill rules (a)/(b) and null outcome on a cohort with two carriers.
-- Queue query: tag with sample FK, tag resolved by inference, tag excluded once a matching
-  classification exists, tag reappearing after withdraw.
+- Proband resolution: a single-sample node names its sample even when that sample doesn't carry the
+  variant; a cohort node with one carrier still resolves to nothing.
+- Queue query: tag with sample FK; a null-sample tag offered to each carrier with no sample set;
+  tag done once resolved, and back in the queue after withdraw.
 - Apply-to-sample POST: creates record with consensus patch + sample, returns JSON link.
-- Retire-by-sample extension of `retire_requires_classification_tags` keeps the audit LogEntry
-  fields intact.
+- Resolve-by-sample keeps the audit LogEntry fields intact, leaves another case's tagging alone, and
+  leaves an ambiguous tagging for the Clear tag button.
 - URL tests for the two tab views via `URLTestCase`.

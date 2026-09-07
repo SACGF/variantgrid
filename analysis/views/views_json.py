@@ -272,7 +272,7 @@ def set_variant_tag(request, location):
                 variant_tag.node_version = node_version
                 variant_tag.node_live_data_sources = node_version.live_data_sources if node_version else {}
             if created:
-                # Tagging is one click - the sample is only filled in where it's unambiguous
+                # Tagging is one click - the sample is the node's proband, or null where it has none
                 variant_tag.sample = get_sample_for_variant_tag(variant_tag)
             if node_id or created:
                 variant_tag.save()

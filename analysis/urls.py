@@ -131,6 +131,8 @@ urlpatterns = [
          views_classify_report.classify_report_tag_dialog, name='classify_report_tag_dialog'),
     path('classify_report/<slug:case_type>/<int:case_id>/variant_tag/<int:variant_tag_id>/classify',
          views_classify_report.create_classification_for_case, name='create_classification_for_case'),
+    path('classify_report/<slug:case_type>/<int:case_id>/variant_tag/<int:variant_tag_id>/resolve',
+         views_classify_report.resolve_variant_tag_for_case, name='resolve_variant_tag_for_case'),
     path('classify_report/<slug:case_type>/<int:case_id>/report',
          views_classify_report.multi_classification_report, name='multi_classification_report'),
 
