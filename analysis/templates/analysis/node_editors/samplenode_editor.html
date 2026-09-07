@@ -460,7 +460,7 @@
             if (pickable) {
                 var radio = $("<input/>", {type: "radio", name: "source-row", disabled: LOCK_INPUT_SOURCES,
                                            checked: isSelected(SOURCE_LEVELS.SAMPLE, sample.sample_id)});
-                radio.appendTo(row).change(function() { selectSource(SOURCE_LEVELS.SAMPLE, sample.sample_id); });
+                radio.appendTo(row).change(function() { selectSource(SOURCE_LEVELS.SAMPLE, sample.sample_id, sample.sample); });
             }
             var caret = expandedSamples[sample.sample_id] ? "fa-caret-down" : "fa-caret-right";
             $("<i/>", {"class": "source-expand fa-solid " + caret}).appendTo(row).click(function() {
@@ -500,7 +500,7 @@
         }
         var radio = $("<input/>", {type: "radio", name: "source-row", disabled: LOCK_INPUT_SOURCES,
                                    checked: isSelected(container.level, container.id)});
-        radio.appendTo(row).change(function() { selectSource(container.level, container.id); });
+        radio.appendTo(row).change(function() { selectSource(container.level, container.id, container.label); });
         $("<span/>", {"class": "source-row-label", text: container.label}).appendTo(row);
         if (container.detail) {
             $("<span/>", {"class": "source-row-detail", text: container.detail}).appendTo(row);
@@ -659,9 +659,15 @@
         setCrossLink(link, SOURCE_VIEW_URLS[sourceSelection.level], sourceSelection.id);
     }
 
-    function selectSource(level, id) {
+    function selectSource(level, id, label) {
         sourceSelection = {level: level, id: id};
-        $("#id_source").val(level + ":" + id);
+        // select2 only holds options it has loaded, so a tree pick has to be added before it can be selected
+        var select = $("#id_source");
+        var value = level + ":" + id;
+        if (!select.find("option[value='" + value + "']").length) {
+            select.append(new Option(label, value));
+        }
+        select.val(value).trigger("change.select2");
         setSourceLink();
         drawSourceTree();
     }
