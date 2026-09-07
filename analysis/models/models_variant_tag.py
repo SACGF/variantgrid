@@ -64,6 +64,16 @@ class VariantTag(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
     resolved_classification = models.ForeignKey(Classification, null=True, blank=True, on_delete=SET_NULL)
     user = models.ForeignKey(User, on_delete=CASCADE)
 
+    class Meta(TimeStampedModel.Meta):
+        constraints = [
+            # One tagging per (variant, tag, analysis, user, sample) - a null sample counts as a value, so an
+            # analysis also has at most one sample-less tagging. Global (variant page) taggings are outside this.
+            models.UniqueConstraint(fields=["variant", "tag", "analysis", "user", "sample"],
+                                    nulls_distinct=False,
+                                    condition=Q(analysis__isnull=False),
+                                    name="varianttag_one_per_sample_in_analysis"),
+        ]
+
     @property
     def is_resolved(self) -> bool:
         """ Withdrawing the classification puts the to-do back

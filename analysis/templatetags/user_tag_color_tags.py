@@ -52,7 +52,8 @@ class VariableCSSRGBNode(template.Node):
 
 
 class VariantTagsJSNode(template.Node):
-    """ {variant_id: [tag, ...]} - the analysis grid's tags column, pushed/spliced on tag and untag """
+    """ {variant_id: [{id, tag, sample, resolved}, ...]} - one entry per tagging, which is one pill in the
+        analysis grid's tags column (@see VariantGridFormat.tags). Pushed/spliced on tag and untag """
 
     def __init__(self, nodes):
         self.variable = template.Variable(nodes)
@@ -61,34 +62,16 @@ class VariantTagsJSNode(template.Node):
         analysis = self.variable.resolve(context)
 
         variant_tags = defaultdict(list)
-        variant_tags_qs = VariantTag.objects.filter(analysis=analysis).values_list('variant__id', 'tag__id')
-        for variant_id, tag_id in variant_tags_qs:
-            variant_tags[variant_id].append(tag_id)
+        variant_tags_qs = VariantTag.objects.filter(analysis=analysis).values_list(
+            'id', 'variant_id', 'tag_id', 'sample_id', 'resolved', 'resolved_classification__withdrawn')
+        for pk, variant_id, tag_id, sample_id, resolved, withdrawn in variant_tags_qs:
+            resolved_date = None
+            # A withdrawn resolving classification puts the to-do back @see VariantTag.unresolved_q
+            if resolved and not withdrawn:
+                resolved_date = localtime(resolved).date().isoformat()
+            variant_tags[variant_id].append({"id": pk, "tag": tag_id, "sample": sample_id,
+                                             "resolved": resolved_date})
         return json.dumps(variant_tags)
-
-
-class VariantTagsResolvedJSNode(template.Node):
-    """ {variant_id: {tag: resolved date}} - the pills the grid draws as done. A tag is only done once
-        every tagging of it in the analysis is (@see VariantTag.unresolved_q) """
-
-    def __init__(self, nodes):
-        self.variable = template.Variable(nodes)
-
-    def render(self, context):
-        analysis = self.variable.resolve(context)
-
-        variant_tags_qs = VariantTag.objects.filter(analysis=analysis)
-        still_to_do = set(variant_tags_qs.filter(VariantTag.unresolved_q()).values_list('variant__id', 'tag__id'))
-        resolved = defaultdict(dict)
-        for variant_id, tag_id, resolved_date in variant_tags_qs.exclude(VariantTag.unresolved_q()).values_list(
-                'variant__id', 'tag__id', 'resolved'):
-            if (variant_id, tag_id) in still_to_do:
-                continue
-            date_string = localtime(resolved_date).date().isoformat()
-            tags = resolved[variant_id]
-            if date_string > tags.get(tag_id, ""):
-                tags[tag_id] = date_string
-        return json.dumps(resolved)
 
 
 @register.tag
@@ -111,9 +94,10 @@ def render_variant_tags_dict(_parser, token):
     return VariantTagsJSNode(tag_utils.get_passed_object(token))
 
 
-@register.tag
-def render_variant_tags_resolved_dict(_parser, token):
-    return VariantTagsResolvedJSNode(tag_utils.get_passed_object(token))
+@register.simple_tag
+def render_analysis_samples_dict(analysis):
+    """ {sample_id: name} - what a tagging's sample is called on its pill's tooltip """
+    return mark_safe(json.dumps({s.pk: str(s) for s in analysis.get_samples()}))
 
 
 @register.simple_tag(takes_context=True)

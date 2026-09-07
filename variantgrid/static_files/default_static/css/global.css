@@ -1355,6 +1355,12 @@ table.variantgrid-datatable .grid-tag-deletable .user-tag-colored {
 table.variantgrid-datatable .grid-tag-resolved .user-tag-colored {
   opacity: 0.55;
 }
+table.variantgrid-datatable .grid-tag-sample-marker {
+  margin-left: 3px;
+  font-size: 8px;
+  vertical-align: 1px;
+  opacity: 0.75;
+}
 table.variantgrid-datatable .grid-tag-delete {
   position: absolute;
   top: 2px;

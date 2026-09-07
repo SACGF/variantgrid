@@ -348,11 +348,14 @@ function showTagAutocomplete(variantId) {
         tagSelect.change(function() {
             const tag = $(this).val();
             if (tag) {
-                const successFunc = function () {
-                    const vtHtml = getVariantTagHtml(variantId, tag);
-                    const newTag = $(vtHtml);
-                    newTag.click(tagClickHandler);
-                    cell.append(newTag);
+                const successFunc = function (response) {
+                    // The click lands on this node's proband's tagging - a new pill only where a row was made
+                    if (response && response.created) {
+                        const newTag = $(getVariantTagHtml(variantId, tag, false,
+                                                           {variantTagId: response.variant_tag.id}));
+                        newTag.click(tagClickHandler);
+                        cell.append(newTag);
+                    }
                     FloatingPanel.hide();
                 };
                 addVariantTag(variantId, nodeId, tag, successFunc);
@@ -404,34 +407,48 @@ function colorTagAutocompleteResults(tagSelect) {
 }
 
 
-function getVariantTagHtml(variantId, tag, readOnly, tagLabel, extraClasses, title) {
-    if (typeof(tagLabel) === 'undefined') {
-        tagLabel = tag;
-    }
-    if (typeof(title) === 'undefined') {
-        title = `Tagged as ${tag}`;
-    }
+/* options: tagLabel (HTML, defaults to the tag), extraClasses, title, variantTagId (the tagging the
+   pill is - what the X deletes) and marker (icon classes drawn after the label, saying whose tagging
+   it is - @see VariantGridFormat.tags) */
+function getVariantTagHtml(variantId, tag, readOnly, options) {
+    options = options || {};
+    const tagLabel = typeof(options.tagLabel) === 'undefined' ? tag : options.tagLabel;
+    const title = typeof(options.title) === 'undefined' ? `Tagged as ${tag}` : options.title;
     const outerClasses = ["grid-tag", "tagged-" + tag];
     if (!readOnly) {
         outerClasses.push("grid-tag-deletable");
     }
-    if (extraClasses) {
-        outerClasses.push(...extraClasses);
+    if (options.extraClasses) {
+        outerClasses.push(...options.extraClasses);
     }
-    return `<span class='${outerClasses.join(' ')}' title='${title}' variant_id='${variantId}' tag_id='${tag}'><span class='user-tag-colored'>${tagLabel}</span></span>`;
+    // A tagging's own pk - the analysis grid's X removes that one tagging, not every tagging of the tag
+    const pkAttr = options.variantTagId ? ` variant_tag_id='${options.variantTagId}'` : "";
+    const marker = options.marker ? `<i class='grid-tag-sample-marker ${options.marker}'></i>` : "";
+    return `<span class='${outerClasses.join(' ')}' title='${escapeHtml(title)}' variant_id='${variantId}' tag_id='${tag}'${pkAttr}><span class='user-tag-colored'>${tagLabel}${marker}</span></span>`;
+}
+
+
+// The sample the grid's pills are read against - the node the grid is showing is about one study.
+// @see node_data_grid.html / sample_variants_tab.html
+function getNodeProbandSampleId() {
+    return typeof(nodeProbandSampleId) === 'undefined' ? null : nodeProbandSampleId;
 }
 
 
 // Tags with no entry in variantTagOrder sort as 0, ties broken alphabetically.
 // Customised per-collection on the tag colors page - see issue #343
-function sortVariantTags(aWin, tagList) {
+// getTag pulls the tag out of an entry - the analysis grid sorts taggings, not tag names
+function sortVariantTags(aWin, tagList, getTag) {
     const tagOrder = aWin.variantTagOrder || {};
+    const tagOf = getTag || function(entry) { return entry; };
     return tagList.slice().sort(function(a, b) {
-        const diff = (tagOrder[a] || 0) - (tagOrder[b] || 0);
+        const tagA = tagOf(a);
+        const tagB = tagOf(b);
+        const diff = (tagOrder[tagA] || 0) - (tagOrder[tagB] || 0);
         if (diff) {
             return diff;
         }
-        return a.localeCompare(b);
+        return tagA.localeCompare(tagB);
     });
 }
 
@@ -464,7 +481,8 @@ function tagClickHandler() {
         const removeTagCallback = function () {
             gridTag.remove();
         };
-        removeVariantTag(gridTag.attr('variant_id'), gridTag.attr('tag_id'), removeTagCallback);
+        removeVariantTag(gridTag.attr('variant_id'), gridTag.attr('tag_id'),
+                         gridTag.attr('variant_tag_id'), removeTagCallback);
     });
     gridTag.append(deleteButton);
 }

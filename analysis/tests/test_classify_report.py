@@ -177,6 +177,17 @@ class ClassifyQueueTest(ClassifyReportTestCase):
         vcf.save()
         self.assertEqual(self._queue_variant_tags(), [variant_tag])
 
+    def test_sample_less_tagging_drops_out_of_a_case_that_has_its_own(self):
+        """ A tagging with no sample is "no one's yet" - the case's own tagging of the same variant, tag and
+            analysis supersedes it there, and it stays for the analysis' other samples """
+        analysis = self._create_cohort_analysis()
+        # Both parents carry shared_variant, so the sample-less tagging is offered to each of them
+        sample_less = self._create_variant_tag(analysis=analysis, variant=self.shared_variant)
+        mothers = self._create_variant_tag(analysis=analysis, variant=self.shared_variant, sample=self.mother)
+
+        self.assertEqual(self._queue_variant_tags(sample=self.mother), [mothers])
+        self.assertEqual(self._queue_variant_tags(sample=self.father), [sample_less])
+
     def test_tag_of_a_retired_tag_is_not_queued(self):
         self._create_variant_tag(sample=self.proband)
         Tag.objects.filter(pk=self.tag.pk).update(retired="2026-01-01T00:00:00Z")

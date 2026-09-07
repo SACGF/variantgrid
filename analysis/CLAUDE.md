@@ -72,6 +72,15 @@ Patterns here:
   so a lab's own queue tag is offered and resolved the same way: the tag node editor's Classifications tab
   (`analysis/views/nodes/node_views.py:TagNodeView`), the variant tags grid (`variantopedia/grids.py:VariantTagsColumns`)
   and the Classify & Report tab. Retiring a tag takes it out of the vocabulary, so its taggings stop being to-dos.
+- A tagging's identity in an analysis is (variant, tag, analysis, user, sample) - the sample being the tagged
+  node's proband, worked out before the `get_or_create` in `analysis/views/views_json.py:set_variant_tag` and
+  enforced by `varianttag_one_per_sample_in_analysis` (`nulls_distinct=False`, so an analysis has at most one
+  sample-less tagging too). A tagging never changes sample: tagging for this proband adds a row rather than
+  taking the tag off a sibling, and the X on a pill deletes that one tagging by pk.
+- The analysis grid draws one pill per tagging, read against the proband of the node the grid is showing
+  (`nodeProbandSampleId`): the proband's own looks as it always did, another sample's gets a solid person
+  marker and a sample-less one a hollow person. `variantTags` is `{variant_id: [{id, tag, sample, resolved}]}`
+  - one entry per tagging, resolution included (@see `render_variant_tags_dict`, `VariantGridFormat.tags`).
 - A resolved tagging is hidden from the work lists: the tags node (`TagNode.include_resolved`, off by default), the
   variant page's tag list and the variant tags page (both on `UserGridConfig.show_hidden_data` under grid name
   `Variant Tags`, shown as a "Show resolved" checkbox). They all filter with

@@ -1598,6 +1598,15 @@ table.variantgrid-datatable {
 		opacity: 0.55;
 	}
 
+	// Whose tagging the pill is, drawn only when it isn't the grid's node's proband - a solid person
+	// for another sample, a hollow one for a tagging nobody owns yet. @see VariantGridFormat.tags
+	.grid-tag-sample-marker {
+		margin-left: 3px;
+		font-size: 8px;
+		vertical-align: 1px;
+		opacity: 0.75;
+	}
+
 	// Armed by clicking the tag - it sits over the tag's right end rather than being given room
 	// inside it, so arming a tag resizes nothing and the grid doesn't reflow. @see tagClickHandler
 	.grid-tag-delete {

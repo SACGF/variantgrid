@@ -191,10 +191,15 @@ class ClassifyReportCase:
         """ The case's taggings, each with the sample it is about where the tagging knows """
         tags_qs = self._visible_variant_tags()
         rows = [(vt, vt.sample) for vt in tags_qs.filter(sample__in=self.samples)]
+        # A sample-less tagging means "no one's yet", so it drops out of a case that has its own tagging
+        # of the same variant, tag and analysis - and stays for the analysis' other samples
+        superseded = {(vt.variant_id, vt.tag_id, vt.analysis_id) for vt, _ in rows}
 
         no_sample = list(tags_qs.filter(sample__isnull=True, analysis__isnull=False))
         samples_by_analysis = self._analysis_samples({vt.analysis_id for vt in no_sample})
         for variant_tag in no_sample:
+            if (variant_tag.variant_id, variant_tag.tag_id, variant_tag.analysis_id) in superseded:
+                continue
             candidates = samples_by_analysis.get(variant_tag.analysis_id, [])
             if candidates and self._shown_to_carriers(variant_tag, candidates):
                 rows.append((variant_tag, None))

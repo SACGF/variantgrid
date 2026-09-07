@@ -13,6 +13,8 @@ from variantopedia.views_tag_stats import _grouped_series
 
 LOCMEM_CACHE = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
 
+_UNSET = object()  # analysis=None is a global (variant page) tagging, so it can't be the default
+
 
 @override_settings(CACHES=LOCMEM_CACHE)
 class TagStatsTest(TestCase):
@@ -32,16 +34,20 @@ class TagStatsTest(TestCase):
         cls.allele = Allele.objects.create()
         cls.other_allele = Allele.objects.create()
 
-        # The same (variant, tag) tagged twice - the re-tagging the page has to distinguish
-        for _ in range(2):
-            cls._create_variant_tag(cls.artefact, cls.variant, cls.allele)
+        # The same (variant, tag) tagged in the analysis and again from the variant page - the re-tagging
+        # the page has to distinguish (an analysis holds one tagging per sample @see VariantTag.Meta)
+        cls._create_variant_tag(cls.artefact, cls.variant, cls.allele)
+        cls._create_variant_tag(cls.artefact, cls.variant, cls.allele, analysis=None)
         cls._create_variant_tag(cls.artefact, cls.other_variant, cls.other_allele)
         cls._create_variant_tag(cls.somatic, cls.variant, cls.allele)
         cls._create_variant_tag(cls.inherited, cls.variant, cls.allele)
 
     @classmethod
-    def _create_variant_tag(cls, tag: Tag, variant: Variant, allele: Allele = None) -> VariantTag:
-        return VariantTag.objects.create(variant=variant, tag=tag, analysis=cls.analysis, allele=allele,
+    def _create_variant_tag(cls, tag: Tag, variant: Variant, allele: Allele = None,
+                            analysis: Analysis = _UNSET) -> VariantTag:
+        if analysis is _UNSET:
+            analysis = cls.analysis
+        return VariantTag.objects.create(variant=variant, tag=tag, analysis=analysis, allele=allele,
                                          genome_build=cls.genome_build, user=cls.user)
 
     def setUp(self):
@@ -89,7 +95,7 @@ class TagStatsTest(TestCase):
 
     def test_response_is_cached(self):
         first = self._get_json("tag_stats_headline")
-        self._create_variant_tag(self.artefact, self.other_variant)
+        self._create_variant_tag(self.artefact, self.other_variant, analysis=None)
         self.assertEqual(self._get_json("tag_stats_headline")["calculated"], first["calculated"])
 
     def test_cache_is_not_shared_between_users(self):
