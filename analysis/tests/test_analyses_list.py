@@ -4,13 +4,14 @@ from django.urls.base import resolve, reverse
 
 from analysis.grids import AnalysesListColumns
 from analysis.models import Analysis, VariantTag
+from analysis.models.enums import AnalysisType
 from snpdb.models import GenomeBuild, Tag
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
 from snpdb.views.datatable_view import DatabaseTableView
 
 
 class AnalysesListTests(TestCase):
-    """ The analyses grid is filtered by the build toggle and the tag count pills above it """
+    """ The analyses grid is filtered by the build and analysis type toggles and the tag count pills above it """
 
     @classmethod
     def setUpTestData(cls):
@@ -20,6 +21,8 @@ class AnalysesListTests(TestCase):
         cls.tagged = Analysis.objects.create(genome_build=cls.grch37, user=cls.user, name="tagged")
         cls.untagged = Analysis.objects.create(genome_build=cls.grch37, user=cls.user, name="untagged")
         cls.other_build = Analysis.objects.create(genome_build=cls.grch38, user=cls.user, name="other build")
+        cls.trio = Analysis.objects.create(genome_build=cls.grch37, user=cls.user, name="trio",
+                                           analysis_type=AnalysisType.TRIO)
 
         cls.tag = Tag.objects.get_or_create(pk="artefact")[0]
         # Two tag events in the one analysis - the pills count analyses, not events
@@ -40,13 +43,16 @@ class AnalysesListTests(TestCase):
         return {row["name"] for row in view.prepare_results(view.config.ordering(qs))}
 
     def test_no_filters(self):
-        self.assertEqual(self._analysis_names(), {"tagged", "untagged", "other build"})
+        self.assertEqual(self._analysis_names(), {"tagged", "untagged", "other build", "trio"})
 
     def test_filter_by_tag(self):
         self.assertEqual(self._analysis_names(tags='["artefact"]'), {"tagged"})
 
     def test_filter_by_genome_build(self):
         self.assertEqual(self._analysis_names(genome_build_name="GRCh38"), {"other build"})
+
+    def test_filter_by_analysis_type(self):
+        self.assertEqual(self._analysis_names(analysis_type=AnalysisType.TRIO), {"trio"})
 
     def test_tag_counts(self):
         """ The pills count analyses per tag, so the number matches what clicking one returns """

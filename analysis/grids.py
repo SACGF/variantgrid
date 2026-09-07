@@ -497,6 +497,8 @@ class AnalysesListColumns(DatatableConfig[Analysis]):
             qs = qs.filter(user=self.user)
         if genome_build_name := self.get_query_param("genome_build_name"):
             qs = qs.filter(genome_build=GenomeBuild.get_name_or_alias(genome_build_name))
+        if analysis_type := self.get_query_param("analysis_type"):
+            qs = qs.filter(analysis_type=analysis_type)
         return qs
 
 

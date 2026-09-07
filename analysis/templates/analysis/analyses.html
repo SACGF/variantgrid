@@ -12,6 +12,11 @@
 {% block head %}
     {{ block.super }}
     {% render_tag_styles_and_formatter %}
+    <style>
+        .analysis-type-radio label {
+            white-space: nowrap;
+        }
+    </style>
     <script>
         const TAG_COUNTS_SUMMARY = "#analyses-tag-counts";
         // Shared filter state - the build toggle and the tag pills both write to it
@@ -54,7 +59,9 @@
             container.html("<i class='fas fa-spinner fa-spin'></i> Counting tags...");
             return $.ajax({
                 url: "{% url 'analysis_list_tag_counts' %}",
-                data: {genome_build_name: gridParams["genome_build_name"] || "", tag: selected},
+                data: {genome_build_name: gridParams["genome_build_name"] || "",
+                       analysis_type: gridParams["analysis_type"] || "",
+                       tag: selected},
                 traditional: true,
             }).done(function(html) {
                 container.html(html);
@@ -102,6 +109,17 @@
                     gridParams["genome_build_name"] = genomeBuildName;
                 } else {
                     delete gridParams["genome_build_name"];
+                }
+                refreshTagCounts();
+                reloadAnalysesGrid();
+            });
+
+            $("#analyses-grid-filter input[name=analysis_type_filter]").change(function() {
+                const analysisType = $(this).val();
+                if (analysisType) {
+                    gridParams["analysis_type"] = analysisType;
+                } else {
+                    delete gridParams["analysis_type"];
                 }
                 refreshTagCounts();
                 reloadAnalysesGrid();
@@ -167,6 +185,18 @@
             {% if multiple_genome_builds %}
                 {% labelled label="Genome Build" %}{% genome_build_grid_filter %}{% endlabelled %}
             {% endif %}
+            {% labelled label="Analysis Type" %}
+                <div class="btn-group btn-group-toggle analysis-type-radio" data-toggle="buttons">
+                    <label class="btn btn-outline-primary active">
+                        <input class="table-filter" type="radio" name="analysis_type_filter" value="" autocomplete="off" checked> All
+                    </label>
+                    {% for value, label in analysis_types %}
+                        <label class="btn btn-outline-primary">
+                            <input class="table-filter" type="radio" name="analysis_type_filter" value="{{ value }}" autocomplete="off"> {{ label }}
+                        </label>
+                    {% endfor %}
+                </div>
+            {% endlabelled %}
             <button class="btn btn-outline-secondary m-2" type="button" data-toggle="collapse"
                     data-target="#analyses-tag-filter" aria-expanded="false">
                 <i class="fas fa-tags"></i> Filter by Tag

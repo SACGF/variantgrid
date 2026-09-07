@@ -40,7 +40,7 @@ from analysis.models import (
     TagNode,
     VariantTag,
 )
-from analysis.models.enums import MinimisationResultType, NodeStatus
+from analysis.models.enums import AnalysisType, MinimisationResultType, NodeStatus
 from analysis.models.mutational_signatures import MutationalSignature
 from analysis.models.nodes.analysis_node import AnalysisClassification
 from analysis.models.nodes.node_counts import get_node_count_colors, get_tag_node_count_colors
@@ -76,6 +76,7 @@ def analysis_list(request):
 
     context = {"create_analysis_form": form,
                "analysis_choice_form": AnalysisChoiceForm(),
+               "analysis_types": AnalysisType.choices,
                "multiple_genome_builds": len(GenomeBuild.builds_with_annotation()) > 1}
     return render(request, 'analysis/analyses.html', context)
 
