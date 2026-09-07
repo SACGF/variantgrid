@@ -313,7 +313,7 @@ class Patient(GuardianPermissionsMixin, HasPhenotypeDescriptionMixin, Externally
         sample_model = self.sample_set.model
         reaches_patient = Q(patient=self) | Q(extraction__specimen__patient=self)
         return sample_model.objects.filter(reaches_patient).distinct() \
-            .select_related("vcf", "extraction__specimen").order_by("vcf__date")
+            .select_related("vcf__genome_build", "extraction__specimen").order_by("vcf__date")
 
     def __str__(self):
         # De-identified patients have no name, so fall back to the code they're known by
