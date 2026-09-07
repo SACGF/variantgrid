@@ -797,7 +797,7 @@ def get_analysis_log_entry_summary(action, content_type_model, changes, addition
         if additional_data.get("operation") == VARIANT_TAG_CLASSIFIED:
             classification_id = additional_data["classification_id"]
             url = Classification.get_url_for_pk(classification_id)
-            return f"Retired - classified as <a href='{url}'>{classification_id}</a>"
+            return f"Cleared - classified as <a href='{url}'>{classification_id}</a>"
 
     if action == LogEntry.Action.CREATE:
         return "Created"

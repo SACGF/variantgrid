@@ -9,7 +9,7 @@ from analysis.grids import get_analysis_log_entry_summary
 from analysis.models import Analysis, TagNode, VariantTag, TagNodeInput
 from analysis.models.enums import TagNodeMode
 from analysis.models.nodes.analysis_node import NodeVersion
-from analysis.variant_tag_operations import retire_requires_classification_tags
+from analysis.variant_tag_operations import resolve_requires_classification_tags
 from annotation.fake_annotation import create_fake_variants, get_fake_annotation_version
 from classification.enums import SubmissionSource
 from classification.models.classification import Classification
@@ -197,24 +197,23 @@ class TestRetireRequiresClassificationTags(TestCase):
         return VariantTag.objects.create(genome_build=self.grch37, analysis=self.analysis,
                                          variant=variant, tag=tag, user=self.user)
 
-    def test_retires_every_tagging_of_the_classified_variant(self):
-        retired = self._tag_variant(self.variant, self.requires_classification_tag)
-        also_retired = self._tag_variant(self.variant, self.requires_classification_tag)
+    def test_resolves_every_tagging_of_the_classified_variant(self):
+        cleared = self._tag_variant(self.variant, self.requires_classification_tag)
+        also_cleared = self._tag_variant(self.variant, self.requires_classification_tag)
         other_tag = self._tag_variant(self.variant, self.other_tag)
         other_variant = self._tag_variant(self.other_variant, self.requires_classification_tag)
 
-        num_retired = retire_requires_classification_tags(self.classification, self.analysis, self.user)
-        self.assertEqual(num_retired, 2)
+        resolved = resolve_requires_classification_tags(self.classification, self.analysis, self.user)
+        self.assertEqual({vt.pk for vt in resolved}, {cleared.pk, also_cleared.pk})
 
-        remaining = set(VariantTag.objects.values_list("pk", flat=True))
-        self.assertEqual(remaining, {other_tag.pk, other_variant.pk})
-        self.assertNotIn(retired.pk, remaining)
-        self.assertNotIn(also_retired.pk, remaining)
+        # The taggings stay - they are the record of what was flagged and what it turned into
+        unresolved = set(VariantTag.objects.filter(resolved__isnull=True).values_list("pk", flat=True))
+        self.assertEqual(unresolved, {other_tag.pk, other_variant.pk})
 
     def test_logs_classification_in_analysis_audit_log(self):
         variant_tag = self._tag_variant(self.variant, self.requires_classification_tag)
 
-        retire_requires_classification_tags(self.classification, self.analysis, self.user)
+        resolve_requires_classification_tags(self.classification, self.analysis, self.user)
 
         log_entry = self.analysis.log_entry_qs().get()
         self.assertEqual(log_entry.object_pk, str(variant_tag.pk))

@@ -8,8 +8,9 @@ from django_extensions.db.models import TimeStampedModel
 from analysis.models.enums import TagLocation
 from analysis.models.models_analysis import Analysis
 from analysis.models.nodes.analysis_node import AnalysisNode, NodeVersion
+from classification.models import Classification
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsAutoInitialSaveMixin
-from snpdb.models import Allele, GenomeBuild, Tag, Variant, VariantAllele
+from snpdb.models import Allele, GenomeBuild, Sample, Tag, Variant, VariantAllele
 
 
 class VariantTagsImport(TimeStampedModel):
@@ -52,7 +53,24 @@ class VariantTag(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
     # NodeVersion rows are deleted when a node reloads, so the sources the node was showing when this tag
     # was made are copied here - the tag is the audit record of what the tagger actually saw
     node_live_data_sources = models.JSONField(default=dict)
+    # Which sample the tagging is about - the study's proband, filled in at tag time where the node knows it and
+    # left null otherwise (never prompted for) @see analysis.variant_tag_operations.get_sample_for_variant_tag
+    sample = models.ForeignKey(Sample, null=True, blank=True, on_delete=SET_NULL)
+    # A to-do tag (Tag.requires_classification) is satisfied by a classification rather than deleted, so the
+    # tagging stays as the record of what was flagged and what it turned into
+    resolved = models.DateTimeField(null=True, blank=True)
+    resolved_by = models.ForeignKey(User, null=True, blank=True, on_delete=SET_NULL,
+                                    related_name="resolved_variant_tags")
+    resolved_classification = models.ForeignKey(Classification, null=True, blank=True, on_delete=SET_NULL)
     user = models.ForeignKey(User, on_delete=CASCADE)
+
+    @property
+    def is_resolved(self) -> bool:
+        """ Withdrawing the classification puts the to-do back
+            @see analysis.variant_tag_operations.resolve_variant_tag """
+        if self.resolved is None:
+            return False
+        return not (self.resolved_classification and self.resolved_classification.withdrawn)
 
     def __str__(self):
         description = f"{self.tag_id}: {self.variant} ({self.genome_build})"

@@ -40,6 +40,7 @@ class TagOperation(TextChoices):
     RETIRE = "retire", "Retired"
     REINSTATE = "reinstate", "Reinstated"
     SET_ALLELE_ORIGIN = "allele_origin", "Allele origin"
+    SET_REQUIRES_CLASSIFICATION = "requires_classification", "Classify queue"
 
 
 @dataclass(frozen=True)
@@ -229,6 +230,8 @@ def describe_tag_operation(log_entry: LogEntry) -> str:
         return ""
     if operation == TagOperation.SET_ALLELE_ORIGIN:
         return f"{_allele_origin_label(data.get('from'))} -> {_allele_origin_label(data.get('to'))}"
+    if operation == TagOperation.SET_REQUIRES_CLASSIFICATION:
+        return "added to the classify queue" if data.get("to") else "removed from the classify queue"
     return ""
 
 
@@ -301,6 +304,24 @@ def reinstate_tag(tag: Tag, user: User) -> Tag:
         log_tag_operation(tag, TagOperation.REINSTATE, user, was_merged_into=merged_into_id)
 
     logging.info("Reinstated tag '%s'", tag)
+    return tag
+
+
+def set_tag_requires_classification(tag: Tag, requires_classification: bool, user: User) -> Tag:
+    """ Whether tagging a variant with this is asking for it to be classified - it's what the classify queue
+        on the sample/patient page is built from. Existing tagging is unchanged, it just starts (or stops)
+        showing up as outstanding work """
+    previous = tag.requires_classification
+    if previous == requires_classification:
+        return tag
+
+    with transaction.atomic():
+        tag.requires_classification = requires_classification
+        tag.save()
+        log_tag_operation(tag, TagOperation.SET_REQUIRES_CLASSIFICATION, user,
+                          **{"from": previous, "to": requires_classification})
+
+    logging.info("Tag '%s' requires_classification %s -> %s", tag, previous, requires_classification)
     return tag
 
 

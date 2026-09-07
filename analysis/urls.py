@@ -19,6 +19,7 @@ from analysis.views import (
     views_analysis_settings,
     views_autocomplete,
     views_candidate_search,
+    views_classify_report,
     views_grid,
     views_json,
     views_karyomapping,
@@ -120,6 +121,20 @@ urlpatterns = [
          name='create_classification_for_variant_tag'),
     path('<int:analysis_id>/create_classification/',
          views.create_classification_for_analysis, name='create_classification_for_analysis'),
+
+    # Classify & Report tab (sample / patient pages)
+    path('classify_report/sample/<int:sample_id>', views_classify_report.sample_classify_report_tab,
+         name='sample_classify_report_tab'),
+    path('classify_report/patient/<int:patient_id>', views_classify_report.patient_classify_report_tab,
+         name='patient_classify_report_tab'),
+    path('classify_report/<slug:case_type>/<int:case_id>/variant_tag/<int:variant_tag_id>',
+         views_classify_report.classify_report_tag_dialog, name='classify_report_tag_dialog'),
+    path('classify_report/<slug:case_type>/<int:case_id>/variant_tag/<int:variant_tag_id>/classify',
+         views_classify_report.create_classification_for_case, name='create_classification_for_case'),
+    path('classify_report/<slug:case_type>/<int:case_id>/variant_tag/<int:variant_tag_id>/resolve',
+         views_classify_report.resolve_variant_tag_for_case, name='resolve_variant_tag_for_case'),
+    path('classify_report/<slug:case_type>/<int:case_id>/report',
+         views_classify_report.multi_classification_report, name='multi_classification_report'),
 
     # Node Data (bottom right window)
     path('<int:analysis_id>/<int:analysis_version>/node_data_grid/cfg/<int:node_id>/<int:node_version>/<str:extra_filters>/', views_node.node_data_grid, name='node_data_grid'),

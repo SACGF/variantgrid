@@ -45,7 +45,7 @@ from analysis.models.mutational_signatures import MutationalSignature
 from analysis.models.nodes.analysis_node import AnalysisClassification
 from analysis.models.nodes.node_counts import get_node_count_colors, get_tag_node_count_colors
 from analysis.models.nodes.node_types import get_node_display_data_by_class_name, get_node_types_hash
-from analysis.variant_tag_operations import retire_requires_classification_tags
+from analysis.variant_tag_operations import resolve_requires_classification_tags
 from analysis.views.analysis_permissions import get_analysis_or_404
 from annotation.models.models import MutationalSignatureInfo
 from classification.views.views import (
@@ -438,14 +438,14 @@ class CreateClassificationForVariantTagView(CreateClassificationForVariantView):
                 if self.variant_tag.analysis:
                     read_only_message = "You have read-only access to this analysis. You can create a " \
                                         "classification but it will not be linked to the analysis and the " \
-                                        f"{settings.TAG_REQUIRES_CLASSIFICATION} tag will not be deleted."
+                                        f"{settings.TAG_REQUIRES_CLASSIFICATION} tag will not be cleared."
                 else:
                     read_only_message = "You have read-only access to this tag. You can create a classification " \
-                                        f"but the {settings.TAG_REQUIRES_CLASSIFICATION} tag will not be deleted."
+                                        f"but the {settings.TAG_REQUIRES_CLASSIFICATION} tag will not be cleared."
                 messages.add_message(self.request, messages.WARNING, read_only_message)
         except VariantTag.DoesNotExist:
             variant_tag_id = self.kwargs["variant_tag_id"]
-            msg = f"The VariantTag ({variant_tag_id}) does not exist. It may have been deleted or already classified."
+            msg = f"The VariantTag ({variant_tag_id}) does not exist. It may have been deleted."
             context = {"error_message": msg}
         return context
 
@@ -457,5 +457,5 @@ def create_classification_for_analysis(request, analysis_id):
 
     if analysis.can_write(request.user):
         AnalysisClassification.objects.create(analysis=analysis, classification=classification)
-        retire_requires_classification_tags(classification, analysis, request.user)
+        resolve_requires_classification_tags(classification, analysis, request.user)
     return redirect(classification.get_edit_url())

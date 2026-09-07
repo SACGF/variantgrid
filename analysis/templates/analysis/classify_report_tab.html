@@ -1,0 +1,321 @@
+{% load ui_utils %}
+{% load classification_tags %}
+<div id="classify-report" data-tab-url="{{ request.path }}">
+    <script>
+        $(document).ready(function() {
+            const container = $("#classify-report");
+            const tabPane = container.parent();  // Reloaded in place, the way the other sample tabs do it
+            // The wizard walks the outstanding rows one dialog at a time
+            let wizard = null;
+            let reloadWhenDone = false;
+
+            function reloadTab() {
+                tabPane.load(container.data("tab-url"));
+            }
+
+            function outstandingTagIds() {
+                return $(".classify-queue-row:not(.classified)", container).map(function() {
+                    return $(this).data("variantTagId");
+                }).get();
+            }
+
+            function openClassifyDialog(variantTagId) {
+                const row = $(`.classify-queue-row[data-variant-tag-id='${variantTagId}']`, container);
+                const url = row.data("dialogUrl");
+                const modal = $("#classify-modal");
+                $(".modal-body", modal).load(url, function() {
+                    // Skip is only meaningful while stepping through the queue
+                    $(".wizard-skip", modal).toggle(Boolean(wizard));
+                    if (wizard) {
+                        const position = wizard.indexOf(variantTagId) + 1;
+                        $(".wizard-position", modal).text(`tag ${position} of ${wizard.length}`);
+                    }
+                });
+                modal.data("variantTagId", variantTagId).modal("show");
+            }
+
+            // Always forwards through the queue, so a skipped tag isn't offered again on the next step
+            function nextInWizard(afterTagId) {
+                if (!wizard) return null;
+                const outstanding = new Set(outstandingTagIds());
+                for (let i = wizard.indexOf(afterTagId) + 1; i < wizard.length; i++) {
+                    if (outstanding.has(wizard[i])) {
+                        return wizard[i];
+                    }
+                }
+                return null;
+            }
+
+            function markRowClassified(variantTagId, data) {
+                const row = $(`.classify-queue-row[data-variant-tag-id='${variantTagId}']`, container);
+                const action = $(".classify-action", row);
+                action.html($("<span>", {class: "text-success mr-2", text: "✓ Classified"})).append(
+                    $("<a>", {href: data.url, target: "_blank", text: data.label}));
+                // A tagging that never knew whose it was stays outstanding until someone says this is the person
+                if (data.resolved) {
+                    row.addClass("classified table-success");
+                } else {
+                    action.append($("<button>", {
+                        type: "button", class: "btn btn-outline-success btn-sm ml-2 resolve-tag",
+                        title: "Say this classification is what the tag was asking for", text: "Clear tag"
+                    }));
+                }
+                reloadWhenDone = true;
+            }
+
+            function afterClassified(variantTagId, data) {
+                markRowClassified(variantTagId, data);
+                const next = nextInWizard(variantTagId);
+                if (next) {
+                    openClassifyDialog(next);
+                } else {
+                    $("#classify-modal").modal("hide");
+                }
+            }
+
+            // Copy a previous classification's consensus into a new record for this sample
+            container.on("click", ".apply-previous", function() {
+                const form = $("#classify-form");
+                const variantTagId = $("#classify-modal").data("variantTagId");
+                form.find("[name=copy_from_vcm_id]").val($(this).data("vcmId"));
+                $("button", form).prop("disabled", true);
+                $(this).text("Creating\u2026");
+                $.post(form.attr("action"), form.serialize(), function(data) {
+                    afterClassified(variantTagId, data);
+                }).fail(function() {
+                    $("button", form).prop("disabled", false);
+                    window.alert("Could not create the classification - please use the full form.");
+                });
+            });
+
+            // The full form creates the record then opens the classification editor in a new tab
+            container.on("click", ".full-form-button", function() {
+                const form = $("#classify-form");
+                form.find("[name=copy_from_vcm_id]").val("");
+                form.find("[name=response_format]").val("");
+                form.attr("target", "_blank");
+                wizard = null;
+                reloadWhenDone = true;
+                form[0].submit();
+                window.setTimeout(function() {
+                    $("#classify-modal").modal("hide");
+                }, 500);
+            });
+
+            container.on("click", ".resolve-tag", function() {
+                const button = $(this);
+                const row = button.closest(".classify-queue-row");
+                button.prop("disabled", true);
+                $.post($(".classify-action", row).data("resolveUrl"), function() {
+                    button.remove();
+                    row.addClass("classified table-success");
+                    reloadWhenDone = true;
+                }).fail(function() {
+                    button.prop("disabled", false);
+                    window.alert("Could not clear the tag.");
+                });
+            });
+
+            container.on("click", ".classify-tag", function() {
+                wizard = null;
+                openClassifyDialog($(this).closest(".classify-queue-row").data("variantTagId"));
+            });
+
+            container.on("click", "#classify-all", function() {
+                const outstanding = outstandingTagIds();
+                if (outstanding.length) {
+                    wizard = outstanding;
+                    openClassifyDialog(outstanding[0]);
+                }
+            });
+
+            container.on("click", ".wizard-skip", function() {
+                const next = nextInWizard($("#classify-modal").data("variantTagId"));
+                if (next) {
+                    openClassifyDialog(next);
+                } else {
+                    $("#classify-modal").modal("hide");
+                }
+            });
+
+            $("#classify-modal").on("hidden.bs.modal", function() {
+                wizard = null;
+                if (reloadWhenDone) {
+                    reloadTab();
+                }
+            });
+
+            function updateReportSelection() {
+                const selected = $(".report-select:checked", container).length;
+                $("#report-selected-count", container).text(`${selected} selected`);
+                $("#create-report", container).prop("disabled", selected === 0)
+                    .text(`Create report (${selected})`);
+            }
+
+            container.on("change", ".report-select", updateReportSelection);
+            container.on("change", "#report-select-all", function() {
+                $(".report-select", container).prop("checked", $(this).is(":checked"));
+                updateReportSelection();
+            });
+            updateReportSelection();
+        });
+    </script>
+
+    <div class="container-fluid mt-2">
+        <div class="row mb-3">
+            <div class="col-md-4">
+                <div class="card h-100">
+                    <div class="card-body py-2">
+                        <div class="text-muted small">Tags to action</div>
+                        <div class="h4 mb-0">{{ outstanding }}</div>
+                        <div class="text-muted small">
+                            {% for tag, count in tag_summary %}{% if not forloop.first %} &middot; {% endif %}{{ count }} {{ tag }}{% empty %}nothing outstanding{% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card h-100">
+                    <div class="card-body py-2">
+                        <div class="text-muted small">Classifications on this case</div>
+                        <div class="h4 mb-0">{{ classification_modifications|length }}</div>
+                        <div class="text-muted small">created from the tags below</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card h-100">
+                    <div class="card-body py-2">
+                        <div class="text-muted small">Report</div>
+                        <div class="h4 mb-0" id="report-selected-count">0 selected</div>
+                        <div class="text-muted small">select classifications, then build</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mb-3">
+            <div class="card-header d-flex align-items-center">
+                <span>Tags awaiting classification</span>
+                <span class="text-muted small ml-2">classifying clears the tag when the record is for the tag's own sample - otherwise clear it yourself</span>
+                {% if can_create_classifications and outstanding %}
+                    <button type="button" class="btn btn-outline-primary btn-sm ml-auto" id="classify-all">Classify all (wizard)</button>
+                {% endif %}
+            </div>
+            <table class="table table-sm mb-0">
+                <thead>
+                    <tr>
+                        <th>Variant</th>
+                        <th>Gene</th>
+                        <th>Tag</th>
+                        <th>Sample</th>
+                        <th>Previous classifications</th>
+                        <th class="text-right">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for row in rows %}
+                    <tr class="classify-queue-row{% if row.done %} classified table-success{% endif %}"
+                        data-variant-tag-id="{{ row.variant_tag.pk }}"
+                        data-dialog-url="{% url 'classify_report_tag_dialog' case_type case_id row.variant_tag.pk %}">
+                        <td>
+                            <a href="{% url 'view_variant' row.variant_tag.variant_id %}" class="hover-link">{{ row.variant_tag.canonical_c_hgvs|default:row.variant_tag.variant }}</a>
+                        </td>
+                        <td>{{ row.gene_symbol|default_if_none:"" }}</td>
+                        <td><span class="badge badge-secondary">{{ row.variant_tag.tag_id }}</span></td>
+                        <td>{% if row.sample %}{{ row.sample.name }}{% else %}<span class="text-muted">choose when classifying</span>{% endif %}</td>
+                        <td>
+                            {% if row.previous %}
+                                <span>{{ row.previous|length }} previous</span>
+                                <div class="text-muted small">{{ row.conditions|join:", "|default:"no conditions recorded" }}</div>
+                            {% else %}
+                                <span class="text-muted">none for this allele</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-right classify-action"
+                            data-resolve-url="{% url 'resolve_variant_tag_for_case' case_type case_id row.variant_tag.pk %}">
+                            {% if row.done %}
+                                <span class="text-success mr-2">&#10003; Classified</span>
+                                <a href="{{ row.variant_tag.resolved_classification.get_absolute_url }}" target="_blank">{{ row.variant_tag.resolved_classification.friendly_label }}</a>
+                            {% elif row.can_resolve %}
+                                <span class="text-success mr-2">&#10003; Classified</span>
+                                <a href="{{ row.classification.get_absolute_url }}" target="_blank">{{ row.classification.friendly_label }}</a>
+                                <button type="button" class="btn btn-outline-success btn-sm ml-2 resolve-tag"
+                                        title="Say this classification is what the tag was asking for">Clear tag</button>
+                            {% elif can_create_classifications %}
+                                <button type="button" class="btn btn-primary btn-sm classify-tag">
+                                    {% if row.previous %}Classify &ndash; check previous&hellip;{% else %}New classification{% endif %}
+                                </button>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="6" class="text-muted text-center py-3">No tags are waiting on a classification for this case</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <span>Classifications</span>
+                <span class="text-muted small ml-2">tick the ones to include in the report</span>
+            </div>
+            <form method="post" target="_blank" action="{% url 'multi_classification_report' case_type case_id %}">
+                {% csrf_token %}
+                <table class="table table-sm mb-0">
+                    <thead>
+                        <tr>
+                            <th style="width: 34px"><input type="checkbox" id="report-select-all" aria-label="Select all" /></th>
+                            <th>Variant</th>
+                            <th>Gene</th>
+                            <th>Classification</th>
+                            <th>Sample</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for cm in classification_modifications %}
+                        <tr>
+                            <td><input type="checkbox" class="report-select" name="classification_modification_id" value="{{ cm.pk }}" checked /></td>
+                            <td>{{ cm.evidence.c_hgvs.value|default:cm.classification.variant }}</td>
+                            <td>{{ cm.evidence.gene_symbol.value|default_if_none:"" }}</td>
+                            <td>{% classification_quick cm show_condition=True %}</td>
+                            <td>{{ cm.classification.sample.name }}</td>
+                        </tr>
+                    {% empty %}
+                        <tr><td colspan="5" class="text-muted text-center py-3">No classifications yet &ndash; work through the tag queue above</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+                {% if classification_modifications %}
+                    <div class="card-body d-flex align-items-center">
+                        {% if report_templates %}
+                            <label class="text-muted small mb-0 mr-2" for="report_template">Template</label>
+                            <select class="form-control form-control-sm w-auto mr-2" name="report_template" id="report_template">
+                                {% for report_template in report_templates %}
+                                    <option value="{{ report_template.pk }}">{{ report_template.pk }}</option>
+                                {% endfor %}
+                            </select>
+                            <button class="btn btn-primary btn-sm" id="create-report">Create report</button>
+                        {% else %}
+                            <span class="text-muted small">No report templates have been configured</span>
+                        {% endif %}
+                    </div>
+                {% endif %}
+            </form>
+        </div>
+    </div>
+
+    <div class="modal fade" id="classify-modal" tabindex="-1" role="dialog">
+        <div class="modal-dialog modal-lg" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">New classification</h5>
+                    <span class="text-muted small ml-2 wizard-position"></span>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                </div>
+                <div class="modal-body"></div>
+            </div>
+        </div>
+    </div>
+</div>
