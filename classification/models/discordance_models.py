@@ -177,23 +177,31 @@ class DiscordanceReport(TimeStampedModel, ReviewableModelMixin, PreviewModelMixi
 
         existing_vms = set()
         existing_labs = set()
-        for drc in DiscordanceReportClassification.objects.filter(report=self):
+        drc_qs = DiscordanceReportClassification.objects.filter(report=self) \
+            .select_related("classification_original__classification__lab")
+        for drc in drc_qs:
             existing_vms.add(drc.classification_original.classification_id)
             existing_labs.add(drc.classification_original.classification.lab)
 
         newly_added_labs: set[Lab] = set()
+        added_classification_ids = []
         for vcm_id in self.clinical_context.classifications_qs.values_list('id', flat=True):
             if vcm_id in existing_vms:
                 existing_vms.remove(vcm_id)
             else:
-                vcm = ClassificationModification.objects.get(is_last_published=True, classification=vcm_id)
-                if vcm.classification.lab not in existing_labs:
-                    newly_added_labs.add(vcm.classification.lab)
+                added_classification_ids.append(vcm_id)
 
-                DiscordanceReportClassification(
-                    report=self,
-                    classification_original=vcm
-                ).save()
+        added_qs = ClassificationModification.objects.filter(is_last_published=True,
+                                                             classification__in=added_classification_ids) \
+            .select_related("classification__lab")
+        for vcm in added_qs:
+            if vcm.classification.lab not in existing_labs:
+                newly_added_labs.add(vcm.classification.lab)
+
+            DiscordanceReportClassification(
+                report=self,
+                classification_original=vcm
+            ).save()
 
         invalidate_cached_property(self, 'discordance_report_classifications')
         invalidate_cached_property(self, 'involved_labs')

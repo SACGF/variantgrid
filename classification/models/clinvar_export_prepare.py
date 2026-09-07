@@ -3,6 +3,7 @@ from collections import defaultdict
 from collections.abc import Iterable
 from typing import Optional
 
+from django.db.models import Count, Q
 from django.utils import timezone
 from django.utils.timezone import now
 
@@ -176,9 +177,11 @@ class ClinvarExportPrepare:
                 no_condition_count += 1
         clinvar_merger.consolidate()
 
-        total = clinvar_allele.clinvarexport_set.count()
-        in_error = clinvar_allele.clinvarexport_set.filter(status=ClinVarExportStatus.IN_ERROR).count()
-        valid = total - in_error
+        export_counts = clinvar_allele.clinvarexport_set.aggregate(
+            total=Count("pk"),
+            in_error=Count("pk", filter=Q(status=ClinVarExportStatus.IN_ERROR)))
+        in_error = export_counts["in_error"]
+        valid = export_counts["total"] - in_error
 
         clinvar_allele.classifications_missing_condition = no_condition_count
         clinvar_allele.submissions_valid = valid
