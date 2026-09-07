@@ -48,11 +48,9 @@ def calculate_vcf_stats(vcf_id, annotation_version_id):
         assert annotation_version.genome_build == vcf.genome_build, msg
         calculate_cohort_stats(vcf.cohort, annotation_version)
         _compute_vcf_specific_stats(vcf, annotation_version)
-        vcf.sample_set.update(import_status=ImportStatus.SUCCESS)
     except:
         tb = get_traceback()
         create_event(None, 'calculate_vcf_stats', details=tb, severity=LogLevel.ERROR)
-        vcf.sample_set.update(import_status=ImportStatus.ERROR)
         raise
 
 

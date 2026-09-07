@@ -60,6 +60,9 @@ Gotchas:
 - A VCF whose build cannot be resolved gets ImportStatus.REQUIRES_USER_INPUT and the pipeline TERMINATED_EARLY
   (upload/tasks/vcf/genotype_vcf_tasks.py:ImportCreateVCFModelForGenotypeVCFTask); declare genome_build/source as
   upload metadata (upload/upload_metadata.py:validate_upload_metadata).
+- Sample ImportStatus only moves with its VCF, through snpdb/import_status.py:set_vcf_and_samples_import_status
+  (success from ImportGenotypeVCFSuccessTask, error from UploadPipeline.error). A finish task list that closes the
+  pipeline before the success task leaves the VCF Importing forever - the success step is SKIPPED, not run.
 - Queues (celery_settings.py:CELERY_TASK_ROUTES, keyed by dotted class path): web_workers reads uploaded files,
   variant_id_single_worker inserts variants and zygosity counts, scheduling_single_worker runs
   schedule_pipeline_stage_steps; everything else lands on db_workers.
