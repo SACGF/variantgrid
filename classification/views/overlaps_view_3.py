@@ -15,7 +15,7 @@ from classification.models import ClassificationResultValue, \
     EvidenceKey, EvidenceKeyMap, OverlapContribution, Overlap, TriageNextStep, OverlapContributionSkew
 from classification.enums.overlaps_enums import TriageState, TriageStatus
 from classification.services.overlap_calculator import overlap_calculator_for_value_type, OVERLAP_CLIN_SIG_ENABLED
-from classification.services.overlaps_services import OverlapServices, OverlapGrouping3
+from classification.services.overlaps_services import OverlapServices, OverlapPageDetails
 from classification.views.overlaps_datatables_3 import OverlapColumns
 from library.django_utils import get_url_from_view_path
 from library.log_utils import log_admin_change
@@ -214,16 +214,16 @@ class TriageView3(AjaxFormView[OverlapContribution]):
 
 def view_overlap_3(request: HttpRequest, overlap_id: int) -> HttpResponseBase:
     overlap = Overlap.objects.filter(pk=overlap_id).get()
-    overlap_grouping = OverlapGrouping3(overlap=overlap, user=request.user)
+    overlap_details = OverlapPageDetails(overlap=overlap, user=request.user)
     context = {
-        "overlap_grouping": overlap_grouping
+        "overlap_details": overlap_details
     }
     return render_ajax_view(request, "classification/overlap_detail_3.html", context, menubar="classification")
 
 
 def view_overlap_history(request: HttpRequest, overlap_id: int) -> HttpResponseBase:
     overlap = Overlap.objects.filter(pk=overlap_id).get()
-    overlap_grouping = OverlapGrouping3(overlap=overlap, user=request.user)
+    overlap_grouping = OverlapPageDetails(overlap=overlap, user=request.user)
 
     context = {
         "overlap_grouping": overlap_grouping
@@ -301,7 +301,6 @@ def action_overlap_review(request: HttpRequest, review_id: int) -> HttpResponseB
                         contribution.comment_obj = contribution.comment_obj.next_comment("Marked as update after review - see attached review for more details")
                     # save the reviewed value if nothing else
                     contribution.save()
-
 
             OverlapServices.update_skews(overlap)
             OverlapServices.recalc_overlap(overlap)

@@ -1,11 +1,9 @@
 from django.contrib.auth.models import User
 from django.dispatch.dispatcher import receiver
 
-from classification.models import ClinicalContext
-from classification.models.classification_import_run import ClassificationImportRun, \
-    classification_imports_complete_signal
-from classification.models.clinical_context_models import ClinicalContextRecalcTrigger
-from classification.services.overlaps_services import send_prepared_discordance_notifications
+from classification.models import ClinicalContext, ClassificationImportRun
+from classification.models.classification_import_run import classification_imports_complete_signal
+from classification.services.overlaps_services import OverlapServices
 from flags.models.models import FlagCollection, \
     flag_collection_extra_info_signal, FlagInfos
 
@@ -28,3 +26,7 @@ def get_extra_info(flag_infos: FlagInfos, user: User, **kwargs):  # pylint: disa
 #         cc.recalc_and_save(cause=cc.pending_cause, cause_code=ClinicalContextRecalcTrigger.DELAYED)
 #
 #     send_prepared_discordance_notifications()
+
+@receiver(classification_imports_complete_signal, sender=ClassificationImportRun)
+def import_complete(**kwargs):
+    OverlapServices.send_prepared_discordance_notifications()

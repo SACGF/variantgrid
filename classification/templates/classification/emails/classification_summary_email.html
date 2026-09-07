@@ -45,7 +45,7 @@ Hello Shariant User,
                                         <a href="{% absolute_url 'overlaps_3' %}?tab=TT"><span style="{{ number_style }}">{{ counts.awaiting_triage_any }}</span> active discordance{% plural counts.awaiting_triage_any %} awaiting your triage</a>
                                         {% if counts.awaiting_triage_others_have_triaged %} <span style="color:#B88">({{ counts.awaiting_triage_others_have_triaged }} already triaged by other labs)</span>{% endif %}
                                     {% else %}
-                                        <span style="color:#888">No active discordances</span>
+                                        <span style="color:#888">None</span>
                                     {% endif %}
                                 </td>
                             </tr>
@@ -56,7 +56,7 @@ Hello Shariant User,
                                     {% if counts.ready_for_discussion %}
                                 <a href="{% absolute_url 'overlaps_3' %}?tab=D">{{ counts.ready_for_discussion }} of your discordances {% plural items=counts.ready_for_discussion plural='are' singular='is' %} ready to discuss with other labs</a>
                                     {% else %}
-                                        <span style="color:#666">No discordances are marked as ready for discussion</span>
+                                        <span style="color:#666">None</span>
                                     {% endif %}
                                 </td>
                             </tr>

@@ -159,7 +159,10 @@ class OverlapContribution(TimeStampedModel):
 
     @property
     def lab(self) -> Optional[Lab]:
-        # DEPRECATED, use lab_like
+        """
+        Note this can return None if the contribution is ClinVar expert panel
+        lab_like will return an object in every scenario
+        """
         if classification_grouping := self.classification_grouping:
             return classification_grouping.lab
         return None

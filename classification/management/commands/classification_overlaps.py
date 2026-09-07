@@ -17,7 +17,7 @@ from classification.models import ClassificationGrouping, Overlap, OverlapContri
 from classification.enums.overlaps_enums import OverlapContributionStatus, TriageState, \
     TriageStatus
 from classification.services.overlap_calculator import overlap_calculator_for_value_type
-from classification.services.overlaps_services import OverlapServices, OverlapGrouping3
+from classification.services.overlaps_services import OverlapServices, OverlapPageDetails
 from flags.models import Flag, FlagStatus
 from library.guardian_utils import admin_bot
 from snpdb.models import Allele

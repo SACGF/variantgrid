@@ -67,7 +67,7 @@ from classification.models.clinical_context_models import (
 )
 from classification.models.discordance_lab_summaries import DiscordanceLabSummary
 from classification.models.discordance_models_utils import DiscordanceReportRowDataTriagesRowData
-from classification.signals import send_prepared_discordance_notifications
+from classification.services.overlaps_services import OverlapServices
 from classification.tasks.classification_import_map_and_insert_task import (
     ClassificationImportMapInsertTask,
 )
@@ -1106,7 +1106,7 @@ class OverlapDiscordanceNotificationAdmin(ModelAdminBasics):
 
     @admin_action("Resend Notifications")
     def resend_notifications(self, request, queryset: QuerySet[OverlapDiscordanceNotification]):
-        send_prepared_discordance_notifications(outstanding_notifications=queryset)
+        OverlapServices.send_prepared_discordance_notifications(outstanding_notifications=queryset)
 
 
 @admin.register(UploadedClassificationsUnmapped)

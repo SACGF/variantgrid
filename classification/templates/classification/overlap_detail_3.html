@@ -5,10 +5,10 @@
 
 <div class="mt-4">
     {% if render_mode == "ajax" %}
-        {% labelled label="Page Link" %}<a class="hover-link" href="{{ overlap_grouping.overlap.get_absolute_url }}">Overlap {{ overlap_grouping.overlap.pk }}</a>{% endlabelled %}
+        {% labelled label="Page Link" %}<a class="hover-link" href="{{ overlap_details.overlap.get_absolute_url }}">Overlap {{ overlap_details.overlap.pk }}</a>{% endlabelled %}
     {% else %}
         <a href="{% url 'overlaps_3' %}" class="hover-link"><i class="fas fa-angle-left"></i> Back to all Overlaps</a>
-        {% with overlap=overlap_grouping.overlap %}
+        {% with overlap=overlap_details.overlap %}
             <div class="current-record-menu-item">
                 <div class="text-small text-muted">viewing</div>
                 <div><i class="{{ overlap.preview_icon }} mr-1" style="color:#bbb; font-size:8pt"></i><span class="text-monospace">OV_{{ overlap.pk }}</span></div>
@@ -29,10 +29,10 @@
             {% endif %}
             {% if overlap.overlap_status.is_discordant %}
             {% labelled label="Next Step" %}
-                {% if overlap_grouping.skews|length == 1 %}
-                    {{ overlap_grouping.skews.0.next_step.label }}
+                {% if overlap_details.skews|length == 1 %}
+                    {{ overlap_details.skews.0.next_step.label }}
                 {% else %}
-                    {% for skew in overlap_grouping.skews %}
+                    {% for skew in overlap_details.skews %}
                         <div>{% lab skew.contribution.classification_grouping.lab %} - <span style="font-weight:500">{{ skew.next_step.label }}</span></div>
                     {% endfor %}
                 {% endif %}
@@ -41,10 +41,10 @@
             {% labelled label="Context" %}
                 {% for testing_context in overlap.testing_contexts_objs %}{% if not forloop.first %}/{% endif %}<span class="testing-context-box testing-context-{{ testing_context.value }}">{{ testing_context.name | pretty_label:"lower" }}</span>{% endfor %}
                 {{ overlap.value_type_label }}
-                {% if overlap_grouping.other_relevant_overlaps %}
+                {% if overlap_details.other_relevant_overlaps %}
                     <div class="mt-2"><a class="toggle-link" href="#other-overlaps" data-toggle="collapse">Toggle Other Relevant Overlaps</a></div>
                 <div id="other-overlaps" class="collapse">
-                    {% for other_overlap in overlap_grouping.other_relevant_overlaps %}
+                    {% for other_overlap in overlap_details.other_relevant_overlaps %}
                         <div class="my-1">{% overlap other_overlap show_link=True %}</div>
                     {% endfor %}
                 </div>
@@ -53,8 +53,8 @@
             {% labelled label="c.HGVS" %}
                 {% for c_hgvs in overlap.c_hgvses %}
                     <div>
-                        {% if overlap_grouping.overlap.allele %}
-                            <a class="hover-link" href="{{ overlap_grouping.overlap.allele.get_absolute_url }}">{% c_hgvs c_hgvs show_genome_build=True %}</a>
+                        {% if overlap_details.overlap.allele %}
+                            <a class="hover-link" href="{{ overlap_details.overlap.allele.get_absolute_url }}">{% c_hgvs c_hgvs show_genome_build=True %}</a>
                         {% else %}
                             {% c_hgvs c_hgvs %}
                         {% endif %}
@@ -64,48 +64,48 @@
         {% endwith %}
     {% endif %}
     {% labelled label="Allele" %}
-        <a class="hover-link" href="{{ overlap_grouping.overlap.allele.get_absolute_url }}">{{ overlap_grouping.overlap.allele }}</a>
+        <a class="hover-link" href="{{ overlap_details.overlap.allele.get_absolute_url }}">{{ overlap_details.overlap.allele }}</a>
     {% endlabelled %}
     {% labelled label="Involved Labs" %}
-        {% for lab_contact in overlap_grouping.involved_labs %}
+        {% for lab_contact in overlap_details.involved_labs %}
             <div>{% lab lab_contact.lab show_contact_link=True contact_subject=lab_contact.contact_subject %}</div>
         {% endfor %}
         {% comment %}Add a warning if ClinVar is in the list of labs, they wont be diffed{% endcomment %}
     {% endlabelled %}
-    {% if overlap_grouping.discordance_reports %}
+    {% if overlap_details.discordance_reports %}
         {% labelled label="Legacy Discordance Reports" %}
-            {% for discordance_report in overlap_grouping.discordance_reports %}
+            {% for discordance_report in overlap_details.discordance_reports %}
                 <div class="my-1">{% discordance_report discordance_report %}</div>
             {% endfor %}
         {% endlabelled %}
     {% endif %}
-    {% if overlap_grouping.legacy_reviews %}
+    {% if overlap_details.legacy_reviews %}
         {% labelled label="Legacy Multi-Lab Discussions" %}
-            {% for review in overlap_grouping.legacy_reviews %}
+            {% for review in overlap_details.legacy_reviews %}
                 <div class="my-1">{% review review %}</div>
             {% endfor %}
         {% endlabelled %}
     {% endif %}
 
-    {% if overlap_grouping.overlap.has_reviews or overlap_grouping.overlap.overlap_status.is_discordant %}
+    {% if overlap_details.overlap.has_reviews or overlap_details.overlap.overlap_status.is_discordant %}
         {% labelled label="Multi-Lab Discussions" %}
-            {% for review in overlap_grouping.overlap.reviews_all %}
+            {% for review in overlap_details.overlap.reviews_all %}
                 <div class="my-1">
                     {% review review edit=True %}
                 </div>
             {% endfor %}
-            <div {% if overlap_grouping.overlap.has_reviews %}class="mt-2"{% endif %}>
-            {% if overlap_grouping.overlap.has_outstanding_triages %}
-                <span class="no-value">Still waiting on all labs to triage. <a class="hover-link" href="{% url 'overlap_report_review' overlap_id=overlap_grouping.overlap.pk %}">Click here</a> to discuss anyway.</span>
+            <div {% if overlap_details.overlap.has_reviews %}class="mt-2"{% endif %}>
+            {% if overlap_details.overlap.has_outstanding_triages %}
+                <span class="no-value">Still waiting on all labs to triage. <a class="hover-link" href="{% url 'overlap_report_review' overlap_id=overlap_details.overlap.pk %}">Click here</a> to discuss anyway.</span>
             {% else %}
-                <a class="hover-link" href="{% url 'overlap_report_review' overlap_id=overlap_grouping.overlap.pk %}"><i class="fa-solid fa-message" style="opacity:0.5; position:relative;top:1px"></i> Start Multi-Lab Discussion Discussion</a>
+                <a class="hover-link" href="{% url 'overlap_report_review' overlap_id=overlap_details.overlap.pk %}"><i class="fa-solid fa-message" style="opacity:0.5; position:relative;top:1px"></i> Start Multi-Lab Discussion Discussion</a>
             {% endif %}
             </div>
         {% endlabelled %}
     {% endif %}
 
     {% if user.is_superuser %}
-        {% labelled label="Overlap Admin" %}{% admin_link overlap_grouping.overlap %}{% endlabelled %}
+        {% labelled label="Overlap Admin" %}{% admin_link overlap_details.overlap %}{% endlabelled %}
     {% endif %}
 </div>
 
@@ -114,8 +114,8 @@
         <div class="d-flex">
             <div class="flex-grow">Classifications</div>
             <div class="flex-col">
-                <a class="hover-link" href="{% url 'classification_diff' %}?overlap={{ overlap_grouping.overlap.pk }}">Show Diffs</a>
-                {% if overlap_grouping.overlap.has_clinvar_expert_panel %} <i class="fa-info-circl text-info" title="ClinVar records won't appear in the diff"></i>{% endif %}
+                <a class="hover-link" href="{% url 'classification_diff' %}?overlap={{ overlap_details.overlap.pk }}">Show Diffs</a>
+                {% if overlap_details.overlap.has_clinvar_expert_panel %} <i class="fa-info-circl text-info" title="ClinVar records won't appear in the diff"></i>{% endif %}
             </div>
         </div>
     </div>
@@ -131,7 +131,7 @@
                 </tr>
             </thead>
             <tbody>
-                {% for overlap_entry in overlap_grouping.rows %}
+                {% for overlap_entry in overlap_details.rows %}
                     {% ifchanged overlap_entry.is_cross_context %}
                         {% if overlap_entry.is_cross_context %}
                         <tr><td colspan="6" style="text-align: center; font-weight: 600">Cross Context Records</td></tr>
@@ -182,5 +182,5 @@
 </div>
 <br/>
 <div class="mb-4">
-    <a data-toggle="ajax-collapse" href="{% url 'overlap_history' overlap_grouping.overlap.pk %}" title="Overlap History <i class='fas fa-history'></i>"></a>
+    <a data-toggle="ajax-collapse" href="{% url 'overlap_history' overlap_details.overlap.pk %}" title="Overlap History <i class='fas fa-history'></i>"></a>
 </div>

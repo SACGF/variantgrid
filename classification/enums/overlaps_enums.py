@@ -58,7 +58,7 @@ class OverlapContributionStatus(TextChoices):
 
 class TriageStatus(TextChoices):
     """
-    An OverlapContribution has a triage status, generally saying how confident they are in the record
+    An OverlapContribution has a triage status, generally saying how confident a lab is in the record
     """
 
     PENDING = "P", "Pending Triage"
@@ -111,7 +111,6 @@ class TriageState(DataClassJsonMixin):
 
     def __str__(self):
         if self.amend_value:
-            # TODO does amend_value need to be formatted?
             return f"{self.status.label} ({self.amend_value.replace("_", "-")})"
         return self.status.label
 
@@ -144,6 +143,11 @@ class TriageComment(DataClassJsonMixin):
 
 @dataclass(frozen=True)
 class OverlapState(DataClassJsonMixin):
+    """
+    Considers the outcome state of the overlap, e.g. how discordant is it, what labs are in it etc
+    Allows methods to generate OverlapState (that can then be used to update an overlap with) or
+    record before and after states for changes so we can determine if we need to send notifications
+    """
     status: OverlapStatus
     has_pending_values: bool = False
     override_status: OverlapOverrideStatus = OverlapOverrideStatus.NO_OVERRIDE
@@ -167,6 +171,10 @@ class OverlapState(DataClassJsonMixin):
 
     @staticmethod
     def is_notify_relevant(old_state: 'OverlapState', new_state: 'OverlapState') -> bool:
+        """
+        Returns true if we've entered or left discordance OR
+        if we're discordant but now have 1 or more labs attached
+        """
         if old_state.is_active_discordance ^ new_state.is_active_discordance:
             return True
         if new_state.is_active_discordance and set(new_state.lab_groups).difference(old_state.lab_groups):

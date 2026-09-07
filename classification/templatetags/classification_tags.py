@@ -42,8 +42,6 @@ from classification.models.discordance_models_utils import (
 )
 from classification.models.evidence_key import EvidenceKey, EvidenceKeyMap
 from classification.models.evidence_mixin import VCDbRefDict
-#from classification.models.evidence_mixin_summary_cache import clinical_significance_pills
-from classification.services.overlaps_services import OverlapEntryCompare
 from eventlog.models import ViewEvent
 from genes.hgvs import HGVSComponents, HGVSDisplay
 from genes.models import GeneSymbol
@@ -812,25 +810,6 @@ def overlap(overlap: Overlap, show_value_type: bool = True, show_link: bool = Fa
         "overlap": overlap,
         "show_value_type": show_value_type,
         "show_link": show_link
-    }
-
-
-@register.inclusion_tag("classification/tags/overlap_contribution.html")
-def overlap_contribution(overlap_entry: OverlapContribution | OverlapEntryCompare, show_lab: bool = False, show_context: bool = True):
-    compare_overlap_status = None
-    cross_context = False
-
-    if isinstance(overlap_entry, OverlapEntryCompare):
-        cross_context = overlap_entry.is_cross_context
-        compare_overlap_status = overlap_entry.comparison
-        overlap_entry = overlap_entry.entry_2
-
-    return {
-        "overlap_contribution": overlap_entry,
-        "show_lab": show_lab,
-        "show_context": show_context,
-        "compare_overlap_status": compare_overlap_status,
-        "cross_context": cross_context
     }
 
 
