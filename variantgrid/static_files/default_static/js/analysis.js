@@ -743,6 +743,16 @@ function setVariantTag(variantId, nodeId, tagId, successFunc, op) {
         } else {
             delete aWin.variantTags[variantId];
         }
+        if (op == 'del') {
+            // Re-tagging makes a fresh tagging, so the done marker goes with the old one
+            const resolvedTags = (aWin.variantTagsResolved || {})[variantId];
+            if (resolvedTags) {
+                delete resolvedTags[tagId];
+                if (Object.keys(resolvedTags).length === 0) {
+                    delete aWin.variantTagsResolved[variantId];
+                }
+            }
+        }
         setNumVariantTags();
         checkAndMarkDirtyNodes(aWin);
         if (response && response.node_count_types) {

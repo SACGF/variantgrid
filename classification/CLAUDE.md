@@ -63,6 +63,18 @@ Gotchas:
 - What copying from a previous classification brings across is EvidenceKey.copy_scope (NONE / ALLELE / GENE) filtered by
   copy_allele_origin (models/classification.py:ClassificationConsensus.consensus_patch). Scope is how far a value travels, so
   a GENE key also copies at allele level; copy_allele_origin=GERMLINE keeps segregation and de novo data out of somatic records.
+  Pass copy_scopes=COPY_SCOPES_GENE for a gene-only copy, and models/classification.py:ClassificationConsensus.apply_to to
+  write one into a record (fills empty fields only, as SubmissionSource.CONSENSUS).
+- The target allele origin bucket is decided before the candidates are listed, never after: nothing germline is ever offered
+  as the source for a somatic record. The create page takes it from the user's allele_origin_focus (flippable), the Classify
+  & Report dialog from Tag.allele_origin_bucket, the in-form box from the record's own bucket. External labs' records are
+  shown for context with no copy control - their evidence was assembled under a config reviewed elsewhere.
+- Gene level candidates come from models/classification.py:ClassificationConsensus.gene_consensus_groups - one row per
+  distinct set of GENE-scope values, newest representative first, capped at ten. Most records in a gene carry identical gene
+  content because they were copied from each other. The pick is always a human's: AMP tiering and therapy content are gene
+  *and* tumour type, so the row's "and N other records" spread is the deciding information, not something to automate.
+  The three surfaces that offer it (create page, Classify & Report dialog, the form's Gene Content card in
+  views/views_gene_consensus.py) all call that one function.
 - Classification.clinical_significance, allele_origin_bucket and summary are denormalised caches written by patch_value / publish
   (models/evidence_mixin_summary_cache.py:ClassificationSummaryCalculator); filter and sort on them, never recompute from
   evidence in a grid.

@@ -10,6 +10,7 @@
         <input type="hidden" name="refseq_transcript_accession" value="{{ refseq_transcript_accession }}" />
         <input type="hidden" name="ensembl_transcript_accession" value="{{ ensembl_transcript_accession }}" />
         <input type="hidden" name="copy_from_vcm_id" value="" />
+        <input type="hidden" name="copy_gene_from_vcm_id" value="" />
         <input type="hidden" name="response_format" value="json" />
 
         {% labelled label="Variant" %}{{ variant_tag.canonical_c_hgvs|default:variant_tag.variant }}{% endlabelled %}
@@ -42,8 +43,30 @@
                             <div class="text-muted small mt-1">{{ previous.interpretation_summary|truncatewords:60 }}</div>
                         {% endif %}
                     </div>
-                    <button type="button" class="btn btn-outline-primary btn-sm ml-2 apply-previous"
-                            data-vcm-id="{{ previous.modification.pk }}">Apply to this sample</button>
+                    {% if previous.can_copy %}
+                        <button type="button" class="btn btn-outline-primary btn-sm ml-2 apply-previous"
+                                data-vcm-id="{{ previous.modification.pk }}">Apply to this sample</button>
+                    {% else %}
+                        <span class="text-muted small ml-2 align-self-center">another lab &ndash; for context</span>
+                    {% endif %}
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        {% if gene_groups %}
+            <hr/>
+            <h6>Gene information from {{ row.gene_symbol }}</h6>
+            <p class="text-muted small">
+                Nothing has been curated for this allele. Gene content is the same for every variant in the
+                gene - whether the tumour type it was curated for matches this case is your call.
+            </p>
+            {% for group in gene_groups %}
+                <div class="d-flex align-items-start border-top py-2">
+                    <div class="flex-grow-1">
+                        {% include "classification/tags/gene_consensus_group.html" %}
+                    </div>
+                    <button type="button" class="btn btn-outline-primary btn-sm ml-2 apply-gene"
+                            data-vcm-id="{{ group.representative.pk }}">Apply to this sample</button>
                 </div>
             {% endfor %}
         {% endif %}

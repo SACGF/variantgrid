@@ -26,8 +26,8 @@ class TagStatsTest(TestCase):
         cls.analysis = Analysis.objects.create(genome_build=cls.genome_build, user=cls.user)
         # Artefact means the same thing to both sides of the house, so it stays in every origin's numbers
         cls.artefact = Tag.objects.create(pk="Artefact")
-        cls.reportable = Tag.objects.create(pk="SomaticReportable",
-                                            allele_origin_bucket=AlleleOriginBucket.SOMATIC)
+        cls.somatic = Tag.objects.create(pk="Somatic",
+                                         allele_origin_bucket=AlleleOriginBucket.SOMATIC)
         cls.inherited = Tag.objects.create(pk="Inherited", allele_origin_bucket=AlleleOriginBucket.GERMLINE)
         cls.allele = Allele.objects.create()
         cls.other_allele = Allele.objects.create()
@@ -36,7 +36,7 @@ class TagStatsTest(TestCase):
         for _ in range(2):
             cls._create_variant_tag(cls.artefact, cls.variant, cls.allele)
         cls._create_variant_tag(cls.artefact, cls.other_variant, cls.other_allele)
-        cls._create_variant_tag(cls.reportable, cls.variant, cls.allele)
+        cls._create_variant_tag(cls.somatic, cls.variant, cls.allele)
         cls._create_variant_tag(cls.inherited, cls.variant, cls.allele)
 
     @classmethod
@@ -71,8 +71,8 @@ class TagStatsTest(TestCase):
 
     def test_co_occurrence_counts_alleles_with_both_tags(self):
         data = self._get_json("tag_stats_co_occurrence")
-        self.assertEqual(data["tags"], ["Artefact", "Inherited", "SomaticReportable"])
-        self.assertIn({"tags": ["Artefact", "SomaticReportable"], "alleles": 1}, data["top_pairs"])
+        self.assertEqual(data["tags"], ["Artefact", "Inherited", "Somatic"])
+        self.assertIn({"tags": ["Artefact", "Somatic"], "alleles": 1}, data["top_pairs"])
 
     def test_user_card_is_for_the_requested_user(self):
         other_user = User.objects.create(username='tag_stats_other_user')
@@ -99,7 +99,7 @@ class TagStatsTest(TestCase):
         self.assertEqual(self._get_json("tag_stats_headline")["tag_events"], 0)
 
     def test_each_origin_keeps_its_own_tags_and_the_ones_marked_both(self):
-        """ Of the 5 events, 3 are Artefact (both), 1 SomaticReportable and 1 Inherited """
+        """ Of the 5 events, 3 are Artefact (both), 1 Somatic and 1 Inherited """
         somatic = self._get_json("tag_stats_headline",
                                  params={"allele_origin": AlleleOriginFilterDefault.SOMATIC})
         self.assertEqual(somatic["tag_events"], 4)
@@ -110,7 +110,7 @@ class TagStatsTest(TestCase):
     def test_cache_is_not_shared_between_allele_origins(self):
         """ Every card is origin filtered, so one origin's numbers must not be served to another """
         self.assertEqual(self._get_json("tag_stats_over_time")["totals"],
-                         {"Artefact": 3, "SomaticReportable": 1, "Inherited": 1})
+                         {"Artefact": 3, "Somatic": 1, "Inherited": 1})
         germline = self._get_json("tag_stats_over_time",
                                   params={"allele_origin": AlleleOriginFilterDefault.GERMLINE})
         self.assertEqual(germline["totals"], {"Artefact": 3, "Inherited": 1})
@@ -139,7 +139,7 @@ class TagStatsTest(TestCase):
         overrides.save()
 
         response = self.client.get(reverse("tag_stats"))
-        self.assertEqual(response.context["re_tagged_form"].initial["tag"], "SomaticReportable")
+        self.assertEqual(response.context["re_tagged_form"].initial["tag"], "Somatic")
 
 
 @override_settings(CACHES=LOCMEM_CACHE)

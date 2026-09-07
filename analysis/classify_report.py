@@ -24,7 +24,7 @@ from django.db.models import Q, QuerySet
 
 from analysis.models import Analysis, VariantTag
 from analysis.variant_tag_operations import sample_carries_variant
-from classification.enums import SpecialEKeys
+from classification.enums import AlleleOriginBucket, SpecialEKeys
 from classification.models import Classification, ClassificationModification
 from patients.models import Patient
 from snpdb.models import Lab, Sample, Tag
@@ -35,6 +35,12 @@ class PreviousClassification:
     """ An existing classification of the same allele - the scientist decides whether it applies here """
     modification: ClassificationModification
     own_lab: bool
+
+    @property
+    def can_copy(self) -> bool:
+        """ An external lab's record was curated under another config, assertion method and namespaces, so it
+            is context for the decision rather than something to copy evidence out of """
+        return not self.modification.classification.lab.external
 
     @property
     def condition(self) -> str:
@@ -63,6 +69,11 @@ class ClassifyQueueRow:
         return self.classification is not None and not self.done
 
     @property
+    def copyable(self) -> list[PreviousClassification]:
+        """ The previous classifications this row can be started from - external labs are shown, not copied """
+        return [previous for previous in self.previous if previous.can_copy]
+
+    @property
     def conditions(self) -> list[str]:
         """ Distinct conditions the allele has been classified for before - they rarely agree, which is why
             picking one is left to the scientist """
@@ -75,6 +86,18 @@ class ClassifyQueueRow:
     @cached_property
     def gene_symbol(self):
         return self.variant_tag.gene_symbol
+
+    @property
+    def allele_origin_bucket(self) -> Optional[AlleleOriginBucket]:
+        """ The bucket a classification made from this tagging goes into - the tag says which work it is
+            part of, and nothing germline is ever copied into a somatic record or the other way round """
+        return tag_allele_origin_bucket(self.variant_tag.tag)
+
+
+def tag_allele_origin_bucket(tag: Tag) -> Optional[AlleleOriginBucket]:
+    """ Which bucket a tag's classifications belong in - "Both" leaves the choice to the record being copied """
+    bucket = AlleleOriginBucket(tag.allele_origin_bucket)
+    return bucket if bucket != AlleleOriginBucket.UNKNOWN else None
 
 
 def _allele_keys(allele_id, variant_id) -> set[tuple[str, int]]:
@@ -116,7 +139,7 @@ class ClassifyReportCase:
     def _visible_variant_tags(self):
         """ Live classify-queue taggings the user can see - a tagging made in an analysis is the analysis's
             to show (@see VariantTag.can_view) """
-        return VariantTag.objects.filter(tag__requires_classification=True, tag__retired__isnull=True) \
+        return VariantTag.objects.filter(tag__in=Tag.classify_queue_qs()) \
             .filter(Q(analysis__isnull=True) | Q(analysis__in=Analysis.filter_for_user(self.user))) \
             .select_related("tag", "variant", "allele", "analysis", "sample", "genome_build")
 
@@ -204,8 +227,11 @@ class ClassifyReportCase:
         previous_by_tag = {}
         for variant_tag in variant_tags:
             previous = []
+            bucket = tag_allele_origin_bucket(variant_tag.tag)
             for key in _allele_keys(variant_tag.allele_id, variant_tag.variant_id):
                 for candidate in by_key.get(key, []):
+                    if bucket and candidate.modification.classification.allele_origin_bucket != bucket:
+                        continue
                     if candidate not in previous:
                         previous.append(candidate)
             # Own lab first, then most recently curated - it's the lab's own work that usually applies

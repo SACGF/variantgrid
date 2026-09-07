@@ -49,10 +49,24 @@ Patterns here:
   `analysis/models/nodes/analysis_node.py:AnalysisNode.get_proband_sample` at tag time), else the analysis it was made
   in contains the sample. Carrying the variant is only a display filter for a tagging with no sample - a relative who is
   HET for the proband's variant does not need their own classification, so it never assigns ownership.
+- The queue dialog's previous classifications are filtered to the tag's allele origin bucket
+  (`analysis/classify_report.py:tag_allele_origin_bucket`; "Both" means no filter), and an external lab's record is listed
+  without "Apply to this sample". Where a tagged allele has nothing of the lab's own, the dialog offers the gene level
+  candidates instead - the same `ClassificationConsensus.gene_consensus_groups` rows the create page shows.
 - A to-do tagging is resolved against a classification rather than deleted
   (`analysis/variant_tag_operations.py:resolve_variant_tag`), so it stays as the record of what was flagged. That happens
   by itself when the classification is of the tagging's own sample and via the queue row's "Clear tag" button otherwise.
   A withdrawn `resolved_classification` puts the to-do back (`VariantTag.is_resolved`).
+- Every "New Classification" button scopes with `snpdb/models/models.py:Tag.classify_queue_qs` rather than naming a tag,
+  so a lab's own queue tag is offered and resolved the same way: the tag node editor's Classifications tab
+  (`analysis/views/nodes/node_views.py:TagNodeView`), the variant tags grid (`variantopedia/grids.py:VariantTagsColumns`)
+  and the Classify & Report tab. Retiring a tag takes it out of the vocabulary, so its taggings stop being to-dos.
+- A resolved tagging is hidden from the work lists: the tags node (`TagNode.include_resolved`, off by default), the
+  variant page's tag list and the variant tags page (both on `UserGridConfig.show_hidden_data` under grid name
+  `Variant Tags`, shown as a "Show resolved" checkbox). They all filter with
+  `analysis/models/models_variant_tag.py:VariantTag.unresolved_q` - the SQL twin of `is_resolved` - never a bare
+  `resolved__isnull=True`. The analysis grid keeps the pill, since clicking it is how a tag is removed, and draws it
+  as done. Tag stats and the analyses list pills are history and count everything.
 - Load nodes with `AnalysisNode.objects.get_subclass(pk=...)` / `.select_subclasses()` (`analysis/models/nodes/analysis_node.py:NodeInheritanceManager`);
   in views use `analysis/views/analysis_permissions.py:get_node_subclass_or_404`, which enforces
   `analysis/models/models_analysis.py:Analysis.can_write` (locked analyses and template snapshots are read-only).

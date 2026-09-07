@@ -1,0 +1,13 @@
+{# Body of the Gene Content card on the classification form. Renders nothing at all once this record has #}
+{# gene content and the gene has not been curated again since - @see views_gene_consensus.py             #}
+{% if groups %}
+    {% if applied_at %}
+        <div class="small">
+            Newer gene content from {{ groups.0.representative.classification.lab }},
+            {{ groups.0.representative.curated_date|date:"j M Y" }}.
+        </div>
+    {% else %}
+        <div>Gene content available from {{ record_count }} classification{{ record_count|pluralize }} in <strong>{{ gene_symbol }}</strong>.</div>
+    {% endif %}
+    <button type="button" class="btn btn-outline-primary btn-sm mt-2" id="gene-consensus-open">Review gene content</button>
+{% endif %}

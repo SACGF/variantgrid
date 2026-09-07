@@ -51,7 +51,7 @@ from snpdb.variant_filters import (
     resolve_gene_symbols,
 )
 from variantopedia import forms
-from variantopedia.grids import VariantTagsColumns
+from variantopedia.grids import VariantTagsColumns, filter_unresolved_variant_tags
 from variantopedia.interesting_nearby import (
     get_method_summaries,
     get_nearby_qs,
@@ -223,7 +223,9 @@ def view_variant_annotation_history(request, variant_id):
 
 def variant_tags(request, genome_build_name=None):
     genome_build = UserSettings.get_genome_build_or_default(request.user, genome_build_name)
-    variant_tags_qs = VariantTag.get_for_build(genome_build)
+    # The counts and the grids below are one work list, so they hide resolved to-dos together
+    tags_qs = filter_unresolved_variant_tags(VariantTag.objects.all(), request.user)
+    variant_tags_qs = VariantTag.get_for_build(genome_build, tags_qs=tags_qs)
     tag_counts = sorted(get_field_counts(variant_tags_qs, "tag").items())
     month_ago = localtime() - timedelta(days=30)
 
@@ -234,7 +236,7 @@ def variant_tags(request, genome_build_name=None):
     # The grids below show coordinates, so a tag needs a variant in this build to appear in them.
     # get_for_build is what they both start from, so ask it rather than re-deriving the rule - a tag
     # made in this build has its own variant and shows up before liftover assigns it an allele
-    without_coordinate_qs = VariantTag.objects.exclude(
+    without_coordinate_qs = tags_qs.exclude(
         pk__in=variant_tags_qs.values_list("pk", flat=True))
     if filter_user:
         without_coordinate_qs = without_coordinate_qs.filter(user=filter_user)

@@ -10,8 +10,8 @@ from analysis.models import Analysis, VariantTag
 from analysis.models.nodes.filters.filter_node import FilterNode
 from analysis.models.nodes.filters.merge_node import MergeNode
 from analysis.models.nodes.sources.cohort_node import CohortNode
-from analysis.models.nodes.sources.trio_node import TrioNode
 from analysis.models.nodes.sources.sample_node import SampleNode
+from analysis.models.nodes.sources.trio_node import TrioNode
 from analysis.tests.inheritance_node_mixin import make_cohort_genotype
 from analysis.variant_tag_operations import (
     VARIANT_TAG_CLASSIFIED,
@@ -20,13 +20,12 @@ from analysis.variant_tag_operations import (
     resolve_requires_classification_tags_for_samples,
 )
 from annotation.fake_annotation import create_fake_variants, get_fake_annotation_version
-from classification.enums import SpecialEKeys, SubmissionSource
+from classification.enums import AlleleOriginBucket, ShareLevel, SpecialEKeys, SubmissionSource
 from classification.models import Classification, ClassificationReportTemplate
-from library.guardian_utils import assign_permission_to_user_and_groups
+from library.guardian_utils import all_users_group, assign_permission_to_user_and_groups
 from snpdb.models import Country, GenomeBuild, Lab, Organization, Tag, Variant
 from snpdb.tests.utils.fake_cohort_data import create_fake_cohort, create_fake_trio
-
-REQUIRES_CLASSIFICATION = "RequiresClassification"
+from snpdb.tests.utils.tag_testing_utils import create_classify_queue_tag
 
 
 class ClassifyReportTestCase(TestCase):
@@ -49,8 +48,7 @@ class ClassifyReportTestCase(TestCase):
         make_cohort_genotype(cls.cgc, cls.variant, "E..")
         make_cohort_genotype(cls.cgc, cls.shared_variant, ".EE")
 
-        cls.tag = Tag.objects.get_or_create(pk=REQUIRES_CLASSIFICATION,
-                                            defaults={"requires_classification": True})[0]
+        cls.tag = create_classify_queue_tag()
 
         organization = Organization.objects.get_or_create(name="classify_report_org",
                                                           group_name="classify_report_org")[0]
@@ -205,7 +203,7 @@ class ClassifyQueueTest(ClassifyReportTestCase):
         self.assertFalse(row.can_resolve)
 
 
-class ResolveRequiresClassificationTagsForSamplesTest(ClassifyReportTestCase):
+class ResolveClassifyQueueTagsForSamplesTest(ClassifyReportTestCase):
 
     def test_resolves_the_case_tagging_with_an_audit_entry(self):
         analysis = self._create_analysis()
@@ -320,18 +318,68 @@ class CreateClassificationForCaseTest(ClassifyReportTestCase):
         variant_tag.refresh_from_db()
         self.assertTrue(variant_tag.is_resolved)
 
+    def _dialog_url(self, variant_tag) -> str:
+        return reverse("classify_report_tag_dialog",
+                       kwargs={"case_type": "sample", "case_id": self.proband.pk,
+                               "variant_tag_id": variant_tag.pk})
+
     def test_dialog_offers_the_previous_classifications_of_the_allele(self):
         previous = self._classify(self.mother, data={SpecialEKeys.CLINICAL_SIGNIFICANCE: {"value": "VUS"}})
         previous.publish_latest(self.user)
 
-        url = reverse("classify_report_tag_dialog",
-                      kwargs={"case_type": "sample", "case_id": self.proband.pk,
-                              "variant_tag_id": self.variant_tag.pk})
-        response = self.client.get(url)
+        response = self.client.get(self._dialog_url(self.variant_tag))
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Apply to this sample")
         self.assertContains(response, f'data-vcm-id="{previous.last_published_version.pk}"')
+
+    def test_dialog_shows_another_labs_record_without_a_copy_control(self):
+        """ An external record was curated under another lab's config and assertion method - context, not a source """
+        external_lab = Lab.objects.create(name="external_lab", city="Sydney", external=True,
+                                          country=Country.objects.get(name="Australia"),
+                                          organization=self.lab.organization,
+                                          group_name="classify_report_org/external_lab")
+        self.user.groups.add(all_users_group())  # the record is shared, not this user's lab's
+        external_user = User.objects.create(username="external_user")
+        external_lab.group.user_set.add(external_user)
+        previous = Classification.create(user=external_user, lab=external_lab, variant=self.variant,
+                                         source=SubmissionSource.VARIANT_GRID,
+                                         data={SpecialEKeys.CLINICAL_SIGNIFICANCE: {"value": "VUS"}})
+        previous.publish_latest(external_user, share_level=ShareLevel.ALL_USERS)
+
+        response = self.client.get(self._dialog_url(self.variant_tag))
+
+        self.assertContains(response, previous.cr_lab_id)
+        self.assertNotContains(response, f'data-vcm-id="{previous.last_published_version.pk}"')
+
+    def test_a_somatic_tag_is_not_offered_a_germline_record(self):
+        somatic_tag = create_classify_queue_tag("SomaticToDo", AlleleOriginBucket.SOMATIC)
+        variant_tag = self._create_variant_tag(sample=self.proband)
+        VariantTag.objects.filter(pk=variant_tag.pk).update(tag=somatic_tag)
+        variant_tag.refresh_from_db()
+
+        germline = self._classify(self.mother, data={SpecialEKeys.ALLELE_ORIGIN: {"value": "germline"}})
+        germline.publish_latest(self.user)
+        somatic = self._classify(self.father, data={SpecialEKeys.ALLELE_ORIGIN: {"value": "somatic"}})
+        somatic.publish_latest(self.user)
+
+        row = ClassifyReportCase.for_sample(self.user, self.proband).queue_row(variant_tag)
+        self.assertEqual([p.modification.classification for p in row.previous], [somatic])
+
+    def test_copies_only_gene_content_from_the_chosen_gene_record(self):
+        previous = self._classify(self.mother, data={
+            SpecialEKeys.GENE_SYMBOL: {"value": "RUNX1"},
+            "h_summary": {"value": "RUNX1 is a transcription factor"},
+            SpecialEKeys.INTERPRETATION_SUMMARY: {"value": "about the mother's variant"},
+        })
+        previous.publish_latest(self.user)
+
+        response = self.client.post(
+            self.url, self._post_data(copy_gene_from_vcm_id=previous.last_published_version.pk))
+
+        classification = Classification.objects.get(pk=json.loads(response.content)["classification_id"])
+        self.assertEqual(classification.get("h_summary"), "RUNX1 is a transcription factor")
+        self.assertIsNone(classification.get(SpecialEKeys.INTERPRETATION_SUMMARY))
 
     def test_multi_classification_report_groups_by_gene(self):
         ClassificationReportTemplate.objects.create(

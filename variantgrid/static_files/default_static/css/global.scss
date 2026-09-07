@@ -1586,6 +1586,11 @@ table.variantgrid-datatable {
 		cursor: pointer;
 	}
 
+	// A to-do tag a classification has satisfied - still there to be read and untagged, but done
+	.grid-tag-resolved .user-tag-colored {
+		opacity: 0.55;
+	}
+
 	// Armed by clicking the tag - it sits over the tag's right end rather than being given room
 	// inside it, so arming a tag resizes nothing and the grid doesn't reflow. @see tagClickHandler
 	.grid-tag-delete {

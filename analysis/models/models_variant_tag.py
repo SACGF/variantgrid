@@ -72,6 +72,12 @@ class VariantTag(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
             return False
         return not (self.resolved_classification and self.resolved_classification.withdrawn)
 
+    @staticmethod
+    def unresolved_q() -> Q:
+        """ SQL twin of is_resolved - a withdrawn resolving classification puts the to-do back.
+            Every work list filters with this rather than a bare resolved__isnull=True """
+        return Q(resolved__isnull=True) | Q(resolved_classification__withdrawn=True)
+
     def __str__(self):
         description = f"{self.tag_id}: {self.variant} ({self.genome_build})"
         if self.analysis_id:
@@ -145,10 +151,11 @@ class VariantTag(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
                  variantallele__allele__in=tags_qs.values_list("allele"))
 
     @staticmethod
-    def get_variant_tag_counts_qs(variant, genome_build=None) -> QuerySet['VariantTag']:
+    def get_variant_tag_counts_qs(variant, genome_build=None, tags_qs=None) -> QuerySet['VariantTag']:
+        """ tags_qs - the taggings to count, applied before the grouping (default: all of them) """
         if genome_build is None:
             genome_build = variant.any_genome_build
-        qs = VariantTag.get_for_build(genome_build, variant_qs=variant.equivalent_variants)
+        qs = VariantTag.get_for_build(genome_build, tags_qs=tags_qs, variant_qs=variant.equivalent_variants)
         return qs.values("tag").annotate(count=Count("id"), last_created=Max("created")).order_by("tag")
 
     @staticmethod

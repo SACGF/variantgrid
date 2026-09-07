@@ -18,6 +18,7 @@ Patterns here:
 - Genotypes are packed one row per variant per cohort (models/models_cohort.py:CohortGenotype samples_* arrays, indexed by CohortSample.cohort_genotype_packed_field_index). Query them with models/models_cohort.py:CohortGenotypeCollection.get_annotation_kwargs and get_zygosity_q.
 - Each CohortGenotypeCollection (and VariantZygosityCountCollection, VariantCollection) is its own partition table via library/django_utils/django_partition.py:RelatedModelsPartitionModel — create_partition on save, delete_related_objects to drop.
 - Resolve which build a request is for with genome_build_manager.py:GenomeBuildManager.get_current_genome_build (GET param, URL path, user default, first annotated build, in that order).
+- `settings.TAG_REQUIRES_CLASSIFICATION` is seed data - the name a fresh install's classify queue tag gets. What behaves as one is `Tag.requires_classification`, set per tag on the tag settings page; ask `models/models.py:Tag.classify_queue_qs` (or `classify_queue_qs_for_bucket`), never a tag name.
 - Read user preferences through models/models_user_settings.py:UserSettings.get_for_user — Global, Organization, Lab then User overrides, later wins.
 - Search handlers register with search.py:search_receiver (see signals/variant_search.py); every other receiver is connected in apps.py:SnpdbConfig.ready, not at import.
 

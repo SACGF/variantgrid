@@ -94,6 +94,13 @@ $(document).ready(function() {
     {% else %}
         <div class="editor-help">All tags for this analysis</div>
     {% endif %}
+    <div class="editor-row">
+        <label class="editor-label" for="id_include_resolved">{{ form.include_resolved.label }}</label>
+        <div>
+            {{ form.include_resolved }}
+            <span class="editor-help">A to-do tag satisfied by a classification is hidden by default</span>
+        </div>
+    </div>
     <div class="editor-actions">
         {% if has_write_permission %}
             <button id='tag-node-save' class="btn btn-primary">Save</button>
@@ -107,12 +114,11 @@ $(document).ready(function() {
 
     {% if requires_classification_tags %}
         <div class="editor-help">
-        Classify variants tagged with
-        <span class="tagged-{% settings_value "TAG_REQUIRES_CLASSIFICATION" %}"><span class="user-tag-colored">{% settings_value "TAG_REQUIRES_CLASSIFICATION" %}</span></span>
+        Classify variants tagged for the classify queue
         </div>
 
         <table class="table table-sm">
-            <tr><th>Classify</th><th>Variant</th><th>Gene</th><th>Username</th><th>Date</th>
+            <tr><th>Classify</th><th>Tag</th><th>Variant</th><th>Gene</th><th>Username</th><th>Date</th>
 
         {% for vt in requires_classification_tags %}
             <tr>
@@ -121,6 +127,7 @@ $(document).ready(function() {
                         <i class="fas fa-plus-circle"></i> New Classification
                     </a>
                 </td>
+                <td><span class="grid-tag tagged-{{ vt.tag_id }}" title="Tagged as {{ vt.tag_id }}"><span class="user-tag-colored">{{ vt.tag_id }}</span></span></td>
                 <td>{{ vt.canonical_c_hgvs }}</td>
                 <td>{{ vt.gene_symbol }}</td>
                 <td>{{ vt.user }}</td>

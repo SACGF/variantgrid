@@ -79,14 +79,18 @@ def view_patient_contact_tab(request, patient_id):
 
 def view_patient_specimens(request, patient_id):
     patient = Patient.get_for_user(request.user, patient_id)
+    specimen_formset = None
     if request.method == "POST":
         specimen_formset = forms.PatientSpecimenFormSet(request.POST, instance=patient)
         valid = specimen_formset.is_valid()
         if valid:
             specimen_formset.save()
+            specimen_formset = None  # Re-read what was saved, and hand back an empty row to add to
         add_save_message(request, valid, "Patient Specimen")
 
-    specimen_formset = forms.PatientSpecimenFormSet(instance=patient)
+    if specimen_formset is None:
+        specimen_formset = forms.PatientSpecimenFormSet(instance=patient)
+
     context = {"patient": patient,
                "num_specimens": patient.num_specimens,
                "specimen_formset": specimen_formset,
@@ -106,16 +110,21 @@ def _patient_extraction_formset(patient, data=None):
 
 def view_patient_extractions(request, patient_id):
     patient = Patient.get_for_user(request.user, patient_id)
+    extraction_formset = None
     if request.method == "POST":
         extraction_formset = _patient_extraction_formset(patient, data=request.POST)
         valid = extraction_formset.is_valid()
         if valid:
             extraction_formset.save()
+            extraction_formset = None  # Re-read what was saved, and hand back an empty row to add to
         add_save_message(request, valid, "Patient Extraction")
+
+    if extraction_formset is None:
+        extraction_formset = _patient_extraction_formset(patient)
 
     context = {"patient": patient,
                "num_extractions": patient.num_extractions,
-               "extraction_formset": _patient_extraction_formset(patient),
+               "extraction_formset": extraction_formset,
                "has_write_permission": patient.can_write(request.user)}
     return render(request, 'patients/view_patient_extractions.html', context)
 

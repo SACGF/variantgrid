@@ -1,4 +1,5 @@
 {% extends "uicore/page/base.html" %}
+{% load classify_queue_tags %}
 {% load crispy_forms_tags %}
 {% load static %}
 {% load js_tags %}
@@ -194,7 +195,8 @@
             {% page_help_embedded title="Classification Record Listing" %}
                 {% if labs.count > 0 and can_create_classification %}
                     <p>
-                    Create a new Classification Record by entering a HGVS sequence in the box below, on the variant details page or inside an analysis by tagging it as RequiresClassification.
+                    {% classify_queue_tag_names as queue_tag_names %}
+                    Create a new Classification Record by entering a HGVS sequence in the box below, on the variant details page{% if queue_tag_names %} or inside an analysis by tagging it as {{ queue_tag_names }}{% endif %}.
                     </p>
                 {% endif %}
                 <p>

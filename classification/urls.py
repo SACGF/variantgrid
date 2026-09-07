@@ -75,6 +75,7 @@ from classification.views.imported_allele_info_view import (
     view_imported_allele_info_detail,
 )
 from classification.views.views import AutopopulateView, classification_import_tool
+from classification.views.views_gene_consensus import gene_consensus_panel
 from classification.views.views_hgvs_resolution_tool import hgvs_resolution_tool
 from classification.views.views_uploaded_classifications_unmapped import (
     UploadedClassificationsUnmappedColumns,
@@ -107,6 +108,9 @@ urlpatterns = [
 
     path('create_for_variant/<int:variant_id>/<genome_build_name>', views.CreateClassificationForVariantView.as_view(),
          name='create_classification_for_variant'),
+
+    path('classification/<int:classification_id>/gene_consensus', gene_consensus_panel,
+         name='classification_gene_consensus'),
 
     path('classification/reclassification_analytics', view_reclassification_analytics, name="classification_reclassification_analytics"),
     path('classification/view_metrics', view_classification_metrics, name="classification_view_metrics"),

@@ -71,6 +71,39 @@
             });
     });
     {% endif %}
+    {% if gene_consensus_enabled %}
+    // Gene level content is the same for every variant in the gene, so a record the create page never saw
+    // can still pick it up here. The card stays hidden unless the panel has something to offer.
+    $(document).ready(() => {
+        const geneConsensusUrl = "{% url 'classification_gene_consensus' classification_id=record.id %}";
+        const card = $('#vcform-gene-consensus');
+        function loadGeneConsensusCard() {
+            $('.card-body', card).load(geneConsensusUrl, function(response, status) {
+                card.toggleClass('d-none', status === 'error' || !$.trim(response));
+            });
+        }
+        loadGeneConsensusCard();
+
+        card.on('click', '#gene-consensus-open', function() {
+            const modal = $('#gene-consensus-modal');
+            $('.modal-body', modal).load(geneConsensusUrl + "?rows=1");
+            modal.modal('show');
+        });
+
+        $('#gene-consensus-modal').on('click', '.apply-gene-consensus', function() {
+            const button = $(this);
+            button.prop('disabled', true).text('Applying\u2026');
+            $.post(geneConsensusUrl,
+                   {copy_gene_from_vcm_id: button.data('vcmId'), csrfmiddlewaretoken: getCookie('csrftoken')},
+                   function() {
+                       window.location.reload();
+                   }).fail(function() {
+                       button.prop('disabled', false).text('Apply');
+                       window.alert('Could not apply the gene content.');
+                   });
+        });
+    });
+    {% endif %}
     {% if record and attachments_enabled %}
     $(document).ready(() => {
         const inputElement = document.querySelector('#classification-file-upload');
@@ -275,7 +308,29 @@
                 <div class="card-header">Criteria Summary</div>
                 <div class="card-body no-padding summary-crit" id="vcform-crit-table"></div>
             </div>
+
+            {% if gene_consensus_enabled %}
+                {# Hidden until the panel says there's something to reuse - see views_gene_consensus.py #}
+                <div id="vcform-gene-consensus" class="card m-2 d-none">
+                    <div class="card-header">Gene Content</div>
+                    <div class="card-body"></div>
+                </div>
+            {% endif %}
         </div>
     </div>
+
+    {% if gene_consensus_enabled %}
+        <div class="modal fade" id="gene-consensus-modal" tabindex="-1" role="dialog">
+            <div class="modal-dialog modal-lg" role="document">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Gene content</h5>
+                        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                    </div>
+                    <div class="modal-body"></div>
+                </div>
+            </div>
+        </div>
+    {% endif %}
 
 {% endblock content %}

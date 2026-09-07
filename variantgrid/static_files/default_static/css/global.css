@@ -1350,6 +1350,9 @@ table.variantgrid-datatable td.dt-tags_global:hover > .grid-tags {
 table.variantgrid-datatable .grid-tag-deletable .user-tag-colored {
   cursor: pointer;
 }
+table.variantgrid-datatable .grid-tag-resolved .user-tag-colored {
+  opacity: 0.55;
+}
 table.variantgrid-datatable .grid-tag-delete {
   position: absolute;
   top: 2px;

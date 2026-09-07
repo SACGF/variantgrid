@@ -165,6 +165,13 @@ cohort (`AnalysisTemplateRun`); auto-analyses on import use them.
 Candidate…). Repeats heavily - the same artefact is re-tagged in every analysis it appears in - so aggregate in SQL
 ([operations.md#scale](guides/operations.md#scale)).
 
+**Classify-queue tag** - a live `snpdb/models/models.py:Tag` with `requires_classification` set: tagging a variant with one
+is asking for it to be classified, and classifying resolves the tagging rather than deleting it. A lab flags its own on the
+tag settings page; `settings.TAG_REQUIRES_CLASSIFICATION` only names the one a fresh install is seeded with. A queue tag is
+*for a bucket* when its `allele_origin_bucket` is that bucket or "Both", the same rule
+`snpdb/models/models_enums.py:AlleleOriginFilterDefault` uses. Query with `snpdb/models/models.py:Tag.classify_queue_qs` /
+`classify_queue_qs_for_bucket` rather than naming a tag.
+
 ## People, labs and permissions (snpdb, library)
 
 **Organization / Lab** - `snpdb/models/models.py:Organization`, `Lab`. A Lab belongs to an Organization; each has a

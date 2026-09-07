@@ -3,6 +3,7 @@ from collections import defaultdict
 
 from django import template
 from django.utils.safestring import mark_safe
+from django.utils.timezone import localtime
 
 from analysis.models import VariantTag
 from analysis.models.nodes.node_counts import get_node_count_colors, get_tag_node_count_colors
@@ -51,6 +52,7 @@ class VariableCSSRGBNode(template.Node):
 
 
 class VariantTagsJSNode(template.Node):
+    """ {variant_id: [tag, ...]} - the analysis grid's tags column, pushed/spliced on tag and untag """
 
     def __init__(self, nodes):
         self.variable = template.Variable(nodes)
@@ -63,6 +65,30 @@ class VariantTagsJSNode(template.Node):
         for variant_id, tag_id in variant_tags_qs:
             variant_tags[variant_id].append(tag_id)
         return json.dumps(variant_tags)
+
+
+class VariantTagsResolvedJSNode(template.Node):
+    """ {variant_id: {tag: resolved date}} - the pills the grid draws as done. A tag is only done once
+        every tagging of it in the analysis is (@see VariantTag.unresolved_q) """
+
+    def __init__(self, nodes):
+        self.variable = template.Variable(nodes)
+
+    def render(self, context):
+        analysis = self.variable.resolve(context)
+
+        variant_tags_qs = VariantTag.objects.filter(analysis=analysis)
+        still_to_do = set(variant_tags_qs.filter(VariantTag.unresolved_q()).values_list('variant__id', 'tag__id'))
+        resolved = defaultdict(dict)
+        for variant_id, tag_id, resolved_date in variant_tags_qs.exclude(VariantTag.unresolved_q()).values_list(
+                'variant__id', 'tag__id', 'resolved'):
+            if (variant_id, tag_id) in still_to_do:
+                continue
+            date_string = localtime(resolved_date).date().isoformat()
+            tags = resolved[variant_id]
+            if date_string > tags.get(tag_id, ""):
+                tags[tag_id] = date_string
+        return json.dumps(resolved)
 
 
 @register.tag
@@ -83,6 +109,11 @@ def render_node_count_colors_css(context):
 @register.tag
 def render_variant_tags_dict(_parser, token):
     return VariantTagsJSNode(tag_utils.get_passed_object(token))
+
+
+@register.tag
+def render_variant_tags_resolved_dict(_parser, token):
+    return VariantTagsResolvedJSNode(tag_utils.get_passed_object(token))
 
 
 @register.simple_tag(takes_context=True)

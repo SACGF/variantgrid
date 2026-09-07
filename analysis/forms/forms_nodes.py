@@ -1092,6 +1092,7 @@ class TagNodeForm(BaseNodeForm):
         }
         labels = {
             "tagged_within_days": "Only tags added within (days)",
+            "include_resolved": "Include resolved",
         }
 
     def __init__(self, *args, **kwargs):
