@@ -15,8 +15,8 @@ import pandas as pd
 from auditlog.models import LogEntry
 from django.conf import settings
 from django.core.exceptions import PermissionDenied
-from django.db.models import F, Max, Q, QuerySet, StringAgg, Value
-from django.db.models.functions import Substr
+from django.db.models import F, FloatField, Max, Q, QuerySet, StringAgg, Value
+from django.db.models.functions import Cast, Substr
 from django.http import HttpRequest
 from django.shortcuts import get_object_or_404
 from django.urls.base import reverse
@@ -60,9 +60,11 @@ from ontology.models import GeneDiseaseClassification, OntologyTermRelation, Ont
 from patients.models_enums import Zygosity
 from snpdb.grid_columns.custom_columns import get_variantgrid_extra_annotate
 from snpdb.grid_columns.grid_sample_columns import (
+    COPY_NUMBER_COLUMN,
     SAMPLE_COMPOSITE_COLUMNS,
     SAMPLE_SORT_KEY_LABELS,
     get_available_format_columns,
+    get_copy_number_alias,
     get_variantgrid_zygosity_annotation_kwargs,
 )
 from snpdb.grids import AbstractVariantGrid
@@ -257,6 +259,24 @@ class VariantGrid(AbstractVariantGrid):
             val = cell[packed_column][i]
             return packed_data_replace.get(val, val)
 
+        if column == COPY_NUMBER_COLUMN:
+            # Annotated per sample out of the JSON, so there is nothing to unpack
+            copy_number_column = get_copy_number_alias(cohort.cohort_genotype_collection, sample.pk)
+
+            def copy_number_renderer(cell: CellData):
+                """ A copy ratio comes out of the JSON at full float precision - round here rather
+                    than in the cell, so the CSV says what the grid says """
+                value = cell[copy_number_column]
+                if value is None:
+                    return None
+                try:
+                    number = float(value)
+                except ValueError:
+                    return value
+                return int(number) if number.is_integer() else round(number, 3)
+
+            return copy_number_renderer
+
         renderer = unpack
         if column == "samples_filters" and cohort.vcf:
             filter_formatter = VCFFilter.get_formatter(sample.vcf)  # Per VCF - look up once, not per row
@@ -322,6 +342,8 @@ class VariantGrid(AbstractVariantGrid):
             'samples_genotype_quality': ('GQ', '%(label)s %(sample)s', 25),
             'samples_phred_likelihood': ('PL', '%(label)s %(sample)s', 25),
             'samples_filters': ('FT', '%(label)s %(sample)s', 100),
+            # Labelled with the VCF's own key (CN / SM / FC) - what the number means differs per caller
+            COPY_NUMBER_COLUMN: ('CN', '%(label)s %(sample)s', 40),
         }
         packed_data_replace = dict(Zygosity.CHOICES)
         # Some legacy data (Missing data in FreeBayes before PythonKnownVariantsImporter v12) has -2147483647 for
@@ -345,10 +367,18 @@ class VariantGrid(AbstractVariantGrid):
                 if sample_formatted_str is None or len(sample_formatted_str) == 0:
                     sample_formatted_str = str(sample.name)
 
+                cgc = cohort.cohort_genotype_collection
+                if column == COPY_NUMBER_COLUMN:
+                    if not sample.vcf.copy_number_field:
+                        continue  # Another VCF in this node has one, this sample's doesn't
+                    column_label = sample.vcf.copy_number_field
+                    extra_columns = [get_copy_number_alias(cgc, sample.pk)]
+                else:
+                    extra_columns = [cgc.get_packed_column_alias(column)]
+
                 label = label_format % {"sample": sample_formatted_str, "label": column_label}
                 renderer = self._get_sample_column_renderer(cohort, sample, packed_data_replace, column,
                                                             cohort_index, self.af_show_in_percent)
-                cgc = cohort.cohort_genotype_collection
                 self._genotype_sort_funcs[name] = self._genotype_sort_func(cgc, column, sample.pk)
                 kwargs = {
                     "key": None,
@@ -358,15 +388,23 @@ class VariantGrid(AbstractVariantGrid):
                     "renderer": renderer,
                     "csv_rendered": True,
                     "include_in_csv": True,
-                    "extra_columns": [cgc.get_packed_column_alias(column)],
+                    "extra_columns": extra_columns,
                     "sort_keys": [self.GENOTYPE_SORT_ALIAS_PREFIX + name],
                     "orderable": True,
                     "null_order": NullOrder.FIRST_ON_ASC,
                 }
                 if column == 'samples_zygosity':
+                    client_renderer_kwargs = {"samplePrefix": f"sample_{sample.pk}_"}
+                    if copy_number_field := sample.vcf.copy_number_field:
+                        # The cell draws the value as a chip - it needs the key's name and what the
+                        # VCF header said it means, neither of which is on the row
+                        client_renderer_kwargs["copyNumber"] = {
+                            "label": copy_number_field,
+                            "title": sample.vcf.copy_number_description or copy_number_field,
+                        }
                     kwargs.update({
                         "client_renderer": 'VariantGridFormat.sampleZygosity',
-                        "client_renderer_kwargs": {"samplePrefix": f"sample_{sample.pk}_"},
+                        "client_renderer_kwargs": client_renderer_kwargs,
                         "sort_menu": [
                             {"label": label, "column": f"sample_{sample.pk}_{c}"}
                             for c, label in SAMPLE_SORT_KEY_LABELS.items()
@@ -381,6 +419,9 @@ class VariantGrid(AbstractVariantGrid):
     @staticmethod
     def _genotype_sort_func(cgc, column: str, sample_id: int):
         """ This sample's value out of the cohort's packed genotype column, as something sortable """
+        if column == COPY_NUMBER_COLUMN:
+            # Already this sample's own annotation, but text out of the JSON - sort it as a number
+            return Cast(get_copy_number_alias(cgc, sample_id), FloatField())
         sql_index = cgc.get_sql_index_for_sample_id(sample_id)
         is_array, _ = CohortGenotype.COLUMN_IS_ARRAY_EMPTY_VALUE[column]
         if is_array:

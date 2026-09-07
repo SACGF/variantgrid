@@ -393,6 +393,20 @@ VariantGridFormat.sampleZygosity = (zygosity, type, rowData, ctx) => {
         values += `<span class='zyg-depth'>${escapeHtml(depths.join('/'))}</span>`;
     }
 
+    // The caller's copy number or copy ratio, where its VCF has one. Which key it came from and what
+    // that key means are per VCF, so they arrive as render kwargs - @see VCF.copy_number_field
+    const copyNumber = (ctx && ctx.kwargs && ctx.kwargs.copyNumber);
+    let copyNumberHtml = '';
+    if (copyNumber) {
+        const cn = sampleValue('samples_copy_number');
+        if (_hasSampleValue(cn)) {
+            const text = `${copyNumber.label} ${cn}`;
+            copyNumberHtml = `<span class='zyg-cn' title='${escapeHtml(`${copyNumber.title}: ${cn}`)}'>`
+                           + `${escapeHtml(text)}</span>`;
+            detail.push(text);
+        }
+    }
+
     const thresholds = (ctx && ctx.extra && ctx.extra.genotypeQuality) || {};
     let quality = '';
     for (const q of GENOTYPE_QUALITIES) {
@@ -417,7 +431,7 @@ VariantGridFormat.sampleZygosity = (zygosity, type, rowData, ctx) => {
     return `<span class='sample-zygosity' title='${escapeHtml(detail.join(' · '))}'>`
          + `<svg class='zyg-glyph ${ZYGOSITY_GLYPH_CSS[zygosity]}' viewBox='0 0 16 16'>${glyph}</svg>`
          + (values ? `<span class='zyg-values'>${values}</span>` : '')
-         + quality + filtersHtml + '</span>';
+         + copyNumberHtml + quality + filtersHtml + '</span>';
 };
 
 

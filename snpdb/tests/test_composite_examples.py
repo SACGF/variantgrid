@@ -7,6 +7,7 @@ from snpdb.grid_columns.composite_examples import (
     SAMPLE_EXAMPLE_PREFIX,
     SAMPLE_EXAMPLE_ROW,
 )
+from snpdb.grid_columns.grid_sample_columns import COPY_NUMBER_COLUMN
 from snpdb.grids import variant_grid_client_extra
 from snpdb.models import CohortGenotype, GenomeBuild, Variant, VariantGridColumn
 
@@ -65,4 +66,6 @@ class CompositeExamplesTest(TestCase):
         for key in SAMPLE_EXAMPLE_ROW:
             self.assertTrue(key.startswith(SAMPLE_EXAMPLE_PREFIX), key)
             format_column = key[len(SAMPLE_EXAMPLE_PREFIX):]
+            if format_column == COPY_NUMBER_COLUMN:
+                continue  # Read out of the JSON, so it has no packed column - @see VCF.copy_number_field
             self.assertIn(format_column, CohortGenotype.COLUMN_IS_ARRAY_EMPTY_VALUE)

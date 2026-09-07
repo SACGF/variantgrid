@@ -93,23 +93,38 @@ def get_node_export_basename(node: AnalysisNode) -> str:
     return "_".join(name_parts)
 
 
+def _get_copy_number_formats(sample_ids) -> list[tuple[int, str]]:
+    """ (sample id, the VCF key its copy number came from) for the exported samples that have one.
+        The samples in one export can come from VCFs that disagree on the key, so every key present
+        goes in FORMAT and a sample writes '.' under the ones that aren't its own """
+    values_qs = Sample.objects.filter(id__in=sample_ids, vcf__copy_number_field__isnull=False) \
+                              .values_list("id", "vcf__copy_number_field")
+    return sorted(values_qs)
+
+
 def _grid_export_vcf(genome_build, csv_columns, items, sample_ids, sample_names_by_id) -> Iterator[str]:
     samples = [sample_names_by_id[s_id] for s_id in sample_ids]
 
     use_accession = False
     info_dict = _get_vcf_info_dict(csv_columns)
+    copy_number_formats = _get_copy_number_formats(sample_ids)
+    copy_number_keys = sorted({field for _sample_id, field in copy_number_formats})
     # The export carries fusions (@see ExportVariantGrid.export_contigs), so declare the contig they
     # are written on or the file won't re-import
     header_lines = get_vcf_header_from_contigs(genome_build, info_dict, samples, use_accession=use_accession,
-                                               include_gene_level=True)
+                                               include_gene_level=True,
+                                               extra_formats=_copy_number_format_lines(copy_number_keys))
 
     pseudo_buffer = StashFile()
     writer = VCFWriter(pseudo_buffer, header_lines)
     yield pseudo_buffer.value  # header
 
+    copy_number_by_sample = dict(copy_number_formats)
     for i, obj in enumerate(items, start=1):
         chrom, pos, vcf_id, ref, alt, info, fmt, sample_calls = \
-            _grid_item_to_vcf_row(info_dict, obj, sample_ids, samples, use_accession=use_accession)
+            _grid_item_to_vcf_row(info_dict, obj, sample_ids, samples, use_accession=use_accession,
+                                  copy_number_by_sample=copy_number_by_sample,
+                                  copy_number_keys=copy_number_keys)
         writer.write_record(chrom, pos, ref, alt, vcf_id=vcf_id, info=info, fmt=fmt, sample_calls=sample_calls)
         if i % EXPORT_ROWS_PER_CHUNK == 0:
             yield pseudo_buffer.value
@@ -156,6 +171,17 @@ VCF_INFO_REPLACE = {
 }
 
 VCF_SAMPLE_FORMAT = ['GT', 'AD', 'AF', 'PL', 'DP', 'GQ']
+COPY_NUMBER_FORMAT_DESCRIPTIONS = {
+    "CN": "Copy number",
+    "SM": "Linear copy ratio over the segment",
+    "FC": "Fold change over the segment",
+}
+
+
+def _copy_number_format_lines(copy_number_keys: list[str]) -> list[str]:
+    return [f'##FORMAT=<ID={key},Number=1,Type=Float,'
+            f'Description="{COPY_NUMBER_FORMAT_DESCRIPTIONS.get(key, key)}">'
+            for key in copy_number_keys]
 
 
 def _vcf_info_encode(val):
@@ -172,14 +198,17 @@ def _format_sample_value(value):
     return str(value)
 
 
-def _format_sample_call(gt, ad, af, pl, dp, gq) -> str:
-    # GT leads whenever present; the remaining fields follow VCF_SAMPLE_FORMAT order
+def _format_sample_call(gt, ad, af, pl, dp, gq, copy_numbers=()) -> str:
+    # GT leads whenever present; the remaining fields follow VCF_SAMPLE_FORMAT order, then one value
+    # per copy number key any exported sample uses
     parts = [gt] if gt else []
     parts.extend(_format_sample_value(v) for v in (ad, af, pl, dp, gq))
+    parts.extend(_format_sample_value(v) for v in copy_numbers)
     return ":".join(parts)
 
 
-def _grid_item_to_vcf_row(info_dict, obj, sample_ids, sample_names, use_accession=True):
+def _grid_item_to_vcf_row(info_dict, obj, sample_ids, sample_names, use_accession=True,
+                          copy_number_by_sample=None, copy_number_keys=()):
     if use_accession:
         chrom = obj.get("locus__contig__refseq_accession", ".")
     else:
@@ -201,7 +230,8 @@ def _grid_item_to_vcf_row(info_dict, obj, sample_ids, sample_names, use_accessio
     fmt = None
     sample_calls = None
     if sample_ids:
-        fmt = ':'.join(VCF_SAMPLE_FORMAT)
+        fmt = ':'.join(list(VCF_SAMPLE_FORMAT) + list(copy_number_keys))
+        copy_number_by_sample = copy_number_by_sample or {}
         sample_calls = []
         for sample_id in sample_ids:
             sample_prefix = f"sample_{sample_id}_samples"
@@ -213,7 +243,11 @@ def _grid_item_to_vcf_row(info_dict, obj, sample_ids, sample_names, use_accessio
             # GQ/PL/FT are optional now
             pl = obj.get(f"{sample_prefix}_phred_likelihood", ".")
             gq = obj.get(f"{sample_prefix}_genotype_quality", ".")
-            sample_calls.append(_format_sample_call(gt, ad, af, pl, dp, gq))
+            # A value only under this sample's own key, so a CNV VCF round-trips its copy number
+            sample_key = copy_number_by_sample.get(sample_id)
+            copy_numbers = [obj.get(f"{sample_prefix}_copy_number") if key == sample_key else None
+                            for key in copy_number_keys]
+            sample_calls.append(_format_sample_call(gt, ad, af, pl, dp, gq, copy_numbers))
 
     return chrom, pos, vcf_id, ref, alt, info or None, fmt, sample_calls
 

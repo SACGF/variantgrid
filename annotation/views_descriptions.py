@@ -14,12 +14,13 @@ from library.constants import WEEK_SECS
 from library.unit_percent import get_allele_frequency_formatter
 from snpdb.grid_columns.composite_examples import (
     COMPOSITE_EXAMPLE_ROWS,
+    SAMPLE_EXAMPLE_COPY_NUMBER,
     SAMPLE_EXAMPLE_PREFIX,
     SAMPLE_EXAMPLE_ROW,
     SAMPLE_EXAMPLE_SAMPLE_NAME,
 )
 from snpdb.grid_columns.custom_columns import composite_rich_column
-from snpdb.grid_columns.grid_sample_columns import SAMPLE_SORT_KEY_LABELS
+from snpdb.grid_columns.grid_sample_columns import COPY_NUMBER_COLUMN, SAMPLE_SORT_KEY_LABELS
 from snpdb.grids import (
     AF_UNIT_COLUMNS,
     AbstractVariantGrid,
@@ -47,7 +48,8 @@ _COMPOSITE_LEVEL_ORDER = [
 # @see VariantGrid._get_grid_genotype_columns
 _SAMPLE_CELL_DESCRIPTION = (
     "Everything the VCF says about this sample&#146;s call, in the one cell - the zygosity glyph, the "
-    "allele frequency and depths, quality marks for GQ/PL and a warning where the call failed a filter"
+    "allele frequency and depths, quality marks for GQ/PL, the caller&#146;s copy number and a warning "
+    "where the call failed a filter"
 )
 _SAMPLE_MEMBER_COLUMNS = [
     ("samples_zygosity", "Sample Zygosity", "GT",
@@ -73,6 +75,10 @@ _SAMPLE_MEMBER_COLUMNS = [
     ("samples_filters", "FT (Sample Filters)", "FT",
      "Which of the VCF&#146;s filters this sample&#146;s call failed, where the caller reports them per "
      "sample rather than per record. The cell only marks a call that failed one"),
+    (COPY_NUMBER_COLUMN, "Copy Number", "CN / SM / FC",
+     "The caller&#146;s copy number over the segment - an integer copy number (CN), a linear copy ratio "
+     "(SM) or a fold change (FC), whichever the VCF header declared. The chip is labelled with the "
+     "key it came from, since what the number means differs between them"),
 ]
 
 
@@ -87,7 +93,8 @@ def _sample_composite_section(format_afs) -> dict:
         key=None, name=f"{SAMPLE_EXAMPLE_PREFIX}samples_zygosity", width=140,
         label=f"{SAMPLE_EXAMPLE_SAMPLE_NAME} Zygosity", header_title=_SAMPLE_CELL_DESCRIPTION,
         client_renderer="VariantGridFormat.sampleZygosity",
-        client_renderer_kwargs={"samplePrefix": SAMPLE_EXAMPLE_PREFIX},
+        client_renderer_kwargs={"samplePrefix": SAMPLE_EXAMPLE_PREFIX,
+                                "copyNumber": SAMPLE_EXAMPLE_COPY_NUMBER},
         sort_menu=[{"label": label, "column": f"{SAMPLE_EXAMPLE_PREFIX}{c}"}
                    for c, label in SAMPLE_SORT_KEY_LABELS.items()],
     )

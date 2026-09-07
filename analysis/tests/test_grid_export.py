@@ -102,8 +102,9 @@ class GridExportTestCase(TestCase):
         cls.analysis.set_defaults_and_save(cls.user)
 
     @classmethod
-    def _add_genotype(cls, cgc, variant, read_depth=40):
-        """ Insert a CohortGenotype row into the collection's partition table (proband at index 0) """
+    def _add_genotype(cls, cgc, variant, read_depth=40, sample_format=None):
+        """ Insert a CohortGenotype row into the collection's partition table (proband at index 0).
+            sample_format: the FORMAT JSON the importer keeps, one dict per sample """
         old_db_table = CohortGenotype._meta.db_table
         try:
             CohortGenotype._meta.db_table = cgc.get_partition_table()
@@ -111,6 +112,7 @@ class GridExportTestCase(TestCase):
                 collection=cgc, variant=variant,
                 ref_count=0, het_count=1, hom_count=0, unk_count=0,
                 filters="X",
+                format=sample_format or [],
                 samples_zygosity="E..",
                 samples_allele_depth=[20, 0, 0],
                 samples_allele_frequency=[0.5, 0.0, 0.0],

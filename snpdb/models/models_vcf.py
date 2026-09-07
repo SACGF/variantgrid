@@ -91,6 +91,10 @@ class VCF(GuardianPermissionsMixin, DataArchiveMixin, PreviewModelMixin):
     genotype_quality_field = models.TextField(null=True)
     phred_likelihood_field = models.TextField(null=True)
     sample_filters_field = models.TextField(null=True)
+    # The FORMAT (or, for a single-sample VCF, INFO) key carrying the sample's copy number or copy
+    # ratio - CN, SM, FC. There is no packed column for it: the grid reads it out of the stored
+    # CohortGenotype JSON at query time, labelled with this name (@see VCFConstant.COPY_NUMBER_FIELDS)
+    copy_number_field = models.TextField(null=True)
     allele_frequency_percent = models.BooleanField(default=False)  # Legacy data used AF as percent
     # We don't want some VCFs to add to variant zygosity count (see VCFSourceSettings)
     variant_zygosity_count = models.BooleanField(default=True)
@@ -106,6 +110,17 @@ class VCF(GuardianPermissionsMixin, DataArchiveMixin, PreviewModelMixin):
     class Meta:
         verbose_name = 'VCF'
         verbose_name_plural = 'VCFs'
+
+    @cached_property
+    def copy_number_description(self) -> Optional[str]:
+        """ The header's own description of copy_number_field - what the grid cell says on hover """
+        if not self.copy_number_field:
+            return None
+        for klass in (VCFFormat, VCFInfo):
+            if field := klass.objects.filter(vcf=self, identifier=self.copy_number_field).first():
+                # Header descriptions are stored as the file quoted them
+                return field.description.strip('"')
+        return None
 
     @property
     def data_archive_in_progress(self) -> bool:
@@ -706,6 +721,7 @@ class VCFSourceSettings(models.Model):
         "genotype_quality_field",
         "phred_likelihood_field",
         "sample_filters_field",
+        "copy_number_field",
     })
 
     source_regex = models.TextField()

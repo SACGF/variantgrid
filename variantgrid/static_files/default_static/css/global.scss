@@ -1522,6 +1522,17 @@ table.variantgrid-datatable {
 			font-size: 10px;
 		}
 
+		// The caller's own copy number / copy ratio, chipped so it doesn't read as another depth -
+		// what the key means is in the title. @see VCF.copy_number_field
+		.zyg-cn {
+			flex: none;
+			padding: 0 3px;
+			border-radius: 3px;
+			background: #eef3f8;
+			color: #3a6ea5;
+			font-size: 10px;
+		}
+
 		// One mark per quality, coloured by how bad it is - the numbers are in the cell's title
 		.zyg-qual {
 			width: 3px;

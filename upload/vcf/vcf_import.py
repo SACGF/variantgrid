@@ -92,6 +92,20 @@ def get_format_field(vcf_formats, wanted_format_id):
     return format_id
 
 
+def get_copy_number_field(vcf_formats, vcf_infos, single_sample: bool):
+    """ Which key this caller wrote copy number under, in preference order. A single-sample VCF is
+        allowed to put it in INFO (the Pisces TSO 500 shape) - with more than one sample an INFO
+        value says nothing about which of them it belongs to """
+    for field in VCFConstant.COPY_NUMBER_FIELDS:
+        if field in vcf_formats:
+            return field
+    if single_sample:
+        for field in VCFConstant.COPY_NUMBER_FIELDS:
+            if field in vcf_infos:
+                return field
+    return None
+
+
 def set_allele_depth_format_fields(vcf: VCF, vcf_formats, vcf_source, default_allele_field):
     # Use FreeBayes AO/RO fields due to AD field not being decomposed properly on multi-alts
     # @see https://github.com/SACGF/variantgrid/issues/2126
@@ -356,6 +370,8 @@ def configure_vcf_from_header(vcf, vcf_reader):
                                                                 VCFConstant.DEFAULT_PHRED_LIKILIHOOD_FIELD)
         vcf.allele_frequency_field = get_format_field(vcf_formats, VCFConstant.DEFAULT_ALLELE_FREQUENCY_FIELD)
         vcf.sample_filters_field = get_format_field(vcf_formats, VCFConstant.DEFAULT_SAMPLE_FILTERS_FIELD)
+        vcf.copy_number_field = get_copy_number_field(vcf_formats, set(header_types.get("INFO", {})),
+                                                      single_sample=vcf.genotype_samples == 1)
 
     vcf.allele_frequency_percent = False  # Explicitly set for when reloading old VCFs
     vcf.save()

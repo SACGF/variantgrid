@@ -520,6 +520,11 @@ $(document).ready(function() {
                                 <td>Sample Filters: {{ vcf.sample_filters_field }}</td>
                             </tr>
                         {% endif %}
+                        {% if vcf.copy_number_field %}
+                            <tr>
+                                <td>Copy Number: {{ vcf.copy_number_field }}</td>
+                            </tr>
+                        {% endif %}
                     </table>
                 </span>
             </p>

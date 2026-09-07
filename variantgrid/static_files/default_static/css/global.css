@@ -1298,6 +1298,14 @@ table.variantgrid-datatable .sample-zygosity .zyg-depth {
   color: #888;
   font-size: 10px;
 }
+table.variantgrid-datatable .sample-zygosity .zyg-cn {
+  flex: none;
+  padding: 0 3px;
+  border-radius: 3px;
+  background: #eef3f8;
+  color: #3a6ea5;
+  font-size: 10px;
+}
 table.variantgrid-datatable .sample-zygosity .zyg-qual {
   width: 3px;
   height: 10px;

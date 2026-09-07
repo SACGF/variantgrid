@@ -14,6 +14,8 @@ without its example keeping up.
 """
 from typing import Any
 
+from snpdb.grid_columns.grid_sample_columns import COPY_NUMBER_COLUMN
+
 
 def _va(**values) -> dict[str, Any]:
     """ variantannotation__ paths, keyed by the field name each ends in """
@@ -255,5 +257,8 @@ SAMPLE_EXAMPLE_ROW: dict[str, Any] = {
         "samples_genotype_quality": 99,
         "samples_phred_likelihood": 0,
         "samples_filters": "PASS",
+        COPY_NUMBER_COLUMN: 3,
     }.items()
 }
+# What the example cell says the copy number key is - @see VCF.copy_number_field
+SAMPLE_EXAMPLE_COPY_NUMBER = {"label": "CN", "title": "Copy number"}

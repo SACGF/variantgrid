@@ -83,6 +83,10 @@ Deep reference: __uicore_readme.md · claude/research/uicore.md
   variantgrid/static_files/default_static/js/variantgrid_formats.js) is drawn from members already riding along
   hidden - `alt__seq` and `svlen` - so a new "what kind of row is this?" signal needs no extra column. Small
   variants deliberately get no badge. @see claude/domain.md **Variant kind**.
+- A per-sample value with no packed CohortGenotype column (copy number - which FORMAT/INFO key means it is
+  per VCF) is annotated out of the stored JSON, one alias per sample, by
+  snpdb/grid_columns/grid_sample_columns.py:get_copy_number_annotation; the cell reads it like any other
+  member and the server renderer rounds it so the CSV matches.
 - Variant grids differ: snpdb/grids.py:AbstractVariantGrid builds `rich_columns` per user from the UserSettings
   CustomColumnsCollection via snpdb/grid_columns/custom_columns.py:get_variant_grid_columns (VariantGridColumn
   catalogue, composite cells, columns dropped when this build's annotation version never annotates them) plus
