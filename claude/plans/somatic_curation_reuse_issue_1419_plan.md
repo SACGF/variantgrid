@@ -52,17 +52,19 @@ sample. Tag → specimen goes tag → `node.get_samples()` → `Sample.extractio
 142 of 330 evidence keys have `copy_consensus=True`. The flag was set for germline ACMG work and has
 never been reviewed against somatic. Four findings, in descending severity.
 
-The audit is split across two issues, both raised, and both worth checking the status of before
-starting the rest of this plan:
+The audit was split across two issues, both landed:
 
-- **[#1713](https://github.com/SACGF/variantgrid/issues/1713)** — A1, A2 and A3's namespace filter. Wrong
-  today, needs no new vocabulary, wanted ASAP.
+- **[#1713](https://github.com/SACGF/variantgrid/issues/1713)** — A1 and A2, as data migrations
+  `0170_copy_consensus_off_patient_and_report_keys` and `0171_copy_consensus_off_annotation_backed_keys`.
 - **[#1714](https://github.com/SACGF/variantgrid/issues/1714)** — the `copy_scope` / `copy_allele_origin`
-  fields, covering A3's twenty germline-only keys and Part B's gene scope. Goes through Shariant triage,
-  since it changes a field labs configure.
+  fields, covering A3's twenty germline-only keys and Part B's gene scope, as
+  `0176_evidence_key_copy_scope` and `0177_evidence_key_copy_scope_and_allele_origin_values`.
+  `consensus_patch` filters on the source record's allele origin bucket, which is the bucket the new
+  record inherits; Part C's wizard seeds the bucket itself, so it wants the target bucket passed in.
 
-Land #1713 first: it is independent, and its `copy_consensus=False` settings migrate straight to
-`copy_scope = NONE` when #1714 follows.
+A3's namespace filter is not done. Filtering the patch by the target record's namespaces drops all 28
+`acmg:*` criteria, because the create form never sets `assertion_method` and the "assume ACMG unless
+Horak" rule exists only in `variantgrid/sitestatic/static/js/vc_keys.js`.
 
 ### A1 — Test-level facts about *this* tumour are marked copyable
 

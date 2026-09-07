@@ -50,6 +50,7 @@ from classification.enums import (
     CRITERIA_NOT_MET,
     AlleleOriginBucket,
     ClinicalSignificance,
+    CopyScope,
     CriteriaEvaluation,
     ShareLevel,
     SpecialEKeys,
@@ -2717,7 +2718,8 @@ class ClassificationConsensus:
         consensus: dict[str, Any] = {}
 
         # default allele origin - don't use copy consensus because that would copy "likely somatic" etc
-        if allele_origin_bucket := self.modification.classification.allele_origin_bucket:
+        allele_origin_bucket = self.modification.classification.allele_origin_bucket
+        if allele_origin_bucket:
             allele_origin = None
             if allele_origin_bucket == AlleleOriginBucket.GERMLINE:
                 allele_origin = "germline"
@@ -2727,7 +2729,11 @@ class ClassificationConsensus:
             if allele_origin:
                 consensus["allele_origin.value"] = allele_origin
 
-        for key in (ekey.key for ekey in keys.all_keys if ekey.copy_consensus):
+        def copyable(ekey: EvidenceKey) -> bool:
+            return ekey.copy_scope_enum != CopyScope.NONE and \
+                ekey.copy_allele_origin_enum.can_copy_to(allele_origin_bucket)
+
+        for key in (ekey.key for ekey in keys.all_keys if copyable(ekey)):
             for part in ['value', 'note']:
                 blob = evidence.get(key)
                 if blob is None:

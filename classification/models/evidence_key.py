@@ -22,6 +22,8 @@ from django_extensions.db.models import TimeStampedModel
 
 from classification.enums import CriteriaEvaluation, SpecialEKeys, SubmissionSource
 from classification.enums.classification_enums import (
+    CopyAlleleOrigin,
+    CopyScope,
     EvidenceCategory,
     EvidenceKeyValueType,
     ShareLevel,
@@ -194,7 +196,25 @@ class EvidenceKey(TimeStampedModel):
 
     immutable = models.BooleanField(default=False, null=False, blank=True)
 
-    copy_consensus = models.BooleanField(default=True, null=False, blank=True)
+    copy_scope = models.CharField(max_length=1, choices=CopyScope.choices, default=CopyScope.ALLELE)
+    """
+    How far a value travels when copied from a previously curated classification - ALLELE for the same
+    allele, GENE for content that is the same for every variant in the gene
+    """
+
+    @property
+    def copy_scope_enum(self) -> CopyScope:
+        return CopyScope(self.copy_scope)
+
+    copy_allele_origin = models.CharField(max_length=1, choices=CopyAlleleOrigin.choices,
+                                          default=CopyAlleleOrigin.ANY)
+    """
+    Which allele origin the key is meaningful for, keeping germline concepts out of somatic records
+    """
+
+    @property
+    def copy_allele_origin_enum(self) -> CopyAlleleOrigin:
+        return CopyAlleleOrigin(self.copy_allele_origin)
 
     variantgrid_column = models.ForeignKey(VariantGridColumn, blank=True, null=True, on_delete=SET_NULL)
     """

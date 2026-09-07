@@ -7,7 +7,7 @@ import pandas as pd
 from django.core.management import BaseCommand
 from pandas import Series
 
-from classification.enums import EvidenceCategory, EvidenceKeyValueType
+from classification.enums import CopyScope, EvidenceCategory, EvidenceKeyValueType
 from classification.models import EvidenceKey
 
 data = \
@@ -285,7 +285,7 @@ class Command(BaseCommand):
             examples = json.loads(example_str)
 
         e_key.examples = examples
-        e_key.copy_consensus = row["copy_consensus"]
+        e_key.copy_scope = CopyScope.ALLELE if row["copy_consensus"] else CopyScope.NONE
         e_key.see = row["see"]
         e_key.order = row["order"]
         e_key.allow_custom_values = row["allow_custom_values"]
