@@ -228,6 +228,24 @@ class VCF(GuardianPermissionsMixin, DataArchiveMixin, PreviewModelMixin):
         return self.has_sample_columns and any(depth_fields)
 
     @property
+    def has_allele_depth(self) -> bool:
+        """ AD was declared, or built from ref+alt depths on import (@see BulkGenotypeVCFProcessor) """
+        allele_depths = self.allele_depth_field or (self.ref_depth_field and self.alt_depth_field)
+        return self.has_sample_columns and bool(allele_depths)
+
+    @property
+    def has_read_depth(self) -> bool:
+        return self.has_sample_columns and self.read_depth_field is not None
+
+    @property
+    def has_genotype_quality(self) -> bool:
+        return self.has_sample_columns and self.genotype_quality_field is not None
+
+    @property
+    def has_phred_likelihood(self) -> bool:
+        return self.has_sample_columns and self.phred_likelihood_field is not None
+
+    @property
     def has_allele_frequency(self) -> bool:
         """ AF was read from the VCF, or derived from allele depths on import. A VCF with only DP has
             depth but nothing to make a frequency from (@see BulkGenotypeVCFProcessor) """
@@ -420,6 +438,22 @@ class Sample(GuardianPermissionsMixin, SortByPKMixin, SvgSymbolPreviewIconMixin,
     @property
     def has_depth(self) -> bool:
         return self.vcf.has_depth
+
+    @property
+    def has_allele_depth(self) -> bool:
+        return self.vcf.has_allele_depth
+
+    @property
+    def has_read_depth(self) -> bool:
+        return self.vcf.has_read_depth
+
+    @property
+    def has_genotype_quality(self) -> bool:
+        return self.vcf.has_genotype_quality
+
+    @property
+    def has_phred_likelihood(self) -> bool:
+        return self.vcf.has_phred_likelihood
 
     @property
     def has_allele_frequency(self) -> bool:

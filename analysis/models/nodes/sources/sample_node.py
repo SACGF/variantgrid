@@ -67,11 +67,13 @@ class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
     zygosity_unk = models.BooleanField(default=False)
     restrict_to_qc_gene_list = models.BooleanField(default=False)
 
-    FIELDS_THAT_CHANGE_QUERYSET = ("min_ad", "min_dp", "min_gq", "max_pl", "restrict_to_qc_gene_list")
     THRESHOLD_FIELDS = ("min_ad", "min_dp", "min_gq", "max_pl")
-    SAMPLE_FIELD_MAPPINGS = [("ad", "allele_depth"),
-                             ("dp", "read_depth"),
-                             ("gq", "genotype_quality")]
+    # What each threshold filters on - the CohortGenotype column, the lookup and how it reads in a
+    # method summary. A VCF that doesn't carry the column has nothing to filter @see get_applied_thresholds
+    THRESHOLD_SAMPLE_FIELDS = {"min_ad": ("allele_depth", "gte", "AD>="),
+                               "min_dp": ("read_depth", "gte", "DP>="),
+                               "min_gq": ("genotype_quality", "gte", "GQ>="),
+                               "max_pl": ("phred_likelihood", "lte", "PL<=")}
     # The node's zygosity checkboxes, and the code each stands for - a sample's override stores the
     # whole set as one string of these
     ZYGOSITY_FIELD_CODES = [("zygosity_ref", Zygosity.HOM_REF),
@@ -222,6 +224,21 @@ class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
                                if (value := getattr(override, f)) is not None})
         return thresholds
 
+    def get_applied_thresholds(self, sample: Sample) -> dict[str, int]:
+        """ The thresholds that actually filter this sample - a column the sample's VCF doesn't carry
+            is null on every row, so filtering on it would empty the node rather than leave it alone
+            (a fusion caller reports supporting reads and no PL, so PL<=0 dropped every variant) """
+        applied = {}
+        for field, value in self.get_sample_thresholds(sample).items():
+            if value is None:
+                continue
+            if field.startswith("min_") and value == 0:
+                continue  # A minimum of 0 passes everything - it's how "no filter" is stored
+            sample_field = self.THRESHOLD_SAMPLE_FIELDS[field][0]
+            if getattr(sample, f"has_{sample_field}"):
+                applied[field] = value
+        return applied
+
     @cached_property
     def _node_pass_only(self) -> bool:
         return NodeVCFFilter.has_pass(self)
@@ -277,19 +294,13 @@ class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
         q = Q(**{f"{field}__in": zygosity})
         arg_q_dict[alias] = {str(q): q}
 
-        if sample.has_depth:
-            thresholds = self.get_sample_thresholds(sample)
-            for node_field, ov_field in self.SAMPLE_FIELD_MAPPINGS:
-                if min_value := thresholds[f"min_{node_field}"]:
-                    alias, ov_path = sample.get_cohort_genotype_alias_and_field(ov_field)
-                    q = Q(**{f"{ov_path}__gte": min_value})
-                    self.merge_arg_q_dicts(arg_q_dict, {alias: {str(q): q}})
+        for field, value in self.get_applied_thresholds(sample).items():
+            sample_field, lookup, _ = self.THRESHOLD_SAMPLE_FIELDS[field]
+            alias, ov_path = sample.get_cohort_genotype_alias_and_field(sample_field)
+            q = Q(**{f"{ov_path}__{lookup}": value})
+            self.merge_arg_q_dicts(arg_q_dict, {alias: {str(q): q}})
 
-            if (max_pl := thresholds["max_pl"]) is not None:
-                alias, pl_path = sample.get_cohort_genotype_alias_and_field("phred_likelihood")
-                q = Q(**{f"{pl_path}__lte": max_pl})
-                self.merge_arg_q_dicts(arg_q_dict, {alias: {str(q): q}})
-
+        if sample.has_allele_frequency:
             if sample_arg_q_dict := self._get_sample_allele_frequency_arg_q_dict(sample):
                 self.merge_arg_q_dicts(arg_q_dict, sample_arg_q_dict)
 
@@ -371,12 +382,9 @@ class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
 
     def _get_sample_method_summary(self, sample: Sample) -> str:
         sample_description = f"Sample {sample.name}"
-        thresholds = self.get_sample_thresholds(sample)
-        for node_field, _ in self.SAMPLE_FIELD_MAPPINGS:
-            if min_value := thresholds[f"min_{node_field}"]:
-                sample_description += f" {node_field.upper()}>={min_value}"
-        if (max_pl := thresholds["max_pl"]) is not None:
-            sample_description += f" PL<={max_pl}"
+        for field, value in self.get_applied_thresholds(sample).items():
+            label = self.THRESHOLD_SAMPLE_FIELDS[field][2]
+            sample_description += f" {label}{value}"
         if self.has_filters and self.get_sample_pass_only(sample):
             sample_description += " PASS"
         if (override := self.get_sample_filter(sample)) and override.has_allele_frequency:
@@ -438,14 +446,19 @@ class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
         if NodeAlleleFrequencyFilter.get_sample_arg_q_dict(self, self.sample):
             return True
 
-        return any(getattr(self, f) for f in self.FIELDS_THAT_CHANGE_QUERYSET)
+        if self.restrict_to_qc_gene_list:
+            return True
+
+        # Only the thresholds the query actually applies - one the VCF has no column for isn't in
+        # the query, so it can't move the count away from the cached stats
+        return bool(self.get_applied_thresholds(self.sample))
 
     def _get_cached_label_count(self, label):
         """ Input counts can be static, so use cached CohortGenotype*Stats if we can. """
-        if self._has_filters_that_affect_label_counts():
-            return None  # Have to do counts
         if self.sample is None:
             return None
+        if self._has_filters_that_affect_label_counts():
+            return None  # Have to do counts
 
         filter_key = get_handler_for_node(self).filter_key_for_node(self)
 
