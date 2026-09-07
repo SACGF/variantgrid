@@ -94,6 +94,13 @@ $(document).ready(function() {
     {% else %}
         <div class="editor-help">All tags for this analysis</div>
     {% endif %}
+    <div class="editor-row">
+        <label class="editor-label" for="id_include_resolved">{{ form.include_resolved.label }}</label>
+        <div>
+            {{ form.include_resolved }}
+            <span class="editor-help">A to-do tag satisfied by a classification is hidden by default</span>
+        </div>
+    </div>
     <div class="editor-actions">
         {% if has_write_permission %}
             <button id='tag-node-save' class="btn btn-primary">Save</button>

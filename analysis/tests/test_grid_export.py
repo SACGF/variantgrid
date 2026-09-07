@@ -186,7 +186,7 @@ class TestFormatItemsIterator(GridExportTestCase):
 
     def test_tags_are_summarised_and_analysis_tags_applied(self):
         items = [
-            {"id": 1, "tags_global": "foo:2024-03-01|bar:2019-07-12|foo:2019-07-12", "tags": None},
+            {"id": 1, "tags_global": "foo:2024-03-01:|bar:2019-07-12:|foo:2019-07-12:", "tags": None},
             {"id": 2, "tags_global": None, "tags": None},
         ]
         formatted = list(format_items_iterator(iter(items), {2: "in_analysis"}))
@@ -196,13 +196,26 @@ class TestFormatItemsIterator(GridExportTestCase):
         self.assertEqual(formatted[1]["tags"], "in_analysis")
 
     def test_tags_fresh_counts_with_stale_cutoff(self):
-        payload = "foo:2024-03-01|foo:2019-07-12|foo:2019-06-01|bar:2019-01-01|baz:2024-05-06"
+        payload = "foo:2024-03-01:|foo:2019-07-12:|foo:2019-06-01:|bar:2019-01-01:|baz:2024-05-06:"
         items = [{"id": 1, "tags_global": payload, "tags": None}]
         stale_date = datetime(2020, 1, 1, tzinfo=timezone.utc)
         formatted = list(format_items_iterator(iter(items), tag_stale_date=stale_date))
         # Multi-event tags show fresh of total; a single entirely-stale tag shows (0 fresh);
         # a single fresh tag stays as today
         self.assertEqual(formatted[0]["tags_global"], "foo x 3 (1 fresh), bar (0 fresh), baz")
+
+    def test_resolved_tag_events_are_counted(self):
+        """ A to-do a classification satisfied is done - the summary says how many of the events are """
+        payload = "foo:2024-03-01:R|foo:2019-07-12:|bar:2019-01-01:R"
+        items = [{"id": 1, "tags_global": payload, "tags": None}]
+        formatted = list(format_items_iterator(iter(items)))
+        self.assertEqual(formatted[0]["tags_global"], "foo x 2 (1 resolved), bar (1 resolved)")
+
+    def test_a_tag_id_containing_a_colon_keeps_its_name(self):
+        """ Tag ids are user supplied, so only the two trailing fields are separators """
+        items = [{"id": 1, "tags_global": "a:b:2024-03-01:R", "tags": None}]
+        formatted = list(format_items_iterator(iter(items)))
+        self.assertEqual(formatted[0]["tags_global"], "a:b (1 resolved)")
 
     def test_missing_sample_values_export_as_dot(self):
         node = self._sample_node()

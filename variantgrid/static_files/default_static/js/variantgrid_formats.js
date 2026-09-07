@@ -951,10 +951,19 @@ VariantGridFormat.tags = (tagsCellValue, type, rowData) => {
 
     const tagList = (aWin.variantTags || {})[variantId];
     if (tagList) {
+        // A to-do tag a classification has satisfied stays on the row (it's how it gets untagged)
+        // but reads as done - @see render_variant_tags_resolved_dict
+        const resolvedTags = (aWin.variantTagsResolved || {})[variantId] || {};
         const sortedTags = sortVariantTags(aWin, tagList);
         for (let i=0 ; i<sortedTags.length ; ++i) {
             const tag = sortedTags[i];
-            tagHtml += getVariantTagHtml(variantId, tag, readOnly);
+            const resolvedDate = resolvedTags[tag];
+            if (resolvedDate) {
+                tagHtml += getVariantTagHtml(variantId, tag, readOnly, `${tag} <i class='fas fa-check'></i>`,
+                                             ["grid-tag-resolved"], `Tagged as ${tag} - classified ${resolvedDate}`);
+            } else {
+                tagHtml += getVariantTagHtml(variantId, tag, readOnly);
+            }
         }
     }
     // Wrapped so the set can lift out of the clipped cell as one thing on hover - @see .grid-tags
@@ -975,20 +984,27 @@ VariantGridFormat.tagsGlobal = (value, type, rowData) => {
         staleCutoff = new Date(Date.now() - staleDays * 86400 * 1000).toISOString().slice(0, 10);
     }
 
-    // Entries are "tag:date" - see get_variantgrid_extra_annotate
+    // Entries are "tag:date:resolved" - see get_variantgrid_extra_annotate. A tag id can contain a
+    // colon, so take the two trailing fields off the end rather than splitting
     const tagStats = {};
     const entries = value.split("|");
     for (let i=0 ; i<entries.length ; ++i) {
-        const entry = entries[i];
-        const sep = entry.lastIndexOf(":");
+        let entry = entries[i];
+        let sep = entry.lastIndexOf(":");
+        const resolved = sep >= 0 ? entry.slice(sep + 1) : "";
+        entry = sep >= 0 ? entry.slice(0, sep) : entry;
+        sep = entry.lastIndexOf(":");
         const tag = sep >= 0 ? entry.slice(0, sep) : entry;
         const date = sep >= 0 ? entry.slice(sep + 1) : null;
         let stats = tagStats[tag];
         if (!stats) {
-            stats = {total: 0, fresh: 0, mostRecent: null};
+            stats = {total: 0, fresh: 0, resolved: 0, mostRecent: null};
             tagStats[tag] = stats;
         }
         stats.total += 1;
+        if (resolved) {
+            stats.resolved += 1;
+        }
         if (date && (!staleCutoff || date >= staleCutoff)) {
             stats.fresh += 1;
         }
@@ -1016,6 +1032,17 @@ VariantGridFormat.tagsGlobal = (value, type, rowData) => {
             } else if (stats.total > 1) {
                 tagLabel = `${tag} x ${stats.total} (${stats.fresh} fresh)`;
                 title = `${stats.fresh} of ${stats.total} tag events within the last ${staleDays} days, most recent ${stats.mostRecent}`;
+            }
+        }
+        // Done rather than hidden - the pill is still how the tag is read and removed
+        if (stats.resolved) {
+            if (stats.resolved === stats.total) {
+                extraClasses.push("grid-tag-resolved");
+                tagLabel += " <i class='fas fa-check'></i>";
+                title = title ? `${title}; classified` : `Tagged as ${tag} - classified`;
+            } else {
+                const resolvedText = `${stats.resolved} of ${stats.total} resolved`;
+                title = title ? `${title}; ${resolvedText}` : `Tagged as ${tag} - ${resolvedText}`;
             }
         }
         tagGlobalHtml += getVariantTagHtml(variantId, tag, true, tagLabel, extraClasses, title);

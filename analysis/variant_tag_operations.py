@@ -5,7 +5,9 @@ classification has satisfied.
 A tag with Tag.requires_classification is a to-do item, and classifying the variant is what completes it.
 The tagging is marked resolved and linked to the classification rather than deleted, so it stays as the record
 of what was flagged and what it turned into, and withdrawing the classification puts the to-do back
-(@see VariantTag.is_resolved). Resolved taggings still show everywhere a tagging shows.
+(@see VariantTag.is_resolved). The work lists - the tags node, the variant page's tag list and the variant
+tags page - leave a resolved tagging out unless asked for, each filtering with VariantTag.unresolved_q;
+the analysis grid keeps the pill (it is how a tag is removed) and styles it as done.
 
 VariantTag isn't registered with auditlog - taggings come and go all the time and we only want this one
 deliberate resolution - so the LogEntry is written by hand. Putting analysis_id in additional_data is what

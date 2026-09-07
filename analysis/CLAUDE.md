@@ -53,6 +53,12 @@ Patterns here:
   (`analysis/variant_tag_operations.py:resolve_variant_tag`), so it stays as the record of what was flagged. That happens
   by itself when the classification is of the tagging's own sample and via the queue row's "Clear tag" button otherwise.
   A withdrawn `resolved_classification` puts the to-do back (`VariantTag.is_resolved`).
+- A resolved tagging is hidden from the work lists: the tags node (`TagNode.include_resolved`, off by default), the
+  variant page's tag list and the variant tags page (both on `UserGridConfig.show_hidden_data` under grid name
+  `Variant Tags`, shown as a "Show resolved" checkbox). They all filter with
+  `analysis/models/models_variant_tag.py:VariantTag.unresolved_q` - the SQL twin of `is_resolved` - never a bare
+  `resolved__isnull=True`. The analysis grid keeps the pill, since clicking it is how a tag is removed, and draws it
+  as done. Tag stats and the analyses list pills are history and count everything.
 - Load nodes with `AnalysisNode.objects.get_subclass(pk=...)` / `.select_subclasses()` (`analysis/models/nodes/analysis_node.py:NodeInheritanceManager`);
   in views use `analysis/views/analysis_permissions.py:get_node_subclass_or_404`, which enforces
   `analysis/models/models_analysis.py:Analysis.can_write` (locked analyses and template snapshots are read-only).

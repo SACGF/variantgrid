@@ -24,6 +24,8 @@ class TagNode(AnalysisNode):
     node_input = models.CharField(max_length=1, choices=TagNodeInput.choices, default=TagNodeInput.PARENT_TAGGED)
     mode = models.CharField(max_length=1, choices=TagNodeMode.choices, default=TagNodeMode.THIS_ANALYSIS)
     tagged_within_days = models.IntegerField(null=True, blank=True)
+    # A resolved to-do tagging (VariantTag.resolved) is done, so it is left out unless asked for
+    include_resolved = models.BooleanField(default=False)
 
     def modifies_parents(self):
         return True
@@ -60,11 +62,13 @@ class TagNode(AnalysisNode):
 
     def tagged_variants_q(self, tag_ids: list[str], cutoff: Optional[datetime] = None) -> Q:
         """ Variants carrying any of tag_ids (any tag at all if empty), within this node's tag scope.
-            The one place local vs global tags is decided """
+            The one place local vs global tags, and resolved to-dos, is decided """
         # Pull in tags from this analysis - use variant query
         # VariantTags are same build as analysis, so use this not Allele as it avoids a race condition where
         # tagging a variant w/o an Allele takes a few seconds to create one via liftover pipelines
         variants_with_tags = VariantTag.objects.filter(analysis=self.analysis)
+        if not self.include_resolved:
+            variants_with_tags = variants_with_tags.filter(VariantTag.unresolved_q())
         if tag_ids:
             variants_with_tags = variants_with_tags.filter(tag__in=tag_ids)
         if cutoff:
@@ -77,6 +81,8 @@ class TagNode(AnalysisNode):
             tags_qs = VariantTag.filter_for_user(self.analysis.user)
             # We already have tags from this analysis, no need to retrieve again
             tags_qs = tags_qs.exclude(analysis=self.analysis)
+            if not self.include_resolved:
+                tags_qs = tags_qs.filter(VariantTag.unresolved_q())
             if cutoff:
                 tags_qs = tags_qs.filter(created__gte=cutoff)
             # Builds from different analyses (maybe diff builds) - so do query using Allele
@@ -154,6 +160,9 @@ class TagNode(AnalysisNode):
             if self.tagged_within_days is not None:
                 description_list.append(f"≤ {self.tagged_within_days}d")
 
+            if self.include_resolved:
+                description_list.append("incl. resolved")
+
             description = " ".join(description_list)
         else:
             description = self.ANALYSIS_TAGS_NAME  # Has to be set to this
@@ -184,6 +193,8 @@ class TagNode(AnalysisNode):
         if self.tagged_within_days is not None:
             summary += f", tagged within {self.tagged_within_days} days" \
                        f" (since {localtime(self.tagged_within_cutoff):%d %b %Y})"
+        if self.include_resolved:
+            summary += ", incl. resolved"
         return summary
 
     def get_css_classes(self):

@@ -253,15 +253,22 @@ def _grid_item_to_vcf_row(info_dict, obj, sample_ids, sample_names, use_accessio
 
 
 def _summarise_tags_global(tags_global: str, stale_cutoff: Optional[str]) -> str:
-    """ tags_global entries are 'tag:date' - see get_variantgrid_extra_annotate.
+    """ tags_global entries are 'tag:date:resolved' - see get_variantgrid_extra_annotate. A tag id can
+        itself contain a colon, so the two trailing fields come off the end.
         stale_cutoff: ISO date - events on/after it count as fresh (None = no fresh counts) """
     totals = Counter()
     fresh = Counter()
+    resolved = Counter()
     for entry in tags_global.split("|"):
-        tag, sep, entry_date = entry.rpartition(":")
+        entry, sep, resolved_marker = entry.rpartition(":")
         if not sep:  # rpartition puts a separator-less entry in the tail
+            entry, resolved_marker = resolved_marker, ""
+        tag, sep, entry_date = entry.rpartition(":")
+        if not sep:
             tag, entry_date = entry_date, ""
         totals[tag] += 1
+        if resolved_marker:
+            resolved[tag] += 1
         if entry_date and (stale_cutoff is None or entry_date >= stale_cutoff):
             fresh[tag] += 1
 
@@ -270,6 +277,8 @@ def _summarise_tags_global(tags_global: str, stale_cutoff: Optional[str]) -> str
         summary = f"{tag} x {count}" if count > 1 else tag
         if stale_cutoff is not None and (count > 1 or fresh[tag] < count):
             summary += f" ({fresh[tag]} fresh)"
+        if resolved[tag]:
+            summary += f" ({resolved[tag]} resolved)"
         summarised_tags.append(summary)
     return ", ".join(summarised_tags)
 
