@@ -978,8 +978,10 @@ VariantGridFormat.tags = (tagsCellValue, type, rowData) => {
                 title = `Tagged as ${tag} for ${sampleNames[tagging.sample] || "another sample"}`;
             } else {
                 marker = "far fa-user";
-                title = `Tagged as ${tag}, no sample - tag here to make one for ` +
-                        (sampleNames[probandSampleId] || "this sample");
+                title = `Tagged as ${tag}, no sample`;
+                if (!readOnly) {
+                    title += " - tag here to make one for " + (sampleNames[probandSampleId] || "this sample");
+                }
             }
             let tagLabel = tag;
             // A to-do tag a classification has satisfied stays on the row (it's how it gets untagged)

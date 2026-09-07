@@ -16,7 +16,6 @@ from analysis.tests.inheritance_node_mixin import make_cohort_genotype
 from analysis.variant_tag_operations import (
     VARIANT_TAG_CLASSIFIED,
     get_proband_sample_by_node_id,
-    get_sample_for_variant_tag,
     resolve_requires_classification_tags_for_samples,
 )
 from annotation.fake_annotation import create_fake_variants, get_fake_annotation_version
@@ -83,24 +82,11 @@ class ClassifyReportTestCase(TestCase):
 
 
 class VariantTagSampleTest(ClassifyReportTestCase):
-    """ Which sample a tagging is about - the study's proband, not whoever happens to carry the variant """
+    """ Which sample a node's tagging is about - the study's proband, not whoever happens to carry the variant.
+        The bulk lookup is what the backfill relies on - one graph load answers for every node in the analysis """
 
-    def test_node_proband_is_the_taggings_sample(self):
-        analysis = self._create_analysis()
-        node = SampleNode.objects.create(analysis=analysis, sample=self.mother)
+    def test_bulk_lookup_gives_a_sample_nodes_sample_and_nothing_for_a_cohort(self):
         # The mother doesn't carry the variant - the node she was tagged in still says who it's about
-        variant_tag = self._create_variant_tag(analysis=analysis, node=node)
-        self.assertEqual(get_sample_for_variant_tag(variant_tag), self.mother)
-
-    def test_cohort_node_has_no_proband(self):
-        analysis = self._create_cohort_analysis()
-        node = analysis.analysisnode_set.get()
-        # Only the proband carries it, but being the one carrier is not what makes it their to-do
-        variant_tag = self._create_variant_tag(analysis=analysis, node=node)
-        self.assertIsNone(get_sample_for_variant_tag(variant_tag))
-
-    def test_bulk_lookup_gives_the_same_answers_as_asking_a_tag_at_a_time(self):
-        """ What the backfill relies on - one graph load answers for every node in the analysis """
         analysis = self._create_analysis()
         sample_node = SampleNode.objects.create(analysis=analysis, sample=self.mother)
         cohort_node = CohortNode.objects.create(analysis=analysis, cohort=self.cohort)
@@ -121,9 +107,6 @@ class VariantTagSampleTest(ClassifyReportTestCase):
 
         proband_sample_by_node_id = get_proband_sample_by_node_id(analysis)
         self.assertEqual(proband_sample_by_node_id[merge.pk], trio.proband.sample)
-
-        variant_tag = self._create_variant_tag(analysis=analysis, node=merge)
-        self.assertEqual(get_sample_for_variant_tag(variant_tag), trio.proband.sample)
 
     def test_bulk_lookup_follows_the_graph_to_an_ancestors_proband(self):
         analysis = self._create_analysis()

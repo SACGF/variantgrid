@@ -19,6 +19,11 @@ from snpdb.variant_queries import get_variant_queryset_for_gene_symbol
 register = template.Library()
 
 
+def _json_for_script(value) -> str:
+    """ Inline in a <script> block - tag and sample names are user data, so '</script>' must not end it """
+    return json.dumps(value).replace("</", "<\\/")
+
+
 def render_user_tag_styles(prefix, user_tag_style):
     """ CSS rules for UserTagColor - .<prefix><tag> > .user-tag-colored """
     css_string = ''
@@ -71,7 +76,7 @@ class VariantTagsJSNode(template.Node):
                 resolved_date = localtime(resolved).date().isoformat()
             variant_tags[variant_id].append({"id": pk, "tag": tag_id, "sample": sample_id,
                                              "resolved": resolved_date})
-        return json.dumps(variant_tags)
+        return _json_for_script(variant_tags)
 
 
 @register.tag
@@ -97,13 +102,13 @@ def render_variant_tags_dict(_parser, token):
 @register.simple_tag
 def render_analysis_samples_dict(analysis):
     """ {sample_id: name} - what a tagging's sample is called on its pill's tooltip """
-    return mark_safe(json.dumps({s.pk: str(s) for s in analysis.get_samples()}))
+    return mark_safe(_json_for_script({s.pk: str(s) for s in analysis.get_samples()}))
 
 
 @register.simple_tag(takes_context=True)
 def render_variant_tag_order(context):
     """ {tag_id: sort_order} for JS tag sorting - see sortVariantTags in grid.js """
-    return mark_safe(json.dumps(get_tag_sort_order_by_tag(context["user"])))
+    return mark_safe(_json_for_script(get_tag_sort_order_by_tag(context["user"])))
 
 
 @register.inclusion_tag("analysis/tags/render_tag_styles_and_formatter.html", takes_context=True)

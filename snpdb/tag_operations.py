@@ -271,8 +271,7 @@ def merge_tag(dying_tag: Tag, surviving_tag: Tag, user: User) -> TagMergeResult:
     """ Repoint everything using dying_tag at surviving_tag, then retire dying_tag. The repointing cannot
         be undone - reinstating the tag afterwards gets the name back, not the rows.
         An analysis tagging the surviving tag already holds for the same variant, analysis, user and sample
-        is dropped rather than moved - the same repeat the variant_tags delete-duplicates command clears up
-        in data made before the constraint. """
+        is dropped rather than moved (@see VariantTag.Meta). """
     if dying_tag.pk == surviving_tag.pk:
         raise ValueError("Cannot merge a tag into itself")
     if not surviving_tag.active:

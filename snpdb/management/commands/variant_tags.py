@@ -3,8 +3,8 @@ Variant tag maintenance.
 
 Tag names are their primary key, so deployments accumulate case variants of the same tag (eg 'artefact' and
 'Artefact') that split reporting and node filters. Repeats of one analysis tagging can no longer be written
-(@see VariantTag.Meta), but data made before that constraint still carries them - run delete-duplicates to
-clear them out.
+(@see VariantTag.Meta - its migration deleted the ones made before it); global taggings can still repeat,
+and delete-duplicates clears those.
 
 @see https://github.com/SACGF/variantgrid/issues/1751
 """

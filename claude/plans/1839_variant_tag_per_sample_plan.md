@@ -16,7 +16,7 @@ current node's proband so the difference is visible.
 ## 1. What exists
 
 - `analysis/models/models_variant_tag.py:VariantTag` already carries `sample` - the tagged node's proband at tag time
-  (`analysis/variant_tag_operations.py:get_sample_for_variant_tag`), null when the node has no unambiguous proband and
+  (`AnalysisNode.get_proband_sample` of the tagged node), null when the node has no unambiguous proband and
   never prompted for.
 - A tagging's identity is the `get_or_create` key in `analysis/views/views_json.py:set_variant_tag`:
   variant, tag, genome build, location, analysis, user. Sample is not in it, so tagging the same variant with the same
@@ -62,8 +62,9 @@ class VariantTag(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
 
 `nulls_distinct=False` needs Django 5+ and PostgreSQL 15+; this box is Django 6.1 on PostgreSQL 16. The migration adds
 the constraint only - it was verified on vg-test2 that no analysis tagging violates it (4 analysis taggings, none with
-a sample). Deployments with older data: the migration's `test=` should count violations and a `ManualOperation` dedupe
-is only worth writing if one turns up.
+a sample). Deployments with older data hold repeats a tag merge left behind, and a `ManualOperation` cannot clear them
+first - the migrator runs `migrate` before it surfaces manual tasks - so the migration deletes them itself before the
+`AddConstraint`, keeping the earliest of each set (the `variant_tags delete-duplicates` rule).
 
 ### 2.2 What the browser holds
 

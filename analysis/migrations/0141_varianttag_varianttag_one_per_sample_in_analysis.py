@@ -2,19 +2,21 @@
 
 from django.conf import settings
 from django.db import migrations, models
-from django.db.models import Count
+from django.db.models import Min
 
 
-def _check_no_repeated_analysis_taggings(apps, _schema_editor):
+def _delete_repeated_analysis_taggings(apps, _schema_editor):
     """ The constraint can't go on while an analysis holds repeats of one tagging. Data made before it can
-        (a tag merge used to leave them), and 'manage.py variant_tags delete-duplicates' clears them out """
+        (a tag merge used to leave them) - the earliest of each set stays, the same rule as
+        'manage.py variant_tags delete-duplicates'. Global (variant page) taggings are outside the
+        constraint and untouched """
     VariantTag = apps.get_model("analysis", "VariantTag")
-    repeats = VariantTag.objects.filter(analysis__isnull=False) \
-        .values("variant_id", "tag_id", "analysis_id", "user_id", "sample_id") \
-        .annotate(num_taggings=Count("id")).filter(num_taggings__gt=1).count()
-    if repeats:
-        raise RuntimeError(f"{repeats} analysis taggings are repeated - run "
-                           "'manage.py variant_tags delete-duplicates', then this migration again")
+    analysis_taggings = VariantTag.objects.filter(analysis__isnull=False)
+    earliest_qs = analysis_taggings.values("variant_id", "tag_id", "analysis_id", "user_id", "sample_id") \
+        .annotate(earliest=Min("pk")).values("earliest")
+    num_deleted, _ = analysis_taggings.exclude(pk__in=earliest_qs).delete()
+    if num_deleted:
+        print(f"Deleted {num_deleted} repeated analysis taggings")
 
 
 class Migration(migrations.Migration):
@@ -27,7 +29,7 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RunPython(_check_no_repeated_analysis_taggings, migrations.RunPython.noop),
+        migrations.RunPython(_delete_repeated_analysis_taggings, migrations.RunPython.noop),
         migrations.AddConstraint(
             model_name='varianttag',
             constraint=models.UniqueConstraint(condition=models.Q(('analysis__isnull', False)), fields=('variant', 'tag', 'analysis', 'user', 'sample'), name='varianttag_one_per_sample_in_analysis', nulls_distinct=False),
