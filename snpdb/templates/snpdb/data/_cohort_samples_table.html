@@ -63,7 +63,7 @@
                 <td>{% detected_sex sample_genotype_stats|get_item:form.instance.pk %}</td>
                 <td>
                     <div class="sample-patient display-flex">
-                        {% preview_icon_for_model "patients.Patient" %}
+                        <a class="patient-link" title="View patient">{% preview_icon_for_model "patients.Patient" %}</a>
                         <div class="flex-grow">
                         {{ form.patient }}{{ form.patient.errors }}
                         </div>

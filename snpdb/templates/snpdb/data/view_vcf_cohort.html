@@ -184,6 +184,21 @@ $(document).ready(function() {
 
     addCreateProjectButtonAndForm();
 
+    $(".sample-patient select", "form#vcf-form").each(function () {
+        const patientSelector = $(this);
+        const patientLink = patientSelector.parents(".sample-patient").find("a.patient-link");
+        function setPatientLink() {
+            const pk = patientSelector.val();
+            if (pk) {
+                patientLink.attr("href", Urls.view_patient(pk));
+            } else {
+                patientLink.removeAttr("href");
+            }
+        }
+        setPatientLink();
+        patientSelector.change(setPatientLink);
+    });
+
 {% if has_write_permission %}
     setupUnsavedChangesMessage("form#vcf-form", ".sample-select, .sample-select-all");
     const dialog = setupCreatePatientDialog();
