@@ -1,6 +1,5 @@
 import json
 
-from django.conf import settings
 from django.http.response import HttpResponse
 
 from analysis.exceptions import NonFatalNodeError
@@ -322,9 +321,11 @@ class TagNodeView(NodeView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["datatable_config"] = ClassificationColumns(self.request)
-        # The to-do list - a tagging a classification has already satisfied is done @see VariantTag.unresolved_q
+        # The to-do list - every classify queue tag, not just RequiresClassification @see Tag.requires_classification
+        # A tagging a classification has already satisfied is done @see VariantTag.unresolved_q
         context["requires_classification_tags"] = self.object.analysis.varianttag_set.filter(
-            VariantTag.unresolved_q(), tag=settings.TAG_REQUIRES_CLASSIFICATION)
+            VariantTag.unresolved_q(), tag__requires_classification=True,
+            tag__retired__isnull=True).select_related("tag")
         context.update(self._get_tag_counts_context())
         return context
 

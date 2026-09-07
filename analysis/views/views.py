@@ -3,7 +3,6 @@ from functools import cached_property
 
 import numpy as np
 from django.apps import apps
-from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import user_passes_test
 from django.core.exceptions import PermissionDenied
@@ -436,13 +435,14 @@ class CreateClassificationForVariantTagView(CreateClassificationForVariantView):
             context["variant_tag"] = self.variant_tag
 
             if not self.variant_tag.can_write(self.request.user):
+                tag_id = self.variant_tag.tag_id
                 if self.variant_tag.analysis:
                     read_only_message = "You have read-only access to this analysis. You can create a " \
                                         "classification but it will not be linked to the analysis and the " \
-                                        f"{settings.TAG_REQUIRES_CLASSIFICATION} tag will not be cleared."
+                                        f"{tag_id} tag will not be cleared."
                 else:
                     read_only_message = "You have read-only access to this tag. You can create a classification " \
-                                        f"but the {settings.TAG_REQUIRES_CLASSIFICATION} tag will not be cleared."
+                                        f"but the {tag_id} tag will not be cleared."
                 messages.add_message(self.request, messages.WARNING, read_only_message)
         except VariantTag.DoesNotExist:
             variant_tag_id = self.kwargs["variant_tag_id"]

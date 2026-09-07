@@ -129,23 +129,37 @@ class TaggedVariantGridTest(TestCase):
                          reverse("view_variant", kwargs={"variant_id": self.both_variant.pk}))
         self.assertTrue(row["delete"], "Tag owner can delete their own tag")
 
-    def test_variant_tags_datatable_classify_button(self):
-        """ A RequiresClassification tag is a to-do item - offer to complete it from the analysis it came from """
+    def _classify_button_row(self, tag: Tag) -> dict:
         annotation_version = AnnotationVersion.latest(self.genome_build)
         analysis = Analysis.objects.create(genome_build=self.genome_build, annotation_version=annotation_version,
                                            user=self.user)
-        requires_classification, _ = Tag.objects.get_or_create(pk=settings.TAG_REQUIRES_CLASSIFICATION)
-        variant_tag = self._tag(self.artefact_variant, requires_classification)
+        variant_tag = self._tag(self.artefact_variant, tag)
         variant_tag.analysis = analysis
         variant_tag.save()
+        self.variant_tag = variant_tag
+        self.analysis = analysis
 
         self.client.force_login(self.user)
         url = reverse('variant_tags_datatable', kwargs={"genome_build_name": self.genome_build.name})
-        response = self.client.get(url, {"tag": requires_classification.pk})
-        row = response.json()["data"][0]
+        response = self.client.get(url, {"tag": tag.pk})
+        rows_by_id = {r["id"]: r for r in response.json()["data"]}
+        return rows_by_id[variant_tag.pk]
+
+    def test_variant_tags_datatable_classify_button(self):
+        """ Any classify queue tag is a to-do item - offer to complete it from the analysis it came from,
+            not just RequiresClassification @see Tag.requires_classification """
+        self.reportable.requires_classification = True
+        self.reportable.save()
+
+        row = self._classify_button_row(self.reportable)
         self.assertEqual(row["variant_string"]["classify_url"],
                          reverse("create_classification_for_variant_tag",
-                                 kwargs={"analysis_id": analysis.pk, "variant_tag_id": variant_tag.pk}))
+                                 kwargs={"analysis_id": self.analysis.pk, "variant_tag_id": self.variant_tag.pk}))
+
+    def test_variant_tags_datatable_no_classify_button_off_queue(self):
+        """ A tag that isn't in the classify queue is just a label - no to-do to complete """
+        row = self._classify_button_row(self.artefact)
+        self.assertNotIn("classify_url", row["variant_string"])
 
     def test_tag_awaiting_liftover_keeps_its_own_coordinate(self):
         """ A tag gets its allele assigned asynchronously (@see _liftover_variant_tag), so a freshly
