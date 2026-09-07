@@ -470,6 +470,10 @@ phase — the per-node values built here run either way; #1717 only changes what
 
 ## Phase 6 — what is left of #1558
 
+Designed in [`1558_non_variants_on_grids_plan.md`](1558_non_variants_on_grids_plan.md), which is the
+spec for everything below - the kind badge, the fusion row expansion and export, copy number per
+sample, the fusion calls column and the Effect node's structural filter.
+
 Per the issue's own comment table, SV already works in the grid and CNV works as SV — what is missing
 is surfacing `CohortGenotype.info["CN"]` and TSO 500's `FORMAT/SM` linear copy ratio, which importer
 v21+ already keeps in the format JSON blob but which is not queryable. Nothing has been built for this

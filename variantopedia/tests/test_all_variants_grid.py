@@ -11,6 +11,7 @@ from annotation.fake_annotation import create_fake_variants, get_fake_annotation
 from annotation.models import AnnotationRangeLock, AnnotationRun, VariantAnnotationVersion
 from annotation.tests.test_data_fake_genes import create_fake_transcript_version
 from genes.models import GeneSymbol, GeneSymbolAlias, GeneSymbolAliasSource
+from genes.tests.gene_fusion_test_utils import create_gene_fusion
 from library.django_utils import FakeRequest
 from library.genomics.vcf_enums import VCFSymbolicAllele
 from snpdb.models import (
@@ -68,6 +69,11 @@ class AllVariantsGridFilterTest(TestCase):
         reference_alt = Sequence.objects.get_or_create(seq=Variant.REFERENCE_ALT)[0]
         cls.reference_variant = Variant.objects.create(locus=cls.variant.locus, alt=reference_alt,
                                                        end=cls.variant.end)
+
+        # Fusions live on the shared gene-level contig, which is on no chromosome button
+        for symbol in ["CD74", "ROS1"]:
+            GeneSymbol.objects.get_or_create(symbol=symbol)
+        cls.fusion_variant = create_gene_fusion("CD74", "ROS1").variant
 
     @classmethod
     def _create_variant_gene_overlap(cls, variant, gene):
@@ -188,6 +194,24 @@ class AllVariantsGridFilterTest(TestCase):
         """ min_count >= 1 restricts to variants observed in samples - the test data has none """
         variant_ids = self._grid_variant_ids({"contig_ids": [self.contig.pk], "min_count": 1})
         self.assertEqual(set(), variant_ids)
+
+    def test_fusion_type_selects_gene_level_rows(self):
+        variant_ids = self._grid_variant_ids({"contig_ids": [self.contig.pk],
+                                              "variant_types": [VariantType.FUSION]})
+        self.assertEqual({self.fusion_variant.pk}, variant_ids)
+
+    def test_fusion_contig_passes_the_chromosome_filter(self):
+        """ The gene-level contig is not a chromosome anyone can tick, so ticking Fusion is what
+            lets it through - without that the contig filter hides every fusion """
+        variant_ids = self._grid_variant_ids({"contig_ids": [self.contig.pk],
+                                              "variant_types": [VariantType.FUSION, VariantType.SNV]})
+        self.assertIn(self.fusion_variant.pk, variant_ids)
+        self.assertIn(self.variant.pk, variant_ids)
+
+    def test_fusion_hidden_when_its_type_is_not_selected(self):
+        variant_ids = self._grid_variant_ids({"contig_ids": [self.contig.pk],
+                                              "variant_types": [VariantType.SNV]})
+        self.assertNotIn(self.fusion_variant.pk, variant_ids)
 
     def test_default_filters_pick_chr21(self):
         filters = get_default_all_variants_filters(self.genome_build)

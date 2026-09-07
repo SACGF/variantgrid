@@ -98,7 +98,10 @@ def _grid_export_vcf(genome_build, csv_columns, items, sample_ids, sample_names_
 
     use_accession = False
     info_dict = _get_vcf_info_dict(csv_columns)
-    header_lines = get_vcf_header_from_contigs(genome_build, info_dict, samples, use_accession=use_accession)
+    # The export carries fusions (@see ExportVariantGrid.export_contigs), so declare the contig they
+    # are written on or the file won't re-import
+    header_lines = get_vcf_header_from_contigs(genome_build, info_dict, samples, use_accession=use_accession,
+                                               include_gene_level=True)
 
     pseudo_buffer = StashFile()
     writer = VCFWriter(pseudo_buffer, header_lines)

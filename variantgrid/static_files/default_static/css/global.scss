@@ -1159,6 +1159,42 @@ table.variantgrid-datatable {
 		font-size: 11px;
 	}
 
+	// The kind badge beside the label - what this row is when it isn't a small variant. Outside the
+	// clipped label, so it survives an ellipsis. @see _variantKind in variantgrid_formats.js
+	.rv-kind {
+		flex: none;
+		padding: 0 4px;
+		border-radius: 3px;
+		background: #eceff1;
+		color: #546e7a;
+		font-family: ui-monospace, Menlo, Consolas, monospace;
+		font-size: 10px;
+	}
+
+	.rv-kind-del,
+	.rv-kind-loss {
+		background: #fdecea;
+		color: #b3261e;
+	}
+
+	.rv-kind-dup,
+	.rv-kind-cnv,
+	.rv-kind-amp {
+		background: #e8f0fe;
+		color: #1a56b8;
+	}
+
+	.rv-kind-ins,
+	.rv-kind-inv {
+		background: #fff4e5;
+		color: #a15c00;
+	}
+
+	.rv-kind-fusion {
+		background: #ede7f6;
+		color: #5e35b1;
+	}
+
 	// The germline pair then the somatic pair, each with a fixed share of whatever the cell is, so
 	// the four line up down the column - the eye scans one origin without tracking sideways. Shares
 	// rather than fixed widths: the cell is overflow:hidden, and fixed widths wider than the column

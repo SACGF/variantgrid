@@ -26,6 +26,13 @@ locus); exclude them with `Variant.get_no_reference_q` when you mean real calls.
 `Variant.qs_from_variant_coordinate` applies it for you. Gene-level events (fusions) are Variants on a fake contig - guard
 coordinate code with `Variant.get_gene_level_q`.
 
+**Variant kind** - what the grids' kind badge says a row is, read off the alt: `FUSION` / `AMP` / `LOSS` for a gene-level
+alt (`library/genomics/vcf_enums.py:GeneLevelSymbolicAlt`), `DEL` / `DUP` / `INV` / `CNV` / `INS` with the size from `svlen`
+for a symbolic one, and nothing at all for a small variant. Not VEP's `variant_class`
+(`library/genomics/vcf_enums.py:VariantClass`), which the Effect node filters on: VEP calls a 1 Mb `<DEL>` and a 1 bp
+deletion the same class, so the badge answers "is this a small variant?" where `variant_class` answers "what sort of
+change?". Drawn client side by `_variantKind` in `variantgrid/static_files/default_static/js/variantgrid_formats.js`.
+
 **VariantCoordinate** - `snpdb/models/models_variant.py:VariantCoordinate`, a pydantic value object (chrom, position, ref,
 alt, svlen), the currency between HGVS, VCF and Variant. Canonicalise before lookup or insert.
 

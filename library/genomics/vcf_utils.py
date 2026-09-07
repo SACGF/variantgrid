@@ -237,10 +237,16 @@ def get_vcf_header_contig_lines(contigs: list[tuple]) -> list[str]:
     return header_lines
 
 
-def get_contigs_header_lines(genome_build, standard_only=True, use_accession=True, contig_allow_list: set = None) -> list[str]:
-    """ use_accession: If True - write contigs like 'NC_000004.12' if False then '4' """
+def get_contigs_header_lines(genome_build, standard_only=True, use_accession=True, contig_allow_list: set = None,
+                             include_gene_level=False) -> list[str]:
+    """ use_accession: If True - write contigs like 'NC_000004.12' if False then '4'
+        include_gene_level: also declare the fake gene-level contig, so a file holding fusions
+        re-imports - @see snpdb.gene_level_variants """
     if standard_only:
-        contig_qs = genome_build.standard_contigs
+        roles = [SequenceRole.ASSEMBLED_MOLECULE]
+        if include_gene_level:
+            roles.append(SequenceRole.VG_GENE_LEVEL_FAKE_CONTIG)
+        contig_qs = genome_build.contigs.filter(role__in=roles)
     else:
         contig_qs = genome_build.contigs
 

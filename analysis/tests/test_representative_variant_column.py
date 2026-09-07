@@ -15,6 +15,8 @@ from annotation.models import ClinVar
 from annotation.models.models_enums import ClinVarReviewStatus
 from classification.enums import SpecialEKeys, SubmissionSource
 from classification.models.classification import Classification
+from genes.models import GeneSymbol
+from genes.tests.gene_fusion_test_utils import create_gene_fusion
 from library.django_utils import FakeRequest
 from snpdb.grid_columns.grid_sample_columns import get_available_format_columns
 from snpdb.models import CompositeColumnMember, Country, CustomColumnsCollection, Lab, Organization, UserSettings
@@ -227,6 +229,29 @@ class VariantGridRowDetailViewTest(GridExportTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, f"v {variant.pk}")
         self.assertContains(response, escape(variant.full_string))  # HGVS/coordinate '>' is escaped
+
+    def _row_detail(self, variant):
+        client = Client()
+        client.force_login(self.user)
+        url = reverse("variant_grid_row_detail",
+                      kwargs={"variant_id": variant.pk,
+                              "annotation_version_id": self.analysis.annotation_version_id})
+        return client.get(url)
+
+    def test_row_detail_names_the_fusion_partners(self):
+        """ The expanded row is the one place every grid shares, so the partners and the direction
+            live there rather than in each grid's column set (#1558) """
+        for symbol in ["CD74", "ROS1"]:
+            GeneSymbol.objects.get_or_create(symbol=symbol)
+
+        ordered = create_gene_fusion("CD74", "ROS1")
+        self.assertContains(self._row_detail(ordered.variant), "5\u2032 CD74 \u2192 3\u2032 ROS1")
+
+        unordered = create_gene_fusion("CD74", "ROS1", directionality_known=False)
+        self.assertContains(self._row_detail(unordered.variant), "direction not asserted")
+
+        no_partner = create_gene_fusion("CD74", None)
+        self.assertContains(self._row_detail(no_partner.variant), "partner unspecified")
 
     def test_row_detail_shows_clinvar(self):
         """ The Classifications chips are a summary - the expanded row is where the ClinVar detail is """

@@ -981,6 +981,35 @@ table.variantgrid-datatable .rv-sub {
   color: #777;
   font-size: 11px;
 }
+table.variantgrid-datatable .rv-kind {
+  flex: none;
+  padding: 0 4px;
+  border-radius: 3px;
+  background: #eceff1;
+  color: #546e7a;
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 10px;
+}
+table.variantgrid-datatable .rv-kind-del,
+table.variantgrid-datatable .rv-kind-loss {
+  background: #fdecea;
+  color: #b3261e;
+}
+table.variantgrid-datatable .rv-kind-dup,
+table.variantgrid-datatable .rv-kind-cnv,
+table.variantgrid-datatable .rv-kind-amp {
+  background: #e8f0fe;
+  color: #1a56b8;
+}
+table.variantgrid-datatable .rv-kind-ins,
+table.variantgrid-datatable .rv-kind-inv {
+  background: #fff4e5;
+  color: #a15c00;
+}
+table.variantgrid-datatable .rv-kind-fusion {
+  background: #ede7f6;
+  color: #5e35b1;
+}
 table.variantgrid-datatable .cs-chips {
   display: grid;
   grid-template-columns: 74fr 52fr 66fr 60fr;

@@ -1,7 +1,7 @@
 # #1558 — Showing non-variants (SV / CNV / fusions) on the variant grids
 
 Written by Claude Fable 5.1 (claude-fable-5-1), 2026-09-07
-Status: draft
+Status: in progress
 
 [#1558](https://github.com/SACGF/variantgrid/issues/1558): SVs, CNVs and gene fusions are all `Variant` rows
 now, but the grids show them as if they were small variants. This is Phase 6 of

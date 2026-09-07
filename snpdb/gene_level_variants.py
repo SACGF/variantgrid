@@ -62,10 +62,13 @@ anyway. A third pipeline type (`VariantAnnotationPipelineType.GENE_LEVEL`) compu
 from the gene identity instead, writing the `VariantGeneOverlap` rows for both partners that make
 gene lists and comp-het work.
 
-The VCF-writing paths need no check of their own: they build their contig list from
+Most VCF-writing paths need no check of their own: they build their contig list from
 `GenomeBuild.standard_contigs`, which filters on `SequenceRole.ASSEMBLED_MOLECULE`, so the gene-level
-contig is excluded before anything asks for a reference base. Worth keeping true - a writer that
-switched to `contigs` rather than `standard_contigs` would start emitting them.
+contig is excluded before anything asks for a reference base. The analysis node export is the
+deliberate exception (#1558) - dropping fusions out of every CSV/VCF was worse than writing them, so
+`ExportVariantGrid.export_contigs` adds the contig and `get_contigs_header_lines(include_gene_level=True)`
+declares it, which is what makes the file re-import. A writer that wants the plain genome keeps
+`standard_contigs` and gets it.
 """
 
 # The contig every build shares. Deliberately non-genomic names so nothing mistakes it for a sequence,

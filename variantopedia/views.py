@@ -26,7 +26,7 @@ from annotation.models import (
 )
 from annotation.transcripts_annotation_selections import VariantTranscriptSelections
 from eventlog.models import create_event
-from genes.models import CanonicalTranscriptCollection, GeneSymbol
+from genes.models import CanonicalTranscriptCollection, GeneFusion, GeneSymbol
 from library.django_utils import get_field_counts
 from library.django_utils.grid_export import EXPORT_ROWS_PER_CHUNK
 from library.git import Git
@@ -147,6 +147,13 @@ def variant_grid_row_detail(request, variant_id: int, annotation_version_id: int
     if variant.is_symbolic and variant_annotation:
         overlapping_symbols = variant_annotation.overlapping_symbols
 
+    # A fusion's partners and direction - the one place every grid shares, so it lives here rather
+    # than in each grid's column set. @see snpdb.gene_level_variants
+    gene_fusion = None
+    if variant.is_gene_level:
+        gene_fusion = GeneFusion.objects.filter(variant=variant) \
+            .select_related("anchor", "partner").first()
+
     # What the Classifications column's ClinVar chips summarise
     clinvar = ClinVar.objects.filter(variant=variant, version=annotation_version.clinvar_version).first()
 
@@ -159,6 +166,7 @@ def variant_grid_row_detail(request, variant_id: int, annotation_version_id: int
         "classifications": classifications,
         "clinvar": clinvar,
         "overlapping_symbols": overlapping_symbols,
+        "gene_fusion": gene_fusion,
     }
     return render(request, "variantopedia/variant_grid_row_detail.html", context)
 

@@ -74,6 +74,7 @@ from snpdb.models import (
     VariantGridColumn,
     VCFFilter,
 )
+from snpdb.models.models_enums import SequenceRole
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.views.datatable_view import CellData, DatatableConfig, NullOrder, RichColumn, SortOrder
 
@@ -404,7 +405,7 @@ class ExportVariantGrid(VariantGrid):
             any node size. A contig with no variants costs one cheap index probe and no annotated query. """
         value_columns = self.value_columns()
         node_qs = self.node.get_queryset()
-        for contig in self.node.analysis.genome_build.standard_contigs:
+        for contig in self.export_contigs(self.node.analysis.genome_build):
             contig_pks_qs = node_qs.filter(locus__contig=contig).order_by("locus__position", "pk")
             # A node queryset can fan out over a multi-valued join, so de-dupe (keeping order) to stop
             # a repeated PK straddling a batch boundary and being exported twice
@@ -412,6 +413,14 @@ class ExportVariantGrid(VariantGrid):
             for batch in iter_fixed_chunks(contig_pks, self.EXPORT_PK_BATCH_SIZE):
                 batch_qs = qs.filter(pk__in=batch).order_by("locus__position", "pk")
                 yield from self.render_export_rows(batch_qs.values(*value_columns).iterator())
+
+    @staticmethod
+    def export_contigs(genome_build: GenomeBuild) -> QuerySet:
+        """ The build's own contigs, then the shared gene-level one - a fusion has no coordinate, so it
+            exports after everything that does. Leaving it out is how fusions used to fall out of every
+            node export (#1558). @see snpdb.gene_level_variants """
+        roles = [SequenceRole.ASSEMBLED_MOLECULE, SequenceRole.VG_GENE_LEVEL_FAKE_CONTIG]
+        return genome_build.contigs.filter(role__in=roles)
 
     def ordering(self, qs: QuerySet) -> QuerySet:
         """ Export order is set by iter_export_rows (genome build contig, then position), so any

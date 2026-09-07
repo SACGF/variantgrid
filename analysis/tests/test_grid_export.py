@@ -37,6 +37,9 @@ from snpdb.models import CachedGeneratedFile, CohortGenotype, GenomeBuild, Tag
 from snpdb.models.models_cohort import CohortGenotypeCollection
 from snpdb.models.models_enums import CohortGenotypeCollectionType
 from snpdb.tests.utils.fake_cohort_data import create_fake_cohort
+from genes.models import GeneSymbol
+from genes.tests.gene_fusion_test_utils import create_gene_fusion
+from snpdb.gene_level_variants import GENE_LEVEL_CONTIG_NAME
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
 
 # (contig name, position) - deliberately out of both PK order and contig-name string order, so an
@@ -357,3 +360,47 @@ class TestNodeExportLaunch(GridExportTestCase):
                     csv_name = zipf.namelist()[0]
                     lines = zipf.read(csv_name).decode().splitlines()
                 self.assertEqual(len(lines), self.node.count + 1)  # header
+
+
+class TestGeneLevelExport(GridExportTestCase):
+    """ A fusion sits on the shared gene-level contig, which is not one of the build's own, so an
+        export walking standard_contigs dropped it without saying so (#1558) """
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        for symbol in ["CD74", "ROS1"]:
+            GeneSymbol.objects.get_or_create(symbol=symbol)
+        cls.gene_fusion = create_gene_fusion("CD74", "ROS1")
+        cgc = CohortGenotypeCollection.objects.get(cohort=cls.cohort, cohort_version=cls.cohort.version,
+                                                  collection_type=CohortGenotypeCollectionType.UNCOMMON)
+        cls._add_genotype(cgc, cls.gene_fusion.variant)
+
+    def test_csv_export_includes_the_fusion(self):
+        node = self._sample_node()
+        _header, rows = self._export_csv(node)
+        self.assertEqual(node.count, len(rows))
+        alt = self.gene_fusion.variant.alt.seq
+        self.assertTrue(any(alt in cell for row in rows for cell in row), alt)
+
+    def test_fusion_exports_after_the_coordinates(self):
+        """ It has no position to sort with, so it lands at the end rather than in the middle """
+        node = self._sample_node()
+        _header, rows = self._export_csv(node)
+        alt = self.gene_fusion.variant.alt.seq
+        self.assertIn(alt, rows[-1])
+
+    def test_vcf_export_declares_the_gene_level_contig(self):
+        """ Without the contig line the file we just wrote will not re-import """
+        node = self._sample_node()
+        lines = self._export_lines(node, export_type="vcf")
+        header = [line for line in lines if line.startswith("##")]
+        self.assertTrue(any(line.startswith(f"##contig=<ID={GENE_LEVEL_CONTIG_NAME},") for line in header),
+                        header)
+        records = [line for line in lines if not line.startswith("#")]
+        fusion_records = [line for line in records if line.startswith(f"{GENE_LEVEL_CONTIG_NAME}\t")]
+        self.assertEqual(1, len(fusion_records), records)
+        _chrom, pos, _id, ref, alt = fusion_records[0].split("\t")[:5]
+        self.assertEqual(str(self.gene_fusion.anchor_id), pos, "the anchor gene id stands in for a position")
+        self.assertEqual("N", ref)
+        self.assertEqual(self.gene_fusion.variant.alt.seq, alt)

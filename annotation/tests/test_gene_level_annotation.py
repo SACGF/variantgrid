@@ -33,6 +33,7 @@ from genes.models_enums import AnnotationConsortium, HGNCStatus
 from library.genomics.vcf_enums import VariantClass
 from classification.models.classification_variant_info_models import ImportedAlleleInfo
 from snpdb.models import GenomeBuild, GenomeBuildPatchVersion, Variant
+from snpdb.variant_queries import get_variant_queryset_for_gene_symbol
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
 
 
@@ -139,6 +140,15 @@ class GeneLevelAnnotationTest(TestCase):
         self._run_annotation()
         q = VariantTranscriptAnnotation.get_overlapping_genes_q(self.vav, [self.ros1_gene.pk])
         self.assertIn(self.gene_fusion.variant, list(Variant.objects.filter(q)))
+
+    def test_gene_page_queryset_finds_the_fusion_from_either_partner(self):
+        """ The gene page joins VariantGeneOverlap itself rather than going through the transcript
+            annotation - @see genes.grids.GeneSymbolVariantsGrid """
+        self._run_annotation()
+        for symbol in ["CD74", "ROS1"]:
+            qs = get_variant_queryset_for_gene_symbol(GeneSymbol.objects.get(pk=symbol),
+                                                      self.annotation_version)
+            self.assertIn(self.gene_fusion.variant, list(qs), symbol)
 
     def test_writes_annotation_with_symbols(self):
         annotation_run = self._run_annotation()

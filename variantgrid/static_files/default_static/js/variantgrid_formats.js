@@ -790,6 +790,44 @@ function _formatBases(bases) {
     return bases + " bp";
 }
 
+// What kind of thing a row is, when it isn't a small variant. Small variants are the overwhelming
+// majority of every grid, so they carry no badge - the badge is the signal that a row is not one.
+// A gene-level alt is <KIND:NAMESPACE:id> or <KIND:UNKNOWN>, so the kind is everything before the
+// first ':'. @see GeneLevelSymbolicAlt / VCFSymbolicAllele in library/genomics/vcf_enums.py
+const GENE_LEVEL_KINDS = {
+    'FUSION': {code: 'FUSION', css: 'fusion', title: 'Gene fusion'},
+    'FUSION_UNORDERED': {code: 'FUSION \u21c4', css: 'fusion',
+                         title: 'Gene fusion - direction not asserted by the caller'},
+    'AMP': {code: 'AMP', css: 'amp', title: 'Gene-level copy number'},
+    'LOSS': {code: 'LOSS', css: 'loss', title: 'Gene-level copy number'},
+};
+const SV_KIND_CSS = {'DEL': 'del', 'DUP': 'dup', 'INV': 'inv', 'CNV': 'cnv', 'INS': 'ins'};
+
+// Returns {code, cssClass, title}, or null for a row with an explicit ref/alt
+function _variantKind(rowData) {
+    const alt = rowData["alt__seq"];
+    if (alt == null || !String(alt).startsWith("<")) {
+        return null;
+    }
+    const kind = String(alt).slice(1, -1).split(":")[0];
+    const geneLevel = GENE_LEVEL_KINDS[kind];
+    if (geneLevel) {
+        return {code: geneLevel.code, cssClass: `rv-kind-${geneLevel.css}`, title: geneLevel.title};
+    }
+    // An SV says how big it is - that, not the coordinate, is what a reader wants off the row
+    const size = Math.abs(rowData["svlen"] || 0);
+    const chrom = rowData["locus__contig__name"];
+    const position = rowData["locus__position"];
+    const title = (chrom != null && position != null)
+                ? `${chrom}:${position}-${position + size} ${alt}` : String(alt);
+    return {
+        code: size ? `${kind} ${_formatBases(size)}` : kind,
+        cssClass: `rv-kind-${SV_KIND_CSS[kind] || 'other'}`,
+        title: title,
+    };
+}
+
+
 // The cascade from the mockup's "Representative variant" card. Returns {html, title}; title is the
 // plain string for the link tooltip. Every key may be undefined on a row cached before these fields
 // existed - each step checks and falls through, ending at the VariantGrid id.
@@ -837,11 +875,9 @@ function _representativeVariantLabel(variantId, rowData) {
     // 3/4. Coordinate - symbolic as a span with the type, otherwise ref>alt with long alleles collapsed
     if (chrom != null && position != null && alt != null) {
         if (String(alt).startsWith("<")) {
-            const size = Math.abs(svlen || 0);
-            const end = position + size;
-            const svType = String(alt).slice(1, -1);
-            const html = `<span class='rv-hgvs'>${escapeHtml(chrom)}:${position}-${end}</span> <b>${escapeHtml(svType)}</b>`
-                       + (size ? ` <span class='rv-sub'>${_formatBases(size)}</span>` : '');
+            // The type and the size are on the kind badge beside the label, for every branch
+            const end = position + Math.abs(svlen || 0);
+            const html = `<span class='rv-hgvs'>${escapeHtml(chrom)}:${position}-${end}</span>`;
             return {html: html, title: `${chrom}:${position}-${end} ${alt}`};
         }
         const title = `${chrom}:${position} ${ref}>${alt}`;
@@ -864,6 +900,11 @@ VariantGridFormat.representativeVariant = (variantId, type, rowData, ctx) => {
     const label = _representativeVariantLabel(variantId, rowData);
     const detailsUrl = `javascript:load_variant_details(${variantId});`;
     parts.push(`<a class='variant-link rv-label' title='${escapeHtml(label.title)}' href='${detailsUrl}' orig_href='${detailsUrl}'>${label.html}</a>`);
+    // Outside the label, which clips - the badge is the one thing on the row that must stay readable
+    const kind = _variantKind(rowData);
+    if (kind) {
+        parts.push(`<span class='rv-kind ${kind.cssClass}' title='${escapeHtml(kind.title)}'>${escapeHtml(kind.code)}</span>`);
+    }
     return `<span class='variant_id-container' variant_id='${variantId}'>${parts.join('')}</span>`;
 };
 
