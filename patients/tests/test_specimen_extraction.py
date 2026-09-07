@@ -576,6 +576,85 @@ class TestCreateExtractionFromSpecimenPage(TestCase):
         self.assertEqual(self.specimen.extraction_set.count(), 0)
 
 
+class TestPatientExtractionsTab(TestCase):
+    """ The tab posts the whole formset back over AJAX, so a rejected row has to come back bound -
+        otherwise the only sign of trouble is the "not saved" message at the top """
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.user = User.objects.create_user("extraction_tab_user", password="x")
+        cls.patient = Patient.objects.create(first_name="TAB", last_name="PATIENT")
+        assign_permission_to_user_and_groups(cls.user, cls.patient)
+        cls.specimen = Specimen.objects.create(reference_id="2600000040", patient=cls.patient)
+        cls.dna = Extraction.objects.create(specimen=cls.specimen, reference_id="2600000040C",
+                                            nucleic_acid_source=NucleicAcid.DNA)
+
+    def _post(self, **new_row):
+        self.client.force_login(self.user)
+        data = {"form-TOTAL_FORMS": "2", "form-INITIAL_FORMS": "1", "form-MIN_NUM_FORMS": "0",
+                "form-MAX_NUM_FORMS": "1000",
+                "form-0-id": str(self.dna.pk), "form-0-specimen": str(self.specimen.pk),
+                "form-0-reference_id": self.dna.reference_id,
+                "form-0-nucleic_acid_source": NucleicAcid.DNA, "form-0-extraction_date": "",
+                "form-1-id": "", "form-1-specimen": str(self.specimen.pk),
+                "form-1-reference_id": "", "form-1-nucleic_acid_source": NucleicAcid.RNA,
+                "form-1-extraction_date": ""}
+        data.update({f"form-1-{k}": v for k, v in new_row.items()})
+        url = reverse("view_patient_extractions", kwargs={"patient_id": self.patient.pk})
+        return self.client.post(url, data)
+
+    def test_duplicate_reference_shows_the_field_error(self):
+        response = self._post(reference_id="2600000040C")
+        self.assertContains(response, "This specimen already has an extraction with this reference.")
+
+    def test_rejected_row_keeps_what_was_typed(self):
+        response = self._post(reference_id="2600000040C")
+        self.assertContains(response, 'value="2600000040C"')
+        self.assertEqual(self.specimen.extraction_set.count(), 1)
+
+    def test_a_valid_row_is_saved(self):
+        self._post(reference_id="2600000040B")
+        extraction = self.specimen.extraction_set.get(reference_id="2600000040B")
+        self.assertEqual(extraction.nucleic_acid_source, NucleicAcid.RNA)
+
+
+class TestPatientSpecimensTab(TestCase):
+    """ Same shape as the extractions tab - a rejected row has to come back bound """
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.user = User.objects.create_user("specimen_tab_user", password="x")
+        cls.patient = Patient.objects.create(first_name="SPECTAB", last_name="PATIENT")
+        assign_permission_to_user_and_groups(cls.user, cls.patient)
+        cls.specimen = Specimen.objects.create(reference_id="2600000050", patient=cls.patient)
+
+    def _post(self, **new_row):
+        self.client.force_login(self.user)
+        prefix = "specimen_set"
+        data = {f"{prefix}-TOTAL_FORMS": "2", f"{prefix}-INITIAL_FORMS": "1",
+                f"{prefix}-MIN_NUM_FORMS": "0", f"{prefix}-MAX_NUM_FORMS": "1000",
+                f"{prefix}-0-id": str(self.specimen.pk), f"{prefix}-0-patient": str(self.patient.pk),
+                f"{prefix}-0-reference_id": self.specimen.reference_id,
+                f"{prefix}-0-tissue_status": TissueStatus.UNKNOWN,
+                f"{prefix}-1-id": "", f"{prefix}-1-patient": str(self.patient.pk),
+                f"{prefix}-1-reference_id": "", f"{prefix}-1-tissue_status": TissueStatus.UNKNOWN}
+        data.update({f"{prefix}-1-{k}": v for k, v in new_row.items()})
+        url = reverse("view_patient_specimens", kwargs={"patient_id": self.patient.pk})
+        return self.client.post(url, data)
+
+    def test_rejected_row_comes_back_with_its_error(self):
+        response = self._post(reference_id="2600000050", description="TYPED DESCRIPTION")
+        self.assertContains(response, "already exists")
+        self.assertContains(response, "TYPED DESCRIPTION")
+        self.assertEqual(self.patient.specimen_set.count(), 1)
+
+    def test_a_valid_row_is_saved(self):
+        self._post(reference_id="2600000051")
+        self.assertTrue(self.patient.specimen_set.filter(reference_id="2600000051").exists())
+
+
 class TestSpecimenExtractionSearch(TestCase):
     """ Searching a specimen reference also turns up the extractions hanging off it, which used to
         leave 2 results and nowhere to jump to """
