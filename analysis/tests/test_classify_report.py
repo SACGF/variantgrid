@@ -44,9 +44,10 @@ class ClassifyReportTestCase(TestCase):
         cls.cgc = cls.cohort.cohort_genotype_collection
 
         variants = list(Variant.objects.filter(Variant.get_no_reference_q()).order_by("pk"))
-        cls.variant, cls.shared_variant = variants[0], variants[1]
+        cls.variant, cls.shared_variant, cls.no_genotype_variant = variants[0], variants[1], variants[2]
         make_cohort_genotype(cls.cgc, cls.variant, "E..")
         make_cohort_genotype(cls.cgc, cls.shared_variant, ".EE")
+        make_cohort_genotype(cls.cgc, cls.no_genotype_variant, "U..")
 
         cls.tag = create_classify_queue_tag()
 
@@ -163,6 +164,18 @@ class ClassifyQueueTest(ClassifyReportTestCase):
         for sample in (self.mother, self.father):
             self.assertEqual(self._queue_variant_tags(sample=sample), [variant_tag])
         self.assertEqual(self._queue_variant_tags(sample=self.proband), [])
+
+    def test_a_caller_without_a_gt_field_has_its_calls_queued(self):
+        """ A fusion caller reports read support and no GT, so every zygosity is unknown - a row for the
+            sample is the call (@see sample_carries_variant) """
+        analysis = self._create_cohort_analysis()
+        variant_tag = self._create_variant_tag(analysis=analysis, variant=self.no_genotype_variant)
+        self.assertEqual(self._queue_variant_tags(), [])
+
+        vcf = self.proband.vcf
+        vcf.genotype_field = None
+        vcf.save()
+        self.assertEqual(self._queue_variant_tags(), [variant_tag])
 
     def test_tag_of_a_retired_tag_is_not_queued(self):
         self._create_variant_tag(sample=self.proband)
