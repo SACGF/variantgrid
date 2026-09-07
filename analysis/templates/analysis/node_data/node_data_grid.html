@@ -193,7 +193,8 @@ $(document).ready(function() {
 	</div>
 	{% endif %}
 	<div id='node-data-grid' class='node-data'{% if not grid_auto_load %} style='display: none'{% endif %}>
-	<table id='grid-{{ node_id }}' class='grid'>
+	{# The tag widget takes the node from the grid it was raised in - @see showTagAutocomplete #}
+	<table id='grid-{{ node_id }}' class='grid' node_id='{{ node_id }}'>
 	</table>
 	{# Downloads and the sorting note sit under the grid on the pager's row (moved there by DataTableDefinition.setupDom) - space above the grid is rows the user can't see #}
 	{% if grid_sorting_disabled %}

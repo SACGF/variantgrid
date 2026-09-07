@@ -331,7 +331,9 @@ function inAnalysis() {
 function showTagAutocomplete(variantId) {
     const addTagButton = $(".show-tag-autocomplete[variant_id=" + variantId + "]");
     const cell = addTagButton.parent();
-    const nodeId = addTagButton.parents("#node-data-container").attr("node_id");
+    // The grid the + was clicked in is the node the tagging is about - the data container's node_id
+    // is cleared whenever the editor is replaced, and a tagging without a node never learns its sample
+    const nodeId = addTagButton.closest("table.grid").attr("node_id");
 
     const panel = $("<div/>", {"class": "variant-tag-entry"});
     // The panel is anchored off the button's rect, so it can only be hidden once that has been taken
