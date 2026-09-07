@@ -464,12 +464,12 @@ $(document).ready(function() {
                             {% if vcf.ref_depth_field and vcf.alt_depth_field %}
                                 Ref Depth: {{ vcf.ref_depth_field }}, Alt Depth: {{ vcf.alt_depth_field }}
                             {% else %}
-                                Allele Depth: {{ vcf.allele_depth_field }}
+                                Allele Depth: {{ vcf.allele_depth_field|default_if_none:"-" }}
                             {% endif %}
                             </td>
                         </tr>
                         <tr>
-                            <td>Read Depth: {{ vcf.read_depth_field }}</td>
+                            <td>Read Depth: {{ vcf.read_depth_field|default_if_none:"-" }}</td>
                         </tr>
                         <tr>
                             <td>Allele Frequency:
@@ -481,10 +481,10 @@ $(document).ready(function() {
                             </td>
                         </tr>
                         <tr>
-                            <td>Genotype Quality: {{ vcf.genotype_quality_field }}</td>
+                            <td>Genotype Quality: {{ vcf.genotype_quality_field|default_if_none:"-" }}</td>
                         </tr>
                         <tr>
-                            <td>Phred Likelihood: {{ vcf.phred_likelihood_field }}</td>
+                            <td>Phred Likelihood: {{ vcf.phred_likelihood_field|default_if_none:"-" }}</td>
                         </tr>
                         {% if vcf.sample_filters_field %}
                             <tr>
