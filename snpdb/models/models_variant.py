@@ -848,9 +848,7 @@ class Variant(PreviewModelMixin, models.Model):
     @property
     def can_make_g_hgvs(self) -> bool:
         """ Can't form ones with some symbolic variants (eg <INS>) """
-        if self.is_symbolic:
-            return self.alt.seq in {VCFSymbolicAllele.DEL, VCFSymbolicAllele.DUP, VCFSymbolicAllele.INV}
-        return True
+        return self.coordinate.can_be_made_explicit
 
     @property
     def _clingen_allele_size(self) -> int:

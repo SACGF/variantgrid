@@ -13,7 +13,13 @@ from annotation.tests.test_data_fake_genes import (
     create_gata2_transcript_version,
     create_pten_transcript_version,
 )
-from genes.hgvs import HGVSConverterType, HGVSException, HGVSMatcher, HGVSVariant
+from genes.hgvs import (
+    HGVSConverterType,
+    HGVSException,
+    HGVSMatcher,
+    HGVSNoRepresentationException,
+    HGVSVariant,
+)
 from genes.hgvs.hgvs_matcher import FakeTranscriptVersion
 from snpdb.models import GenomeBuild, VariantCoordinate
 
@@ -355,3 +361,12 @@ class TestSymbolicHGVS(TestCase):
             vc = self._symbolic_coordinate(chrom, position, '<DEL>', -1000)
             hgvs_variant = matcher.variant_coordinate_to_hgvs_variant(vc, transcript_accession)
             self.assertEqual(expected, str(hgvs_variant))
+
+    def test_cnv_has_no_hgvs_representation(self):
+        """ #1574 - "copy number changed somewhere in here" has no HGVS, on either the g. or the c. path """
+        matcher = HGVSMatcher(self.genome_build, clingen_resolution=False)
+        vc = self._symbolic_coordinate('3', 128200000, '<CNV>', 1000)
+        with self.assertRaises(HGVSNoRepresentationException):
+            matcher.variant_coordinate_to_g_hgvs(vc)
+        with self.assertRaises(HGVSNoRepresentationException):
+            matcher.variant_coordinate_to_hgvs_variant(vc, "NM_001145661.2")

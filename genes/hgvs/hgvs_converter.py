@@ -17,6 +17,11 @@ class HGVSImplementationException(HGVSException):
     """ HGVSException subclass for when problem is with the library (users can NOT fix) """
 
 
+class HGVSNoRepresentationException(HGVSException):
+    """ The variant is valid but HGVS has no way to write it - <CNV>, <INS> and other
+        symbolic alts with neither a ranged form nor an explicit ref/alt expansion """
+
+
 class HGVSConverterType(Enum):
     BIOCOMMONS_HGVS = 2
     CLINGEN_ALLELE_REGISTRY = 4  # This is not a full implementation just enough for HGVS tester tool
