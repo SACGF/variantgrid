@@ -14,13 +14,13 @@ class SampleNodeView(GeneCoverageNodeView):
             return self.object.sample.get_minimum_coverage_required()
         return super()._get_minimum_coverage_required()
 
-    def _has_genotype(self) -> bool:
-        """ A node reading no genotype at all hides the genotype widgets - which the form drops and
-            the editor's tree hides, so it has to be worked out in one place """
+    def _any_sample(self, attr: str) -> bool:
+        """ The form drops a widget and the editor's tree hides it, so which samples can use it is
+            worked out in one place - a group shows a widget if any of its samples can use it """
         if self.object.is_group_level:
             samples = self.object.get_source_samples()
-            return any(s.has_genotype for s in samples) if samples else True
-        return self.object.sample.has_genotype if self.object.sample else True
+            return any(getattr(s, attr) for s in samples) if samples else True
+        return getattr(self.object.sample, attr) if self.object.sample else True
 
     @staticmethod
     def _get_zygosity_fields() -> list[dict]:
@@ -47,7 +47,9 @@ class SampleNodeView(GeneCoverageNodeView):
         context.update({"base_template": base_template,
                         "sample": sample,
                         "patient": self.object.get_patient(),
-                        "has_genotype": self._has_genotype(),
+                        "has_sample_columns": self._any_sample("has_sample_columns"),
+                        "has_genotype": self._any_sample("has_genotype"),
+                        "has_depth": self._any_sample("has_depth"),
                         # The editor tree draws the whole patient, then flags the picked subtree
                         "source_level": self.object.source_level,
                         "source_id": source_object.pk if source_object else None,
@@ -68,5 +70,6 @@ class SampleNodeView(GeneCoverageNodeView):
         kwargs["genome_build"] = analysis.genome_build
         if not analysis.template_type:  # Always show everything in templates
             kwargs["lock_input_sources"] = analysis.lock_input_sources
-            kwargs["has_genotype"] = self._has_genotype()
+            kwargs["has_genotype"] = self._any_sample("has_genotype")
+            kwargs["has_depth"] = self._any_sample("has_depth")
         return kwargs

@@ -132,7 +132,7 @@ class SampleNodeLevelsTestCase(TestCase):
     @classmethod
     def _create_vcf_sample(cls, name, genome_build, extraction) -> tuple[Sample, CohortGenotypeCollection]:
         """ A single sample VCF, as each TSO 500 caller produces """
-        vcf = VCF.objects.create(name=f"{name}_vcf", genotype_samples=1, genome_build=genome_build,
+        vcf = VCF.objects.create(name=f"{name}_vcf", genotype_samples=1, genotype_field="GT", allele_depth_field="AD", genome_build=genome_build,
                                  import_status=ImportStatus.SUCCESS, user=cls.user, date=timezone.now())
         sample = Sample.objects.create(name=name, vcf=vcf, extraction=extraction,
                                        import_status=ImportStatus.SUCCESS)
@@ -246,6 +246,23 @@ class TestSampleNodeLevels(SampleNodeLevelsTestCase):
     def test_zygosity_applies_to_every_sample(self):
         node = self._extraction_node(zygosity_het=False)  # HOM_ALT only
         self.assertEqual(self._pks(node), {self.v_both.pk})
+
+    def test_nothing_ticked_is_no_zygosity_filter(self):
+        node = self._extraction_node(zygosity_het=False, zygosity_hom=False)
+        self.assertEqual(self._pks(node), {self.v_snv.pk, self.v_ref.pk, self.v_cnv.pk, self.v_both.pk})
+
+    def test_vcf_without_gt_has_no_zygosity_filter_but_keeps_depth(self):
+        """ A depth-only caller (TSO 500 splice variants) stores every zygosity as unknown, so the
+            node's ticked zygosities are ignored for it while its AD threshold still applies """
+        VCF.objects.filter(pk=self.snv_sample.vcf_id).update(genotype_field=None)
+        self.snv_sample.vcf.refresh_from_db()
+        self.assertFalse(self.snv_sample.has_genotype)
+        self.assertTrue(self.snv_sample.has_depth)
+
+        node = self._extraction_node(min_ad=10)  # HET + HOM_ALT
+        self.assertEqual(node._get_zygosities(self.snv_sample), [])
+        # snv: v_ref (HOM_REF, AD=45) now comes through, v_both (AD=5) is dropped by depth
+        self.assertEqual(self._pks(node), {self.v_snv.pk, self.v_ref.pk, self.v_cnv.pk, self.v_both.pk})
 
     # ── Per sample overrides ─────────────────────────────────────────────────
 

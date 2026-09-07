@@ -20,7 +20,7 @@ class GridSearchTests(TestCase):
         self.user = User.objects.create(username='grid_search_user', is_superuser=True)
         genome_build = GenomeBuild.get_name_or_alias("GRCh38")
         self.vcf = VCF.objects.create(name="findme_vcf", genome_build=genome_build, user=self.user,
-                                      date=now(), genotype_samples=1, import_status=ImportStatus.SUCCESS)
+                                      date=now(), genotype_samples=1, genotype_field="GT", allele_depth_field="AD", import_status=ImportStatus.SUCCESS)
         self.sample = Sample.objects.create(name="findme_sample", vcf=self.vcf,
                                             import_status=ImportStatus.SUCCESS)
         self.analysis = Analysis.objects.create(name="findme_analysis", user=self.user,

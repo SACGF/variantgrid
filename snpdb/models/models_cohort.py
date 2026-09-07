@@ -109,10 +109,22 @@ class Cohort(GuardianPermissionsAutoInitialSaveMixin, PreviewModelMixin, SortByP
         )
 
     @property
-    def has_genotype(self):
+    def has_sample_columns(self) -> bool:
+        if self.vcf:
+            return self.vcf.has_sample_columns
+        return True  # Created cohorts must contain genotype
+
+    @property
+    def has_genotype(self) -> bool:
         if self.vcf:
             return self.vcf.has_genotype
-        return True  # Created cohorts must contain genotype
+        return True
+
+    @property
+    def has_depth(self) -> bool:
+        if self.vcf:
+            return self.vcf.has_depth
+        return True
 
     @property
     def data_archived(self) -> bool:

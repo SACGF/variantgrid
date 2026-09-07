@@ -170,7 +170,7 @@ class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
             cohort = sample.vcf.cohort
             if cohort not in cohorts:
                 cohorts.append(cohort)
-            visibility[sample] = sample.has_genotype
+            visibility[sample] = sample.has_sample_columns
         return cohorts, visibility
 
     def _get_annotation_kwargs_for_node(self, **kwargs) -> dict:
@@ -239,10 +239,10 @@ class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
 
     # ── Query ─────────────────────────────────────────────────────────────────
 
-    def _get_zygosities(self, sample: Optional[Sample] = None):
-        # No genotype - all will be unknown
-        if sample and sample.has_genotype is False:
-            return [Zygosity.UNKNOWN_ZYGOSITY]
+    def _get_zygosities(self, sample: Optional[Sample] = None) -> list[str]:
+        """ Empty means no zygosity filter - a VCF without GT has nothing to filter on """
+        if sample and not sample.has_genotype:
+            return []
 
         if sample and (override := self.get_sample_filter(sample)) and override.zygosity is not None:
             return list(override.zygosity)
@@ -270,13 +270,14 @@ class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
     def _get_sample_arg_q_dict(self, sample: Sample) -> dict[Optional[str], dict[str, Q]]:
         """ The genotype filters for one sample - zygosity, thresholds and allele frequency """
         arg_q_dict = {}
-        # _get_zygosities handles no genotype (UNKNOWN)
-        if zygosity := self._get_zygosities(sample):
-            alias, field = sample.get_cohort_genotype_alias_and_field("zygosity")
-            q = Q(**{f"{field}__in": zygosity})
-            arg_q_dict[alias] = {str(q): q}
+        # The zygosity IN is also what restricts the outer join to this sample's rows, so with nothing
+        # to filter on it becomes "any zygosity" rather than being left out
+        zygosity = self._get_zygosities(sample) or [code for _, code in self.ZYGOSITY_FIELD_CODES]
+        alias, field = sample.get_cohort_genotype_alias_and_field("zygosity")
+        q = Q(**{f"{field}__in": zygosity})
+        arg_q_dict[alias] = {str(q): q}
 
-        if sample.has_genotype:
+        if sample.has_depth:
             thresholds = self.get_sample_thresholds(sample)
             for node_field, ov_field in self.SAMPLE_FIELD_MAPPINGS:
                 if min_value := thresholds[f"min_{node_field}"]:
@@ -452,9 +453,11 @@ class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
         if filter_code not in (0, 1):
             return None  # Custom filters defeat the cache
 
-        zygosities = [self.zygosity_ref, self.zygosity_het, self.zygosity_hom, self.zygosity_unk]
-        if not self.sample.has_genotype:
-            zygosities = [True] * len(zygosities)  # Show everything
+        # The query treats an empty selection as no filter, so the cache has to count everything too
+        if selected := self._get_zygosities(self.sample):
+            zygosities = [code in selected for _, code in self.ZYGOSITY_FIELD_CODES]
+        else:
+            zygosities = [True] * len(self.ZYGOSITY_FIELD_CODES)
 
         return get_cached_label_count_for_cohort(
             cohort=self.sample.vcf.cohort,

@@ -15,7 +15,7 @@ class Command(BaseCommand):
         for cgc in CohortGenotypeCollection.objects.filter(cohort__vcf__isnull=False):
             cohort = cgc.cohort
             vcf = cohort.vcf
-            if not vcf.has_genotype:
+            if not vcf.has_sample_columns:
                 continue  # Will only have 1 sample
             try:
                 filename = vcf.uploadedvcf.file_upload.get_filename()

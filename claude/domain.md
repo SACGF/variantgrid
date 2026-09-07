@@ -55,7 +55,8 @@ Whole-database liftover is batched (`settings.LIFTOVER_BATCH_SIZE`) and fanned o
 ## Samples and cohorts (snpdb, pedigree)
 
 **VCF / Sample** - `snpdb/models/models_vcf.py:VCF`, `Sample`. A VCF is one imported file with an `import_status`;
-a Sample is one genotype column of it. Permissions cascade from the VCF; deleting from the UI is a soft delete
+a Sample is one sample column of it. `VCF.has_sample_columns`, `has_genotype` (GT present) and `has_depth` (AD/DP present)
+are separate facts - a depth-only caller has sample columns without a genotype. Permissions cascade from the VCF; deleting from the UI is a soft delete
 (`ImportStatus.MARKED_FOR_DELETION`) finished by a celery task. Uploads arrive through the upload app (below).
 
 **Cohort / CohortSample** - `snpdb/models/models_cohort.py:Cohort`, `CohortSample`. An ordered set of Samples. Every VCF has

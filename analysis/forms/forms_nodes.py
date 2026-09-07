@@ -978,9 +978,8 @@ class SampleNodeForm(GenomeBuildAutocompleteForwardMixin, SampleFiltersMixin, VC
         widget=ListSelect2(url='sample_source_autocomplete',
                            attrs={'data-placeholder': 'Patient, specimen, extraction or sample...'}))
 
-    GENOTYPE_FIELDS = ["min_ad", "min_dp", "min_gq", "max_pl",
-                       "zygosity_ref", "zygosity_het", "zygosity_hom", "zygosity_unk",
-                       "allele_frequency"]
+    GENOTYPE_FIELDS = ["zygosity_ref", "zygosity_het", "zygosity_hom", "zygosity_unk"]
+    DEPTH_FIELDS = ["min_ad", "min_dp", "min_gq", "max_pl", "allele_frequency"]
     LOCKED_INPUT_FIELDS = ['source', 'restrict_to_qc_gene_list']
     # Only meaningful over a single sample - hidden at group levels rather than given an invented meaning
     SAMPLE_LEVEL_FIELDS = ["sample_gene_list", "restrict_to_qc_gene_list"]
@@ -1001,7 +1000,7 @@ class SampleNodeForm(GenomeBuildAutocompleteForwardMixin, SampleFiltersMixin, VC
                                                      forward=(None, 'category'),),  # Set in __init__
         }
 
-    def __init__(self, *args, has_genotype=True, lock_input_sources=False, **kwargs):
+    def __init__(self, *args, has_genotype=True, has_depth=True, lock_input_sources=False, **kwargs):
         super().__init__(*args, **kwargs)
 
         # A saved node has to round trip - select2 loads its options by ajax, so the current one is
@@ -1014,6 +1013,8 @@ class SampleNodeForm(GenomeBuildAutocompleteForwardMixin, SampleFiltersMixin, VC
         remove_fields = []
         if has_genotype is False:
             remove_fields.extend(SampleNodeForm.GENOTYPE_FIELDS)
+        if has_depth is False:
+            remove_fields.extend(SampleNodeForm.DEPTH_FIELDS)
 
         if lock_input_sources:
             remove_fields.extend(SampleNodeForm.LOCKED_INPUT_FIELDS)

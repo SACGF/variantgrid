@@ -65,7 +65,7 @@ class ExtractionSampleTestCase(TestCase):
 
     @classmethod
     def _create_vcf_sample(cls, name, genome_build) -> tuple[Sample, CohortGenotypeCollection]:
-        vcf = VCF.objects.create(name=f"{name}_vcf", genotype_samples=1, genome_build=genome_build,
+        vcf = VCF.objects.create(name=f"{name}_vcf", genotype_samples=1, genotype_field="GT", allele_depth_field="AD", genome_build=genome_build,
                                  import_status=ImportStatus.SUCCESS, user=cls.user, date=timezone.now())
         sample = Sample.objects.create(name=name, vcf=vcf, extraction=cls.extraction,
                                        import_status=ImportStatus.SUCCESS)

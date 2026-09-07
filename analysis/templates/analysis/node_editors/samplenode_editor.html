@@ -134,6 +134,7 @@
     // A node reading one sample has no defaults to differ from - its settings are the ones above the tree
     var multiSample = false;
     var HAS_GENOTYPE = {% if has_genotype %}true{% else %}false{% endif %};
+    var HAS_DEPTH = {% if has_depth %}true{% else %}false{% endif %};
     var LOCK_INPUT_SOURCES = {% if node.analysis.lock_input_sources and not node.analysis.template_type %}true{% else %}false{% endif %};
 
     function isSelected(level, id) {
@@ -408,9 +409,13 @@
         // Reading one sample, the settings above the tree are that sample's - showing them again here
         // would be the same controls twice
         if (multiSample) {
-            if (HAS_GENOTYPE && sample.has_genotype) {
+            if (HAS_DEPTH && sample.has_depth) {
                 renderSampleThresholds(sample, detail);
+            }
+            if (HAS_GENOTYPE && sample.has_genotype) {
                 renderSampleZygosity(sample, detail);
+            }
+            if (HAS_DEPTH && sample.has_depth) {
                 renderSampleAlleleFrequency(sample, detail);
             }
             renderSampleReset(sample, detail);
@@ -813,14 +818,17 @@
             <input type='checkbox' id='pass-only' {% if vcf_locus_filters.pass %}checked{% endif %} /> PASS
         </label>
     </div>
-{% if has_genotype %}
+{% if has_sample_columns %}
+    {% if has_depth %}
     <div class='genotype-row'>
         <span class="genotype-field"><b title='Allelic Depth'>AD</b>&ge;{{ form.min_ad }}</span>
         <span class="genotype-field"><b title='Read Depth'>DP</b>&ge;{{ form.min_dp }}</span>
         <span class="genotype-field"><b title='Genotype Quality'>GQ</b>&ge;{{ form.min_gq }}</span>
         <span class="genotype-field"><b title='Phred-scaled Likelihoods for Genotypes'>PL</b>&le;{{ form.max_pl }}</span>
     </div>
+    {% endif %}
     <div class='genotype-row'>
+    {% if has_genotype %}
         <table class='editor-table zygosity-table'>
             <tr class='editor-table-head'>
                 <th class="zygosity-sample">Zygosity</th>
@@ -834,10 +842,17 @@
                 <td> {{ form.zygosity_hom }}
                 <td> {{ form.zygosity_unk }}
         </table>
+    {% else %}
+        <span class='editor-note'>VCF has no GT field, so there is no zygosity to filter on.</span>
+    {% endif %}
+    {% if has_depth %}
         <a id='view-allele-frequency-filter-link' class="hover-link" href='javascript:viewAlleleFrequencyFilter()'>Allele Frequency...</a>
+    {% endif %}
     </div>
+    {% if has_depth %}
     {% load allele_frequency_tags %}
     {% allele_frequency_controls node %}
+    {% endif %}
 {% else %}
     <div class='editor-note no-genotype-row'>
         VCF had no sample/genotype columns, so no sample information will appear in the grid.

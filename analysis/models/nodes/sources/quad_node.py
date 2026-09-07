@@ -472,7 +472,7 @@ class QuadNode(FamilyInheritanceNodeMixin, AbstractCohortBasedNode):
         if self.quad:
             cohort = self.quad.cohort
             cohorts = [cohort]
-            visibility = dict.fromkeys(self.quad.get_samples(), cohort.has_genotype)
+            visibility = dict.fromkeys(self.quad.get_samples(), cohort.has_sample_columns)
         return cohorts, visibility
 
     def _get_proband_sample_for_node(self) -> Optional[Sample]:

@@ -90,7 +90,7 @@ class CohortMixin:
         visibility = {}
         if cohort := self._get_cohort():
             cohorts = [cohort]
-            visibility = dict.fromkeys(cohort.get_samples(), cohort.has_genotype)
+            visibility = dict.fromkeys(cohort.get_samples(), cohort.has_sample_columns)
         return cohorts, visibility
 
     @property
@@ -394,7 +394,7 @@ class SampleMixin(CohortMixin):
 
         if sample := self._get_sample():
             cohorts = [self._get_cohort()]
-            visibility[sample] = sample.has_genotype
+            visibility[sample] = sample.has_sample_columns
         return cohorts, visibility
 
 
@@ -414,7 +414,7 @@ class AncestorSampleMixin(SampleMixin):
 
     def _get_ancestor_samples(self) -> set[Sample]:
         """ Get all samples from ancestor nodes, including those from VCFs without genotypes,
-            so that variant-only VCFs (has_genotype=False) are still valid ancestors """
+            so that variant-only VCFs (has_sample_columns=False) are still valid ancestors """
         parent_sample_set = set()
         parents, _errors = self.get_parent_subclasses_and_errors()
         for parent in parents:  # Use parent samples not own as own inserts self.sample

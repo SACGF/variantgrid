@@ -457,7 +457,7 @@ class DuoNode(FamilyInheritanceNodeMixin, AbstractCohortBasedNode):
         if self.duo:
             cohort = self.duo.cohort
             cohorts = [cohort]
-            visibility = dict.fromkeys(self.duo.get_samples(), cohort.has_genotype)
+            visibility = dict.fromkeys(self.duo.get_samples(), cohort.has_sample_columns)
         return cohorts, visibility
 
     def _get_proband_sample_for_node(self) -> Optional[Sample]:

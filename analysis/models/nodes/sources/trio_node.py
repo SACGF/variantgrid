@@ -460,7 +460,7 @@ class TrioNode(FamilyInheritanceNodeMixin, AbstractCohortBasedNode):
         if self.trio:
             cohort = self.trio.cohort
             cohorts = [cohort]
-            visibility = dict.fromkeys(self.trio.get_samples(), cohort.has_genotype)
+            visibility = dict.fromkeys(self.trio.get_samples(), cohort.has_sample_columns)
         return cohorts, visibility
 
     def _get_proband_sample_for_node(self) -> Optional[Sample]:

@@ -307,7 +307,7 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
 
     def get_samples_with_genotype(self) -> list[Sample]:
         """ Node + ancestor samples whose genotype we can show/filter on - ie variant-only VCFs
-            (has_genotype=False) are left out. Use get_samples() for sample level data """
+            (has_sample_columns=False) are left out. Use get_samples() for sample level data """
         cohorts, visibility = self.get_cohorts_and_sample_visibility(sort=False)
         return self._get_visible_samples_from_cohort(cohorts, visibility)
 

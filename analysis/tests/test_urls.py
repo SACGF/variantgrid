@@ -53,7 +53,7 @@ class Test(URLTestCase):
         non_owner_username = f"test_user_{__file__}_non_owner"
         cls.user_owner = User.objects.get_or_create(username=owner_username)[0]
         cls.user_non_owner = User.objects.get_or_create(username=non_owner_username)[0]
-        cls.vcf = VCF.objects.create(name="test_urls_vcf", genotype_samples=1, genome_build=grch37,
+        cls.vcf = VCF.objects.create(name="test_urls_vcf", genotype_samples=1, genotype_field="GT", allele_depth_field="AD", genome_build=grch37,
                                      import_status=ImportStatus.SUCCESS,
                                      user=cls.user_owner, date=timezone.now())
         cls.sample = Sample.objects.create(name="sample1", vcf=cls.vcf, import_status=ImportStatus.SUCCESS)

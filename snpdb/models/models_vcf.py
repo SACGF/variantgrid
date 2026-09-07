@@ -210,8 +210,22 @@ class VCF(GuardianPermissionsMixin, DataArchiveMixin, PreviewModelMixin):
         return reverse('data')
 
     @property
-    def has_genotype(self):
+    def has_sample_columns(self) -> bool:
+        """ FORMAT plus sample columns - a variant-only (sites) VCF has none. What decides whether the
+            genotype importer ran and whether there is anything per sample to show in a grid """
         return self.genotype_samples > 0
+
+    @property
+    def has_genotype(self) -> bool:
+        """ A GT field, so zygosity means something. A caller that reports only depths (eg TSO 500
+            splice variants) has sample columns but every zygosity is unknown """
+        return self.has_sample_columns and self.genotype_field is not None
+
+    @property
+    def has_depth(self) -> bool:
+        """ Allele or read depths, so the AD/DP/GQ/PL thresholds and allele frequency mean something """
+        depth_fields = (self.allele_depth_field, self.alt_depth_field, self.read_depth_field)
+        return self.has_sample_columns and any(depth_fields)
 
     @cached_property
     def samples_by_vcf_name(self) -> dict[str, 'Sample']:
@@ -389,8 +403,16 @@ class Sample(GuardianPermissionsMixin, SortByPKMixin, SvgSymbolPreviewIconMixin,
         return self.vcf.genome_build
 
     @property
-    def has_genotype(self):
+    def has_sample_columns(self) -> bool:
+        return self.vcf.has_sample_columns
+
+    @property
+    def has_genotype(self) -> bool:
         return self.vcf.has_genotype
+
+    @property
+    def has_depth(self) -> bool:
+        return self.vcf.has_depth
 
     @property
     def data_archived(self) -> bool:

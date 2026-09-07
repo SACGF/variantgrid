@@ -407,7 +407,7 @@ def handle_vcf_source(vcf):
 
 
 def genotype_vcf_processor_factory(upload_step, cohort_genotype_collection, uploaded_vcf, preprocess_vcf_import_info):
-    if uploaded_vcf.vcf.has_genotype:
+    if uploaded_vcf.vcf.has_sample_columns:
         klass = BulkGenotypeVCFProcessor
     else:
         klass = BulkNoGenotypeVCFProcessor

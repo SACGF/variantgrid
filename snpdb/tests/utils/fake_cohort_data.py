@@ -20,7 +20,7 @@ from snpdb.models import (
 
 
 def create_fake_cohort(user: User, genome_build: GenomeBuild) -> Cohort:
-    vcf = VCF.objects.create(name="test_urls_vcf", genotype_samples=1, genome_build=genome_build,
+    vcf = VCF.objects.create(name="test_urls_vcf", genotype_samples=1, genotype_field="GT", allele_depth_field="AD", genome_build=genome_build,
                              import_status=ImportStatus.SUCCESS,
                              user=user, date=timezone.now())
     VCFFilter.objects.create(vcf=vcf, filter_code="X", filter_id='YOUSHALLNOTPASS', description="fdas")
@@ -70,7 +70,7 @@ def create_fake_trio(user: User, genome_build: GenomeBuild) -> Trio:
 def create_fake_quad(user: User, genome_build: GenomeBuild, sibling_affected: bool = False) -> Quad:
     """4-sample Cohort (proband, mother, father, sibling) + a Quad."""
     vcf = VCF.objects.create(
-        name="test_quad_vcf", genotype_samples=1, genome_build=genome_build,
+        name="test_quad_vcf", genotype_samples=1, genotype_field="GT", allele_depth_field="AD", genome_build=genome_build,
         import_status=ImportStatus.SUCCESS, user=user, date=timezone.now()
     )
     proband_sample = Sample.objects.create(name="proband", vcf=vcf, import_status=ImportStatus.SUCCESS)
@@ -118,7 +118,7 @@ def create_fake_duo(user: User, genome_build: GenomeBuild,
                     parent_affected: bool = False) -> Duo:
     """2-sample Cohort (proband, parent) + a Duo."""
     vcf = VCF.objects.create(
-        name="test_duo_vcf", genotype_samples=1, genome_build=genome_build,
+        name="test_duo_vcf", genotype_samples=1, genotype_field="GT", allele_depth_field="AD", genome_build=genome_build,
         import_status=ImportStatus.SUCCESS, user=user, date=timezone.now()
     )
     proband_sample = Sample.objects.create(name="proband", vcf=vcf, import_status=ImportStatus.SUCCESS)
