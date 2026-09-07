@@ -75,6 +75,20 @@ class Tag(models.Model):
     def live_qs(cls) -> QuerySet['Tag']:
         return cls.objects.filter(retired__isnull=True)
 
+    @classmethod
+    def classify_queue_qs(cls) -> QuerySet['Tag']:
+        """ The classify queue vocabulary - tagging a variant with one of these is asking for it to be
+            classified. Taggings are scoped with tag__in=Tag.classify_queue_qs() so every work list,
+            button and resolution agrees on what a to-do is """
+        return cls.live_qs().filter(requires_classification=True)
+
+    @classmethod
+    def classify_queue_qs_for_bucket(cls, allele_origin_bucket: AlleleOriginBucket) -> QuerySet['Tag']:
+        """ The queue vocabulary one side of the house works from - its own bucket plus the tags marked
+            Both, the same rule AlleleOriginFilterDefault applies to its buckets """
+        buckets = [AlleleOriginBucket(allele_origin_bucket), AlleleOriginBucket.UNKNOWN]
+        return cls.classify_queue_qs().filter(allele_origin_bucket__in=buckets)
+
     @property
     def active(self) -> bool:
         return self.retired is None

@@ -57,10 +57,10 @@ Patterns here:
   (`analysis/variant_tag_operations.py:resolve_variant_tag`), so it stays as the record of what was flagged. That happens
   by itself when the classification is of the tagging's own sample and via the queue row's "Clear tag" button otherwise.
   A withdrawn `resolved_classification` puts the to-do back (`VariantTag.is_resolved`).
-- Every "New Classification" button asks `Tag.requires_classification` rather than naming
-  `settings.TAG_REQUIRES_CLASSIFICATION`, so a lab's own queue tag (`SomaticReportable`) is offered and resolved the same
-  way: the tag node editor's Classifications tab (`analysis/views/nodes/node_views.py:TagNodeView`), the variant tags
-  grid (`variantopedia/grids.py:VariantTagsColumns`) and the Classify & Report tab.
+- Every "New Classification" button scopes with `snpdb/models/models.py:Tag.classify_queue_qs` rather than naming a tag,
+  so a lab's own queue tag is offered and resolved the same way: the tag node editor's Classifications tab
+  (`analysis/views/nodes/node_views.py:TagNodeView`), the variant tags grid (`variantopedia/grids.py:VariantTagsColumns`)
+  and the Classify & Report tab. Retiring a tag takes it out of the vocabulary, so its taggings stop being to-dos.
 - A resolved tagging is hidden from the work lists: the tags node (`TagNode.include_resolved`, off by default), the
   variant page's tag list and the variant tags page (both on `UserGridConfig.show_hidden_data` under grid name
   `Variant Tags`, shown as a "Show resolved" checkbox). They all filter with

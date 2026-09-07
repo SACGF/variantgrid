@@ -1,6 +1,5 @@
 import json
 
-from django.conf import settings
 from django.contrib.auth.models import User
 from django.db import connection
 from django.test import RequestFactory, TestCase
@@ -33,6 +32,7 @@ from snpdb.models import (
     Variant,
     VariantAllele,
 )
+from snpdb.tests.utils.tag_testing_utils import create_classify_queue_tag
 from variantopedia.grids import TaggedVariantGrid, VariantTagCountsColumns, VariantTagsColumns
 
 
@@ -47,7 +47,7 @@ class TaggedVariantGridTest(TestCase):
         create_fake_variants(cls.genome_build)
 
         cls.artefact = Tag.objects.create(pk="Artefact")
-        cls.reportable = Tag.objects.create(pk="SomaticReportable")
+        cls.reportable = Tag.objects.create(pk="Reportable")
 
         # both_variant carries both tags, artefact_variant only one
         cls.both_variant, cls.artefact_variant, cls.other_user_variant = list(Variant.objects.order_by("pk")[:3])
@@ -91,14 +91,14 @@ class TaggedVariantGridTest(TestCase):
 
     def test_multiple_tags_require_all(self):
         """ The co-occurrence card links here expecting variants carrying every tag, not any of them """
-        self.assertEqual(self._grid_variant_ids({"tags": ["Artefact", "SomaticReportable"]}),
+        self.assertEqual(self._grid_variant_ids({"tags": ["Artefact", "Reportable"]}),
                          {self.both_variant.pk})
 
     def test_any_tags_filter_is_the_union(self):
         """ The tag counts summary toggles mean "carries any of these", unlike "tags" """
-        self.assertEqual(self._grid_variant_ids({"any_tags": ["Artefact", "SomaticReportable"]}),
+        self.assertEqual(self._grid_variant_ids({"any_tags": ["Artefact", "Reportable"]}),
                          {self.both_variant.pk, self.artefact_variant.pk, self.other_user_variant.pk})
-        self.assertEqual(self._tags_grid_variant_ids({"any_tags": json.dumps(["SomaticReportable"])}),
+        self.assertEqual(self._tags_grid_variant_ids({"any_tags": json.dumps(["Reportable"])}),
                          {self.both_variant.pk})
 
     def test_tag_count_column(self):
@@ -146,12 +146,9 @@ class TaggedVariantGridTest(TestCase):
         return rows_by_id[variant_tag.pk]
 
     def test_variant_tags_datatable_classify_button(self):
-        """ Any classify queue tag is a to-do item - offer to complete it from the analysis it came from,
-            not just RequiresClassification @see Tag.requires_classification """
-        self.reportable.requires_classification = True
-        self.reportable.save()
-
-        row = self._classify_button_row(self.reportable)
+        """ Any classify queue tag is a to-do item - offer to complete it from the analysis it came from
+            @see Tag.classify_queue_qs """
+        row = self._classify_button_row(create_classify_queue_tag())
         self.assertEqual(row["variant_string"]["classify_url"],
                          reverse("create_classification_for_variant_tag",
                                  kwargs={"analysis_id": self.analysis.pk, "variant_tag_id": self.variant_tag.pk}))
@@ -159,6 +156,14 @@ class TaggedVariantGridTest(TestCase):
     def test_variant_tags_datatable_no_classify_button_off_queue(self):
         """ A tag that isn't in the classify queue is just a label - no to-do to complete """
         row = self._classify_button_row(self.artefact)
+        self.assertNotIn("classify_url", row["variant_string"])
+
+    def test_variant_tags_datatable_no_classify_button_for_retired_queue_tag(self):
+        """ A retired tag is out of the vocabulary, so its taggings are history rather than a to-do """
+        queue_tag = create_classify_queue_tag()
+        Tag.objects.filter(pk=queue_tag.pk).update(retired=now())
+
+        row = self._classify_button_row(queue_tag)
         self.assertNotIn("classify_url", row["variant_string"])
 
     def test_tag_awaiting_liftover_keeps_its_own_coordinate(self):
@@ -221,7 +226,7 @@ class TaggedVariantGridTest(TestCase):
 
     def test_variant_tag_counts_custom_sort_order(self):
         """ The variant page tag table follows the sort order from the user's tag colours collection """
-        self.assertEqual(self._variant_tag_counts_tags(), ["Artefact", "SomaticReportable"])
+        self.assertEqual(self._variant_tag_counts_tags(), ["Artefact", "Reportable"])
 
         collection = TagColorsCollection.objects.create(name="sort test colors", user=self.user)
         TagColor.objects.create(collection=collection, tag=self.artefact, rgb="", sort_order=10)
@@ -229,7 +234,7 @@ class TaggedVariantGridTest(TestCase):
         user_settings_override.tag_colors = collection
         user_settings_override.save()
 
-        self.assertEqual(self._variant_tag_counts_tags(), ["SomaticReportable", "Artefact"])
+        self.assertEqual(self._variant_tag_counts_tags(), ["Reportable", "Artefact"])
 
     def test_user_filter_overrides_show_group_data(self):
         """ An explicit user filter must still show another user's (permission-visible) tags
@@ -369,7 +374,7 @@ class ResolvedVariantTagsTest(TestCase):
         get_fake_annotation_version(cls.genome_build)
         create_fake_variants(cls.genome_build)
 
-        cls.tag = Tag.objects.get_or_create(pk=settings.TAG_REQUIRES_CLASSIFICATION)[0]
+        cls.tag = create_classify_queue_tag()
         cls.open_variant, cls.done_variant = list(Variant.objects.order_by("pk")[:2])
         cls._tag(cls.open_variant)
         cls._tag(cls.done_variant, resolved=now())

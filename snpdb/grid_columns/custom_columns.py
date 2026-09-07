@@ -259,7 +259,7 @@ def get_variantgrid_extra_annotate(user: User, exclude_analysis=None) -> dict:
     tags_qs = VariantTag.filter_for_user(user).filter(allele__variantallele__variant_id=OuterRef("id"))
     if exclude_analysis:
         tags_qs = tags_qs.filter(Q(analysis__isnull=True) | Q(analysis__id__ne=exclude_analysis.pk))
-    # "tag_id:date:resolved" entries, e.g. "Artefact:2024-03-01:|SomaticReportable:2023-05-06:R" - the
+    # "tag_id:date:resolved" entries, e.g. "Artefact:2024-03-01:|ToDo:2023-05-06:R" - the
     # date lets formatters show fresh vs total counts, the trailing R marks a to-do a classification has
     # satisfied (see VariantGridFormat.tagsGlobal / _summarise_tags_global). A tag id may itself contain
     # a colon, so the two trailing fields are taken off the end rather than split on

@@ -25,8 +25,7 @@ from classification.models import Classification, ClassificationReportTemplate
 from library.guardian_utils import all_users_group, assign_permission_to_user_and_groups
 from snpdb.models import Country, GenomeBuild, Lab, Organization, Tag, Variant
 from snpdb.tests.utils.fake_cohort_data import create_fake_cohort, create_fake_trio
-
-REQUIRES_CLASSIFICATION = "RequiresClassification"
+from snpdb.tests.utils.tag_testing_utils import create_classify_queue_tag
 
 
 class ClassifyReportTestCase(TestCase):
@@ -49,8 +48,7 @@ class ClassifyReportTestCase(TestCase):
         make_cohort_genotype(cls.cgc, cls.variant, "E..")
         make_cohort_genotype(cls.cgc, cls.shared_variant, ".EE")
 
-        cls.tag = Tag.objects.get_or_create(pk=REQUIRES_CLASSIFICATION,
-                                            defaults={"requires_classification": True})[0]
+        cls.tag = create_classify_queue_tag()
 
         organization = Organization.objects.get_or_create(name="classify_report_org",
                                                           group_name="classify_report_org")[0]
@@ -205,7 +203,7 @@ class ClassifyQueueTest(ClassifyReportTestCase):
         self.assertFalse(row.can_resolve)
 
 
-class ResolveRequiresClassificationTagsForSamplesTest(ClassifyReportTestCase):
+class ResolveClassifyQueueTagsForSamplesTest(ClassifyReportTestCase):
 
     def test_resolves_the_case_tagging_with_an_audit_entry(self):
         analysis = self._create_analysis()
@@ -355,8 +353,7 @@ class CreateClassificationForCaseTest(ClassifyReportTestCase):
         self.assertNotContains(response, f'data-vcm-id="{previous.last_published_version.pk}"')
 
     def test_a_somatic_tag_is_not_offered_a_germline_record(self):
-        somatic_tag = Tag.objects.create(pk="SomaticReportable", requires_classification=True,
-                                         allele_origin_bucket=AlleleOriginBucket.SOMATIC)
+        somatic_tag = create_classify_queue_tag("SomaticToDo", AlleleOriginBucket.SOMATIC)
         variant_tag = self._create_variant_tag(sample=self.proband)
         VariantTag.objects.filter(pk=variant_tag.pk).update(tag=somatic_tag)
         variant_tag.refresh_from_db()

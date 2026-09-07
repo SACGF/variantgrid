@@ -244,7 +244,7 @@ class VariantTagsColumns(DatatableConfig[VariantTag]):
             RichColumn("id", visible=False),
             RichColumn("variant_string", label="Variant", orderable=True,
                        extra_columns=["id", "variant__id", "tag__id", "tag__requires_classification",
-                                      "analysis__id"],
+                                      "tag__retired", "analysis__id"],
                        renderer=self.render_variant, client_renderer="renderVariantTagVariant"),
             RichColumn(name="genome_build", label="Genome Build", renderer=self.render_genome_build),
             RichColumn("gene_symbol", label="Gene", orderable=True,
@@ -270,8 +270,9 @@ class VariantTagsColumns(DatatableConfig[VariantTag]):
             "variant_string": cell.value,
             "url": url_if_visible("view_variant", variant_id=cell["variant__id"]),
         }
-        # The tag is a to-do item - offer to complete it @see analysis.variant_tag_operations
-        if cell["tag__requires_classification"] and (analysis_id := cell["analysis__id"]):
+        # A live classify queue tag is a to-do item - offer to complete it @see Tag.classify_queue_qs
+        if cell["tag__requires_classification"] and cell["tag__retired"] is None \
+                and (analysis_id := cell["analysis__id"]):
             data["classify_url"] = url_if_visible("create_classification_for_variant_tag",
                                                   analysis_id=analysis_id, variant_tag_id=cell["id"])
         return data

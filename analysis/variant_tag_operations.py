@@ -30,7 +30,7 @@ from analysis.models import Analysis, AnalysisEdge, VariantTag
 from analysis.models.nodes.node_utils import get_nodes_by_id
 from classification.models import Classification
 from patients.models_enums import Zygosity
-from snpdb.models import Sample, SampleGenotype, Variant
+from snpdb.models import Sample, SampleGenotype, Tag, Variant
 
 VARIANT_TAG_CLASSIFIED = "classified"
 
@@ -140,7 +140,7 @@ def resolve_requires_classification_tags(classification: Classification, analysi
     """ Resolve the taggings the classification just satisfied - the variant is done for that person, so that's
         everyone's tagging of it in this analysis, not just the one that was clicked """
     variant_tags = VariantTag.objects.filter(variant=classification.variant, analysis=analysis,
-                                             tag__requires_classification=True)
+                                             tag__in=Tag.classify_queue_qs())
     return _resolve_unambiguous(variant_tags, classification, user)
 
 
@@ -157,7 +157,7 @@ def resolve_requires_classification_tags_for_samples(classification: Classificat
     sample_ids = {s.pk for s in samples}
     variant_tags = []
     for variant_tag in VariantTag.objects.filter(variant__in=variant.equivalent_variants,
-                                                 tag__requires_classification=True):
+                                                 tag__in=Tag.classify_queue_qs()):
         if variant_tag.sample_id:
             in_case = variant_tag.sample_id in sample_ids
         else:

@@ -273,10 +273,10 @@ class CreateTagFormTest(TestCase):
                                         "allele_origin_bucket": AlleleOriginBucket.UNKNOWN}).is_valid())
 
     def test_creates_new_tag_with_its_allele_origin(self):
-        form = CreateTagForm({"tag": "SomaticReportable", "allele_origin_bucket": AlleleOriginBucket.SOMATIC})
+        form = CreateTagForm({"tag": "Somatic", "allele_origin_bucket": AlleleOriginBucket.SOMATIC})
         self.assertTrue(form.is_valid(), form.errors)
         tag = form.save()
-        self.assertEqual(tag.pk, "SomaticReportable")
+        self.assertEqual(tag.pk, "Somatic")
         self.assertEqual(tag.allele_origin_bucket, AlleleOriginBucket.SOMATIC)
 
     def test_rejects_retired_name_and_says_where_it_went(self):

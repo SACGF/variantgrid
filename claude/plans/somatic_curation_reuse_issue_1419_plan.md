@@ -1,7 +1,8 @@
 # Reusing prior curation for somatic reporting
 
 Written by Claude Fable 5.1 (claude-fable-5-1), 2026-09-07 (Part B revised; original plan 2026-08-11);
-revised to the as-built state by Claude Opus 5 (claude-opus-5), 2026-09-07
+revised to the as-built state, and Part C/D re-specified on `Tag` properties, by
+Claude Opus 5 (claude-opus-5), 2026-09-07
 Status: in progress (A and B landed, C stage 1's list landed; C's triage drop and wizard, and D's
 analysis / specimen launch points remain)
 
@@ -176,7 +177,7 @@ implement — Part C follows the same ones.
 A germline record is never copied into a somatic one, in either scope. Before this part `consensus_patch`
 took `allele_origin` from the *source* with nothing constraining which source was on offer: the
 create-from-variant page listed Latest Germline beside Latest Somatic, and `_previous_by_tag` had no
-bucket filter at all, so a `SomaticReportable` tag could copy a germline record and come out germline.
+bucket filter at all, so a somatic-bucket tag could copy a germline record and come out germline.
 
 The rule everywhere: decide the target bucket first, then list only candidates in that bucket.
 
@@ -328,13 +329,16 @@ A row leaves the queue by being *resolved* against a classification
 the record of what was flagged. That is the "classified" exit; the "not reporting this" exit is the drop
 below, which does not exist yet.
 
-One row per `SomaticReportable` tag in scope. Each row shows the variant and its gene, and a brief
-overview of what already exists for that allele: how many prior classifications, the latest one's
-clinical significance / tier, its condition, lab and date — external labs included, marked as such.
+One row per unresolved tagging (`analysis/models/models_variant_tag.py:VariantTag.unresolved_q`) in scope
+whose tag is a somatic classify-queue tag — `snpdb/models/models.py:Tag.classify_queue_qs_for_bucket`
+with `AlleleOriginBucket.SOMATIC`, so a tag marked "Both" counts too. Each row shows the variant and its
+gene, and a brief overview of what already exists for that allele: how many prior classifications, the
+latest one's clinical significance / tier, its condition, lab and date — external labs included, marked
+as such.
 
-The scientist drops the rows they are not going to report. Dropping removes the `SomaticReportable` tag,
-which is the same gesture as untagging in the analysis — a plain delete, with the existing post-delete
-signal (`analysis/signals/signal_handlers.py:29`) updating node counts and nothing else recorded. Then:
+The scientist drops the rows they are not going to report. Dropping deletes the tagging, which is the
+same gesture as untagging in the analysis — a plain delete, with the existing post-delete signal
+(`analysis/signals/signal_handlers.py:29`) updating node counts and nothing else recorded. Then:
 *Classify N variants*.
 
 Soft-deleting `VariantTag` was considered and rejected. There are 32 query sites across 15 modules
@@ -343,8 +347,10 @@ have to learn to exclude deleted rows, and `get_or_create` in `set_variant_tag`
 (`analysis/views/views_json.py:227`) would need to undelete rather than duplicate. That is a lot of blast
 radius on a high-frequency mundane gesture.
 
-Classifying does **not** remove the tag — sapath#246 is explicit that the somatic lab uses
-`SomaticReportable` to track somatic variants, so the tag survives the classification that came from it.
+Classifying resolves the tagging exactly as the germline queue does
+(`analysis/variant_tag_operations.py:resolve_variant_tag`): the row is stamped rather than deleted, so
+the tag survives the classification that came from it — which is what sapath#246 asks for, the somatic
+lab keeping its tags on the variants it has reported.
 
 ### Stage 2 — one variant at a time
 
@@ -378,16 +384,17 @@ construction, survives a browser crash, and lets two people work the same list w
 ## Part D — where it launches from
 
 **The tag vocabulary landed** as `Tag.requires_classification` and `Tag.allele_origin_bucket` per row
-rather than the `TAG_SOMATIC_REPORTABLE` setting this plan first proposed — a deployment marks its own
-tags in the admin instead of naming one in settings, and a lab can have several. `SomaticReportable` is
-flagged and set to the somatic bucket by
-`snpdb/migrations/0251_one_off_tags_requiring_classification.py`. The sample and patient pages' Classify &
-Report tab is the launch point that came with it (`analysis/views/views_classify_report.py`).
+rather than a setting naming one tag — a deployment flags its own tags on the tag settings page, and a
+lab can have several. A deployment turns this feature on by flagging a tag as a somatic queue tag there;
+SA Path's already are, from `snpdb/migrations/0251_one_off_tags_requiring_classification.py`. Every
+launch point counts and scopes with the same `Tag` classmethods as stage 1's list. The sample and
+patient pages' Classify & Report tab is the launch point that came with it
+(`analysis/views/views_classify_report.py`).
 
 Still to do:
 
-**From the analysis**, beside the existing tags button — "Classify somatic reportable (N)" — scoped to
-that analysis's tags.
+**From the analysis**, beside the existing tags button — "Classify somatic (N)" — scoped to that
+analysis's taggings.
 
 **From the specimen and extraction pages**, scoped to the tags on variants in analyses containing a
 sample of that specimen's extractions. This waits on Phase 3 (#1706) giving `Specimen` and `Extraction`

@@ -1,7 +1,6 @@
 import json
 from datetime import timedelta
 
-from django.conf import settings
 from django.contrib.auth.models import User
 from django.template import Context, Template
 from django.test import TestCase
@@ -18,6 +17,7 @@ from classification.enums import SubmissionSource
 from classification.models.classification import Classification
 from classification.tests.models.test_utils import ClassificationTestUtils
 from snpdb.models import GenomeBuild, Tag, Variant
+from snpdb.tests.utils.tag_testing_utils import create_classify_queue_tag
 from snpdb.tests.utils.vcf_testing_utils import create_mock_allele
 
 
@@ -168,9 +168,9 @@ class TestTagNodeTaggedWithinDays(TestCase):
         self.assertIn(self.old_variant.pk, self._node_variant_ids(node))
 
 
-class TestRetireRequiresClassificationTags(TestCase):
-    """ Classifying the variant completes the to-do, deleting the tagging - the audit log entry is
-        then the only record it was ever there """
+class TestResolveClassifyQueueTags(TestCase):
+    """ Classifying the variant completes the to-do - every tagging of it in the analysis is resolved
+        against the classification, and the analysis audit log records it """
 
     @classmethod
     def setUpTestData(cls):
@@ -187,7 +187,7 @@ class TestRetireRequiresClassificationTags(TestCase):
 
         no_ref_qs = Variant.objects.filter(Variant.get_no_reference_q()).order_by("pk")
         cls.variant, cls.other_variant = no_ref_qs[:2]
-        cls.requires_classification_tag = Tag.objects.get_or_create(pk=settings.TAG_REQUIRES_CLASSIFICATION)[0]
+        cls.requires_classification_tag = create_classify_queue_tag()
         cls.other_tag = Tag.objects.get_or_create(pk="artefact")[0]
 
         cls.classification = Classification.create(user=cls.user, lab=cls.lab, lab_record_id=None, data={},
@@ -222,7 +222,7 @@ class TestRetireRequiresClassificationTags(TestCase):
         self.assertEqual(log_entry.object_pk, str(variant_tag.pk))
         self.assertEqual(log_entry.actor, self.user)
         self.assertEqual(log_entry.additional_data["classification_id"], self.classification.pk)
-        self.assertEqual(log_entry.additional_data["tag_id"], settings.TAG_REQUIRES_CLASSIFICATION)
+        self.assertEqual(log_entry.additional_data["tag_id"], self.requires_classification_tag.pk)
 
         summary = get_analysis_log_entry_summary(log_entry.action, log_entry.content_type.model,
                                                  log_entry.changes, log_entry.additional_data)
@@ -246,7 +246,7 @@ class TestVariantTagUnresolvedQ(TestCase):
         cls.analysis = Analysis(genome_build=cls.grch37)
         cls.analysis.set_defaults_and_save(cls.user)
         cls.variant = Variant.objects.filter(Variant.get_no_reference_q()).order_by("pk").first()
-        cls.tag = Tag.objects.get_or_create(pk=settings.TAG_REQUIRES_CLASSIFICATION)[0]
+        cls.tag = create_classify_queue_tag()
 
     def _classification(self, withdrawn: bool) -> Classification:
         classification = Classification.create(user=self.user, lab=self.lab, lab_record_id=None, data={},
@@ -298,7 +298,7 @@ class TestTagNodeIncludeResolved(TestCase):
 
         no_ref_qs = Variant.objects.filter(Variant.get_no_reference_q()).order_by("pk")
         cls.open_variant, cls.done_variant = no_ref_qs[:2]
-        cls.tag = Tag.objects.get_or_create(pk=settings.TAG_REQUIRES_CLASSIFICATION)[0]
+        cls.tag = create_classify_queue_tag()
         cls._tag_variant(cls.open_variant)
         cls._tag_variant(cls.done_variant, resolved=timezone.now())
 
@@ -359,7 +359,7 @@ class TestVariantTagsResolvedDict(TestCase):
 
         no_ref_qs = Variant.objects.filter(Variant.get_no_reference_q()).order_by("pk")
         cls.open_variant, cls.done_variant, cls.mixed_variant = no_ref_qs[:3]
-        cls.tag = Tag.objects.get_or_create(pk=settings.TAG_REQUIRES_CLASSIFICATION)[0]
+        cls.tag = create_classify_queue_tag()
 
         cls._tag_variant(cls.open_variant)
         cls.resolved_at = timezone.now()

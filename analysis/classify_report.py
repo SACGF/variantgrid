@@ -139,7 +139,7 @@ class ClassifyReportCase:
     def _visible_variant_tags(self):
         """ Live classify-queue taggings the user can see - a tagging made in an analysis is the analysis's
             to show (@see VariantTag.can_view) """
-        return VariantTag.objects.filter(tag__requires_classification=True, tag__retired__isnull=True) \
+        return VariantTag.objects.filter(tag__in=Tag.classify_queue_qs()) \
             .filter(Q(analysis__isnull=True) | Q(analysis__in=Analysis.filter_for_user(self.user))) \
             .select_related("tag", "variant", "allele", "analysis", "sample", "genome_build")
 

@@ -22,7 +22,7 @@ class GeneSymbolVariantsGridTest(TestCase):
         cls.gene_symbol = create_fake_transcript_version(cls.genome_build).gene_version.gene_symbol
 
         cls.artefact = Tag.objects.create(pk="Artefact")
-        cls.reportable = Tag.objects.create(pk="SomaticReportable")
+        cls.reportable = Tag.objects.create(pk="Reportable")
         cls.artefact_variant, cls.reportable_variant, cls.untagged_variant = \
             list(Variant.objects.order_by("pk")[:3])
         cls._tag(cls.artefact_variant, cls.artefact)

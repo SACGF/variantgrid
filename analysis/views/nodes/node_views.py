@@ -59,6 +59,7 @@ from classification.models.classification import Classification
 from classification.views.classification_datatables import ClassificationColumns
 from library.django_utils import highest_pk
 from library.django_utils import resolve_field_path
+from snpdb.models import Tag
 from snpdb.models.models_user_settings import UserSettings
 from snpdb.models.models_variant import Variant
 
@@ -321,11 +322,10 @@ class TagNodeView(NodeView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["datatable_config"] = ClassificationColumns(self.request)
-        # The to-do list - every classify queue tag, not just RequiresClassification @see Tag.requires_classification
+        # The to-do list - every tag in the classify queue vocabulary @see Tag.classify_queue_qs
         # A tagging a classification has already satisfied is done @see VariantTag.unresolved_q
         context["requires_classification_tags"] = self.object.analysis.varianttag_set.filter(
-            VariantTag.unresolved_q(), tag__requires_classification=True,
-            tag__retired__isnull=True).select_related("tag")
+            VariantTag.unresolved_q(), tag__in=Tag.classify_queue_qs()).select_related("tag")
         context.update(self._get_tag_counts_context())
         return context
 

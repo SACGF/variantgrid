@@ -18,6 +18,7 @@ from annotation.fake_annotation import create_fake_variants
 from library.genomics.vcf_enums import VariantClass
 from library.guardian_utils import assign_permission_to_user_and_groups
 from snpdb.models import Tag, Variant
+from snpdb.tests.utils.tag_testing_utils import create_classify_queue_tag
 
 
 class _FormSubmitDataParser(HTMLParser):
@@ -136,10 +137,10 @@ class NodeEditorRenderTest(AnalysisSetupMixin, TestCase):
         self._test_editor_posts_back_valid(node, "clinvar-node-form")
 
     def test_tag_node_editor_to_do_list_is_every_classify_queue_tag(self):
-        """ The to-do list is Tag.requires_classification, so a somatic lab's own queue tag is offered
-            for classification the same way RequiresClassification is """
+        """ The to-do list is the classify queue vocabulary, so a somatic lab's own queue tag is offered
+            for classification the same way the seeded one is @see Tag.classify_queue_qs """
         create_fake_variants(self.grch37)
-        queue_tag = Tag.objects.create(pk="EditorReportable", requires_classification=True)
+        queue_tag = create_classify_queue_tag("EditorToDo")
         label_tag = Tag.objects.create(pk="EditorArtefact")
         variant, other_variant = list(Variant.objects.order_by("pk")[:2])
         to_do = VariantTag.objects.create(analysis=self.analysis, genome_build=self.grch37,

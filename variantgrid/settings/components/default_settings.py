@@ -763,7 +763,9 @@ STATICFILES_FINDERS = (
 # django_secret_key.txt in this dir (which is hidden via .gitignore)
 SECRET_KEY = get_or_create_django_secret_key(SETTINGS_DIR)
 
-TAG_REQUIRES_CLASSIFICATION = "RequiresClassification"  # tags can't have spaces
+# Seed data only: the classify queue tag a fresh install is created with (tags can't have spaces).
+# What behaves as a queue tag is Tag.requires_classification, set per tag on the tag settings page
+TAG_REQUIRES_CLASSIFICATION = "RequiresClassification"
 
 TEMPLATES = [
     {
