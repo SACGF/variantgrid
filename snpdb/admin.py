@@ -95,7 +95,7 @@ class AlleleAdmin(ModelAdminBasics):
     def recalc_overlaps(self, request, queryset: QuerySet[Allele]):
         for overlap in Overlap.objects.filter(allele__in=queryset).iterator():
             OverlapServices.recalc_overlap(overlap)
-            OverlapServices.update_skews(overlap)
+            OverlapServices.update_next_steps(overlap)
 
 
 class DefaultBuildFilter(admin.SimpleListFilter):

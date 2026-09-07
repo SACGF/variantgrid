@@ -64,7 +64,7 @@ from classification.models import (
     DiscordanceReport,
     ImportedAlleleInfo,
     ImportedAlleleInfoStatus,
-    ReportNames, OverlapContribution, OverlapContributionSkew, Overlap,
+    ReportNames, OverlapContribution, OverlapContributionNextStep, Overlap,
 )
 from classification.models.classification import ClassificationModification
 from classification.models.classification_import_run import ClassificationImportRunStatus
@@ -1036,7 +1036,7 @@ def view_classification_grouping_detail(request, classification_grouping_id: int
     grouping.check_can_view(request.user)
 
     contributions = OverlapContribution.objects.filter(classification_grouping=grouping)
-    skews = OverlapContributionSkew.objects.filter(contribution__in=contributions)
+    skews = OverlapContributionNextStep.objects.filter(contribution__in=contributions)
     # not showing cross context overlaps as that's just confusing
     overlaps = list(sorted(Overlap.objects.filter(
         valid=True,

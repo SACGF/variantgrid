@@ -6,7 +6,7 @@ from django.db.models import QuerySet
 from django.http import HttpRequest
 
 from classification.enums import OverlapStatus
-from classification.models import Overlap, OverlapContribution, OverlapContributionSkew
+from classification.models import Overlap, OverlapContribution, OverlapContributionNextStep
 from classification.services.overlaps_services import OverlapServices
 from snpdb.admin_utils import ModelAdminBasics, admin_action, admin_list_column
 from django.contrib import admin
@@ -81,10 +81,10 @@ class OverlapContributionAdmin(AuditlogHistoryAdminMixin, ModelAdminBasics):
         return obj.triage_state_obj
 
 
-@admin.register(OverlapContributionSkew)
-class OverlapContributionSkewAdmin(ModelAdminBasics):
-    list_display = ('overlap', 'contribution', 'next_step', 'contribution__classification_grouping__lab')
-    list_filter = ('contribution__classification_grouping__lab', 'overlap__overlap_status', 'next_step')
+@admin.register(OverlapContributionNextStep)
+class OverlapContributionNextStepAdmin(ModelAdminBasics):
+    list_display = ('overlap', 'contribution', 'next_step')
+    list_filter = ('overlap__overlap_status', 'next_step')
 
 
 class OverlapStatusFilter(admin.SimpleListFilter):
@@ -107,10 +107,10 @@ class OverlapStatusFilter(admin.SimpleListFilter):
         return queryset
 
 
-class OverlapContributionSkewsAdmin(admin.TabularInline):
+class OverlapContributionNextStepAdminInline(admin.TabularInline):
     readonly_fields = ('modified',)
     # fields = ('last_edited_by', 'parent', 'gene_symbol', 'mode_of_inheritance', 'classification', 'condition_xrefs', 'modified')
-    model = OverlapContributionSkew
+    model = OverlapContributionNextStep
 
     def has_add_permission(self, request, obj=None):
         return False
@@ -125,7 +125,7 @@ class OverlapAdmin(ModelAdminBasics):
     # inlines = (OverlapContributionInline, )
     search_fields = ('pk', 'allele__id')
     list_filter = (OverlapStatusFilter, 'valid', 'overlap_type', 'value_type', 'testing_context_bucket', 'overlap_override_status')
-    inlines = (OverlapContributionSkewsAdmin,)
+    inlines = (OverlapContributionNextStepAdminInline,)
 
     @admin_list_column()
     def contributions_list(self, obj: Overlap):
@@ -143,4 +143,4 @@ class OverlapAdmin(ModelAdminBasics):
     def refresh_overlap(self, request, queryset: QuerySet[Overlap]):
         for overlap in queryset:
             OverlapServices.recalc_overlap(overlap)
-            OverlapServices.update_skews(overlap)
+            OverlapServices.update_next_steps(overlap)

@@ -113,11 +113,11 @@
         {% endlabelled %}
     {% endif %}
 
-    {% if 'overlaps_3'|is_view_enabled %}
+    {% if 'overlaps'|is_view_enabled %}
         {% page_help_embedded title="Discordant Overlaps Awaiting Triage" %}
             <p>Below are the overlaps where your lab has a triage pending.</p>
         {% end_page_help_embedded %}
-        <p><a href="{% url 'overlaps_3' %}" class="hover-link">Click here</a> to see all overlaps your lab is involved in.</p>
+        <p><a href="{% url 'overlaps' %}" class="hover-link">Click here</a> to see all overlaps your lab is involved in.</p>
 
         <script>
         function overlapsGroupingFilter(data) {
@@ -128,7 +128,7 @@
 
         <table
            data-datatable-data='overlapsGroupingFilter'
-           data-datatable-url="{% url 'overlaps_3_datatables' %}"
+           data-datatable-url="{% url 'overlaps_datatables' %}"
            class="sticky-header thick-border"
            id="overlaps-table"
            data-adjust-columns="false">

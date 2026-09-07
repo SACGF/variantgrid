@@ -52,7 +52,7 @@ from uicore.views.ajax_form_view import LazyRender
 
 
 def discordance_reports_view(request: HttpRequest, lab_id: Optional[str] = None) -> HttpResponseBase:
-    return redirect(reverse('overlaps_3'))
+    return redirect(reverse('overlaps'))
 
 
 def discordance_reports_history_detail(request: HttpRequest, lab_id: Optional[str] = None) -> HttpResponseBase:

@@ -17,7 +17,7 @@ from django.utils.timezone import now
 from annotation.models import ClinVarRecordCollection, ClinVarRecord
 from classification.enums import TestingContextBucket, OverlapStatus, OverlapState
 from classification.models import ClassificationGrouping, ClassificationResultValue, OverlapContributionStatus, \
-    OverlapContribution, OverlapEntrySourceTextChoices, Overlap, OverlapType, OverlapContributionSkew, \
+    OverlapContribution, OverlapEntrySourceTextChoices, Overlap, OverlapType, OverlapContributionNextStep, \
     TriageNextStep, TriageState, EffectiveDate, TriageComment, EffectiveDateType, OverlapDiscordanceNotification, \
     DiscordanceReport, ClassificationImportRun, EvidenceKeyMap
 from classification.enums.overlaps_enums import TriageStatus
@@ -114,7 +114,7 @@ class OverlapServices:
                 # now update status of any created overlaps or existing linked overlaps
                 for overlap in overlap_contribution.overlaps:
                     # FIXME, should mark the overlap as dirty instead so overlap can be batch
-                    OverlapServices.update_skews(overlap)
+                    OverlapServices.update_next_steps(overlap)
                     OverlapServices.recalc_overlap(overlap)
 
     @staticmethod
@@ -173,7 +173,7 @@ class OverlapServices:
                 OverlapServices._link_overlap_contribution(contribution)
                 if recalc_overlap:
                     overlaps = set()
-                    for skew in contribution.overlapcontributionskew_set.select_related('overlap').all():
+                    for skew in contribution.overlapcontributionnextstep_set.select_related('overlap').all():
                         overlaps.add(skew.overlap)
                     for overlap in overlaps:
                         OverlapServices.recalc_overlap(overlap)
@@ -207,7 +207,7 @@ class OverlapServices:
             }
         )
 
-        OverlapContributionSkew.objects.get_or_create(
+        OverlapContributionNextStep.objects.get_or_create(
             overlap=single_context_overlap,
             contribution=overlap_contribution
         )
@@ -224,25 +224,25 @@ class OverlapServices:
             }
         )
 
-        OverlapContributionSkew.objects.get_or_create(
+        OverlapContributionNextStep.objects.get_or_create(
             overlap=cross_context_overlap,
             contribution=overlap_contribution
         )
 
     @staticmethod
-    def update_skews(overlap: Overlap):
+    def update_next_steps(overlap: Overlap):
         """
         Skews determine if from a lab's PoV an Overlap is waiting on them, waiting on another lab etc
         So grab all the OverlapContributions, check their TriageStatus, link those to the Skews
         Then update the Skew's next steps
         """
 
-        status_buckets: defaultdict[TriageStatus, list[OverlapContributionSkew]] = defaultdict(list)
-        all_interactive_skews: list[OverlapContributionSkew] = []
-        for skew in overlap.overlapcontributionskew_set.all():
+        status_buckets: defaultdict[TriageStatus, list[OverlapContributionNextStep]] = defaultdict(list)
+        all_interactive_next_steps: list[OverlapContributionNextStep] = []
+        for skew in overlap.overlapcontributionnextstep_set.all():
             status_buckets[skew.contribution.triage_state_obj.status].append(skew)
             if skew.contribution.triage_state_obj.status != TriageStatus.NON_INTERACTIVE_THIRD_PARTY:
-                all_interactive_skews.append(skew)
+                all_interactive_next_steps.append(skew)
 
         pending = status_buckets[TriageStatus.PENDING]
         reviewed_will_change = status_buckets[TriageStatus.REVIEWED_WILL_FIX]
@@ -254,7 +254,7 @@ class OverlapServices:
         # note we ignore non-interactive 3rd party... since they're non-interactive
 
         # mark everything as Pending Calculation (then if we don't replace pending later with a real value
-        for entry in all_interactive_skews:
+        for entry in all_interactive_next_steps:
             entry.next_step = TriageNextStep.PENDING_CALCULATION
 
         had_pending_or_changing = False
@@ -305,12 +305,12 @@ class OverlapServices:
                     r_complex.next_step = TriageNextStep.UNANIMOUSLY_COMPLEX
 
         # the above should have updated every skew perspective, check below
-        for entry in all_interactive_skews:
+        for entry in all_interactive_next_steps:
             if entry.next_step == TriageNextStep.PENDING_CALCULATION:
                 raise ValueError("Failed to assign each skew a status")
 
-        OverlapContributionSkew.objects.bulk_update(
-            objs=all_interactive_skews,
+        OverlapContributionNextStep.objects.bulk_update(
+            objs=all_interactive_next_steps,
             fields=['next_step']
         )
 
@@ -587,13 +587,13 @@ class OverlapPageDetails:
     user: User
 
     @cached_property
-    def skews(self) -> list[OverlapContributionSkew]:
-        relevant_skews = list(
-            self.overlap.overlapcontributionskew_set.filter(
+    def next_steps(self) -> list[OverlapContributionNextStep]:
+        relevant_next_steps = list(
+            self.overlap.overlapcontributionnextstep_set.filter(
                 contribution__contribution_status=OverlapContributionStatus.CONTRIBUTING,
                 contribution__classification_grouping__lab__in=Lab.valid_labs_qs(self.user, admin_check=True))
         )
-        sorted_by_lab = list(sorted(relevant_skews, key=lambda ocs: ocs.contribution.classification_grouping.lab))
+        sorted_by_lab = list(sorted(relevant_next_steps, key=lambda ocs: ocs.contribution.classification_grouping.lab))
         return sorted_by_lab
 
     @cached_property
@@ -838,7 +838,7 @@ class OverlapsSummary:
             contribution__contribution_status=OverlapContributionStatus.CONTRIBUTING)
 
         qs = qs.annotate(skew_status=Subquery(
-                OverlapContributionSkew.objects.filter(lab_filter_q).filter(
+                OverlapContributionNextStep.objects.filter(lab_filter_q).filter(
                     overlap=OuterRef('pk')
                 ).annotate(max_status=Max('next_step')).values_list('max_status')[:1]
             ))

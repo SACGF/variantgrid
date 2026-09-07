@@ -70,12 +70,12 @@ class Command(BaseCommand):
         print("Recalcing Overlaps")
         for overlap in Overlap.objects.all().iterator():
             OverlapServices.recalc_overlap(overlap)
-            OverlapServices.update_skews(overlap)
+            OverlapServices.update_next_steps(overlap)
 
     def recalc_skews(self):
         print("Recalcing just skews")
         for overlap in Overlap.objects.all().iterator():
-            OverlapServices.update_skews(overlap)
+            OverlapServices.update_next_steps(overlap)
 
     def full_reset(self, *args, **options):
         print("Full Reset")
@@ -90,7 +90,7 @@ class Command(BaseCommand):
 
         for overlap in Overlap.objects.all().iterator():
             OverlapServices.recalc_overlap(overlap)
-            OverlapServices.update_skews(overlap)
+            OverlapServices.update_next_steps(overlap)
 
         self.populate_overlap_change_date()
 

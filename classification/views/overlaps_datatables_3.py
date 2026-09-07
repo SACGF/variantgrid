@@ -11,7 +11,7 @@ from django.utils.safestring import SafeString
 
 from classification.enums import OverlapStatus, SpecialEKeys, OverlapOverrideStatus
 from classification.models import ClassificationGrouping, Overlap, OverlapType, \
-    ClassificationResultValue, OverlapContributionStatus, OverlapContributionSkew, TriageNextStep, EvidenceKey, \
+    ClassificationResultValue, OverlapContributionStatus, OverlapContributionNextStep, TriageNextStep, EvidenceKey, \
     EvidenceKeyMap, IN_REVIEW_VALUE
 from classification.services.overlap_calculator import OVERLAP_CLIN_SIG_ENABLED
 from genes.hgvs import HGVSDisplay, HGVSComponents
@@ -146,21 +146,21 @@ class OverlapColumns(DatatableConfig[ClassificationGrouping]):
                 Q(overlap_override_status__ne=OverlapOverrideStatus.NO_OVERRIDE))
             qs = qs.filter(overlap_status__gte=OverlapStatus.SINGLE_SUBMITTER)
             qs = qs.annotate(skew_status=Subquery(
-                OverlapContributionSkew.objects.filter(lab_filter_q).filter(
+                OverlapContributionNextStep.objects.filter(lab_filter_q).filter(
                     overlap=OuterRef('pk')
                 ).annotate(max_status=Max('next_step')).values_list('max_status')[:1]
             ))
         elif self.get_query_param("skew_status") == "X":  # show all overlaps (don't care about next step)
             qs = qs.filter(overlap_status__gt=OverlapStatus.SINGLE_SUBMITTER)
             qs = qs.annotate(skew_status=Subquery(
-                OverlapContributionSkew.objects.filter(lab_filter_q).filter(
+                OverlapContributionNextStep.objects.filter(lab_filter_q).filter(
                     overlap=OuterRef('pk')
                 ).annotate(max_status=Max('next_step')).values_list('max_status')[:1]
             ))
         elif self.get_query_param("skew_status") == "V":  # V for VUS (don't care about next step)
             qs = qs.filter(overlap_status__gt=OverlapStatus.SINGLE_SUBMITTER, all_vus=True)
             qs = qs.annotate(skew_status=Subquery(
-                OverlapContributionSkew.objects.filter(lab_filter_q).filter(
+                OverlapContributionNextStep.objects.filter(lab_filter_q).filter(
                     overlap=OuterRef('pk')
                 ).annotate(max_status=Max('next_step')).values_list('max_status')[:1]
             ))
@@ -169,7 +169,7 @@ class OverlapColumns(DatatableConfig[ClassificationGrouping]):
             qs = qs.filter(overlap_status__gte=OverlapStatus.TIER_1_VS_TIER_2_DIFFERENCES).filter(overlap_override_status=OverlapOverrideStatus.NO_OVERRIDE)
             # filter based on overlap skew
             qs = qs.annotate(skew_status=Subquery(
-                OverlapContributionSkew.objects.filter(lab_filter_q).filter(
+                OverlapContributionNextStep.objects.filter(lab_filter_q).filter(
                     overlap=OuterRef('pk'),
                     next_step__in=self.triage_next_step_filter
                 ).annotate(max_status=Max('next_step')).values_list('max_status')[:1]
@@ -177,7 +177,7 @@ class OverlapColumns(DatatableConfig[ClassificationGrouping]):
 
         # Make sure the skews exist
         qs = qs.filter(skew_status__isnull=False)
-        qs = qs.prefetch_related("overlapcontributionskew_set")
+        qs = qs.prefetch_related("overlapcontributionnextstep_set")
         return qs
 
     def pre_render(self, qs: QuerySet[DC]):
@@ -230,7 +230,7 @@ class OverlapColumns(DatatableConfig[ClassificationGrouping]):
         overlap = cell.obj
         values = ContributionValues(EvidenceKeyMap.cached_key(overlap.value_type.evidence_key_str))
 
-        skew_qs = overlap.overlapcontributionskew_set
+        skew_qs = overlap.overlapcontributionnextstep_set
         if not self.lab_picker.is_admin_mode:
             skew_qs = skew_qs.filter(contribution__classification_grouping__lab__in=self.lab_picker.lab_ids)
 
@@ -289,7 +289,7 @@ class OverlapColumns(DatatableConfig[ClassificationGrouping]):
         # used to cache cross context
 
         self.server_calculate_mode = DatatableConfigQuerySetMode.OBJECTS
-        self.expand_client_renderer = DatatableConfig._row_expand_ajax('overlap_3', expected_height=108)
+        self.expand_client_renderer = DatatableConfig._row_expand_ajax('overlap', expected_height=108)
         self.rich_columns = [
 
             RichColumn(

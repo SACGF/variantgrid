@@ -4,7 +4,7 @@
 {% load classification_tags %}
 <div class="card-header">Triaging</div>
 {% if form %}
-    <form data-toggle="ajax-form" id="triage-{{ triage.pk }}-form" method="POST" action="{% url 'triage_3' triage.pk %}?mode={{ mode }}">
+    <form data-toggle="ajax-form" id="triage-{{ triage.pk }}-form" method="POST" action="{% url 'triage' triage.pk %}?mode={{ mode }}">
     <div class="card-body">
         {% labelled label="c.HGVS" %}
             <a href="{{ triage.allele.get_absolute_url }}">

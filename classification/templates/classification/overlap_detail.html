@@ -7,7 +7,7 @@
     {% if render_mode == "ajax" %}
         {% labelled label="Page Link" %}<a class="hover-link" href="{{ overlap_details.overlap.get_absolute_url }}">Overlap {{ overlap_details.overlap.pk }}</a>{% endlabelled %}
     {% else %}
-        <a href="{% url 'overlaps_3' %}" class="hover-link"><i class="fas fa-angle-left"></i> Back to all Overlaps</a>
+        <a href="{% url 'overlaps' %}" class="hover-link"><i class="fas fa-angle-left"></i> Back to all Overlaps</a>
         {% with overlap=overlap_details.overlap %}
             <div class="current-record-menu-item">
                 <div class="text-small text-muted">viewing</div>
@@ -29,11 +29,11 @@
             {% endif %}
             {% if overlap.overlap_status.is_discordant %}
             {% labelled label="Next Step" %}
-                {% if overlap_details.skews|length == 1 %}
-                    {{ overlap_details.skews.0.next_step.label }}
+                {% if overlap_details.next_steps|length == 1 %}
+                    {{ overlap_details.next_steps.0.next_step.label }}
                 {% else %}
-                    {% for skew in overlap_details.skews %}
-                        <div>{% lab skew.contribution.classification_grouping.lab %} - <span style="font-weight:500">{{ skew.next_step.label }}</span></div>
+                    {% for overlap_next_step in overlap_details.next_steps %}
+                        <div>{% lab overlap_next_step.contribution.classification_grouping.lab %} - <span style="font-weight:500">{{ overlap_next_step.next_step.label }}</span></div>
                     {% endfor %}
                 {% endif %}
             {% endlabelled %}

@@ -12,7 +12,7 @@ from django.utils.safestring import mark_safe
 from classification.enums import SpecialEKeys, OverlapStatus, OverlapType, OverlapContributionStatus, \
     OverlapOverrideStatus
 from classification.models import ClassificationResultValue, \
-    EvidenceKey, EvidenceKeyMap, OverlapContribution, Overlap, TriageNextStep, OverlapContributionSkew
+    EvidenceKey, EvidenceKeyMap, OverlapContribution, Overlap, TriageNextStep, OverlapContributionNextStep
 from classification.enums.overlaps_enums import TriageState, TriageStatus
 from classification.services.overlap_calculator import overlap_calculator_for_value_type, OVERLAP_CLIN_SIG_ENABLED
 from classification.services.overlaps_services import OverlapServices, OverlapPageDetails
@@ -91,8 +91,8 @@ class ClassificationGroupingValueTriageClinSigForm(ClassificationGroupingValueTr
     )
 
 
-def view_overlaps_3(request: HttpRequest, lab_id=None) -> HttpResponseBase:
-    lab_picker = LabPickerData.from_request(request, lab_id, 'overlaps_3')
+def view_overlaps(request: HttpRequest, lab_id=None) -> HttpResponseBase:
+    lab_picker = LabPickerData.from_request(request, lab_id, 'overlaps')
     if redirect_response := lab_picker.check_redirect():
         return redirect_response
 
@@ -103,14 +103,14 @@ def view_overlaps_3(request: HttpRequest, lab_id=None) -> HttpResponseBase:
     for skew_status in ["TT", "S", "V", TriageNextStep.TO_DISCUSS, TriageNextStep.AWAITING_OTHER_LAB, TriageNextStep.UNANIMOUSLY_COMPLEX, TriageNextStep.AWAITING_YOUR_AMEND]:
         counts[skew_status] = OverlapColumns(request, {"skew_status": str(skew_status), "lab_selection": lab_id}).get_initial_queryset().count()
 
-    return render(request, "classification/overlaps_3.html", {
+    return render(request, "classification/overlaps.html", {
         "lab_picker_data": lab_picker,
         "tab": request.GET.get("tab") or "TT",
         "counts": counts
     })
 
 
-class TriageView3(AjaxFormView[OverlapContribution]):
+class TriageView(AjaxFormView[OverlapContribution]):
 
     @classmethod
     def lazy_render(cls, obj: OverlapContribution, context: Optional[dict] = None) -> LazyRender:
@@ -127,7 +127,7 @@ class TriageView3(AjaxFormView[OverlapContribution]):
             #     }
 
         return LazyRender(
-            template_name="classification/triage_detail_3.html",
+            template_name="classification/triage_detail.html",
             core_object=obj,
             core_object_name="triage",
             static_context=context,
@@ -201,7 +201,7 @@ class TriageView3(AjaxFormView[OverlapContribution]):
 
             for overlap_contribution in triage.classification_grouping.overlapcontribution_set.filter(value_type=value_type):
                 for overlap in overlap_contribution.overlaps:
-                    OverlapServices.update_skews(overlap)
+                    OverlapServices.update_next_steps(overlap)
                     OverlapServices.recalc_overlap(overlap)
 
             messages.add_message(request, level=messages.SUCCESS, message="Triage saved successfully")
@@ -209,16 +209,16 @@ class TriageView3(AjaxFormView[OverlapContribution]):
         else:
             context["form"] = form
 
-        return TriageView3.lazy_render(triage, context).render(request, saved=saved)
+        return TriageView.lazy_render(triage, context).render(request, saved=saved)
 
 
-def view_overlap_3(request: HttpRequest, overlap_id: int) -> HttpResponseBase:
+def view_overlap(request: HttpRequest, overlap_id: int) -> HttpResponseBase:
     overlap = Overlap.objects.filter(pk=overlap_id).get()
     overlap_details = OverlapPageDetails(overlap=overlap, user=request.user)
     context = {
         "overlap_details": overlap_details
     }
-    return render_ajax_view(request, "classification/overlap_detail_3.html", context, menubar="classification")
+    return render_ajax_view(request, "classification/overlap_detail.html", context, menubar="classification")
 
 
 def view_overlap_history(request: HttpRequest, overlap_id: int) -> HttpResponseBase:
@@ -302,7 +302,7 @@ def action_overlap_review(request: HttpRequest, review_id: int) -> HttpResponseB
                     # save the reviewed value if nothing else
                     contribution.save()
 
-            OverlapServices.update_skews(overlap)
+            OverlapServices.update_next_steps(overlap)
             OverlapServices.recalc_overlap(overlap)
 
             updated_resolution = overlap.overlap_status
@@ -320,7 +320,7 @@ def action_overlap_review(request: HttpRequest, review_id: int) -> HttpResponseB
         else:
             raise ValueError(f"Unsupported action \"{action}\"")
 
-        return redirect(reverse('overlap_3', kwargs={'overlap_id': overlap.pk}))
+        return redirect(reverse('overlap', kwargs={'overlap_id': overlap.pk}))
 
     else:  # GET
         evidence_key = EvidenceKeyMap.cached_key(overlap.value_type.evidence_key_str)
@@ -379,9 +379,8 @@ class OverlapDownloadRow(ExportRow):
     @export_column("Next Step", categories={"outstanding": True})
     def next_step(self):
         relevant = [x for x in self.overlap.contributions_list if x.classification_grouping and x.classification_grouping.lab_id in self.lab_picker.lab_ids]
-        skews = list(self.overlap.overlapcontributionskew_set.filter(contribution__in=relevant).all())
-        if skews:
-            return max(x.next_step for x in skews).label
+        if next_steps := list(self.overlap.overlapcontributionnextstep_set.filter(contribution__in=relevant).all()):
+            return max(x.next_step for x in next_steps).label
         return ""
 
     @export_column("Detail")
@@ -404,7 +403,7 @@ class OverlapDownloadRow(ExportRow):
 
 def download_overlaps(request, lab_id: str):
     solved_mode = request.GET.get("mode") == "solved"
-    lab_picker = LabPickerData.from_request(request, lab_id, 'overlaps_3')
+    lab_picker = LabPickerData.from_request(request, lab_id, 'overlaps')
     if redirect_response := lab_picker.check_redirect():
         return redirect_response
 
@@ -431,14 +430,14 @@ def download_overlaps(request, lab_id: str):
 
     # filter based on overlap skew
     qs = qs.annotate(skew_status=Subquery(
-        OverlapContributionSkew.objects.filter(lab_filter_q).filter(
+        OverlapContributionNextStep.objects.filter(lab_filter_q).filter(
             overlap=OuterRef('pk')
         ).annotate(max_status=Max('next_step')).values_list('max_status')[:1]
     ))
 
     qs = qs.order_by("-overlap_status", "-skew_status", "-overlap_status_change_timestamp", "-overlap_override_status")
 
-    qs = qs.prefetch_related("overlapcontributionskew_set")
+    qs = qs.prefetch_related("overlapcontributionnextstep_set")
     categories: dict
     if solved_mode:
         categories = {"solved": True}

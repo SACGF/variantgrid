@@ -144,7 +144,7 @@ class OverlapContribution(TimeStampedModel):
 
     @property
     def overlaps(self) -> QuerySet['Overlap']:
-        return Overlap.objects.filter(pk__in=self.overlapcontributionskew_set.values_list('overlap_id'))
+        return Overlap.objects.filter(pk__in=self.overlapcontributionnextstep_set.values_list('overlap_id'))
 
     @property
     def label(self):
@@ -277,7 +277,7 @@ class Overlap(TimeStampedModel, ReviewableModelMixin, PreviewModelMixin):
         return self.is_active_discordance
 
     def get_absolute_url(self):
-        return reverse('overlap_3', kwargs={"overlap_id": self.pk})
+        return reverse('overlap', kwargs={"overlap_id": self.pk})
 
     @property
     def derived_overlap_state(self):
@@ -367,7 +367,7 @@ class Overlap(TimeStampedModel, ReviewableModelMixin, PreviewModelMixin):
     def contributions(self) -> QuerySet[OverlapContribution]:
         return OverlapContribution.objects.filter(
             contribution_status=OverlapContributionStatus.CONTRIBUTING,
-            pk__in=self.overlapcontributionskew_set.values_list('contribution', flat=True)
+            pk__in=self.overlapcontributionnextstep_set.values_list('contribution', flat=True)
         ).select_related("classification_grouping__lab__organization")
 
     @property
@@ -387,7 +387,7 @@ class Overlap(TimeStampedModel, ReviewableModelMixin, PreviewModelMixin):
         # unlike contributions this will also return OverlapContributions that aren't currently contribution
         # as they may have contributed in the past
         return OverlapContribution.objects.filter(
-            pk__in=self.overlapcontributionskew_set.values_list('contribution', flat=True)
+            pk__in=self.overlapcontributionnextstep_set.values_list('contribution', flat=True)
         ).select_related("classification_grouping__lab__organization")
 
     @cached_property
@@ -553,7 +553,7 @@ class TriageNextStep(IntegerChoices):
 
 
 # this should be the model that links Contributions to Overlaps to reduce redundancy
-class OverlapContributionSkew(TimeStampedModel):
+class OverlapContributionNextStep(TimeStampedModel):
     overlap = models.ForeignKey(Overlap, on_delete=CASCADE)
     contribution = models.ForeignKey(OverlapContribution, on_delete=CASCADE)
     next_step = IntegerFieldChoices(choices_type=TriageNextStep, default=TriageNextStep.PENDING_CALCULATION)
