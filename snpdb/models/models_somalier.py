@@ -86,6 +86,16 @@ class SomalierVCFExtract(AbstractSomalierModel):
     def get_samples(self) -> Iterable[Sample]:
         return self.vcf.sample_set.filter(no_dna_control=False).order_by("pk")
 
+    def get_stages(self) -> list[tuple[str, AbstractSomalierModel]]:
+        """ (name, stage) for each somalier stage of this VCF, so a page can show a failed or skipped
+            one rather than just leaving the tab out """
+        stages = [
+            ("Extract", self),
+            ("Ancestry", SomalierAncestryRun.objects.filter(vcf_extract=self).first()),
+            ("Relate (VCF)", SomalierCohortRelate.objects.filter(cohort=self.vcf.cohort).first()),
+        ]
+        return [(name, stage) for name, stage in stages if stage]
+
 
 @receiver(pre_delete, sender=SomalierVCFExtract)
 def somalier_vcf_extract_pre_delete_handler(sender, instance, **kwargs):  # pylint: disable=unused-argument
@@ -156,10 +166,15 @@ class SomalierRelate(AbstractSomalierModel):
         return []
 
     @property
-    def is_joint_called_vcf(self) -> bool:
-        samples_qs = self.get_samples()
-        num_vcfs = samples_qs.order_by("vcf").distinct("vcf").count()
-        return num_vcfs == 1
+    def has_hom_ref_calls(self) -> bool:
+        """ A VCF that records 0/0 calls means an absent site is unknown. Without them (merged
+            single-sample calls, benchmark VCFs, anything gVCF-derived) absent means hom-ref, which
+            is what somalier's --unknown says. """
+        sample_ids = [s.pk for s in self.get_samples()]
+        if not sample_ids:
+            return False
+        with_ref = SomalierSampleExtract.objects.filter(sample__in=sample_ids, ref_count__gt=0).count()
+        return with_ref == len(sample_ids)
 
     def has_ped_file(self) -> bool:
         return False
@@ -205,15 +220,6 @@ class SomalierTrioRelate(SomalierRelate):
                        father, self.trio.father_affected, mother, self.trio.mother_affected)
 
 
-@receiver(pre_delete, sender=SomalierCohortRelate)
-@receiver(pre_delete, sender=SomalierTrioRelate)
-def somalier_relate_pre_delete_handler(sender, instance, **kwargs):  # pylint: disable=unused-argument
-    related_dir = instance.get_related_dir()
-    if os.path.exists(related_dir):
-        logging.info("Deleting %s - removing dir: %s", instance, related_dir)
-        shutil.rmtree(related_dir)
-
-
 class SomalierAllSamplesRelate(SomalierRelate):
     def get_sample_somalier_filenames(self) -> list[str]:
         cfg = SomalierConfig()
@@ -221,6 +227,20 @@ class SomalierAllSamplesRelate(SomalierRelate):
 
     def get_samples(self) -> Iterable[Sample]:
         return Sample.objects.filter(import_status=ImportStatus.SUCCESS)
+
+    @property
+    def has_hom_ref_calls(self) -> bool:
+        return False  # Samples from different VCFs are never jointly called
+
+
+@receiver(pre_delete, sender=SomalierAllSamplesRelate)
+@receiver(pre_delete, sender=SomalierCohortRelate)
+@receiver(pre_delete, sender=SomalierTrioRelate)
+def somalier_relate_pre_delete_handler(sender, instance, **kwargs):  # pylint: disable=unused-argument
+    related_dir = instance.get_related_dir()
+    if os.path.exists(related_dir):
+        logging.info("Deleting %s - removing dir: %s", instance, related_dir)
+        shutil.rmtree(related_dir)
 
 
 class SomalierRelatePairs(models.Model):

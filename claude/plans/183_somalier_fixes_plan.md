@@ -3,6 +3,9 @@
 Written by Claude Fable 5.1 (claude-fable-5-1), 2026-09-04; §1/§2 revised by Claude Fable 5
 (claude-fable-5), 2026-09-05 — export real depths so somalier applies its own QC, instead of GT-only
 
+Status: in progress — implemented by Claude Opus 5 (claude-opus-5), 2026-09-07; awaiting the
+`somalier_existing_vcfs --clear` re-run on vgtest2 (HSS2008 trio and sample 1824) before rollout
+
 ## Diagnosis in one paragraph
 
 Somalier re-genotypes every sample from the `AD` FORMAT field whenever the VCF header declares `AD`,
@@ -124,6 +127,17 @@ Route `snpdb.tasks.somalier_tasks.somalier_all_samples` to `SCHEDULING_SINGLE_WO
 4. Build the header with `get_vcf_header_from_contigs(..., use_accession=False)` so `##contig` IDs
    match the record `CHROM` values and the `nochr` sites file.
 5. Keep the `filters__isnull=True` restriction (somalier only counts PASS sites).
+6. Write each record in the site's own allele order. somalier keeps a site's two alleles
+   alphabetically (A = min, B = max) and reads `GT` and `AD` positionally against that pair, not
+   against the record's `REF`/`ALT` — so a record whose ALT sorts first is read inside out. Measured
+   on v0.2.12 and v0.3.4: a file of 200 hom-ref calls at real sites comes back as 133 hom-alt, which
+   is the 133 of those 200 sites whose ALT sorts before their REF. The flip cancels out for pairwise
+   relatedness when both samples have data, so a jointly called VCF looks fine either way — it only
+   shows up once `--unknown` fills missing calls as hom-ref in somalier's allele space while real
+   calls arrive in ours. On the 166-sample lipo VCF that put the median pair at 0.19 with 12,971 of
+   13,695 pairs over the 0.1 threshold; writing the alleles in the site's order gives a median of
+   -0.18 and 103 pairs. When `alt < ref`, swap `REF`/`ALT` and flip `GT` (`0/0` <-> `1/1`) and the
+   `AD` pair with them, so the record stays self-consistent.
 
 ## §2 Decide `--unknown` from the data, not the file count (#183)
 
@@ -179,14 +193,15 @@ In `snpdb/tasks/somalier_tasks.py`:
    VCF without hom-ref calls, is understated relative to a jointly called VCF (the HSS2008 trio
    measured 0.51 joint vs 0.33 with `--unknown`), so duplicates still show near 1.0 but
    parent/child pairs may sit in the 0.3–0.5 band.
-4. Add a wiki page `Install-Somalier.md`: binary + `sites.*.vcf.gz` + `1kg-somalier` +
-   `ancestry-labels-1kg.tsv` under `SOMALIER["annotation_base_dir"]`, the sites VCFs imported with
-   their file name unchanged (the `deployment_check` command verifies this), the `enabled` flag,
-   the `somalier_existing_vcfs --clear` backfill, and a note that local disk matters for ancestry.
+4. Add a wiki page Install-Somalier: binary + sites VCFs + the 1kg somalier files and ancestry
+   labels under `SOMALIER["annotation_base_dir"]`, the sites VCFs imported with their file name
+   unchanged (the `deployment_check` command verifies this), the `enabled` flag, the
+   `somalier_existing_vcfs --clear` backfill, and a note that local disk matters for ancestry.
 
 ## §6 Show what happened on the sample and VCF pages (#162, #196)
 
-`view_sample.html` Ancestry/Relatedness tab and `view_vcf.html`:
+`snpdb/templates/snpdb/data/view_sample.html` Ancestry/Relatedness tab and
+`snpdb/templates/snpdb/data/view_vcf_cohort.html`:
 
 1. Show the status and, when present, `error_exception` of the VCF's extract, ancestry run and
    cohort relate, so a failed or skipped stage is visible instead of the tab silently missing.
@@ -217,7 +232,7 @@ Worth keeping:
 2. `has_hom_ref_calls`: true for a VCF whose extracts have `ref_count > 0`, false when any is 0.
 3. `somalier_vcf_id` with the somalier binary replaced by a failing command records `ERROR` on the
    extract and returns without raising; with a fresh `PROCESSING` extract it returns early.
-4. `somalier_all_samples` pair loading from a fixture `somalier.pairs.tsv`: threshold filter,
+4. `somalier_all_samples` pair loading from a somalier pairs TSV: threshold filter,
    deleted-sample rows dropped, previous pairs replaced.
 
 ## Order of work

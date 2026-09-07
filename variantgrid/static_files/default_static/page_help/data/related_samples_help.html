@@ -5,7 +5,40 @@ See <a target="_blank" href="https://variantgrid.readthedocs.io/en/latest/data/r
 
 
 <p>
-    Samples with a minimum of 1000 shared HET, 1000 shared HOM and relatedness cooefficient >= 0.2 are displayed as a list at the bottom of the sample page.
+    Pairs are kept when they clear the shared HET, shared HOM ALT and relatedness minimums shown above the
+    table on the sample page (they are set per deployment in <code>settings.SOMALIER["relatedness"]</code>).
+</p>
+
+<h3>How the genotypes are decided</h3>
+
+<p>
+    VariantGrid imports every call a VCF makes, however low its depth or quality - we never drop one.
+    So relatedness is QC'd by Somalier instead: we hand it the imported allele depths and it re-genotypes
+    from those, counting only sites with a read depth of at least 7 and, for a HET, an allele balance
+    between 0.3 and 0.7. Expect the HET/HOM counts Somalier reports to sit below the sample extract counts
+    at the bottom of this tab - that difference is the QC doing its job.
+</p>
+
+<p>
+    A VCF imported without depth information (no allele depth field, or no read depth / allele frequency to
+    derive a reference depth from) has nothing to QC with, so those samples are related on their genotypes
+    exactly as called.
+</p>
+
+<h3>Samples from different VCFs</h3>
+
+<p>
+    A jointly called VCF records a <code>0/0</code> for a site a sample was called reference at, so a site
+    missing from that sample means "unknown". A VCF that never writes <code>0/0</code> - merged single-sample
+    calls, a benchmark VCF, anything derived from a gVCF - means a missing site is reference, and Somalier is
+    run with <code>--unknown</code> to say so. The same is true of the nightly all-vs-all run, where samples
+    come from many different VCFs.
+</p>
+
+<p>
+    Relatedness under <code>--unknown</code> is understated compared to a jointly called VCF: a trio measured
+    0.51 jointly called and 0.33 with <code>--unknown</code>. Duplicates still come out near 1.0, but a
+    parent/child pair may sit in the 0.3 - 0.5 band rather than at 0.5.
 </p>
 
 <!-- Copy/pasted from read the docs -->

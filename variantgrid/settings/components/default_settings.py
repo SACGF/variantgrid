@@ -1153,6 +1153,11 @@ SOMALIER = {
             "T2T-CHM13v2.0": "sites.chm13v2.T2T.vcf.gz",
         },
     },
+    "ancestry_enabled": True,  # The expensive stage - it reads all 2,504 1kg .somalier files each run
+    # A VCF whose best sample has fewer het+hom sites than this is extracted, but ancestry and relate
+    # are recorded as SKIPPED rather than run on numbers that mean nothing
+    "min_genotyped_sites": 100,
+    "all_samples_relate_hour": 2,  # Nightly all-vs-all relate. None disables it
     # Minimums for related samples to appear at bottom of view_sample page
     "relatedness": {
         "min_relatedness": 0.1,

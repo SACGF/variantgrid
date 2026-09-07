@@ -122,6 +122,8 @@ CELERY_TASK_ROUTES = {
     'upload.tasks.vcf.import_vcf_step_task.schedule_pipeline_stage_steps': SCHEDULING_SINGLE_WORKER,
     'snpdb.tasks.soft_delete_tasks.remove_soft_deleted_vcfs_task': SCHEDULING_SINGLE_WORKER,
     'snpdb.tasks.user_award_tasks.update_user_awards': SCHEDULING_SINGLE_WORKER,
+    # Nightly all-vs-all relate rewrites every SomalierRelatePairs row - two runs must never overlap
+    'snpdb.tasks.somalier_tasks.somalier_all_samples': SCHEDULING_SINGLE_WORKER,
 
     # Partition archive
     'patients.tasks.extraction_matching_tasks.reconcile_pending_extractions': DB_WORKERS,
@@ -154,6 +156,7 @@ CELERY_IMPORTS = (
     'snpdb.tasks.graph_generation_task',
     'snpdb.tasks.partition_archive_tasks',
     'snpdb.tasks.soft_delete_tasks',
+    'snpdb.tasks.somalier_tasks',
     'snpdb.tasks.vcf_bed_file_task',
     'snpdb.tasks.vcf_zygosity_count_tasks',
     'sync.tasks.sync_tasks',

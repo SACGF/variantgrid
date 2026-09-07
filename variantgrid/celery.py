@@ -119,6 +119,14 @@ if settings.MME_ENABLED:
         'schedule': crontab(hour=2, minute=30),
     }
 
+# All-vs-all sample relatedness (#393). Nightly rather than per-import: it globs every sample's
+# .somalier file, so it only makes sense once the day's imports have all extracted.
+if settings.SOMALIER["enabled"] and settings.SOMALIER["all_samples_relate_hour"] is not None:
+    app.conf.beat_schedule['somalier-all-samples-relate'] = {
+        'task': 'snpdb.tasks.somalier_tasks.somalier_all_samples',
+        'schedule': crontab(hour=settings.SOMALIER["all_samples_relate_hour"], minute=0),
+    }
+
 # Server monitoring tasks - send RollBar warnings
 if settings.SERVER_MIN_DISK_WARNING_GIGS:
     app.conf.beat_schedule['warn-low-disk-space'] = {
