@@ -63,6 +63,7 @@ from snpdb.models import (
     Sample,
     SampleLocusCount,
     SomalierRelatePairs,
+    Variant,
     VariantZygosityCountCollection,
     VariantZygosityCountForVCF,
     VCFLengthStatsCollection,
@@ -345,14 +346,17 @@ def _sample_stats(sample) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     except (Cohort.DoesNotExist, CohortGenotypeCollection.DoesNotExist, DataArchivedError):
         return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
 
+    # Each stats model contributes a variant class column and a zygosity column, which count different
+    # things: the variant annotation model's classes are the dbSNP ones, but its per-zygosity fields
+    # are high or moderate impact
     STATS = {
-        "Total": (CohortGenotypeStats, set()),
-        "dbSNP": (CohortGenotypeVariantAnnotationStats, {"variant_annotation_version"}),
-        "OMIM pheno": (CohortGenotypeGeneAnnotationStats, {"gene_annotation_version"}),
-        "ClinVar LP/P": (CohortGenotypeClinVarAnnotationStats, {"clinvar_version"}),
+        CohortGenotypeStats: ("Total", "Total", set()),
+        CohortGenotypeVariantAnnotationStats: ("dbSNP", "High/Mod impact", {"variant_annotation_version"}),
+        CohortGenotypeGeneAnnotationStats: ("OMIM pheno", "OMIM pheno", {"gene_annotation_version"}),
+        CohortGenotypeClinVarAnnotationStats: ("ClinVar LP/P", "ClinVar LP/P", {"clinvar_version"}),
     }
 
-    VARIANT_CLASS = ["variant", "snp", "insertions", "deletions"]
+    VARIANT_CLASS = ["variant", "snp", "insertions", "deletions", "fusions"]
     ZYGOSITY = ["ref", "het", "hom", "unk"]
     # Counts that are neither a variant class nor a zygosity - the number of variants in a gene
     # (ie VEP gave them a transcript) and the number with a ClinVar record
@@ -362,7 +366,7 @@ def _sample_stats(sample) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     zygosity_data = {}
     annotated_data = {}
     missing_stats = False
-    for name, (stats_klass, shared_fields) in STATS.items():
+    for stats_klass, (variant_class_name, zygosity_name, shared_fields) in STATS.items():
         base_kwargs = {
             "cohort_genotype_collection": cgc,
             "sample": sample,
@@ -384,7 +388,7 @@ def _sample_stats(sample) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
             pass
 
         for passing_filter, o in objs.items():
-            n = f"{name} PASS filters" if passing_filter else name
+            filter_suffix = " PASS filters" if passing_filter else ""
             obj_variant_class_data = {}
             for field in get_model_fields(o):
                 for k in VARIANT_CLASS:
@@ -392,7 +396,7 @@ def _sample_stats(sample) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
                         obj_variant_class_data[k] = getattr(o, field)
                         break
             if obj_variant_class_data:
-                variant_class_data[n] = obj_variant_class_data
+                variant_class_data[variant_class_name + filter_suffix] = obj_variant_class_data
 
             obj_zygosity_data = {}
             for field in get_model_fields(o):
@@ -401,7 +405,7 @@ def _sample_stats(sample) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
                         obj_zygosity_data[k] = getattr(o, field)
                         break
             if obj_zygosity_data:
-                zygosity_data[n] = obj_zygosity_data
+                zygosity_data[zygosity_name + filter_suffix] = obj_zygosity_data
 
             # Each of these lives on a single stats model, so column by filter rather than by model
             annotated_column = "PASS filters" if passing_filter else "Total"
@@ -413,8 +417,13 @@ def _sample_stats(sample) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     if "Total" in sample_stats_variant_class_df.columns:
         total = sample_stats_variant_class_df["Total"]
         sample_stats_variant_class_df["Total %"] = 100 * total / total["variant"]
+        if not total["fusions"]:  # Most samples have none, so keep the row for those that do
+            sample_stats_variant_class_df = sample_stats_variant_class_df.drop("fusions")
 
     sample_stats_zygosity_df = pd.DataFrame.from_dict(zygosity_data).reindex(ZYGOSITY)
+    if not sample.has_genotype:
+        # Without a GT field every call is unknown zygosity, so one row of totals says it all
+        sample_stats_zygosity_df = sample_stats_zygosity_df.sum().to_frame("all").T
     sample_stats_annotated_df = pd.DataFrame.from_dict(annotated_data).reindex(list(ANNOTATED.values()))
 
     if missing_stats:
@@ -539,8 +548,10 @@ def sample_variants_gene_detail(request, sample_id, gene_symbol):
 
 def sample_graphs_tab(request, sample_id):
     sample = Sample.get_for_user(request.user, sample_id)
-
-    context = {'sample': sample}
+    # Gene-level events (fusions) have no coordinate, so there is nothing to bin along a chromosome
+    has_positioned_variants = sample.get_variant_qs().exclude(Variant.get_gene_level_q()).exists()
+    context = {'sample': sample,
+               'has_positioned_variants': has_positioned_variants}
     return render(request, 'snpdb/data/sample_graphs_tab.html', context)
 
 

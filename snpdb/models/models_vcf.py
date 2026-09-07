@@ -223,9 +223,16 @@ class VCF(GuardianPermissionsMixin, DataArchiveMixin, PreviewModelMixin):
 
     @property
     def has_depth(self) -> bool:
-        """ Allele or read depths, so the AD/DP/GQ/PL thresholds and allele frequency mean something """
+        """ Allele or read depths, so the AD/DP/GQ/PL thresholds mean something """
         depth_fields = (self.allele_depth_field, self.alt_depth_field, self.read_depth_field)
         return self.has_sample_columns and any(depth_fields)
+
+    @property
+    def has_allele_frequency(self) -> bool:
+        """ AF was read from the VCF, or derived from allele depths on import. A VCF with only DP has
+            depth but nothing to make a frequency from (@see BulkGenotypeVCFProcessor) """
+        allele_depths = self.allele_depth_field or (self.ref_depth_field and self.alt_depth_field)
+        return self.has_sample_columns and bool(self.allele_frequency_field or allele_depths)
 
     @cached_property
     def samples_by_vcf_name(self) -> dict[str, 'Sample']:
@@ -413,6 +420,10 @@ class Sample(GuardianPermissionsMixin, SortByPKMixin, SvgSymbolPreviewIconMixin,
     @property
     def has_depth(self) -> bool:
         return self.vcf.has_depth
+
+    @property
+    def has_allele_frequency(self) -> bool:
+        return self.vcf.has_allele_frequency
 
     @property
     def data_archived(self) -> bool:

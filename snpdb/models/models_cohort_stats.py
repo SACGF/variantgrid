@@ -51,6 +51,7 @@ class CohortGenotypeStats(TimeStampedModel):
     snp_count = models.IntegerField(default=0)
     insertions_count = models.IntegerField(default=0)
     deletions_count = models.IntegerField(default=0)
+    fusions_count = models.IntegerField(default=0)  # gene-level events, @see snpdb.gene_level_variants
     ref_count = models.IntegerField(default=0)
     het_count = models.IntegerField(default=0)
     hom_count = models.IntegerField(default=0)

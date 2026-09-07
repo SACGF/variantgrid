@@ -239,7 +239,7 @@ $(document).ready(function() {
 
         {% if not sample_stats_zygosity_df.empty %}
             <div class="card stats-card">
-                <div class="card-header">Zygosity</div>
+                <div class="card-header">{% if sample.has_genotype %}Zygosity{% else %}Variants{% endif %}</div>
                 <div class="card-body">{% render_dataframe sample_stats_zygosity_df 1 %}</div>
             </div>
         {% endif %}
@@ -275,7 +275,7 @@ $(document).ready(function() {
             </div>
         {% endif %}
 
-        {% if sample_genotype_stats %}
+        {% if sample_genotype_stats and sample.has_genotype %}
             <div class="card stats-card">
                 <div class="card-header" data-help="{% detected_sex_help sample_genotype_stats %}">Sex</div>
                 <div class="card-body">

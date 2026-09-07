@@ -20,7 +20,7 @@ from annotation.models.models import VCFAnnotationStats
 from eventlog.models import create_event
 from library.django_utils import thread_safe_unique_together_get_or_create
 from library.enums.log_level import LogLevel
-from library.genomics.vcf_enums import VariantClass, VCFSymbolicAllele
+from library.genomics.vcf_enums import GeneLevelSymbolicAlt, VariantClass, VCFSymbolicAllele
 from library.git import Git
 from library.log_utils import get_traceback
 from library.utils.json_utils import canonical_filter_key
@@ -63,10 +63,11 @@ def _get_sample_stats_code_version() -> SampleStatsCodeVersion:
         1 - Existing code when code_version added
         2 - Added VCFLengthStats
         3 - Optimisations
+        4 - fusions_count, and gene-level variants left out of VCFLengthStats
     """
     code_version, _ = thread_safe_unique_together_get_or_create(SampleStatsCodeVersion,
                                                                 name="SampleStats",
-                                                                version=3,
+                                                                version=4,
                                                                 code_git_hash=Git(settings.BASE_DIR).hash)
     return code_version
 
@@ -99,6 +100,7 @@ def _compute_vcf_specific_stats(vcf: VCF, annotation_version: AnnotationVersion)
     start = time.time()
     qs = get_variant_queryset_for_annotation_version(annotation_version)
     qs = qs.filter(Variant.get_no_reference_q())
+    qs = qs.exclude(Variant.get_gene_level_q())  # no coordinate, so no length
     qs = vcf.get_variant_qs(qs)
     columns = [
         "locus__ref__seq",
@@ -174,6 +176,7 @@ _COUNTER_FIELDS = (
     "snp_count",
     "insertions_count",
     "deletions_count",
+    "fusions_count",
     "ref_count",
     "het_count",
     "hom_count",
@@ -330,12 +333,14 @@ def _compute_and_persist_cohort_stats(cohort: Cohort, cgc: CohortGenotypeCollect
     NO_VARIANT = (MISSING, HOM_REF)
     pathogenicity_high_mod = {PathogenicityImpact.HIGH, PathogenicityImpact.MODERATE}
     symbolic_insertions = {VCFSymbolicAllele.DUP, VCFSymbolicAllele.INS}
+    fusion_kinds = {GeneLevelSymbolicAlt.FUSION, GeneLevelSymbolicAlt.FUSION_UNORDERED}
 
     # Field indexes
     F_VARIANT = _FIELD_INDEX["variant_count"]
     F_SNP = _FIELD_INDEX["snp_count"]
     F_INS = _FIELD_INDEX["insertions_count"]
     F_DEL = _FIELD_INDEX["deletions_count"]
+    F_FUSIONS = _FIELD_INDEX["fusions_count"]
     F_REF = _FIELD_INDEX["ref_count"]
     F_HET = _FIELD_INDEX["het_count"]
     F_HOM = _FIELD_INDEX["hom_count"]
@@ -421,6 +426,8 @@ def _compute_and_persist_cohort_stats(cohort: Cohort, cgc: CohortGenotypeCollect
                 type_field = F_INS
             elif alt == VCFSymbolicAllele.DEL:
                 type_field = F_DEL
+            elif (gene_level := GeneLevelSymbolicAlt.parse(alt)) and gene_level[0] in fusion_kinds:
+                type_field = F_FUSIONS
             else:
                 type_field = F_SNP  # fallback
         elif ref_len > alt_len:
@@ -627,7 +634,7 @@ def _persist_cohort_stats(cgc, annotation_version, code_version, has_filters,
             setattr(target, f, counter[_FIELD_INDEX[f]])
 
     GENOTYPE_FIELDS = (
-        "variant_count", "snp_count", "insertions_count", "deletions_count",
+        "variant_count", "snp_count", "insertions_count", "deletions_count", "fusions_count",
         "ref_count", "het_count", "hom_count", "unk_count",
         "x_hom_count", "x_het_count", "x_unk_count",
     )

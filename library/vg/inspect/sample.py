@@ -51,7 +51,8 @@ def _genotype_stats(sample: Sample) -> dict[str, Any] | None:
     if stats is None:
         return None
     return {"variants": stats.variant_count, "het": stats.het_count, "hom": stats.hom_count, "ref": stats.ref_count,
-            "unknown": stats.unk_count, "snps": stats.snp_count, "insertions": stats.insertions_count, "deletions": stats.deletions_count}
+            "unknown": stats.unk_count, "snps": stats.snp_count, "insertions": stats.insertions_count,
+            "deletions": stats.deletions_count, "fusions": stats.fusions_count}
 
 
 def _cohort(cohort_sample: CohortSample) -> dict[str, Any]:
