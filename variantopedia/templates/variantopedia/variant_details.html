@@ -2,6 +2,7 @@
 {% load classification_tags %}
 {% load js_tags %}
 {% load fieldset_tags %}
+{% load gene_fusion_tags %}
 {% load ui_utils %}
 {% load ui_help %}
 {% load settings_tags %}
@@ -511,7 +512,11 @@ function applyVariantValues() {
             <div class="card-body">
                 {% if variant_annotation %}{% labelled label="Variant Annotation" admin_only=True %}{{ variant_annotation.version }} {% admin_link variant_annotation %}{% endlabelled %}{% endif %}
                 {% labelled id="g-hgvs" label="g.HGVS" value_css="variant-coordinate variant_coordinate" %}{% c_hgvs hgvs_g %}{% endlabelled %}
-                {% labelled id="variant_coordinate" label="Variant Coordinate" value_css="variant-coordinate variant_coordinate" %}Loading...{% endlabelled %}
+                {% if gene_fusion %}
+                    {% labelled label="Fusion" %}{% gene_fusion gene_fusion %}{% endlabelled %}
+                {% else %}
+                    {% labelled id="variant_coordinate" label="Variant Coordinate" value_css="variant-coordinate variant_coordinate" %}Loading...{% endlabelled %}
+                {% endif %}
                 {% if variant.svlen %}
                     <!-- You can't see ref base in variant coordinate for symbolics - so explicitly show to help admins debug stuff -->
                     {% labelled label="Reference" admin_only=True %}{{ variant.locus.ref }}{% endlabelled %}

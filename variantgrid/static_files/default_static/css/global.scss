@@ -1042,6 +1042,65 @@ table.as_table {
 // cells with hundreds of links. Every column carries a width (RichColumn.width, falling back to
 // default_column_width), so lay the table out from those and clip each cell to one line, rather than
 // letting one PubMed cell run to a few thousand pixels.
+// A variant's name as the grid's Variant cell draws it - gene + c.HGVS, g.HGVS, or the coordinate -
+// and as the variant page's locus table draws it. The second line only shows in the grid's two line
+// rows mode. @see VariantGridFormat.representativeVariantLabel in variantgrid_formats.js
+.rv-gene {
+	font-weight: 600;
+}
+
+.rv-hgvs {
+	font-family: ui-monospace, Menlo, Consolas, monospace;
+	font-size: 11px;
+}
+
+.rv-hgvs-p,
+.rv-sub {
+	color: #777;
+	font-size: 11px;
+}
+
+.rv-line2 {
+	display: none;
+}
+
+// The kind badge beside a variant's name - what it is when it isn't a small variant. In the grid it
+// sits outside the clipped label so it survives an ellipsis; the variant page's locus table uses it
+// too. @see VariantGridFormat.variantKindBadge in variantgrid_formats.js
+.rv-kind {
+	flex: none;
+	padding: 0 4px;
+	border-radius: 3px;
+	background: #eceff1;
+	color: #546e7a;
+	font-family: ui-monospace, Menlo, Consolas, monospace;
+	font-size: 10px;
+}
+
+.rv-kind-del,
+.rv-kind-loss {
+	background: #fdecea;
+	color: #b3261e;
+}
+
+.rv-kind-dup,
+.rv-kind-cnv,
+.rv-kind-amp {
+	background: #e8f0fe;
+	color: #1a56b8;
+}
+
+.rv-kind-ins,
+.rv-kind-inv {
+	background: #fff4e5;
+	color: #a15c00;
+}
+
+.rv-kind-fusion {
+	background: #ede7f6;
+	color: #5e35b1;
+}
+
 table.variantgrid-datatable {
 	table-layout: fixed;
 	width: auto;
@@ -1064,7 +1123,6 @@ table.variantgrid-datatable {
 
 	// The second line every composite cell carries. Off by default - the per-user 'two line rows'
 	// setting turns it on. @see AbstractVariantGrid.get_extra_table_classes
-	.rv-line2,
 	.ic-line2 {
 		display: none;
 	}
@@ -1144,21 +1202,6 @@ table.variantgrid-datatable {
 		}
 	}
 
-	.rv-gene {
-		font-weight: 600;
-	}
-
-	.rv-hgvs {
-		font-family: ui-monospace, Menlo, Consolas, monospace;
-		font-size: 11px;
-	}
-
-	.rv-hgvs-p,
-	.rv-sub {
-		color: #777;
-		font-size: 11px;
-	}
-
 	// How many caller rows a fusion was merged from - the calls are in the title. @see fusionCalls
 	.fusion-calls {
 		padding: 0 4px;
@@ -1166,42 +1209,6 @@ table.variantgrid-datatable {
 		background: #ede7f6;
 		color: #5e35b1;
 		font-size: 11px;
-	}
-
-	// The kind badge beside the label - what this row is when it isn't a small variant. Outside the
-	// clipped label, so it survives an ellipsis. @see _variantKind in variantgrid_formats.js
-	.rv-kind {
-		flex: none;
-		padding: 0 4px;
-		border-radius: 3px;
-		background: #eceff1;
-		color: #546e7a;
-		font-family: ui-monospace, Menlo, Consolas, monospace;
-		font-size: 10px;
-	}
-
-	.rv-kind-del,
-	.rv-kind-loss {
-		background: #fdecea;
-		color: #b3261e;
-	}
-
-	.rv-kind-dup,
-	.rv-kind-cnv,
-	.rv-kind-amp {
-		background: #e8f0fe;
-		color: #1a56b8;
-	}
-
-	.rv-kind-ins,
-	.rv-kind-inv {
-		background: #fff4e5;
-		color: #a15c00;
-	}
-
-	.rv-kind-fusion {
-		background: #ede7f6;
-		color: #5e35b1;
 	}
 
 	// The germline pair then the somatic pair, each with a fixed share of whatever the cell is, so

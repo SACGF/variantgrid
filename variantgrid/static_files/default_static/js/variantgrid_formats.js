@@ -831,9 +831,8 @@ const GENE_LEVEL_KINDS = {
 };
 const SV_KIND_CSS = {'DEL': 'del', 'DUP': 'dup', 'INV': 'inv', 'CNV': 'cnv', 'INS': 'ins'};
 
-// Returns {code, cssClass, title}, or null for a row with an explicit ref/alt
-function _variantKind(rowData) {
-    const alt = rowData["alt__seq"];
+// Returns {code, cssClass, title}, or null for a variant with an explicit ref/alt
+VariantGridFormat.variantKind = (alt, svlen, chrom, position) => {
     if (alt == null || !String(alt).startsWith("<")) {
         return null;
     }
@@ -843,9 +842,7 @@ function _variantKind(rowData) {
         return {code: geneLevel.code, cssClass: `rv-kind-${geneLevel.css}`, title: geneLevel.title};
     }
     // An SV says how big it is - that, not the coordinate, is what a reader wants off the row
-    const size = Math.abs(rowData["svlen"] || 0);
-    const chrom = rowData["locus__contig__name"];
-    const position = rowData["locus__position"];
+    const size = Math.abs(svlen || 0);
     const title = (chrom != null && position != null)
                 ? `${chrom}:${position}-${position + size} ${alt}` : String(alt);
     return {
@@ -853,13 +850,24 @@ function _variantKind(rowData) {
         cssClass: `rv-kind-${SV_KIND_CSS[kind] || 'other'}`,
         title: title,
     };
-}
+};
+
+// The badge itself - beside the grid label, and beside a variant named anywhere else (the locus
+// table on the variant page). '' for a small variant. Styled by .rv-kind in global.scss
+VariantGridFormat.variantKindBadge = (alt, svlen, chrom, position) => {
+    const kind = VariantGridFormat.variantKind(alt, svlen, chrom, position);
+    if (!kind) {
+        return '';
+    }
+    return `<span class='rv-kind ${kind.cssClass}' title='${escapeHtml(kind.title)}'>${escapeHtml(kind.code)}</span>`;
+};
 
 
 // The cascade from the mockup's "Representative variant" card. Returns {html, title}; title is the
 // plain string for the link tooltip. Every key may be undefined on a row cached before these fields
-// existed - each step checks and falls through, ending at the VariantGrid id.
-function _representativeVariantLabel(variantId, rowData) {
+// existed - each step checks and falls through, ending at the VariantGrid id. rowData is keyed the
+// way the grid's Variant column is - the variant page's locus table sends the same keys
+VariantGridFormat.representativeVariantLabel = (variantId, rowData) => {
     const chrom = rowData["locus__contig__name"];
     const position = rowData["locus__position"];
     const ref = rowData["locus__ref__seq"];
@@ -914,7 +922,7 @@ function _representativeVariantLabel(variantId, rowData) {
     }
     // 5. Last resort while annotation is still running - the id the old details box linked to
     return {html: `<span class='rv-sub'>v ${variantId}</span>`, title: `VariantGrid variant ${variantId}`};
-}
+};
 
 // Mandatory Variant column. Reads the members riding along hidden - @see CompositeColumnMember.
 // Markup contract: .variant_id-container[variant_id] > input.variant-select (analysis only)
@@ -925,13 +933,14 @@ VariantGridFormat.representativeVariant = (variantId, type, rowData, ctx) => {
     if (_isNodeVisible(ctx)) {
         parts.push(`<input type='checkbox' class='variant-select' variant_id='${variantId}'>`);
     }
-    const label = _representativeVariantLabel(variantId, rowData);
+    const label = VariantGridFormat.representativeVariantLabel(variantId, rowData);
     const detailsUrl = `javascript:load_variant_details(${variantId});`;
     parts.push(`<a class='variant-link rv-label' title='${escapeHtml(label.title)}' href='${detailsUrl}' orig_href='${detailsUrl}'>${label.html}</a>`);
     // Outside the label, which clips - the badge is the one thing on the row that must stay readable
-    const kind = _variantKind(rowData);
-    if (kind) {
-        parts.push(`<span class='rv-kind ${kind.cssClass}' title='${escapeHtml(kind.title)}'>${escapeHtml(kind.code)}</span>`);
+    const badge = VariantGridFormat.variantKindBadge(rowData["alt__seq"], rowData["svlen"],
+                                                     rowData["locus__contig__name"], rowData["locus__position"]);
+    if (badge) {
+        parts.push(badge);
     }
     return `<span class='variant_id-container' variant_id='${variantId}'>${parts.join('')}</span>`;
 };

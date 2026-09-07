@@ -79,7 +79,7 @@ Deep reference: __uicore_readme.md · claude/research/uicore.md
   exports rows already fetched.
 - COUNTs cost: `count_unfiltered = False` skips the unfiltered one; `known_count()` / `approximate_count_enabled`
   supply a stored or estimated total (snpdb/views/datatable_view.py:datatable_response).
-- The Variant cell's kind badge (`_variantKind` in
+- The Variant cell's kind badge (`VariantGridFormat.variantKindBadge` in
   variantgrid/static_files/default_static/js/variantgrid_formats.js) is drawn from members already riding along
   hidden - `alt__seq` and `svlen` - so a new "what kind of row is this?" signal needs no extra column. Small
   variants deliberately get no badge. @see claude/domain.md **Variant kind**.

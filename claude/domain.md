@@ -31,7 +31,7 @@ alt (`library/genomics/vcf_enums.py:GeneLevelSymbolicAlt`), `DEL` / `DUP` / `INV
 for a symbolic one, and nothing at all for a small variant. Not VEP's `variant_class`
 (`library/genomics/vcf_enums.py:VariantClass`), which the Effect node filters on: VEP calls a 1 Mb `<DEL>` and a 1 bp
 deletion the same class, so the badge answers "is this a small variant?" where `variant_class` answers "what sort of
-change?". Drawn client side by `_variantKind` in `variantgrid/static_files/default_static/js/variantgrid_formats.js`.
+change?". Drawn client side by `VariantGridFormat.variantKindBadge` in `variantgrid/static_files/default_static/js/variantgrid_formats.js`, which the variant page's locus table reuses.
 
 **VariantCoordinate** - `snpdb/models/models_variant.py:VariantCoordinate`, a pydantic value object (chrom, position, ref,
 alt, svlen), the currency between HGVS, VCF and Variant. Canonicalise before lookup or insert.

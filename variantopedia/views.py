@@ -2,6 +2,7 @@ import csv
 import json
 from collections import defaultdict
 from datetime import timedelta
+from typing import Optional
 
 from django.conf import settings
 from django.contrib import messages
@@ -147,13 +148,6 @@ def variant_grid_row_detail(request, variant_id: int, annotation_version_id: int
     if variant.is_symbolic and variant_annotation:
         overlapping_symbols = variant_annotation.overlapping_symbols
 
-    # A fusion's partners and direction - the one place every grid shares, so it lives here rather
-    # than in each grid's column set. @see snpdb.gene_level_variants
-    gene_fusion = None
-    if variant.is_gene_level:
-        gene_fusion = GeneFusion.objects.filter(variant=variant) \
-            .select_related("anchor", "partner").first()
-
     # What the Classifications column's ClinVar chips summarise
     clinvar = ClinVar.objects.filter(variant=variant, version=annotation_version.clinvar_version).first()
 
@@ -166,9 +160,17 @@ def variant_grid_row_detail(request, variant_id: int, annotation_version_id: int
         "classifications": classifications,
         "clinvar": clinvar,
         "overlapping_symbols": overlapping_symbols,
-        "gene_fusion": gene_fusion,
+        "gene_fusion": _get_gene_fusion(variant),
     }
     return render(request, "variantopedia/variant_grid_row_detail.html", context)
+
+
+def _get_gene_fusion(variant: Variant) -> Optional[GeneFusion]:
+    """ A fusion's partners and direction - what a gene-level variant shows in place of the coordinate
+        it formats as, so the one place every page shares. @see snpdb.gene_level_variants """
+    if not variant.is_gene_level:
+        return None
+    return GeneFusion.objects.filter(variant=variant).select_related("anchor", "partner").first()
 
 
 def view_variant(request, variant_id, genome_build_name=None):
@@ -419,6 +421,7 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
         "variant": variant,
         "variant_allele": variant_allele_data,
         "variant_annotation": variant_annotation,
+        "gene_fusion": _get_gene_fusion(variant),
         # Names the page and the analysis' variant details tab, which have no room for a transcript
         "variant_short_label": variant_annotation.get_short_label() if variant_annotation else hgvs_g or str(variant),
         "variant_tag_stale_days": user_settings.variant_tag_stale_days,

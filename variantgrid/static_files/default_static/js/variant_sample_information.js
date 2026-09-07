@@ -356,9 +356,17 @@ var VariantSampleInformation = (function () {
 
         const tbody = $('<tbody>');
         for (const row of locusCounts) {
-            const link = $('<a>', {class: 'hover-link', href: row.url, text: row.variant});
+            // Named the way the grid's Variant cell names it - the row carries the same members
+            const label = VariantGridFormat.representativeVariantLabel(row.variant_id, row);
+            const link = $('<a>', {class: 'hover-link', href: row.url, title: label.title, html: label.html});
             const description = row.description ? ` (${row.description})` : '';
-            const tr = $('<tr>').append($('<td>').append(link).append(document.createTextNode(description)));
+            const cell = $('<td>').append(link);
+            const badge = VariantGridFormat.variantKindBadge(row["alt__seq"], row["svlen"],
+                                                             row["locus__contig__name"], row["locus__position"]);
+            if (badge) {
+                cell.append(' ').append(badge);
+            }
+            const tr = $('<tr>').append(cell.append(document.createTextNode(description)));
             fields.forEach(f => tr.append($('<td>', {text: row[f]})));
             tbody.append(tr);
         }
