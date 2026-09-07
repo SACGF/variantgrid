@@ -27,16 +27,16 @@
                  {% timestamp overlap.overlap_status_change_timestamp time_ago=True %}
                 {% endlabelled %}
             {% endif %}
-            {% if overlap.overlap_status.is_discordant %}
-            {% labelled label="Next Step" %}
-                {% if overlap_details.next_steps|length == 1 %}
-                    {{ overlap_details.next_steps.0.next_step.label }}
-                {% else %}
-                    {% for overlap_next_step in overlap_details.next_steps %}
-                        <div>{% lab overlap_next_step.contribution.classification_grouping.lab %} - <span style="font-weight:500">{{ overlap_next_step.next_step.label }}</span></div>
-                    {% endfor %}
-                {% endif %}
-            {% endlabelled %}
+            {% if overlap.is_active_discordance %}
+                {% labelled label="Next Step" %}
+                    {% if overlap_details.next_steps|length == 1 %}
+                        {{ overlap_details.next_steps.0.next_step.label }}
+                    {% else %}
+                        {% for overlap_next_step in overlap_details.next_steps %}
+                            <div>{% lab overlap_next_step.contribution.classification_grouping.lab %} - <span style="font-weight:500">{{ overlap_next_step.next_step.label }}</span></div>
+                        {% endfor %}
+                    {% endif %}
+                {% endlabelled %}
             {% endif %}
             {% labelled label="Context" %}
                 {% for testing_context in overlap.testing_contexts_objs %}{% if not forloop.first %}/{% endif %}<span class="testing-context-box testing-context-{{ testing_context.value }}">{{ testing_context.name | pretty_label:"lower" }}</span>{% endfor %}
