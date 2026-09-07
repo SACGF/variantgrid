@@ -458,7 +458,9 @@ def view_sample(request, sample_id):
     patient_form = PatientForm(user=request.user)  # blank
     related_samples = None
     if settings.SOMALIER.get("enabled"):
-        related_samples = SomalierRelatePairs.get_for_sample(sample).order_by("relate")
+        # Sample.__str__ names its VCF, so the related samples table is an N+1 without this
+        related_samples = SomalierRelatePairs.get_for_sample(sample) \
+            .select_related("sample_a__vcf", "sample_b__vcf").order_by("relate")
 
     sample_stats_variant_class_df, sample_stats_zygosity_df, sample_stats_annotated_df = _sample_stats(sample)
     sample_genotype_stats = sample.get_genotype_stats()
