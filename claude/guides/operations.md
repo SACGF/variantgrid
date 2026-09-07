@@ -68,7 +68,12 @@ wrong. Process-level caches (`library/cache.py:timed_cache`, the caching model m
 
 Static files: `manage.py collectstatic` writes `variantgrid/sitestatic/`; storage is Django's plain `StaticFilesStorage`
 (no manifest hashing), which is why CI runs tests without collectstatic and `library/django_utils/unittest_utils.py`
-overrides `STORAGES` to the plain backend.
+overrides `STORAGES` to the plain backend. django-compressor bundles the `{% compress %}` blocks into `sitestatic/static/CACHE/`
+and caches the rendered tag in Redis for 30 days under a key hashed from the source files' mtimes. With `DEBUG=True` those
+are the finders' source files, so `collectstatic --clear` leaves every page linking a deleted bundle (symptom: unstyled
+pages, an SVG icon filling its cell); deployments read the freshly collected copies and rebuild on their own. The migrator
+runs `manage.py collectstatic_clean_compressor --clear`, collectstatic plus a clear of just the compressor's keys - use it
+instead of plain collectstatic on a dev box.
 
 ## Data roots
 
