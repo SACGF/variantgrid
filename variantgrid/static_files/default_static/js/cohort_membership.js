@@ -23,6 +23,7 @@ class CohortMembershipEditor {
         this.order = sampleRows.map((row) => row.id);
         this.baseline = this.order.slice();
         this.removed = new Set();
+        this.selected = new Set();  // Ticked for the selected samples actions - read back off the table before a redraw
         this.version = config.version;
         this.status = null;
 
@@ -135,10 +136,16 @@ class CohortMembershipEditor {
         });
     }
 
+    /* Only saved members are analysis material - a pending add has no CohortSample behind it yet */
+    isSelectable(sampleId) {
+        return this.baseline.includes(sampleId) && !this.removed.has(sampleId);
+    }
+
     renderTable() {
         const baselineSet = new Set(this.baseline);
         const table = $(`<table class="table membership-table">
-            <thead><tr><th></th><th>Sample</th><th>Source VCF</th><th>Het / Hom</th><th>Sex</th><th></th></tr></thead>
+            <thead><tr><th><input type="checkbox" class="sample-select-all" title="Select all samples"></th>
+            <th></th><th>Sample</th><th>Source VCF</th><th>Het / Hom</th><th>Sex</th><th></th></tr></thead>
             <tbody></tbody></table>`);
         const tbody = $("tbody", table);
 
@@ -148,10 +155,14 @@ class CohortMembershipEditor {
             const isRemoved = this.removed.has(sampleId);
             const rowClass = isRemoved ? "pending-remove" : (isNew ? "pending-add" : "");
             const newChip = isNew ? ' <span class="badge badge-success chip-new">new</span>' : "";
+            const checkbox = this.isSelectable(sampleId)
+                ? `<input type="checkbox" class="sample-select" sample_id="${sampleId}" ${this.selected.has(sampleId) ? "checked" : ""}>`
+                : "";
             const button = isRemoved
                 ? `<button type="button" class="btn btn-sm btn-outline-success undo-sample" data-sample-id="${sampleId}">Undo</button>`
                 : `<button type="button" class="btn btn-sm btn-outline-danger remove-sample" data-sample-id="${sampleId}">Remove</button>`;
             tbody.append(`<tr draggable="true" data-sample-id="${sampleId}" class="${rowClass}">
+                <td class="select-cell">${checkbox}</td>
                 <td class="drag-handle" title="Drag to reorder">&#8942;&#8942;</td>
                 <td class="sample-name"><a href="${sample.url}">${escapeHtml(sample.name)}</a>${newChip}</td>
                 <td class="vcf-name">${escapeHtml(sample.vcf_name)}</td>
@@ -161,18 +172,19 @@ class CohortMembershipEditor {
             </tr>`);
         }
         if (!this.order.length) {
-            tbody.append('<tr><td colspan="6" class="text-muted">No samples - add some below.</td></tr>');
+            tbody.append('<tr><td colspan="7" class="text-muted">No samples - add some below.</td></tr>');
         }
 
         // Sub cohort: the rest of the parent VCF's samples, ready to tick back in
         const memberSet = new Set(this.order);
         const available = this.candidateIds.filter((id) => !memberSet.has(id));
         if (available.length) {
-            tbody.append(`<tr class="candidate-heading"><td colspan="6">Other samples in this VCF</td></tr>`);
+            tbody.append(`<tr class="candidate-heading"><td colspan="7">Other samples in this VCF</td></tr>`);
             for (const sampleId of available) {
                 const sample = this.samplesById[sampleId];
                 const button = `<button type="button" class="btn btn-sm btn-outline-primary add-sample" data-sample-id="${sampleId}">Add</button>`;
                 tbody.append(`<tr class="candidate-row" data-candidate-id="${sampleId}">
+                    <td></td>
                     <td></td>
                     <td class="sample-name"><a href="${sample.url}">${escapeHtml(sample.name)}</a></td>
                     <td class="vcf-name">${escapeHtml(sample.vcf_name)}</td>
@@ -189,10 +201,29 @@ class CohortMembershipEditor {
         }
     }
 
+    /* The table is redrawn from scratch, so the ticks have to be read off it first */
+    captureSelection() {
+        const that = this;
+        $(".sample-select", this.tableContainer).each(function () {
+            const sampleId = Number($(this).attr("sample_id"));
+            if ($(this).is(":checked")) {
+                that.selected.add(sampleId);
+            } else {
+                that.selected.delete(sampleId);
+            }
+        });
+    }
+
     bindRowHandlers(tbody) {
         const that = this;
         $(".remove-sample", tbody).click(function () {
-            that.removed.add(Number($(this).data("sample-id")));
+            const sampleId = Number($(this).data("sample-id"));
+            if (that.baseline.includes(sampleId)) {
+                // Strike-through and undo is for dropping a sample the saved cohort has
+                that.removed.add(sampleId);
+            } else {
+                that.order = that.order.filter((id) => id !== sampleId);
+            }
             that.status = null;
             that.render();
         });
@@ -316,8 +347,12 @@ class CohortMembershipEditor {
     }
 
     render() {
+        this.captureSelection();
         this.renderTable();
         this.renderSaveBar();
+        if (typeof SampleSelectionActions !== "undefined") {
+            SampleSelectionActions.update();  // Which samples are ticked can change with the table
+        }
     }
 
     discard() {

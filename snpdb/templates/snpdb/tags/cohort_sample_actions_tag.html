@@ -1,0 +1,29 @@
+{% load ui_utils %}
+<div id="sample-actions">
+    <div class="selected-count">
+        <div class="selected-number">0</div>
+        <div class="selected-label">samples selected</div>
+    </div>
+    <div class="sample-actions-main">
+        <div class="sample-actions-buttons">
+            {% for fa in family_analyses %}
+                <button type="button" class="btn btn-primary family-analysis-action" style="display: none"
+                        data-num-samples="{{ fa.num_samples }}" data-label="{{ fa.label }}" data-url-name="{{ fa.url_name }}">
+                    {% preview_icon_for_model fa.model "sample-action-icon" %} Perform {{ fa.label }} analysis using template
+                </button>
+            {% endfor %}
+            <button type="button" class="btn btn-outline-primary" id="create-sub-cohort-action" style="display: none">
+                {% preview_icon_for_model "snpdb.Cohort" "sample-action-icon" %} Create cohort from selected samples
+            </button>
+        </div>
+        <div class="sample-actions-hint text-muted"></div>
+    </div>
+</div>
+<script>
+    $(document).ready(function() {
+        SampleSelectionActions.init({
+            cohortId: {{ cohort.pk }},
+            subCohortUrl: "{{ sub_cohort_url }}",
+        });
+    });
+</script>

@@ -16,7 +16,7 @@
         <table id='sample-formset' class="table">
         <thead>
             <tr>
-                <th>Sample
+                <th><input class='sample-select-all' type='checkbox' title='Select all samples' /> Sample
                 {% if vcf.import_status == 'S' %}
                     <th>Het/Hom Variants
                     {% if vcf.vcffiltercollection %}

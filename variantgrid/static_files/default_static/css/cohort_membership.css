@@ -8,6 +8,11 @@
     vertical-align: middle;
 }
 
+#cohort-membership .select-cell {
+    width: 24px;
+    text-align: center;
+}
+
 #cohort-membership .drag-handle {
     cursor: grab;
     color: #6c757d;

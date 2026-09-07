@@ -8,6 +8,7 @@
 {% load ui_utils %}
 {% load vcf_import_info_tags %}
 {% load vcf_history_trail_tags %}
+{% load cohort_sample_actions_tag %}
 
 {% block title %}{{ page_title }}{% endblock %}
 {% block head %}
@@ -39,10 +40,6 @@ table#sample-formset input[type=checkbox] {
     display: none;
 }
 
-.sub-cohort-button-component {
-    float: left;
-}
-
 #sample-list-top-links>div {
     line-height: 24px;
     margin-right: 20px;
@@ -65,43 +62,6 @@ table#sample-formset input[type=checkbox] {
 }
 </style>
 <script>
-{% if vcf.import_status == 'S' and vcf.cohort %}
-    function subCohortClick() {
-        let sampleIdList = [];
-        $("input:checked", "#sample-formset").each(function() {
-            const sampleId = $(this).attr("sample_id");
-            sampleIdList.push(sampleId);
-        });
-
-        const data = 'sample_id_list=' + encodeURIComponent(JSON.stringify(sampleIdList));
-        $.ajax({
-            type: "POST",
-            data: data,
-            url: "{% url 'create_sub_cohort' vcf.cohort.pk %}",
-            success: function(data) {
-                const cohortId = data["cohort_id"];
-                window.location = Urls.view_cohort(cohortId);
-            },
-        });
-    }
-{% endif %}
-
-function initSubCohort() {
-    const subCohortButton = $("#sub-cohort-button");
-    subCohortButton.prop("disabled", true);
-    {% if vcf.import_status == 'S' and vcf.cohort %}
-    subCohortButton.click(subCohortClick);
-    $(".sample-select").change(setupSubCohortButton);
-    setupSubCohortButton();
-    {% endif %}
-}
-
-function setupSubCohortButton() {
-    const numSelectedSamples = $("input:checked", "#sample-formset").length;
-    const buttonEnabled = numSelectedSamples > 1;
-    $("#sub-cohort-button").attr("disabled", !buttonEnabled );
-}
-
 function addCreateProjectButtonAndForm() {
     const createProjectButton = $("<div/>")
         .addClass("click-to-add-button left")
@@ -216,8 +176,6 @@ $(document).ready(function() {
         $("form#vcf-form").submit();
     });
 
-    initSubCohort();
-
     // Skipped-annotation warning message (issue #1409) links to its tab
     $(".activate-tab").click(function() {
         $("#vcf-cohort-tabs .nav-tabs a[href='" + $(this).attr("href") + "']").tab('show');
@@ -227,7 +185,7 @@ $(document).ready(function() {
     addCreateProjectButtonAndForm();
 
 {% if has_write_permission %}
-    setupUnsavedChangesMessage("form#vcf-form", ".sample-select");
+    setupUnsavedChangesMessage("form#vcf-form", ".sample-select, .sample-select-all");
     const dialog = setupCreatePatientDialog();
     $(".sample-patient select", "form#vcf-form").each(function () {
         const parentRow = $(this).parents("tr");
@@ -299,6 +257,10 @@ $(document).ready(function() {
 {% else %}
 <link href="{% static 'css/cohort_membership.css' %}" rel="stylesheet">
 <script type="text/javascript" src="{% static 'js/cohort_membership.js' %}"></script>
+{% endif %}
+{% if cohort %}
+<link href="{% static 'css/sample_selection_actions.css' %}" rel="stylesheet">
+<script type="text/javascript" src="{% static 'js/sample_selection_actions.js' %}"></script>
 {% endif %}
 {% endblock %}
 
@@ -402,13 +364,8 @@ $(document).ready(function() {
             </p>
 
             {% if vcf.import_status == 'S' and vcf.cohort %}
-                <button id='sub-cohort-button' type='button' class="btn btn-outline-primary">
-                  {% preview_icon_for_model "snpdb.Cohort" "sub-cohort-button-component" %}
-                  <div class='sub-cohort-button-component'> Create cohort from selected samples</div>
-                </button>
-                {% include "snpdb/data/_cohort_wizards.html" %}
+                {% cohort_sample_actions vcf.cohort %}
             {% endif %}
-            <div class='clear'></div>
 
             {% vcf_import_info vcf 'Please see "View upload processing" in VCF info tab.' %}
         </form>
@@ -441,9 +398,8 @@ $(document).ready(function() {
         <h3>Samples</h3>
         {% include "snpdb/data/_cohort_samples_table.html" %}
         {% if not cohort.data_archived %}
-            {% include "snpdb/data/_cohort_wizards.html" %}
+            {% cohort_sample_actions cohort %}
         {% endif %}
-        <div class='clear'></div>
     {% endif %}
     </div>
 
