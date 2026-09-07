@@ -189,7 +189,8 @@ Still-open entries below, and the PRs are #1705, #1709, #1712, #1715, #1716, #17
   another deployment — anything leaving the system sends `GeneFusion.canonical_str`, not the number.
 
   Two changes came out of review on #1719, both worth carrying forward. **One way into the database**:
-  the loader writes a genotype VCF (`FORMAT/GT` plus the caller's rows as `INFO`) and hands it to the
+  the loader writes a sample VCF (the call's read support as `FORMAT/ALT_READS:REF_READS`, no `GT` since a fusion
+  caller asserts presence rather than a genotype, plus the caller's rows as `INFO`) and hands it to the
   ordinary import path, so `ImportCreateVCFModelForGenotypeVCFTask` builds the VCF/Sample/Cohort and
   `ProcessGenotypeVCFDataTask` COPYs the `CohortGenotype` rows — only the bcftools stages are skipped
   (`upload/vcf/gene_level_vcf_preprocess.py`), since `norm --check-ref=s` reads a base from the fasta a

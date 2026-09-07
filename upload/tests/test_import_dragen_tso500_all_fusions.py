@@ -4,23 +4,21 @@ import tempfile
 
 import cyvcf2
 import simplejson
-
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.test import TestCase
 
 from annotation.fake_annotation import get_fake_annotation_version
+from genes.gene_fusions import GeneFusionResolver, create_gene_fusions_for_variants
+from genes.models import FusionGeneId, GeneFusion
+from genes.tests.gene_fusion_test_utils import create_gene_fusion
+from genes.tests.test_gene_fusions import GeneFusionTestCase
 from library.genomics.vcf_enums import GeneLevelSymbolicAlt
 from library.genomics.vcf_utils import vcf_get_ref_alt_svlen_and_modification
 from library.genomics.vcf_writer import percent_decode_info_value
 from snpdb.gene_level_variants import GENE_LEVEL_CONTIG_NAME
-from genes.models import GeneFusion, FusionGeneId
-from genes.gene_fusions import GeneFusionResolver, create_gene_fusions_for_variants
-from genes.tests.gene_fusion_test_utils import create_gene_fusion
-from genes.tests.test_gene_fusions import GeneFusionTestCase
-from snpdb.models import GenomeBuild, ImportSource, Variant
+from snpdb.models import VCF, GenomeBuild, ImportSource, Variant, VCFSourceSettings
 from snpdb.variant_pk_lookup import VariantPKLookup
-from upload.tso500.dragen_all_fusions_parser import can_process_file, read_all_fusions
 from upload.import_task_factories.import_task_factory import get_import_task_factories
 from upload.models import (
     FileUpload,
@@ -28,15 +26,17 @@ from upload.models import (
     ModifiedImportedVariantOperation,
     UploadedFileTypes,
     UploadPipeline,
+    UploadStep,
 )
 from upload.tasks.import_dragen_tso500_all_fusions_task import (
+    ALT_READS_FORMAT,
     FUSION_INFO,
     FUSION_OBSERVATIONS_INFO,
-    NO_GENOTYPE_CALL,
+    REF_READS_FORMAT,
     DragenTSO500AllFusionsCreateVCFTask,
 )
+from upload.tso500.dragen_all_fusions_parser import can_process_file, read_all_fusions
 from upload.vcf.vcf_import import resolve_genome_build
-from upload.models import UploadStep
 
 TSO500_RNA_DIR = os.path.join(settings.BASE_DIR, "upload", "test_data", "tso500",
                               "ExampleSample_2600000001", "ExampleSample_RNA_2600000001B")
@@ -124,9 +124,30 @@ class TestGeneFusionVCF(GeneFusionTestCase):
             self.assertIsNotNone(GeneLevelSymbolicAlt.parse(alt))
             self.assertEqual(0, svlen)
 
-    def test_genotype_asserts_presence_not_a_diploid_call(self):
+    def test_sample_carries_read_support_not_a_genotype(self):
+        """ A caller asserts the fusion is present, so there is no GT to filter zygosity on - the
+            sample column holds how many reads support it and how many don't """
         for record in self.records:
-            self.assertIn(NO_GENOTYPE_CALL, str(record))
+            self.assertEqual([ALT_READS_FORMAT, REF_READS_FORMAT], record.FORMAT)
+
+    def test_read_support_sums_breakpoints_and_keeps_shared_reference(self):
+        """ ENTPD3::RPL14's three calls have 4, 12 and 10 supporting reads at distinct 5' breakpoints
+            and all re-report the same 1 + 3108 reference reads across the junctions """
+        by_fusion = {record.INFO.get(FUSION_INFO): record for record in self.records}
+        record = by_fusion["ENTPD3::RPL14"]
+        self.assertEqual(26, record.format(ALT_READS_FORMAT).flatten()[0])
+        self.assertEqual(3109, record.format(REF_READS_FORMAT).flatten()[0])
+
+    def test_source_settings_bind_read_support_as_depth(self):
+        """ The ^FusionProcessor row makes ALT_READS/REF_READS the depths the sample node and VAF
+            use, and with no GT in the header nothing binds a genotype """
+        vcf = VCF(source="FusionProcessor 1.0.0.614", genotype_samples=1)
+        for vss in VCFSourceSettings.get_for_source(vcf.source):
+            vss.apply_sample_field_overrides(vcf)
+        self.assertEqual(ALT_READS_FORMAT, vcf.alt_depth_field)
+        self.assertEqual(REF_READS_FORMAT, vcf.ref_depth_field)
+        self.assertTrue(vcf.has_depth)
+        self.assertFalse(vcf.has_genotype)
 
     def test_sept14_resolves_to_septin14(self):
         """ The file says SEPT14; the fusion is EGFR::SEPTIN14 """
