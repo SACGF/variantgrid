@@ -1,7 +1,7 @@
 # #1558 — Showing non-variants (SV / CNV / fusions) on the variant grids
 
 Written by Claude Fable 5.1 (claude-fable-5-1), 2026-09-07
-Status: in progress
+Status: landed - Phase 1 b738276af, Phase 2 31fc543aa, Phase 3 (the commit carrying this line)
 
 [#1558](https://github.com/SACGF/variantgrid/issues/1558): SVs, CNVs and gene fusions are all `Variant` rows
 now, but the grids show them as if they were small variants. This is Phase 6 of
@@ -105,7 +105,7 @@ Everything else this plan shows is read at query time from what is already store
 
 One client-side function, `_variantKind(rowData)` in
 `variantgrid/static_files/default_static/js/variantgrid_formats.js`, next to `_representativeVariantLabel`,
-returns `{code, label, title}` or null:
+returns `{code, cssClass, title}` or null:
 
 | Row | Badge | Title |
 |---|---|---|
@@ -178,7 +178,8 @@ nothing that matters. `SEGID` is not surfaced: it is the caller's own gene name 
 `CN`, `SM`, `FC` in the header's FORMAT ids (`get_format_field` in order), else the same names in INFO for a
 single-sample VCF (the Pisces shape). A source whose meaning differs overrides it through
 `snpdb/models/models_vcf.py:VCFSourceSettings` `sample_field_overrides`, which is why it joins
-`OVERRIDABLE_SAMPLE_FIELDS`. It is editable on the VCF page like the other field names. A data migration
+`OVERRIDABLE_SAMPLE_FIELDS`. It is shown on the VCF page beside the other field names, which are
+display-only there. A data migration
 sets it on existing VCFs whose `VCFFormat` / `VCFInfo` rows declare one of the three ids (importer v25+
 stores those; older VCFs have nothing to read anyway).
 
@@ -190,11 +191,12 @@ that field in the hover. Mechanics, all in `analysis/grids.py:VariantGrid` besid
 
 - `snpdb/grid_columns/grid_sample_columns.py:get_available_format_columns` reports `samples_copy_number`
   when any cohort VCF has `copy_number_field`.
-- `get_variantgrid_zygosity_annotation_kwargs` annotates, per cohort, `<alias>_packed_samples_copy_number`
-  as a `Coalesce` of the JSON paths `format__<i>__<field>__0` (the sample's dict in the per-sample list, then
-  the field's one-element array) and `info__<field>` - Django's JSON key transforms handle the list index
-  and the key; the sample index in `format` is the VCF column order, which is also the cohort's packed
-  index for a VCF's own cohort.
+- `get_variantgrid_zygosity_annotation_kwargs` annotates one alias per *sample* (there is no packed array
+  to index into) as a `Coalesce` of the JSON paths `format__<i>__<field>__0` (the sample's dict in the
+  per-sample list, then the field's one-element array) and `info__<field>` - Django's JSON key transforms
+  handle the list index and the key; the sample index in `format` is the VCF column order, which is also
+  the cohort's packed index for a VCF's own cohort. A custom cohort's rows are repacked with empty
+  `format`/`info`, so copy number is blank there.
 - One hidden `sample_<pk>_samples_copy_number` column per sample carries it to the cell and the CSV; the
   sort menu offers "Copy number" through `_genotype_sort_func` (a `KeyTextTransform` cast to float).
 - `_format_sample_value` in `analysis/grid_export.py` writes it into the VCF export's FORMAT under the

@@ -3,15 +3,29 @@ import re
 from functools import cached_property, reduce
 from typing import Optional
 
+import simplejson
 from django.db.models import Q
 
 from analysis.models.enums import GroupOperation
 from analysis.models.nodes.analysis_node import NodeAlleleFrequencyFilter, NodeVCFFilter
+from library.genomics.vcf_writer import percent_decode_info_value
 from patients.models_enums import Zygosity
 from snpdb.archive import DataArchivedError
-from snpdb.models import Cohort, CohortGenotypeCollection, ImportStatus, Sample, VCFFilter
-from snpdb.views.datatable_view import NullOrder, RichColumn
+from snpdb.models import Cohort, CohortGenotypeCollection, ImportStatus, Sample, VCFFilter, VCFInfo
+from snpdb.views.datatable_view import CellData, NullOrder, RichColumn
 from upload.models import UploadedVCF
+from upload.tso500.dragen_all_fusions_parser import (
+    FUSION_OBSERVATIONS_INFO,
+    format_fusion_observations,
+)
+
+
+def _render_fusion_calls(cell: CellData) -> str:
+    """ The caller rows this fusion was merged from. INFO values are stored as the VCF wrote them -
+        htslib doesn't decode, so we do. @see upload.tso500.dragen_all_fusions_parser """
+    if not (encoded := cell.value):
+        return ""
+    return format_fusion_observations(simplejson.loads(percent_decode_info_value(encoded)))
 
 
 class CohortMixin:
@@ -300,7 +314,26 @@ class CohortMixin:
                 # failure reads. @see VariantGridFormat.vcfFilters
                 client_renderer='VariantGridFormat.vcfFilters',
                 null_order=NullOrder.FIRST_ON_ASC))
+
+        # One gene pair can be several caller rows, all merged onto the one Variant - blank on
+        # everything that isn't a fusion, which is why the column only appears for a fusion VCF
+        fusion_cgcs = self._get_fusion_calls_cohort_genotype_collections()
+        for cgc in fusion_cgcs:
+            label = f"{cgc.cohort.get_vcf()} Fusion calls" if len(fusion_cgcs) > 1 else "Fusion calls"
+            extra_columns.append(RichColumn(
+                key=f"{cgc.cohortgenotype_alias}__info__{FUSION_OBSERVATIONS_INFO}",
+                label=label, width=90,
+                orderable=False, search=False, include_in_csv=True,
+                renderer=_render_fusion_calls, csv_rendered=True,
+                client_renderer='VariantGridFormat.fusionCalls'))
         return extra_columns
+
+    def _get_fusion_calls_cohort_genotype_collections(self) -> list:
+        """ The genotype collections whose VCF carries fusion observations. Nodes spanning VCFs override """
+        if cgc := self.cohort_genotype_collection:
+            if VCFInfo.objects.filter(vcf=cgc.cohort.get_vcf(), identifier=FUSION_OBSERVATIONS_INFO).exists():
+                return [cgc]
+        return []
 
     def _get_configuration_check_cohorts(self) -> list:
         """ Cohorts to check for missing/archived genotype data. Nodes spanning VCFs override """

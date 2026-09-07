@@ -24,6 +24,7 @@ from analysis.grid_export import format_items_iterator, node_grid_get_export_ite
 from analysis.grids import ExportVariantGrid
 from analysis.models import Analysis
 from analysis.models.enums import NodeStatus
+from analysis.models.nodes.sources.cohort_node import CohortNode
 from analysis.models.nodes.sources.sample_node import SampleNode
 from analysis.models.models_variant_tag import VariantTag
 from analysis.tasks.analysis_grid_export_tasks import (
@@ -33,12 +34,16 @@ from analysis.tasks.analysis_grid_export_tasks import (
 from annotation.fake_annotation import get_fake_annotation_version
 from library.django_utils import FakeRequest
 from library.django_utils.grid_export import EXPORT_ROWS_PER_CHUNK, grid_export_csv
-from snpdb.models import CachedGeneratedFile, CohortGenotype, GenomeBuild, Tag
+from snpdb.models import CachedGeneratedFile, CohortGenotype, GenomeBuild, Tag, VCFInfo
+from snpdb.models.models_enums import VCFInfoTypes
 from snpdb.models.models_cohort import CohortGenotypeCollection
 from snpdb.models.models_enums import CohortGenotypeCollectionType
 from snpdb.tests.utils.fake_cohort_data import create_fake_cohort
+from analysis.grids import VariantGrid
 from genes.models import GeneSymbol
 from genes.tests.gene_fusion_test_utils import create_gene_fusion
+from library.genomics.vcf_writer import percent_encode_info_value
+from upload.tso500.dragen_all_fusions_parser import FUSION_OBSERVATIONS_INFO
 from snpdb.gene_level_variants import GENE_LEVEL_CONTIG_NAME
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
 
@@ -102,9 +107,10 @@ class GridExportTestCase(TestCase):
         cls.analysis.set_defaults_and_save(cls.user)
 
     @classmethod
-    def _add_genotype(cls, cgc, variant, read_depth=40, sample_format=None):
+    def _add_genotype(cls, cgc, variant, read_depth=40, sample_format=None, sample_info=None):
         """ Insert a CohortGenotype row into the collection's partition table (proband at index 0).
-            sample_format: the FORMAT JSON the importer keeps, one dict per sample """
+            sample_format: the FORMAT JSON the importer keeps, one dict per sample
+            sample_info: the record's remaining INFO fields, as the importer stores them """
         old_db_table = CohortGenotype._meta.db_table
         try:
             CohortGenotype._meta.db_table = cgc.get_partition_table()
@@ -113,6 +119,7 @@ class GridExportTestCase(TestCase):
                 ref_count=0, het_count=1, hom_count=0, unk_count=0,
                 filters="X",
                 format=sample_format or [],
+                info=sample_info or {},
                 samples_zygosity="E..",
                 samples_allele_depth=[20, 0, 0],
                 samples_allele_frequency=[0.5, 0.0, 0.0],
@@ -406,3 +413,62 @@ class TestGeneLevelExport(GridExportTestCase):
         self.assertEqual(str(self.gene_fusion.anchor_id), pos, "the anchor gene id stands in for a position")
         self.assertEqual("N", ref)
         self.assertEqual(self.gene_fusion.variant.alt.seq, alt)
+
+
+class TestFusionCallsColumn(GridExportTestCase):
+    """ One gene pair can be several caller rows, all merged onto the one Variant, so the
+        breakpoints and read counts only exist in the INFO blob (#1558 §5.1) """
+
+    OBSERVATIONS = [
+        {"Caller": "DRAGEN", "Gene A Breakpoint": "chr8:128806980",
+         "Gene B Breakpoint": "chr8:128750494", "Alt Split Dedup": "6", "Alt Pair Dedup": "1"},
+        {"Caller": "SpliceGirl", "Gene A Breakpoint": "chr4:55133909",
+         "Gene B Breakpoint": "chr4:55138560", "Alt Split": "40"},
+    ]
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        for symbol in ["PVT1", "MYC"]:
+            GeneSymbol.objects.get_or_create(symbol=symbol)
+        cls.gene_fusion = create_gene_fusion("PVT1", "MYC")
+        VCFInfo.objects.create(vcf=cls.vcf, identifier=FUSION_OBSERVATIONS_INFO, number="1",
+                               data_type=VCFInfoTypes.STRING, description="Calls")
+        encoded = percent_encode_info_value(json.dumps(cls.OBSERVATIONS))
+        cgc = cls.cohort.cohort_genotype_collection
+        cls._add_genotype(cgc, cls.gene_fusion.variant, sample_info={FUSION_OBSERVATIONS_INFO: encoded})
+
+    def _node(self) -> CohortNode:
+        node = CohortNode.objects.create(analysis=self.analysis, cohort=self.cohort,
+                                         accordion_panel=CohortNode.COUNT)
+        node.count = node.get_queryset().count()
+        node.status = NodeStatus.READY
+        node.save()
+        return node
+
+    @property
+    def _column(self) -> str:
+        cgc = self.cohort.cohort_genotype_collection
+        return f"{cgc.cohortgenotype_alias}__info__{FUSION_OBSERVATIONS_INFO}"
+
+    def _grid_columns(self) -> dict:
+        grid = VariantGrid(FakeRequest(user=self.user), self._node())
+        return {rc.name: rc for rc in grid.enabled_columns}
+
+    def test_column_only_appears_for_a_vcf_carrying_fusion_calls(self):
+        columns = self._grid_columns()
+        self.assertIn(self._column, columns)
+        self.assertEqual("VariantGridFormat.fusionCalls", columns[self._column].client_renderer)
+
+        VCFInfo.objects.filter(vcf=self.vcf, identifier=FUSION_OBSERVATIONS_INFO).delete()
+        self.assertNotIn(self._column, self._grid_columns())
+
+    def test_calls_are_decoded_for_the_cell_and_the_csv(self):
+        node = self._node()
+        header, rows = self._export_csv(node)
+        index = header.index("Fusion calls")
+        by_variant = {int(row[0]): row[index] for row in rows}
+        self.assertEqual("DRAGEN chr8:128806980→chr8:128750494 (7 reads); "
+                         "SpliceGirl chr4:55133909→chr4:55138560 (40 reads)",
+                         by_variant[self.gene_fusion.variant.pk])
+        self.assertEqual("", by_variant[self.variants[0].pk], "blank on a row that isn't a fusion")

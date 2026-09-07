@@ -768,6 +768,20 @@ VariantGridFormat.vcfFilters = (filters) => {
 };
 
 
+// The caller rows a fusion Variant was merged from - one gene pair, several calls, and the pair is
+// the identity so the breakpoints only exist here. The cell says how many; the calls themselves are
+// the hover, and the CSV. @see FUSION_OBS in upload/tso500/dragen_all_fusions_parser.py
+const FUSION_CALL_SEPARATOR = "; ";  // OBSERVATION_SEPARATOR
+VariantGridFormat.fusionCalls = (calls) => {
+    if (!calls) {
+        return '';
+    }
+    const text = String(calls);
+    const count = text.split(FUSION_CALL_SEPARATOR).length;
+    return `<span class='fusion-calls' title='${escapeHtml(text)}'>&times;${count}</span>`;
+};
+
+
 // hgvs_c / hgvs_p / hgvs_g are "ACCESSION:change" or "ACCESSION(SYMBOL):change". The change has to
 // start with an HGVS kind so gene-level fusion nomenclature ("BCR::ABL1") isn't split as one
 const HGVS_REGEX = /^([^:(]+)(?:\(([^)]+)\))?:([cgmnopr]\..+)$/;

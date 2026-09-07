@@ -981,6 +981,13 @@ table.variantgrid-datatable .rv-sub {
   color: #777;
   font-size: 11px;
 }
+table.variantgrid-datatable .fusion-calls {
+  padding: 0 4px;
+  border-radius: 3px;
+  background: #ede7f6;
+  color: #5e35b1;
+  font-size: 11px;
+}
 table.variantgrid-datatable .rv-kind {
   flex: none;
   padding: 0 4px;

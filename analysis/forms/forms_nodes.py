@@ -18,7 +18,7 @@ from analysis.models.nodes.analysis_node import NodeAlleleFrequencyFilter, NodeV
 from analysis.models.nodes.filters.classifications_node import ClassificationsNode
 from analysis.models.nodes.filters.clinvar_node import ClinVarNode
 from analysis.models.nodes.filters.conservation_node import ConservationNode
-from analysis.models.nodes.filters.damage_node import DamageNode
+from analysis.models.nodes.filters.damage_node import DamageNode, StructuralFilter
 from analysis.models.nodes.filters.gene_list_node import GeneListNode
 from analysis.models.nodes.filters.intersection_node import IntersectionNode
 from analysis.models.nodes.filters.merge_node import MergeNode
@@ -489,6 +489,9 @@ class DamageNodeForm(BaseNodeForm):
     variant_class = forms.MultipleChoiceField(
         required=False, label="Variant type", widget=forms.CheckboxSelectMultiple,
         choices=[(vc.value, vc.label) for group in VARIANT_CLASS_GROUPS.values() for vc in group])
+    # Beside the classes rather than in them - a symbolic alt is a different question from VEP's class
+    structural = forms.ChoiceField(required=False, label="Structural", choices=StructuralFilter.choices,
+                                   widget=forms.RadioSelect)
 
     class Meta:
         model = DamageNode
@@ -550,6 +553,10 @@ class DamageNodeForm(BaseNodeForm):
             "required_field": self[f"{tool.pred_field}_required"],
             "allow_null_field": self[f"{tool.pred_field}_allow_null"],
         } for tool in self.instance.get_pred_tools()]
+
+    def clean_structural(self):
+        """ The radio always posts a value, but an empty one would read as a filter rather than none """
+        return self.cleaned_data.get("structural") or StructuralFilter.ANY
 
     def get_variant_class_groups(self) -> list[tuple[str, list]]:
         """ (group name, sub-widgets) for the grouped checkboxes in the editor """

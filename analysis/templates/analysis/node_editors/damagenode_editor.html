@@ -31,6 +31,20 @@
 	    white-space: nowrap;
 	}
 
+	#structural-filter ul {
+	    display: flex;
+	    gap: 12px;
+	    margin: 0;
+	    padding: 0;
+	    list-style: none;
+	}
+
+	#structural-filter label {
+	    margin: 0;
+	    font-weight: normal;
+	    white-space: nowrap;
+	}
+
 	#damage-table th.filter-required,
 	#damage-table td.filter-required {
 	    text-align: center;
@@ -314,6 +328,14 @@
                 </td>
                 <td class="collapse filter-required"> <!-- variant type always restricts --> </td>
                 <td class="collapse filter-required"> <!-- variant_class is non-nullable --> </td>
+            </tr>
+            <tr>
+                <th title="Stored as a symbolic alt with an SVLEN - SVs, CNVs and gene-level events. VEP calls a 1Mb deletion and a 1bp one the same class, so this is a separate question">{{ form.structural.label }}</th>
+                <td>{{ form.structural.errors }}
+                    <div id="structural-filter">{{ form.structural }}</div>
+                </td>
+                <td class="collapse filter-required"> <!-- structural always restricts --> </td>
+                <td class="collapse filter-required"> <!-- structural is non-nullable --> </td>
             </tr>
             <tr>
                 <th>{{ form.impact_min.label }}</th>

@@ -34,7 +34,12 @@ from library.genomics.vcf_writer import (
     percent_encode_info_value,
 )
 from snpdb.gene_level_variants import GENE_LEVEL_CONTIG_LENGTH, GENE_LEVEL_CONTIG_NAME
-from upload.tso500.dragen_all_fusions_parser import read_all_fusions
+from upload.tso500.dragen_all_fusions_parser import (
+    FUSION_INFO,
+    FUSION_OBSERVATIONS_INFO,
+    format_fusion_observations,
+    read_all_fusions,
+)
 from upload.models import (
     ModifiedImportedVariant,
     ModifiedImportedVariantOperation,
@@ -43,11 +48,6 @@ from upload.models import (
 )
 from upload.tasks.vcf.import_vcf_step_task import ImportVCFStepTask
 from variantgrid.celery import app
-
-# INFO fields carrying what the caller reported - these land in CohortGenotype.info via the
-# standard bulk importer, which stores every INFO field the header declares
-FUSION_INFO = "FUSION"
-FUSION_OBSERVATIONS_INFO = "FUSION_OBS"
 
 # A fusion caller asserts the fusion is present, not a diploid genotype, so there is no zygosity to
 # report. The importer reads a missing GT as unknown zygosity.
@@ -146,9 +146,7 @@ def _record_merged_rows(upload_step, variant_qs):
         encoded = (info or {}).get(FUSION_OBSERVATIONS_INFO) or "[]"
         observations = simplejson.loads(percent_decode_info_value(encoded))
         if len(observations) > 1:
-            calls = "; ".join(f"{o.get('Caller')} {o.get('Gene A Breakpoint')}->{o.get('Gene B Breakpoint')}"
-                              for o in observations)
-            merged.append((variant_id, len(observations), calls))
+            merged.append((variant_id, len(observations), format_fusion_observations(observations)))
 
     if not merged:
         return

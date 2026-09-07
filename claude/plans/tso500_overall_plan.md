@@ -316,7 +316,7 @@ The five test files from `ed5e15a33` — one de-identified run, one specimen, DN
 | File | State |
 |---|---|
 | hard-filtered.vcf | loads, 93 records |
-| cnv.vcf | loads, 16 records — 9 copy-neutral rows skipped and counted; `SM` surfacing is Phase 6 |
+| cnv.vcf | loads, 16 records — 9 copy-neutral rows skipped and counted; `SM` surfaced by Phase 6 |
 | SpliceVariants.vcf | loads, 17 records — VAF derived from `ALTDEDUP`/`REFDEDUP`, `LowUniqueAlignments` preserved |
 | DragenExonCNV.vcf | loads, 2 records, against a `genome_build` declared at upload or on its `VCFSourceSettings` row |
 | AllFusions.csv | loads, 33 rows -> 31 fusion variants (2 gene pairs seen more than once); build from `VCFSourceSettings.genome_build` |
@@ -348,7 +348,7 @@ below.
       │
   P5  #1506 GeneFusion ✔ ──► AllFusions parser ✔
       │
-  P6  #1706 grids ✔  private#2837 ✔  ──► #1558 CN / SM / SEGID columns, fusion filter + columns
+  P6  #1706 grids ✔  private#2837 ✔  ──► #1558 kind badge ✔ copy number ✔ fusion columns + filter ✔
                                           #1747 tissue as UBERON
 ```
 
@@ -358,15 +358,14 @@ Nothing left has a hard dependency on anything else; what remains is ordered by 
 
 ## What remains
 
-1. **Phase 6, #1558 proper** — the only ingestion-side gap still visible to a user. Below.
-2. **Phase 8 remainder** — the `copy_consensus` audit, #1419's gene-level copy, and #444's report
+1. **Phase 8 remainder** — the `copy_consensus` audit, #1419's gene-level copy, and #444's report
    template and specimen-page launch. Below.
-3. **The manual pass over a real GRCh37 deployment** — owed by Phases 2, 4, 5 and 7 and never run.
+2. **The manual pass over a real GRCh37 deployment** — owed by Phases 2, 4, 5 and 7 and never run.
    One session, listed under each phase below.
-4. **Client work** — `variantgrid_api#20`, deferred to batch with the other client issues.
-5. **Chase TAU** for the missing files. Long lead time; below.
-6. **#1717** — deployment-wide threshold defaults per VCF source and panel. Independent.
-7. **#1747** — tissue as a UBERON term. Independent; PR #1761 hid the tissue dropdown until it lands.
+3. **Client work** — `variantgrid_api#20`, deferred to batch with the other client issues.
+4. **Chase TAU** for the missing files. Long lead time; below.
+5. **#1717** — deployment-wide threshold defaults per VCF source and panel. Independent.
+6. **#1747** — tissue as a UBERON term. Independent; PR #1761 hid the tissue dropdown until it lands.
 
 ## Still open from Phase 0 — chase TAU for the missing files
 
@@ -468,36 +467,35 @@ PR #1814 notes the editor's tree and the card chips were not checked in a browse
 Deployment-wide threshold defaults per VCF source and per panel are #1717 rather than part of this
 phase — the per-node values built here run either way; #1717 only changes what a new node starts from.
 
-## Phase 6 — what is left of #1558
+## Phase 6 — #1558
 
-Designed in [`1558_non_variants_on_grids_plan.md`](1558_non_variants_on_grids_plan.md), which is the
-spec for everything below - the kind badge, the fusion row expansion and export, copy number per
-sample, the fusion calls column and the Effect node's structural filter.
+Landed. Designed in [`1558_non_variants_on_grids_plan.md`](1558_non_variants_on_grids_plan.md), which
+is the spec and records what each phase touched - the kind badge, the fusion row expansion and export,
+copy number per sample, the fusion calls column and the Effect node's structural filter.
 
-Per the issue's own comment table, SV already works in the grid and CNV works as SV — what is missing
-is surfacing `CohortGenotype.info["CN"]` and TSO 500's `FORMAT/SM` linear copy ratio, which importer
-v21+ already keeps in the format JSON blob but which is not queryable. Nothing has been built for this
-yet.
+Per the issue's own comment table, SV already worked in the grid and CNV worked as SV — what was
+missing was surfacing `CohortGenotype.info["CN"]` and TSO 500's `FORMAT/SM` linear copy ratio, which
+importer v21+ already kept in the format JSON blob but which was not queryable. That is now
+`VCF.copy_number_field` plus a read of the JSON at query time.
 
-cnv.vcf's `SEGID` gene symbol joins it, down from Phase 2. The value is stored and the JSON is
-queryable, but it is whatever the caller wrote — `MYCL1` where the rest of the pipeline says `MYCL` —
-and JSON cannot be joined to `GeneSymbol`/`GeneSymbolAlias`. So it is the same read-time-versus-column
-decision as `SM` and `CN`, and wants deciding once for all three.
-`GeneSymbolMatcher.get_gene_symbol_id_and_alias_id` (`genes/gene_matching.py:45`) is the resolver
-either way.
+cnv.vcf's `SEGID` gene symbol came down from Phase 2 with it, and was deliberately left unsurfaced:
+it is whatever the caller wrote — `MYCL1` where the rest of the pipeline says `MYCL` — and the gene and
+overlapping-symbol columns already say which gene a segment hits, resolved properly.
 
-Fusions are the genuinely new case. **One grid, not several** — a fusion is a row like any other, so
+Fusions were the genuinely new case. **One grid, not several** — a fusion is a row like any other, so
 compound-het detection, gene lists and every downstream node keep working over the same result set
 rather than needing a per-kind union. That is also what Phase 5's choice of a real `Variant` over a bare
-`Allele` was for. Phase 5 and its follow-ups left them grid-ready rather than grid-complete: they carry a
-gene symbol, `overlapping_symbols` and a variant class from their own annotation run, so what remains is
-the kind filter and the columns that only make sense for a fusion (both breakpoints, caller, read
-counts — all in `CohortGenotype.info["observations"]`, one entry per row the caller wrote).
+`Allele` was for. Phase 5 left them grid-ready rather than grid-complete; what this phase added is the
+kind badge that says a row is one, the partners and direction in the expanded row, the Fusion calls
+column (breakpoints, caller and read counts out of `CohortGenotype.info`, one entry per row the caller
+wrote), the export and All Variants paths they used to fall out of, and a structural filter on the
+Effect node.
 
-Finding a fusion by a **single** partner — `ROS1` returning every fusion it takes part in — belongs here
-too. Phase 5's search receiver resolves a full pair either way round (`BCR::ABL1`, `CD74-ROS1`, aliases
-applied) and is deliberately lookup-only, minting no `GeneFusion` or `FusionGeneId` on whatever a user
-types; the single-partner query is the same discipline over `GeneFusion`'s anchor and partner FKs.
+Finding a fusion by a **single** partner — `ROS1` returning every fusion it takes part in — is the gene
+page: it already joins `VariantGeneOverlap`, which the gene-level annotation run writes for both
+partners, and the badge now makes those rows recognisable among the small variants. Phase 5's search
+receiver still resolves only a full pair (`BCR::ABL1`, `CD74-ROS1`, aliases applied) and stays
+lookup-only, minting no `GeneFusion` or `FusionGeneId` on whatever a user types.
 
 ## Phase 8 — what is left (#1419, then #444)
 

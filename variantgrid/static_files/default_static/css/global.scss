@@ -1159,6 +1159,15 @@ table.variantgrid-datatable {
 		font-size: 11px;
 	}
 
+	// How many caller rows a fusion was merged from - the calls are in the title. @see fusionCalls
+	.fusion-calls {
+		padding: 0 4px;
+		border-radius: 3px;
+		background: #ede7f6;
+		color: #5e35b1;
+		font-size: 11px;
+	}
+
 	// The kind badge beside the label - what this row is when it isn't a small variant. Outside the
 	// clipped label, so it survives an ellipsis. @see _variantKind in variantgrid_formats.js
 	.rv-kind {
