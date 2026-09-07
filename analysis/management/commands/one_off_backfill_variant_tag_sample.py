@@ -13,6 +13,8 @@ interrupted run picks up where it stopped.
 @see https://github.com/SACGF/variantgrid_sapath/issues/246
 """
 import logging
+import time
+from datetime import timedelta
 
 from django.core.management import BaseCommand
 
@@ -20,6 +22,7 @@ from analysis.models import Analysis, VariantTag
 from analysis.variant_tag_operations import get_proband_sample_by_node_id
 
 BATCH_SIZE = 1000
+PROGRESS_EVERY = 10_000  # Taggings between progress lines - analyses vary from a handful to thousands
 
 
 class Command(BaseCommand):
@@ -33,9 +36,15 @@ class Command(BaseCommand):
         dry_run = options["dry_run"]
         base_qs = VariantTag.objects.filter(sample__isnull=True, analysis__isnull=False, node__isnull=False)
         analysis_ids = list(base_qs.order_by("analysis_id").values_list("analysis_id", flat=True).distinct())
+        total = base_qs.count()  # Taggings still without a sample - a resumed run counts what is left to do
+        self.stdout.write(f"{total} taggings without a sample, across {len(analysis_ids)} analyses")
+        if not total:
+            return
 
+        start = time.time()
         filled = 0
         ambiguous = 0
+        last_logged = 0
         for i, analysis_id in enumerate(analysis_ids, start=1):
             analysis = Analysis.objects.get(pk=analysis_id)
             proband_sample_by_node_id = get_proband_sample_by_node_id(analysis)
@@ -53,11 +62,24 @@ class Command(BaseCommand):
                     to_update = []
             filled += self._write(to_update, dry_run)
 
-            logging.info("Analysis %s (%d/%d): %d filled, %d ambiguous so far",
-                         analysis_id, i, len(analysis_ids), filled, ambiguous)
+            if filled + ambiguous - last_logged >= PROGRESS_EVERY or i == len(analysis_ids):
+                last_logged = filled + ambiguous
+                self._log_progress(analysis_id, i, len(analysis_ids), filled, ambiguous, total, start)
 
         prefix = "Would set" if dry_run else "Set"
         self.stdout.write(f"{prefix} sample on {filled} taggings, left {ambiguous} ambiguous")
+
+    @staticmethod
+    def _log_progress(analysis_id: int, analyses_done: int, analyses_total: int,
+                      filled: int, ambiguous: int, total: int, start: float):
+        done = filled + ambiguous
+        elapsed = time.time() - start
+        rate = done / elapsed if elapsed else 0
+        remaining = timedelta(seconds=int((total - done) / rate)) if rate else "?"
+        logging.info("analysis %s (%d/%d) - %d/%d taggings (%.1f%%), %d filled / %d ambiguous, "
+                     "%.0f/sec, ~%s left",
+                     analysis_id, analyses_done, analyses_total, done, total, 100 * done / total,
+                     filled, ambiguous, rate, remaining)
 
     @staticmethod
     def _write(variant_tags: list[VariantTag], dry_run: bool) -> int:
