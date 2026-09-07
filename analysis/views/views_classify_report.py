@@ -53,6 +53,7 @@ def _classify_report_context(case: ClassifyReportCase, case_type: str, case_id: 
         "case_id": case_id,
         "rows": rows,
         "outstanding": outstanding_tag_count(rows),
+        "unclassified": sum(1 for row in rows if row.needs_classification),
         "tag_summary": tag_summary(rows),
         "classification_modifications": list(case.classification_modifications()),
         "report_templates": ClassificationReportTemplate.objects.exclude(template="").order_by("name"),

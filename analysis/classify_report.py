@@ -21,6 +21,7 @@ from typing import Optional
 
 from django.contrib.auth.models import User
 from django.db.models import Q, QuerySet
+from django.urls import reverse
 
 from analysis.models import Analysis, VariantTag
 from analysis.variant_tag_operations import sample_carries_variant
@@ -67,6 +68,23 @@ class ClassifyQueueRow:
     def can_resolve(self) -> bool:
         """ The row has something to point the to-do at, but nobody has said it is the right person yet """
         return self.classification is not None and not self.done
+
+    @property
+    def needs_classification(self) -> bool:
+        """ Nothing has been classified for the allele yet - a row that has one is waiting on "Clear tag",
+            not on more curation, so the wizard walks past it """
+        return not self.done and self.classification is None
+
+    @property
+    def full_form_url(self) -> str:
+        """ The full create page for this tagging - the analysis one where the tag was made in an analysis, so
+            creating there links the record to it and clears the tag """
+        if analysis_id := self.variant_tag.analysis_id:
+            return reverse("create_classification_for_variant_tag",
+                           kwargs={"analysis_id": analysis_id, "variant_tag_id": self.variant_tag.pk})
+        return reverse("create_classification_for_variant",
+                       kwargs={"variant_id": self.variant_tag.variant_id,
+                               "genome_build_name": self.variant_tag.genome_build.name})
 
     @property
     def copyable(self) -> list[PreviousClassification]:

@@ -365,6 +365,16 @@ class CreateClassificationForCaseTest(ClassifyReportTestCase):
         self.assertContains(response, previous.cr_lab_id)
         self.assertNotContains(response, f'data-vcm-id="{previous.last_published_version.pk}"')
 
+    def test_dialog_full_form_links_to_the_full_create_page(self):
+        previous = self._classify(self.mother, data={SpecialEKeys.CLINICAL_SIGNIFICANCE: {"value": "VUS"}})
+        previous.publish_latest(self.user)
+
+        response = self.client.get(self._dialog_url(self.variant_tag))
+
+        self.assertContains(response, reverse("create_classification_for_variant",
+                                              kwargs={"variant_id": self.variant.pk,
+                                                      "genome_build_name": self.genome_build.name}))
+
     def test_a_somatic_tag_is_not_offered_a_germline_record(self):
         somatic_tag = create_classify_queue_tag("SomaticToDo", AlleleOriginBucket.SOMATIC)
         variant_tag = self._create_variant_tag(sample=self.proband)
@@ -411,6 +421,34 @@ class CreateClassificationForCaseTest(ClassifyReportTestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "[RUNX1=1]")
+
+    def test_a_tag_with_nothing_to_reuse_links_to_the_analysis_create_page(self):
+        analysis = self._create_analysis()
+        node = SampleNode.objects.create(analysis=analysis, sample=self.proband)
+        variant_tag = self._create_variant_tag(analysis=analysis, node=node, sample=self.proband)
+
+        response = self.client.get(reverse("sample_classify_report_tab", kwargs={"sample_id": self.proband.pk}))
+
+        self.assertContains(response, reverse("create_classification_for_variant_tag",
+                                              kwargs={"analysis_id": analysis.pk,
+                                                      "variant_tag_id": variant_tag.pk}))
+
+    def test_a_tag_made_outside_an_analysis_links_to_the_variant_create_page(self):
+        self._create_variant_tag(sample=self.proband)
+
+        response = self.client.get(reverse("sample_classify_report_tab", kwargs={"sample_id": self.proband.pk}))
+
+        self.assertContains(response, reverse("create_classification_for_variant",
+                                              kwargs={"variant_id": self.variant.pk,
+                                                      "genome_build_name": self.genome_build.name}))
+
+    def test_wizard_stops_being_offered_once_every_tag_has_a_classification(self):
+        url = reverse("sample_classify_report_tab", kwargs={"sample_id": self.proband.pk})
+        self.assertContains(self.client.get(url), 'id="classify-all"')
+
+        self._classify(self.proband)
+
+        self.assertNotContains(self.client.get(url), 'id="classify-all"')
 
     def test_tab_lists_the_classifications_made_for_the_case(self):
         classification = self._classify(self.proband, data={SpecialEKeys.GENE_SYMBOL: {"value": "RUNX1"}})

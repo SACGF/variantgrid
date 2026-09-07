@@ -7,7 +7,7 @@
         $(document).ready(function() {
             const container = $("#classify-report");
             const tabPane = container.parent();  // Reloaded in place, the way the other sample tabs do it
-            // The wizard walks the outstanding rows one dialog at a time
+            // The wizard walks the rows still wanting a classification, one dialog at a time
             let wizard = null;
             let reloadWhenDone = false;
 
@@ -15,8 +15,9 @@
                 tabPane.load(container.data("tab-url"));
             }
 
-            function outstandingTagIds() {
-                return $(".classify-queue-row:not(.classified)", container).map(function() {
+            // The walk is about making classifications - a row that already has one is waiting on "Clear tag"
+            function unclassifiedTagIds() {
+                return $(".classify-queue-row:not(.has-classification)", container).map(function() {
                     return $(this).data("variantTagId");
                 }).get();
             }
@@ -39,9 +40,9 @@
             // Always forwards through the queue, so a skipped tag isn't offered again on the next step
             function nextInWizard(afterTagId) {
                 if (!wizard) return null;
-                const outstanding = new Set(outstandingTagIds());
+                const unclassified = new Set(unclassifiedTagIds());
                 for (let i = wizard.indexOf(afterTagId) + 1; i < wizard.length; i++) {
-                    if (outstanding.has(wizard[i])) {
+                    if (unclassified.has(wizard[i])) {
                         return wizard[i];
                     }
                 }
@@ -53,6 +54,7 @@
                 const action = $(".classify-action", row);
                 action.html($("<span>", {class: "text-success mr-2", text: "✓ Classified"})).append(
                     $("<a>", {href: data.url, target: "_blank", text: data.label}));
+                row.addClass("has-classification");
                 // A tagging that never knew whose it was stays outstanding until someone says this is the person
                 if (data.resolved) {
                     row.addClass("classified table-success");
@@ -65,14 +67,19 @@
                 reloadWhenDone = true;
             }
 
-            function afterClassified(variantTagId, data) {
-                markRowClassified(variantTagId, data);
-                const next = nextInWizard(variantTagId);
+            // Whether stepping on or finishing, the modal closes on the last tag of the walk
+            function stepWizard(afterTagId) {
+                const next = nextInWizard(afterTagId);
                 if (next) {
                     openClassifyDialog(next);
                 } else {
                     $("#classify-modal").modal("hide");
                 }
+            }
+
+            function afterClassified(variantTagId, data) {
+                markRowClassified(variantTagId, data);
+                stepWizard(variantTagId);
             }
 
             // Copy a previously curated record into a new one for this sample - the whole record when the
@@ -99,20 +106,6 @@
                 applyPrevious($(this), "copy_gene_from_vcm_id");
             });
 
-            // The full form creates the record then opens the classification editor in a new tab
-            container.on("click", ".full-form-button", function() {
-                const form = $("#classify-form");
-                form.find("[name=copy_from_vcm_id], [name=copy_gene_from_vcm_id]").val("");
-                form.find("[name=response_format]").val("");
-                form.attr("target", "_blank");
-                wizard = null;
-                reloadWhenDone = true;
-                form[0].submit();
-                window.setTimeout(function() {
-                    $("#classify-modal").modal("hide");
-                }, 500);
-            });
-
             container.on("click", ".resolve-tag", function() {
                 const button = $(this);
                 const row = button.closest(".classify-queue-row");
@@ -127,26 +120,40 @@
                 });
             });
 
+            // The full form opens in its own tab, so the row is picked up when they come back to this one.
+            // The flag lives on the tab pane, which outlives reloadTab() replacing the tab's contents
+            container.on("click", ".classify-full-form", function() {
+                tabPane.data("reloadOnReturn", true);
+                if (wizard) {
+                    // Sending a tag off to the full form doesn't classify it here - the walk moves on, as Skip does
+                    stepWizard($("#classify-modal").data("variantTagId"));
+                } else {
+                    $("#classify-modal").modal("hide");
+                }
+            });
+
+            $(window).off("focus.classifyReport").on("focus.classifyReport", function() {
+                if (tabPane.data("reloadOnReturn") && !$("#classify-modal").hasClass("show")) {
+                    tabPane.data("reloadOnReturn", false);
+                    reloadTab();
+                }
+            });
+
             container.on("click", ".classify-tag", function() {
                 wizard = null;
                 openClassifyDialog($(this).closest(".classify-queue-row").data("variantTagId"));
             });
 
             container.on("click", "#classify-all", function() {
-                const outstanding = outstandingTagIds();
-                if (outstanding.length) {
-                    wizard = outstanding;
-                    openClassifyDialog(outstanding[0]);
+                const unclassified = unclassifiedTagIds();
+                if (unclassified.length) {
+                    wizard = unclassified;
+                    openClassifyDialog(unclassified[0]);
                 }
             });
 
             container.on("click", ".wizard-skip", function() {
-                const next = nextInWizard($("#classify-modal").data("variantTagId"));
-                if (next) {
-                    openClassifyDialog(next);
-                } else {
-                    $("#classify-modal").modal("hide");
-                }
+                stepWizard($("#classify-modal").data("variantTagId"));
             });
 
             $("#classify-modal").on("hidden.bs.modal", function() {
@@ -209,7 +216,7 @@
             <div class="card-header d-flex align-items-center">
                 <span>Tags awaiting classification</span>
                 <span class="text-muted small ml-2">classifying clears the tag when the record is for the tag's own sample - otherwise clear it yourself</span>
-                {% if can_create_classifications and outstanding %}
+                {% if can_create_classifications and unclassified %}
                     <button type="button" class="btn btn-outline-primary btn-sm ml-auto" id="classify-all">Classify all (wizard)</button>
                 {% endif %}
             </div>
@@ -226,7 +233,7 @@
                 </thead>
                 <tbody>
                 {% for row in rows %}
-                    <tr class="classify-queue-row{% if row.done %} classified table-success{% endif %}"
+                    <tr class="classify-queue-row{% if row.done %} classified table-success{% endif %}{% if not row.needs_classification %} has-classification{% endif %}"
                         data-variant-tag-id="{{ row.variant_tag.pk }}"
                         data-dialog-url="{% url 'classify_report_tag_dialog' case_type case_id row.variant_tag.pk %}">
                         <td>
@@ -254,9 +261,12 @@
                                 <button type="button" class="btn btn-outline-success btn-sm ml-2 resolve-tag"
                                         title="Say this classification is what the tag was asking for">Clear tag</button>
                             {% elif can_create_classifications %}
-                                <button type="button" class="btn btn-primary btn-sm classify-tag">
-                                    {% if row.previous %}Classify &ndash; check previous&hellip;{% else %}New classification{% endif %}
-                                </button>
+                                {% if row.previous %}
+                                    <button type="button" class="btn btn-primary btn-sm classify-tag">Classify &ndash; check previous&hellip;</button>
+                                {% else %}
+                                    <a class="btn btn-primary btn-sm classify-full-form" target="_blank"
+                                       href="{{ row.full_form_url }}">New classification</a>
+                                {% endif %}
                             {% endif %}
                         </td>
                     </tr>

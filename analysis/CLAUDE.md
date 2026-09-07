@@ -51,6 +51,15 @@ Patterns here:
   HET for the proband's variant does not need their own classification, so it never assigns ownership.
   `analysis/variant_tag_operations.py:sample_carries_variant` treats a genotype row as the call when the sample's VCF
   has no GT field (`Sample.has_genotype`) - a fusion caller reports read support, so every zygosity is unknown.
+- The queue row's button only opens the dialog when the allele has been curated before - there is something to choose
+  between. With nothing previous it links straight to the full create page in a new tab
+  (`analysis/classify_report.py:ClassifyQueueRow.full_form_url` - the analysis one where the tag was made in an analysis,
+  so the tag is cleared on save, else the plain variant one), which offers transcript, bucket and sample properly.
+  The dialog's own "full form" button goes to the same URL, so starting from scratch is always the full page and the
+  dialog is only ever the copy-from-previous shortcut.
+- "Classify all" walks `analysis/classify_report.py:ClassifyQueueRow.needs_classification` rows, not unresolved ones -
+  a row whose allele has been classified is waiting on "Clear tag", and offering it again made a second record every
+  time the wizard was run.
 - The queue dialog's previous classifications are filtered to the tag's allele origin bucket
   (`analysis/classify_report.py:tag_allele_origin_bucket`; "Both" means no filter), and an external lab's record is listed
   without "Apply to this sample". Where a tagged allele has nothing of the lab's own, the dialog offers the gene level
