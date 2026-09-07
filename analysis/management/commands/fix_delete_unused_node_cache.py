@@ -8,6 +8,8 @@ class Command(BaseCommand):
         @See https://github.com/SACGF/variantgrid/issues/696
         We can remove these now (were keeping them around in case we needed to roll back)
     """
+    category = "one-off"
+
     def handle(self, *args, **options):
 
         if total_nc := NodeCache.objects.count():

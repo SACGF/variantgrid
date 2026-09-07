@@ -1,3 +1,10 @@
+"""
+Enums for patients, specimens and samples that other apps also read: Zygosity (the one-character
+codes packed into CohortGenotype.samples_zygosity, with the regex helpers), Sex, the specimen /
+extraction hierarchy levels and tissue status, population groups extending gnomAD, and matching
+statuses for externally managed records. Codes are stored in the database - add values, never
+renumber.
+"""
 from django.db import models
 from django.db.models import Q
 

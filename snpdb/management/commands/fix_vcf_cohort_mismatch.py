@@ -9,6 +9,7 @@ from upload.models import UploadedVCF
 
 
 class Command(BaseCommand):
+    category = "one-off"
 
     def handle(self, *args, **options):
         for cgc in CohortGenotypeCollection.objects.filter(cohort__vcf__isnull=False):

@@ -25,6 +25,7 @@ class Command(BaseCommand):
         matched - update_variant_coordinate/recalc_c_hgvs re-stamp it while leaving the matched variant
         as it was, so the stored coordinate is compared against a fresh resolution instead.
     """
+    category = "one-off"
 
     def add_arguments(self, parser):
         parser.add_argument('--dry-run', action='store_true',

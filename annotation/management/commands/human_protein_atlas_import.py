@@ -30,6 +30,7 @@ def get_or_create_hpa_samples_ids(df) -> dict:
 
 
 class Command(BaseCommand):
+    category = "import"
 
     def add_arguments(self, parser):
         parser.add_argument('--replace', action='store_true')

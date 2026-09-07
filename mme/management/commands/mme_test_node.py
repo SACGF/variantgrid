@@ -22,6 +22,8 @@ TEST_PROFILE = {
 
 
 class Command(BaseCommand):
+    category = "dev"
+
     def add_arguments(self, parser):
         parser.add_argument("node_id")
 

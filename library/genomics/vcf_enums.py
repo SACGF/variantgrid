@@ -1,3 +1,8 @@
+"""
+VCF-level constants that both the importer and the writers share: column positions (VCFColumns),
+the symbolic alts (VCFSymbolicAllele, and GeneLevelSymbolicAlt for gene-level events on the fake
+contig), header constants, and VariantClass (Ensembl's VARIANT_CLASS terms).
+"""
 import re
 from typing import Optional
 

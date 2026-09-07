@@ -11,7 +11,7 @@
 ### Files
 
 - `admin.py` — Django admin registration
-- `user_admin.py` — Custom User admin class
+- `vcauth/user_admin.py` — Custom User admin class
 
 ### CustomUserAdmin
 

@@ -2,8 +2,8 @@
 """
 scripts/vg — thin dispatcher for `manage.py vg` (see snpdb/management/commands/vg.py).
 
-Subcommands that need no Django (`tests`, and the static maps: signals, settings, tasks) run here in
-well under a second. Everything else delegates to `manage.py vg` with the repo's virtualenv, and
+Subcommands that need no Django (`tests`, `outline`, `docs`, and the static maps: signals, settings, tasks)
+run here in well under a second. Everything else delegates to `manage.py vg` with the repo's virtualenv, and
 `map` is run under the canonical CI settings module so the committed maps are deterministic.
 """
 import os
@@ -15,6 +15,8 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
 from library.vg import maps  # noqa: E402
+from library.vg.docs import check_docs, render_report  # noqa: E402
+from library.vg.outline import outline, render_coverage, render_outline  # noqa: E402
 from library.vg.test_selection import select_tests  # noqa: E402
 
 CANONICAL_SETTINGS_MODULE = "variantgrid.settings.env.github_actions"
@@ -76,12 +78,43 @@ def _static_map(argv: list[str]) -> int:
     return 0
 
 
+def _static_docs(argv: list[str]) -> int:
+    if not argv or argv[0] != "check":
+        print("usage: vg docs check [doc.md|dir ...] [--all-plans]")
+        return 2
+    paths = [a for a in argv[1:] if not a.startswith("--")]
+    report = check_docs(paths or None, all_plans="--all-plans" in argv)
+    print(render_report(report))
+    return 0 if report.ok else 1
+
+
+def _static_outline(argv: list[str]) -> int:
+    files = [a for a in argv if not a.startswith("--")]
+    min_lines = int(argv[argv.index("--min-lines") + 1]) if "--min-lines" in argv else 0
+    if "--coverage" in argv:
+        print(render_coverage(files or None))
+        return 0
+    if not files:
+        print("usage: vg outline <file.py> [--min-lines N] | vg outline --coverage [package ...]")
+        return 2
+    path = Path(files[0])
+    if not path.exists():
+        print(f"No such file: {path}")
+        return 1
+    print(render_outline(path, outline(path), min_lines))
+    return 0
+
+
 def main(argv: list[str]) -> int:
     if not argv:
         return _delegate(["--help"], canonical_settings=False)
     subcommand = argv[0]
     if subcommand == "tests":
         return _static_tests(argv[1:])
+    if subcommand == "outline":
+        return _static_outline(argv[1:])
+    if subcommand == "docs":
+        return _static_docs(argv[1:])
     if subcommand == "map":
         if len(argv) > 1 and argv[1] in maps.STATIC_MAPS and "--app" not in argv:
             return _static_map(argv)

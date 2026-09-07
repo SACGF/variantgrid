@@ -20,6 +20,7 @@ def init_session(session_key):
 
 
 class Command(BaseCommand):
+    category = "ops"
     help = "Kill all active sessions"
 
     def handle(self, *args, **options):

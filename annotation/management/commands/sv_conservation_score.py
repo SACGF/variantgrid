@@ -21,6 +21,7 @@ from snpdb.models.models_genome import GenomeBuild
 
 
 class Command(BaseCommand):
+    category = "import"
     help = "Score SV conservation (phastCons/phyloP max) with pyBigWig (#1657)"
 
     def add_arguments(self, parser):

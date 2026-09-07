@@ -1,3 +1,10 @@
+"""
+snpdb's Django forms: the BaseForm / BaseModelForm variants that drop the ':' label suffix, the
+autocomplete-backed pickers (user, lab, genome build via GenomeBuildAutocompleteForwardMixin), the
+Lab / Organization / VCF / user settings model forms (ROFormMixin gives read-only rendering), the
+Guardian GroupPermissionForm, and manual variant entry. VCFForm hides unused sample-field columns, so
+not every model field is on the form.
+"""
 import collections
 from functools import cached_property
 

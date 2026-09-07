@@ -67,6 +67,8 @@ Gotchas:
 - A plain script needs `DJANGO_SETTINGS_MODULE` set explicitly (e.g. `variantgrid.settings.env.vgtest2`);
   `variantgrid/settings/__init__.py` otherwise derives the module from the hostname (`vg-test2` → `vgtest2`,
   `env_developers/` checked before `env/`) and only logs an error when no file matches.
+- `library/vg/inspect/__init__.py:inspect` opens `transaction.atomic()` and calls `set_rollback(True)` only after the
+  inspector returns: marking rollback first makes Django refuse every query in the block (TransactionManagementError).
 Tests: `TEST_RUNNER` is `variantgrid/test_runner.py:VariantGridTestRunner`, which swaps `ClinGenAlleleRegistryAPI`
 and `TranscriptSequenceFetcher` for recorded mocks that raise, naming the fixture to add, when asked for anything
 unrecorded; `FastaRecordingRunner` regenerates the sparse test fastas. Page tests extend

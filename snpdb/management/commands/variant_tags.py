@@ -47,6 +47,8 @@ def get_duplicate_variant_tags_qs() -> QuerySet[VariantTag]:
 
 
 class Command(BaseCommand):
+    category = "maintenance"
+
     def add_arguments(self, parser):
         subparsers = parser.add_subparsers(dest="subcommand", required=True)
         merge_parser = subparsers.add_parser(

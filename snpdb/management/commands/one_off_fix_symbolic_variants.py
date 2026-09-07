@@ -23,6 +23,8 @@ class Command(BaseCommand):
 
         This will try and fix them
     """
+    category = "one-off"
+
     def add_arguments(self, parser):
         parser.add_argument('--dry-run', action='store_true')
 

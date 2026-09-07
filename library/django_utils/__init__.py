@@ -1,3 +1,11 @@
+"""
+Small Django helpers with no model of their own: `require_superuser` / RequireSuperUserView, field
+and choice display formatting (get_expanded_field, get_choices_formatter), Q helpers for name
+searches, timezone and form read-only utilities, `thread_safe_unique_together_get_or_create`,
+related-object introspection (related_objects, object_relations) and the SortMetaOrderingMixin /
+SortByPKMixin that let model instances sort like their querysets. Permission checks live in
+guardian_permissions_mixin.py, partitioning in django_partition.py, test bases in unittest_utils.py.
+"""
 import datetime
 import operator
 import os

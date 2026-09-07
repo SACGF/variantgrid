@@ -6,6 +6,7 @@ from snpdb.user_awards import get_award_definitions
 
 
 class Command(BaseCommand):
+    category = "ops"
     help = "Recompute user titles and badges (#1819) - the beat task does this hourly/nightly"
 
     def add_arguments(self, parser):

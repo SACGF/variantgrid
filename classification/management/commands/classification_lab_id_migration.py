@@ -48,6 +48,7 @@ class LabRecordIdCalculator:
 
 
 class Command(BaseCommand):
+    category = "one-off"
 
     def add_arguments(self, parser):
         parser.add_argument('--lab', type=str, required=True)

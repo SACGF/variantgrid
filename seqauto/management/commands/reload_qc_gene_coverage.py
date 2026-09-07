@@ -17,6 +17,7 @@ from snpdb.models import DataState
 
 
 class Command(BaseCommand):
+    category = "maintenance"
 
     def add_arguments(self, parser):
         parser.add_argument('--all', action='store_true', required=False)

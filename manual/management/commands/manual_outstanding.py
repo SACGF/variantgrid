@@ -12,6 +12,7 @@ class Command(BaseCommand):
     """
     To be called via the migrator.py program
     """
+    category = "ops"
 
     def add_arguments(self, parser: CommandParser):
         pass

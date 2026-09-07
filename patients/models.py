@@ -1,3 +1,11 @@
+"""
+Patients and the material taken from them: Patient (phenotype text matched to ontology terms),
+Specimen (one tissue at one timepoint), Extraction (nucleic acid off a specimen) and
+SpecimenMeasure, all Guardian-permissioned and optionally externally managed (ExternalPK /
+ExternallyManagedModel). ExtractionMatchMixin is how a Sample claims its extraction before the
+records exist. Patient modifications and imports are audited rows; clinicians and patient records
+complete the set.
+"""
 import os
 from typing import Optional
 

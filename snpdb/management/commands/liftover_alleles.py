@@ -6,6 +6,7 @@ from snpdb.tasks.liftover_tasks import liftover_alleles
 
 
 class Command(BaseCommand):
+    category = "ops"
     help = "Lifts over any alleles not in both genome builds"
 
     def handle(self, **options):

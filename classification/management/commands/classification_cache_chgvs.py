@@ -21,6 +21,7 @@ class ConversionSize:
 
 
 class Command(BaseCommand):
+    category = "maintenance"
 
     def handle(self, *args, **options):
         conversions = []

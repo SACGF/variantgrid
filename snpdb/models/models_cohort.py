@@ -1,3 +1,13 @@
+"""
+Cohorts and packed genotypes. Cohort orders a set of Samples (every VCF has one automatically; custom
+cohorts pick across VCFs, sub-cohorts share a parent's packing); CohortSample carries the packed
+index; CohortGenotypeCollection is one partition table per (cohort, version) - split into a common and
+an uncommon side by CohortGenotypeCommonFilterVersion - and CohortGenotype is one row per variant
+with every sample packed into arrays and the samples_zygosity string. Membership changes go through
+Cohort.set_samples (one version bump); query genotypes with CohortGenotypeCollection.get_annotation_kwargs
+and get_zygosity_q. Trio, Quad and Duo (FamilyGroupMixin) are the named family structures. The
+build task is snpdb/tasks/cohort_genotype_tasks.py.
+"""
 import logging
 from functools import cached_property
 from typing import Optional, Union

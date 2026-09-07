@@ -21,6 +21,8 @@ class Command(BaseCommand):
         By variant so we only need to do that once
 
     """
+    category = "one-off"
+
     def _update_annotation(self, v: Variant, variant_coordinate: VariantCoordinate, matcher,
                            records, klass, hgvs_c: Optional[str]):
         va_list = []

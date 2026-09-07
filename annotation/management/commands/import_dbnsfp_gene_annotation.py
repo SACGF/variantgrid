@@ -10,6 +10,7 @@ from library.utils import file_sha256sum
 
 
 class Command(BaseCommand):
+    category = "import"
     COLUMNS_TO_FIELDS = {
         "Essential_gene_CRISPR": "essential_gene_crispr",
         "Essential_gene_CRISPR2": "essential_gene_crispr2",

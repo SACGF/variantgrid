@@ -5,6 +5,7 @@ from flags.models import Flag, FlagComment, FlagResolution, FlagStatus, FlagType
 
 
 class Command(BaseCommand):
+    category = "ops"
 
     def add_arguments(self, parser):
         parser.add_argument('--user_id', type=int, default=0)

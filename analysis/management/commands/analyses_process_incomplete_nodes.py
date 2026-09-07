@@ -8,6 +8,8 @@ from analysis.models.nodes.node_utils import update_analysis
 
 
 class Command(BaseCommand):
+    category = "ops"
+
     def add_arguments(self, parser):
         parser.add_argument('--max-queue', type=int, default=200, help='Max number of queued nodes')
 

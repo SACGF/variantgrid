@@ -37,6 +37,7 @@ class Command(BaseCommand):
             * set classification.sample (will be used in auto populate)
             * Auto populate - classification_auto_populate_fields
     """
+    category = "import"
 
     def add_arguments(self, parser):
         parser.add_argument('--max-records', type=int, default=1,  # TODO: Remove after testing ok

@@ -1,3 +1,11 @@
+"""
+Per-user preferences and their layering: SettingsOverride rows at Global, Organization, Lab and
+User level are merged by `UserSettings.get_for_user` (later wins) into the UserSettings dataclass -
+default build, columns, initial permission groups, tag colours, node count settings. Also the
+small per-user state models (UserGridConfig, UserPageAck, AllVariantsFilter, UserContact) and
+UserPreview / AvatarDetails for display. Read preferences through get_for_user, never the override
+rows directly.
+"""
 import dataclasses
 from collections import defaultdict
 from collections.abc import Iterable

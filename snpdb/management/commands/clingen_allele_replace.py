@@ -8,6 +8,8 @@ from snpdb.models import ClinGenAllele, Variant
 
 
 class Command(BaseCommand):
+    category = "maintenance"
+
     def add_arguments(self, parser):
         parser.add_argument('--indels', action='store_true', help='Only retrieve indels')
         parser.add_argument('--before-date', type=date.fromisoformat, help='Date (ISO)')

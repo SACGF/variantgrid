@@ -1,3 +1,13 @@
+"""
+The annotation version models and the annotation itself. SubVersionPartition is the base for every
+per-version partitioned table (ClinVarVersion, GeneAnnotationVersion, HumanProteinAtlasAnnotationVersion,
+VariantAnnotationVersion); AnnotationVersion bundles one of each per build and is what analyses pin;
+AnnotationRangeLock / AnnotationRun are one batch of variants through VEP; VariantAnnotation (the
+representative transcript row) and VariantTranscriptAnnotation (every transcript) hold the columns
+VEPColumnDef writes. Query a version's rows through annotation/annotation_version_querysets.py,
+never VariantAnnotation.objects directly. Enums are in models_enums.py and damage_enums.py;
+annotation/CLAUDE.md has the rules. Large: use `scripts/vg outline`.
+"""
 import logging
 import os
 import re

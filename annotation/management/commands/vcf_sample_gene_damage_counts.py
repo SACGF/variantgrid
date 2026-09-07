@@ -26,6 +26,7 @@ def launch_task_for_vcf(gene_count_type, vcf):
 
 
 class Command(BaseCommand):
+    category = "maintenance"
 
     def add_arguments(self, parser):
         parser.add_argument('--all', action='store_true', default=False)

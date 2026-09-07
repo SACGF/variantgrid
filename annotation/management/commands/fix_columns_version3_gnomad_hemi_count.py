@@ -5,6 +5,8 @@ from annotation.models import VariantAnnotation, VariantAnnotationVersion
 
 
 class Command(BaseCommand):
+    category = "one-off"
+
     def handle(self, *args, **options):
         for vav in VariantAnnotationVersion.objects.filter(gnomad='4.0', columns_version=3):
             print(f"Updating {vav} with gnomad_hemi_count")

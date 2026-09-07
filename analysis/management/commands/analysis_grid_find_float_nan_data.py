@@ -16,6 +16,8 @@ from snpdb.models import CustomColumnsCollection, GenomeBuild
 class Command(BaseCommand):
     """ Occasionally we run into a JSON serialization issue because some data was inserted without
         converting np.nan to None - this looks for it: """
+    category = "dev"
+
     def handle(self, *args, **options):
         genome_build = GenomeBuild.grch38()
         annotation_version = AnnotationVersion.latest(genome_build)

@@ -25,6 +25,8 @@ class Command(BaseCommand):
         Now we want to make an AlleleLiftover for each Allele - that shows what was responsible for it
 
     """
+    category = "one-off"
+
     def add_arguments(self, parser):
         parser.add_argument('--dry-run', action='store_true')
 

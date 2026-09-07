@@ -1,3 +1,10 @@
+"""
+The analysis grids: VariantGrid (the node variant grid - AbstractVariantGrid with the node's
+queryset, count and sample columns) and ExportVariantGrid for unpaged CSV/VCF export, plus the
+DatatableConfig tables for analyses, templates, node issues, node column summaries, gene lists
+and ontology genes inside a node, karyomapping, the audit log and candidate search runs. Grid
+plumbing is snpdb/views/datatable_view.py; columns come from the user's CustomColumnsCollection.
+"""
 import operator
 from collections import defaultdict
 from collections.abc import Callable, Iterator

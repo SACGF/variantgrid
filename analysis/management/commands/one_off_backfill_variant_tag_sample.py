@@ -17,6 +17,8 @@ from analysis.variant_tag_operations import get_sample_for_variant_tag
 
 
 class Command(BaseCommand):
+    category = "one-off"
+
     def add_arguments(self, parser):
         parser.add_argument('--dry-run', action='store_true',
                             help="Report what would be set without changing anything")

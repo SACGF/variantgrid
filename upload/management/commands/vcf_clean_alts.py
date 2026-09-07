@@ -14,6 +14,7 @@ from library.genomics.vcf_utils import parse_vcf_info_column
 
 
 class Command(BaseCommand):
+    category = "maintenance"
     ALT_CONVERSION = {
         # This should all be in upper case
         "<DUP:TANDEM>": "<DUP>",

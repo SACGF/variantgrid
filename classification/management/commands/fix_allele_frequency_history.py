@@ -5,6 +5,7 @@ from classification.models import Classification
 
 
 class Command(BaseCommand):
+    category = "one-off"
 
     def handle(self, *args, **options):
         print("Reviewing every classification, this may take some time")

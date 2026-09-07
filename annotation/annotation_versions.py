@@ -1,3 +1,9 @@
+"""
+Which variants still need annotation: get_annotation_range_lock_and_unannotated_count and
+get_lowest_unannotated_variant_id decide where the next AnnotationRangeLock starts, and
+merge_pending_range_locks combines small pending locks into batch-sized ones (#2667). The scheduler
+in annotation/tasks/annotation_scheduler_task.py calls these.
+"""
 import logging
 import sys
 

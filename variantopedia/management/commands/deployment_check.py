@@ -24,6 +24,8 @@ from variantgrid.deployment_validation.vep_columns_check import check_vep_column
 
 
 class Command(BaseCommand):
+    category = "ops"
+
     def add_arguments(self, parser):
         parser.add_argument('--quiet', action='store_true', help="Suppress info message")
         parser.add_argument('--die-if-invalid', action='store_true')

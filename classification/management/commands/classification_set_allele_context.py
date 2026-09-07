@@ -10,6 +10,8 @@ from library.utils import iter_fixed_chunks
 
 class Command(BaseCommand):
 
+    category = "maintenance"
+
     @staticmethod
     def update_bucket(qs: QuerySet[Classification], allele_origin_bucket: AlleleOriginBucket):
         for count, chunk in enumerate(iter_fixed_chunks(qs.iterator(chunk_size=100), chunk_size=100)):

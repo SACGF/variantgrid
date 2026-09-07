@@ -1,856 +1,304 @@
-# VariantGrid: `analysis` Django App
-
-## Overview
-
-The `analysis` app provides an interactive, graph-based variant filtering pipeline. Users construct DAG (directed acyclic graph) workflows where nodes filter and transform variants, enabling complex multi-step analysis of genomic data. Supports single-sample, trio, cohort, and pedigree analysis modes. Results are displayed in DataTables grids with dynamic column configurations. The system is built on `django-dag` for graph structure and Celery for asynchronous execution of node computations.
-
----
-
-## 1. PURPOSE
-
-The `analysis` app is the core interactive analysis engine of VariantGrid. It allows users to:
-
-- Build visual graph workflows where each node represents a filtering or transformation step applied to genomic variants.
-- Chain nodes together to form complex multi-step pipelines with branching and merging logic.
-- Analyse single samples, trios (mother/father/proband), cohorts (groups of samples), and pedigrees.
-- Save and reuse analysis workflows as **templates** that can be parameterised with new inputs.
-- Display filtered variant results in paginated, sortable, filterable DataTables grids with dynamically added columns based on node type.
-- Cache intermediate results at multiple levels (Redis, database VariantCollections) for performance.
-- Automatically trigger analyses on new VCF imports via `AutoLaunchAnalysisTemplate`.
-
-Architecturally, the app is built around a Q-object pipeline system where each node produces Django Q objects representing its filtering logic. These Q objects are composed and applied to database querysets in a staged manner to produce filtered variant result sets.
-
----
-
-## 2. CORE MODELS
-
-### `Analysis`
-Container for an analysis workflow. Defined in `analysis/models/models.py`.
-
-**Key Fields:**
-- `name` (str): Human-readable name for the analysis.
-- `description` (str): Optional extended description.
-- `genome_build` (FK to `GenomeBuild`): The genome build (GRCh37/GRCh38) the analysis operates on.
-- `user` (FK to `User`): Owner of the analysis.
-- `custom_columns_collection` (FK): Column configuration for the result grid.
-- `annotation_version` (FK): Pinned annotation version used for this analysis.
-- `version` (int): Incremented to invalidate all node caches when analysis-level settings change.
-- `lock_input_sources` (bool): Prevents modification of source node inputs.
-- `visible` (bool): Controls whether the analysis appears in listings.
-- `template_type` (enum): One of `None` (normal analysis), `TEMPLATE` (reusable template), or `SNAPSHOT` (immutable snapshot of a template version).
-
-**Permissions:** Uses Guardian object-level permissions. Audit-logged via `django-auditlog`.
-
-**Methods:**
-- Methods for cloning the analysis (used by the template system).
-- Methods for retrieving the node graph structure.
-
----
-
-### `AnalysisLock`
-Tracks the history of lock and unlock actions on an analysis.
-
-**Fields:**
-- `analysis` (FK to `Analysis`)
-- `locked` (bool): Whether the action was a lock (`True`) or unlock (`False`).
-- `date` (datetime): Timestamp of the action.
-
----
-
-### `AnalysisNodeCountConfiguration`
-OneToOne with `Analysis`. Defines which count types are displayed in the node count badges on the graph UI.
-
-**Count types include:** TOTAL, CLINVAR, OMIM, and other domain-specific category counts, plus one per
-tag (`tag_<tag id>`, @see `TagFilter`). `Analysis.node_count_auto_add_tags` adds/removes a tag's count as
-variants in the analysis are tagged/untagged (#21).
-
----
-
-### `AnalysisVariable`
-Extracts specific node fields as templatable variables, enabling analysis templates to expose fields that callers must populate when instantiating the template.
-
-**Fields:**
-- `node` (FK to `AnalysisNode`): The node containing the field.
-- `field` (str): The field name on the node (e.g. `sample`).
-- `class_name` (str): The fully qualified class name of the field's type (e.g. `snpdb.Sample`), used for type-safe population of values.
-
-**Example:** A `SampleNode` with its `sample` field marked as an `AnalysisVariable` means any template run must provide a `Sample` object for that slot.
-
----
-
-### `AnalysisTemplate`
-A locked-down, reusable analysis workflow.
-
-**Fields:**
-- `name` (unique str): Identifier for the template.
-- `analysis` (OneToOne FK to `Analysis`): The live template analysis (with `template_type=TEMPLATE`).
-- `user` (FK): Owner/author.
-- `deleted` (bool): Soft-delete flag.
-- `active` (property): The `AnalysisTemplateVersion` with `active=True`, or `None`.
-- `draft` (property): The latest version when it hasn't been activated, or `None`.
-
-**Key Methods:**
-- `new_version()`: Creates an immutable snapshot of the current template state and registers it as a new `AnalysisTemplateVersion`. The snapshot has `template_type=SNAPSHOT`. The new version is a **draft** - `activate()` is what makes it live.
-- `requires_sample_somatic` (property): Whether any source node requires a somatic sample.
-- `requires_sample_gene_list` (property): Whether any source node requires a gene list.
-
----
-
-### `AnalysisTemplateVersion`
-Represents a specific versioned snapshot of an `AnalysisTemplate`.
-
-**Fields:**
-- `version` (int): Monotonically increasing version number within the template.
-- `analysis_snapshot` (OneToOne FK to `Analysis`): The immutable snapshot analysis.
-- `active` (bool): Only one version per template can be active at a time - the one everyone who can view the template runs. `activate()` is the only thing that sets it, clearing the flag on the template's other versions. A version that isn't active but is the latest is a **draft** (`is_draft`), runnable only by people who can write the template. `filter_for_user()` returns exactly those two sets.
-- `analysis_name_template` (str): A Python string template used to name analyses created from this version. Example: `"%(template)s for %(input)s"`.
-- `appears_in_autocomplete` (bool): Controls whether this template version shows up in autocomplete suggestions.
-- `appears_in_links` (bool): Controls whether this template version appears in quick-launch link lists.
-
-**Note:** Uses `PROTECT` foreign key constraint to prevent deletion of snapshots that are referenced by runs.
-
----
-
-### `AnalysisTemplateRun`
-Created when a user instantiates a template to run it against specific inputs.
-
-**Fields:**
-- `template_version` (FK to `AnalysisTemplateVersion`): The template version being run.
-- `analysis` (FK to `Analysis`): The newly cloned analysis created for this run.
-
-**Factory:** `AnalysisTemplateRun.create()` clones the snapshot analysis into a new editable analysis, then calls `populate_arguments()` to validate and set all `AnalysisVariable` values.
-
----
-
-### `AnalysisTemplateRunArgument`
-Stores the populated values for each `AnalysisVariable` in a template run.
-
-**Fields:**
-- `variable` (FK to `AnalysisVariable`): The variable being populated.
-- `object_pk` (str): Primary key of the object being assigned (serialised as string for generic FK support).
-- `value` (str): String representation of the assigned value.
-- `error` (str): Error message if population failed validation.
-
----
-
-### `AnalysisNode` (Base Class)
-The central abstract base class for all node types. Uses `django-dag` for graph structure. All concrete node types extend this class.
-
-**Positional/Display Fields:**
-- `analysis` (FK to `Analysis`)
-- `name` (str): Display name of the node.
-- `x`, `y` (int): Canvas position coordinates for the graph editor UI.
-- `visible` (bool): Whether the node is shown in the graph.
-- `output_node` (bool): Marks nodes whose results are displayed in the main result grid.
-- `auto_node_name` (bool): Whether the name is auto-generated from node configuration.
-- `appearance_version` (int): Incremented when display-only properties change (avoids full cache invalidation).
-- `shadow_color` (str): Visual styling hint for the node on the canvas.
-
-**Execution State Fields:**
-- `version` (int): Incremented when node configuration changes (cache invalidation key).
-- `ready` (bool): Whether the node has been computed and results are available.
-- `valid` (bool): Whether the node configuration is currently valid.
-- `count` (int, nullable): The number of variants passing through this node.
-- `errors` (JSONField): Validation/execution errors.
-- `load_seconds` (float): Last recorded execution time.
-- `cloned_from` (FK to `NodeVersion`): Tracks provenance when nodes are cloned from templates.
-- `status` (`NodeStatus` enum): Current execution state. Values:
-  - `DIRTY`: Configuration changed, needs recomputation.
-  - `QUEUED`: Celery task submitted, waiting to execute.
-  - `LOADING_CACHE`: Pre-caching variant collection.
-  - `LOADING`: Actively computing.
-  - `READY`: Computation complete, results available.
-  - `ERROR_CONFIGURATION`: Node has invalid configuration.
-  - `ERROR_WITH_PARENT`: A parent node has an error blocking this node.
-  - `ERROR_TECHNICAL`: Unexpected technical error during computation.
-  - `CANCELLED`: Task was cancelled (e.g. superseded by newer version).
-
-**Graph Configuration Fields:**
-- `min_inputs` (int): Minimum number of parent nodes required (0 for source nodes, 1 for filter nodes).
-- `max_inputs` (int): Maximum number of parent nodes allowed (`PARENT_CAP_NOT_SET` for unlimited).
-- `uses_parent_queryset` (bool): Whether this node builds on the parent's queryset.
-- `disabled` (bool): Temporarily disables the node without removing it from the graph.
-- `queryset_requires_distinct` (bool): Whether the resulting queryset must apply `.distinct()`.
-
-**Key Methods:**
-- `_get_node_q()`: **Primary override point for subclasses.** Returns the Q object representing this node's filtering logic (without parent filters). Must be implemented by all concrete node types.
-- `_get_node_arg_q_dict()`: Returns an `arg_q_dict` (see Q Object System section) for this node's own filters.
-- `get_arg_q_dict(disable_cache=False)`: Composes parent and own arg_q_dicts. Caches the result in Redis using the node's version as part of the cache key. Returns `dict[Optional[str], dict[str, Q]]`.
-- `get_queryset()`: Applies annotation kwargs and Q filters from the composed arg_q_dict in stages, grouped to prevent double-joins. Returns a Django queryset of variants.
-- `_get_model_queryset()`: Returns the base queryset (typically `Variant.objects.filter(...)`) before node-specific filters are applied.
-- `_get_node_contigs()`: Returns the set of contigs (chromosomes) relevant to this node, used for optimisation.
-- `get_parent_subclasses()`: Returns the concrete subclass instances of all parent nodes.
-- `bump_version()`: Increments `version`, which deletes the current `NodeVersion` and cascades to delete `NodeCache` and `NodeCount` entries, forcing full recomputation.
-- `load()`: Triggers the node's Celery task chain.
-- `node_counts()`: Returns variant count breakdowns by configured label types.
-
----
-
-### `AnalysisEdge`
-The concrete edge model for `django-dag`. Represents a directed connection between two nodes.
-
-**Fields:**
-- `parent` (FK to `AnalysisNode`): The upstream/source node.
-- `child` (FK to `AnalysisNode`): The downstream/consuming node.
-
-Audit-logged via `django-auditlog`.
-
----
-
-### `NodeTask`
-Tracks active Celery tasks for node computation.
-
-**Fields:**
-- `node` (FK to `AnalysisNode`)
-- `version` (int): The node version this task is computing.
-- `analysis_update_uuid` (UUID): Groups tasks belonging to the same analysis update run.
-- `celery_task` (str): Celery task ID for revocation/tracking.
-- `db_pid` (int): Database process ID for `pg_cancel_backend()` calls.
-
-**Unique constraint:** `(node, version)` - only one task per node version.
-
----
-
-### `NodeVersion`
-A version snapshot object that ties together a node and its version number. Serves as the primary key for cache entries.
-
-**Lifecycle:** Deleted when `node.bump_version()` is called, which cascades to delete all `NodeCache` and `NodeCount` entries for that version, ensuring cache invalidation.
-
----
-
-### `NodeCache`
-OneToOne with `NodeVersion`. Links to a `VariantCollection` that has been pre-computed and stored in the database for expensive nodes.
-
-**Fields:**
-- `node_version` (OneToOne FK to `NodeVersion`)
-- `variant_collection` (FK to `VariantCollection`): The pre-computed set of variant IDs.
-- Processing status tracking fields.
-
-Only used for nodes with `use_cache=True` (currently `VennNode` and `IntersectionNode` when using BED file collections).
-
----
-
-### `NodeCount`
-Stores variant count values grouped by label for a specific node version.
-
-**Fields:**
-- `node_version` (FK to `NodeVersion`)
-- `label` (str): Count category (e.g. `"total"`, `"clinvar"`, `"omim"`).
-- `count` (int): The count value.
-
-**Unique constraint:** `(node_version, label)`.
-
----
-
-### `NodeColumnSummaryCacheCollection`
-Caches value distribution summaries per column for a node. Used to power the column summary panel in the UI (showing top values for a column across variants in a node).
-
----
-
-### `NodeVCFFilter`
-Associates VCF FILTER tags with a node for VCF FILTER-based filtering.
-
-**Fields:**
-- `node` (FK to `AnalysisNode`)
-- `vcf_filter` (FK to `VCFFilter`, nullable): A specific FILTER tag. `None` means the PASS filter (only variants with PASS or empty FILTER field).
-
----
-
-### `NodeAlleleFrequencyFilter`
-OneToOne with `AnalysisNode`. Defines allele frequency filtering logic that can be applied to a node's variants.
-
-**Fields:**
-- `group_operation` (enum): `ANY` (OR) or `ALL` (AND) logic when multiple AF ranges are configured.
-
-**Key Methods:**
-- `get_q()`: Returns the composite Q object for all configured AF ranges.
-- `get_sample_arg_q_dict()`: Returns the arg_q_dict for sample-level AF filters, using the cohort genotype annotation alias to avoid double-joins.
-
----
-
-### `NodeAlleleFrequencyRange`
-An individual allele frequency range constraint within a `NodeAlleleFrequencyFilter`.
-
-**Fields:**
-- `node_allele_frequency_filter` (FK to `NodeAlleleFrequencyFilter`)
-- `min_af` (float, nullable): Minimum allele frequency (inclusive).
-- `max_af` (float, nullable): Maximum allele frequency (exclusive).
-- Population source (which AF column to apply the range to).
-
----
-
-## 3. Q OBJECT SYSTEM (Core Filtering Mechanism)
-
-### `arg_q_dict` Structure
-
-The Q object system is the heart of the filtering pipeline. Each node produces an `arg_q_dict` of the form:
-
-```python
-dict[Optional[str], dict[str, Q]]
-```
-
-The outer key is an **annotation alias** (or `None`):
-- `None`: Filters that apply directly to the base `Variant` queryset with no extra annotation. Always applied.
-- `"cohort_genotype_alias"` (e.g. `"cga_12345"`): Filters that require the `CohortGenotypeCollection` annotation. Grouped to a single annotation call to avoid duplicate expensive JOIN operations.
-- `"variant_transcript_annotation"`: Filters that require joining to the transcript annotation table.
-
-The inner dict maps **argument names** (strings, typically the field path) to **Q objects** representing the filter condition.
-
-**Example:**
-
-```python
-{
-    None: {
-        "variant__locus__contig__genomebuild": Q(variant__locus__contig__genomebuild=build),
-    },
-    "cohort_genotype_alias": {
-        "zygosity_het": Q(cohort_genotype_alias__samples_zygosity__contains=HET_MASK),
-    },
-}
-```
-
-### Composition
-
-`get_arg_q_dict()` composes the parent node's `arg_q_dict` with this node's own `_get_node_arg_q_dict()` result. For nodes with `uses_parent_queryset=True`, Q objects are merged by annotation key.
-
-### Caching
-
-`get_arg_q_dict(disable_cache=False)` caches the result in Redis:
-- **Cache key format:** `{node_version_id}:q_cache={disable_cache}`
-- The version-based key means cache is automatically invalidated when `bump_version()` creates a new `NodeVersion`.
-
-### Queryset Application
-
-`get_queryset()` takes the composed `arg_q_dict` and:
-1. Groups Q objects by annotation alias.
-2. Calls `queryset.annotate(**annotation_kwargs)` for each alias group.
-3. Applies the Q filters for that group via `queryset.filter(Q(...))`.
-4. Handles `queryset_requires_distinct` to add `.distinct()` when needed.
-5. Returns the final queryset of `Variant` objects (or related model rows).
-
-This staged approach ensures each expensive JOIN annotation is only added once, regardless of how many filter conditions use that annotation.
-
----
-
-## 4. ALL NODE TYPES
-
-### Source Nodes (`min_inputs=0`)
-
-These nodes produce variant sets from data sources without requiring parent input.
-
-#### `SampleNode`
-Loads variants from a single `Sample` object. The most fundamental source node.
-
-**Key Fields:**
-- `sample` (FK to `Sample`): The sample to load variants from.
-- `sample_gene_list` (FK): Optional gene list to restrict variants.
-- `restrict_to_qc_gene_list` (bool): Whether to restrict to QC-defined gene list.
-- `min_ad` (int): Minimum allelic depth.
-- `min_dp` (int): Minimum read depth.
-- `min_gq` (int): Minimum genotype quality.
-- `max_pl` (int): Maximum phred-scaled likelihood.
-- `zygosity_ref` / `zygosity_het` / `zygosity_hom` / `zygosity_unk` (bool): Which zygosity classes to include.
-
-**Filtering:** Builds the `arg_q_dict` with:
-- Zygosity filter Q objects under the `cohort_genotype_alias` key (avoids re-joining the `CohortGenotype` table).
-- Genotype quality (`gq`, `dp`, `ad`) filter Q objects.
-- `NodeAlleleFrequencyFilter` Q objects if configured.
-
-#### `TrioNode`
-Filters variants by Mendelian inheritance patterns within a trio (proband + mother + father).
-
-**Key Fields:**
-- `trio` (FK to `Trio`): The trio being analysed.
-- `inheritance` (`TrioInheritance` enum):
-  - `RECESSIVE`: Both parents het, proband hom-alt.
-  - `COMPOUND_HET`: Two different het variants in the same gene, one from each parent.
-  - `DOMINANT`: At least one parent affected, proband het or hom-alt.
-  - `DENOVO`: Neither parent has the variant, proband does.
-  - `XLINKED_RECESSIVE`: Recessive on the X chromosome.
-- `require_zygosity` (bool): Strictly enforce zygosity expectations.
-
-**Compound Het Complexity:** The `COMPOUND_HET` mode is the most computationally expensive. It identifies genes where the proband has two or more het variants and each parent contributes a different one (i.e. one het from mum, one het from dad). This requires a self-join or subquery on the gene annotation to find variants that co-occur in the same gene.
-
-#### `CohortNode`
-Filters variants from a `Cohort` (a named group of samples).
-
-**Key Fields:**
-- `cohort` (FK to `Cohort`)
-- `zygosity` (`SimpleZygosity`): HET, HOM_ALT, or both.
-- `zygosity_op` (enum): `ALL` (all samples must match) or `ANY` (at least one sample must match).
-- `accordion_panel` (enum): `COUNT` (filter by het/hom counts), `SIMPLE_ZYGOSITY`, or `PER_SAMPLE_ZYGOSITY` (individual sample zygosity filters).
-- Per-sample filter fields for the `PER_SAMPLE_ZYGOSITY` mode.
-
-**Dynamic Columns:** Adds `ref_count`, `het_count`, `hom_count` annotation columns to the result grid, showing zygosity distribution across cohort samples.
-
-#### `PedigreeNode`
-Similar to `TrioNode` but operates on a `Pedigree` object that can contain any number of related individuals. Supports the same inheritance modes but with more flexible family structures.
-
-#### `ClassificationsNode`
-Loads variants that have associated `Classification` objects (clinical variant classifications). Queries `Classification` objects filtered by criteria such as clinical significance and links back to variants.
-
-#### `AllVariantsNode`
-Returns all variants in the genome build without any source-level filtering. Typically used as a starting point when the goal is to filter down from the entire variant catalogue.
-
----
-
-### Filter Nodes (`min_inputs=1`)
-
-These nodes take the variant set from their parent node(s) and apply additional filtering.
-
-#### `FilterNode`
-Generic column-based filtering using the grid engine's filter JSON format.
-
-**Mechanism:** The filter builder UI (`variantgrid_filter_builder.js`) sends filter rules as JSON (column name, operator, value). `FilterNode` deserialises this JSON and converts it to Django Q objects, supporting operators like `eq`, `ne`, `lt`, `gt`, `bw` (begins with), `cn` (contains), `in`, etc.
-
-This is the most flexible filter node, allowing users to filter on any column available in the analysis grid.
-
-#### `ZygosityNode`
-Filters variants by zygosity for a specific sample.
-
-**Key Fields:**
-- `sample` (FK to `Sample`)
-- `zygosity` (enum): `HET`, `HOM_ALT`, `MULTIPLE_HIT`, etc.
-- `exclude` (bool): Inverts the filter (exclude variants with this zygosity).
-
-**Multiple Hit Mode:** `MULTIPLE_HIT` queries `gene_counts` to find genes where the sample has two or more hits (relevant for compound het analysis without the full trio structure).
-
-#### `TagNode`
-Filters variants by variant tags applied by users.
-
-**Key Fields:**
-- `parent_input` (bool): If True, only considers tags applied within the current analysis context; if False, considers tags globally.
-- `exclude` (bool): Inverts the filter (excludes tagged variants).
-- `mode` (enum): `THIS_ANALYSIS` (tags in this analysis only) or `ALL_TAGS` (tags in any analysis).
-
-**Implementation:** Queries `VariantTag` objects and builds Q objects on variant PKs.
-
-#### `PhenotypeNode`
-Filters variants to those in genes associated with phenotypes or diseases.
-
-**Key Fields:**
-- `text_phenotype` (str): Free-text phenotype search.
-- `patient` (FK to `Patient`): If set, uses the patient's recorded phenotypes.
-- `accordion_panel` (enum): `ONTOLOGY` (HPO/OMIM/MONDO terms) or `TEXT` (free text search).
-- `phenotypenodeontologyterm_set`: Related set of specific ontology terms (HPO, OMIM, MONDO) with their match mode.
-
-**Mechanism:**
-1. Resolves ontology terms (HPO/OMIM/MONDO) to associated gene lists using the ontology database.
-2. Free-text mode searches gene names, phenotype descriptions.
-3. Builds a Q object on `VariantTranscriptAnnotation.gene_symbol` (or gene ID) using the `variant_transcript_annotation` annotation alias key.
-
-#### `GeneListNode`
-Filters variants to those falling within genes in one or more gene lists.
-
-**Key Fields:**
-- Links to `GeneList` objects (user-created or imported).
-- Links to PanelApp panels (via PanelApp integration).
-
-**Mechanism:** Resolves gene lists to sets of gene symbols/IDs, then builds a Q on the transcript annotation gene field.
-
-#### `PopulationNode`
-Filters variants by gnomAD (or other population database) allele frequency.
-
-**Key Fields:**
-- gnomAD AF thresholds (overall and per-population sub-group).
-- Which gnomAD dataset (exomes, genomes).
-- Frequency comparison operator (less than, greater than, etc.).
-
-#### `ConservationNode`
-Filters variants by evolutionary conservation scores (e.g. GERP, PhyloP, SiPhy).
-
-#### `TissueNode`
-Filters genes by tissue expression data. Allows restricting to variants in genes expressed in a specified tissue (e.g. using GTEx data).
-
-#### `DamageNode`
-Filters variants by in-silico pathogenicity prediction scores (e.g. CADD, SIFT, PolyPhen). Applies thresholds to prediction score columns in the annotation.
-
-#### `AlleleFrequencyNode`
-Filters variants by allele frequency from multiple population databases (gnomAD, UK Biobank, etc.) with a configurable filter structure. Distinct from `PopulationNode` in that it uses the `NodeAlleleFrequencyFilter` / `NodeAlleleFrequencyRange` mechanism.
-
-#### `BuiltInFilterNode`
-Applies predefined, named filter sets maintained by the system. Examples:
-- `CLINVAR`: Restrict to variants with ClinVar significance annotations.
-- `OMIM`: Restrict to variants in OMIM disease genes.
-
-**Mechanism:** Maps built-in filter names to pre-defined Q object factory functions.
-
-#### `MOINode`
-Filters variants by Mode of Inheritance (MOI) using ontology terms (HP:000XXXX terms for inheritance modes).
-
-**Mechanism:** Resolves MOI ontology terms to gene lists (via the ontology database which links MOI terms to OMIM gene-disease records) and filters accordingly.
-
-#### `SelectedInParentNode`
-Filters variants to only those that were manually selected (marked/highlighted) by the user in the parent node's result grid.
-
-**Mechanism:** Queries a per-node selection state stored in the database and builds a Q on variant PKs.
-
----
-
-### Multi-Input Nodes
-
-These nodes combine or intersect results from multiple parent nodes.
-
-#### `MergeNode`
-Combines variants from multiple parent nodes using set union (OR logic).
-
-**Configuration:**
-- `min_inputs=1`, `max_inputs=PARENT_CAP_NOT_SET` (unlimited parents).
-
-**Optimisation:** If the total combined count is at or below `ANALYSIS_NODE_STORE_ID_SIZE_MAX`, the variant IDs are stored explicitly and the Q object becomes a simple `variant_id__in=[...]` lookup. For larger result sets, the individual parent querysets are OR-combined.
-
-#### `VennNode`
-Performs set operations on exactly two parent nodes.
-
-**Configuration:**
-- Requires exactly 2 parents.
-- `use_cache=True`: Pre-computes and caches the three regions (A-only, B-only, intersection).
-
-**Operations:**
-- `INTERSECTION`: Variants in both A and B.
-- `UNION`: Variants in either A or B.
-- `A_NOT_B`: Variants in A but not B.
-- `B_NOT_A`: Variants in B but not A.
-
-**Caching:** Pre-computes a `VennNodeCache` (or `NodeCache` with `VariantCollection`) containing the set memberships, so that changing the operation (e.g. from INTERSECTION to A_NOT_B) only requires switching which pre-computed set to use, not re-running the parent queries.
-
-#### `IntersectionNode`
-Filters variants to those falling within specified genomic intervals (regions).
-
-**Key Fields:**
-- `genomic_intervals_collection` (FK to `GenomicIntervalsCollection`): A BED-format interval set.
-- `hgvs_string` (str): HGVS coordinates for manual interval specification.
-- `accordion_panel` (enum): `SELECTED`, `CUSTOM` (user-drawn intervals), `HGVS`, or `BACKEND_KIT` (sequencing kit capture regions).
-
-**Caching:** `use_cache=True`. The `write_cache()` method performs a genomic interval intersection using a `bedtools intersect` subprocess call, piping variant coordinates through `intersectBed` to find overlapping variants. The result is stored as a `VariantCollection` in the database.
-
----
-
-## 5. CACHING SYSTEM
-
-The analysis app uses three distinct caching levels, each targeting a different granularity:
-
-### Level 1: Redis Q-Object Cache
-
-**What is cached:** The serialised `arg_q_dict` (composed Q object dictionary) for each node.
-
-**Cache key format:** `{node_version_id}:q_cache={disable_cache}`
-
-**Purpose:** Avoids recomputing the composition of parent and child Q objects on every grid page request. Since the Q composition can involve traversing the entire ancestor chain and merging complex Q objects, caching this result in Redis provides significant speed improvements for large graphs.
-
-**Invalidation:** Automatic. When `bump_version()` creates a new `NodeVersion`, the old version ID is no longer valid and its Redis entries are simply never looked up again (they expire naturally via TTL, or are replaced when the new version is computed).
-
-### Level 2: VariantCollection Cache (Database)
-
-**What is cached:** The actual set of variant IDs (as a `VariantCollection`) for nodes with `use_cache=True`.
-
-**Models involved:** `NodeCache` (OneToOne with `NodeVersion`), `VariantCollection`.
-
-**Nodes using this level:** `VennNode`, `IntersectionNode` (when using BED file collections).
-
-**Purpose:** For nodes requiring expensive operations (bedtools subprocess, complex set intersection of large variant collections), the resulting variant IDs are stored in the database as a `VariantCollection`. Subsequent queryset builds for this node simply query `variant_id IN (SELECT variant_id FROM variant_collection_records WHERE collection_id=...)`.
-
-**Invalidation:** When `bump_version()` deletes the `NodeVersion`, the `NodeCache` is cascade-deleted. The associated `VariantCollection` is also cleaned up.
-
-### Level 3: Count Cache (Database)
-
-**What is cached:** `NodeCount` records storing variant counts by label for each `NodeVersion`.
-
-**Models involved:** `NodeCount` (FK to `NodeVersion`), `NodeColumnSummaryCacheCollection`.
-
-**Purpose:** Avoids re-running `COUNT(*)` queries against potentially large querysets on every UI refresh. The node count badges shown in the graph editor (showing how many variants pass each node) are served from this cache.
-
-**Labels:** Configurable per-analysis via `AnalysisNodeCountConfiguration`. Common labels include total count, ClinVar pathogenic count, OMIM gene count.
-
-**Invalidation:** Cascade delete from `NodeVersion` deletion. Tag counts are the exception - tagging
-doesn't bump node versions, so `node_utils.update_analysis_tag_node_counts` recounts them in place
-(restricted to the small set of tagged variants) whenever a tag changes.
-
----
-
-## 6. EXECUTION FLOW
-
-### Analysis Update Entry Point
-
-```
-update_analysis(analysis_id)
-    → delete_analysis_old_node_versions   [cleanup stale tasks/versions]
-    → create_and_launch_analysis_tasks    [single-worker serialised entry point]
-```
-
-`create_and_launch_analysis_tasks` runs on a single Celery worker (via dedicated queue or locking) to prevent race conditions when multiple concurrent events try to update the same analysis simultaneously (e.g. user edits node A and node B within milliseconds of each other).
-
-### Task Graph Construction
-
-Inside `create_and_launch_analysis_tasks`:
-1. Performs a **topological sort** of the analysis node graph using the `toposort` library.
-2. For each node that needs recomputation (status is DIRTY), creates a Celery task chain.
-3. Nodes at the same topological level can execute in **parallel** (independent branches).
-4. Nodes with parent dependencies are chained so they execute after their parents complete.
-
-### Celery Tasks
-
-Defined in `analysis/tasks/node_update_tasks.py`:
-
-**`update_node_task`** (main computation task):
-- Implements `AbortableTask` to support cancellation.
-- Calls `node.get_queryset()` to build the filtered queryset.
-- Executes the queryset to get variant counts.
-- Stores results and updates node `status` to `READY` or `ERROR_TECHNICAL`.
-- Updates `NodeVersion`, `NodeCount` entries.
-
-**`node_cache_task`** (pre-caching):
-- For nodes with `use_cache=True`.
-- Calls the node's `write_cache()` method.
-- Creates the `NodeCache` and underlying `VariantCollection`.
-- Transitions node to `LOADING` status.
-
-**`wait_for_cache_task`** (polling waiter):
-- Polls for `NodeCache` processing completion.
-- Maximum 60 checks before timing out.
-- Re-queues itself if cache is not yet ready (asynchronous polling pattern).
-
-**`wait_for_node`** (parent dependency waiter):
-- Called at the start of a child node's chain when the parent node was also being recomputed.
-- Waits until the parent node's `status` reaches `READY` before proceeding.
-- Handles parent error states by marking child as `ERROR_WITH_PARENT`.
-
-### Node Status Transitions
-
-```
-DIRTY → QUEUED           [task submitted]
-QUEUED → LOADING_CACHE   [node_cache_task starts, use_cache=True nodes]
-LOADING_CACHE → LOADING  [cache written, starting count computation]
-QUEUED/LOADING → READY   [computation complete]
-* → ERROR_CONFIGURATION  [invalid node configuration detected]
-* → ERROR_WITH_PARENT    [parent node in error state]
-* → ERROR_TECHNICAL      [unexpected exception during computation]
-* → CANCELLED            [superseded by newer version task]
-```
-
----
-
-## 7. TEMPLATE SYSTEM
-
-The template system allows saving analysis workflows as reusable, parameterised templates.
-
-### Template Creation
-
-1. User builds an analysis graph with nodes configured as desired.
-2. Fields that should be parameterised (e.g. the `sample` field on a `SampleNode`) are marked as `AnalysisVariable` instances.
-3. The `Analysis` is set to `template_type=TEMPLATE`, creating an `AnalysisTemplate` record.
-
-### Versioning a Template
-
-Calling `AnalysisTemplate.new_version()`:
-1. Clones the current template analysis into an immutable **snapshot** (`template_type=SNAPSHOT`).
-2. Creates an `AnalysisTemplateVersion` record pointing to the snapshot.
-3. Sets the new version as `active=True`, deactivating the previous active version.
-4. The snapshot cannot be modified; it serves as a reproducible baseline.
-
-### Running a Template
-
-`AnalysisTemplateRun.create(template_version, arguments)`:
-1. Clones the snapshot analysis into a new, fully editable `Analysis`.
-2. Creates an `AnalysisTemplateRun` record linking the template version to the new analysis.
-3. Calls `populate_arguments()` which iterates over `AnalysisVariable` instances and sets the corresponding node fields to the provided values.
-4. If any argument is invalid (wrong type, object not found, permission denied), stores the error in `AnalysisTemplateRunArgument.error`.
-5. Triggers `update_analysis()` to compute the new analysis.
-
-### Name Templating
-
-The `analysis_name_template` field uses Python string formatting:
-
-```python
-"%(template)s for %(input)s" % {"template": template.name, "input": sample.name}
-# Result: "Trio Analysis for Patient_001"
-```
-
-### Auto-Launch Templates
-
-`AutoLaunchAnalysisTemplate` links an `AnalysisTemplate` to:
-- An `enrichment_kit`: Only trigger for samples sequenced with this kit.
-- A `sample_regex`: Only trigger for samples whose name matches this regex.
-
-When a new VCF is imported, `auto_run_analyses_for_vcf` (Celery task) checks all `AutoLaunchAnalysisTemplate` records and automatically creates `AnalysisTemplateRun` instances for matching samples.
-
----
-
-## 8. VIEWS & URLS
-
-### Analysis List and Main View
-
-- `analyses/list/` → `AnalysesGrid`: Paginated listing of all analyses visible to the user, with Guardian permission filtering.
-- `<analysis_id>/` → `view_analysis`: The main analysis editor UI. Renders the graph canvas with nodes, edges, and the result data grid.
-
-### Node Views
-
-- `node/view/<node_id>/<version>/<extra_filters>/` → Node detail view. The `version` parameter allows the UI to detect stale views and prompt for refresh. `extra_filters` provides additional grid filter context.
-- `node/<id>/update/` → `NodeUpdate`: JSON endpoint for saving node configuration changes. Returns the new node state including version and status.
-- `node/<id>/data/` → Node data endpoint for loading node-specific configuration data into the UI.
-
-### Grid Endpoints
-
-- `node_grid/handler/` → `NodeGridHandler`: The primary data endpoint for the result table.
-  - Implements **per-user locking** with a 10-minute lock to prevent duplicate expensive queries when the same user triggers multiple rapid page requests.
-  - Caches grid responses for up to **1 week** (since results are deterministic for a given node version).
-  - Returns paginated, sorted, filtered variant rows as the DataTables JSON envelope.
-- `node_grid/cfg/` → `NodeGridConfig`: Returns the DataTables definition (columns, widths, renderers) for a specific node. Dynamic columns (e.g. sample zygosity columns for `CohortNode`, per-sample AF columns) are added based on the node type.
-- `node_grid/export/` → Export endpoint. Supports CSV and VCF export formats via Celery background tasks.
-
-### Template Views
-
-- `analysis_templates/` → Template management list view.
-- `analysis_template/<pk>/save/` → Save/version a template.
-- `templates/variable/<node_id>/` → Manage `AnalysisVariable` entries for a node.
-
-### Grid Integration
-
-The `VariantGrid` class (in `analysis/views/`) orchestrates the grid integration:
-
-- `get_colmodels()`: Produces the column configuration the DataTables adapter translates. Includes:
-  - Standard variant columns (chromosome, position, ref, alt, gene, consequence, etc.).
-  - Annotation columns (ClinVar, gnomAD, etc.).
-  - Node-type-specific dynamic columns (zygosity per sample, AF columns, count columns).
-- `get_data()`: Executes the node's queryset with pagination, sorting, and filter parameters from the grid request. Returns serialised row data.
-
----
-
-## 9. AUDIT LOG
-
-The analysis app uses `django-auditlog` to record all significant mutations.
-
-**Registered models:**
-- `Analysis`: Records analysis creation, updates, name changes, locking.
-- `AnalysisEdge`: Records edge additions and removals (graph topology changes).
-- `AnalysisNode`: Records node creation, configuration changes, deletions.
-
-**`NodeAuditLogMixin`**: A mixin applied to node-modifying views that enriches audit log entries with additional context fields:
-- `analysis_id`: The analysis containing the node.
-- `node_id`: The specific node being modified.
-
-**Audit Log URL:** `node_audit_log/<node_id>/<version>/<extra_filters>/` renders a paginated history of audit events for a specific node, useful for debugging and change tracking.
-
----
-
-## 10. CELERY TASKS
-
-All Celery tasks are defined under `analysis/tasks/`.
-
-### Node Update Tasks (`node_update_tasks.py`)
-
-| Task | Description |
-|---|---|
-| `update_node_task` | Main node computation. `AbortableTask`. Executes the node's queryset, computes counts, updates status. |
-| `node_cache_task` | Pre-caches a `VariantCollection` for nodes with `use_cache=True`. |
-| `wait_for_cache_task` | Polling waiter (max 60 iterations) that waits for `NodeCache` to finish processing. |
-| `wait_for_node` | Dependency waiter that blocks a child node's chain until its parent node reaches `READY` status. |
-| `delete_analysis_old_node_versions` | Cleans up stale `NodeVersion`, `NodeCache`, `NodeCount` entries from superseded task runs. |
-
-### Analysis Update Tasks (`analysis_update_tasks.py`)
-
-| Task | Description |
-|---|---|
-| `create_and_launch_analysis_tasks` | Serialised single-worker entry point. Performs topological sort and dispatches node task chains. |
-
-### Variant Tag Tasks (`variant_tag_tasks.py`)
-
-| Task | Description |
-|---|---|
-| `variant_tag_created_task` | Called when a `VariantTag` is created. Invalidates `TagNode` caches in affected analyses. |
-| `variant_tag_deleted_in_analysis_task` | Called when a `VariantTag` is deleted. Invalidates `TagNode` caches. |
-
-### Auto-Analysis Tasks (`auto_analysis_tasks.py`)
-
-| Task | Description |
-|---|---|
-| `auto_run_analyses_for_vcf` | Triggered on VCF import. Checks `AutoLaunchAnalysisTemplate` records and creates runs for matching samples. |
-| `auto_run_analyses_for_sample` | Triggered on sample creation. Similar logic for sample-triggered auto-launch. |
-
-### Export Tasks (`analysis_grid_export_tasks.py`)
-
-| Task | Description |
-|---|---|
-| Grid export tasks | Handles asynchronous CSV and VCF export of node result sets. Streams large result sets to file without blocking the web process. |
-
----
-
-## 11. KEY FILE LOCATIONS
-
-```
-analysis/
-├── models/
-│   ├── models.py                    # Analysis, AnalysisLock, AnalysisTemplate*, AnalysisVariable
-│   ├── analysis_node.py             # AnalysisNode base class, AnalysisEdge, NodeVersion, NodeCache, NodeCount
-│   └── nodes/
-│       ├── source_nodes/
-│       │   ├── sample_node.py       # SampleNode
-│       │   ├── trio_node.py         # TrioNode
-│       │   ├── cohort_node.py       # CohortNode
-│       │   ├── pedigree_node.py     # PedigreeNode
-│       │   └── ...
-│       └── filter_nodes/
-│           ├── filter_node.py       # FilterNode (filter rule JSON → Q)
-│           ├── phenotype_node.py    # PhenotypeNode
-│           ├── gene_list_node.py    # GeneListNode
-│           ├── venn_node.py         # VennNode
-│           ├── intersection_node.py # IntersectionNode
-│           └── ...
-├── tasks/
-│   ├── node_update_tasks.py         # update_node_task, node_cache_task, wait_for_*
-│   ├── analysis_update_tasks.py     # create_and_launch_analysis_tasks
-│   ├── variant_tag_tasks.py         # Tag invalidation tasks
-│   ├── auto_analysis_tasks.py       # AutoLaunchAnalysisTemplate tasks
-│   └── analysis_grid_export_tasks.py
-├── views/
-│   ├── views.py                     # view_analysis, AnalysesGrid, template views
-│   ├── node_view.py                 # Node update/view endpoints
-│   └── analysis_grid_view.py        # NodeGridHandler, NodeGridConfig, VariantGrid
-├── urls/
-│   └── urls.py                      # URL routing
-└── admin.py                         # Django admin registrations
-```
-
----
-
-## 12. DESIGN PATTERNS AND ARCHITECTURAL NOTES
-
-### DAG-Based Workflow
-
-The use of `django-dag` (directed acyclic graph) for the node graph structure means:
-- Parent-child relationships are stored as `AnalysisEdge` records.
-- The graph is validated to be acyclic (no cycles allowed).
-- Topological sort is straightforward and used directly in task scheduling.
-- Each node can have multiple parents (for `MergeNode`, `VennNode`) or multiple children (branching workflows).
-
-### Queryset Composition vs. Materialisation
-
-A key design decision is that most nodes compose Q objects rather than materialising intermediate results. This means:
-- For linear chains, the entire chain's filter logic is expressed as a single Django ORM queryset with multiple `.filter()` calls and annotations.
-- The database handles the combined filtering in a single SQL query (with multiple JOINs/WHERE clauses).
-- Only `VennNode` and `IntersectionNode` materialise intermediate results (as `VariantCollection` records) because their logic cannot be expressed efficiently as a single SQL query.
-
-### Version-Based Cache Invalidation
-
-The `version` integer on `AnalysisNode` + `NodeVersion` provides a simple but effective cache invalidation mechanism:
-- No explicit cache clearing calls are needed for Q-object cache entries in Redis.
-- No explicit cleanup queries are needed for `NodeCount` records.
-- Simply deleting the `NodeVersion` record cascades all dependent cache records away.
-- The cache key incorporates the version ID, so stale entries are simply never referenced.
-
-### Single-Worker Serialisation for Task Launch
-
-The `create_and_launch_analysis_tasks` task runs on a dedicated single-worker queue. This prevents the race condition where:
-1. User edits node A → triggers update.
-2. User edits node B (milliseconds later) → triggers second update.
-3. Both updates run concurrently and try to create overlapping task chains.
-
-By serialising the task-creation step, the second update sees the state left by the first and produces a coherent, non-overlapping task graph.
-
-### Guardian Object Permissions
-
-`Analysis` objects use Django Guardian for row-level permissions, allowing fine-grained sharing of analyses between users while preventing unauthorised access to genomic data.
-
-### AbortableTask for Node Computation
-
-Node computation tasks implement `AbortableTask`, which allows them to be cancelled when a node's version is bumped (i.e. the user makes another configuration change while a computation is still running). The task periodically checks whether it has been aborted and exits cleanly if so, rather than completing and writing stale results.
+# analysis — research notes
+
+Verified against 7c4408c62 on 2026-09-06
+
+The analysis app is the interactive filter: an `analysis/models/models_analysis.py:Analysis` is a DAG of
+`analysis/models/nodes/analysis_node.py:AnalysisNode` subclasses over one genome build and one pinned AnnotationVersion,
+where source nodes (sample, cohort, trio, duo, quad, pedigree, all variants) start the graph and filter nodes narrow it,
+each contributing a Django Q rather than a stored result set. Around that core sit the version/lease machinery that
+recounts nodes in celery after every edit, the node grid and its exports, templates that are cloned and parameterised per
+sample or cohort (and auto-launched on VCF import), variant tags, and the trio karyomapping side-feature. This document is
+the story behind `analysis/CLAUDE.md`: how an edit becomes a count, why a node is a Q and not a table, and what has gone
+wrong before. Model fields, URLs, commands, tasks, signals and settings are in the generated maps
+([models](../maps/models.md#analysis), [urls](../maps/urls.md#analysis), [commands](../maps/commands.md),
+[tasks](../maps/tasks.md#analysis), [signals](../maps/signals.md), [settings](../maps/settings.md));
+`claude/domain.md` has the vocabulary.
+
+## Flows
+
+### A node edit, end to end
+
+An editor POST lands in `analysis/views/nodes/node_view.py:NodeView.form_valid`, which sets `queryset_dirty`, saves and
+calls `analysis/models/nodes/node_utils.py:update_analysis`; a drag or a connection change goes through
+`analysis/views/views_json.py:NodeUpdate` and does the same (a pure move saves without dirtying).
+`analysis/models/nodes/analysis_node.py:AnalysisNode.save` takes a `select_for_update` on the Analysis row and hands off
+to `analysis/models/nodes/analysis_node.py:AnalysisNode._save`, which recomputes validity and shadow colour, and - only
+when `parents_changed` or `queryset_dirty` - calls `analysis/models/nodes/analysis_node.py:AnalysisNode.bump_version`
+(version+1, DIRTY, count/errors/cloned_from cleared) and then recursively saves every child with `queryset_dirty=True`,
+so a whole subtree bumps in one transaction. The save ends by `get_or_create`ing the
+`analysis/models/nodes/analysis_node.py:NodeVersion` for the new number; everything scoped to a version (the Redis Q
+cache key, `analysis/models/nodes/analysis_node.py:NodeCache`, `analysis/models/nodes/analysis_node.py:NodeTask`, column
+summaries) hangs off that row and cascades away when
+`analysis/tasks/node_update_tasks.py:delete_analysis_old_node_versions` deletes every NodeVersion that is not its node's
+latest.
+
+`update_analysis` fires that cleanup and `analysis/tasks/analysis_update_tasks.py:create_and_launch_analysis_tasks` on
+`scheduling_single_worker`. The scheduler is state-driven (#346): it does not build a chain of tasks mirroring the
+graph, it calls `analysis/tasks/analysis_update_tasks.py:lease_ready_nodes`, which locks the analysis' unsettled nodes
+(`skip_locked`), loads the graph once via `analysis/tasks/analysis_update_tasks.py:_load_graph`, and for each DIRTY
+node whose parents are all settled (`analysis/tasks/analysis_update_tasks.py:_node_ready_to_lease` - an error parent
+counts as settled, so the child runs and fails fast with ERROR_WITH_PARENT) writes a NodeTask lease (`leased_by`,
+`lease_expires`, `attempt_count`, `run_after`) and flips the node to QUEUED. At most
+`ANALYSIS_NODE_DISPATCH_MAX_NODES_PER_ANALYSIS` go out per dispatch; each leased node becomes the signature from
+`analysis/tasks/analysis_update_tasks.py:_node_launch_signature`, an `update_node_task` on `analysis_workers`, chained
+behind a `node_cache_task` only when the node builds its own cache.
+
+`analysis/tasks/node_update_tasks.py:update_node_task` loads the subclass at the leased version, then
+`analysis/models/nodes/analysis_node.py:AnalysisNode.claim_for_load` does a conditional UPDATE from a claimable status to
+LOADING and restarts the lease window (a task that sat in a backlog should not spend its lease queued). After a reclaim two
+tasks can exist for one node/version; the UPDATE is the arbiter and the loser exits without touching anything. The winner
+runs `analysis/models/nodes/analysis_node.py:AnalysisNode.load` (below), maps exceptions to statuses
+(`NodeOutOfDateException` means the user edited meanwhile - exit quietly, a newer version is coming; `OperationalError`
+backs off through `analysis/tasks/node_update_tasks.py:_backoff_node`, which sets DIRTY with a future `run_after`;
+`MemoryError` under the worker's RLIMIT_AS perma-fails and re-raises as `NodeOutOfMemoryException` so Rollbar sees it),
+clears the lease in a `finally`, and calls `analysis/tasks/node_update_tasks.py:_trigger_rescheduling` - the dispatcher
+immediately and again in 3 s, covering the race where a concurrent dispatcher read statuses just before this commit. A
+node finishing is what leases its children. `analysis/tasks/analysis_update_tasks.py:dispatch_analysis_backlog` on beat
+is the catch-all: it tops the in-flight count up to `ANALYSIS_NODE_DISPATCH_BACKLOG_IN_FLIGHT_TARGET` from analyses with
+un-leased loading nodes, and it is where dead workers are noticed. Both dispatchers honour the `JobsControl` pause.
+
+### Counts, stored pks and the grid
+
+`AnalysisNode.load` runs the subclass `_load` (returning fields to persist), then
+`analysis/models/nodes/analysis_node.py:AnalysisNode.node_counts`, then writes everything through
+`analysis/models/nodes/analysis_node.py:AnalysisNode.update`, a conditional UPDATE on (pk, version). `node_counts` first
+records `live_data_sources` on the NodeVersion, then asks
+`analysis/models/nodes/analysis_node.py:AnalysisNode._get_cached_label_count` for each configured label (TOTAL plus the
+analysis' `analysis/models/models_analysis.py:AnalysisNodeCountConfiguration` records, which include one label per tag
+when `node_count_auto_add_tags` is on): a clone reuses `cloned_from`'s counts, a pass-through node reuses its single
+parent's, all-zero parents short-circuit to zero, and a SampleNode with no count-affecting filters reads the precomputed
+`CohortGenotype*Stats` row via `analysis/models/nodes/stats_cache.py:get_cached_label_count_for_cohort`. Whatever is
+left is one aggregate query in `analysis/models/nodes/node_counts.py:get_node_counts_and_labels_dict`. For a node at or
+under `ANALYSIS_NODE_STORE_ID_SIZE_MAX` (1000) `_get_variant_ids_to_store` also pulls the exact pk list, and the list
+length becomes the total - the count and the pks came from the same load. Counts, `tag_counts` from `_get_load_data` and
+the pks land on the NodeVersion as `load_data` / `variant_ids` in one `.update()` that stamps `modified`, because the
+client's `analysis/views/views_json.py:nodes_status` poll uses `modified` to know a recount has landed. `analysis/models/nodes/analysis_node.py:AnalysisNode._raise_or_warn_count_mismatch`
+then checks for a label count above the total or a single-parent node bigger than its parent: an error for a
+deterministic node, a warning for one whose `live_data_sources` say its tables move under it (#235).
+
+The grid reads the same queryset. `analysis/views/views_node.py:node_load` redirects to errors, the grid or an async-wait
+page by status; `analysis/views/views_grid.py:NodeGridConfig` and `analysis/views/views_grid.py:NodeGridHandler` are
+`cache_page`d for a week under the node version in the URL, and the handler holds a per-user, per-URL cache lock and a
+`major_operation` slot so a double-click cannot run a minutes-long query twice.
+`analysis/views/views_grid.py:NodeGridHandler._get_redirect` sends a pass-through node to its parent's URL
+(`analysis/models/nodes/analysis_node.py:AnalysisNode.get_grid_node_id_and_version`) so the two share one cache entry.
+`analysis/grids.py:VariantGrid` builds columns from the analysis' `CustomColumnsCollection` (every viewer sees the same
+grid, permissions checked as the analysis owner), adds per-node extra columns (`_get_node_extra_columns` - cohort counts,
+sample genotype cells, VCF FILTER), and uses `analysis/grids.py:VariantGrid.known_count` so the datatable never re-counts
+what the load already counted; sorting is disabled above `ANALYSIS_GRID_SORT_MAX_ROWS`. Exports
+(`analysis/views/views_grid.py:node_grid_export`) create a `CachedGeneratedFile` keyed on the hash from
+`analysis/tasks/analysis_grid_export_tasks.py:get_node_grid_downloadable_file_params_hash` (node, version, user, filters,
+transcript collection) and run `analysis/tasks/analysis_grid_export_tasks.py:export_node_to_downloadable_file` in celery
+(#1257), which retries itself while the output node is still loading rather than blocking a worker;
+`analysis/grids.py:ExportVariantGrid.iter_export_rows` walks pks a contig at a time so the annotation joins never see a
+full-table sort.
+
+### Materialised nodes: Venn and Intersection
+
+Two nodes cannot be a Q and so write a `VariantCollection` instead. `analysis/models/nodes/filters/venn_node.py:VennNode`
+keeps its own `analysis/models/nodes/filters/venn_node.py:VennNodeCache` keyed on the two parent NodeVersions and a
+region (A-only, intersection, B-only); `analysis/models/nodes/filters/venn_node.py:VennNode.get_cache_task_args_set`
+`get_or_create`s one per region the set operation needs and returns a
+`analysis/models/nodes/filters/venn_node.py:venn_cache_count` task for any region not yet SUCCESS, which
+`_node_launch_signature` chains ahead of the node's own update. `venn_cache_count` pulls both sides' pks into Python and
+does set arithmetic there, skipping any side an empty parent already decides - SQL EXCEPT/INTERSECT across the partition
+tables used to die with "too many range tables". It truncates partial records first and is idempotent, so a re-lease or a
+sibling Venn over the same parents reuses an in-flight build. `analysis/models/nodes/filters/venn_node.py:VennNode._get_node_q`
+raises: the node's Q always comes from `_get_node_cache_arg_q_dict` as `variantcollectionrecord__variant_collection__in`.
+
+`analysis/models/nodes/filters/intersection_node.py:IntersectionNode` is the last user of the generic
+`analysis/models/nodes/analysis_node.py:NodeCache`: `use_cache` is true for a selected BED collection or a long pasted
+variant list, `analysis/models/nodes/analysis_node.py:AnalysisNode.get_cache_task_args_set` creates the NodeCache (or
+finds the parent's, for a pass-through node) and the chained `analysis/tasks/node_update_tasks.py:node_cache_task` calls
+`analysis/models/nodes/filters/intersection_node.py:IntersectionNode.write_cache`, which streams the parent queryset as a
+VCF into an `intersectBed` pipe that loads the collection itself. A node whose cache another node is building is held
+back by `analysis/tasks/analysis_update_tasks.py:_node_cache_ready` while the collection is PROCESSING; a CREATED
+collection with no builder does not block, the node just runs live.
+
+### Templates and auto-analyses on import
+
+A template is an Analysis with `template_type=TEMPLATE` plus `analysis/models/models_analysis.py:AnalysisVariable` rows
+naming the node fields a run must supply; the editor only offers the variable widget on source-node fields of a template
+(`analysis/views/nodes/node_view.py:NodeView.get_form`). `analysis/models/models_analysis.py:AnalysisTemplate.new_version`
+refuses without a source-field variable, clones the analysis via `analysis/models/models_analysis.py:Analysis.clone`
+(toposorted `save_clone` of every node with `cloned_from` pointing at the original NodeVersion, edges and variables
+re-pointed, the node-count configuration copied so "all counts off" survives) into an invisible SNAPSHOT, and creates an
+`analysis/models/models_analysis.py:AnalysisTemplateVersion` with `active=False` - a draft only writers can run until
+`analysis/models/models_analysis.py:AnalysisTemplateVersion.activate` makes it the one everyone runs (#1496).
+`analysis/models/models_analysis.py:AnalysisTemplateVersion.filter_for_user` returns exactly the active versions the
+user can see plus the drafts they can write.
+
+`analysis/analysis_templates.py:run_analysis_template` is the run: `analysis/models/models_analysis.py:AnalysisTemplateRun.create`
+clones the snapshot into a visible analysis on the latest validated AnnotationVersion for the build;
+`analysis/models/models_analysis.py:AnalysisTemplateRun.populate_arguments` resolves each variable (Guardian
+`check_can_view` as the run's user, type-checked against `class_name`) into an
+`analysis/models/models_analysis.py:AnalysisTemplateRunArgument`, recording an error rather than raising; then
+`analysis/analysis_templates.py:populate_analysis_from_template_run` names the analysis from `analysis_name_template`
+(`%(input)s` is the first of pedigree/trio/quad/duo/cohort/sample), sets the fields node by node in toposort order with
+`queryset_dirty=True` so `_save` cascades sample changes downstream, hides any node that
+`hide_node_and_descendants_upon_template_configuration_error` says should vanish along with its descendants
+(`analysis/views/views_json.py:node_reveal_hidden` brings them back), and finishes with
+`analysis/models/nodes/node_utils.py:reload_analysis_nodes` - a bulk bump of every node's version and status in two
+UPDATEs plus a `bulk_create` of NodeVersions, then `update_analysis`.
+
+Auto-analyses hang off `upload`'s `vcf_import_success_signal`: `analysis/signals/signal_handlers.py:handle_vcf_import_success`
+chains `analysis/tasks/auto_analysis_tasks.py:auto_run_analyses_for_vcf` (one run per sample per matching
+`analysis/models/models_analysis.py:AutoLaunchAnalysisTemplate`, matched on enrichment kit and a sample-name regex by
+`analysis/analysis_templates.py:get_auto_launch_analysis_template_matches`, skipped when the sample already has a related
+analysis) and `analysis/tasks/auto_analysis_tasks.py:reload_auto_analyses_for_vcf`, which re-bumps the sample-tab and
+cohort-export analyses of a re-imported VCF. A template that `requires_sample_gene_list` is skipped until the QC gene list
+arrives, and `analysis/signals/signal_handlers.py:handle_active_sample_gene_list_created` retries then. The sample tab
+and the cohort VCF export use `analysis/analysis_templates.py:get_sample_analysis` /
+`analysis/analysis_templates.py:get_cohort_analysis`, one hidden run per object per template version recorded in
+`SampleAnalysisTemplateRun` / `CohortAnalysisTemplateRun`, named by `ANALYSIS_TEMPLATES_AUTO_SAMPLE` and
+`ANALYSIS_TEMPLATES_AUTO_COHORT_EXPORT`.
+
+### Tags
+
+A `analysis/models/models_variant_tag.py:VariantTag` is a user's tag on a Variant, optionally inside an analysis (and
+node/node version); permissions delegate to the analysis when there is one. Creating or deleting one runs
+`analysis/signals/signal_handlers.py:variant_tag_create` / `variant_tag_delete`: synchronously it dirties the visible
+`analysis/models/nodes/filters/tag_node.py:TagNode`s that read that tag (`analysis/tasks/variant_tag_tasks.py:analysis_tag_nodes_set_dirty`,
+so the client's next `analysis_node_versions` poll already sees the bump) and adds or removes the tag's node-count label
+(`analysis/tasks/variant_tag_tasks.py:update_analysis_tag_node_count_config`, #21); on commit it queues
+`analysis/tasks/variant_tag_tasks.py:variant_tag_created_task`, which dirties the hidden "Tagged Variants" node, recounts
+the tag labels in place and links the tag to an Allele and a liftover pipeline. Tagging does not bump the other nodes'
+versions - the tag count on a node badge is recomputed by
+`analysis/models/nodes/node_utils.py:update_analysis_tag_node_counts` against the NodeVersion each READY node is already
+on, looking the tagged variants up once per analysis (`analysis/models/nodes/node_counts.py:get_tagged_variant_ids_by_label`)
+and merging with `jsonb_set` + `||` so a concurrent load cannot lose its own labels.
+`analysis/models/nodes/filters/tag_node.py:TagNode.tagged_variants_q` is the one place local versus global scope is
+decided: this analysis' tags by Variant pk (avoiding the Allele race right after tagging), other analyses' by Allele
+through `analysis/models/models_variant_tag.py:VariantTag.variants_for_build_q`, with `tagged_within_days` anchored to
+the NodeVersion's creation so an old analysis reproduces what it showed. A global node is a snapshot and says so in
+`get_warnings`. The editor's tag picker is `analysis/models/nodes/filters/tag_node.py:TagNode.get_tag_counts`, counted
+over the node's *input* so every tag stays pickable, and snapshotted into `load_data["tag_counts"]` at load because the
+global-mode query is slow (#1820).
+
+### Source nodes
+
+Every genotype-aware node mixes in `analysis/models/nodes/cohort_mixin.py:CohortMixin`: `_get_cohort` names the cohort,
+`cohort_genotype_collection` finds its packed genotype partition (archived or missing data becomes a configuration error,
+not a 500), `_get_annotation_kwargs_for_node` registers the `cohortgenotype_<id>` alias and
+`analysis/models/nodes/cohort_mixin.py:CohortMixin.get_cohort_and_arg_q_dict` puts the zygosity, quality, VCF FILTER and
+allele-frequency Qs under that alias so `annotate_and_filter_queryset` joins the partition once. Its `_get_cache_key`
+folds in the collection pk (and the sub-cohort any-sample-called VariantCollection of #1551, which turns a regex
+exclusion into a hash join) so a reloaded VCF invalidates the cached Q.
+`analysis/models/nodes/sources/sample_node.py:SampleNode` is one sample or, at extraction/specimen/patient level
+(`patients/models_enums.py:SampleSourceLevel`, offered per `ANALYSIS_SAMPLE_NODE_LEVELS`), every sample of a grouping object: a single sample degenerates to the alias path, a group
+ORs one `pk IN (subquery)` per sample via `analysis/models/nodes/sources/sample_node.py:SampleNode._get_sample_pk_q`,
+each annotated with only its own VCF's join. Per-sample overrides live in
+`analysis/models/nodes/sources/sample_node.py:SampleNodeSampleFilter`. Downstream nodes that need "the sample" get it
+through `analysis/models/nodes/cohort_mixin.py:AncestorSampleMixin.handle_ancestor_input_samples_changed`, which auto-sets
+the field when exactly one proband sample is upstream - this is why `_save` cascades `ancestor_input_samples_changed`.
+
+`analysis/models/nodes/sources/cohort_node.py:CohortNode` filters by het/hom counts, a simple zygosity, or per-sample
+zygosities (`CohortNodeZygosityFiltersCollection`), and adds the ref/het/hom count columns. Trio, duo and quad share
+`analysis/models/nodes/family_inheritance.py:FamilyInheritanceNodeMixin` (inheritance-versus-family checks, waivable as
+warnings) and one `AbstractFamilyInheritance` strategy object per mode, built by the node's `_inheritance_factory`;
+`analysis/models/nodes/sources/trio_node.py:TrioNode`, `analysis/models/nodes/sources/duo_node.py:DuoNode` (#1829, a
+proband and one parent, with Denovo becoming "absent in parent") and `analysis/models/nodes/sources/quad_node.py:QuadNode`
+(a sibling too) differ only in the zygosity tuples. Compound het is
+`analysis/models/nodes/family_inheritance.py:AbstractCompHetInheritance`: three queries find genes with a maternal-only
+and a paternal-only hit (over `VariantGeneOverlap`, not transcript annotation, so a long SV VEP skipped still counts, #940),
+memoised per node version, then the Q is "comp-het zygosity AND overlaps one of those genes". The mosaic-parent modes
+(#1830) look for low-VAF alt reads in one parent through `analysis/models/nodes/family_inheritance.py:mosaic_evidence_q`.
+`analysis/models/nodes/sources/pedigree_node.py:PedigreeNode` is the general case over a PED file: recessive and
+dominant Qs from affected/unaffected zygosity sets via `CohortGenotypeCollection.get_zygosity_q`.
+`analysis/models/nodes/sources/all_variants_node.py:AllVariantsNode` starts from every variant of the build, optionally
+by contig and zygosity-count bounds from `VariantZygosityCountCollection`.
+
+### Karyomapping
+
+`analysis/models/models_karyomapping.py:KaryotypeBins` classifies each trio variant by the (proband, father, mother)
+genotype tuple into in-phase/out-of-phase paternal and maternal bins. Creating a Trio queues
+`analysis/tasks/karyomapping_tasks.py:create_genome_karyomapping_for_trio` (`snpdb/signals/signal_handlers.py:trio_post_save_handler`),
+which streams the trio's genotypes once into `GenomeKaryomappingCounts` plus one `ContigKaryomappingCounts` per contig -
+the relatedness summary shown for the trio. A `analysis/models/models_karyomapping.py:KaryomappingAnalysis`
+(`analysis/views/views_karyomapping.py:create_and_view_karyomapping_analysis_for_trio`) adds `KaryomappingGene` rows
+whose bins over the gene's flanking region drive the Plotly scatter and CSV download.
+
+## Why it is shaped this way
+
+A node is a filter, not a result set. `analysis/models/nodes/analysis_node.py:AnalysisNode.get_arg_q_dict` composes the
+parent's `{alias: {hash: Q}}` dict with the node's own (`merge_arg_q_dicts`; the hash lets
+`analysis/models/nodes/filters/merge_node.py:MergeNode` factor common filters out of an OR), and
+`analysis/models/nodes/analysis_node.py:annotate_and_filter_queryset` applies each annotation alias then the Qs that
+depend on it, then the alias-less Qs, so a chain of ten nodes is one SQL statement with each genotype partition joined
+once. Materialising every node would mean writing millions of pks per edit on a 7.4M-variant cohort; composing means an
+edit costs one count query per dirty node and the grid's page query is the same plan the count ran. The exceptions
+(Venn, Intersection) are exactly the operations Postgres could not plan well as subqueries.
+
+Caching is in tiers because each tier fails differently. The Redis Q cache (`ANALYSIS_NODE_CACHE_Q`, keyed on the
+NodeVersion pk plus whatever `_get_cache_key` overrides fold in) exists because building the dict for a compound-het or
+phenotype node costs seconds and the grid asks for it on every page; it is never invalidated, only outlived. NodeVersion
+`load_data` is the count cache the badges read. NodeCache/VennNodeCache are on-disk sets for the two materialising
+nodes. `cloned_from` is the fourth tier: a template run's nodes point at the snapshot's NodeVersions and reuse their
+counts and grid cache until either side is edited, which is why `bump_version` clears it.
+
+Explicit-pk substitution (#546): `analysis/models/nodes/analysis_node.py:AnalysisNode.get_small_parent_arg_q_dict`
+replaces a small parent's whole filter chain with `Q(pk__in=[...])` from `NodeVersion.variant_ids`, so a MergeNode or a
+Venn over three 200-variant parents becomes a bitmap-or over the pk index instead of three nested subqueries. Large
+parents stay as `analysis/models/nodes/analysis_node.py:queryset_to_pk_in_q`, a RawSQL semi-join that also keeps the
+dict picklable for Redis (a live `TransformerQuerySet` inside a Q is not, #240). The list is stored at load, after the
+count, so "small" and "these pks" agree by construction; `analysis/tests/test_explicit_pk_substitution.py` pins the
+two paths to the same answer.
+
+Scheduling is single-worker and state-driven (#346) because the previous design - a celery group/chord built from a
+toposort at edit time - deadlocked: `wait_for_node` tasks occupied every worker waiting for parents that could not get a
+worker. Now nothing waits: the only cross-node dependency is "parents settled", read from the database by the one
+dispatcher on `scheduling_single_worker`, so leases are written by one process and need no row-lock gymnastics, and a
+finished node kicks the dispatcher rather than its children. The lease (`NodeTask.lease_expires`, restarted at claim)
+is the only way a lost worker is detected; `MAX_NODE_ATTEMPTS` bounds retries and reclaims together. Workers never
+`save()` a node (#431): `AnalysisNode.update` is a conditional UPDATE on (pk, version), so a user edit racing a load
+wins by construction and the load discovers it through `NodeOutOfDateException`.
+
+## History
+
+The app began with a jqGrid front end and a toposorted chord of celery tasks per edit; `wait_for_node` and
+`wait_for_cache_task` in `analysis/tasks/node_update_tasks.py` survive only for in-flight messages at deploy time. The
+MergeNode rewrite (#240) stopped writing parent caches and introduced the hash-keyed Q dicts. Explicit pks (#546) and
+the NodeVersion lease record (`analysis/migrations/0105_nodetask_lease_on_node_version.py`, #346) landed in mid 2026;
+`analysis/migrations/0115_nodecount_variant_ids_nodeversion_live_data_sources_and_more.py` added the stored pk list and
+count provenance (#235), and `analysis/migrations/0132_nodeversion_load_data.py` folded the per-label `NodeCount` rows
+into `NodeVersion.load_data` (#1825, #1820). Node exports moved to celery-backed `CachedGeneratedFile`s (#1257). `VariantGrid.known_count` arrived with the
+KnownCountPaginator (#1700); grids then moved from jqGrid to native DataTables (#1785, #1815).
+The ClassificationsNode was split into Classifications and ClinVar nodes (#1789). Templates gained draft versions
+(#1496). Per-tag node counts (#21), the TagNode editor's pill picker (#1820), sample-node grouping levels and per-sample
+overrides (`analysis/migrations/0130_samplenodesamplefilter.py`), waivable field errors
+(`analysis/migrations/0131_analysisnode_ignore_field_errors.py`), the DuoNode (#1829,
+`analysis/migrations/0133_add_duo_node.py`) and the mosaic-parent modes (#1830) are the most recent additions.
+
+## Traps
+
+The Q cache is keyed only on NodeVersion pk (plus what `_get_cache_key` adds), so a test that changes a node and expects
+a different queryset without saving needs `ANALYSIS_NODE_CACHE_Q=False`; a node whose query depends on something outside
+its fields and its parents must fold that into `_get_cache_key` the way `CohortMixin` folds in the genotype collection,
+or deleting and re-importing a VCF leaves a `FieldError` for an alias that no longer exists.
+`analysis/signals/source_data_invalidation.py:_bump_nodes` is the pattern for bumping nodes when their source rows are
+deleted: bump, cascade, then dispatch on commit so the node settles in ERROR_CONFIGURATION instead of spinning as DIRTY.
+
+`_get_cached_label_count` reuses a parent's label count only when the parent was loaded with that label configured;
+adding a node-count type after the fact makes every node run the SQL once. A count bigger than the parent's is a real
+bug for a deterministic node: a filter that fans out over a multi-valued join (transcript annotation, gene lists) must
+set `queryset_requires_distinct` or use a subquery, and `_get_variant_ids_to_store` will catch the case where the pk
+list overruns the count. `AnalysisNode.load` persists only what `_load` returns and what `update()` is given - setting
+attributes on `self` inside a task is lost.
+
+`lease_ready_nodes` perma-fails a node found LOADING with a lapsed lease on the theory that it killed its worker
+(OOM, SIGKILL); only QUEUED nodes are re-leased. A node whose load legitimately exceeds `LEASE_SECONDS` (10 min) will be
+failed by the next backlog sweep even though the worker is still running it - the lease is not heart-beaten. `analysis/views/views_node.py:node_cancel_load` revokes the celery task, `pg_cancel_backend`s the recorded `db_pid`
+and saves CANCELLED without bumping the version - a load that survives the revoke can still `update()` READY over it.
+
+`Analysis.VERSION_BUMP_FIELDS` (custom columns, default sort) must bump `Analysis.version`
+(`analysis/forms/forms.py:AnalysisForm`): the node editor, grid config and grid data are `cache_page`d under the analysis
+version and node version in the URL, so a settings change that forgets the bump serves last week's columns. The grid
+handler's cache lock is per user and URL: a second user hitting the same slow node runs the query again, and a gunicorn
+worker killed inside the lock leaves it held for up to 10 minutes.
+
+`VennNode.get_cache_task_args_set` sets `errors` and ERROR directly on the node with a `save()` if creating the cache rows
+fails - the one place a node is saved from dispatch - and that status is never cleared automatically; the user must
+re-save the node. `venn_cache_count` holds both sides' pk sets in worker memory, so a Venn over two whole-cohort parents
+is the analysis app's most likely `MemoryError`. Cloning is `save_clone` per node in toposort order and each subclass
+that owns satellite rows (`FilterNodeItem`, `TagNodeTag`, contigs, sample filters) must copy them itself; a new node
+model with a related table that forgets `save_clone` silently loses its configuration in every template run.

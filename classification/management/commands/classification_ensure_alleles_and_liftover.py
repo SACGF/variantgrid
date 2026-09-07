@@ -16,6 +16,8 @@ from snpdb.models.models_genome import GenomeBuild
 
 
 class Command(BaseCommand):
+    category = "maintenance"
+
     def add_arguments(self, parser):
         parser.add_argument('--add-clingen-allele', action='store_true',
                             help="Add 'clingen_allele_id' to Classifications missing it")

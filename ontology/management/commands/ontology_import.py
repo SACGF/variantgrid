@@ -579,6 +579,7 @@ def sync_hgnc(force=False):
 
 
 class Command(BaseCommand):
+    category = "import"
 
     def add_arguments(self, parser):
         parser.add_argument('--force', action="store_true")

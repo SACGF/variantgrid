@@ -9,6 +9,7 @@ from library.genomics.vcf_utils import cyvcf2_header_types
 
 
 class Command(BaseCommand):
+    category = "dev"
 
     def add_arguments(self, parser):
         parser.add_argument('--vcf', required=True)

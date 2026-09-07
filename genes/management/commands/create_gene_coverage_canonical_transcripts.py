@@ -11,6 +11,7 @@ from seqauto.models import EnrichmentKit
 
 
 class Command(BaseCommand):
+    category = "maintenance"
 
     def add_arguments(self, parser):
         parser.add_argument('--clear', action='store_true', required=False)

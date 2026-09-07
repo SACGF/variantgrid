@@ -1,3 +1,10 @@
+"""
+Test bases and query accounting: URLTestCase (Celery eager, plain static storage, annotation web
+resources off) with _test_urls / _test_datatable_urls / _test_autocomplete_urls for batch status
+checks, production_query_count (drops savepoints and the tables production caches), and
+QueryProfilingClient which appends per-GET query stats when VG_QUERY_PROFILE is set (stacks for
+matching SQL under VG_QUERY_TRACE). `vg page --queries` reuses the same counting.
+"""
 import json
 import logging
 import os

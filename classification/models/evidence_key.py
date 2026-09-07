@@ -1,3 +1,10 @@
+"""
+The evidence schema. EvidenceKey rows define each key's type, options (with bucket and other
+metadata), share level, category and immutability; EvidenceKeyMap is the cached lookup
+(EvidenceKeyMap.cached_key / instance) every validator and renderer reads; VCDataCell and VCDataDict
+wrap a patch or a record's evidence JSON so values, notes and explanations are read the same way
+everywhere. Name keys through SpecialEKeys, never string literals.
+"""
 import math
 import re
 from collections import defaultdict

@@ -7,6 +7,8 @@ from library.guardian_utils import admin_bot
 
 
 class Command(BaseCommand):
+    category = "one-off"
+
     @staticmethod
     def _update_allele_origin(user, qs, old_value, allele_origin_value, allele_origin_confirmation_value):
         note = f"Auto set from '{old_value}' (legacy)"

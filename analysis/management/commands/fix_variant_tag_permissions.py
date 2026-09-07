@@ -9,6 +9,8 @@ from library.guardian_utils import assign_permission_to_user_and_groups
 class Command(BaseCommand):
     """ VariantTags used to always have an Analysis and thus used that permission
         we now have to handle tag existing w/o analyses and thus they have their own permissions """
+    category = "one-off"
+
     def handle(self, *args, **options):
         analysis_read_perm = Analysis.get_read_perm()
         analysis_write_perm = Analysis.get_write_perm()

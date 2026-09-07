@@ -23,9 +23,14 @@ python3 manage.py vg tests --changed                                        # on
   `scripts/vg tests --explain` shows which changed file selected each label without booting Django; `--run`
   executes them.
 - `--parallel 4 --keepdb` runs the whole suite (2,741 tests) in about 2 minutes wall on vg-test2 with nothing
-  failing (2026-09-02); Django clones `test_snpdb` into `test_snpdb_1..4` and keeps the clones. CI runs it the
-  same way (`.github/workflows/django-tests.yml`). A test that fails only in parallel is sharing a file under
-  `data/` or a fixed temp path - give it its own directory rather than marking it serial.
+  failing (2026-09-02); Django clones `test_snpdb` into `test_snpdb_1..4`. `VariantGridTestRunner` drops the
+  clones before each `--keepdb` run (about 3 s each to recreate) because Django would otherwise reuse them
+  unmigrated. CI runs it the same way (`.github/workflows/django-tests.yml`). A test that fails only in parallel
+  is sharing a file under `data/` or a fixed temp path - give it its own directory rather than marking it serial.
+  `tblib` (in requirements) lets a worker ship a failing test's traceback back to the parent; without it any
+  error under `--parallel` aborts the whole run with `cannot pickle 'traceback' object`.
+- Every app package needs an `__init__.py`: `manage.py test <app>.tests` fails at discovery with
+  `expected str ... not NoneType` when the app is an implicit namespace package.
 - `TEST_RUNNER` is `variantgrid/test_runner.py:VariantGridTestRunner` (see External services below).
 
 ## Fixture builders
@@ -96,7 +101,7 @@ class Test(URLTestCase):
 ```
 
 - `_test_datatable_urls(...)` hits each URL and again with `?dataTableDefinition=1`; `_test_autocomplete_urls(names_obj_kwargs, user, in_results)` and `_test_datatables_grid_urls_contains_objs(names_obj, user, in_results)` assert an object's pk is (or is not) in the JSON - the standard permission check for grids.
-- `URLTestCase` overrides settings: plain `StaticFilesStorage` (manifest storage would demand `staticfiles.json`), `CELERY_TASK_ALWAYS_EAGER=True` (tasks run inline), `ANNOTATION_CACHED_WEB_RESOURCES=[]` (nothing auto-loads), `LIFTOVER_CLASSIFICATIONS=False`, `GENES_DEFAULT_CANONICAL_TRANSCRIPT_COLLECTION_ID=None`, `LOG_PARTITION_WARNINGS=False`. A plain `TestCase` gets none of these; add `@override_settings(CELERY_TASK_ALWAYS_EAGER=True)` yourself when a test fires a task.
+- `URLTestCase` overrides settings: plain `StaticFilesStorage` (manifest storage would demand a staticfiles manifest that collectstatic never writes), `CELERY_TASK_ALWAYS_EAGER=True` (tasks run inline), `ANNOTATION_CACHED_WEB_RESOURCES=[]` (nothing auto-loads), `LIFTOVER_CLASSIFICATIONS=False`, `GENES_DEFAULT_CANONICAL_TRANSCRIPT_COLLECTION_ID=None`, `LOG_PARTITION_WARNINGS=False`. A plain `TestCase` gets none of these; add `@override_settings(CELERY_TASK_ALWAYS_EAGER=True)` yourself when a test fires a task.
 - `prevent_request_warnings` decorates a test that expects 404/405 so `django.request` stays quiet.
 - Query budgets: wrap the call in `CaptureQueriesContext(connection)` and assert on `production_query_count(ctx.captured_queries)`, which drops savepoints and reads of `PRODUCTION_CACHED_TABLES` (GenomeBuild, GeneSymbol, FlagType, ResolvedVariantInfo, Allele, Organization, Lab - their managers cache in production but not under `UNIT_TEST`). Raw `assertNumQueries` over-counts by exactly those.
 - `VG_QUERY_PROFILE=/path.jsonl manage.py test ...` swaps in `QueryProfilingClient`: one JSON line per GET with status, query count, ms and duplicated (N+1) SQL. Add `VG_QUERY_TRACE=<regex>` to log a stack trace to `<path>.trace` for each matching statement.

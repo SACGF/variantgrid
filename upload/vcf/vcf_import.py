@@ -1,3 +1,12 @@
+"""
+Creating the VCF and Sample rows from an uploaded file's header: create_vcf_from_uploaded_vcf and
+create_vcf_from_vcf read the header only, resolve_genome_build (header, then what was declared at
+upload, then the source's fallback), configure_vcf_from_header binds the sample FORMAT fields
+(overridable per source through VCFSourceSettings in handle_vcf_source), create_cohort_genotype_collection_from_vcf
+makes the automatic cohort, and create_backend_vcf_links attaches SeqAuto records. import_vcf_file
+is the per-split-file genotype import that runs in parallel. Steps are wired in
+upload/import_task_factories/.
+"""
 import logging
 import os
 import re

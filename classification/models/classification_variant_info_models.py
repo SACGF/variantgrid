@@ -1,3 +1,11 @@
+"""
+What a classification said about its variant and what it resolved to. ImportedAlleleInfo is unique
+on the md5 of the imported text (build, c.HGVS or g.HGVS, transcript) so re-imports share one
+resolution; ResolvedVariantInfo is that resolution per build (variant, c.HGVS, gene, transcript) and
+ImportedAlleleInfoValidation records the include / confirmed decision and its validation tags.
+This is the only link from a classification to an Allele; HGVSConverterVersion records which
+converter produced it.
+"""
 import logging
 from dataclasses import dataclass
 from datetime import timedelta

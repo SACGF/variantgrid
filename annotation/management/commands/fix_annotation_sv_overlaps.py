@@ -74,6 +74,7 @@ class Command(BaseCommand):
         with vep_skipped_reason=TOO_LONG and no overlapping_symbols / VariantGeneOverlap rows.
         This command resolves gene overlaps locally from each VariantAnnotationVersion's
         gene_annotation_release transcripts and fills them in. """
+    category = "one-off"
 
     def handle(self, *args, **options):
         fix_annotation_sv_overlaps()

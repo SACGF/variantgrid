@@ -95,6 +95,7 @@ def _parse_ids(values):
 
 
 class Command(BaseCommand):
+    category = "dev"
     help = "Profile AnalysisNode querysets per-node and emit a CSV + EXPLAIN plans"
 
     def add_arguments(self, parser):

@@ -23,6 +23,7 @@ RANGED_SYMBOLIC_ALTS = [VCFSymbolicAllele.DEL, VCFSymbolicAllele.DUP, VCFSymboli
 class Command(BaseCommand):
     """ Symbolic DEL/DUP/INV are HGVS from coordinates alone (#1571) - rows imported before that
         hold a placeholder message where the string should be, so recalculate them """
+    category = "one-off"
 
     BATCH_SIZE = 1000
 

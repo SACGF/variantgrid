@@ -1,3 +1,11 @@
+"""
+Running VEP: get_vep_command builds the command line from settings.ANNOTATION[build] (plugins,
+custom files, cache) for a pipeline type, run_vep executes it, get_vep_version reads the installed
+versions, and vep_dict_to_variant_annotation_version_kwargs turns those into the fields a
+VariantAnnotationVersion records. The vep_check_* functions guard an annotated file against a
+version drift (VEPVersionMismatchError). Column mapping is vep_columns.py; the runs themselves are
+scheduled in annotation/tasks/.
+"""
 import logging
 import os
 import re

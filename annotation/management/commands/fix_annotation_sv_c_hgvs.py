@@ -20,6 +20,7 @@ from snpdb.models.models_genome import GenomeBuild
 
 class Command(BaseCommand):
     """ Only needs to be run on legacy systems that imported SV annotations before 2025-01-14 """
+    category = "one-off"
 
     def handle(self, *args, **options):
         for genome_build in GenomeBuild.builds_with_annotation():
