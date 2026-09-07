@@ -49,6 +49,10 @@ Patterns here:
   `analysis/models/nodes/analysis_node.py:AnalysisNode.get_proband_sample` at tag time), else the analysis it was made
   in contains the sample. Carrying the variant is only a display filter for a tagging with no sample - a relative who is
   HET for the proband's variant does not need their own classification, so it never assigns ownership.
+- The queue dialog's previous classifications are filtered to the tag's allele origin bucket
+  (`analysis/classify_report.py:tag_allele_origin_bucket`; "Both" means no filter), and an external lab's record is listed
+  without "Apply to this sample". Where a tagged allele has nothing of the lab's own, the dialog offers the gene level
+  candidates instead - the same `ClassificationConsensus.gene_consensus_groups` rows the create page shows.
 - A to-do tagging is resolved against a classification rather than deleted
   (`analysis/variant_tag_operations.py:resolve_variant_tag`), so it stays as the record of what was flagged. That happens
   by itself when the classification is of the tagging's own sample and via the queue row's "Clear tag" button otherwise.

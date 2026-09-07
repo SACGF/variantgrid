@@ -73,25 +73,34 @@
                 }
             }
 
-            // Copy a previous classification's consensus into a new record for this sample
-            container.on("click", ".apply-previous", function() {
+            // Copy a previously curated record into a new one for this sample - the whole record when the
+            // allele has been curated before, otherwise just the gene content
+            function applyPrevious(button, fieldName) {
                 const form = $("#classify-form");
                 const variantTagId = $("#classify-modal").data("variantTagId");
-                form.find("[name=copy_from_vcm_id]").val($(this).data("vcmId"));
+                form.find(`[name=${fieldName}]`).val(button.data("vcmId"));
                 $("button", form).prop("disabled", true);
-                $(this).text("Creating\u2026");
+                button.text("Creating\u2026");
                 $.post(form.attr("action"), form.serialize(), function(data) {
                     afterClassified(variantTagId, data);
                 }).fail(function() {
                     $("button", form).prop("disabled", false);
                     window.alert("Could not create the classification - please use the full form.");
                 });
+            }
+
+            container.on("click", ".apply-previous", function() {
+                applyPrevious($(this), "copy_from_vcm_id");
+            });
+
+            container.on("click", ".apply-gene", function() {
+                applyPrevious($(this), "copy_gene_from_vcm_id");
             });
 
             // The full form creates the record then opens the classification editor in a new tab
             container.on("click", ".full-form-button", function() {
                 const form = $("#classify-form");
-                form.find("[name=copy_from_vcm_id]").val("");
+                form.find("[name=copy_from_vcm_id], [name=copy_gene_from_vcm_id]").val("");
                 form.find("[name=response_format]").val("");
                 form.attr("target", "_blank");
                 wizard = null;

@@ -21,7 +21,11 @@ from analysis.variant_tag_operations import (
     resolve_variant_tag,
 )
 from annotation.transcripts_annotation_selections import VariantTranscriptSelections
-from classification.models import Classification, ClassificationReportTemplate
+from classification.models import (
+    Classification,
+    ClassificationConsensus,
+    ClassificationReportTemplate,
+)
 from classification.views.classification_export_report import ClassificationReport
 from classification.views.views import classification_created_response, create_classification_object
 from patients.models import Patient
@@ -86,6 +90,13 @@ def classify_report_tag_dialog(request, case_type: str, case_id: int, variant_ta
 
     sample_genotype = get_sample_genotype_for_variant_tag(row.sample, variant_tag) if row.sample else None
 
+    # Gene content is what's left to reuse when the lab has never seen this variant before - same
+    # deduplicated rows as the create-from-variant page, so the two can't drift
+    gene_groups = []
+    if not row.copyable and row.gene_symbol:
+        gene_groups = ClassificationConsensus.gene_consensus_groups(
+            gene_symbol=row.gene_symbol, user=request.user, allele_origin_bucket=row.allele_origin_bucket)
+
     context = {
         "case": case,
         "case_type": case_type,
@@ -100,6 +111,7 @@ def classify_report_tag_dialog(request, case_type: str, case_id: int, variant_ta
         "lab_form": lab_form,
         "sample_genotype": sample_genotype,
         "zygosity_display": Zygosity.display(sample_genotype.zygosity) if sample_genotype else None,
+        "gene_groups": gene_groups,
     }
     return render(request, 'analysis/classify_report_tag_dialog.html', context)
 

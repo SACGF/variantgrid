@@ -1,5 +1,10 @@
 # Reusing prior curation for somatic reporting
 
+Written by Claude Fable 5.1 (claude-fable-5-1), 2026-09-07 (Part B revised; original plan 2026-08-11);
+revised to the as-built state by Claude Opus 5 (claude-opus-5), 2026-09-07
+Status: in progress (A and B landed, C stage 1's list landed; C's triage drop and wizard, and D's
+analysis / specimen launch points remain)
+
 Design for [#1419](https://github.com/SACGF/variantgrid/issues/1419) (separate out gene / disease
 curation), [sapath#246](https://github.com/SACGF/variantgrid_sapath/issues/246) (SomaticReportable →
 easy classifications), and the entry point [#444](https://github.com/SACGF/variantgrid/issues/444)
@@ -17,12 +22,11 @@ variant in that gene.
 
 Most of the machinery is here; the delta is smaller than the issue titles suggest.
 
-- **Allele-level copy consensus.** `ClassificationConsensus.all_consensus_candidates()`
-  (`classification/models/classification.py:2664`) returns *Latest Germline* and *Latest Somatic* for an
-  allele — published, non-withdrawn, `exclude_external_labs=True` — defaulting the radio to whichever
-  matches the user's `allele_origin_focus`. `consensus_patch` (`:2685`) copies `value` and `note` for
-  every ekey with `copy_consensus=True`, and forces `allele_origin` from the source's bucket rather than
-  copying it.
+- **Allele-level copy consensus.** `classification/models/classification.py:ClassificationConsensus` returns
+  the latest record for an allele per bucket — published, non-withdrawn, `exclude_external_labs=True` —
+  defaulting the radio to whichever matches the user's `allele_origin_focus`. `consensus_patch` copies
+  `value` and `note` for every ekey whose `copy_scope` is in scope, and forces `allele_origin` from the
+  source's bucket rather than copying it. (Before Part A the filter was a `copy_consensus` boolean.)
 
 - **Somatic vs germline is data, not code.** The `allele_origin` option `somatic` carries
   `namespaces: ["somatic"]` and `assertion_method` option `amp` carries `["amp"]`;
@@ -30,26 +34,27 @@ Most of the machinery is here; the delta is smaller than the issue titles sugges
   those into the per-record namespace set that switches the `amp:`/`horak:`/`somatic:` keys on. So
   "launch as AMP/somatic" means seeding those two keys at creation.
 
-- **Tag → classification.** `CreateClassificationForVariantTagView` (`analysis/views/views.py:1207`)
-  already narrows the sample dropdown to the tag's node samples and posts to
-  `create_classification_for_analysis`, which links the new record to the analysis via
-  `AnalysisClassification` (`:1275`). The only reason the path is germline-flavoured is
-  `formatVariantTagFirstColumn` (`variantgrid/sitestatic/static/js/grid.js:541`), which hardcodes the
-  New Classification button to `RequiresClassification`.
+- **Tag → classification.** `analysis/views/views.py:CreateClassificationForVariantTagView` already
+  narrows the sample dropdown to the tag's node samples and posts to `create_classification_for_analysis`,
+  which links the new record to the analysis via `AnalysisClassification`. Which tags ask for a
+  classification is `snpdb/models/models.py:Tag.requires_classification`, set for `RequiresClassification`
+  and `SomaticReportable` by `snpdb/migrations/0251_one_off_tags_requiring_classification.py`; every "New
+  Classification" button reads that flag rather than naming a tag.
 
 - **Gene lookup.** `ResolvedVariantInfo.gene_symbol` is a real FK
   (`classification/models/classification_variant_info_models.py:143`) and
   `classification_gene_symbol_filter` exists, so "prior classifications in this gene" is one query with
   no new denormalisation.
 
-The gap on the specimen side: `VariantTag` (`analysis/models/models_variant_tag.py:42-51`) has no
-sample. Tag → specimen goes tag → `node.get_samples()` → `Sample.extraction` → `Specimen`.
+On the specimen side, `analysis/models/models_variant_tag.py:VariantTag` now carries a `sample` (the
+study's proband at tag time, from sapath#246). Where it is unset — an older tagging, or a node with no
+proband — tag → specimen still goes tag → `node.get_samples()` → `Sample.extraction` → `Specimen`.
 
 ---
 
 ## Part A — the copy consensus audit
 
-142 of 330 evidence keys have `copy_consensus=True`. The flag was set for germline ACMG work and has
+142 of 330 evidence keys had `copy_consensus=True`. The flag was set for germline ACMG work and had
 never been reviewed against somatic. Four findings, in descending severity.
 
 The audit was split across two issues, both landed:
@@ -152,21 +157,110 @@ admin fieldset beside `max_share_level` (`classification/admin/classification_ad
 ## Part B — gene-level reuse, with the human picking
 
 The gene-level content of a somatic classification — what the gene does, its role in cancer, the
-gene-level literature — is identical across every variant in that gene, and is exactly what
-`copy_consensus` cannot reach today because it is keyed on the allele.
+gene-level literature — is identical across every variant in that gene, and is exactly what the
+allele-keyed copy cannot reach.
+
+Part A landed the vocabulary (`copy_scope = GENE` on the `H` keys below). This part consumes it: the same
+candidate list in three places, each with a different amount of ceremony.
+
+**Landed.** The code is `classification/models/classification.py:ClassificationConsensus` (the candidate
+functions and `apply_to`), `classification/views/views.py:CreateClassificationForVariantView` plus
+`classification/templates/classification/create_classification_for_variant.html`,
+`analysis/classify_report.py` plus `analysis/templates/analysis/classify_report_tag_dialog.html`, and
+`classification/views/views_gene_consensus.py` plus the Gene Content card in
+`classification/templates/classification/classification.html`. The sections below are the rules those
+implement — Part C follows the same ones.
+
+### The bucket is an input, never an output
+
+A germline record is never copied into a somatic one, in either scope. Before this part `consensus_patch`
+took `allele_origin` from the *source* with nothing constraining which source was on offer: the
+create-from-variant page listed Latest Germline beside Latest Somatic, and `_previous_by_tag` had no
+bucket filter at all, so a `SomaticReportable` tag could copy a germline record and come out germline.
+
+The rule everywhere: decide the target bucket first, then list only candidates in that bucket.
+
+- **Create-from-variant page** — the bucket comes from the user's `allele_origin_focus`
+  (`ClassificationConsensus.default_allele_origin_bucket`), shown as an explicit germline / somatic choice
+  at the top of the copy section so it can be flipped. Both buckets' candidates are rendered and the
+  inactive set is disabled, so only the chosen bucket's radios can be posted.
+- **Classify & Report** — the bucket comes from the tag
+  (`analysis/classify_report.py:tag_allele_origin_bucket`; `Tag.allele_origin_bucket` "Both" means no
+  filter).
+- **In-form helper** — the bucket is the record's own `allele_origin_bucket`.
+
+`consensus_patch` keeps seeding `allele_origin` from the source, which is now always the same bucket.
+This also takes most of the weight off A3: same-bucket copies mostly share namespaces, so the remaining
+cross-namespace leak is `amp` vs `horak` within somatic, and `copy_allele_origin = GERMLINE` covers
+germline-only keys that have drifted into somatic records.
+
+Part C's wizard seeds the bucket itself, so it wants the target bucket passed *in* rather than derived —
+`ClassificationConsensus.allele_origin_bucket` reads it off the source record today, and that is the one
+place to change when C lands.
 
 ### The candidates are shown, never auto-picked
 
 AMP tiering and therapy content are gene **and tumour type**, not gene. Copying gene-level content from
 a colorectal case onto a melanoma case is a clinical error rather than staleness, and the phenotype data
 available to match on is not good enough to automate the judgement. So the gene-level source is always a
-human choice.
+human choice, and "none" is the default.
 
-The query: `ClassificationModification.latest_for_user(user, published=True)` filtered through
-`classification_gene_symbol_filter(gene_symbol)` and the current allele-origin bucket, most recent
-first, excluding whatever is already offered as an allele-level candidate, capped at ten. Each row shows
-condition, clinical significance / tier, lab and curated date — enough to judge tumour-type relevance at
-a glance. "None" is a first-class choice and the default.
+The query: `ClassificationModification.latest_for_user(user, published=True, exclude_external_labs=True)`
+filtered through `classification_gene_symbol_filter(gene_symbol)` and the target bucket, excluding any
+record already offered as an allele-level candidate. It lives in
+`classification/models/classification.py:ClassificationConsensus.gene_consensus_groups`, which all three
+surfaces call.
+
+### Deduplicated — one row per distinct gene content
+
+Most records in a gene carry identical gene content, because they were copied from each other. Listing
+them all is noise. Group the candidates by the values of their `GENE`-scope keys (`value` and `note`,
+after the `copy_allele_origin` filter, so two records that differ only in a variant-level field are the
+same group). Each group is one row:
+
+- **Representative** — the most recently curated record in the group. The row shows its curated date,
+  clinical significance / tier, condition and lab, which is enough to judge tumour-type relevance.
+- **"and N other records"** — a disclosure on the row. Expanded, it lists the rest of the group as one
+  overview line each (tier, condition, date, lab), so the curator can see the spread of tumour types this
+  gene content has been used for. That spread is often the deciding information.
+
+Groups are ordered by the representative's curated date, newest first, capped at ten groups. Whichever
+record is picked, only its `GENE`-scope keys travel (`copy_scopes=COPY_SCOPES_GENE`). A record whose
+gene-scope keys are all empty is not a candidate — a row with nothing to copy is noise.
+
+### Where the pick is made
+
+**1. Create-from-variant page** (`classification/views/views.py:CreateClassificationForVariantView`, the
+primary place). A second radio group, "Gene information from", under "Copy values from", with the
+deduplicated rows above and "none" selected. It posts `copy_gene_from_vcm_id`. The autofill preview labels
+each key's source as annotation, allele copy (`copy from latest`) or gene copy (`copy from gene`);
+`used_keys` ordering in `AutopopulateView` gives autopopulate over allele over gene.
+
+Picking an allele-level candidate hides the gene group: the allele record's gene content travels with it
+(`GENE` is copyable at allele scope already), and there is no mixing and matching between two source
+records. The gene group appears when the allele choice is "none", which is the case gene copy exists
+for — a variant the lab has never seen in a gene it curates often.
+
+**2. Classify & Report dialog** (`analysis/templates/analysis/classify_report_tag_dialog.html`). "Apply to
+this sample" on an allele candidate keeps working exactly as it does and brings that record's gene content
+with it. When the tag has no copyable allele-level candidate, the dialog shows the gene rows instead, with
+the same button. Both surfaces call `ClassificationConsensus.gene_consensus_groups`, so they cannot drift.
+
+**3. In-form helper box** (`classification/views/views_gene_consensus.py`, rendered as the Gene Content
+card in `classification/templates/classification/classification.html`, right column beside Criteria
+Summary). For the records the create page never sees: created from the Classify & Report tab with no
+candidate, created by API or import, or created before the gene was curated. The card reads "Gene content
+available from N classifications in *GENE*" and opens a dialog with the same deduplicated rows, each row
+also showing its `GENE`-scope values beside this record's current ones. Apply patches empty fields only,
+as `SubmissionSource.CONSENSUS`, then reloads the form. Both card and dialog are AJAX-loaded, so the
+candidate query stays off the form's own page load.
+
+The box is present only while it is useful. It is hidden once gene content has been applied to this
+record — by the box itself, or by the create page's copy — and the fact is derivable without new data:
+a `ClassificationModification` with `source = CONSENSUS` whose `delta` touches a `GENE`-scope key. While
+that modification exists the box collapses to one line only when a candidate's curated date is later
+than it — "newer gene content from *lab*, *date*" — so a record can learn that the gene has been
+re-curated since, and otherwise takes no space at all.
 
 ### Which keys travel at gene scope
 
@@ -195,12 +289,14 @@ beating the general; autopopulate beating both is existing behaviour and stays.
 
 ### Other labs
 
-Show them, do not copy from them. `all_consensus_candidates` passes `exclude_external_labs=True` today,
-which hides what other labs — including Shariant — have curated on the same allele, and that is worth
-seeing when deciding how to curate. But an external record was curated under another lab's config,
-assertion method and namespaces, so copying its evidence into a local record imports assumptions that
-were never reviewed here. External candidates therefore render in the overview as read-only context,
-without a copy control.
+Show them, do not copy from them. `all_consensus_candidates` passes `exclude_external_labs=True`, which
+hides what other labs — including Shariant — have curated on the same allele, and that is worth seeing
+when deciding how to curate. But an external record was curated under another lab's config, assertion
+method and namespaces, so copying its evidence into a local record imports assumptions that were never
+reviewed here. So the create page gained a read-only "Other labs" row
+(`ClassificationConsensus.external_lab_candidates`), and the Classify & Report dialog — which lists every
+visible lab through `_previous_by_tag` — shows an external record without the "Apply to this sample"
+button (`PreviousClassification.can_copy`).
 
 ### Not doing: a first-class gene/disease object
 
@@ -221,6 +317,16 @@ navigation cost for a screen nobody can reason about. The wizard batches the tri
 the decisions, one variant at a time.
 
 ### Stage 1 — triage the list
+
+**Partly landed.** The list is the Classify & Report tab (`analysis/classify_report.py`,
+`analysis/views/views_classify_report.py`): one row per queue tagging in scope, with the variant, its
+gene, the sample and what already exists for that allele. Two things in this section are still open — the
+drop gesture below, and the row's overview does not yet mark external labs as such.
+
+A row leaves the queue by being *resolved* against a classification
+(`analysis/variant_tag_operations.py:resolve_variant_tag`) rather than deleted, so the tagging stays as
+the record of what was flagged. That is the "classified" exit; the "not reporting this" exit is the drop
+below, which does not exist yet.
 
 One row per `SomaticReportable` tag in scope. Each row shows the variant and its gene, and a brief
 overview of what already exists for that allele: how many prior classifications, the latest one's
@@ -271,32 +377,39 @@ construction, survives a browser crash, and lets two people work the same list w
 
 ## Part D — where it launches from
 
-**A `TAG_SOMATIC_REPORTABLE` setting**, mirroring `TAG_REQUIRES_CLASSIFICATION`
-(`variantgrid/settings/components/default_settings.py:720`), defaulting to `None` so the feature is off
-except where a deployment names its tag. `formatVariantTagFirstColumn` stops hardcoding
-`RequiresClassification` and drives off the configured tags instead.
+**The tag vocabulary landed** as `Tag.requires_classification` and `Tag.allele_origin_bucket` per row
+rather than the `TAG_SOMATIC_REPORTABLE` setting this plan first proposed — a deployment marks its own
+tags in the admin instead of naming one in settings, and a lab can have several. `SomaticReportable` is
+flagged and set to the somatic bucket by
+`snpdb/migrations/0251_one_off_tags_requiring_classification.py`. The sample and patient pages' Classify &
+Report tab is the launch point that came with it (`analysis/views/views_classify_report.py`).
+
+Still to do:
 
 **From the analysis**, beside the existing tags button — "Classify somatic reportable (N)" — scoped to
 that analysis's tags.
 
-**From the specimen, extraction and patient pages**, scoped to the tags on variants in analyses
-containing a sample of that specimen's extractions. Two things this depends on: Phase 3 (#1706) has to
-give `Specimen` and `Extraction` pages to hang it off, and the tag → specimen path runs
-tag → `node.get_samples()` → `Sample.extraction` → `Specimen`, since `VariantTag` carries no sample. A
-node can hold several samples, so the reverse query is a join rather than a lookup. Worth measuring
-before deciding whether `VariantTag` wants a denormalised sample or extraction column.
+**From the specimen and extraction pages**, scoped to the tags on variants in analyses containing a
+sample of that specimen's extractions. This waits on Phase 3 (#1706) giving `Specimen` and `Extraction`
+pages to hang it off. `VariantTag.sample` now makes the common case a lookup; a tagging with no sample
+still needs the tag → `node.get_samples()` → `Sample.extraction` → `Specimen` join, so measure before
+deciding whether `VariantTag` also wants a denormalised extraction column.
 
 ---
 
 ## Order of work
 
-1. **A** — #1713's data fixes and namespace filter, then #1714's fields once triage has seen them.
-   Independent of everything else, and #1713 corrects a live wrongness in the existing copy consensus
-   regardless of whether the rest lands.
-2. **C stage 1 + D's analysis launch point + the `TAG_SOMATIC_REPORTABLE` setting** — this is
-   sapath#246, and it is the piece that is useful on its own.
-3. **C stage 2** — the per-variant screen, initially with the allele-level decision only.
-4. **B** — `copy_scope = GENE`, the gene candidate query, and decision 2 on the stage 2 screen.
+1. **A** — landed: #1713's data fixes, #1714's `copy_scope` / `copy_allele_origin`.
+2. **C stage 1's list + D's tag vocabulary and sample/patient launch point** — landed as sapath#246
+   (PR #1834): the Classify & Report tab, `Tag.requires_classification`, `Tag.allele_origin_bucket`,
+   `VariantTag.sample` and tag resolution. Stage 1's triage *drop* and the external-lab marking on the
+   row are still outstanding.
+3. **B, the bucket rule** — landed: target bucket decided first on the create page and in the Classify &
+   Report dialog, candidates filtered to it, external records shown without a copy control.
+4. **B, gene candidates** — landed: `ClassificationConsensus.gene_consensus_groups`, the "Gene information
+   from" radio on the create page, the gene rows in the Classify & Report dialog.
+5. **B, the in-form helper box** and its "newer gene content" line — landed as
+   `classification/views/views_gene_consensus.py` and the form's Gene Content card.
 
 #444 (multi-variant reporting) starts from stage 1's list: the same triaged set, taken to a report
 instead of one classification at a time.
@@ -320,5 +433,4 @@ instead of one classification at a time.
 
 | Question | Why it matters |
 |---|---|
-| Should external-lab candidates be visible by default, or behind a toggle? | Shariant records are the useful ones, but they widen the list |
 | Do `amp:level_a`–`d` belong at gene scope? | They are gene + tumour type in practice; if so they need the same human pick, not a scope change |
