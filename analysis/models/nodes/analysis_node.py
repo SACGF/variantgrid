@@ -280,8 +280,14 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
         """ Sample of the object of a study, if known """
         return None
 
-    def get_proband_sample(self) -> Optional[Sample]:
-        """ Sample of the object of a study if known """
+    def get_proband_sample(self, proband_by_node_id: Optional[dict[int, Optional[Sample]]] = None) -> Optional[Sample]:
+        """ Sample of the object of a study if known.
+            proband_by_node_id: answers already worked out, shared across a whole graph rather than kept on the
+            node - a descendant asks each of its ancestors, so a diamond in the DAG asks the same node once per
+            path to it (@see analysis/variant_tag_operations.py:get_proband_sample_by_node_id) """
+        if proband_by_node_id is not None and self.pk in proband_by_node_id:
+            return proband_by_node_id[self.pk]
+
         proband_samples = set()
         if proband_sample := self._get_proband_sample_for_node():
             proband_samples.add(proband_sample)
@@ -289,12 +295,14 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
         if self.has_input():
             parents, _ = self.get_parent_subclasses_and_errors()
             for parent in parents:
-                if parent_proband_sample := parent.get_proband_sample():
+                if parent_proband_sample := parent.get_proband_sample(proband_by_node_id):
                     proband_samples.add(parent_proband_sample)
 
         proband_sample = None
         if len(proband_samples) == 1:  # If ambiguous, then just give up
             proband_sample = proband_samples.pop()
+        if proband_by_node_id is not None:
+            proband_by_node_id[self.pk] = proband_sample
         return proband_sample
 
     def get_samples_with_genotype(self) -> list[Sample]:

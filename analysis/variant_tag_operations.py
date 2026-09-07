@@ -15,6 +15,7 @@ Tagging stays one click - the sample is the study's proband where the node knows
 never prompted for. Carrying the variant is not what makes a tagging someone's: a relative who is HET for the
 proband's variant doesn't need their own classification.
 """
+from collections import defaultdict
 from collections.abc import Iterable
 from typing import Optional
 
@@ -23,7 +24,8 @@ from django.contrib.auth.models import User
 from django.db import transaction
 from django.utils.timezone import now
 
-from analysis.models import Analysis, VariantTag
+from analysis.models import Analysis, AnalysisEdge, VariantTag
+from analysis.models.nodes.node_utils import get_nodes_by_id
 from classification.models import Classification
 from patients.models_enums import Zygosity
 from snpdb.models import Sample, SampleGenotype, Variant
@@ -63,6 +65,23 @@ def get_sample_for_variant_tag(variant_tag: VariantTag) -> Optional[Sample]:
     if node := variant_tag.node:
         return node.get_subclass().get_proband_sample()
     return None
+
+
+def get_proband_sample_by_node_id(analysis: Analysis) -> dict[int, Optional[Sample]]:
+    """ Every node's answer to get_sample_for_variant_tag, from the analysis graph loaded once.
+        Asking a tagging at a time walks the ancestors a subclass query at a time and re-walks them for
+        the next tagging - one analysis has thousands of taggings across a handful of nodes """
+    nodes_by_id = get_nodes_by_id(analysis.analysisnode_set.all().select_subclasses())
+    parents = defaultdict(list)
+    for parent_id, child_id in AnalysisEdge.objects.filter(parent__analysis=analysis).values_list("parent", "child"):
+        parents[child_id].append(nodes_by_id[parent_id])
+    for node_id, node in nodes_by_id.items():
+        node._cached_parents = parents.get(node_id, [])
+
+    proband_by_node_id = {}
+    for node in nodes_by_id.values():
+        node.get_proband_sample(proband_by_node_id)
+    return proband_by_node_id
 
 
 def classification_resolves_tag(variant_tag: VariantTag, classification: Classification) -> bool:

@@ -6,14 +6,20 @@ an analysis can usually say which sample it was about without anyone being asked
 knows the study's proband. Anything still ambiguous is left null and picked at classification time, where a
 sample dropdown already exists.
 
+Taggings are done an analysis at a time so the node graph - which is what the answer actually comes from - is
+loaded once for the thousands of taggings that share it. Only taggings without a sample are selected, so an
+interrupted run picks up where it stopped.
+
 @see https://github.com/SACGF/variantgrid_sapath/issues/246
 """
 import logging
 
 from django.core.management import BaseCommand
 
-from analysis.models import VariantTag
-from analysis.variant_tag_operations import get_sample_for_variant_tag
+from analysis.models import Analysis, VariantTag
+from analysis.variant_tag_operations import get_proband_sample_by_node_id
+
+BATCH_SIZE = 1000
 
 
 class Command(BaseCommand):
@@ -25,20 +31,36 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         dry_run = options["dry_run"]
-        qs = VariantTag.objects.filter(sample__isnull=True, analysis__isnull=False) \
-            .select_related("analysis", "node", "variant", "allele").order_by("pk")
+        base_qs = VariantTag.objects.filter(sample__isnull=True, analysis__isnull=False, node__isnull=False)
+        analysis_ids = list(base_qs.order_by("analysis_id").values_list("analysis_id", flat=True).distinct())
 
         filled = 0
         ambiguous = 0
-        for variant_tag in qs.iterator():
-            sample = get_sample_for_variant_tag(variant_tag)
-            if sample is None:
-                ambiguous += 1
-                continue
-            filled += 1
-            logging.info("VariantTag %s (%s) -> sample %s", variant_tag.pk, variant_tag.tag_id, sample)
-            if not dry_run:
-                VariantTag.objects.filter(pk=variant_tag.pk).update(sample=sample)
+        for i, analysis_id in enumerate(analysis_ids, start=1):
+            analysis = Analysis.objects.get(pk=analysis_id)
+            proband_sample_by_node_id = get_proband_sample_by_node_id(analysis)
+
+            to_update = []
+            for variant_tag in base_qs.filter(analysis=analysis).order_by("pk").iterator():
+                sample = proband_sample_by_node_id.get(variant_tag.node_id)
+                if sample is None:
+                    ambiguous += 1
+                    continue
+                variant_tag.sample = sample
+                to_update.append(variant_tag)
+                if len(to_update) >= BATCH_SIZE:
+                    filled += self._write(to_update, dry_run)
+                    to_update = []
+            filled += self._write(to_update, dry_run)
+
+            logging.info("Analysis %s (%d/%d): %d filled, %d ambiguous so far",
+                         analysis_id, i, len(analysis_ids), filled, ambiguous)
 
         prefix = "Would set" if dry_run else "Set"
         self.stdout.write(f"{prefix} sample on {filled} taggings, left {ambiguous} ambiguous")
+
+    @staticmethod
+    def _write(variant_tags: list[VariantTag], dry_run: bool) -> int:
+        if variant_tags and not dry_run:
+            VariantTag.objects.bulk_update(variant_tags, ["sample"])
+        return len(variant_tags)

@@ -7,11 +7,15 @@ from django.urls import reverse
 
 from analysis.classify_report import ClassifyReportCase
 from analysis.models import Analysis, VariantTag
+from analysis.models.nodes.filters.filter_node import FilterNode
+from analysis.models.nodes.filters.merge_node import MergeNode
 from analysis.models.nodes.sources.cohort_node import CohortNode
+from analysis.models.nodes.sources.trio_node import TrioNode
 from analysis.models.nodes.sources.sample_node import SampleNode
 from analysis.tests.inheritance_node_mixin import make_cohort_genotype
 from analysis.variant_tag_operations import (
     VARIANT_TAG_CLASSIFIED,
+    get_proband_sample_by_node_id,
     get_sample_for_variant_tag,
     resolve_requires_classification_tags_for_samples,
 )
@@ -20,7 +24,7 @@ from classification.enums import SpecialEKeys, SubmissionSource
 from classification.models import Classification, ClassificationReportTemplate
 from library.guardian_utils import assign_permission_to_user_and_groups
 from snpdb.models import Country, GenomeBuild, Lab, Organization, Tag, Variant
-from snpdb.tests.utils.fake_cohort_data import create_fake_cohort
+from snpdb.tests.utils.fake_cohort_data import create_fake_cohort, create_fake_trio
 
 REQUIRES_CLASSIFICATION = "RequiresClassification"
 
@@ -95,6 +99,40 @@ class VariantTagSampleTest(ClassifyReportTestCase):
         # Only the proband carries it, but being the one carrier is not what makes it their to-do
         variant_tag = self._create_variant_tag(analysis=analysis, node=node)
         self.assertIsNone(get_sample_for_variant_tag(variant_tag))
+
+    def test_bulk_lookup_gives_the_same_answers_as_asking_a_tag_at_a_time(self):
+        """ What the backfill relies on - one graph load answers for every node in the analysis """
+        analysis = self._create_analysis()
+        sample_node = SampleNode.objects.create(analysis=analysis, sample=self.mother)
+        cohort_node = CohortNode.objects.create(analysis=analysis, cohort=self.cohort)
+
+        proband_sample_by_node_id = get_proband_sample_by_node_id(analysis)
+        self.assertEqual(proband_sample_by_node_id[sample_node.pk], self.mother)
+        self.assertIsNone(proband_sample_by_node_id[cohort_node.pk])
+
+    def test_two_nodes_of_the_same_trio_are_not_ambiguous(self):
+        """ An analysis often has several TrioNodes on the one trio - that is one study, not two """
+        trio = create_fake_trio(self.user, self.genome_build)
+        analysis = self._create_analysis()
+        first = TrioNode.objects.create(analysis=analysis, trio=trio)
+        second = TrioNode.objects.create(analysis=analysis, trio=trio)
+        merge = MergeNode.objects.create(analysis=analysis)
+        merge.add_parent(first)
+        merge.add_parent(second)
+
+        proband_sample_by_node_id = get_proband_sample_by_node_id(analysis)
+        self.assertEqual(proband_sample_by_node_id[merge.pk], trio.proband.sample)
+
+        variant_tag = self._create_variant_tag(analysis=analysis, node=merge)
+        self.assertEqual(get_sample_for_variant_tag(variant_tag), trio.proband.sample)
+
+    def test_bulk_lookup_follows_the_graph_to_an_ancestors_proband(self):
+        analysis = self._create_analysis()
+        sample_node = SampleNode.objects.create(analysis=analysis, sample=self.mother)
+        child = FilterNode.objects.create(analysis=analysis)
+        child.add_parent(sample_node)
+
+        self.assertEqual(get_proband_sample_by_node_id(analysis)[child.pk], self.mother)
 
 
 class ClassifyQueueTest(ClassifyReportTestCase):
