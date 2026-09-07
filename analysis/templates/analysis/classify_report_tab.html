@@ -1,5 +1,7 @@
 {% load ui_utils %}
 {% load classification_tags %}
+{% load user_tag_color_tags %}
+{% render_tag_styles_and_formatter %}
 <div id="classify-report" data-tab-url="{{ request.path }}">
     <script>
         $(document).ready(function() {
@@ -178,7 +180,7 @@
                         <div class="text-muted small">Tags to action</div>
                         <div class="h4 mb-0">{{ outstanding }}</div>
                         <div class="text-muted small">
-                            {% for tag, count in tag_summary %}{% if not forloop.first %} &middot; {% endif %}{{ count }} {{ tag }}{% empty %}nothing outstanding{% endfor %}
+                            {% for tag, count in tag_summary %}{% if not forloop.first %} &middot; {% endif %}{{ count }} <span class="grid-tag tagged-{{ tag }}"><span class="user-tag-colored">{{ tag }}</span></span>{% empty %}nothing outstanding{% endfor %}
                         </div>
                     </div>
                 </div>
@@ -231,7 +233,7 @@
                             <a href="{% url 'view_variant' row.variant_tag.variant_id %}" class="hover-link">{{ row.variant_tag.canonical_c_hgvs|default:row.variant_tag.variant }}</a>
                         </td>
                         <td>{{ row.gene_symbol|default_if_none:"" }}</td>
-                        <td><span class="badge badge-secondary">{{ row.variant_tag.tag_id }}</span></td>
+                        <td><span class="grid-tag tagged-{{ row.variant_tag.tag_id }}" title="Tagged as {{ row.variant_tag.tag_id }}"><span class="user-tag-colored">{{ row.variant_tag.tag_id }}</span></span></td>
                         <td>{% if row.sample %}{{ row.sample.name }}{% else %}<span class="text-muted">choose when classifying</span>{% endif %}</td>
                         <td>
                             {% if row.previous %}
