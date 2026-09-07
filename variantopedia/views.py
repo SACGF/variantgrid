@@ -437,6 +437,7 @@ def variant_sample_information(request, variant_id, genome_build_name):
     context = {
         "variant": variant,
         "variant_ids": [v.pk for v in variant.all_build_variants],
+        "genome_builds": sorted(variant.all_genome_builds, key=lambda gb: gb.name),
         "has_samples_in_other_builds":
             Sample.objects.exclude(vcf__genome_build__in=variant.all_genome_builds).exists(),
     }
