@@ -450,8 +450,6 @@ python-dateutil==2.9.0.post0
     #   pronto
 python-ipware==3.0.0
     # via django-ipware
-pyvcf3 @ git+https://github.com/dridk/PyVCF3@1fb3789153d1d8e28e2cedf121399f276b5f312a#egg=pyvcf3
-    # via -r requirements.in
 pyyaml==6.0.3
     # via
     #   -r requirements.in
@@ -499,8 +497,6 @@ s3transfer==0.19.2
     # via boto3
 scipy==1.18.1
     # via -r requirements.in
-setuptools==84.0.0
-    # via pyvcf3
 simplejson==4.1.2
     # via -r requirements.in
 six==1.17.0

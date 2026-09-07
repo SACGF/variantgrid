@@ -42,7 +42,6 @@ drf-spectacular-sidecar
 easy_thumbnails
 fontawesomefree==6.4.0
 git+https://github.com/biocommons/hgvs#egg=hgvs
-git+https://github.com/dridk/PyVCF3#egg=pyvcf3
 gunicorn
 HTSeq
 ijson

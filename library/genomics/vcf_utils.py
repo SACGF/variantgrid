@@ -13,7 +13,6 @@ from collections.abc import Iterable
 from typing import IO, Optional, Union
 
 import cyvcf2
-import vcf
 from django.conf import settings
 
 from library.genomics.vcf_enums import VCFSymbolicAllele
@@ -26,8 +25,10 @@ from library.genomics.vcf_writer import (
 from library.utils import open_file_or_filename, open_handle_gzip
 from snpdb.models import GenomeFasta, Sequence, SequenceRole, Variant, VariantCoordinate
 
-
 VCF_HEADER_FILTER_ID_PATTERN = re.compile(r'^##FILTER=<ID=([^,>]+)')
+VCF_HEADER_SOURCE_PATTERN = re.compile(r'^##source=(.*)$')
+VCF_HEADER_GATK_COMMANDLINE_PATTERN = re.compile(r'^##GATKCommandLine=<(.*)>$')
+VCF_HEADER_KEY_VALUE_PATTERN = re.compile(r'(\w+)=("[^"]*"|[^,>]*)')
 
 
 def vcf_header_filter_ids(vcf_header_lines: Iterable[str]) -> set[str]:
@@ -114,29 +115,33 @@ def vcf_to_variant_coordinates_and_records(filename: str) -> Iterable[tuple[Vari
 
 
 def get_variant_caller_and_version_from_vcf(filename) -> tuple[str, str]:
+    """ From '##source=freeBayes v1.3.5' style lines, or GATKCommandLine structured lines (any GATK tool is
+        reported as "GATK"). Header lines are matched as text: cyvcf2's header_iter drops the key of
+        ##GATKCommandLine lines, keeping only their ID """
     variant_caller = None
     version = None
 
     if os.path.exists(filename):
-        reader = vcf.Reader(filename=filename)
+        header_lines = cyvcf2.VCF(filename).raw_header.splitlines()
 
-        if source_list := reader.metadata.get("source"):
-            for source in source_list:
+        for line in header_lines:
+            if m := VCF_HEADER_SOURCE_PATTERN.match(line):
                 # Match source = "freeBayes v1.3.5" or "VarDict_v1.8.2"
-                if m := re.match(r"(.*?)[ _]v([\d\\.]+)", source):
+                if m := re.match(r"(.*?)[ _]v([\d\\.]+)", m.group(1)):
                     variant_caller, version = m.groups()
                     break
 
-        if gatk_commandline := reader.metadata.get("GATKCommandLine"):
-            variant_caller = "GATK"
-            for commandline in gatk_commandline:
+        for line in header_lines:
+            if m := VCF_HEADER_GATK_COMMANDLINE_PATTERN.match(line):
+                variant_caller = "GATK"
+                commandline = {k: v.strip('"') for k, v in VCF_HEADER_KEY_VALUE_PATTERN.findall(m.group(1))}
                 if caller_id := commandline.get("ID"):
                     if caller_id == 'HaplotypeCaller':
                         caller_id = "GATK"  # Just stay with GATK
                     variant_caller = caller_id
 
-                if version := commandline.get("Version"):
-                    version = version.replace('"', "")  # Strip quotes
+                if commandline_version := commandline.get("Version"):
+                    version = commandline_version
 
     return variant_caller, version
 

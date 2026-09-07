@@ -171,7 +171,7 @@ def create_vcf_filters(vcf, filters: dict):
             logging.warning("Warning: Run out of characters to store filters! Only storing 1st %d.", num_filters)
             break
 
-        if filter_id == "PASS":  # Special - don't store this as vcf.Reader will not return it
+        if filter_id == "PASS":  # Special - don't store this as cyvcf2 returns FILTER=None for it
             continue
         filter_description = filter_dict["Description"]
 

@@ -1,4 +1,4 @@
-import vcf
+import cyvcf2
 
 from library.utils import sha256sum_str
 from snpdb.models import (
@@ -45,7 +45,7 @@ def slowly_create_loci_and_variants_for_vcf(genome_build, vcf_filename, get_vari
     """ For tests - doesn't use VariantPKLookup """
 
     pk_by_seq = Sequence.get_pk_by_seq()
-    for v in vcf.Reader(filename=vcf_filename):
+    for v in cyvcf2.VCF(vcf_filename):
         ref = str(v.REF)
         alt = str(v.ALT[0])
         if svlen := v.INFO.get("SVLEN"):
