@@ -19,6 +19,7 @@ import logging
 from typing import Optional
 
 from django.conf import settings
+from django.db import IntegrityError, transaction
 
 from library.django_utils import thread_safe_unique_together_get_or_create
 from library.genomics.vcf_enums import VCFSymbolicAllele
@@ -76,27 +77,37 @@ def populate_clingen_alleles_for_variants(genome_build: GenomeBuild, variants,
     miv_qs = ModifiedImportedVariant.objects.filter(variant__in=variants)
     normalized_variants = set(miv_qs.values_list("variant_id", flat=True))
 
+    seen_variant_ids = set()
     for v in variants:
         variant_id = v.pk
-        if variant_id not in variant_ids_with_allele or variant_id in allele_missing_clingen_by_variant_id:
-            if v.can_have_clingen_allele:
-                variant_ids_without_alleles.append(variant_id)
-                # Because we can't guarantee annotation is finished here, use HGVSMatcher to get g.HGVS
-                variant_hgvs.append(hgvs_matcher.variant_to_g_hgvs(v))
-            else:
-                skip_variant_ids_without_alleles.append(variant_id)
-        else:
+        if variant_id in seen_variant_ids:
+            continue  # Variants don't have to be distinct - don't make a 2nd Allele for a repeat
+        seen_variant_ids.add(variant_id)
+
+        has_allele = variant_id in variant_ids_with_allele
+        if has_allele and variant_id not in allele_missing_clingen_by_variant_id:
             num_existing_records += 1
+        elif v.can_have_clingen_allele:
+            variant_ids_without_alleles.append(variant_id)
+            # Because we can't guarantee annotation is finished here, use HGVSMatcher to get g.HGVS
+            variant_hgvs.append(hgvs_matcher.variant_to_g_hgvs(v))
+        elif has_allele:
+            # Can never get a ClinGen Allele, so the empty Allele it already has is all it will ever have (#1361)
+            num_existing_records += 1
+        else:
+            skip_variant_ids_without_alleles.append(variant_id)
 
     num_no_record = len(variant_ids_without_alleles)
     logging.debug("ClinGeneAllele %s: %d variants have Alleles, %d without",
                   genome_build, num_existing_records, num_no_record)
 
     variant_id_allele_error: list[tuple[int, Allele, Optional[str]]] = []
+    new_empty_allele_ids: list[int] = []
     if num_skip := len(skip_variant_ids_without_alleles):
         logging.debug("%d variants skipping ClingenAlleleRegistry", num_skip)
         empty_alleles = [Allele() for _ in range(num_skip)]
         reference_alleles = Allele.objects.bulk_create(empty_alleles)
+        new_empty_allele_ids.extend(a.pk for a in reference_alleles)
         variant_id_allele_error.extend(((variant_id, allele, None) for variant_id, allele in
                                         zip(skip_variant_ids_without_alleles, reference_alleles)))
 
@@ -150,6 +161,7 @@ def populate_clingen_alleles_for_variants(genome_build: GenomeBuild, variants,
             Allele.objects.bulk_update(modified_alleles_list, ["clingen_allele_id"], batch_size=2000)
 
         allele_no_clingen_list = Allele.objects.bulk_create(allele_no_clingen_list)
+        new_empty_allele_ids.extend(a.pk for a in allele_no_clingen_list)
         alleles_with_clingen_list = Allele.objects.bulk_create(new_alleles_with_clingen_list, ignore_conflicts=True)
         alleles_by_clingen = {}
         existing_allele_clingen_ids = [a.clingen_allele_id for a in alleles_with_clingen_list if a.pk is None]
@@ -183,6 +195,27 @@ def populate_clingen_alleles_for_variants(genome_build: GenomeBuild, variants,
         logging.debug("Creating %d VariantAlleles", len(variant_allele_list))
         VariantAllele.objects.bulk_create(variant_allele_list, ignore_conflicts=True)
 
+    if new_empty_allele_ids:
+        # Another writer linking the variant first means our VariantAllele was dropped as a conflict,
+        # leaving the empty Allele we made for it unused
+        Allele.objects.filter(pk__in=new_empty_allele_ids, variantallele__isnull=True).delete()
+
+
+def _create_variant_allele_with_new_allele(variant: Variant, genome_build: GenomeBuild, **kwargs) -> VariantAllele:
+    """ Another task may link the variant between our Allele and VariantAllele inserts - on a clash use
+        theirs and discard the Allele we just made """
+    allele = Allele.objects.create()
+    try:
+        with transaction.atomic():
+            return VariantAllele.objects.create(variant_id=variant.pk,
+                                                genome_build=genome_build,
+                                                allele=allele,
+                                                origin=AlleleOrigin.variant_origin(variant, allele, genome_build),
+                                                **kwargs)
+    except IntegrityError:
+        allele.delete()
+        return VariantAllele.objects.get(variant=variant, genome_build=genome_build)
+
 
 def get_variant_allele_for_variant(genome_build: GenomeBuild, variant: Variant,
                                    clingen_api: ClinGenAlleleRegistryAPI = None) -> Optional[VariantAllele]:
@@ -190,7 +223,6 @@ def get_variant_allele_for_variant(genome_build: GenomeBuild, variant: Variant,
         Successful calls link variants in all builds (that exist)
         errors are only stored on the requesting build """
 
-    # In a very rare race condition, we may have 2 VariantAlleles created, in which case just use 1st
     if va := VariantAllele.objects.filter(variant=variant, genome_build=genome_build).order_by("pk").first():
         if va.needs_clingen_call():
             try:
@@ -207,11 +239,7 @@ def get_variant_allele_for_variant(genome_build: GenomeBuild, variant: Variant,
 
         if va is None:
             logging.debug("Not using ClinGen")
-            allele = Allele.objects.create()
-            va = VariantAllele.objects.create(variant_id=variant.pk,
-                                              genome_build=genome_build,
-                                              allele=allele,
-                                              origin=AlleleOrigin.variant_origin(variant, allele, genome_build))
+            va = _create_variant_allele_with_new_allele(variant, genome_build)
     return va
 
 
@@ -259,12 +287,7 @@ def variant_allele_clingen(genome_build, variant, existing_variant_allele=None,
             existing_variant_allele.save()
             va = existing_variant_allele
         else:
-            allele = Allele.objects.create()
-            va = VariantAllele.objects.create(variant_id=variant.pk,
-                                              genome_build=genome_build,
-                                              allele=allele,
-                                              origin=AlleleOrigin.variant_origin(variant, allele, genome_build),
-                                              clingen_error=api_response)
+            va = _create_variant_allele_with_new_allele(variant, genome_build, clingen_error=api_response)
 
     else:
         clingen_allele_id = ClinGenAllele.get_id_from_response(api_response)

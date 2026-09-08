@@ -1,6 +1,18 @@
+from django.contrib.auth.models import User
 from django.test import TestCase
 
-from snpdb.models import Allele, AlleleConversionTool, AlleleOrigin, GenomeBuild, VariantAllele
+from analysis.models import VariantTag
+from snpdb.models import (
+    Allele,
+    AlleleConversionTool,
+    AlleleLiftover,
+    AlleleOrigin,
+    GenomeBuild,
+    LiftoverRun,
+    ProcessingStatus,
+    Tag,
+    VariantAllele,
+)
 from snpdb.models.models_clingen_allele import ClinGenAllele
 from snpdb.tests.utils.vcf_testing_utils import create_mock_allele, slowly_create_test_variant
 
@@ -96,3 +108,50 @@ class AlleleVariantForBuildTestCase(TestCase):
     def test_variant_for_any_build_missing_best_attempt_false_raises(self):
         with self.assertRaises(ValueError):
             self.allele.variant_for_any_build(self.grch38, best_attempt=False)
+
+
+class AlleleMergeMovesForeignKeysTestCase(TestCase):
+    """ Everything else pointing at the merged-away Allele has to come across, or it ends up on an Allele
+        with no variants - eg a tag that can't be seen in either build (#1361) """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.grch37 = GenomeBuild.get_name_or_alias("GRCh37")
+        cls.user = User.objects.create_user("allele_merge_tester")
+        cls.tag = Tag.objects.create(pk="test-merge-tag")
+
+    def test_merge_moves_variant_tag_and_allele_liftover(self):
+        allele_a = Allele.objects.create()
+        allele_b = Allele.objects.create()
+        variant = slowly_create_test_variant("1", 7_000_000, "A", "G", self.grch37)
+        variant_tag = VariantTag.objects.create(variant=variant, genome_build=self.grch37, tag=self.tag,
+                                                allele=allele_b, user=self.user)
+        liftover_run = LiftoverRun.objects.create(user=self.user, genome_build=self.grch37,
+                                                  conversion_tool=AlleleConversionTool.SAME_CONTIG)
+        allele_liftover = AlleleLiftover.objects.create(allele=allele_b, liftover=liftover_run,
+                                                        status=ProcessingStatus.SUCCESS)
+
+        self.assertTrue(allele_a.merge(AlleleConversionTool.BCFTOOLS_LIFTOVER, allele_b))
+
+        variant_tag.refresh_from_db()
+        allele_liftover.refresh_from_db()
+        self.assertEqual(variant_tag.allele, allele_a)
+        self.assertEqual(allele_liftover.allele, allele_a)
+
+    def test_merge_keeps_our_allele_liftover_when_both_were_in_a_run(self):
+        """ AlleleLiftover is unique on (liftover, allele) - moving them blindly raises """
+        allele_a = Allele.objects.create()
+        allele_b = Allele.objects.create()
+        liftover_run = LiftoverRun.objects.create(user=self.user, genome_build=self.grch37,
+                                                  conversion_tool=AlleleConversionTool.SAME_CONTIG)
+        ours = AlleleLiftover.objects.create(allele=allele_a, liftover=liftover_run,
+                                             status=ProcessingStatus.SUCCESS)
+        theirs = AlleleLiftover.objects.create(allele=allele_b, liftover=liftover_run,
+                                               status=ProcessingStatus.ERROR)
+
+        self.assertTrue(allele_a.merge(AlleleConversionTool.BCFTOOLS_LIFTOVER, allele_b))
+
+        ours.refresh_from_db()
+        theirs.refresh_from_db()
+        self.assertEqual(ours.allele, allele_a)
+        self.assertEqual(theirs.allele, allele_b)

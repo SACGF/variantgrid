@@ -54,15 +54,24 @@ computed, for overlap queries.
 that made it (`AlleleConversionTool`). `snpdb/clingen_allele.py:populate_clingen_alleles_for_variants` is the batch
 path: variants that fail `Variant.can_have_clingen_allele` (gene-level, an alt that cannot form g.HGVS, or larger than
 `ClinGenAllele.CLINGEN_ALLELE_MAX_ALLELE_SIZE`, with `<DUP>` counted double for a registry bug) get a bare `Allele`
-with no network call; the rest are sent as one `hgvs_put` batch, and the response creates `ClinGenAllele` rows or
-stores the error on `VariantAllele.clingen_error`. Alleles are created with `ignore_conflicts=True` and re-read because
-the Allele may already exist from another build. The single-variant path is `snpdb/clingen_allele.py:get_variant_allele_for_variant`,
+with no network call, once - a variant that can never be registered counts as done on every later call, which is what
+stopped it collecting a fresh `Allele` per call (#1361 / #1844). The rest are sent as one `hgvs_put` batch, and the
+response creates `ClinGenAllele` rows or stores the error on `VariantAllele.clingen_error`. Alleles are created with
+`ignore_conflicts=True` and re-read because the Allele may already exist from another build; any empty Allele whose
+`VariantAllele` insert was dropped as a conflict is deleted at the end of the call. The single-variant path is `snpdb/clingen_allele.py:get_variant_allele_for_variant`,
 and `snpdb/clingen_allele.py:variant_allele_clingen` handles the registry saying "this coordinate is CA123" when CA123
 already belongs to a different Allele by calling `Allele.merge`.
 
-`snpdb/models/models_variant.py:Allele.merge` moves the ClinGen id, flags, clinical contexts, classifications and every
-`VariantAllele` onto the survivor (deleting a link that would violate the unique constraint) and refuses when both sides
-already carry a ClinGenAllele, logging the attempt in `AlleleMergeLog`. `VariantAllele.needs_clingen_call` only retries a
+`snpdb/models/models_variant.py:Allele.merge` moves the ClinGen id, flags, clinical contexts, classifications,
+variant tags, `ImportedAlleleInfo`s, `AlleleLiftover`s, `ClinVarRecordCollection`s and every `VariantAllele` onto the
+survivor (deleting a link that would violate the unique constraint) and refuses when both sides already carry a
+ClinGenAllele, logging the attempt in `AlleleMergeLog`. It ends by sending
+`snpdb/models/models_variant.py:allele_merged_signal`, which
+`classification/signals/classification_hooks_allele_merge.py:allele_merged_handler` uses to put the moved
+classifications' clinical contexts and groupings back under the surviving Allele - both are derived records that are
+otherwise only re-homed when a classification is next published.
+`ClinVarAllele` and `AlleleGrouping` are left alone: both are rebuilt from classifications and both carry uniqueness a
+blind update would violate. `VariantAllele.needs_clingen_call` only retries a
 stored error when it was a server error, and only when `settings.CLINGEN_ALLELE_REGISTRY_LOGIN` is set.
 
 ### Liftover
@@ -77,7 +86,8 @@ range, and each batch re-queries `Allele.missing_variants_for_build` so a failur
 `snpdb/liftover.py:_get_build_liftover_dicts` chooses the method per allele, stopping at the first that works:
 `snpdb/liftover.py:_liftover_using_existing_contig` when the contig is shared between builds (MT), which just creates the
 `VariantAllele` with `AlleleConversionTool.SAME_CONTIG` and no VCF at all
-(`snpdb/liftover.py:_run_liftover_using_same_contig`); `snpdb/liftover.py:_liftover_using_dest_variant_coordinate`, which
+(`snpdb/liftover.py:_run_liftover_using_same_contig` - if the destination build's variant already has an Allele of its
+own it merges the two and records the `AlleleLiftover` as `SKIPPED` instead); `snpdb/liftover.py:_liftover_using_dest_variant_coordinate`, which
 asks the ClinGen record for the destination g.HGVS (`ClinGenAllele.get_g_hgvs`) and, if `settings.LIFTOVER_DBSNP_ENABLED`
 (off by default), dbSNP; and `snpdb/liftover.py:_liftover_using_source_variant_coordinate`, whose only option is
 `AlleleConversionTool.BCFTOOLS_LIFTOVER` (`snpdb/bcftools_liftover.py:bcftools_liftover`). `PICARD` and `CROSSMAP` exist

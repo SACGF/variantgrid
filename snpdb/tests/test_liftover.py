@@ -3,6 +3,7 @@ from django.test import TestCase, override_settings
 from django.test.utils import CaptureQueriesContext
 
 from annotation.fake_annotation import get_fake_annotation_version
+from library.guardian_utils import admin_bot
 from snpdb.clingen_allele import get_clingen_allele
 from snpdb.liftover import (
     _batch_alleles,
@@ -11,8 +12,18 @@ from snpdb.liftover import (
     _liftover_using_existing_contig,
     _liftover_using_source_variant_coordinate,
     _non_standard_contig_error,
+    _run_liftover_using_same_contig,
 )
-from snpdb.models import Allele, AlleleConversionTool, GenomeBuild, VariantCoordinate
+from snpdb.models import (
+    Allele,
+    AlleleConversionTool,
+    AlleleLiftover,
+    GenomeBuild,
+    LiftoverRun,
+    ProcessingStatus,
+    VariantAllele,
+    VariantCoordinate,
+)
 from snpdb.tasks.liftover_tasks import _allele_id_batches
 from snpdb.tests.utils.mock_clingen_api import MockClinGenAlleleRegistryAPI
 from snpdb.tests.utils.vcf_testing_utils import create_mock_allele, slowly_create_test_variant
@@ -144,3 +155,41 @@ class TestLiftoverQueries(TestCase):
         one_allele = _num_queries(self._create_alleles(1, 2000))
         five_alleles = _num_queries(self._create_alleles(5, 3000))
         self.assertEqual(one_allele, five_alleles)
+
+
+class TestLiftoverSameContig(TestCase):
+    """ A build sharing a contig (MT) may already have imported the variant and given it an Allele of its own """
+
+    @classmethod
+    def setUpTestData(cls):
+        for genome_build in [GenomeBuild.grch37(), GenomeBuild.grch38()]:
+            get_fake_annotation_version(genome_build)
+        cls.mt_variant = slowly_create_test_variant("MT", 263, 'A', 'G', GenomeBuild.grch37())
+
+    def test_same_contig_liftover_merges_when_dest_variant_already_linked(self):
+        grch37 = GenomeBuild.grch37()
+        grch38 = GenomeBuild.grch38()
+        source_allele = create_mock_allele(self.mt_variant, grch37)
+        dest_allele = create_mock_allele(self.mt_variant, grch38)
+
+        liftover = LiftoverRun.objects.create(user=admin_bot(), genome_build=grch38,
+                                              conversion_tool=AlleleConversionTool.SAME_CONTIG)
+        _run_liftover_using_same_contig(liftover, [(source_allele, self.mt_variant)])
+
+        variant_allele = VariantAllele.objects.get(variant=self.mt_variant, genome_build=grch38)
+        surviving_allele_id = min(source_allele.pk, dest_allele.pk)
+        self.assertEqual(variant_allele.allele_id, surviving_allele_id)
+        self.assertEqual(AlleleLiftover.objects.get(liftover=liftover).status, ProcessingStatus.SKIPPED)
+
+    def test_same_contig_liftover_links_unclaimed_variant(self):
+        grch37 = GenomeBuild.grch37()
+        grch38 = GenomeBuild.grch38()
+        source_allele = create_mock_allele(self.mt_variant, grch37)
+
+        liftover = LiftoverRun.objects.create(user=admin_bot(), genome_build=grch38,
+                                              conversion_tool=AlleleConversionTool.SAME_CONTIG)
+        _run_liftover_using_same_contig(liftover, [(source_allele, self.mt_variant)])
+
+        variant_allele = VariantAllele.objects.get(variant=self.mt_variant, genome_build=grch38)
+        self.assertEqual(variant_allele.allele, source_allele)
+        self.assertEqual(AlleleLiftover.objects.get(liftover=liftover).status, ProcessingStatus.SUCCESS)

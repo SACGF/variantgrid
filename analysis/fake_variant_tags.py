@@ -218,7 +218,7 @@ class FakeVariantTags:
     def _pick_variants(self, genome_build: GenomeBuild, group: str, genes: list[str],
                        num_variants: int) -> list[FakeVariant]:
         """ Real variants, so the gene cards have real symbols to group on and the links all work """
-        variant_ids_by_gene = get_variant_ids_by_gene(genome_build, genes)
+        variant_ids_by_gene = get_variant_ids_by_gene(genome_build, genes, without_alleles=True)
         tags = [t for t in FAKE_TAGS if t.group in (group, BOTH)]
 
         fake_variants = []

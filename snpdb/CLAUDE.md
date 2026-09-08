@@ -25,6 +25,7 @@ Patterns here:
 
 Gotchas:
 - Some contigs are shared between builds (MT, unplaced scaffolds), so one Variant can carry a VariantAllele per build; filter the variantallele join by genome_build or rows duplicate (grids.py:AbstractVariantGrid.get_initial_queryset, #1626).
+- A Variant has at most one Allele per build - unique_together on (variant, genome_build) since #1361. Two Alleles wanting the same variant/build is resolved with models/models_variant.py:Allele.merge, which also sends models/models_variant.py:allele_merged_signal so classification re-homes the clinical contexts and groupings it moved.
 - Gene-level events (fusions) are Variants on a fake contig with a gene id for a position; guard coordinate code with models/models_variant.py:Variant.get_gene_level_q and read gene_level_variants.py first.
 - GenomeBuild, Allele, Lab and Organization managers cache lookups in production only (library/django_utils/django_object_managers.py:ObjectManagerCachingImmutable / ObjectManagerCachingRequest, off under settings.UNIT_TEST); expect stale instances, and count queries in tests with library/django_utils/unittest_utils.py:production_query_count.
 - Allele.grch37 / grch38 / variants are cached_property; refetch the Allele after a liftover or merge. models/models_variant.py:Allele.merge refuses when both sides already have a ClinGenAllele.

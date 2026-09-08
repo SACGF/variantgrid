@@ -17,3 +17,4 @@ from classification.signals.classification_hooks_grouping_search_terms import * 
 from classification.signals.classification_hooks_pending_flags import *  # so we load the receivers
 from classification.signals.classification_import_integration_status import *  # so we load the receivers
 from classification.signals.clinvar_export_integration_status import *  # so we load the receivers
+from classification.signals.classification_hooks_allele_merge import *  # so we load the receivers

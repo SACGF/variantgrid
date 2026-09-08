@@ -17,13 +17,19 @@ from snpdb.models import (
 def slowly_create_test_variant(chrom: str, position: int, ref: str, alt: str, genome_build: GenomeBuild) -> Variant:
     """ For test only - doesn't use VariantPKLookup """
     vc = VariantCoordinate.from_explicit_no_svlen(chrom, position, ref, alt)
-    vc = vc.as_internal_symbolic(genome_build)
+    return slowly_create_test_variant_from_coordinate(vc, genome_build)
+
+
+def slowly_create_test_variant_from_coordinate(variant_coordinate: VariantCoordinate,
+                                               genome_build: GenomeBuild) -> Variant:
+    """ For test only - the symbolic (<DEL>/<DUP>/<INV> + svlen) way in """
+    vc = variant_coordinate.as_internal_symbolic(genome_build)
     contig = genome_build.contigs.get(name=vc.chrom)
     uref = vc.ref.upper()
     ualt = vc.alt.upper()
     ref_seq, _ = Sequence.objects.get_or_create(seq=uref, seq_sha256_hash=sha256sum_str(uref))
     alt_seq, _ = Sequence.objects.get_or_create(seq=ualt, seq_sha256_hash=sha256sum_str(ualt))
-    locus, _ = Locus.objects.get_or_create(contig=contig, position=position, ref=ref_seq)
+    locus, _ = Locus.objects.get_or_create(contig=contig, position=vc.position, ref=ref_seq)
     defaults = {"end": vc.end}
     variant, _ = Variant.objects.get_or_create(locus=locus, alt=alt_seq, svlen=vc.svlen, defaults=defaults)
     return variant

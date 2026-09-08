@@ -264,20 +264,34 @@ def _run_liftover_using_same_contig(liftover, av_tuples: list[tuple[Allele, Vari
     """ Special case of e.g. Mitochondria that has the same contig across multiple builds
         we just need to create a VariantAllele object - will already have annotation for both builds """
 
+    # The destination variant may already have an Allele of its own (eg an MT variant imported straight into
+    # GRCh38 before the GRCh37 copy was lifted over) - a variant only ever has 1 Allele per build, so merge
+    existing_allele_id_by_variant_id = dict(
+        VariantAllele.objects.filter(genome_build=liftover.genome_build,
+                                     variant__in=[v for _, v in av_tuples]).values_list("variant_id", "allele_id"))
+
     variant_alleles = []
     allele_liftovers = []
     for allele, variant in av_tuples:
-        va = VariantAllele(variant=variant,
-                           genome_build=liftover.genome_build,
-                           allele=allele,
-                           origin=AlleleOrigin.LIFTOVER,
-                           allele_linking_tool=AlleleConversionTool.SAME_CONTIG)
-        variant_alleles.append(va)
+        if existing_allele_id := existing_allele_id_by_variant_id.get(variant.pk):
+            if existing_allele_id != allele.pk:
+                keep_id, other_id = sorted([existing_allele_id, allele.pk])
+                keep_allele = Allele.objects.get(pk=keep_id)
+                if not keep_allele.merge(AlleleConversionTool.SAME_CONTIG, Allele.objects.get(pk=other_id)):
+                    logging.warning("Couldn't merge 2xAlleles (same contig liftover) - Allele IDs: %s and %s",
+                                    keep_id, other_id)
+            status = ProcessingStatus.SKIPPED
+        else:
+            variant_alleles.append(VariantAllele(variant=variant,
+                                                 genome_build=liftover.genome_build,
+                                                 allele=allele,
+                                                 origin=AlleleOrigin.LIFTOVER,
+                                                 allele_linking_tool=AlleleConversionTool.SAME_CONTIG))
+            status = ProcessingStatus.SUCCESS
 
-        al = AlleleLiftover(allele=allele,
-                            liftover=liftover,
-                            status=ProcessingStatus.SUCCESS)
-        allele_liftovers.append(al)
+        allele_liftovers.append(AlleleLiftover(allele=allele,
+                                               liftover=liftover,
+                                               status=status))
 
     if variant_alleles:
         VariantAllele.objects.bulk_create(variant_alleles, ignore_conflicts=True, batch_size=2000)

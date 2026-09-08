@@ -41,7 +41,8 @@ linked by `VariantAllele` (`Allele.variant_for_build`). Classifications, ClinGen
 `Allele.grch37` / `grch38` are cached properties - refetch after a liftover or merge.
 
 **VariantAllele** - `snpdb/models/models_variant.py:VariantAllele`. The Variant→Allele link per build, recording how it was
-made (`origin`, `allele_linking_tool`). Filter by `genome_build` when joining or shared contigs duplicate rows.
+made (`origin`, `allele_linking_tool`). One Allele per variant per build (unique_together, #1361); several variants in a
+build may share an Allele. Filter by `genome_build` when joining or shared contigs duplicate rows.
 
 **ClinGenAllele** - `snpdb/models/models_clingen_allele.py:ClinGenAllele`. The ClinGen Allele Registry `CA…` id and its
 record; fetched over the network (`snpdb/clingen_allele.py`), bounded by `Variant.can_have_clingen_allele`. Two Alleles that

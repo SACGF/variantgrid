@@ -21,7 +21,7 @@ import pydantic
 from bioutils.sequences import reverse_complement
 from django.conf import settings
 from django.contrib.auth.models import User
-from django.db import IntegrityError, models
+from django.db import IntegrityError, models, transaction
 from django.db.models import F, QuerySet, Value
 from django.db.models.deletion import CASCADE, DO_NOTHING
 from django.db.models.fields import TextField
@@ -65,6 +65,10 @@ VARIANT_GENE_LEVEL_PATTERN = re.compile(
     rf"^{GENE_LEVEL_CONTIG_NAME}\s*:\s*(\d+)\s*-\s*\d+\s*({GENE_LEVEL_ALT_PATTERN.pattern})$")
 # matches anything hgvs-like before any fixes
 HGVS_UNCLEANED_PATTERN = re.compile(r"(^(N[MC]_|ENST)\d+.*:|[cnmg]\.|[^:]:[cnmg]).*\d+", re.IGNORECASE)
+
+
+# kwargs: old_allele, new_allele - sent after Allele.merge() moves everything across
+allele_merged_signal = django.dispatch.Signal()
 
 
 class Allele(FlagsMixin, PreviewModelMixin, models.Model):
@@ -189,16 +193,30 @@ class Allele(FlagsMixin, PreviewModelMixin, models.Model):
                 other_fc.classification_set.update(flag_collection=self.flag_collection)
             existing_allele_cc_names = self.clinicalcontext_set.values_list("name", flat=True)
             other_allele.clinicalcontext_set.exclude(name__in=existing_allele_cc_names).update(allele=self)
+            # Everything else pointing at the allele we're merging away - left behind these become records
+            # against an Allele with no variants (eg a tag that then can't be seen in either build - #1361)
+            other_allele.varianttag_set.update(allele=self)
+            other_allele.classification_set.update(allele=self)
+            other_allele.importedalleleinfo_set.update(allele=self)
+            other_allele.clinvarrecordcollection_set.update(allele=self)
+            # AlleleLiftover is unique on (liftover, allele) - if both were in a run, ours is the record of it
+            existing_liftover_ids = self.alleleliftover_set.values_list("liftover_id", flat=True)
+            other_allele.alleleliftover_set.exclude(liftover_id__in=existing_liftover_ids).update(allele=self)
             for va in other_allele.variantallele_set.all():
                 try:
-                    va.allele = self
-                    va.clingen_error = None  # clear any errors
-                    va.allele_linking_tool = allele_linking_tool
-                    va.save()
+                    # Savepoint - both alleles linking the same variant/build is normal, and an IntegrityError
+                    # that isn't rolled back aborts any transaction we're running inside
+                    with transaction.atomic():
+                        va.allele = self
+                        va.clingen_error = None  # clear any errors
+                        va.allele_linking_tool = allele_linking_tool
+                        va.save()
                 except IntegrityError:
                     logging.warning("VariantAllele exists with allele/build/variant of %s/%s/%s - deleting this one",
                                     va.allele, va.genome_build, va.variant)
                     va.delete()
+
+            allele_merged_signal.send_robust(sender=Allele, old_allele=other_allele, new_allele=self)
 
         return can_merge
 
@@ -981,11 +999,10 @@ class VariantWiki(Wiki):
 
 
 class VariantAllele(TimeStampedModel):
-    """ It's possible for multiple variants from the same genome build to
-        resolve to the same allele (due to our normalization not being the same as ClinGen
-        or 2 loci in a genome build being represented by 1 loci in the build being used
-        by ClinGen) - but it's not likely. It's a bug to have the same 3 variant/build/allele
-        so we can add that unique_together constraint
+    """ One Allele per variant per build - that's the unique_together, and code relies on it (#1361)
+
+        Several variants in a build may share an Allele (our normalization isn't the same as ClinGen's,
+        or 2 loci in a genome build are 1 locus in the build ClinGen used) - but it's not likely.
 
         We only expect to store Alleles for a small fraction of Variants
         So don't want them on the Variant object - instead do 1-to-1 """
@@ -1002,7 +1019,7 @@ class VariantAllele(TimeStampedModel):
     clingen_error = models.JSONField(null=True)  # null on success
 
     class Meta:
-        unique_together = ("variant", "genome_build", "allele")
+        unique_together = ("variant", "genome_build")
 
     @property
     def canonical_c_hgvs(self):
