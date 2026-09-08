@@ -90,10 +90,11 @@ Patterns here:
   enforced by `varianttag_one_per_sample_in_analysis` (`nulls_distinct=False`, so an analysis has at most one
   sample-less tagging too). A tagging never changes sample: tagging for this proband adds a row rather than
   taking the tag off a sibling, and the X on a pill deletes that one tagging by pk.
-- The analysis grid draws one pill per tagging, read against the proband of the node the grid is showing
-  (`nodeProbandSampleId`): the proband's own looks as it always did, another sample's gets a solid person
-  marker and a sample-less one a hollow person. `variantTags` is `{variant_id: [{id, tag, sample, resolved}]}`
-  - one entry per tagging, resolution included (@see `render_variant_tags_dict`, `VariantGridFormat.tags`).
+- The analysis grid draws one pill per tagging, marked with whose it is: a tagging for a sample always gets a
+  solid person marker naming it, boxed as well where that sample isn't the proband of the node the grid is
+  showing (`nodeProbandSampleId`), and a sample-less one gets a hollow person. `variantTags` is
+  `{variant_id: [{id, tag, sample, resolved}]}` - one entry per tagging, resolution included (@see
+  `render_variant_tags_dict`, `VariantGridFormat.tags`, `variantTaggingPillOptions` in `grid.js`).
 - A resolved tagging is hidden from the work lists: the tags node (`TagNode.include_resolved`, off by default), the
   variant page's tag list and the variant tags page (both on `UserGridConfig.show_hidden_data` under grid name
   `Variant Tags`, shown as a "Show resolved" checkbox). They all filter with

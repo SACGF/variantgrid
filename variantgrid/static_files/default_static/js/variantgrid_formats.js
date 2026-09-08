@@ -958,42 +958,26 @@ VariantGridFormat.tags = (tagsCellValue, type, rowData) => {
         tagHtml += "<a class='show-tag-autocomplete' variant_id='" + variantId + "' href='javascript:showTagAutocomplete(" + variantId + ")'><span class='add-variant-tag' title='Tag variant..'></span></a>";
     }
 
-    // One pill per tagging, read against the proband of the node this grid is showing - a tagging made
-    // for someone else, or for nobody yet, is not this proband's to-do @see render_variant_tags_dict
+    // One pill per tagging, marked with whose it is and read against the proband of the node this grid
+    // is showing - a tagging made for someone else is not this proband's to-do @see render_variant_tags_dict
     const taggings = (aWin.variantTags || {})[variantId];
     if (taggings) {
-        const probandSampleId = getNodeProbandSampleId();
         const sampleNames = aWin.analysisSamples || {};
         const sortedTaggings = sortVariantTags(aWin, taggings, (tagging) => tagging.tag);
         for (let i=0 ; i<sortedTaggings.length ; ++i) {
             const tagging = sortedTaggings[i];
             const tag = tagging.tag;
-            const extraClasses = [];
-            let marker;
-            let title;
-            if (tagging.sample === probandSampleId) {
-                title = `Tagged as ${tag}`;
-            } else if (tagging.sample) {
-                marker = "fas fa-user";
-                title = `Tagged as ${tag} for ${sampleNames[tagging.sample] || "another sample"}`;
-            } else {
-                marker = "far fa-user";
-                title = `Tagged as ${tag}, no sample`;
-                if (!readOnly) {
-                    title += " - tag here to make one for " + (sampleNames[probandSampleId] || "this sample");
-                }
-            }
-            let tagLabel = tag;
+            const options = variantTaggingPillOptions(tagging, sampleNames, readOnly);
+            options.variantTagId = tagging.id;
+            options.tagLabel = tag;
             // A to-do tag a classification has satisfied stays on the row (it's how it gets untagged)
             // but reads as done
             if (tagging.resolved) {
-                extraClasses.push("grid-tag-resolved");
-                tagLabel = `${tag} <i class='fas fa-check'></i>`;
-                title += ` - classified ${tagging.resolved}`;
+                options.extraClasses = ["grid-tag-resolved"];
+                options.tagLabel = `${tag} <i class='fas fa-check'></i>`;
+                options.title += ` - classified ${tagging.resolved}`;
             }
-            tagHtml += getVariantTagHtml(variantId, tag, readOnly,
-                                         {tagLabel: tagLabel, extraClasses: extraClasses, title: title,
-                                          variantTagId: tagging.id, marker: marker});
+            tagHtml += getVariantTagHtml(variantId, tag, readOnly, options);
         }
     }
     // Wrapped so the set can lift out of the clipped cell as one thing on hover - @see .grid-tags

@@ -1598,13 +1598,22 @@ table.variantgrid-datatable {
 		opacity: 0.55;
 	}
 
-	// Whose tagging the pill is, drawn only when it isn't the grid's node's proband - a solid person
-	// for another sample, a hollow one for a tagging nobody owns yet. @see VariantGridFormat.tags
+	// Whose tagging the pill is - a solid person for a tagging made for a sample, a hollow one for a
+	// tagging nobody owns yet. @see VariantGridFormat.tags
 	.grid-tag-sample-marker {
 		margin-left: 3px;
 		font-size: 8px;
 		vertical-align: 1px;
 		opacity: 0.75;
+	}
+
+	// A tagging for a sample other than the one this grid is about - boxed so it reads apart from
+	// this proband's own at a glance, the tooltip says whose it is
+	.grid-tag-sample-marker.grid-tag-sample-other {
+		opacity: 1;
+		padding: 0 1px;
+		border: 1px solid;
+		border-radius: 2px;
 	}
 
 	// Armed by clicking the tag - it sits over the tag's right end rather than being given room

@@ -1361,6 +1361,12 @@ table.variantgrid-datatable .grid-tag-sample-marker {
   vertical-align: 1px;
   opacity: 0.75;
 }
+table.variantgrid-datatable .grid-tag-sample-marker.grid-tag-sample-other {
+  opacity: 1;
+  padding: 0 1px;
+  border: 1px solid;
+  border-radius: 2px;
+}
 table.variantgrid-datatable .grid-tag-delete {
   position: absolute;
   top: 2px;

@@ -351,8 +351,12 @@ function showTagAutocomplete(variantId) {
                 const successFunc = function (response) {
                     // The click lands on this node's proband's tagging - a new pill only where a row was made
                     if (response && response.created) {
-                        const newTag = $(getVariantTagHtml(variantId, tag, false,
-                                                           {variantTagId: response.variant_tag.id}));
+                        const tagging = response.variant_tag;
+                        // setVariantTag has already recorded the sample's name by the time this runs
+                        const options = variantTaggingPillOptions(tagging, getAnalysisWindow().analysisSamples || {},
+                                                                  false);
+                        options.variantTagId = tagging.id;
+                        const newTag = $(getVariantTagHtml(variantId, tag, false, options));
                         newTag.click(tagClickHandler);
                         cell.append(newTag);
                     }
@@ -432,6 +436,32 @@ function getVariantTagHtml(variantId, tag, readOnly, options) {
 // @see node_data_grid.html / sample_variants_tab.html
 function getNodeProbandSampleId() {
     return typeof(nodeProbandSampleId) === 'undefined' ? null : nodeProbandSampleId;
+}
+
+
+/* How a tagging reads on its pill: a tagging with a sample always says so, and one made for a sample
+   other than the one the grid is about is boxed as well - it isn't this proband's to-do.
+   Returns the marker/title getVariantTagHtml takes - @see VariantGridFormat.tags */
+function variantTaggingPillOptions(tagging, sampleNames, readOnly) {
+    const probandSampleId = getNodeProbandSampleId();
+    const tag = tagging.tag;
+    if (tagging.sample) {
+        const options = {marker: "fas fa-user",
+                         title: `Tagged as ${tag} for ${sampleNames[tagging.sample] || "another sample"}`};
+        if (probandSampleId && tagging.sample !== probandSampleId) {
+            options.marker += " grid-tag-sample-other";
+            options.title += ` - not ${sampleNames[probandSampleId] || "this node's sample"}`;
+        }
+        return options;
+    }
+    if (probandSampleId) {
+        let title = `Tagged as ${tag}, no sample`;
+        if (!readOnly) {
+            title += ` - tag here to make one for ${sampleNames[probandSampleId] || "this sample"}`;
+        }
+        return {marker: "far fa-user", title: title};
+    }
+    return {title: `Tagged as ${tag}`};
 }
 
 
