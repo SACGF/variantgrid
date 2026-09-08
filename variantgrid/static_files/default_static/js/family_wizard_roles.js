@@ -65,7 +65,9 @@ function setupFamilyRoles(sampleSexes, options) {
             checkbox.closest(".sample-affected").find(".proband-affected").toggle(isProband);
             const cssClass = roleClasses[role];
             if (cssClass) {
-                filled[cssClass] = checkbox.is(":checked");
+                // Roles can double up before a proband is picked, and Duo draws both parents with the
+                // one class - the symbol fills if any sample holding that role is affected
+                filled[cssClass] = filled[cssClass] || checkbox.is(":checked");
             }
             if (roleShapeClasses[role]) {
                 shapes.add(roleShapeClasses[role]);
