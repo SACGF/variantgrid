@@ -150,6 +150,7 @@
                     <li>PanelApp panels are matched on HGNC ID rather than the gene symbol from a dated snapshot, and deleted panels are handled</li>
                     <li>Gene Lists - faster grid, copy/paste genes in, and a graphs tab showing gene locations</li>
                     <li>A mitochondrial 'm.' HGVS on a non-MT reference now warns rather than silently resolving as 'g.'</li>
+                    <li>Gene Lists - a symbol only matches genes through a single alias hop, so genes sharing an alias string (eg MT-TS2 / PDCD2 via "RP8") are no longer linked</li>
                 </ul>
 
                 <h4>Genome Builds</h4>
@@ -259,6 +260,16 @@
 
 
     {% else %}
+       <div class="card mt-4">
+            <div class="card-header">8 September 2026</div>
+            <div class="card-body">
+                <h4>Genes</h4>
+                <ul>
+                    <li>#1669 - Gene list matching follows a single alias hop; symbols sharing an alias string (eg MT-TS2 / PDCD2 via "RP8") are no longer linked</li>
+                </ul>
+            </div>
+       </div>
+
        <div class="card mt-4">
             <div class="card-header">4 September 2026</div>
             <div class="card-body">

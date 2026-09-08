@@ -81,8 +81,11 @@ A symbol does not name a gene; it names a gene *in a release*. The same symbol h
 RefSeq ids over time (and TAZ became TAFAZZIN between builds), so `genes/gene_matching.py:ReleaseGeneMatcher` writes
 `genes/models/models_gene_annotation_release.py:ReleaseGeneSymbol` / `ReleaseGeneSymbolGene` rows per release: first
 a direct hit on the release's own GeneVersion symbols, then `genes/gene_matching.py:ReleaseGeneMatcher.aliases_dict`,
-which walks the alias graph (`ReleaseGeneMatcher._aliases`, loop-guarded) and the symbols other builds' GeneVersions
-gave the same gene, recording the path as `match_info` so the gene list grid can show why. Readers never touch the
+which takes a single `GeneSymbolAlias` hop in either direction (the symbol is the alias, or the alias is of the symbol)
+plus the symbols other builds' GeneVersions gave the same gene, recording the hop as `match_info` so the gene list grid
+can show why. The hop count is the whole point: chaining hops let an alias string shared by two unrelated genes bridge
+them, which is how an MT-TS2 gene list matched PDCD2 via "RP8" (#1669), and HGNC lists every previous symbol of a gene
+so renames never need more than one. Readers never touch the
 matcher: `genes/models/models_gene_annotation_release.py:GeneAnnotationRelease.genes_for_symbols` and
 `genes/models/models_gene_list.py:GeneList.get_genes` read the cached rows, and the release always comes from the
 VAV (`GeneAnnotationRelease.get_for_latest_annotation_versions_for_builds`). Matching is triggered whenever symbols
@@ -247,8 +250,10 @@ dicts on first use and `GeneSymbolMatcher.create_gene_list_gene_symbols` re-matc
 a loop creating lists should share one matcher. Inserting
 `GeneListGeneSymbol` rows any other way leaves symbols with no release rows and the list matches nothing in analyses
 until `genes/management/commands/rematch_unmatched_gene_list_symbols.py:Command` runs;
-`genes/management/commands/fix_rematch_release_symbols_to_genes.py:Command` re-runs the alias walk for symbols that
-have a release row but no gene.
+`genes/management/commands/fix_rematch_release_symbols_to_genes.py:Command` resyncs the whole derived table for every
+release - it inserts, updates `match_info` and deletes matches the current rules no longer make, which matching itself
+never does (`match_symbols_to_genes` only inserts), so rows left behind by an alias re-import or an older matcher need
+it. Run it `--dry-run` first.
 
 Genes prefixed `unknown_` are legacy placeholders from pre-GFF imports; `genes/management/commands/fix_fake_genes.py:Command`
 re-points their transcripts where another version names the gene and `Gene.delete_orphaned_fake_genes` removes the

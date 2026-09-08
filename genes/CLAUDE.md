@@ -32,6 +32,8 @@ Gotchas:
 - `PanelAppPanel.cache_valid` expires after `settings.PANEL_APP_CACHE_DAYS` (models/models_panel_app.py:PanelAppPanel.cache_valid); panel_app.py:get_panel_app_local_cache re-fetches from the live API when stale, so tests must not depend on it.
 - GeneCoverageCollection is a partitioned model (models/models_gene_coverage.py:GeneCoverageCollection); delete via the model so partitions are dropped.
 - gene_matching.py:GeneSymbolMatcher and gene_matching.py:ReleaseGeneMatcher cache whole-table dicts on first use; build one per import, not per symbol.
+- gene_matching.py:ReleaseGeneMatcher takes exactly one GeneSymbolAlias hop (either direction) - chaining hops lets an alias string shared by two unrelated genes bridge them (#1669). Keep it single-hop.
+- Matching only ever inserts ReleaseGeneSymbolGene rows, so a rematch can't remove a match that's since become wrong; `manage.py fix_rematch_release_symbols_to_genes` (`--dry-run` first) is the full resync that also updates and deletes.
 - `<CNV>` and `<INS>` have no HGVS at all - neither a ranged form nor an explicit expansion - so hgvs/hgvs_matcher.py:HGVSMatcher raises hgvs/hgvs_converter.py:HGVSNoRepresentationException before any converter runs, and classification records it as `ResolvedVariantInfo.error` rather than a Rollbar bug.
 Tests:
 - annotation/tests/test_data_fake_genes.py:create_fake_transcript_version builds Gene/GeneVersion/Transcript/TranscriptVersion (RUNX1, ENST00000300305.7) for a build; `create_gata2_transcript_version` / `create_pten_transcript_version` add RefSeq examples.
