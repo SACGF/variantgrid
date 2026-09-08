@@ -336,7 +336,10 @@ Committed, so it applies to every session and every teammate's agent:
 - **`settings.json`**
   - `PostToolUse` on Edit/Write: `*.py` → `ruff check <file>` (report; `--fix` only for the safe
     import-order/unused-import rules), `*.js` → eslint on that file, `*.scss` → print the
-    reminder that the compiled `.css` needs the same hand-applied change.
+    reminder that the compiled `.css` needs the same hand-applied change, `*.md` → `vg docs check`
+    on that file when it is one of the agent docs, so a dead citation is caught as it is written
+    rather than by the Agent maps job on push. The `.md` case is scoped to `doc_files()` and skips
+    landed plans, so the hook is never stricter than CI.
   - `PreToolUse` on Bash matching `restart_services|systemctl (restart|stop)|manage.py migrate\b|
     manage.py (vep_run|create_new_variant_annotation_version|liftover_alleles)` → emit a one-line
     warning naming who else uses this box; the permission mode decides.
