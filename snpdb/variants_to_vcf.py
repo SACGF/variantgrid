@@ -3,6 +3,7 @@ from collections import Counter
 from typing import Optional
 
 from bgzip import BGZipWriter
+from django.conf import settings
 
 from library.genomics.vcf_enums import GeneLevelSymbolicAlt
 from library.genomics.vcf_writer import VCFWriter, symbolic_alt_info
@@ -137,7 +138,7 @@ def _missing_to_none(value):
 SOMALIER_FLIPPED_GENOTYPE = {"0/0": "1/1", "1/1": "0/0"}
 
 
-def _somalier_alleles_flipped(ref: str, alt: str) -> bool:
+def somalier_alleles_flipped(ref: str, alt: str) -> bool:
     """ somalier keeps each site's two alleles in alphabetical order and reads the genotype against
         that pair rather than against the record's own REF/ALT, so a record whose ALT sorts first is
         read inside out - 20 hom-ref calls come back as 10 hom-ref and 10 hom-alt
@@ -145,8 +146,11 @@ def _somalier_alleles_flipped(ref: str, alt: str) -> bool:
 
         We compensate in the AD pair, which is the field somalier misreads and the only reason this
         file exists; REF, ALT and GT stay as they should be. Only a VCF with no depths to write has
-        to carry it in the genotype instead. Remove all of this once somalier reads the record's own
-        alleles. """
+        to carry it in the genotype instead. settings.SOMALIER["compensate_allele_order"] turns it
+        off for a somalier that reads the record's alleles - deployment_check says which way it
+        should be set for the installed binary. """
+    if not settings.SOMALIER["compensate_allele_order"]:
+        return False
     return alt < ref
 
 
@@ -178,7 +182,7 @@ def vcf_export_to_file(vcf: VCF, exported_vcf_filename, original_qs=None, sample
         the incoming GT as called, however low the depth, so we hand over real depths when the import
         recorded them and let somalier do the QC - and GT alone when it didn't, since declaring AD we
         can't fill in would zero out every sample. The AD pair goes out in the site's allele order
-        (@see _somalier_alleles_flipped). """
+        (@see somalier_alleles_flipped). """
     if sample_name_func is None:
         def sample_name_func(s):
             return s.vcf_sample_name
@@ -231,7 +235,7 @@ def vcf_export_to_file(vcf: VCF, exported_vcf_filename, original_qs=None, sample
                     allele_depth = read_depth = allele_frequency = empty
 
                 alt = alt or ref
-                flipped = _somalier_alleles_flipped(ref, alt)
+                flipped = somalier_alleles_flipped(ref, alt)
 
                 samples_list = []
                 for i, (z, ad, dp, af) in enumerate(zip(samples_zygosity, allele_depth, read_depth, allele_frequency)):

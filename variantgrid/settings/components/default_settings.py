@@ -1153,6 +1153,12 @@ SOMALIER = {
             "T2T-CHM13v2.0": "sites.chm13v2.T2T.vcf.gz",
         },
     },
+    # somalier reads a record against its own alphabetically sorted site alleles rather than the
+    # record's REF/ALT (https://github.com/brentp/somalier/issues/163), so we write the AD pair in the
+    # site's order. Turn this off for a somalier that reads the record's alleles - deployment_check's
+    # somalier_allele_order tells you which way this should be set, and the extracts need rebuilding
+    # with 'somalier_existing_vcfs --clear' whenever it changes
+    "compensate_allele_order": True,
     "ancestry_enabled": True,  # The expensive stage - it reads all 2,504 1kg .somalier files each run
     # A VCF whose best sample has fewer het+hom sites than this is extracted, but ancestry and relate
     # are recorded as SKIPPED rather than run on numbers that mean nothing
