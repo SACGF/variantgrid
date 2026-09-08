@@ -44,6 +44,9 @@ Gotchas:
   (variantgrid/static_files/default_static/js/global.js:checkNode).
 - Preview handlers run under send_robust: an exception becomes a report_message and the card shows nothing
   (library/preview_request.py:PreviewRequest.preview_data).
+- `var()` does not work in an SVG presentation attribute (`fill="var(--x, none)"` is silently dropped) - the
+  pedigree symbols in uicore/templates/uicore/tags/svg_icon_sprite.html theme themselves through `style="fill: var(...)"`
+  instead, which is what lets a page fill in the affected members with `--pedigree-*-fill`.
 Tests: no uicore/tests. Tag logic is tested by rendering a `Template("{% load x %}...")` with a Context
   (variantgrid/tests/test_tips.py) or `render_to_string` of the template (analysis/tests/test_node_display.py);
   ValidatedJson in classification/tests/utils/test_json_utils.py. Pages are covered by URL tests:
