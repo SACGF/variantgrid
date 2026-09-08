@@ -13,11 +13,13 @@ from snpdb.liftover import (
     _liftover_using_source_variant_coordinate,
     _non_standard_contig_error,
     _run_liftover_using_same_contig,
+    allele_can_attempt_liftover,
 )
 from snpdb.models import (
     Allele,
     AlleleConversionTool,
     AlleleLiftover,
+    AlleleOrigin,
     GenomeBuild,
     LiftoverRun,
     ProcessingStatus,
@@ -87,6 +89,44 @@ class TestLiftover(TestCase):
         self.assertEqual(conversion_tool, AlleleConversionTool.BCFTOOLS_LIFTOVER)
         self.assertEqual(variant_coordinate_38, self.expected_vc_38)
 
+    def test_retry_conversion_tools_overrides_failed_set(self):
+        """ #1273 - a tool that has already failed on an allele is skipped forever unless explicitly retried """
+        grch37 = GenomeBuild.grch37()
+        grch38 = GenomeBuild.grch38()
+        variant_37 = slowly_create_test_variant("3", 128198980, 'A', 'T', grch37)
+        VariantAllele.objects.create(variant=variant_37, genome_build=grch37, allele=self.allele,
+                                     origin=AlleleOrigin.IMPORTED_TO_DATABASE,
+                                     allele_linking_tool=AlleleConversionTool.CLINGEN_ALLELE_REGISTRY)
+        for conversion_tool in [AlleleConversionTool.CLINGEN_ALLELE_REGISTRY,
+                                AlleleConversionTool.BCFTOOLS_LIFTOVER]:
+            liftover_run = LiftoverRun.objects.create(user=admin_bot(), conversion_tool=conversion_tool,
+                                                      genome_build=grch38)
+            AlleleLiftover.objects.create(allele=self.allele, liftover=liftover_run,
+                                          status=ProcessingStatus.ERROR)
+
+        _existing, needs_pipeline = _get_build_liftover_dicts([self.allele], grch37, [grch38])
+        self.assertEqual(dict(needs_pipeline), {}, "Every tool failed, so nothing is attempted")
+
+        retry_tools = {AlleleConversionTool.CLINGEN_ALLELE_REGISTRY}
+        _existing, needs_pipeline = _get_build_liftover_dicts([self.allele], grch37, [grch38],
+                                                              retry_conversion_tools=retry_tools)
+        tools = needs_pipeline[grch38]
+        self.assertNotIn(AlleleConversionTool.BCFTOOLS_LIFTOVER, tools, "Tools not retried stay skipped")
+        _allele, variant_coordinate, _error = tools[AlleleConversionTool.CLINGEN_ALLELE_REGISTRY][0]
+        self.assertEqual(variant_coordinate, self.expected_vc_38)
+
+    def test_allele_can_attempt_liftover_with_retry(self):
+        grch38 = GenomeBuild.grch38()
+        for conversion_tool in AlleleConversionTool:
+            liftover_run = LiftoverRun.objects.create(user=admin_bot(), conversion_tool=conversion_tool,
+                                                      genome_build=grch38)
+            AlleleLiftover.objects.create(allele=self.allele, liftover=liftover_run,
+                                          status=ProcessingStatus.ERROR)
+
+        self.assertFalse(allele_can_attempt_liftover(self.allele, grch38))
+        self.assertTrue(allele_can_attempt_liftover(self.allele, grch38,
+                                                    retry_conversion_tools=list(AlleleConversionTool)))
+
     def test_standard_contig_written_to_vcf(self):
         self.assertIsNone(_non_standard_contig_error(GenomeBuild.grch37(), self.expected_vc_37))
 
@@ -126,6 +166,35 @@ class TestLiftoverBatching(TestCase):
         pks = sorted(a.pk for a in self.alleles)
         expected = [(pks[0], pks[1]), (pks[2], pks[3]), (pks[4], pks[4])]
         self.assertEqual(list(_allele_id_batches(allele_qs)), expected)
+
+
+class TestFailedLiftoverAlleles(TestCase):
+    """ #1273 - which alleles a per-tool retry re-attempts """
+
+    @classmethod
+    def setUpTestData(cls):
+        grch37 = GenomeBuild.grch37()
+        grch38 = GenomeBuild.grch38()
+        cls.still_missing = create_mock_allele(slowly_create_test_variant("3", 1000, 'A', 'T', grch37), grch37)
+        cls.lifted_over = create_mock_allele(slowly_create_test_variant("3", 2000, 'A', 'T', grch37), grch37)
+        VariantAllele.objects.create(variant=slowly_create_test_variant("3", 2001, 'A', 'T', grch38),
+                                     genome_build=grch38, allele=cls.lifted_over,
+                                     origin=AlleleOrigin.LIFTOVER,
+                                     allele_linking_tool=AlleleConversionTool.BCFTOOLS_LIFTOVER)
+
+        liftover_run = LiftoverRun.objects.create(user=admin_bot(),
+                                                  conversion_tool=AlleleConversionTool.BCFTOOLS_LIFTOVER,
+                                                  genome_build=grch38)
+        for allele in [cls.still_missing, cls.lifted_over]:
+            AlleleLiftover.objects.create(allele=allele, liftover=liftover_run, status=ProcessingStatus.ERROR)
+
+    def test_failed_liftover_for_build(self):
+        grch38 = GenomeBuild.grch38()
+        qs = Allele.failed_liftover_for_build(grch38, AlleleConversionTool.BCFTOOLS_LIFTOVER)
+        self.assertEqual(list(qs), [self.still_missing], "An allele that has since been lifted over is left alone")
+
+        qs = Allele.failed_liftover_for_build(grch38, AlleleConversionTool.CLINGEN_ALLELE_REGISTRY)
+        self.assertEqual(list(qs), [], "Only the tool being retried counts")
 
 
 class TestLiftoverQueries(TestCase):

@@ -11,6 +11,7 @@ from classification.models import Classification, ImportedAlleleInfo
 from snpdb.liftover import allele_can_attempt_liftover
 from snpdb.models import (
     Allele,
+    AlleleConversionTool,
     AlleleLiftover,
     AlleleMergeLog,
     AlleleOrigin,
@@ -40,7 +41,9 @@ class VariantCard:
             if unfinished_liftover is None:
                 try:
                     check_can_create_variants(user)
-                    can_create_variant = allele_can_attempt_liftover(allele, genome_build)
+                    # An explicit ask by a user, so offer tools that have already failed on this allele
+                    can_create_variant = allele_can_attempt_liftover(allele, genome_build,
+                                                                    retry_conversion_tools=list(AlleleConversionTool))
                 except CreateManualVariantForbidden:
                     pass
 

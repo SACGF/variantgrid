@@ -2,6 +2,8 @@
 
 Written by Claude Fable 5 (claude-fable-5), 2026-08-31
 
+Status: in progress
+
 [#1273](https://github.com/SACGF/variantgrid/issues/1273): after fixing a bug or config problem we want to
 re-run liftover for the alleles that failed, broken down by tool (e.g. "relaunch all failed bcftools
 +liftover jobs").

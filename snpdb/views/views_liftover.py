@@ -1,5 +1,7 @@
+from typing import Optional
 
 from django.contrib import messages
+from django.db.models import Count
 from django.shortcuts import render
 
 from library.django_utils import (
@@ -23,19 +25,23 @@ from snpdb.tasks.liftover_tasks import liftover_alleles
 def liftover_runs(request):
     genome_builds = GenomeBuild.builds_with_annotation()
     if request.method == 'POST':
-        dest_genome_build = None
-        for genome_build in genome_builds:
-            if f"liftover_to_{genome_build.name}" in request.POST:
-                dest_genome_build = genome_build
-                break
-        if dest_genome_build is None:
-            raise ValueError("Could not determine dest genome build from liftover_runs POST")
-        messages.add_message(request, messages.INFO, f"Lifting over alleles to {dest_genome_build}")
-        liftover_alleles.si(request.user.username, dest_genome_build.name).apply_async()
+        dest_genome_build, retry_conversion_tool = _liftover_post_action(request.POST, genome_builds)
+        if retry_conversion_tool:
+            num_alleles = Allele.failed_liftover_for_build(dest_genome_build, retry_conversion_tool).count()
+            message = f"Retrying {retry_conversion_tool.label} liftover to {dest_genome_build} " \
+                      f"for {num_alleles} alleles"
+        else:
+            message = f"Lifting over alleles to {dest_genome_build}"
+        messages.add_message(request, messages.INFO, message)
+        liftover_alleles.si(request.user.username, dest_genome_build.name,
+                            retry_conversion_tool.value if retry_conversion_tool else None).apply_async()
 
     alleles_missing_variants = {}
+    retry_counts = {}
     for genome_build in genome_builds:
-        alleles_missing_variants[genome_build.name] = Allele.missing_variants_for_build(genome_build).count()
+        missing_qs = Allele.missing_variants_for_build(genome_build)
+        alleles_missing_variants[genome_build.name] = missing_qs.count()
+        retry_counts[genome_build.name] = _failed_tool_counts(genome_build, missing_qs)
 
     qs_allele_liftover = AlleleLiftover.objects.all()
 
@@ -59,12 +65,33 @@ def liftover_runs(request):
     context = {
         "genome_builds": genome_builds,
         "alleles_missing_variants": alleles_missing_variants,
+        "retry_counts": retry_counts,
         "processing_status_cols": processing_status_cols,
         "tool_status": tool_status,
         "failure_rate": failure_rate,
     }
 
     return render(request, "snpdb/liftover/liftover_runs.html", context)
+
+
+def _liftover_post_action(post, genome_builds) -> tuple[GenomeBuild, Optional[AlleleConversionTool]]:
+    """ Buttons are named liftover_to_{build} (everything missing) or retry_{build}_{tool} (that tool's failures) """
+    for genome_build in genome_builds:
+        if f"liftover_to_{genome_build.name}" in post:
+            return genome_build, None
+        for act in AlleleConversionTool:
+            if f"retry_{genome_build.name}_{act.value}" in post:
+                return genome_build, act
+    raise ValueError("Could not determine dest genome build from liftover_runs POST")
+
+
+def _failed_tool_counts(genome_build, missing_qs) -> list[tuple[AlleleConversionTool, int]]:
+    """ (tool, number of alleles a retry would re-attempt) for each tool with failures, in enum order """
+    qs = AlleleLiftover.objects.filter(liftover__genome_build=genome_build,
+                                       status=ProcessingStatus.ERROR,
+                                       allele__in=missing_qs)
+    counts = dict(qs.values_list("liftover__conversion_tool").annotate(num_alleles=Count("allele", distinct=True)))
+    return [(act, counts[act.value]) for act in AlleleConversionTool if counts.get(act.value)]
 
 
 @require_superuser
