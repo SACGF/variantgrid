@@ -1,14 +1,19 @@
-/* Trio/Quad wizards - keeps the pedigree figure in step with the roles and affected ticks the user
+/* Duo/Trio/Quad wizards - keeps the pedigree figure in step with the roles and affected ticks the user
    picks. Wants one select per sample inside '.sample-select' and, inside '.sample-affected', an
    '#id_sample_<n>_affected' checkbox plus the '.proband-affected' note that stands in for it on the
    proband's row - all in the same order as sampleSexes.
 
-   roleClasses maps a role value to the class that fills that symbol in (see --pedigree-*-fill in
-   uicore/tags/svg_icon_sprite.html). autoAssignRoles maps a sex to the role a sample of that sex
-   takes once the proband is chosen - pass it where sex, plus what is left over, decide the rest. */
+   options.roleClasses maps a role value to the class that fills that symbol in, and
+   options.roleShapeClasses to the class that picks which shape the role is drawn as - the Duo symbol
+   draws both parents and blanks one out (see --pedigree-*-fill in uicore/tags/svg_icon_sprite.html).
+   options.autoAssignRoles maps a sex to the role a sample of that sex takes once the proband is
+   chosen - pass it where sex, plus what is left over, decide the rest. */
 const FAMILY_PROBAND = 'P';
 
-function setupFamilyRoles(sampleSexes, roleClasses, autoAssignRoles) {
+function setupFamilyRoles(sampleSexes, options) {
+    const roleClasses = options.roleClasses || {};
+    const roleShapeClasses = options.roleShapeClasses || {};
+    const autoAssignRoles = options.autoAssignRoles;
     const roleSelects = $("select", ".sample-select");
 
     function affectedCheckbox(i) {
@@ -49,6 +54,7 @@ function setupFamilyRoles(sampleSexes, roleClasses, autoAssignRoles) {
 
     function refresh() {
         const filled = {};
+        const shapes = new Set();
         roleSelects.each(function(i) {
             const role = $(this).val();
             const checkbox = affectedCheckbox(i);
@@ -61,9 +67,17 @@ function setupFamilyRoles(sampleSexes, roleClasses, autoAssignRoles) {
             if (cssClass) {
                 filled[cssClass] = checkbox.is(":checked");
             }
+            if (roleShapeClasses[role]) {
+                shapes.add(roleShapeClasses[role]);
+            }
         });
         for (const cssClass of Object.values(roleClasses)) {
             $(".pedigree-figure").toggleClass(cssClass, Boolean(filled[cssClass]));
+        }
+        // Only one shape can be right - with the roles contradicting each other the symbol falls
+        // back to drawing both, which reads as "a parent"
+        for (const cssClass of Object.values(roleShapeClasses)) {
+            $(".pedigree-figure").toggleClass(cssClass, shapes.size === 1 && shapes.has(cssClass));
         }
     }
 

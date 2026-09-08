@@ -90,30 +90,36 @@ class QuadWizardFormTest(TestCase):
 
 
 class DuoWizardFormTest(TestCase):
-    """ A duo's roles are open to either sex - which parent it is comes from its own radio """
+    """ The parent's role is which parent it is, so the Duo's relationship comes off the select """
 
-    def _form(self, data=None):
-        return UserDuoWizardForm(data, sample_sexes=[Sex.FEMALE, Sex.MALE])
+    def _form(self, data=None, sample_sexes=None):
+        return UserDuoWizardForm(data, sample_sexes=sample_sexes or [Sex.FEMALE, Sex.MALE])
 
-    def test_either_sample_can_take_either_role(self):
+    def test_sex_narrows_the_roles_on_offer(self):
         form = self._form()
-        for field in ("sample_1", "sample_2"):
-            roles = [value for value, _ in form.fields[field].choices]
-            self.assertEqual([DuoSample.PARENT, DuoSample.PROBAND], roles)
+        female_roles = [value for value, _ in form.fields["sample_1"].choices]
+        male_roles = [value for value, _ in form.fields["sample_2"].choices]
 
-    def test_parent_relationship_and_affected_come_off_the_form(self):
-        form = self._form({"sample_1": DuoSample.PARENT,
+        self.assertEqual([DuoSample.MOTHER, DuoSample.PROBAND], female_roles)
+        self.assertEqual([DuoSample.FATHER, DuoSample.PROBAND], male_roles)
+
+    def test_parent_role_and_affected_come_off_the_form(self):
+        form = self._form({"sample_1": DuoSample.FATHER,
                            "sample_2": DuoSample.PROBAND,
-                           "sample_1_affected": "on",
-                           "relationship": DuoRelationship.FATHER})
+                           "sample_1_affected": "on"},
+                          sample_sexes=[Sex.MALE, Sex.FEMALE])
         self.assertTrue(form.is_valid(), form.errors)
-        self.assertEqual({DuoSample.PARENT: True, DuoSample.PROBAND: True}, form.affected_by_role)
-        self.assertEqual(DuoRelationship.FATHER, form.parent_relationship)
+        self.assertEqual({DuoSample.FATHER: True, DuoSample.PROBAND: True}, form.affected_by_role)
+        self.assertEqual(DuoSample.FATHER, form.parent_role)
+
+    def test_two_parents_without_a_proband_is_rejected(self):
+        form = self._form({"sample_1": DuoSample.MOTHER,
+                           "sample_2": DuoSample.FATHER})
+        self.assertFalse(form.is_valid())
 
     def test_two_samples_in_the_same_role_is_rejected(self):
         form = self._form({"sample_1": DuoSample.PROBAND,
-                           "sample_2": DuoSample.PROBAND,
-                           "relationship": DuoRelationship.MOTHER})
+                           "sample_2": DuoSample.PROBAND})
         self.assertFalse(form.is_valid())
 
 
@@ -137,9 +143,8 @@ class DuoWizardViewTest(URLTestCase):
                                             "sample1_id": self.proband_sample_id,
                                             "sample2_id": self.parent_sample_id})
         response = self.client.post(url, {"sample_1": DuoSample.PROBAND,
-                                          "sample_2": DuoSample.PARENT,
+                                          "sample_2": DuoSample.FATHER,
                                           "sample_2_affected": "on",
-                                          "relationship": DuoRelationship.FATHER,
                                           "proband_sex": ""})
         duo = Duo.objects.get(cohort=self.cohort)
         self.assertEqual(response.url, duo.get_absolute_url())

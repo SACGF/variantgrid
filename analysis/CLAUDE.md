@@ -38,6 +38,10 @@ Patterns here:
 - Expensive set operations materialise instead of composing: override `use_cache`/`write_cache` to fill a VariantCollection
   (`analysis/models/nodes/filters/intersection_node.py:IntersectionNode.use_cache`); VennNode keeps its own
   `analysis/models/nodes/filters/venn_node.py:VennNodeCache` keyed on the two parent NodeVersions.
+- The Duo/Trio/Quad wizards are one view and one template: `analysis/views/views_wizard.py:FamilyWizardView` +
+  `analysis/templates/analysis/family_wizard.html`, driven by the subclass's `family_*`/`role_*` attributes. A sample's
+  role says which family member it is (Mother/Father/Proband/Sibling), and the sample's sex narrows the roles on offer
+  (`analysis/forms/forms.py:FamilyWizardForm`) - a Duo stores its parent's role as the Duo's relationship.
 - Node editor = ModelForm subclass of `analysis/forms/forms_nodes.py:BaseNodeForm` + a `NodeView` subclass in views/nodes/
   with `model` set + template `analysis/node_editors/<classname>_editor.html`.
   `analysis/views/views_node.py:get_node_views_by_class` finds the view by `model`, so defining the class registers it;

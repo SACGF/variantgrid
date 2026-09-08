@@ -2,47 +2,47 @@
 {% load static %}
 {% load js_tags %}
 {% load model_tags %}
-{% block title %}Trio Wizard{% endblock title %}
+{% block title %}{{ family_name }} Wizard{% endblock title %}
 
 {% block head %}
 <style>
-/* Pedigree figure - the same sprite symbol the TrioNode wears, with the parents filling in as
+/* Pedigree figure - the same sprite symbol the family's node wears, with members filling in as
    they're marked affected (see --pedigree-*-fill in uicore/tags/svg_icon_sprite.html) */
 .pedigree-figure {
-    width: 150px;
+    width: {{ figure_width }};
     height: 122px;
     color: #495057;
     /* the sprite's stroke is weighted for a 15px badge - lighten it at this size */
     --pedigree-stroke-width: 1.5;
 }
 
-#trio-heading-icon {
+#family-heading-icon {
     margin-right: 0.35em;
-    width: 1.5em;
+    width: {{ heading_icon_width }};
     height: 1.2em;
     vertical-align: -0.15em;
     color: #495057;
 }
 
-#trio-table td {
+#family-table td {
     vertical-align: middle;
 }
 
-#trio-table .role-cell {
+#family-table .role-cell {
     width: 150px;
 }
 
-#trio-table .affected-cell {
+#family-table .affected-cell {
     width: 110px;
 }
 
 /* The switch sits in a table cell - drop the paragraph spacing so the row keeps its height */
-#trio-table .custom-switch {
+#family-table .custom-switch {
     margin-bottom: 0;
 }
 
 /* Stands in for the switch on the proband's row, which is affected by definition */
-#trio-table .proband-affected {
+#family-table .proband-affected {
     display: none;
 }
 
@@ -102,81 +102,51 @@ function setProbandPhenoText() {
 
     setupProbandSexMismatch(sample_sexes);
 
-    $("#create-trio-button").click(function() {
+    $("#create-family-button").click(function() {
         setProbandPhenoText();
         $("#form-submitted-dialog").modal("show");
     });
 
-    setupFamilyRoles(sample_sexes,
-                     {"M": "mother-affected", "F": "father-affected"},
-                     {"F": "M", "M": "F"});
+    setupFamilyRoles(sample_sexes, {{ role_options | jsonify }});
 
 {% endblock jsdocumentready %}
 
 {% block submenu_page_content %}
     <h3>
-        <svg id="trio-heading-icon"><use href="#node-icon-trio"></use></svg> Create Trio
+        <svg id="family-heading-icon"><use href="#{{ family_icon }}"></use></svg> Create {{ family_name }}
     </h3>
     <p class="text-muted">
-        From cohort <a href="{{ cohort.get_absolute_url }}">{{ cohort }}</a> - give each sample a role
-        in the family, and tick the parents that are affected. Picking the proband fills in the parents
-        where their sexes settle it.
+        From cohort <a href="{{ cohort.get_absolute_url }}">{{ cohort }}</a> - {{ role_help }}
     </p>
 
-    <form id="trio-form" method="post">
+    <form id="family-form" method="post">
         {% csrf_token %}
 
         <div class="row">
             <div class="col-lg-8">
                 <div class="card mb-3">
                     <div class="card-header">Samples</div>
-                    <table id='trio-table' class="table table-sm mb-0">
+                    <table id='family-table' class="table table-sm mb-0">
                         <thead>
                             <tr><th>Sample</th><th>Role</th><th>Affected</th><th data-help="{% detected_sex_help %}">Detected Sex</th><th>Patient</th><th>Phenotype</th></tr>
                         </thead>
                         <tbody>
+                            {% for row in sample_rows %}
                             <tr>
-                                <td><a href="{{ sample_1.get_absolute_url }}">{{ sample_1.name }}</a></td>
-                                <td class='sample-select role-cell'>{{ form.sample_1 }}{{ form.sample_1.errors }}</td>
+                                <td><a href="{{ row.sample.get_absolute_url }}">{{ row.sample.name }}</a></td>
+                                <td class='sample-select role-cell'>{{ row.role_field }}{{ row.role_field.errors }}</td>
                                 <td class='sample-affected affected-cell'>
                                     <div class="custom-control custom-switch">
-                                        {{ form.sample_1_affected }}
-                                        <label class="custom-control-label" for="{{ form.sample_1_affected.id_for_label }}"></label>
+                                        {{ row.affected_field }}
+                                        <label class="custom-control-label" for="{{ row.affected_field.id_for_label }}"></label>
                                     </div>
                                     <span class="proband-affected text-muted small">Always</span>
                                 </td>
-                                <td>{% detected_sex sample_1.get_genotype_stats %}</td>
-                                <td>{% if sample_1.patient %}<a href="{{ sample_1.patient.get_absolute_url }}">{{ sample_1.patient }}</a>{% endif %}</td>
-                                <td id='patient-results-1'></td>
+                                <td>{% detected_sex row.sample.get_genotype_stats %}</td>
+                                <td>{% if row.sample.patient %}<a href="{{ row.sample.patient.get_absolute_url }}">{{ row.sample.patient }}</a>{% endif %}</td>
+                                <td id='patient-results-{{ row.index }}'></td>
                             </tr>
-                            <tr>
-                                <td><a href="{{ sample_2.get_absolute_url }}">{{ sample_2.name }}</a></td>
-                                <td class='sample-select role-cell'>{{ form.sample_2 }}{{ form.sample_2.errors }}</td>
-                                <td class='sample-affected affected-cell'>
-                                    <div class="custom-control custom-switch">
-                                        {{ form.sample_2_affected }}
-                                        <label class="custom-control-label" for="{{ form.sample_2_affected.id_for_label }}"></label>
-                                    </div>
-                                    <span class="proband-affected text-muted small">Always</span>
-                                </td>
-                                <td>{% detected_sex sample_2.get_genotype_stats %}</td>
-                                <td>{% if sample_2.patient %}<a href="{{ sample_2.patient.get_absolute_url }}">{{ sample_2.patient }}</a>{% endif %}</td>
-                                <td id='patient-results-2'></td>
-                            </tr>
-                            <tr>
-                                <td><a href="{{ sample_3.get_absolute_url }}">{{ sample_3.name }}</a></td>
-                                <td class='sample-select role-cell'>{{ form.sample_3 }}{{ form.sample_3.errors }}</td>
-                                <td class='sample-affected affected-cell'>
-                                    <div class="custom-control custom-switch">
-                                        {{ form.sample_3_affected }}
-                                        <label class="custom-control-label" for="{{ form.sample_3_affected.id_for_label }}"></label>
-                                    </div>
-                                    <span class="proband-affected text-muted small">Always</span>
-                                </td>
-                                <td>{% detected_sex sample_3.get_genotype_stats %}</td>
-                                <td>{% if sample_3.patient %}<a href="{{ sample_3.patient.get_absolute_url }}">{{ sample_3.patient }}</a>{% endif %}</td>
-                                <td id='patient-results-3'></td>
-                            </tr>
+                            {% endfor %}
                         </tbody>
                     </table>
                 </div>
@@ -186,7 +156,7 @@ function setProbandPhenoText() {
                 <div class="card mb-3">
                     <div class="card-header">Pedigree</div>
                     <div class="card-body text-center">
-                        <svg class="pedigree-figure"><use href="#node-icon-trio"></use></svg>
+                        <svg class="pedigree-figure"><use href="#{{ family_icon }}"></use></svg>
                         <div class="text-muted small">Filled symbols are affected</div>
                     </div>
                 </div>
@@ -206,7 +176,7 @@ function setProbandPhenoText() {
             </ul>
         {% endif %}
 
-        <button id='create-trio-button' class="btn btn-primary"><i class="fas fa-plus-circle"></i> Create Trio</button>
+        <button id='create-family-button' class="btn btn-primary"><i class="fas fa-plus-circle"></i> Create {{ family_name }}</button>
     </form>
 
     <div class="modal" id="form-submitted-dialog" data-backdrop="static" data-keyboard="false"
@@ -214,8 +184,8 @@ function setProbandPhenoText() {
         <div class="modal-dialog" role="document">
             <div class="modal-content">
                 <div class="modal-body">
-                    <div><i class="fa fa-spinner fa-spin"></i> Creating Trio...</div>
-                    <svg class="pedigree-figure"><use href="#node-icon-trio"></use></svg>
+                    <div><i class="fa fa-spinner fa-spin"></i> Creating {{ family_name }}...</div>
+                    <svg class="pedigree-figure"><use href="#{{ family_icon }}"></use></svg>
                     <div id='proband-description'>
                         <div id='proband-text'></div>
                         <ul id='proband-phenos'></ul>

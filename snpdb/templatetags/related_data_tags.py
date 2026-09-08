@@ -99,9 +99,10 @@ def related_data_for_cohort(context, cohort):
     return context
 
 
-@register.inclusion_tag("snpdb/tags/related_data_for_trio.html", takes_context=True)
-def related_data_for_trio(context, trio):
-    return related_data_context(context, trio.get_samples())
+@register.inclusion_tag("snpdb/tags/related_data_for_family.html", takes_context=True)
+def related_data_for_family(context, family):
+    """ Duo/Trio/Quad - anything with FamilyGroupMixin.get_samples() """
+    return related_data_context(context, family.get_samples())
 
 
 @register.inclusion_tag("snpdb/tags/related_data_for_pedigree.html")

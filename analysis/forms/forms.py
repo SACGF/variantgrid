@@ -40,7 +40,7 @@ from library.guardian_utils import assign_permission_to_user_and_groups
 from patients.models_enums import SampleSourceLevel, Sex
 from seqauto.models import EnrichmentKit
 from snpdb.forms import GenomeBuildAutocompleteForwardMixin, UserSettingsGenomeBuildMixin
-from snpdb.models import CustomColumnsCollection, DuoRelationship, Trio, UserSettings, VariantGridColumn
+from snpdb.models import CustomColumnsCollection, Trio, UserSettings, VariantGridColumn
 from uicore.utils.form_helpers import form_helper_horizontal
 
 
@@ -401,6 +401,10 @@ class FamilyWizardForm(forms.Form):
                 msg = f"Samples {a}/{b} are both assigned to: {role.label}"
                 raise forms.ValidationError(msg)
 
+        roles = [cleaned_data.get(field_name) for field_name in self.SAMPLE_FIELDS]
+        if all(roles) and self.ROLE_ENUM.PROBAND not in roles:
+            raise forms.ValidationError("One of the samples must be the proband")
+
         return cleaned_data
 
     @property
@@ -447,21 +451,21 @@ class UserQuadWizardForm(FamilyWizardForm):
 
 
 class UserDuoWizardForm(FamilyWizardForm):
-    """ Only Parent/Proband to assign - which parent it is comes from its own radio, so a duo can be
-        made from two samples of any sex """
+    """ Mother/Father/Proband like the trio, with only two samples to place - the parent's role is
+        what the Duo stores as its relationship """
     ROLE_ENUM = DuoSample
     SAMPLE_FIELDS = ["sample_1", "sample_2"]
+    PARENT_ROLE_BY_SEX = {Sex.MALE: DuoSample.FATHER, Sex.FEMALE: DuoSample.MOTHER}
 
     sample_1 = forms.ChoiceField(choices=DuoSample.choices, widget=_family_role_widget())
     sample_1_affected = forms.BooleanField(required=False, widget=_affected_widget())
     sample_2 = forms.ChoiceField(choices=DuoSample.choices, widget=_family_role_widget())
     sample_2_affected = forms.BooleanField(required=False, widget=_affected_widget())
-    relationship = forms.ChoiceField(choices=DuoRelationship.choices, initial=DuoRelationship.MOTHER,
-                                     widget=forms.RadioSelect(attrs={"class": "duo-relationship"}))
 
     @property
-    def parent_relationship(self) -> str:
-        return self.cleaned_data["relationship"]
+    def parent_role(self) -> str:
+        """ Mother or Father - whichever of the two samples isn't the proband """
+        return next(role for role in self.roles if role != DuoSample.PROBAND)
 
 
 class KaryomappingGeneForm(forms.ModelForm):

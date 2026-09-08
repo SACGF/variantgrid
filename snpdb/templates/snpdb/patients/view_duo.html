@@ -2,6 +2,7 @@
 {% load model_tags %}
 {% load ui_utils %}
 {% load related_analyses_tags %}
+{% load related_data_tags %}
 
 {% block title %}Duo {{ duo }}{% endblock %}
 
@@ -76,6 +77,7 @@
     </div>
 
     <div id='related-data-container'>
+    {% related_data_for_family duo %}
     {% related_analyses_for_duo duo %}
     </div>
 
