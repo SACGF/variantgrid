@@ -505,6 +505,12 @@ $(document).ready(function() {
                 <span>{{ cohort_genotype_collection.get_common_filter_info }}</span>
             </p>
             {% endif %}
+            {% if somalier_stages %}
+            <p>
+                <label>Somalier</label>
+                <span>{% include "snpdb/data/_somalier_stages.html" %}</span>
+            </p>
+            {% endif %}
             <p>
                 <label>Variant Zygosity Count</label>
                 <span>

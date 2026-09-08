@@ -38,6 +38,9 @@ Gotchas:
 - Whole-table work on snpdb_variant or snpdb_allele is millions of rows in prod: page by pk range and fan out celery tasks (tasks/liftover_tasks.py:liftover_allele_batch, settings.LIFTOVER_BATCH_SIZE) rather than iterating one queryset.
 - Liftover is per Allele, not per Variant: liftover.py:create_liftover_pipelines batches AlleleLiftover records and liftover.py:allele_can_attempt_liftover decides eligibility. Builds sharing a contig link with AlleleConversionTool.SAME_CONTIG and no external call.
 - ClinGen Allele Registry calls are network I/O (clingen_allele.py:populate_clingen_alleles_for_variants); models/models_variant.py:Variant.can_have_clingen_allele bounds what may be sent.
+- Somalier decides how to genotype from the header of the VCF we hand it: a FORMAT `AD` line means it re-genotypes every sample from the depths and applies its own QC at relate time (`--min-depth` 7, `--min-ab` 0.3), no `AD` line means it trusts `GT`. variants_to_vcf.py:vcf_export_to_file picks one per VCF - declaring `AD` we can't fill in zeroes out every sample (#183).
+- somalier keeps each site's two alleles alphabetically (A = min, B = max) and reads `GT` and `AD` positionally against that pair, not against the record's `REF`/`ALT`, so variants_to_vcf.py:vcf_export_to_file emits a record whose ALT sorts first with its alleles (and GT and AD) swapped. Getting this wrong is invisible in a jointly called VCF - it cancels out pairwise - and only shows up as inflated relatedness once `--unknown` is in play (#183).
+- `CohortGenotype` stores "no value" as `-1` (models/models_cohort.py:CohortGenotype.MISSING_NUMBER_VALUE), so `is not None` is not enough when reading `samples_allele_depth` / `samples_read_depth` / `samples_allele_frequency`.
 - Views are split by topic (views/views_data.py, views_cohort.py, views_lab.py, views_user_settings.py, views_liftover.py, …); views/views.py holds only index, wiki and genome build/contig pages.
 
 Tests:

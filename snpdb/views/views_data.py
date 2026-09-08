@@ -63,6 +63,8 @@ from snpdb.models import (
     Sample,
     SampleLocusCount,
     SomalierRelatePairs,
+    SomalierSampleExtract,
+    SomalierVCFExtract,
     Variant,
     VariantZygosityCountCollection,
     VariantZygosityCountForVCF,
@@ -432,6 +434,47 @@ def _sample_stats(sample) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     return sample_stats_variant_class_df, sample_stats_zygosity_df, sample_stats_annotated_df
 
 
+# A pair this close is the same DNA, so two different patients means a sample swap or a mislabel (#196)
+DUPLICATE_SAMPLE_RELATEDNESS = 0.9
+
+
+def _related_samples(sample: Sample) -> list[dict]:
+    """ The other sample of each pair, with how its patient lines up with this one's """
+    # Sample.__str__ names its VCF, so pull that in too or the table is an N+1
+    pairs_qs = SomalierRelatePairs.get_for_sample(sample) \
+        .select_related("sample_a__patient", "sample_a__vcf",
+                        "sample_b__patient", "sample_b__vcf").order_by("-relatedness")
+    related_samples = []
+    for pair in pairs_qs:
+        other = pair.sample_b if pair.sample_a_id == sample.pk else pair.sample_a
+        different_patient = bool(sample.patient_id and other.patient_id and sample.patient_id != other.patient_id)
+        related_samples.append({
+            "pair": pair,
+            "sample": other,
+            "same_patient": bool(sample.patient_id) and sample.patient_id == other.patient_id,
+            "different_patient": different_patient,
+            "duplicate_warning": different_patient and pair.relatedness >= DUPLICATE_SAMPLE_RELATEDNESS,
+        })
+    return related_samples
+
+
+def _somalier_sample_context(sample: Sample) -> dict:
+    """ Each stage's status, so a failed or skipped one shows on the page instead of nothing at all """
+    vcf_extract = SomalierVCFExtract.objects.filter(vcf=sample.vcf).first()
+    if vcf_extract is None:
+        return {}
+
+    sample_extract = SomalierSampleExtract.objects.filter(sample=sample) \
+        .select_related("vcf_extract", "somalierancestry").first()
+    return {
+        "somalier_vcf_extract": vcf_extract,
+        "somalier_sample_extract": sample_extract,
+        "somalier_stages": vcf_extract.get_stages(),
+        "somalier_relatedness": settings.SOMALIER["relatedness"],
+        "related_samples": _related_samples(sample),
+    }
+
+
 def view_sample(request, sample_id):
     sample = Sample.get_for_user(request.user, sample_id)
     has_write_permission = sample.can_write(request.user)
@@ -456,11 +499,9 @@ def view_sample(request, sample_id):
     sample_locus_count = list(SampleLocusCount.objects.filter(sample=sample).order_by("locus_count"))
     igv_data = get_igv_data(request.user, genome_build=sample.genome_build)
     patient_form = PatientForm(user=request.user)  # blank
-    related_samples = None
+    somalier_context = {}
     if settings.SOMALIER.get("enabled"):
-        # Sample.__str__ names its VCF, so the related samples table is an N+1 without this
-        related_samples = SomalierRelatePairs.get_for_sample(sample) \
-            .select_related("sample_a__vcf", "sample_b__vcf").order_by("relate")
+        somalier_context = _somalier_sample_context(sample)
 
     sample_stats_variant_class_df, sample_stats_zygosity_df, sample_stats_annotated_df = _sample_stats(sample)
     sample_genotype_stats = sample.get_genotype_stats()
@@ -491,8 +532,8 @@ def view_sample(request, sample_id):
         "sample_stats_zygosity_df": sample_stats_zygosity_df,
         "sample_stats_annotated_df": sample_stats_annotated_df,
         "sample_genotype_stats": sample_genotype_stats,
-        "related_samples": related_samples,
         "skipped_annotation_count": skipped_annotation_count,
+        **somalier_context,
     }
     return render(request, 'snpdb/data/view_sample.html', context)
 

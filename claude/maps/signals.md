@@ -101,6 +101,7 @@ Receivers of Django / third-party signals (post_save, pre_delete, m2m_changed, u
 | pre_delete | CohortGenotypeCollection | `snpdb.models.models_cohort:cohort_genotype_collection_pre_delete_handler` |
 | pre_delete | Cohort | `snpdb.models.models_cohort:pre_delete_cohort` |
 | pre_delete | SomalierAncestryRun | `snpdb.models.models_somalier:somalier_ancestry_run_pre_delete_handler` |
+| pre_delete | SomalierAllSamplesRelate | `snpdb.models.models_somalier:somalier_relate_pre_delete_handler` |
 | pre_delete | SomalierCohortRelate | `snpdb.models.models_somalier:somalier_relate_pre_delete_handler` |
 | pre_delete | SomalierTrioRelate | `snpdb.models.models_somalier:somalier_relate_pre_delete_handler` |
 | pre_delete | SomalierVCFExtract | `snpdb.models.models_somalier:somalier_vcf_extract_pre_delete_handler` |

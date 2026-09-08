@@ -167,7 +167,7 @@ $(document).ready(function() {
             <li class="nav-item"><a class="nav-link" data-toggle="tab" role="tab" href="#sample-stats">Stats</a></li>
             {% endif %}
             <li class="nav-item"><a class="nav-link" data-toggle="tab" role="tab" href="#sample-files" data-href="{% url 'sample_files_tab' sample.pk %}">Files</a></li>
-            {% if somalier_enabled and sample.somaliersampleextract %}
+            {% if somalier_enabled and somalier_vcf_extract %}
             <li class="nav-item"><a class="nav-link" data-toggle="tab" role="tab" href="#sample-ancestry-relatedness">Ancestry/Relatedness</a></li>
             {% endif %}
             <li class="nav-item"><a class="nav-link" data-toggle="tab" role="tab" href="#sample-variants" data-href="{% url 'sample_variants_tab' sample.pk %}">Variants</a></li>
@@ -296,96 +296,119 @@ $(document).ready(function() {
         </div>
 	{% endif %}
 
-     {% if somalier_enabled and sample.somaliersampleextract %}
-         {%  with sse=sample.somaliersampleextract %}
+     {% if somalier_enabled and somalier_vcf_extract %}
+         {%  with sse=somalier_sample_extract %}
              {% with ancestry=sse.somalierancestry %}
                 <div class="tab-pane" role="tabpanel" id="sample-ancestry-relatedness">
                     {% page_help page_id='data/related_samples_help' title='Related Samples' show_title=False %}
 
-                    {% if sse.has_sufficient_data %}
-                        {% if ancestry %}
-                            <p>
-                                Prediction by <a href="https://github.com/brentp/somalier">Somalier</a>
-                            </p>
-                            <table>
-                                <tr>
-                                    <th>Predicted</th>
-                                    <th>AFR prob</th>
-                                    <th>AMR prob</th>
-                                    <th>EAS prob</th>
-                                    <th>EUR prob</th>
-                                    <th>SAS prob</th>
-                                </tr>
-                                <tr>
-                                    <td>{{ ancestry.get_predicted_ancestry_display }}</td>
-                                    <td>{{ ancestry.AFR_prob }}</td>
-                                    <td>{{ ancestry.AMR_prob }}</td>
-                                    <td>{{ ancestry.EAS_prob }}</td>
-                                    <td>{{ ancestry.EUR_prob }}</td>
-                                    <td>{{ ancestry.SAS_prob }}</td>
-                                </tr>
-                            </table>
-                        {% endif %}
+                    <h4>Somalier Stages</h4>
+                    {% include "snpdb/data/_somalier_stages.html" %}
 
-                        <h4>Related Samples</h4>
+                    {% if ancestry %}
+                        <h4>Ancestry</h4>
+                        <p>
+                            Prediction by <a href="https://github.com/brentp/somalier">Somalier</a>
+                        </p>
+                        <table>
+                            <tr>
+                                <th>Predicted</th>
+                                <th>AFR prob</th>
+                                <th>AMR prob</th>
+                                <th>EAS prob</th>
+                                <th>EUR prob</th>
+                                <th>SAS prob</th>
+                            </tr>
+                            <tr>
+                                <td>{{ ancestry.get_predicted_ancestry_display }}</td>
+                                <td>{{ ancestry.AFR_prob }}</td>
+                                <td>{{ ancestry.AMR_prob }}</td>
+                                <td>{{ ancestry.EAS_prob }}</td>
+                                <td>{{ ancestry.EUR_prob }}</td>
+                                <td>{{ ancestry.SAS_prob }}</td>
+                            </tr>
+                        </table>
+                    {% endif %}
 
-                        {% if related_samples.exists %}
-                            <table class="table">
+                    <h4>Related Samples</h4>
+                    <p>
+                        Pairs with relatedness &gt; {{ somalier_relatedness.min_relatedness }},
+                        at least {{ somalier_relatedness.min_shared_hets }} shared HETs and more than
+                        {{ somalier_relatedness.min_shared_hom_alts }} shared HOM ALTs.
+                    </p>
+
+                    {% if related_samples %}
+                        <table class="table">
+                            <tr>
+                                <th>Sample</th>
+                                <th>Patient</th>
+                                <th>relatedness</th>
+                                <th>ibs0</th>
+                                <th>ibs2</th>
+                                <th>hom_concordance</th>
+                                <th>hets_a</th>
+                                <th>hets_b</th>
+                                <th>hets_ab</th>
+                                <th>shared_hets</th>
+                                <th>hom_alts_a</th>
+                                <th>hom_alts_b</th>
+                                <th>shared_hom_alts</th>
+                                <th>N</th>
+                                <th>x_ibs0</th>
+                                <th>x_ibs2</th>
+                            </tr>
+                            {% for related in related_samples %}
+                                {% with rp=related.pair %}
                                 <tr>
-                                    <th>Sample</th>
-                                    <th>relatedness</th>
-                                    <th>ibs0</th>
-                                    <th>ibs2</th>
-                                    <th>hom_concordance</th>
-                                    <th>hets_a</th>
-                                    <th>hets_b</th>
-                                    <th>hets_ab</th>
-                                    <th>shared_hets</th>
-                                    <th>hom_alts_a</th>
-                                    <th>hom_alts_b</th>
-                                    <th>shared_hom_alts</th>
-                                    <th>N</th>
-                                    <th>x_ibs0</th>
-                                    <th>x_ibs2</th>
-                                </tr>
-                                {% for rp in related_samples %}
-                                    <tr>
-                                        <td>
-                                            {% if rp.sample_a == sample %}
-                                                <a href="{% url 'view_sample' rp.sample_b.pk %}">{{ rp.sample_b }}</a>
-                                            {% else %}
-                                                <a href="{% url 'view_sample' rp.sample_a.pk %}">{{ rp.sample_a }}</a>
+                                    <td>
+                                        <a href="{% url 'view_sample' related.sample.pk %}">{{ related.sample }}</a>
+                                    </td>
+                                    <td>
+                                        {% if related.sample.patient_id %}
+                                            <a href="{% url 'view_patient' related.sample.patient_id %}">{{ related.sample.patient }}</a>
+                                            {% if related.same_patient %}
+                                                <span class="badge badge-success">Same patient</span>
+                                            {% elif related.duplicate_warning %}
+                                                <span class="badge badge-danger" title="Relatedness this high is the same DNA">Different patient</span>
+                                            {% elif related.different_patient %}
+                                                <span class="badge badge-warning">Different patient</span>
                                             {% endif %}
-                                        </td>
-                                        <td>{{ rp.relatedness | floatformat:2 }}</td>
-                                        <td>{{ rp.ibs0 }}</td>
-                                        <td>{{ rp.ibs2 }}</td>
-                                        <td>{{ rp.hom_concordance | floatformat:2 }}</td>
-                                        <td>{{ rp.hets_a }}</td>
-                                        <td>{{ rp.hets_b }}</td>
-                                        <td>{{ rp.hets_ab }}</td>
-                                        <td>{{ rp.shared_hets }}</td>
-                                        <td>{{ rp.hom_alts_a }}</td>
-                                        <td>{{ rp.hom_alts_b }}</td>
-                                        <td>{{ rp.shared_hom_alts }}</td>
-                                        <td>{{ rp.n }}</td>
-                                        <td>{{ rp.x_ibs0 }}</td>
-                                        <td>{{ rp.x_ibs2 }}</td>
-                                    </tr>
-                                {% endfor %}
-                            </table>
-                        {% else %}
-                            <p>No related samples found.</p>
-                        {% endif %}
+                                        {% else %}
+                                            <span class="badge badge-secondary">No patient</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ rp.relatedness | floatformat:2 }}</td>
+                                    <td>{{ rp.ibs0 }}</td>
+                                    <td>{{ rp.ibs2 }}</td>
+                                    <td>{{ rp.hom_concordance | floatformat:2 }}</td>
+                                    <td>{{ rp.hets_a }}</td>
+                                    <td>{{ rp.hets_b }}</td>
+                                    <td>{{ rp.hets_ab }}</td>
+                                    <td>{{ rp.shared_hets }}</td>
+                                    <td>{{ rp.hom_alts_a }}</td>
+                                    <td>{{ rp.hom_alts_b }}</td>
+                                    <td>{{ rp.shared_hom_alts }}</td>
+                                    <td>{{ rp.n }}</td>
+                                    <td>{{ rp.x_ibs0 }}</td>
+                                    <td>{{ rp.x_ibs2 }}</td>
+                                </tr>
+                                {% endwith %}
+                            {% endfor %}
+                        </table>
                     {% else %}
+                        <p>No related samples found.</p>
+                    {% endif %}
+
+                    {% if sse and not sse.has_sufficient_data %}
                         <ul class="messages">
                             <li class="import-message warning">
                                 Warning: Insufficient HET/HOM variants known to <a class="reference external" href="https://github.com/brentp/somalier">Somalier</a>
-                                Relatedness calculation cannot be performed for this sample - see 'Related Samples Help' above.
+                                Relatedness calculation is unreliable for this sample - see 'Related Samples Help' above.
                             </li>
                         </ul>
                     {% endif %}
 
+                    {% if sse %}
                     <h4>Sample Extract</h4>
                     <table>
                         <tr>
@@ -409,6 +432,7 @@ $(document).ready(function() {
                             <td>{{ sse.unk_count }}</td>
                         </tr>
                     </table>
+                    {% endif %}
                 </div>
             {% endwith %}
          {% endwith %}

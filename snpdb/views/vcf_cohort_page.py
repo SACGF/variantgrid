@@ -6,6 +6,7 @@
 """
 from collections import defaultdict
 
+from django.conf import settings
 from django.db.models import ForeignKey
 from django.db.models.expressions import F
 from django.urls.base import reverse
@@ -24,6 +25,7 @@ from snpdb.models import (
     Duo,
     Quad,
     Sample,
+    SomalierVCFExtract,
     Trio,
 )
 
@@ -167,6 +169,9 @@ def vcf_cohort_page_context(cohort: Cohort, has_write_permission: bool, vcf: VCF
 
     if vcf:
         context["page_title"] = vcf.name
+        if settings.SOMALIER.get("enabled"):
+            if vcf_extract := SomalierVCFExtract.objects.filter(vcf=vcf).first():
+                context["somalier_stages"] = vcf_extract.get_stages()
     else:
         context["page_title"] = "Cohort"
         context.update(_membership_editor_context(cohort, cohort_samples, cohort_genotype_collection,
