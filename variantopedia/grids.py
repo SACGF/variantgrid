@@ -271,10 +271,9 @@ class VariantTagsColumns(DatatableConfig[VariantTag]):
             "url": url_if_visible("view_variant", variant_id=cell["variant__id"]),
         }
         # A live classify queue tag is a to-do item - offer to complete it @see Tag.classify_queue_qs
-        if cell["tag__requires_classification"] and cell["tag__retired"] is None \
-                and (analysis_id := cell["analysis__id"]):
+        if cell["tag__requires_classification"] and cell["tag__retired"] is None:
             data["classify_url"] = url_if_visible("create_classification_for_variant_tag",
-                                                  analysis_id=analysis_id, variant_tag_id=cell["id"])
+                                                  variant_tag_id=cell["id"])
         return data
 
     @staticmethod

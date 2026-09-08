@@ -57,10 +57,17 @@ Patterns here:
   has no GT field (`Sample.has_genotype`) - a fusion caller reports read support, so every zygosity is unknown.
 - The queue row's button only opens the dialog when the allele has been curated before - there is something to choose
   between. With nothing previous it links straight to the full create page in a new tab
-  (`analysis/classify_report.py:ClassifyQueueRow.full_form_url` - the analysis one where the tag was made in an analysis,
-  so the tag is cleared on save, else the plain variant one), which offers transcript, bucket and sample properly.
+  (`analysis/classify_report.py:ClassifyQueueRow.full_form_url`), which offers transcript, bucket and sample properly.
   The dialog's own "full form" button goes to the same URL, so starting from scratch is always the full page and the
   dialog is only ever the copy-from-previous shortcut.
+- Every route into the full create page goes through the tagging, analysis or not
+  (`create_classification_for_variant_tag`, posting to `analysis/views/views.py:create_classification_from_variant_tag`) -
+  the analysis alone cannot say which of its taggings a record is for. The page starts on the tagging's own sample, since
+  a record without it never reaches the case's queue row or its report.
+- The Classify & Report tab's label carries the counts (`analysis/views/views_classify_report.py:classify_report_summary`,
+  drawn by `analysis/templates/analysis/classify_report_tab_counts.html`), so a page says whether there is anything to do
+  before the tab is opened. It is fetched after render - deciding which taggings are the case's walks every analysis its
+  samples are in, which is too much for page load.
 - "Classify all" walks `analysis/classify_report.py:ClassifyQueueRow.needs_classification` rows, not unresolved ones -
   a row whose allele has been classified is waiting on "Clear tag", and offering it again made a second record every
   time the wizard was run.
@@ -70,8 +77,10 @@ Patterns here:
   candidates instead - the same `ClassificationConsensus.gene_consensus_groups` rows the create page shows.
 - A to-do tagging is resolved against a classification rather than deleted
   (`analysis/variant_tag_operations.py:resolve_variant_tag`), so it stays as the record of what was flagged. That happens
-  by itself when the classification is of the tagging's own sample and via the queue row's "Clear tag" button otherwise.
-  A withdrawn `resolved_classification` puts the to-do back (`VariantTag.is_resolved`).
+  by itself when the classification is of the tagging's own sample, when the create form was launched from the tagging
+  (`analysis/variant_tag_operations.py:resolve_launching_variant_tag` - clicking its "New classification" is the scientist
+  saying whose it is), and via the queue row's "Clear tag" button otherwise. A withdrawn `resolved_classification` puts
+  the to-do back (`VariantTag.is_resolved`).
 - Every "New Classification" button scopes with `snpdb/models/models.py:Tag.classify_queue_qs` rather than naming a tag,
   so a lab's own queue tag is offered and resolved the same way: the tag node editor's Classifications tab
   (`analysis/views/nodes/node_views.py:TagNodeView`), the variant tags grid (`variantopedia/grids.py:VariantTagsColumns`)
@@ -134,6 +143,10 @@ Tests:
 - `analysis/tests/test_urls.py:Test` is the URLTestCase (every analysis/node URL incl. editors and grid exports, owner vs
   non-owner) — run it after touching urls.py, a view signature or an editor template. Celery is eager under URLTestCase,
   so `update_analysis` executes inline. `analysis/tests/test_scheduler.py` covers lease/backoff/reclaim.
+- A test that creates a classification needs `@override_settings(CLINGEN_ALLELE_REGISTRY_LOGIN=None)` — autopopulate
+  asks ClinGen for the variant and `snpdb/tests/utils/mock_clingen_api.py` raises on an HGVS it has no recorded response
+  for, which surfaces as a 500 from the create POST rather than as a ClinGen error
+  (`analysis/tests/test_classify_report.py`).
 - `manage.py profile_analysis_nodes --analysis <id> --rerun --explain` times every node's queryset and dumps EXPLAIN plans
   (also `--sample/--trio/--cohort` synthetic runs) — run it before and after changing a Q.
 Deep reference: __analysis_readme.md · claude/research/analysis.md · claude/maps/models.md#analysis

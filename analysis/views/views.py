@@ -30,7 +30,6 @@ from analysis.forms import (
     SelectGridColumnForm,
 )
 from analysis.models import (
-    Analysis,
     AnalysisNode,
     AnalysisTemplate,
     AnalysisTemplateRun,
@@ -44,7 +43,7 @@ from analysis.models.mutational_signatures import MutationalSignature
 from analysis.models.nodes.analysis_node import AnalysisClassification
 from analysis.models.nodes.node_counts import get_node_count_colors, get_tag_node_count_colors
 from analysis.models.nodes.node_types import get_node_display_data_by_class_name, get_node_types_hash
-from analysis.variant_tag_operations import resolve_requires_classification_tags
+from analysis.variant_tag_operations import resolve_launching_variant_tag, resolve_requires_classification_tags
 from analysis.views.analysis_permissions import get_analysis_or_404
 from annotation.models.models import MutationalSignatureInfo
 from classification.views.views import (
@@ -398,11 +397,10 @@ class CreateClassificationForVariantTagView(CreateClassificationForVariantView):
         return self.variant_tag.genome_build
 
     def _get_form_post_url(self) -> str:
-        if self.variant_tag.analysis:
-            return reverse("create_classification_for_analysis", kwargs={"analysis_id": self.variant_tag.analysis_id})
-        else:
-            # Just for variant
-            return super()._get_form_post_url()
+        # Posting through the tagging is what lets the create clear it - the analysis alone can't say which
+        # of its taggings this record is for (@see create_classification_from_variant_tag)
+        return reverse("create_classification_from_variant_tag",
+                       kwargs={"variant_tag_id": self.variant_tag.pk})
 
     def _get_sample_form(self):
         # If we have a node with input samples, use that. Then fall back on all samples in analysis.
@@ -419,6 +417,10 @@ class CreateClassificationForVariantTagView(CreateClassificationForVariantView):
             form = SampleChoiceForm()
             form.fields['sample'].required = False
             form.fields['sample'].queryset = Sample.objects.filter(pk__in=[s.pk for s in samples])
+            # Start on whoever the tagging is about - the record is only linked to the case, and only
+            # reaches the case's report, when it has their sample on it
+            if self.variant_tag.sample_id in {s.pk for s in samples}:
+                form.fields['sample'].initial = self.variant_tag.sample_id
         else:
             form = super()._get_sample_form()
         return form
@@ -452,11 +454,15 @@ class CreateClassificationForVariantTagView(CreateClassificationForVariantView):
 
 
 @require_POST
-def create_classification_for_analysis(request, analysis_id):
+def create_classification_from_variant_tag(request, variant_tag_id):
+    """ The full create form launched from a tagging - the tagging it came from is resolved against the new
+        record, and the rest of the analysis' taggings of the variant follow the unambiguous rule """
+    variant_tag = VariantTag.get_for_user(request.user, pk=variant_tag_id)
     classification = create_classification_object(request)
-    analysis = Analysis.get_for_user(request.user, pk=analysis_id)
 
-    if analysis.can_write(request.user):
-        AnalysisClassification.objects.create(analysis=analysis, classification=classification)
-        resolve_requires_classification_tags(classification, analysis, request.user)
+    if analysis := variant_tag.analysis:
+        if analysis.can_write(request.user):
+            AnalysisClassification.objects.create(analysis=analysis, classification=classification)
+            resolve_requires_classification_tags(classification, analysis, request.user)
+    resolve_launching_variant_tag(classification, variant_tag, request.user)
     return redirect(classification.get_edit_url())

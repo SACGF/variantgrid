@@ -17,6 +17,7 @@ from analysis.variant_tag_operations import (
     VARIANT_TAG_CLASSIFIED,
     get_proband_sample_by_node_id,
     resolve_requires_classification_tags_for_samples,
+    resolve_variant_tag,
 )
 from annotation.fake_annotation import create_fake_variants, get_fake_annotation_version
 from classification.enums import AlleleOriginBucket, ShareLevel, SpecialEKeys, SubmissionSource
@@ -252,6 +253,9 @@ class ResolveClassifyQueueTagsForSamplesTest(ClassifyReportTestCase):
         self.assertFalse(variant_tag.is_resolved)
 
 
+# Creating a classification autopopulates from the variant, and the ClinGen mock raises on any HGVS it has no
+# recorded response for - every class that makes one carries this. A new class dropped in between a decorator
+# and its class takes the decorator with it, leaving the old one to fail as a 500 from the create POST.
 @override_settings(CELERY_TASK_ALWAYS_EAGER=True, LIFTOVER_CLASSIFICATIONS=False,
                    CLINGEN_ALLELE_REGISTRY_LOGIN=None)
 class CreateClassificationForCaseTest(ClassifyReportTestCase):
@@ -365,9 +369,8 @@ class CreateClassificationForCaseTest(ClassifyReportTestCase):
 
         response = self.client.get(self._dialog_url(self.variant_tag))
 
-        self.assertContains(response, reverse("create_classification_for_variant",
-                                              kwargs={"variant_id": self.variant.pk,
-                                                      "genome_build_name": self.genome_build.name}))
+        self.assertContains(response, reverse("create_classification_for_variant_tag",
+                                              kwargs={"variant_tag_id": self.variant_tag.pk}))
 
     def test_a_somatic_tag_is_not_offered_a_germline_record(self):
         somatic_tag = create_classify_queue_tag("SomaticToDo", AlleleOriginBucket.SOMATIC)
@@ -416,7 +419,7 @@ class CreateClassificationForCaseTest(ClassifyReportTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "[RUNX1=1]")
 
-    def test_a_tag_with_nothing_to_reuse_links_to_the_analysis_create_page(self):
+    def test_a_tag_with_nothing_to_reuse_links_to_the_tag_create_page(self):
         analysis = self._create_analysis()
         node = SampleNode.objects.create(analysis=analysis, sample=self.proband)
         variant_tag = self._create_variant_tag(analysis=analysis, node=node, sample=self.proband)
@@ -424,17 +427,16 @@ class CreateClassificationForCaseTest(ClassifyReportTestCase):
         response = self.client.get(reverse("sample_classify_report_tab", kwargs={"sample_id": self.proband.pk}))
 
         self.assertContains(response, reverse("create_classification_for_variant_tag",
-                                              kwargs={"analysis_id": analysis.pk,
-                                                      "variant_tag_id": variant_tag.pk}))
+                                              kwargs={"variant_tag_id": variant_tag.pk}))
 
-    def test_a_tag_made_outside_an_analysis_links_to_the_variant_create_page(self):
-        self._create_variant_tag(sample=self.proband)
+    def test_a_tag_made_outside_an_analysis_links_to_the_tag_create_page(self):
+        """ The tagging is what clears the tag, so a global tagging goes through the same page """
+        variant_tag = self._create_variant_tag(sample=self.proband)
 
         response = self.client.get(reverse("sample_classify_report_tab", kwargs={"sample_id": self.proband.pk}))
 
-        self.assertContains(response, reverse("create_classification_for_variant",
-                                              kwargs={"variant_id": self.variant.pk,
-                                                      "genome_build_name": self.genome_build.name}))
+        self.assertContains(response, reverse("create_classification_for_variant_tag",
+                                              kwargs={"variant_tag_id": variant_tag.pk}))
 
     def test_wizard_stops_being_offered_once_every_tag_has_a_classification(self):
         url = reverse("sample_classify_report_tab", kwargs={"sample_id": self.proband.pk})
@@ -453,3 +455,79 @@ class CreateClassificationForCaseTest(ClassifyReportTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, classification.cr_lab_id)
         self.assertContains(response, "RUNX1")
+
+
+@override_settings(CELERY_TASK_ALWAYS_EAGER=True, LIFTOVER_CLASSIFICATIONS=False,
+                   CLINGEN_ALLELE_REGISTRY_LOGIN=None)
+class CreateClassificationFromVariantTagTest(ClassifyReportTestCase):
+    """ The queue row's "New classification" - the full create page, which posts back through the tagging """
+
+    def setUp(self):
+        super().setUp()
+        self.client.force_login(self.user)
+
+    def _post(self, variant_tag, **kwargs):
+        data = {
+            "variant_id": self.variant.pk,
+            "genome_build_name": self.genome_build.pk,
+            "sample_id": self.proband.pk,
+            "lab": self.lab.pk,
+        }
+        data.update(kwargs)
+        return self.client.post(reverse("create_classification_from_variant_tag",
+                                        kwargs={"variant_tag_id": variant_tag.pk}), data)
+
+    def test_creating_clears_a_tagging_no_sample_could_have_resolved(self):
+        """ Launching from the row is the scientist saying whose it is - without this the tag came back as
+            outstanding, with the new record only showing up as a previous classification """
+        analysis = self._create_cohort_analysis()
+        variant_tag = self._create_variant_tag(analysis=analysis)
+
+        response = self._post(variant_tag)
+
+        self.assertEqual(response.status_code, 302)
+        variant_tag.refresh_from_db()
+        self.assertTrue(variant_tag.is_resolved)
+        self.assertEqual(variant_tag.resolved_classification.sample, self.proband)
+
+    def test_a_record_of_another_variant_leaves_the_tagging_alone(self):
+        variant_tag = self._create_variant_tag(sample=self.proband)
+
+        self._post(variant_tag, variant_id=self.shared_variant.pk)
+
+        variant_tag.refresh_from_db()
+        self.assertFalse(variant_tag.is_resolved)
+
+    def test_the_create_page_starts_on_the_taggings_sample(self):
+        """ The record only reaches the case's queue and report with the sample on it """
+        analysis = self._create_analysis()
+        node = SampleNode.objects.create(analysis=analysis, sample=self.proband)
+        variant_tag = self._create_variant_tag(analysis=analysis, node=node, sample=self.proband)
+
+        response = self.client.get(reverse("create_classification_for_variant_tag",
+                                           kwargs={"variant_tag_id": variant_tag.pk}))
+
+        self.assertContains(response, f'<option value="{self.proband.pk}" selected>{self.proband}</option>',
+                            html=True)
+
+
+@override_settings(CELERY_TASK_ALWAYS_EAGER=True, LIFTOVER_CLASSIFICATIONS=False,
+                   CLINGEN_ALLELE_REGISTRY_LOGIN=None)
+class ClassifyReportSummaryTest(ClassifyReportTestCase):
+    """ The counts the sample / patient page hangs off the tab label """
+
+    def setUp(self):
+        super().setUp()
+        self.client.force_login(self.user)
+        self.url = reverse("classify_report_summary",
+                           kwargs={"case_type": "sample", "case_id": self.proband.pk})
+
+    def test_counts_outstanding_tags_and_the_cases_classifications(self):
+        self._create_variant_tag(sample=self.proband)
+        resolved = self._create_variant_tag(sample=self.proband, variant=self.shared_variant)
+        classification = self._classify(self.proband)
+        classification.publish_latest(self.user)
+        resolve_variant_tag(resolved, classification, self.user)
+
+        self.assertEqual(json.loads(self.client.get(self.url).content),
+                         {"outstanding": 1, "classifications": 1})

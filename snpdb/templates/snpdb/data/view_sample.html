@@ -447,6 +447,9 @@ $(document).ready(function() {
         <div class="tab-pane" role="tabpanel" id="sample-variants"></div>
         {% if url_name_visible.sample_classify_report_tab %}
         <div class="tab-pane" role="tabpanel" id="sample-classify-report"></div>
+        {% url 'sample_classify_report_tab' sample.pk as classify_report_tab_url %}
+        {% url 'classify_report_summary' 'sample' sample.pk as classify_report_summary_url %}
+        {% include "analysis/classify_report_tab_counts.html" %}
         {% endif %}
         {% if sample.import_status == 'S' or sample.import_status == 'A' %}
         <div class="tab-pane" role="tabpanel" id="sample-graphs"></div>

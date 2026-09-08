@@ -13,6 +13,7 @@
 
             function reloadTab() {
                 tabPane.load(container.data("tab-url"));
+                $(document).trigger("classifyReportChanged");  // The tab label's counts follow the tab
             }
 
             // The walk is about making classifications - a row that already has one is waiting on "Clear tag"

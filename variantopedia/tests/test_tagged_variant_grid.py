@@ -146,12 +146,12 @@ class TaggedVariantGridTest(TestCase):
         return rows_by_id[variant_tag.pk]
 
     def test_variant_tags_datatable_classify_button(self):
-        """ Any classify queue tag is a to-do item - offer to complete it from the analysis it came from
+        """ Any classify queue tag is a to-do item - offer to complete it through the tagging
             @see Tag.classify_queue_qs """
         row = self._classify_button_row(create_classify_queue_tag())
         self.assertEqual(row["variant_string"]["classify_url"],
                          reverse("create_classification_for_variant_tag",
-                                 kwargs={"analysis_id": self.analysis.pk, "variant_tag_id": self.variant_tag.pk}))
+                                 kwargs={"variant_tag_id": self.variant_tag.pk}))
 
     def test_variant_tags_datatable_no_classify_button_off_queue(self):
         """ A tag that isn't in the classify queue is just a label - no to-do to complete """

@@ -117,16 +117,18 @@ urlpatterns = [
 
     path('set_variant_tag/<slug:location>/', views_json.set_variant_tag, name='set_variant_tag'),
 
-    path('<int:analysis_id>/classification/create_for_variant_tag/<int:variant_tag_id>', views.CreateClassificationForVariantTagView.as_view(),
+    path('classification/create_for_variant_tag/<int:variant_tag_id>', views.CreateClassificationForVariantTagView.as_view(),
          name='create_classification_for_variant_tag'),
-    path('<int:analysis_id>/create_classification/',
-         views.create_classification_for_analysis, name='create_classification_for_analysis'),
+    path('classification/create_from_variant_tag/<int:variant_tag_id>',
+         views.create_classification_from_variant_tag, name='create_classification_from_variant_tag'),
 
     # Classify & Report tab (sample / patient pages)
     path('classify_report/sample/<int:sample_id>', views_classify_report.sample_classify_report_tab,
          name='sample_classify_report_tab'),
     path('classify_report/patient/<int:patient_id>', views_classify_report.patient_classify_report_tab,
          name='patient_classify_report_tab'),
+    path('classify_report/<slug:case_type>/<int:case_id>/summary',
+         views_classify_report.classify_report_summary, name='classify_report_summary'),
     path('classify_report/<slug:case_type>/<int:case_id>/variant_tag/<int:variant_tag_id>',
          views_classify_report.classify_report_tag_dialog, name='classify_report_tag_dialog'),
     path('classify_report/<slug:case_type>/<int:case_id>/variant_tag/<int:variant_tag_id>/classify',

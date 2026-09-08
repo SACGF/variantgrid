@@ -77,14 +77,10 @@ class ClassifyQueueRow:
 
     @property
     def full_form_url(self) -> str:
-        """ The full create page for this tagging - the analysis one where the tag was made in an analysis, so
-            creating there links the record to it and clears the tag """
-        if analysis_id := self.variant_tag.analysis_id:
-            return reverse("create_classification_for_variant_tag",
-                           kwargs={"analysis_id": analysis_id, "variant_tag_id": self.variant_tag.pk})
-        return reverse("create_classification_for_variant",
-                       kwargs={"variant_id": self.variant_tag.variant_id,
-                               "genome_build_name": self.variant_tag.genome_build.name})
+        """ The full create page for this tagging - going through the tagging is what links the new record to
+            the analysis and clears the tag (@see analysis/views/views.py:create_classification_from_variant_tag) """
+        return reverse("create_classification_for_variant_tag",
+                       kwargs={"variant_tag_id": self.variant_tag.pk})
 
     @property
     def copyable(self) -> list[PreviousClassification]:

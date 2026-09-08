@@ -26,7 +26,8 @@
                 </tr>
             </table>
 
-            Classifying variant tag above. Samples below are from the analysis node the tag was created in.
+            Classifying variant tag above.{% if variant_tag.analysis %} Samples below are from the analysis node the tag was created in.{% endif %}
+            Creating the record here clears the tag.
         </div>
 
     {% endlabelled %}

@@ -122,6 +122,19 @@ def resolve_variant_tag(variant_tag: VariantTag, classification: Classification,
     return variant_tag
 
 
+def resolve_launching_variant_tag(classification: Classification, variant_tag: VariantTag,
+                                  user: User) -> Optional[VariantTag]:
+    """ The tagging whose "New classification" opened the create form. Launching from it is the scientist
+        saying this record is what that tagging was asking for, so it resolves without the samples having to
+        agree - which they can't when the tagging never knew whose it was """
+    if variant_tag.is_resolved or not variant_tag.can_write(user):
+        return None
+    variant = classification.variant
+    if variant is None or variant_tag.variant_id not in {v.pk for v in variant.equivalent_variants}:
+        return None
+    return resolve_variant_tag(variant_tag, classification, user)
+
+
 def _resolve_unambiguous(variant_tags: Iterable[VariantTag], classification: Classification,
                          user: User) -> list[VariantTag]:
     resolved = []

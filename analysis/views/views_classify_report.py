@@ -75,6 +75,16 @@ def patient_classify_report_tab(request, patient_id: int):
     return classify_report_tab(request, CASE_TYPE_PATIENT, patient_id)
 
 
+def classify_report_summary(request, case_type: str, case_id: int) -> JsonResponse:
+    """ The counts the sample / patient page hangs off the Classify & Report tab label, so the page says
+        whether there is anything to do before the tab is opened. Fetched after the page renders - working
+        out which taggings are the case's walks every analysis its samples are in """
+    case = _get_case(request.user, case_type, case_id)
+    outstanding = sum(1 for variant_tag, _ in case.variant_tags() if not variant_tag.is_resolved)
+    return JsonResponse({"outstanding": outstanding,
+                         "classifications": case.classification_modifications().count()})
+
+
 def classify_report_tag_dialog(request, case_type: str, case_id: int, variant_tag_id: int):
     """ The launcher for one tagged variant - the previous classifications of the allele, and where the new
         classification is going. Which (if any) previous classification applies is always the scientist's call """

@@ -100,6 +100,11 @@
         {% endif %}
         </ul>
         {% ui_render_tabs tab_set="patients" %}
+        {% if url_name_visible.patient_classify_report_tab %}
+            {% url 'patient_classify_report_tab' patient.pk as classify_report_tab_url %}
+            {% url 'classify_report_summary' 'patient' patient.pk as classify_report_summary_url %}
+            {% include "analysis/classify_report_tab_counts.html" %}
+        {% endif %}
 
         <hr/>
         {% if has_write_permission or existing_files %}
