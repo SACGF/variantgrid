@@ -329,7 +329,7 @@ class OverlapColumns(DatatableConfig[ClassificationGrouping]):
             # just here for the expand row
             RichColumn(
                 name="id",
-                renderer=lambda x: x.obj.pk,
+                renderer=lambda x: x.obj_sure().pk,
                 visible=False,
                 sort_keys=["pk"]
             )

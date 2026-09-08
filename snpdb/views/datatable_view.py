@@ -28,7 +28,7 @@ class SortOrder(enum.Enum):
     DESC = 'desc'
 
 
-RDC = TypeVar('RDC', bound=models.Model)  # Row Data Class (should match the DatatableConfig but only required if using OBjects mode)
+RDC = TypeVar('RDC', bound=models.Model)  # Row Data Class (should match the DatatableConfig but only required if using Objects mode)
 
 
 @dataclass(frozen=True)
