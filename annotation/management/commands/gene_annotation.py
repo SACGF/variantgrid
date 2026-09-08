@@ -34,6 +34,7 @@ from upload.vcf.sql_copy_files import sql_copy_csv, write_sql_copy_csv
 
 
 class Command(BaseCommand):
+    category = "import"
     GENE_ANNOTATION_HEADER = ["version_id", "gene_id", "dbnsfp_gene_id", "hpo_terms", "omim_terms", "mondo_terms",
                               "gene_disease_moderate_or_above", "gene_disease_supportive_or_below", "gnomad_oe_lof"]
     TERM_JOIN_STRING = " | "

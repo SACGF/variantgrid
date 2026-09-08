@@ -5,6 +5,8 @@ from genes.models import GeneAnnotationRelease, ReleaseGeneSymbol, ReleaseGeneSy
 
 
 class Command(BaseCommand):
+    category = "one-off"
+
     def handle(self, *args, **options):
         for gar in GeneAnnotationRelease.objects.all():
             no_match_qs = ReleaseGeneSymbol.objects.filter(release=gar, releasegenesymbolgene__isnull=True)

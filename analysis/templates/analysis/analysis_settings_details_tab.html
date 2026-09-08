@@ -44,12 +44,6 @@
         });
         initSmartSelectsInForm($("form#analysis-form"));
 
-        $("#reveal-hidden-nodes").click(function() {
-            $.post("{% url 'analysis_reveal_hidden_nodes' analysis.pk %}", function() {
-                window.location.reload();
-            });
-        });
-
         {% if reload_analysis %}
             checkAndMarkDirtyNodes();
         {% endif %}
@@ -61,24 +55,6 @@
         {% endif %}
     });
 </script>
-
-{% if hidden_nodes %}
-<div class="card mb-4" id="hidden-nodes">
-    <div class="card-header">{{ hidden_nodes|length }} hidden node{{ hidden_nodes|pluralize }}</div>
-    <div class="card-body">
-        <p>These nodes were hidden because they couldn't be configured when the analysis template ran.</p>
-        <ul>
-        {% for hidden_node in hidden_nodes %}
-            <li>{{ hidden_node.name }}
-                {% for error in hidden_node.errors %}<div class="text-muted">{{ error }}</div>{% endfor %}
-        {% endfor %}
-        </ul>
-        {% if has_write_permission %}
-            <button class="btn btn-outline-primary" id="reveal-hidden-nodes" type="button">Show hidden nodes</button>
-        {% endif %}
-    </div>
-</div>
-{% endif %}
 
 <div>
     <form id="analysis-form" method="post" action="{{ request.path }}">

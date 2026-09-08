@@ -1,0 +1,251 @@
+{% extends menu_analysis_base %}
+{% load static %}
+{% load js_tags %}
+{% load model_tags %}
+{% block title %}Duo Wizard{% endblock title %}
+
+{% block head %}
+<style>
+/* Pedigree figure - the same sprite symbol the DuoNode wears, with the parent filling in when
+   it's marked affected (see --pedigree-*-fill in uicore/tags/svg_icon_sprite.html) */
+.pedigree-figure {
+    width: 90px;
+    height: 122px;
+    color: #495057;
+    /* the sprite's stroke is weighted for a 15px badge - lighten it at this size */
+    --pedigree-stroke-width: 1.5;
+}
+
+#duo-heading-icon {
+    margin-right: 0.35em;
+    width: 1.1em;
+    height: 1.2em;
+    vertical-align: -0.15em;
+    color: #495057;
+}
+
+#duo-table td {
+    vertical-align: middle;
+}
+
+#duo-table .role-cell {
+    width: 150px;
+}
+
+#duo-table .affected-cell {
+    width: 110px;
+}
+
+/* The switch sits in a table cell - drop the paragraph spacing so the row keeps its height */
+#duo-table .custom-switch {
+    margin-bottom: 0;
+}
+
+/* Stands in for the switch on the proband's row, which is affected by definition */
+#duo-table .proband-affected {
+    display: none;
+}
+
+#relationship-choice label {
+    margin-right: 1em;
+}
+
+#form-submitted-dialog {
+    text-align: center;
+}
+
+#proband-description {
+    text-align: left;
+}
+</style>
+<script src="{% static 'js/patient_phenotype.js' %}"></script>
+<script src="{% static 'js/proband_sex_mismatch.js' %}"></script>
+<script src="{% static 'js/family_wizard_roles.js' %}"></script>
+<script>
+const patient_description_results = {{ patient_description_results | jsonify }};
+const sample_sexes = {{ sample_sexes | jsonify }};
+
+function setProbandPhenoText() {
+    const pp = $("#proband-phenos");
+    pp.empty();
+    const displayedTerms = new Set();
+
+    $("select", ".sample-select").each(function(i) {
+        if ($(this).val() === 'P') {
+            const results = patient_description_results[i][1];
+            if (results) {
+                $("#proband-text").html("Using proband phenotypes:");
+                for (let m = 0; m < results.length; ++m) {
+                    const result = results[m];
+                    const ontologyService = result["ontology_service"];
+                    const resultMatch = result["match"];
+                    if (!displayedTerms.has(resultMatch) && (ontologyService === 'HPO' || ontologyService === 'OMIM')) {
+                        pp.append($("<li>").text(resultMatch));
+                        displayedTerms.add(resultMatch);
+                    }
+                }
+            }
+        }
+    });
+}
+
+/* The parent's own sex is what usually settles Mother vs Father, so preselect it from whichever
+   sample the user gave the Parent role - they can still override it */
+function setupRelationshipFromParentSex() {
+    function relationshipFromParent() {
+        let sex = null;
+        $("select", ".sample-select").each(function(i) {
+            if ($(this).val() === 'A') {
+                sex = sample_sexes[i]["sex"];
+            }
+        });
+        if (sex === 'M' || sex === 'F') {
+            $("#relationship-choice input[value='" + sex + "']").prop("checked", true);
+        }
+    }
+    relationshipFromParent();
+    $("select", ".sample-select").change(relationshipFromParent);
+}
+
+/* The pedigree figure draws both parent shapes - the radio picks which one shows */
+function setupRelationshipFigure() {
+    function refresh() {
+        const relationship = $("#relationship-choice input:checked").val();
+        $(".pedigree-figure").toggleClass("duo-mother", relationship === 'M')
+                             .toggleClass("duo-father", relationship === 'F');
+    }
+    refresh();
+    $("#relationship-choice input").change(refresh);
+}
+</script>
+{% endblock head %}
+
+{% block jsdocumentready %}
+
+    for (let i = 0; i < patient_description_results.length; ++i) {
+        const pdr = patient_description_results[i];
+        const phenotypeText = pdr[0];
+        const phenotypeMatches = pdr[1];
+
+        if (phenotypeText) {
+            const resultSelector = $("#patient-results-" + (i + 1));
+            displayPhenotypeMatches(resultSelector, phenotypeText, phenotypeMatches);
+        }
+    }
+
+    setupProbandSexMismatch(sample_sexes);
+
+    $("#create-duo-button").click(function() {
+        setProbandPhenoText();
+        $("#form-submitted-dialog").modal("show");
+    });
+
+    setupFamilyRoles(sample_sexes, {"A": "parent-affected"});
+    setupRelationshipFromParentSex();
+    setupRelationshipFigure();
+
+{% endblock jsdocumentready %}
+
+{% block submenu_page_content %}
+    <h3>
+        <svg id="duo-heading-icon"><use href="#node-icon-duo"></use></svg> Create Duo
+    </h3>
+    <p class="text-muted">
+        From cohort <a href="{{ cohort.get_absolute_url }}">{{ cohort }}</a> - give each sample a role,
+        say which parent you have, and tick the parent if they're affected.
+    </p>
+
+    <form id="duo-form" method="post">
+        {% csrf_token %}
+
+        <div class="row">
+            <div class="col-lg-8">
+                <div class="card mb-3">
+                    <div class="card-header">Samples</div>
+                    <table id='duo-table' class="table table-sm mb-0">
+                        <thead>
+                            <tr><th>Sample</th><th>Role</th><th>Affected</th><th data-help="{% detected_sex_help %}">Detected Sex</th><th>Patient</th><th>Phenotype</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>{{ sample_1.name }}</td>
+                                <td class='sample-select role-cell'>{{ form.sample_1 }}{{ form.sample_1.errors }}</td>
+                                <td class='sample-affected affected-cell'>
+                                    <div class="custom-control custom-switch">
+                                        {{ form.sample_1_affected }}
+                                        <label class="custom-control-label" for="{{ form.sample_1_affected.id_for_label }}"></label>
+                                    </div>
+                                    <span class="proband-affected text-muted small">Always</span>
+                                </td>
+                                <td>{% detected_sex sample_1.get_genotype_stats %}</td>
+                                <td>{{ sample_1.patient | default_if_none:"" }}</td>
+                                <td id='patient-results-1'></td>
+                            </tr>
+                            <tr>
+                                <td>{{ sample_2.name }}</td>
+                                <td class='sample-select role-cell'>{{ form.sample_2 }}{{ form.sample_2.errors }}</td>
+                                <td class='sample-affected affected-cell'>
+                                    <div class="custom-control custom-switch">
+                                        {{ form.sample_2_affected }}
+                                        <label class="custom-control-label" for="{{ form.sample_2_affected.id_for_label }}"></label>
+                                    </div>
+                                    <span class="proband-affected text-muted small">Always</span>
+                                </td>
+                                <td>{% detected_sex sample_2.get_genotype_stats %}</td>
+                                <td>{{ sample_2.patient | default_if_none:"" }}</td>
+                                <td id='patient-results-2'></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <div class="card-footer">
+                        <span id='relationship-choice'>
+                            <b>The parent is the proband's:</b> {{ form.relationship }}{{ form.relationship.errors }}
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-4">
+                <div class="card mb-3">
+                    <div class="card-header">Pedigree</div>
+                    <div class="card-body text-center">
+                        <svg class="pedigree-figure"><use href="#node-icon-duo"></use></svg>
+                        <div class="text-muted small">Filled symbols are affected</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id='proband-sex-mismatch' class="alert alert-warning" style="display: none;">
+            <div id='proband-sex-message'></div>
+            {{ form.proband_sex }}{{ form.proband_sex.errors }}
+        </div>
+
+        {% if form.non_field_errors %}
+            <ul class='messages'>
+            {% for error in form.non_field_errors %}
+                <li class="error">{{ error|escape }}</li>
+            {% endfor %}
+            </ul>
+        {% endif %}
+
+        <button id='create-duo-button' class="btn btn-primary"><i class="fas fa-plus-circle"></i> Create Duo</button>
+    </form>
+
+    <div class="modal" id="form-submitted-dialog" data-backdrop="static" data-keyboard="false"
+         tabindex="-1" role="dialog" aria-hidden="true">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-body">
+                    <div><i class="fa fa-spinner fa-spin"></i> Creating Duo...</div>
+                    <svg class="pedigree-figure"><use href="#node-icon-duo"></use></svg>
+                    <div id='proband-description'>
+                        <div id='proband-text'></div>
+                        <ul id='proband-phenos'></ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+{% endblock submenu_page_content %}

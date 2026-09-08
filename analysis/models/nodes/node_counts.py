@@ -16,8 +16,7 @@ from snpdb.models.models_user_settings import AbstractNodeCountSettings
 from snpdb.utils import get_tag_styles_and_colors
 
 # Tags the user hasn't given a colour still need a visible legend swatch
-# Tag counts are drawn as tag-coloured pills like the grid tags, so an uncoloured tag gets the grid's default pill grey
-DEFAULT_TAG_NODE_COUNT_COLOR = "#eceff3"
+DEFAULT_TAG_NODE_COUNT_COLOR = "#888888"
 
 
 def get_omim_q(annotation_version: AnnotationVersion) -> Q:
@@ -90,16 +89,15 @@ def get_node_extra_filters_q(node, extra_filters) -> Optional[Q]:
 
 def get_extra_filters_count(node, extra_filters) -> Optional[int]:
     """ How many rows the node shows under extra_filters, or None if we can't say cheaply. There
-        being no filter is one of those - the node's own count is what covers that.
-        NodeCount is reached through the node version rather than imported - analysis_node imports us """
+        being no filter is one of those - the node's own count is what covers that """
     if not is_extra_filter(extra_filters):
         return None
     tag_ids = TagFilter.get_tag_ids(extra_filters)
     node_tag_q = node.get_extra_filters_tag_q(tag_ids) if tag_ids else None
     if node_tag_q is None:
         # Stored counts are analysis-scoped, so they only speak for an analysis-scoped filter
-        if node_count := node.node_version.nodecount_set.filter(label=extra_filters).first():
-            return node_count.count
+        if (count := node.node_version.counts.get(extra_filters)) is not None:
+            return count
     if tag_ids:
         # Tags narrow the node to a handful of variants, so counting them exactly here is cheap
         q = node_tag_q if node_tag_q is not None else get_extra_filters_q(node.analysis, extra_filters)

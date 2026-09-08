@@ -7,6 +7,9 @@ from django.conf import settings
 from django.db.models import Q, StringAgg, TextField, Value
 from django.urls import reverse
 
+from annotation.annotation_version_querysets import (
+    get_variant_queryset_for_latest_annotation_version,
+)
 from annotation.models.models import VariantAnnotation
 from annotation.models.models_phenotype_match import PATIENT_ONTOLOGY_TERM_PATH
 from classification.models import ClassificationModification
@@ -512,34 +515,39 @@ class VariantSampleGenotypes(VariantZygosityCounts):
             "patient_mondo": row["patient_mondo"],
         } | self._get_sample_details(row)
 
+    # What the grid's Variant cell is drawn from, so the locus table names each variant the same way
+    # (gene + c.HGVS, or the fusion pair, with the kind badge). @see VariantGridFormat.representativeVariant
+    LOCUS_COUNT_VARIANT_FIELDS = ("locus__contig__name", "locus__position", "locus__ref__seq", "alt__seq", "svlen",
+                                  "variantannotation__hgvs_c", "variantannotation__hgvs_p",
+                                  "variantannotation__hgvs_g", "variantannotation__symbol")
+
     def _get_locus_counts(self) -> list[dict]:
         """ Zygosity counts for every variant at this locus, this variant first """
         counts_by_variant_id = self._get_locus_zygosity_counts()
-        # str(v) and v.alt.seq below reach through to the locus/sequence rows
-        variant_qs = Variant.objects.filter(pk__in=counts_by_variant_id) \
-            .select_related("locus__contig", "locus__ref", "alt")
-        variant_by_id = {v.pk: v for v in variant_qs}
+        variant_qs = get_variant_queryset_for_latest_annotation_version(self.genome_builds[0]) \
+            .filter(pk__in=counts_by_variant_id)
+        variant_by_id = {v["pk"]: v for v in variant_qs.values("pk", *self.LOCUS_COUNT_VARIANT_FIELDS)}
 
         sorted_rows = []
         for variant_id, zygosity_counts in counts_by_variant_id.items():
             v = variant_by_id[variant_id]
             row = {
                 "variant_id": variant_id,
-                "variant": str(v),
                 "url": reverse("view_variant", kwargs={"variant_id": variant_id}),
                 "description": "",
                 "total": sum(zygosity_counts.values()),
-            }
+            } | {field: v[field] for field in self.LOCUS_COUNT_VARIANT_FIELDS}
             for zygosity, label in LOCUS_COUNT_ZYGOSITY_LABELS:
                 row[label] = zygosity_counts[zygosity]
 
+            alt = v["alt__seq"]
             if variant_id == self.variant.pk:
                 row["description"] = "This variant"
                 sort_order = 1
-            elif v.is_reference:
+            elif alt == Variant.REFERENCE_ALT:
                 sort_order = 0
             else:
-                sort_order = sum(map(ord, v.alt.seq))
+                sort_order = sum(map(ord, alt))
             sorted_rows.append((sort_order, row))
 
         sorted_rows.sort(key=lambda sort_order_row: sort_order_row[0])

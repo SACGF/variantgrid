@@ -1,3 +1,4 @@
+{% load genome_build_tags %}
 {% load js_tags %}
 {% load ui_utils %}
 <div class="vcf-grid-filter-tags-{{ table_id }}">
@@ -5,10 +6,6 @@
     fieldset.grid-filter-container {
         margin-left: 0px;
         min-width: 700px;
-    }
-
-    .genome-build-radio label {
-        white-space: nowrap;
     }
 
     #vcf-grid-filter {
@@ -131,16 +128,7 @@
         <legend>Filter Grid</legend>
         <div class="pair">
             {% labelled label="Genome Build" %}
-            <div class="btn-group btn-group-toggle genome-build-radio" data-toggle="buttons">
-                <label class="btn btn-outline-primary active">
-                    <input class="table-filter" type="radio" name="genome_build_filter" value="" autocomplete="off" checked> All
-                </label>
-                {% for genome_build in genome_builds %}
-                    <label class="btn btn-outline-primary">
-                        <input class="table-filter" type="radio" name="genome_build_filter" value="{{ genome_build.name }}" autocomplete="off"> {{ genome_build.name }}
-                    </label>
-                {% endfor %}
-            </div>
+            {% genome_build_grid_filter %}
             {% endlabelled %}
             {% labelled label="Project" %}
             {{ project_form.project }}

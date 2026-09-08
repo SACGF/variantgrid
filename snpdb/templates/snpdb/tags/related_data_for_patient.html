@@ -14,7 +14,9 @@
             <th>Sample Name
             <th>VCF
             <th>VCF date
+            <th>Genome build
             <th>Specimen
+            <th>Extraction
             </tr>
             </thead>
             <tbody>
@@ -24,7 +26,9 @@
             <td>{{ sample.name }}
             <td>{% preview_icon sample.vcf %} <a href="{% url 'view_vcf' sample.vcf.pk %}">{{ sample.vcf.name }}</a>
             <td>{{ sample.vcf.date }}
+            <td>{{ sample.vcf.genome_build }}
             <td>{% if sample.specimen %}{% preview_icon sample.specimen %} <a href="{{ sample.specimen.get_absolute_url }}">{{ sample.specimen }}</a>{% endif %}
+            <td>{% if sample.extraction %}{% preview_icon sample.extraction %} <a href="{{ sample.extraction.get_absolute_url }}">{{ sample.extraction }}</a>{% endif %}
             </tr>
         {% endfor %}
         </tbody>

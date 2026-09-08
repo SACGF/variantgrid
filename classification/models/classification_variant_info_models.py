@@ -1,3 +1,11 @@
+"""
+What a classification said about its variant and what it resolved to. ImportedAlleleInfo is unique
+on the md5 of the imported text (build, c.HGVS or g.HGVS, transcript) so re-imports share one
+resolution; ResolvedVariantInfo is that resolution per build (variant, c.HGVS, gene, transcript) and
+ImportedAlleleInfoValidation records the include / confirmed decision and its validation tags.
+This is the only link from a classification to an Allele; HGVSConverterVersion records which
+converter produced it.
+"""
 import logging
 from dataclasses import dataclass
 from datetime import timedelta
@@ -24,7 +32,8 @@ from django.utils.timezone import now
 from model_utils.models import TimeStampedModel
 
 from genes.gene_fusions import resolve_fusion_string
-from genes.hgvs import HGVSComponents, HGVSDiff, HGVSConverterType, HGVSDisplay, HGVSMatcher, hgvs_diff_description
+from genes.hgvs import (HGVSComponents, HGVSDiff, HGVSConverterType, HGVSDisplay, HGVSMatcher,
+                       HGVSNoRepresentationException, hgvs_diff_description)
 from genes.models import GeneFusion, GeneSymbol, NoTranscript, Transcript, TranscriptVersion
 from library.cache import timed_cache
 from library.django_utils.django_object_managers import ObjectManagerCachingRequest
@@ -206,6 +215,10 @@ class ResolvedVariantInfo(TimeStampedModel):
             self.error = str(nt)
             logging.warning("Could not resolve c.HGVS for variant %s (%s, transcript %s): %s",
                             variant, self.genome_build.name, self.allele_info.get_transcript, nt)
+        except HGVSNoRepresentationException as nr:
+            # The variant is fine, HGVS just has no way to write it - eg <CNV>. See #1574.
+            self.error = str(nr)
+            logging.info("No c.HGVS for variant %s (%s): %s", variant, self.genome_build.name, nr)
         except Exception as exception:
             self.error = str(exception)
             report_exc_info(extra_data={

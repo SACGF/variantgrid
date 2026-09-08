@@ -91,6 +91,10 @@ class VCF(GuardianPermissionsMixin, DataArchiveMixin, PreviewModelMixin):
     genotype_quality_field = models.TextField(null=True)
     phred_likelihood_field = models.TextField(null=True)
     sample_filters_field = models.TextField(null=True)
+    # The FORMAT (or, for a single-sample VCF, INFO) key carrying the sample's copy number or copy
+    # ratio - CN, SM, FC. There is no packed column for it: the grid reads it out of the stored
+    # CohortGenotype JSON at query time, labelled with this name (@see VCFConstant.COPY_NUMBER_FIELDS)
+    copy_number_field = models.TextField(null=True)
     allele_frequency_percent = models.BooleanField(default=False)  # Legacy data used AF as percent
     # We don't want some VCFs to add to variant zygosity count (see VCFSourceSettings)
     variant_zygosity_count = models.BooleanField(default=True)
@@ -106,6 +110,17 @@ class VCF(GuardianPermissionsMixin, DataArchiveMixin, PreviewModelMixin):
     class Meta:
         verbose_name = 'VCF'
         verbose_name_plural = 'VCFs'
+
+    @cached_property
+    def copy_number_description(self) -> Optional[str]:
+        """ The header's own description of copy_number_field - what the grid cell says on hover """
+        if not self.copy_number_field:
+            return None
+        for klass in (VCFFormat, VCFInfo):
+            if field := klass.objects.filter(vcf=self, identifier=self.copy_number_field).first():
+                # Header descriptions are stored as the file quoted them
+                return field.description.strip('"')
+        return None
 
     @property
     def data_archive_in_progress(self) -> bool:
@@ -195,8 +210,47 @@ class VCF(GuardianPermissionsMixin, DataArchiveMixin, PreviewModelMixin):
         return reverse('data')
 
     @property
-    def has_genotype(self):
+    def has_sample_columns(self) -> bool:
+        """ FORMAT plus sample columns - a variant-only (sites) VCF has none. What decides whether the
+            genotype importer ran and whether there is anything per sample to show in a grid """
         return self.genotype_samples > 0
+
+    @property
+    def has_genotype(self) -> bool:
+        """ A GT field, so zygosity means something. A caller that reports only depths (eg TSO 500
+            splice variants) has sample columns but every zygosity is unknown """
+        return self.has_sample_columns and self.genotype_field is not None
+
+    @property
+    def has_depth(self) -> bool:
+        """ Allele or read depths, so the AD/DP/GQ/PL thresholds mean something """
+        depth_fields = (self.allele_depth_field, self.alt_depth_field, self.read_depth_field)
+        return self.has_sample_columns and any(depth_fields)
+
+    @property
+    def has_allele_depth(self) -> bool:
+        """ AD was declared, or built from ref+alt depths on import (@see BulkGenotypeVCFProcessor) """
+        allele_depths = self.allele_depth_field or (self.ref_depth_field and self.alt_depth_field)
+        return self.has_sample_columns and bool(allele_depths)
+
+    @property
+    def has_read_depth(self) -> bool:
+        return self.has_sample_columns and self.read_depth_field is not None
+
+    @property
+    def has_genotype_quality(self) -> bool:
+        return self.has_sample_columns and self.genotype_quality_field is not None
+
+    @property
+    def has_phred_likelihood(self) -> bool:
+        return self.has_sample_columns and self.phred_likelihood_field is not None
+
+    @property
+    def has_allele_frequency(self) -> bool:
+        """ AF was read from the VCF, or derived from allele depths on import. A VCF with only DP has
+            depth but nothing to make a frequency from (@see BulkGenotypeVCFProcessor) """
+        allele_depths = self.allele_depth_field or (self.ref_depth_field and self.alt_depth_field)
+        return self.has_sample_columns and bool(self.allele_frequency_field or allele_depths)
 
     @cached_property
     def samples_by_vcf_name(self) -> dict[str, 'Sample']:
@@ -374,8 +428,36 @@ class Sample(GuardianPermissionsMixin, SortByPKMixin, SvgSymbolPreviewIconMixin,
         return self.vcf.genome_build
 
     @property
-    def has_genotype(self):
+    def has_sample_columns(self) -> bool:
+        return self.vcf.has_sample_columns
+
+    @property
+    def has_genotype(self) -> bool:
         return self.vcf.has_genotype
+
+    @property
+    def has_depth(self) -> bool:
+        return self.vcf.has_depth
+
+    @property
+    def has_allele_depth(self) -> bool:
+        return self.vcf.has_allele_depth
+
+    @property
+    def has_read_depth(self) -> bool:
+        return self.vcf.has_read_depth
+
+    @property
+    def has_genotype_quality(self) -> bool:
+        return self.vcf.has_genotype_quality
+
+    @property
+    def has_phred_likelihood(self) -> bool:
+        return self.vcf.has_phred_likelihood
+
+    @property
+    def has_allele_frequency(self) -> bool:
+        return self.vcf.has_allele_frequency
 
     @property
     def data_archived(self) -> bool:
@@ -706,6 +788,7 @@ class VCFSourceSettings(models.Model):
         "genotype_quality_field",
         "phred_likelihood_field",
         "sample_filters_field",
+        "copy_number_field",
     })
 
     source_regex = models.TextField()

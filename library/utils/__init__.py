@@ -1,3 +1,10 @@
+"""
+The `library.utils` facade: every library/utils/*_utils.py module is star-imported here so callers write
+`from library.utils import first, batch_iterator, sha256sum_str`. Check the per-topic modules
+(collection, text, html, json, hash, file, date, diff, export, model, class, os, timer, misc, color)
+before adding a helper - library/CLAUDE.md lists what each holds. A new utils module must be added
+to this list to be reachable through the facade.
+"""
 from library.utils.class_utils import *
 from library.utils.collection_utils import *
 from library.utils.color_utils import *

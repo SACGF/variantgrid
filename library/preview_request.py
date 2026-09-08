@@ -1,3 +1,10 @@
+"""
+Hover previews and search summaries: a model implements PreviewModelMixin (preview_category,
+preview_icon, preview) and returns PreviewData; other apps add rows with
+`@receiver(preview_extra_signal, sender=Model)` returning PreviewKeyValue. SvgSymbolPreviewIconMixin
+is for icons FontAwesome lacks (pedigree shapes). PreviewRequest resolves a `category:pk` from the
+search page into the same PreviewData.
+"""
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
@@ -204,8 +211,13 @@ class SvgSymbolPreviewIconMixin:
         """ Override where the shape varies by record, e.g. Sample draws its patient's pedigree notation """
         return self.preview_icon_symbol
 
+    def get_preview_icon_css_class(self) -> str:
+        """ Override to shade the symbol from the record, e.g. Trio blackens the affected family members """
+        return ""
+
     def preview_icon_html(self, css_class: str = "") -> SafeString:
-        return svg_symbol_icon_html(self.get_preview_icon_symbol(), css_class)
+        return svg_symbol_icon_html(self.get_preview_icon_symbol(),
+                                    _icon_classes(css_class, self.get_preview_icon_css_class()))
 
 
 PreviewCoordinator = Union[type[PreviewModelMixin], PreviewProxyModel]

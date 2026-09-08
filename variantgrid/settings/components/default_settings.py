@@ -126,7 +126,7 @@ MAJOR_OPERATION_SLOT_EXPIRE_SECONDS = 10 * 60  # Safety TTL so a crashed request
 CACHE_HOURS = 48
 TIMEOUT = 60 * 60 * CACHE_HOURS
 REDIS_PORT = 6379
-CACHE_VERSION = 51  # increment to flush caches (eg if invalid due to upgrade)
+CACHE_VERSION = 53  # increment to flush caches (eg if invalid due to upgrade)
 if UNIT_TEST:
     # In-process cache, so tests don't read/write the dev Redis (state leaking between runs)
     CACHES = {
@@ -550,8 +550,8 @@ ANALYSIS_DUAL_SCREEN_MODE_FEATURE_ENABLED = False  # Currently broken
 ANALYSIS_TEMPLATES_AUTO_SAMPLE = "Sample tab auto analysis"
 ANALYSIS_TEMPLATES_AUTO_COHORT_EXPORT = "Cohort VCF Export auto analysis"
 ANALYSIS_WARN_IF_NO_QC_GENE_LIST_MESSAGE = None  # disabled by default
-# Which Patient -> Specimen -> Extraction -> Sample levels a SampleNode can read from - one add node
-# menu entry each. A deployment with no patient data trims this down to just the sample
+# Which Patient -> Specimen -> Extraction -> Sample levels a SampleNode can be pointed at in its
+# editor. A deployment with no patient data trims this down to just the sample
 ANALYSIS_SAMPLE_NODE_LEVELS = ["S", "E", "P", "T"]
 ANALYSIS_NODE_CACHE_Q = True
 # Node dispatch throttles (see analysis.tasks.analysis_update_tasks). A single dispatch leases at
@@ -763,7 +763,9 @@ STATICFILES_FINDERS = (
 # django_secret_key.txt in this dir (which is hidden via .gitignore)
 SECRET_KEY = get_or_create_django_secret_key(SETTINGS_DIR)
 
-TAG_REQUIRES_CLASSIFICATION = "RequiresClassification"  # tags can't have spaces
+# Seed data only: the classify queue tag a fresh install is created with (tags can't have spaces).
+# What behaves as a queue tag is Tag.requires_classification, set per tag on the tag settings page
+TAG_REQUIRES_CLASSIFICATION = "RequiresClassification"
 
 TEMPLATES = [
     {
@@ -1151,6 +1153,17 @@ SOMALIER = {
             "T2T-CHM13v2.0": "sites.chm13v2.T2T.vcf.gz",
         },
     },
+    # somalier reads a record against its own alphabetically sorted site alleles rather than the
+    # record's REF/ALT (https://github.com/brentp/somalier/issues/163), so we write the AD pair in the
+    # site's order. Turn this off for a somalier that reads the record's alleles - deployment_check's
+    # somalier_allele_order tells you which way this should be set, and the extracts need rebuilding
+    # with 'somalier_existing_vcfs --clear' whenever it changes
+    "compensate_allele_order": True,
+    "ancestry_enabled": True,  # The expensive stage - it reads all 2,504 1kg .somalier files each run
+    # A VCF whose best sample has fewer het+hom sites than this is extracted, but ancestry and relate
+    # are recorded as SKIPPED rather than run on numbers that mean nothing
+    "min_genotyped_sites": 100,
+    "all_samples_relate_hour": 2,  # Nightly all-vs-all relate. None disables it
     # Minimums for related samples to appear at bottom of view_sample page
     "relatedness": {
         "min_relatedness": 0.1,

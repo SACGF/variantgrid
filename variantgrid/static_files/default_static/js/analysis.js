@@ -30,24 +30,6 @@ function loadNodeData(nodeId, extra_filters, fromSelectNode) {
     win.loadGridAndEditorForNode(nodeId, extra_filters, fromSelectNode);
 }
 
-/* The TagNode editor's toggles show the node's own per-tag counts, which the DAG has already
-   counted - fill them in from the node card, and keep them live while the editor is open.
-   @see setNodeCounts, which calls updateTagCountsSummary after every recount */
-function fillTagCountsFromNode(container, nodeId) {
-    const aWin = getAnalysisWindow();
-    setTagCountsSummaryCounts(container, aWin.getNodeTagCounts(aWin.getNode(nodeId)));
-}
-
-function updateTagCountsSummary(nodeId, tagCounts) {
-    if (nodeId != getLoadedNodeId()) {
-        return;  // The editor showing belongs to some other node
-    }
-    const container = $("[data-tag-counts-summary]");
-    if (container.length) {
-        setTagCountsSummaryCounts(container, tagCounts);
-    }
-}
-
 function isHorizontalMode() {
     return typeof ANALYSIS_HORIZONTAL_MODE !== "undefined" && ANALYSIS_HORIZONTAL_MODE;
 }
@@ -656,10 +638,9 @@ function setupErrorHandlers() {
 }
 
 function setupNodeTypeSelect() {
-    // Icon and source/filter colour come from NODE_TYPES - see node_types.get_node_display_data_by_menu_key()
-    // A menu key is a node class, or a class plus the configuration the entry stamps (eg "SampleNode:E")
-    function renderNodeTypeItem(menuKey, label) {
-        const nodeType = NODE_TYPES[menuKey];
+    // Icon and source/filter colour come from NODE_TYPES - see node_types.get_node_display_data_by_class_name()
+    function renderNodeTypeItem(className, label) {
+        const nodeType = NODE_TYPES[className];
         // Class name on the row picks up the node's accent colour - see analysis_nodes.css
         const wrapper = $("<div>", {"class": "node-type-item " + ((nodeType && nodeType.class_name) || "")});
         if (nodeType) {
@@ -714,11 +695,12 @@ function setupNodeTypeSelect() {
 }
 
 function addVariantTag(variantId, nodeId, tagId, successFunc) {
-    setVariantTag(variantId, nodeId, tagId, successFunc, 'add');
+    setVariantTag(variantId, nodeId, tagId, null, successFunc, 'add');
 }
 
-function removeVariantTag(variantId, tagId, successFunc) {
-    setVariantTag(variantId, null, tagId, successFunc, 'del');
+// The X is on one pill, so it removes that tagging rather than every tagging of the tag
+function removeVariantTag(variantId, tagId, variantTagId, successFunc) {
+    setVariantTag(variantId, null, tagId, Number(variantTagId), successFunc, 'del');
 }
 
 function setNumVariantTags(pulseLabel) {
@@ -738,7 +720,7 @@ function setNumVariantTags(pulseLabel) {
     numberOfTags.text(label);
 }
 
-function setVariantTag(variantId, nodeId, tagId, successFunc, op) {
+function setVariantTag(variantId, nodeId, tagId, variantTagId, successFunc, op) {
     let data = 'variant_id=' + variantId;
     data += '&tag_id=' + tagId;
     data += '&op=' + op;
@@ -746,19 +728,33 @@ function setVariantTag(variantId, nodeId, tagId, successFunc, op) {
     if (nodeId) {
         data += '&node_id=' + nodeId;
     }
+    if (variantTagId) {
+        data += '&variant_tag_id=' + variantTagId;
+    }
 
     const success = function (response) {
         const aWin = getAnalysisWindow();
-        const tagList = aWin.variantTags[variantId] || [];
+        const taggings = aWin.variantTags[variantId] || [];
         if (op == 'add') {
-            tagList.push(tagId);
+            // Tagging where this node's proband already has the tag finds that row - only a new one is a new pill
+            if (response && response.created) {
+                const tagging = response.variant_tag;
+                taggings.push(tagging);
+                if (tagging.sample) {
+                    aWin.analysisSamples = aWin.analysisSamples || {};
+                    aWin.analysisSamples[tagging.sample] = tagging.sample_name;
+                }
+            }
         } else if (op == 'del') {
-            if (tagList) {
-                removeItemFromArray(tagId, tagList);
+            for (let i=0 ; i<taggings.length ; ++i) {
+                if (taggings[i].id === variantTagId) {
+                    taggings.splice(i, 1);
+                    break;
+                }
             }
         }
-        if (Object.keys(tagList).length > 0) {
-            aWin.variantTags[variantId] = tagList;
+        if (taggings.length > 0) {
+            aWin.variantTags[variantId] = taggings;
         } else {
             delete aWin.variantTags[variantId];
         }
@@ -769,7 +765,7 @@ function setVariantTag(variantId, nodeId, tagId, successFunc, op) {
         }
 
         if (successFunc) {
-            successFunc();
+            successFunc(response);
         }
     };
 

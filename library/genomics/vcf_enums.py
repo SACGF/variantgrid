@@ -1,3 +1,8 @@
+"""
+VCF-level constants that both the importer and the writers share: column positions (VCFColumns),
+the symbolic alts (VCFSymbolicAllele, and GeneLevelSymbolicAlt for gene-level events on the fake
+contig), header constants, and VariantClass (Ensembl's VARIANT_CLASS terms).
+"""
 import re
 from typing import Optional
 
@@ -90,6 +95,9 @@ class VCFConstant:
     GENOTYPE_LIKELIHOOD = "GL"
     ALT_DEPTH_FIELD = "AO"  # FreeBayes - Alternate allele observation count
     REF_DEPTH_FIELD = "RO"  # FreeBayes - Reference allele observation count
+    # The FORMAT (or, for a single-sample VCF, INFO) keys a caller writes copy number under, best
+    # first: CN is an integer copy number, SM a linear copy ratio (DRAGEN), FC a fold change (Pisces)
+    COPY_NUMBER_FIELDS = ("CN", "SM", "FC")
 
 
 class VariantClass(models.TextChoices):

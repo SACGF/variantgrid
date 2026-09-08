@@ -1,0 +1,15 @@
+<style>
+.genome-build-radio label {
+    white-space: nowrap;
+}
+</style>
+<div class="btn-group btn-group-toggle genome-build-radio" data-toggle="buttons">
+    <label class="btn btn-outline-primary active">
+        <input class="table-filter" type="radio" name="genome_build_filter" value="" autocomplete="off" checked> All
+    </label>
+    {% for genome_build in genome_builds %}
+        <label class="btn btn-outline-primary">
+            <input class="table-filter" type="radio" name="genome_build_filter" value="{{ genome_build.name }}" autocomplete="off"> {{ genome_build.name }}
+        </label>
+    {% endfor %}
+</div>

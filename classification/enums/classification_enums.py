@@ -1,3 +1,12 @@
+"""
+The classification vocabulary: SpecialEKeys (the evidence keys code refers to by name - use these,
+never string literals), ShareLevel (lab -> institution -> logged-in users -> public, with which levels
+count toward discordance), AlleleOriginBucket, CopyScope / CopyAlleleOrigin (how far a value travels
+when copied from a previous classification), ClinicalSignificance / SomaticClinicalSignificance value
+helpers, EvidenceCategory and EvidenceKeyValueType (the EvidenceKey schema), CriteriaEvaluation
+(ACMG strengths), SubmissionSource, ValidationCode and WithdrawReason. Buckets and option metadata
+come from EvidenceKey rows, not from these enums.
+"""
 import typing
 from enum import Enum
 from functools import total_ordering
@@ -38,6 +47,35 @@ class AlleleOriginBucket(TextChoices):
             return AlleleOriginBucket.GERMLINE
         else:
             return AlleleOriginBucket.UNKNOWN
+
+
+class CopyScope(TextChoices):
+    """
+    How far an EvidenceKey's value legitimately travels when copying from a previously curated
+    classification - gene level content is the same for every variant in the gene, allele level content
+    only for the same allele
+    """
+    NONE = "N", "None"
+    ALLELE = "A", "Allele"
+    GENE = "G", "Gene"
+
+
+class CopyAlleleOrigin(TextChoices):
+    """
+    Which allele origin an EvidenceKey is meaningful for - segregation, de novo and allelic data are
+    germline concepts with no namespace to filter on
+    """
+    ANY = "A", "Any"
+    GERMLINE = "G", "Germline"
+    SOMATIC = "S", "Somatic"
+
+    def can_copy_to(self, allele_origin_bucket: Optional[AlleleOriginBucket]) -> bool:
+        """ Only the opposite bucket stops the copy, an unknown bucket keeps the value """
+        if self == CopyAlleleOrigin.GERMLINE:
+            return allele_origin_bucket != AlleleOriginBucket.SOMATIC
+        if self == CopyAlleleOrigin.SOMATIC:
+            return allele_origin_bucket != AlleleOriginBucket.GERMLINE
+        return True
 
 
 class ReclassificationEventType(TextChoices):

@@ -1,5 +1,6 @@
 from .all_variants_node import *
 from .cohort_node import *
+from .duo_node import *
 from .pedigree_node import *
 from .quad_node import *
 from .sample_node import *

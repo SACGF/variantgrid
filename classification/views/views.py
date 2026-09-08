@@ -15,7 +15,7 @@ from django.core.exceptions import PermissionDenied
 from django.db.models import QuerySet
 from django.http import Http404, StreamingHttpResponse
 from django.http.request import HttpRequest
-from django.http.response import HttpResponse
+from django.http.response import HttpResponse, HttpResponseBase, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.timezone import now
@@ -62,11 +62,16 @@ from classification.models import (
     ClassificationReportTemplate,
     ConditionResolvedDict,
     DiscordanceReport,
+    GeneConsensusGroup,
     ImportedAlleleInfo,
     ImportedAlleleInfoStatus,
     ReportNames,
 )
-from classification.models.classification import ClassificationModification
+from classification.models.classification import (
+    COPY_SCOPES_ALL,
+    COPY_SCOPES_GENE,
+    ClassificationModification,
+)
 from classification.models.classification_import_run import ClassificationImportRunStatus
 from classification.models.clinical_context_models import ClinicalContext
 from classification.models.evidence_key import EvidenceKeyMap
@@ -79,6 +84,7 @@ from classification.views.exports import (
 )
 from classification.views.exports.classification_export_filter import ClassificationFilter
 from classification.views.exports.classification_export_formatter_csv import FormatDetailsCSV
+from classification.views.views_gene_consensus import classification_gene_symbol
 from flags.models import Flag, FlagComment
 from flags.models.models import FlagType
 from genes.forms import GeneSymbolForm
@@ -306,7 +312,7 @@ class AutopopulateView(APIView):
     and optionally an existing classification to copy from), used to pre-fill the classification form. """
 
     @extend_schema(
-        summary="Auto-populate classification evidence key values for a variant (query params: variant_id, genome_build_name, transcript accessions, sample_id, copy_from_vcm_id)",
+        summary="Auto-populate classification evidence key values for a variant (query params: variant_id, genome_build_name, transcript accessions, sample_id, copy_from_vcm_id, copy_gene_from_vcm_id)",
         responses=OpenApiTypes.OBJECT
     )
     def get(self, request):
@@ -316,8 +322,7 @@ class AutopopulateView(APIView):
         ensembl_transcript_accession = request.GET.get("ensembl_transcript_accession")
         sample_id = request.GET.get("sample_id")
         copy_from_id = request.GET.get("copy_from_vcm_id")
-        if copy_from_id:
-            copy_from_id = int(copy_from_id)
+        copy_gene_from_id = request.GET.get("copy_gene_from_vcm_id")
 
         genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
         variant: Variant = get_object_or_404(Variant, pk=variant_id)
@@ -348,14 +353,19 @@ class AutopopulateView(APIView):
                         value = {'value': value}
                     complete_values.append({'key': key, 'blob': value, 'source': name})
 
-        if copy_from_id:
-            copy_from = ClassificationModification.objects.get(pk=copy_from_id)
+        # Annotation wins over the allele level copy, which wins over the gene level copy - the specific
+        # beats the general, and what this variant actually is beats both
+        for source_id, copy_scopes, source_name in [(copy_from_id, COPY_SCOPES_ALL, 'copy from latest'),
+                                                    (copy_gene_from_id, COPY_SCOPES_GENE, 'copy from gene')]:
+            if not source_id or source_id == "0":
+                continue
+            copy_from = ClassificationModification.objects.get(pk=int(source_id))
             copy_from.check_can_view(request.user)
-            consensus_patch = ClassificationConsensus(modification=copy_from).consensus_patch
+            consensus_patch = ClassificationConsensus(modification=copy_from, copy_scopes=copy_scopes).consensus_patch
             for key, blob in consensus_patch.items():
                 if key not in used_keys:
                     used_keys.add(key)
-                    complete_values.append({'key': key, 'blob': blob, 'source': 'copy from latest'})
+                    complete_values.append({'key': key, 'blob': blob, 'source': source_name})
 
         key_to_order = {}
         index = 1
@@ -374,7 +384,23 @@ class AutopopulateView(APIView):
 
 @require_POST
 def create_classification(request):
-    return redirect(create_classification_object(request).get_edit_url())
+    return classification_created_response(request, create_classification_object(request))
+
+
+def classification_created_response(request, classification: Classification, extra: Optional[dict] = None) \
+        -> HttpResponseBase:
+    """ The web form sends the user straight to the new record. The classify queue on the sample/patient page
+        asks for JSON instead, so it can put a link to the record in the row it just actioned """
+    if request.POST.get("response_format") == "json":
+        data = {
+            "classification_id": classification.pk,
+            "label": classification.friendly_label,
+            "url": classification.get_absolute_url(),
+            "edit_url": classification.get_edit_url(),
+        }
+        data.update(extra or {})
+        return JsonResponse(data)
+    return redirect(classification.get_edit_url())
 
 
 def create_classification_object(request) -> Classification:
@@ -388,8 +414,7 @@ def create_classification_object(request) -> Classification:
     sample_id = request.POST.get("sample_id")
     lab_id = request.POST.get("lab")
     copy_from_id = request.POST.get("copy_from_vcm_id")
-    if copy_from_id:
-        copy_from_id = int(copy_from_id)
+    copy_gene_from_id = request.POST.get("copy_gene_from_vcm_id")
 
     evidence_json = request.POST.get("evidence_json")
 
@@ -427,19 +452,14 @@ def create_classification_object(request) -> Classification:
 
     classification.publish_latest(request.user)
 
-    if copy_from_id:
-        copy_from = ClassificationModification.objects.get(pk=copy_from_id)
+    # Allele level first so it beats the gene level copy, which only ever fills what is still empty
+    for source_id, copy_scopes in [(copy_from_id, COPY_SCOPES_ALL), (copy_gene_from_id, COPY_SCOPES_GENE)]:
+        if not source_id or source_id == "0":
+            continue
+        copy_from = ClassificationModification.objects.get(pk=int(source_id))
         copy_from.check_can_view(request.user)
-        consensus_patch = ClassificationConsensus(modification=copy_from).consensus_patch
-        classification.patch_value(
-            patch=consensus_patch,
-            clear_all_fields=False,
-            user=request.user,
-            source=SubmissionSource.CONSENSUS,
-            leave_existing_values=True,
-            save=True,
-            make_patch_fields_immutable=False)
-        classification.publish_latest(request.user)
+        ClassificationConsensus(modification=copy_from, copy_scopes=copy_scopes).apply_to(classification,
+                                                                                         request.user)
 
     return classification
 
@@ -517,6 +537,8 @@ def view_classification(request: HttpRequest, classification_id: str):
         'duplicate_records': duplicate_records,
         'withdraw_reasons': withdraw_reasons,
         'mme_enabled': settings.MME_ENABLED,   # shows the MatchMaker Exchange card
+        # Card body is loaded lazily - the gene candidates are a query the page shouldn't wait on
+        'gene_consensus_enabled': vc.can_write(request.user) and bool(classification_gene_symbol(vc)),
         'sync_statuses': classification_sync_status(vc),
     }
     return render(request, 'classification/classification.html', context)
@@ -766,6 +788,18 @@ def view_classification_file_attachment_thumbnail(request, pk):
     return view_classification_file_attachment(request, pk, thumbnail=True)
 
 
+@dataclass(frozen=True)
+class CopyFromOptions:
+    """ The copy sources on offer for one allele origin bucket - the create page renders a set per bucket
+        and shows the one the scientist has chosen """
+    allele_origin_bucket: AlleleOriginBucket
+    consensuses: list[ClassificationConsensus]
+    gene_symbol: Optional[str]
+    gene_groups: list[GeneConsensusGroup]
+    external: list[ClassificationModification]
+    default_consensus_pk: int
+
+
 class CreateClassificationForVariantView(TemplateView):
     template_name = 'classification/create_classification_for_variant.html'
 
@@ -796,8 +830,9 @@ class CreateClassificationForVariantView(TemplateView):
         vts = VariantTranscriptSelections(variant, genome_build)
         lab, lab_error = UserSettings.get_lab_and_error(self.request.user)
 
-        consensuses = ClassificationConsensus.all_consensus_candidates(allele=variant.allele, user=self.request.user)
-        consensus_default_suggestion = first((c for c in consensuses if c.default_suggestion), default=None)
+        copy_options = self._copy_options(variant, vts)
+        default_bucket = ClassificationConsensus.default_allele_origin_bucket(self.request.user) \
+                         or AlleleOriginBucket.GERMLINE
 
         lab_form = None
         if lab:
@@ -811,9 +846,40 @@ class CreateClassificationForVariantView(TemplateView):
             "vts": vts,
             "lab_error": lab_error,
             "lab_form": lab_form,
-            "consensuses": consensuses,
-            "consensus_default_suggestion": consensus_default_suggestion.modification.pk if consensus_default_suggestion else 0
+            "copy_options": copy_options,
+            "default_allele_origin_bucket": default_bucket,
         }
+
+    def _copy_options(self, variant: Variant, vts: VariantTranscriptSelections) -> list[CopyFromOptions]:
+        """ What may be copied into a new record, per bucket the record could be in - the scientist picks the
+            bucket first, and only sees the candidates that can legitimately go into it """
+        allele = variant.allele
+        if allele is None:
+            return []
+
+        selected_transcript = first((td for td in vts.transcript_data if td.get("selected")), default={})
+        gene_symbol = selected_transcript.get(VariantTranscriptSelections.GENE_SYMBOL)
+
+        options = []
+        for bucket in (AlleleOriginBucket.GERMLINE, AlleleOriginBucket.SOMATIC):
+            consensuses = ClassificationConsensus.all_consensus_candidates(allele=allele, user=self.request.user,
+                                                                          allele_origin_bucket=bucket)
+            gene_groups = []
+            if gene_symbol:
+                gene_groups = ClassificationConsensus.gene_consensus_groups(
+                    gene_symbol=gene_symbol, user=self.request.user, allele_origin_bucket=bucket,
+                    exclude_modifications=[c.modification for c in consensuses])
+            options.append(CopyFromOptions(
+                allele_origin_bucket=bucket,
+                consensuses=consensuses,
+                gene_symbol=gene_symbol,
+                gene_groups=gene_groups,
+                external=ClassificationConsensus.external_lab_candidates(allele=allele, user=self.request.user,
+                                                                        allele_origin_bucket=bucket),
+                default_consensus_pk=first((c.modification.pk for c in consensuses if c.default_suggestion),
+                                           default=0),
+            ))
+        return options
 
 
 def create_classification_from_hgvs(request, genome_build_name, hgvs_string):

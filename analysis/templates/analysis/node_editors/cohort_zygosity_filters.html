@@ -1,19 +1,3 @@
-<style>
-table.zygosity-filter-table {
-	text-align: center;
-	border-collapse: collapse;
-	border-spacing: 0px;
-}
-
-table.zygosity-filter-table tr.top-header th {
-	border-left: 1px solid black;
-	border-right: 1px solid black;
-	padding-left: 5px;
-	padding-right: 5px;
-	margin: 0px;
-}
-
-</style>
 <script>
 function checkIfAllChecked(toggle, array) {
 	let numChecked = 0;
@@ -97,59 +81,54 @@ $(document).ready(function() {
 </script>
 
 {% if cohort.is_sub_cohort %}
-<ul class="messages" id="sub-cohort-note">
-    <li class="info">
-        Sub cohort of <b>{{ cohort.parent_cohort.name }}</b> - variants need a zygosity call
-        (Ref/Het/Hom) in at least 1 of the {{ cohort.sample_count }} samples, whatever the filters below.
-        A Sample node with "No zygosity call in sample" ticked can return more variants.
-    </li>
-</ul>
+<div class="editor-note" id="sub-cohort-note">
+    Sub cohort of <b>{{ cohort.parent_cohort.name }}</b> - variants need a zygosity call
+    (Ref/Het/Hom) in at least 1 of the {{ cohort.sample_count }} samples, whatever the filters below.
+    A Sample node with "No zygosity call in sample" ticked can return more variants.
+</div>
 {% endif %}
 
-<table class='zygosity-filter-table'>
-<tr class="top-header">
-	<td></td>
+<table class='editor-table zygosity-table zygosity-filter-table'>
+<tr class="editor-table-head">
+	<th class="zygosity-sample"></th>
     <th>Show In Grid</th>
 	<th>Ref</th>
 	<th>Het</th>
 	<th>Hom</th>
-	<th>No Zygosity call in sample</th>
-	<td><i>Toggle Row</i></td>
+	<th title="No zygosity call in sample">No call</th>
+	<th class="zygosity-toggle">Toggle row</th>
 {% for form in formset %}
 	<tr class='cohort-node-zygosity-filter'>
 	{% for field in form.hidden_fields %}
 		{{ field }}
 	{% endfor %}
-		<th> {{ form.cohort_sample }}
-        <td class="show_in_grid">   {{ form.show_in_grid }}
-		<td class="zygosity_ref">	{{ form.zygosity_ref }}
-		<td class="zygosity_het"> 	{{ form.zygosity_het }}
-		<td class="zygosity_hom">	{{ form.zygosity_hom }}
-		<td class="zygosity_none">	{{ form.zygosity_none }}
-		<td><input type="checkbox" class="toggle-row"></td>
+		<th class="zygosity-sample">{{ form.cohort_sample }}
+        <td class="show_in_grid">{{ form.show_in_grid }}
+		<td class="zygosity_ref">{{ form.zygosity_ref }}
+		<td class="zygosity_het">{{ form.zygosity_het }}
+		<td class="zygosity_hom">{{ form.zygosity_hom }}
+		<td class="zygosity_none">{{ form.zygosity_none }}
+		<td><input type="checkbox" class="toggle-row" title="Toggle row"></td>
 	</tr>
 {% endfor %}
 	<tr>
-	<td><i>Toggle Column</i></td>
-    <th><input type="checkbox" class="toggle-column" column_name="show_in_grid"></th>
-	<th><input type="checkbox" class="toggle-column" column_name="zygosity_ref"></th>
-	<th><input type="checkbox" class="toggle-column" column_name="zygosity_het"></th>
-	<th><input type="checkbox" class="toggle-column" column_name="zygosity_hom"></th>
-	<th><input type="checkbox" class="toggle-column" column_name="zygosity_none"></th>
+	<td class="zygosity-toggle">Toggle column</td>
+    <td><input type="checkbox" class="toggle-column" column_name="show_in_grid" title="Toggle column"></td>
+	<td><input type="checkbox" class="toggle-column" column_name="zygosity_ref" title="Toggle column"></td>
+	<td><input type="checkbox" class="toggle-column" column_name="zygosity_het" title="Toggle column"></td>
+	<td><input type="checkbox" class="toggle-column" column_name="zygosity_hom" title="Toggle column"></td>
+	<td><input type="checkbox" class="toggle-column" column_name="zygosity_none" title="Toggle column"></td>
 	<td></td>
 	</tr>
 </table>
 
-<ul class="messages">
-    <li id="zyg-config-unintuitive-no-zyg-call-warning" class="warning hidden">
-        Warning: You have checked all zygosity calls (including "No Zygosity call in sample")
-        for all samples with any ticked.
-        This will return all variants in the cohort which may be unintuitive behaviour.
-    </li>
-    <li id="zyg-config-no-samples-warning" class="warning hidden">
-        Warning: No zygosity calls for any sample selected - no variants will be returned.
-    </li>
-    <li id="zyg-config-no-visible-samples-warning" class="warning hidden">
-        Warning: No samples will be shown in grid.
-    </li>
-</ul>
+<div id="zyg-config-unintuitive-no-zyg-call-warning" class="editor-warning hidden">
+    You have ticked every zygosity call (including "No call") for every sample with any ticked.
+    This returns all variants in the cohort, which may be unintuitive.
+</div>
+<div id="zyg-config-no-samples-warning" class="editor-warning hidden">
+    No zygosity calls ticked for any sample - no variants will be returned.
+</div>
+<div id="zyg-config-no-visible-samples-warning" class="editor-warning hidden">
+    No samples will be shown in the grid.
+</div>

@@ -2,12 +2,5 @@
 {% load user_tag_color_tags %}
 <script type="text/javascript" src="{% static 'js/tag_counts_summary.js' %}"></script>
 <style>
-    .grid-tag .user-tag-colored {
-        margin: 2px;
-        padding: 2px;
-        display: inline-block;
-        white-space: nowrap;
-    }
-
     {% render_rgb_css 'tagged-' user_tag_styles %}
 </style>

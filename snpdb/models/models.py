@@ -67,10 +67,27 @@ class Tag(models.Model):
     merged_into = models.ForeignKey('self', null=True, blank=True, on_delete=SET_NULL)
     allele_origin_bucket = models.CharField(max_length=1, choices=TAG_ALLELE_ORIGIN_CHOICES,
                                             default=AlleleOriginBucket.UNKNOWN)
+    # Tagging a variant with this is asking for it to be classified - it shows up in the classify queue
+    # on the sample/patient page until a classification exists for the case
+    requires_classification = models.BooleanField(default=False)
 
     @classmethod
     def live_qs(cls) -> QuerySet['Tag']:
         return cls.objects.filter(retired__isnull=True)
+
+    @classmethod
+    def classify_queue_qs(cls) -> QuerySet['Tag']:
+        """ The classify queue vocabulary - tagging a variant with one of these is asking for it to be
+            classified. Taggings are scoped with tag__in=Tag.classify_queue_qs() so every work list,
+            button and resolution agrees on what a to-do is """
+        return cls.live_qs().filter(requires_classification=True)
+
+    @classmethod
+    def classify_queue_qs_for_bucket(cls, allele_origin_bucket: AlleleOriginBucket) -> QuerySet['Tag']:
+        """ The queue vocabulary one side of the house works from - its own bucket plus the tags marked
+            Both, the same rule AlleleOriginFilterDefault applies to its buckets """
+        buckets = [AlleleOriginBucket(allele_origin_bucket), AlleleOriginBucket.UNKNOWN]
+        return cls.classify_queue_qs().filter(allele_origin_bucket__in=buckets)
 
     @property
     def active(self) -> bool:
@@ -113,10 +130,26 @@ class CachedGeneratedFile(TimeStampedModel):
             raise ValueError(f"{self}.filename is None")
         return get_url_from_media_root_filename(self.filename)
 
+    @property
+    def file_missing(self) -> bool:
+        """ We generated a file but it's not there anymore - eg media_root cleaned up, or the database
+            was copied from a deployment with a different MEDIA_ROOT """
+        if not self.filename:
+            return False  # Still generating - nothing promised yet
+        if not self.filename.startswith(os.path.join(settings.MEDIA_ROOT, "")):
+            return True
+        return not os.path.exists(self.filename)
+
     @staticmethod
     def get_or_create_and_launch(generator, params_hash, task: signature) -> 'CachedGeneratedFile':
         cgf, created = CachedGeneratedFile.objects.get_or_create(generator=generator,
                                                                  params_hash=params_hash)
+        if cgf.file_missing:
+            # Drop the row so the get_or_create below regenerates it lazily
+            logging.info("Discarding CachedGeneratedFile %s - %s is gone", cgf.pk, cgf.filename)
+            cgf.delete()
+            cgf, created = CachedGeneratedFile.objects.get_or_create(generator=generator,
+                                                                     params_hash=params_hash)
         if created or not cgf.task_id:
             logging.debug("Launching Celery Job for CachedGeneratedFile(generator=%s, params_hash=%s)",
                           generator, params_hash)

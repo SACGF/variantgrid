@@ -116,8 +116,6 @@ class PatientSearchForm(forms.Form):
     patient = forms.ModelChoiceField(queryset=Patient.objects.all(),
                                      widget=ModelSelect2(url='patient_autocomplete',
                                                          attrs={'data-placeholder': 'Patient...'}))
-    family_code = forms.CharField(widget=TextInput(attrs={'placeholder': 'Family Code'}))
-    phenotype = forms.CharField(widget=TextInput(attrs={'placeholder': 'Phenotype text'}))
 
 
 # Tissue has no way to be created yet (#1747), so both editors here leave out a dropdown that
@@ -166,8 +164,10 @@ class ExtractionForm(forms.ModelForm):
         # Django skips a unique_together whose fields the form leaves out, so a clash would otherwise
         # only surface as an IntegrityError
         reference_id = cleaned_data.get('reference_id')
-        if reference_id and self.instance.specimen_id:
-            clash = Extraction.objects.filter(specimen_id=self.instance.specimen_id,
+        # The patient tab's formset has specimen as a field, the specimen page has it on the instance
+        specimen = cleaned_data.get('specimen') or self.instance.specimen_id
+        if reference_id and specimen:
+            clash = Extraction.objects.filter(specimen=specimen,
                                               reference_id=reference_id).exclude(pk=self.instance.pk)
             if clash.exists():
                 self.add_error('reference_id', "This specimen already has an extraction with this reference.")

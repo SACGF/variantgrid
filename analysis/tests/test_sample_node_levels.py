@@ -6,8 +6,9 @@ variant, CNV, exon CNV), so these build a patient with two specimens and pin:
 
   * each level resolving to its samples, once each, and the union of their calls out of one node
   * a single sample group degenerating to the alias path a sample level node produces
-  * per sample thresholds (sapath#301 - a different min_ad per caller)
-  * VCF FILTER: PASS is global, every other code belongs to the VCF that declared it
+  * per sample filter overrides (sapath#301 - a different min_ad, zygosity or PASS per caller)
+  * VCF FILTER: PASS is the node's default and a sample's to override, every other code belongs to
+    the VCF that declared it
   * samples the group leaves out being reported rather than silently dropped
   * the card saying what the node is and what it reaches
   * the grid knowing which VCF each row came from
@@ -21,7 +22,7 @@ from django.urls.base import reverse
 from django.utils import timezone
 
 from analysis.grid_export import node_grid_get_export_iterator
-from analysis.forms.forms_nodes import SampleNodeForm
+from analysis.forms.forms_nodes import SampleFiltersMixin, SampleNodeForm
 from analysis.grids import VariantGrid
 from analysis.analysis_templates import run_analysis_template
 from analysis.models import (
@@ -131,7 +132,7 @@ class SampleNodeLevelsTestCase(TestCase):
     @classmethod
     def _create_vcf_sample(cls, name, genome_build, extraction) -> tuple[Sample, CohortGenotypeCollection]:
         """ A single sample VCF, as each TSO 500 caller produces """
-        vcf = VCF.objects.create(name=f"{name}_vcf", genotype_samples=1, genome_build=genome_build,
+        vcf = VCF.objects.create(name=f"{name}_vcf", genotype_samples=1, genotype_field="GT", allele_depth_field="AD", genome_build=genome_build,
                                  import_status=ImportStatus.SUCCESS, user=cls.user, date=timezone.now())
         sample = Sample.objects.create(name=name, vcf=vcf, extraction=extraction,
                                        import_status=ImportStatus.SUCCESS)
@@ -148,7 +149,7 @@ class SampleNodeLevelsTestCase(TestCase):
         return sample, cgc
 
     @classmethod
-    def _add_genotype(cls, cgc, variant, samples_zygosity, ad, dp, filters=None):
+    def _add_genotype(cls, cgc, variant, samples_zygosity, ad, dp, filters=None, af=0.5):
         """ Insert into the collection's partition table, as production inserts do """
         old_db_table = CohortGenotype._meta.db_table
         try:
@@ -162,7 +163,7 @@ class SampleNodeLevelsTestCase(TestCase):
                 filters=filters,
                 samples_zygosity=samples_zygosity,
                 samples_allele_depth=[ad],
-                samples_allele_frequency=[0.5],
+                samples_allele_frequency=[af],
                 samples_read_depth=[dp],
                 samples_genotype_quality=[30],
                 samples_phred_likelihood=[0],
@@ -246,7 +247,24 @@ class TestSampleNodeLevels(SampleNodeLevelsTestCase):
         node = self._extraction_node(zygosity_het=False)  # HOM_ALT only
         self.assertEqual(self._pks(node), {self.v_both.pk})
 
-    # ── Per sample thresholds ────────────────────────────────────────────────
+    def test_nothing_ticked_is_no_zygosity_filter(self):
+        node = self._extraction_node(zygosity_het=False, zygosity_hom=False)
+        self.assertEqual(self._pks(node), {self.v_snv.pk, self.v_ref.pk, self.v_cnv.pk, self.v_both.pk})
+
+    def test_vcf_without_gt_has_no_zygosity_filter_but_keeps_depth(self):
+        """ A depth-only caller (TSO 500 splice variants) stores every zygosity as unknown, so the
+            node's ticked zygosities are ignored for it while its AD threshold still applies """
+        VCF.objects.filter(pk=self.snv_sample.vcf_id).update(genotype_field=None)
+        self.snv_sample.vcf.refresh_from_db()
+        self.assertFalse(self.snv_sample.has_genotype)
+        self.assertTrue(self.snv_sample.has_depth)
+
+        node = self._extraction_node(min_ad=10)  # HET + HOM_ALT
+        self.assertEqual(node._get_zygosities(self.snv_sample), [])
+        # snv: v_ref (HOM_REF, AD=45) now comes through, v_both (AD=5) is dropped by depth
+        self.assertEqual(self._pks(node), {self.v_snv.pk, self.v_ref.pk, self.v_cnv.pk, self.v_both.pk})
+
+    # ── Per sample overrides ─────────────────────────────────────────────────
 
     def test_node_thresholds_apply_to_every_sample(self):
         node = self._extraction_node(min_ad=20)
@@ -256,21 +274,55 @@ class TestSampleNodeLevels(SampleNodeLevelsTestCase):
     def test_per_sample_threshold_overrides_node_value(self):
         """ sapath#301 - a different cutoff per caller """
         node = self._extraction_node(min_ad=20)
-        node.samplenodesamplethreshold_set.create(sample=self.snv_sample, min_ad=10)
+        node.samplenodesamplefilter_set.create(sample=self.snv_sample, min_ad=10)
 
         self.assertEqual(node.get_sample_thresholds(self.snv_sample)["min_ad"], 10)
         self.assertEqual(node.get_sample_thresholds(self.cnv_sample)["min_ad"], 20)
         # snv now keeps v_snv (AD=15) as well
         self.assertEqual(self._pks(node), {self.v_snv.pk, self.v_cnv.pk, self.v_both.pk})
 
-    def test_sample_without_a_threshold_row_gets_the_node_default(self):
+    def test_sample_without_a_row_gets_the_node_default(self):
         node = self._extraction_node(min_dp=45)
-        node.samplenodesamplethreshold_set.create(sample=self.snv_sample, min_dp=0)
+        node.samplenodesamplefilter_set.create(sample=self.snv_sample, min_dp=0)
         # cnv has no row, so the node's DP>=45 applies: v_cnv DP=50, v_both DP=60
         # snv's override drops the threshold, so it keeps v_snv (DP=40) too
         self.assertEqual(self._pks(node), {self.v_snv.pk, self.v_cnv.pk, self.v_both.pk})
 
-    # ── VCF FILTER - PASS is global, every other code belongs to its own VCF ─
+    def test_per_sample_zygosity_overrides_the_node_set(self):
+        """ The whole set is the override - one caller reporting a different genotype is what it's for """
+        node = self._extraction_node()  # HET + HOM_ALT
+        node.samplenodesamplefilter_set.create(sample=self.snv_sample, zygosity="R")
+
+        self.assertEqual(node._get_zygosities(self.snv_sample), ["R"])
+        self.assertEqual(node._get_zygosities(self.cnv_sample), ["E", "O"])
+        # snv now brings its HOM_REF row instead of its HET/HOM ones
+        self.assertEqual(self._pks(node), {self.v_ref.pk, self.v_cnv.pk, self.v_both.pk})
+
+    def test_per_sample_pass_only_overrides_the_node(self):
+        v_filtered = slowly_create_test_variant("1", 8000, "A", "T", self.grch37)
+        self._add_genotype(self.snv_cgc, v_filtered, "E", ad=50, dp=50, filters="A")
+
+        node = self._extraction_node()
+        node.samplenodesamplefilter_set.create(sample=self.snv_sample, pass_only=True)
+
+        self.assertTrue(node.get_sample_pass_only(self.snv_sample))
+        self.assertFalse(node.get_sample_pass_only(self.cnv_sample))
+        # Only the small variant caller is PASS only, so its LowUniqueAlignments row goes and the
+        # CNV caller's stays
+        self.assertEqual(self._pks(node), {self.v_snv.pk, self.v_cnv.pk, self.v_both.pk})
+
+    def test_per_sample_allele_frequency_overrides_the_node_ranges(self):
+        v_low_af = slowly_create_test_variant("1", 9000, "A", "T", self.grch37)
+        self._add_genotype(self.snv_cgc, v_low_af, "E", ad=50, dp=50, af=0.1)
+
+        node = self._extraction_node()
+        self.assertIn(v_low_af.pk, self._pks(node))
+
+        node.samplenodesamplefilter_set.create(sample=self.snv_sample, af_min=0.4)
+        node = SampleNode.objects.get(pk=node.pk)  # The overrides are read once per node instance
+        self.assertEqual(self._pks(node), {self.v_snv.pk, self.v_cnv.pk, self.v_both.pk})
+
+    # ── VCF FILTER - PASS is the node default, every other code belongs to its own VCF ─
 
     def test_a_ticked_code_applies_only_to_the_vcf_that_declared_it(self):
         """ 'LowUniqueAlignments' in the CNV VCF is not the same call as in the small variant one,
@@ -394,9 +446,9 @@ class TestSampleNodeLevels(SampleNodeLevelsTestCase):
         self.assertGreater(node.version, version)
         self.assertEqual(node.get_source_samples(), [self.snv_sample])
 
-    def test_cloning_keeps_per_sample_thresholds(self):
+    def test_cloning_keeps_per_sample_overrides(self):
         node = self._extraction_node(min_ad=20)
-        node.samplenodesamplethreshold_set.create(sample=self.snv_sample, min_ad=10)
+        node.samplenodesamplefilter_set.create(sample=self.snv_sample, min_ad=10)
 
         original_pk = node.pk
         clone = node.save_clone()  # Mutates in place - the original stays in the DB
@@ -606,26 +658,51 @@ class TestSampleNodeForm(SampleNodeLevelsTestCase):
                               lock_input_sources=True)
         self.assertNotIn("source", form.fields)
 
-    def test_only_overridden_thresholds_are_stored(self):
+    def test_only_overridden_fields_are_stored(self):
         node = self._extraction_node()
         # The editor only sends what the user typed - anything else inherits the node's own value
-        sample_thresholds = {str(self.snv_sample.pk): {"min_ad": 10}}
-        form = self._form(node, sample_thresholds=json.dumps(sample_thresholds))
+        sample_filters = {str(self.snv_sample.pk): {"min_ad": 10}}
+        form = self._form(node, sample_filters=json.dumps(sample_filters))
         self.assertTrue(form.is_valid(), form.errors)
         node = form.save()
 
-        thresholds = node.samplenodesamplethreshold_set.all()
-        self.assertEqual([t.sample for t in thresholds], [self.snv_sample])
+        sample_filters = node.samplenodesamplefilter_set.all()
+        self.assertEqual([sf.sample for sf in sample_filters], [self.snv_sample])
         self.assertEqual(node.get_sample_thresholds(self.snv_sample)["min_ad"], 10)
         self.assertEqual(node.get_sample_thresholds(self.cnv_sample)["min_ad"], 20)
 
-    def test_saving_replaces_previous_threshold_rows(self):
+    def test_the_whole_override_set_round_trips(self):
         node = self._extraction_node()
-        node.samplenodesamplethreshold_set.create(sample=self.cnv_sample, min_ad=99)
-        form = self._form(node, sample_thresholds=json.dumps({str(self.snv_sample.pk): {"min_ad": 10}}))
+        overrides = {"min_ad": 10, "zygosity": "R", "pass_only": True, "af_min": 0.2}
+        form = self._form(node, sample_filters=json.dumps({str(self.snv_sample.pk): overrides}))
         self.assertTrue(form.is_valid(), form.errors)
         node = form.save()
-        self.assertEqual([t.sample for t in node.samplenodesamplethreshold_set.all()], [self.snv_sample])
+
+        self.assertEqual(SampleFiltersMixin.get_saved_sample_filters(node), {self.snv_sample.pk: overrides})
+        self.assertEqual(node._get_zygosities(self.snv_sample), ["R"])
+        self.assertEqual(node._get_zygosities(self.cnv_sample), ["E", "O"])
+        self.assertTrue(node.get_sample_pass_only(self.snv_sample))
+        self.assertFalse(node.get_sample_pass_only(self.cnv_sample))
+
+    def test_saving_replaces_previous_override_rows(self):
+        node = self._extraction_node()
+        node.samplenodesamplefilter_set.create(sample=self.cnv_sample, min_ad=99)
+        form = self._form(node, sample_filters=json.dumps({str(self.snv_sample.pk): {"min_ad": 10}}))
+        self.assertTrue(form.is_valid(), form.errors)
+        node = form.save()
+        self.assertEqual([sf.sample for sf in node.samplenodesamplefilter_set.all()], [self.snv_sample])
+
+    def test_narrowing_to_one_sample_drops_its_overrides(self):
+        """ Its settings are then the node's own, which is what the editor shows """
+        node = self._extraction_node()
+        node.samplenodesamplefilter_set.create(sample=self.snv_sample, min_ad=10)
+
+        form = self._form(node, source=f"{SampleSourceLevel.SAMPLE}:{self.snv_sample.pk}",
+                          sample_filters=json.dumps({str(self.snv_sample.pk): {"min_ad": 10}}))
+        self.assertTrue(form.is_valid(), form.errors)
+        node = form.save()
+        self.assertFalse(node.samplenodesamplefilter_set.exists())
+        self.assertEqual(node.get_sample_thresholds(self.snv_sample)["min_ad"], 20)
 
     def test_filters_are_stored_against_the_vcf_that_declared_them(self):
         node = self._extraction_node()
@@ -656,31 +733,6 @@ class TestSampleNodeForm(SampleNodeLevelsTestCase):
                 content = response.content.decode()
                 # The picker round trips, and the tree is drawn from the saved level
                 self.assertIn(f"{level}:{source.pk}", content)
-
-
-class TestSampleNodeMenu(SampleNodeLevelsTestCase):
-    """ A user looking for "Patient" finds it in the add node list, not behind a dropdown """
-
-    def test_one_menu_entry_per_level(self):
-        entries = SampleNode.get_menu_entries()
-        self.assertEqual([e.key for e in entries],
-                         [f"SampleNode:{level}" for level in
-                          [SampleSourceLevel.SAMPLE, SampleSourceLevel.EXTRACTION,
-                           SampleSourceLevel.SPECIMEN, SampleSourceLevel.PATIENT]])
-        self.assertEqual([e.label for e in entries], ["Sample", "Extraction", "Specimen", "Patient"])
-
-    @override_settings(ANALYSIS_SAMPLE_NODE_LEVELS=["S"])
-    def test_a_deployment_without_patients_data_offers_only_the_sample(self):
-        self.assertEqual([e.key for e in SampleNode.get_menu_entries()], ["SampleNode:S"])
-
-    def test_node_create_stamps_the_entrys_level(self):
-        self.client.force_login(self.user)
-        url = reverse("node_create", kwargs={"analysis_id": self.analysis.pk,
-                                             "node_type": f"SampleNode:{SampleSourceLevel.PATIENT}"})
-        response = self.client.post(url)
-        self.assertEqual(response.status_code, 200)
-        node = SampleNode.objects.get(pk=json.loads(response.content)["attributes"]["node_id"])
-        self.assertEqual(node.source_level, SampleSourceLevel.PATIENT)
 
 
 class TestAnalysisTemplatesTag(SampleNodeLevelsTestCase):

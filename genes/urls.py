@@ -9,7 +9,7 @@ from genes.grids import (
     QCGeneCoverageColumns,
     UncoveredGenesColumns,
 )
-from genes.views import views, views_autocomplete, views_rest
+from genes.views import views, views_autocomplete, views_coverage, views_rest
 from genes.views.views_hotspot_graphs import (
     ClassificationsHotspotGraphView,
     CohortHotspotGraphView,
@@ -37,10 +37,10 @@ urlpatterns = [
     path('gene_list_graphs_tab/<int:gene_list_id>', views.gene_list_graphs_tab, name='gene_list_graphs_tab'),
     path('gene_list_chromosome_graph/<int:gene_list_id>', views.gene_list_chromosome_graph, name='gene_list_chromosome_graph'),
     path('view_canonical_transcript_collection/<pk>', views.view_canonical_transcript_collection, name='view_canonical_transcript_collection'),
-    path('qc_coverage', views.qc_coverage, name='qc_coverage'),
-    path('qc_coverage/<genome_build_name>', views.qc_coverage, name='genome_build_qc_coverage'),
-    path('gene_coverage_collection_graphs/<genome_build_name>/<slug:gene_symbol>', views.gene_coverage_collection_graphs, name='gene_symbol_coverage_collection_graphs'),
-    path('qc_gene_list_coverage_graphs/<genome_build_name>/<int:gene_list_id>', views.qc_gene_list_coverage_graphs, name='qc_gene_list_coverage_graphs'),
+    path('qc_coverage', views_coverage.qc_coverage, name='qc_coverage'),
+    path('qc_coverage/<genome_build_name>', views_coverage.qc_coverage, name='genome_build_qc_coverage'),
+    path('gene_coverage_collection_graphs/<genome_build_name>/<slug:gene_symbol>', views_coverage.gene_coverage_collection_graphs, name='gene_symbol_coverage_collection_graphs'),
+    path('qc_gene_list_coverage_graphs/<genome_build_name>/<int:gene_list_id>', views_coverage.qc_gene_list_coverage_graphs, name='qc_gene_list_coverage_graphs'),
     path('gene_grid/<path:columns_from_url>', views.gene_grid, name='passed_gene_grid'),
     path('gene_grid', views.gene_grid, name='gene_grid'),
     path('canonical_transcripts', views.canonical_transcripts, name='canonical_transcripts'),

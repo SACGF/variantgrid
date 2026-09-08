@@ -85,6 +85,10 @@ class VariantSampleGenotypesTest(TestCase):
         self.assertEqual("This variant", this_variant["description"])
         self.assertEqual(4, this_variant["total"])
         self.assertEqual(4, this_variant["HET"])
+        # The members the client's representative variant label reads, keyed as the grid keys them
+        self.assertEqual(("3", 3100, "A", "T"), tuple(this_variant[f] for f in
+                                                      ("locus__contig__name", "locus__position", "locus__ref__seq", "alt__seq")))
+        self.assertIn("variantannotation__hgvs_c", this_variant)
 
     def test_filters_pass(self):
         variant = slowly_create_test_variant("3", 3200, "A", "T", self.grch37)

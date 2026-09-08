@@ -27,6 +27,7 @@ class SnpdbConfig(AppConfig):
             cohort_search,
             common_variants_classification_changed,
             disk_usage_health_check,
+            duo_search,
             genomics_search,
             jobs_autopause,  # registers worker_ready crash-safety auto-pause
             lab_search,

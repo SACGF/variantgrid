@@ -10,6 +10,7 @@ from upload.upload_processing import process_vcf_file
 
 
 class Command(BaseCommand):
+    category = "import"
 
     def add_arguments(self, parser):
         parser.add_argument('vcf')

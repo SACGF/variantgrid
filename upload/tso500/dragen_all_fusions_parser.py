@@ -25,8 +25,26 @@ GENE_B = "Gene B"
 GENE_A_BREAKPOINT = "Gene A Breakpoint"
 GENE_B_BREAKPOINT = "Gene B Breakpoint"
 DIRECTIONALITY_KNOWN = "Fusion Directionality Known"
+ALT_SPLIT = "Alt Split"
+ALT_PAIR = "Alt Pair"
+ALT_SPLIT_DEDUP = "Alt Split Dedup"
+ALT_PAIR_DEDUP = "Alt Pair Dedup"
+REF_A_SPLIT = "Ref A Split"
+REF_A_PAIR = "Ref A Pair"
+REF_B_SPLIT = "Ref B Split"
+REF_B_PAIR = "Ref B Pair"
+REF_A_DEDUP = "Ref A Dedup"
+REF_B_DEDUP = "Ref B Dedup"
 
 REQUIRED_COLUMNS = (CALLER, GENE_A, GENE_B, GENE_A_BREAKPOINT, GENE_B_BREAKPOINT)
+
+# INFO fields the rows are carried in once they become a VCF - they land in CohortGenotype.info via
+# the standard bulk importer, which stores every INFO field the header declares
+FUSION_INFO = "FUSION"
+FUSION_OBSERVATIONS_INFO = "FUSION_OBS"
+# What separates one call from the next in the text the grid and the merge record show. The parts of
+# a call - caller, breakpoints, read count - never contain it
+OBSERVATION_SEPARATOR = "; "
 
 
 @dataclass
@@ -102,3 +120,43 @@ def read_all_fusions(filename: str) -> tuple[list[str], list[AllFusionsRow]]:
                 continue  # Named no genes at all, so describes nothing we can key on
             rows.append(AllFusionsRow(caller=data.get(CALLER), gene_a=gene_a, gene_b=gene_b, data=data))
     return comments, rows
+
+
+def _read_count(observation: dict, *key_sets: tuple[str, ...]) -> Optional[int]:
+    """ The first set of columns the caller filled in, summed - a set is tried as a whole so
+        deduplicated counts are never mixed with raw ones """
+    for keys in key_sets:
+        values = [observation.get(k) for k in keys]
+        if any(v is not None for v in values):
+            try:
+                return sum(int(float(v)) for v in values if v is not None)
+            except ValueError:
+                return None
+    return None
+
+
+def supporting_reads(observation: dict) -> Optional[int]:
+    """ Reads supporting the fusion - the caller's deduplicated counts where it reported them """
+    return _read_count(observation, (ALT_SPLIT_DEDUP, ALT_PAIR_DEDUP), (ALT_SPLIT, ALT_PAIR))
+
+
+def reference_reads(observation: dict) -> Optional[int]:
+    """ Reads across either junction that do not support the fusion, deduplicated where reported """
+    return _read_count(observation, (REF_A_DEDUP, REF_B_DEDUP),
+                       (REF_A_SPLIT, REF_A_PAIR, REF_B_SPLIT, REF_B_PAIR))
+
+
+def format_fusion_observation(observation: dict) -> str:
+    """ One caller row as a reader wants it - who called it, the breakpoints, how many reads """
+    parts = [observation.get(CALLER) or "?"]
+    breakpoints = [observation.get(GENE_A_BREAKPOINT), observation.get(GENE_B_BREAKPOINT)]
+    if all(breakpoints):
+        parts.append("\u2192".join(breakpoints))
+    if (reads := supporting_reads(observation)) is not None:
+        parts.append(f"({reads} reads)")
+    return " ".join(parts)
+
+
+def format_fusion_observations(observations) -> str:
+    """ Every call a gene pair was merged from, in one line """
+    return OBSERVATION_SEPARATOR.join(format_fusion_observation(o) for o in observations)

@@ -310,9 +310,10 @@ class Migrator:
         # collectstatic without warning for conflicting files has been an issue for 6 years
         # see https://code.djangoproject.com/ticket/26583 maybe it'll get fixed soon? For now (since we've never had
         # a problem) just turn off all verbosity
-        # --clear so a moved file whose mtime looks unchanged doesn't leave a stale copy behind
-        CommandSubMigration.manage_py(["collectstatic", "-v", "0", "--noinput", "--clear"]).using(key="c",
-                                                                                       task_id="manage*collectstatic"),
+        # --clear so a moved file whose mtime looks unchanged doesn't leave a stale copy behind. The wrapper also
+        # drops the compressor's cached tags, which point at the bundles --clear just deleted
+        CommandSubMigration.manage_py(["collectstatic_clean_compressor", "-v", "0", "--noinput", "--clear"]).using(
+            key="c", task_id="manage*collectstatic_clean_compressor"),
         CommandSubMigration.manage_py(["deployment_check", "--die-if-invalid", "--quiet"]).using(key="k",
                                                                                        task_id="manage*deployment_check"),
     ]
@@ -453,7 +454,7 @@ class Migrator:
             self.refresh_migrations()
         keys = []
         print_purple("-- Welcome to variantgrid upgrader --")
-        print("a: automate standard steps (runs git + install requirements, migrate, collectstatic_js_reverse, collectstatic, deployment_check, deployed)")
+        print("a: automate standard steps (runs git + install requirements, migrate, collectstatic_js_reverse, collectstatic_clean_compressor, deployment_check, deployed)")
         print("am: auto-run all unblocked manage.py steps (skips gated + non-manage manual steps)")
         for migration in self.migrations:
             if migration.key == "1":

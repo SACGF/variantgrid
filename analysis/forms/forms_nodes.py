@@ -18,7 +18,7 @@ from analysis.models.nodes.analysis_node import NodeAlleleFrequencyFilter, NodeV
 from analysis.models.nodes.filters.classifications_node import ClassificationsNode
 from analysis.models.nodes.filters.clinvar_node import ClinVarNode
 from analysis.models.nodes.filters.conservation_node import ConservationNode
-from analysis.models.nodes.filters.damage_node import DamageNode
+from analysis.models.nodes.filters.damage_node import DamageNode, StructuralFilter
 from analysis.models.nodes.filters.gene_list_node import GeneListNode
 from analysis.models.nodes.filters.intersection_node import IntersectionNode
 from analysis.models.nodes.filters.merge_node import MergeNode
@@ -34,6 +34,7 @@ from analysis.models.nodes.sources.cohort_node import (
     CohortNodeZygosityFilter,
     CohortNodeZygosityFiltersCollection,
 )
+from analysis.models.nodes.sources.duo_node import DuoNode
 from analysis.models.nodes.sources.pedigree_node import PedigreeNode
 from analysis.models.nodes.sources.quad_node import QuadNode
 from analysis.models.nodes.sources.sample_node import SampleNode
@@ -59,6 +60,7 @@ from uicore.widgets.date_widget import NativeDateInput
 ANALYSIS_NODE_FIELDS = fields_for_model(AnalysisNode)
 WIDGET_INTEGER_MIN_0 = NumberInput(attrs={'class': 'narrow', 'min': '0', 'step': '1'})
 WIDGET_INTEGER_MIN_1 = NumberInput(attrs={'class': 'narrow', 'min': '1', 'step': '1'})
+WIDGET_UNIT_INTERVAL = NumberInput(attrs={'class': 'narrow', 'min': '0', 'max': '1', 'step': '0.01'})
 
 
 class AlleleFrequencyMixin(forms.Form):
@@ -127,6 +129,23 @@ class VCFLocusFiltersMixin(forms.Form):
 
 
 class BaseNodeForm(forms.ModelForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if ignorable_fields := self.instance.get_ignorable_error_fields():
+            label = f"Ignore {', '.join(ignorable_fields)} errors"
+            self.fields["ignore_field_errors"] = forms.BooleanField(required=False, label=label,
+                                                                    initial=self.instance.ignore_field_errors)
+
+    def _post_clean(self):
+        """ The instance now carries the submitted values, so the node's own field checks can run """
+        super()._post_clean()
+        if "ignore_field_errors" in self.cleaned_data:
+            self.instance.ignore_field_errors = self.cleaned_data["ignore_field_errors"]
+        for field, errors in self.instance.get_field_errors().items():
+            if field in self.fields:
+                for error in errors:
+                    self.add_error(field, error)
+
     @property
     def media(self):
         m = super().media
@@ -193,6 +212,7 @@ class AnalysisNodeForm(BaseNodeForm):
 
         if self.instance.analysis.template_type != AnalysisTemplateType.TEMPLATE:
             del self.fields['hide_node_and_descendants_upon_template_configuration_error']
+        self.fields.pop("ignore_field_errors", None)  # Set from the node's own editor
 
 
 class AnalysisOutputNodeChoiceForm(forms.Form):
@@ -469,6 +489,9 @@ class DamageNodeForm(BaseNodeForm):
     variant_class = forms.MultipleChoiceField(
         required=False, label="Variant type", widget=forms.CheckboxSelectMultiple,
         choices=[(vc.value, vc.label) for group in VARIANT_CLASS_GROUPS.values() for vc in group])
+    # Beside the classes rather than in them - a symbolic alt is a different question from VEP's class
+    structural = forms.ChoiceField(required=False, label="Structural", choices=StructuralFilter.choices,
+                                   widget=forms.RadioSelect)
 
     class Meta:
         model = DamageNode
@@ -530,6 +553,10 @@ class DamageNodeForm(BaseNodeForm):
             "required_field": self[f"{tool.pred_field}_required"],
             "allow_null_field": self[f"{tool.pred_field}_allow_null"],
         } for tool in self.instance.get_pred_tools()]
+
+    def clean_structural(self):
+        """ The radio always posts a value, but an empty one would read as a filter rather than none """
+        return self.cleaned_data.get("structural") or StructuralFilter.ANY
 
     def get_variant_class_groups(self) -> list[tuple[str, list]]:
         """ (group name, sub-widgets) for the grouped checkboxes in the editor """
@@ -893,49 +920,57 @@ class PopulationNodeForm(BaseNodeForm):
         return node
 
 
-class SampleThresholdsMixin(forms.Form):
+class SampleFiltersMixin(forms.Form):
     """ Hidden field, automatically populated in base_editor ajaxForm beforeSerialize.
 
-        Per sample threshold overrides - what sapath#301 asked for, different cutoffs per caller. A
-        row is only stored where the user overrode the node's own values, so a sample linked to the
-        extraction later gets the node defaults rather than nothing """
-    sample_thresholds = forms.CharField(widget=HiddenInput(), required=False)
-    THRESHOLD_FIELDS = ["min_ad", "min_dp", "min_gq", "max_pl"]
+        Per sample overrides of the node's genotype filters - what sapath#301 asked for, different
+        settings per caller. Only the fields the user set are sent and stored, so anything else
+        follows the node, including for a sample linked to the extraction later.
 
-    def clean_sample_thresholds(self):
-        data = self.cleaned_data["sample_thresholds"]
+        {"<sample_id>": {"min_ad": 10, "zygosity": "EO", "pass_only": true, "af_min": 0.2}} """
+    sample_filters = forms.CharField(widget=HiddenInput(), required=False)
+    OVERRIDE_FIELDS = list(SampleNode.THRESHOLD_FIELDS) + ["zygosity", "pass_only", "af_min", "af_max"]
+
+    def clean_sample_filters(self):
+        data = self.cleaned_data["sample_filters"]
         if not data:
             return {}
         return {int(sample_id): values for sample_id, values in json.loads(data).items()}
 
     @staticmethod
-    def get_saved_sample_thresholds(node) -> dict:
-        """ What save_sample_thresholds wrote - only the fields that differ from the node's own
-            values, since the editor shows those as the placeholder and a blank input inherits """
-        node_values = {f: getattr(node, f) for f in SampleThresholdsMixin.THRESHOLD_FIELDS}
+    def get_saved_sample_filters(node) -> dict:
+        """ What save_sample_filters wrote, in the shape the editor posts back - only what was
+            overridden, since a field the row leaves out is one the editor shows as inherited """
         overrides = {}
-        for row in node.samplenodesamplethreshold_set.all():
-            values = {f: getattr(row, f) for f in SampleThresholdsMixin.THRESHOLD_FIELDS
-                      if getattr(row, f) != node_values[f]}
+        for row in node.samplenodesamplefilter_set.all():
+            values = {f: value for f in SampleFiltersMixin.OVERRIDE_FIELDS
+                      if (value := getattr(row, f)) is not None}
             if values:
                 overrides[row.sample_id] = values
         return overrides
 
-    def save_sample_thresholds(self, node):
-        sample_thresholds: dict = self.cleaned_data.get("sample_thresholds") or {}
-        threshold_set = node.samplenodesamplethreshold_set
-        threshold_set.all().delete()
+    def save_sample_filters(self, node):
+        sample_filters: dict = self.cleaned_data.get("sample_filters") or {}
+        filter_set = node.samplenodesamplefilter_set
+        filter_set.all().delete()
 
-        node_values = {f: getattr(node, f) for f in SampleThresholdsMixin.THRESHOLD_FIELDS}
-        for sample in node.get_source_samples():
-            if (values := sample_thresholds.get(sample.pk)) is None:
-                continue
-            values = {f: values.get(f, node_values[f]) for f in SampleThresholdsMixin.THRESHOLD_FIELDS}
-            if values != node_values:  # Only store what's actually an override
-                threshold_set.create(sample=sample, **values)
+        samples = node.get_source_samples()
+        if len(samples) < 2:
+            # Reading one sample, the node's own fields are that sample's settings - which is what
+            # the editor shows, so a row overriding them would win over what the user can see
+            node.__dict__.pop("_sample_filters", None)
+            return
+
+        for sample in samples:
+            posted = sample_filters.get(sample.pk) or {}
+            values = {f: value for f in SampleFiltersMixin.OVERRIDE_FIELDS
+                      if (value := posted.get(f)) is not None}
+            if values:
+                filter_set.create(sample=sample, **values)
+        node.__dict__.pop("_sample_filters", None)  # Rows just changed under the cached lookup
 
 
-class SampleNodeForm(GenomeBuildAutocompleteForwardMixin, SampleThresholdsMixin, VCFSourceNodeForm):
+class SampleNodeForm(GenomeBuildAutocompleteForwardMixin, SampleFiltersMixin, VCFSourceNodeForm):
     """ One picker for all four levels - the editor asks for the thing, not for a level and then a
         thing. `source` carries "<level>:<pk>"; save() unpacks it into source_level plus one FK. """
     source = forms.CharField(
@@ -943,9 +978,8 @@ class SampleNodeForm(GenomeBuildAutocompleteForwardMixin, SampleThresholdsMixin,
         widget=ListSelect2(url='sample_source_autocomplete',
                            attrs={'data-placeholder': 'Patient, specimen, extraction or sample...'}))
 
-    GENOTYPE_FIELDS = ["min_ad", "min_dp", "min_gq", "max_pl",
-                       "zygosity_ref", "zygosity_het", "zygosity_hom", "zygosity_unk",
-                       "allele_frequency"]
+    GENOTYPE_FIELDS = ["zygosity_ref", "zygosity_het", "zygosity_hom", "zygosity_unk"]
+    DEPTH_FIELDS = ["min_ad", "min_dp", "min_gq", "max_pl", "allele_frequency"]
     LOCKED_INPUT_FIELDS = ['source', 'restrict_to_qc_gene_list']
     # Only meaningful over a single sample - hidden at group levels rather than given an invented meaning
     SAMPLE_LEVEL_FIELDS = ["sample_gene_list", "restrict_to_qc_gene_list"]
@@ -966,7 +1000,7 @@ class SampleNodeForm(GenomeBuildAutocompleteForwardMixin, SampleThresholdsMixin,
                                                      forward=(None, 'category'),),  # Set in __init__
         }
 
-    def __init__(self, *args, has_genotype=True, lock_input_sources=False, **kwargs):
+    def __init__(self, *args, has_genotype=True, has_depth=True, lock_input_sources=False, **kwargs):
         super().__init__(*args, **kwargs)
 
         # A saved node has to round trip - select2 loads its options by ajax, so the current one is
@@ -979,6 +1013,8 @@ class SampleNodeForm(GenomeBuildAutocompleteForwardMixin, SampleThresholdsMixin,
         remove_fields = []
         if has_genotype is False:
             remove_fields.extend(SampleNodeForm.GENOTYPE_FIELDS)
+        if has_depth is False:
+            remove_fields.extend(SampleNodeForm.DEPTH_FIELDS)
 
         if lock_input_sources:
             remove_fields.extend(SampleNodeForm.LOCKED_INPUT_FIELDS)
@@ -1024,10 +1060,13 @@ class SampleNodeForm(GenomeBuildAutocompleteForwardMixin, SampleThresholdsMixin,
             node.source_level = level
             for source_level, field_name in SampleNode.SOURCE_LEVEL_FIELDS.items():
                 setattr(node, field_name, source_object if source_level == level else None)
+            # The filter and allele frequency rows below are resolved against what the node now
+            # reads, so the group this node resolved before the pick changed has to go
+            node.__dict__.pop("_sample_group", None)
 
     def save(self, commit=True):
         node = super().save(commit=commit)
-        self.save_sample_thresholds(node)
+        self.save_sample_filters(node)
         return node
 
 
@@ -1040,10 +1079,10 @@ class SelectedInParentNodeForm(BaseNodeForm):
 
 
 class TagNodeForm(BaseNodeForm):
+    # The editor's tag pills are the picker - they maintain the selection as hidden inputs
     tags = forms.ModelMultipleChoiceField(required=False,
                                           queryset=Tag.objects.none(),
-                                          widget=ModelSelect2Multiple(url='tag_autocomplete',
-                                                                      attrs={'data-placeholder': 'Tags...'}))
+                                          widget=forms.MultipleHiddenInput)
 
     class Meta:
         model = TagNode
@@ -1054,12 +1093,14 @@ class TagNodeForm(BaseNodeForm):
         }
         labels = {
             "tagged_within_days": "Only tags added within (days)",
+            "include_resolved": "Include resolved",
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Retired tags aren't offered, but a node already filtering on one has to keep validating
-        q_selectable = Q(retired__isnull=True)
+        # Everything the pills can offer has to validate: a retired tag still tagged in this
+        # analysis, or one the node already filters on
+        q_selectable = Q(retired__isnull=True) | Q(varianttag__analysis=self.instance.analysis)
         if self.instance.pk:
             q_selectable |= Q(tagnodetag__tag_node=self.instance)
         self.fields["tags"].queryset = Tag.objects.filter(q_selectable).distinct()
@@ -1106,18 +1147,9 @@ class TrioNodeForm(GenomeBuildAutocompleteForwardMixin, VCFSourceNodeForm):
             "min_dp": WIDGET_INTEGER_MIN_0,
             "min_gq": WIDGET_INTEGER_MIN_0,
             "max_pl": WIDGET_INTEGER_MIN_0,
+            "mosaic_max_af": WIDGET_UNIT_INTERVAL,
+            "mosaic_min_alt_reads": WIDGET_INTEGER_MIN_1,
         }
-
-    def clean(self):
-        cleaned_data = super().clean()
-        trio = cleaned_data.get("trio")
-        inheritance = cleaned_data.get("inheritance")
-
-        # Don't perform validation on template - so we can configure how we like
-        if self.instance.analysis.template_type != AnalysisTemplateType.TEMPLATE:
-            if trio and inheritance:
-                for error in TrioNode.get_trio_inheritance_errors(trio, inheritance):
-                    self.add_error("inheritance", error)
 
 
 class QuadNodeForm(GenomeBuildAutocompleteForwardMixin, VCFSourceNodeForm):
@@ -1134,17 +1166,28 @@ class QuadNodeForm(GenomeBuildAutocompleteForwardMixin, VCFSourceNodeForm):
             "min_dp": WIDGET_INTEGER_MIN_0,
             "min_gq": WIDGET_INTEGER_MIN_0,
             "max_pl": WIDGET_INTEGER_MIN_0,
+            "mosaic_max_af": WIDGET_UNIT_INTERVAL,
+            "mosaic_min_alt_reads": WIDGET_INTEGER_MIN_1,
         }
 
-    def clean(self):
-        cleaned_data = super().clean()
-        quad = cleaned_data.get("quad")
-        inheritance = cleaned_data.get("inheritance")
-        # Don't perform validation on template - so we can configure how we like
-        if self.instance.analysis.template_type != AnalysisTemplateType.TEMPLATE:
-            if quad and inheritance:
-                for error in QuadNode.get_quad_inheritance_errors(quad, inheritance):
-                    self.add_error("inheritance", error)
+
+class DuoNodeForm(GenomeBuildAutocompleteForwardMixin, VCFSourceNodeForm):
+    genome_build_fields = ["duo"]
+    exclude_archived = True
+
+    class Meta:
+        model = DuoNode
+        exclude = ANALYSIS_NODE_FIELDS
+        widgets = {
+            "duo": ModelSelect2(url='duo_autocomplete',
+                                attrs={'data-placeholder': 'Duo...'}),
+            "min_ad": WIDGET_INTEGER_MIN_0,
+            "min_dp": WIDGET_INTEGER_MIN_0,
+            "min_gq": WIDGET_INTEGER_MIN_0,
+            "max_pl": WIDGET_INTEGER_MIN_0,
+            "mosaic_max_af": WIDGET_UNIT_INTERVAL,
+            "mosaic_min_alt_reads": WIDGET_INTEGER_MIN_1,
+        }
 
 
 class ZygosityNodeForm(BaseNodeForm):

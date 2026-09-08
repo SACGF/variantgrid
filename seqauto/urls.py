@@ -2,7 +2,7 @@ from django.urls import include
 from rest_framework import routers
 
 from library.django_utils.datatable_dataframe import DataFrameTableView
-from seqauto import views, views_autocomplete, views_rest
+from seqauto import views, views_admin, views_autocomplete, views_qc_graphs, views_rest
 from seqauto.grids.qc_data_grids import (
     FastQCColumns,
     FlagstatsColumns,
@@ -32,7 +32,7 @@ from seqauto.grids.sequencing_software_versions_grids import (
     VariantCallerColumns,
     VariantCallingPipelineColumns,
 )
-from seqauto.views import (
+from seqauto.views_admin import (
     AlignerUpdate,
     AssayUpdate,
     LibraryUpdate,
@@ -77,17 +77,17 @@ urlpatterns = [
     path('enrichment_kits_list', views.enrichment_kits_list, name='enrichment_kits_list'),
     path('enrichment_kit/<int:pk>', views.view_enrichment_kit, name='view_enrichment_kit'),
 
-    path('sequencing_stats', views.sequencing_stats, name='sequencing_stats'),
-    path('sequencing_stats/data', views.sequencing_stats_data, name='sequencing_stats_data'),
-    path('qc_data', views.qc_data, name='qc_data'),
-    path('qc_graphs', views.qc_graphs, name='qc_graphs'),
-    path('graphs/sequencing_run_qc_graph/<sequencing_run_id>/<qc_compare_type>', views.sequencing_run_qc_graph, name='sequencing_run_qc_graph'),
-    path('graphs/sequencing_run_qc_json_graph/<sequencing_run_id>/<qc_compare_type>', views.sequencing_run_qc_json_graph, name='sequencing_run_qc_json_graph'),
-    path('graphs/qc_column_graph/<int:qc_column_id>/<use_percent>', views.qc_column_graph, name='qc_column_graph'),
+    path('sequencing_stats', views_qc_graphs.sequencing_stats, name='sequencing_stats'),
+    path('sequencing_stats/data', views_qc_graphs.sequencing_stats_data, name='sequencing_stats_data'),
+    path('qc_data', views_qc_graphs.qc_data, name='qc_data'),
+    path('qc_graphs', views_qc_graphs.qc_graphs, name='qc_graphs'),
+    path('graphs/sequencing_run_qc_graph/<sequencing_run_id>/<qc_compare_type>', views_qc_graphs.sequencing_run_qc_graph, name='sequencing_run_qc_graph'),
+    path('graphs/sequencing_run_qc_json_graph/<sequencing_run_id>/<qc_compare_type>', views_qc_graphs.sequencing_run_qc_json_graph, name='sequencing_run_qc_json_graph'),
+    path('graphs/qc_column_graph/<int:qc_column_id>/<use_percent>', views_qc_graphs.qc_column_graph, name='qc_column_graph'),
 
-    path('graphs/index_metrics_qc_graph/<illumina_qc_id>', views.index_metrics_qc_graph, name='index_metrics_qc_graph'),
-    path('graphs/qc_exec_summary_graph/<qc_exec_summary_id>/<qc_compare_type>', views.qc_exec_summary_graph, name='qc_exec_summary_graph'),
-    path('graphs/qc_exec_summary_json_graph/<qc_exec_summary_id>/<qc_compare_type>', views.qc_exec_summary_json_graph, name='qc_exec_summary_json_graph'),
+    path('graphs/index_metrics_qc_graph/<illumina_qc_id>', views_qc_graphs.index_metrics_qc_graph, name='index_metrics_qc_graph'),
+    path('graphs/qc_exec_summary_graph/<qc_exec_summary_id>/<qc_compare_type>', views_qc_graphs.qc_exec_summary_graph, name='qc_exec_summary_graph'),
+    path('graphs/qc_exec_summary_json_graph/<qc_exec_summary_id>/<qc_compare_type>', views_qc_graphs.qc_exec_summary_json_graph, name='qc_exec_summary_json_graph'),
 
     path('view_sequencing_run/<sequencing_run_id>/tab/<int:tab_id>', views.view_sequencing_run, name='view_sequencing_run_tab'),
     path('view_sequencing_run_stats_tab/<sequencing_run_id>', views.view_sequencing_run_stats_tab, name='view_sequencing_run_stats_tab'),
@@ -149,7 +149,7 @@ urlpatterns = [
     path('sequencing_software_versions/variant_caller/datatables/', DatabaseTableView.as_view(column_class=VariantCallerColumns), name='variant_caller_datatable'),
     path('sequencing_software_versions/variant_calling_pipeline/datatables/', DatabaseTableView.as_view(column_class=VariantCallingPipelineColumns), name='variant_calling_pipeline_datatable'),
 
-    path('sequencing_software_versions', views.sequencing_software_versions, name='sequencing_software_versions'),
+    path('sequencing_software_versions', views_admin.sequencing_software_versions, name='sequencing_software_versions'),
     path('view_sequencer/<pk>', SequencerUpdate.as_view(), name='view_sequencer'),
     path('view_library/<pk>', LibraryUpdate.as_view(), name='view_library'),
     path('view_assay/<pk>', AssayUpdate.as_view(), name='view_assay'),

@@ -1,7 +1,7 @@
 from django.template import Library
 
 from snpdb.forms import ProjectChoiceForm, VariantsTypeMultipleChoiceForm
-from snpdb.models import GenomeBuild, VariantsType
+from snpdb.models import VariantsType
 
 register = Library()
 
@@ -15,7 +15,6 @@ def vcf_grid_filter(context, table_id, variants_type=False):
     context = {
         'table_id': table_id,
         "project_form": project_form,
-        "genome_builds": GenomeBuild.builds_with_annotation(),
     }
 
     if variants_type:

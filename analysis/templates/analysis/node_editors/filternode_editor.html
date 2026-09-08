@@ -29,14 +29,14 @@ $(document).ready(function() {
                 url: "{{ request.path }}",
                 data: {filters: JSON.stringify(filters)},
                 success: function () {
-                    $("#filter-messages").empty();
+                    $("#filter-messages").empty().hide();
                     reloadNodeAndData({{ node.pk }});
                 }
             });
         };
 
         const unsavedChanges = function() {
-            $("#filter-messages").text("Warning: You have unsaved changes, press 'Find' to save");
+            $("#filter-messages").text("You have unsaved changes - press 'Find' to save").show();
         };
 
         const builder = new VariantGridFilterBuilder({
@@ -61,6 +61,9 @@ $(document).ready(function() {
 });
 </script>
 <div id="FilterNode-editor"></div>
-<div id="filter-messages"></div>
-Note: Search is case insensitive (except "in"). Some columns contain NULL (no value) which will not match anything. You may want to use "is null" to include or "is not null" to exclude them.
+<div id="filter-messages" class="editor-warning" style="display: none"></div>
+<div class="editor-help">
+    Search is case insensitive (except "in"). Some columns contain NULL (no value) which will not match anything -
+    use "is null" to include or "is not null" to exclude them.
+</div>
 {% endblock content %}

@@ -6,60 +6,61 @@
 {% endblock docreadyjs %}
 
 {% block content %}
-<div>
-	<form id="classifications-node-form" method="post" action="{{ request.path }}">
-        {% csrf_token %}
-            <div id="classification-node-form-widgets" class="significance-pills-form">
-                <div id="node-input-select">
-                    <label for="{{ form.node_input.id_for_label }}">Input:</label> {{ form.node_input }}
-                </div>
-                <div id="allele-origin-toggle" style="display: inline-block">
-                    <div class="btn-group btn-group-toggle" data-toggle="buttons">
-                        {% for radio in form.allele_origin %}
-                            <label class="btn btn-sm btn-outline-secondary allele-origin-{{ radio.data.value }}{% if radio.data.selected %} focus active{% endif %}">
-                                {{ radio.tag }} {{ radio.choice_label }}
-                            </label>
-                        {% endfor %}
-                    </div>
-                </div>
-                <div id="germline-significances" class="significance-pills germline-row">
-                    <span class="row-label">Germline:</span>
-                    <label class="c-pill pill-toggle cs-p" title="Pathogenic">{{ form.pathogenic }}P</label>
-                    <label class="c-pill pill-toggle cs-lp" title="Likely Pathogenic">{{ form.likely_pathogenic }}LP</label>
-                    <label class="c-pill pill-toggle cs-vus" title="VUS">{{ form.vus }}VUS</label>
-                    <label class="c-pill pill-toggle cs-lb" title="Likely Benign">{{ form.likely_benign }}LB</label>
-                    <label class="c-pill pill-toggle cs-b" title="Benign">{{ form.benign }}B</label>
-                    <label class="c-pill pill-toggle cs-none" title="Other">{{ form.other }}O</label>
-                </div>
-                <div id="somatic-significances" class="significance-pills somatic-row">
-                    <span class="row-label">Somatic:</span>
-                    <label class="c-pill pill-toggle scs-tier_1" title="Tier I (includes Tier I/II records)">{{ form.tier_1 }}Tier I</label>
-                    <label class="c-pill pill-toggle scs-tier_2" title="Tier II (includes Tier I/II records)">{{ form.tier_2 }}Tier II</label>
-                    <label class="c-pill pill-toggle scs-tier_3" title="Tier III">{{ form.tier_3 }}Tier III</label>
-                    <label class="c-pill pill-toggle scs-tier_4" title="Tier IV">{{ form.tier_4 }}Tier IV</label>
-                </div>
-                <div>
-                    {{ form.lab }}
-                </div>
-                <div class="text-muted">
-                    With every pill on, this keeps variants classified in this database.
-                </div>
+<form id="classifications-node-form" method="post" action="{{ request.path }}">
+    {% csrf_token %}
+    <div id="classification-node-form-widgets" class="significance-pills-form">
+        <div class="editor-row" id="node-input-select">
+            <label class="editor-label" for="{{ form.node_input.id_for_label }}">Input</label>
+            {{ form.node_input }}
+        </div>
+        <div class="editor-row" id="allele-origin-toggle">
+            <span class="editor-label">Allele origin</span>
+            <div class="btn-group btn-group-toggle" data-toggle="buttons">
+                {% for radio in form.allele_origin %}
+                    <label class="btn btn-sm btn-outline-secondary allele-origin-{{ radio.data.value }}{% if radio.data.selected %} focus active{% endif %}">
+                        {{ radio.tag }} {{ radio.choice_label }}
+                    </label>
+                {% endfor %}
             </div>
-            <div>
-    		  <b>Last Saved:</b> {{ node.modified }}
-            </div>
-            {% if node.has_classification_filters %}
-            <div>
-		      <b>Warning:</b> This node retrieves variants that have been classified in this database - this changes over time!
+        </div>
+        <div id="germline-significances" class="significance-pills germline-row">
+            <span class="row-label">Germline</span>
+            <label class="c-pill pill-toggle cs-p" title="Pathogenic">{{ form.pathogenic }}P</label>
+            <label class="c-pill pill-toggle cs-lp" title="Likely Pathogenic">{{ form.likely_pathogenic }}LP</label>
+            <label class="c-pill pill-toggle cs-vus" title="VUS">{{ form.vus }}VUS</label>
+            <label class="c-pill pill-toggle cs-lb" title="Likely Benign">{{ form.likely_benign }}LB</label>
+            <label class="c-pill pill-toggle cs-b" title="Benign">{{ form.benign }}B</label>
+            <label class="c-pill pill-toggle cs-none" title="Other">{{ form.other }}O</label>
+        </div>
+        <div id="somatic-significances" class="significance-pills somatic-row">
+            <span class="row-label">Somatic</span>
+            <label class="c-pill pill-toggle scs-tier_1" title="Tier I (includes Tier I/II records)">{{ form.tier_1 }}Tier I</label>
+            <label class="c-pill pill-toggle scs-tier_2" title="Tier II (includes Tier I/II records)">{{ form.tier_2 }}Tier II</label>
+            <label class="c-pill pill-toggle scs-tier_3" title="Tier III">{{ form.tier_3 }}Tier III</label>
+            <label class="c-pill pill-toggle scs-tier_4" title="Tier IV">{{ form.tier_4 }}Tier IV</label>
+        </div>
+        <div class="editor-row editor-row-top">
+            <label class="editor-label" for="{{ form.lab.id_for_label }}">Labs</label>
+            {{ form.lab }}
+        </div>
+        <div class="editor-help">
+            With every pill on, this keeps variants classified in this database.
+        </div>
+    </div>
+    {% if node.has_classification_filters %}
+        <div class="editor-warning">
+            This node retrieves variants that have been classified in this database - this changes over time!
             {% if out_of_date_message %}
-		      <p>{{ out_of_date_message }}</p>
+                <div>{{ out_of_date_message }}</div>
             {% endif %}
-		    </div>
-            {% endif %}
+        </div>
+    {% endif %}
+    <div class="editor-actions">
         {% if has_write_permission %}
-            <button id='classifications-node-save' class="btn btn-primary">save</button>
+            <button id='classifications-node-save' class="btn btn-primary">Save</button>
         {% endif %}
-        {{ form.media }}
-	</form>
-</div>
+        <span class="editor-meta">Last saved {{ node.modified }}</span>
+    </div>
+    {{ form.media }}
+</form>
 {% endblock content %}

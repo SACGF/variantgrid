@@ -14,13 +14,13 @@ from django.urls import reverse
 from guardian.shortcuts import get_objects_for_user
 
 from annotation.annotation_version_querysets import get_queryset_for_latest_annotation_version
-from annotation.models import PATIENT_ONTOLOGY_TERM_PATH, AnnotationVersion, ManualVariantEntryCollection
+from annotation.models import PATIENT_ONTOLOGY_TERM_PATH, AnnotationVersion, ManualVariantEntryCollection, VariantAnnotation
 from annotation.models.models_enums import ClinVarReviewStatus
 from library.genomics.vcf_enums import INFO_LIFTOVER_SWAPPED_REF_ALT
 from library.unit_percent import get_allele_frequency_formatter
 from library.utils import JsonDataType, JsonObjType, calculate_age
 from ontology.models import OntologyService
-from patients.models_enums import Sex
+from patients.models_enums import GnomADPopulation, Sex
 from snpdb.grid_columns.custom_columns import get_variant_grid_columns, get_variantgrid_extra_annotate
 from snpdb.models import (
     VCF,
@@ -31,6 +31,8 @@ from snpdb.models import (
     Cohort,
     CohortGenotypeStats,
     CustomColumnsCollection,
+    Duo,
+    DuoRelationship,
     GenomeBuild,
     GenomicIntervalsCollection,
     ImportSource,
@@ -63,34 +65,37 @@ def url_if_visible(url_name: str, **kwargs) -> Optional[str]:
 
 class VCFListColumns(DatatableConfig[VCF]):
     server_csv_download = True
+    search_box_enabled = True
+    search_pk_enabled = True
 
     def __init__(self, request: HttpRequest):
         super().__init__(request)
         self.scroll_x = True
 
         self.rich_columns = [
-            RichColumn(key="id", visible=False),
+            RichColumn(key="id", visible=False, search=False),
             RichColumn(key="name", label="Name", orderable=True,
                        renderer=self.view_primary_key, client_renderer='TableFormat.linkUrl'),
-            RichColumn(key="date", label="Date", orderable=True, default_sort=SortOrder.DESC,
+            RichColumn(key="date", label="Date", orderable=True, default_sort=SortOrder.DESC, search=False,
                        css_class="text-nowrap", client_renderer='TableFormat.timestamp'),
-            RichColumn(key="import_status", label="Import Status", orderable=True,
+            RichColumn(key="import_status", label="Import Status", orderable=True, search=False,
                        client_renderer=RichColumn.choices_client_renderer(ImportStatus.choices)),
-            RichColumn(key="data_archived_date", label="Archived", orderable=True,
+            RichColumn(key="data_archived_date", label="Archived", orderable=True, search=False,
                        css_class="text-nowrap", client_renderer='TableFormat.timestamp'),
             RichColumn(key="genome_build__name", label="Genome Build", orderable=True),
             RichColumn(key="user__username", label="Uploaded by", orderable=True,
                        extra_columns=["user__id"], renderer=self.render_user),
             RichColumn(key="source", label="VCF source", orderable=True),
             RichColumn(key="uploadedvcf__file_upload__import_source", label="Import Source", orderable=True,
+                       search=False,
                        client_renderer=RichColumn.choices_client_renderer(ImportSource.choices)),
-            RichColumn(key="genotype_samples", label="Genotype Samples", orderable=True),
+            RichColumn(key="genotype_samples", label="Genotype Samples", orderable=True, search=False),
             RichColumn(key="project__name", label="Project", orderable=True),
             RichColumn(key="uploadedvcf__vcf_importer__name", label="VCF Importer", orderable=True,
                        enabled=self.user.is_superuser),
             RichColumn(key="uploadedvcf__vcf_importer__version", label="VCF Importer Version", orderable=True,
-                       enabled=self.user.is_superuser),
-            RichColumn(key="id", name="delete", label="", orderable=False,
+                       search=False, enabled=self.user.is_superuser),
+            RichColumn(key="id", name="delete", label="", orderable=False, search=False,
                        renderer=self.render_delete, client_renderer='TableFormat.deleteRow'),
         ]
 
@@ -109,6 +114,8 @@ class VCFListColumns(DatatableConfig[VCF]):
 
 class SamplesListColumns(DatatableConfig[Sample]):
     server_csv_download = True
+    search_box_enabled = True
+    search_pk_enabled = True
     # The unfiltered count is over a correlated subquery and a group by, and only feeds the
     # "(filtered from N total)" text
     count_unfiltered = False
@@ -133,16 +140,17 @@ class SamplesListColumns(DatatableConfig[Sample]):
             dob_client_renderer = 'TableFormat.timestamp'
 
         self.rich_columns = [
-            RichColumn(key="id", visible=False),
+            RichColumn(key="id", visible=False, search=False),
             RichColumn(key="name", label="Name", orderable=True,
                        renderer=self.view_primary_key, client_renderer='TableFormat.linkUrl'),
-            RichColumn(key="het_hom_count", label="Het/Hom Count", orderable=True),
+            RichColumn(key="het_hom_count", label="Het/Hom Count", orderable=True, search=False),
             RichColumn(key="vcf__date", label="Date", orderable=True, default_sort=SortOrder.DESC,
+                       search=False,
                        css_class="text-nowrap", client_renderer='TableFormat.timestamp'),
-            RichColumn(key="import_status", label="Import Status", orderable=True,
+            RichColumn(key="import_status", label="Import Status", orderable=True, search=False,
                        client_renderer=RichColumn.choices_client_renderer(ImportStatus.choices)),
             RichColumn(key="vcf__genome_build__name", label="Genome Build", orderable=True),
-            RichColumn(key="variants_type", label="Variants Type", orderable=True,
+            RichColumn(key="variants_type", label="Variants Type", orderable=True, search=False,
                        client_renderer=RichColumn.choices_client_renderer(VariantsType.choices)),
             RichColumn(key="vcf__user__username", label="Uploaded by", orderable=True,
                        extra_columns=["vcf__user__id"], renderer=self.render_user),
@@ -151,23 +159,26 @@ class SamplesListColumns(DatatableConfig[Sample]):
                        renderer=self._render_vcf, client_renderer='renderOptionalLink'),
             RichColumn(key="vcf__project__name", label="Project", orderable=True),
             RichColumn(key="vcf__uploadedvcf__file_upload__import_source", label="Import Source", orderable=True,
+                       search=False,
                        client_renderer=RichColumn.choices_client_renderer(ImportSource.choices)),
-            RichColumn(key="sample_gene_list_count", label="# Sample GeneLists", orderable=True,
+            RichColumn(key="sample_gene_list_count", label="# Sample GeneLists", orderable=True, search=False,
                        extra_columns=["activesamplegenelist__id"], enabled=has_sample_gene_lists,
                        renderer=self._render_sample_gene_list_count,
                        client_renderer='renderSampleGeneListCount'),
             RichColumn(key="mutationalsignature__summary", label="Mutational Signature", orderable=True,
+                       search=False,
                        extra_columns=["mutationalsignature__id"], enabled=has_mutational_signature,
                        renderer=self._render_mutational_signature, client_renderer='renderOptionalLink'),
             RichColumn(key="somaliersampleextract__somalierancestry__predicted_ancestry",
-                       label="Predicted Ancestry", orderable=True, enabled=has_somalier_ancestry,
+                       label="Predicted Ancestry", orderable=True, search=False,
+                       enabled=has_somalier_ancestry,
                        client_renderer=RichColumn.choices_client_renderer(SuperPopulationCode.choices)),
             RichColumn(key="patient__patient_code", label="Patient Code", orderable=True),
             RichColumn(key="patient__first_name", label="First Name", orderable=True),
             RichColumn(key="patient__last_name", label="Last Name", orderable=True),
-            RichColumn(key="patient__sex", label="Sex", orderable=True,
+            RichColumn(key="patient__sex", label="Sex", orderable=True, search=False,
                        client_renderer=RichColumn.choices_client_renderer(Sex.choices)),
-            RichColumn(key="patient__date_of_birth", label=dob_label, orderable=True,
+            RichColumn(key="patient__date_of_birth", label=dob_label, orderable=True, search=False,
                        renderer=dob_renderer, client_renderer=dob_client_renderer),
             RichColumn(key="extraction__specimen__reference_id", label="Specimen", orderable=True,
                        extra_columns=["extraction__specimen__id"],
@@ -179,8 +190,9 @@ class SamplesListColumns(DatatableConfig[Sample]):
                        renderer=self._render_extraction, client_renderer='renderOptionalLink'),
             RichColumn(key="extraction__specimen__tissue__name", label="Tissue", orderable=True),
             RichColumn(key="extraction__specimen__collection_date", label="Collected", orderable=True,
+                       search=False,
                        css_class="text-nowrap", client_renderer='TableFormat.timestamp'),
-            RichColumn(key="id", name="delete", label="", orderable=False,
+            RichColumn(key="id", name="delete", label="", orderable=False, search=False,
                        renderer=self.render_delete, client_renderer='TableFormat.deleteRow'),
         ]
 
@@ -372,7 +384,7 @@ class CohortListColumns(DatatableConfig[Cohort]):
 
 
 class FamilyGroupListColumns(DatatableConfig[DC]):
-    """ Trios/Quads listing - same grid bar the extra family members """
+    """ Duos/Trios/Quads listing - same grid bar the family members """
     MODEL: type[DC]
     GRID_NAME: str
     # (field prefix, label, has an affected column)
@@ -420,6 +432,19 @@ class QuadsListColumns(FamilyGroupListColumns[Quad]):
     MODEL = Quad
     GRID_NAME = 'Quads'
     FAMILY_MEMBERS = [*FamilyGroupListColumns.FAMILY_MEMBERS, ("sibling", "Sibling", True)]
+
+
+class DuosListColumns(FamilyGroupListColumns[Duo]):
+    MODEL = Duo
+    GRID_NAME = 'Duos'
+    FAMILY_MEMBERS = [("parent", "Parent", True), ("proband", "Proband", False)]
+
+    def __init__(self, request: HttpRequest):
+        super().__init__(request)
+        relationship_column = RichColumn(key='relationship', label='Relationship', orderable=True,
+                                         client_renderer=RichColumn.choices_client_renderer(DuoRelationship.choices))
+        parent_affected = next(i for i, rc in enumerate(self.rich_columns) if rc.key == 'parent_affected')
+        self.rich_columns.insert(parent_affected + 1, relationship_column)
 
 
 class GenomicIntervalsListColumns(DatatableConfig[GenomicIntervalsCollection]):
@@ -497,6 +522,129 @@ def render_annotsv_pathogenic_overlaps(cell: CellData) -> JsonDataType:
     return text
 
 
+# Allele frequencies held in the database as a unit value (0-1). The grid formats them server side so
+# its CSV/VCF exports match what it draws - and the annotation descriptions page formats its example
+# cells the same way. @see get_standard_overrides
+AF_UNIT_COLUMNS = [
+    'variantannotation__af_1kg',
+    'variantannotation__af_uk10k',
+    'variantannotation__gnomad2_liftover_af',
+    'variantannotation__gnomad_af',
+    'variantannotation__gnomad_afr_af',
+    'variantannotation__gnomad_amr_af',
+    'variantannotation__gnomad_asj_af',
+    'variantannotation__gnomad_eas_af',
+    'variantannotation__gnomad_fin_af',
+    'variantannotation__gnomad_nfe_af',
+    'variantannotation__gnomad_oth_af',
+    'variantannotation__gnomad_popmax_af',
+    'variantannotation__gnomad_sas_af',
+    'variantannotation__topmed_af',
+]
+
+
+def get_standard_overrides(af_show_in_percent: bool) -> dict[str, dict]:
+    """ Per column RichColumn kwargs the variant grids apply on top of the catalogue - the client
+        renderers, the server side formatting the CSV shares, and the AF unit/percent conversion """
+    overrides = {
+        # Note:     client side renderers should only be used for adding links etc, never conversion of data, such as
+        #           unit to percent, as the CSV downloads (w/o JS renderers) won't match the grid.
+        # The representative variant cell: expand arrow, select checkbox, cascade label (details link)
+        'id': {'width': 280, 'client_renderer': 'VariantGridFormat.representativeVariant'},
+        'classifications': {
+            'css_class': 'no-word-wrap',
+            'client_renderer': 'VariantGridFormat.classifications',
+        },
+        'tags_global': {
+            'model_field': False, 'css_class': 'no-word-wrap', 'orderable': False,
+            'client_renderer': 'VariantGridFormat.tagsGlobal',
+        },
+        'clinvar__clinvar_variation_id': {'width': 60, 'client_renderer': 'VariantGridFormat.clinvarLink'},
+        'variantallele__allele__clingen_allele__id': {
+            'width': 90,
+            'renderer': render_clingen_allele, 'csv_rendered': True,
+            'client_renderer': 'VariantGridFormat.clinGenAlleleId',
+        },
+        'variantannotation__cosmic_id': {'width': 130, 'client_renderer': 'VariantGridFormat.cosmicLink'},
+        'variantannotation__cosmic_legacy_id': {'width': 130, 'client_renderer': 'VariantGridFormat.cosmicLink'},
+        'variantannotation__dbsnp_rs_id': {'width': 130, 'client_renderer': 'VariantGridFormat.dbsnp'},
+        'variantannotation__pubmed': {'client_renderer': 'VariantGridFormat.pubMed'},
+        'variantannotation__gene__geneannotation__hpo_terms': {'client_renderer': 'VariantGridFormat.ontologyTerms'},
+        'variantannotation__gene__geneannotation__mondo_terms': {'client_renderer': 'VariantGridFormat.ontologyTerms'},
+        'variantannotation__gene__geneannotation__omim_terms': {'client_renderer': 'VariantGridFormat.ontologyTerms'},
+        'variantannotation__transcript_version__gene_version__gene_symbol__symbol': {
+            'client_renderer': 'VariantGridFormat.geneSymbolLink'},
+        'variantannotation__overlapping_symbols': {'client_renderer': 'VariantGridFormat.geneSymbolNewWindowLink'},
+        'variantannotation__transcript_version__gene_version__hgnc__omim_ids': {
+            'width': 60, 'client_renderer': 'VariantGridFormat.omimLink'},
+        # A member shown standalone keeps its own link - and the composite cells reuse these
+        'variantannotation__gnomad_filtered': {'client_renderer': 'VariantGridFormat.gnomadFiltered'},
+        'variantannotation__transcript_version__gene_version__hgnc__uniprot__accession': {
+            'client_renderer': 'VariantGridFormat.uniprotLink'},
+        # Composite cells, keyed by the composite column's own name - the members they draw
+        # ride along hidden and their sort menus come from CompositeColumnMember
+        'consequence_impact': {'client_renderer': 'VariantGridFormat.impactConsequence'},
+        'gnomad': {'client_renderer': 'VariantGridFormat.gnomad'},
+        'spliceai': {'client_renderer': 'VariantGridFormat.spliceai'},
+        'maxentscan': {'client_renderer': 'VariantGridFormat.maxentscan'},
+        'mastermind': {'client_renderer': 'VariantGridFormat.mastermind'},
+        'aloft': {'client_renderer': 'VariantGridFormat.aloft'},
+        'predictions': {'client_renderer': 'VariantGridFormat.predictions'},
+        'pop_freq_other': {'client_renderer': 'VariantGridFormat.popFreqOther'},
+        'uniprot': {'client_renderer': 'VariantGridFormat.uniprot'},
+        'conservation': {'client_renderer': 'VariantGridFormat.conservation'},
+        # The same cell (and the same menu) the cohort node draws with its own counts
+        # @see CohortNode._get_node_extra_columns
+        'db_zygosity': {'client_renderer': 'VariantGridFormat.dbZygosityCounts'},
+        'variantannotation__exon': {'renderer': render_exon_and_intron, 'csv_rendered': True},
+        'variantannotation__intron': {'renderer': render_exon_and_intron, 'csv_rendered': True},
+        'variantannotation__mastermind_mmid3': {'client_renderer': 'VariantGridFormat.masterMind'},
+        'variantannotation__mavedb_urn': {'client_renderer': 'VariantGridFormat.mavedbUrn'},
+        'variantannotation__annotsv_pathogenic_overlaps': {
+            'renderer': render_annotsv_pathogenic_overlaps, 'csv_rendered': True,
+        },
+    }
+
+    if af_show_in_percent:
+        # gnomAD etc are all stored as AF in DB - want to show as percentage on grid
+        # But need to be able to turn it off to export VCF as AF
+        render_unit_af = get_allele_frequency_formatter(source_in_percent=False,
+                                                        dest_in_percent=af_show_in_percent)
+        af_override = {'renderer': render_unit_af, 'csv_rendered': True}
+        for column in AF_UNIT_COLUMNS:
+            overrides.setdefault(column, {}).update(af_override)
+    return overrides
+
+
+def variant_grid_client_extra(genome_build: GenomeBuild) -> JsonObjType:
+    """ Grid wide metadata the client renderers read off the table definition - @see ctx.extra in
+        variantgrid_formats.js """
+    # gnomAD links are per genome build, and the client renderers have no other way to know it
+    extra = {"genomeBuild": genome_build.name,
+             # The ClinVar review status columns are choice fields, so the row carries the display
+             # label the CSV and the standalone column share - key the stars by what the client gets
+             "clinvarStars": {ClinVarReviewStatus(review_status).label: stars
+                              for review_status, stars in ClinVarReviewStatus.STARS.items()},
+             # What counts as a bad GQ/PL in the sample genotype cell
+             "genotypeQuality": settings.VARIANT_GRID_GENOTYPE_QUALITY_THRESHOLDS,
+             # The popmax population arrives as its label (a choice field) - the gnomAD cell draws the
+             # code and keeps the label for the hover
+             "gnomadPopulationCodes": {label: code for code, label in GnomADPopulation.choices},
+             # Each conservation score's range and where it reads as conserved, keyed the way the
+             # conservation cell's members arrive on the row
+             "conservation": {f"variantannotation__{field}": {"min": stats["min"], "max": stats["max"],
+                                                              "conserved": stats["conserved"]}
+                              for field, stats in VariantAnnotation.CONSERVATION_SCORES.items()}}
+    # The AF the import 'common' filter uses, in the units the grid shows AFs in - the gnomAD
+    # cell mutes at or above it so rare variants keep the reader's full attention
+    if cf_data := settings.VCF_IMPORT_COMMON_FILTERS.get(genome_build.name):
+        common_af = cf_data["gnomad_af_min"]
+        if settings.VARIANT_ALLELE_FREQUENCY_CLIENT_SIDE_PERCENT:
+            common_af *= 100
+        extra["commonGnomadAf"] = common_af
+    return extra
+
+
 class AbstractVariantGrid(DatatableConfig[Variant]):
     """ The variant grids - the analysis node grid and the standalone Variant tables. Their columns are
         built per user from a CustomColumnsCollection (@see snpdb.grid_columns.custom_columns) rather
@@ -548,103 +696,14 @@ class AbstractVariantGrid(DatatableConfig[Variant]):
         return UserSettings.get_for_user(self.user).columns
 
     def _get_standard_overrides(self, af_show_in_percent: bool) -> dict[str, dict]:
-        overrides = {
-            # Note:     client side renderers should only be used for adding links etc, never conversion of data, such as
-            #           unit to percent, as the CSV downloads (w/o JS renderers) won't match the grid.
-            # The representative variant cell: expand arrow, select checkbox, cascade label (details link)
-            'id': {'width': 280, 'client_renderer': 'VariantGridFormat.representativeVariant'},
-            'classifications': {
-                'css_class': 'no-word-wrap',
-                'client_renderer': 'VariantGridFormat.classifications',
-            },
-            'tags_global': {
-                'model_field': False, 'css_class': 'no-word-wrap', 'orderable': False,
-                'client_renderer': 'VariantGridFormat.tagsGlobal',
-            },
-            'clinvar__clinvar_variation_id': {'width': 60, 'client_renderer': 'VariantGridFormat.clinvarLink'},
-            'variantallele__allele__clingen_allele__id': {
-                'width': 90,
-                'renderer': render_clingen_allele, 'csv_rendered': True,
-                'client_renderer': 'VariantGridFormat.clinGenAlleleId',
-            },
-            'variantannotation__cosmic_id': {'width': 130, 'client_renderer': 'VariantGridFormat.cosmicLink'},
-            'variantannotation__cosmic_legacy_id': {'width': 130, 'client_renderer': 'VariantGridFormat.cosmicLink'},
-            'variantannotation__dbsnp_rs_id': {'width': 130, 'client_renderer': 'VariantGridFormat.dbsnp'},
-            'variantannotation__pubmed': {'client_renderer': 'VariantGridFormat.pubMed'},
-            'variantannotation__gene__geneannotation__hpo_terms': {'client_renderer': 'VariantGridFormat.ontologyTerms'},
-            'variantannotation__gene__geneannotation__mondo_terms': {'client_renderer': 'VariantGridFormat.ontologyTerms'},
-            'variantannotation__gene__geneannotation__omim_terms': {'client_renderer': 'VariantGridFormat.ontologyTerms'},
-            'variantannotation__transcript_version__gene_version__gene_symbol__symbol': {
-                'client_renderer': 'VariantGridFormat.geneSymbolLink'},
-            'variantannotation__overlapping_symbols': {'client_renderer': 'VariantGridFormat.geneSymbolNewWindowLink'},
-            'variantannotation__transcript_version__gene_version__hgnc__omim_ids': {
-                'width': 60, 'client_renderer': 'VariantGridFormat.omimLink'},
-            # A member shown standalone keeps its own link - and the composite cells reuse these
-            'variantannotation__gnomad_filtered': {'client_renderer': 'VariantGridFormat.gnomadFiltered'},
-            # Composite cells, keyed by the composite column's own name - the members they draw
-            # ride along hidden and their sort menus come from CompositeColumnMember
-            'consequence_impact': {'client_renderer': 'VariantGridFormat.impactConsequence'},
-            'gnomad': {'client_renderer': 'VariantGridFormat.gnomad'},
-            'spliceai': {'client_renderer': 'VariantGridFormat.spliceai'},
-            'maxentscan': {'client_renderer': 'VariantGridFormat.maxentscan'},
-            'mastermind': {'client_renderer': 'VariantGridFormat.mastermind'},
-            'aloft': {'client_renderer': 'VariantGridFormat.aloft'},
-            'predictions': {'client_renderer': 'VariantGridFormat.predictions'},
-            # The same cell (and the same menu) the cohort node draws with its own counts
-            # @see CohortNode._get_node_extra_columns
-            'db_zygosity': {'client_renderer': 'VariantGridFormat.dbZygosityCounts'},
-            'variantannotation__exon': {'renderer': render_exon_and_intron, 'csv_rendered': True},
-            'variantannotation__intron': {'renderer': render_exon_and_intron, 'csv_rendered': True},
-            'variantannotation__mastermind_mmid3': {'client_renderer': 'VariantGridFormat.masterMind'},
-            'variantannotation__mavedb_urn': {'client_renderer': 'VariantGridFormat.mavedbUrn'},
-            'variantannotation__annotsv_pathogenic_overlaps': {
-                'renderer': render_annotsv_pathogenic_overlaps, 'csv_rendered': True,
-            },
-        }
-
-        if af_show_in_percent:
-            # gnomAD etc are all stored as AF in DB - want to show as percentage on grid
-            # But need to be able to turn it off to export VCF as AF
-            render_unit_af = get_allele_frequency_formatter(source_in_percent=False,
-                                                            dest_in_percent=af_show_in_percent)
-            af_override = {'renderer': render_unit_af, 'csv_rendered': True}
-            af_columns = [
-                'variantannotation__af_1kg',
-                'variantannotation__af_uk10k',
-                'variantannotation__gnomad2_liftover_af',
-                'variantannotation__gnomad_af',
-                'variantannotation__gnomad_afr_af',
-                'variantannotation__gnomad_amr_af',
-                'variantannotation__gnomad_asj_af',
-                'variantannotation__gnomad_eas_af',
-                'variantannotation__gnomad_fin_af',
-                'variantannotation__gnomad_nfe_af',
-                'variantannotation__gnomad_oth_af',
-                'variantannotation__gnomad_popmax_af',
-                'variantannotation__gnomad_sas_af',
-                'variantannotation__topmed_af',
-            ]
-            for column in af_columns:
-                overrides.setdefault(column, {}).update(af_override)
-        return overrides
+        """ Subclasses add the columns only they draw - @see VariantGrid for the analysis' own tags """
+        return get_standard_overrides(af_show_in_percent)
 
     def _get_base_queryset(self) -> QuerySet:
         raise NotImplementedError()
 
     def get_extra(self) -> JsonObjType:
-        # gnomAD links are per genome build, and the client renderers have no other way to know it
-        extra = {"genomeBuild": self.genome_build.name,
-                 "clinvarStars": dict(ClinVarReviewStatus.STARS),
-                 # What counts as a bad GQ/PL in the sample genotype cell
-                 "genotypeQuality": settings.VARIANT_GRID_GENOTYPE_QUALITY_THRESHOLDS}
-        # The AF the import 'common' filter uses, in the units the grid shows AFs in - the gnomAD
-        # cell mutes at or above it so rare variants keep the reader's full attention
-        if cf_data := settings.VCF_IMPORT_COMMON_FILTERS.get(self.genome_build.name):
-            common_af = cf_data["gnomad_af_min"]
-            if settings.VARIANT_ALLELE_FREQUENCY_CLIENT_SIDE_PERCENT:
-                common_af *= 100
-            extra["commonGnomadAf"] = common_af
-        return extra
+        return variant_grid_client_extra(self.genome_build)
 
     def get_table_classes(self) -> list[str]:
         """ Two line rows are a per-user setting. The second line is in the markup either way -

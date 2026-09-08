@@ -1,0 +1,18 @@
+{% load classification_tags %}
+{# One deduplicated gene content row - the representative, and the spread of tumour types the same #}
+{# content has been used for, which is usually what decides whether it applies to the case in hand. #}
+<div class="gene-consensus-group">
+    {% classification_quick group.representative show_condition=True %}
+    {% if group.other_count %}
+        <div>
+            <a class="toggle-link collapsed" data-toggle="collapse" href="#gene-group-{{ group.representative.pk }}">
+                and {{ group.other_count }} other record{{ group.other_count|pluralize }} with the same gene content
+            </a>
+            <div class="collapse pl-3" id="gene-group-{{ group.representative.pk }}">
+                {% for other in group.others %}
+                    <div class="small">{% classification_quick other show_condition=True %}</div>
+                {% endfor %}
+            </div>
+        </div>
+    {% endif %}
+</div>

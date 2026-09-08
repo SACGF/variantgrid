@@ -1,0 +1,79 @@
+{% load model_tags %}
+{% load ui_utils %}
+
+<div class="card mb-3">
+    <div class="card-header">Family</div>
+    <table class="table table-sm mb-0 duo-family-table">
+        <thead>
+            <tr>
+                <th>Role</th>
+                <th>Sample</th>
+                <th>Affected</th>
+                <th data-help="{% detected_sex_help %}">Detected Sex</th>
+                <th>Patient</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for member in members %}
+            {% with sample=member.cohort_sample.sample %}
+            <tr>
+                <th>{{ member.role }}</th>
+                <td>
+                    {% preview_icon sample %}
+                    <a href="{% url 'view_sample' sample.pk %}">{{ sample.name }}</a>
+                </td>
+                <td>
+                    {% if member.affected %}
+                        <span class="badge badge-dark">Affected</span>
+                    {% else %}
+                        <span class="text-muted">Unaffected</span>
+                    {% endif %}
+                </td>
+                <td>{% detected_sex sample.get_genotype_stats %}</td>
+                <td>
+                    {% if sample.patient %}
+                        {% preview_icon sample.patient %}
+                        <a href="{% url 'view_patient' sample.patient_id %}">{{ sample.patient }}</a>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endwith %}
+        {% endfor %}
+        </tbody>
+    </table>
+    <div class="card-footer text-muted small">
+        The {{ duo.missing_parent_label|lower }} was not sequenced - de novo can't be confirmed and
+        compound het is only half phased.
+    </div>
+</div>
+
+<div class="card mb-3">
+    <div class="card-header">Duo</div>
+    <table class="table table-sm mb-0 duo-details-table">
+        <tbody>
+            <tr><th>Duo ID</th>
+                <td><a href="{% url 'view_duo' duo.pk %}">{{ duo.pk }}</a></td>
+            </tr>
+            <tr><th>Name</th>
+                <td>{{ duo.name }}</td>
+            </tr>
+            <tr><th>Genome Build</th>
+                <td>{{ duo.genome_build }}</td>
+            </tr>
+            <tr><th>Cohort</th>
+                <td>
+                    {% preview_icon duo.cohort %}
+                    <a href="{% url 'view_cohort' duo.cohort.pk %}">{{ duo.cohort }}</a>
+                </td>
+            </tr>
+        {% if duo.proband_sex %}
+            <tr><th>Proband Sex</th>
+                <td>
+                    {{ duo.effective_proband_sex.label }}
+                    <span class="text-muted small">set on the duo, overriding the patient record</span>
+                </td>
+            </tr>
+        {% endif %}
+        </tbody>
+    </table>
+</div>

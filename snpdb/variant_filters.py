@@ -31,6 +31,7 @@ class VariantType:
     INDEL = "indel"
     COMPLEX = "complex"
     SYMBOLIC = "symbolic"  # Any variant with an SVLEN
+    FUSION = "fusion"  # Gene-level events - @see snpdb.gene_level_variants
 
 
 _VARIANT_TYPE_Q_FUNCS = {
@@ -39,6 +40,7 @@ _VARIANT_TYPE_Q_FUNCS = {
     VariantType.INDEL: Variant.get_indel_q,
     VariantType.COMPLEX: Variant.get_complex_subsitution_q,
     VariantType.SYMBOLIC: Variant.get_symbolic_q,
+    VariantType.FUSION: Variant.get_gene_level_q,
 }
 
 VARIANT_TYPE_LABELS = {
@@ -47,6 +49,7 @@ VARIANT_TYPE_LABELS = {
     VariantType.INDEL: "Indel",
     VariantType.COMPLEX: "Complex sub",
     VariantType.SYMBOLIC: "Structural",
+    VariantType.FUSION: "Fusion",
 }
 
 # The types offered on the All Variants page - reference variants are always excluded there, and the
@@ -62,7 +65,7 @@ def get_symbolic_variant_types() -> list[str]:
 
 
 def get_all_variant_types() -> list[str]:
-    return STANDARD_VARIANT_TYPES + get_symbolic_variant_types()
+    return STANDARD_VARIANT_TYPES + get_symbolic_variant_types() + [VariantType.FUSION]
 
 
 def get_variant_type_label(variant_type: str) -> str:
@@ -91,6 +94,12 @@ def get_variant_types_q(variant_types: Optional[Iterable[str]],
     if selected.issuperset(all_variant_types):
         return None
     return reduce(operator.or_, [get_variant_type_q(vt) for vt in sorted(selected)])
+
+
+def get_gene_level_contig_ids(genome_build: GenomeBuild) -> list[int]:
+    """ The shared coordinate-free contig fusions live on - @see snpdb.gene_level_variants """
+    qs = genome_build.contigs.filter(role=SequenceRole.VG_GENE_LEVEL_FAKE_CONTIG)
+    return list(qs.values_list("pk", flat=True))
 
 
 def get_non_standard_contig_ids(genome_build: GenomeBuild) -> list[int]:
@@ -168,16 +177,22 @@ def get_variant_filter_q(genome_build: GenomeBuild, annotation_version: Annotati
                          variant_types: Optional[Iterable[str]] = None) -> Q:
     """ The standard variant filters composed into a single Q """
     contig_id_list = list(contig_ids or [])
-    if gene_symbols and (contig_id_list or non_standard_contigs):
-        # Let the genes' contigs through, so a gene on a chromosome the user hasn't ticked still shows.
-        # The page ticks them too, but a stale saved filter set or a direct grid URL wouldn't have.
-        contig_id_list.extend(get_contig_ids_for_gene_symbols(genome_build, gene_symbols))
+    variant_type_list = list(variant_types) if variant_types is not None else None
+    if contig_id_list or non_standard_contigs:
+        if gene_symbols:
+            # Let the genes' contigs through, so a gene on a chromosome the user hasn't ticked still shows.
+            # The page ticks them too, but a stale saved filter set or a direct grid URL wouldn't have.
+            contig_id_list.extend(get_contig_ids_for_gene_symbols(genome_build, gene_symbols))
+        if variant_type_list is None or VariantType.FUSION in variant_type_list:
+            # The gene-level contig is not a chromosome anyone can tick, so the Fusion type is what
+            # lets it through - without it the contig filter hides every fusion whatever else is on
+            contig_id_list.extend(get_gene_level_contig_ids(genome_build))
 
     filter_list = [get_contigs_q(genome_build, contig_ids=contig_id_list,
                                  non_standard_contigs=non_standard_contigs)]
     if (q_genes := get_gene_symbols_q(annotation_version, gene_symbols)) is not None:
         filter_list.append(q_genes)
-    if (q_types := get_variant_types_q(variant_types)) is not None:
+    if (q_types := get_variant_types_q(variant_type_list)) is not None:
         filter_list.append(q_types)
     return reduce(operator.and_, filter_list)
 

@@ -29,6 +29,7 @@ from annotation.pathogenicity_predictions import (
     RawScoreDirection,
 )
 from library.genomics.vcf_enums import VariantClass
+from snpdb.models.models_variant import Variant
 
 
 class ALoFTPredictionOptions(models.TextChoices):
@@ -38,6 +39,14 @@ class ALoFTPredictionOptions(models.TextChoices):
     DOMINANT = ALoFTPrediction.DOMINANT, "Dominant"
 
 
+class StructuralFilter(models.TextChoices):
+    """ Whether to keep only, or drop, the rows stored as a symbolic alt with an SVLEN - SVs, CNVs
+        and the gene-level events. @see Variant.get_symbolic_q """
+    ANY = 'A', "Any"
+    ONLY = 'O', "Structural only"
+    EXCLUDE = 'E', "Exclude structural"
+
+
 class DamageNode(AnalysisNode):
     """ This is called 'EffectNode' in analysis """
     # A type restriction restricts - it goes in and_filters rather than the scoring OR pool,
@@ -45,6 +54,10 @@ class DamageNode(AnalysisNode):
     variant_class = ArrayField(models.CharField(max_length=2, choices=VariantClass.choices),
                                default=list, blank=True)
     variant_class_exclude = models.BooleanField(default=False)
+    # Orthogonal to variant_class, which is VEP's: VEP calls a 1 Mb <DEL> and a 1 bp deletion the
+    # same class, so "just the SVs/CNVs" is a question the class filter cannot answer
+    structural = models.CharField(max_length=1, choices=StructuralFilter.choices,
+                                  default=StructuralFilter.ANY)
 
     impact_min = models.CharField(max_length=1, choices=PathogenicityImpact.CHOICES, null=True, blank=True)
     impact_required = models.BooleanField(default=False)
@@ -229,7 +242,8 @@ class DamageNode(AnalysisNode):
 
     def modifies_parents(self):
         all_versions = [self.impact_min, self.splice_min, self.cosmic_count_min, self.damage_predictions_min,
-                        self.protein_domain, self.published, self.variant_class]
+                        self.protein_domain, self.published, self.variant_class,
+                        self.structural != StructuralFilter.ANY]
         v2_fields = [self.bayesdel_noaf_rankscore_min, self.cadd_raw_rankscore_min, self.clinpred_rankscore_min,
                 self.metalr_rankscore_min, self.revel_rankscore_min, self.vest4_rankscore_min,
                 self.nmd_escaping_variant, self.aloft]
@@ -380,6 +394,12 @@ class DamageNode(AnalysisNode):
                 # Negated subquery so variants without annotation aren't silently dropped
                 q_variant_class = ~q_variant_class
             and_filters.append(q_variant_class)
+
+        if self.structural != StructuralFilter.ANY:
+            q_structural = Variant.get_symbolic_q()
+            if self.structural == StructuralFilter.EXCLUDE:
+                q_structural = ~q_structural
+            and_filters.append(q_structural)
 
         if self.impact_min is not None:
             q_impact = PathogenicityImpact.get_q(self.impact_min)

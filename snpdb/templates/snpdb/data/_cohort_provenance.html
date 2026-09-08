@@ -1,0 +1,16 @@
+{# Where this page's membership comes from - phrased as what you can do with it (#933, #1238) #}
+<p class="cohort-provenance text-muted">
+{% if vcf %}
+    Samples come from this VCF file - membership is fixed by the file.
+    {% if has_write_permission and vcf.import_status == 'S' %}
+        Select samples below and use <b>Create cohort from selected samples</b> to work with a subset.
+    {% endif %}
+{% elif cohort.parent_cohort %}
+    Sub cohort of <a href="{{ cohort.parent_cohort.get_absolute_url }}">{{ cohort.parent_cohort.name }}</a> -
+    {{ cohort.sample_count }} of {{ cohort.parent_cohort.sample_count }} samples. Samples from that file reuse its
+    genotype data; samples from anywhere else rebuild on save.
+{% else %}
+    Custom cohort - samples drawn from {{ source_vcf_count }} VCF{{ source_vcf_count|pluralize }};
+    membership edits rebuild genotype data on save.
+{% endif %}
+</p>

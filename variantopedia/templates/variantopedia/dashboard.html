@@ -3,6 +3,7 @@
 {% load js_tags %}
 {% load settings_tags %}
 {% load tips_tags %}
+{% load ui_utils %}
 {% block head %}
     <script type="text/javascript" src="{% static 'js/lib/plotly-custom-3.7.0.min.js' %}"></script>
     <script type="text/javascript" src="{% static 'js/plotly_helper.js' %}"></script>
@@ -91,7 +92,8 @@
                                 {% if ENABLE_PATIENTS_ON_FRONTPAGE %}
                                     <td>
                                         {% if ss.patient %}
-                                            <a href="{% url 'view_patient' ss.patient.pk %}"><div class='patient-icon'></div>{{ ss.patient }}</a>
+                                            {% preview_icon ss.patient %}
+                                            <a href="{% url 'view_patient' ss.patient.pk %}">{{ ss.patient }}</a>
                                         {% endif %}
                                     </td>
                                 {% endif %}

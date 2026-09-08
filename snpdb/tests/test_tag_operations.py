@@ -24,6 +24,8 @@ from snpdb.tag_operations import (
     set_tag_allele_origin,
 )
 
+_UNSET = object()  # analysis=None is a global (variant page) tagging, so it can't be the default
+
 
 class VariantTagTestCase(TestCase):
     @classmethod
@@ -39,8 +41,11 @@ class VariantTagTestCase(TestCase):
         self.dying_tag = Tag.objects.create(pk="artefact")
         self.surviving_tag = Tag.objects.create(pk="Artefact")
 
-    def _create_variant_tag(self, tag: Tag, variant: Variant = None, user: User = None) -> VariantTag:
-        return VariantTag.objects.create(variant=variant or self.variant, tag=tag, analysis=self.analysis,
+    def _create_variant_tag(self, tag: Tag, variant: Variant = None, user: User = None,
+                            analysis: Analysis = _UNSET) -> VariantTag:
+        if analysis is _UNSET:
+            analysis = self.analysis
+        return VariantTag.objects.create(variant=variant or self.variant, tag=tag, analysis=analysis,
                                          genome_build=self.genome_build, user=user or self.user)
 
 
@@ -56,18 +61,27 @@ class TagMergeTest(VariantTagTestCase):
         self.assertEqual(self.dying_tag.merged_into, self.surviving_tag)
         self.assertEqual(VariantTag.objects.filter(tag=self.surviving_tag).count(), 2)
 
-    def test_merge_keeps_variant_tags_that_repeat(self):
-        """ Variant tags have no unique constraint, so both sides of the merge move - the repeat this leaves
-            is the delete-duplicates command's business """
-        self._create_variant_tag(self.surviving_tag)
+    def test_merge_drops_an_analysis_tagging_that_would_repeat(self):
+        """ One tagging per (variant, tag, analysis, user, sample), so a row the surviving tag already
+            holds that key for can't move - it says the same thing twice and goes """
+        surviving = self._create_variant_tag(self.surviving_tag)
         self._create_variant_tag(self.dying_tag)
 
         result = merge_tag(self.dying_tag, self.surviving_tag, self.user)
 
-        self.assertEqual(VariantTag.objects.filter(tag=self.surviving_tag).count(), 2)
+        self.assertEqual([vt.pk for vt in VariantTag.objects.filter(tag=self.surviving_tag)], [surviving.pk])
         variant_tag_counts = result.counts[0]
-        self.assertEqual(variant_tag_counts.moved, 1)
-        self.assertEqual(variant_tag_counts.deleted, 0)
+        self.assertEqual(variant_tag_counts.moved, 0)
+        self.assertEqual(variant_tag_counts.deleted, 1)
+
+    def test_merge_moves_a_global_tagging_that_repeats(self):
+        """ The constraint is analysis taggings only - the variant page's stay as the history they are """
+        self._create_variant_tag(self.surviving_tag, analysis=None)
+        self._create_variant_tag(self.dying_tag, analysis=None)
+
+        merge_tag(self.dying_tag, self.surviving_tag, self.user)
+
+        self.assertEqual(VariantTag.objects.filter(tag=self.surviving_tag).count(), 2)
 
     def test_merge_collapses_tag_node_tags(self):
         tag_node = TagNode.objects.create(analysis=self.analysis, version=1)
@@ -230,10 +244,16 @@ class MergeCaseCollisionsCommandTest(VariantTagTestCase):
 
 
 class DeleteDuplicateVariantTagsTest(VariantTagTestCase):
+    """ An analysis tagging can no longer repeat (@see VariantTag.Meta), so what is left to clean up is the
+        variant page's global taggings and analysis data made before the constraint """
+
+    def _create_global_tag(self, tag: Tag, **kwargs) -> VariantTag:
+        return self._create_variant_tag(tag, analysis=None, **kwargs)
+
     def test_keeps_earliest_of_a_repeat(self):
-        earliest = self._create_variant_tag(self.surviving_tag)
-        self._create_variant_tag(self.surviving_tag)
-        self._create_variant_tag(self.surviving_tag, variant=self.other_variant)
+        earliest = self._create_global_tag(self.surviving_tag)
+        self._create_global_tag(self.surviving_tag)
+        self._create_global_tag(self.surviving_tag, variant=self.other_variant)
 
         call_command("variant_tags", "delete-duplicates")
 
@@ -243,16 +263,16 @@ class DeleteDuplicateVariantTagsTest(VariantTagTestCase):
     def test_keeps_different_users_re_tagging(self):
         """ A second user tagging the same variant is agreement data, not a duplicate """
         other_user = User.objects.create(username='tag_merge_test_other_user')
-        self._create_variant_tag(self.surviving_tag)
-        self._create_variant_tag(self.surviving_tag, user=other_user)
+        self._create_global_tag(self.surviving_tag)
+        self._create_global_tag(self.surviving_tag, user=other_user)
 
         call_command("variant_tags", "delete-duplicates")
 
         self.assertEqual(VariantTag.objects.filter(tag=self.surviving_tag).count(), 2)
 
     def test_dry_run_deletes_nothing(self):
-        self._create_variant_tag(self.surviving_tag)
-        self._create_variant_tag(self.surviving_tag)
+        self._create_global_tag(self.surviving_tag)
+        self._create_global_tag(self.surviving_tag)
 
         call_command("variant_tags", "delete-duplicates", "--dry-run")
 
@@ -273,10 +293,10 @@ class CreateTagFormTest(TestCase):
                                         "allele_origin_bucket": AlleleOriginBucket.UNKNOWN}).is_valid())
 
     def test_creates_new_tag_with_its_allele_origin(self):
-        form = CreateTagForm({"tag": "SomaticReportable", "allele_origin_bucket": AlleleOriginBucket.SOMATIC})
+        form = CreateTagForm({"tag": "Somatic", "allele_origin_bucket": AlleleOriginBucket.SOMATIC})
         self.assertTrue(form.is_valid(), form.errors)
         tag = form.save()
-        self.assertEqual(tag.pk, "SomaticReportable")
+        self.assertEqual(tag.pk, "Somatic")
         self.assertEqual(tag.allele_origin_bucket, AlleleOriginBucket.SOMATIC)
 
     def test_rejects_retired_name_and_says_where_it_went(self):

@@ -11,6 +11,8 @@ from snpdb.models import GenomeBuild
 
 
 class Command(BaseCommand):
+    category = "maintenance"
+
     def add_arguments(self, parser):
         parser.add_argument('--replace', default=False, action='store_true')
 

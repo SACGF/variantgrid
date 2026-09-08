@@ -1,4 +1,4 @@
-from annotation import views, views_rest
+from annotation import views, views_annotation_runs, views_citations, views_descriptions, views_rest
 from annotation.grids import AnnotationRunColumns, VariantAnnotationVersionColumns
 from snpdb.views.datatable_view import DatabaseTableView
 from variantgrid.perm_path import path
@@ -10,15 +10,15 @@ urlpatterns = [
     path('annotation_versions', views.annotation_versions, name='annotation_versions'),
     path('version_diffs', views.version_diffs, name='version_diffs'),
     path('view_version_diff/<int:version_diff_id>/', views.view_version_diff, name='view_version_diff'),
-    path('variant_annotation_runs', views.variant_annotation_runs, name='variant_annotation_runs'),
-    path('annotation_run/view/<int:annotation_run_id>', views.view_annotation_run, name='view_annotation_run'),
-    path('annotation_run/retry/<int:annotation_run_id>', views.retry_annotation_run, name='retry_annotation_run'),
-    path('annotation_run/retry_upload/<int:annotation_run_id>', views.retry_annotation_run_upload, name='retry_annotation_run_upload'),
-    path('annotation_run/subdivide/<int:annotation_run_id>', views.subdivide_annotation_run, name='subdivide_annotation_run'),
-    path('annotation_run/make_local/<int:annotation_run_id>', views.make_annotation_run_local, name='make_annotation_run_local'),
+    path('variant_annotation_runs', views_annotation_runs.variant_annotation_runs, name='variant_annotation_runs'),
+    path('annotation_run/view/<int:annotation_run_id>', views_annotation_runs.view_annotation_run, name='view_annotation_run'),
+    path('annotation_run/retry/<int:annotation_run_id>', views_annotation_runs.retry_annotation_run, name='retry_annotation_run'),
+    path('annotation_run/retry_upload/<int:annotation_run_id>', views_annotation_runs.retry_annotation_run_upload, name='retry_annotation_run_upload'),
+    path('annotation_run/subdivide/<int:annotation_run_id>', views_annotation_runs.subdivide_annotation_run, name='subdivide_annotation_run'),
+    path('annotation_run/make_local/<int:annotation_run_id>', views_annotation_runs.make_annotation_run_local, name='make_annotation_run_local'),
     path('create_manual_variant_entry_from_text/<genome_build_name>/<variants_text>', views.create_manual_variant_entry_from_text, name='create_manual_variant_entry_from_text'),
-    path('view_annotation_descriptions', views.view_annotation_descriptions, name='view_annotation_descriptions'),
-    path('view_annotation_descriptions/<genome_build_name>', views.view_annotation_descriptions, name='view_annotation_descriptions_genome_build'),
+    path('view_annotation_descriptions', views_descriptions.view_annotation_descriptions, name='view_annotation_descriptions'),
+    path('view_annotation_descriptions/<genome_build_name>', views_descriptions.view_annotation_descriptions, name='view_annotation_descriptions_genome_build'),
     path('pathogenicity_thresholds', views.view_pathogenicity_thresholds, name='pathogenicity_thresholds'),
     path('view_annotation_version_details/<int:annotation_version_id>', views.view_annotation_version_details, name='view_annotation_version_details'),
     path('load_cached_web_resource/<pk>', views.load_cached_web_resource, name='load_cached_web_resource'),
@@ -27,9 +27,9 @@ urlpatterns = [
 
     path('annotation_run/datatables', DatabaseTableView.as_view(column_class=AnnotationRunColumns), name='annotation_run_datatable'),
 
-    path('citations_json/<path:citations_ids_list>', views.citations_json, name='citations_json'),
-    path('citation/<str:citation_id>', views.view_citation, name='view_citation'),
-    path('citation/<str:citation_id>/detail', views.view_citation_detail, name='view_citation_detail'),
+    path('citations_json/<path:citations_ids_list>', views_citations.citations_json, name='citations_json'),
+    path('citation/<str:citation_id>', views_citations.view_citation, name='view_citation'),
+    path('citation/<str:citation_id>/detail', views_citations.view_citation_detail, name='view_citation_detail'),
 
     path('clinvar/<int:clinvar_variation_id>/detail/<int:min_stars>', views.view_clinvar_records_detail, name='view_clinvar_records_detail'),
 

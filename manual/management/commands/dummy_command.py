@@ -3,6 +3,7 @@ from django.core.management.base import BaseCommand
 
 
 class Command(BaseCommand):
+    category = "dev"
 
     def add_arguments(self, parser: CommandParser):
         pass

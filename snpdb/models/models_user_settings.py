@@ -1,3 +1,11 @@
+"""
+Per-user preferences and their layering: SettingsOverride rows at Global, Organization, Lab and
+User level are merged by `UserSettings.get_for_user` (later wins) into the UserSettings dataclass -
+default build, columns, initial permission groups, tag colours, node count settings. Also the
+small per-user state models (UserGridConfig, UserPageAck, AllVariantsFilter, UserContact) and
+UserPreview / AvatarDetails for display. Read preferences through get_for_user, never the override
+rows directly.
+"""
 import dataclasses
 from collections import defaultdict
 from collections.abc import Iterable
@@ -257,7 +265,7 @@ class SettingsOverride(models.Model):
     show_candidates_classification_evidence_update = models.BooleanField(null=True, blank=True, help_text="Show candidates on sample / classification pages (You can always explicitly go to the candidate pages)")
 
     initially_show_zygosity_table = models.BooleanField(null=True, blank=True,
-                                                         help_text="Initially expand the zygosity requirements table in Trio/Quad node editors")
+                                                         help_text="Initially expand the zygosity requirements table in Duo/Trio/Quad node editors")
     variant_grid_two_line_rows = models.BooleanField(null=True, blank=True,
                                                      help_text="Variant grid rows are two lines high, with the transcript, protein change and impact on the second line. Fewer variants per screen, more of each one")
     node_grid_auto_load_max_variants = models.IntegerField(

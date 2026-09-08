@@ -3,6 +3,7 @@ from collections import defaultdict
 
 from django import template
 from django.utils.safestring import mark_safe
+from django.utils.timezone import localtime
 
 from analysis.models import VariantTag
 from analysis.models.nodes.node_counts import get_node_count_colors, get_tag_node_count_colors
@@ -16,6 +17,11 @@ from snpdb.utils import get_tag_sort_order_by_tag, get_tag_styles_and_colors
 from snpdb.variant_queries import get_variant_queryset_for_gene_symbol
 
 register = template.Library()
+
+
+def _json_for_script(value) -> str:
+    """ Inline in a <script> block - tag and sample names are user data, so '</script>' must not end it """
+    return json.dumps(value).replace("</", "<\\/")
 
 
 def render_user_tag_styles(prefix, user_tag_style):
@@ -51,6 +57,8 @@ class VariableCSSRGBNode(template.Node):
 
 
 class VariantTagsJSNode(template.Node):
+    """ {variant_id: [{id, tag, sample, resolved}, ...]} - one entry per tagging, which is one pill in the
+        analysis grid's tags column (@see VariantGridFormat.tags). Pushed/spliced on tag and untag """
 
     def __init__(self, nodes):
         self.variable = template.Variable(nodes)
@@ -59,10 +67,16 @@ class VariantTagsJSNode(template.Node):
         analysis = self.variable.resolve(context)
 
         variant_tags = defaultdict(list)
-        variant_tags_qs = VariantTag.objects.filter(analysis=analysis).values_list('variant__id', 'tag__id')
-        for variant_id, tag_id in variant_tags_qs:
-            variant_tags[variant_id].append(tag_id)
-        return json.dumps(variant_tags)
+        variant_tags_qs = VariantTag.objects.filter(analysis=analysis).values_list(
+            'id', 'variant_id', 'tag_id', 'sample_id', 'resolved', 'resolved_classification__withdrawn')
+        for pk, variant_id, tag_id, sample_id, resolved, withdrawn in variant_tags_qs:
+            resolved_date = None
+            # A withdrawn resolving classification puts the to-do back @see VariantTag.unresolved_q
+            if resolved and not withdrawn:
+                resolved_date = localtime(resolved).date().isoformat()
+            variant_tags[variant_id].append({"id": pk, "tag": tag_id, "sample": sample_id,
+                                             "resolved": resolved_date})
+        return _json_for_script(variant_tags)
 
 
 @register.tag
@@ -85,10 +99,16 @@ def render_variant_tags_dict(_parser, token):
     return VariantTagsJSNode(tag_utils.get_passed_object(token))
 
 
+@register.simple_tag
+def render_analysis_samples_dict(analysis):
+    """ {sample_id: name} - what a tagging's sample is called on its pill's tooltip """
+    return mark_safe(_json_for_script({s.pk: str(s) for s in analysis.get_samples()}))
+
+
 @register.simple_tag(takes_context=True)
 def render_variant_tag_order(context):
     """ {tag_id: sort_order} for JS tag sorting - see sortVariantTags in grid.js """
-    return mark_safe(json.dumps(get_tag_sort_order_by_tag(context["user"])))
+    return mark_safe(_json_for_script(get_tag_sort_order_by_tag(context["user"])))
 
 
 @register.inclusion_tag("analysis/tags/render_tag_styles_and_formatter.html", takes_context=True)
@@ -113,8 +133,7 @@ def tag_counts_summary(context, genome_build: GenomeBuild = None, gene_symbol=No
                        tag_counts=None, selected=None):
     """ Pill + count toggles that filter the grid below them - the page wires them up with
         setupTagCountsSummary(). tag_counts is a (tag, count) list - pass it in if the page has
-        already counted them, it's an expensive count. A None count leaves the box for the client
-        to fill in (@see setTagCountsSummaryCounts) """
+        already counted them, it's an expensive count """
     if tag_counts is None:
         tag_kwargs = {}
         if gene_symbol:

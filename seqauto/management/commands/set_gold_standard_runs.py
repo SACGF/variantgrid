@@ -16,6 +16,8 @@ def get_enrichment_kit_gold_sequencing_runs(runs_for_enrichment_kit_qs):
 
 
 class Command(BaseCommand):
+    category = "ops"
+
     def add_arguments(self, parser):
         parser.add_argument('--clear', help="Clears all existing gold runs", action='store_true')
         parser.add_argument('--enrichment-kit', required=True)

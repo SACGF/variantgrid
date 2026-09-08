@@ -13,6 +13,8 @@ from ontology.models import OntologyService, OntologyTerm
 
 
 class Command(BaseCommand):
+    category = "one-off"
+
     def handle(self, *args, **options):
         omim = OntologyTerm.objects.filter(ontology_service=OntologyService.OMIM)
         if not omim.exists():

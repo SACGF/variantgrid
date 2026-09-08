@@ -28,6 +28,9 @@
     .pill-copy-from-latest {
         background-color: #ccffcc;
     }
+    .pill-copy-from-gene {
+        background-color: #e6f4d7;
+    }
     .pill-sample, .pill-speciman {
         background-color: #eeeeff;
     }
@@ -69,7 +72,6 @@
 
         let url = "{% url 'classification_auto_populate_api' %}";
         let patchDom = $('#auto-populate').LoadingOverlay('show');
-        // let checkedModification = $('#copy_from_vcm_id').is(':checked');
 
         let data = {
             'variant_id': $('#variant_id').val(),
@@ -77,7 +79,8 @@
             'genome_build_name': $('#genome_build_name').val(),
             'refseq_transcript_accession': $('#refseq_transcript_accession').val(),
             'ensembl_transcript_accession': $('#ensembl_transcript_accession').val(),
-            'copy_from_vcm_id': $('[name="copy_from_vcm_id"]:checked').val() || "0"
+            'copy_from_vcm_id': $('[name="copy_from_vcm_id"]:checked').not(':disabled').val() || "0",
+            'copy_gene_from_vcm_id': $('[name="copy_gene_from_vcm_id"]:checked').not(':disabled').val() || "0"
         };
         $.ajax({
             type: "GET",
@@ -170,6 +173,47 @@
         });
     }
 
+    // Both buckets' radios share a name, so the active bucket's default is applied here rather than in
+    // the markup - checked="checked" on two groups of the same name only survives on the last one.
+    function applyDefaultChoice(name, container) {
+        let inputs = $(`input[name="${name}"]`, container).not(':disabled');
+        if (inputs.length && !inputs.filter(':checked').length) {
+            let preferred = inputs.filter('[data-default]').first();
+            (preferred.length ? preferred : inputs.first()).prop('checked', true);
+        }
+    }
+
+    // The target bucket is decided first - only candidates that can legitimately go into it are offered,
+    // and an allele level pick brings its own gene content, so the gene choice only applies without one.
+    function refreshCopyOptions(reloadAutoPopulate) {
+        let bucket = $('input[name="allele_origin_bucket"]:checked').val();
+        $('.copy-bucket-options').each(function() {
+            let active = $(this).data('bucket') === bucket;
+            $(this).toggle(active).find('input').prop('disabled', !active);
+            if (active) {
+                applyDefaultChoice('copy_from_vcm_id', this);
+            }
+        });
+        let alleleChoice = $('input[name="copy_from_vcm_id"]:checked').not(':disabled').val() || "0";
+        let anyGeneOptions = false;
+        $('.gene-copy-options').each(function() {
+            let active = $(this).data('bucket') === bucket && alleleChoice === "0";
+            $(this).toggle(active).find('input').prop('disabled', !active);
+            if (active) {
+                applyDefaultChoice('copy_gene_from_vcm_id', this);
+                anyGeneOptions = anyGeneOptions || Boolean($(this).data('hasGroups'));
+            }
+        });
+        $('#gene-copy-section').toggle(anyGeneOptions);
+        $('.external-candidates').each(function() {
+            $(this).toggle($(this).data('bucket') === bucket);
+        });
+        $('#external-candidates-section').toggle($('.external-candidates:visible').length > 0);
+        if (reloadAutoPopulate) {
+            refreshAutoPopulate();
+        }
+    }
+
     $(document).ready(() => {
         createClassificationButton = $("button#create-variant-classification");
 
@@ -187,6 +231,10 @@
         $('.auto-pop-field').change(function() {
             refreshAutoPopulate();
         });
+        $('input[name="allele_origin_bucket"], input[name="copy_from_vcm_id"], input[name="copy_gene_from_vcm_id"]').change(function() {
+            refreshCopyOptions(true);
+        });
+        refreshCopyOptions(false);
     });
 </script>
 {% endblock %}
@@ -248,41 +296,78 @@
                 {% endif %}
 
                 <hr/>
+                {% if copy_options %}
+                {% labelled label="Allele origin" help="A record is only ever copied from one of the same allele origin - pick this first" %}
+                    {% for option in copy_options %}
+                        <label class="form-check-label mr-3">
+                            <input class="mr-2" type="radio" name="allele_origin_bucket" value="{{ option.allele_origin_bucket.value }}" {% if option.allele_origin_bucket == default_allele_origin_bucket %}checked{% endif %} />
+                            {{ option.allele_origin_bucket.label }}
+                        </label>
+                    {% endfor %}
+                {% endlabelled %}
+                {% endif %}
+
                 {% labelled label="Copy values from" %}
-                    {% if consensuses %}
-                        <div class="my-2">
-                            <label class="form-check-label">
-                                <input class='auto-pop-field mr-2' type="radio" name="copy_from_vcm_id" id="copy_from_vcm_id" value="0" {% if consensus_default_suggestion == 0 %}checked{% endif %} />
-                                <span class="no-value">Do not copy any values from previous classification records</span>
-                            </label>
+                    {% for option in copy_options %}
+                        <div class="copy-bucket-options" data-bucket="{{ option.allele_origin_bucket.value }}">
+                            {% if option.consensuses %}
+                                <div class="my-2">
+                                    <label class="form-check-label">
+                                        <input class='mr-2' type="radio" name="copy_from_vcm_id" value="0" {% if not option.default_consensus_pk %}data-default="1"{% endif %} />
+                                        <span class="no-value">Do not copy any values from previous classification records</span>
+                                    </label>
+                                </div>
+                                {% for candidate in option.consensuses %}
+                                    <div class="my-2">
+                                        <label class="form-check-label">
+                                            <input class='mr-2' type="radio" name="copy_from_vcm_id" value="{{ candidate.modification.pk }}" {% if option.default_consensus_pk == candidate.modification.pk %}data-default="1"{% endif %}/>
+                                            <span style="display:inline-block; width:110px">{{ candidate.label }} </span>
+                                        </label>
+                                        <span class="text-bold text-secondary">:</span> {% classification_quick candidate.modification %}
+                                    </div>
+                                {% endfor %}
+                            {% else %}
+                                <input type="radio" name="copy_from_vcm_id" value="0" data-default="1" class="d-none" />
+                                <div class="no-value">No {{ option.allele_origin_bucket.label|lower }} classification records for this allele to copy from</div>
+                            {% endif %}
                         </div>
-                    {% endif %}
-                    {% for candidate in consensuses %}
-                        <div class="my-2">
-                            <label class="form-check-label">
-                                <input class='auto-pop-field mr-2' type="radio" name="copy_from_vcm_id" value="{{ candidate.modification.pk }}" {% if consensus_default_suggestion == candidate.modification.pk %}checked{% endif %}/>
-                                <span style="display:inline-block; width:110px">{{ candidate.label }} </span>
-                            </label>
-                            <span class="text-bold text-secondary">:</span> {% classification_quick candidate.modification %}
-                        </div>
-                        {% empty %}
+                    {% empty %}
                         <div class="no-value">No valid candidate classification records available to copy from</div>
                     {% endfor %}
                 {% endlabelled %}
 
-                {% comment %}
-                {% if consensus.is_valid %}
-                    {% labelled label="Latest classification for allele" %}
-                        {% classification_quick consensus.vcm %}
-                    {% endlabelled %}
-                    {% labelled label="" value_css="form-check" %}
-                        <label data-toggle="tooltip" id="copy_consensus_label" class="help-label form-check-label" title="Copies certain values from the latest classifications for the allele.<br/>All summary statements and applied ACMG criteria are retained, but should be carefully reviewed before use in new classification.">
-                            <input class='auto-pop-field mr-2' type="checkbox" name="copy_from_vcm_id" id="copy_from_vcm_id" value="{{ consensus.vcm.id }}" checked />
-                        Copy values from latest classification
-                        </label>
-                    {% endlabelled %}
-                {% endif %}
-                {% endcomment %}
+                {% labelled label="Gene information from" row_id="gene-copy-section" help="Gene content is the same for every variant in the gene - whether this one's tumour type matches yours is your call" %}
+                    {% for option in copy_options %}
+                        <div class="gene-copy-options" data-bucket="{{ option.allele_origin_bucket.value }}" data-has-groups="{% if option.gene_groups %}1{% endif %}">
+                            <div class="my-2">
+                                <label class="form-check-label">
+                                    <input class='mr-2' type="radio" name="copy_gene_from_vcm_id" value="0" data-default="1" />
+                                    <span class="no-value">Do not copy gene information</span>
+                                </label>
+                            </div>
+                            {% for group in option.gene_groups %}
+                                <div class="my-2 border-top pt-2">
+                                    <label class="form-check-label">
+                                        <input class='mr-2' type="radio" name="copy_gene_from_vcm_id" value="{{ group.representative.pk }}" />
+                                    </label>
+                                    {% include "classification/tags/gene_consensus_group.html" %}
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% endfor %}
+                {% endlabelled %}
+
+                {% labelled label="Other labs" row_id="external-candidates-section" help="Curated elsewhere under another lab's config and assertion method - shown for context, not to copy from" %}
+                    {% for option in copy_options %}
+                        {% if option.external %}
+                            <div class="external-candidates" data-bucket="{{ option.allele_origin_bucket.value }}">
+                                {% for external in option.external %}
+                                    <div class="my-1">{% classification_quick external show_condition=True %}</div>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    {% endfor %}
+                {% endlabelled %}
             </div>
         </div>
 

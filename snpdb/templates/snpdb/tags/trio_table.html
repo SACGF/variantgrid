@@ -1,66 +1,83 @@
 {% load karyomapping_tags %}
+{% load model_tags %}
+{% load ui_utils %}
 
-<table>
-    <tr><th>Trio ID:</th>
-        <td><a href="{% url 'view_trio' trio.pk %}">{{ trio.pk }}</a></td>
-    </tr>
-    <tr><th>Name:</th>
-        <td>{{ trio.name }}</td>
-    </tr>
-    <tr><th>Genome Build:</th>
-        <td>{{ trio.genome_build }}</td>
-    </tr>
-    <tr><th>Cohort:</th>
-        <td><a href="{% url 'view_cohort' trio.cohort.pk %}">{{ trio.cohort }}</a></td>
-    </tr>
-    <tr><th>Mother:</th>
-        <td>
-            <div class="display-flex flex-row">
-                <div class="icon24 sample-icon"></div>
-                <a href="{% url 'view_sample' trio.mother.sample.pk %}">{{ trio.mother_details }}</a>
-                {% if trio.mother.sample.patient %}
-                    <div class="icon24 patient-icon"></div>
-                    <a href="{% url 'view_patient' trio.mother.sample.patient_id %}">{{ trio.mother.sample.patient }}</a>
-                {% endif %}
-            </div>
-        </td>
-    </tr>
-    <tr><th>Father:</th>
-        <td>
-            <div class="display-flex flex-row">
-                <div class="icon24 sample-icon"></div>
-                <a href="{% url 'view_sample' trio.father.sample.pk %}">{{ trio.father_details }}</a>
-                {% if trio.father.sample.patient %}
-                    <div class="icon24 patient-icon"></div>
-                    <a href="{% url 'view_patient' trio.father.sample.patient_id %}">{{ trio.father.sample.patient }}</a>
-                {% endif %}
-            </div>
-        </td>
-    </tr>
-    <tr><th>Proband:</th>
-        <td>
-            <div class="display-flex flex-row">
-                <div class="icon24 sample-icon"></div>
-                <a href="{% url 'view_sample' trio.proband.sample.pk %}">{{ trio.proband }}</a>
-                {% if trio.proband.sample.patient %}
-                    <div class="icon24 patient-icon"></div>
-                    <a href="{% url 'view_patient' trio.proband.sample.patient_id %}">{{ trio.proband.sample.patient }}</a>
-                {% endif %}
-            </div>
-        </td>
-    </tr>
+<div class="card mb-3">
+    <div class="card-header">Family</div>
+    <table class="table table-sm mb-0 trio-family-table">
+        <thead>
+            <tr>
+                <th>Role</th>
+                <th>Sample</th>
+                <th>Affected</th>
+                <th data-help="{% detected_sex_help %}">Detected Sex</th>
+                <th>Patient</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for member in members %}
+            {% with sample=member.cohort_sample.sample %}
+            <tr>
+                <th>{{ member.role }}</th>
+                <td>
+                    {% preview_icon sample %}
+                    <a href="{% url 'view_sample' sample.pk %}">{{ sample.name }}</a>
+                </td>
+                <td>
+                    {% if member.affected %}
+                        <span class="badge badge-dark">Affected</span>
+                    {% else %}
+                        <span class="text-muted">Unaffected</span>
+                    {% endif %}
+                </td>
+                <td>{% detected_sex sample.get_genotype_stats %}</td>
+                <td>
+                    {% if sample.patient %}
+                        {% preview_icon sample.patient %}
+                        <a href="{% url 'view_patient' sample.patient_id %}">{{ sample.patient }}</a>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endwith %}
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
 
-{% if trio.proband_sex %}
-    <tr><th>Proband Sex:</th>
-        <td>{{ trio.effective_proband_sex.label }} (set on the trio, overriding the patient record)</td>
-    </tr>
+<div class="card mb-3">
+    <div class="card-header">Trio</div>
+    <table class="table table-sm mb-0 trio-details-table">
+        <tbody>
+            <tr><th>Trio ID</th>
+                <td><a href="{% url 'view_trio' trio.pk %}">{{ trio.pk }}</a></td>
+            </tr>
+            <tr><th>Name</th>
+                <td>{{ trio.name }}</td>
+            </tr>
+            <tr><th>Genome Build</th>
+                <td>{{ trio.genome_build }}</td>
+            </tr>
+            <tr><th>Cohort</th>
+                <td>
+                    {% preview_icon trio.cohort %}
+                    <a href="{% url 'view_cohort' trio.cohort.pk %}">{{ trio.cohort }}</a>
+                </td>
+            </tr>
+        {% if trio.proband_sex %}
+            <tr><th>Proband Sex</th>
+                <td>
+                    {{ trio.effective_proband_sex.label }}
+                    <span class="text-muted small">set on the trio, overriding the patient record</span>
+                </td>
+            </tr>
+        {% endif %}
+        </tbody>
+    </table>
+</div>
+
+{% if trio.genomekaryomappingcounts %}
+<div class="card mb-3">
+    <div class="card-header">Whole sample karyomapping counts</div>
+    <div class="card-body">{% genome_karyomapping_counts_summary trio.genomekaryomappingcounts %}</div>
+</div>
 {% endif %}
-
-{% if trio.genomekaryomappingcounts  %}
-    <tr><th>Whole sample karyomapping counts</th>
-        <td>{% genome_karyomapping_counts_summary trio.genomekaryomappingcounts %}</td>
-    </tr>
-{% endif %}
-
-</table>
-

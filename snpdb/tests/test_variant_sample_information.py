@@ -3,6 +3,7 @@ from django.db import connection
 from django.test import TestCase
 from django.test.utils import CaptureQueriesContext
 
+from annotation.fake_annotation import get_fake_annotation_version
 from patients.models_enums import Zygosity
 from snpdb.models import CohortGenotype, CohortGenotypeCollection, GenomeBuild
 from snpdb.tests.utils.fake_cohort_data import create_fake_cohort
@@ -19,6 +20,9 @@ class VariantZygosityCountsTest(TestCase):
         cls.user = User.objects.get_or_create(username='vsi_test_user')[0]
         cls.grch37 = GenomeBuild.get_name_or_alias("GRCh37")
         cls.grch38 = GenomeBuild.get_name_or_alias("GRCh38")
+        # the locus counts table joins variant annotation, so it needs a version to resolve
+        get_fake_annotation_version(cls.grch37)
+        get_fake_annotation_version(cls.grch38)
 
         # A cohort/VCF per build - each has a proband the user can read
         cls.cohort_37 = create_fake_cohort(cls.user, cls.grch37)
@@ -111,6 +115,7 @@ class LocusCountsTest(TestCase):
         super().setUpTestData()
         cls.user = User.objects.get_or_create(username='locus_counts_test_user')[0]
         cls.grch37 = GenomeBuild.get_name_or_alias("GRCh37")
+        get_fake_annotation_version(cls.grch37)
         cls.cohort = create_fake_cohort(cls.user, cls.grch37)
 
     def _proband_zygosity(self, variant, zygosity):
@@ -126,7 +131,7 @@ class LocusCountsTest(TestCase):
 
     def _locus_counts_by_variant(self, variant) -> dict:
         locus_counts = VariantSampleGenotypes(self.user, variant).to_json()["locus_counts"]
-        return {row["variant"]: row for row in locus_counts}
+        return {row["variant_id"]: row for row in locus_counts}
 
     def test_allele_without_samples_counts_zero(self):
         """ An allele at the locus with no CohortGenotype still gets a row, but it has no observations """
@@ -135,9 +140,9 @@ class LocusCountsTest(TestCase):
         self._proband_zygosity(variant, Zygosity.HET)
 
         by_variant = self._locus_counts_by_variant(variant)
-        self.assertEqual({str(variant), str(no_samples)}, set(by_variant))
+        self.assertEqual({variant.pk, no_samples.pk}, set(by_variant))
 
-        row = by_variant[str(no_samples)]
+        row = by_variant[no_samples.pk]
         self.assertEqual(0, row["total"])
         self.assertEqual(0, row["Unknown"], "No CohortGenotype isn't an unknown zygosity call")
 
@@ -147,7 +152,7 @@ class LocusCountsTest(TestCase):
         self._proband_zygosity(variant, Zygosity.UNKNOWN_ZYGOSITY)
 
         data = VariantSampleGenotypes(self.user, variant).to_json()
-        row = {r["variant"]: r for r in data["locus_counts"]}[str(variant)]
+        row = {r["variant_id"]: r for r in data["locus_counts"]}[variant.pk]
         self.assertEqual(1, row["total"])
         self.assertEqual(1, row["Unknown"])
         self.assertEqual({Zygosity.UNKNOWN_ZYGOSITY: 1}, data["zygosity_counts"])

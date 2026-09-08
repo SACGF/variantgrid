@@ -5,7 +5,8 @@ from django.test import TestCase, override_settings
 
 from analysis.models import Analysis, TrioNode
 from analysis.models.enums import TrioInheritance
-from analysis.tests.inheritance_node_mixin import InheritanceNodeTestsMixin, make_cohort_genotype
+from analysis.tests.inheritance_node_mixin import (DEFAULT_GENOTYPE_VALUES, InheritanceNodeTestsMixin,
+                                                   make_cohort_genotype)
 from annotation.fake_annotation import get_fake_annotation_version
 from snpdb.models import BuiltInFilters, GenomeBuild
 from snpdb.models.models_cohort import CohortGenotypeCollection
@@ -69,10 +70,29 @@ class TestTrioNodeInheritance(InheritanceNodeTestsMixin, TestCase):
         # Father-only variant: proband=HOM_REF, mother=HOM_REF, father=HET
         cls.father_only_v = cls._make_variant(6200, "RRE")
 
+        # Mosaic parent (#1830) - AD/AF matter as much as the call. [proband, mother, father]
+        # Mother called HOM_REF but with 3 alt reads at 6%
+        cls.mosaic_mother_v = cls._make_variant(8000, "ERR", [15, 3, 0], [0.5, 0.06, 0.0])
+        # Father called HET, but at 15% - too low to be constitutional
+        cls.mosaic_father_v = cls._make_variant(8100, "ERE", [15, 0, 4], [0.5, 0.0, 0.15])
+        # Father is a full HET - inherited dominant, not mosaic
+        cls.inherited_het_v = cls._make_variant(8200, "ERE", [15, 0, 14], [0.5, 0.0, 0.48])
+        # A single alt read in each parent - below the evidence threshold
+        cls.single_alt_read_v = cls._make_variant(8300, "ERR", [15, 1, 1], [0.5, 0.02, 0.02])
+        # Reads in both parents - noise rather than one mosaic parent
+        cls.both_parents_reads_v = cls._make_variant(8400, "ERR", [15, 3, 3], [0.5, 0.06, 0.06])
+        # Mosaic mother, but the proband doesn't carry it
+        cls.mother_mosaic_no_proband_v = cls._make_variant(8500, "RRR", [0, 3, 0], [0.0, 0.06, 0.0])
+        # AF FORMAT field present but no value for this record - the missing number
+        cls.mosaic_missing_af_v = cls._make_variant(8600, "ERR", [15, 3, 0], [-1, -1, -1])
+        # VCF had no AF FORMAT field at all, so the whole column is NULL
+        cls.mosaic_null_af_v = cls._make_variant(8700, "ERR", [15, 3, 0], allele_frequency=None)
+
     @classmethod
-    def _make_variant(cls, position, samples_zygosity):
+    def _make_variant(cls, position, samples_zygosity, allele_depth=DEFAULT_GENOTYPE_VALUES,
+                      allele_frequency=DEFAULT_GENOTYPE_VALUES):
         variant = slowly_create_test_variant("3", position, "A", "T", cls.grch37)
-        make_cohort_genotype(cls.cgc, variant, samples_zygosity)
+        make_cohort_genotype(cls.cgc, variant, samples_zygosity, allele_depth, allele_frequency)
         return variant
 
     def _make_node(self, inheritance, **kwargs):
@@ -109,6 +129,62 @@ class TestTrioNodeInheritance(InheritanceNodeTestsMixin, TestCase):
     def test_xlinked_excludes_dominant_variant(self):
         node = self._make_node(TrioInheritance.XLINKED_RECESSIVE)
         self.assertNotIn(self.dominant_v.pk, self._filter_variants(node))
+
+    # ── Dominant (mosaic parent) ──────────────────────────────────────────────
+
+    def test_mosaic_matches_alt_reads_in_a_hom_ref_called_mother(self):
+        node = self._make_node(TrioInheritance.MOSAIC_PARENT)
+        self.assertIn(self.mosaic_mother_v.pk, self._filter_variants(node))
+
+    def test_mosaic_matches_low_vaf_het_called_father(self):
+        node = self._make_node(TrioInheritance.MOSAIC_PARENT)
+        self.assertIn(self.mosaic_father_v.pk, self._filter_variants(node))
+
+    def test_mosaic_excludes_full_het_parent(self):
+        """ A parent at 48% is a constitutional het - that's plain dominant, not mosaic """
+        node = self._make_node(TrioInheritance.MOSAIC_PARENT)
+        self.assertNotIn(self.inherited_het_v.pk, self._filter_variants(node))
+
+    def test_mosaic_excludes_parent_below_min_alt_reads(self):
+        node = self._make_node(TrioInheritance.MOSAIC_PARENT)
+        self.assertNotIn(self.single_alt_read_v.pk, self._filter_variants(node))
+
+    def test_mosaic_excludes_alt_reads_in_both_parents(self):
+        """ Only one parent can be the mosaic one - reads in both is noise """
+        node = self._make_node(TrioInheritance.MOSAIC_PARENT)
+        self.assertNotIn(self.both_parents_reads_v.pk, self._filter_variants(node))
+
+    def test_mosaic_excludes_variants_the_proband_lacks(self):
+        node = self._make_node(TrioInheritance.MOSAIC_PARENT)
+        self.assertNotIn(self.mother_mosaic_no_proband_v.pk, self._filter_variants(node))
+
+    def test_mosaic_matches_when_the_allele_frequency_is_missing(self):
+        node = self._make_node(TrioInheritance.MOSAIC_PARENT)
+        self.assertIn(self.mosaic_missing_af_v.pk, self._filter_variants(node))
+
+    def test_mosaic_matches_when_the_vcf_has_no_allele_frequency_field(self):
+        """ AD carries the mode on its own - AF is only stored when the VCF has the FORMAT field """
+        node = self._make_node(TrioInheritance.MOSAIC_PARENT)
+        self.assertIn(self.mosaic_null_af_v.pk, self._filter_variants(node))
+
+    def test_mosaic_min_alt_reads_raises_the_bar(self):
+        node = self._make_node(TrioInheritance.MOSAIC_PARENT, mosaic_min_alt_reads=4)
+        self.assertNotIn(self.mosaic_mother_v.pk, self._filter_variants(node))
+
+    def test_mosaic_max_af_lets_a_higher_vaf_parent_in(self):
+        node = self._make_node(TrioInheritance.MOSAIC_PARENT, mosaic_max_af=0.6)
+        self.assertIn(self.inherited_het_v.pk, self._filter_variants(node))
+
+    def test_mosaic_is_a_source_node(self):
+        self.assertEqual(self._make_node(TrioInheritance.MOSAIC_PARENT).max_inputs, 0)
+
+    def test_mosaic_always_warns_about_the_data_it_needs(self):
+        node = self._make_node(TrioInheritance.MOSAIC_PARENT)
+        self.assertTrue(node.get_warnings())
+        self.assertEqual(self._make_node(TrioInheritance.DOMINANT).get_warnings(), [])
+
+    def test_mosaic_needs_no_affected_parent(self):
+        self.assertEqual(self._get_inheritance_errors(TrioInheritance.MOSAIC_PARENT), [])
 
     # ── Validation ────────────────────────────────────────────────────────────
 

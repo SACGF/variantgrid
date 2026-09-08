@@ -1,3 +1,10 @@
+"""
+Enums for the annotation pipeline: AnnotationStatus (an AnnotationRun's lifecycle, with the
+completed / error sets), VariantAnnotationPipelineType (which tool handles which class of variant),
+VEPPlugin / VEPCustom (what a VariantAnnotationVersion recorded running), ClinVar review status
+and pathogenicity / oncogenicity scales, and the Human Protein Atlas abundance levels. Stored
+codes: add values, never renumber. Predictor scales live in damage_enums.py.
+"""
 from django.db import models
 
 from library.utils import Constant
@@ -114,6 +121,7 @@ class ColumnAnnotationCategory(models.TextChoices):
     PROTEIN_DOMAINS = 'D', "Protein Domains"
     SEQUENCE = 'Q', "Sequence"
     SPLICING_PREDICTIONS = 'S', "Splicing Predictions"
+    CLASSIFICATIONS = 'K', "Classifications"
     VARIANT_DATA = 'V', "Variant Data"
 
 

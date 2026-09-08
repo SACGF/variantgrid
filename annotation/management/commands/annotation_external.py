@@ -26,6 +26,7 @@ from snpdb.models.models_genome import GenomeBuild
 
 
 class Command(BaseCommand):
+    category = "import"
     help = "Dump/import external annotation runs (#1568)"
 
     def add_arguments(self, parser):

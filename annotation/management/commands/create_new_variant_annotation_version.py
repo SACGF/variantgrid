@@ -15,6 +15,7 @@ INSTALL_RELEASE_COMMAND = "python3 manage.py import_cdot_gene_annotation_release
 
 
 class Command(BaseCommand):
+    category = "ops"
 
     def add_arguments(self, parser):
         parser.add_argument('--genome-build')

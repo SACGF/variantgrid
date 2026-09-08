@@ -1,8 +1,13 @@
+{% load clinvar_tags %}
+{% load classification_tags %}
+{% load english_tags %}
+{% load gene_fusion_tags %}
 <div class="variant-row-detail-columns">
   <table class="variant-row-detail-table">
     {% if variant_annotation.hgvs_c %}<tr><th>Transcript</th><td class="mono">{{ variant_annotation.hgvs_c }}</td></tr>{% endif %}
     {% if variant_annotation.hgvs_p %}<tr><th>Protein</th><td class="mono">{{ variant_annotation.hgvs_p }}</td></tr>{% endif %}
     {% if variant_annotation.hgvs_g %}<tr><th>Genomic</th><td class="mono">{{ variant_annotation.hgvs_g }}</td></tr>{% endif %}
+    {% if gene_fusion %}<tr><th>Fusion</th><td>{% gene_fusion gene_fusion %}</td></tr>{% endif %}
     {% if overlapping_symbols %}<tr><th>Genes</th><td>{{ overlapping_symbols }}</td></tr>{% endif %}
     {% for build_variant in build_variants %}
       <tr><th>{{ build_variant.any_genome_build }}</th><td class="mono">{{ build_variant.full_string }}</td></tr>
@@ -18,14 +23,57 @@
     {% endfor %}
   </table>
   {% endif %}
+  {% if clinvar %}
+  {# What the Classifications column's ClinVar chips summarise - the row is where you come for the detail #}
+  <table class="variant-row-detail-table">
+    <tr><th colspan="2">ClinVar</th></tr>
+    <tr>
+      <th>Variation</th>
+      <td><a class="external-link" target="_blank"
+             href="https://www.ncbi.nlm.nih.gov/clinvar/variation/{{ clinvar.clinvar_variation_id }}">{{ clinvar.clinvar_variation_id }}</a></td>
+    </tr>
+    {% if clinvar.clinical_significance %}
+      <tr>
+        <th>Germline</th>
+        <td>{% clinvar_stars clinvar.germline_stars clinvar.get_review_status_display %}{{ clinvar.clinical_significance|code_to_english }}</td>
+      </tr>
+    {% endif %}
+    {% if clinvar.conflicting_clinical_significance %}
+      <tr><th>Conflicting</th><td>{{ clinvar.conflicting_clinical_significance|code_to_english }}</td></tr>
+    {% endif %}
+    {% if clinvar.oncogenic_classification %}
+      <tr>
+        <th>Oncogenicity</th>
+        <td>{% clinvar_stars clinvar.oncogenic_stars clinvar.get_oncogenic_review_status_display %}{{ clinvar.oncogenic_classification|code_to_english }}</td>
+      </tr>
+    {% endif %}
+    {% if clinvar.somatic_clinical_significance %}
+      <tr>
+        <th>Somatic</th>
+        <td>{% clinvar_stars clinvar.somatic_stars clinvar.get_somatic_review_status_display %}{{ clinvar.somatic_clinical_significance|code_to_english }}{% if clinvar.somatic_tier_label %} ({{ clinvar.somatic_tier_label }}){% endif %}</td>
+      </tr>
+    {% endif %}
+    {% if clinvar.preferred_disease_names %}
+      <tr><th>Condition</th><td>{% for disease_name in clinvar.preferred_disease_names %}{% if not forloop.first %}, {% endif %}{{ disease_name }}{% endfor %}</td></tr>
+    {% endif %}
+    <tr><th>Origin</th><td>{{ clinvar.get_allele_origins_display }}</td></tr>
+    {% if clinvar.clinical_sources_list %}
+      <tr><th>Sources</th><td>{% for source in clinvar.clinical_sources_list %}{% if not forloop.first %}, {% endif %}{{ source|code_to_english }}{% endfor %}</td></tr>
+    {% endif %}
+    {% if clinvar.drug_response %}<tr><th>Drug response</th><td>Yes</td></tr>{% endif %}
+  </table>
+  {% endif %}
   {% if classifications %}
   <table class="variant-row-detail-table">
     <tr><th colspan="2">Classifications</th></tr>
     {% for cm in classifications %}
       <tr>
-        <td><a href="{{ cm.get_absolute_url }}">{{ cm.classification.lab }}</a></td>
-        <td class="text-muted">{{ cm.classification.get_clinical_significance_display|default:"No data" }}</td>
+        <td><a href="{{ cm.get_absolute_url }}">{{ cm.classification.friendly_label }}</a></td>
+        <td>{% clinical_significance_values cm %}</td>
       </tr>
+      {% if cm.classification.condition_resolution_obj %}
+        <tr><th>Condition</th><td>{% condition cm.classification.condition_resolution_obj show_link=False %}</td></tr>
+      {% endif %}
     {% endfor %}
   </table>
   {% endif %}

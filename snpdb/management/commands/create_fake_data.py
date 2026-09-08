@@ -19,6 +19,7 @@ FAKE_DATA = {
 
 
 class Command(BaseCommand):
+    category = "dev"
     help = "Create obviously fake data for development"
 
     def add_arguments(self, parser):

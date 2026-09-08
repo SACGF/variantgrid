@@ -9,7 +9,7 @@
     {{ block.super }}
     <script>
         $(document).ready(() => {
-            $(".allele-origin-select").change(function() {
+            $(".allele-origin-select, .requires-classification-check").change(function() {
                 $(this).closest("form").submit();
             });
 
@@ -25,13 +25,6 @@
 	</script>
 
     <style>
-        .grid-tag .user-tag-colored {
-            padding: 4px;
-            margin: 4px;
-            border-radius: 2px;
-            font-weight: bold;
-        }
-
         {% load user_tag_color_tags %}
         {% render_rgb_css 'tagged-' user_tag_styles %}
     </style>
@@ -71,6 +64,7 @@
 
             <p class="text-muted small">
                 Allele origin is used on {% if url_name_visible.tag_stats %}<a href="{% url 'tag_stats' %}">tag stats</a>{% else %}tag stats{% endif %}
+                Classify queue tags list a variant as needing classification on the sample and patient pages.
                 Only admins can change existing tags.
             </p>
 
@@ -79,6 +73,7 @@
                     <tr>
                         <th>Tag</th>
                         <th>Allele origin</th>
+                        <th>Classify queue</th>
                         <th>Used by</th>
                         <th>Similar tags</th>
                         {% if user.is_superuser %}<th></th>{% endif %}
@@ -100,6 +95,17 @@
                                 </form>
                             {% else %}
                                 {{ ts.tag.get_allele_origin_bucket_display }}
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if user.is_superuser %}
+                                <form method="post" action="{% url 'tag_set_requires_classification' ts.tag_id %}">
+                                    {% csrf_token %}
+                                    <input type="checkbox" name="requires_classification" class="requires-classification-check"
+                                           {% if ts.tag.requires_classification %}checked{% endif %} />
+                                </form>
+                            {% else %}
+                                {{ ts.tag.requires_classification|yesno:"Yes,No" }}
                             {% endif %}
                         </td>
                         <td>{{ ts.usage.description }}</td>

@@ -6,12 +6,9 @@ from annotation.models import Citation, CitationFetchRequest
 from annotation.models.models_citations import CitationSource
 from library.utils import batch_iterator
 
-error_citations = list(Citation.objects.filter(error__isnull=False))
-for batch in batch_iterator(error_citations):
-    CitationFetchRequest.fetch_all_now(batch, cache_age=timedelta(seconds=0))
-
 
 class Command(BaseCommand):
+    category = "import"
 
     def add_arguments(self, parser):
         parser.add_argument('--load', action='store_true', default=False, help='Pre-emptively load all citations not yet loaded')

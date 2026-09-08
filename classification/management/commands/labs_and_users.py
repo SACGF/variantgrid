@@ -98,6 +98,7 @@ def ensure_users():
 
 
 class Command(BaseCommand):
+    category = "ops"
 
     def handle(self, *args, **options):
         ensure_labs()

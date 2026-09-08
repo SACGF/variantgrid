@@ -1,0 +1,80 @@
+{% load ui_utils %}
+{% load classification_tags %}
+{% if lab_error %}
+    <div class="alert alert-danger">{{ lab_error }}<br/><a href="{% url 'view_user_settings' %}">Please review your default lab here.</a></div>
+{% else %}
+    <form id="classify-form" method="post" action="{% url 'create_classification_for_case' case_type case_id variant_tag.pk %}">
+        {% csrf_token %}
+        <input type="hidden" name="variant_id" value="{{ variant_tag.variant_id }}" />
+        <input type="hidden" name="genome_build_name" value="{{ genome_build.pk }}" />
+        <input type="hidden" name="refseq_transcript_accession" value="{{ refseq_transcript_accession }}" />
+        <input type="hidden" name="ensembl_transcript_accession" value="{{ ensembl_transcript_accession }}" />
+        <input type="hidden" name="copy_from_vcm_id" value="" />
+        <input type="hidden" name="copy_gene_from_vcm_id" value="" />
+        <input type="hidden" name="response_format" value="json" />
+
+        {% labelled label="Variant" %}{{ variant_tag.canonical_c_hgvs|default:variant_tag.variant }}{% endlabelled %}
+        {% labelled label="Transcript" %}{{ refseq_transcript_accession|default:ensembl_transcript_accession|default:"None - set on the classification form" }}{% endlabelled %}
+        {% labelled label="Zygosity" %}{% if sample_genotype %}{{ zygosity_display }}{% if sample_genotype.allele_frequency %} (VAF {{ sample_genotype.allele_frequency|floatformat:3 }}){% endif %}{% else %}<span class="no-value">unknown</span>{% endif %}{% endlabelled %}
+        {% labelled label="Sample" %}
+            <select class="form-control form-control-sm" name="sample_id">
+                {% for sample in case.samples %}
+                    <option value="{{ sample.pk }}" {% if sample.pk == row.sample.pk %}selected{% endif %}>{{ sample.name }}</option>
+                {% endfor %}
+            </select>
+        {% endlabelled %}
+        {% labelled label="For lab" %}
+            {% if lab_form %}{{ lab_form.lab }}{{ lab_form.media }}{% endif %}
+        {% endlabelled %}
+
+        {% if row.previous %}
+            <hr/>
+            <h6>Previous classifications for this allele</h6>
+            <p class="text-muted small">
+                Whether one of these applies to this patient is your call - applying copies its consensus into a
+                new classification for this sample.
+            </p>
+            {% for previous in row.previous %}
+                <div class="d-flex align-items-start border-top py-2">
+                    <div class="flex-grow-1">
+                        {% classification_quick previous.modification show_condition=True %}
+                        <div class="text-muted small">curated by {{ previous.modification.classification.user }}</div>
+                        {% if previous.interpretation_summary %}
+                            <div class="text-muted small mt-1">{{ previous.interpretation_summary|truncatewords:60 }}</div>
+                        {% endif %}
+                    </div>
+                    {% if previous.can_copy %}
+                        <button type="button" class="btn btn-outline-primary btn-sm ml-2 apply-previous"
+                                data-vcm-id="{{ previous.modification.pk }}">Apply to this sample</button>
+                    {% else %}
+                        <span class="text-muted small ml-2 align-self-center">another lab &ndash; for context</span>
+                    {% endif %}
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        {% if gene_groups %}
+            <hr/>
+            <h6>Gene information from {{ row.gene_symbol }}</h6>
+            <p class="text-muted small">
+                Nothing has been curated for this allele. Gene content is the same for every variant in the
+                gene - whether the tumour type it was curated for matches this case is your call.
+            </p>
+            {% for group in gene_groups %}
+                <div class="d-flex align-items-start border-top py-2">
+                    <div class="flex-grow-1">
+                        {% include "classification/tags/gene_consensus_group.html" %}
+                    </div>
+                    <button type="button" class="btn btn-outline-primary btn-sm ml-2 apply-gene"
+                            data-vcm-id="{{ group.representative.pk }}">Apply to this sample</button>
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        <div class="mt-3 d-flex">
+            <button type="button" class="btn btn-secondary btn-sm wizard-skip">Skip</button>
+            <a class="btn btn-primary btn-sm ml-auto classify-full-form" target="_blank"
+               href="{{ row.full_form_url }}">New classification &ndash; full form</a>
+        </div>
+    </form>
+{% endif %}

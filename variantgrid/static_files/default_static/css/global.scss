@@ -1007,10 +1007,100 @@ table.as_table {
 	}
 }
 
+// Every tag on the site is this markup (@see getVariantTagHtml) - the grids, the tags pages, the
+// node counts lists and the tag autocomplete - so the pill is shaped once here. Tag colours come
+// from UserTagColor (@see render_rgb_css), which is why the background is only a fallback.
+// Sized to sit inside a grid row's line box, so tagging a variant doesn't make its row taller
+// than every other row in the grid.
+.grid-tag {
+	position: relative;
+	display: inline-block;
+	// top, not middle - a 16px box aligned to the middle of a 16px line box makes the line
+	// (and so every tagged row) taller than the rest of the grid
+	vertical-align: top;
+
+	// Capped so one long tag name can't take the whole cell (and push the X out of the clipped
+	// cell with it) - the full name is in the tag's title
+	.user-tag-colored {
+		display: inline-block;
+		max-width: 130px;
+		height: 16px;
+		line-height: 16px;
+		margin: 0 3px 0 0;
+		padding: 0 6px;
+		border-radius: 8px;
+		font-size: 10px;
+		background: #eceff3;
+		color: #333;
+		overflow: hidden;
+		white-space: nowrap;
+		text-overflow: ellipsis;
+	}
+}
+
 // The variant grids (@see AbstractVariantGrid in snpdb/grids.py) are dozens of columns wide and hold
 // cells with hundreds of links. Every column carries a width (RichColumn.width, falling back to
 // default_column_width), so lay the table out from those and clip each cell to one line, rather than
 // letting one PubMed cell run to a few thousand pixels.
+// A variant's name as the grid's Variant cell draws it - gene + c.HGVS, g.HGVS, or the coordinate -
+// and as the variant page's locus table draws it. The second line only shows in the grid's two line
+// rows mode. @see VariantGridFormat.representativeVariantLabel in variantgrid_formats.js
+.rv-gene {
+	font-weight: 600;
+}
+
+.rv-hgvs {
+	font-family: ui-monospace, Menlo, Consolas, monospace;
+	font-size: 11px;
+}
+
+.rv-hgvs-p,
+.rv-sub {
+	color: #777;
+	font-size: 11px;
+}
+
+.rv-line2 {
+	display: none;
+}
+
+// The kind badge beside a variant's name - what it is when it isn't a small variant. In the grid it
+// sits outside the clipped label so it survives an ellipsis; the variant page's locus table uses it
+// too. @see VariantGridFormat.variantKindBadge in variantgrid_formats.js
+.rv-kind {
+	flex: none;
+	padding: 0 4px;
+	border-radius: 3px;
+	background: #eceff1;
+	color: #546e7a;
+	font-family: ui-monospace, Menlo, Consolas, monospace;
+	font-size: 10px;
+}
+
+.rv-kind-del,
+.rv-kind-loss {
+	background: #fdecea;
+	color: #b3261e;
+}
+
+.rv-kind-dup,
+.rv-kind-cnv,
+.rv-kind-amp {
+	background: #e8f0fe;
+	color: #1a56b8;
+}
+
+.rv-kind-ins,
+.rv-kind-inv {
+	background: #fff4e5;
+	color: #a15c00;
+}
+
+.rv-kind-fusion {
+	background: #ede7f6;
+	color: #5e35b1;
+}
+
 table.variantgrid-datatable {
 	table-layout: fixed;
 	width: auto;
@@ -1033,7 +1123,6 @@ table.variantgrid-datatable {
 
 	// The second line every composite cell carries. Off by default - the per-user 'two line rows'
 	// setting turns it on. @see AbstractVariantGrid.get_extra_table_classes
-	.rv-line2,
 	.ic-line2 {
 		display: none;
 	}
@@ -1077,6 +1166,26 @@ table.variantgrid-datatable {
 		font-size: 10px;
 	}
 
+	// The drag handle on a header's right edge - @see DataTableDefinition.setupColumnResize
+	th {
+		position: relative;
+	}
+
+	// z-index so it sits above the DataTables sort arrows, which are pseudo-elements on the same edge
+	th .dt-col-resize {
+		position: absolute;
+		top: 0;
+		right: 0;
+		z-index: 1;
+		width: 6px;
+		height: 100%;
+		cursor: col-resize;
+
+		&:hover {
+			background: #ccc;
+		}
+	}
+
 	// Representative variant cell: expand arrow (td.toggle-link:before) · checkbox · label (details link)
 	.variant_id-container {
 		display: inline-flex;
@@ -1093,18 +1202,12 @@ table.variantgrid-datatable {
 		}
 	}
 
-	.rv-gene {
-		font-weight: 600;
-	}
-
-	.rv-hgvs {
-		font-family: ui-monospace, Menlo, Consolas, monospace;
-		font-size: 11px;
-	}
-
-	.rv-hgvs-p,
-	.rv-sub {
-		color: #777;
+	// How many caller rows a fusion was merged from - the calls are in the title. @see fusionCalls
+	.fusion-calls {
+		padding: 0 4px;
+		border-radius: 3px;
+		background: #ede7f6;
+		color: #5e35b1;
 		font-size: 11px;
 	}
 
@@ -1338,6 +1441,44 @@ table.variantgrid-datatable {
 		}
 	}
 
+	// The highest non-gnomAD population frequency, with the database it came from alongside it
+	.pop-freq-source {
+		margin-left: 4px;
+		color: #777;
+		font-size: 10px;
+	}
+
+	// UniProt: the linked accession, then the function summary running on to the cell's edge
+	.uniprot {
+		display: inline-flex;
+		align-items: baseline;
+		gap: 5px;
+		min-width: 0;
+
+		.uniprot-link {
+			flex: none;
+		}
+
+		.uniprot-function {
+			color: #777;
+			font-size: 11px;
+			overflow: hidden;
+			text-overflow: ellipsis;
+		}
+	}
+
+	// Conservation - a dot per score. The detail table it carries only draws once floated on hover
+	.conservation {
+		display: inline-flex;
+		align-items: center;
+		gap: 3px;
+		min-width: 0;
+
+		.conservation-detail {
+			display: none;
+		}
+	}
+
 	// Database hom · het; a zero count recedes so a real count stands out
 	.db-count-zero {
 		color: #bbb;
@@ -1353,16 +1494,9 @@ table.variantgrid-datatable {
 	.vcf-filter-failed {
 		display: inline-flex;
 		align-items: center;
-		gap: 4px;
 		min-width: 0;
-		color: #cf3f3a;
 		overflow: hidden;
 		text-overflow: ellipsis;
-
-		i {
-			font-size: 10px;
-			flex: none;
-		}
 	}
 
 	// The sample's whole call in one cell: zygosity glyph, allele frequency over alt/total reads,
@@ -1401,6 +1535,17 @@ table.variantgrid-datatable {
 		// The reads behind the frequency - present for the doubt the frequency alone leaves
 		.zyg-depth {
 			color: #888;
+			font-size: 10px;
+		}
+
+		// The caller's own copy number / copy ratio, chipped so it doesn't read as another depth -
+		// what the key means is in the title. @see VCF.copy_number_field
+		.zyg-cn {
+			flex: none;
+			padding: 0 3px;
+			border-radius: 3px;
+			background: #eef3f8;
+			color: #3a6ea5;
 			font-size: 10px;
 		}
 
@@ -1444,36 +1589,22 @@ table.variantgrid-datatable {
 		}
 	}
 
-	// Tags sit inside the row's line box, so tagging a variant doesn't make its row taller than
-	// every other row in the grid. @see VariantGridFormat.tags
-	.grid-tag {
-		position: relative;
-		display: inline-block;
-		// top, not middle - a 16px box aligned to the middle of a 16px line box makes the line
-		// (and so every tagged row) taller than the rest of the grid
-		vertical-align: top;
-
-		// Capped so one long tag name can't take the whole cell (and push the X out of the clipped
-		// cell with it) - the full name is in the tag's title
-		.user-tag-colored {
-			display: inline-block;
-			max-width: 130px;
-			height: 16px;
-			line-height: 16px;
-			margin: 0 3px 0 0;
-			padding: 0 6px;
-			border-radius: 8px;
-			font-size: 10px;
-			background: #eceff3;
-			color: #333;
-			overflow: hidden;
-			white-space: nowrap;
-			text-overflow: ellipsis;
-		}
-	}
-
 	.grid-tag-deletable .user-tag-colored {
 		cursor: pointer;
+	}
+
+	// A to-do tag a classification has satisfied - still there to be read and untagged, but done
+	.grid-tag-resolved .user-tag-colored {
+		opacity: 0.55;
+	}
+
+	// Whose tagging the pill is, drawn only when it isn't the grid's node's proband - a solid person
+	// for another sample, a hollow one for a tagging nobody owns yet. @see VariantGridFormat.tags
+	.grid-tag-sample-marker {
+		margin-left: 3px;
+		font-size: 8px;
+		vertical-align: 1px;
+		opacity: 0.75;
 	}
 
 	// Armed by clicking the tag - it sits over the tag's right end rather than being given room
@@ -1537,8 +1668,26 @@ table.variantgrid-datatable {
 
 		.variant-row-detail-columns {
 			display: flex;
-			gap: 32px;
+			flex-wrap: wrap;
+			gap: 12px 32px;
 			align-items: flex-start;
+		}
+
+		// Grid cells are single line with an ellipsis, which the detail tables inherit through the
+		// descendant selector - here there's room to wrap, and a ClinVar condition is a dozen
+		// disease names that would otherwise push everything after it off to the right
+		.variant-row-detail-table {
+			max-width: 420px;
+
+			th, td {
+				overflow: visible;
+				text-overflow: clip;
+			}
+
+			td {
+				white-space: normal;
+				overflow-wrap: anywhere;
+			}
 		}
 
 		.variant-row-detail-table th {
@@ -3226,6 +3375,36 @@ li.help-item {
 	vertical-align: -0.125em;
 }
 
+/* Blackens a member of the Duo/Trio/Quad pedigree symbols - see --pedigree-*-fill in
+   uicore/tags/svg_icon_sprite.html. Set on the <svg> by the page, or by Duo/Trio/Quad's
+   get_preview_icon_css_class() so a listed trio wears its affected status */
+.mother-affected {
+	--pedigree-mother-fill: currentColor;
+}
+
+.father-affected {
+	--pedigree-father-fill: currentColor;
+}
+
+.sibling-affected {
+	--pedigree-sibling-fill: currentColor;
+}
+
+.parent-affected {
+	--pedigree-parent-fill: currentColor;
+}
+
+/* node-icon-duo draws both parent shapes - blank out the one the relationship rules out */
+.duo-mother {
+	--pedigree-duo-square-fill: none;
+	--pedigree-duo-square-stroke: none;
+}
+
+.duo-father {
+	--pedigree-duo-circle-fill: none;
+	--pedigree-duo-circle-stroke: none;
+}
+
 .preview-data {
 	.preview-category,
 	.preview-title {
@@ -3282,6 +3461,175 @@ li.help-item {
 		padding: 2px 12px;
 	}
 }
+
+// While a column is being dragged the cursor stays a resize cursor wherever it goes
+body.dt-col-resizing {
+	cursor: col-resize;
+	user-select: none;
+}
+
+// The conservation dots - in the grid cell and again in its floated detail. Filled at or above the
+// score's conserved threshold, muted below it, hollow where the position has no score
+.cons-dot {
+	display: inline-block;
+	width: 8px;
+	height: 8px;
+	border-radius: 50%;
+	flex: none;
+	vertical-align: middle;
+}
+.cons-conserved { background: #cf3f3a; }
+.cons-not-conserved { background: #a0a8b3; }
+.cons-none { background: transparent; box-shadow: inset 0 0 0 1px #ccc; }
+
+// The conservation cell's detail, floated on the body by FloatingPanel - each score against its
+// range, the minimum and maximum faded so the value is what the eye lands on
+.conservation-detail {
+	padding: 4px 8px;
+	font-size: 12px;
+	white-space: nowrap;
+	background: white;
+	border: 1px solid #ccc;
+	border-radius: 4px;
+	box-shadow: 0 2px 8px rgba(0, 0, 0, .2);
+
+	th {
+		padding: 1px 10px 1px 0;
+		font-weight: normal;
+		text-align: left;
+		color: #444;
+	}
+
+	td {
+		padding: 1px 4px;
+		text-align: right;
+	}
+
+	.cons-range {
+		color: #bbb;
+		font-size: 10px;
+	}
+
+	.cons-value {
+		font-weight: bold;
+
+		.cons-dot {
+			margin-right: 5px;
+		}
+	}
+
+	.cons-blank {
+		color: #bbb;
+		font-weight: normal;
+	}
+}
+
+// The annotation descriptions page draws each composite cell exactly as the grid does, so its example
+// tables carry the grid's own classes (@see table.variantgrid-datatable). Only what a one row, one
+// column picture of a cell needs on top of that lives here.
+.annotation-descriptions {
+	.composite-section {
+		padding: 12px 0;
+		border-top: 1px solid #e5e5e5;
+	}
+
+	.composite-section:first-of-type {
+		border-top: none;
+	}
+
+	.composite-section-header {
+		display: flex;
+		align-items: flex-start;
+		gap: 16px;
+	}
+
+	.composite-section-title {
+		flex: 1;
+		min-width: 0;
+	}
+
+	// Beside a line of text rather than heading a card
+	.composite-section-title .color-box {
+		width: 14px;
+		height: 14px;
+		float: none;
+		margin-right: 0;
+	}
+
+	// The cell is a picture - it sits at the width its column asked for and nothing in it is clickable
+	table.composite-example {
+		flex: none;
+		margin-top: 0 !important;
+
+		th {
+			font-size: 12px;
+			border-bottom: 1px solid #ccc;
+			cursor: default;
+		}
+
+		td {
+			height: 22px;
+			border: none;
+		}
+
+		a {
+			cursor: default;
+		}
+	}
+
+	.annotation-grid-column-name {
+		font-size: 11px;
+		font-weight: normal;
+	}
+
+	.annotation-member-level {
+		font-size: 11px;
+		padding-top: 4px;
+		white-space: nowrap;
+	}
+
+	.annotation-member-level .color-box {
+		width: 12px;
+		height: 12px;
+		float: none;
+		display: inline-block;
+		margin-right: 4px;
+		vertical-align: text-bottom;
+	}
+
+	// What a member contributes to its cell - headline, an alternative sort key, or hover detail
+	.annotation-role {
+		border-radius: 5px;
+		white-space: nowrap;
+		text-align: center;
+		padding: 2px;
+		font-size: 11px;
+	}
+
+	.annotation-role-headline {
+		background-color: #333333;
+		color: #fff;
+	}
+
+	.annotation-role-sort {
+		background-color: #cccccc;
+		color: #333333;
+	}
+
+	.annotation-role-hover {
+		background-color: #eeeeee;
+		color: #666666;
+	}
+
+	.annotation-source-composite {
+		background-color: #6A5ACD;
+	}
+
+	.annotation-source-vcf {
+		background-color: #B8860B;
+	}
+}
+
 
 ////////////////////////
 // MISC 3rd PARTY icons
@@ -3384,16 +3732,8 @@ a.clinical-context {
 	min-width: 106px;
 }
 
-.sample-icon {
-	background-image: url(/static/icons/samples_icon.png);
-}
-
 .bed-icon {
 	background-image: url(/static/images/node_icons/intersection.png);
-}
-
-.analysis-icon {
-	background-image: url(/static/images/node_icons/analysis_node.png);
 }
 
 .clingen-icon {
@@ -3428,22 +3768,6 @@ a.clinical-context {
 
 .iseq-100 {
 	background-image: url(/static/icons/sequencers/iseq_icon.png);
-}
-
-.patient-icon {
-	background-image: url(/static/icons/patient-icon-png-3.png);
-}
-
-.cohort-icon {
-	background-image: url(/static/images/node_icons/cohort.png);
-}
-
-.pedigree-icon {
-	background-image: url(/static/images/node_icons/pedigree.png);
-}
-
-.trio-icon {
-	background-image: url(/static/images/node_icons/trio.png);
 }
 
 .gold-standard-icon {

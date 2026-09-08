@@ -65,6 +65,8 @@ class Command(BaseCommand):
         Until 210622 - (PythonKnownVariantsImporter v.16) we used to insert a reference variant (alt='=') for each ALT
         We also didn't have a way to delete variants that are no longer referenced
     """
+    category = "maintenance"
+
     def add_arguments(self, parser):
         parser.add_argument('--batch-size', type=int, default=5000, required=False,
                             help="Number of (actual) variants to examine per step")

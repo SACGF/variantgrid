@@ -1,3 +1,8 @@
+"""
+Which labs a view is about: LabPickerData resolves the request (a lab, an organisation, 'all my
+labs') against what the user may see, and LabSelection tracks the selected versus available labs so
+classification pages, dashboards and exports share one notion of scope.
+"""
 import itertools
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass

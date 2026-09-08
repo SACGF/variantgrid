@@ -123,7 +123,8 @@ class GetVepCommandColumnsVersion5Tests(TestCase):
         with override_settings(**_v5_settings(vep_version="116")):
             plugins = self._plugins()
         self.assertTrue(any(p.startswith("ProtVar,db=") for p in plugins))
-        self.assertTrue(any(p.startswith("OpenTargets,file=") and "cols=all" in p for p in plugins))
+        self.assertTrue(any(p.startswith("OpenTargets,file=") and "cols=all" in p
+                            and "lead_variants_only=0" in p for p in plugins))
         self.assertTrue(any(p.startswith("EVE,file=") and "popeve_file=" in p for p in plugins))
         self.assertTrue(any(p.startswith("PromoterAI,file=") for p in plugins))
 

@@ -1,3 +1,13 @@
+"""
+The annotation version models and the annotation itself. SubVersionPartition is the base for every
+per-version partitioned table (ClinVarVersion, GeneAnnotationVersion, HumanProteinAtlasAnnotationVersion,
+VariantAnnotationVersion); AnnotationVersion bundles one of each per build and is what analyses pin;
+AnnotationRangeLock / AnnotationRun are one batch of variants through VEP; VariantAnnotation (the
+representative transcript row) and VariantTranscriptAnnotation (every transcript) hold the columns
+VEPColumnDef writes. Query a version's rows through annotation/annotation_version_querysets.py,
+never VariantAnnotation.objects directly. Enums are in models_enums.py and damage_enums.py;
+annotation/CLAUDE.md has the rules. Large: use `scripts/vg outline`.
+"""
 import logging
 import os
 import re
@@ -288,6 +298,18 @@ class ClinVar(models.Model):
         if clinical_sources := self.clinical_sources:
             return [name.strip() for name in clinical_sources.split("|")]
         return []
+
+    @property
+    def preferred_disease_names(self) -> list[str]:
+        """ CLNDN packs every condition into one pipe joined run of underscored words - split it
+            back out so it reads as a list and wraps """
+        return ClinVar._pipe_names(self.preferred_disease_name)
+
+    @staticmethod
+    def _pipe_names(value: Optional[str]) -> list[str]:
+        if not value:
+            return []
+        return [name.lstrip("_").replace("_", " ").strip() for name in value.split("|")]
 
     @property
     def stars(self):
@@ -1563,6 +1585,7 @@ OPEN_TARGETS_GWAS = "gwas"
 OPEN_TARGETS_RECORD_FIELDS = {
     "open_targets_study_type": "study_type",
     "open_targets_study_id": "study_id",
+    "open_targets_is_lead": "is_lead",
     "open_targets_variant_id": "variant_id",
     "open_targets_gwas_gene_id": "gwas_gene_id",
     "open_targets_gwas_l2g_scores": "l2g_score",
@@ -1868,6 +1891,8 @@ class VariantAnnotation(AbstractVariantAnnotation):
     open_targets_gwas_diseases = models.TextField(null=True, blank=True)
     open_targets_study_type = models.TextField(null=True, blank=True)
     open_targets_study_id = models.TextField(null=True, blank=True)  # external lookup key
+    # 'true'/'false' per record - whether this variant is the credible set's lead, or just a member
+    open_targets_is_lead = models.TextField(null=True, blank=True)
     open_targets_variant_id = models.TextField(null=True, blank=True)  # external lookup key
     open_targets_qtl_gene_id = models.TextField(null=True, blank=True)  # Ensembl gene id
     open_targets_qtl_biosample = models.TextField(null=True, blank=True)
@@ -1976,11 +2001,17 @@ class VariantAnnotation(AbstractVariantAnnotation):
         "DL": ("spliceai_pred_ds_dl", "spliceai_pred_dp_dl"),
     }
 
+    # 'conserved' is where a score starts to read as conserved - the variant grid conservation cell
+    # fills a dot at or above it. GERP++ and PhyloP 46 way are the deleterious thresholds from
+    # https://academic.oup.com/hmg/article/24/8/2125/651446, PhyloP 100 way and PhastCons the ones the
+    # conservation filter node was built around (@see ConservationNode). PhyloP 30 way has no published
+    # cutoff - 1.0 is ~75% of the way to its 1.312 ceiling, in line with the PhyloP 100 way cutoff
     CONSERVATION_SCORES = {
         "gerp_pp_rs": {
             # UCSC says RS scores range from a maximum of 6.18 down to a below-zero minimum, which we cap at -12.36
             "min": -12.36,
             "max": 6.18,
+            "conserved": 4.4,
         },
         # BigWig stats obtained via kent-335 bigWigInfo
         "phylop_30_way_mammalian": {
@@ -1988,36 +2019,42 @@ class VariantAnnotation(AbstractVariantAnnotation):
             "min": -20.0,
             "max": 1.312,
             "std": 0.727453,
+            "conserved": 1.0,
         },
         "phylop_46_way_mammalian": {
             "mean": 0.035934,
             "min": -13.796,
             "max": 2.941,
             "std": 0.779426,
+            "conserved": 1.6,
         },
         "phylop_100_way_vertebrate": {
             "mean": 0.093059,
             "min": -20.0,
             "max": 10.003,
             "std": 1.036944,
+            "conserved": 1.4,
         },
         "phastcons_30_way_mammalian": {
             "mean": 0.128025,
             "min": 0.0,
             "max": 1.0,
             "std": 0.247422,
+            "conserved": 0.85,
         },
         "phastcons_46_way_mammalian": {
             "mean": 0.088576,
             "min": 0.0,
             "max": 1.0,
             "std": 0.210242,
+            "conserved": 0.85,
         },
         "phastcons_100_way_vertebrate": {
             "mean": 0.101765,
             "min": 0.0,
             "max": 1.0,
             "std": 0.237072,
+            "conserved": 0.85,
         }
     }
 
@@ -2341,6 +2378,8 @@ class VariantAnnotation(AbstractVariantAnnotation):
                 record["qtl_biosample"] = biosample.replace("_", " ")  # VEP escapes whitespace
             if score := record["l2g_score"]:
                 record["l2g_score"] = float(score)
+            if (is_lead := record["is_lead"]) is not None:
+                record["is_lead"] = is_lead == "true"  # None where the column predates the record
         return records
 
     def _open_targets_gene_details(self, gene_ids: Iterable[str]) -> dict[str, dict]:
@@ -2398,12 +2437,15 @@ class VariantAnnotation(AbstractVariantAnnotation):
             if record["study_type"] != OPEN_TARGETS_GWAS:
                 continue
             if gene_id := record["gwas_gene_id"]:
-                gene = genes.setdefault(gene_id, {"scores": [], "diseases": set(), "study_ids": set()})
+                gene = genes.setdefault(gene_id, {"scores": [], "diseases": set(), "study_ids": set(),
+                                                  "lead_study_ids": set()})
                 if (score := record["l2g_score"]) is not None:
                     gene["scores"].append(score)
                 gene["diseases"].update(record["diseases"])
                 if study_id := record["study_id"]:
                     gene["study_ids"].add(study_id)
+                    if record["is_lead"]:
+                        gene["lead_study_ids"].add(study_id)
 
         gene_details = self._open_targets_gene_details(genes)
         gwas_genes = []
@@ -2413,6 +2455,7 @@ class VariantAnnotation(AbstractVariantAnnotation):
                 "l2g_score": max(gene["scores"]) if gene["scores"] else None,
                 "diseases": self._open_targets_diseases(gene["diseases"]),
                 "study_count": len(gene["study_ids"]),
+                "lead_study_count": len(gene["lead_study_ids"]),
             })
         gwas_genes.sort(key=lambda g: (g["l2g_score"] is None, -(g["l2g_score"] or 0)))
         return gwas_genes
@@ -2427,11 +2470,14 @@ class VariantAnnotation(AbstractVariantAnnotation):
             if not study_type or study_type == OPEN_TARGETS_GWAS:
                 continue
             if gene_id := record["qtl_gene_id"]:
-                gene = genes.setdefault((gene_id, study_type), {"biosamples": set(), "study_ids": set()})
+                gene = genes.setdefault((gene_id, study_type), {"biosamples": set(), "study_ids": set(),
+                                                                "lead_study_ids": set()})
                 if biosample := record["qtl_biosample"]:
                     gene["biosamples"].add(biosample)
                 if study_id := record["study_id"]:
                     gene["study_ids"].add(study_id)
+                    if record["is_lead"]:
+                        gene["lead_study_ids"].add(study_id)
 
         gene_details = self._open_targets_gene_details({gene_id for gene_id, _ in genes})
         qtl_genes = []
@@ -2442,6 +2488,7 @@ class VariantAnnotation(AbstractVariantAnnotation):
                 "study_type_label": OPEN_TARGETS_STUDY_TYPE_LABELS.get(study_type, study_type),
                 "biosamples": sorted(gene["biosamples"]),
                 "study_count": len(gene["study_ids"]),
+                "lead_study_count": len(gene["lead_study_ids"]),
             })
         qtl_genes.sort(key=lambda g: (g["gene_symbol"], g["study_type"]))
         return qtl_genes

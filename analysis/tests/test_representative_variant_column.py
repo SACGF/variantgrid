@@ -11,9 +11,16 @@ from django.utils.html import escape
 from analysis.grids import VariantGrid
 from analysis.models.nodes.sources.cohort_node import CohortNode
 from analysis.tests.test_grid_export import GridExportTestCase
+from annotation.models import ClinVar
+from annotation.models.models_enums import ClinVarReviewStatus
+from classification.enums import SpecialEKeys, SubmissionSource
+from classification.models.classification import Classification
+from genes.models import GeneSymbol
+from genes.tests.gene_fusion_test_utils import create_gene_fusion
 from library.django_utils import FakeRequest
 from snpdb.grid_columns.grid_sample_columns import get_available_format_columns
-from snpdb.models import CompositeColumnMember, CustomColumnsCollection, UserSettings
+from snpdb.models import CompositeColumnMember, Country, CustomColumnsCollection, Lab, Organization, UserSettings
+from snpdb.tests.utils.vcf_testing_utils import create_mock_allele
 from snpdb.views.datatable_view import datatable_definition, datatable_response
 
 
@@ -160,7 +167,7 @@ class RepresentativeVariantColumnTest(GridExportTestCase):
     def test_system_default_collection(self):
         columns = list(CustomColumnsCollection.get_system_default().customcolumn_set
                        .order_by("sort_order").values_list("column_id", flat=True))
-        self.assertEqual(columns[:4], ["variant", "classifications", "tags", "tags_global"])
+        self.assertEqual(columns[:5], ["variant", "classifications", "tags", "tags_global", "Sample"])
         # Coordinates now live in the Variant cell; the rest inside their composite cells
         for removed in ["chrom", "position", "ref", "alt", "svlen", "hgvs_g", "consequence", "impact",
                         "gnomad_af", "gnomad_popmax", "gnomad_filtered", "spliceai_max_ds",
@@ -222,3 +229,91 @@ class VariantGridRowDetailViewTest(GridExportTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, f"v {variant.pk}")
         self.assertContains(response, escape(variant.full_string))  # HGVS/coordinate '>' is escaped
+
+    def _row_detail(self, variant):
+        client = Client()
+        client.force_login(self.user)
+        url = reverse("variant_grid_row_detail",
+                      kwargs={"variant_id": variant.pk,
+                              "annotation_version_id": self.analysis.annotation_version_id})
+        return client.get(url)
+
+    def test_row_detail_names_the_fusion_partners(self):
+        """ The expanded row is the one place every grid shares, so the partners and the direction
+            live there rather than in each grid's column set (#1558) """
+        for symbol in ["CD74", "ROS1"]:
+            GeneSymbol.objects.get_or_create(symbol=symbol)
+
+        ordered = create_gene_fusion("CD74", "ROS1")
+        self.assertContains(self._row_detail(ordered.variant), "5\u2032 CD74 \u2192 3\u2032 ROS1")
+
+        unordered = create_gene_fusion("CD74", "ROS1", directionality_known=False)
+        self.assertContains(self._row_detail(unordered.variant), "direction not asserted")
+
+        no_partner = create_gene_fusion("CD74", None)
+        self.assertContains(self._row_detail(no_partner.variant), "partner unspecified")
+
+    def test_row_detail_shows_clinvar(self):
+        """ The Classifications chips are a summary - the expanded row is where the ClinVar detail is """
+        variant = self.variants[0]
+        annotation_version = self.analysis.annotation_version
+        ClinVar.objects.create(version=annotation_version.clinvar_version, variant=variant,
+                               clinvar_variation_id=12345, clinvar_allele_id=678,
+                               preferred_disease_name="Cystic fibrosis",
+                               review_status=ClinVarReviewStatus.CRITERIA_PROVIDED_SINGLE_SUBMITTER,
+                               clinical_significance="Likely_pathogenic", highest_pathogenicity=4,
+                               origin=1)
+        client = Client()
+        client.force_login(self.user)
+        url = reverse("variant_grid_row_detail",
+                      kwargs={"variant_id": variant.pk,
+                              "annotation_version_id": annotation_version.pk})
+        response = client.get(url)
+        self.assertContains(response, "clinvar/variation/12345")
+        self.assertContains(response, "Likely Pathogenic")
+        self.assertContains(response, "Cystic fibrosis")
+        self.assertContains(response, "germline")
+
+    def test_row_detail_splits_clinvar_conditions(self):
+        """ CLNDN arrives as one pipe joined run of underscored words - a hundred characters of it
+            would push the tables beside it off the screen """
+        variant = self.variants[1]
+        annotation_version = self.analysis.annotation_version
+        ClinVar.objects.create(version=annotation_version.clinvar_version, variant=variant,
+                               clinvar_variation_id=999, clinvar_allele_id=888,
+                               preferred_disease_name="Melanoma|_not_provided|Cardio-facio-cutaneous_syndrome",
+                               review_status=ClinVarReviewStatus.CRITERIA_PROVIDED_SINGLE_SUBMITTER,
+                               clinical_significance="Likely_pathogenic", highest_pathogenicity=4,
+                               origin=1)
+        client = Client()
+        client.force_login(self.user)
+        url = reverse("variant_grid_row_detail",
+                      kwargs={"variant_id": variant.pk,
+                              "annotation_version_id": annotation_version.pk})
+        response = client.get(url)
+        self.assertContains(response, "Melanoma, not provided, Cardio-facio-cutaneous syndrome")
+
+    def test_row_detail_names_classifications(self):
+        """ The link needs to say which record it goes to, and how it was classified """
+        variant = self.variants[2]
+        allele = create_mock_allele(variant, self.genome_build)
+        organization = Organization.objects.create(name="RowDetailOrg", group_name="rowdetailorg")
+        lab = Lab.objects.create(name="RowDetailLab", organization=organization, city="CityA",
+                                 country=Country.objects.get_or_create(name="CountryA")[0],
+                                 group_name="rowdetailorg/rowdetaillab")
+        self.user.groups.add(lab.group)
+        classification = Classification.create(user=self.user, lab=lab, save=True,
+                                               source=SubmissionSource.API,
+                                               data={SpecialEKeys.CLINICAL_SIGNIFICANCE: "VUS"})
+        classification.allele = allele
+        classification.save()
+        classification.publish_latest(user=self.user)  # The summary the pills read is written on publish
+
+        client = Client()
+        client.force_login(self.user)
+        url = reverse("variant_grid_row_detail",
+                      kwargs={"variant_id": variant.pk,
+                              "annotation_version_id": self.analysis.annotation_version_id})
+        response = client.get(url)
+        self.assertContains(response, escape(classification.friendly_label))
+        self.assertContains(response, "VUS")

@@ -1,3 +1,10 @@
+"""
+Matching text to genes: GeneSymbolMatcher and HGNCMatcher resolve symbols and aliases to GeneSymbol
+rows, ReleaseGeneMatcher records which Gene a symbol meant in a particular GeneAnnotationRelease (symbols
+move between genes over time, so matching is per release), and tokenize_gene_symbols /
+partition_oversized_names split gene-list text and reject tokens over MAX_GENE_SYMBOL_LENGTH with a
+recorded warning.
+"""
 import logging
 import re
 from collections import defaultdict, namedtuple

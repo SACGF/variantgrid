@@ -51,6 +51,7 @@ class Command(BaseCommand):
         This makes use of files produced by a spin-off project: cdot
         @see https://github.com/SACGF/cdot
     """
+    category = "import"
     BATCH_SIZE = 2000
 
     def add_arguments(self, parser):

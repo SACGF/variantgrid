@@ -640,7 +640,8 @@ class EvidenceKeyAdmin(ModelAdminBasics):
                              'crit_allows_override_strengths', 'crit_uses_points')}),
         ('Overrides', {'fields': ('namespace_overrides',)}),
         ('Help', {'fields': ('description', 'examples', 'see')}),
-        ('Admin', {'fields': ('max_share_level', 'copy_consensus', 'variantgrid_column', 'immutable')}),
+        ('Admin', {'fields': ('max_share_level', 'copy_scope', 'copy_allele_origin', 'variantgrid_column',
+                              'immutable')}),
         ('History', {'fields': ('created', 'modified')})
     )
 

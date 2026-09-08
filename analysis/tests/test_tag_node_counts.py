@@ -1,14 +1,14 @@
 """
 Tests for per-tag node counts (issue #21) - every tag used in an analysis can have its own count
 badge on the nodes, added automatically as variants are tagged - and the TagNode editor's tag
-count toggles (issue #1820), which filter the grid on any of the selected tags.
+pills (issue #1820), the node's tag picker.
 """
 from django.urls import reverse
 
 from analysis.grids import VariantGrid
 from analysis.models import Analysis, NodeStatus, TagNode, VariantTag
 from analysis.models.enums import TagNodeInput, TagNodeMode, ZygosityNodeZygosity
-from analysis.models.nodes.analysis_node import NodeCount
+from analysis.models.nodes.analysis_node import NodeVersion
 from analysis.models.nodes.filters.zygosity_node import ZygosityNode
 from analysis.models.nodes.node_counts import (
     get_extra_filters_count,
@@ -90,9 +90,12 @@ class TestTagNodeCountConfig(TagNodeCountTestCase):
 class TestTagNodeCountValues(TagNodeCountTestCase):
     """ The recount runs in a task after tagging, so call it directly rather than through celery """
 
+    def _node_version(self, node) -> NodeVersion:
+        return NodeVersion.objects.get(node=node, version=node.version)
+
     def _tag_count(self, node) -> int:
         update_analysis_tag_node_counts(self.analysis)
-        return NodeCount.objects.get(node_version=node.node_version, label=self.tag_label).count
+        return self._node_version(node).counts[self.tag_label]
 
     def test_counts_tagged_variants_in_the_node(self):
         node = self._sample_node()
@@ -128,19 +131,34 @@ class TestTagNodeCountValues(TagNodeCountTestCase):
         self._tag_variant(self.variants[0])
         update_analysis_tag_node_counts(self.analysis)
 
-        self.assertFalse(NodeCount.objects.filter(node_version__node=child, label=self.tag_label).exists())
+        self.assertNotIn(self.tag_label, self._node_version(child).counts)
 
     def test_recount_bumps_modified_so_the_client_sees_it(self):
         """ nodes_status hands the client counts_modified - it's how it knows a recount landed """
         node = self._sample_node()
         self._tag_variant(self.variants[0])
         update_analysis_tag_node_counts(self.analysis)
-        node_count = NodeCount.objects.get(node_version=node.node_version, label=self.tag_label)
-        first_modified = node_count.modified
+        node_version = self._node_version(node)
+        first_modified = node_version.modified
 
         update_analysis_tag_node_counts(self.analysis)
-        node_count.refresh_from_db()
-        self.assertGreater(node_count.modified, first_modified)
+        node_version.refresh_from_db()
+        self.assertGreater(node_version.modified, first_modified)
+
+    def test_recount_keeps_the_rest_of_the_load_data(self):
+        """ The recount only computes tag labels - it merges into what the load wrote """
+        node = self._sample_node()
+        node_version = self._node_version(node)
+        node_version.load_data = {"counts": {BuiltInFilters.TOTAL: 7}, "tag_counts": {self.tag.pk: 1}}
+        node_version.save()
+        self._tag_variant(self.variants[0])
+
+        update_analysis_tag_node_counts(self.analysis)
+
+        node_version.refresh_from_db()
+        self.assertEqual(1, node_version.counts[self.tag_label])
+        self.assertEqual(7, node_version.counts[BuiltInFilters.TOTAL])
+        self.assertEqual({self.tag.pk: 1}, node_version.load_data["tag_counts"])
 
 
 class TestTagExtraFiltersQ(TagNodeCountTestCase):
@@ -212,7 +230,7 @@ class TestMultiTagExtraFilters(TagNodeCountTestCase):
                          set(Variant.objects.filter(q).values_list("pk", flat=True)))
 
     def test_grid_filters_and_counts_without_a_stored_node_count(self):
-        """ A compound selection never has a NodeCount row - the grid counts it exactly instead """
+        """ A compound selection is never a stored count - the grid counts it exactly instead """
         node = self._sample_node()
         self._tag_variant(self.variants[0])
         self._tag_variant(self.variants[1], tag=self.other_tag)
@@ -269,7 +287,7 @@ class TestGlobalTagNodeCounts(TagNodeCountTestCase):
     def test_counts_a_tag_made_in_another_analysis(self):
         self._tag_in_other_analysis(self.variants[0])
         node = self._tag_node(mode=TagNodeMode.ALL_TAGS)
-        self.assertEqual([(self.tag.pk, 1)], node.get_global_tag_counts())
+        self.assertEqual({self.tag.pk: 1}, node.get_tag_counts())
 
     def test_ignores_the_tagged_within_days_cutoff(self):
         """ The cutoff decides which variants enter the node, not which tags to count """
@@ -277,12 +295,12 @@ class TestGlobalTagNodeCounts(TagNodeCountTestCase):
         node = self._tag_node(mode=TagNodeMode.ALL_TAGS)
         node.tagged_within_days = 0
         node.save()
-        self.assertEqual([(self.tag.pk, 1)], node.get_global_tag_counts())
+        self.assertEqual({self.tag.pk: 1}, node.get_tag_counts())
 
-    def test_local_mode_has_no_global_counts(self):
+    def test_local_mode_does_not_count_another_analysis_tag(self):
         self._tag_in_other_analysis(self.variants[0])
         node = self._tag_node()
-        self.assertEqual([], node.get_global_tag_counts())
+        self.assertEqual({}, node.get_tag_counts())
 
     def test_local_node_filters_to_this_analysis_only(self):
         self._tag_in_other_analysis(self.variants[0])
@@ -298,10 +316,12 @@ class TestGlobalTagNodeCounts(TagNodeCountTestCase):
                          set(node.get_queryset().filter(q).values_list("pk", flat=True)))
 
     def test_global_node_ignores_its_analysis_scoped_stored_count(self):
-        """ NodeCounts are analysis-scoped, so they disagree with a global node's own filter """
+        """ Stored counts are analysis-scoped, so they disagree with a global node's own filter """
         self._tag_in_other_analysis(self.variants[0])
         node = self._tag_node(mode=TagNodeMode.ALL_TAGS)
-        NodeCount.objects.create(node_version=node.node_version, label=self.tag_label, count=99)
+        node_version = node.node_version
+        node_version.load_data = {"counts": {self.tag_label: 99}}
+        node_version.save()
         self.assertEqual(1, get_extra_filters_count(node, self.tag_label))
 
     def test_no_extra_filter_shows_the_whole_node(self):
@@ -313,7 +333,8 @@ class TestGlobalTagNodeCounts(TagNodeCountTestCase):
 
 
 class TestTagNodeEditorCounts(TagNodeCountTestCase):
-    """ The pills above the TagNode form - toggling one reloads the editor at that extra_filters """
+    """ The pills above the TagNode form are the node's tag picker - selection comes from the
+        node's configuration, counts from its input scope """
 
     def _editor_html(self, node, extra_filters="default") -> str:
         self.client.force_login(self.user)
@@ -326,24 +347,57 @@ class TestTagNodeEditorCounts(TagNodeCountTestCase):
         self.assertEqual(200, response.status_code)
         return response.content.decode()
 
-    def test_local_mode_renders_a_pill_per_tag_node_count(self):
+    def test_local_mode_renders_a_pill_per_tag_in_the_analysis(self):
         self._tag_variant(self.variants[0])
         node = self._tag_node()
         html = self._editor_html(node)
         self.assertIn(f'data-tag="{self.tag.pk}"', html)
         self.assertNotIn(f'data-tag="{self.other_tag.pk}"', html)
 
-    def test_selected_tags_come_back_selected(self):
+    def test_counts_come_from_the_node_not_the_configured_node_counts(self):
+        """ Tags applied before the analysis had that tag's node count still get a pill (#1820) """
+        self._tag_variant(self.variants[0])
+        self.analysis.set_node_count_types([BuiltInFilters.TOTAL])
+        node = self._tag_node()
+        html = self._editor_html(node)
+        self.assertIn(f'data-tag="{self.tag.pk}"', html)
+        self.assertIn('<span class="count">1</span>', html)
+
+    def test_clear_is_disabled_rather_than_hidden_with_nothing_selected(self):
+        """ A hidden button would shift the pills along as tags are toggled """
+        self._tag_variant(self.variants[0])
+        node = self._tag_node()
+        self.assertIn('clear-tags" disabled', self._editor_html(node))
+        node.tagnodetag_set.create(tag=self.tag)
+        self.assertNotIn('clear-tags" disabled', self._editor_html(node))
+
+    def test_configured_tags_come_back_selected(self):
         self._tag_variant(self.variants[0])
         self._tag_variant(self.variants[1], tag=self.other_tag)
         node = self._tag_node()
-        html = self._editor_html(node, TagFilter.label_for_tags([self.tag.pk, self.other_tag.pk]))
+        node.tagnodetag_set.create(tag=self.tag)
+        node.tagnodetag_set.create(tag=self.other_tag)
+        html = self._editor_html(node)
         self.assertEqual(2, html.count("summary-count tagged-"))
         self.assertEqual(2, html.count(" selected\""))
 
-    def test_excluding_tagged_variants_has_no_counts(self):
+    def test_configured_tag_keeps_its_pill_at_zero_count(self):
+        """ Dropping the pill would silently drop the tag on the next save """
+        node = self._tag_node()
+        node.tagnodetag_set.create(tag=self.tag)
+        self.assertIn(f'data-tag="{self.tag.pk}"', self._editor_html(node))
+
+    def test_counts_cover_the_input_so_other_tags_stay_pickable(self):
+        """ The node's output only carries its configured tags - the picker counts its input """
+        self._tag_variant(self.variants[0])
+        self._tag_variant(self.variants[1], tag=self.other_tag)
+        node = self._tag_node()
+        node.tagnodetag_set.create(tag=self.tag)
+        html = self._editor_html(node)
+        self.assertIn(f'data-tag="{self.other_tag.pk}"', html)
+
+    def test_exclude_mode_keeps_the_pills(self):
         self._tag_variant(self.variants[0])
         node = self._tag_node()
-        node.node_input = TagNodeInput.PARENT_NOT_TAGGED
-        node.save()
-        self.assertNotIn("tag-counts-summary", self._editor_html(node))
+        node.update(node_input=TagNodeInput.PARENT_NOT_TAGGED)
+        self.assertIn("tag-counts-summary", self._editor_html(node))

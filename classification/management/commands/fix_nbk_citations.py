@@ -5,6 +5,7 @@ from library.guardian_utils import admin_bot
 
 
 class Command(BaseCommand):
+    category = "one-off"
 
     def handle(self, *args, **options):
         for classification in Classification.objects.order_by('pk').iterator():

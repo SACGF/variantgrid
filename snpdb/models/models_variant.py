@@ -1,3 +1,13 @@
+"""
+Variant identity. Sequence (unique by sha256 - save through the model), Locus (contig, position,
+ref: one per VCF line), Variant (locus, alt, svlen - build-specific, no build FK; builds come from
+the locus contig) and the build-independent Allele linked per build by VariantAllele. VariantCoordinate
+is the value object between HGVS, VCF and the database - canonicalise with as_internal_canonical_form
+before lookup or insert. Also the liftover records (LiftoverRun, AlleleLiftover, the AlleleSource
+family) and VariantCollection (a partitioned set of variants used as a cache). Gene-level variants
+are a declared hack: read snpdb/gene_level_variants.py before touching get_gene_level_q. Bulk
+insert goes through snpdb/variant_pk_lookup.py, not this module. snpdb/CLAUDE.md has the rules.
+"""
 import logging
 import re
 from collections import defaultdict
@@ -838,9 +848,7 @@ class Variant(PreviewModelMixin, models.Model):
     @property
     def can_make_g_hgvs(self) -> bool:
         """ Can't form ones with some symbolic variants (eg <INS>) """
-        if self.is_symbolic:
-            return self.alt.seq in {VCFSymbolicAllele.DEL, VCFSymbolicAllele.DUP, VCFSymbolicAllele.INV}
-        return True
+        return self.coordinate.can_be_made_explicit
 
     @property
     def _clingen_allele_size(self) -> int:

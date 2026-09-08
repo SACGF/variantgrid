@@ -58,6 +58,8 @@ class Command(BaseCommand):
 
         and makes use of files produced by a spin-off project: cdot @see https://github.com/SACGF/cdot
     """
+    category = "import"
+
     def add_arguments(self, parser):
         parser.add_argument('--genome-build', choices=self.genome_builds, required=False)
         parser.add_argument('--annotation-consortium', choices=self.annotation_consortia, required=False)

@@ -873,6 +873,27 @@ table.as_table td {
   border: none;
 }
 
+.grid-tag {
+  position: relative;
+  display: inline-block;
+  vertical-align: top;
+}
+.grid-tag .user-tag-colored {
+  display: inline-block;
+  max-width: 130px;
+  height: 16px;
+  line-height: 16px;
+  margin: 0 3px 0 0;
+  padding: 0 6px;
+  border-radius: 8px;
+  font-size: 10px;
+  background: #eceff3;
+  color: #333;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
 table.variantgrid-datatable {
   table-layout: fixed;
   width: auto;
@@ -888,7 +909,6 @@ table.variantgrid-datatable td {
 table.variantgrid-datatable tbody td {
   line-height: 16px;
 }
-table.variantgrid-datatable .rv-line2,
 table.variantgrid-datatable .ic-line2 {
   display: none;
 }
@@ -914,6 +934,21 @@ table.variantgrid-datatable.two-line-rows .variant_id-container a.rv-label {
 table.variantgrid-datatable.two-line-rows .impact-consequence {
   display: inline-block;
 }
+table.variantgrid-datatable th {
+  position: relative;
+}
+table.variantgrid-datatable th .dt-col-resize {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 1;
+  width: 6px;
+  height: 100%;
+  cursor: col-resize;
+}
+table.variantgrid-datatable th .dt-col-resize:hover {
+  background: #ccc;
+}
 table.variantgrid-datatable th .dt-sort-menu .dt-sort-menu-toggle {
   margin-left: 4px;
   color: #888;
@@ -933,17 +968,56 @@ table.variantgrid-datatable .variant_id-container a.rv-label {
   white-space: nowrap;
   text-decoration: none;
 }
-table.variantgrid-datatable .rv-gene {
+.rv-gene {
   font-weight: 600;
 }
-table.variantgrid-datatable .rv-hgvs {
+.rv-hgvs {
   font-family: ui-monospace, Menlo, Consolas, monospace;
   font-size: 11px;
 }
-table.variantgrid-datatable .rv-hgvs-p,
-table.variantgrid-datatable .rv-sub {
+.rv-hgvs-p,
+.rv-sub {
   color: #777;
   font-size: 11px;
+}
+table.variantgrid-datatable .fusion-calls {
+  padding: 0 4px;
+  border-radius: 3px;
+  background: #ede7f6;
+  color: #5e35b1;
+  font-size: 11px;
+}
+.rv-line2 {
+  display: none;
+}
+.rv-kind {
+  flex: none;
+  padding: 0 4px;
+  border-radius: 3px;
+  background: #eceff1;
+  color: #546e7a;
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 10px;
+}
+.rv-kind-del,
+.rv-kind-loss {
+  background: #fdecea;
+  color: #b3261e;
+}
+.rv-kind-dup,
+.rv-kind-cnv,
+.rv-kind-amp {
+  background: #e8f0fe;
+  color: #1a56b8;
+}
+.rv-kind-ins,
+.rv-kind-inv {
+  background: #fff4e5;
+  color: #a15c00;
+}
+.rv-kind-fusion {
+  background: #ede7f6;
+  color: #5e35b1;
 }
 table.variantgrid-datatable .cs-chips {
   display: grid;
@@ -1156,6 +1230,35 @@ table.variantgrid-datatable .predictions .predictions-count {
   color: #777;
   font-size: 10px;
 }
+table.variantgrid-datatable .pop-freq-source {
+  margin-left: 4px;
+  color: #777;
+  font-size: 10px;
+}
+table.variantgrid-datatable .uniprot {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  min-width: 0;
+}
+table.variantgrid-datatable .uniprot .uniprot-link {
+  flex: none;
+}
+table.variantgrid-datatable .uniprot .uniprot-function {
+  color: #777;
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+table.variantgrid-datatable .conservation {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+}
+table.variantgrid-datatable .conservation .conservation-detail {
+  display: none;
+}
 table.variantgrid-datatable .db-count-zero {
   color: #bbb;
 }
@@ -1166,15 +1269,9 @@ table.variantgrid-datatable .vcf-filter-pass {
 table.variantgrid-datatable .vcf-filter-failed {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
   min-width: 0;
-  color: #cf3f3a;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-table.variantgrid-datatable .vcf-filter-failed i {
-  font-size: 10px;
-  flex: none;
 }
 table.variantgrid-datatable .sample-zygosity {
   display: inline-flex;
@@ -1208,6 +1305,14 @@ table.variantgrid-datatable .sample-zygosity .zyg-values {
 }
 table.variantgrid-datatable .sample-zygosity .zyg-depth {
   color: #888;
+  font-size: 10px;
+}
+table.variantgrid-datatable .sample-zygosity .zyg-cn {
+  flex: none;
+  padding: 0 3px;
+  border-radius: 3px;
+  background: #eef3f8;
+  color: #3a6ea5;
   font-size: 10px;
 }
 table.variantgrid-datatable .sample-zygosity .zyg-qual {
@@ -1244,28 +1349,17 @@ table.variantgrid-datatable td.dt-tags_global:hover > .grid-tags {
   z-index: 3;
   background: #f8f8f8;
 }
-table.variantgrid-datatable .grid-tag {
-  position: relative;
-  display: inline-block;
-  vertical-align: top;
-}
-table.variantgrid-datatable .grid-tag .user-tag-colored {
-  display: inline-block;
-  max-width: 130px;
-  height: 16px;
-  line-height: 16px;
-  margin: 0 3px 0 0;
-  padding: 0 6px;
-  border-radius: 8px;
-  font-size: 10px;
-  background: #eceff3;
-  color: #333;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
 table.variantgrid-datatable .grid-tag-deletable .user-tag-colored {
   cursor: pointer;
+}
+table.variantgrid-datatable .grid-tag-resolved .user-tag-colored {
+  opacity: 0.55;
+}
+table.variantgrid-datatable .grid-tag-sample-marker {
+  margin-left: 3px;
+  font-size: 8px;
+  vertical-align: 1px;
+  opacity: 0.75;
 }
 table.variantgrid-datatable .grid-tag-delete {
   position: absolute;
@@ -1316,8 +1410,21 @@ table.variantgrid-datatable .variant-row-detail {
 }
 table.variantgrid-datatable .variant-row-detail .variant-row-detail-columns {
   display: flex;
-  gap: 32px;
+  flex-wrap: wrap;
+  gap: 12px 32px;
   align-items: flex-start;
+}
+table.variantgrid-datatable .variant-row-detail .variant-row-detail-table {
+  max-width: 420px;
+}
+table.variantgrid-datatable .variant-row-detail .variant-row-detail-table th,
+table.variantgrid-datatable .variant-row-detail .variant-row-detail-table td {
+  overflow: visible;
+  text-overflow: clip;
+}
+table.variantgrid-datatable .variant-row-detail .variant-row-detail-table td {
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 table.variantgrid-datatable .variant-row-detail .variant-row-detail-table th {
   color: #777;
@@ -2765,6 +2872,35 @@ li.help-item :last-child {
   vertical-align: -0.125em;
 }
 
+/* Blackens a member of the Trio/Quad pedigree symbols - see --pedigree-*-fill in
+   uicore/tags/svg_icon_sprite.html. Set on the <svg> by the page, or by Trio/Quad's
+   get_preview_icon_css_class() so a listed trio wears its affected status */
+.mother-affected {
+  --pedigree-mother-fill: currentColor;
+}
+
+.father-affected {
+  --pedigree-father-fill: currentColor;
+}
+
+.sibling-affected {
+  --pedigree-sibling-fill: currentColor;
+}
+
+.parent-affected {
+  --pedigree-parent-fill: currentColor;
+}
+
+.duo-mother {
+  --pedigree-duo-square-fill: none;
+  --pedigree-duo-square-stroke: none;
+}
+
+.duo-father {
+  --pedigree-duo-circle-fill: none;
+  --pedigree-duo-circle-stroke: none;
+}
+
 .preview-data .preview-category,
 .preview-data .preview-title {
   font-weight: 500;
@@ -2811,6 +2947,149 @@ li.help-item :last-child {
 .dt-sort-menu-items .dropdown-item {
   padding: 2px 12px;
 }
+
+body.dt-col-resizing {
+  cursor: col-resize;
+  user-select: none;
+}
+
+.cons-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+  vertical-align: middle;
+}
+
+.cons-conserved {
+  background: #cf3f3a;
+}
+
+.cons-not-conserved {
+  background: #a0a8b3;
+}
+
+.cons-none {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px #ccc;
+}
+
+.conservation-detail {
+  padding: 4px 8px;
+  font-size: 12px;
+  white-space: nowrap;
+  background: white;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .2);
+}
+.conservation-detail th {
+  padding: 1px 10px 1px 0;
+  font-weight: normal;
+  text-align: left;
+  color: #444;
+}
+.conservation-detail td {
+  padding: 1px 4px;
+  text-align: right;
+}
+.conservation-detail .cons-range {
+  color: #bbb;
+  font-size: 10px;
+}
+.conservation-detail .cons-value {
+  font-weight: bold;
+}
+.conservation-detail .cons-value .cons-dot {
+  margin-right: 5px;
+}
+.conservation-detail .cons-blank {
+  color: #bbb;
+  font-weight: normal;
+}
+
+.annotation-descriptions .composite-section {
+  padding: 12px 0;
+  border-top: 1px solid #e5e5e5;
+}
+.annotation-descriptions .composite-section:first-of-type {
+  border-top: none;
+}
+.annotation-descriptions .composite-section-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+.annotation-descriptions .composite-section-title {
+  flex: 1;
+  min-width: 0;
+}
+.annotation-descriptions .composite-section-title .color-box {
+  width: 14px;
+  height: 14px;
+  float: none;
+  margin-right: 0;
+}
+.annotation-descriptions table.composite-example {
+  flex: none;
+  margin-top: 0 !important;
+}
+.annotation-descriptions table.composite-example th {
+  font-size: 12px;
+  border-bottom: 1px solid #ccc;
+  cursor: default;
+}
+.annotation-descriptions table.composite-example td {
+  height: 22px;
+  border: none;
+}
+.annotation-descriptions table.composite-example a {
+  cursor: default;
+}
+.annotation-descriptions .annotation-grid-column-name {
+  font-size: 11px;
+  font-weight: normal;
+}
+.annotation-descriptions .annotation-member-level {
+  font-size: 11px;
+  padding-top: 4px;
+  white-space: nowrap;
+}
+.annotation-descriptions .annotation-member-level .color-box {
+  width: 12px;
+  height: 12px;
+  float: none;
+  display: inline-block;
+  margin-right: 4px;
+  vertical-align: text-bottom;
+}
+.annotation-descriptions .annotation-role {
+  border-radius: 5px;
+  white-space: nowrap;
+  text-align: center;
+  padding: 2px;
+  font-size: 11px;
+}
+.annotation-descriptions .annotation-role-headline {
+  background-color: #333333;
+  color: #fff;
+}
+.annotation-descriptions .annotation-role-sort {
+  background-color: #cccccc;
+  color: #333333;
+}
+.annotation-descriptions .annotation-role-hover {
+  background-color: #eeeeee;
+  color: #666666;
+}
+.annotation-descriptions .annotation-source-composite {
+  background-color: #6A5ACD;
+}
+.annotation-descriptions .annotation-source-vcf {
+  background-color: #B8860B;
+}
+
 
 .gnomad-link {
   text-decoration: none;
@@ -2903,16 +3182,8 @@ a.clinical-context {
   min-width: 106px;
 }
 
-.sample-icon {
-  background-image: url(/static/icons/samples_icon.png);
-}
-
 .bed-icon {
   background-image: url(/static/images/node_icons/intersection.png);
-}
-
-.analysis-icon {
-  background-image: url(/static/images/node_icons/analysis_node.png);
 }
 
 .clingen-icon {
@@ -2947,22 +3218,6 @@ a.clinical-context {
 
 .iseq-100 {
   background-image: url(/static/icons/sequencers/iseq_icon.png);
-}
-
-.patient-icon {
-  background-image: url(/static/icons/patient-icon-png-3.png);
-}
-
-.cohort-icon {
-  background-image: url(/static/images/node_icons/cohort.png);
-}
-
-.pedigree-icon {
-  background-image: url(/static/images/node_icons/pedigree.png);
-}
-
-.trio-icon {
-  background-image: url(/static/images/node_icons/trio.png);
 }
 
 .gold-standard-icon {

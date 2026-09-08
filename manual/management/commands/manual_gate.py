@@ -12,6 +12,7 @@ class Command(BaseCommand):
         Gates are prerequisites that manual `manage` tasks depend on (see manual.gates). Auto
         gates are checked in code; manual gates (e.g. an external data upgrade) must be confirmed
         here once they are done, which unblocks the tasks that require them. """
+    category = "ops"
 
     def add_arguments(self, parser: CommandParser):
         parser.add_argument('--satisfy', metavar="GATE_NAME",

@@ -6,6 +6,7 @@ biopython>=1.81
 cdot>=0.2.31
 celery
 ConfigArgParse
+dataclasses-json
 crispy-bootstrap4
 cryptography>=50.0.0
 cyvcf2>=0.30.14
@@ -41,7 +42,6 @@ drf-spectacular-sidecar
 easy_thumbnails
 fontawesomefree==6.4.0
 git+https://github.com/biocommons/hgvs#egg=hgvs
-git+https://github.com/dridk/PyVCF3#egg=pyvcf3
 gunicorn
 HTSeq
 ijson
@@ -79,6 +79,7 @@ rollbar
 scipy
 simplejson
 sqlparse>=0.6.0
+tblib  # picklable tracebacks for manage.py test --parallel
 toposort
 Unidecode
 # below are only required for environments directly integrating with s3

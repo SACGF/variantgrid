@@ -1,13 +1,14 @@
 import json
 import logging
 import random
-from collections import Counter, defaultdict
+from collections import Counter
 
 from celery.result import AsyncResult
 from django.conf import settings
 from django.db.models import F
 from django.http.response import JsonResponse
 from django.shortcuts import get_object_or_404
+from django.utils.timezone import localtime
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_POST
 
@@ -17,18 +18,23 @@ from analysis.models import (
     Candidate,
     CandidateSearchRun,
     CandidateStatus,
-    NodeCount,
     TagNode,
     VariantTag,
 )
 from analysis.models.enums import TagLocation, TagNodeMode
 from analysis.models.nodes import node_utils
-from analysis.models.nodes.analysis_node import AnalysisEdge, AnalysisNode, NodeStatus, NodeTask, NodeVersion
+from analysis.models.nodes.analysis_node import (
+    AnalysisEdge,
+    AnalysisNode,
+    NodeStatus,
+    NodeTask,
+    NodeVersion,
+)
 from analysis.models.nodes.filter_child import create_filter_child_node
 from analysis.models.nodes.filters.built_in_filter_node import BuiltInFilterNode
 from analysis.models.nodes.filters.selected_in_parent_node import NodeVariant, SelectedInParentNode
 from analysis.models.nodes.filters.venn_node import VennNode
-from analysis.models.nodes.node_types import get_menu_entries_by_key
+from analysis.models.nodes.node_types import get_node_types_hash_by_class_name
 from analysis.models.nodes.node_utils import (
     get_child_position,
     get_rendering_dict,
@@ -62,16 +68,29 @@ def clone_analysis(request, analysis_id):
 
 
 @require_POST
-def analysis_reveal_hidden_nodes(request, analysis_id):
-    """ Running a template hides nodes that error while being configured (and their descendants) -
-        put them back so the user can see the branch and why it failed """
-    analysis = get_analysis_or_404(request.user, analysis_id)
-    analysis.check_can_write(request.user)
-    hidden_qs = analysis.analysisnode_set.filter(visible=False)
-    revealed = hidden_qs.update(visible=True, appearance_version=F("appearance_version") + 1)
-    if revealed:
-        reload_analysis_nodes(analysis.pk)
-    return JsonResponse({"revealed": revealed})
+def node_reveal_hidden(request, analysis_id, node_id):
+    """ Running a template hides a node that errors while being configured, and everything below it -
+        waive the node's errors (see AnalysisNode.can_ignore_errors) and put that branch back """
+    node = get_node_subclass_or_404(request.user, node_id, write=True)
+    if node.can_ignore_errors():
+        node.ignore_field_errors = True
+        node.queryset_dirty = True
+        node.save()
+    branch_node_ids = {node.pk} | {n.pk for n in node.descendants_set()}
+    hidden_qs = AnalysisNode.objects.filter(pk__in=branch_node_ids, visible=False)
+    revealed_ids = list(hidden_qs.values_list("pk", flat=True))
+    if revealed_ids:
+        hidden_qs.update(visible=True, appearance_version=F("appearance_version") + 1)
+        reload_analysis_nodes(node.analysis_id)
+
+    # Same shape as nodes_copy, so the page can drop the branch onto the canvas without a reload
+    nodes = []
+    edges = []
+    for revealed in AnalysisNode.objects.filter(pk__in=revealed_ids).select_subclasses():
+        nodes.append(get_rendering_dict(revealed))
+        for parent in revealed.analysisnode_ptr.parents():
+            edges.append(revealed.get_connection_data(parent))
+    return JsonResponse({"nodes": nodes, "edges": edges})
 
 
 @never_cache
@@ -118,7 +137,7 @@ class NodeUpdate(NodeJSONPostView):
         return {}
 
 
-MENU_ENTRIES_BY_KEY = None
+NODE_TYPES_HASH = None
 
 
 @never_cache
@@ -129,14 +148,13 @@ def node_data(request, analysis_id, node_id):
 
 @require_POST
 def node_create(request, analysis_id, node_type):
-    global MENU_ENTRIES_BY_KEY
-    if MENU_ENTRIES_BY_KEY is None:
-        MENU_ENTRIES_BY_KEY = get_menu_entries_by_key()
+    global NODE_TYPES_HASH
+    if NODE_TYPES_HASH is None:
+        NODE_TYPES_HASH = get_node_types_hash_by_class_name()
 
     analysis = get_analysis_or_404(request.user, analysis_id, write=True)
 
-    # A menu entry is a class plus the field values it stamps on the new node (eg a source level)
-    node_class, menu_entry = MENU_ENTRIES_BY_KEY[node_type]
+    node_class = NODE_TYPES_HASH[node_type]
     # New nodes go at the start of the flow - the top in vertical mode, the left edge in horizontal
     if analysis.analysis_horizontal_mode:
         x = 50 + random.random() * 20
@@ -144,7 +162,7 @@ def node_create(request, analysis_id, node_type):
     else:
         x = 10 + random.random() * 50
         y = 50 + random.random() * 20
-    node = node_class.objects.create(analysis=analysis, x=x, y=y, **menu_entry.initial_kwargs)
+    node = node_class.objects.create(analysis=analysis, x=x, y=y)
     update_analysis(node.analysis_id)
     return JsonResponse(get_rendering_dict(node))
 
@@ -225,6 +243,20 @@ def nodes_delete(request, analysis_id):
     return JsonResponse({})
 
 
+def _analysis_variant_tag_json(variant_tag: VariantTag) -> dict:
+    """ One tagging as the analysis grid draws it - one pill @see VariantGridFormat.tags """
+    resolved = None
+    if variant_tag.is_resolved:
+        resolved = localtime(variant_tag.resolved).date().isoformat()
+    return {
+        "id": variant_tag.pk,
+        "tag": variant_tag.tag_id,
+        "sample": variant_tag.sample_id,
+        "sample_name": str(variant_tag.sample) if variant_tag.sample_id else None,
+        "resolved": resolved,
+    }
+
+
 @require_POST
 def set_variant_tag(request, location):
     """ Can be called from analysis or variant details page (location = A or V) """
@@ -248,18 +280,27 @@ def set_variant_tag(request, location):
     ret = {}  # Empty
     if op == 'add':
         if analysis:
-            genome_build = analysis.genome_build
-            variant_tag, created = VariantTag.objects.get_or_create(variant_id=variant_id, tag=tag,
-                                                                    genome_build=genome_build, location=location,
-                                                                    analysis=analysis, user=request.user)
+            node = None
             if node_id:
-                variant_tag.node_id = node_id
+                node = get_object_or_404(AnalysisNode.objects.select_subclasses(),
+                                         pk=node_id, analysis=analysis)
+            # Tagging is one click - the sample is the node's proband, or null where it has none. It is part
+            # of the tagging's identity, so tagging for this proband never takes the tag off a sibling
+            sample = node.get_proband_sample() if node else None
+            variant_tag, created = VariantTag.objects.get_or_create(variant_id=variant_id, tag=tag,
+                                                                    genome_build=analysis.genome_build,
+                                                                    location=location, analysis=analysis,
+                                                                    user=request.user, sample=sample)
+            if node:
+                variant_tag.node = node
                 # Stamp what the node was showing, so a reviewer can later tell why the variant was in it
                 node_version = NodeVersion.objects.filter(node_id=node_id,
                                                           version=F("node__version")).first()
                 variant_tag.node_version = node_version
                 variant_tag.node_live_data_sources = node_version.live_data_sources if node_version else {}
                 variant_tag.save()
+            # The click always lands on a tagging - "created" is what tells the grid to draw a new pill
+            ret = {"variant_tag": _analysis_variant_tag_json(variant_tag), "created": created}
         else:
             if genome_build_name is None:
                 raise ValueError("Adding requires either 'analysis_id' or 'genome_build_name'")
@@ -269,12 +310,14 @@ def set_variant_tag(request, location):
                                                                     analysis=None, location=location,
                                                                     user=request.user,
                                                                     defaults={"genome_build": genome_build})
-        if created:  # Only return new if anything created
-            ret = VariantTagSerializer(variant_tag, context={"request": request}).data
+            if created:  # Only return new if anything created
+                ret = VariantTagSerializer(variant_tag, context={"request": request}).data
     elif op == 'del':
-        # Deletion of tags is for analysis (all users)
         if analysis:
-            VariantTag.objects.filter(variant_id=variant_id, analysis=analysis, tag=tag).delete()
+            # The X is on one pill, so it removes that tagging - the analysis' write permission covers it
+            if not variant_tag_id:
+                raise ValueError("Deletion from an analysis requires 'variant_tag_id'")
+            get_object_or_404(VariantTag, pk=variant_tag_id, analysis=analysis).delete()
         elif variant_tag_id:
             variant_tag = VariantTag.get_for_user(request.user, pk=variant_tag_id, write=True)
             variant_tag.delete()
@@ -407,22 +450,13 @@ def analysis_reload(request, analysis_id):
 def nodes_status(request, analysis_id):
     analysis = get_analysis_or_404(request.user, analysis_id)
     nodes = json.loads(request.GET['nodes'])
-    node_counts_qs = NodeCount.objects.filter(node_version__node__in=nodes)
-    node_counts = defaultdict(dict)
     # Tag counts are recalculated without bumping the node version (@see update_analysis_tag_node_counts),
     # so hand the client the last time the counts changed - that's how it knows a recount landed
-    counts_modified = {}
-    for node_id, version, label, count, modified in node_counts_qs.values_list(
-            "node_version__node_id", "node_version__version", "label", "count", "modified"):
-        key = f"{node_id}_{version}"
-        node_counts[key][label] = count
-        if modified and modified.isoformat() > counts_modified.get(key, ""):
-            counts_modified[key] = modified.isoformat()
-
+    node_versions = {}
     node_version_qs = NodeVersion.objects.filter(node__in=nodes)
-    live_data_sources = {f"{node_id}_{version}": sources
-                         for node_id, version, sources in node_version_qs.values_list("node_id", "version",
-                                                                                      "live_data_sources")}
+    for node_id, version, load_data, live_data_sources, modified in node_version_qs.values_list(
+            "node_id", "version", "load_data", "live_data_sources", "modified"):
+        node_versions[f"{node_id}_{version}"] = (load_data, live_data_sources, modified)
 
     qs = analysis.analysisnode_set.filter(id__in=nodes)
     node_status_list = []
@@ -433,12 +467,13 @@ def nodes_status(request, analysis_id):
         data["valid"] = not NodeStatus.is_error(data["status"])
         data["ready"] = NodeStatus.is_ready(data["status"])
 
-        counts = node_counts.get(f"{node_id}_{version}", {})
+        load_data, sources, modified = node_versions.get(f"{node_id}_{version}", ({}, {}, None))
+        counts = dict(load_data.get("counts", {}))
         counts[BuiltInFilters.TOTAL] = data["count"]
         data["counts"] = counts
-        data["counts_modified"] = counts_modified.get(f"{node_id}_{version}", "")
+        data["counts_modified"] = modified.isoformat() if modified else ""
         # A node reading mutable tables has an advisory count - the client shows it abbreviated (#235)
-        sources = live_data_sources.get(f"{node_id}_{version}") or {}
+        sources = sources or {}
         data["deterministic"] = not sources
         data["live_data_sources"] = sources
         node_status_list.append(data)

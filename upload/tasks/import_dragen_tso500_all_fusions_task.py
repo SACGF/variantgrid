@@ -19,9 +19,15 @@ Two steps:
 Each caller row becomes an observation carried in INFO, so what the caller wrote survives import.
 Several rows can name one gene pair (one caller reports ENTPD3::RPL14 three times with three 5'
 breakpoints), and those become one Variant with several observations.
+
+A fusion caller asserts the fusion is present, not a diploid genotype, so the VCF has no GT and the
+sample has no zygosity to filter on. What it does have is read support, written as the sample's
+ALT_READS and REF_READS; the ^FusionProcessor VCFSourceSettings row binds those as alt and ref depth
+so the sample node's minimum-reads threshold and allele frequency work on fusions.
 """
 import logging
 from collections import defaultdict
+from typing import Optional
 
 import simplejson
 
@@ -34,7 +40,6 @@ from library.genomics.vcf_writer import (
     percent_encode_info_value,
 )
 from snpdb.gene_level_variants import GENE_LEVEL_CONTIG_LENGTH, GENE_LEVEL_CONTIG_NAME
-from upload.tso500.dragen_all_fusions_parser import read_all_fusions
 from upload.models import (
     ModifiedImportedVariant,
     ModifiedImportedVariantOperation,
@@ -42,16 +47,20 @@ from upload.models import (
     UploadStep,
 )
 from upload.tasks.vcf.import_vcf_step_task import ImportVCFStepTask
+from upload.tso500.dragen_all_fusions_parser import (
+    FUSION_INFO,
+    FUSION_OBSERVATIONS_INFO,
+    format_fusion_observations,
+    read_all_fusions,
+    reference_reads,
+    supporting_reads,
+)
 from variantgrid.celery import app
 
-# INFO fields carrying what the caller reported - these land in CohortGenotype.info via the
-# standard bulk importer, which stores every INFO field the header declares
-FUSION_INFO = "FUSION"
-FUSION_OBSERVATIONS_INFO = "FUSION_OBS"
-
-# A fusion caller asserts the fusion is present, not a diploid genotype, so there is no zygosity to
-# report. The importer reads a missing GT as unknown zygosity.
-NO_GENOTYPE_CALL = "./."
+# The sample's FORMAT fields - read support rather than a genotype
+ALT_READS_FORMAT = "ALT_READS"
+REF_READS_FORMAT = "REF_READS"
+VCF_MISSING_VALUE = "."
 
 
 def _source_from_comments(comments) -> str:
@@ -75,6 +84,20 @@ def _observations_by_variant_coordinate(rows) -> dict:
     return observations
 
 
+def _read_support(observations: list[dict]) -> tuple[Optional[int], Optional[int]]:
+    """ (supporting reads, reference reads) for one gene pair. Each observation is a distinct
+        breakpoint with its own supporting reads, so those add up; the reference reads across a
+        junction are re-reported by every call that shares it, so the largest stands for the pair """
+    alt = [r for o in observations if (r := supporting_reads(o)) is not None]
+    ref = [r for o in observations if (r := reference_reads(o)) is not None]
+    return (sum(alt) if alt else None), (max(ref) if ref else None)
+
+
+def _sample_call(observations: list[dict]) -> str:
+    alt, ref = _read_support(observations)
+    return ":".join(VCF_MISSING_VALUE if v is None else str(v) for v in (alt, ref))
+
+
 def _write_gene_level_vcf(filename: str, observations: dict, sample_name: str, source: str):
     """ Written already-clean and sorted, which is what lets preprocess skip straight to the split.
         END = POS gives svlen 0 through vcf_get_ref_alt_svlen_and_modification, which needs one of
@@ -90,7 +113,12 @@ def _write_gene_level_vcf(filename: str, observations: dict, sample_name: str, s
             VCFInfoHeader(id=FUSION_OBSERVATIONS_INFO, type="String",
                           description="JSON list of the caller rows this fusion was called from"),
         ],
-        formats=['##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">'],
+        formats=[
+            f'##FORMAT=<ID={ALT_READS_FORMAT},Number=1,Type=Integer,'
+            f'Description="Reads supporting the fusion, summed over its breakpoints">',
+            f'##FORMAT=<ID={REF_READS_FORMAT},Number=1,Type=Integer,'
+            f'Description="Reads across the junctions that do not support the fusion">',
+        ],
         contig_lines=[f"##contig=<ID={GENE_LEVEL_CONTIG_NAME},length={GENE_LEVEL_CONTIG_LENGTH}>"],
         samples=[sample_name],
     )
@@ -106,7 +134,8 @@ def _write_gene_level_vcf(filename: str, observations: dict, sample_name: str, s
             }
             writer.write_record(variant_coordinate.chrom, variant_coordinate.position,
                                 variant_coordinate.ref, variant_coordinate.alt,
-                                info=info, fmt="GT", sample_calls=[NO_GENOTYPE_CALL])
+                                info=info, fmt=f"{ALT_READS_FORMAT}:{REF_READS_FORMAT}",
+                                sample_calls=[_sample_call(observations[resolved_fusion])])
 
 
 class DragenTSO500AllFusionsCreateVCFTask(ImportVCFStepTask):
@@ -146,9 +175,7 @@ def _record_merged_rows(upload_step, variant_qs):
         encoded = (info or {}).get(FUSION_OBSERVATIONS_INFO) or "[]"
         observations = simplejson.loads(percent_decode_info_value(encoded))
         if len(observations) > 1:
-            calls = "; ".join(f"{o.get('Caller')} {o.get('Gene A Breakpoint')}->{o.get('Gene B Breakpoint')}"
-                              for o in observations)
-            merged.append((variant_id, len(observations), calls))
+            merged.append((variant_id, len(observations), format_fusion_observations(observations)))
 
     if not merged:
         return

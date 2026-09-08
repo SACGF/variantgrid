@@ -16,13 +16,10 @@
         </div>
     </div>
     <div>
-        <h4>Human Phenotype Ontology</h4>
-        {% patient_phenotypes_graph max_records=40 graph_width=1024 graph_height=768 %}
+        {% patient_phenotypes_graph max_records=40 graph_width=1024 graph_height=768 heading="Human Phenotype Ontology" %}
     
-        <h4>OMIM</h4>
-        {% patient_omim_graph max_records=40 graph_width=1024 graph_height=768 %}
+        {% patient_omim_graph max_records=40 graph_width=1024 graph_height=768 heading="OMIM" %}
     
-        <h4>Genes</h4>
-        {% patient_genes_graph max_records=40 graph_width=1024 graph_height=768 %}
+        {% patient_genes_graph max_records=40 graph_width=1024 graph_height=768 heading="Genes" %}
     </div>
 {% endblock submenu_page_content %}

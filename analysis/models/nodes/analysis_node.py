@@ -49,7 +49,7 @@ from analysis.models.enums import (
 )
 from analysis.models.models_analysis import Analysis
 from analysis.models.nodes.node_counts import get_node_counts_and_labels_dict, get_node_extra_filters_q
-from analysis.models.nodes.node_display import NodeChip, NodeIcon, NodeMenuEntry
+from analysis.models.nodes.node_display import NodeChip, NodeIcon
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
 from classification.models import Classification
 from library.constants import DAY_SECS, MINUTE_SECS
@@ -164,6 +164,8 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
     auto_node_name = models.BooleanField(default=True)
     output_node = models.BooleanField(default=False)
     hide_node_and_descendants_upon_template_configuration_error = models.BooleanField(default=False)
+    # Waives the errors on get_ignorable_error_fields() - they're reported as warnings instead
+    ignore_field_errors = models.BooleanField(default=False)
     ready = models.BooleanField(default=True)
     valid = models.BooleanField(default=False)
     visible = models.BooleanField(default=True)
@@ -278,8 +280,14 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
         """ Sample of the object of a study, if known """
         return None
 
-    def get_proband_sample(self) -> Optional[Sample]:
-        """ Sample of the object of a study if known """
+    def get_proband_sample(self, proband_by_node_id: Optional[dict[int, Optional[Sample]]] = None) -> Optional[Sample]:
+        """ Sample of the object of a study if known.
+            proband_by_node_id: answers already worked out, shared across a whole graph rather than kept on the
+            node - a descendant asks each of its ancestors, so a diamond in the DAG asks the same node once per
+            path to it (@see analysis/variant_tag_operations.py:get_proband_sample_by_node_id) """
+        if proband_by_node_id is not None and self.pk in proband_by_node_id:
+            return proband_by_node_id[self.pk]
+
         proband_samples = set()
         if proband_sample := self._get_proband_sample_for_node():
             proband_samples.add(proband_sample)
@@ -287,17 +295,19 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
         if self.has_input():
             parents, _ = self.get_parent_subclasses_and_errors()
             for parent in parents:
-                if parent_proband_sample := parent.get_proband_sample():
+                if parent_proband_sample := parent.get_proband_sample(proband_by_node_id):
                     proband_samples.add(parent_proband_sample)
 
         proband_sample = None
         if len(proband_samples) == 1:  # If ambiguous, then just give up
             proband_sample = proband_samples.pop()
+        if proband_by_node_id is not None:
+            proband_by_node_id[self.pk] = proband_sample
         return proband_sample
 
     def get_samples_with_genotype(self) -> list[Sample]:
         """ Node + ancestor samples whose genotype we can show/filter on - ie variant-only VCFs
-            (has_genotype=False) are left out. Use get_samples() for sample level data """
+            (has_sample_columns=False) are left out. Use get_samples() for sample level data """
         cohorts, visibility = self.get_cohorts_and_sample_visibility(sort=False)
         return self._get_visible_samples_from_cohort(cohorts, visibility)
 
@@ -655,10 +665,9 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
         """ The exact PK set stored at load for nodes <= ANALYSIS_NODE_STORE_ID_SIZE_MAX (@see node_counts),
             or None for a large node - or one loaded before the PKs were stored with the count """
         try:
-            node_count = NodeCount.load_for_node(node, BuiltInFilters.TOTAL)
-        except (NodeCount.DoesNotExist, NodeVersion.DoesNotExist):
+            return node.node_version.variant_ids
+        except NodeVersion.DoesNotExist:
             return None
-        return node_count.variant_ids
 
     @staticmethod
     def get_small_parent_arg_q_dict(parent) -> Optional[dict[Optional[str], dict[str, Q]]]:
@@ -829,13 +838,6 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
         """ Badge icon for a node of this class - also what the create node dropdown shows """
         return NodeIcon(fa="fa-solid fa-circle-nodes")
 
-    @classmethod
-    def get_menu_entries(cls) -> list[NodeMenuEntry]:
-        """ The add node dropdown rows this class provides. One per class unless a class is
-            configurable enough that users look for its configurations by name """
-        return [NodeMenuEntry(key=cls.__name__, label=cls.get_node_class_label(),
-                              icon=cls.get_node_class_icon())]
-
     def get_node_icon(self) -> NodeIcon:
         """ Badge icon for this node - the class default unless config changes it (eg SampleNode
             draws the patient's pedigree shape) """
@@ -876,11 +878,38 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
             errors = AnalysisNode.flatten_errors(errors)
         return errors
 
-    def get_warnings(self) -> list[str]:
+    def get_ignorable_error_fields(self) -> list[str]:
+        """ Fields whose _get_field_errors() the user may waive with ignore_field_errors """
         return []
 
-    def get_errors(self, include_parent_errors=True, flat=False):
-        """ returns a tuple of (NodeError, str) unless flat=True where it's only string """
+    def _get_field_errors(self) -> dict[str, list[str]]:
+        """ Configuration errors keyed by the node field at fault, so the editor shows them against
+            that field. Templates are exempt - they're configured however the author likes """
+        return {}
+
+    def _get_ignored_error_fields(self) -> set[str]:
+        if self.ignore_field_errors:
+            return set(self.get_ignorable_error_fields())
+        return set()
+
+    def get_field_errors(self) -> dict[str, list[str]]:
+        """ The field errors that stop the node running """
+        if self.analysis.template_type == AnalysisTemplateType.TEMPLATE:
+            return {}
+        ignored = self._get_ignored_error_fields()
+        return {field: errors for field, errors in self._get_field_errors().items()
+                if errors and field not in ignored}
+
+    def get_ignored_field_errors(self) -> list[str]:
+        if self.analysis.template_type == AnalysisTemplateType.TEMPLATE:
+            return []
+        ignored = self._get_ignored_error_fields()
+        return [e for field, errors in self._get_field_errors().items() if field in ignored for e in errors]
+
+    def get_warnings(self) -> list[str]:
+        return list(self.get_ignored_field_errors())
+
+    def _get_non_field_errors(self, include_parent_errors=True) -> list[tuple[NodeErrorSource, str]]:
         errors = self.get_analysis_errors()
         _, parent_errors = self.get_parents_and_errors()
         if include_parent_errors:
@@ -888,9 +917,24 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
         if self.errors:
             errors.append((NodeErrorSource.INTERNAL_ERROR, self.errors))
         errors.extend((NodeErrorSource.CONFIGURATION, ce) for ce in self._get_configuration_errors())
+        return errors
+
+    def get_errors(self, include_parent_errors=True, flat=False):
+        """ returns a tuple of (NodeError, str) unless flat=True where it's only string """
+        errors = self._get_non_field_errors(include_parent_errors=include_parent_errors)
+        errors.extend((NodeErrorSource.CONFIGURATION, e) for field_errors in self.get_field_errors().values()
+                      for e in field_errors)
         if flat:
             errors = AnalysisNode.flatten_errors(errors)
         return errors
+
+    def can_ignore_errors(self) -> bool:
+        """ Everything wrong with the node is a field error ignore_field_errors would waive - what the
+            Template tab offers when it reveals a branch the template run hid """
+        field_errors = self.get_field_errors()
+        if not field_errors or self._get_non_field_errors():
+            return False
+        return set(field_errors) <= set(self.get_ignorable_error_fields())
 
     @staticmethod
     def flatten_errors(errors):
@@ -1006,21 +1050,20 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
         try:
             if self.cloned_from:
                 # If cloned (and we or original haven't changed) - use those counts
-                try:
-                    node_count = NodeCount.load_for_node_version(self.cloned_from, label)
-                    return node_count.count
-                except NodeCount.DoesNotExist:
-                    # Should only ever happen if original bumped version since we were loaded
-                    # otherwise should have cascade set cloned_from to NULL
-                    pass
+                # A missing count should only ever happen if original bumped version since we were
+                # loaded, otherwise the cascade should have set cloned_from to NULL
+                if (cloned_count := self.cloned_from.counts.get(label)) is not None:
+                    return cloned_count
 
             if self.has_input():
                 parent_non_zero_label_counts = []
                 for parent in self.get_non_empty_parents():
                     if parent.count != 0:  # count=0 has 0 for all labels
-                        parent_node_count = NodeCount.load_for_node(parent, label)
-                        if parent_node_count.count != 0:
-                            parent_non_zero_label_counts.append(parent_node_count.count)
+                        parent_count = parent.node_version.counts.get(label)
+                        if parent_count is None:
+                            return None  # Parent loaded before this label was configured - run the SQL
+                        if parent_count != 0:
+                            parent_non_zero_label_counts.append(parent_count)
 
                 if not parent_non_zero_label_counts:
                     # logging.info("all parents had 0 %s counts", label)
@@ -1030,8 +1073,6 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
                     if len(parent_non_zero_label_counts) == 1:
                         # logging.info("Single parent, no modification, using that")
                         return parent_non_zero_label_counts[0]
-        except NodeCount.DoesNotExist:
-            pass
         except Exception as e:
             logging.warning("Trouble getting cached %s count: %s", label, e)
 
@@ -1081,22 +1122,22 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
             # For a small node the PK list is the truth - it and the count came from the same load
             total_count = len(variant_ids)
 
-        node_counts = []
-        for label, count in label_counts.items():
-            node_counts.append(NodeCount(node_version=self.node_version, label=label, count=count))
-        if node_counts:
-            total_node_count = next(nc for nc in node_counts if nc.label == BuiltInFilters.TOTAL)
-            total_node_count.count = total_count
-            total_node_count.variant_ids = variant_ids
-            # Counts are a cache of a query against an immutable node_version, so a re-load (eg after a
-            # backoff retry that failed once these were already written) can safely overwrite them
-            NodeCount.objects.bulk_create(node_counts, update_conflicts=True,
-                                          update_fields=["count", "variant_ids", "modified"],
-                                          unique_fields=["node_version", "label"])
-
         # Every label count is a subset of the total - a bigger one means the query fanned out over a
         # multi-valued join, or a cached count is out of sync with the live query
-        if bigger_than_total := {l: c for l, c in label_counts.items() if c > total_count}:
+        bigger_than_total = {l: c for l, c in label_counts.items() if c > total_count}
+
+        label_counts[BuiltInFilters.TOTAL] = total_count
+        load_data = {"counts": label_counts}
+        load_data.update(self._get_load_data())
+        # Counts are a cache of a query against an immutable node_version, so a re-load (eg after a
+        # backoff retry that failed once these were already written) can safely overwrite them.
+        # "modified" is the client's signal that counts landed @see nodes_status
+        NodeVersion.objects.filter(pk=self.node_version.pk).update(load_data=load_data, variant_ids=variant_ids,
+                                                                   modified=timezone.now())
+        self.node_version.load_data = load_data
+        self.node_version.variant_ids = variant_ids
+
+        if bigger_than_total:
             self._raise_or_warn_count_mismatch(f"label counts {bigger_than_total} > total count={total_count}")
 
         # Single parent nodes should always reduce the number of variants - run a check to make sure the
@@ -1121,6 +1162,11 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
             self._raise_or_warn_count_mismatch(f"{len(variant_ids)} pks > max_size={max_size}")
             return None
         return variant_ids
+
+    def _get_load_data(self) -> dict:
+        """ Override to snapshot anything else the node worked out at load - merged into
+            NodeVersion.load_data alongside "counts" @see node_counts """
+        return {}
 
     def _load(self):
         """ Override to do anything interesting.
@@ -1270,7 +1316,7 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
             copy.id = None
             copy.pk = None
             copy.version = 1  # 0 is for those being constructed in analysis templates
-            # Store cloned_from so we can use original's NodeCounts
+            # Store cloned_from so we can use original's counts
             copy.cloned_from = original_node_version
             copy.save()
 
@@ -1388,6 +1434,14 @@ class NodeVersion(TimeStampedModel):
     version = models.IntegerField(null=False)
     # {source_key: data_version} of the mutable tables this node read at load. Empty = deterministic
     live_data_sources = models.JSONField(default=dict)
+    # The exact PK set stored at load, only for nodes <= ANALYSIS_NODE_STORE_ID_SIZE_MAX.
+    # When present, load_data["counts"][TOTAL] == len(variant_ids)
+    variant_ids = ArrayField(models.IntegerField(), null=True)
+    # Products of the node's load:
+    #   "counts":     {node count label: count} - the DAG badge counts, eg {"T": 1234, "C": 4, "tag_artefact": 3}.
+    #                 Labels only ever live under this key, so they can never collide with the keys beside it
+    #   "tag_counts": {tag: count} - TagNode only: the editor's tag picker, counted over the node's input
+    load_data = models.JSONField(default=dict)
 
     class Meta:
         unique_together = ("node", "version")
@@ -1399,6 +1453,10 @@ class NodeVersion(TimeStampedModel):
         except NodeVersion.DoesNotExist:
             node.check_still_valid()
             raise
+
+    @property
+    def counts(self) -> dict[str, int]:
+        return self.load_data.get("counts", {})
 
     def __str__(self):
         return f"{self.node.pk} (v{self.version})"
@@ -1433,29 +1491,6 @@ def post_delete_node_cache(sender, instance, **kwargs):  # pylint: disable=unuse
     except VariantCollection.DoesNotExist:
         # Deleted already
         pass
-
-
-class NodeCount(TimeStampedModel):
-    node_version = models.ForeignKey(NodeVersion, on_delete=CASCADE)
-    label = models.CharField(max_length=100)
-    count = models.IntegerField(null=False)
-    # Only on the TOTAL row, and only for nodes <= ANALYSIS_NODE_STORE_ID_SIZE_MAX. When present,
-    # count == len(variant_ids) and this is the exact set the node held at load
-    variant_ids = ArrayField(models.IntegerField(), null=True)
-
-    class Meta:
-        unique_together = ("node_version", "label")
-
-    @staticmethod
-    def load_for_node_version(node_version: NodeVersion, label: str) -> 'NodeCount':
-        return NodeCount.objects.get(node_version=node_version, label=label)
-
-    @staticmethod
-    def load_for_node(node: AnalysisNode, label: str) -> 'NodeCount':
-        return NodeCount.load_for_node_version(node.node_version, label=label)
-
-    def __str__(self):
-        return f"NodeCount({self.node_version}, {self.label}) = {self.count}"
 
 
 class NodeColumnSummaryCacheCollection(models.Model):
@@ -1526,15 +1561,18 @@ class NodeVCFFilter(NodeAuditLogMixin, models.Model):
         return list(nvf_qs.values_list("vcf_filter__vcf_id", "vcf_filter__filter_id"))
 
     @staticmethod
-    def get_filter_codes(node, vcf):
+    def get_filter_codes(node, vcf, pass_only: Optional[bool] = None):
         """ What this VCF lets through: its own ticked codes, plus PASS if the node's PASS row is set.
 
             PASS is the one FILTER value that means the same thing in every VCF, so a code is never
             translated across them - 'LowDepth' in a DRAGEN small variant VCF is not 'LowDepth' in
-            its CNV VCF. """
+            its CNV VCF. pass_only stands in for the node's PASS row, which is how SampleNode lets
+            one of its samples decide for itself. """
         nvf_qs = NodeVCFFilter.objects.filter(node_id=node.pk, vcf_filter__vcf=vcf)
         filter_codes = set(nvf_qs.values_list("vcf_filter__filter_code", flat=True))
-        if NodeVCFFilter.has_pass(node):
+        if pass_only is None:
+            pass_only = NodeVCFFilter.has_pass(node)
+        if pass_only:
             filter_codes.add(None)
         return filter_codes
 

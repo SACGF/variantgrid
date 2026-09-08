@@ -9,6 +9,8 @@ from snpdb.models import Allele, GenomeBuild, ImportSource, Variant
 
 
 class Command(BaseCommand):
+    category = "one-off"
+
     def handle(self, *args, **options):
         for genome_build in GenomeBuild.builds_with_annotation():
             print(f"Handling {genome_build}")

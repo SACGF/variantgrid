@@ -9,6 +9,8 @@ from annotation.models import VariantAnnotation, VariantAnnotationVersion
 
 
 class Command(BaseCommand):
+    category = "one-off"
+
     def handle(self, *args, **options):
         pathogenic_rankscore = settings.ANNOTATION_MIN_PATHOGENIC_RANKSCORE
         patho_kwargs = {

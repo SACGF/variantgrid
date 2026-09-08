@@ -1,3 +1,13 @@
+"""
+Cohorts and packed genotypes. Cohort orders a set of Samples (every VCF has one automatically; custom
+cohorts pick across VCFs, sub-cohorts share a parent's packing); CohortSample carries the packed
+index; CohortGenotypeCollection is one partition table per (cohort, version) - split into a common and
+an uncommon side by CohortGenotypeCommonFilterVersion - and CohortGenotype is one row per variant
+with every sample packed into arrays and the samples_zygosity string. Membership changes go through
+Cohort.set_samples (one version bump); query genotypes with CohortGenotypeCollection.get_annotation_kwargs
+and get_zygosity_q. Trio, Quad and Duo (FamilyGroupMixin) are the named family structures. The
+build task is snpdb/tasks/cohort_genotype_tasks.py.
+"""
 import logging
 from functools import cached_property
 from typing import Optional, Union
@@ -28,7 +38,7 @@ from library.guardian_utils import DjangoPermission
 from library.preview_request import PreviewKeyValue, PreviewModelMixin, SvgSymbolPreviewIconMixin
 from library.utils import invert_dict
 from patients.models_enums import Sex, Zygosity
-from snpdb.models.models_enums import CohortGenotypeCollectionType, ImportStatus, ProcessingStatus
+from snpdb.models.models_enums import CohortGenotypeCollectionType, DuoRelationship, ImportStatus, ProcessingStatus
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_variant import Variant, VariantCollection
 from snpdb.models.models_vcf import VCF, Sample
@@ -99,10 +109,22 @@ class Cohort(GuardianPermissionsAutoInitialSaveMixin, PreviewModelMixin, SortByP
         )
 
     @property
-    def has_genotype(self):
+    def has_sample_columns(self) -> bool:
+        if self.vcf:
+            return self.vcf.has_sample_columns
+        return True  # Created cohorts must contain genotype
+
+    @property
+    def has_genotype(self) -> bool:
         if self.vcf:
             return self.vcf.has_genotype
-        return True  # Created cohorts must contain genotype
+        return True
+
+    @property
+    def has_depth(self) -> bool:
+        if self.vcf:
+            return self.vcf.has_depth
+        return True
 
     @property
     def data_archived(self) -> bool:
@@ -175,6 +197,54 @@ class Cohort(GuardianPermissionsAutoInitialSaveMixin, PreviewModelMixin, SortByP
                                              sort_order=i)
             # Will call increment_version() to bump cohort
         return ss
+
+    def set_samples(self, ordered_sample_ids: list[int]):
+        """ Replace membership with ordered_sample_ids (in display order) under a single version bump.
+
+            CohortGenotype packs every sample into fixed width arrays, so any membership change costs a
+            full rebuild regardless of how many samples moved - edits are batched and committed in one go.
+            Goes around CohortSample.save()/delete() as those bump the version per row. """
+        sample_ids = list(dict.fromkeys(ordered_sample_ids))
+        if not sample_ids:
+            raise ValueError("A cohort needs at least one sample")
+        sample_id_set = set(sample_ids)
+
+        cohort_sample_by_sample_id = {cs.sample_id: cs for cs in self.cohortsample_set.all()}
+        if removed_sample_ids := set(cohort_sample_by_sample_id) - sample_id_set:
+            self.cohortsample_set.filter(sample_id__in=removed_sample_ids).delete()
+
+        parent_packed_index = {}
+        if self.parent_cohort:
+            # Sub cohorts share the parent's packing so the parent's CohortGenotype rows stay usable
+            parent_packed_index = dict(self.parent_cohort.cohortsample_set.values_list(
+                "sample_id", "cohort_genotype_packed_field_index"))
+
+        used_packed_indexes = {cs.cohort_genotype_packed_field_index
+                               for sample_id, cs in cohort_sample_by_sample_id.items() if sample_id in sample_id_set}
+        next_packed_index = max(used_packed_indexes, default=-1) + 1
+
+        new_cohort_samples = []
+        resorted_cohort_samples = []
+        for sort_order, sample_id in enumerate(sample_ids):
+            if cohort_sample := cohort_sample_by_sample_id.get(sample_id):
+                if cohort_sample.sort_order != sort_order:
+                    cohort_sample.sort_order = sort_order
+                    resorted_cohort_samples.append(cohort_sample)
+                continue
+
+            packed_index = parent_packed_index.get(sample_id)
+            if packed_index is None or packed_index in used_packed_indexes:
+                while next_packed_index in used_packed_indexes:
+                    next_packed_index += 1
+                packed_index = next_packed_index
+            used_packed_indexes.add(packed_index)
+            new_cohort_samples.append(CohortSample(cohort=self, sample_id=sample_id,
+                                                   cohort_genotype_packed_field_index=packed_index,
+                                                   sort_order=sort_order))
+
+        CohortSample.objects.bulk_create(new_cohort_samples)
+        CohortSample.objects.bulk_update(resorted_cohort_samples, ["sort_order"])
+        self.increment_version()
 
     def get_cohort_samples(self):
         return self.cohortsample_set.all().select_related("sample", "sample__vcf").order_by("sort_order")
@@ -771,16 +841,23 @@ class CohortGenotype(models.Model):
 
 
 class FamilyGroupMixin:
-    """ Shared by Trio and Quad - permissions and display that don't care how many members there are.
-        Subclasses provide get_cohort_samples() and their own urls. """
+    """ Shared by Duo, Trio and Quad - permissions and display that don't care how many members
+        there are. Subclasses provide get_cohort_samples() and their own urls. """
 
     @classmethod
     def get_permission_class(cls):
         return Cohort
 
+    pedigree_icon_members = ("mother", "father")  # Quad adds the sibling, Duo has one parent
+
     @classmethod
     def preview_icon(cls) -> str:
         return "fa-solid fa-people-roof"
+
+    def get_preview_icon_css_class(self) -> str:
+        """ Blacken the affected members, the way the pedigree figure on the view page does """
+        return " ".join(f"{member}-affected" for member in self.pedigree_icon_members
+                        if getattr(self, f"{member}_affected"))
 
     @property
     def preview(self) -> 'PreviewData':
@@ -882,6 +959,7 @@ class Quad(FamilyGroupMixin, GuardianPermissionsAutoInitialSaveMixin, SvgSymbolP
     sibling_affected = models.BooleanField(default=False)
 
     preview_icon_symbol = "node-icon-quad"  # QuadNode wears this too - see get_node_class_icon
+    pedigree_icon_members = ("mother", "father", "sibling")
 
     @classmethod
     def preview_if_url_visible(cls) -> str:
@@ -899,6 +977,68 @@ class Quad(FamilyGroupMixin, GuardianPermissionsAutoInitialSaveMixin, SvgSymbolP
     @property
     def sibling_details(self):
         return self._member_details(self.sibling, self.sibling_affected)
+
+
+class Duo(FamilyGroupMixin, GuardianPermissionsAutoInitialSaveMixin, SvgSymbolPreviewIconMixin, PreviewModelMixin,
+          SortByPKMixin, TimeStampedModel):
+    """Proband + one sequenced parent.
+
+    The other parent is unavailable (deceased, not consented, cost, or a prenatal case entered under
+    the mother's record) so a Trio can't be made. One `parent` FK that is always set, plus the
+    `relationship` the inheritance modes need - X-linked recessive is only meaningful through the
+    mother, and comp het is half phased on "one from the parent, one not".
+    """
+    name = models.TextField(blank=True)
+    user = models.ForeignKey(User, null=True, on_delete=CASCADE)
+    cohort = models.ForeignKey(Cohort, on_delete=CASCADE)
+    proband = models.ForeignKey(CohortSample, related_name='duo_proband', on_delete=CASCADE)
+    parent = models.ForeignKey(CohortSample, related_name='duo_parent', on_delete=CASCADE)
+    relationship = models.CharField(max_length=1, choices=DuoRelationship.choices)
+    parent_affected = models.BooleanField(default=False)
+    # Set in the duo wizard when the scientist resolves patient.sex vs sample.detected_sex
+    proband_sex = models.CharField(max_length=1, choices=Sex.choices, null=True, blank=True)
+
+    preview_icon_symbol = "node-icon-duo"  # DuoNode wears this too - see get_node_class_icon
+    pedigree_icon_members = ("parent",)
+
+    @classmethod
+    def preview_if_url_visible(cls) -> str:
+        return "duos"
+
+    def get_cohort_samples(self):
+        return [self.parent, self.proband]
+
+    def get_absolute_url(self):
+        return reverse('view_duo', kwargs={"pk": self.pk})
+
+    def get_listing_url(self):
+        return reverse('duos')
+
+    @property
+    def parent_is_mother(self) -> bool:
+        return self.relationship == DuoRelationship.MOTHER
+
+    @property
+    def relationship_label(self) -> str:
+        return DuoRelationship(self.relationship).label
+
+    @property
+    def missing_parent_label(self) -> str:
+        """ The parent we don't have - named in the "absent in parent" warning """
+        if self.parent_is_mother:
+            return DuoRelationship.FATHER.label
+        return DuoRelationship.MOTHER.label
+
+    def get_preview_icon_css_class(self) -> str:
+        """ The symbol draws both parent shapes - the relationship class picks which one shows """
+        css_classes = ["duo-mother" if self.parent_is_mother else "duo-father"]
+        if affected := super().get_preview_icon_css_class():
+            css_classes.append(affected)
+        return " ".join(css_classes)
+
+    @property
+    def parent_details(self):
+        return self._member_details(self.parent, self.parent_affected)
 
 
 # This has to be in this file so we don't end up with circular references

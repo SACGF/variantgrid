@@ -2,7 +2,7 @@ from django.urls import include
 from rest_framework import routers
 
 from library.django_utils.datatable_dataframe import DataFrameTableView
-from patients import views, views_autocomplete
+from patients import views, views_autocomplete, views_json
 from patients.grids import (
     ExtractionColumns,
     PatientListColumns,
@@ -28,12 +28,12 @@ urlpatterns = [
     path('patient_import/<int:patient_records_id>', views.view_patient_import, name='view_patient_import'),
     path('patient_import/view_patient_record/<int:pk>', views.view_patient_record, name='view_patient_record'),
     path('help/import_patient_records_details', views.import_patient_records_details, name='import_patient_records_details'),
-    path('example_upload_csv/empty', views.example_upload_csv_empty, name='example_upload_csv_empty'),
-    path('example_upload_csv/all', views.example_upload_csv_all, name='example_upload_csv_all'),
-    path('example_upload_csv/no_patients', views.example_upload_csv_no_patients, name='example_upload_csv_no_patients'),
+    path('example_upload_csv/empty', views_json.example_upload_csv_empty, name='example_upload_csv_empty'),
+    path('example_upload_csv/all', views_json.example_upload_csv_all, name='example_upload_csv_all'),
+    path('example_upload_csv/no_patients', views_json.example_upload_csv_no_patients, name='example_upload_csv_no_patients'),
 
     path('patients', views.patients, name='patients'),
-    path('patient/create', views.create_patient, name='create_patient'),
+    path('patient/create', views_json.create_patient, name='create_patient'),
     path('view_patient/<int:patient_id>', views.view_patient, name='view_patient'),
     path('view_patient/contact/<int:patient_id>', views.view_patient_contact_tab, name='view_patient_contact_tab'),
     path('view_patient/patient_specimens/<int:patient_id>', views.view_patient_specimens, name='view_patient_specimens'),
@@ -42,7 +42,7 @@ urlpatterns = [
     path('extractions', views.extractions, name='extractions'),
     path('view_specimen/<int:specimen_id>', views.view_specimen, name='view_specimen'),
     path('view_extraction/<int:extraction_id>', views.view_extraction, name='view_extraction'),
-    path('sample_group/<str:level>/<int:pk>/tree', views.sample_group_tree, name='sample_group_tree'),
+    path('sample_group/<str:level>/<int:pk>/tree', views_json.sample_group_tree, name='sample_group_tree'),
     path('unmatched_extractions', views.unmatched_extractions, name='unmatched_extractions'),
     path('view_patient/genes/<int:patient_id>', views.view_patient_genes, name='view_patient_genes'),
     path('view_patient/modifications/<int:patient_id>', views.view_patient_modifications, name='view_patient_modifications'),
@@ -58,8 +58,8 @@ urlpatterns = [
     path('bulk_patient_term', views.bulk_patient_term, name='bulk_patient_term'),
     path('patient_term_approvals/<int:patient_id_offset>', views.patient_term_approvals, name='patient_term_approvals_offset'),
     path('patient_term_approvals', views.patient_term_approvals, name='patient_term_approvals'),
-    path('approve_patient_term', views.approve_patient_term, name='approve_patient_term'),
-    path('phenotypes_matches', views.phenotypes_matches, name='phenotypes_matches'),
+    path('approve_patient_term', views_json.approve_patient_term, name='approve_patient_term'),
+    path('phenotypes_matches', views_json.phenotypes_matches, name='phenotypes_matches'),
 
     # Grids
     path('patient/datatables/', DatabaseTableView.as_view(column_class=PatientListColumns),

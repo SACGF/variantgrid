@@ -194,6 +194,8 @@ URLS_NAME_REGISTER.update({  # Disable selected snpdb urls
     "view_trio": False,
     "quads": False,
     "view_quad": False,
+    "duos": False,
+    "view_duo": False,
     "patient_imports": False,
     "patient_term_approvals": False,
     "patients": False,

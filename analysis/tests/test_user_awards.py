@@ -22,19 +22,20 @@ class TagAwardCountersTest(TestCase):
         create_fake_variants(cls.grch37)
         cls.analysis = Analysis(genome_build=cls.grch37)
         cls.analysis.set_defaults_and_save(cls.user)
-        cls.variant = Variant.objects.filter(Variant.get_no_reference_q()).order_by("pk").first()
+        no_ref_qs = Variant.objects.filter(Variant.get_no_reference_q()).order_by("pk")
+        cls.variant, cls.other_variant = no_ref_qs[:2]
 
-    def _tag(self, name: str, created: datetime) -> VariantTag:
+    def _tag(self, name: str, created: datetime, variant: Variant = None) -> VariantTag:
         tag = Tag.objects.get_or_create(pk=name)[0]
         variant_tag = VariantTag.objects.create(genome_build=self.grch37, analysis=self.analysis,
-                                                variant=self.variant, tag=tag, user=self.user)
+                                                variant=variant or self.variant, tag=tag, user=self.user)
         VariantTag.objects.filter(pk=variant_tag.pk).update(created=created)
         return variant_tag
 
     def test_tags_created_respects_since(self):
         when = datetime(2026, 3, 1, 12, 0, tzinfo=dt_timezone.utc)
         self._tag("artefact", when)
-        self._tag("artefact", when)
+        self._tag("artefact", when, variant=self.other_variant)
         self._tag("pathogenic", when)
         self.assertEqual(_tags_created(None), {None: {self.user.pk: 3}})
         self.assertEqual(_tags_created(datetime(2026, 4, 1, tzinfo=dt_timezone.utc)), {None: {}})

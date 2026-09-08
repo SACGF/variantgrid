@@ -4,9 +4,9 @@ from django.test import TestCase, override_settings
 from annotation.fake_annotation import get_fake_annotation_version
 from annotation.tests.test_data_fake_genes import create_fake_transcript_version
 from genes.models import Gene, GeneSymbol, Transcript, TranscriptVersion
-from snpdb.models import ClinGenAllele, GenomeBuild, Quad, Trio, Variant
+from snpdb.models import ClinGenAllele, Duo, GenomeBuild, Quad, Trio, Variant
 from snpdb.search import search_data
-from snpdb.tests.utils.fake_cohort_data import create_fake_quad, create_fake_trio
+from snpdb.tests.utils.fake_cohort_data import create_fake_duo, create_fake_quad, create_fake_trio
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
 
 VARIANT_CHROM = "1"
@@ -132,3 +132,8 @@ class TestSearch(TestCase):
         quad = create_fake_quad(self.user, GenomeBuild.grch38())
         search_results = search_data(self.user, quad.name, False)
         self._assert_found_of_type(search_results, quad, Quad.preview_category())
+
+    def test_search_duo(self):
+        duo = create_fake_duo(self.user, GenomeBuild.grch38())
+        search_results = search_data(self.user, duo.name, False)
+        self._assert_found_of_type(search_results, duo, Duo.preview_category())

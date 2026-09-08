@@ -1,3 +1,12 @@
+"""
+Creating the VCF and Sample rows from an uploaded file's header: create_vcf_from_uploaded_vcf and
+create_vcf_from_vcf read the header only, resolve_genome_build (header, then what was declared at
+upload, then the source's fallback), configure_vcf_from_header binds the sample FORMAT fields
+(overridable per source through VCFSourceSettings in handle_vcf_source), create_cohort_genotype_collection_from_vcf
+makes the automatic cohort, and create_backend_vcf_links attaches SeqAuto records. import_vcf_file
+is the per-split-file genotype import that runs in parallel. Steps are wired in
+upload/import_task_factories/.
+"""
 import logging
 import os
 import re
@@ -83,6 +92,20 @@ def get_format_field(vcf_formats, wanted_format_id):
     return format_id
 
 
+def get_copy_number_field(vcf_formats, vcf_infos, single_sample: bool):
+    """ Which key this caller wrote copy number under, in preference order. A single-sample VCF is
+        allowed to put it in INFO (the Pisces TSO 500 shape) - with more than one sample an INFO
+        value says nothing about which of them it belongs to """
+    for field in VCFConstant.COPY_NUMBER_FIELDS:
+        if field in vcf_formats:
+            return field
+    if single_sample:
+        for field in VCFConstant.COPY_NUMBER_FIELDS:
+            if field in vcf_infos:
+                return field
+    return None
+
+
 def set_allele_depth_format_fields(vcf: VCF, vcf_formats, vcf_source, default_allele_field):
     # Use FreeBayes AO/RO fields due to AD field not being decomposed properly on multi-alts
     # @see https://github.com/SACGF/variantgrid/issues/2126
@@ -148,7 +171,7 @@ def create_vcf_filters(vcf, filters: dict):
             logging.warning("Warning: Run out of characters to store filters! Only storing 1st %d.", num_filters)
             break
 
-        if filter_id == "PASS":  # Special - don't store this as vcf.Reader will not return it
+        if filter_id == "PASS":  # Special - don't store this as cyvcf2 returns FILTER=None for it
             continue
         filter_description = filter_dict["Description"]
 
@@ -347,6 +370,8 @@ def configure_vcf_from_header(vcf, vcf_reader):
                                                                 VCFConstant.DEFAULT_PHRED_LIKILIHOOD_FIELD)
         vcf.allele_frequency_field = get_format_field(vcf_formats, VCFConstant.DEFAULT_ALLELE_FREQUENCY_FIELD)
         vcf.sample_filters_field = get_format_field(vcf_formats, VCFConstant.DEFAULT_SAMPLE_FILTERS_FIELD)
+        vcf.copy_number_field = get_copy_number_field(vcf_formats, set(header_types.get("INFO", {})),
+                                                      single_sample=vcf.genotype_samples == 1)
 
     vcf.allele_frequency_percent = False  # Explicitly set for when reloading old VCFs
     vcf.save()
@@ -382,7 +407,7 @@ def handle_vcf_source(vcf):
 
 
 def genotype_vcf_processor_factory(upload_step, cohort_genotype_collection, uploaded_vcf, preprocess_vcf_import_info):
-    if uploaded_vcf.vcf.has_genotype:
+    if uploaded_vcf.vcf.has_sample_columns:
         klass = BulkGenotypeVCFProcessor
     else:
         klass = BulkNoGenotypeVCFProcessor

@@ -1,11 +1,11 @@
 import json
 
-from django.conf import settings
 from django.contrib.auth.models import User
 from django.db import connection
 from django.test import RequestFactory, TestCase
 from django.test.utils import CaptureQueriesContext
 from django.urls import resolve, reverse
+from django.utils.timezone import now
 from guardian.shortcuts import assign_perm
 
 from analysis.models import Analysis, VariantTag
@@ -32,6 +32,7 @@ from snpdb.models import (
     Variant,
     VariantAllele,
 )
+from snpdb.tests.utils.tag_testing_utils import create_classify_queue_tag
 from variantopedia.grids import TaggedVariantGrid, VariantTagCountsColumns, VariantTagsColumns
 
 
@@ -46,7 +47,7 @@ class TaggedVariantGridTest(TestCase):
         create_fake_variants(cls.genome_build)
 
         cls.artefact = Tag.objects.create(pk="Artefact")
-        cls.reportable = Tag.objects.create(pk="SomaticReportable")
+        cls.reportable = Tag.objects.create(pk="Reportable")
 
         # both_variant carries both tags, artefact_variant only one
         cls.both_variant, cls.artefact_variant, cls.other_user_variant = list(Variant.objects.order_by("pk")[:3])
@@ -90,14 +91,14 @@ class TaggedVariantGridTest(TestCase):
 
     def test_multiple_tags_require_all(self):
         """ The co-occurrence card links here expecting variants carrying every tag, not any of them """
-        self.assertEqual(self._grid_variant_ids({"tags": ["Artefact", "SomaticReportable"]}),
+        self.assertEqual(self._grid_variant_ids({"tags": ["Artefact", "Reportable"]}),
                          {self.both_variant.pk})
 
     def test_any_tags_filter_is_the_union(self):
         """ The tag counts summary toggles mean "carries any of these", unlike "tags" """
-        self.assertEqual(self._grid_variant_ids({"any_tags": ["Artefact", "SomaticReportable"]}),
+        self.assertEqual(self._grid_variant_ids({"any_tags": ["Artefact", "Reportable"]}),
                          {self.both_variant.pk, self.artefact_variant.pk, self.other_user_variant.pk})
-        self.assertEqual(self._tags_grid_variant_ids({"any_tags": json.dumps(["SomaticReportable"])}),
+        self.assertEqual(self._tags_grid_variant_ids({"any_tags": json.dumps(["Reportable"])}),
                          {self.both_variant.pk})
 
     def test_tag_count_column(self):
@@ -128,23 +129,42 @@ class TaggedVariantGridTest(TestCase):
                          reverse("view_variant", kwargs={"variant_id": self.both_variant.pk}))
         self.assertTrue(row["delete"], "Tag owner can delete their own tag")
 
-    def test_variant_tags_datatable_classify_button(self):
-        """ A RequiresClassification tag is a to-do item - offer to complete it from the analysis it came from """
+    def _classify_button_row(self, tag: Tag) -> dict:
         annotation_version = AnnotationVersion.latest(self.genome_build)
         analysis = Analysis.objects.create(genome_build=self.genome_build, annotation_version=annotation_version,
                                            user=self.user)
-        requires_classification, _ = Tag.objects.get_or_create(pk=settings.TAG_REQUIRES_CLASSIFICATION)
-        variant_tag = self._tag(self.artefact_variant, requires_classification)
+        variant_tag = self._tag(self.artefact_variant, tag)
         variant_tag.analysis = analysis
         variant_tag.save()
+        self.variant_tag = variant_tag
+        self.analysis = analysis
 
         self.client.force_login(self.user)
         url = reverse('variant_tags_datatable', kwargs={"genome_build_name": self.genome_build.name})
-        response = self.client.get(url, {"tag": requires_classification.pk})
-        row = response.json()["data"][0]
+        response = self.client.get(url, {"tag": tag.pk})
+        rows_by_id = {r["id"]: r for r in response.json()["data"]}
+        return rows_by_id[variant_tag.pk]
+
+    def test_variant_tags_datatable_classify_button(self):
+        """ Any classify queue tag is a to-do item - offer to complete it from the analysis it came from
+            @see Tag.classify_queue_qs """
+        row = self._classify_button_row(create_classify_queue_tag())
         self.assertEqual(row["variant_string"]["classify_url"],
                          reverse("create_classification_for_variant_tag",
-                                 kwargs={"analysis_id": analysis.pk, "variant_tag_id": variant_tag.pk}))
+                                 kwargs={"analysis_id": self.analysis.pk, "variant_tag_id": self.variant_tag.pk}))
+
+    def test_variant_tags_datatable_no_classify_button_off_queue(self):
+        """ A tag that isn't in the classify queue is just a label - no to-do to complete """
+        row = self._classify_button_row(self.artefact)
+        self.assertNotIn("classify_url", row["variant_string"])
+
+    def test_variant_tags_datatable_no_classify_button_for_retired_queue_tag(self):
+        """ A retired tag is out of the vocabulary, so its taggings are history rather than a to-do """
+        queue_tag = create_classify_queue_tag()
+        Tag.objects.filter(pk=queue_tag.pk).update(retired=now())
+
+        row = self._classify_button_row(queue_tag)
+        self.assertNotIn("classify_url", row["variant_string"])
 
     def test_tag_awaiting_liftover_keeps_its_own_coordinate(self):
         """ A tag gets its allele assigned asynchronously (@see _liftover_variant_tag), so a freshly
@@ -206,7 +226,7 @@ class TaggedVariantGridTest(TestCase):
 
     def test_variant_tag_counts_custom_sort_order(self):
         """ The variant page tag table follows the sort order from the user's tag colours collection """
-        self.assertEqual(self._variant_tag_counts_tags(), ["Artefact", "SomaticReportable"])
+        self.assertEqual(self._variant_tag_counts_tags(), ["Artefact", "Reportable"])
 
         collection = TagColorsCollection.objects.create(name="sort test colors", user=self.user)
         TagColor.objects.create(collection=collection, tag=self.artefact, rgb="", sort_order=10)
@@ -214,7 +234,7 @@ class TaggedVariantGridTest(TestCase):
         user_settings_override.tag_colors = collection
         user_settings_override.save()
 
-        self.assertEqual(self._variant_tag_counts_tags(), ["SomaticReportable", "Artefact"])
+        self.assertEqual(self._variant_tag_counts_tags(), ["Reportable", "Artefact"])
 
     def test_user_filter_overrides_show_group_data(self):
         """ An explicit user filter must still show another user's (permission-visible) tags
@@ -340,3 +360,75 @@ class VariantTagsGridQueryTest(TestCase):
         data = self._response()
         self.assertEqual(1, data["recordsFiltered"])
         self.assertEqual(data["recordsFiltered"], data["recordsTotal"])
+
+
+class ResolvedVariantTagsTest(TestCase):
+    """ The tags page and the variant page are work lists, so a to-do a classification has satisfied
+        drops out of them until the user asks for it - @see VariantTag.unresolved_q """
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.user = User.objects.get_or_create(username='resolved_variant_tags_user')[0]
+        cls.genome_build = GenomeBuild.get_name_or_alias("GRCh37")
+        get_fake_annotation_version(cls.genome_build)
+        create_fake_variants(cls.genome_build)
+
+        cls.tag = create_classify_queue_tag()
+        cls.open_variant, cls.done_variant = list(Variant.objects.order_by("pk")[:2])
+        cls._tag(cls.open_variant)
+        cls._tag(cls.done_variant, resolved=now())
+
+    @classmethod
+    def _tag(cls, variant: Variant, resolved=None) -> VariantTag:
+        allele, _ = VariantAllele.objects.get_or_create(
+            variant=variant, genome_build=cls.genome_build, origin=AlleleOrigin.IMPORTED_TO_DATABASE,
+            defaults={"allele": Allele.objects.create()})
+        return VariantTag.objects.create(variant=variant, allele=allele.allele, tag=cls.tag,
+                                         genome_build=cls.genome_build, user=cls.user, resolved=resolved)
+
+    def _set_show_resolved(self, show_resolved: bool):
+        config = UserGridConfig.get(self.user, VariantTagsColumns.GRID_NAME)
+        config.show_hidden_data = show_resolved
+        config.save()
+
+    def _tags_grid_variant_ids(self) -> set[int]:
+        url = reverse('variant_tags_datatable', kwargs={"genome_build_name": self.genome_build.name})
+        request = RequestFactory().get(url)
+        request.resolver_match = resolve(url)
+        request.user = self.user
+        config = VariantTagsColumns(request)
+        qs = config.filter_queryset(config.get_initial_queryset())
+        return set(qs.values_list("variant__id", flat=True))
+
+    def _variant_tags_page_tag_events(self) -> int:
+        self.client.force_login(self.user)
+        url = reverse('genome_build_variant_tags', kwargs={"genome_build_name": self.genome_build.name})
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        return response.context["tag_events"]
+
+    def test_tags_grid_hides_resolved_by_default(self):
+        self.assertEqual(self._tags_grid_variant_ids(), {self.open_variant.pk})
+
+    def test_tags_grid_shows_resolved_when_asked(self):
+        self._set_show_resolved(True)
+        self.assertEqual(self._tags_grid_variant_ids(), {self.open_variant.pk, self.done_variant.pk})
+
+    def test_variant_tags_page_counts_follow_the_same_setting(self):
+        """ The pill counts are server rendered, so they have to agree with the grids below them """
+        self.assertEqual(self._variant_tags_page_tag_events(), 1)
+        self._set_show_resolved(True)
+        self.assertEqual(self._variant_tags_page_tag_events(), 2)
+
+    def test_variant_page_tag_counts_follow_the_same_setting(self):
+        """ One setting, shared with the tags page, so the choice follows the user between them """
+        url = reverse('variant_tag_counts_datatable', kwargs={"variant_id": self.done_variant.pk})
+        request = RequestFactory().get(url, {"variant_id": self.done_variant.pk})
+        request.resolver_match = resolve(url)
+        request.user = self.user
+
+        self.assertEqual(list(VariantTagCountsColumns(request).get_initial_queryset()), [])
+        self._set_show_resolved(True)
+        counts = list(VariantTagCountsColumns(request).get_initial_queryset())
+        self.assertEqual([c["tag"] for c in counts], [self.tag.pk])

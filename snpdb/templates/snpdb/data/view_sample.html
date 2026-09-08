@@ -8,6 +8,9 @@
 {% load text_tags %}
 {% load tz %}
 {% load crispy_forms_tags %}
+{% load humanize %}
+{% load model_tags %}
+{% load ui_utils %}
 
 {% block title %}{{ sample.name }}{% endblock %}
 {% block head %}
@@ -20,6 +23,43 @@
 
 	#sample-stats {
 		margin-bottom: 20px;
+	}
+
+	#sample-stats .stats-cards {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: flex-start;
+		gap: 20px;
+	}
+
+	#sample-stats .stats-card {
+		max-width: 100%;
+	}
+
+	/* Each stats table is only as wide as its numbers, rather than stretching over the page */
+	#sample-stats .card-body {
+		padding: 0;
+		overflow-x: auto;
+	}
+
+	#sample-stats table.table {
+		width: auto;
+		margin-bottom: 0;
+	}
+
+	#sample-stats table.df-table th {
+		text-align: left;
+		font-weight: 500;
+	}
+
+	#sample-stats table.df-table thead th {
+		text-align: right;
+	}
+
+	#sample-stats table.df-table td,
+	#sample-stats table.df-table th {
+		padding: 0.4rem 0.9rem;
+		white-space: nowrap;
 	}
 
     #sample-grid-container {
@@ -97,7 +137,7 @@ $(document).ready(function() {
         {% if cgf %}
             {% if cgf.exception %}
                 afd.setError()
-            {% elif cgf.status == "SUCCESS" %}
+            {% elif cgf.task_status == "SUCCESS" %}
                 afd.setDownloadLink("{{ cgf.get_media_url  }}");
             {% else %}
                 afd.setPolling(false);
@@ -127,10 +167,13 @@ $(document).ready(function() {
             <li class="nav-item"><a class="nav-link" data-toggle="tab" role="tab" href="#sample-stats">Stats</a></li>
             {% endif %}
             <li class="nav-item"><a class="nav-link" data-toggle="tab" role="tab" href="#sample-files" data-href="{% url 'sample_files_tab' sample.pk %}">Files</a></li>
-            {% if somalier_enabled and sample.somaliersampleextract %}
+            {% if somalier_enabled and somalier_vcf_extract %}
             <li class="nav-item"><a class="nav-link" data-toggle="tab" role="tab" href="#sample-ancestry-relatedness">Ancestry/Relatedness</a></li>
             {% endif %}
             <li class="nav-item"><a class="nav-link" data-toggle="tab" role="tab" href="#sample-variants" data-href="{% url 'sample_variants_tab' sample.pk %}">Variants</a></li>
+            {% if url_name_visible.sample_classify_report_tab %}
+            <li class="nav-item"><a class="nav-link" data-toggle="tab" role="tab" href="#sample-classify-report" data-href="{% url 'sample_classify_report_tab' sample.pk %}">Classify &amp; Report</a></li>
+            {% endif %}
             {% if sample.import_status == 'S' or sample.import_status == 'A' %}
             <li class="nav-item"><a class="nav-link" data-toggle="tab" role="tab" href="#sample-graphs" data-href="{% url 'sample_graphs_tab' sample.pk %}">Graphs</a></li>
             {% endif %}
@@ -162,6 +205,8 @@ $(document).ready(function() {
             <form method="post" id='sample-form'>
                 {% csrf_token %}
                 {% crispy form form_helper.horizontal %}
+                {% detected_sex_help sample_genotype_stats as detected_sex_help_text %}
+                {% labelled id="detected-sex" label="Detected Sex" help=detected_sex_help_text %}{{ sample.detected_sex.label }}{% endlabelled %}
                 {% if annotated_download_files and not sample.vcf.data_archived %}
                     <div class="form-group-row row">
                         <label class="col-form-label col-12 col-md-3 text-md-right">Download</label>
@@ -184,133 +229,186 @@ $(document).ready(function() {
         </div>
     {% if sample_genotype_stats.import_status == 'S' %}
         <div class="tab-pane" role="tabpanel" id="sample-stats">
+        <div class="stats-cards">
         {% if not sample_stats_variant_class_df.empty %}
-            <h4>Variant Class</h4>
-            {% render_dataframe sample_stats_variant_class_df 1 %}
+            <div class="card stats-card">
+                <div class="card-header">Variant Class</div>
+                <div class="card-body">{% render_dataframe sample_stats_variant_class_df 1 %}</div>
+            </div>
         {% endif %}
 
         {% if not sample_stats_zygosity_df.empty %}
-            <h4>Zygosity</h4>
-            {% render_dataframe sample_stats_zygosity_df 1 %}
+            <div class="card stats-card">
+                <div class="card-header">{% if sample.has_genotype %}Zygosity{% else %}Variants{% endif %}</div>
+                <div class="card-body">{% render_dataframe sample_stats_zygosity_df 1 %}</div>
+            </div>
+        {% endif %}
+
+        {% if not sample_stats_annotated_df.empty %}
+            <div class="card stats-card">
+                <div class="card-header">Annotated</div>
+                <div class="card-body">{% render_dataframe sample_stats_annotated_df 1 %}</div>
+            </div>
         {% endif %}
 
         {% if sample_locus_count %}
-            <h4>Ploidy</h4>
-            <table class="table df-table">
-                <thead>
-                    <tr><th>Locus Count <th> Count
-                </thead>
-                <tbody>
-                {% for slc in sample_locus_count %}
-                    <tr><td>{{ slc.locus_count }}
-                            {% if slc.locus_count == 1 %}
-                                (HOM)
-                            {% elif slc.locus_count == 2 %}
-                                (HET)
-                            {% endif %}
-                        <td>{{ slc.count }}
-                {% endfor %}
-                </tbody>
-            </table>
+            <div class="card stats-card">
+                <div class="card-header">Ploidy</div>
+                <div class="card-body">
+                    <table class="table df-table">
+                        <thead>
+                            <tr><th>Locus Count <th> Count
+                        </thead>
+                        <tbody>
+                        {% for slc in sample_locus_count %}
+                            <tr><th>{{ slc.locus_count }}
+                                    {% if slc.locus_count == 1 %}
+                                        (HOM)
+                                    {% elif slc.locus_count == 2 %}
+                                        (HET)
+                                    {% endif %}
+                                <td>{{ slc.count|intcomma }}
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         {% endif %}
 
-        {% if sample_genotype_stats %}
-        <h4>Sex</h4>
-        {{ sample_genotype_stats.chrx_sex_guess.label }} (chrX Hom: {{ sample_genotype_stats.x_hom_count }}, Het: {{ sample_genotype_stats.x_het_count }})
+        {% if sample_genotype_stats and sample.has_genotype %}
+            <div class="card stats-card">
+                <div class="card-header" data-help="{% detected_sex_help sample_genotype_stats %}">Sex</div>
+                <div class="card-body">
+                    <table class="table df-table">
+                        <tbody>
+                            <tr><th>Detected Sex<td>{{ sample_genotype_stats.chrx_sex_guess.label }}
+                            <tr><th>chrX Hom<td>{{ sample_genotype_stats.x_hom_count|intcomma }}
+                            <tr><th>chrX Het<td>{{ sample_genotype_stats.x_het_count|intcomma }}
+                            <tr><th>chrX unknown zygosity<td>{{ sample_genotype_stats.x_unk_count|intcomma }}
+                            <tr><th>chrX calls used (Hom + Het)<td>{{ sample_genotype_stats.chrx_genotyped_count|intcomma }}
+                            <tr><th>chrX Hom/Het ratio<td>{{ sample_genotype_stats.chrx_hom_het_ratio|floatformat:2|default:"-" }}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         {% endif %}
+        </div>
         </div>
 	{% endif %}
 
-     {% if somalier_enabled and sample.somaliersampleextract %}
-         {%  with sse=sample.somaliersampleextract %}
+     {% if somalier_enabled and somalier_vcf_extract %}
+         {%  with sse=somalier_sample_extract %}
              {% with ancestry=sse.somalierancestry %}
                 <div class="tab-pane" role="tabpanel" id="sample-ancestry-relatedness">
                     {% page_help page_id='data/related_samples_help' title='Related Samples' show_title=False %}
 
-                    {% if sse.has_sufficient_data %}
-                        {% if ancestry %}
-                            <p>
-                                Prediction by <a href="https://github.com/brentp/somalier">Somalier</a>
-                            </p>
-                            <table>
-                                <tr>
-                                    <th>Predicted</th>
-                                    <th>AFR prob</th>
-                                    <th>AMR prob</th>
-                                    <th>EAS prob</th>
-                                    <th>EUR prob</th>
-                                    <th>SAS prob</th>
-                                </tr>
-                                <tr>
-                                    <td>{{ ancestry.get_predicted_ancestry_display }}</td>
-                                    <td>{{ ancestry.AFR_prob }}</td>
-                                    <td>{{ ancestry.AMR_prob }}</td>
-                                    <td>{{ ancestry.EAS_prob }}</td>
-                                    <td>{{ ancestry.EUR_prob }}</td>
-                                    <td>{{ ancestry.SAS_prob }}</td>
-                                </tr>
-                            </table>
-                        {% endif %}
+                    <h4>Somalier Stages</h4>
+                    {% include "snpdb/data/_somalier_stages.html" %}
 
-                        <h4>Related Samples</h4>
+                    {% if ancestry %}
+                        <h4>Ancestry</h4>
+                        <p>
+                            Prediction by <a href="https://github.com/brentp/somalier">Somalier</a>
+                        </p>
+                        <table>
+                            <tr>
+                                <th>Predicted</th>
+                                <th>AFR prob</th>
+                                <th>AMR prob</th>
+                                <th>EAS prob</th>
+                                <th>EUR prob</th>
+                                <th>SAS prob</th>
+                            </tr>
+                            <tr>
+                                <td>{{ ancestry.get_predicted_ancestry_display }}</td>
+                                <td>{{ ancestry.AFR_prob }}</td>
+                                <td>{{ ancestry.AMR_prob }}</td>
+                                <td>{{ ancestry.EAS_prob }}</td>
+                                <td>{{ ancestry.EUR_prob }}</td>
+                                <td>{{ ancestry.SAS_prob }}</td>
+                            </tr>
+                        </table>
+                    {% endif %}
 
-                        {% if related_samples.exists %}
-                            <table class="table">
+                    <h4>Related Samples</h4>
+                    <p>
+                        Pairs with relatedness &gt; {{ somalier_relatedness.min_relatedness }},
+                        at least {{ somalier_relatedness.min_shared_hets }} shared HETs and more than
+                        {{ somalier_relatedness.min_shared_hom_alts }} shared HOM ALTs.
+                    </p>
+
+                    {% if related_samples %}
+                        <table class="table">
+                            <tr>
+                                <th>Sample</th>
+                                <th>Patient</th>
+                                <th>relatedness</th>
+                                <th>ibs0</th>
+                                <th>ibs2</th>
+                                <th>hom_concordance</th>
+                                <th>hets_a</th>
+                                <th>hets_b</th>
+                                <th>hets_ab</th>
+                                <th>shared_hets</th>
+                                <th>hom_alts_a</th>
+                                <th>hom_alts_b</th>
+                                <th>shared_hom_alts</th>
+                                <th>N</th>
+                                <th>x_ibs0</th>
+                                <th>x_ibs2</th>
+                            </tr>
+                            {% for related in related_samples %}
+                                {% with rp=related.pair %}
                                 <tr>
-                                    <th>Sample</th>
-                                    <th>relatedness</th>
-                                    <th>ibs0</th>
-                                    <th>ibs2</th>
-                                    <th>hom_concordance</th>
-                                    <th>hets_a</th>
-                                    <th>hets_b</th>
-                                    <th>hets_ab</th>
-                                    <th>shared_hets</th>
-                                    <th>hom_alts_a</th>
-                                    <th>hom_alts_b</th>
-                                    <th>shared_hom_alts</th>
-                                    <th>N</th>
-                                    <th>x_ibs0</th>
-                                    <th>x_ibs2</th>
-                                </tr>
-                                {% for rp in related_samples %}
-                                    <tr>
-                                        <td>
-                                            {% if rp.sample_a == sample %}
-                                                <a href="{% url 'view_sample' rp.sample_b.pk %}">{{ rp.sample_b }}</a>
-                                            {% else %}
-                                                <a href="{% url 'view_sample' rp.sample_a.pk %}">{{ rp.sample_a }}</a>
+                                    <td>
+                                        <a href="{% url 'view_sample' related.sample.pk %}">{{ related.sample }}</a>
+                                    </td>
+                                    <td>
+                                        {% if related.sample.patient_id %}
+                                            <a href="{% url 'view_patient' related.sample.patient_id %}">{{ related.sample.patient }}</a>
+                                            {% if related.same_patient %}
+                                                <span class="badge badge-success">Same patient</span>
+                                            {% elif related.duplicate_warning %}
+                                                <span class="badge badge-danger" title="Relatedness this high is the same DNA">Different patient</span>
+                                            {% elif related.different_patient %}
+                                                <span class="badge badge-warning">Different patient</span>
                                             {% endif %}
-                                        </td>
-                                        <td>{{ rp.relatedness | floatformat:2 }}</td>
-                                        <td>{{ rp.ibs0 }}</td>
-                                        <td>{{ rp.ibs2 }}</td>
-                                        <td>{{ rp.hom_concordance | floatformat:2 }}</td>
-                                        <td>{{ rp.hets_a }}</td>
-                                        <td>{{ rp.hets_b }}</td>
-                                        <td>{{ rp.hets_ab }}</td>
-                                        <td>{{ rp.shared_hets }}</td>
-                                        <td>{{ rp.hom_alts_a }}</td>
-                                        <td>{{ rp.hom_alts_b }}</td>
-                                        <td>{{ rp.shared_hom_alts }}</td>
-                                        <td>{{ rp.n }}</td>
-                                        <td>{{ rp.x_ibs0 }}</td>
-                                        <td>{{ rp.x_ibs2 }}</td>
-                                    </tr>
-                                {% endfor %}
-                            </table>
-                        {% else %}
-                            <p>No related samples found.</p>
-                        {% endif %}
+                                        {% else %}
+                                            <span class="badge badge-secondary">No patient</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ rp.relatedness | floatformat:2 }}</td>
+                                    <td>{{ rp.ibs0 }}</td>
+                                    <td>{{ rp.ibs2 }}</td>
+                                    <td>{{ rp.hom_concordance | floatformat:2 }}</td>
+                                    <td>{{ rp.hets_a }}</td>
+                                    <td>{{ rp.hets_b }}</td>
+                                    <td>{{ rp.hets_ab }}</td>
+                                    <td>{{ rp.shared_hets }}</td>
+                                    <td>{{ rp.hom_alts_a }}</td>
+                                    <td>{{ rp.hom_alts_b }}</td>
+                                    <td>{{ rp.shared_hom_alts }}</td>
+                                    <td>{{ rp.n }}</td>
+                                    <td>{{ rp.x_ibs0 }}</td>
+                                    <td>{{ rp.x_ibs2 }}</td>
+                                </tr>
+                                {% endwith %}
+                            {% endfor %}
+                        </table>
                     {% else %}
+                        <p>No related samples found.</p>
+                    {% endif %}
+
+                    {% if sse and not sse.has_sufficient_data %}
                         <ul class="messages">
                             <li class="import-message warning">
                                 Warning: Insufficient HET/HOM variants known to <a class="reference external" href="https://github.com/brentp/somalier">Somalier</a>
-                                Relatedness calculation cannot be performed for this sample - see 'Related Samples Help' above.
+                                Relatedness calculation is unreliable for this sample - see 'Related Samples Help' above.
                             </li>
                         </ul>
                     {% endif %}
 
+                    {% if sse %}
                     <h4>Sample Extract</h4>
                     <table>
                         <tr>
@@ -334,6 +432,7 @@ $(document).ready(function() {
                             <td>{{ sse.unk_count }}</td>
                         </tr>
                     </table>
+                    {% endif %}
                 </div>
             {% endwith %}
          {% endwith %}
@@ -346,6 +445,9 @@ $(document).ready(function() {
     {% endif %}
         <div class="tab-pane" role="tabpanel" id="sample-files"></div>
         <div class="tab-pane" role="tabpanel" id="sample-variants"></div>
+        {% if url_name_visible.sample_classify_report_tab %}
+        <div class="tab-pane" role="tabpanel" id="sample-classify-report"></div>
+        {% endif %}
         {% if sample.import_status == 'S' or sample.import_status == 'A' %}
         <div class="tab-pane" role="tabpanel" id="sample-graphs"></div>
         {% endif %}

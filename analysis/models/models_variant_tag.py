@@ -2,14 +2,15 @@ from typing import Union
 
 from django.contrib.auth.models import Group, User
 from django.db import models
-from django.db.models import CASCADE, PROTECT, SET_NULL, Count, Max, Q, QuerySet
+from django.db.models import CASCADE, PROTECT, SET_NULL, Count, Exists, Max, OuterRef, Q, QuerySet
 from django_extensions.db.models import TimeStampedModel
 
 from analysis.models.enums import TagLocation
 from analysis.models.models_analysis import Analysis
 from analysis.models.nodes.analysis_node import AnalysisNode, NodeVersion
+from classification.models import Classification
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsAutoInitialSaveMixin
-from snpdb.models import Allele, GenomeBuild, Tag, Variant, VariantAllele
+from snpdb.models import Allele, GenomeBuild, Sample, Tag, Variant, VariantAllele
 
 
 class VariantTagsImport(TimeStampedModel):
@@ -52,7 +53,40 @@ class VariantTag(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
     # NodeVersion rows are deleted when a node reloads, so the sources the node was showing when this tag
     # was made are copied here - the tag is the audit record of what the tagger actually saw
     node_live_data_sources = models.JSONField(default=dict)
+    # Which sample the tagging is about - the tagged node's proband, part of the tagging's identity (@see Meta)
+    # so it is set at tag time and never changes, null where the node has no proband (never prompted for)
+    sample = models.ForeignKey(Sample, null=True, blank=True, on_delete=SET_NULL)
+    # A to-do tag (Tag.requires_classification) is satisfied by a classification rather than deleted, so the
+    # tagging stays as the record of what was flagged and what it turned into
+    resolved = models.DateTimeField(null=True, blank=True)
+    resolved_by = models.ForeignKey(User, null=True, blank=True, on_delete=SET_NULL,
+                                    related_name="resolved_variant_tags")
+    resolved_classification = models.ForeignKey(Classification, null=True, blank=True, on_delete=SET_NULL)
     user = models.ForeignKey(User, on_delete=CASCADE)
+
+    class Meta(TimeStampedModel.Meta):
+        constraints = [
+            # One tagging per (variant, tag, analysis, user, sample) - a null sample counts as a value, so an
+            # analysis also has at most one sample-less tagging. Global (variant page) taggings are outside this.
+            models.UniqueConstraint(fields=["variant", "tag", "analysis", "user", "sample"],
+                                    nulls_distinct=False,
+                                    condition=Q(analysis__isnull=False),
+                                    name="varianttag_one_per_sample_in_analysis"),
+        ]
+
+    @property
+    def is_resolved(self) -> bool:
+        """ Withdrawing the classification puts the to-do back
+            @see analysis.variant_tag_operations.resolve_variant_tag """
+        if self.resolved is None:
+            return False
+        return not (self.resolved_classification and self.resolved_classification.withdrawn)
+
+    @staticmethod
+    def unresolved_q() -> Q:
+        """ SQL twin of is_resolved - a withdrawn resolving classification puts the to-do back.
+            Every work list filters with this rather than a bare resolved__isnull=True """
+        return Q(resolved__isnull=True) | Q(resolved_classification__withdrawn=True)
 
     def __str__(self):
         description = f"{self.tag_id}: {self.variant} ({self.genome_build})"
@@ -99,14 +133,13 @@ class VariantTag(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
         if tags_qs is None:
             tags_qs = VariantTag.objects.all()
 
-        # Narrowing this to tags_qs's own alleles only looks like it saves work - the outer filter below
-        # already restricts to them, so it just adds a scan of the whole tag table to every query
-        va_kwargs = {"genome_build": genome_build}
+        # This has to be a correlated EXISTS - an IN-subquery inside the OR below can't become a
+        # semi-join, so Postgres hashes every VariantAllele in the build on each query
+        va_kwargs = {"genome_build": genome_build, "allele": OuterRef("allele")}
         if variant_qs is not None:
             va_kwargs["variant__in"] = variant_qs
 
-        va_qs = VariantAllele.objects.filter(**va_kwargs)
-        q_allele = Q(allele__in=va_qs.values_list("allele", flat=True))
+        q_allele = Q(Exists(VariantAllele.objects.filter(**va_kwargs)))
 
         # Tags in our own build are matched on variant, so they show up straight away - allele is assigned
         # asynchronously (@see analysis.tasks.variant_tag_tasks._liftover_variant_tag)
@@ -128,10 +161,11 @@ class VariantTag(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
                  variantallele__allele__in=tags_qs.values_list("allele"))
 
     @staticmethod
-    def get_variant_tag_counts_qs(variant, genome_build=None) -> QuerySet['VariantTag']:
+    def get_variant_tag_counts_qs(variant, genome_build=None, tags_qs=None) -> QuerySet['VariantTag']:
+        """ tags_qs - the taggings to count, applied before the grouping (default: all of them) """
         if genome_build is None:
             genome_build = variant.any_genome_build
-        qs = VariantTag.get_for_build(genome_build, variant_qs=variant.equivalent_variants)
+        qs = VariantTag.get_for_build(genome_build, tags_qs=tags_qs, variant_qs=variant.equivalent_variants)
         return qs.values("tag").annotate(count=Count("id"), last_created=Max("created")).order_by("tag")
 
     @staticmethod

@@ -63,78 +63,118 @@ function showGnomadPopulations() {
 {% block content %}
 <style>
     #id_percent, #id_internal_percent {
-        width: 80px;
+        width: 5em;
     }
-    
+
     #id_max_samples {
-        width: 60px;
+        width: 4.5em;
     }
 
     .disease-warning {
-        color: #FF8C00;
+        color: #d97706;
+    }
+
+    .population-db {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        gap: 2px 6px;
+        margin: 3px 0;
+    }
+
+    .population-db .editor-help {
+        margin: 0;
     }
 
     #gnomad-options {
-        margin-left: 50px;
+        margin: 2px 0 4px 20px;
     }
 
+    #gnomad-populations {
+        margin-top: 4px;
+    }
 </style>
-<div>
-	<form id="population" method="post" action="{{ request.path }}">
-        {% csrf_token %}
-		<div>Max population frequency of {{ form.percent }} % in
-		<span title='ANY - remove if frequency is above cutoff in any database (much more strict). ALL - Only remove if frequency is above cutoff in all databases. Note: ALL retains variants with a missing entry from any database'>
-		  {{ form.group_operation }}
-		</span> ticked database(s) below.</div>
+<form id="population" method="post" action="{{ request.path }}">
+    {% csrf_token %}
+    <div class="editor-row">
+        <span class="editor-label">Max frequency</span>
+        {{ form.percent }} % in
+        <span title='ANY - remove if frequency is above cutoff in any database (much more strict). ALL - Only remove if frequency is above cutoff in all databases. Note: ALL retains variants with a missing entry from any database'>
+          {{ form.group_operation }}
+        </span> ticked database(s) below
+    </div>
+    <div class="editor-section">
+        <div class="editor-section-title">Population databases</div>
         <div>
             <a target='_blank' href='http://gnomad.broadinstitute.org/about'>gnomAD v{{ annotation_version.variant_annotation_version.gnomad }}</a>
             <div id="gnomad-options">
-                <div>
-                <span>{{ form.gnomad_af }} <i>AF (average)</i></span>
-                <span>{{ form.gnomad_popmax_af }} <i>Popmax (Highest sub-pop frequency)</i>  </span>
+                <div class="editor-checks">
+                    <label for="{{ form.gnomad_af.id_for_label }}">{{ form.gnomad_af }} AF <span class="editor-help">(average)</span></label>
+                    <label for="{{ form.gnomad_popmax_af.id_for_label }}">{{ form.gnomad_popmax_af }} Popmax <span class="editor-help">(highest sub-population frequency)</span></label>
                 </div>
-
                 {% if node.has_filtering_allele_frequency %}
-                <div>
-                <span>{{ form.gnomad_fafmax_faf95_max }} <i>Filtering Allele Frequency (95% confidence)</i>  </span>
-                <span>{{ form.gnomad_fafmax_faf99_max }} <i>Filtering Allele Frequency (99% confidence)</i>  </span>
+                <div class="editor-checks">
+                    <label for="{{ form.gnomad_fafmax_faf95_max.id_for_label }}">{{ form.gnomad_fafmax_faf95_max }} Filtering AF <span class="editor-help">(95% confidence)</span></label>
+                    <label for="{{ form.gnomad_fafmax_faf99_max.id_for_label }}">{{ form.gnomad_fafmax_faf99_max }} Filtering AF <span class="editor-help">(99% confidence)</span></label>
                 </div>
                 {% endif %}
                 <div>
-                    <a id='show-gnomad-populations-link' href='javascript:showGnomadPopulations()'>Pick individual gnomAD populations</a>
+                    <a id='show-gnomad-populations-link' class="hover-link" href='javascript:showGnomadPopulations()'>Pick individual gnomAD populations</a>
                 </div>
-
-                <div id='gnomad-populations' class='hidden'>
+                <div id='gnomad-populations' class='hidden editor-choices'>
                 {{ form.gnomad_population }}
                 </div>
             </div>
         </div>
-
-        <div>
-            <div>{{ form.topmed_af }} <a target='_blank' href='https://www.nhlbiwgs.org/'>TOPMed</a> <i>TOPMed, ~144k participants from >80 different studies.</i> <span class="disease-warning">Warning: some patients have disease phenotypes</span></div>
-            <div>{{ form.af_1kg }} <a target='_blank' href='http://www.1000genomes.org'>1000 genomes</a> <i>1kg Phase3_v5. Global pop. ~2,500 individuals</i></div>
-            <div>{{ form.af_uk10k }} <a target='_blank' href='http://www.uk10k.org'>UK10K project</a> <i>WGS for controls. 3,781 individuals</i></div>
+        <div class="population-db">
+            <label for="{{ form.topmed_af.id_for_label }}">{{ form.topmed_af }} <a target='_blank' href='https://www.nhlbiwgs.org/'>TOPMed</a></label>
+            <span class="editor-help">~144k participants from >80 different studies.</span>
+            <span class="disease-warning">Some patients have disease phenotypes</span>
         </div>
-        <div><b>gnomAD hom alt max:</b> {{ form.gnomad_hom_alt_max }}</div>
-        <div><b>show gnomAD filtered:</b> {{ form.show_gnomad_filtered }}</div>
-        <div><b>Keep internally classified (likely) pathogenic:</b> {{ form.keep_internally_classified_pathogenic }} </div>
+        <div class="population-db">
+            <label for="{{ form.af_1kg.id_for_label }}">{{ form.af_1kg }} <a target='_blank' href='http://www.1000genomes.org'>1000 genomes</a></label>
+            <span class="editor-help">1kg Phase3_v5. Global population, ~2,500 individuals.</span>
+        </div>
+        <div class="population-db">
+            <label for="{{ form.af_uk10k.id_for_label }}">{{ form.af_uk10k }} <a target='_blank' href='http://www.uk10k.org'>UK10K project</a></label>
+            <span class="editor-help">WGS for controls, 3,781 individuals.</span>
+        </div>
+    </div>
+    <div class="editor-row">
+        <label class="editor-label" for="{{ form.gnomad_hom_alt_max.id_for_label }}">gnomAD hom alt max</label>
+        {{ form.gnomad_hom_alt_max }}
+    </div>
+    <div class="editor-row">
+        <span class="editor-label">Options</span>
+        <span class="editor-checks">
+            <label for="{{ form.show_gnomad_filtered.id_for_label }}">{{ form.show_gnomad_filtered }} Show gnomAD filtered</label>
+            <label for="{{ form.keep_internally_classified_pathogenic.id_for_label }}">{{ form.keep_internally_classified_pathogenic }} Keep internally classified (likely) pathogenic</label>
+        </span>
+    </div>
 
-        <div id='db-restrictions-container'>
-            <h3>Internal Population Frequency</h3>
-
-            Filter based on samples in this database {{ form.use_internal_counts }}
-            <div id='internal-population-container' class='hidden'>
-                <div><b>Max percent:</b> {{ form.internal_percent }} (Note: results vary over time with # of samples in database) </div>
-                <div><b>Max count:</b> {{ form.max_samples }} ({{ form.zygosity }}) (of the {{ num_samples_for_build }} samples in the database)</div>
-                <div class='text-muted'>"Any zygosity call" means Ref, Het or Hom Alt - samples with no zygosity call ("?") don't count.</div>
+    <div id='db-restrictions-container' class="editor-section">
+        <div class="editor-section-title">Internal population frequency</div>
+        <label for="{{ form.use_internal_counts.id_for_label }}">{{ form.use_internal_counts }} Filter based on samples in this database</label>
+        <div id='internal-population-container' class='hidden'>
+            <div class="editor-row">
+                <label class="editor-label" for="{{ form.internal_percent.id_for_label }}">Max percent</label>
+                {{ form.internal_percent }}
+                <span class="editor-help">Results vary over time with the number of samples in the database</span>
             </div>
+            <div class="editor-row">
+                <label class="editor-label" for="{{ form.max_samples.id_for_label }}">Max count</label>
+                {{ form.max_samples }} {{ form.zygosity }}
+                <span class="editor-help">of the {{ num_samples_for_build }} samples in the database</span>
+            </div>
+            <div class='editor-help'>"Any zygosity call" means Ref, Het or Hom Alt - samples with no zygosity call ("?") don't count.</div>
         </div>
+    </div>
 
+    <div class="editor-actions">
         {% if has_write_permission %}
-    		<button id='population-save' class="btn btn-primary">save</button>
+            <button id='population-save' class="btn btn-primary">Save</button>
         {% endif %}
-    	{{ form.media }}
-	</form>
-</div>
-
+    </div>
+    {{ form.media }}
+</form>
 {% endblock content %}

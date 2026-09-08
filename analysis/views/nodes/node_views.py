@@ -1,6 +1,5 @@
 import json
 
-from django.conf import settings
 from django.http.response import HttpResponse
 
 from analysis.exceptions import NonFatalNodeError
@@ -13,6 +12,7 @@ from analysis.forms.forms_nodes import (
     CohortNodeForm,
     ConservationNodeForm,
     DamageNodeForm,
+    DuoNodeForm,
     FilterNodeForm,
     IntersectionNodeForm,
     MergeNodeForm,
@@ -28,8 +28,9 @@ from analysis.forms.forms_nodes import (
     VennNodeForm,
     ZygosityNodeForm,
 )
-from analysis.models import MOINode, OntologyTerm, TagNode
-from analysis.models.enums import NodeStatus, SetOperations, TagNodeInput, TagNodeMode
+from analysis.models import MOINode, OntologyTerm, TagNode, VariantTag
+from analysis.models.enums import NodeStatus, SetOperations
+from analysis.models.nodes.analysis_node import NodeVersion
 from analysis.models.nodes.filters.allele_frequency_node import AlleleFrequencyNode
 from analysis.models.nodes.filters.built_in_filter_node import BuiltInFilterNode
 from analysis.models.nodes.filters.classifications_node import ClassificationsNode
@@ -48,6 +49,7 @@ from analysis.models.nodes.filters.zygosity_node import ZygosityNode
 from analysis.models.nodes.node_utils import update_analysis
 from analysis.models.nodes.sources.all_variants_node import AllVariantsNode
 from analysis.models.nodes.sources.cohort_node import CohortNode
+from analysis.models.nodes.sources.duo_node import DuoNode
 from analysis.models.nodes.sources.pedigree_node import PedigreeNode
 from analysis.models.nodes.sources.quad_node import QuadNode
 from analysis.models.nodes.sources.trio_node import TrioNode
@@ -57,7 +59,7 @@ from classification.models.classification import Classification
 from classification.views.classification_datatables import ClassificationColumns
 from library.django_utils import highest_pk
 from library.django_utils import resolve_field_path
-from snpdb.models.models_enums import TagFilter
+from snpdb.models import Tag
 from snpdb.models.models_user_settings import UserSettings
 from snpdb.models.models_variant import Variant
 
@@ -320,33 +322,30 @@ class TagNodeView(NodeView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["datatable_config"] = ClassificationColumns(self.request)
-        context["requires_classification_tags"] = self.object.analysis.varianttag_set.filter(tag=settings.TAG_REQUIRES_CLASSIFICATION)
+        # The to-do list - every tag in the classify queue vocabulary @see Tag.classify_queue_qs
+        # A tagging a classification has already satisfied is done @see VariantTag.unresolved_q
+        context["requires_classification_tags"] = self.object.analysis.varianttag_set.filter(
+            VariantTag.unresolved_q(), tag__in=Tag.classify_queue_qs()).select_related("tag")
         context.update(self._get_tag_counts_context())
         return context
 
     def _get_tag_counts_context(self) -> dict:
-        """ The pills above the form - each toggles its tag into the grid's extra_filters. Excluding
-            tagged variants leaves every count at zero, so there's nothing to show """
+        """ The pills above the form are the node's tag picker - toggling one updates the form's
+            tags, applied on save like the rest of the editor """
         node = self.object
-        if node.node_input == TagNodeInput.PARENT_NOT_TAGGED or not NodeStatus.is_ready(node.status):
+        if not NodeStatus.is_ready(node.status):
             return {"show_tag_counts": False}
 
-        global_tag_counts = node.mode == TagNodeMode.ALL_TAGS
-        context = {
+        node_version = NodeVersion.objects.filter(node=node, version=node.version).first()
+        tag_counts = node_version.load_data.get("tag_counts") if node_version else None
+        if tag_counts is None:
+            # Loaded before the picker was snapshotted, or mid-reload - count them now
+            tag_counts = node.get_tag_counts()
+        return {
             "show_tag_counts": True,
-            "global_tag_counts": global_tag_counts,
-            "selected_tag_ids": TagFilter.get_tag_ids(self.kwargs.get("extra_filters")),
+            "tag_counts": list(tag_counts.items()),
+            "selected_tag_ids": node.tag_ids,
         }
-        if global_tag_counts:
-            context["tag_counts"] = node.get_global_tag_counts()
-        else:
-            # The analysis' own tag node counts - the DAG has already counted these, so the counts
-            # come from the node card client side @see fillTagCountsFromNode
-            tag_ids = [tag_id for label, _ in node.analysis.get_node_count_types()
-                       if (tag_id := TagFilter.get_tag_id(label))]
-            context["tag_counts"] = [(tag_id, None) for tag_id in tag_ids]
-            context["tag_counts_auto_add_tags"] = node.analysis.node_count_auto_add_tags
-        return context
 
     def _get_form_initial(self):
         form_initial = super()._get_form_initial()
@@ -405,6 +404,21 @@ class QuadNodeView(ZygosityTableMixin, NodeView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["quad_loadable"] = _source_visible_to_user(self.object.quad, self.request.user)
+        return context
+
+
+class DuoNodeView(ZygosityTableMixin, NodeView):
+    model = DuoNode
+    form_class = DuoNodeForm
+
+    def get_form_kwargs(self):
+        form_kwargs = super().get_form_kwargs()
+        form_kwargs["genome_build"] = self.object.analysis.genome_build
+        return form_kwargs
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["duo_loadable"] = _source_visible_to_user(self.object.duo, self.request.user)
         return context
 
 

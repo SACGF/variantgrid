@@ -2,6 +2,7 @@ from typing import Optional
 
 from django.contrib.auth.models import User
 from django.db.models import F, Max, OuterRef, Q, StringAgg, Subquery, TextField, Value, fields
+from django.db.models.expressions import Case, When
 from django.db.models.fields.json import KeyTextTransform, KeyTransform
 from django.db.models.functions import Cast, Coalesce, Concat, TruncDate
 from django.utils.timezone import localtime
@@ -30,6 +31,10 @@ VARIANT_GRID_EXTRA_ANNOTATION_ALIASES = set(CLASSIFICATIONS_COLUMN_ROW_ANNOTATIO
     "tags_global",
 }
 
+
+# VariantGrid column name -> the separator its stored value joins multiple values with. The cell
+# splits on it so a multi-value column reads as a list; the raw value is what the exports carry
+COLUMN_SEPARATORS = vep_columns.separators_by_variant_grid_column()
 
 # Filter type offered for a model field's class (first match wins)
 _FIELD_FILTER_TYPES = [
@@ -122,6 +127,11 @@ def _catalogue_column_kwargs(column) -> dict:
     }
     if column.width is not None:
         kwargs["width"] = column.width
+    if separator := COLUMN_SEPARATORS.get(column.pk):
+        # A column with a link renderer of its own overrides the renderer but keeps the kwarg -
+        # they all take the separator the same way (@see get_standard_overrides)
+        kwargs["client_renderer"] = "VariantGridFormat.separated"
+        kwargs["client_renderer_kwargs"] = {"separator": separator}
     return kwargs
 
 
@@ -133,6 +143,8 @@ def _composite_column_kwargs(column, members: list, column_overrides: dict[str, 
         entry = {"path": member.column.variant_column, "label": member.column.label}
         if renderer := column_overrides.get(member.column.variant_column, {}).get("client_renderer"):
             entry["renderer"] = renderer
+        if separator := COLUMN_SEPARATORS.get(member.column.pk):
+            entry["separator"] = separator
         return entry
 
     kwargs = {
@@ -146,6 +158,15 @@ def _composite_column_kwargs(column, members: list, column_overrides: dict[str, 
         # Display only - nothing of its own to sort on, so it sorts on the value the cell reads as
         kwargs["sort_keys"] = [members[0].column.variant_column]
     return kwargs
+
+
+def composite_rich_column(column, members: list, column_overrides: dict[str, dict]) -> RichColumn:
+    """ The grid column for a composite cell drawing `members` - the catalogue's label/width/tooltip,
+        the members and sort keys the cell needs, and whatever the deployment overrides on it """
+    kwargs = _catalogue_column_kwargs(column)
+    kwargs.update(_composite_column_kwargs(column, members, column_overrides))
+    kwargs.update(column_overrides.get(column.variant_column, {}))
+    return variant_column_rich_column(column.variant_column, **kwargs)
 
 
 def get_variant_grid_columns(custom_columns_collection: CustomColumnsCollection,
@@ -175,6 +196,8 @@ def get_variant_grid_columns(custom_columns_collection: CustomColumnsCollection,
     for c in columns_queryset:
         column = c.column
         if not column.variant_column:
+            if column.annotation_level == ColumnAnnotationLevel.SAMPLE_LEVEL:
+                shown_columns.append((column, []))  # marks where the per-sample columns go
             continue
         # Tags are only shown in the analysis they are in (otherwise will just show tags_global)
         if column.variant_column == "tags" and not analysis_tags:
@@ -183,20 +206,22 @@ def get_variant_grid_columns(custom_columns_collection: CustomColumnsCollection,
         if column.is_composite and not members:
             continue  # nothing this version annotates for the cell to draw
         shown_columns.append((column, members))
-    shown_paths = {column.variant_column for column, _ in shown_columns}
+    shown_paths = {column.variant_column for column, _ in shown_columns if column.variant_column}
 
     fields_kwargs: dict[str, dict] = {}  # field path -> RichColumn kwargs, in column order
+    composites: dict[str, tuple] = {}  # field path -> (column, the members its cell draws)
     sample_columns_position = None
 
-    for field_pos, (column, members) in enumerate(shown_columns):
-        if column.model_field is False:
-            if column.annotation_level == ColumnAnnotationLevel.SAMPLE_LEVEL:
-                sample_columns_position = field_pos
+    for column, members in shown_columns:
+        if not column.variant_column:
+            # The Sample marker - an index into the columns built below, so it counts the members
+            # riding along hidden behind everything before it
+            sample_columns_position = len(fields_kwargs)
+            continue
 
-        kwargs = _catalogue_column_kwargs(column)
+        fields_kwargs[column.variant_column] = _catalogue_column_kwargs(column)
         if members:
-            kwargs.update(_composite_column_kwargs(column, members, column_overrides))
-        fields_kwargs[column.variant_column] = kwargs
+            composites[column.variant_column] = (column, members)
 
         # The members the cell draws ride along hidden, right after it - unless the collection shows
         # one standalone, where it is simply visible, once, in its own place
@@ -208,8 +233,10 @@ def get_variant_grid_columns(custom_columns_collection: CustomColumnsCollection,
 
     rich_columns = []
     for path, kwargs in fields_kwargs.items():
-        kwargs = {**kwargs, **column_overrides.get(path, {})}
-        rich_columns.append(variant_column_rich_column(path, **kwargs))
+        if composite := composites.get(path):
+            rich_columns.append(composite_rich_column(*composite, column_overrides))
+        else:
+            rich_columns.append(variant_column_rich_column(path, **{**kwargs, **column_overrides.get(path, {})}))
     return rich_columns, sample_columns_position
 
 
@@ -232,9 +259,14 @@ def get_variantgrid_extra_annotate(user: User, exclude_analysis=None) -> dict:
     tags_qs = VariantTag.filter_for_user(user).filter(allele__variantallele__variant_id=OuterRef("id"))
     if exclude_analysis:
         tags_qs = tags_qs.filter(Q(analysis__isnull=True) | Q(analysis__id__ne=exclude_analysis.pk))
-    # "tag_id:date" entries, e.g. "Artefact:2024-03-01|SomaticReportable:2023-05-06" - the date lets
-    # formatters show fresh vs total counts (see tagsGlobalFormatter / format_items_iterator)
-    tag_and_date = Concat("tag_id", Value(":"), Cast(TruncDate("created"), TextField()), output_field=TextField())
+    # "tag_id:date:resolved" entries, e.g. "Artefact:2024-03-01:|ToDo:2023-05-06:R" - the
+    # date lets formatters show fresh vs total counts, the trailing R marks a to-do a classification has
+    # satisfied (see VariantGridFormat.tagsGlobal / _summarise_tags_global). A tag id may itself contain
+    # a colon, so the two trailing fields are taken off the end rather than split on
+    resolved_marker = Case(When(VariantTag.unresolved_q(), then=Value("")), default=Value("R"),
+                           output_field=TextField())
+    tag_and_date = Concat("tag_id", Value(":"), Cast(TruncDate("created"), TextField()),
+                          Value(":"), resolved_marker, output_field=TextField())
     tags_global = tags_qs.values("allele").annotate(tags=StringAgg(tag_and_date, delimiter=Value('|'))).values_list("tags")
 
     return {

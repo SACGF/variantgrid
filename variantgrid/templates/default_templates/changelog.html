@@ -39,6 +39,11 @@
                     <li>New analysis type - Quad (a trio plus an affected sibling). Has its own creation wizard and page, and the
                         Trio/Quad nodes show a table of zygosities, with options for combined recessive filtering, "any affected",
                         and requiring the affected sibling's zygosity</li>
+                    <li>New analysis type - Duo (a proband plus one sequenced parent, where the other isn't available).
+                        Own wizard, page and node, with the inheritance modes that make sense with one parent</li>
+                    <li>Trio/Duo/Quad nodes - new "Dominant (mosaic parent)" inheritance, which finds a parent carrying the
+                        variant in a fraction of cells by their alt reads at a low allele frequency, rather than by
+                        the germline caller's genotype</li>
                     <li>Analysis templates can be configured to auto-launch when a sample is imported</li>
                     <li>Audit log - records which nodes were added/configured, by who and when</li>
                     <li>All Variants node - filter by variant type (eg symbolic) and by chromosome/contig</li>
@@ -255,6 +260,30 @@
 
     {% else %}
        <div class="card mt-4">
+            <div class="card-header">4 September 2026</div>
+            <div class="card-body">
+                <h4>Analysis</h4>
+                <ul>
+                    <li>#1829 - Duo analysis (proband + one parent) - wizard, Duo page and DuoNode</li>
+                    <li>#1830 - Trio/Duo/Quad nodes - "Dominant (mosaic parent)" inheritance mode</li>
+                </ul>
+            </div>
+       </div>
+
+       <div class="card mt-4">
+            <div class="card-header">3 September 2026</div>
+            <div class="card-body">
+                <h4>Analysis</h4>
+                <ul>
+                    <li>private#223 - SampleNode - FILTER, zygosity and allele frequency get per sample overrides</li>
+                    <li>sapath#439 - Analysis templates - reveal a node hidden by ignorable errors (useful for trio analysis where part stopped due to detected sex)</li>
+                    <li>#21 - Tag counts draw as pills in the node counts settings lists and tag autocomplete</li>
+                    <li>private#686 - Analysis grid - multi-value column refinements</li>
+                </ul>
+            </div>
+       </div>
+
+       <div class="card mt-4">
             <div class="card-header">2 September 2026</div>
             <div class="card-body">
                 <h4>Analysis</h4>
@@ -285,6 +314,7 @@
                 <h4>User Interface</h4>
                 <ul>
                     <li>private#686 - Variant grids - composite columns, sample glyphs, 2 line rows, sort menus</li>
+                    <li>Variant grids - Pop Freq Other and UniProt composite columns, conservation drawn as a dot per score</li>
                     <li>#1819 - User awards - computed badges for analysis, classification, tags etc</li>
                     <li>#1673 - Variant details - COSMIC Sample Count no longer left blank</li>
                     <li>#1822 - Variant details - Open Targets card - a row per gene, de-duplicated diseases / biosamples</li>

@@ -2,35 +2,9 @@
 {% load js_tags %}
 {% block content %}
 <style>
-	.slider-container {
-		margin-left: 10px;
-		display: inline-block;
-	}
-
-	.slider {
-		display: inline-block;
-		width: 200px;
-		vertical-align: middle;
-	}
-
-	.slider-labels {
-		width: 200px;
-	}
-
-	.label {
-		font-weight: bold;
-	}
-
-	.slider-value {
-        min-width: 50px;
-        height: 25px;
-		margin-left: 15px;
-	}
-
 	.individual-conservation-scores {
 	    display: none;
 	}
-
 </style>
 <script>
     function showIndividualConservationScores() {
@@ -103,22 +77,50 @@
         }
     });
 </script>
-<div>
-	<form id="conservation-filter" method="post" action="{{ request.path }}">
-        {% csrf_token %}
-        {% for hidden in form.hidden_fields %}
-            {{ hidden }}
-        {% endfor %}
+<form id="conservation-filter" method="post" action="{{ request.path }}">
+    {% csrf_token %}
+    {% for hidden in form.hidden_fields %}
+        {{ hidden }}
+    {% endfor %}
 
-		{{ form.non_field_errors }}
-        <table>
-            <tr>
-                <th>{{ form.any_scaled_min.label }}</th>
-                <td>
-                    {{ form.any_scaled_min.errors }}
+    {{ form.non_field_errors }}
+    <table class="editor-table">
+        <tr>
+            <th>{{ form.any_scaled_min.label }}</th>
+            <td>
+                {{ form.any_scaled_min.errors }}
+                <span class='slider-container'>
+                    <div class="display-flex">
+                        <input type="range" id="any_scaled_min-slider" class='slider' />
+                        <div class='label slider-value'></div>
+                    </div>
+                    <div class='slider-labels'>
+                        <span class='label min-value left'></span>
+                        <span class='label max-value right'></span>
+                    </div>
+                </span>
+            </td>
+        </tr>
+        <tr>
+            <th>{{ form.allow_null.label }}</th>
+            <td>{{ form.allow_null }}</td>
+        </tr>
+        <tr id="show-individual-conservation-scores">
+            <td colspan="2">
+                <a class="hover-link" href="javascript:showIndividualConservationScores()">Show individual conservation scores</a>
+            </td>
+        </tr>
+        <tr class="individual-conservation-scores">
+            <th>{{ form.use_individual_sliders.label }}</th>
+            <td>{{ form.use_individual_sliders }}</td>
+        </tr>
+        {% for field_name, field in form.individual_conservation_score_fields.items %}
+            <tr class="individual-conservation-scores">
+                <th>{{ field.label }}</th>
+                <td>{{ field.errors }}
                     <span class='slider-container'>
                         <div class="display-flex">
-                            <input type="range" id="any_scaled_min-slider" class='slider' />
+                            <input type="range" id="{{ field_name }}-slider" class='slider' />
                             <div class='label slider-value'></div>
                         </div>
                         <div class='slider-labels'>
@@ -128,42 +130,14 @@
                     </span>
                 </td>
             </tr>
-            <tr>
-                <th>{{ form.allow_null.label }}</th>
-                <td>{{ form.allow_null }}</td>
-            </tr>
-            <tr id="show-individual-conservation-scores">
-                <td colspan="2">
-                    <a class="hover-link" href="javascript:showIndividualConservationScores()">Show Individual Conservation Scores</a>
-                </td>
-            </tr>
-            <tr class="individual-conservation-scores">
-                <th>{{ form.use_individual_sliders.label }}</th>
-                <td>{{ form.use_individual_sliders }}</td>
-            </tr>
-            {% for field_name, field in form.individual_conservation_score_fields.items %}
-                <tr class="individual-conservation-scores">
-                    <th>{{ field.label }}</th>
-                    <td>{{ field.errors }}
-                        <span class='slider-container'>
-                            <div class="display-flex">
-                                <input type="range" id="{{ field_name }}-slider" class='slider' />
-                                <div class='label slider-value'></div>
-                            </div>
-                            <div class='slider-labels'>
-                                <span class='label min-value left'></span>
-                                <span class='label max-value right'></span>
-                            </div>
-                        </span>
-                    </td>
-                </tr>
-            {% endfor %}
-        </table>
+        {% endfor %}
+    </table>
 
+    <div class="editor-actions">
         {% if has_write_permission %}
-    		<button id='damage-save' class="btn btn-primary">save</button>
+            <button id='damage-save' class="btn btn-primary">Save</button>
         {% endif %}
-	    {{ form.media }}
-	</form>
-</div>
+    </div>
+    {{ form.media }}
+</form>
 {% endblock content %}

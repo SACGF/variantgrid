@@ -1,3 +1,10 @@
+"""
+snpdb's Django forms: the BaseForm / BaseModelForm variants that drop the ':' label suffix, the
+autocomplete-backed pickers (user, lab, genome build via GenomeBuildAutocompleteForwardMixin), the
+Lab / Organization / VCF / user settings model forms (ROFormMixin gives read-only rendering), the
+Guardian GroupPermissionForm, and manual variant entry. VCFForm hides unused sample-field columns, so
+not every model field is on the form.
+"""
 import collections
 from functools import cached_property
 
@@ -561,7 +568,7 @@ class SettingsOverrideForm(BaseModelForm):
             "allele_origin_focus": "Allele Origin focus",
             "allele_origin_exclude_filter": "Allele Origin (filter by default)",
             "grid_sample_label_template": "Grid Sample Label Template",
-            "initially_show_zygosity_table": "Initially Show Trio/Quad Zygosity Table",
+            "initially_show_zygosity_table": "Initially Show Duo/Trio/Quad Zygosity Table",
             "variant_grid_two_line_rows": "Variant Grid Two Line Rows",
             "node_grid_auto_load_max_variants": "Node Grid Auto Load Max Variants",
             "variant_tag_stale_days": "Variant Tags Stale After",
@@ -768,6 +775,9 @@ class CreateTagForm(forms.Form):
     tag = forms.CharField(widget=forms.TextInput(attrs={'placeholder': 'New Tag Name...'}), required=True)
     allele_origin_bucket = forms.ChoiceField(choices=TAG_ALLELE_ORIGIN_CHOICES, label="Allele origin",
                                              initial=AlleleOriginBucket.UNKNOWN, required=True)
+    requires_classification = forms.BooleanField(label="Classify queue", required=False,
+                                                 help_text="Tagged variants are listed as needing classification "
+                                                           "on the sample and patient pages")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -776,6 +786,7 @@ class CreateTagForm(forms.Form):
         helper.layout = Layout(
             FieldWithButtons('tag', Submit(name="Create", value="create", css_class="btn btn-primary")),
             Field('allele_origin_bucket'),
+            Field('requires_classification'),
         )
         self.helper = helper
 
@@ -792,7 +803,8 @@ class CreateTagForm(forms.Form):
 
     def save(self) -> Tag:
         return Tag.objects.create(pk=self.cleaned_data['tag'],
-                                  allele_origin_bucket=self.cleaned_data['allele_origin_bucket'])
+                                  allele_origin_bucket=self.cleaned_data['allele_origin_bucket'],
+                                  requires_classification=self.cleaned_data['requires_classification'])
 
 
 class UserSettingsGenomeBuildMixin:

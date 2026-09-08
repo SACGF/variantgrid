@@ -4,14 +4,14 @@ from upload.grids import (
     UploadPipelineSkippedAnnotationColumns,
     UploadStepColumns,
 )
-from upload.views import views
+from upload.views import views, views_json
 from upload.views.views import view_upload_step_detail
 from upload.views.views_rest import APIAnnotatedDownloadView, APIFileUploadView, APIUploadStatusView
 from variantgrid.perm_path import path
 
 urlpatterns = [
     path('', views.upload, name='upload'),
-    path('upload_poll', views.upload_poll, name='upload_poll'),
+    path('upload_poll', views_json.upload_poll, name='upload_poll'),
     path('view_uploaded_file/<int:file_upload_id>', views.view_uploaded_file, name='view_uploaded_file'),
     path('view_upload_pipeline/<int:upload_pipeline_id>', views.view_upload_pipeline, name='view_upload_pipeline'),
     path('view_upload_pipeline/warnings_and_errors/<int:upload_pipeline_id>', views.view_upload_pipeline_warnings_and_errors, name='view_upload_pipeline_warnings_and_errors'),
@@ -28,9 +28,9 @@ urlpatterns = [
          name='upload_pipeline_modified_variants_datatable'),
 
     path('view_upload_stats/detail', views.view_upload_stats, name='view_upload_stats_detail'),
-    path('vcf_import_info_tags/accept/<int:vcf_import_info_id>', views.accept_vcf_import_info_tag, name='accept_vcf_import_info_tag'),
-    path('upload_file/', views.upload_file, name='upload_file'),
-    path('upload_file_delete/<int:pk>', views.upload_file_delete, name='upload_file_delete'),
+    path('vcf_import_info_tags/accept/<int:vcf_import_info_id>', views_json.accept_vcf_import_info_tag, name='accept_vcf_import_info_tag'),
+    path('upload_file/', views_json.upload_file, name='upload_file'),
+    path('upload_file_delete/<int:pk>', views_json.upload_file_delete, name='upload_file_delete'),
     path('uploaded_file/download/<int:pk>', views.DownloadUploadedFile.as_view(), name='download_uploaded_file'),
 
     # APIs - Django REST framework

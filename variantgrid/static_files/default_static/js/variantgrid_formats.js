@@ -35,20 +35,33 @@ function _genomeBuildName(ctx) {
 }
 
 
-function splitAndLink(rawValue, split, buildLinkFunc) {
-    let formattedValue = '';
-    if (rawValue) {
-        const raw_value_list = rawValue.split(split);
-        const links = [];
-        for(let i=0 ; i<raw_value_list.length ; ++i) {
-            const value = raw_value_list[i];
-            links.push(buildLinkFunc(value));
-        }
-        formattedValue = links.join();
-    }
-    return formattedValue;
+// Multi-value columns arrive joined by the separator their VEP column declares (@see
+// VEPColumnDef.separator) - the exports carry the raw value, the cell reads as a list
+const VEP_SEPARATOR = "&";  // what a column falls back to, @see vep_field_formatters.VEP_SEPARATOR
+const VALUE_JOIN = ", ";
+
+function _separator(ctx) {
+    return (ctx && ctx.kwargs && ctx.kwargs.separator) || VEP_SEPARATOR;
 }
 
+function splitValues(rawValue, separator) {
+    return String(rawValue).split(separator || VEP_SEPARATOR).filter(v => v !== '');
+}
+
+function splitAndLink(rawValue, separator, buildLinkFunc) {
+    if (!rawValue) {
+        return '';
+    }
+    return splitValues(rawValue, separator).map(buildLinkFunc).join(VALUE_JOIN);
+}
+
+// Columns with nothing to link - the value is just easier to read split up
+VariantGridFormat.separated = (value, type, rowData, ctx) => {
+    if (value == null || value === '') {
+        return '';
+    }
+    return escapeHtml(splitValues(value, _separator(ctx)).join(VALUE_JOIN));
+};
 
 // Keys are Classification.clinical_significance codes / somatic summary tiers - values give the box
 // contents and tooltip label
@@ -107,13 +120,13 @@ const CLINVAR_ONCOGENICITY_CHIPS = {  // ClinVar.highest_oncogenicity (ClinVarOn
 };
 
 // ClinVar.somatic_tier (SomaticClinicalSignificance) - the AMP tier, in the short form the chip has
-// room for
+// room for. It's a choice field, so unlike the internal tiers above the row carries the label
 const CLINVAR_SOMATIC_TIER_CHIPS = {
-    'tier_1': {text: 'I', css: 'scs-tier_1'},
-    'tier_1_or_2': {text: 'I/II', css: 'scs-tier_1_or_2'},
-    'tier_2': {text: 'II', css: 'scs-tier_2'},
-    'tier_3': {text: 'III', css: 'scs-tier_3'},
-    'tier_4': {text: 'IV', css: 'scs-tier_4'},
+    'Tier I': {text: 'I', css: 'scs-tier_1'},
+    'Tier I/II': {text: 'I/II', css: 'scs-tier_1_or_2'},
+    'Tier II': {text: 'II', css: 'scs-tier_2'},
+    'Tier III': {text: 'III', css: 'scs-tier_3'},
+    'Tier IV': {text: 'IV', css: 'scs-tier_4'},
 };
 
 // Each chip sits in a fixed slot (global.scss) so the four origins line up down the column - a
@@ -123,17 +136,18 @@ const GERMLINE_CHIP_SLOT = 'cs-chip-germline';
 const CLINVAR_SOMATIC_CHIP_SLOT = 'cs-chip-clinvar-somatic';
 const SOMATIC_CHIP_SLOT = 'cs-chip-somatic';
 
-function _classificationChip(cssClasses, innerHtml, title, gridColumn) {
-    const href = gridColumn ? `javascript:showGridCell("${gridColumn}")` : 'javascript:void(0)';
-    return `<a class='cs-chip ${cssClasses.join(' ')}' title='${escapeHtml(title)}' href='${href}'>${innerHtml}</a>`;
+// Chips are spans rather than links, so a click on one falls through to the row click handler and
+// expands the row - where the full ClinVar and classification detail is (@see variantGridRowDetail)
+function _classificationChip(cssClasses, innerHtml, title) {
+    return `<span class='cs-chip ${cssClasses.join(' ')}' title='${escapeHtml(title)}'>${innerHtml}</span>`;
 }
 
 function _emptyChip(slotCssClass, title) {
-    return _classificationChip([slotCssClass, 'cs-chip-empty'], '&mdash;', title, null);
+    return _classificationChip([slotCssClass, 'cs-chip-empty'], '&mdash;', title);
 }
 
 function _internalClassificationChip(originLabel, originCssClass, slotCssClass, maxClassification,
-                                     classifiedSummary, gridColumn, chipLookup, boxLookup) {
+                                     classifiedSummary, chipLookup, boxLookup) {
     // null = not classified; undefined = a row cached before these fields existed - treat the same
     if (maxClassification == null) {
         return _emptyChip(slotCssClass, originLabel + ": not classified");
@@ -146,7 +160,7 @@ function _internalClassificationChip(originLabel, originCssClass, slotCssClass, 
         inner += ` <span class='cs-chip-count'>&times;${records.length}</span>`;
     }
     return _classificationChip([slotCssClass, chip.css, originCssClass], inner,
-                               `${originLabel}: ${summaryLabels.join(' | ')}`, gridColumn);
+                               `${originLabel}: ${summaryLabels.join(' | ')}`);
 }
 
 function _clinvarChip(rowData, ctx) {
@@ -158,9 +172,11 @@ function _clinvarChip(rowData, ctx) {
     const inner = `<span class='cs-chip-src'>CV</span>${escapeHtml(chip.text)}`
                 + _clinvarStarsHtml(rowData["clinvar__review_status"], ctx);
     const title = "ClinVar: " + (rowData["clinvar__clinical_significance"] || chip.text);
-    return _classificationChip([CLINVAR_CHIP_SLOT, chip.css], inner, title, "clinvar__clinical_significance");
+    return _classificationChip([CLINVAR_CHIP_SLOT, chip.css], inner, title);
 }
 
+// clinvarStars is keyed by the review status label, which is what the choice field's column carries
+// @see variant_grid_client_extra
 function _clinvarStarsHtml(reviewStatus, ctx) {
     const starsLookup = (ctx && ctx.extra && ctx.extra.clinvarStars) || {};
     const stars = starsLookup[reviewStatus];
@@ -194,11 +210,10 @@ function _clinvarSomaticChip(rowData, ctx) {
     const chip = oncChip || tierChip;
     const reviewStatus = oncChip ? rowData["clinvar__oncogenic_review_status"]
                                  : rowData["clinvar__somatic_review_status"];
-    const gridColumn = oncChip ? "clinvar__highest_oncogenicity" : "clinvar__somatic_tier";
     const inner = `<span class='cs-chip-src'>CV</span>${escapeHtml(chip.text)}`
                 + _clinvarStarsHtml(reviewStatus, ctx);
     return _classificationChip([CLINVAR_SOMATIC_CHIP_SLOT, chip.css], inner,
-                               "ClinVar somatic: " + titleParts.join(", "), gridColumn);
+                               "ClinVar somatic: " + titleParts.join(", "));
 }
 
 
@@ -211,11 +226,11 @@ VariantGridFormat.classifications = (_value, type, rowData, ctx) => {
     const chips = _clinvarChip(rowData, ctx)
         + _internalClassificationChip("Internally Classified (Germline)", "allele-origin-G", GERMLINE_CHIP_SLOT,
             rowData["max_internal_classification"], rowData["internally_classified"],
-            "max_internal_classification", GERMLINE_CLASSIFICATION_CHIPS, GERMLINE_CLASSIFICATION_BOXES)
+            GERMLINE_CLASSIFICATION_CHIPS, GERMLINE_CLASSIFICATION_BOXES)
         + _clinvarSomaticChip(rowData, ctx)
         + _internalClassificationChip("Internally Classified (Somatic)", "allele-origin-S", SOMATIC_CHIP_SLOT,
             rowData["max_internal_somatic_classification"], rowData["internally_classified_somatic"],
-            "max_internal_somatic_classification", SOMATIC_CLASSIFICATION_CHIPS, SOMATIC_CLASSIFICATION_BOXES);
+            SOMATIC_CLASSIFICATION_CHIPS, SOMATIC_CLASSIFICATION_BOXES);
     return `<span class='cs-chips'>${chips}</span>`;
 };
 
@@ -223,13 +238,27 @@ VariantGridFormat.classifications = (_value, type, rowData, ctx) => {
 // The generic composite cell: the first member is what the cell reads as, every other non-blank
 // member goes on hover as "label: value". A group whose members are all blank draws nothing, which
 // is what lets the eye skip down a sparse column.
-// Members (path, label, and the client renderer the member carries standalone) come from the
-// members render kwarg - @see _composite_column_kwargs in snpdb/grid_columns/custom_columns.py
+// Members (path, label, the client renderer the member carries standalone, and its separator where
+// it holds multiple values) come from the members render kwarg
+// @see _composite_column_kwargs in snpdb/grid_columns/custom_columns.py
 function _compositeMemberHtml(member, value, type, rowData, ctx) {
     if (member.renderer) {
-        return eval(member.renderer)(value, type, rowData, ctx);
+        // The member's own separator, not the composite's
+        const memberCtx = {...ctx, kwargs: {...(ctx && ctx.kwargs), separator: member.separator}};
+        return eval(member.renderer)(value, type, rowData, memberCtx);
     }
-    return escapeHtml(String(value));
+    return escapeHtml(_memberText(member, value));
+}
+
+function _memberText(member, value) {
+    return member.separator ? splitValues(value, member.separator).join(VALUE_JOIN) : String(value);
+}
+
+// The separator declared by the composite member reading `path`
+function _memberSeparator(ctx, path) {
+    const members = (ctx && ctx.kwargs && ctx.kwargs.members) || [];
+    const member = members.find(m => m.path === path);
+    return member && member.separator;
 }
 
 function _isBlank(value) {
@@ -245,7 +274,7 @@ VariantGridFormat.composite = (_value, type, rowData, ctx) => {
     for (let i = 1; i < members.length; ++i) {
         const value = rowData[members[i].path];
         if (!_isBlank(value)) {
-            detail.push(`${members[i].label}: ${value}`);
+            detail.push(`${members[i].label}: ${_memberText(members[i], value)}`);
         }
     }
     const headline = rowData[members[0].path];
@@ -256,7 +285,8 @@ VariantGridFormat.composite = (_value, type, rowData, ctx) => {
     const cell = _isBlank(headline)
         ? `<span class='composite-empty-headline'>&middot;</span>`
         : _compositeMemberHtml(members[0], headline, type, rowData, ctx);
-    const title = [`${members[0].label}: ${_isBlank(headline) ? '' : headline}`].concat(detail).join(' \u00b7 ');
+    const headlineText = _isBlank(headline) ? '' : _memberText(members[0], headline);
+    const title = [`${members[0].label}: ${headlineText}`].concat(detail).join(' \u00b7 ');
     return `<span class='composite-cell' title='${escapeHtml(title)}'>${cell}</span>`;
 };
 
@@ -270,17 +300,20 @@ const IMPACT_DOT_CSS = {
 };
 
 // Impact + Consequence in one cell. Sorts by consequence, its headline member.
-VariantGridFormat.impactConsequence = (_value, type, rowData) => {
-    const consequence = rowData["variantannotation__consequence"];
+VariantGridFormat.impactConsequence = (_value, type, rowData, ctx) => {
+    const rawConsequence = rowData["variantannotation__consequence"];
     const impact = rowData["variantannotation__impact"];
-    if (consequence == null && impact == null) {
+    if (rawConsequence == null && impact == null) {
         return '';
     }
+    // VEP gives every consequence the variant hits, joined - "missense_variant, splice_region_variant"
+    const consequence = rawConsequence == null
+        ? '' : splitValues(rawConsequence, _memberSeparator(ctx, "variantannotation__consequence")).join(VALUE_JOIN);
     const dotCss = IMPACT_DOT_CSS[impact] || 'impact-unknown';
-    const title = [impact, consequence].filter(v => v != null).join(' · ');
+    const title = [impact, consequence].filter(v => v !== '' && v != null).join(' · ');
     const impactWord = impact == null ? '' : `<span class='ic-line2'>${escapeHtml(impact)}</span>`;
     return `<span class='impact-consequence' title='${escapeHtml(title)}'>`
-         + `<i class='impact-dot ${dotCss}'></i>${escapeHtml(consequence == null ? '' : consequence)}`
+         + `<i class='impact-dot ${dotCss}'></i>${escapeHtml(consequence)}`
          + `${impactWord}</span>`;
 };
 
@@ -360,6 +393,20 @@ VariantGridFormat.sampleZygosity = (zygosity, type, rowData, ctx) => {
         values += `<span class='zyg-depth'>${escapeHtml(depths.join('/'))}</span>`;
     }
 
+    // The caller's copy number or copy ratio, where its VCF has one. Which key it came from and what
+    // that key means are per VCF, so they arrive as render kwargs - @see VCF.copy_number_field
+    const copyNumber = (ctx && ctx.kwargs && ctx.kwargs.copyNumber);
+    let copyNumberHtml = '';
+    if (copyNumber) {
+        const cn = sampleValue('samples_copy_number');
+        if (_hasSampleValue(cn)) {
+            const text = `${copyNumber.label} ${cn}`;
+            copyNumberHtml = `<span class='zyg-cn' title='${escapeHtml(`${copyNumber.title}: ${cn}`)}'>`
+                           + `${escapeHtml(text)}</span>`;
+            detail.push(text);
+        }
+    }
+
     const thresholds = (ctx && ctx.extra && ctx.extra.genotypeQuality) || {};
     let quality = '';
     for (const q of GENOTYPE_QUALITIES) {
@@ -384,7 +431,7 @@ VariantGridFormat.sampleZygosity = (zygosity, type, rowData, ctx) => {
     return `<span class='sample-zygosity' title='${escapeHtml(detail.join(' · '))}'>`
          + `<svg class='zyg-glyph ${ZYGOSITY_GLYPH_CSS[zygosity]}' viewBox='0 0 16 16'>${glyph}</svg>`
          + (values ? `<span class='zyg-values'>${values}</span>` : '')
-         + quality + filtersHtml + '</span>';
+         + copyNumberHtml + quality + filtersHtml + '</span>';
 };
 
 
@@ -559,6 +606,124 @@ VariantGridFormat.predictions = (_value, type, rowData) => {
 };
 
 
+// The population frequencies other than gnomAD - 1000 Genomes, UK10K, TOPMed - as the highest of them
+// with which one it came from, each on hover. The members this version annotates (and their labels)
+// come from the members render kwarg; their values arrive formatted server side, in the deployment's
+// unit or percent, so they compare as numbers and print as they are. Sorts on the headline member.
+VariantGridFormat.popFreqOther = (_value, type, rowData, ctx) => {
+    const members = (ctx && ctx.kwargs && ctx.kwargs.members) || [];
+    const detail = [];
+    let highest = null;
+    for (const member of members) {
+        const value = rowData[member.path];
+        if (_isBlank(value)) {
+            continue;
+        }
+        detail.push(`${member.label} ${value}`);
+        if (highest === null || parseFloat(value) > parseFloat(highest.value)) {
+            highest = {source: member.label.replace(/ AF$/, ''), value};
+        }
+    }
+    if (highest === null) {
+        return '';
+    }
+    return `<span class='pop-freq-other' title='${escapeHtml(detail.join(' · '))}'>`
+         + `${escapeHtml(highest.value)}<span class='pop-freq-source'>${escapeHtml(highest.source)}</span></span>`;
+};
+
+
+// UniProt accession, linked to the entry. The uniprot cell reuses it for its headline
+const UNIPROT_ACCESSION = "variantannotation__transcript_version__gene_version__hgnc__uniprot__accession";
+const UNIPROT_FUNCTION = "variantannotation__transcript_version__gene_version__hgnc__uniprot__function";
+
+VariantGridFormat.uniprotLink = (accession) => {
+    if (_isBlank(accession)) {
+        return '';
+    }
+    const url = `https://www.uniprot.org/uniprotkb/${encodeURIComponent(String(accession))}/entry`;
+    return `<a class='uniprot-link' href='${escapeHtml(url)}' target='_blank'>${escapeHtml(accession)}</a>`;
+};
+
+// The gene's UniProt entry in one cell - the linked accession with the function summary running on
+// after it, and the function, pathway, tissue specificity and Reactome pathways on hover
+VariantGridFormat.uniprot = (_value, type, rowData, ctx) => {
+    const members = (ctx && ctx.kwargs && ctx.kwargs.members) || [];
+    const accession = rowData[UNIPROT_ACCESSION];
+    const detail = [];
+    for (const member of members) {
+        const value = rowData[member.path];
+        if (member.path !== UNIPROT_ACCESSION && !_isBlank(value)) {
+            detail.push(`${member.label}: ${value}`);
+        }
+    }
+    if (_isBlank(accession) && !detail.length) {
+        return '';
+    }
+    const func = rowData[UNIPROT_FUNCTION];
+    const funcHtml = _isBlank(func) ? '' : `<span class='uniprot-function'>${escapeHtml(func)}</span>`;
+    return `<span class='uniprot' title='${escapeHtml(detail.join(' · '))}'>`
+         + `${VariantGridFormat.uniprotLink(accession)}${funcHtml}</span>`;
+};
+
+
+// Conservation as a row of dots, one per score this version annotates, in member order - filled where
+// the score reaches its conserved threshold, muted below it, hollow where the position has no score.
+// The cell carries a detail table that the hover handler below floats under it: each score between
+// its (faded) minimum and maximum. Ranges and thresholds come from ctx.extra.conservation
+// (@see VariantAnnotation.CONSERVATION_SCORES); sorts on PhyloP 100 way, its headline member.
+function _conservationRange(value) {
+    return value == null ? '' : String(Math.round(value * 100) / 100);
+}
+
+// Scores come out of a float4 column, so 0.314 arrives as 0.314000010490417
+function _conservationScore(value) {
+    const score = Number(value);
+    return isFinite(score) ? String(parseFloat(score.toPrecision(3))) : String(value);
+}
+
+VariantGridFormat.conservation = (_value, type, rowData, ctx) => {
+    const members = (ctx && ctx.kwargs && ctx.kwargs.members) || [];
+    const scales = (ctx && ctx.extra && ctx.extra.conservation) || {};
+    let dots = '';
+    let rows = '';
+    let anyScore = false;
+    for (const member of members) {
+        const value = rowData[member.path];
+        const scale = scales[member.path] || {};
+        let css = 'cons-none';
+        let valueHtml = `<span class='cons-blank'>–</span>`;
+        if (!_isBlank(value)) {
+            anyScore = true;
+            const conserved = scale.conserved != null && parseFloat(value) >= scale.conserved;
+            css = conserved ? 'cons-conserved' : 'cons-not-conserved';
+            valueHtml = escapeHtml(_conservationScore(value));
+        }
+        dots += `<i class='cons-dot ${css}'></i>`;
+        rows += `<tr><th>${escapeHtml(member.label)}</th>`
+              + `<td class='cons-range'>${escapeHtml(_conservationRange(scale.min))}</td>`
+              + `<td class='cons-value'><i class='cons-dot ${css}'></i>${valueHtml}</td>`
+              + `<td class='cons-range'>${escapeHtml(_conservationRange(scale.max))}</td></tr>`;
+    }
+    if (!anyScore) {
+        return '';
+    }
+    return `<span class='conservation'>${dots}<table class='conservation-detail'>${rows}</table></span>`;
+};
+
+// The conservation cell's hover - its detail table, floated below the cell. A panel a reader opened
+// on purpose (a header sort menu) stays put
+$(document).on('mouseenter', '.conservation', function() {
+    if (FloatingPanel.panel && !FloatingPanel.panel.hasClass('conservation-detail')) {
+        return;
+    }
+    FloatingPanel.show($(this).children('.conservation-detail').clone(), this);
+}).on('mouseleave', '.conservation', function() {
+    if (FloatingPanel.panel && FloatingPanel.panel.hasClass('conservation-detail')) {
+        FloatingPanel.hide();
+    }
+});
+
+
 // Zygosity counts in one cell - hom · het, with the rest in the title. Sorts on the het count, the
 // column it lives on. The row key prefix comes from the countPrefix render kwarg: this database's
 // global counts by default, a cohort node's own counts where it names its own.
@@ -589,7 +754,7 @@ VariantGridFormat.dbZygosityCounts = (_value, type, rowData, ctx) => {
 
 
 // The record's VCF FILTER. Nearly every row passed, and a column of 'PASS' is a column of nothing -
-// so a pass fades almost out and only a call that failed something reads.
+// so a pass fades almost out and the codes a record failed read as ordinary text.
 // @see CohortMixin._get_node_extra_columns
 VariantGridFormat.vcfFilters = (filters) => {
     if (filters == null || filters === '' || filters === '.') {
@@ -599,8 +764,21 @@ VariantGridFormat.vcfFilters = (filters) => {
     if (text.toUpperCase() === 'PASS') {
         return `<span class='vcf-filter-pass' title='Passed every VCF filter'>PASS</span>`;
     }
-    return `<span class='vcf-filter-failed' title='${escapeHtml(`Filtered: ${text}`)}'>`
-         + `<i class='fa-solid fa-triangle-exclamation'></i>${escapeHtml(text)}</span>`;
+    return `<span class='vcf-filter-failed' title='${escapeHtml(`Filtered: ${text}`)}'>${escapeHtml(text)}</span>`;
+};
+
+
+// The caller rows a fusion Variant was merged from - one gene pair, several calls, and the pair is
+// the identity so the breakpoints only exist here. The cell says how many; the calls themselves are
+// the hover, and the CSV. @see FUSION_OBS in upload/tso500/dragen_all_fusions_parser.py
+const FUSION_CALL_SEPARATOR = "; ";  // OBSERVATION_SEPARATOR
+VariantGridFormat.fusionCalls = (calls) => {
+    if (!calls) {
+        return '';
+    }
+    const text = String(calls);
+    const count = text.split(FUSION_CALL_SEPARATOR).length;
+    return `<span class='fusion-calls' title='${escapeHtml(text)}'>&times;${count}</span>`;
 };
 
 
@@ -640,10 +818,56 @@ function _formatBases(bases) {
     return bases + " bp";
 }
 
+// What kind of thing a row is, when it isn't a small variant. Small variants are the overwhelming
+// majority of every grid, so they carry no badge - the badge is the signal that a row is not one.
+// A gene-level alt is <KIND:NAMESPACE:id> or <KIND:UNKNOWN>, so the kind is everything before the
+// first ':'. @see GeneLevelSymbolicAlt / VCFSymbolicAllele in library/genomics/vcf_enums.py
+const GENE_LEVEL_KINDS = {
+    'FUSION': {code: 'FUSION', css: 'fusion', title: 'Gene fusion'},
+    'FUSION_UNORDERED': {code: 'FUSION \u21c4', css: 'fusion',
+                         title: 'Gene fusion - direction not asserted by the caller'},
+    'AMP': {code: 'AMP', css: 'amp', title: 'Gene-level copy number'},
+    'LOSS': {code: 'LOSS', css: 'loss', title: 'Gene-level copy number'},
+};
+const SV_KIND_CSS = {'DEL': 'del', 'DUP': 'dup', 'INV': 'inv', 'CNV': 'cnv', 'INS': 'ins'};
+
+// Returns {code, cssClass, title}, or null for a variant with an explicit ref/alt
+VariantGridFormat.variantKind = (alt, svlen, chrom, position) => {
+    if (alt == null || !String(alt).startsWith("<")) {
+        return null;
+    }
+    const kind = String(alt).slice(1, -1).split(":")[0];
+    const geneLevel = GENE_LEVEL_KINDS[kind];
+    if (geneLevel) {
+        return {code: geneLevel.code, cssClass: `rv-kind-${geneLevel.css}`, title: geneLevel.title};
+    }
+    // An SV says how big it is - that, not the coordinate, is what a reader wants off the row
+    const size = Math.abs(svlen || 0);
+    const title = (chrom != null && position != null)
+                ? `${chrom}:${position}-${position + size} ${alt}` : String(alt);
+    return {
+        code: size ? `${kind} ${_formatBases(size)}` : kind,
+        cssClass: `rv-kind-${SV_KIND_CSS[kind] || 'other'}`,
+        title: title,
+    };
+};
+
+// The badge itself - beside the grid label, and beside a variant named anywhere else (the locus
+// table on the variant page). '' for a small variant. Styled by .rv-kind in global.scss
+VariantGridFormat.variantKindBadge = (alt, svlen, chrom, position) => {
+    const kind = VariantGridFormat.variantKind(alt, svlen, chrom, position);
+    if (!kind) {
+        return '';
+    }
+    return `<span class='rv-kind ${kind.cssClass}' title='${escapeHtml(kind.title)}'>${escapeHtml(kind.code)}</span>`;
+};
+
+
 // The cascade from the mockup's "Representative variant" card. Returns {html, title}; title is the
 // plain string for the link tooltip. Every key may be undefined on a row cached before these fields
-// existed - each step checks and falls through, ending at the VariantGrid id.
-function _representativeVariantLabel(variantId, rowData) {
+// existed - each step checks and falls through, ending at the VariantGrid id. rowData is keyed the
+// way the grid's Variant column is - the variant page's locus table sends the same keys
+VariantGridFormat.representativeVariantLabel = (variantId, rowData) => {
     const chrom = rowData["locus__contig__name"];
     const position = rowData["locus__position"];
     const ref = rowData["locus__ref__seq"];
@@ -687,11 +911,9 @@ function _representativeVariantLabel(variantId, rowData) {
     // 3/4. Coordinate - symbolic as a span with the type, otherwise ref>alt with long alleles collapsed
     if (chrom != null && position != null && alt != null) {
         if (String(alt).startsWith("<")) {
-            const size = Math.abs(svlen || 0);
-            const end = position + size;
-            const svType = String(alt).slice(1, -1);
-            const html = `<span class='rv-hgvs'>${escapeHtml(chrom)}:${position}-${end}</span> <b>${escapeHtml(svType)}</b>`
-                       + (size ? ` <span class='rv-sub'>${_formatBases(size)}</span>` : '');
+            // The type and the size are on the kind badge beside the label, for every branch
+            const end = position + Math.abs(svlen || 0);
+            const html = `<span class='rv-hgvs'>${escapeHtml(chrom)}:${position}-${end}</span>`;
             return {html: html, title: `${chrom}:${position}-${end} ${alt}`};
         }
         const title = `${chrom}:${position} ${ref}>${alt}`;
@@ -700,7 +922,7 @@ function _representativeVariantLabel(variantId, rowData) {
     }
     // 5. Last resort while annotation is still running - the id the old details box linked to
     return {html: `<span class='rv-sub'>v ${variantId}</span>`, title: `VariantGrid variant ${variantId}`};
-}
+};
 
 // Mandatory Variant column. Reads the members riding along hidden - @see CompositeColumnMember.
 // Markup contract: .variant_id-container[variant_id] > input.variant-select (analysis only)
@@ -711,9 +933,15 @@ VariantGridFormat.representativeVariant = (variantId, type, rowData, ctx) => {
     if (_isNodeVisible(ctx)) {
         parts.push(`<input type='checkbox' class='variant-select' variant_id='${variantId}'>`);
     }
-    const label = _representativeVariantLabel(variantId, rowData);
+    const label = VariantGridFormat.representativeVariantLabel(variantId, rowData);
     const detailsUrl = `javascript:load_variant_details(${variantId});`;
     parts.push(`<a class='variant-link rv-label' title='${escapeHtml(label.title)}' href='${detailsUrl}' orig_href='${detailsUrl}'>${label.html}</a>`);
+    // Outside the label, which clips - the badge is the one thing on the row that must stay readable
+    const badge = VariantGridFormat.variantKindBadge(rowData["alt__seq"], rowData["svlen"],
+                                                     rowData["locus__contig__name"], rowData["locus__position"]);
+    if (badge) {
+        parts.push(badge);
+    }
     return `<span class='variant_id-container' variant_id='${variantId}'>${parts.join('')}</span>`;
 };
 
@@ -730,12 +958,42 @@ VariantGridFormat.tags = (tagsCellValue, type, rowData) => {
         tagHtml += "<a class='show-tag-autocomplete' variant_id='" + variantId + "' href='javascript:showTagAutocomplete(" + variantId + ")'><span class='add-variant-tag' title='Tag variant..'></span></a>";
     }
 
-    const tagList = (aWin.variantTags || {})[variantId];
-    if (tagList) {
-        const sortedTags = sortVariantTags(aWin, tagList);
-        for (let i=0 ; i<sortedTags.length ; ++i) {
-            const tag = sortedTags[i];
-            tagHtml += getVariantTagHtml(variantId, tag, readOnly);
+    // One pill per tagging, read against the proband of the node this grid is showing - a tagging made
+    // for someone else, or for nobody yet, is not this proband's to-do @see render_variant_tags_dict
+    const taggings = (aWin.variantTags || {})[variantId];
+    if (taggings) {
+        const probandSampleId = getNodeProbandSampleId();
+        const sampleNames = aWin.analysisSamples || {};
+        const sortedTaggings = sortVariantTags(aWin, taggings, (tagging) => tagging.tag);
+        for (let i=0 ; i<sortedTaggings.length ; ++i) {
+            const tagging = sortedTaggings[i];
+            const tag = tagging.tag;
+            const extraClasses = [];
+            let marker;
+            let title;
+            if (tagging.sample === probandSampleId) {
+                title = `Tagged as ${tag}`;
+            } else if (tagging.sample) {
+                marker = "fas fa-user";
+                title = `Tagged as ${tag} for ${sampleNames[tagging.sample] || "another sample"}`;
+            } else {
+                marker = "far fa-user";
+                title = `Tagged as ${tag}, no sample`;
+                if (!readOnly) {
+                    title += " - tag here to make one for " + (sampleNames[probandSampleId] || "this sample");
+                }
+            }
+            let tagLabel = tag;
+            // A to-do tag a classification has satisfied stays on the row (it's how it gets untagged)
+            // but reads as done
+            if (tagging.resolved) {
+                extraClasses.push("grid-tag-resolved");
+                tagLabel = `${tag} <i class='fas fa-check'></i>`;
+                title += ` - classified ${tagging.resolved}`;
+            }
+            tagHtml += getVariantTagHtml(variantId, tag, readOnly,
+                                         {tagLabel: tagLabel, extraClasses: extraClasses, title: title,
+                                          variantTagId: tagging.id, marker: marker});
         }
     }
     // Wrapped so the set can lift out of the clipped cell as one thing on hover - @see .grid-tags
@@ -756,20 +1014,27 @@ VariantGridFormat.tagsGlobal = (value, type, rowData) => {
         staleCutoff = new Date(Date.now() - staleDays * 86400 * 1000).toISOString().slice(0, 10);
     }
 
-    // Entries are "tag:date" - see get_variantgrid_extra_annotate
+    // Entries are "tag:date:resolved" - see get_variantgrid_extra_annotate. A tag id can contain a
+    // colon, so take the two trailing fields off the end rather than splitting
     const tagStats = {};
     const entries = value.split("|");
     for (let i=0 ; i<entries.length ; ++i) {
-        const entry = entries[i];
-        const sep = entry.lastIndexOf(":");
+        let entry = entries[i];
+        let sep = entry.lastIndexOf(":");
+        const resolved = sep >= 0 ? entry.slice(sep + 1) : "";
+        entry = sep >= 0 ? entry.slice(0, sep) : entry;
+        sep = entry.lastIndexOf(":");
         const tag = sep >= 0 ? entry.slice(0, sep) : entry;
         const date = sep >= 0 ? entry.slice(sep + 1) : null;
         let stats = tagStats[tag];
         if (!stats) {
-            stats = {total: 0, fresh: 0, mostRecent: null};
+            stats = {total: 0, fresh: 0, resolved: 0, mostRecent: null};
             tagStats[tag] = stats;
         }
         stats.total += 1;
+        if (resolved) {
+            stats.resolved += 1;
+        }
         if (date && (!staleCutoff || date >= staleCutoff)) {
             stats.fresh += 1;
         }
@@ -799,7 +1064,19 @@ VariantGridFormat.tagsGlobal = (value, type, rowData) => {
                 title = `${stats.fresh} of ${stats.total} tag events within the last ${staleDays} days, most recent ${stats.mostRecent}`;
             }
         }
-        tagGlobalHtml += getVariantTagHtml(variantId, tag, true, tagLabel, extraClasses, title);
+        // Done rather than hidden - the pill is still how the tag is read and removed
+        if (stats.resolved) {
+            if (stats.resolved === stats.total) {
+                extraClasses.push("grid-tag-resolved");
+                tagLabel += " <i class='fas fa-check'></i>";
+                title = title ? `${title}; classified` : `Tagged as ${tag} - classified`;
+            } else {
+                const resolvedText = `${stats.resolved} of ${stats.total} resolved`;
+                title = title ? `${title}; ${resolvedText}` : `Tagged as ${tag} - ${resolvedText}`;
+            }
+        }
+        tagGlobalHtml += getVariantTagHtml(variantId, tag, true,
+                                           {tagLabel: tagLabel, extraClasses: extraClasses, title: title});
     }
     return tagGlobalHtml ? `<span class='grid-tags'>${tagGlobalHtml}</span>` : "";
 };
@@ -814,13 +1091,13 @@ VariantGridFormat.clinvarLink = (clinvar_variation_id) => {
 };
 
 
-VariantGridFormat.cosmicLink = (cosmic_ids) => {
+VariantGridFormat.cosmicLink = (cosmic_ids, type, rowData, ctx) => {
     const COSMIC_PREFIX = "COSV";
     const COSMIC_LEGACY_PREFIX = "COSM";
 
     let cosmic_string = '';
     if (cosmic_ids) {
-        const cosmic_ids_list = cosmic_ids.split("&");
+        const cosmic_ids_list = splitValues(cosmic_ids, _separator(ctx));
         const cosmic_links = [];
         for(let i=0 ; i<cosmic_ids_list.length ; ++i) {
             let cosmic_id = cosmic_ids_list[i];
@@ -834,7 +1111,7 @@ VariantGridFormat.cosmicLink = (cosmic_ids) => {
             cosmic_links.push(cosmic_id);
         }
 
-        cosmic_string = cosmic_links.join();
+        cosmic_string = cosmic_links.join(VALUE_JOIN);
     }
     return cosmic_string;
 };
@@ -859,7 +1136,9 @@ function _geneSymbolLink(geneSymbolColumn, filterChildLink) {
             let geneLinkString = '';
             if (filterChildLink) {
                 const filterGeneLink = "javascript:createFilterChild(\"gene_symbol\", \"" + geneSymbol + "\");";
-                geneLinkString = "<a class='grid-link' title='Filter to " + geneSymbol + "' href='" + filterGeneLink + "'><i class='fa-solid fa-list-check gene-list-node-icon'></i></a>";
+                // The gene list node's own badge glyph - the child this makes is a GeneListNode
+                geneLinkString = "<a class='grid-link' title='Gene list node for " + geneSymbol + "' href='" + filterGeneLink + "'>"
+                               + "<svg class='gene-list-node-icon' width='14' height='14' viewBox='0 0 18 20'><use href='#node-icon-gene-list'></use></svg></a>";
                 geneLinkString += " <a class='left' target='_blank' title='View gene in new window' href='" + Urls.view_gene_symbol(geneSymbol) + "'>" + geneSymbol + "</a> ";
             } else {
                 // not left
@@ -1010,7 +1289,8 @@ VariantGridFormat.gnomad = (_value, type, rowData, ctx) => {
     if (popmaxAf != null && popmaxAf !== '') {
         html += `<span class='gnomad-popmax-af'>${escapeHtml(popmaxAf)}</span>`;
         if (population) {
-            html += `<span class='gnomad-popmax-pop'>${escapeHtml(population)}</span>`;
+            const codes = (ctx && ctx.extra && ctx.extra.gnomadPopulationCodes) || {};
+            html += `<span class='gnomad-popmax-pop'>${escapeHtml(codes[population] || population)}</span>`;
         }
     }
     // The Pass/Fail goes to the cell's right edge, so they line up down the column whatever width
@@ -1029,19 +1309,19 @@ VariantGridFormat.clinGenAlleleId = (cellValue) => {
 };
 
 
-VariantGridFormat.dbsnp = (dbsnp_rs_ids) => {
+VariantGridFormat.dbsnp = (dbsnp_rs_ids, type, rowData, ctx) => {
     function buildDBSNPLink(dbsnp_id) {
         return "<a title='View dbSNP in new window' target='_blank' href='https://www.ncbi.nlm.nih.gov/snp/" + dbsnp_id + "'>" + dbsnp_id + "</a>";
     }
-    return splitAndLink(dbsnp_rs_ids, "&", buildDBSNPLink);
+    return splitAndLink(dbsnp_rs_ids, _separator(ctx), buildDBSNPLink);
 };
 
 
-VariantGridFormat.pubMed = (pubmed) => {
+VariantGridFormat.pubMed = (pubmed, type, rowData, ctx) => {
     function buildPubMedLink(pubmed_id) {
         return "<a title='View PubMed article in new window' target='_blank' href='https://pubmed.ncbi.nlm.nih.gov/" + pubmed_id + "'>" + pubmed_id + "</a>";
     }
-    return splitAndLink(pubmed, "&", buildPubMedLink);
+    return splitAndLink(pubmed, _separator(ctx), buildPubMedLink);
 };
 
 
@@ -1055,11 +1335,11 @@ VariantGridFormat.ontologyTerms = (ontology_terms) => {
 };
 
 
-VariantGridFormat.masterMind = (value) => {
+VariantGridFormat.masterMind = (value, type, rowData, ctx) => {
     function buildMasterMindLink(mmid3) {
         return "<a title='View MasterMind in new window' target='_blank' href='https://mastermind.genomenon.com/detail?mutation=" + mmid3 + "'>" + mmid3 + "</a>";
     }
-    return splitAndLink(value, "&", buildMasterMindLink);
+    return splitAndLink(value, _separator(ctx), buildMasterMindLink);
 };
 
 

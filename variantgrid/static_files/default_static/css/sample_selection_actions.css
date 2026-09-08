@@ -1,0 +1,46 @@
+/* Selected samples action bar - see js/sample_selection_actions.js */
+
+#sample-actions {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin: 16px 0;
+    padding: 12px 16px;
+    border: 1px solid #d8e0e6;
+    border-radius: 5px;
+    background-color: #f1f4f7;
+}
+
+#sample-actions .selected-count {
+    text-align: center;
+    min-width: 90px;
+}
+
+#sample-actions .selected-number {
+    font-size: 34px;
+    font-weight: 600;
+    line-height: 1;
+    color: #2f6f9f;
+}
+
+#sample-actions .selected-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #64737f;
+}
+
+#sample-actions .sample-actions-buttons {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+#sample-actions .sample-actions-hint {
+    margin-top: 6px;
+}
+
+/* .svg-symbol-icon / FontAwesome already size these, they just need room before the label */
+#sample-actions .sample-action-icon {
+    margin-right: 0.4em;
+}

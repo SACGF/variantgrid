@@ -1,24 +1,9 @@
-<style>
-    .af-slider {
-        width: 50%;
-        margin: 8px 10px 10px 10px;  /* noUiSlider's handles overhang its 18px track */
-    }
-    
-    .slider-label {
-        width: 35px;
-    }
-
-    #af-tool-container {
-        margin-bottom: 5px;
-    }
-</style>
 <script type="text/ignored_template" data-template="slider">
-    <div class='slider-container'>
-        <div class='slider-min slider-label label left'></div>
-        <div class='af-slider left'></div>
-        <div class='slider-max slider-label label left'></div>
-        <input value="-" title="Delete AF range" class="delete-slider" type="button">
-        <div class='clear'></div>
+    <div class='af-slider-row'>
+        <div class='slider-min slider-label'></div>
+        <div class='af-slider'></div>
+        <div class='slider-max slider-label'></div>
+        <button type="button" title="Delete AF range" class="delete-slider btn btn-sm btn-outline-secondary btn-icon">&minus;</button>
     </div>
 </script>
 <script>
@@ -112,14 +97,14 @@
         {% endif %}
     });
 </script>
-<div id='allele-frequency-filter' class='hidden'>
+<div id='allele-frequency-filter' class='hidden editor-section'>
     <div id='af-tool-container'>
-        <b>Allele Frequency</b>
-        <select id='slider-group-operation'>
+        <span class="editor-section-title">Allele frequency</span>
+        <select id='slider-group-operation' title="Match all ranges, or any of them">
             <option value="L">all</option>
             <option value="Y" selected="selected">any</option>
         </select>
-        <input id='add-slider' value="+" title="Add AF range" class="ui-add" type="button">
+        <button type="button" id='add-slider' title="Add AF range" class="btn btn-sm btn-outline-secondary btn-icon">+</button>
     </div>
 </div>
 

@@ -1,3 +1,10 @@
+"""
+The analysis grids: VariantGrid (the node variant grid - AbstractVariantGrid with the node's
+queryset, count and sample columns) and ExportVariantGrid for unpaged CSV/VCF export, plus the
+DatatableConfig tables for analyses, templates, node issues, node column summaries, gene lists
+and ontology genes inside a node, karyomapping, the audit log and candidate search runs. Grid
+plumbing is snpdb/views/datatable_view.py; columns come from the user's CustomColumnsCollection.
+"""
 import operator
 from collections import defaultdict
 from collections.abc import Callable, Iterator
@@ -8,8 +15,8 @@ import pandas as pd
 from auditlog.models import LogEntry
 from django.conf import settings
 from django.core.exceptions import PermissionDenied
-from django.db.models import F, Max, Q, QuerySet, StringAgg, Value
-from django.db.models.functions import Substr
+from django.db.models import F, FloatField, Max, Q, QuerySet, StringAgg, Value
+from django.db.models.functions import Cast, Substr
 from django.http import HttpRequest
 from django.shortcuts import get_object_or_404
 from django.urls.base import reverse
@@ -25,6 +32,7 @@ from analysis.models import (
     CandidateStatus,
     GroupOperation,
     NodeStatus,
+    VariantTag,
 )
 from analysis.models.models_karyomapping import KaryomappingAnalysis
 from analysis.models.nodes.analysis_node import NodeColumnSummaryCacheCollection
@@ -52,7 +60,11 @@ from ontology.models import GeneDiseaseClassification, OntologyTermRelation, Ont
 from patients.models_enums import Zygosity
 from snpdb.grid_columns.custom_columns import get_variantgrid_extra_annotate
 from snpdb.grid_columns.grid_sample_columns import (
+    COPY_NUMBER_COLUMN,
+    SAMPLE_COMPOSITE_COLUMNS,
+    SAMPLE_SORT_KEY_LABELS,
     get_available_format_columns,
+    get_copy_number_alias,
     get_variantgrid_zygosity_annotation_kwargs,
 )
 from snpdb.grids import AbstractVariantGrid
@@ -64,6 +76,7 @@ from snpdb.models import (
     VariantGridColumn,
     VCFFilter,
 )
+from snpdb.models.models_enums import SequenceRole
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.views.datatable_view import CellData, DatatableConfig, NullOrder, RichColumn, SortOrder
 
@@ -206,7 +219,7 @@ class VariantGrid(AbstractVariantGrid):
         def insert_columns(columns: list[RichColumn], new_columns: list[RichColumn]) -> list[RichColumn]:
             # Put extra columns after sample (they are all usually to do with sample/vcf etc info)
             new_columns = [rc for rc in new_columns if rc not in columns]
-            if sample_cols_pos:
+            if sample_cols_pos is not None:
                 return columns[:sample_cols_pos] + new_columns + columns[sample_cols_pos:]
             return columns + new_columns
 
@@ -245,6 +258,24 @@ class VariantGrid(AbstractVariantGrid):
         def unpack(cell: CellData):
             val = cell[packed_column][i]
             return packed_data_replace.get(val, val)
+
+        if column == COPY_NUMBER_COLUMN:
+            # Annotated per sample out of the JSON, so there is nothing to unpack
+            copy_number_column = get_copy_number_alias(cohort.cohort_genotype_collection, sample.pk)
+
+            def copy_number_renderer(cell: CellData):
+                """ A copy ratio comes out of the JSON at full float precision - round here rather
+                    than in the cell, so the CSV says what the grid says """
+                value = cell[copy_number_column]
+                if value is None:
+                    return None
+                try:
+                    number = float(value)
+                except ValueError:
+                    return value
+                return int(number) if number.is_integer() else round(number, 3)
+
+            return copy_number_renderer
 
         renderer = unpack
         if column == "samples_filters" and cohort.vcf:
@@ -311,21 +342,8 @@ class VariantGrid(AbstractVariantGrid):
             'samples_genotype_quality': ('GQ', '%(label)s %(sample)s', 25),
             'samples_phred_likelihood': ('PL', '%(label)s %(sample)s', 25),
             'samples_filters': ('FT', '%(label)s %(sample)s', 100),
-        }
-        # The sample's whole call is drawn in the one zygosity cell - glyph, frequency, depths, then
-        # GQ/PL as quality marks and the sample filters. The rest ride along hidden and stay in the
-        # CSV. @see VariantGridFormat.sampleZygosity. The header's sort menu offers whichever of them
-        # the sample's VCF actually has
-        SAMPLE_COMPOSITE_COLUMNS = ['samples_allele_depth', 'samples_allele_frequency', 'samples_read_depth',
-                                    'samples_genotype_quality', 'samples_phred_likelihood', 'samples_filters']
-        SAMPLE_SORT_KEY_LABELS = {
-            'samples_zygosity': 'Zygosity',
-            'samples_allele_frequency': 'Allele frequency',
-            'samples_allele_depth': 'Allele depth',
-            'samples_read_depth': 'Read depth',
-            'samples_genotype_quality': 'Genotype quality',
-            'samples_phred_likelihood': 'Phred likelihood',
-            'samples_filters': 'Filters',
+            # Labelled with the VCF's own key (CN / SM / FC) - what the number means differs per caller
+            COPY_NUMBER_COLUMN: ('CN', '%(label)s %(sample)s', 40),
         }
         packed_data_replace = dict(Zygosity.CHOICES)
         # Some legacy data (Missing data in FreeBayes before PythonKnownVariantsImporter v12) has -2147483647 for
@@ -349,10 +367,18 @@ class VariantGrid(AbstractVariantGrid):
                 if sample_formatted_str is None or len(sample_formatted_str) == 0:
                     sample_formatted_str = str(sample.name)
 
+                cgc = cohort.cohort_genotype_collection
+                if column == COPY_NUMBER_COLUMN:
+                    if not sample.vcf.copy_number_field:
+                        continue  # Another VCF in this node has one, this sample's doesn't
+                    column_label = sample.vcf.copy_number_field
+                    extra_columns = [get_copy_number_alias(cgc, sample.pk)]
+                else:
+                    extra_columns = [cgc.get_packed_column_alias(column)]
+
                 label = label_format % {"sample": sample_formatted_str, "label": column_label}
                 renderer = self._get_sample_column_renderer(cohort, sample, packed_data_replace, column,
                                                             cohort_index, self.af_show_in_percent)
-                cgc = cohort.cohort_genotype_collection
                 self._genotype_sort_funcs[name] = self._genotype_sort_func(cgc, column, sample.pk)
                 kwargs = {
                     "key": None,
@@ -362,15 +388,23 @@ class VariantGrid(AbstractVariantGrid):
                     "renderer": renderer,
                     "csv_rendered": True,
                     "include_in_csv": True,
-                    "extra_columns": [cgc.get_packed_column_alias(column)],
+                    "extra_columns": extra_columns,
                     "sort_keys": [self.GENOTYPE_SORT_ALIAS_PREFIX + name],
                     "orderable": True,
                     "null_order": NullOrder.FIRST_ON_ASC,
                 }
                 if column == 'samples_zygosity':
+                    client_renderer_kwargs = {"samplePrefix": f"sample_{sample.pk}_"}
+                    if copy_number_field := sample.vcf.copy_number_field:
+                        # The cell draws the value as a chip - it needs the key's name and what the
+                        # VCF header said it means, neither of which is on the row
+                        client_renderer_kwargs["copyNumber"] = {
+                            "label": copy_number_field,
+                            "title": sample.vcf.copy_number_description or copy_number_field,
+                        }
                     kwargs.update({
                         "client_renderer": 'VariantGridFormat.sampleZygosity',
-                        "client_renderer_kwargs": {"samplePrefix": f"sample_{sample.pk}_"},
+                        "client_renderer_kwargs": client_renderer_kwargs,
                         "sort_menu": [
                             {"label": label, "column": f"sample_{sample.pk}_{c}"}
                             for c, label in SAMPLE_SORT_KEY_LABELS.items()
@@ -385,6 +419,9 @@ class VariantGrid(AbstractVariantGrid):
     @staticmethod
     def _genotype_sort_func(cgc, column: str, sample_id: int):
         """ This sample's value out of the cohort's packed genotype column, as something sortable """
+        if column == COPY_NUMBER_COLUMN:
+            # Already this sample's own annotation, but text out of the JSON - sort it as a number
+            return Cast(get_copy_number_alias(cgc, sample_id), FloatField())
         sql_index = cgc.get_sql_index_for_sample_id(sample_id)
         is_array, _ = CohortGenotype.COLUMN_IS_ARRAY_EMPTY_VALUE[column]
         if is_array:
@@ -409,7 +446,7 @@ class ExportVariantGrid(VariantGrid):
             any node size. A contig with no variants costs one cheap index probe and no annotated query. """
         value_columns = self.value_columns()
         node_qs = self.node.get_queryset()
-        for contig in self.node.analysis.genome_build.standard_contigs:
+        for contig in self.export_contigs(self.node.analysis.genome_build):
             contig_pks_qs = node_qs.filter(locus__contig=contig).order_by("locus__position", "pk")
             # A node queryset can fan out over a multi-valued join, so de-dupe (keeping order) to stop
             # a repeated PK straddling a batch boundary and being exported twice
@@ -417,6 +454,14 @@ class ExportVariantGrid(VariantGrid):
             for batch in iter_fixed_chunks(contig_pks, self.EXPORT_PK_BATCH_SIZE):
                 batch_qs = qs.filter(pk__in=batch).order_by("locus__position", "pk")
                 yield from self.render_export_rows(batch_qs.values(*value_columns).iterator())
+
+    @staticmethod
+    def export_contigs(genome_build: GenomeBuild) -> QuerySet:
+        """ The build's own contigs, then the shared gene-level one - a fusion has no coordinate, so it
+            exports after everything that does. Leaving it out is how fusions used to fall out of every
+            node export (#1558). @see snpdb.gene_level_variants """
+        roles = [SequenceRole.ASSEMBLED_MOLECULE, SequenceRole.VG_GENE_LEVEL_FAKE_CONTIG]
+        return genome_build.contigs.filter(role__in=roles)
 
     def ordering(self, qs: QuerySet) -> QuerySet:
         """ Export order is set by iter_export_rows (genome build contig, then position), so any
@@ -426,6 +471,8 @@ class ExportVariantGrid(VariantGrid):
 
 class AnalysesListColumns(DatatableConfig[Analysis]):
     server_csv_download = True
+    search_box_enabled = True
+    search_pk_enabled = True
     # The unfiltered count is over the tag aggregate and the lock join, and only feeds the
     # "(filtered from N total)" text
     count_unfiltered = False
@@ -436,22 +483,23 @@ class AnalysesListColumns(DatatableConfig[Analysis]):
 
         self.genome_builds = list(GenomeBuild.builds_with_annotation())
         self.rich_columns = [
-            RichColumn(key="id", label="ID", orderable=True, extra_columns=["analysislock__locked"],
+            RichColumn(key="id", label="ID", orderable=True, search=False,
+                       extra_columns=["analysislock__locked"],
                        renderer=self._render_analysis, client_renderer='renderAnalysisLink'),
             RichColumn(key="name", label="Name", orderable=True),
-            RichColumn(key="created", label="Created", orderable=True,
+            RichColumn(key="created", label="Created", orderable=True, search=False,
                        client_renderer='TableFormat.timestamp'),
             RichColumn(key="modified", label="Modified", orderable=True, default_sort=SortOrder.DESC,
-                       client_renderer='TableFormat.timestamp'),
+                       search=False, client_renderer='TableFormat.timestamp'),
             RichColumn(key="genome_build__name", label="Genome Build", orderable=True,
                        enabled=len(self.genome_builds) > 1),
-            RichColumn(key="analysis_type", label="Type", orderable=True,
+            RichColumn(key="analysis_type", label="Type", orderable=True, search=False,
                        client_renderer=RichColumn.choices_client_renderer(AnalysisType.choices)),
             RichColumn(key="description", label="Description", orderable=True),
             RichColumn(key="user__username", label="Created by", orderable=True,
                        extra_columns=["user__id"], renderer=self.render_user),
-            RichColumn(key="tags", label="Tags", client_renderer='renderAnalysisTags'),
-            RichColumn(key="id", name="actions", label="", orderable=False,
+            RichColumn(key="tags", label="Tags", search=False, client_renderer='renderAnalysisTags'),
+            RichColumn(key="id", name="actions", label="", orderable=False, search=False,
                        renderer=self._render_actions, client_renderer='renderRowActions'),
         ]
 
@@ -485,9 +533,22 @@ class AnalysesListColumns(DatatableConfig[Analysis]):
         return qs.annotate(tags=StringAgg("varianttag__tag", delimiter=Value('|')))
 
     def filter_queryset(self, qs: QuerySet[Analysis]) -> QuerySet[Analysis]:
+        qs = self.filter_analyses(qs)
+        if tags := self.get_query_json("tags"):
+            # VariantTag is large (400k+ on some deployments) so keep it a subquery rather than a join
+            qs = qs.filter(pk__in=VariantTag.objects.filter(tag__in=tags).values("analysis"))
+        return qs
+
+    def filter_analyses(self, qs: QuerySet[Analysis]) -> QuerySet[Analysis]:
+        """ Everything the page filters on bar the tag selection - the tag count pills count over
+            this, so their counts stay put as tags are selected """
         user_grid_config = UserGridConfig.get(self.user, 'Analyses')
         if not user_grid_config.show_group_data:
             qs = qs.filter(user=self.user)
+        if genome_build_name := self.get_query_param("genome_build_name"):
+            qs = qs.filter(genome_build=GenomeBuild.get_name_or_alias(genome_build_name))
+        if analysis_type := self.get_query_param("analysis_type"):
+            qs = qs.filter(analysis_type=analysis_type)
         return qs
 
 
@@ -788,7 +849,7 @@ def get_analysis_log_entry_summary(action, content_type_model, changes, addition
         if additional_data.get("operation") == VARIANT_TAG_CLASSIFIED:
             classification_id = additional_data["classification_id"]
             url = Classification.get_url_for_pk(classification_id)
-            return f"Retired - classified as <a href='{url}'>{classification_id}</a>"
+            return f"Cleared - classified as <a href='{url}'>{classification_id}</a>"
 
     if action == LogEntry.Action.CREATE:
         return "Created"

@@ -21,6 +21,7 @@ from analysis.models.nodes.sources.sample_node import SampleNode
 from analysis.models.models_karyomapping import KaryomappingAnalysis
 from analysis.related_analyses import (
     get_related_analysis_details_for_cohort,
+    get_related_analysis_details_for_duo,
     get_related_analysis_details_for_pedigree,
     get_related_analysis_details_for_quad,
     get_related_analysis_details_for_samples,
@@ -34,7 +35,8 @@ from snpdb.models import Cohort, Trio
 register = Library()
 
 
-def get_all_analyses_for_user(user, samples, cohorts=None, trios=None, quads=None, pedigrees=None):
+def get_all_analyses_for_user(user, samples, cohorts=None, trios=None, quads=None, duos=None,
+                              pedigrees=None):
     analysis_details: dict[Analysis, list] = defaultdict(list)
     if pedigrees:
         for analysis, details in get_related_analysis_details_for_pedigree(user, pedigrees):
@@ -52,17 +54,21 @@ def get_all_analyses_for_user(user, samples, cohorts=None, trios=None, quads=Non
         for analysis, details in get_related_analysis_details_for_quad(user, quads):
             analysis_details[analysis].append(f'Quad: {details}')
 
+    if duos:
+        for analysis, details in get_related_analysis_details_for_duo(user, duos):
+            analysis_details[analysis].append(f'Duo: {details}')
+
     for analysis, details in get_related_analysis_details_for_samples(user, samples):
         analysis_details[analysis].append(f"Sample: {details}")
 
     return [(analysis, ", ".join(details)) for analysis, details in analysis_details.items()]
 
 
-def update_context_with_related_analysis(context, samples, cohorts=None, trios=None, quads=None,
+def update_context_with_related_analysis(context, samples, cohorts=None, trios=None, quads=None, duos=None,
                                          pedigrees=None, show_sample_info=True, show_create_analyses=True):
     user = context["user"]
     analysis_details = get_all_analyses_for_user(user, samples, cohorts=cohorts, trios=trios,
-                                                 quads=quads, pedigrees=pedigrees)
+                                                 quads=quads, duos=duos, pedigrees=pedigrees)
     karyomapping_analyses = KaryomappingAnalysis.filter_for_user(user).filter(trio__in=trios or [])
     analyses_list = [i[0].pk for i in analysis_details]
     analyses_with_tags = Analysis.objects.filter(pk__in=analyses_list, varianttag__isnull=False)
@@ -122,6 +128,14 @@ def related_analyses_for_quad(context, quad):
     return context
 
 
+@register.inclusion_tag("analysis/tags/related_analyses_for_duo.html", takes_context=True)
+def related_analyses_for_duo(context, duo):
+    pedigrees = duo.cohort.pedigree_set.all()
+    update_context_with_related_analysis(context, duo.get_samples(), [duo.cohort], duos=[duo], pedigrees=pedigrees)
+    context["duo"] = duo
+    return context
+
+
 @register.inclusion_tag("analysis/tags/related_analyses_for_pedigree.html", takes_context=True)
 def related_analyses_for_pedigree(context, pedigree):
     trios = pedigree.cohort.trio_set.all()
@@ -137,7 +151,7 @@ SAMPLE_GROUP_ARGS = {field: level for level, field in SampleNode.SOURCE_LEVEL_FI
 
 
 def _source_is_archived(user, kwargs: dict) -> bool:
-    """ True when any sample/cohort/trio/quad/pedigree passed in is archived.
+    """ True when any sample/cohort/duo/trio/quad/pedigree passed in is archived.
         Each source model implements its own `data_archived` property that walks
         down to the underlying VCF/CohortGenotypeCollection.
 
@@ -195,6 +209,8 @@ def analysis_templates_tag(context, genome_build, autocomplete_field=True, has_s
         hidden_inputs["sample"] = trio.proband.sample_id
     if quad := kwargs.get("quad"):
         hidden_inputs["sample"] = quad.proband.sample_id
+    if duo := kwargs.get("duo"):
+        hidden_inputs["sample"] = duo.proband.sample_id
 
     class_name = klass._meta.label
     # Show/Hide AnalysisTemplateVersions based on requires_sample_gene_list

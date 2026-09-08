@@ -12,6 +12,7 @@ from classification.models.classification_grouping import (
 
 
 class Command(BaseCommand):
+    category = "maintenance"
 
     def add_arguments(self, parser):
         parser.add_argument('--summary', required=False, action="store_true", help="Refreshes the summary data assigned to each classification")

@@ -13,6 +13,8 @@ from variantopedia.views_tag_stats import _grouped_series
 
 LOCMEM_CACHE = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
 
+_UNSET = object()  # analysis=None is a global (variant page) tagging, so it can't be the default
+
 
 @override_settings(CACHES=LOCMEM_CACHE)
 class TagStatsTest(TestCase):
@@ -26,22 +28,26 @@ class TagStatsTest(TestCase):
         cls.analysis = Analysis.objects.create(genome_build=cls.genome_build, user=cls.user)
         # Artefact means the same thing to both sides of the house, so it stays in every origin's numbers
         cls.artefact = Tag.objects.create(pk="Artefact")
-        cls.reportable = Tag.objects.create(pk="SomaticReportable",
-                                            allele_origin_bucket=AlleleOriginBucket.SOMATIC)
+        cls.somatic = Tag.objects.create(pk="Somatic",
+                                         allele_origin_bucket=AlleleOriginBucket.SOMATIC)
         cls.inherited = Tag.objects.create(pk="Inherited", allele_origin_bucket=AlleleOriginBucket.GERMLINE)
         cls.allele = Allele.objects.create()
         cls.other_allele = Allele.objects.create()
 
-        # The same (variant, tag) tagged twice - the re-tagging the page has to distinguish
-        for _ in range(2):
-            cls._create_variant_tag(cls.artefact, cls.variant, cls.allele)
+        # The same (variant, tag) tagged in the analysis and again from the variant page - the re-tagging
+        # the page has to distinguish (an analysis holds one tagging per sample @see VariantTag.Meta)
+        cls._create_variant_tag(cls.artefact, cls.variant, cls.allele)
+        cls._create_variant_tag(cls.artefact, cls.variant, cls.allele, analysis=None)
         cls._create_variant_tag(cls.artefact, cls.other_variant, cls.other_allele)
-        cls._create_variant_tag(cls.reportable, cls.variant, cls.allele)
+        cls._create_variant_tag(cls.somatic, cls.variant, cls.allele)
         cls._create_variant_tag(cls.inherited, cls.variant, cls.allele)
 
     @classmethod
-    def _create_variant_tag(cls, tag: Tag, variant: Variant, allele: Allele = None) -> VariantTag:
-        return VariantTag.objects.create(variant=variant, tag=tag, analysis=cls.analysis, allele=allele,
+    def _create_variant_tag(cls, tag: Tag, variant: Variant, allele: Allele = None,
+                            analysis: Analysis = _UNSET) -> VariantTag:
+        if analysis is _UNSET:
+            analysis = cls.analysis
+        return VariantTag.objects.create(variant=variant, tag=tag, analysis=analysis, allele=allele,
                                          genome_build=cls.genome_build, user=cls.user)
 
     def setUp(self):
@@ -71,8 +77,8 @@ class TagStatsTest(TestCase):
 
     def test_co_occurrence_counts_alleles_with_both_tags(self):
         data = self._get_json("tag_stats_co_occurrence")
-        self.assertEqual(data["tags"], ["Artefact", "Inherited", "SomaticReportable"])
-        self.assertIn({"tags": ["Artefact", "SomaticReportable"], "alleles": 1}, data["top_pairs"])
+        self.assertEqual(data["tags"], ["Artefact", "Inherited", "Somatic"])
+        self.assertIn({"tags": ["Artefact", "Somatic"], "alleles": 1}, data["top_pairs"])
 
     def test_user_card_is_for_the_requested_user(self):
         other_user = User.objects.create(username='tag_stats_other_user')
@@ -89,7 +95,7 @@ class TagStatsTest(TestCase):
 
     def test_response_is_cached(self):
         first = self._get_json("tag_stats_headline")
-        self._create_variant_tag(self.artefact, self.other_variant)
+        self._create_variant_tag(self.artefact, self.other_variant, analysis=None)
         self.assertEqual(self._get_json("tag_stats_headline")["calculated"], first["calculated"])
 
     def test_cache_is_not_shared_between_users(self):
@@ -99,7 +105,7 @@ class TagStatsTest(TestCase):
         self.assertEqual(self._get_json("tag_stats_headline")["tag_events"], 0)
 
     def test_each_origin_keeps_its_own_tags_and_the_ones_marked_both(self):
-        """ Of the 5 events, 3 are Artefact (both), 1 SomaticReportable and 1 Inherited """
+        """ Of the 5 events, 3 are Artefact (both), 1 Somatic and 1 Inherited """
         somatic = self._get_json("tag_stats_headline",
                                  params={"allele_origin": AlleleOriginFilterDefault.SOMATIC})
         self.assertEqual(somatic["tag_events"], 4)
@@ -110,7 +116,7 @@ class TagStatsTest(TestCase):
     def test_cache_is_not_shared_between_allele_origins(self):
         """ Every card is origin filtered, so one origin's numbers must not be served to another """
         self.assertEqual(self._get_json("tag_stats_over_time")["totals"],
-                         {"Artefact": 3, "SomaticReportable": 1, "Inherited": 1})
+                         {"Artefact": 3, "Somatic": 1, "Inherited": 1})
         germline = self._get_json("tag_stats_over_time",
                                   params={"allele_origin": AlleleOriginFilterDefault.GERMLINE})
         self.assertEqual(germline["totals"], {"Artefact": 3, "Inherited": 1})
@@ -139,7 +145,7 @@ class TagStatsTest(TestCase):
         overrides.save()
 
         response = self.client.get(reverse("tag_stats"))
-        self.assertEqual(response.context["re_tagged_form"].initial["tag"], "SomaticReportable")
+        self.assertEqual(response.context["re_tagged_form"].initial["tag"], "Somatic")
 
 
 @override_settings(CACHES=LOCMEM_CACHE)

@@ -22,6 +22,8 @@ def _get_ontology_text_match_counts() -> dict:
 
 
 class Command(BaseCommand):
+    category = "maintenance"
+
     def add_arguments(self, parser):
         parser.add_argument('--clear', action='store_true')
         parser.add_argument('--cores', type=int, default=1,

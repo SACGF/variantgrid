@@ -24,6 +24,7 @@ from analysis.grid_export import format_items_iterator, node_grid_get_export_ite
 from analysis.grids import ExportVariantGrid
 from analysis.models import Analysis
 from analysis.models.enums import NodeStatus
+from analysis.models.nodes.sources.cohort_node import CohortNode
 from analysis.models.nodes.sources.sample_node import SampleNode
 from analysis.models.models_variant_tag import VariantTag
 from analysis.tasks.analysis_grid_export_tasks import (
@@ -33,10 +34,17 @@ from analysis.tasks.analysis_grid_export_tasks import (
 from annotation.fake_annotation import get_fake_annotation_version
 from library.django_utils import FakeRequest
 from library.django_utils.grid_export import EXPORT_ROWS_PER_CHUNK, grid_export_csv
-from snpdb.models import CachedGeneratedFile, CohortGenotype, GenomeBuild, Tag
+from snpdb.models import CachedGeneratedFile, CohortGenotype, GenomeBuild, Tag, VCFInfo
+from snpdb.models.models_enums import VCFInfoTypes
 from snpdb.models.models_cohort import CohortGenotypeCollection
 from snpdb.models.models_enums import CohortGenotypeCollectionType
 from snpdb.tests.utils.fake_cohort_data import create_fake_cohort
+from analysis.grids import VariantGrid
+from genes.models import GeneSymbol
+from genes.tests.gene_fusion_test_utils import create_gene_fusion
+from library.genomics.vcf_writer import percent_encode_info_value
+from upload.tso500.dragen_all_fusions_parser import FUSION_OBSERVATIONS_INFO
+from snpdb.gene_level_variants import GENE_LEVEL_CONTIG_NAME
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
 
 # (contig name, position) - deliberately out of both PK order and contig-name string order, so an
@@ -99,8 +107,10 @@ class GridExportTestCase(TestCase):
         cls.analysis.set_defaults_and_save(cls.user)
 
     @classmethod
-    def _add_genotype(cls, cgc, variant, read_depth=40):
-        """ Insert a CohortGenotype row into the collection's partition table (proband at index 0) """
+    def _add_genotype(cls, cgc, variant, read_depth=40, sample_format=None, sample_info=None):
+        """ Insert a CohortGenotype row into the collection's partition table (proband at index 0).
+            sample_format: the FORMAT JSON the importer keeps, one dict per sample
+            sample_info: the record's remaining INFO fields, as the importer stores them """
         old_db_table = CohortGenotype._meta.db_table
         try:
             CohortGenotype._meta.db_table = cgc.get_partition_table()
@@ -108,6 +118,8 @@ class GridExportTestCase(TestCase):
                 collection=cgc, variant=variant,
                 ref_count=0, het_count=1, hom_count=0, unk_count=0,
                 filters="X",
+                format=sample_format or [],
+                info=sample_info or {},
                 samples_zygosity="E..",
                 samples_allele_depth=[20, 0, 0],
                 samples_allele_frequency=[0.5, 0.0, 0.0],
@@ -174,7 +186,7 @@ class TestFormatItemsIterator(GridExportTestCase):
 
     def test_tags_are_summarised_and_analysis_tags_applied(self):
         items = [
-            {"id": 1, "tags_global": "foo:2024-03-01|bar:2019-07-12|foo:2019-07-12", "tags": None},
+            {"id": 1, "tags_global": "foo:2024-03-01:|bar:2019-07-12:|foo:2019-07-12:", "tags": None},
             {"id": 2, "tags_global": None, "tags": None},
         ]
         formatted = list(format_items_iterator(iter(items), {2: "in_analysis"}))
@@ -184,13 +196,26 @@ class TestFormatItemsIterator(GridExportTestCase):
         self.assertEqual(formatted[1]["tags"], "in_analysis")
 
     def test_tags_fresh_counts_with_stale_cutoff(self):
-        payload = "foo:2024-03-01|foo:2019-07-12|foo:2019-06-01|bar:2019-01-01|baz:2024-05-06"
+        payload = "foo:2024-03-01:|foo:2019-07-12:|foo:2019-06-01:|bar:2019-01-01:|baz:2024-05-06:"
         items = [{"id": 1, "tags_global": payload, "tags": None}]
         stale_date = datetime(2020, 1, 1, tzinfo=timezone.utc)
         formatted = list(format_items_iterator(iter(items), tag_stale_date=stale_date))
         # Multi-event tags show fresh of total; a single entirely-stale tag shows (0 fresh);
         # a single fresh tag stays as today
         self.assertEqual(formatted[0]["tags_global"], "foo x 3 (1 fresh), bar (0 fresh), baz")
+
+    def test_resolved_tag_events_are_counted(self):
+        """ A to-do a classification satisfied is done - the summary says how many of the events are """
+        payload = "foo:2024-03-01:R|foo:2019-07-12:|bar:2019-01-01:R"
+        items = [{"id": 1, "tags_global": payload, "tags": None}]
+        formatted = list(format_items_iterator(iter(items)))
+        self.assertEqual(formatted[0]["tags_global"], "foo x 2 (1 resolved), bar (1 resolved)")
+
+    def test_a_tag_id_containing_a_colon_keeps_its_name(self):
+        """ Tag ids are user supplied, so only the two trailing fields are separators """
+        items = [{"id": 1, "tags_global": "a:b:2024-03-01:R", "tags": None}]
+        formatted = list(format_items_iterator(iter(items)))
+        self.assertEqual(formatted[0]["tags_global"], "a:b (1 resolved)")
 
     def test_missing_sample_values_export_as_dot(self):
         node = self._sample_node()
@@ -310,6 +335,28 @@ class TestNodeExportLaunch(GridExportTestCase):
         current = self._launch_export()
         self.assertEqual(stale.pk, current.pk)
 
+    def test_missing_file_is_regenerated(self):
+        """ A cached row whose file is gone - media cleaned up, or a database copied from a deployment
+            with a different MEDIA_ROOT - is dropped so the next request generates it again """
+        first = self._launch_export()
+        CachedGeneratedFile.objects.filter(pk=first.pk).update(task_status="SUCCESS",
+                                                               filename="/gone/annotated.csv.zip")
+        second = self._launch_export()
+        self.assertNotEqual(first.pk, second.pk)
+        self.assertFalse(CachedGeneratedFile.objects.filter(pk=first.pk).exists())
+        self.assertEqual(self._num_cached_files(), 1)
+
+    def test_poll_reports_missing_file_as_failure(self):
+        """ Pollers holding a cgf_id (@see analysis_downloads.js) don't go through the launch view,
+            so the poll has to tell them the file is gone rather than blowing up making its URL """
+        cgf = self._launch_export()
+        CachedGeneratedFile.objects.filter(pk=cgf.pk).update(task_status="SUCCESS",
+                                                             filename="/gone/annotated.csv.zip")
+        url = reverse("cached_generated_file_check", kwargs={"cgf_id": cgf.pk})
+        data = self.client.get(url).json()
+        self.assertEqual(data["status"], "FAILURE")
+        self.assertIn("no longer available", data["exception"])
+
     def test_different_grid_filters_are_separate_downloads(self):
         unfiltered = self._launch_export()
         filters = json.dumps({"groupOp": "AND",
@@ -335,3 +382,106 @@ class TestNodeExportLaunch(GridExportTestCase):
                     csv_name = zipf.namelist()[0]
                     lines = zipf.read(csv_name).decode().splitlines()
                 self.assertEqual(len(lines), self.node.count + 1)  # header
+
+
+class TestGeneLevelExport(GridExportTestCase):
+    """ A fusion sits on the shared gene-level contig, which is not one of the build's own, so an
+        export walking standard_contigs dropped it without saying so (#1558) """
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        for symbol in ["CD74", "ROS1"]:
+            GeneSymbol.objects.get_or_create(symbol=symbol)
+        cls.gene_fusion = create_gene_fusion("CD74", "ROS1")
+        cgc = CohortGenotypeCollection.objects.get(cohort=cls.cohort, cohort_version=cls.cohort.version,
+                                                  collection_type=CohortGenotypeCollectionType.UNCOMMON)
+        cls._add_genotype(cgc, cls.gene_fusion.variant)
+
+    def test_csv_export_includes_the_fusion(self):
+        node = self._sample_node()
+        _header, rows = self._export_csv(node)
+        self.assertEqual(node.count, len(rows))
+        alt = self.gene_fusion.variant.alt.seq
+        self.assertTrue(any(alt in cell for row in rows for cell in row), alt)
+
+    def test_fusion_exports_after_the_coordinates(self):
+        """ It has no position to sort with, so it lands at the end rather than in the middle """
+        node = self._sample_node()
+        _header, rows = self._export_csv(node)
+        alt = self.gene_fusion.variant.alt.seq
+        self.assertIn(alt, rows[-1])
+
+    def test_vcf_export_declares_the_gene_level_contig(self):
+        """ Without the contig line the file we just wrote will not re-import """
+        node = self._sample_node()
+        lines = self._export_lines(node, export_type="vcf")
+        header = [line for line in lines if line.startswith("##")]
+        self.assertTrue(any(line.startswith(f"##contig=<ID={GENE_LEVEL_CONTIG_NAME},") for line in header),
+                        header)
+        records = [line for line in lines if not line.startswith("#")]
+        fusion_records = [line for line in records if line.startswith(f"{GENE_LEVEL_CONTIG_NAME}\t")]
+        self.assertEqual(1, len(fusion_records), records)
+        _chrom, pos, _id, ref, alt = fusion_records[0].split("\t")[:5]
+        self.assertEqual(str(self.gene_fusion.anchor_id), pos, "the anchor gene id stands in for a position")
+        self.assertEqual("N", ref)
+        self.assertEqual(self.gene_fusion.variant.alt.seq, alt)
+
+
+class TestFusionCallsColumn(GridExportTestCase):
+    """ One gene pair can be several caller rows, all merged onto the one Variant, so the
+        breakpoints and read counts only exist in the INFO blob (#1558 §5.1) """
+
+    OBSERVATIONS = [
+        {"Caller": "DRAGEN", "Gene A Breakpoint": "chr8:128806980",
+         "Gene B Breakpoint": "chr8:128750494", "Alt Split Dedup": "6", "Alt Pair Dedup": "1"},
+        {"Caller": "SpliceGirl", "Gene A Breakpoint": "chr4:55133909",
+         "Gene B Breakpoint": "chr4:55138560", "Alt Split": "40"},
+    ]
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        for symbol in ["PVT1", "MYC"]:
+            GeneSymbol.objects.get_or_create(symbol=symbol)
+        cls.gene_fusion = create_gene_fusion("PVT1", "MYC")
+        VCFInfo.objects.create(vcf=cls.vcf, identifier=FUSION_OBSERVATIONS_INFO, number="1",
+                               data_type=VCFInfoTypes.STRING, description="Calls")
+        encoded = percent_encode_info_value(json.dumps(cls.OBSERVATIONS))
+        cgc = cls.cohort.cohort_genotype_collection
+        cls._add_genotype(cgc, cls.gene_fusion.variant, sample_info={FUSION_OBSERVATIONS_INFO: encoded})
+
+    def _node(self) -> CohortNode:
+        node = CohortNode.objects.create(analysis=self.analysis, cohort=self.cohort,
+                                         accordion_panel=CohortNode.COUNT)
+        node.count = node.get_queryset().count()
+        node.status = NodeStatus.READY
+        node.save()
+        return node
+
+    @property
+    def _column(self) -> str:
+        cgc = self.cohort.cohort_genotype_collection
+        return f"{cgc.cohortgenotype_alias}__info__{FUSION_OBSERVATIONS_INFO}"
+
+    def _grid_columns(self) -> dict:
+        grid = VariantGrid(FakeRequest(user=self.user), self._node())
+        return {rc.name: rc for rc in grid.enabled_columns}
+
+    def test_column_only_appears_for_a_vcf_carrying_fusion_calls(self):
+        columns = self._grid_columns()
+        self.assertIn(self._column, columns)
+        self.assertEqual("VariantGridFormat.fusionCalls", columns[self._column].client_renderer)
+
+        VCFInfo.objects.filter(vcf=self.vcf, identifier=FUSION_OBSERVATIONS_INFO).delete()
+        self.assertNotIn(self._column, self._grid_columns())
+
+    def test_calls_are_decoded_for_the_cell_and_the_csv(self):
+        node = self._node()
+        header, rows = self._export_csv(node)
+        index = header.index("Fusion calls")
+        by_variant = {int(row[0]): row[index] for row in rows}
+        self.assertEqual("DRAGEN chr8:128806980→chr8:128750494 (7 reads); "
+                         "SpliceGirl chr4:55133909→chr4:55138560 (40 reads)",
+                         by_variant[self.gene_fusion.variant.pk])
+        self.assertEqual("", by_variant[self.variants[0].pk], "blank on a row that isn't a fusion")

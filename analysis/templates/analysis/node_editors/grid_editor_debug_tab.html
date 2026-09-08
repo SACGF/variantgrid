@@ -8,14 +8,15 @@
     }
 </style>
 <div>
-    <div><b>NodeCache:</b>
+    <div class="editor-row">
+        <span class="editor-label">NodeCache</span>
         {% if node.node_cache %}
             {{ node.node_cache }}
             {% if node.id != node.node_cache.node_id %}
-                (from parent)
+                <span class="editor-help">(from parent)</span>
             {% endif %}
         {% else %}
-            N/A
+            <span class="editor-help">N/A</span>
         {% endif %}
     </div>
     <code>{{ node_data|jsonify_pretty }}</code>
@@ -65,9 +66,9 @@
     });
     </script>
     {%  if node_sql or grid_sql %}
-    <span>
-        Show columns <input id='show-grid-columns' type='checkbox' />
-    </span>
+    <div class="editor-row">
+        <label for="show-grid-columns"><input id='show-grid-columns' type='checkbox' /> Show grid columns in SQL</label>
+    </div>
 
     <div id="min-sql">
         <pre>
@@ -84,7 +85,7 @@
         </pre>
     </div>
     {%  else %}
-        Could not generate SQL
+        <div class="editor-help">Could not generate SQL</div>
     {%  endif %}
 
     {% if user.is_superuser %}
@@ -94,5 +95,5 @@
         </button>
     {% endif %}
 {% else %}
-    The node has errors.
+    <div class="editor-warning">The node has errors.</div>
 {% endif %}

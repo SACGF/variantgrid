@@ -1,3 +1,8 @@
+"""
+CacheableGraph: a GraphBase whose output file is keyed on its parameters' hash, so the same graph
+is rendered once and served from CachedGeneratedFile; async_graph is the celery task that renders one
+by class name.
+"""
 import abc
 import os
 

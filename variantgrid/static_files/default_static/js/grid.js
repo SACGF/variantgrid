@@ -303,12 +303,20 @@ function create_igv_link(locus, getBamsFuncString) {
     return '';
 }
 
-function showGridCell(gridColumn) {
-    // The adapter names each cell with a dt-<column> class
-    const selector = $("td.dt-" + gridColumn);
-    if (selector.length) {
-        selector[0].scrollIntoView();
+/* Filter child nodes are raised from cells in the grid (gene symbols) and from the column summary
+   table, so the node comes from whichever node the data container is showing rather than from the
+   editor that happens to be loaded */
+function createFilterChild(columnName, columnFilter) {
+    const nodeId = $("#node-data-container").attr("node_id");
+    if (!nodeId) {
+        return;
     }
+    $.ajax({
+        type: "POST",
+        data: {column_name: columnName, column_filter: columnFilter},
+        url: Urls.create_filter_child(ANALYSIS_ID, nodeId),
+        success: getAnalysisWindow().addConnectedNode,
+    });
 }
 
 function inAnalysis() {
@@ -323,24 +331,31 @@ function inAnalysis() {
 function showTagAutocomplete(variantId) {
     const addTagButton = $(".show-tag-autocomplete[variant_id=" + variantId + "]");
     const cell = addTagButton.parent();
-    const nodeId = addTagButton.parents("#node-data-container").attr("node_id");
+    // The grid the + was clicked in is the node the tagging is about - the data container's node_id
+    // is cleared whenever the editor is replaced, and a tagging without a node never learns its sample
+    const nodeId = addTagButton.closest("table.grid").attr("node_id");
 
     const panel = $("<div/>", {"class": "variant-tag-entry"});
-    addTagButton.hide();
+    // The panel is anchored off the button's rect, so it can only be hidden once that has been taken
     FloatingPanel.show(panel, addTagButton[0], {onHide: function() {
         addTagButton.show();
     }});
+    addTagButton.hide();
 
     panel.load(Urls.tag_autocomplete_form(), function() {
         const tagSelect = $("select#id_tag", panel);
+        colorTagAutocompleteResults(tagSelect);
         tagSelect.change(function() {
             const tag = $(this).val();
             if (tag) {
-                const successFunc = function () {
-                    const vtHtml = getVariantTagHtml(variantId, tag);
-                    const newTag = $(vtHtml);
-                    newTag.click(tagClickHandler);
-                    cell.append(newTag);
+                const successFunc = function (response) {
+                    // The click lands on this node's proband's tagging - a new pill only where a row was made
+                    if (response && response.created) {
+                        const newTag = $(getVariantTagHtml(variantId, tag, false,
+                                                           {variantTagId: response.variant_tag.id}));
+                        newTag.click(tagClickHandler);
+                        cell.append(newTag);
+                    }
                     FloatingPanel.hide();
                 };
                 addVariantTag(variantId, nodeId, tag, successFunc);
@@ -357,34 +372,83 @@ function showTagAutocomplete(variantId) {
 }
 
 
-function getVariantTagHtml(variantId, tag, readOnly, tagLabel, extraClasses, title) {
-    if (typeof(tagLabel) === 'undefined') {
-        tagLabel = tag;
+/* Tag colours are CSS (.tagged-<tag> > .user-tag-colored - @see render_tag_styles_and_formatter), so a
+   dropdown entry draws in its tag's colour once it carries the same markup a grid tag does. select2
+   redraws its list on every keystroke, so watch it rather than decorating once */
+function colorTagAutocompleteResults(tagSelect) {
+    function decorate(resultsList) {
+        // select2 keeps a result's data in its own cache keyed off data-select2-id, not jQuery's store
+        const select2Utils = $.fn.select2.amd.require("select2/utils");
+        $("li.select2-results__option", resultsList).each(function() {
+            const option = $(this);
+            const tag = (select2Utils.GetData(this, "data") || {}).id;
+            if (!tag || option.children(".grid-tag").length) {
+                return;  // a message row ("Searching...", "No results"), or already drawn
+            }
+            option.empty().append($("<span/>", {class: "grid-tag tagged-" + tag})
+                                      .append($("<span/>", {class: "user-tag-colored", text: tag})));
+        });
     }
-    if (typeof(title) === 'undefined') {
-        title = `Tagged as ${tag}`;
-    }
+
+    tagSelect.on("select2:open", function() {
+        const resultsList = $("#select2-" + tagSelect.attr("id") + "-results");
+        if (!resultsList.length) {
+            return;
+        }
+        decorate(resultsList);
+        const observer = new MutationObserver(function() {
+            decorate(resultsList);
+        });
+        observer.observe(resultsList[0], {childList: true});
+        tagSelect.one("select2:close", function() {
+            observer.disconnect();
+        });
+    });
+}
+
+
+/* options: tagLabel (HTML, defaults to the tag), extraClasses, title, variantTagId (the tagging the
+   pill is - what the X deletes) and marker (icon classes drawn after the label, saying whose tagging
+   it is - @see VariantGridFormat.tags) */
+function getVariantTagHtml(variantId, tag, readOnly, options) {
+    options = options || {};
+    const tagLabel = typeof(options.tagLabel) === 'undefined' ? tag : options.tagLabel;
+    const title = typeof(options.title) === 'undefined' ? `Tagged as ${tag}` : options.title;
     const outerClasses = ["grid-tag", "tagged-" + tag];
     if (!readOnly) {
         outerClasses.push("grid-tag-deletable");
     }
-    if (extraClasses) {
-        outerClasses.push(...extraClasses);
+    if (options.extraClasses) {
+        outerClasses.push(...options.extraClasses);
     }
-    return `<span class='${outerClasses.join(' ')}' title='${title}' variant_id='${variantId}' tag_id='${tag}'><span class='user-tag-colored'>${tagLabel}</span></span>`;
+    // A tagging's own pk - the analysis grid's X removes that one tagging, not every tagging of the tag
+    const pkAttr = options.variantTagId ? ` variant_tag_id='${options.variantTagId}'` : "";
+    const marker = options.marker ? `<i class='grid-tag-sample-marker ${options.marker}'></i>` : "";
+    return `<span class='${outerClasses.join(' ')}' title='${escapeHtml(title)}' variant_id='${variantId}' tag_id='${tag}'${pkAttr}><span class='user-tag-colored'>${tagLabel}${marker}</span></span>`;
+}
+
+
+// The sample the grid's pills are read against - the node the grid is showing is about one study.
+// @see node_data_grid.html / sample_variants_tab.html
+function getNodeProbandSampleId() {
+    return typeof(nodeProbandSampleId) === 'undefined' ? null : nodeProbandSampleId;
 }
 
 
 // Tags with no entry in variantTagOrder sort as 0, ties broken alphabetically.
 // Customised per-collection on the tag colors page - see issue #343
-function sortVariantTags(aWin, tagList) {
+// getTag pulls the tag out of an entry - the analysis grid sorts taggings, not tag names
+function sortVariantTags(aWin, tagList, getTag) {
     const tagOrder = aWin.variantTagOrder || {};
+    const tagOf = getTag || function(entry) { return entry; };
     return tagList.slice().sort(function(a, b) {
-        const diff = (tagOrder[a] || 0) - (tagOrder[b] || 0);
+        const tagA = tagOf(a);
+        const tagB = tagOf(b);
+        const diff = (tagOrder[tagA] || 0) - (tagOrder[tagB] || 0);
         if (diff) {
             return diff;
         }
-        return a.localeCompare(b);
+        return tagA.localeCompare(tagB);
     });
 }
 
@@ -417,7 +481,8 @@ function tagClickHandler() {
         const removeTagCallback = function () {
             gridTag.remove();
         };
-        removeVariantTag(gridTag.attr('variant_id'), gridTag.attr('tag_id'), removeTagCallback);
+        removeVariantTag(gridTag.attr('variant_id'), gridTag.attr('tag_id'),
+                         gridTag.attr('variant_tag_id'), removeTagCallback);
     });
     gridTag.append(deleteButton);
 }

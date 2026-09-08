@@ -50,6 +50,14 @@ class VariantGridDefinitionTest(GridExportTestCase):
         self.assertTrue(extra["analysisNode"]["visible"])
         self.assertEqual(self.genome_build.name, extra["genomeBuild"])
 
+    def test_multi_value_columns_carry_their_separator(self):
+        """ The cell splits on it so a multi-value column reads as a list - @see VEPColumnDef.separator """
+        columns = {c["data"]: c for c in self._definition()["columns"]}
+        consequence = columns["consequence_impact"]
+        members = {m["path"]: m for m in consequence["renderKwargs"]["members"]}
+        self.assertEqual("&", members["variantannotation__consequence"]["separator"])
+        self.assertNotIn("separator", members["variantannotation__impact"])
+
     def test_rows_are_deferred(self):
         """ Whether to fetch rows at all is the page's call - the placeholder on a big node, and the
             grid tab being hidden, both hold the query back """

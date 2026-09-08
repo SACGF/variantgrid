@@ -40,8 +40,6 @@ class PatientListColumns(DatatableConfig[Patient]):
         "first_name": "first_name__icontains",
         "last_name": "last_name__icontains",
         "sex": "sex",
-        "family_code": "family_code__icontains",
-        "phenotype": "phenotype__icontains",
     }
 
     def __init__(self, request: HttpRequest):

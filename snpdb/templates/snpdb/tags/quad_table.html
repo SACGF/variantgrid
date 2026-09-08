@@ -1,67 +1,75 @@
-<table>
-    <tr><th>Quad ID:</th>
-        <td><a href="{% url 'view_quad' quad.pk %}">{{ quad.pk }}</a></td>
-    </tr>
-    <tr><th>Name:</th>
-        <td>{{ quad.name }}</td>
-    </tr>
-    <tr><th>Genome Build:</th>
-        <td>{{ quad.genome_build }}</td>
-    </tr>
-    <tr><th>Cohort:</th>
-        <td><a href="{% url 'view_cohort' quad.cohort.pk %}">{{ quad.cohort }}</a></td>
-    </tr>
-    <tr><th>Mother:</th>
-        <td>
-            <div class="display-flex flex-row">
-                <div class="icon24 sample-icon"></div>
-                <a href="{% url 'view_sample' quad.mother.sample.pk %}">{{ quad.mother_details }}</a>
-                {% if quad.mother.sample.patient %}
-                    <div class="icon24 patient-icon"></div>
-                    <a href="{% url 'view_patient' quad.mother.sample.patient_id %}">{{ quad.mother.sample.patient }}</a>
-                {% endif %}
-            </div>
-        </td>
-    </tr>
-    <tr><th>Father:</th>
-        <td>
-            <div class="display-flex flex-row">
-                <div class="icon24 sample-icon"></div>
-                <a href="{% url 'view_sample' quad.father.sample.pk %}">{{ quad.father_details }}</a>
-                {% if quad.father.sample.patient %}
-                    <div class="icon24 patient-icon"></div>
-                    <a href="{% url 'view_patient' quad.father.sample.patient_id %}">{{ quad.father.sample.patient }}</a>
-                {% endif %}
-            </div>
-        </td>
-    </tr>
-    <tr><th>Proband:</th>
-        <td>
-            <div class="display-flex flex-row">
-                <div class="icon24 sample-icon"></div>
-                <a href="{% url 'view_sample' quad.proband.sample.pk %}">{{ quad.proband }}</a>
-                {% if quad.proband.sample.patient %}
-                    <div class="icon24 patient-icon"></div>
-                    <a href="{% url 'view_patient' quad.proband.sample.patient_id %}">{{ quad.proband.sample.patient }}</a>
-                {% endif %}
-            </div>
-        </td>
-    </tr>
-{% if quad.proband_sex %}
-    <tr><th>Proband Sex:</th>
-        <td>{{ quad.effective_proband_sex.label }} (set on the quad, overriding the patient record)</td>
-    </tr>
-{% endif %}
-    <tr><th>Sibling:</th>
-        <td>
-            <div class="display-flex flex-row">
-                <div class="icon24 sample-icon"></div>
-                <a href="{% url 'view_sample' quad.sibling.sample.pk %}">{{ quad.sibling_details }}</a>
-                {% if quad.sibling.sample.patient %}
-                    <div class="icon24 patient-icon"></div>
-                    <a href="{% url 'view_patient' quad.sibling.sample.patient_id %}">{{ quad.sibling.sample.patient }}</a>
-                {% endif %}
-            </div>
-        </td>
-    </tr>
-</table>
+{% load model_tags %}
+{% load ui_utils %}
+
+<div class="card mb-3">
+    <div class="card-header">Family</div>
+    <table class="table table-sm mb-0 quad-family-table">
+        <thead>
+            <tr>
+                <th>Role</th>
+                <th>Sample</th>
+                <th>Affected</th>
+                <th data-help="{% detected_sex_help %}">Detected Sex</th>
+                <th>Patient</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for member in members %}
+            {% with sample=member.cohort_sample.sample %}
+            <tr>
+                <th>{{ member.role }}</th>
+                <td>
+                    {% preview_icon sample %}
+                    <a href="{% url 'view_sample' sample.pk %}">{{ sample.name }}</a>
+                </td>
+                <td>
+                    {% if member.affected %}
+                        <span class="badge badge-dark">Affected</span>
+                    {% else %}
+                        <span class="text-muted">Unaffected</span>
+                    {% endif %}
+                </td>
+                <td>{% detected_sex sample.get_genotype_stats %}</td>
+                <td>
+                    {% if sample.patient %}
+                        {% preview_icon sample.patient %}
+                        <a href="{% url 'view_patient' sample.patient_id %}">{{ sample.patient }}</a>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endwith %}
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div class="card mb-3">
+    <div class="card-header">Quad</div>
+    <table class="table table-sm mb-0 quad-details-table">
+        <tbody>
+            <tr><th>Quad ID</th>
+                <td><a href="{% url 'view_quad' quad.pk %}">{{ quad.pk }}</a></td>
+            </tr>
+            <tr><th>Name</th>
+                <td>{{ quad.name }}</td>
+            </tr>
+            <tr><th>Genome Build</th>
+                <td>{{ quad.genome_build }}</td>
+            </tr>
+            <tr><th>Cohort</th>
+                <td>
+                    {% preview_icon quad.cohort %}
+                    <a href="{% url 'view_cohort' quad.cohort.pk %}">{{ quad.cohort }}</a>
+                </td>
+            </tr>
+        {% if quad.proband_sex %}
+            <tr><th>Proband Sex</th>
+                <td>
+                    {{ quad.effective_proband_sex.label }}
+                    <span class="text-muted small">set on the quad, overriding the patient record</span>
+                </td>
+            </tr>
+        {% endif %}
+        </tbody>
+    </table>
+</div>

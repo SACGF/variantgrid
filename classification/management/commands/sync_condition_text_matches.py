@@ -15,6 +15,7 @@ class Command(BaseCommand):
     """
     Updates Condition Text Matches to match the state of the classifications
     """
+    category = "maintenance"
 
     def add_arguments(self, parser):
         parser.add_argument('--obsolete', action='store_true', default=False)

@@ -31,102 +31,90 @@
 
 
 {% block content %}
-<style>
-	#id_percent {
-		width: 100px;
-	}
-</style>
-<div>
-	<form id="phenotype-node" method="post" action="{{ request.path }}">
-        {% csrf_token %}
-        {% for hidden in form.hidden_fields %}
-            {{ hidden }}
-        {% endfor %}
+<form id="phenotype-node" method="post" action="{{ request.path }}">
+    {% csrf_token %}
+    {% for hidden in form.hidden_fields %}
+        {{ hidden }}
+    {% endfor %}
 
-		<div class="accordion node-editor-accordion" id="phenotype-node-accordion">
-            <div class="card">
-                <div class="card-header" data-toggle="collapse" data-target="#phenotype-panel-custom">Custom Fields</div>
-                <div id="phenotype-panel-custom" class="collapse" data-parent="#phenotype-node-accordion">
-                <div class="card-body">
-                <table>
-                    <tr>
-                        <th class='hpo'>Phenotype:</th>
-                        <td class='hpo'> {{ form.hpo }}</td>
-                        <td id='phenotypes-list'></td>
-                    </tr>
-                    <tr>
-                        <th class='omim'>OMIM:</th>
-                        <td class='omim'> {{ form.omim }}</td>
-                        <td id='omim-list'></td>
-                    </tr>
-                    <tr>
-                        <th class='mondo'>MONDO:</th>
-                        <td class='mondo'> {{ form.mondo }}</td>
-                        <td id='mondo-list'></td>
-                    </tr>
-                    <tr>
-                        <th>Free Text:</th>
-                        <td> {{ form.text_phenotype }}</td>
-                        <td><i>Matches at least one word to RefSeq Gene Summary, OMIM terms, HPO terms, or UniProt
-                            Function (case insensitive)</i></td>
-                    </tr>
-                </table>
+    <div class="accordion node-editor-accordion" id="phenotype-node-accordion">
+        <div class="card">
+            <div class="card-header" data-toggle="collapse" data-target="#phenotype-panel-custom">Custom Fields</div>
+            <div id="phenotype-panel-custom" class="collapse" data-parent="#phenotype-node-accordion">
+            <div class="card-body">
+                <div class="editor-row editor-row-top">
+                    <label class="editor-label hpo" for="{{ form.hpo.id_for_label }}">Phenotype</label>
+                    <span>{{ form.hpo }}</span>
                 </div>
+                <div class="editor-row editor-row-top">
+                    <label class="editor-label omim" for="{{ form.omim.id_for_label }}">OMIM</label>
+                    <span>{{ form.omim }}</span>
+                </div>
+                <div class="editor-row editor-row-top">
+                    <label class="editor-label mondo" for="{{ form.mondo.id_for_label }}">MONDO</label>
+                    <span>{{ form.mondo }}</span>
+                </div>
+                <div class="editor-row editor-row-top">
+                    <label class="editor-label" for="{{ form.text_phenotype.id_for_label }}">Free text</label>
+                    {{ form.text_phenotype }}
+                </div>
+                <div class="editor-help">
+                    Free text matches at least one word to RefSeq Gene Summary, OMIM terms, HPO terms or UniProt
+                    Function (case insensitive).
                 </div>
             </div>
-			<div class="card">
-	        <div class="card-header" data-toggle="collapse" data-target="#phenotype-panel-patient">From Patient</div>
-	        <div id="phenotype-panel-patient" class="collapse" data-parent="#phenotype-node-accordion">
-	        <div class="card-body">
-                {% if node.has_sample_inputs_with_patient %}
-    				Patient: {{ form.patient }}
-                    {% if node.patient %}
-                        <div id='patient-details'>
+            </div>
+        </div>
+        <div class="card">
+        <div class="card-header" data-toggle="collapse" data-target="#phenotype-panel-patient">From Patient</div>
+        <div id="phenotype-panel-patient" class="collapse" data-parent="#phenotype-node-accordion">
+        <div class="card-body">
+            {% if node.has_sample_inputs_with_patient %}
+                <div class="editor-row">
+                    <label class="editor-label" for="{{ form.patient.id_for_label }}">Patient</label>
+                    {{ form.patient }}
+                </div>
+                {% if node.patient %}
+                    <div id='patient-details'>
+                    <div class="editor-row editor-row-top">
+                        <span class="editor-label">HPO</span>
                         {% if patient_hpo %}
-                            <p>
-                            <b>HPO:</b>
-                            {% for hpo in patient_hpo %}
-                                {{ hpo }}
-                            {% endfor %}
-                            </p>
+                            <span>{% for hpo in patient_hpo %}{{ hpo }}{% if not forloop.last %}, {% endif %}{% endfor %}</span>
                         {% else %}
-                            This patient has no HPO terms
+                            <span class="editor-help">This patient has no HPO terms</span>
                         {% endif %}
+                    </div>
+                    <div class="editor-row editor-row-top">
+                        <span class="editor-label">OMIM</span>
                         {% if patient_omim %}
-                            <p>
-                            <b>OMIM:</b>
-                            {% for omim in patient_omim %}
-                                {{ omim }}
-                            {% endfor %}
-                            </p>
+                            <span>{% for omim in patient_omim %}{{ omim }}{% if not forloop.last %}, {% endif %}{% endfor %}</span>
                         {% else %}
-                            This patient has no OMIM terms
+                            <span class="editor-help">This patient has no OMIM terms</span>
                         {% endif %}
+                    </div>
+                    <div class="editor-row editor-row-top">
+                        <span class="editor-label">MONDO</span>
                         {% if patient_mondo %}
-                            <p>
-                            <b>MONDO:</b>
-                            {% for mondo in patient_mondo %}
-                                {{ mondo }}
-                            {% endfor %}
-                            </p>
+                            <span>{% for mondo in patient_mondo %}{{ mondo }}{% if not forloop.last %}, {% endif %}{% endfor %}</span>
                         {% else %}
-                            This patient has no MONDO terms
+                            <span class="editor-help">This patient has no MONDO terms</span>
                         {% endif %}
-                        </div>
-                    {% endif %}
-                {% else %}
-                    <i>There are no patients assigned to samples above this node.</i>
+                    </div>
+                    </div>
                 {% endif %}
-	        </div>
-	        </div>
-	        </div>
-		</div>
+            {% else %}
+                <div class="editor-help">There are no patients assigned to samples above this node.</div>
+            {% endif %}
+        </div>
+        </div>
+        </div>
+    </div>
 
+    <div class="editor-actions">
         {% if has_write_permission %}
-	    	<button id='phenotype-save' class="btn btn-primary">save</button>
+            <button id='phenotype-save' class="btn btn-primary">Save</button>
         {% endif %}
+    </div>
     {{ form.media }}
-	</form>
-</div>
-
+</form>
 {% endblock content %}

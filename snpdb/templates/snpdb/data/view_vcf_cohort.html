@@ -1,0 +1,696 @@
+{# Unified VCF / Cohort page (issue #933) - rendered by both view_vcf and view_cohort #}
+{% extends base_template %}
+{% load static %}
+{% load js_tags %}
+{% load settings_tags %}
+{% load crispy_forms_tags %}
+{% load model_tags %}
+{% load ui_utils %}
+{% load vcf_import_info_tags %}
+{% load vcf_history_trail_tags %}
+{% load cohort_sample_actions_tag %}
+
+{% block title %}{{ page_title }}{% endblock %}
+{% block head %}
+{{ block.super }}
+{% if show_stats_tab %}
+<script type="text/javascript" src="{% static 'js/lib/plotly-custom-3.7.0.min.js' %}"></script>
+<script type="text/javascript" src="{% static 'js/plotly_helper.js' %}"></script>
+{% endif %}
+{% if vcf %}
+<script type="text/javascript" src="{% static 'js/cached_generated_files.js' %}"></script>
+<script type="text/javascript" src="{% static 'js/annotated_file_download.js' %}"></script>
+<style>
+#bulk-set-form-container {
+    display: none;
+    border: 1px solid black;
+    margin: 10px;
+}
+
+table#sample-formset input {
+    width: 100%;
+}
+
+table#sample-formset input[type=checkbox] {
+    width: auto;
+    margin-right: 5px;
+}
+
+.vcf-history-trail-link-text {
+    display: none;
+}
+
+#sample-list-top-links>div {
+    line-height: 24px;
+    margin-right: 20px;
+}
+
+#sample-list-top-links img {
+    vertical-align: middle;
+}
+
+#vcf-populate-clingen-alleles {
+    margin-left: 10px;
+}
+
+#change-zygosity-count {
+    margin-left: 5px;
+}
+
+.zygosity-count-button {
+    margin-left: 5px;
+}
+</style>
+<script>
+function addCreateProjectButtonAndForm() {
+    const createProjectButton = $("<div/>")
+        .addClass("click-to-add-button left")
+        .attr("title", "Create new project...");
+
+    const dialog = $("#new-project-dialog");
+    const form = dialog.find("form");
+    const allFields = $("input", dialog);
+
+    function createNewProject() {
+        allFields.removeClass("is-invalid");
+        let valid = true;
+        const name = $("#name", form);
+        const nameVal = name.val().trim();
+        if (!nameVal) {
+            name.addClass("is-invalid");
+            valid = false;
+        }
+
+        if (valid) {
+            const postData = {
+                name: nameVal,
+                description: $("#description", form).val().trim()
+            };
+
+            $.ajax({
+                type: "POST",
+                url: "{% url 'api_project_create' %}",
+                data: JSON.stringify(postData),
+                headers: {
+                      'Accept': 'application/json',
+                      'Content-Type': 'application/json'
+                },
+                success: function(data) {
+                    let name = data.name;
+                    if (data.description) {
+                        name += " (" + data.description + ")";
+                    }
+                    const option = $('<option>', {value: data.name, text: name, selected: 'selected'});
+                    $("select#id_project").append(option);
+                    dialog.modal("hide");
+                },
+                error: function(data) {
+                    const errorMessage = data.responseJSON.name[0];
+                    $(".error-messages", dialog).html(errorMessage);
+                    console.log(data);
+                }
+            });
+        }
+        return valid;
+    }
+
+    $("#create-new-project-button", dialog).click(createNewProject);
+
+    dialog.on("hidden.bs.modal", function() {
+      form[0].reset();
+      allFields.removeClass("is-invalid");
+      $(".error-messages", dialog).empty();
+    });
+
+    form.on("submit", function(event) {
+      event.preventDefault();
+      createNewProject();
+    });
+
+    createProjectButton.click(function() {
+      dialog.modal("show");
+    });
+
+    $("select#id_project").addClass("left").after(createProjectButton);
+}
+
+function toggleVCFSection(id) {
+    $("#" + id).slideToggle();
+}
+
+function drawLengthHistograms() {
+        const histoData = {{ vcf_length_stats | jsonify }};
+        let container = $("#vcf-length-stats-graph-container");
+
+        for(const [variant_class, data] of Object.entries(histoData)) {
+            let identifier = "vcf-length-graph-" + variant_class;
+            let graphContainer = $("<div />", {"id": identifier});
+            container.append(graphContainer);
+
+            let title = variant_class + " lengths"
+            var trace = {x: data.bin_centers, y: data.counts, type: 'bar'};
+            var layout = {
+                title: {text: title},
+                xaxis: {title: {text: data.is_log ? 'Log10(length)' : 'length'}},
+                yaxis: {title: {text: 'Frequency'}}
+            };
+            if (data.is_log) {
+              var minTick = Math.floor(Math.min(...data.bin_centers));
+              var maxTick = Math.ceil(Math.max(...data.bin_centers));
+              var tickvals = [];
+              for (var i = minTick; i <= maxTick; i++) tickvals.push(i);
+              var ticktext = tickvals.map(val => {
+                var orig = Math.pow(10, val);
+                return orig >= 1e6 ? (orig / 1e6) + "M" : orig >= 1000 ? (orig / 1000) + "k" : orig.toFixed(0);
+              });
+              layout.xaxis.tickmode = 'array';
+              layout.xaxis.tickvals = tickvals;
+              layout.xaxis.ticktext = ticktext;
+            }
+            Plotly.newPlot(identifier, [trace], layout);
+        }
+}
+
+$(document).ready(function() {
+    $("button#vcf-submit-button").click(function () {
+        $("form#vcf-form").submit();
+    });
+
+    // Skipped-annotation warning message (issue #1409) links to its tab
+    $(".activate-tab").click(function() {
+        $("#vcf-cohort-tabs .nav-tabs a[href='" + $(this).attr("href") + "']").tab('show');
+        return false;
+    });
+
+    addCreateProjectButtonAndForm();
+
+    $(".sample-patient select", "form#vcf-form").each(function () {
+        const patientSelector = $(this);
+        const patientLink = patientSelector.parents(".sample-patient").find("a.patient-link");
+        function setPatientLink() {
+            const pk = patientSelector.val();
+            if (pk) {
+                patientLink.attr("href", Urls.view_patient(pk));
+            } else {
+                patientLink.removeAttr("href");
+            }
+        }
+        setPatientLink();
+        patientSelector.change(setPatientLink);
+    });
+
+{% if has_write_permission %}
+    setupUnsavedChangesMessage("form#vcf-form", ".sample-select, .sample-select-all");
+    const dialog = setupCreatePatientDialog();
+    $(".sample-patient select", "form#vcf-form").each(function () {
+        const parentRow = $(this).parents("tr");
+        const sampleNameCell = $(".sample-name", parentRow);
+        const sampleName = $("input", sampleNameCell).val();
+        addCreatePatientButton(dialog, $(this), sampleName, $(this).parents(".sample-patient"));
+    });
+{% endif %}
+
+    drawLengthHistograms();
+
+    $("button#vcf-populate-clingen-alleles").click(function () {
+        let btn = $(this);
+        if (!btn.hasClass("disabled")) {
+            $.ajax({
+                type: "POST",
+                url: "{% url 'vcf_populate_clingen_alleles' vcf.pk %}",
+                success: function (data) {
+                    btn.addClass("disabled");
+                },
+            });
+        }
+    });
+
+    $("button.zygosity-count-button").click(function() {
+        let vcfId = "{{ vcf.pk }}";
+        let vzccId = $(this).attr("vzcc-id");
+        let operation = $(this).attr("operation");
+        let url = Urls.vcf_change_zygosity_count(vcfId, vzccId, operation);
+        let countInfo = $(this).parent(".zygosity-count-container");
+        countInfo.empty();
+        let msgBox = $("<ul/>").addClass("messages");
+        countInfo.append(msgBox);
+        let vzccName = $(this).attr("vzcc-name");
+        let jobName = `${vzccName} (${operation} )`;
+
+        $.ajax({
+            type: "POST",
+            url: url,
+            success: function (data) {
+                msgBox.append(`<li class='alert-info'>Submitted job: ${jobName}</li>`);
+                msgBox.fadeIn().delay(2000).fadeOut(1000);
+            },
+            error: function() {
+                msgBox.append(`<li class='error'>Error submitting job: ${jobName}</li>`);
+                msgBox.fadeIn();
+            },
+        });
+    });
+
+    {% for file_type, cgf in annotated_download_files.items %}
+        var pollUrl = Urls.cohort_grid_export({{ vcf.cohort.pk  }}, "{{ file_type }}");
+        var afdSelector = $("div#generate-{{ file_type }}-download");
+        var afd = new AnnotatedFileDownload(afdSelector, pollUrl, "{{ file_type }}");
+        {% if cgf %}
+            {% if cgf.exception %}
+                afd.setError()
+            {% elif cgf.task_status == "SUCCESS" %}
+                afd.setDownloadLink("{{ cgf.get_media_url  }}");
+            {% else %}
+                afd.setPolling(false);
+            {% endif %}
+        {% else %}
+            afd.setGenerateDownloadLink();
+        {% endif %}
+    {% endfor %}
+});
+</script>
+{% else %}
+<link href="{% static 'css/cohort_membership.css' %}" rel="stylesheet">
+<script type="text/javascript" src="{% static 'js/cohort_membership.js' %}"></script>
+{% endif %}
+{% if cohort %}
+<link href="{% static 'css/sample_selection_actions.css' %}" rel="stylesheet">
+<script type="text/javascript" src="{% static 'js/sample_selection_actions.js' %}"></script>
+{% endif %}
+{% endblock %}
+
+{% block jsdocumentready %}
+{% if sample_zygosities %}
+    showStackedBar('sample-zygosities-graph', 'Sample Zygosities', 500, 500,
+                   {{ sample_zygosities|jsonify }}, {{ sample_names|jsonify }});
+{% endif %}
+{% if not vcf %}
+    new CohortMembershipEditor({{ membership_config|jsonify }}, {{ cohort_sample_rows|jsonify }}).init();
+{% endif %}
+{% endblock %}
+
+{% block submenu_page_content %}
+<div id="vcf-cohort-page">
+
+{% if vcf %}
+    {% vcf_history_trail vcf %}
+    <h1>VCF: {{ vcf.name }}</h1>
+    {% include "snpdb/data/_data_archived_banner.html" with obj=vcf restore_url_name='restore_vcf' %}
+{% else %}
+    {% if cohort.data_archived %}
+    <div class="alert alert-warning" role="alert">
+        <strong>Cohort is read-only.</strong>
+        Underlying VCF data has been archived. Restore the parent VCF to enable editing.
+    </div>
+    {% endif %}
+    <form id="cohort-form" method="post">
+        {% csrf_token %}
+        {% if has_write_permission %}
+            {{ cohort_form.name }}<button id='change-name' class="btn btn-primary">Change Name</button>
+        {% else %}
+            <b>Cohort:</b> {{ cohort.name }}
+        {% endif %}
+        <b>Genome Build:</b> {{ cohort.genome_build }}
+    </form>
+{% endif %}
+
+{% include "snpdb/data/_cohort_provenance.html" %}
+
+<div id="vcf-cohort-tabs">
+    <ul class="nav nav-tabs mb-4" role="tablist">
+        <li class="nav-item"><a class="nav-link show active" data-toggle="tab" role="tab" href="#details">Details</a></li>
+        {% if show_stats_tab %}
+        <li class="nav-item"><a class="nav-link" data-toggle="tab" role="tab" href="#stats">Stats</a></li>
+        {% endif %}
+        {% if vcf %}
+        <li class="nav-item"><a class="nav-link" data-toggle="tab" role="tab" href="#vcf-info">VCF Info</a></li>
+        {% if somalier_enabled and vcf.cohort.somaliercohortrelate %}
+        <li class="nav-item"><a class="nav-link" data-toggle="tab" role="tab" href="#vcf-relate">Relate</a></li>
+        {% endif %}
+        {% if somalier_enabled and vcf.somaliervcfextract.somalierancestryrun %}
+        <li class="nav-item"><a class="nav-link" data-toggle="tab" role="tab" href="#vcf-ancestry">Ancestry</a></li>
+        {% endif %}
+        {% if skipped_annotation_count %}
+        <li class="nav-item"><a class="nav-link" data-toggle="tab" role="tab" href="#vcf-skipped-annotation">Skipped Annotation ({{ skipped_annotation_count }})</a></li>
+        {% endif %}
+        {% endif %}
+        {% if has_write_permission %}
+        <li class="nav-item"><a class="nav-link" data-toggle="tab" role="tab" href="#page-permissions" data-href="{% url 'group_permissions' permission_class permission_pk %}">Sharing / Permissions</a></li>
+        {% endif %}
+    </ul>
+    <div class="tab-content">
+
+    <div class="tab-pane show active" role="tabpanel" id="details">
+    {% if vcf %}
+        <form method="post" id='vcf-form'>
+            {% csrf_token %}
+            {% crispy vcf_form form_helper.horizontal %}
+
+            {% if vcf.uploadedvcf.file_upload.exists or annotated_download_files and not vcf.data_archived %}
+                <div class="form-group-row row">
+                    <label class="col-form-label col-12 col-md-3 text-md-right">Download</label>
+                    <div class="d-flex flex-row">
+                        {% if vcf.uploadedvcf.file_upload.exists %}
+                            <div class="p-2"><a href="{% url 'download_uploaded_file' vcf.uploadedvcf.file_upload.pk %}"><div class="icon24 left margin-r-5 vcf-icon"></div> Original VCF</a> ({{ vcf.uploadedvcf.file_upload.size|filesizeformat }})</div>
+                        {% endif %}
+                        {% if not vcf.data_archived %}
+                            {% for file_type in annotated_download_files %}
+                                <div id="generate-{{ file_type }}-download" class="p-2"></div>
+                            {% endfor %}
+                        {% endif %}
+                    </div>
+                </div>
+            {% endif %}
+
+            <h3>Samples</h3>
+            {% include "snpdb/data/_cohort_samples_table.html" %}
+
+            <p>
+            {% if has_write_permission %}
+                <button id="vcf-submit-button" type='button' class="btn btn-primary">Update VCF</button>
+                <div class="unsaved-changes-message text-info" style="display: none;">Click 'Update VCF' to save your changes.</div>
+                {% if user.is_superuser %}
+                    <button id="vcf-populate-clingen-alleles" class="btn btn-secondary"
+                            title="Retrieves max {% settings_value 'CLINGEN_ALLELE_REGISTRY_MAX_MANUAL_REQUESTS' %} ClinGen Alleles">
+                        Populate ClinGen Alleles
+                    </button>
+                {% endif %}
+            {% endif %}
+            </p>
+
+            {% if vcf.import_status == 'S' and vcf.cohort %}
+                {% cohort_sample_actions vcf.cohort %}
+            {% endif %}
+
+            {% vcf_import_info vcf 'Please see "View upload processing" in VCF info tab.' %}
+        </form>
+    {% else %}
+        <fieldset class="form-fields">
+            <p>
+                <label>Status</label>
+                <span>{{ cohort.get_import_status_display }}</span>
+            </p>
+            <p>
+                <label>Genome Build</label>
+                <span>{{ cohort.genome_build }}</span>
+            </p>
+            <p>
+                <label>Samples</label>
+                <span>{{ cohort.sample_count }}</span>
+            </p>
+            <p>
+                <label>Created by</label>
+                <span>{{ cohort.user }}</span>
+            </p>
+            {% if cohort_genotype_collection %}
+            <p>
+                <label>Common </label>
+                <span>{{ cohort_genotype_collection.get_common_filter_info }}</span>
+            </p>
+            {% endif %}
+        </fieldset>
+
+        <h3>Samples</h3>
+        {% include "snpdb/data/_cohort_samples_table.html" %}
+        {% if not cohort.data_archived %}
+            {% cohort_sample_actions cohort %}
+        {% endif %}
+    {% endif %}
+    </div>
+
+    {% if show_stats_tab %}
+    <div class="tab-pane" role="tabpanel" id="stats">
+        {% if stats_pending %}
+            <p class="text-muted">
+                <i class="fas fa-spinner fa-spin"></i>
+                Sample stats are being calculated for this cohort - reload the page shortly.
+            </p>
+        {% endif %}
+        <div id="sample-zygosities-graph"></div>
+        {% if vcf %}<div id="vcf-length-stats-graph-container"></div>{% endif %}
+    </div>
+    {% endif %}
+
+    {% if vcf %}
+    <div class="tab-pane" role="tabpanel" id="vcf-info">
+        <fieldset class="form-fields">
+            {% if vcf.uploadedvcf.file_upload.uploadpipeline %}
+                {% if url_name_visible.view_upload_pipeline and can_view_upload_pipeline %}
+                <p>
+                    <label>Processing</label>
+                    <span><a href="{% url 'view_upload_pipeline' vcf.uploadedvcf.file_upload.uploadpipeline.pk %}">View upload processing</a></span>
+                </p>
+                {% endif %}
+                {% include "snpdb/data/_archive_action.html" with obj=vcf archive_url_name='archive_vcf' %}
+                {% if vcf.uploadedvcf.vcf_importer %}
+                <p>
+                    <label>Importer Version</label>
+                    <span>{{ vcf.uploadedvcf.vcf_importer }}</span>
+                </p>
+                {% endif %}
+            {% endif %}
+            {% if vcf.source %}
+                <p>
+                <label>Source</label>
+                <span>{{ vcf.source }}</span>
+                </p>
+            {% endif %}
+            <p>
+                <label>Special Format Fields</label>
+                <span>
+                    <table>
+                        <tr>
+                            <td>
+                            {% if vcf.ref_depth_field and vcf.alt_depth_field %}
+                                Ref Depth: {{ vcf.ref_depth_field }}, Alt Depth: {{ vcf.alt_depth_field }}
+                            {% else %}
+                                Allele Depth: {{ vcf.allele_depth_field|default_if_none:"-" }}
+                            {% endif %}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>Read Depth: {{ vcf.read_depth_field|default_if_none:"-" }}</td>
+                        </tr>
+                        <tr>
+                            <td>Allele Frequency:
+                                {%  if vcf.allele_frequency_field %}
+                                    {{ vcf.allele_frequency_field }}
+                                {% else %}
+                                    Calculated as <code>AD / (sum of all AD for that locus)</code> after VCF normalisation
+                                {% endif %}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>Genotype Quality: {{ vcf.genotype_quality_field|default_if_none:"-" }}</td>
+                        </tr>
+                        <tr>
+                            <td>Phred Likelihood: {{ vcf.phred_likelihood_field|default_if_none:"-" }}</td>
+                        </tr>
+                        {% if vcf.sample_filters_field %}
+                            <tr>
+                                <td>Sample Filters: {{ vcf.sample_filters_field }}</td>
+                            </tr>
+                        {% endif %}
+                        {% if vcf.copy_number_field %}
+                            <tr>
+                                <td>Copy Number: {{ vcf.copy_number_field }}</td>
+                            </tr>
+                        {% endif %}
+                    </table>
+                </span>
+            </p>
+            {% if not vcf.data_archived %}
+            <p>
+                <label>Common </label>
+                <span>{{ cohort_genotype_collection.get_common_filter_info }}</span>
+            </p>
+            {% endif %}
+            {% if somalier_stages %}
+            <p>
+                <label>Somalier</label>
+                <span>{% include "snpdb/data/_somalier_stages.html" %}</span>
+            </p>
+            {% endif %}
+            <p>
+                <label>Variant Zygosity Count</label>
+                <span>
+                    {% if vcf.has_genotype %}
+                        {% for vzcc, vzcc_for_vcf in variant_zygosity_count_collections.items %}
+                            <span class="zygosity-count-container">
+                            {% if vzcc_for_vcf.count_complete and not vzcc_for_vcf.deleted %}
+                                {{ vzcc.name }}
+                                {% if request.user.is_superuser %}
+                                    ({{ vzcc_for_vcf.count_complete }})
+                                    <button class="collapse btn btn-outline-danger fas fa-delete zygosity-count-button" type='button' vzcc-id="{{ vzcc.pk }}" operation="del" vzcc-name="{{ vzcc.name }}">
+                                        Remove from '{{ vzcc.name }}' zygosity counts
+                                    </button>
+                                {% endif %}
+                            {% else %}
+                                -
+                                {% if request.user.is_superuser %}
+                                    <button class="collapse btn btn-outline-danger fas zygosity-count-button" type='button' vzcc-id="{{ vzcc.pk }}" operation="add" vzcc-name="{{ vzcc.name }}">
+                                        Add to '{{ vzcc.name }}' zygosity counts
+                                    </button>
+                                {% endif %}
+                            {% endif %}
+                            </span>
+                        {% endfor %}
+
+                        {% if request.user.is_superuser %}
+                            <a id="change-zygosity-count" class="hover-link" data-toggle="collapse" href=".zygosity-count-button">change...</a>
+                        {% endif %}
+                    {% endif %}
+                </span>
+            </p>
+            <p>
+                <label>Header</label>
+                <span>
+                    <a href="javascript:toggleVCFSection('vcf-header')">Show / hide VCF header...</a>
+                </span>
+                <div id='vcf-header' style='display: none'>
+                    <pre>{{ vcf.header }}</pre>
+                </div>
+            </p>
+        </fieldset>
+
+        {% if vcf.vcfinfo_set.exists or vcf.vcffilter_set.exists or vcf.vcfformat_set.exists %}
+        <fieldset class="form-fields">
+            {% if vcf.vcfinfo_set.exists %}
+            <p>
+                <label>INFO</label>
+                <span>
+                    <a href="javascript:toggleVCFSection('vcf-info-table')">Show / hide INFO...</a>
+                </span>
+                <div id='vcf-info-table' style='display: none'>
+                    <table>
+                        <tr>
+                            <th>ID</th>
+                            <th>Description</th>
+                        </tr>
+                    {% for vcf_info in vcf.vcfinfo_set.all %}
+                        <tr>
+                            <td>{{ vcf_info.identifier }}</td>
+                            <td>{{ vcf_info.description }}</td>
+                        </tr>
+                    {% endfor %}
+                    </table>
+                </div>
+            </p>
+            {% endif %}
+            {% if vcf.vcffilter_set.exists %}
+            <p>
+                <label>FILTER</label>
+                <span>
+                    <a href="javascript:toggleVCFSection('vcf-filter-table')">Show / hide FILTER...</a>
+                </span>
+                <div id='vcf-filter-table' style='display: none'>
+                    <table>
+                        <tr>
+                            <th>ID</th>
+                            <th>Description</th>
+                        </tr>
+                    {% for vcf_filter in vcf.vcffilter_set.all %}
+                        <tr>
+                            <td>{{ vcf_filter.filter_id }}</td>
+                            <td>{{ vcf_filter.description }}</td>
+                        </tr>
+                    {% endfor %}
+                    </table>
+                </div>
+            </p>
+            {% endif %}
+            {% if vcf.vcfformat_set.exists %}
+            <p>
+                <label>FORMAT</label>
+                <span>
+                    <a href="javascript:toggleVCFSection('vcf-format-table')">Show / hide FORMAT...</a>
+                </span>
+                <div id='vcf-format-table' style='display: none'>
+                    <table>
+                        <tr>
+                            <th>ID</th>
+                            <th>Description</th>
+                        </tr>
+                    {% for vcf_format in vcf.vcfformat_set.all %}
+                        <tr>
+                            <td>{{ vcf_format.identifier }}</td>
+                            <td>{{ vcf_format.description }}</td>
+                        </tr>
+                    {% endfor %}
+                    </table>
+                </div>
+            </p>
+            {% endif %}
+        </fieldset>
+        {% endif %}
+    </div>
+
+    {% if somalier_enabled and vcf.cohort.somaliercohortrelate %}
+        <div class="tab-pane" role="tabpanel" id="vcf-relate">
+            <iframe width="100%" height="100%" src="{{ vcf.cohort.somaliercohortrelate.url }}"></iframe>
+        </div>
+    {% endif %}
+    {% if somalier_enabled and vcf.somaliervcfextract.somalierancestryrun %}
+        <div class="tab-pane" role="tabpanel" id="vcf-ancestry">
+            <iframe width="100%" height="100%" src="{{ vcf.somaliervcfextract.somalierancestryrun.url }}"></iframe>
+        </div>
+    {% endif %}
+    {% if skipped_annotation_count %}
+        <div class="tab-pane" role="tabpanel" id="vcf-skipped-annotation">
+            <p>Variants that Variant Effect Predictor (VEP) was unable to annotate.</p>
+            <table id="vcf-skipped-annotation-grid" class="sticky-header" data-datatable-url="{% url 'vcf_skipped_annotation_datatable' vcf_id=vcf.pk %}"></table>
+        </div>
+    {% endif %}
+    {% endif %}
+
+    {% if has_write_permission %}
+        <div class="tab-pane" role="tabpanel" id="page-permissions"></div>
+    {% endif %}
+    </div>
+</div>
+
+{% if cohort %}
+    {% include "snpdb/data/_cohort_related_data.html" %}
+{% endif %}
+
+</div>
+
+{% if vcf %}
+<div class="modal fade" id="new-project-dialog" tabindex="-1" role="dialog" aria-labelledby="new-project-dialog-label" aria-hidden="true">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="new-project-dialog-label">New project</h5>
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body">
+        <form>
+          <div class="form-group">
+            <label for="name">Name</label>
+            <input type="text" name="name" id="name" class="form-control">
+            <div class="invalid-feedback">Name is required.</div>
+          </div>
+          <div class="form-group">
+            <label for="description">Description</label>
+            <input type="text" name="description" id="description" class="form-control">
+          </div>
+          <!-- Allow form submission with keyboard without duplicating the dialog button -->
+          <input type="submit" tabindex="-1" style="position:absolute; top:-1000px">
+          <div class="error-messages"></div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+        <button type="button" id="create-new-project-button" class="btn btn-primary">Create new project</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- create_patient_dialog -->
+{% include "snpdb/create_patient_dialog.html" %}
+{% endif %}
+
+{% endblock %}

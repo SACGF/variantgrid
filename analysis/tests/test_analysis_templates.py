@@ -40,7 +40,7 @@ class AnalysisTemplateDraftTestCase(TestCase):
         cls.grch37 = GenomeBuild.get_name_or_alias("GRCh37")
         get_fake_annotation_version(cls.grch37)
 
-        cls.vcf = VCF.objects.create(name="template_vcf", genotype_samples=1, genome_build=cls.grch37,
+        cls.vcf = VCF.objects.create(name="template_vcf", genotype_samples=1, genotype_field="GT", allele_depth_field="AD", genome_build=cls.grch37,
                                      import_status=ImportStatus.SUCCESS, user=cls.owner, date=timezone.now())
         cls.sample = Sample.objects.create(name="template_sample", vcf=cls.vcf,
                                            import_status=ImportStatus.SUCCESS)

@@ -1,3 +1,10 @@
+"""
+classification's models as one namespace: every models module is star-imported so callers write
+`from classification.models import Classification, ClassificationModification, EvidenceKey`. Two
+entries exist only for their side effects - classification_variant_fields_validation and
+clinvar_export_exclude_utils register signal receivers on import - so removing an import here can
+silently unregister behaviour. Add new models modules to this list.
+"""
 from classification.models.discordance_models import *
 from classification.models.classification import *
 from classification.models.classification_ref import *

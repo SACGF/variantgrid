@@ -8,7 +8,9 @@ from django.test import TestCase, override_settings
 from analysis.models import AllVariantsNode, Analysis
 from analysis.models.enums import GroupOperation
 from analysis.models.nodes.filters.population_node import PopulationNode
+from analysis.models.nodes.sources.sample_node import SampleNode
 from analysis.tests.utils import AnalysisSetupMixin
+from snpdb.tests.utils.fake_cohort_data import create_fake_cohort
 
 # ---------------------------------------------------------------------------
 # AbstractZygosityCountNode - max_count=0
@@ -187,3 +189,55 @@ class TestZygosityCountNoOpBounds(AnalysisSetupMixin, TestCase):
         node = self._node(min_het_or_hom_count=0, max_het_or_hom_count=self.MAX_SAMPLES,
                           min_het_count=2)
         self.assertEqual("Het >= 2", node._get_zygosity_count_description())
+
+
+# ---------------------------------------------------------------------------
+# SampleNode thresholds vs the columns the VCF carries - max_pl=0
+# ---------------------------------------------------------------------------
+
+@override_settings(ANALYSIS_NODE_CACHE_Q=False)
+class TestSampleNodeThresholdColumns(AnalysisSetupMixin, TestCase):
+    """ PL<=0 is a real filter, but a caller that reports no PL (TSO 500 fusions) leaves the column
+        null on every row, so applying it emptied the node - while the cached stats lookup read
+        max_pl=0 as unset and answered with the sample's whole count """
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.cohort = create_fake_cohort(cls.analysis.user, cls.grch37)
+        cls.sample = cls.cohort.get_samples().first()
+
+    def _node(self, **kwargs):
+        return SampleNode(analysis=self.analysis, sample=self.sample, **kwargs)
+
+    def _phred_likelihood_in_query(self, node) -> bool:
+        arg_q_dict = node._get_sample_arg_q_dict(self.sample)
+        return any("phred_likelihood" in str(q)
+                   for q_dict in arg_q_dict.values() for q in q_dict.values())
+
+    def test_max_pl_left_out_when_vcf_has_no_pl(self):
+        node = self._node(max_pl=0)
+        self.assertFalse(self._phred_likelihood_in_query(node))
+        self.assertFalse(node._has_filters_that_affect_label_counts())
+
+    def test_max_pl_filters_when_vcf_has_pl(self):
+        self.sample.vcf.phred_likelihood_field = "PL"
+        self.sample.vcf.save()
+        node = self._node(max_pl=0)
+        self.assertTrue(self._phred_likelihood_in_query(node))
+        self.assertTrue(node._has_filters_that_affect_label_counts())
+
+    def test_min_ad_filters_when_vcf_has_ad(self):
+        node = self._node(min_ad=5)
+        self.assertTrue(node._has_filters_that_affect_label_counts())
+
+    def test_min_dp_left_out_when_vcf_has_no_dp(self):
+        node = self._node(min_dp=5)
+        self.assertFalse(node._has_filters_that_affect_label_counts())
+
+    def test_method_summary_only_shows_applied_thresholds(self):
+        node = self._node(min_ad=5, min_dp=10, max_pl=0)
+        summary = node._get_sample_method_summary(self.sample)
+        self.assertIn("AD>=5", summary)
+        self.assertNotIn("DP>=", summary)
+        self.assertNotIn("PL<=", summary)

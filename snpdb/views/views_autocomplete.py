@@ -17,6 +17,7 @@ from snpdb.models import (
     Cohort,
     CustomColumn,
     CustomColumnsCollection,
+    Duo,
     GenomeBuild,
     GenomicIntervalsCollection,
     ImportStatus,
@@ -205,6 +206,16 @@ class TrioAutocompleteView(GenomeBuildAutocompleteView):
 
     def get_user_queryset(self, user):
         qs = Trio.filter_for_user(user, success_status_only=True)
+        qs = self.exclude_archived_if_forwarded(qs, "cohort__vcf__data_archived_date")
+        return self.filter_to_genome_build(qs, "cohort__genome_build")
+
+
+@method_decorator([cache_page(MINUTE_SECS), vary_on_cookie], name='dispatch')
+class DuoAutocompleteView(GenomeBuildAutocompleteView):
+    fields = ['name']
+
+    def get_user_queryset(self, user):
+        qs = Duo.filter_for_user(user).filter(cohort__import_status=ImportStatus.SUCCESS)
         qs = self.exclude_archived_if_forwarded(qs, "cohort__vcf__data_archived_date")
         return self.filter_to_genome_build(qs, "cohort__genome_build")
 

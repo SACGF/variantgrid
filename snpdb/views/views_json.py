@@ -44,7 +44,12 @@ def cached_generated_file_check(request, cgf_id):
     if cgf.exception:
         data["exception"] = str(cgf.exception)
     elif cgf.task_status == "SUCCESS":
-        if cgf.filename:
+        if cgf.file_missing:
+            # Pollers that go via a generator view have had the row dropped already - this is for
+            # anyone holding onto a cgf_id (@see analysis_downloads.js)
+            data["status"] = "FAILURE"
+            data["exception"] = "Generated file is no longer available"
+        elif cgf.filename:
             data["url"] = cgf.get_media_url()
         else:
             # File generation still in progress - task_status was set before filename was saved
@@ -53,12 +58,9 @@ def cached_generated_file_check(request, cgf_id):
     return JsonResponse(data)
 
 
-@require_POST
-def create_cohort_genotype(request, cohort_id):
-    cohort = Cohort.get_for_user(request.user, cohort_id)
-    if cohort.data_archived:
-        raise PermissionDenied("Underlying VCF data is archived; cohort is read-only.")
-
+def cohort_genotype_json_response(cohort: Cohort) -> JsonResponse:
+    """ Build the cohort's genotype data - 'status' when it was free (sub cohort conversion),
+        otherwise 'celery_task' for the client to poll """
     status, celery_task = create_cohort_genotype_and_launch_task(cohort)
 
     data = {}
@@ -67,6 +69,15 @@ def create_cohort_genotype(request, cohort_id):
     elif celery_task:
         data["celery_task"] = celery_task
     return JsonResponse(data)
+
+
+@require_POST
+def create_cohort_genotype(request, cohort_id):
+    cohort = Cohort.get_for_user(request.user, cohort_id, write=True)
+    if cohort.data_archived:
+        raise PermissionDenied("Underlying VCF data is archived; cohort is read-only.")
+
+    return cohort_genotype_json_response(cohort)
 
 
 @require_POST

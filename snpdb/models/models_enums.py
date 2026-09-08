@@ -1,3 +1,11 @@
+"""
+Enums shared across snpdb and the apps built on it: import and processing lifecycles (ImportStatus,
+ProcessingStatus, DataState), where uploads came from (ImportSource), allele linking
+(AlleleOrigin, AlleleConversionTool, AlleleOriginFilterDefault), contig roles (SequenceRole - including the
+gene-level fake contig), sample and file kinds, the grid's built-in and per-tag filter keys
+(BuiltInFilters, TagFilter) and the user award scale. Codes are stored in the database: add values,
+never renumber. Zygosity lives in patients/models_enums.py.
+"""
 from enum import Enum
 from typing import Optional
 
@@ -299,3 +307,9 @@ class DataState(models.TextChoices):
 class CohortGenotypeCollectionType(models.TextChoices):
     COMMON = "C", "Common"
     UNCOMMON = "U", "Uncommon"
+
+
+class DuoRelationship(models.TextChoices):
+    """ Which parent of the proband a Duo's single parent is """
+    MOTHER = 'M', 'Mother'
+    FATHER = 'F', 'Father'

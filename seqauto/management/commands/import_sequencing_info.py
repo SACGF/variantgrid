@@ -18,6 +18,7 @@ FILE_COUNT = "file count"
 
 
 class Command(BaseCommand):
+    category = "import"
 
     def add_arguments(self, parser):
         parser.add_argument('SequencingInfo', help='csv file for Sequencing Details')

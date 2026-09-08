@@ -11,16 +11,15 @@
 
 {% block content %}
 <style>
-    #tagnode-input ul {
-        list-style: none;
-        margin: 0;
-        padding: 0;
+    #tagnode-input .editor-choices > div {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 2px;
     }
 </style>
 <script>
 function classificationFilter(data, type) {
     data.analysis_id = "{{ node.analysis_id }}";
-    // Object.assign(data, geneClassificationsGridParams);
 }
 
 function classifyAndCloseButton(tagId) {
@@ -32,14 +31,6 @@ function classifyAndCloseButton(tagId) {
 $(document).ready(function() {
     const tagNodeForm = $("form#tag-node-form");
     ajaxForm(tagNodeForm);
-    const tagSelect = $("select#id_tag");
-
-    // Set dropdown options to have tag colors
-	$("option", tagSelect).each(function() {
-		if (this.value) {
-			$(this).addClass("tagged-" + this.value);
-		}
-	});
 
     {%  if not requires_classification_tags %}
         {% if not node.analysis.analysisclassification_set.exists %}
@@ -52,81 +43,91 @@ $(document).ready(function() {
         Flags.instance.init({userId: '{{user.id}}'});
     });
 
-    {% if show_tag_counts %}
+    {% if show_tag_counts and has_write_permission %}
+        // The pills are the node's tag picker - a toggle lands in the form's hidden inputs
+        // and applies on save, like the rest of the editor
         const tagCountsSummary = $("[data-tag-counts-summary]", "#node-editor-wrapper");
-        setupTagCountsSummary(tagCountsSummary, function() {
-            // Same path as clicking a count on the node card - the editor comes back with the
-            // toggles selected, and the grid, its exports and the create child node banner follow
-            loadNodeData({{ node.pk }}, getTagCountsSummaryFilter(tagCountsSummary));
+        const tagsHolder = $("#tag-node-tags", tagNodeForm);
+        setupTagCountsSummary(tagCountsSummary, function(selectedTagIds) {
+            tagsHolder.empty();
+            for (const tagId of selectedTagIds) {
+                $("<input>", {type: "hidden", name: "tags", value: tagId}).appendTo(tagsHolder);
+            }
         });
-        {% if not global_tag_counts %}
-            fillTagCountsFromNode(tagCountsSummary, {{ node.pk }});
-        {% endif %}
     {% endif %}
 });
 </script>
-{% if show_tag_counts %}
-    {% tag_counts_summary tag_counts=tag_counts selected=selected_tag_ids %}
-    {% if tag_counts_auto_add_tags is False %}
-        <div class="text-muted small mb-2">
-            Counting only the tags in
-            <a href="javascript:getAnalysisWindow().analysisSettings()">Node Counts</a> -
-            "automatically add tags" is off for this analysis.
+<form id="tag-node-form" method="post" action="{{ request.path }}">
+    {% csrf_token %}
+    {% for hidden in form.hidden_fields %}
+        {% if hidden.name != "tags" %}{{ hidden }}{% endif %}
+    {% endfor %}
+    <div class="editor-row editor-row-top">
+        <span class="editor-label">Tags</span>
+        <div>
+            {% if show_tag_counts %}
+                {% if tag_counts %}
+                    {% tag_counts_summary tag_counts=tag_counts selected=selected_tag_ids %}
+                {% else %}
+                    <span class="editor-help">Nothing tagged yet</span>
+                {% endif %}
+            {% else %}
+                <span class="editor-help">The tag picker appears once the node has loaded</span>
+            {% endif %}
+            <div class="editor-help">No selection = any tag</div>
         </div>
+        <span id="tag-node-tags">{{ form.tags }}</span>
+    </div>
+    {% if node.visible %}
+        <div class="editor-row editor-row-top">
+            <span class="editor-label">Tags from</span>
+            <div class="editor-choices">{{ form.mode }}</div>
+        </div>
+        <div class="editor-row editor-row-top" id="tagnode-input">
+            <span class="editor-label">Variants</span>
+            <div class="editor-choices">{{ form.node_input }}</div>
+        </div>
+        <div class="editor-row">
+            <label class="editor-label" for="id_tagged_within_days">{{ form.tagged_within_days.label }}</label>
+            {{ form.tagged_within_days }}
+        </div>
+    {% else %}
+        <div class="editor-help">All tags for this analysis</div>
     {% endif %}
-{% endif %}
-<div>
-	<form id="tag-node-form" method="post" action="{{ request.path }}">
-        {% csrf_token %}
-        {% for hidden in form.hidden_fields %}
-            {{ hidden }}
-        {% endfor %}
-		<div>
-    		<b>Tag:</b> {{ form.tags }}
-		</div>
-        {% if node.visible %}
-            <div class="display-flex">
-                <label>Tags from:</label>
-                {{ form.mode }}
-            </div>
-            <div id="tagnode-input">
-                <label>Variants:</label>
-                {{ form.node_input }}
-            </div>
-            <div>
-                <label for="id_tagged_within_days">{{ form.tagged_within_days.label }}:</label>
-                {{ form.tagged_within_days }}
-            </div>
-        {% else %}
-            <div><b>All tags for analysis</b></div>
-        {% endif %}
+    <div class="editor-row">
+        <label class="editor-label" for="id_include_resolved">{{ form.include_resolved.label }}</label>
+        <div>
+            {{ form.include_resolved }}
+            <span class="editor-help">A to-do tag satisfied by a classification is hidden by default</span>
+        </div>
+    </div>
+    <div class="editor-actions">
         {% if has_write_permission %}
-            <button id='tag-node-save' class="btn btn-primary">save</button>
+            <button id='tag-node-save' class="btn btn-primary">Save</button>
         {% endif %}
-        {{ form.media }}
-	</form>
-</div>
+    </div>
+</form>
 {% endblock content %}
 
 {% block node_editor_not_visible_tab %}
 <div class="tab-pane" role="tabpanel" id='tag-classification'>
 
     {% if requires_classification_tags %}
-        <p>
-        Classify variants tagged with
-        <span class="tagged-{% settings_value "TAG_REQUIRES_CLASSIFICATION" %}"><span class="user-tag-colored">{% settings_value "TAG_REQUIRES_CLASSIFICATION" %}</span></span>:
-        </p>
+        <div class="editor-help">
+        Classify variants tagged for the classify queue
+        </div>
 
-        <table class="table">
-            <tr><th>Classify</th><th>Variant</th><th>Gene</th><th>Username</th><th>Date</th>
+        <table class="table table-sm">
+            <tr><th>Classify</th><th>Tag</th><th>Variant</th><th>Gene</th><th>Username</th><th>Date</th>
 
         {% for vt in requires_classification_tags %}
             <tr>
                 <td>
-                    <a id="tag-button-{{ vt.pk }}" class="btn btn-primary" href="javascript:classifyAndCloseButton({{ vt.pk }})">
+                    <a id="tag-button-{{ vt.pk }}" class="btn btn-sm btn-primary" href="javascript:classifyAndCloseButton({{ vt.pk }})">
                         <i class="fas fa-plus-circle"></i> New Classification
                     </a>
                 </td>
+                <td><span class="grid-tag tagged-{{ vt.tag_id }}" title="Tagged as {{ vt.tag_id }}"><span class="user-tag-colored">{{ vt.tag_id }}</span></span></td>
                 <td>{{ vt.canonical_c_hgvs }}</td>
                 <td>{{ vt.gene_symbol }}</td>
                 <td>{{ vt.user }}</td>
@@ -137,7 +138,7 @@ $(document).ready(function() {
     {% endif %}
 
     {% if node.analysis.analysisclassification_set.exists %}
-        <h3>Classifications for this analysis</h3>
+        <div class="editor-section-title">Classifications for this analysis</div>
         <table id="tag-datatable"
                data-datatable-url="{% url 'classification_datatables' %}"
                data-datatable-data="classificationFilter"

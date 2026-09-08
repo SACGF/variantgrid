@@ -9,6 +9,8 @@ from upload.models import UploadedVCF
 
 
 class Command(BaseCommand):
+    category = "one-off"
+
     def handle(self, *args, **options):
         q_no_header = Q(header__isnull=True)
         q_no_chrom_line = ~Q(header__icontains='#CHROM')

@@ -17,7 +17,8 @@ from django.core.cache import cache
 from django.db.models import Max, Min
 from django.utils.timezone import now
 
-from genes.hgvs import HGVSComponents, HGVSImplementationException, HGVSNomenclatureException, HGVSVariant
+from genes.hgvs import (HGVSComponents, HGVSImplementationException, HGVSNoRepresentationException,
+                       HGVSNomenclatureException, HGVSVariant)
 from genes.hgvs.biocommons_hgvs.data_provider import DjangoTranscriptDataProvider
 from genes.hgvs.biocommons_hgvs.hgvs_converter_biocommons import BioCommonsHGVSConverter
 from genes.hgvs.hgvs_converter import (
@@ -538,6 +539,8 @@ class HGVSMatcher:
             We always generate the HGVS with full-length reference bases etc, as we adjust that in HGVSExtra.format()
         """
 
+        self._check_has_hgvs_representation(variant_coordinate)
+
         hgvs_variant = None
         hgvs_converter_type = None
         hgvs_method = None
@@ -622,7 +625,15 @@ class HGVSMatcher:
         """ returns c.HGVS is transcript provided, g.HGVS if no transcript"""
         return self.variant_coordinate_to_hgvs_variant(variant.coordinate, transcript_name=transcript_name)
 
+    @staticmethod
+    def _check_has_hgvs_representation(variant_coordinate: VariantCoordinate):
+        """ <CNV>/<INS> have neither a ranged HGVS form nor an explicit expansion - there is no HGVS
+            to write, which is a fact about the variant rather than a converter failure (#1574) """
+        if variant_coordinate.symbolic_hgvs_interval is None and not variant_coordinate.can_be_made_explicit:
+            raise HGVSNoRepresentationException(f"{variant_coordinate.alt} has no HGVS representation")
+
     def variant_coordinate_to_hgvs_variant(self, variant_coordinate: VariantCoordinate, transcript_name=None) -> HGVSVariant:
+        self._check_has_hgvs_representation(variant_coordinate)
         # Symbolic DEL/DUP/INV go to the converter as coordinates - no reference read at all (#1571)
         if variant_coordinate.symbolic_hgvs_interval is None:
             variant_coordinate = variant_coordinate.as_external_explicit(self.genome_build)
@@ -645,6 +656,7 @@ class HGVSMatcher:
         return self.variant_coordinate_to_g_hgvs(variant.coordinate)
 
     def variant_coordinate_to_g_hgvs(self, variant_coordinate: VariantCoordinate) -> str:
+        self._check_has_hgvs_representation(variant_coordinate)
         symbolic = variant_coordinate.symbolic_hgvs_interval is not None
         if not symbolic:
             variant_coordinate = variant_coordinate.as_external_explicit(self.genome_build)

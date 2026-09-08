@@ -1,8 +1,19 @@
+"""
+Classification and ClassificationModification: a lab's record for an allele + condition, whose
+evidence is JSON validated against EvidenceKey, with every edit kept as a modification. Change
+evidence through Classification.patch_value, publish through ClassificationModification.publish,
+and read what a user may see through ClassificationModification.latest_for_user; allele resolution
+is delegated to ImportedAlleleInfo (classification_variant_info_models.py). Also here:
+ClassificationImport and the allele sources that drive matching and liftover, ConditionResolved,
+ClassificationConsensus and CuratedDate. classification/CLAUDE.md has the rules. Large: use
+`scripts/vg outline`.
+"""
 import copy
+import json
 import logging
 import re
 import uuid
-from collections import Counter, namedtuple
+from collections import Counter, defaultdict, namedtuple
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
@@ -40,6 +51,7 @@ from classification.enums import (
     CRITERIA_NOT_MET,
     AlleleOriginBucket,
     ClinicalSignificance,
+    CopyScope,
     CriteriaEvaluation,
     ShareLevel,
     SpecialEKeys,
@@ -54,6 +66,7 @@ from classification.models.classification_utils import (
     ClassificationPatchResponse,
     PatchMeta,
     ValidationMerger,
+    classification_gene_symbol_filter,
 )
 from classification.models.classification_variant_info_models import (
     ImportedAlleleInfo,
@@ -83,7 +96,7 @@ from flags.models.models import (
     flag_collection_extra_info_signal,
 )
 from genes.hgvs import HGVSComponents, HGVSDisplay, HGVSMatcher
-from genes.models import Gene, NoTranscript
+from genes.models import Gene, GeneSymbol, NoTranscript
 from library.cache import clear_cached_property
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
 from library.guardian_utils import clear_permissions
@@ -2672,32 +2685,162 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
         return True
 
 
+COPY_SCOPES_ALL = frozenset({CopyScope.ALLELE, CopyScope.GENE})
+COPY_SCOPES_GENE = frozenset({CopyScope.GENE})
+GENE_CONSENSUS_GROUP_LIMIT = 10
+EXTERNAL_CANDIDATE_LIMIT = 10
+
+BUCKET_ALLELE_ORIGIN = {  # what the allele_origin evidence key is seeded with per bucket
+    AlleleOriginBucket.GERMLINE: "germline",
+    AlleleOriginBucket.SOMATIC: "somatic",
+}
+
+
+@dataclass(frozen=True)
+class GeneConsensusGroup:
+    """
+    Classifications in a gene whose gene level content is identical - they were copied from each other, so
+    they are one choice rather than many. The others are kept so the curator can see the spread of tumour
+    types the content has been used for, which is usually what decides whether it applies here.
+    """
+    representative: ClassificationModification
+    others: list[ClassificationModification]
+
+    @property
+    def other_count(self) -> int:
+        return len(self.others)
+
+    @property
+    def record_count(self) -> int:
+        return len(self.others) + 1
+
+
 @dataclass
 class ClassificationConsensus:
     modification: ClassificationModification
     label: str = "no-label"
     default_suggestion: bool = False
+    copy_scopes: frozenset[CopyScope] = COPY_SCOPES_ALL
 
     @staticmethod
-    def all_consensus_candidates(allele: Allele, user: User) -> ['ClassificationConsensus']:
-        us = UserSettingsManager.get_user_settings(user)
+    def default_allele_origin_bucket(user: User) -> Optional[AlleleOriginBucket]:
+        """ The bucket a new record starts in, from the user's allele origin focus """
+        allele_origin_filter = UserSettingsManager.get_user_settings(user).allele_origin_focus
+        if allele_origin_filter.value in (AlleleOriginBucket.GERMLINE.value, AlleleOriginBucket.SOMATIC.value):
+            return AlleleOriginBucket(allele_origin_filter.value)
+        return None
 
-        default_allele_origin_filter = us.allele_origin_focus
-        default_allele_origin_bucket: Optional[AlleleOriginBucket] = None
-        if default_allele_origin_filter.value in (AlleleOriginBucket.GERMLINE.value, AlleleOriginBucket.SOMATIC.value):
-            default_allele_origin_bucket = AlleleOriginBucket(default_allele_origin_filter.value)
+    @staticmethod
+    def gene_scope_keys(allele_origin_bucket: Optional[AlleleOriginBucket]) -> list[str]:
+        """ The keys that travel when copying gene level content into a record of this bucket """
+        return [ekey.key for ekey in EvidenceKeyMap.cached().all_keys
+                if ekey.copy_scope_enum == CopyScope.GENE
+                and ekey.copy_allele_origin_enum.can_copy_to(allele_origin_bucket)]
+
+    @staticmethod
+    def all_consensus_candidates(allele: Allele, user: User,
+                                 allele_origin_bucket: Optional[AlleleOriginBucket] = None) \
+            -> list['ClassificationConsensus']:
+        """ The allele level records that may be copied from. The target bucket is decided before the list is
+            drawn, so a germline record is never offered as the source for a somatic one """
+        default_allele_origin_bucket = ClassificationConsensus.default_allele_origin_bucket(user)
+
+        buckets = [bucket for bucket in (AlleleOriginBucket.GERMLINE, AlleleOriginBucket.SOMATIC)
+                   if allele_origin_bucket is None or bucket == allele_origin_bucket]
 
         results = []
-        for identifier, allele_origin_bucket in [("Latest Germline", AlleleOriginBucket.GERMLINE),
-                                                 ("Latest Somatic", AlleleOriginBucket.SOMATIC)]:
+        for bucket in buckets:
             if candidates := list(ClassificationModification.latest_for_user(user=user, allele=allele, published=True,
                                                                              exclude_external_labs=True,
-                                                                             allele_origin_bucket=allele_origin_bucket).all()):
+                                                                             allele_origin_bucket=bucket).all()):
                 candidates.sort(key=lambda vcm: vcm.curated_date_check, reverse=True)
-                default_suggestion = allele_origin_bucket == default_allele_origin_bucket
-                results.append(ClassificationConsensus(modification=candidates[0], label=identifier,
-                                                       default_suggestion=default_suggestion))
+                results.append(ClassificationConsensus(modification=candidates[0], label=f"Latest {bucket.label}",
+                                                       default_suggestion=bucket == default_allele_origin_bucket))
         return results
+
+    @staticmethod
+    def external_lab_candidates(allele: Allele, user: User,
+                                allele_origin_bucket: Optional[AlleleOriginBucket] = None,
+                                limit: int = EXTERNAL_CANDIDATE_LIMIT) -> list[ClassificationModification]:
+        """ What other labs have curated on this allele - worth seeing while deciding how to curate, but never
+            a copy source: their evidence was assembled under a config and assertion method reviewed elsewhere """
+        qs = ClassificationModification.latest_for_user(user=user, allele=allele, published=True,
+                                                       allele_origin_bucket=allele_origin_bucket) \
+            .filter(classification__lab__external=True) \
+            .select_related("classification", "classification__lab", "classification__lab__organization")
+        return sorted(qs, key=lambda vcm: vcm.curated_date_check, reverse=True)[:limit]
+
+    @staticmethod
+    def _gene_content(modification: ClassificationModification, gene_scope_keys: list[str]) -> tuple:
+        """ The gene level content of a record, as something two records can be compared on """
+        evidence = modification.published_evidence or {}
+        content = []
+        for key in gene_scope_keys:
+            blob = evidence.get(key)
+            if blob is None:
+                continue
+            for part in ('value', 'note'):
+                part_value = blob.get(part)
+                if part_value is None or (isinstance(part_value, list) and not part_value):
+                    continue
+                content.append((key, part, json.dumps(part_value, sort_keys=True, default=str)))
+        return tuple(content)
+
+    @staticmethod
+    def gene_consensus_groups(gene_symbol: Union[str, GeneSymbol], user: User,
+                              allele_origin_bucket: Optional[AlleleOriginBucket] = None,
+                              exclude_modifications: Optional[Iterable[ClassificationModification]] = None,
+                              exclude_classification: Optional[Classification] = None,
+                              limit: int = GENE_CONSENSUS_GROUP_LIMIT) -> list[GeneConsensusGroup]:
+        """
+        The gene level content available to copy in a gene, one row per distinct set of values - most records
+        in a gene carry the same content because they were copied from each other. Newest representative first.
+
+        AMP tiering and therapy content are gene *and* tumour type, so this only ever lists: which row applies
+        to the case in hand is the curator's call.
+        """
+        gene_q = classification_gene_symbol_filter(gene_symbol)
+        if gene_q is None:
+            return []
+
+        qs = ClassificationModification.latest_for_user(user=user, published=True, exclude_external_labs=True,
+                                                       allele_origin_bucket=allele_origin_bucket) \
+            .filter(gene_q).distinct() \
+            .select_related("classification", "classification__lab", "classification__lab__organization")
+        if exclude_modifications:
+            qs = qs.exclude(pk__in=[cm.pk for cm in exclude_modifications])
+        if exclude_classification:
+            qs = qs.exclude(classification=exclude_classification)
+
+        gene_scope_keys = ClassificationConsensus.gene_scope_keys(allele_origin_bucket)
+        by_content: dict[tuple, list[ClassificationModification]] = defaultdict(list)
+        for cm in qs:
+            if content := ClassificationConsensus._gene_content(cm, gene_scope_keys):
+                by_content[content].append(cm)
+
+        groups = []
+        for members in by_content.values():
+            members.sort(key=lambda vcm: vcm.curated_date_check, reverse=True)
+            groups.append(GeneConsensusGroup(representative=members[0], others=members[1:]))
+        groups.sort(key=lambda group: group.representative.curated_date_check, reverse=True)
+        return groups[:limit]
+
+    @property
+    def allele_origin_bucket(self) -> Optional[AlleleOriginBucket]:
+        """ The bucket the copy is going into - a candidate is only ever offered for its own bucket """
+        return self.modification.classification.allele_origin_bucket
+
+    def apply_to(self, classification: 'Classification', user: User):
+        """ Copy this record's values into another one, filling the fields it has left empty """
+        classification.patch_value(
+            patch=self.consensus_patch,
+            clear_all_fields=False,
+            user=user,
+            source=SubmissionSource.CONSENSUS,
+            leave_existing_values=True,
+            save=True,
+            make_patch_fields_immutable=False)
+        classification.publish_latest(user)
 
     @cached_property
     def consensus_patch(self) -> VCPatch:
@@ -2707,17 +2850,15 @@ class ClassificationConsensus:
         consensus: dict[str, Any] = {}
 
         # default allele origin - don't use copy consensus because that would copy "likely somatic" etc
-        if allele_origin_bucket := self.modification.classification.allele_origin_bucket:
-            allele_origin = None
-            if allele_origin_bucket == AlleleOriginBucket.GERMLINE:
-                allele_origin = "germline"
-            elif allele_origin_bucket == AlleleOriginBucket.SOMATIC:
-                allele_origin = "somatic"
+        allele_origin_bucket = self.allele_origin_bucket
+        if allele_origin := BUCKET_ALLELE_ORIGIN.get(allele_origin_bucket):
+            consensus["allele_origin.value"] = allele_origin
 
-            if allele_origin:
-                consensus["allele_origin.value"] = allele_origin
+        def copyable(ekey: EvidenceKey) -> bool:
+            return ekey.copy_scope_enum in self.copy_scopes and \
+                ekey.copy_allele_origin_enum.can_copy_to(allele_origin_bucket)
 
-        for key in (ekey.key for ekey in keys.all_keys if ekey.copy_consensus):
+        for key in (ekey.key for ekey in keys.all_keys if copyable(ekey)):
             for part in ['value', 'note']:
                 blob = evidence.get(key)
                 if blob is None:

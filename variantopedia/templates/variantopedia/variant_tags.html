@@ -147,8 +147,9 @@
 
     (One tag per row, showing full information)
 
-    {% datatable_user_data_filter 'variant-tags-datatable' 'Variant Tags' %}
+    {% datatable_user_data_filter 'variant-tags-datatable' 'Variant Tags' hidden_data=True hidden_label="Show resolved" %}
     <table id="variant-tags-datatable" class="sticky-header"
+           data-filter-reloads-page
            data-datatable-url="{% url 'variant_tags_datatable' genome_build.name %}"
            data-datatable-data="variantTagsDatatableFilter"></table>
     <div data-toolbar-bottom="#variant-tags-datatable">
