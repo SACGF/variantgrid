@@ -183,9 +183,9 @@
     <div class="container-table">
         <div id="analyses-grid-filter" class="form-inline">
             {% if multiple_genome_builds %}
-                {% labelled label="Genome Build" %}{% genome_build_grid_filter %}{% endlabelled %}
+                {% labelled label="Genome Build" hint="inline" %}{% genome_build_grid_filter %}{% endlabelled %}
             {% endif %}
-            {% labelled label="Analysis Type" %}
+            {% labelled label="Analysis Type" hint="inline" %}
                 <div class="btn-group btn-group-toggle analysis-type-radio" data-toggle="buttons">
                     <label class="btn btn-outline-primary active">
                         <input class="table-filter" type="radio" name="analysis_type_filter" value="" autocomplete="off" checked> All
