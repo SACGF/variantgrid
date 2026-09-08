@@ -30,9 +30,18 @@ See <a target="_blank" href="https://variantgrid.readthedocs.io/en/latest/data/r
 <p>
     A jointly called VCF records a <code>0/0</code> for a site a sample was called reference at, so a site
     missing from that sample means "unknown". A VCF that never writes <code>0/0</code> - merged single-sample
-    calls, a benchmark VCF, anything derived from a gVCF - means a missing site is reference, and Somalier is
-    run with <code>--unknown</code> to say so. The same is true of the nightly all-vs-all run, where samples
-    come from many different VCFs.
+    calls, a benchmark VCF, anything derived from a gVCF - carries no reference calls at all, and Somalier is
+    run with <code>--unknown</code>, which reads every missing site as reference. The same is true of the
+    nightly all-vs-all run, where samples come from many different VCFs.
+</p>
+
+<p>
+    That assumption is only as good as the coverage behind it. A missing site really means "no variant was
+    called here", which on panel or capture data is a reference call at a covered site <em>or</em> a site the
+    sample was never sequenced at - the VCF doesn't say which, and Somalier counts both as reference. Every
+    uncovered site a sample is scored at is a chance to disagree with a sample that does carry a variant
+    there, so relatedness on this kind of VCF runs low and unrelated pairs can sit slightly below zero.
+    Treat the numbers as a ranking, not a measurement: a duplicate still stands out near 1.0.
 </p>
 
 <p>
