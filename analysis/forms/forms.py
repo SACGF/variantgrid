@@ -362,16 +362,20 @@ def _affected_widget() -> forms.CheckboxInput:
     return forms.CheckboxInput(attrs={"class": "custom-control-input"})
 
 
+BLANK_ROLE = ("", "---")
+
+
 def _family_role_widget() -> forms.Select:
     return forms.Select(attrs={"class": "custom-select custom-select-sm"})
 
 
 def _roles_for_sex(choices, sex: Sex, parent_role_by_sex: dict) -> list:
-    """ A sample's sex rules out the other parent's role - proband and sibling are open to anyone """
-    if sex not in parent_role_by_sex:
-        return list(choices)
-    excluded = {role for other_sex, role in parent_role_by_sex.items() if other_sex != sex}
-    return [(value, label) for value, label in choices if value not in excluded]
+    """ A sample's sex rules out the other parent's role - proband and sibling are open to anyone.
+        Roles start blank so no two samples hold the same one until they're picked """
+    if sex in parent_role_by_sex:
+        excluded = {role for other_sex, role in parent_role_by_sex.items() if other_sex != sex}
+        choices = [(value, label) for value, label in choices if value not in excluded]
+    return [BLANK_ROLE, *choices]
 
 
 class FamilyWizardForm(forms.Form):
@@ -387,7 +391,8 @@ class FamilyWizardForm(forms.Form):
 
     def __init__(self, *args, sample_sexes=None, **kwargs):
         super().__init__(*args, **kwargs)
-        for field_name, sex in zip(self.SAMPLE_FIELDS, sample_sexes or []):
+        sexes = sample_sexes or [Sex.UNKNOWN] * len(self.SAMPLE_FIELDS)
+        for field_name, sex in zip(self.SAMPLE_FIELDS, sexes):
             field = self.fields[field_name]
             field.choices = _roles_for_sex(field.choices, sex, self.PARENT_ROLE_BY_SEX)
 

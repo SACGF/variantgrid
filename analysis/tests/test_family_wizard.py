@@ -42,9 +42,9 @@ class TrioWizardFormTest(TestCase):
         male_roles = [value for value, _ in form.fields["sample_2"].choices]
         unknown_roles = [value for value, _ in form.fields["sample_3"].choices]
 
-        self.assertEqual([TrioSample.MOTHER, TrioSample.PROBAND], female_roles)
-        self.assertEqual([TrioSample.FATHER, TrioSample.PROBAND], male_roles)
-        self.assertEqual([TrioSample.MOTHER, TrioSample.FATHER, TrioSample.PROBAND], unknown_roles)
+        self.assertEqual(["", TrioSample.MOTHER, TrioSample.PROBAND], female_roles)
+        self.assertEqual(["", TrioSample.FATHER, TrioSample.PROBAND], male_roles)
+        self.assertEqual(["", TrioSample.MOTHER, TrioSample.FATHER, TrioSample.PROBAND], unknown_roles)
 
     def test_female_cannot_be_posted_as_father(self):
         form = self._form({"sample_1": TrioSample.FATHER,
@@ -75,7 +75,7 @@ class QuadWizardFormTest(TestCase):
     def test_sibling_is_open_to_either_sex(self):
         form = UserQuadWizardForm(sample_sexes=[Sex.FEMALE, Sex.MALE, Sex.UNKNOWN, Sex.FEMALE])
         female_roles = [value for value, _ in form.fields["sample_1"].choices]
-        self.assertEqual([QuadSample.MOTHER, QuadSample.PROBAND, QuadSample.SIBLING], female_roles)
+        self.assertEqual(["", QuadSample.MOTHER, QuadSample.PROBAND, QuadSample.SIBLING], female_roles)
 
     def test_affected_by_role_covers_the_sibling(self):
         form = UserQuadWizardForm({"sample_1": QuadSample.MOTHER,
@@ -100,8 +100,8 @@ class DuoWizardFormTest(TestCase):
         female_roles = [value for value, _ in form.fields["sample_1"].choices]
         male_roles = [value for value, _ in form.fields["sample_2"].choices]
 
-        self.assertEqual([DuoSample.MOTHER, DuoSample.PROBAND], female_roles)
-        self.assertEqual([DuoSample.FATHER, DuoSample.PROBAND], male_roles)
+        self.assertEqual(["", DuoSample.MOTHER, DuoSample.PROBAND], female_roles)
+        self.assertEqual(["", DuoSample.FATHER, DuoSample.PROBAND], male_roles)
 
     def test_parent_role_and_affected_come_off_the_form(self):
         form = self._form({"sample_1": DuoSample.FATHER,
