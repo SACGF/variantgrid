@@ -121,20 +121,33 @@ class SomalierVCFExportTest(TestCase):
         # 25% of the reads are alt, so 10 alt reads means 30 ref
         self.assertEqual((30, 10), _allele_depths(self.vcf, 10, None, 25.0))
 
-    def test_alleles_written_in_somalier_site_order(self):
-        """ somalier reads GT and AD against its site's alphabetically-first allele, so a record whose
-            ALT sorts before its REF goes out the other way round (#183) """
-        self.vcf.read_depth_field = "DP"
-        self.vcf.save()
+    def _flipped_site_records(self):
+        """ A variant whose ALT sorts before its REF, so somalier reads it against the other allele """
         variant = slowly_create_test_variant("3", 4000, "T", "A", self.genome_build)
         make_cohort_genotype(self.cohort.cohort_genotype_collection, variant, "ROE",
                              allele_depth=[10, 0, 25], allele_frequency=[0.45, 0.0, 1.0])
-
         _, records = self._export()
-        flipped = next(r for r in records if r.POS == 4000)
-        self.assertEqual(("A", ["T"]), (flipped.REF, flipped.ALT))
-        # hom-ref <-> hom-alt, and the depths follow the alleles
-        self.assertEqual(["1/1:10,20", "0/0:0,30", "0/1:25,5"], self._calls(flipped))
+        return next(r for r in records if r.POS == 4000)
+
+    def test_allele_depths_written_in_somalier_site_order(self):
+        """ Only the AD pair compensates - REF, ALT and GT stay as called (brentp/somalier#163) """
+        self.vcf.read_depth_field = "DP"
+        self.vcf.save()
+
+        flipped = self._flipped_site_records()
+        self.assertEqual(("T", ["A"]), (flipped.REF, flipped.ALT), "REF is the reference base")
+        self.assertEqual(["0/0:10,20", "1/1:0,30", "0/1:25,5"], self._calls(flipped))
+
+    def test_genotype_carries_it_when_there_are_no_depths(self):
+        """ Nothing else can, so a depth-less VCF flips the genotype instead (brentp/somalier#163) """
+        self.vcf.allele_depth_field = None
+        self.vcf.read_depth_field = None
+        self.vcf.allele_frequency_field = None
+        self.vcf.save()
+
+        flipped = self._flipped_site_records()
+        self.assertEqual(("T", ["A"]), (flipped.REF, flipped.ALT))
+        self.assertEqual(["1/1", "0/0", "0/1"], self._calls(flipped))
 
 
 class SomalierRelateTest(TestCase):

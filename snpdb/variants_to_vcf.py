@@ -113,8 +113,17 @@ def write_contig_sorted_values_to_vcf_file(genome_build, sorted_values, f, info_
                                             use_accession=use_accession, samples=samples)
 
 
+# Says out loud that the calls below are deliberately not in REF,ALT order - this file is read by
+# somalier and nothing else, and it is the second line of it
+SOMALIER_ALLELE_ORDER_NOTE = (
+    '##VariantGridSomalierAlleleOrder="AD is written in the site\'s alphabetical allele order rather '
+    'than REF,ALT (and where no depths are written, GT is flipped to match). Deliberate - somalier '
+    'reads a record against its own alphabetically sorted alleles and ignores the record REF/ALT. '
+    'See https://github.com/brentp/somalier/issues/163"'
+)
 SOMALIER_GT_FORMAT = '##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">'
-SOMALIER_AD_FORMAT = '##FORMAT=<ID=AD,Number=R,Type=Integer,Description="Allelic depths for the ref and alt alleles">'
+SOMALIER_AD_FORMAT = ('##FORMAT=<ID=AD,Number=R,Type=Integer,Description="Allelic depths, in the '
+                      'site\'s alphabetical allele order - see ##VariantGridSomalierAlleleOrder">')
 
 
 def _missing_to_none(value):
@@ -124,15 +133,20 @@ def _missing_to_none(value):
     return value
 
 
+# Only needed for a VCF with no depths - the AD pair carries it everywhere else
 SOMALIER_FLIPPED_GENOTYPE = {"0/0": "1/1", "1/1": "0/0"}
 
 
 def _somalier_alleles_flipped(ref: str, alt: str) -> bool:
-    """ somalier keeps each site's two alleles in alphabetical order (A = min, B = max) and reads GT
-        and AD against that pair, not against the record's REF/ALT - so a record whose ALT sorts
-        first is read inside out. Measured on v0.2.12 and v0.3.4: 200 hom-ref calls at real sites
-        come back as 133 hom-alt. Emitting the alleles in the site's own order is what makes somalier
-        agree with the genotypes we imported. """
+    """ somalier keeps each site's two alleles in alphabetical order and reads the genotype against
+        that pair rather than against the record's own REF/ALT, so a record whose ALT sorts first is
+        read inside out - 20 hom-ref calls come back as 10 hom-ref and 10 hom-alt
+        (https://github.com/brentp/somalier/issues/163, on 0.2.12 and 0.3.4).
+
+        We compensate in the AD pair, which is the field somalier misreads and the only reason this
+        file exists; REF, ALT and GT stay as they should be. Only a VCF with no depths to write has
+        to carry it in the genotype instead. Remove all of this once somalier reads the record's own
+        alleles. """
     return alt < ref
 
 
@@ -163,7 +177,7 @@ def vcf_export_to_file(vcf: VCF, exported_vcf_filename, original_qs=None, sample
         (--min-depth 7, --min-ab 0.3); with no AD line it trusts GT at pseudo-depths. VariantGrid takes
         the incoming GT as called, however low the depth, so we hand over real depths when the import
         recorded them and let somalier do the QC - and GT alone when it didn't, since declaring AD we
-        can't fill in would zero out every sample. Every record goes out in the site's own allele order
+        can't fill in would zero out every sample. The AD pair goes out in the site's allele order
         (@see _somalier_alleles_flipped). """
     if sample_name_func is None:
         def sample_name_func(s):
@@ -198,7 +212,8 @@ def vcf_export_to_file(vcf: VCF, exported_vcf_filename, original_qs=None, sample
     vcf_sample_names = [sample_name_func(s) for s, w in zip(samples, sample_whitelist) if w]
     # use_accession=False so the ##contig IDs match the CHROM we write and the 'nochr' sites file
     header_lines = get_vcf_header_from_contigs(vcf.genome_build, samples=vcf_sample_names,
-                                               use_accession=False, formats=formats)
+                                               use_accession=False, formats=formats,
+                                               top_lines=[SOMALIER_ALLELE_ORDER_NOTE])
     sample_zygosity_count = [Counter() for _ in samples]
     empty = [None] * len(samples)
 
@@ -226,8 +241,6 @@ def vcf_export_to_file(vcf: VCF, exported_vcf_filename, original_qs=None, sample
                             sample = unknown_call
                         else:
                             sample = Zygosity.get_genotype(z)
-                            if flipped:
-                                sample = SOMALIER_FLIPPED_GENOTYPE.get(sample, sample)
                             if write_allele_depth:
                                 depths = _allele_depths(vcf, ad, dp, af)
                                 if depths is None:
@@ -237,10 +250,10 @@ def vcf_export_to_file(vcf: VCF, exported_vcf_filename, original_qs=None, sample
                                     if flipped:
                                         ref_depth, alt_depth = alt_depth, ref_depth
                                     sample += f":{ref_depth},{alt_depth}"
+                            elif flipped:
+                                sample = SOMALIER_FLIPPED_GENOTYPE.get(sample, sample)
                         samples_list.append(sample)
 
-                if flipped:
-                    ref, alt = alt, ref
                 writer.write_record(chrom, position, ref, alt, vcf_id=pk,
                                     fmt=vcf_format, sample_calls=samples_list)
 

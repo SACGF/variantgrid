@@ -3,8 +3,9 @@
 Written by Claude Fable 5.1 (claude-fable-5-1), 2026-09-04; §1/§2 revised by Claude Fable 5
 (claude-fable-5), 2026-09-05 — export real depths so somalier applies its own QC, instead of GT-only
 
-Status: in progress — implemented by Claude Opus 5 (claude-opus-5), 2026-09-07; awaiting the
-`somalier_existing_vcfs --clear` re-run on vgtest2 (HSS2008 trio and sample 1824) before rollout
+Status: landed d8953a44b — implemented by Claude Opus 5 (claude-opus-5), 2026-09-07/08.
+Backfilled on vgtest2: the HSS2008 trio measures 0.494/0.503 parent-child and 0.011 between the
+parents, and the 166-sample lipo VCF went from 12,971 related pairs to 103.
 
 ## Diagnosis in one paragraph
 
@@ -127,17 +128,18 @@ Route `snpdb.tasks.somalier_tasks.somalier_all_samples` to `SCHEDULING_SINGLE_WO
 4. Build the header with `get_vcf_header_from_contigs(..., use_accession=False)` so `##contig` IDs
    match the record `CHROM` values and the `nochr` sites file.
 5. Keep the `filters__isnull=True` restriction (somalier only counts PASS sites).
-6. Write each record in the site's own allele order. somalier keeps a site's two alleles
-   alphabetically (A = min, B = max) and reads `GT` and `AD` positionally against that pair, not
-   against the record's `REF`/`ALT` — so a record whose ALT sorts first is read inside out. Measured
-   on v0.2.12 and v0.3.4: a file of 200 hom-ref calls at real sites comes back as 133 hom-alt, which
-   is the 133 of those 200 sites whose ALT sorts before their REF. The flip cancels out for pairwise
-   relatedness when both samples have data, so a jointly called VCF looks fine either way — it only
-   shows up once `--unknown` fills missing calls as hom-ref in somalier's allele space while real
-   calls arrive in ours. On the 166-sample lipo VCF that put the median pair at 0.19 with 12,971 of
-   13,695 pairs over the 0.1 threshold; writing the alleles in the site's order gives a median of
-   -0.18 and 103 pairs. When `alt < ref`, swap `REF`/`ALT` and flip `GT` (`0/0` <-> `1/1`) and the
-   `AD` pair with them, so the record stays self-consistent.
+6. Write the `AD` pair in the site's own allele order. somalier keeps a site's two alleles
+   alphabetically and reads the genotype against that pair rather than against the record's
+   `REF`/`ALT`, so a record whose ALT sorts first is read inside out — 20 hom-ref calls come back as
+   10 hom-ref and 10 hom-alt (brentp/somalier#163, on 0.2.12 and 0.3.4). The flip cancels out for
+   pairwise relatedness when both samples have data, so a jointly called VCF looks fine either way —
+   it only shows up once `--unknown` fills missing calls in somalier's allele space while real calls
+   arrive in the record's. On the 166-sample lipo VCF that put the median pair at 0.19 with 12,971 of
+   13,695 pairs over the 0.1 threshold; ordering the `AD` pair gives a median of -0.18 and 103 pairs.
+   somalier never reads the record's `REF`/`ALT`, so those stay as they should be and so does `GT` —
+   the compensation lives in the one field somalier misreads. A VCF with no depths to write has
+   nothing to carry it and flips `GT` (`0/0` <-> `1/1`) instead. A `##VariantGridSomalierAlleleOrder`
+   header line says all this in the file itself. Remove it once somalier is fixed.
 
 ## §2 Decide `--unknown` from the data, not the file count (#183)
 

@@ -22,12 +22,14 @@ def get_vcf_header_lines(top_lines=None, info_dict=None, formats=None, contig_li
 
 
 def get_vcf_header_from_contigs(genome_build, info_dict=None, samples=None, use_accession=True,
-                                include_gene_level=False, extra_formats=None, formats=None):
+                                include_gene_level=False, extra_formats=None, formats=None,
+                                top_lines=None):
     """ info_dict which contains ('number', 'type', 'description')
         include_gene_level: declare the gene-level contig too, for an export carrying fusions
         extra_formats: whole ##FORMAT lines beyond the standard set the writer always emits
         formats: whole ##FORMAT lines replacing the standard set - for a consumer that decides what
-                 to read from what the header declares (@see snpdb.variants_to_vcf.vcf_export_to_file) """
+                 to read from what the header declares (@see snpdb.variants_to_vcf.vcf_export_to_file)
+        top_lines: raw ## lines placed straight after ##fileformat """
 
     if formats is None:
         formats = [
@@ -42,4 +44,5 @@ def get_vcf_header_from_contigs(genome_build, info_dict=None, samples=None, use_
         formats = list(formats) + list(extra_formats)
     contig_lines = get_contigs_header_lines(genome_build, use_accession=use_accession,
                                             include_gene_level=include_gene_level)
-    return get_vcf_header_lines(info_dict=info_dict, formats=formats, contig_lines=contig_lines, samples=samples)
+    return get_vcf_header_lines(top_lines=top_lines, info_dict=info_dict, formats=formats,
+                                contig_lines=contig_lines, samples=samples)
