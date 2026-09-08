@@ -1,7 +1,7 @@
 # #1574 — `<CNV>` has no HGVS: record it, stop reporting it
 
 Written by Claude Fable 5.1 (claude-fable-5-1), 2026-09-07
-Status: in progress
+Status: in progress - §1-§5 landed 5599c2f94; §6 in the working tree
 
 [#1574](https://github.com/SACGF/variantgrid/issues/1574): classifying a `<CNV>` variant raises
 `ValueError: Unknown symbolic alt of '<CNV>'` from `ResolvedVariantInfo.set_variant_and_save`, which
@@ -93,3 +93,29 @@ variants and zero affected rows.
 * `genes/CLAUDE.md`: one line under HGVS gotchas — `<CNV>`/`<INS>` have no HGVS; the matcher raises
   `HGVSNoRepresentationException` and classification records it as `ResolvedVariantInfo.error`.
 * `scripts/vg docs check` after the edit.
+
+## 6. The same expansion in the transcript table
+
+`annotation/transcripts_annotation_selections.py:VariantTranscriptSelections._add_other_annotation_consortium_transcripts`
+converts the coordinate to explicit once, before looping the other consortium's transcripts, so each
+`variant_coordinate_to_hgvs_variant()` call skips re-reading the reference. It skips that only when the alt has no
+ranged form *and* is longer than `settings.HGVS_MAX_SEQUENCE_LENGTH`, so a `<CNV>` under 50 kb still reached
+`as_external_explicit()` and raised the original `ValueError` - a 500 on both `/variantopedia/view_variant/<id>` (the
+view catches it, but only after the transcript table is lost) and `/classification/create_for_variant/<id>/<build>`,
+which is the page that starts a classification.
+
+Convert only when there is something to convert:
+
+```python
+variant_coordinate = variant.coordinate
+if variant_coordinate.symbolic_hgvs_interval is None and variant_coordinate.can_be_made_explicit:
+    variant_coordinate = variant_coordinate.as_external_explicit(self.genome_build)
+```
+
+`<CNV>`/`<INS>` then reach the matcher symbolic, which raises `HGVSNoRepresentationException` - already caught by the
+`except (HGVSException, KeyError)` around the c.HGVS call - so the transcript is listed with a blank HGVS instead of
+taking the page down. Symbolic DEL/DUP/INV now also stay symbolic, which is what #1571 intended: their HGVS comes from
+coordinates alone, so a long one no longer reads its whole reference here.
+
+Covered by `annotation/tests/test_transcripts_annotation_selections.py` - a short `<CNV>` builds a transcript row with
+no `hgvs_c`, a `<DEL>` of the same size still gets `NM_001145661.2(GATA2):c.1018-213_1304del`.

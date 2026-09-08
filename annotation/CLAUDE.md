@@ -68,6 +68,9 @@ Gotchas:
   annotation/models/models.py:VariantAnnotation.open_targets_records, so they are only ever written together.
 - settings.ANNOTATION_GENE_ANNOTATION_VERSION_ENABLED gates whether gene_annotation_version joins the partition SQL
   (annotation/models/models.py:AnnotationVersion.sub_annotations_inheritance_partitioning); validate() still checks it.
+- transcripts_annotation_selections.py:VariantTranscriptSelections converts the coordinate to explicit once before
+  looping the other consortium's transcripts — only for alts that have an explicit form. Symbolic DEL/DUP/INV go to the
+  converter as coordinates (#1571) and <CNV>/<INS> have no HGVS at all (#1574), so both are passed through symbolic.
 Tests:
 - annotation/fake_annotation.py:get_fake_annotation_version builds a full valid AnnotationVersion (ACTIVE VAV at
   columns_version 2, fake gene release, ontology, ClinVar, HPA); refuses to run outside UNIT_TEST.

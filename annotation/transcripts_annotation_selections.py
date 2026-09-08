@@ -278,8 +278,11 @@ class VariantTranscriptSelections:
             "gene_version__gene_symbol_id__in": gene_symbols,
         }
 
-        # Convert once to explicit, then pass this around
-        variant_coordinate = variant.coordinate.as_external_explicit(self.genome_build)
+        # Symbolic DEL/DUP/INV go to the converter as coordinates (#1571) and <CNV>/<INS> have no
+        # HGVS at all (#1574) - everything else converts once here rather than once per transcript
+        variant_coordinate = variant.coordinate
+        if variant_coordinate.symbolic_hgvs_interval is None and variant_coordinate.can_be_made_explicit:
+            variant_coordinate = variant_coordinate.as_external_explicit(self.genome_build)
         has_other_annotation_consortium_transcripts = False
         transcript_version_qs = TranscriptVersion.objects.filter(**kwargs).select_related("gene_version")
         for transcript_version in transcript_version_qs.order_by("-version"):
