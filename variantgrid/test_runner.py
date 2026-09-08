@@ -1,8 +1,10 @@
 import atexit
 import json
 import os
+import shutil
 
 import cdot.hgvs.dataproviders.fasta_seqfetcher as fasta_seqfetcher
+from django.conf import settings
 from django.db import connections
 from django.db.migrations.loader import MigrationLoader
 from django.test.runner import DiscoverRunner
@@ -24,6 +26,12 @@ class VariantGridTestRunner(DiscoverRunner):
         super().setup_test_environment(**kwargs)
         ClinGenAlleleRegistryAPI.override_class = MockClinGenAlleleRegistryAPI
         TranscriptSequenceFetcher.override_class = MockTranscriptSequenceFetcher
+
+    def teardown_test_environment(self, **kwargs):
+        super().teardown_test_environment(**kwargs)
+        # settings.IMPORT_PROCESSING_DIR is a per-suite temp dir (see default_settings UNIT_TEST block),
+        # so whatever the run left in it - a pipeline dir, fake annotation scratch - goes with it
+        shutil.rmtree(settings.IMPORT_PROCESSING_DIR, ignore_errors=True)
 
     def setup_databases(self, **kwargs):
         if self.keepdb and self.parallel > 1:

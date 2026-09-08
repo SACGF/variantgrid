@@ -6,12 +6,16 @@ import logging
 import os
 
 import pandas as pd
+from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 
 from annotation.models import HumanProteinAtlasAnnotationVersion, HumanProteinAtlasTissueSample
 from genes.models import Gene, GeneSymbol
 from genes.models_enums import AnnotationConsortium
-from library.django_utils.django_file_utils import get_import_processing_filename
+from library.django_utils.django_file_utils import (
+    get_import_processing_filename,
+    remove_import_processing_dir,
+)
 from library.utils import file_sha256sum
 from upload.vcf.sql_copy_files import sql_copy_csv, write_sql_copy_csv
 
@@ -116,3 +120,5 @@ class Command(BaseCommand):
                       'value']
         sql_copy_csv(csv_filename, partition_table, HPA_HEADER, delimiter=delimiter)
         logging.info("Done!")
+        if settings.IMPORT_PROCESSING_DELETE_TEMP_FILES_ON_SUCCESS:
+            remove_import_processing_dir(version_id, prefix='human_protein_atlas')

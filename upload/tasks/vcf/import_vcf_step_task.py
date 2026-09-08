@@ -231,6 +231,14 @@ def pipeline_start_task(upload_pipeline_id):
 
 @celery.shared_task
 def pipeline_success_task(upload_pipeline_id):
+    """ The only thing that takes a VCF pipeline out of PROCESSING - it records the timings, fires the
+        success event and reclaims the pipeline's scratch dir (@see UploadPipeline.success).
+
+        The PROCESSING guard makes a repeat run a no-op: FINISH can legitimately be scheduled more than
+        once (two DATA_INSERTION steps finishing together each call check_pipeline_stage), and while
+        schedule_pipeline_stage_steps de-duplicates the steps on start_date it appends this task
+        unconditionally. #928: a FINISH step that set SUCCESS itself made the guard swallow the real
+        close, so none of the above ran. """
     upload_pipeline = UploadPipeline.objects.get(pk=upload_pipeline_id)
     if upload_pipeline.status == ProcessingStatus.PROCESSING:
         steps = upload_pipeline.uploadstep_set.all()

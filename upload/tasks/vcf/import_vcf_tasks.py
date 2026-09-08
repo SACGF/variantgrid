@@ -149,16 +149,6 @@ class ScheduleMultiFileOutputTasksTask(ImportVCFStepTask):
         return 0
 
 
-class UploadPipelineFinishedTask(ImportVCFStepTask):
-
-    def process_items(self, upload_step):
-        upload_pipeline = upload_step.upload_pipeline
-        if upload_pipeline.status == ProcessingStatus.PROCESSING:
-            upload_pipeline.status = ProcessingStatus.SUCCESS
-            upload_pipeline.save()
-        return 0
-
-
 class ImportCreateUploadedVCFTask(ImportVCFStepTask):
 
     def process_items(self, upload_step):
@@ -279,7 +269,6 @@ GeneLevelPreprocessVCFTask = app.register_task(GeneLevelPreprocessVCFTask())
 GeneLevelInsertGeneFusionsTask = app.register_task(GeneLevelInsertGeneFusionsTask())
 CheckStartAnnotationTask = app.register_task(CheckStartAnnotationTask())
 ScheduleMultiFileOutputTasksTask = app.register_task(ScheduleMultiFileOutputTasksTask())
-UploadPipelineFinishedTask = app.register_task(UploadPipelineFinishedTask())
 ImportCreateUploadedVCFTask = app.register_task(ImportCreateUploadedVCFTask())
 ProcessVCFSetMaxVariantTask = app.register_task(ProcessVCFSetMaxVariantTask())
 ProcessVCFLinkAllelesSetMaxVariantTask = app.register_task(ProcessVCFLinkAllelesSetMaxVariantTask())

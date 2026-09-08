@@ -1,6 +1,5 @@
 import logging
 import os
-import shutil
 from collections import defaultdict
 
 from django.conf import settings
@@ -19,9 +18,12 @@ from genes.gene_coverage import load_gene_coverage_df
 from genes.models.models_gene import GeneSymbol, Transcript, TranscriptVersion
 from genes.models_enums import AnnotationConsortium
 from library.django_utils.data_archive_mixin import DataArchiveMixin
+from library.django_utils.django_file_utils import (
+    get_import_processing_dir,
+    remove_import_processing_dir,
+)
 from library.django_utils.django_partition import RelatedModelsPartitionModel
 from library.log_utils import log_traceback
-from library.utils.file_utils import mk_path
 from snpdb.archive import DataArchivedError
 from snpdb.models import DataState
 from snpdb.models.models_genome import GenomeBuild
@@ -31,6 +33,10 @@ from upload.vcf.sql_copy_files import (
     gene_coverage_sql_copy_csv,
     write_sql_copy_csv,
 )
+
+# Nested a level down from the other import_processing prefixes - a sequencing run loads coverage for
+# every sample, so these are kept out of the top level the cleanup command sweeps
+GENE_COVERAGE_IMPORT_PROCESSING_PREFIX = os.path.join("gene_coverage", "gene_coverage_collection")
 
 
 class CanonicalTranscriptCollection(TimeStampedModel):
@@ -179,9 +185,7 @@ class GeneCoverageCollection(DataArchiveMixin, RelatedModelsPartitionModel):
                            f"Sample transcripts from canonical transcript collection: {sample_canonical_transcripts}. ")
                 raise ValueError(message)
 
-        processing_dir = os.path.join(settings.IMPORT_PROCESSING_DIR, "gene_coverage",
-                                      f"gene_coverage_collection_{self.pk}")
-        mk_path(processing_dir)
+        processing_dir = get_import_processing_dir(self.pk, GENE_COVERAGE_IMPORT_PROCESSING_PREFIX)
         if gene_coverage_tuples:
             csv_filename = os.path.join(processing_dir, f"gene_coverage_{self.pk}.csv")
             write_sql_copy_csv(gene_coverage_tuples, csv_filename)
@@ -197,8 +201,8 @@ class GeneCoverageCollection(DataArchiveMixin, RelatedModelsPartitionModel):
             else:
                 logging.warning("GeneCoverage had no canonical transcripts")
 
-        if not settings.DEBUG:
-            shutil.rmtree(processing_dir)
+        if settings.IMPORT_PROCESSING_DELETE_TEMP_FILES_ON_SUCCESS:
+            remove_import_processing_dir(self.pk, GENE_COVERAGE_IMPORT_PROCESSING_PREFIX)
 
         logging.info("%d missing genes, %d missing transcripts", missing_genes, missing_transcripts)
         return warnings
