@@ -404,8 +404,9 @@ one, so they want to stay stable from the first client.
 Phase 6's gene-symbol item rests on that assumption holding. Phase 5's fusion parser goes through the
 same resolver for `SEPT14` → `SEPTIN14`, so one check against a real database covers both — and if the
 alias is missing, a fusion partner still imports, just under a local `GENE:` id rather than its HGNC one.
-[`1669_release_gene_matcher_alias_chaining_plan.md`](1669_release_gene_matcher_alias_chaining_plan.md)
-changes alias resolution to single-hop, so do the check after that lands.
+[#1669](https://github.com/SACGF/variantgrid/issues/1669) made `ReleaseGeneMatcher` single-hop; that is a
+different resolver from this one, but do the check against a database that has had
+`fix_rematch_release_symbols_to_genes` run.
 
 **Clients send a build's own name (`GRCh37`), not an alias.** `GenomeBuild.get_name_or_alias("hg19")`
 raises `MultipleObjectsReturned` rather than `DoesNotExist`, so a declared build that will not resolve
