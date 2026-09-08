@@ -10,6 +10,9 @@
 {% block content %}
 <script>
 var nodeId = {{ node_id }};
+// Tag pills are read against the node the grid is showing - a tagging for someone else, or for
+// nobody yet, is marked rather than looking like this proband's. @see VariantGridFormat.tags
+var nodeProbandSampleId = {{ node_proband_sample_id|jsonify }};
 
 function selectVariant() {
     const variantId = $(this).attr("variant_id");

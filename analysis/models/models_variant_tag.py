@@ -53,8 +53,8 @@ class VariantTag(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
     # NodeVersion rows are deleted when a node reloads, so the sources the node was showing when this tag
     # was made are copied here - the tag is the audit record of what the tagger actually saw
     node_live_data_sources = models.JSONField(default=dict)
-    # Which sample the tagging is about - the study's proband, filled in at tag time where the node knows it and
-    # left null otherwise (never prompted for) @see analysis.variant_tag_operations.get_sample_for_variant_tag
+    # Which sample the tagging is about - the tagged node's proband, part of the tagging's identity (@see Meta)
+    # so it is set at tag time and never changes, null where the node has no proband (never prompted for)
     sample = models.ForeignKey(Sample, null=True, blank=True, on_delete=SET_NULL)
     # A to-do tag (Tag.requires_classification) is satisfied by a classification rather than deleted, so the
     # tagging stays as the record of what was flagged and what it turned into
@@ -63,6 +63,16 @@ class VariantTag(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
                                     related_name="resolved_variant_tags")
     resolved_classification = models.ForeignKey(Classification, null=True, blank=True, on_delete=SET_NULL)
     user = models.ForeignKey(User, on_delete=CASCADE)
+
+    class Meta(TimeStampedModel.Meta):
+        constraints = [
+            # One tagging per (variant, tag, analysis, user, sample) - a null sample counts as a value, so an
+            # analysis also has at most one sample-less tagging. Global (variant page) taggings are outside this.
+            models.UniqueConstraint(fields=["variant", "tag", "analysis", "user", "sample"],
+                                    nulls_distinct=False,
+                                    condition=Q(analysis__isnull=False),
+                                    name="varianttag_one_per_sample_in_analysis"),
+        ]
 
     @property
     def is_resolved(self) -> bool:

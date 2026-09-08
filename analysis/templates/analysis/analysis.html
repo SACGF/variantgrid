@@ -183,7 +183,7 @@
 	var saveSettingsOnResize = true;
 
     variantTags = {% render_variant_tags_dict analysis %};
-    variantTagsResolved = {% render_variant_tags_resolved_dict analysis %};
+    analysisSamples = {% render_analysis_samples_dict analysis %};
     variantTagOrder = {% render_variant_tag_order %};
     variantTagsReadOnly = !{{ has_write_permission|jsonify }};
     variantTagStaleDays = ANALYSIS_SETTINGS.variant_tag_stale_days;

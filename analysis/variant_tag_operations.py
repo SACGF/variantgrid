@@ -13,8 +13,8 @@ VariantTag isn't registered with auditlog - taggings come and go all the time an
 deliberate resolution - so the LogEntry is written by hand. Putting analysis_id in additional_data is what
 makes it show up in the analysis audit log (@see Analysis.log_entry_qs).
 
-Tagging stays one click - the sample is the study's proband where the node knows it, left null otherwise and
-never prompted for. Carrying the variant is not what makes a tagging someone's: a relative who is HET for the
+Tagging stays one click - the sample is the tagged node's proband where it knows it, left null otherwise and
+never prompted for (@see analysis/views/views_json.py:set_variant_tag). Carrying the variant is not what makes a tagging someone's: a relative who is HET for the
 proband's variant doesn't need their own classification.
 """
 from collections import defaultdict
@@ -65,16 +65,8 @@ def sample_carries_variant(sample: Sample, variant_tag: VariantTag) -> bool:
     return False
 
 
-def get_sample_for_variant_tag(variant_tag: VariantTag) -> Optional[Sample]:
-    """ Which sample the tagging is about - the proband of the study the tagged node sits in, which is the same
-        answer AncestorSampleMixin nodes auto-populate from. None when the node's ancestors disagree """
-    if node := variant_tag.node:
-        return node.get_subclass().get_proband_sample()
-    return None
-
-
 def get_proband_sample_by_node_id(analysis: Analysis) -> dict[int, Optional[Sample]]:
-    """ Every node's answer to get_sample_for_variant_tag, from the analysis graph loaded once.
+    """ Every node's proband (@see AnalysisNode.get_proband_sample), from the analysis graph loaded once.
         Asking a tagging at a time walks the ancestors a subclass query at a time and re-walks them for
         the next tagging - one analysis has thousands of taggings across a handful of nodes """
     nodes_by_id = get_nodes_by_id(analysis.analysisnode_set.all().select_subclasses())

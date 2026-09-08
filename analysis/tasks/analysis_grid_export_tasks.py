@@ -220,6 +220,7 @@ def export_node_to_downloadable_file(self, node_id, node_version, user_id, expor
                 pk=canonical_transcript_collection_id)
 
         sort_order_by_tag = get_tag_sort_order_by_tag(user)
+        # A variant carries a tag once per sample (@see VariantTag.Meta) - the export lists it once
         variant_tag_ids = defaultdict(set)
         for variant_id, tag_id in VariantTag.objects.filter(analysis=node.analysis).values_list("variant_id", "tag_id"):
             variant_tag_ids[variant_id].add(tag_id)

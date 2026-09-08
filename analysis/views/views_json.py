@@ -8,6 +8,7 @@ from django.conf import settings
 from django.db.models import F
 from django.http.response import JsonResponse
 from django.shortcuts import get_object_or_404
+from django.utils.timezone import localtime
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_POST
 
@@ -22,7 +23,13 @@ from analysis.models import (
 )
 from analysis.models.enums import TagLocation, TagNodeMode
 from analysis.models.nodes import node_utils
-from analysis.models.nodes.analysis_node import AnalysisEdge, AnalysisNode, NodeStatus, NodeTask, NodeVersion
+from analysis.models.nodes.analysis_node import (
+    AnalysisEdge,
+    AnalysisNode,
+    NodeStatus,
+    NodeTask,
+    NodeVersion,
+)
 from analysis.models.nodes.filter_child import create_filter_child_node
 from analysis.models.nodes.filters.built_in_filter_node import BuiltInFilterNode
 from analysis.models.nodes.filters.selected_in_parent_node import NodeVariant, SelectedInParentNode
@@ -37,7 +44,6 @@ from analysis.models.nodes.node_utils import (
 )
 from analysis.serializers import CandidateSearchRunSerializer, VariantTagSerializer
 from analysis.tasks.analysis_update_tasks import populate_clingen_alleles_from_analysis_node
-from analysis.variant_tag_operations import get_sample_for_variant_tag
 from analysis.views.analysis_permissions import (
     get_analysis_or_404,
     get_node_subclass_or_404,
@@ -237,6 +243,20 @@ def nodes_delete(request, analysis_id):
     return JsonResponse({})
 
 
+def _analysis_variant_tag_json(variant_tag: VariantTag) -> dict:
+    """ One tagging as the analysis grid draws it - one pill @see VariantGridFormat.tags """
+    resolved = None
+    if variant_tag.is_resolved:
+        resolved = localtime(variant_tag.resolved).date().isoformat()
+    return {
+        "id": variant_tag.pk,
+        "tag": variant_tag.tag_id,
+        "sample": variant_tag.sample_id,
+        "sample_name": str(variant_tag.sample) if variant_tag.sample_id else None,
+        "resolved": resolved,
+    }
+
+
 @require_POST
 def set_variant_tag(request, location):
     """ Can be called from analysis or variant details page (location = A or V) """
@@ -260,22 +280,27 @@ def set_variant_tag(request, location):
     ret = {}  # Empty
     if op == 'add':
         if analysis:
-            genome_build = analysis.genome_build
-            variant_tag, created = VariantTag.objects.get_or_create(variant_id=variant_id, tag=tag,
-                                                                    genome_build=genome_build, location=location,
-                                                                    analysis=analysis, user=request.user)
+            node = None
             if node_id:
-                variant_tag.node_id = node_id
+                node = get_object_or_404(AnalysisNode.objects.select_subclasses(),
+                                         pk=node_id, analysis=analysis)
+            # Tagging is one click - the sample is the node's proband, or null where it has none. It is part
+            # of the tagging's identity, so tagging for this proband never takes the tag off a sibling
+            sample = node.get_proband_sample() if node else None
+            variant_tag, created = VariantTag.objects.get_or_create(variant_id=variant_id, tag=tag,
+                                                                    genome_build=analysis.genome_build,
+                                                                    location=location, analysis=analysis,
+                                                                    user=request.user, sample=sample)
+            if node:
+                variant_tag.node = node
                 # Stamp what the node was showing, so a reviewer can later tell why the variant was in it
                 node_version = NodeVersion.objects.filter(node_id=node_id,
                                                           version=F("node__version")).first()
                 variant_tag.node_version = node_version
                 variant_tag.node_live_data_sources = node_version.live_data_sources if node_version else {}
-            if created:
-                # Tagging is one click - the sample is the node's proband, or null where it has none
-                variant_tag.sample = get_sample_for_variant_tag(variant_tag)
-            if node_id or created:
                 variant_tag.save()
+            # The click always lands on a tagging - "created" is what tells the grid to draw a new pill
+            ret = {"variant_tag": _analysis_variant_tag_json(variant_tag), "created": created}
         else:
             if genome_build_name is None:
                 raise ValueError("Adding requires either 'analysis_id' or 'genome_build_name'")
@@ -285,12 +310,14 @@ def set_variant_tag(request, location):
                                                                     analysis=None, location=location,
                                                                     user=request.user,
                                                                     defaults={"genome_build": genome_build})
-        if created:  # Only return new if anything created
-            ret = VariantTagSerializer(variant_tag, context={"request": request}).data
+            if created:  # Only return new if anything created
+                ret = VariantTagSerializer(variant_tag, context={"request": request}).data
     elif op == 'del':
-        # Deletion of tags is for analysis (all users)
         if analysis:
-            VariantTag.objects.filter(variant_id=variant_id, analysis=analysis, tag=tag).delete()
+            # The X is on one pill, so it removes that tagging - the analysis' write permission covers it
+            if not variant_tag_id:
+                raise ValueError("Deletion from an analysis requires 'variant_tag_id'")
+            get_object_or_404(VariantTag, pk=variant_tag_id, analysis=analysis).delete()
         elif variant_tag_id:
             variant_tag = VariantTag.get_for_user(request.user, pk=variant_tag_id, write=True)
             variant_tag.delete()

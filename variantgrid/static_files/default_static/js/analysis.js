@@ -695,11 +695,12 @@ function setupNodeTypeSelect() {
 }
 
 function addVariantTag(variantId, nodeId, tagId, successFunc) {
-    setVariantTag(variantId, nodeId, tagId, successFunc, 'add');
+    setVariantTag(variantId, nodeId, tagId, null, successFunc, 'add');
 }
 
-function removeVariantTag(variantId, tagId, successFunc) {
-    setVariantTag(variantId, null, tagId, successFunc, 'del');
+// The X is on one pill, so it removes that tagging rather than every tagging of the tag
+function removeVariantTag(variantId, tagId, variantTagId, successFunc) {
+    setVariantTag(variantId, null, tagId, Number(variantTagId), successFunc, 'del');
 }
 
 function setNumVariantTags(pulseLabel) {
@@ -719,7 +720,7 @@ function setNumVariantTags(pulseLabel) {
     numberOfTags.text(label);
 }
 
-function setVariantTag(variantId, nodeId, tagId, successFunc, op) {
+function setVariantTag(variantId, nodeId, tagId, variantTagId, successFunc, op) {
     let data = 'variant_id=' + variantId;
     data += '&tag_id=' + tagId;
     data += '&op=' + op;
@@ -727,31 +728,35 @@ function setVariantTag(variantId, nodeId, tagId, successFunc, op) {
     if (nodeId) {
         data += '&node_id=' + nodeId;
     }
+    if (variantTagId) {
+        data += '&variant_tag_id=' + variantTagId;
+    }
 
     const success = function (response) {
         const aWin = getAnalysisWindow();
-        const tagList = aWin.variantTags[variantId] || [];
+        const taggings = aWin.variantTags[variantId] || [];
         if (op == 'add') {
-            tagList.push(tagId);
-        } else if (op == 'del') {
-            if (tagList) {
-                removeItemFromArray(tagId, tagList);
-            }
-        }
-        if (Object.keys(tagList).length > 0) {
-            aWin.variantTags[variantId] = tagList;
-        } else {
-            delete aWin.variantTags[variantId];
-        }
-        if (op == 'del') {
-            // Re-tagging makes a fresh tagging, so the done marker goes with the old one
-            const resolvedTags = (aWin.variantTagsResolved || {})[variantId];
-            if (resolvedTags) {
-                delete resolvedTags[tagId];
-                if (Object.keys(resolvedTags).length === 0) {
-                    delete aWin.variantTagsResolved[variantId];
+            // Tagging where this node's proband already has the tag finds that row - only a new one is a new pill
+            if (response && response.created) {
+                const tagging = response.variant_tag;
+                taggings.push(tagging);
+                if (tagging.sample) {
+                    aWin.analysisSamples = aWin.analysisSamples || {};
+                    aWin.analysisSamples[tagging.sample] = tagging.sample_name;
                 }
             }
+        } else if (op == 'del') {
+            for (let i=0 ; i<taggings.length ; ++i) {
+                if (taggings[i].id === variantTagId) {
+                    taggings.splice(i, 1);
+                    break;
+                }
+            }
+        }
+        if (taggings.length > 0) {
+            aWin.variantTags[variantId] = taggings;
+        } else {
+            delete aWin.variantTags[variantId];
         }
         setNumVariantTags();
         checkAndMarkDirtyNodes(aWin);
@@ -760,7 +765,7 @@ function setVariantTag(variantId, nodeId, tagId, successFunc, op) {
         }
 
         if (successFunc) {
-            successFunc();
+            successFunc(response);
         }
     };
 
