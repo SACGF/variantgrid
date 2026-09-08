@@ -61,8 +61,8 @@ from classification.views.imported_allele_info_view import (
     ImportedAlleleInfoColumns,
     download_allele_info, view_imported_allele_info, view_imported_allele_info_detail
 )
-from classification.views.overlaps_datatables_3 import OverlapColumns
-from classification.views.overlaps_view_3 import view_overlaps, view_overlap_history, overlap_report_review, \
+from classification.views.overlaps_datatables import OverlapColumns
+from classification.views.overlaps_view import view_overlaps, view_overlap_history, overlap_report_review, \
     action_overlap_review, discordance_calculator, TriageView, view_overlap, download_overlaps
 from classification.views.views import AutopopulateView, classification_import_tool
 from classification.views.views_hgvs_resolution_tool import hgvs_resolution_tool

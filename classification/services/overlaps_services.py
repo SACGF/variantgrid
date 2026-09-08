@@ -21,8 +21,7 @@ from classification.models import ClassificationGrouping, ClassificationResultVa
     TriageNextStep, TriageState, EffectiveDate, TriageComment, EffectiveDateType, OverlapDiscordanceNotification, \
     DiscordanceReport, ClassificationImportRun, EvidenceKeyMap
 from classification.enums.overlaps_enums import TriageStatus
-from classification.services.overlap_calculator import overlap_calculator_for_value_type, OverlapCalculatorOncPath, \
-    OverlapCalculatorClinSig, OVERLAP_CLIN_SIG_ENABLED
+from classification.services.overlap_calculator import overlap_calculator_for_value_type, OVERLAP_CLIN_SIG_ENABLED
 import json
 from library.django_utils import get_url_from_view_path
 from library.log_utils import NotificationBuilder
@@ -120,14 +119,14 @@ class OverlapServices:
     @staticmethod
     def update_clinvar_overlap_contribution(
             clinvar_record_collection: ClinVarRecordCollection,
-            migrate: bool = False,
-            recalc_overlap=True):
+            migration: bool = False,
+            recalc_overlaps=True):
         """
         Assigns a clinvar record collection to an Overlap (if the clinvar collection should belong to an overlap).
         No need to call save() after
-        :param clinvar_record_collection: The clinvar grouping to assign to an overlap, should be an expert panel (and for now Germline)
-        :param migration: Are we doing this as a migration and need to calculate some history, otherwise acts live
-        :param recalc_overlaps: If true update the overlaps right after this update
+        :param clinvar_record_collection: The clinvar grouping to assign to an overlap, should be an expert panel (and for now Germline).
+        :param migration: True if doing this as a migration and need to calculate some history, otherwise acts live.
+        :param recalc_overlaps: If true update the overlaps right after this update.
         """
 
         # TODO - code assumes that ClinVarRecordCollection is just for Germline
@@ -146,7 +145,7 @@ class OverlapServices:
                 expert_panel.date_last_evaluated or expert_panel.date_clinvar_updated, EffectiveDateType.CURATED)
 
             extra_data = {}
-            if migrate:
+            if migration:
                 # if we're migrating, pretend this entry was created when the expert panel itself occurred
                 extra_data = {
                     "timestamp": expert_panel.created,
@@ -171,7 +170,7 @@ class OverlapServices:
                 )
 
                 OverlapServices._link_overlap_contribution(contribution)
-                if recalc_overlap:
+                if recalc_overlaps:
                     overlaps = set()
                     for skew in contribution.overlapcontributionnextstep_set.select_related('overlap').all():
                         overlaps.add(skew.overlap)
@@ -232,7 +231,7 @@ class OverlapServices:
     @staticmethod
     def update_next_steps(overlap: Overlap):
         """
-        Skews determine if from a lab's PoV an Overlap is waiting on them, waiting on another lab etc
+        Skews determine if from a lab's PoV an Overlap is waiting on them, waiting on another lab etc.
         So grab all the OverlapContributions, check their TriageStatus, link those to the Skews
         Then update the Skew's next steps
         """
@@ -363,7 +362,7 @@ class OverlapServices:
         Called when important factors of an Overlap change that might require a discordance notification to be prepared
         :param overlap: The overlap object (typically reflecting the new state)
         :param old_state: The overlap's state just prior
-        :param new_state: The overlap's satate now
+        :param new_state: The overlap's state now
         """
         if not settings.DISCORDANCE_ENABLED:
             return
@@ -406,7 +405,7 @@ class OverlapServices:
         """
         Sends discordance notifications to labs if .is_still_relevant and fills in their send date
         Deletes discordance notifications that are marked as not .is_still_relevant
-        Also sends an overal notification to admins about the discordances
+        Also sends an overall notification to admins about the discordances
         :param outstanding_notifications: which notifications to send, if blank then inspect all unsent notifications
         :return: True if all notifications were sent
         """
@@ -854,12 +853,11 @@ class OverlapsSummary:
         return OverlapCounts(
             overall_total=self.base_qs.count(),
             overall_medical=self.base_qs.filter(overlap_status__gte=OverlapStatus.MEDICALLY_SIGNIFICANT).count(),
-            awaiting_triage_no_triage = self.base_qs.filter(skew_status=TriageNextStep.AWAITING_YOUR_TRIAGE).count(),
-            awaiting_triage_others_have_triaged = self.base_qs.filter(skew_status=TriageNextStep.AWAITING_YOUR_TRIAGE_OTHERS_TRIAGED).count(),
-            ready_for_discussion = self.base_qs.filter(skew_status=TriageNextStep.TO_DISCUSS).count()
+            awaiting_triage_no_triage=self.base_qs.filter(skew_status=TriageNextStep.AWAITING_YOUR_TRIAGE).count(),
+            awaiting_triage_others_have_triaged=self.base_qs.filter(skew_status=TriageNextStep.AWAITING_YOUR_TRIAGE_OTHERS_TRIAGED).count(),
+            ready_for_discussion=self.base_qs.filter(skew_status=TriageNextStep.TO_DISCUSS).count()
         )
 
     def overlaps_awaiting_triage(self):
         awaiting_triage_qs = self.base_qs.filter(skew_status__in=(TriageNextStep.AWAITING_YOUR_TRIAGE, TriageNextStep.AWAITING_YOUR_TRIAGE_OTHERS_TRIAGED))
         return awaiting_triage_qs.order_by('-overlap_status_change_timestamp')
-

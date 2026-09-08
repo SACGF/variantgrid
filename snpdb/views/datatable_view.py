@@ -41,6 +41,11 @@ class CellData(Generic[RDC]):
     key: Optional[str]
     obj: Optional[RDC] = None
 
+    def obj_sure(self) -> RDC:
+        if obj := self.obj:
+            return obj
+        raise ValueError("No obj provided")
+
     @cached_property
     def transient(self) -> dict[Any, Any]:
         # if you want to calculate data for a row, shared between renderers

@@ -261,6 +261,7 @@ def clinical_significance_values(vcm: ClassificationModification, show_pending: 
         "css_class": "cs cs-" + (value.lower() if value else "none")
     }]
 
+    # FIXME: merge this code back into clinical_significance_pills
     if always_show_somatic or summary_obj.somatic.clinical_significance:
         pending_from = None
         pending_from_label = None

@@ -4,6 +4,8 @@ from typing import Any, Optional
 from auditlog.models import AuditlogHistoryField
 from auditlog.registry import auditlog
 from django.conf import settings
+from django.contrib.auth.models import User
+from django.core.exceptions import PermissionDenied
 from django.db.models import CASCADE, QuerySet, SET_NULL, JSONField
 from django.db import models
 from django.db.models.enums import IntegerChoices
@@ -57,6 +59,16 @@ class OverlapContribution(TimeStampedModel):
     If this is not None and it matches the effective_value and every other OverlapContribution in the Overlap has their
     final reviewed value matching their value - the Overlap is marked as continued discordance.
     """
+
+    def can_write(self, user: User) -> bool:
+        if lab := self.lab:
+            return lab.is_member(user, admin_check=True)
+        return False
+
+    def check_can_write(self, user):
+        if not self.can_write(user):
+            msg = f"You do not have WRITE permission for {self.pk}"
+            raise PermissionDenied(msg)
 
     def is_review_agreed_value_met(self) -> bool:
         """
@@ -346,10 +358,12 @@ class Overlap(TimeStampedModel, ReviewableModelMixin, PreviewModelMixin):
 
     def c_hgvs_all(self, lab_picker: Optional[LabPickerData], genome_build: GenomeBuild) -> list[HGVSDisplay]:
         results = set()
-        for contribution in self.contributions_list:
-            if classification_grouping := contribution.classification_grouping:
-                if classification_grouping.lab_id in lab_picker.lab_ids:
-                    results.add(classification_grouping.latest_allele_info.preferred_c_hgvs_obj(genome_build))
+        if lab_picker:
+            for contribution in self.contributions_list:
+                if classification_grouping := contribution.classification_grouping:
+                    if classification_grouping.lab_id in lab_picker.lab_ids:
+                        results.add(classification_grouping.latest_allele_info.preferred_c_hgvs_obj(genome_build))
+
         if not results and lab_picker:
             return self.c_hgvs_all(genome_build=genome_build, lab_picker=None)
         elif results:
@@ -359,10 +373,6 @@ class Overlap(TimeStampedModel, ReviewableModelMixin, PreviewModelMixin):
         else:
             return [HGVSDisplay(HGVSComponents("-"), is_normalised=False)]
 
-
-
-    # have to cache the values
-    # contributions = models.ManyToManyField(OverlapContribution)
     @property
     def contributions(self) -> QuerySet[OverlapContribution]:
         return OverlapContribution.objects.filter(

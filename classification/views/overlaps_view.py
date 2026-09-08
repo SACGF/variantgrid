@@ -16,7 +16,7 @@ from classification.models import ClassificationResultValue, \
 from classification.enums.overlaps_enums import TriageState, TriageStatus
 from classification.services.overlap_calculator import overlap_calculator_for_value_type, OVERLAP_CLIN_SIG_ENABLED
 from classification.services.overlaps_services import OverlapServices, OverlapPageDetails
-from classification.views.overlaps_datatables_3 import OverlapColumns
+from classification.views.overlaps_datatables import OverlapColumns
 from library.django_utils import get_url_from_view_path
 from library.log_utils import log_admin_change
 from library.utils import empty_to_none, ExportRow, export_column, ExportDataType, ExportTweak
@@ -24,7 +24,6 @@ from library.utils.django_utils import render_ajax_view
 from review.models import Review
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.lab_picker import LabPickerData
-from snpdb.models import GenomeBuild
 from uicore.views.ajax_form_view import AjaxFormView, LazyRender
 
 
@@ -115,16 +114,8 @@ class TriageView(AjaxFormView[OverlapContribution]):
     @classmethod
     def lazy_render(cls, obj: OverlapContribution, context: Optional[dict] = None) -> LazyRender:
         def dynamic_context_gen(request):
-            # FIX ME what is dynamic context vs static c
+            # FIXME what is dynamic context vs static context?
             return {}
-            # if context and context.get("saved") is True:
-            #     user = request.user
-            #     discordance_report = obj.discordance_report
-            #     discordance_report_row = DiscordanceReportRowData(discordance_report=discordance_report, perspective=LabPickerData.for_user(user))
-            #     return {
-            #         "next_step": discordance_report_row.next_step,
-            #         "report": discordance_report
-            #     }
 
         return LazyRender(
             template_name="classification/triage_detail.html",
@@ -141,8 +132,10 @@ class TriageView(AjaxFormView[OverlapContribution]):
         return self.handle(request, triage_id=triage_id)
 
     def handle(self, request, triage_id: int):
-        # FIXME security checks
         triage = OverlapContribution.objects.get(pk=triage_id)
+
+        triage.check_can_write(request.user)
+
         classification_grouping = triage.classification_grouping
         value_type = triage.value_type
 

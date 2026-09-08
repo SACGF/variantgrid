@@ -299,4 +299,4 @@ class Command(BaseCommand):
         for clinvar_record_collection in ClinVarRecordCollection.objects.filter(
                 max_stars__gte=CLINVAR_REVIEW_EXPERT_PANEL_STARS_VALUE, allele__isnull=False):
             if clinvar_record_collection.expert_panel is not None:
-                OverlapServices.update_clinvar_overlap_contribution(clinvar_record_collection, migrate=True, recalc_overlap=False)
+                OverlapServices.update_clinvar_overlap_contribution(clinvar_record_collection, migration=True, recalc_overlaps=False)

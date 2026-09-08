@@ -1,4 +1,4 @@
-from collections import Counter, defaultdict
+from collections import Counter
 from dataclasses import dataclass, field
 from functools import cached_property
 from typing import Optional, Set
@@ -14,7 +14,6 @@ from classification.models import ClassificationGrouping, Overlap, OverlapType, 
     ClassificationResultValue, OverlapContributionStatus, OverlapContributionNextStep, TriageNextStep, EvidenceKey, \
     EvidenceKeyMap, IN_REVIEW_VALUE
 from classification.services.overlap_calculator import OVERLAP_CLIN_SIG_ENABLED
-from genes.hgvs import HGVSDisplay, HGVSComponents
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.lab_picker import LabPickerData
 from snpdb.models import Lab
@@ -142,7 +141,8 @@ class OverlapColumns(DatatableConfig[ClassificationGrouping]):
 
         if self.get_query_param("skew_status") == "S":  # solved overlaps
             qs = qs.filter(
-                Q(overlap_max_ever_status__gte=OverlapStatus.MAJOR_DIFFERENCES, overlap_status__lt=OverlapStatus.MAJOR_DIFFERENCES) |
+                Q(overlap_max_ever_status__gte=OverlapStatus.MAJOR_DIFFERENCES,
+                  overlap_status__lt=OverlapStatus.MAJOR_DIFFERENCES) |
                 Q(overlap_override_status__ne=OverlapOverrideStatus.NO_OVERRIDE))
             qs = qs.filter(overlap_status__gte=OverlapStatus.SINGLE_SUBMITTER)
             qs = qs.annotate(skew_status=Subquery(
@@ -166,7 +166,8 @@ class OverlapColumns(DatatableConfig[ClassificationGrouping]):
             ))
         else:
             # only look at discordant overlaps
-            qs = qs.filter(overlap_status__gte=OverlapStatus.TIER_1_VS_TIER_2_DIFFERENCES).filter(overlap_override_status=OverlapOverrideStatus.NO_OVERRIDE)
+            qs = qs.filter(overlap_status__gte=OverlapStatus.TIER_1_VS_TIER_2_DIFFERENCES).filter(
+                overlap_override_status=OverlapOverrideStatus.NO_OVERRIDE)
             # filter based on overlap skew
             qs = qs.annotate(skew_status=Subquery(
                 OverlapContributionNextStep.objects.filter(lab_filter_q).filter(
@@ -183,7 +184,8 @@ class OverlapColumns(DatatableConfig[ClassificationGrouping]):
     def pre_render(self, qs: QuerySet[DC]):
         # stores cross context overlaps
         allele_ids = qs.values_list('allele_id', flat=True)
-        cross_context_qs = Overlap.objects.filter(valid=True, overlap_type=OverlapType.CROSS_CONTEXT, allele_id__in=allele_ids)
+        cross_context_qs = Overlap.objects.filter(valid=True, overlap_type=OverlapType.CROSS_CONTEXT,
+                                                  allele_id__in=allele_ids)
         # only ONC PATH for now
         if not OVERLAP_CLIN_SIG_ENABLED:
             cross_context_qs = cross_context_qs.filter(value_type=ClassificationResultValue.ONC_PATH)
@@ -196,18 +198,20 @@ class OverlapColumns(DatatableConfig[ClassificationGrouping]):
         return self.cross_cotext_allele_to_overlap.get((overlap.allele_id, overlap.value_type))
 
     def render_c_hgvs(self, cell: CellData[Overlap]):
-        return list(c_hgvs.to_json() for c_hgvs in cell.obj.c_hgvs_all(lab_picker=self.lab_picker, genome_build=GenomeBuildManager.get_current_genome_build(self.user)))
+        return list(c_hgvs.to_json() for c_hgvs in cell.obj_sure().c_hgvs_all(lab_picker=self.lab_picker,
+                                                                              genome_build=GenomeBuildManager.get_current_genome_build(
+                                                                                  self.user)))
 
     def render_context(self, cell: CellData[Overlap]):
 
         return render_to_string('classification/snippets/testing_context_cell.html',
-                                context={"testing_context": cell.obj.testing_context_full},
+                                context={"testing_context": cell.obj_sure().testing_context_full},
                                 request=self.request)
 
     def render_orgs(self, cell: CellData[Overlap]):
         clinvar = False
         org_count = Counter()
-        for contribution in cell.obj.contributions_list:
+        for contribution in cell.obj_sure().contributions_list:
             if cg := contribution.classification_grouping:
                 org_count[cg.lab.organization] += 1
             elif contribution.scv:
@@ -227,7 +231,7 @@ class OverlapColumns(DatatableConfig[ClassificationGrouping]):
         return SafeString(result)
 
     def render_summary(self, cell: CellData[Overlap]):
-        overlap = cell.obj
+        overlap = cell.obj_sure()
         values = ContributionValues(EvidenceKeyMap.cached_key(overlap.value_type.evidence_key_str))
 
         skew_qs = overlap.overlapcontributionnextstep_set
@@ -278,9 +282,9 @@ class OverlapColumns(DatatableConfig[ClassificationGrouping]):
         }
 
         return render_to_string('classification/snippets/overlap_value_cell_3.html',
-            context,
-            request=self.request,
-        )
+                                context,
+                                request=self.request,
+                                )
 
     def __init__(self, request: HttpRequest, hardcoded_params: Optional[dict] = None):
         super().__init__(request, hardcoded_params=hardcoded_params)
@@ -311,7 +315,8 @@ class OverlapColumns(DatatableConfig[ClassificationGrouping]):
                 name="summary",
                 label="Summary",
                 renderer=self.render_summary,
-                sort_keys=["overlap_status", "skew_status", "overlap_status_change_timestamp", "overlap_override_status"],
+                sort_keys=["overlap_status", "skew_status", "overlap_status_change_timestamp",
+                           "overlap_override_status"],
                 default_sort=SortOrder.DESC
             ),
 
