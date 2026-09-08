@@ -470,9 +470,9 @@ phase — the per-node values built here run either way; #1717 only changes what
 
 ## Phase 6 — #1558
 
-Landed. Designed in [`1558_non_variants_on_grids_plan.md`](1558_non_variants_on_grids_plan.md), which
-is the spec and records what each phase touched - the kind badge, the fusion row expansion and export,
-copy number per sample, the fusion calls column and the Effect node's structural filter.
+Landed over the #1558 commits - the kind badge, the fusion row expansion and export, copy number per
+sample, the fusion calls column and the Effect node's structural filter. Its plan was deleted once it
+landed; `git log --all -- 'claude/plans/*1558*'` finds it if the phase-by-phase spec is wanted.
 
 Per the issue's own comment table, SV already worked in the grid and CNV worked as SV — what was
 missing was surfacing `CohortGenotype.info["CN"]` and TSO 500's `FORMAT/SM` linear copy ratio, which
@@ -573,5 +573,5 @@ scientist's choice.
   individual files (`PASS` small variants, `PASS` non-reference CNV) and discards 148 of 149 fusion calls
   and every splice call.
 - **Fold-change → DEL/DUP conversion** (sapath#304's open question) — moot for v2.6.2, which emits
-  `<DUP>`/`<DEL>` directly with `SM` as the linear copy ratio. The `cnv_tsv_to_vcf.py` command in the
+  `<DUP>`/`<DEL>` directly with `SM` as the linear copy ratio. The cnv_tsv_to_vcf.py command in the
   sapath repo predates that.

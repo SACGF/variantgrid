@@ -70,7 +70,7 @@ The audit was split across two issues, both landed:
 
 A3's namespace filter is not done. Filtering the patch by the target record's namespaces drops all 28
 `acmg:*` criteria, because the create form never sets `assertion_method` and the "assume ACMG unless
-Horak" rule exists only in `variantgrid/sitestatic/static/js/vc_keys.js`.
+Horak" rule exists only in `variantgrid/static_files/default_static/js/vc_keys.js`.
 
 ### A1 — Test-level facts about *this* tumour are marked copyable
 

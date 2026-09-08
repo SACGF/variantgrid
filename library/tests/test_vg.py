@@ -245,6 +245,12 @@ class DocsCheckTest(SimpleTestCase):
         reasons = [docs.check_citation(c) for c in docs.citations_in(doc)]
         self.assertEqual(reasons, [None, "no such file"])
 
+    def test_build_output_resolves_without_existing(self):
+        """ CI has no collectstatic output or lint report, so these must not depend on the working tree """
+        doc = self._doc("`variantgrid/sitestatic/static/js/never_built.js`, `lint.txt`, `variantgrid/nope/x.js`")
+        reasons = [docs.check_citation(c) for c in docs.citations_in(doc)]
+        self.assertEqual(reasons, [None, None, "no such file"])
+
     def test_only_live_plans_are_checked(self):
         live = self._doc("Status: in progress\n`nope/missing.py`", directory=REPO_ROOT / "claude" / "plans")
         landed = self._doc("Status: landed abc123\n`nope/missing.py`", directory=REPO_ROOT / "claude" / "plans")

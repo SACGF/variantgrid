@@ -44,8 +44,8 @@ Route by task. The app notes (`<app>/CLAUDE.md`) load automatically when you wor
 `claude/research/<app>.md` are the longer narratives - flows, why, history, traps - each with a `Verified against <sha>` header
 and citations that `scripts/vg docs check` keeps live. A research doc still without that header is from an earlier model:
 treat a claim there as a lead to verify, not a fact.
-Deeper still: `<app>/__<app>_readme.md`. Plans live in `claude/plans/`, runbooks in `claude/runbooks/`, mockups in
-`claude/mockups/`; `claude/plans/agent_system.md` is the design behind `vg`, the maps and these notes.
+Deeper still: `<app>/__<app>_readme.md`. Plans live in `claude/plans/`, runbooks in `claude/runbooks/`;
+`claude/plans/agent_system.md` is the design behind `vg`, the maps and these notes.
 
 ## This box
 

@@ -13,6 +13,9 @@ Paths resolve against the repo root first, then the citing doc's directory (so `
 the doc's directory tree, then anywhere in the repo. A `module.path:Symbol` spelling is accepted as
 `module/path.py:Symbol`. Fenced code blocks are skipped: what is inside them is a command or a listing, not a
 claim about the tree. `claude/maps/` is generated and verified by `vg map --check`, so it is not a doc here.
+A citation of gitignored build output (BUILD_OUTPUTS - collectstatic's `variantgrid/sitestatic/`, the `lint.txt`
+report) resolves without touching the filesystem, so a doc describing the build reads the same on CI as on a box
+that has run it.
 
 Plans are checked while they are live: a `Status:` of draft, approved or in progress. A landed or superseded
 plan, or one with no Status line, describes code as it was and is reported as unchecked rather than failed.
@@ -27,6 +30,8 @@ from library.vg.repo import REPO_ROOT, first_party_packages
 
 DOC_GLOBS = ("claude/**/*.md", "*/CLAUDE.md", "*/__*_readme.md", "CLAUDE.md")
 GENERATED_DIRS = ("claude/maps",)
+# Gitignored build output: present on a box that has run the build, absent from a fresh checkout
+BUILD_OUTPUTS = ("variantgrid/sitestatic", "lint.txt")
 LIVE_PLAN_STATUSES = ("draft", "approved", "in progress")
 _STATUS_RE = re.compile(r"^Status:\s*(.+)$", re.MULTILINE)
 
@@ -88,6 +93,12 @@ def doc_files(paths=None) -> list[Path]:
 def is_generated(doc: Path) -> bool:
     relative = doc.relative_to(REPO_ROOT).as_posix()
     return any(relative.startswith(prefix + "/") for prefix in GENERATED_DIRS)
+
+
+def is_build_output(path: str) -> bool:
+    """ A citation of collectstatic output or the lint report: the doc is describing the build, and the file
+        is gitignored, so it resolves the same on CI as on a box that has run it """
+    return any(path == output or path.startswith(output + "/") for output in BUILD_OUTPUTS)
 
 
 def is_plan(doc: Path) -> bool:
@@ -330,6 +341,8 @@ def _markdown_anchors(path: Path) -> set[str]:
 
 
 def check_citation(citation: Citation) -> str | None:
+    if is_build_output(citation.path):
+        return None
     path = resolve_path(citation)
     if path is None:
         return "no such file"
