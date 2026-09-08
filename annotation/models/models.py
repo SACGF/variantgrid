@@ -1823,6 +1823,10 @@ class VariantAnnotation(AbstractVariantAnnotation):
 
     # These are populated for SVs using VEP plugin StructuralVariantOverlap
     # They are text as they can have multiple entries joined via '&'
+    # SVOverlapProcessor picks one of those records (ANNOTATION_VEP_SV_OVERLAP_SINGLE_VALUE_METHOD) and copies its
+    # values onto the regular gnomad_af/gnomad_ac/gnomad_popmax_af/per-population columns, so that the analysis
+    # PopulationNode (which compares floats) filters SVs the same way it does small variants. These text fields
+    # keep every overlapping record, for display and to show which one was used.
     gnomad_sv_overlap_af = models.TextField(null=True, blank=True)
     gnomad_sv_overlap_percent = models.TextField(null=True, blank=True)
     gnomad_sv_overlap_name = models.TextField(null=True, blank=True)

@@ -66,6 +66,13 @@ Gotchas:
   annotation/vep_annotation.py passes lead_variants_only=0 so a variant that is merely a member still gets its GWAS L2G
   score. The open_targets_* columns are '&'-joined parallel arrays zipped by
   annotation/models/models.py:VariantAnnotation.open_targets_records, so they are only ever written together.
+- An SV can overlap several gnomAD-SV records. annotation/vcf_files/bulk_vep_vcf_annotation_inserter.py:SVOverlapProcessor
+  picks one (ANNOTATION_VEP_SV_OVERLAP_SINGLE_VALUE_METHOD) and copies its values onto the ordinary gnomad_af / gnomad_ac /
+  gnomad_popmax_af / per-population columns so the analysis PopulationNode filters SVs like small variants; the
+  gnomad_sv_overlap_* text fields keep them all. VEP values are still strings at that point - compare them as floats,
+  as gnomAD-SV mixes '4.6e-05' and '0.006085' notation and string order puts the rarest record last.
+- Reading a data-file VCF back to rewrite a column: cyvcf2 parses Float INFO through float32 ('4.6e-05' comes back as
+  4.600000102072954e-05), so take the value off the raw INFO text (str(record)) to store what VEP's own pass-through would.
 - settings.ANNOTATION_GENE_ANNOTATION_VERSION_ENABLED gates whether gene_annotation_version joins the partition SQL
   (annotation/models/models.py:AnnotationVersion.sub_annotations_inheritance_partitioning); validate() still checks it.
 - transcripts_annotation_selections.py:VariantTranscriptSelections converts the coordinate to explicit once before

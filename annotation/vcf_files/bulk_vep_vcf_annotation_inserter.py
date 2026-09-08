@@ -1053,11 +1053,8 @@ class SVOverlapProcessor:
         if settings.ANNOTATION_VEP_SV_OVERLAP_SINGLE_VALUE_METHOD == "greatest_overlap":
             raise NotImplementedError("greatest_overlap")
         elif settings.ANNOTATION_VEP_SV_OVERLAP_SINGLE_VALUE_METHOD == "lowest_af":
-            for record in filtered_sv_records:
-                if chosen_record:
-                    if record["gnomad_sv_overlap_af"] > chosen_record["gnomad_sv_overlap_af"]:
-                        continue
-                chosen_record = record
+            # VEP values are still strings here - compare as floats, as gnomAD-SV mixes '4.6e-05' and '0.006085'
+            chosen_record = min(filtered_sv_records, key=lambda r: float(r["gnomad_sv_overlap_af"]))
         elif settings.ANNOTATION_VEP_SV_OVERLAP_SINGLE_VALUE_METHOD == "exact_or_lowest_af":
             raise NotImplementedError("exact_or_lowest_af")
         else:
