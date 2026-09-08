@@ -3,6 +3,8 @@ Tests for per-tag node counts (issue #21) - every tag used in an analysis can ha
 badge on the nodes, added automatically as variants are tagged - and the TagNode editor's tag
 pills (issue #1820), the node's tag picker.
 """
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 
 from analysis.grids import VariantGrid
@@ -149,7 +151,7 @@ class TestTagNodeCountValues(TagNodeCountTestCase):
         """ The recount only computes tag labels - it merges into what the load wrote """
         node = self._sample_node()
         node_version = self._node_version(node)
-        node_version.load_data = {"counts": {BuiltInFilters.TOTAL: 7}, "tag_counts": {self.tag.pk: 1}}
+        node_version.load_data = {"counts": {BuiltInFilters.TOTAL: 7}, "timings": {"load": 0.5}}
         node_version.save()
         self._tag_variant(self.variants[0])
 
@@ -158,7 +160,15 @@ class TestTagNodeCountValues(TagNodeCountTestCase):
         node_version.refresh_from_db()
         self.assertEqual(1, node_version.counts[self.tag_label])
         self.assertEqual(7, node_version.counts[BuiltInFilters.TOTAL])
-        self.assertEqual({self.tag.pk: 1}, node_version.load_data["tag_counts"])
+        self.assertEqual({"load": 0.5}, node_version.load_data["timings"])
+
+    def test_load_records_where_the_time_went(self):
+        """ load_seconds is one number - the phases say which part of the load was slow """
+        node = self._sample_node()
+        node.load()
+        timings = self._node_version(node).load_data["timings"]
+        self.assertEqual({"load", "live_data_sources", "counts", "variant_ids", "load_data"},
+                         set(timings))
 
 
 class TestTagExtraFiltersQ(TagNodeCountTestCase):
@@ -287,7 +297,7 @@ class TestGlobalTagNodeCounts(TagNodeCountTestCase):
     def test_counts_a_tag_made_in_another_analysis(self):
         self._tag_in_other_analysis(self.variants[0])
         node = self._tag_node(mode=TagNodeMode.ALL_TAGS)
-        self.assertEqual({self.tag.pk: 1}, node.get_tag_counts())
+        self.assertEqual(1, node.get_tag_counts()[self.tag.pk])
 
     def test_ignores_the_tagged_within_days_cutoff(self):
         """ The cutoff decides which variants enter the node, not which tags to count """
@@ -295,7 +305,7 @@ class TestGlobalTagNodeCounts(TagNodeCountTestCase):
         node = self._tag_node(mode=TagNodeMode.ALL_TAGS)
         node.tagged_within_days = 0
         node.save()
-        self.assertEqual({self.tag.pk: 1}, node.get_tag_counts())
+        self.assertEqual(1, node.get_tag_counts()[self.tag.pk])
 
     def test_local_mode_does_not_count_another_analysis_tag(self):
         self._tag_in_other_analysis(self.variants[0])
@@ -388,7 +398,7 @@ class TestTagNodeEditorCounts(TagNodeCountTestCase):
         self.assertIn(f'data-tag="{self.tag.pk}"', self._editor_html(node))
 
     def test_counts_cover_the_input_so_other_tags_stay_pickable(self):
-        """ The node's output only carries its configured tags - the picker counts its input """
+        """ The node's output only carries its configured tags - the picker counts the scope's taggings """
         self._tag_variant(self.variants[0])
         self._tag_variant(self.variants[1], tag=self.other_tag)
         node = self._tag_node()
@@ -401,3 +411,17 @@ class TestTagNodeEditorCounts(TagNodeCountTestCase):
         node = self._tag_node()
         node.update(node_input=TagNodeInput.PARENT_NOT_TAGGED)
         self.assertIn("tag-counts-summary", self._editor_html(node))
+
+    def test_global_mode_pills_come_from_the_taggings_alone(self):
+        """ The picker counts analysis_varianttag - no variant query, whatever the analysis holds """
+        other_analysis = Analysis(genome_build=self.genome_build)
+        other_analysis.set_defaults_and_save(self.user)
+        self._tag_variant(self.variants[0], analysis=other_analysis)
+        node = self._tag_node(mode=TagNodeMode.ALL_TAGS)
+
+        with CaptureQueriesContext(connection) as queries:
+            html = self._editor_html(node)
+
+        self.assertIn(f'data-tag="{self.tag.pk}"', html)
+        variant_queries = [q["sql"] for q in queries.captured_queries if '"snpdb_variant"' in q["sql"]]
+        self.assertEqual([], variant_queries)

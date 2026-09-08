@@ -46,7 +46,7 @@ from django.db.models import Q
 from django.db.models.functions import Substr as DjSubstr
 
 from analysis.models import Analysis
-from analysis.models.nodes.analysis_node import AnalysisNode
+from analysis.models.nodes.analysis_node import AnalysisNode, NodeVersion
 from annotation.models import VariantAnnotationVersion, VariantGeneOverlap
 from genes.models import GeneList
 from snpdb.models import Cohort, Sample, Trio, Variant, VariantCollection
@@ -62,6 +62,7 @@ CSV_FIELDS = [
     "parent_input_count",
     "count",
     "cached_load_seconds",
+    "cached_load_timings",  # {phase: seconds} the cached load recorded @see NodeVersion.load_data
     "rerun_count_seconds",
     "explain_planning_ms",
     "explain_execution_ms",
@@ -378,6 +379,7 @@ class Command(BaseCommand):
             "config_summary": _config_summary(node),
             "count": node.count,
             "cached_load_seconds": node.load_seconds,
+            "cached_load_timings": _cached_load_timings(node),
             "pk_substitution": getattr(self, "_pk_substitution_mode", ""),
             "join_collapse_limit": getattr(self, "_join_collapse_limit", ""),
         }
@@ -1018,6 +1020,8 @@ class Command(BaseCommand):
             bits.append(f"count={row['count']}")
         if row.get("cached_load_seconds") not in (None, ""):
             bits.append(f"cached={row['cached_load_seconds']}s")
+        if row.get("cached_load_timings"):
+            bits.append(f"timings={row['cached_load_timings']}")
         if row.get("rerun_count_seconds") not in (None, ""):
             bits.append(f"rerun={row['rerun_count_seconds']}s")
         if row.get("explain_execution_ms") not in (None, ""):
@@ -1041,6 +1045,16 @@ class Command(BaseCommand):
             fh.write("options:\n")
             for k, v in sorted(options.items()):
                 fh.write(f"  {k}: {v}\n")
+
+
+def _cached_load_timings(node):
+    """ The phase breakdown the node's last load recorded - what cached_load_seconds was spent on """
+    node_version = NodeVersion.objects.filter(node=node, version=node.version).first()
+    if not node_version:
+        return ""
+    if timings := node_version.load_data.get("timings"):
+        return json.dumps(timings, sort_keys=True)
+    return ""
 
 
 def _sum_parent_counts(node):

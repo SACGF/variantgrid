@@ -29,8 +29,7 @@ from analysis.forms.forms_nodes import (
     ZygosityNodeForm,
 )
 from analysis.models import MOINode, OntologyTerm, TagNode
-from analysis.models.enums import NodeStatus, SetOperations
-from analysis.models.nodes.analysis_node import NodeVersion
+from analysis.models.enums import SetOperations
 from analysis.models.nodes.filters.allele_frequency_node import AlleleFrequencyNode
 from analysis.models.nodes.filters.built_in_filter_node import BuiltInFilterNode
 from analysis.models.nodes.filters.classifications_node import ClassificationsNode
@@ -326,19 +325,11 @@ class TagNodeView(NodeView):
 
     def _get_tag_counts_context(self) -> dict:
         """ The pills above the form are the node's tag picker - toggling one updates the form's
-            tags, applied on save like the rest of the editor """
+            tags, applied on save like the rest of the editor. Counted here rather than at load:
+            it's the tagging table alone, so it costs nothing to work out when the editor opens """
         node = self.object
-        if not NodeStatus.is_ready(node.status):
-            return {"show_tag_counts": False}
-
-        node_version = NodeVersion.objects.filter(node=node, version=node.version).first()
-        tag_counts = node_version.load_data.get("tag_counts") if node_version else None
-        if tag_counts is None:
-            # Loaded before the picker was snapshotted, or mid-reload - count them now
-            tag_counts = node.get_tag_counts()
         return {
-            "show_tag_counts": True,
-            "tag_counts": list(tag_counts.items()),
+            "tag_counts": list(node.get_tag_counts().items()),
             "selected_tag_ids": node.tag_ids,
         }
 

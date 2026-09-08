@@ -11,7 +11,6 @@ from django.db.models.query_utils import Q
 from django.utils import timezone
 from django.utils.timezone import localtime
 
-from analysis.exceptions import NonFatalNodeError
 from analysis.models.enums import TagNodeInput, TagNodeMode
 from analysis.models.models_variant_tag import VariantTag
 from analysis.models.nodes.analysis_node import AnalysisNode, NodeAuditLogMixin, NodeVersion
@@ -96,44 +95,28 @@ class TagNode(AnalysisNode):
             return self.tagged_variants_q(tag_ids)
         return None
 
-    def _get_load_data(self) -> dict:
-        """ The editor's tag picker, snapshotted at load - it's the expensive part of rendering the
-            editor, and in global mode the query reaches across every analysis """
-        return {"tag_counts": self.get_tag_counts()}
-
     def get_tag_counts(self) -> dict[str, int]:
-        """ {tag: count} for the editor's tag picker, which sorts and labels them. Counted over the
-            node's input rather than its output, so every tag stays pickable however the node is
-            currently configured. Counted here rather than read off the DAG's per-tag node counts,
-            which are analysis-scoped (so wrong for a global node) and only exist for the tags the
-            analysis has configured. The tagged_within_days cutoff decides which variants enter the
-            node, not which tags to count, so it's left out """
+        """ {tag: taggings} for the editor's tag picker - a hint beside each pill, not the node's count.
+            Local mode counts this analysis's taggings; global mode counts every tagging the user can see,
+            whatever the analysis or build - the node's own filter decides what gets through.
+            The tagged_within_days cutoff decides which variants enter the node, not which tags to
+            count, so it's left out """
+        if self.mode == TagNodeMode.ALL_TAGS:
+            tags_qs = VariantTag.filter_for_user(self.analysis.user)
+        else:
+            tags_qs = VariantTag.objects.filter(analysis=self.analysis)
+        if not self.include_resolved:
+            tags_qs = tags_qs.filter(VariantTag.unresolved_q())
+        tag_counts = dict(tags_qs.values_list("tag_id").annotate(n=Count("id")).values_list("tag_id", "n"))
         # A tag already configured on the node always keeps its pill - dropping it would silently
         # drop the tag on the next save
-        q_configured = Q(tagnodetag__tag_node=self)
+        for tag_id in self.tag_ids:
+            tag_counts.setdefault(tag_id, 0)
         if self.mode == TagNodeMode.ALL_TAGS:
-            tags_qs = Tag.objects.filter(Q(retired__isnull=True) | q_configured)
-        else:
-            tags_qs = Tag.objects.filter(Q(varianttag__analysis=self.analysis) | q_configured)
-        tag_ids = sorted(tags_qs.distinct().values_list("pk", flat=True))
-        if not tag_ids:
-            return {}
-
-        # Tag ids are user supplied so they can't be aggregate kwargs - index them instead
-        aggregate_kwargs = {f"tag_count_{i}": Count("pk", filter=self.tagged_variants_q([tag_id]),
-                                                    empty_result_set_value=0)
-                            for i, tag_id in enumerate(tag_ids)}
-        try:
-            # The input scope: the parent's queryset, or every variant for a source node.
-            # Restricting to tagged variants first makes this far cheaper than a scan
-            arg_q_dict = self.get_parent_arg_q_dict() if self.has_input() else {None: {}}
-            qs = self.get_queryset(arg_q_dict=arg_q_dict, inner_query_distinct=True)
-            counts = qs.filter(self.tagged_variants_q([])).aggregate(**aggregate_kwargs)
-        except NonFatalNodeError:
-            return {}  # An ancestor isn't ready - the editor re-renders when it is
-        configured = set(self.tag_ids)
-        tag_counts = {tag_id: counts[f"tag_count_{i}"] or 0 for i, tag_id in enumerate(tag_ids)}
-        return {tag_id: count for tag_id, count in tag_counts.items() if count or tag_id in configured}
+            # Every live tag is pickable in global mode
+            for tag_id in Tag.objects.filter(retired__isnull=True).values_list("pk", flat=True):
+                tag_counts.setdefault(tag_id, 0)
+        return tag_counts
 
     def _get_node_q(self) -> Q:
         q = self.tagged_variants_q(self.tag_ids, self.tagged_within_cutoff)

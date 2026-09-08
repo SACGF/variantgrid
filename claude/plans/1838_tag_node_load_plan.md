@@ -1,7 +1,7 @@
 # #1838 — TagNode load: take tag counting out of the load, and time the phases
 
 Written by Claude Fable 5.1 (claude-fable-5-1), 2026-09-08
-Status: approved
+Status: landed (the commit carrying this line)
 
 [#1838](https://github.com/SACGF/variantgrid/issues/1838): a prod TagNode recorded `load_seconds = 149.96` on an
 analysis with **0 VariantTags**. The node's own filter is `Q(pk__in=[])`, which Django short-circuits without SQL,

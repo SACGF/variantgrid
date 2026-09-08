@@ -34,7 +34,7 @@ $(document).ready(function() {
         Flags.instance.init({userId: '{{user.id}}'});
     });
 
-    {% if show_tag_counts and has_write_permission %}
+    {% if has_write_permission %}
         // The pills are the node's tag picker - a toggle lands in the form's hidden inputs
         // and applies on save, like the rest of the editor
         const tagCountsSummary = $("[data-tag-counts-summary]", "#node-editor-wrapper");
@@ -56,14 +56,10 @@ $(document).ready(function() {
     <div class="editor-row editor-row-top">
         <span class="editor-label">Tags</span>
         <div>
-            {% if show_tag_counts %}
-                {% if tag_counts %}
-                    {% tag_counts_summary tag_counts=tag_counts selected=selected_tag_ids %}
-                {% else %}
-                    <span class="editor-help">Nothing tagged yet</span>
-                {% endif %}
+            {% if tag_counts %}
+                {% tag_counts_summary tag_counts=tag_counts selected=selected_tag_ids %}
             {% else %}
-                <span class="editor-help">The tag picker appears once the node has loaded</span>
+                <span class="editor-help">Nothing tagged yet</span>
             {% endif %}
             <div class="editor-help">No selection = any tag</div>
         </div>

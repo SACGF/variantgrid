@@ -33,8 +33,8 @@ Patterns here:
   `analysis/models/nodes/analysis_node.py:AnalysisNode.load` then runs `node_counts` (one aggregate per configured count
   label, plus the exact pk list for nodes under `ANALYSIS_NODE_STORE_ID_SIZE_MAX`) and writes via `AnalysisNode.update`.
   The load's products live on the NodeVersion row: `variant_ids` (the pk list) and `load_data` — `{"counts": {label: count}}`
-  plus whatever `_get_load_data()` contributes (TagNode snapshots its editor's `tag_counts` there, as counting them in
-  global mode is slow). Every write of those goes through `.update()`/raw SQL, so it sets `modified` explicitly.
+  plus `{"timings": {phase: seconds}}` and whatever `_get_load_data()` contributes. Every write of those goes through
+  `.update()`/raw SQL, so it sets `modified` explicitly.
 - Expensive set operations materialise instead of composing: override `use_cache`/`write_cache` to fill a VariantCollection
   (`analysis/models/nodes/filters/intersection_node.py:IntersectionNode.use_cache`); VennNode keeps its own
   `analysis/models/nodes/filters/venn_node.py:VennNodeCache` keyed on the two parent NodeVersions.
@@ -116,6 +116,12 @@ Gotchas:
 - Small parents are inlined as `Q(pk__in=[...])` from `NodeVersion.variant_ids`
   (`analysis/models/nodes/analysis_node.py:AnalysisNode.get_small_parent_arg_q_dict`, issue #546); a parent loaded before
   those pks were stored falls back to the subquery — a count mismatch between the two paths is a real bug.
+- `load_seconds` is one number - `NodeVersion.load_data["timings"]` is where to look when it's big: seconds per load
+  phase (`load`, `live_data_sources`, `counts`, `variant_ids`, `load_data`), also logged as a warning past
+  `settings.ANALYSIS_NODE_SLOW_LOAD_SECONDS` and printed by `manage.py profile_analysis_nodes` (#1838).
+- The TagNode editor's tag pills are counted at render from `analysis_varianttag` alone
+  (`analysis/models/nodes/filters/tag_node.py:TagNode.get_tag_counts`) - taggings in scope, not variants in the node's
+  input. Counting them over the node's queryset put a per-tag aggregate over `snpdb_variant` in every TagNode load.
 - Tagging does not bump versions: `analysis/signals/signal_handlers.py:variant_tag_create` marks tag nodes dirty and
   `analysis/models/nodes/node_utils.py:update_analysis_tag_node_counts` recounts tag labels in place on the existing
   NodeVersion. It runs concurrently with loads and only computes the tag labels, so it merges into `load_data["counts"]`

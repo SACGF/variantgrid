@@ -7,7 +7,7 @@ from collections.abc import Sequence
 from datetime import timedelta
 from functools import cached_property, reduce
 from random import random
-from time import time
+from time import perf_counter, time
 from typing import Optional
 
 from auditlog.context import disable_auditlog
@@ -79,6 +79,11 @@ from snpdb.views.datatable_view import RichColumn
 # How long a node's lease is good for. The window is (re)started when a worker claims the node for
 # loading, so it measures actual load time rather than how long the task sat in the queue.
 LEASE_SECONDS = MINUTE_SECS * 10
+
+
+def _phase_seconds(phase_start: float) -> float:
+    """ How long a load phase took @see NodeVersion.load_data["timings"] """
+    return round(perf_counter() - phase_start, 3)
 
 
 def queryset_to_pk_in_q(qs: QuerySet) -> Q:
@@ -1090,15 +1095,22 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
             node_id, version = parent.get_grid_node_id_and_version()
         return node_id, version
 
-    def node_counts(self):
-        """ This is inside Celery task """
+    def node_counts(self, timings: Optional[dict] = None):
+        """ This is inside Celery task.
+            timings - {phase: seconds} the load fills in as it goes, stored on the NodeVersion """
+
+        if timings is None:
+            timings = {}
 
         self.count = None
         # Record provenance first, so the checks below know whether this node's data can move under it
+        phase_start = perf_counter()
         live_data_sources = self.get_live_data_sources()
         NodeVersion.objects.filter(pk=self.node_version.pk).update(live_data_sources=live_data_sources)
         self.node_version.live_data_sources = live_data_sources
+        timings["live_data_sources"] = _phase_seconds(phase_start)
 
+        phase_start = perf_counter()
         counts_to_get = {BuiltInFilters.TOTAL}
         counts_to_get.update([i[0] for i in self.analysis.get_node_count_types()])
         label_counts = {}
@@ -1116,8 +1128,12 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
             retrieved_label_counts = get_node_counts_and_labels_dict(self, counts_to_get)
             label_counts.update(retrieved_label_counts)
 
+        timings["counts"] = _phase_seconds(phase_start)
+
         total_count = label_counts[BuiltInFilters.TOTAL]
+        phase_start = perf_counter()
         variant_ids = self._get_variant_ids_to_store(total_count)
+        timings["variant_ids"] = _phase_seconds(phase_start)
         if variant_ids is not None:
             # For a small node the PK list is the truth - it and the count came from the same load
             total_count = len(variant_ids)
@@ -1128,7 +1144,10 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
 
         label_counts[BuiltInFilters.TOTAL] = total_count
         load_data = {"counts": label_counts}
+        phase_start = perf_counter()
         load_data.update(self._get_load_data())
+        timings["load_data"] = _phase_seconds(phase_start)
+        load_data["timings"] = timings
         # Counts are a cache of a query against an immutable node_version, so a re-load (eg after a
         # backoff retry that failed once these were already written) can safely overwrite them.
         # "modified" is the client's signal that counts landed @see nodes_status
@@ -1177,9 +1196,16 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
         """ load is called after parents are run """
         # logging.debug("node %d (%d) load()", self.id, self.version)
         start = time()
+        timings = {}
+        phase_start = perf_counter()
         load_update_kwargs = self._load() or {}  # Do before counts in case it affects anything
-        status, count = self.node_counts()
+        timings["load"] = _phase_seconds(phase_start)
+        status, count = self.node_counts(timings=timings)
         load_seconds = time() - start
+        # load_seconds is one number - the phase breakdown is what says where a slow load went
+        if slow_seconds := settings.ANALYSIS_NODE_SLOW_LOAD_SECONDS:
+            if load_seconds > slow_seconds:
+                logging.warning("Node %d.%d slow load %.1fs: %s", self.pk, self.version, load_seconds, timings)
         self.update(status=status, count=count, load_seconds=load_seconds, **load_update_kwargs)
 
     def add_parent(self, parent, *args, **kwargs):
@@ -1438,9 +1464,9 @@ class NodeVersion(TimeStampedModel):
     # When present, load_data["counts"][TOTAL] == len(variant_ids)
     variant_ids = ArrayField(models.IntegerField(), null=True)
     # Products of the node's load:
-    #   "counts":     {node count label: count} - the DAG badge counts, eg {"T": 1234, "C": 4, "tag_artefact": 3}.
-    #                 Labels only ever live under this key, so they can never collide with the keys beside it
-    #   "tag_counts": {tag: count} - TagNode only: the editor's tag picker, counted over the node's input
+    #   "counts":  {node count label: count} - the DAG badge counts, eg {"T": 1234, "C": 4, "tag_artefact": 3}.
+    #              Labels only ever live under this key, so they can never collide with the keys beside it
+    #   "timings": {phase: seconds} of the load - where load_seconds went @see AnalysisNode.load
     load_data = models.JSONField(default=dict)
 
     class Meta:

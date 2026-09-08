@@ -568,6 +568,9 @@ ANALYSIS_NODE_DISPATCH_BACKLOG_MAX_ANALYSES = 20
 # query with a literal Q(pk__in=[...]) instead of re-running its full filter chain. Applies to all
 # single-parent nodes and MergeNode inputs. 0 disables the substitution.
 ANALYSIS_NODE_STORE_ID_SIZE_MAX = 1000
+# A load taking longer than this logs a warning with its per-phase timings (which Rollbar picks up),
+# so a slow load on a deployment arrives with the phase that took the time named. None disables it.
+ANALYSIS_NODE_SLOW_LOAD_SECONDS = 30
 ANALYSIS_RELATED_DOWNLOAD_OUTPUT_NODES = True  # Have download links on sample/vcf pages
 # Fallback when no Global/Org/Lab/User override is set. None = always auto-load.
 # Analysis nodes with at least this many variants don't auto-load their grid - the user clicks

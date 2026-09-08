@@ -171,9 +171,9 @@ and merging with `jsonb_set` + `||` so a concurrent load cannot lose its own lab
 decided: this analysis' tags by Variant pk (avoiding the Allele race right after tagging), other analyses' by Allele
 through `analysis/models/models_variant_tag.py:VariantTag.variants_for_build_q`, with `tagged_within_days` anchored to
 the NodeVersion's creation so an old analysis reproduces what it showed. A global node is a snapshot and says so in
-`get_warnings`. The editor's tag picker is `analysis/models/nodes/filters/tag_node.py:TagNode.get_tag_counts`, counted
-over the node's *input* so every tag stays pickable, and snapshotted into `load_data["tag_counts"]` at load because the
-global-mode query is slow (#1820).
+`get_warnings`. The editor's tag picker is `analysis/models/nodes/filters/tag_node.py:TagNode.get_tag_counts`, one grouped
+count over the taggings in scope - it is a hint beside each pill rather than the node's own count, so it is worked out
+when the editor renders and the load never touches it (#1820, #1838).
 
 ### Source nodes
 
