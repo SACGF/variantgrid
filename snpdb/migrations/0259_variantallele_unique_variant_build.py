@@ -124,6 +124,9 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.RunPython(_dedupe_variant_alleles, migrations.RunPython.noop),
+        # The dedupe's deletes leave deferred FK triggers pending, and Postgres won't ALTER a table that has
+        # them - fire them now so the constraint swap below can run in the same transaction
+        migrations.RunSQL("SET CONSTRAINTS ALL IMMEDIATE", migrations.RunSQL.noop),
         migrations.AlterUniqueTogether(
             name="variantallele",
             unique_together={("variant", "genome_build")},
