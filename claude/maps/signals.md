@@ -56,6 +56,7 @@ Receivers of Django / third-party signals (post_save, pre_delete, m2m_changed, u
 | post_delete | VariantTag | `snpdb.management.commands.variant_tags:variant_tag_delete` |
 | post_delete | CohortGenotypeCollection | `snpdb.models.models_cohort:cohort_genotype_collection_post_delete_handler` |
 | post_delete | SubCohortVariantCollection | `snpdb.models.models_cohort:post_delete_sub_cohort_variant_collection` |
+| post_delete | UploadPipeline | `upload.models.models:upload_pipeline_post_delete_handler` |
 | post_delete | UploadedPatientRecords | `upload.models.models_uploaded_files:uploaded_patient_records_post_delete_handler` |
 | post_save | ActiveSampleGeneList | `analysis.apps:handle_active_sample_gene_list_created` |
 | post_save | VariantTag | `analysis.apps:variant_tag_create` |

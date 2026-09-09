@@ -70,11 +70,15 @@ class ClinGenAlleleRegistryAPI:
     def __init__(self, api_failure_output_filename=None):
         self.login = settings.CLINGEN_ALLELE_REGISTRY_LOGIN
         self.password = settings.CLINGEN_ALLELE_REGISTRY_PASSWORD
-        if api_failure_output_filename is None:
-            api_failure_output_filename = get_import_processing_filename(uuid.uuid4(),
-                                                                         "api_failure_output_filename.json",
-                                                                         prefix="clingen_allele_registry")
+        # Left None unless a caller names one - the path is only worked out when there's a failure to dump.
+        # Computing it here minted an empty import_processing dir per instance (#928)
         self.api_failure_output_filename = api_failure_output_filename
+
+    def _get_api_failure_output_filename(self) -> str:
+        if self.api_failure_output_filename is None:
+            self.api_failure_output_filename = get_import_processing_filename(
+                "failures", f"{uuid.uuid4()}.json", prefix="clingen_allele_registry")
+        return self.api_failure_output_filename
 
     @staticmethod
     def check_api_response(api_response):
@@ -113,19 +117,17 @@ class ClinGenAlleleRegistryAPI:
             self._check_response(response)
             return response.json()
         except Exception as e:
-            if self.api_failure_output_filename:
-                api_failure = {
-                    "request": request,
-                    "timeout": timeout,
-                    "data": data,
-                }
-                with open(self.api_failure_output_filename, "w") as f:
-                    json.dump(api_failure, f)
+            api_failure = {
+                "request": request,
+                "timeout": timeout,
+                "data": data,
+            }
+            api_failure_output_filename = self._get_api_failure_output_filename()
+            with open(api_failure_output_filename, "w") as f:
+                json.dump(api_failure, f)
 
-                msg = f"API call failed, debug info written to '{self.api_failure_output_filename}'"
-                raise ClinGenAllele.ClinGenAlleleRegistryException(msg) from e
-            else:
-                raise e
+            msg = f"API call failed, debug info written to '{api_failure_output_filename}'"
+            raise ClinGenAllele.ClinGenAlleleRegistryException(msg) from e
 
     @classmethod
     def get_code(cls, code):

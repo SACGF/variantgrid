@@ -401,8 +401,7 @@ class LiftoverImportFactory(AbstractVCFImportTaskFactory):
         return [VCFCheckAnnotationTask]
 
     def get_finish_task_classes(self):
-        task_classes = super().get_finish_task_classes()
-        return [LiftoverCompleteTask] + task_classes
+        return [LiftoverCompleteTask]
 
 
 class VariantTagsImportTaskFactory(VCFInsertVariantsOnlyImportFactory):

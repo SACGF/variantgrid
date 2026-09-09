@@ -9,7 +9,6 @@ via --custom. Runs inside an AnnotationRun's upload step.
 import logging
 import operator
 import os
-import shutil
 import time
 from collections import Counter, defaultdict
 from collections.abc import Iterable
@@ -21,6 +20,7 @@ import intervaltree
 from django.conf import settings
 
 from annotation import vep_columns as vep_columns_registry
+from annotation.annotation_run_files import ANNOTATION_RUN_IMPORT_PROCESSING_PREFIX
 from annotation.models.models import (
     AnnotationRun,
     VariantAnnotation,
@@ -45,8 +45,8 @@ from genes.models import GeneVersion, TranscriptVersion
 from genes.models_enums import AnnotationConsortium
 from library.django_utils import get_model_fields
 from library.django_utils.django_file_utils import (
-    get_import_processing_dir,
     get_import_processing_filename,
+    remove_import_processing_dir,
 )
 from library.genomics import Range, overlap_fraction, parse_gnomad_coord
 from library.log_utils import log_traceback
@@ -172,7 +172,7 @@ class BulkVEPVCFAnnotationInserter:
 
         VEP Fields are where they are copied are defined in ColumnVEPField """
 
-    PREFIX = "annotation_run"
+    PREFIX = ANNOTATION_RUN_IMPORT_PROCESSING_PREFIX
     DB_FIXED_COLUMNS = [
         "version_id",
         "annotation_run_id",
@@ -958,10 +958,7 @@ class BulkVEPVCFAnnotationInserter:
         pass
 
     def remove_processing_files(self):
-        import_processing_dir = get_import_processing_dir(self.annotation_run.pk, prefix=self.PREFIX)
-        logging.info("********* Deleting '%s' *******", import_processing_dir)
-        # ignore_errors so a missing dir (eg cleaned-up retry) doesn't blow up - we just want it gone
-        shutil.rmtree(import_processing_dir, ignore_errors=True)
+        remove_import_processing_dir(self.annotation_run.pk, prefix=self.PREFIX)
 
     @cached_property
     def gene_identifiers(self):

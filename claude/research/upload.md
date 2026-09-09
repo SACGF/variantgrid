@@ -189,6 +189,13 @@ and `upload/signals/signals.py:vcf_import_success_signal` for everyone else, and
 `pipeline_success_task` totals wall and CPU seconds from the step rows and `UploadPipeline.success` deletes the
 processing directory when `IMPORT_PROCESSING_DELETE_TEMP_FILES_ON_SUCCESS` is set.
 
+`pipeline_success_task` is the only thing that takes a pipeline out of PROCESSING, and its `status == PROCESSING` guard
+is load-bearing: FINISH can be scheduled more than once, and the guard is what makes the second run a no-op. That makes
+it fragile in one direction - a FINISH step that sets SUCCESS itself swallows the real close, taking the timings, the
+success Event and the cleanup with it. #928 removed the step that did (`UploadPipelineFinishedTask`), so a FINISH task
+class must leave the status alone. Deleting the pipeline row cleans up too: `upload/models/models.py:upload_pipeline_post_delete_handler`
+removes the processing directory and, for a generated input VCF, the directory holding it.
+
 ### Failure and retry
 
 Failure is one-way and top-down: `UploadStep.error_exception` stores the traceback and calls

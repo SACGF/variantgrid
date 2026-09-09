@@ -11,7 +11,6 @@ annotation/CLAUDE.md has the rules. Large: use `scripts/vg outline`.
 import logging
 import os
 import re
-import shutil
 from collections import defaultdict
 from collections.abc import Callable, Iterable
 from contextlib import contextmanager
@@ -37,6 +36,7 @@ from django_extensions.db.models import TimeStampedModel
 from psqlextra.models import PostgresPartitionedModel
 from psqlextra.types import PostgresPartitioningMethod
 
+from annotation.annotation_run_files import ANNOTATION_RUN_IMPORT_PROCESSING_PREFIX
 from annotation.external_search_terms import (
     get_variant_pubmed_search_terms,
     get_variant_search_terms,
@@ -89,6 +89,7 @@ from genes.models import (
 )
 from genes.models_enums import AnnotationConsortium
 from library.django_utils import object_is_referenced
+from library.django_utils.django_file_utils import remove_import_processing_dir
 from library.django_utils.data_archive_mixin import DataArchiveMixin
 from library.django_utils.django_partition import RelatedModelsPartitionModel
 from library.genomics import parse_gnomad_coord
@@ -1420,10 +1421,8 @@ class AnnotationRun(TimeStampedModel):
         # the upload_attempts>1 cleanup in import_vcf_annotations is skipped - so the leftover files trip
         # write_sql_copy_csv's "don't want to overwrite" guard, which is meant only for genuinely out-of-sync
         # dirs (moved dump / double launch). Done outside the transaction (filesystem op) and after the DB
-        # reset commits, so a rolled-back reset leaves the scratch dir intact. Prefix matches
-        # BulkVEPVCFAnnotationInserter.PREFIX.
-        import_processing_dir = os.path.join(settings.IMPORT_PROCESSING_DIR, f"annotation_run_{self.pk}")
-        shutil.rmtree(import_processing_dir, ignore_errors=True)
+        # reset commits, so a rolled-back reset leaves the scratch dir intact.
+        remove_import_processing_dir(self.pk, prefix=ANNOTATION_RUN_IMPORT_PROCESSING_PREFIX)
 
     def revert_external_to_local(self):
         """ #1568: return an external run to the normal local pipeline. Clears the external flag and dump

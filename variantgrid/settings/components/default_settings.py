@@ -10,6 +10,7 @@ import os
 import re
 import socket
 import sys
+import tempfile
 from collections import defaultdict
 
 from library.django_utils.django_secret_key import get_or_create_django_secret_key
@@ -447,6 +448,11 @@ PATIENT_EXTRACTION_SAMPLE_NAME_REGEX = None  # eg r"(?P<extraction>\d{10}[A-Z])$
 PATIENTS_API_EXTERNAL_MANAGER_CREATE_ADMIN_ONLY = True
 IMPORT_PROCESSING_DIR = os.path.join(PRIVATE_DATA_ROOT, 'import_processing')
 IMPORT_PROCESSING_DELETE_TEMP_FILES_ON_SUCCESS = True
+if UNIT_TEST:
+    # A test that builds an UploadPipeline writes pipeline_<test-db pk> wherever this points, and test-db
+    # pks collide with the dev database's - so keep the suite out of the real tree entirely (#928).
+    # VariantGridTestRunner.teardown_test_environment removes this
+    IMPORT_PROCESSING_DIR = os.path.join(tempfile.gettempdir(), "variantgrid_unit_test_import_processing")
 
 # Where partition dump files are written when an archivable model (VAV, ClinVarVersion, CohortGenotypeCollection, ...)
 # is archived via the pre-drop archival pipeline (#1537).
