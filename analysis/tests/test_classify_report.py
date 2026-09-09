@@ -7,6 +7,7 @@ from django.urls import reverse
 
 from analysis.classify_report import ClassifyReportCase
 from analysis.models import Analysis, VariantTag
+from analysis.models.nodes.analysis_node import AnalysisNode
 from analysis.models.nodes.filters.filter_node import FilterNode
 from analysis.models.nodes.filters.merge_node import MergeNode
 from analysis.models.nodes.sources.cohort_node import CohortNode
@@ -15,7 +16,8 @@ from analysis.models.nodes.sources.trio_node import TrioNode
 from analysis.tests.inheritance_node_mixin import make_cohort_genotype
 from analysis.variant_tag_operations import (
     VARIANT_TAG_CLASSIFIED,
-    get_proband_sample_by_node_id,
+    classification_resolves_tag,
+    get_proband_by_node_id,
     resolve_requires_classification_tags_for_samples,
     resolve_variant_tag,
 )
@@ -23,7 +25,8 @@ from annotation.fake_annotation import create_fake_variants, get_fake_annotation
 from classification.enums import AlleleOriginBucket, ShareLevel, SpecialEKeys, SubmissionSource
 from classification.models import Classification, ClassificationReportTemplate
 from library.guardian_utils import all_users_group, assign_permission_to_user_and_groups
-from snpdb.models import Country, GenomeBuild, Lab, Organization, Tag, Variant
+from patients.models import Patient
+from snpdb.models import Country, GenomeBuild, Lab, Organization, Sample, Tag, Variant
 from snpdb.tests.utils.fake_cohort_data import create_fake_cohort, create_fake_trio
 from snpdb.tests.utils.tag_testing_utils import create_classify_queue_tag
 
@@ -71,10 +74,19 @@ class ClassifyReportTestCase(TestCase):
         CohortNode.objects.create(analysis=analysis, cohort=self.cohort)
         return analysis
 
-    def _create_variant_tag(self, analysis=None, node=None, variant=None, sample=None) -> VariantTag:
+    def _create_variant_tag(self, analysis=None, node=None, variant=None, sample=None,
+                            patient=None) -> VariantTag:
         return VariantTag.objects.create(variant=variant or self.variant, tag=self.tag, sample=sample,
-                                         genome_build=self.genome_build, analysis=analysis, node=node,
-                                         user=self.user)
+                                         patient=patient, genome_build=self.genome_build, analysis=analysis,
+                                         node=node, user=self.user)
+
+    def _patient_for(self, sample: Sample, last_name: str) -> Patient:
+        """ The patient CSV links a sample straight to the patient, leaving extraction null """
+        patient = Patient.objects.create(first_name="Test", last_name=last_name)
+        assign_permission_to_user_and_groups(self.user, patient)
+        Sample.objects.filter(pk=sample.pk).update(patient=patient)
+        sample.refresh_from_db()
+        return patient
 
     def _classify(self, sample, variant=None, **kwargs) -> Classification:
         return Classification.create(user=self.user, lab=self.lab, sample=sample,
@@ -82,19 +94,27 @@ class ClassifyReportTestCase(TestCase):
                                      variant=variant or self.variant, **kwargs)
 
 
-class VariantTagSampleTest(ClassifyReportTestCase):
-    """ Which sample a node's tagging is about - the study's proband, not whoever happens to carry the variant.
+class VariantTagProbandTest(ClassifyReportTestCase):
+    """ Who a node's tagging is about - the study's proband, not whoever happens to carry the variant.
         The bulk lookup is what the backfill relies on - one graph load answers for every node in the analysis """
 
-    def test_bulk_lookup_gives_a_sample_nodes_sample_and_nothing_for_a_cohort(self):
+    def test_bulk_lookup_matches_the_per_node_walk(self):
         # The mother doesn't carry the variant - the node she was tagged in still says who it's about
         analysis = self._create_analysis()
         sample_node = SampleNode.objects.create(analysis=analysis, sample=self.mother)
         cohort_node = CohortNode.objects.create(analysis=analysis, cohort=self.cohort)
+        merge = MergeNode.objects.create(analysis=analysis)
+        merge.add_parent(sample_node)
+        merge.add_parent(cohort_node)
+        child = FilterNode.objects.create(analysis=analysis)
+        child.add_parent(merge)
 
-        proband_sample_by_node_id = get_proband_sample_by_node_id(analysis)
-        self.assertEqual(proband_sample_by_node_id[sample_node.pk], self.mother)
-        self.assertIsNone(proband_sample_by_node_id[cohort_node.pk])
+        proband_by_node_id = get_proband_by_node_id(analysis)
+        for node in (sample_node, cohort_node, merge, child):
+            walked = AnalysisNode.objects.get_subclass(pk=node.pk).get_proband()
+            self.assertEqual(proband_by_node_id[node.pk], walked, node.pk)
+        self.assertEqual(proband_by_node_id[sample_node.pk].sample, self.mother)
+        self.assertIsNone(proband_by_node_id[cohort_node.pk].sample)
 
     def test_two_nodes_of_the_same_trio_are_not_ambiguous(self):
         """ An analysis often has several TrioNodes on the one trio - that is one study, not two """
@@ -106,8 +126,7 @@ class VariantTagSampleTest(ClassifyReportTestCase):
         merge.add_parent(first)
         merge.add_parent(second)
 
-        proband_sample_by_node_id = get_proband_sample_by_node_id(analysis)
-        self.assertEqual(proband_sample_by_node_id[merge.pk], trio.proband.sample)
+        self.assertEqual(get_proband_by_node_id(analysis)[merge.pk].sample, trio.proband.sample)
 
     def test_bulk_lookup_follows_the_graph_to_an_ancestors_proband(self):
         analysis = self._create_analysis()
@@ -115,7 +134,28 @@ class VariantTagSampleTest(ClassifyReportTestCase):
         child = FilterNode.objects.create(analysis=analysis)
         child.add_parent(sample_node)
 
-        self.assertEqual(get_proband_sample_by_node_id(analysis)[child.pk], self.mother)
+        self.assertEqual(get_proband_by_node_id(analysis)[child.pk].sample, self.mother)
+
+    def test_a_trio_nodes_patient_is_the_probands(self):
+        """ Every node above SampleNode gets its patient from its proband sample """
+        trio = create_fake_trio(self.user, self.genome_build)
+        patient = self._patient_for(trio.proband.sample, "Trio")
+        analysis = self._create_analysis()
+        node = TrioNode.objects.create(analysis=analysis, trio=trio)
+
+        self.assertEqual(node.get_proband_patient(), patient)
+
+    def test_two_patients_leave_a_merge_with_neither(self):
+        analysis = self._create_analysis()
+        self._patient_for(self.mother, "Mother")
+        self._patient_for(self.father, "Father")
+        merge = MergeNode.objects.create(analysis=analysis)
+        for sample in (self.mother, self.father):
+            merge.add_parent(SampleNode.objects.create(analysis=analysis, sample=sample))
+
+        proband = merge.get_proband()
+        self.assertIsNone(proband.sample)
+        self.assertIsNone(proband.patient)
 
 
 class ClassifyQueueTest(ClassifyReportTestCase):
@@ -209,6 +249,45 @@ class ClassifyQueueTest(ClassifyReportTestCase):
         row = self._queue_rows()[0]
         self.assertFalse(row.done)
         self.assertFalse(row.can_resolve)
+
+
+class ClassifyQueuePatientTest(ClassifyReportTestCase):
+    """ A tagging made above sample level names the person and leaves which of their samples open """
+
+    def setUp(self):
+        super().setUp()
+        self.patient = self._patient_for(self.proband, "Proband")
+        self.analysis = self._create_cohort_analysis()
+        self.variant_tag = self._create_variant_tag(analysis=self.analysis, patient=self.patient)
+
+    def _queue_variant_tags(self, case) -> list[VariantTag]:
+        return [row.variant_tag for row in case.queue_rows()]
+
+    def test_patient_tagging_is_on_the_patients_tab(self):
+        case = ClassifyReportCase.for_patient(self.user, self.patient)
+        self.assertEqual(self._queue_variant_tags(case), [self.variant_tag])
+
+    def test_patient_tagging_is_on_each_of_their_samples_tabs(self):
+        case = ClassifyReportCase.for_sample(self.user, self.proband)
+        rows = case.queue_rows()
+        self.assertEqual([row.variant_tag for row in rows], [self.variant_tag])
+        self.assertIsNone(rows[0].sample)  # which of the patient's samples is still open
+
+    def test_patient_tagging_stays_off_another_persons_sample_tab(self):
+        """ The mother is in the analysis and carries nothing of it - naming the patient is what settles it """
+        case = ClassifyReportCase.for_sample(self.user, self.mother)
+        self.assertEqual(self._queue_variant_tags(case), [])
+
+    def test_another_patients_classification_does_not_resolve_it(self):
+        self._patient_for(self.mother, "Mother")
+        classification = self._classify(self.mother)
+        self.assertFalse(classification_resolves_tag(self.variant_tag, classification))
+
+    def test_the_patients_own_sample_stays_the_scientists_call(self):
+        """ The tagging names the person, not which of their samples - a several sample analysis is still
+            ambiguous, so the row waits on "Clear tag" rather than resolving itself """
+        classification = self._classify(self.proband)
+        self.assertFalse(classification_resolves_tag(self.variant_tag, classification))
 
 
 class ResolveClassifyQueueTagsForSamplesTest(ClassifyReportTestCase):

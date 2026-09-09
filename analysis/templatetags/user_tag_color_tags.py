@@ -10,6 +10,7 @@ from analysis.models.nodes.node_counts import get_node_count_colors, get_tag_nod
 from annotation.models import AnnotationVersion
 from library import tag_utils
 from library.django_utils import get_field_counts
+from patients.models import Patient
 from snpdb.models import GenomeBuild
 from snpdb.models.models_enums import TagFilter
 from snpdb.models.models_user_settings import UserSettings
@@ -57,8 +58,10 @@ class VariableCSSRGBNode(template.Node):
 
 
 class VariantTagsJSNode(template.Node):
-    """ {variant_id: [{id, tag, sample, resolved}, ...]} - one entry per tagging, which is one pill in the
-        analysis grid's tags column (@see VariantGridFormat.tags). Pushed/spliced on tag and untag """
+    """ {variant_id: [{id, tag, sample, patient, patient_name, resolved}, ...]} - one entry per tagging, which
+        is one pill in the analysis grid's tags column (@see VariantGridFormat.tags). Pushed/spliced on tag
+        and untag. A tagging above sample level names the patient instead, so the pill carries that name
+        rather than there being a second dictionary beside render_analysis_samples_dict """
 
     def __init__(self, nodes):
         self.variable = template.Variable(nodes)
@@ -68,13 +71,20 @@ class VariantTagsJSNode(template.Node):
 
         variant_tags = defaultdict(list)
         variant_tags_qs = VariantTag.objects.filter(analysis=analysis).values_list(
-            'id', 'variant_id', 'tag_id', 'sample_id', 'resolved', 'resolved_classification__withdrawn')
-        for pk, variant_id, tag_id, sample_id, resolved, withdrawn in variant_tags_qs:
+            'id', 'variant_id', 'tag_id', 'sample_id', 'patient_id', 'resolved',
+            'resolved_classification__withdrawn')
+        variant_tags_qs = list(variant_tags_qs)
+        # str(Patient) falls back to the code for a de-identified record, so the objects are needed
+        patient_names = {p.pk: str(p) for p in
+                         Patient.objects.filter(pk__in={vt[4] for vt in variant_tags_qs if vt[4]})}
+        for pk, variant_id, tag_id, sample_id, patient_id, resolved, withdrawn in variant_tags_qs:
             resolved_date = None
             # A withdrawn resolving classification puts the to-do back @see VariantTag.unresolved_q
             if resolved and not withdrawn:
                 resolved_date = localtime(resolved).date().isoformat()
             variant_tags[variant_id].append({"id": pk, "tag": tag_id, "sample": sample_id,
+                                             "patient": patient_id,
+                                             "patient_name": patient_names.get(patient_id),
                                              "resolved": resolved_date})
         return _json_for_script(variant_tags)
 

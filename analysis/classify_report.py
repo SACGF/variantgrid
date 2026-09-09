@@ -2,10 +2,11 @@
 The Classify & Report tab on the sample and patient pages - tags that are asking to be classified, the
 classifications made for the case, and what's needed to turn one into the other.
 
-A case is a set of samples (one for a sample page, the patient's samples for a patient page). A tagging is in
-the case's queue when its tag is in the classify queue vocabulary (Tag.requires_classification) and it belongs
-to one of the case's samples - either by its own sample FK, or by having been made in an analysis whose proband
-is one of them.
+A case is a set of samples (one for a sample page, the patient's samples for a patient page) and the patient
+they reach. A tagging is in the case's queue when its tag is in the classify queue vocabulary
+(Tag.requires_classification) and it belongs to the case - by its own sample FK, by its patient FK (a tagging
+made above sample level names the person and leaves which of their samples open), or by having been made in an
+analysis whose proband is one of them.
 
 A tagging is done once it is resolved against a classification (@see analysis.variant_tag_operations), which
 happens by itself when the classification is of the tagging's own sample and by the row's button otherwise.
@@ -28,6 +29,8 @@ from analysis.variant_tag_operations import sample_carries_variant
 from classification.enums import AlleleOriginBucket, SpecialEKeys
 from classification.models import Classification, ClassificationModification
 from patients.models import Patient
+from patients.models_enums import SampleSourceLevel
+from patients.sample_grouping import get_patient_for_source
 from snpdb.models import Lab, Sample, Tag
 
 
@@ -128,23 +131,31 @@ def _allele_keys(allele_id, variant_id) -> set[tuple[str, int]]:
 class ClassifyReportCase:
     """ The samples a Classify & Report tab covers, seen as one case """
 
-    def __init__(self, user: User, obj, samples: list[Sample]):
+    def __init__(self, user: User, obj, samples: list[Sample],
+                 patients: Optional[list[Patient]] = None):
         self.user = user
         self.obj = obj  # Sample or Patient the tab is on
         self.samples = samples
+        # Who the case is - a tagging made above sample level names the person rather than one of their VCFs
+        self.patients = patients or []
 
     @staticmethod
     def for_sample(user: User, sample: Sample) -> 'ClassifyReportCase':
-        return ClassifyReportCase(user, sample, [sample])
+        patient = get_patient_for_source(SampleSourceLevel.SAMPLE, sample)
+        return ClassifyReportCase(user, sample, [sample], [patient] if patient else [])
 
     @staticmethod
     def for_patient(user: User, patient: Patient) -> 'ClassifyReportCase':
         samples = list(Sample.filter_for_user(user).filter(pk__in=patient.get_samples()))
-        return ClassifyReportCase(user, patient, samples)
+        return ClassifyReportCase(user, patient, samples, [patient])
 
     @property
     def sample_ids(self) -> set[int]:
         return {s.pk for s in self.samples}
+
+    @property
+    def patient_ids(self) -> set[int]:
+        return {p.pk for p in self.patients}
 
     @property
     def labs(self) -> list[Lab]:
@@ -155,7 +166,7 @@ class ClassifyReportCase:
             to show (@see VariantTag.can_view) """
         return VariantTag.objects.filter(tag__in=Tag.classify_queue_qs()) \
             .filter(Q(analysis__isnull=True) | Q(analysis__in=Analysis.filter_for_user(self.user))) \
-            .select_related("tag", "variant", "allele", "analysis", "sample", "genome_build")
+            .select_related("tag", "variant", "allele", "analysis", "sample", "patient", "genome_build")
 
     def _analysis_samples(self, analysis_ids) -> dict[int, list[Sample]]:
         """ Which of the case's samples each analysis contains """
@@ -167,9 +178,9 @@ class ClassifyReportCase:
         return samples_by_analysis
 
     def _shown_to_carriers(self, variant_tag: VariantTag, candidates: list[Sample]) -> bool:
-        """ Whether a tagging whose proband we don't know is worth showing this case. Carrying the variant
-            doesn't make it a sample's to-do - a relative can be HET for the proband's variant - it just keeps
-            the row off the pages it cannot be about. The sample stays unset, so the scientist picks """
+        """ Whether a tagging that names neither a sample nor a patient is worth showing this case. Carrying
+            the variant doesn't make it a sample's to-do - a relative can be HET for the proband's variant - it
+            just keeps the row off the pages it cannot be about. The sample stays unset, so the scientist picks """
         return any(sample_carries_variant(s, variant_tag) for s in candidates)
 
     def queue_row(self, variant_tag: VariantTag) -> ClassifyQueueRow:
@@ -192,8 +203,14 @@ class ClassifyReportCase:
         superseded = {(vt.variant_id, vt.tag_id, vt.analysis_id) for vt, _ in rows}
 
         no_sample = list(tags_qs.filter(sample__isnull=True, analysis__isnull=False))
-        samples_by_analysis = self._analysis_samples({vt.analysis_id for vt in no_sample})
-        for variant_tag in no_sample:
+        # A tagging that names the patient is this case's whatever it carries - the node knew the person and
+        # only left which of their samples open, so it stands beside the case's own sample level taggings
+        ours = [vt for vt in no_sample if vt.patient_id in self.patient_ids]
+        rows.extend((variant_tag, None) for variant_tag in ours)
+
+        unknown = [vt for vt in no_sample if not vt.patient_id]
+        samples_by_analysis = self._analysis_samples({vt.analysis_id for vt in unknown})
+        for variant_tag in unknown:
             if (variant_tag.variant_id, variant_tag.tag_id, variant_tag.analysis_id) in superseded:
                 continue
             candidates = samples_by_analysis.get(variant_tag.analysis_id, [])

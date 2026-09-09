@@ -1,7 +1,9 @@
 from collections import Counter
 from functools import cached_property
+from typing import Optional
 
 import numpy as np
+from dal import forward
 from django.apps import apps
 from django.contrib import messages
 from django.contrib.auth.decorators import user_passes_test
@@ -52,6 +54,9 @@ from classification.views.views import (
 )
 from library.django_utils import add_save_message, get_field_counts, set_form_read_only
 from library.guardian_utils import is_superuser
+from patients.models import Patient
+from patients.models_enums import SampleSourceLevel
+from patients.sample_grouping import get_patient_for_source
 from seqauto.models import EnrichmentKit
 from snpdb.forms import SampleChoiceForm
 from snpdb.models import (
@@ -402,9 +407,34 @@ class CreateClassificationForVariantTagView(CreateClassificationForVariantView):
         return reverse("create_classification_from_variant_tag",
                        kwargs={"variant_tag_id": self.variant_tag.pk})
 
+    def _tag_patient(self) -> Optional[Patient]:
+        """ Who the tagging is about. A tagging made before the patient was recorded takes it from its own
+            sample, then - the node-deleted case - from an analysis whose samples all reach the one patient """
+        if self.variant_tag.patient:
+            return self.variant_tag.patient
+        if sample := self.variant_tag.sample:
+            return get_patient_for_source(SampleSourceLevel.SAMPLE, sample)
+        if analysis := self.variant_tag.analysis:
+            patients = {get_patient_for_source(SampleSourceLevel.SAMPLE, s) for s in analysis.get_samples()}
+            if len(patients) == 1:
+                return patients.pop()
+        return None
+
     def _get_sample_form(self):
-        # If we have a node with input samples, use that. Then fall back on all samples in analysis.
+        # The tagging's patient narrows the dropdown to their samples. Otherwise the node's input samples,
+        # then all samples in the analysis, as the queryset the POST is validated against.
         # Otherwise fall back on default (all samples in DB visible to user)
+        if patient := self._tag_patient():
+            # A restricted queryset only validates the POST - the options the user picks from come from
+            # SampleAutocompleteView, so the patient is forwarded to it the same way the specimen
+            # autocomplete is narrowed (@see patients/forms.py:patient_extraction_formset_factory)
+            form = SampleChoiceForm(genome_build=self._get_genome_build())
+            form.fields['sample'].required = False
+            form.fields['sample'].queryset = Sample.objects.filter(pk__in=patient.get_samples())
+            form.fields['sample'].widget.forward.append(forward.Const(patient.pk, "patient"))
+            form.fields['sample'].initial = self.variant_tag.sample_id
+            return form
+
         samples = None
         if self.variant_tag.analysis:
             if self.variant_tag.node:

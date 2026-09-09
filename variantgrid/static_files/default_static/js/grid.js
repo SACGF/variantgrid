@@ -439,9 +439,16 @@ function getNodeProbandSampleId() {
 }
 
 
-/* How a tagging reads on its pill: a tagging with a sample always says so, and one made for a sample
-   other than the one the grid is about is boxed as well - it isn't this proband's to-do.
-   Returns the marker/title getVariantTagHtml takes - @see VariantGridFormat.tags */
+// The patient the grid's pills are read against - a node above sample level is about a person without
+// being about one of their VCFs. @see node_data_grid.html
+function getNodeProbandPatientId() {
+    return typeof(nodeProbandPatientId) === 'undefined' ? null : nodeProbandPatientId;
+}
+
+
+/* How a tagging reads on its pill: a tagging that names someone - a sample, or just the patient - always
+   says who, and one made for someone other than who the grid is about is boxed as well: it isn't this
+   proband's to-do. Returns the marker/title getVariantTagHtml takes - @see VariantGridFormat.tags */
 function variantTaggingPillOptions(tagging, sampleNames, readOnly) {
     const probandSampleId = getNodeProbandSampleId();
     const tag = tagging.tag;
@@ -451,6 +458,16 @@ function variantTaggingPillOptions(tagging, sampleNames, readOnly) {
         if (probandSampleId && tagging.sample !== probandSampleId) {
             options.marker += " grid-tag-sample-other";
             options.title += ` - not ${sampleNames[probandSampleId] || "this node's sample"}`;
+        }
+        return options;
+    }
+    if (tagging.patient) {
+        const probandPatientId = getNodeProbandPatientId();
+        const options = {marker: "fas fa-user",
+                         title: `Tagged as ${tag} for ${tagging.patient_name || "another patient"}`};
+        if (probandPatientId && tagging.patient !== probandPatientId) {
+            options.marker += " grid-tag-sample-other";
+            options.title += " - not this node's patient";
         }
         return options;
     }

@@ -10,6 +10,7 @@ from analysis.models.models_analysis import Analysis
 from analysis.models.nodes.analysis_node import AnalysisNode, NodeVersion
 from classification.models import Classification
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsAutoInitialSaveMixin
+from patients.models import Patient
 from snpdb.models import Allele, GenomeBuild, Sample, Tag, Variant, VariantAllele
 
 
@@ -56,6 +57,10 @@ class VariantTag(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
     # Which sample the tagging is about - the tagged node's proband, part of the tagging's identity (@see Meta)
     # so it is set at tag time and never changes, null where the node has no proband (never prompted for)
     sample = models.ForeignKey(Sample, null=True, blank=True, on_delete=SET_NULL)
+    # Who the tagging is about - the tagged node's proband patient, set at tag time alongside sample (a tagging
+    # with a sample carries that sample's patient too). A node above sample level knows the person without
+    # knowing which of their VCFs, so this is set where sample is null. Part of the identity too (@see Meta)
+    patient = models.ForeignKey(Patient, null=True, blank=True, on_delete=SET_NULL)
     # A to-do tag (Tag.requires_classification) is satisfied by a classification rather than deleted, so the
     # tagging stays as the record of what was flagged and what it turned into
     resolved = models.DateTimeField(null=True, blank=True)
@@ -66,12 +71,14 @@ class VariantTag(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
 
     class Meta(TimeStampedModel.Meta):
         constraints = [
-            # One tagging per (variant, tag, analysis, user, sample) - a null sample counts as a value, so an
-            # analysis also has at most one sample-less tagging. Global (variant page) taggings are outside this.
-            models.UniqueConstraint(fields=["variant", "tag", "analysis", "user", "sample"],
+            # One tagging per (variant, tag, analysis, user, sample, patient) - nulls count as values, so an
+            # analysis has at most one tagging that names nobody. With patient in the key, two patient level
+            # nodes in one analysis get a sample-less tagging each rather than sharing one.
+            # Global (variant page) taggings are outside this.
+            models.UniqueConstraint(fields=["variant", "tag", "analysis", "user", "sample", "patient"],
                                     nulls_distinct=False,
                                     condition=Q(analysis__isnull=False),
-                                    name="varianttag_one_per_sample_in_analysis"),
+                                    name="varianttag_one_per_person_in_analysis"),
         ]
 
     @property

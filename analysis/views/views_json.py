@@ -26,6 +26,7 @@ from analysis.models.nodes import node_utils
 from analysis.models.nodes.analysis_node import (
     AnalysisEdge,
     AnalysisNode,
+    NodeProband,
     NodeStatus,
     NodeTask,
     NodeVersion,
@@ -253,6 +254,8 @@ def _analysis_variant_tag_json(variant_tag: VariantTag) -> dict:
         "tag": variant_tag.tag_id,
         "sample": variant_tag.sample_id,
         "sample_name": str(variant_tag.sample) if variant_tag.sample_id else None,
+        "patient": variant_tag.patient_id,
+        "patient_name": str(variant_tag.patient) if variant_tag.patient_id else None,
         "resolved": resolved,
     }
 
@@ -284,13 +287,15 @@ def set_variant_tag(request, location):
             if node_id:
                 node = get_object_or_404(AnalysisNode.objects.select_subclasses(),
                                          pk=node_id, analysis=analysis)
-            # Tagging is one click - the sample is the node's proband, or null where it has none. It is part
-            # of the tagging's identity, so tagging for this proband never takes the tag off a sibling
-            sample = node.get_proband_sample() if node else None
+            # Tagging is one click - the sample and patient are the node's proband, null where it has none.
+            # Both are part of the tagging's identity, so tagging for this proband never takes the tag off a
+            # sibling, and a node that knows only the patient still tags for that person
+            proband = node.get_proband() if node else NodeProband(sample=None, patient=None)
             variant_tag, created = VariantTag.objects.get_or_create(variant_id=variant_id, tag=tag,
                                                                     genome_build=analysis.genome_build,
                                                                     location=location, analysis=analysis,
-                                                                    user=request.user, sample=sample)
+                                                                    user=request.user, sample=proband.sample,
+                                                                    patient=proband.patient)
             if node:
                 variant_tag.node = node
                 # Stamp what the node was showing, so a reviewer can later tell why the variant was in it

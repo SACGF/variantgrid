@@ -17,6 +17,8 @@ import csv
 import json
 
 from django.contrib.auth.models import User
+from django.core.management import call_command
+from django.template import Context, Template
 from django.test import TestCase, override_settings
 from django.urls.base import reverse
 from django.utils import timezone
@@ -31,11 +33,14 @@ from analysis.models import (
     AnalysisTemplateType,
     AnalysisTemplateVersion,
     AnalysisVariable,
+    VariantTag,
 )
-from analysis.models.enums import NodeStatus
+from analysis.models.enums import NodeStatus, TagLocation
+from analysis.models.nodes.filters.merge_node import MergeNode
 from analysis.models.nodes.analysis_node import NodeVCFFilter
 from analysis.models.nodes.sources.sample_node import SampleNode
 from analysis.templatetags.related_analyses_tags import analysis_templates_tag
+from analysis.views.views import CreateClassificationForVariantTagView
 from annotation.fake_annotation import get_fake_annotation_version
 from library.django_utils import FakeRequest
 from library.guardian_utils import assign_permission_to_user_and_groups
@@ -51,6 +56,7 @@ from snpdb.models import (
     GenomeBuild,
     ImportStatus,
     Sample,
+    Tag,
     VCFFilter,
 )
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
@@ -419,6 +425,10 @@ class TestSampleNodeLevels(SampleNodeLevelsTestCase):
     def test_proband_sample_is_ambiguous_across_callers(self):
         """ Downstream AncestorSampleMixin nodes give up rather than pick a caller """
         self.assertIsNone(self._extraction_node().get_proband_sample())
+
+    def test_the_node_still_names_the_patient_when_the_sample_is_ambiguous(self):
+        """ Two callers on the one extraction is still one person - what a tagging records (#1854) """
+        self.assertEqual(self._extraction_node().get_proband_patient(), self.patient)
 
     def test_single_sample_group_gives_downstream_nodes_a_proband(self):
         extraction = Extraction.objects.create(specimen=self.specimen, reference_id="one_arm",
@@ -823,3 +833,175 @@ class TestSampleNodeAnalysisVariables(SampleNodeLevelsTestCase):
         self.assertEqual(run_node.specimen, self.specimen)
         self.assertEqual(run_node.get_source_samples(),
                          [self.snv_sample, self.cnv_sample, self.rna_sample])
+
+
+class VariantTagPatientTest(SampleNodeLevelsTestCase):
+    """ A tagging made above sample level names the patient rather than one of their VCFs (#1854) - what it
+        is worth to the classify form, the Classify & Report tab and the grid pill """
+
+    def setUp(self):
+        super().setUp()
+        assign_permission_to_user_and_groups(self.user, self.analysis)
+        self.client.force_login(self.user)
+        self.tag = Tag.objects.get_or_create(pk="ReviewMe")[0]
+        self.patient_node = self._node(SampleSourceLevel.PATIENT, self.patient)
+
+    def _other_patient(self) -> tuple[Patient, Sample]:
+        """ A second person in the same analysis - the reason patient is part of a tagging's identity """
+        patient = Patient.objects.create(first_name="Other", last_name="Person", sex=Sex.MALE)
+        assign_permission_to_user_and_groups(self.user, patient)
+        specimen = Specimen.objects.create(reference_id="2600000003", patient=patient)
+        extraction = Extraction.objects.create(specimen=specimen, nucleic_acid_source=NucleicAcid.DNA)
+        sample, _ = self._create_vcf_sample("other_patient", self.grch37, extraction)
+        return patient, sample
+
+    def _add_tag(self, node, variant=None) -> dict:
+        response = self.client.post(reverse("set_variant_tag", kwargs={"location": TagLocation.ANALYSIS}),
+                                    {"variant_id": (variant or self.v_snv).pk, "tag_id": self.tag.pk,
+                                     "op": "add", "analysis_id": self.analysis.pk, "node_id": node.pk})
+        self.assertEqual(response.status_code, 200)
+        return json.loads(response.content)
+
+    # ── Set at tag time ───────────────────────────────────────────────────────
+
+    def test_tagging_a_patient_node_records_the_patient_and_no_sample(self):
+        self._add_tag(self.patient_node)
+
+        variant_tag = VariantTag.objects.get(analysis=self.analysis)
+        self.assertEqual(variant_tag.patient, self.patient)
+        self.assertIsNone(variant_tag.sample)
+
+    def test_tagging_under_a_second_patient_adds_a_tagging_of_its_own(self):
+        other_patient, _ = self._other_patient()
+        other_node = self._node(SampleSourceLevel.PATIENT, other_patient)
+
+        self._add_tag(self.patient_node)
+        self.assertTrue(self._add_tag(other_node)["created"])
+
+        self.assertEqual({vt.patient for vt in VariantTag.objects.filter(analysis=self.analysis)},
+                         {self.patient, other_patient})
+
+    def test_tagging_the_same_node_again_finds_the_one_tagging(self):
+        self._add_tag(self.patient_node)
+        self.assertFalse(self._add_tag(self.patient_node)["created"])
+        self.assertEqual(VariantTag.objects.filter(analysis=self.analysis).count(), 1)
+
+    def test_the_add_response_names_the_patient_for_the_pill(self):
+        variant_tag_json = self._add_tag(self.patient_node)["variant_tag"]
+
+        self.assertEqual(variant_tag_json["patient"], self.patient.pk)
+        self.assertEqual(variant_tag_json["patient_name"], str(self.patient))
+        self.assertIsNone(variant_tag_json["sample"])
+
+    def test_the_grids_tag_dict_names_the_patient(self):
+        self._add_tag(self.patient_node)
+
+        rendered = Template("{% load user_tag_color_tags %}"
+                            "{% render_variant_tags_dict analysis %}").render(
+            Context({"analysis": self.analysis}))
+
+        tagging = json.loads(rendered)[str(self.v_snv.pk)][0]
+        self.assertEqual(tagging["patient"], self.patient.pk)
+        self.assertEqual(tagging["patient_name"], str(self.patient))
+
+    # ── The backfill ──────────────────────────────────────────────────────────
+
+    def _old_tagging(self, node=None, sample=None) -> VariantTag:
+        """ A tagging from before the field existed - patient null """
+        return VariantTag.objects.create(variant=self.v_snv, tag=self.tag, genome_build=self.grch37,
+                                         analysis=self.analysis, node=node, sample=sample, user=self.user)
+
+    def _two_patient_node(self):
+        other_patient, other_sample = self._other_patient()
+        merge = MergeNode.objects.create(analysis=self.analysis)
+        merge.add_parent(self.patient_node)
+        merge.add_parent(self._node(SampleSourceLevel.SAMPLE, other_sample))
+        return merge, other_patient
+
+    def test_backfill_takes_the_patient_from_the_node(self):
+        variant_tag = self._old_tagging(node=self.patient_node)
+
+        call_command("one_off_backfill_variant_tag_patient")
+
+        variant_tag.refresh_from_db()
+        self.assertEqual(variant_tag.patient, self.patient)
+
+    def test_backfill_takes_the_patient_of_a_tagging_that_has_a_sample(self):
+        """ The sample is the more specific answer, even where the graph has since become ambiguous """
+        merge, _ = self._two_patient_node()
+        variant_tag = self._old_tagging(node=merge, sample=self.snv_sample)
+
+        call_command("one_off_backfill_variant_tag_patient")
+
+        variant_tag.refresh_from_db()
+        self.assertEqual(variant_tag.patient, self.patient)
+
+    def test_backfill_leaves_a_two_patient_node_alone(self):
+        merge, _ = self._two_patient_node()
+        variant_tag = self._old_tagging(node=merge)
+
+        call_command("one_off_backfill_variant_tag_patient")
+
+        variant_tag.refresh_from_db()
+        self.assertIsNone(variant_tag.patient)
+
+    def test_backfill_dry_run_writes_nothing(self):
+        variant_tag = self._old_tagging(node=self.patient_node)
+
+        call_command("one_off_backfill_variant_tag_patient", "--dry-run")
+
+        variant_tag.refresh_from_db()
+        self.assertIsNone(variant_tag.patient)
+
+    # ── The classify form ─────────────────────────────────────────────────────
+
+    def _sample_form(self, variant_tag):
+        view = CreateClassificationForVariantTagView()
+        view.request = FakeRequest(self.user)
+        view.kwargs = {"variant_tag_id": variant_tag.pk}
+        return view._get_sample_form()
+
+    def _forwarded(self, form) -> dict:
+        return {f.dst: f.val for f in form.fields["sample"].widget.forward}
+
+    def test_the_classify_form_offers_only_the_taggings_patients_samples(self):
+        _, other_sample = self._other_patient()
+        variant_tag = self._old_tagging(node=self.patient_node)
+        variant_tag.patient = self.patient
+        variant_tag.save()
+
+        form = self._sample_form(variant_tag)
+
+        samples = set(form.fields["sample"].queryset)
+        self.assertEqual(samples, set(self.patient.get_samples()))
+        self.assertNotIn(other_sample, samples)
+        # The options the user picks from come from the autocomplete, so it is forwarded the patient
+        self.assertEqual(self._forwarded(form)["patient"], self.patient.pk)
+
+    def test_a_tagging_from_before_the_backfill_takes_its_samples_patient(self):
+        """ The tagging's own sample is who it is about, whatever the graph looks like now """
+        variant_tag = self._old_tagging(node=self.patient_node, sample=self.snv_sample)
+
+        form = self._sample_form(variant_tag)
+
+        self.assertEqual(set(form.fields["sample"].queryset), set(self.patient.get_samples()))
+        self.assertEqual(self._forwarded(form)["patient"], self.patient.pk)
+
+    def test_a_tagging_whose_node_was_deleted_falls_back_to_the_analysis_patient(self):
+        variant_tag = self._old_tagging()
+
+        form = self._sample_form(variant_tag)
+
+        self.assertEqual(set(form.fields["sample"].queryset), set(self.patient.get_samples()))
+        self.assertEqual(self._forwarded(form)["patient"], self.patient.pk)
+
+    def test_the_autocomplete_only_serves_the_forwarded_patients_samples(self):
+        _, other_sample = self._other_patient()
+
+        response = self.client.get(reverse("sample_autocomplete"),
+                                   {"forward": json.dumps({"patient": self.patient.pk})})
+
+        self.assertEqual(response.status_code, 200)
+        sample_ids = {int(r["id"]) for r in json.loads(response.content)["results"]}
+        self.assertEqual(sample_ids, {s.pk for s in self.patient.get_samples()})
+        self.assertNotIn(other_sample.pk, sample_ids)

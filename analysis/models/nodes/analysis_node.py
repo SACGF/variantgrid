@@ -5,6 +5,7 @@ import operator
 from collections import defaultdict
 from collections.abc import Sequence
 from contextlib import contextmanager
+from dataclasses import dataclass
 from datetime import timedelta
 from functools import cached_property, reduce
 from random import random
@@ -61,6 +62,9 @@ from library.log_utils import log_traceback
 from library.utils import add_exception_note, format_percent
 from library.utils.database_utils import queryset_to_sql
 from library.utils.django_utils import get_model_content_type_dict
+from patients.models import Patient
+from patients.models_enums import SampleSourceLevel
+from patients.sample_grouping import get_patient_for_source
 from snpdb.models import (
     AlleleSource,
     BuiltInFilters,
@@ -142,6 +146,15 @@ def annotate_and_filter_queryset(qs: QuerySet, a_kwargs: dict, arg_q_dict: dict)
 
 def _default_position():
     return 10 + random() * 50
+
+
+@dataclass(frozen=True)
+class NodeProband:
+    """ Who a node is about - the object of the study, resolved once per node up the DAG.
+        Either half can be known without the other: an extraction level node whose DNA arm has two callers
+        has no single sample but does have a patient (@see AnalysisNode.get_proband) """
+    sample: Optional[Sample]
+    patient: Optional[Patient]
 
 
 class NodeInheritanceManager(InheritanceManager):
@@ -298,30 +311,51 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
         """ Sample of the object of a study, if known """
         return None
 
-    def get_proband_sample(self, proband_by_node_id: Optional[dict[int, Optional[Sample]]] = None) -> Optional[Sample]:
-        """ Sample of the object of a study if known.
+    def _get_proband_patient_for_node(self) -> Optional[Patient]:
+        """ Patient of the object of a study, if known - the proband sample's patient, either way the
+            sample is linked (@see patients/sample_grouping.py:get_patient_for_source) """
+        return get_patient_for_source(SampleSourceLevel.SAMPLE, self._get_proband_sample_for_node())
+
+    def get_proband(self, proband_by_node_id: Optional[dict[int, NodeProband]] = None) -> NodeProband:
+        """ Who the node is about - sample and patient resolved independently by the same rule, so a node
+            that cannot name a sample (two callers on the one extraction) can still name the patient.
             proband_by_node_id: answers already worked out, shared across a whole graph rather than kept on the
             node - a descendant asks each of its ancestors, so a diamond in the DAG asks the same node once per
-            path to it (@see analysis/variant_tag_operations.py:get_proband_sample_by_node_id) """
+            path to it (@see analysis/variant_tag_operations.py:get_proband_by_node_id) """
         if proband_by_node_id is not None and self.pk in proband_by_node_id:
             return proband_by_node_id[self.pk]
 
         proband_samples = set()
+        proband_patients = set()
         if proband_sample := self._get_proband_sample_for_node():
             proband_samples.add(proband_sample)
+        if proband_patient := self._get_proband_patient_for_node():
+            proband_patients.add(proband_patient)
 
         if self.has_input():
             parents, _ = self.get_parent_subclasses_and_errors()
             for parent in parents:
-                if parent_proband_sample := parent.get_proband_sample(proband_by_node_id):
-                    proband_samples.add(parent_proband_sample)
+                parent_proband = parent.get_proband(proband_by_node_id)
+                if parent_proband.sample:
+                    proband_samples.add(parent_proband.sample)
+                if parent_proband.patient:
+                    proband_patients.add(parent_proband.patient)
 
-        proband_sample = None
-        if len(proband_samples) == 1:  # If ambiguous, then just give up
-            proband_sample = proband_samples.pop()
+        # If ambiguous, then just give up
+        proband = NodeProband(sample=proband_samples.pop() if len(proband_samples) == 1 else None,
+                              patient=proband_patients.pop() if len(proband_patients) == 1 else None)
         if proband_by_node_id is not None:
-            proband_by_node_id[self.pk] = proband_sample
-        return proband_sample
+            proband_by_node_id[self.pk] = proband
+        return proband
+
+    def get_proband_sample(self, proband_by_node_id: Optional[dict[int, NodeProband]] = None) -> Optional[Sample]:
+        """ Sample of the object of a study if known """
+        return self.get_proband(proband_by_node_id).sample
+
+    def get_proband_patient(self, proband_by_node_id: Optional[dict[int, NodeProband]] = None) -> Optional[Patient]:
+        """ Patient of the object of a study if known - a node above sample level has one where it has no
+            single sample """
+        return self.get_proband(proband_by_node_id).patient
 
     def get_samples_with_genotype(self) -> list[Sample]:
         """ Node + ancestor samples whose genotype we can show/filter on - ie variant-only VCFs

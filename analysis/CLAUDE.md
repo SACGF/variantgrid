@@ -50,7 +50,9 @@ Patterns here:
   `analysis/views/views_classify_report.py` (it lives here because it is built on VariantTag - analysis may import
   classification, never the other way round). A tagging is in a case's queue when `Tag.requires_classification` and it
   belongs to one of the case's samples: its own `VariantTag.sample` (the study's proband, from
-  `analysis/models/nodes/analysis_node.py:AnalysisNode.get_proband_sample` at tag time), else the analysis it was made
+  `analysis/models/nodes/analysis_node.py:AnalysisNode.get_proband_sample` at tag time), else its `VariantTag.patient`
+  (`AnalysisNode.get_proband_patient` - a node above sample level names the person while leaving which of their VCFs
+  open, so the tagging is on the patient's tab and on each of that patient's sample tabs), else the analysis it was made
   in contains the sample. Carrying the variant is only a display filter for a tagging with no sample - a relative who is
   HET for the proband's variant does not need their own classification, so it never assigns ownership.
   `analysis/variant_tag_operations.py:sample_carries_variant` treats a genotype row as the call when the sample's VCF
@@ -63,7 +65,11 @@ Patterns here:
 - Every route into the full create page goes through the tagging, analysis or not
   (`create_classification_for_variant_tag`, posting to `analysis/views/views.py:create_classification_from_variant_tag`) -
   the analysis alone cannot say which of its taggings a record is for. The page starts on the tagging's own sample, since
-  a record without it never reaches the case's queue row or its report.
+  a record without it never reaches the case's queue row or its report. Its sample dropdown is a `ModelSelect2` fed by
+  `snpdb/views/views_autocomplete.py:SampleAutocompleteView`, so narrowing `fields['sample'].queryset` only validates the
+  POST - what the user sees is narrowed by forwarding the tagging's patient to the autocomplete
+  (`analysis/views/views.py:CreateClassificationForVariantTagView`, the same `forward.Const` the specimen autocomplete
+  takes).
 - The Classify & Report tab's label carries the counts (`analysis/views/views_classify_report.py:classify_report_summary`,
   drawn by `analysis/templates/analysis/classify_report_tab_counts.html`), so a page says whether there is anything to do
   before the tab is opened. It is fetched after render - deciding which taggings are the case's walks every analysis its
@@ -85,16 +91,21 @@ Patterns here:
   so a lab's own queue tag is offered and resolved the same way: the tag node editor's Classifications tab
   (`analysis/views/nodes/node_views.py:TagNodeView`), the variant tags grid (`variantopedia/grids.py:VariantTagsColumns`)
   and the Classify & Report tab. Retiring a tag takes it out of the vocabulary, so its taggings stop being to-dos.
-- A tagging's identity in an analysis is (variant, tag, analysis, user, sample) - the sample being the tagged
-  node's proband, worked out before the `get_or_create` in `analysis/views/views_json.py:set_variant_tag` and
-  enforced by `varianttag_one_per_sample_in_analysis` (`nulls_distinct=False`, so an analysis has at most one
-  sample-less tagging too). A tagging never changes sample: tagging for this proband adds a row rather than
-  taking the tag off a sibling, and the X on a pill deletes that one tagging by pk.
-- The analysis grid draws one pill per tagging, marked with whose it is: a tagging for a sample always gets a
-  solid person marker naming it, boxed as well where that sample isn't the proband of the node the grid is
-  showing (`nodeProbandSampleId`), and a sample-less one gets a hollow person. `variantTags` is
-  `{variant_id: [{id, tag, sample, resolved}]}` - one entry per tagging, resolution included (@see
-  `render_variant_tags_dict`, `VariantGridFormat.tags`, `variantTaggingPillOptions` in `grid.js`).
+- A tagging's identity in an analysis is (variant, tag, analysis, user, sample, patient) - both being the tagged
+  node's proband (`AnalysisNode.get_proband`, one walk for the two), worked out before the `get_or_create` in
+  `analysis/views/views_json.py:set_variant_tag` and enforced by `varianttag_one_per_person_in_analysis`
+  (`nulls_distinct=False`, so an analysis has at most one tagging that names nobody). Sample and patient resolve
+  independently, so an extraction level node whose DNA arm has two callers still tags for the person. A tagging never
+  changes who it is about: tagging for this proband adds a row rather than taking the tag off a sibling, and the X on a
+  pill deletes that one tagging by pk. Older taggings were given their patient by
+  `analysis/management/commands/one_off_backfill_variant_tag_patient.py` (#1854).
+- The analysis grid draws one pill per tagging, marked with whose it is: a tagging that names someone - a sample, or
+  just the patient - gets a solid person marker naming them, boxed as well where that isn't the proband of the node the
+  grid is showing (`nodeProbandSampleId` / `nodeProbandPatientId`), and one that names nobody gets a hollow person.
+  `variantTags` is `{variant_id: [{id, tag, sample, patient, patient_name, resolved}]}` - one entry per tagging,
+  resolution included. The patient's name rides on the tagging (a de-identified patient shows as their code), while a
+  sample's comes from `render_analysis_samples_dict` (@see `render_variant_tags_dict`, `VariantGridFormat.tags`,
+  `variantTaggingPillOptions` in `grid.js`).
 - A resolved tagging is hidden from the work lists: the tags node (`TagNode.include_resolved`, off by default), the
   variant page's tag list and the variant tags page (both on `UserGridConfig.show_hidden_data` under grid name
   `Variant Tags`, shown as a "Show resolved" checkbox). They all filter with

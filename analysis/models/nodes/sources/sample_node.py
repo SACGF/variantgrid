@@ -162,6 +162,11 @@ class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
             return dna_samples[0]
         return None
 
+    def _get_proband_patient_for_node(self) -> Optional[Patient]:
+        """ Every source level resolves to one, so a node whose callers make the sample ambiguous still
+            says who it is about - it's what the pedigree badge draws """
+        return self.get_patient()
+
     def _get_cohorts_and_sample_visibility_for_node(self):
         if not self.is_group_level:
             return super()._get_cohorts_and_sample_visibility_for_node()
