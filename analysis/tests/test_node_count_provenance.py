@@ -19,6 +19,15 @@ from snpdb.tests.utils.fake_cohort_data import create_fake_trio
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
 
 
+def _substituted_pks(arg_q_dict):
+    """ The pk list when the dict is the stored-pk substitution, else None """
+    if list(arg_q_dict) == [None] and len(arg_q_dict[None]) == 1:
+        (q,) = arg_q_dict[None].values()
+        if len(q.children) == 1 and q.children[0][0] == "pk__in":
+            return q.children[0][1]
+    return None
+
+
 @override_settings(ANALYSIS_NODE_CACHE_Q=False)
 class TestNodeCountProvenance(TestCase):
     @classmethod
@@ -130,15 +139,20 @@ class TestNodeCountProvenance(TestCase):
         node = self._source_node()
         self.assertIsNone(NodeVersion.objects.get(node=node, version=node.version).variant_ids)
         self.assertIsNone(AnalysisNode.get_cached_node_pks(node))
-        self.assertIsNone(AnalysisNode.get_small_parent_arg_q_dict(node),
-                          "Caller falls back to the parent subquery")
+        self.assertIsNone(_substituted_pks(node.get_arg_q_dict()), "Node runs its own filter chain")
 
     def test_small_node_substitutes_explicit_pks(self):
         node = self._source_node()
-        arg_q_dict = AnalysisNode.get_small_parent_arg_q_dict(node)
-        (q,) = arg_q_dict[None].values()
-        self.assertEqual(set(node.get_queryset().values_list("pk", flat=True)),
-                         set(q.children[0][1]))
+        stored_pks = NodeVersion.objects.get(node=node, version=node.version).variant_ids
+        self.assertEqual(set(stored_pks), set(_substituted_pks(node.get_arg_q_dict())))
+        # The node's own queryset - its grid, export and recounts - runs off the same list
+        self.assertEqual(set(stored_pks), set(node.get_queryset().values_list("pk", flat=True)))
+
+    def test_lowered_threshold_stops_substitution_without_reload(self):
+        node = self._source_node()
+        with override_settings(ANALYSIS_NODE_STORE_ID_SIZE_MAX=0):
+            self.assertIsNone(AnalysisNode.get_cached_node_pks(node))
+            self.assertIsNone(_substituted_pks(node.get_arg_q_dict()))
 
     # ── Provenance-scoped mismatch checks ─────────────────────────────────────
 

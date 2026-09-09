@@ -16,6 +16,7 @@ from django.utils import timezone
 from analysis.analysis_templates import get_cohort_analysis, get_sample_analysis
 from analysis.grid_export import get_node_export_basename, node_grid_get_export_iterator
 from analysis.models import AnalysisTemplate, CohortNode, NodeStatus, SampleNode, VariantTag
+from analysis.models.nodes.analysis_node import node_query_planner_settings
 from analysis.views.analysis_permissions import get_node_subclass_or_non_fatal_exception
 from genes.models import CanonicalTranscriptCollection
 from library.constants import MINUTE_SECS
@@ -231,9 +232,10 @@ def export_node_to_downloadable_file(self, node_id, node_version, user_id, expor
 
         request = FakeRequest(user=user)
         request.GET = grid_params
-        _write_node_to_cached_generated_file(cgf, request, node, get_node_export_basename(node), export_type,
-                                             canonical_transcript_collection=canonical_transcript_collection,
-                                             variant_tags_dict=variant_tags_dict)
+        with node_query_planner_settings():
+            _write_node_to_cached_generated_file(cgf, request, node, get_node_export_basename(node), export_type,
+                                                 canonical_transcript_collection=canonical_transcript_collection,
+                                                 variant_tags_dict=variant_tags_dict)
     except Retry:
         raise  # Output node not ready yet - export task re-queued, not an error
     except Exception:

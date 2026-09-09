@@ -7,9 +7,14 @@ from contextlib import ExitStack
 from unittest import mock
 
 from django.core.cache import cache
+from django.db import connection
 from django.test import TestCase, override_settings
 
-from library.django_utils.major_operation import TooManyMajorOperationsError, major_operation
+from library.django_utils.major_operation import (
+    TooManyMajorOperationsError,
+    major_operation,
+    planner_join_collapse_limit,
+)
 
 LOCMEM_CACHE = {
     "default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"},
@@ -92,3 +97,33 @@ class MajorOperationTests(TestCase):
         with ExitStack() as stack:
             for _ in range(10):
                 stack.enter_context(major_operation(self.USER, "grid"))
+
+
+def _collapse_limits() -> tuple[int, int]:
+    with connection.cursor() as cursor:
+        cursor.execute("SHOW join_collapse_limit;")
+        join_limit = int(cursor.fetchone()[0])
+        cursor.execute("SHOW from_collapse_limit;")
+        from_limit = int(cursor.fetchone()[0])
+    return join_limit, from_limit
+
+
+class PlannerJoinCollapseLimitTests(TestCase):
+    def setUp(self):
+        if connection.vendor != "postgresql":
+            self.skipTest("Postgres planner setting")
+
+    def test_raises_inside_and_restores_the_previous_values(self):
+        before = _collapse_limits()
+        with planner_join_collapse_limit(before[0] + 10):
+            self.assertEqual((before[0] + 10, before[0] + 10), _collapse_limits())
+            # Nested use restores the outer raised value, not the server default
+            with planner_join_collapse_limit(before[0] + 20):
+                self.assertEqual((before[0] + 20, before[0] + 20), _collapse_limits())
+            self.assertEqual((before[0] + 10, before[0] + 10), _collapse_limits())
+        self.assertEqual(before, _collapse_limits())
+
+    def test_none_leaves_the_connection_alone(self):
+        before = _collapse_limits()
+        with planner_join_collapse_limit(None):
+            self.assertEqual(before, _collapse_limits())

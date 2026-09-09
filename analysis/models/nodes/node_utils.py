@@ -22,8 +22,15 @@ from toposort import toposort
 
 from analysis.exceptions import NonFatalNodeError
 from analysis.models import Analysis, NodeColors, NodeStatus
-from analysis.models.nodes.analysis_node import AnalysisEdge, NodeVersion
-from analysis.models.nodes.node_counts import get_tag_node_counts_dict, get_tagged_variant_ids_by_label
+from analysis.models.nodes.analysis_node import (
+    AnalysisEdge,
+    NodeVersion,
+    node_query_planner_settings,
+)
+from analysis.models.nodes.node_counts import (
+    get_tag_node_counts_dict,
+    get_tagged_variant_ids_by_label,
+)
 from analysis.tasks.node_update_tasks import delete_analysis_old_node_versions
 from library.utils import add_exception_note
 from snpdb.models.models_enums import TagFilter
@@ -111,16 +118,17 @@ def update_analysis_tag_node_counts(analysis: Analysis, tag_labels=None):
     tagged_variant_ids_by_label = get_tagged_variant_ids_by_label(analysis, configured_tag_labels)
 
     counts_by_node_version_id = {}
-    for node in analysis.analysisnode_set.filter(status=NodeStatus.READY).select_subclasses():
-        node_version = NodeVersion.objects.filter(node=node, version=node.version).first()
-        if node_version is None:
-            continue  # Node reloaded from under us - it'll count these itself
-        try:
-            counts_by_node_version_id[node_version.pk] = get_tag_node_counts_dict(node, tagged_variant_ids_by_label)
-        except NonFatalNodeError:
-            # Node is ready but an ancestor isn't (eg the analysis is mid-reload) so we can't build its
-            # query - it counts these itself when it loads
-            continue
+    with node_query_planner_settings():
+        for node in analysis.analysisnode_set.filter(status=NodeStatus.READY).select_subclasses():
+            node_version = NodeVersion.objects.filter(node=node, version=node.version).first()
+            if node_version is None:
+                continue  # Node reloaded from under us - it'll count these itself
+            try:
+                counts_by_node_version_id[node_version.pk] = get_tag_node_counts_dict(node, tagged_variant_ids_by_label)
+            except NonFatalNodeError:
+                # Node is ready but an ancestor isn't (eg the analysis is mid-reload) so we can't build its
+                # query - it counts these itself when it loads
+                continue
 
     # Merge into the labels the load wrote rather than replacing them - this runs concurrently with
     # loads, and only computes the tag labels. A node that bumped its version while we were counting

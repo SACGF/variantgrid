@@ -6,6 +6,9 @@ from launching a flood of these concurrently and thrashing Postgres, we:
   * cap how many major operations a user can have running at once (per-user concurrency limit)
   * lower the DB ``statement_timeout`` for the duration of the operation so runaway queries die sooner
 
+``planner_join_collapse_limit`` is the other per-connection knob for expensive work: the analysis node
+Variant queries wrap themselves in it (@see ``analysis.models.nodes.analysis_node.node_query_planner_settings``).
+
 Wrap expensive work in the ``major_operation`` context manager. It raises
 ``TooManyMajorOperationsError`` when the per-user limit is exceeded - callers decide how to respond
 (eg redirect-and-retry for grids, or HTTP 503 for APIs).
@@ -70,6 +73,32 @@ def _statement_timeout(seconds: int):
         default_ms = settings.DATABASE_STATEMENT_TIMEOUT_SECONDS * 1000
         with connection.cursor() as cursor:
             cursor.execute("SET statement_timeout TO %s;", [default_ms])
+
+
+@contextmanager
+def planner_join_collapse_limit(limit: Optional[int]):
+    """ Let the Postgres planner reorder joins across up to ``limit`` relations on the current connection.
+        Past join_collapse_limit / from_collapse_limit (server default 8) the planner keeps the joins in
+        the order the SQL wrote them, so a query that joins a wide table set has its most selective
+        filter applied last. Restores the previous values on exit - connections are reused and this may
+        run inside another caller's raised limit. None leaves the server settings alone. """
+    if limit is None or connection.vendor != 'postgresql':
+        yield
+        return
+
+    with connection.cursor() as cursor:
+        cursor.execute("SHOW join_collapse_limit;")
+        previous_join_limit = int(cursor.fetchone()[0])
+        cursor.execute("SHOW from_collapse_limit;")
+        previous_from_limit = int(cursor.fetchone()[0])
+        cursor.execute("SET join_collapse_limit TO %s;", [limit])
+        cursor.execute("SET from_collapse_limit TO %s;", [limit])
+    try:
+        yield
+    finally:
+        with connection.cursor() as cursor:
+            cursor.execute("SET join_collapse_limit TO %s;", [previous_join_limit])
+            cursor.execute("SET from_collapse_limit TO %s;", [previous_from_limit])
 
 
 @contextmanager

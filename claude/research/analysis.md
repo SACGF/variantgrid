@@ -236,10 +236,11 @@ phenotype node costs seconds and the grid asks for it on every page; it is never
 nodes. `cloned_from` is the fourth tier: a template run's nodes point at the snapshot's NodeVersions and reuse their
 counts and grid cache until either side is edited, which is why `bump_version` clears it.
 
-Explicit-pk substitution (#546): `analysis/models/nodes/analysis_node.py:AnalysisNode.get_small_parent_arg_q_dict`
-replaces a small parent's whole filter chain with `Q(pk__in=[...])` from `NodeVersion.variant_ids`, so a MergeNode or a
-Venn over three 200-variant parents becomes a bitmap-or over the pk index instead of three nested subqueries. Large
-parents stay as `analysis/models/nodes/analysis_node.py:queryset_to_pk_in_q`, a RawSQL semi-join that also keeps the
+Explicit-pk substitution (#546): `analysis/models/nodes/analysis_node.py:AnalysisNode.get_arg_q_dict` answers with
+`Q(pk__in=[...])` from `NodeVersion.variant_ids` when the node stored its pks at load, so a MergeNode or a Venn over
+three 200-variant parents becomes a bitmap-or over the pk index instead of three nested subqueries, and the node's own
+grid page is a pk lookup rather than its filter chain under 50 joins. The check sits ahead of the Redis Q cache, which
+holds the real filter the load ran. Large nodes stay as `analysis/models/nodes/analysis_node.py:queryset_to_pk_in_q`, a RawSQL semi-join that also keeps the
 dict picklable for Redis (a live `TransformerQuerySet` inside a Q is not, #240). The list is stored at load, after the
 count, so "small" and "these pks" agree by construction; `analysis/tests/test_explicit_pk_substitution.py` pins the
 two paths to the same answer.
