@@ -3,6 +3,7 @@ from django.db import transaction
 from django.db.models import Max
 
 from analysis.models import AllVariantsNode, Candidate, IntersectionNode, NodeVariant, VariantTag
+from beacon.models import BeaconQueryCache
 from annotation.models import (
     AnnotationRangeLock,
     ClinVar,
@@ -12,6 +13,7 @@ from annotation.models import (
     VariantTranscriptAnnotation,
 )
 from classification.models import Classification, ImportedAlleleInfo, ResolvedVariantInfo
+from genes.models import GeneFusion
 from snpdb.models import (
     CohortGenotype,
     CommonVariantClassified,
@@ -132,9 +134,11 @@ class Command(BaseCommand):
             with transaction.atomic():
                 # If there is a VariantCollectionRecord, but no sample, the analysis won't work anyway
                 # VariantGeneOverlap/annotation rows are derived data that can be regenerated.
+                # GeneFusion only gives its variant a gene-pair identity (the FusionGeneId rows it points
+                # at are PROTECT and survive), and BeaconQueryCache is a cache.
                 for klass in [VariantCollectionRecord, VariantZygosityCount,
                               VariantAnnotation, VariantTranscriptAnnotation, VariantGeneOverlap,
-                              ModifiedImportedVariant]:
+                              ModifiedImportedVariant, GeneFusion, BeaconQueryCache]:
                     qs = klass.objects.filter(variant_id__in=unused_variant_ids)
                     num_deleted = qs._raw_delete(qs.db)
                     print(f"{klass}: deleted {num_deleted} records")
