@@ -101,7 +101,8 @@ def fix_variant_annotation_version(vav: VariantAnnotationVersion, dry_run: bool 
         return results
 
     partition_qs = _partition_qs(vav)
-    qs = partition_qs.filter(gnomad_sv_overlap_af__contains="&")
+    # The symbolic alt narrows this to the SV rows through an index, rather than scanning the partition
+    qs = partition_qs.filter(gnomad_sv_overlap_af__contains="&", variant__alt__seq__startswith="<")
     fields = ["variant_id", "gnomad_af", *VariantAnnotation.GNOMAD_SV_OVERLAP_MULTI_VALUE_FIELDS]
     for va in qs.values(*fields).iterator():
         results["checked"] += 1

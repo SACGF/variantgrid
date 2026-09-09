@@ -5,9 +5,13 @@ from manual.operations.manual_operations import ManualOperation
 
 def _has_multiple_gnomad_sv_overlaps(apps):
     """ Only SVs that overlapped more than one gnomAD-SV record could have had the wrong one picked -
-        those are the rows whose '&'-joined overlap fields hold more than one value """
+        those are the rows whose '&'-joined overlap fields hold more than one value.
+
+        Coming at it through the symbolic alts keeps it off a scan of every annotation partition -
+        there are only 3 symbolic Sequences and snpdb_variant is indexed on alt """
     VariantAnnotation = apps.get_model("annotation", "VariantAnnotation")
-    return VariantAnnotation.objects.filter(gnomad_sv_overlap_af__contains="&").exists()
+    return VariantAnnotation.objects.filter(gnomad_sv_overlap_af__contains="&",
+                                            variant__alt__seq__startswith="<").exists()
 
 
 class Migration(migrations.Migration):
