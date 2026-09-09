@@ -224,14 +224,31 @@ class ClinVarReviewStatus(models.TextChoices):
         return statuses
 
 
-class ClinVarPathogenicity(models.IntegerChoices):
-    """ ClinVar.highest_pathogenicity - CLNSIG mapped onto an ordered scale (0 = none of the below,
-        eg a drug response or risk factor record) """
+class Pathogenicity(models.IntegerChoices):
+    """ The five-tier ACMG germline scale as an ordered integer: ClinVar.highest_pathogenicity (CLNSIG
+        mapped onto it, 0 = none of the below) and VariantAnnotation.annotsv_acmg_class (AnnotSV's ACMG_class) """
     BENIGN = 1, "Benign"
     LIKELY_BENIGN = 2, "Likely benign"
     UNCERTAIN = 3, "Uncertain"
     LIKELY_PATHOGENIC = 4, "Likely pathogenic"
     PATHOGENIC = 5, "Pathogenic"
+
+    SHORT_LABELS = Constant({
+        1: "B",
+        2: "LB",
+        3: "VUS",
+        4: "LP",
+        5: "P",
+    })
+
+    @property
+    def short_label(self) -> str:
+        """ Also the classification clinical_significance evidence key option values """
+        return Pathogenicity.SHORT_LABELS[self.value]
+
+    @property
+    def css_class(self) -> str:
+        return f"cs-{self.short_label.lower()}"
 
 
 class ClinVarOncogenicity(models.IntegerChoices):

@@ -14,6 +14,7 @@ from typing import Any, Optional
 
 from annotation.annotsv_columns import FULL_COLUMN_MAP
 from annotation.models.models import AnnotationRun, VariantAnnotation
+from annotation.models.models_enums import Pathogenicity
 
 # AnnotSV preserves the input VCF INFO column when run with -SVinputInfo 1.
 # The dump VCF writes "variant_id=NNN" into INFO; we use that to join back.
@@ -55,7 +56,10 @@ def _parse_value(field: str, raw: str) -> Optional[Any]:
     try:
         if field in INT_FIELDS:
             # AnnotSV ACMG_class is an int 1..5 but can occasionally be "NA".
-            return int(raw)
+            value = int(raw)
+            if field == "annotsv_acmg_class" and value not in Pathogenicity.values:
+                return None
+            return value
         if field in FLOAT_FIELDS:
             return float(raw)
         if field in BOOL_FIELDS:

@@ -235,6 +235,32 @@ VariantGridFormat.classifications = (_value, type, rowData, ctx) => {
 };
 
 
+// VariantAnnotation.annotsv_acmg_class (Pathogenicity) - a choice field, so like the ClinVar
+// somatic tiers above the row carries the label and the lookup is by label, not by the stored 1..5
+const PATHOGENICITY_CHIPS = {
+    'Benign': {text: 'B', css: 'cs-b'},
+    'Likely benign': {text: 'LB', css: 'cs-lb'},
+    'Uncertain': {text: 'VUS', css: 'cs-vus'},
+    'Likely pathogenic': {text: 'LP', css: 'cs-lp'},
+    'Pathogenic': {text: 'P', css: 'cs-p'},
+};
+
+// The same chip the classification columns draw, so the abbreviations line up in size and colour
+// down a row. Standalone it needs its own tooltip; as a composite headline it leaves the title to
+// the cell, whose hover already carries the class plus the score and criteria
+VariantGridFormat.pathogenicityChip = (value, type, rowData, ctx) => {
+    if (_isBlank(value)) {
+        return '';
+    }
+    const chip = PATHOGENICITY_CHIPS[value] || {text: value, css: 'cs-none'};
+    const inner = escapeHtml(chip.text);
+    if (ctx && ctx.kwargs && ctx.kwargs.members) {
+        return `<span class='cs-chip ${chip.css}'>${inner}</span>`;
+    }
+    return _classificationChip([chip.css], inner, value);
+};
+
+
 // The generic composite cell: the first member is what the cell reads as, every other non-blank
 // member goes on hover as "label: value". A group whose members are all blank draws nothing, which
 // is what lets the eye skip down a sparse column.

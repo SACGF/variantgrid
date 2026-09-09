@@ -70,6 +70,7 @@ from annotation.models.models_enums import (
     HumanProteinAtlasAbundance,
     ManualVariantEntryType,
     NMDEscapeStatus,
+    Pathogenicity,
     VariantAnnotationPipelineType,
     VEPSkippedReason,
 )
@@ -1774,14 +1775,6 @@ class AbstractVariantAnnotation(models.Model):
 class VariantAnnotation(AbstractVariantAnnotation):
     """ This is the "representative transcript" chosen (1 per variant/annotation version) """
     GENE_COLUMN = "variantannotation__gene"
-    # AnnotSV's ACMG_class tiers line up 1:1 with the classification clinical_significance ekey options
-    ANNOTSV_ACMG_CLASS_CLINICAL_SIGNIFICANCE = {
-        1: "B",
-        2: "LB",
-        3: "VUS",
-        4: "LP",
-        5: "P",
-    }
 
     # Only need this once per variant
     hgvs_g = models.TextField(null=True, blank=True)
@@ -1836,7 +1829,7 @@ class VariantAnnotation(AbstractVariantAnnotation):
 
     # AnnotSV (full-line) annotations - SV-only, populated by the AnnotSV stage on
     # the STRUCTURAL_VARIANT pipeline. Per-gene split-line rows are deferred (#1533).
-    annotsv_acmg_class = models.IntegerField(null=True, blank=True)        # 1..5 - see ANNOTSV_ACMG_CLASS_CLINICAL_SIGNIFICANCE
+    annotsv_acmg_class = models.IntegerField(null=True, blank=True, choices=Pathogenicity.choices)
     annotsv_acmg_score = models.FloatField(null=True, blank=True)          # AnnotSV_ranking_score
     annotsv_re_gene = models.TextField(null=True, blank=True)              # RE_gene
     annotsv_repeat_type_left = models.TextField(null=True, blank=True)
@@ -2138,7 +2131,9 @@ class VariantAnnotation(AbstractVariantAnnotation):
     def annotsv_acmg_clinical_significance(self) -> Optional[str]:
         """ AnnotSV's 5-tier ACMG_class as a clinical_significance ekey value, so SVs can be shown
             with the same pill as classifications """
-        return self.ANNOTSV_ACMG_CLASS_CLINICAL_SIGNIFICANCE.get(self.annotsv_acmg_class)
+        if self.annotsv_acmg_class is None:
+            return None
+        return Pathogenicity(self.annotsv_acmg_class).short_label
 
     @property
     def has_annotsv(self) -> bool:
