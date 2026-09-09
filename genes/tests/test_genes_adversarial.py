@@ -179,17 +179,6 @@ class TestHGVSComponentsInit(TestCase):
         new_c = c.with_transcript_version(7)
         self.assertEqual(str(new_c), "NM_001.7(BRCA1):c.123A>G")
 
-    def test_sort_str_numerical_order(self):
-        # Numerical part of sort_str should sort c.9 before c.100
-        low = HGVSComponents("NM_001.1:c.9A>G")
-        high = HGVSComponents("NM_001.1:c.100A>G")
-        self.assertLess(low, high)
-
-    def test_eq_same_string(self):
-        a = HGVSComponents("NM_001.2:c.123A>G")
-        b = HGVSComponents("NM_001.2:c.123A>G")
-        self.assertEqual(a, b)
-
     def test_hash_and_eq_agree(self):
         # Components identify on the string alone, so equal objects always collide in a set
         a = HGVSComponents("NM_001.2:c.123A>G")

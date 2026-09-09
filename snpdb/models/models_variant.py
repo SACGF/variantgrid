@@ -730,11 +730,12 @@ class Variant(PreviewModelMixin, models.Model):
         return Q(svlen__isnull=False)
 
     @staticmethod
-    def get_gene_level_q() -> Q:
+    def get_gene_level_q(path_to_variant: str = "") -> Q:
         """ Events with no coordinate (gene fusions) - @see snpdb.gene_level_variants.
             The single predicate for "keep this away from anything that reads a reference
-            sequence"; is_gene_level is the instance-level twin """
-        return Q(locus__contig__role=SequenceRole.VG_GENE_LEVEL_FAKE_CONTIG)
+            sequence"; is_gene_level is the instance-level twin.
+            path_to_variant walks from another model, e.g. "classification__allele_info__matched_variant__" """
+        return Q(**{f"{path_to_variant}locus__contig__role": SequenceRole.VG_GENE_LEVEL_FAKE_CONTIG})
 
     @cached_property
     def is_gene_level(self) -> bool:

@@ -1,3 +1,4 @@
+import logging
 from typing import Optional
 
 from django.conf import settings
@@ -52,10 +53,6 @@ def get_classified_high_frequency_variants_qs(cgcfv: CohortGenotypeCommonFilterV
         "genome_build": cgcfv.genome_build
     }
     vav = VariantAnnotationVersion.objects.filter(**kwargs).order_by("pk").last()
-    if vav is None:
-        raise VariantAnnotationVersion.DoesNotExist(f"Can't find VariantAnnotationVersion({kwargs})")
-    av = vav.get_any_annotation_version()
-    qs = get_variant_queryset_for_annotation_version(av)
     clinical_significances = get_excluded_clinical_significances(cgcfv)
     classification_kwargs = {
         "clinical_significance__in": clinical_significances,
@@ -64,6 +61,16 @@ def get_classified_high_frequency_variants_qs(cgcfv: CohortGenotypeCommonFilterV
         classification_kwargs["allele__in"] = alleles
     vc_qs = Classification.objects.filter(**classification_kwargs)
     q_classification = Classification.get_variant_q_from_classification_qs(vc_qs, cgcfv.genome_build)
+    if vav is None:
+        # Without AF for this gnomAD version we can't tell which classified variants sit in the common partition.
+        # Moving a variant to uncommon is always safe (common is only a skip optimisation), so treat every
+        # classified variant as potentially common. Typically a stale filter left behind after re-annotation -
+        # migrate_common_filter_gnomad_versions retires it once the annotation exists.
+        logging.warning("No VariantAnnotationVersion for gnomAD %s / %s - treating all classified variants as "
+                        "common for %s", cgcfv.gnomad_version, cgcfv.genome_build, cgcfv)
+        return Variant.objects.filter(q_classification)
+    av = vav.get_any_annotation_version()
+    qs = get_variant_queryset_for_annotation_version(av)
     q_gnomad_af = Q(variantannotation__gnomad_af__gt=cgcfv.gnomad_af_min)
     return qs.filter(q_classification & q_gnomad_af)
 

@@ -3384,6 +3384,67 @@ li.help-item {
 	vertical-align: -0.125em;
 }
 
+/* Uploaded file type icons on the upload pages - see upload/file_type_icons.py. FontAwesome or a sprite symbol at
+   40px, with a round badge in front for the VCF sub-types (V for variants only, a pen for manual entry, the gene
+   for gene-level) and the gene list's G */
+.file-type-icon {
+	position: relative;
+	float: left;
+	width: 40px;
+	height: 40px;
+	font-size: 30px;
+	line-height: 40px;
+	text-align: center;
+	color: #3455a4;
+
+	> .svg-symbol-icon {
+		width: 40px;
+		height: 40px;
+		vertical-align: top;
+	}
+}
+
+.file-type-icon-bed {
+	color: #8a6d3b;  /* .IntersectionNode's --node-accent-color, which is scoped to the node card */
+}
+
+.file-type-icon-muted {
+	color: #9aa3b2;
+}
+
+.file-type-badge {
+	position: absolute;
+	left: -7px;
+	bottom: -3px;
+	width: 26px;
+	height: 26px;
+	border-radius: 50%;
+	border: 2px solid #fff;
+	box-sizing: border-box;
+	color: #fff;
+	font-size: 12px;
+	line-height: 22px;
+	text-align: center;
+
+	> .svg-symbol-icon {
+		width: 16px;
+		height: 16px;
+		vertical-align: -3px;
+	}
+}
+
+.file-type-badge-variant {
+	background-color: #343a40;
+}
+
+.file-type-badge-manual {
+	background-color: #0e7a4a;
+}
+
+.file-type-badge-gene, .file-type-badge-gene-list {
+	background-color: #6b3fa0;  /* .GeneListNode's --node-accent-color */
+}
+
 /* Blackens a member of the Duo/Trio/Quad pedigree symbols - see --pedigree-*-fill in
    uicore/tags/svg_icon_sprite.html. Set on the <svg> by the page, or by Duo/Trio/Quad's
    get_preview_icon_css_class() so a listed trio wears its affected status */
@@ -3741,10 +3802,6 @@ a.clinical-context {
 	min-width: 106px;
 }
 
-.bed-icon {
-	background-image: url(/static/images/node_icons/intersection.png);
-}
-
 .clingen-icon {
 	background-image: url(/static/images/clingen.jpeg);
 }
@@ -3798,10 +3855,6 @@ a.clinical-context {
 
 .gene-list-icon {
 	background-image: url("/static/images/node_icons/filter_list.png");
-}
-
-.expression-icon {
-	background-image: url("/static/images/node_icons/expression.png");
 }
 
 .show-grid-icon {

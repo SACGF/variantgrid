@@ -168,4 +168,70 @@ their own viewBox, so <use> scales them to whatever width/height the <svg class=
             <path d="M16 17.5 V26 M11.8 22 L16 26.5 L20.2 22"/>
         </g>
     </symbol>
+    {% comment %}
+    Uploaded file types - drawn for upload/file_type_icons.py where FontAwesome and the node badges had nothing
+    that said it. Sized by .file-type-icon in global.scss; the fixed colours are the ones the drawing needs
+    (the extra copy's red, the fusion partner's orange, the old build's grey), everything else is currentColor.
+    {% endcomment %}
+    {# VCF - a file with the format on a band #}
+    <symbol id="file-icon-vcf" viewBox="0 0 40 40">
+        <path d="M8 3 H24 L33 12 V37 H8 Z M24 3 V12 H33" fill="none" stroke="currentColor" stroke-width="2.6"
+              stroke-linejoin="round"/>
+        <rect x="3" y="18" width="34" height="13" rx="2.5" fill="currentColor"/>
+        <text x="20" y="28.4" text-anchor="middle" font-family="-apple-system, Helvetica, Arial, sans-serif"
+              font-size="10.5" font-weight="800" fill="#fff">VCF</text>
+    </symbol>
+
+    {# Gene-level copy number - two copies becoming three #}
+    <symbol id="file-icon-copy-number" viewBox="0 0 40 40">
+        <g fill="currentColor">
+            <rect x="2" y="15.5" width="13" height="4" rx="2"/>
+            <rect x="2" y="21.5" width="13" height="4" rx="2"/>
+            <rect x="26" y="12.5" width="13" height="4" rx="2" fill="#c0392b"/>
+            <rect x="26" y="18.5" width="13" height="4" rx="2"/>
+            <rect x="26" y="24.5" width="13" height="4" rx="2"/>
+        </g>
+        <path d="M17.5 20.5 H23 M20.5 17.5 L23.5 20.5 L20.5 23.5" fill="none" stroke="#6c757d" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round"/>
+    </symbol>
+
+    {# Fusion - two partner genes joined at the breakpoint #}
+    <symbol id="file-icon-fusion" viewBox="0 0 40 40">
+        <clipPath id="file-icon-fusion-clip"><rect x="3" y="14" width="34" height="12" rx="6"/></clipPath>
+        <g clip-path="url(#file-icon-fusion-clip)">
+            <rect x="3" y="14" width="17" height="12" fill="currentColor"/>
+            <rect x="20" y="14" width="17" height="12" fill="#e07a2f"/>
+        </g>
+    </symbol>
+
+    {# Gene coverage - read depth over the gene #}
+    <symbol id="file-icon-gene-coverage" viewBox="0 0 40 40">
+        <g fill="currentColor" opacity=".55">
+            <rect x="4" y="19" width="4" height="8"/><rect x="9" y="11" width="4" height="16"/>
+            <rect x="14" y="14" width="4" height="13"/><rect x="19" y="6" width="4" height="21"/>
+            <rect x="24" y="12" width="4" height="15"/><rect x="29" y="20" width="4" height="7"/>
+            <rect x="34" y="23" width="2" height="4"/>
+        </g>
+        <rect x="3" y="30" width="34" height="6" rx="3" fill="currentColor"/>
+    </symbol>
+
+    {# Liftover - the same variant re-plotted from the old build (grey) onto the new one #}
+    <symbol id="file-icon-liftover" viewBox="0 0 40 40">
+        <rect x="3" y="7" width="34" height="6" rx="3" fill="#b9bec7"/>
+        <rect x="3" y="27" width="34" height="6" rx="3" fill="currentColor"/>
+        <circle cx="12" cy="10" r="3" fill="#fff" stroke="#6c757d" stroke-width="1.5"/>
+        <circle cx="27" cy="30" r="3" fill="#fff" stroke="currentColor" stroke-width="1.5"/>
+        <path d="M14 14 L25 25 M18.5 24 L25.5 25.5 L24 18.5" fill="none" stroke="#6c757d" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round"/>
+    </symbol>
+
+    {# Bulleted list - sits behind the gene list's G #}
+    <symbol id="file-icon-list" viewBox="0 0 40 40">
+        <g fill="currentColor">
+            <circle cx="6" cy="8" r="2.6"/><circle cx="6" cy="17" r="2.6"/>
+            <circle cx="6" cy="26" r="2.6"/><circle cx="6" cy="35" r="2.6"/>
+        </g>
+        <path d="M13 8 H35 M13 17 H35 M13 26 H35 M13 35 H35" stroke="currentColor" stroke-width="3.2"
+              stroke-linecap="round"/>
+    </symbol>
 </svg>

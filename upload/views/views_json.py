@@ -23,6 +23,7 @@ from library.log_utils import log_traceback
 from snpdb.models import VCF
 from snpdb.models.models_enums import ImportStatus
 from upload import upload_processing
+from upload.file_type_icons import file_type_icon_html
 from upload.models import (
     FileUpload,
     ImportSource,
@@ -61,6 +62,7 @@ def _get_basic_uploaded_file_context(file_upload) -> dict:
     data = {
         'file_type': file_type,
         'file_type_code': file_upload.file_type,
+        'file_type_icon': file_type_icon_html(file_upload.file_type),
         'data_url': data_url,
     }
     if upload_data:

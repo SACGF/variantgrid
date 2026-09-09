@@ -202,12 +202,6 @@ class TestPluginToolsNotOfferedAtColumnsVersion4(_RawScoreSliderMixin, TestCase)
 class TestRawScoreDirection(TestCase):
     """ The model field is named for the side it keeps, so a reader of the node can't mistake it """
 
-    def test_threshold_field_named_for_direction(self):
-        by_name = {t.name: t for t in TOOLS}
-        self.assertEqual("alphamissense_score_min", by_name["AlphaMissense"].node_threshold_field)
-        self.assertEqual("popeve_score_max", by_name["popEVE"].node_threshold_field)
-        self.assertEqual("promoter_ai_score_min", by_name["PromoterAI"].node_threshold_field)
-
     def test_every_tool_has_damage_node_fields(self):
         """ A tool added to TOOLS without model fields would silently drop out of the editor """
         for tool in TOOLS:

@@ -45,10 +45,10 @@ download "https://github.com/brentp/somalier/files/9954286/sites.chm13v2.T2T.vcf
 
 # Ancestry: the labels, and the 2,504 1kg samples they label
 download "https://raw.githubusercontent.com/brentp/somalier/master/scripts/ancestry-labels-1kg.tsv" "ancestry-labels-1kg.tsv"
-download "https://zenodo.org/record/3479773/files/1kg.somalier.tar.gz?download=1" "1kg.somalier.tar.gz"
 if [ -d 1kg-somalier ]; then
     echo "Already have 1kg-somalier/ - skipping"
 else
+    download "https://zenodo.org/record/3479773/files/1kg.somalier.tar.gz?download=1" "1kg.somalier.tar.gz"
     tar xfz 1kg.somalier.tar.gz
     chmod -R a+r 1kg-somalier
 fi

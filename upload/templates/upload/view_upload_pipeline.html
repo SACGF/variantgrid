@@ -5,6 +5,7 @@
 {% load humanize %}
 {% load js_tags %}
 {% load model_helpers %}
+{% load upload_tags %}
 {% block submenu %}
     {% menu_bar_data %}
 {% endblock %}
@@ -234,7 +235,7 @@
                     {% if data_url %}
                         {% labelled label="Data" %}
                             <a href="{{ data_url }}">
-                                <div class='file_type_icon file-type-{{ file_type_code }}'></div>
+                                {% file_type_icon file_type_code %}
                                 {{ file_type }}
                             </a>
                         {% endlabelled %}

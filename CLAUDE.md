@@ -189,8 +189,9 @@ prompt for an agent to implement one are in `claude/plans/CLAUDE.md`.
 3. `scripts/vg docs check` passes after any doc edit (CI enforces it). A citation is a repo path or `snpdb/models/models_variant.py:Variant`-style path:Symbol in backticks; a plan is checked while
    its `Status:` is draft, approved or in progress.
 4. The plan file's `Status:` line records the outcome; a landed plan whose knowledge has moved into docs is deleted.
-5. The report-back ends with what the next agent should know, one to three lines; a durable project fact among them goes
-   into the repo in the same change.
+5. A fact a later session needs and could not work out from the code goes into the repo in the same change (a doc,
+   or a comment next to the code), and the report-back says where. Most changes have no such fact: the code and the
+   diff are the record. The chat is gone when the session ends, so a "for the next agent" note there is noise.
 
 ## Memory policy
 

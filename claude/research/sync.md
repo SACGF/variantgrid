@@ -19,6 +19,9 @@ Configured sync connection to an external system.
   - `sync_details`: Key into settings.SYNC_DETAILS for credentials
   - `mapping`: Lab, share level, and user mappings (upload only)
   - `filters`: Optional JSON filters for classifications
+  - `remote_lab_record_url`: true once the remote serves `view_classification_lab_record` (upload only)
+  - `remote_gene_level`: true once the remote resolves gene fusions / copy number events (#1506, #1836) as
+    gene-level Variants; off by default, so they are held back and go up on the first run after it is set (upload only)
   - `genome_build`: Target genome build
   - `exclude_labs` / `exclude_orgs`: Labs/orgs to exclude
   - `include_sources` / `exclude_sources`: Sources to include/exclude (Alissa)
