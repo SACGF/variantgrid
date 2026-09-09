@@ -181,5 +181,7 @@ def create_variant_for_allele(request, allele_id, genome_build_name):
     genome_build = get_genome_build_or_404(genome_build_name)
     non_liftover_origin = [AlleleOrigin.IMPORTED_TO_DATABASE, AlleleOrigin.IMPORTED_NORMALIZED]
     if variant_allele := allele.variantallele_set.filter(origin__in=non_liftover_origin).first():
-        create_liftover_pipelines(admin_bot(), [allele], ImportSource.WEB, variant_allele.genome_build, [genome_build])
+        # The user asked for this allele specifically, so retry every tool that has already failed on it
+        create_liftover_pipelines(admin_bot(), [allele], ImportSource.WEB, variant_allele.genome_build, [genome_build],
+                                  retry_conversion_tools=list(AlleleConversionTool))
     return redirect(allele)

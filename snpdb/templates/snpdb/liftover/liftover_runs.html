@@ -82,6 +82,33 @@
 
             <div style="margin-top: 60px">
                 <h4>Failed Liftover to {{ genome_build }}</h4>
+                {% with tool_counts=retry_counts|get_item:genome_build.name %}
+                    {% if tool_counts %}
+                        <p class="text-info">A retry re-attempts that tool for every allele it has failed on that still
+                            has no {{ genome_build }} variant. Earlier attempts are kept, and shown below.</p>
+                        <form method="post">
+                            {% csrf_token %}
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>Tool</th>
+                                        <th class="num">Alleles Still Missing</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for tool, count in tool_counts %}
+                                        <tr>
+                                            <th>{{ tool.label }}</th>
+                                            <td class="num">{{ count|intcomma }}</td>
+                                            <td><button name="retry_{{ genome_build.name }}_{{ tool.value }}" class="btn btn-secondary">Retry failed liftovers</button></td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </form>
+                    {% endif %}
+                {% endwith %}
                 <table data-datatable-url="{% url 'allele_liftover_failures_datatable' %}" data-datatable-data='datatableFilter{{ genome_build.name|js_symbol }}' class="import-table sticky-header" responsive="true"></table>
             </div>
         {% endfor %}
