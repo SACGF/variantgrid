@@ -49,6 +49,10 @@ class GeneSymbolMatcher:
         for gm in self._release_gene_matchers:
             gm.match_unmatched_in_hgnc_and_gene_lists()
 
+    def _match_unmatched_symbols_in_releases(self, gene_symbol_ids):
+        for gm in self._release_gene_matchers:
+            gm.match_unmatched_symbols(gene_symbol_ids)
+
     def get_gene_symbol_id_and_alias_id(self, original_gene_symbol: str):
         uc_original_gene_symbol = clean_string(original_gene_symbol).upper()
         gene_symbol_id = self._gene_symbol_lookup.get(uc_original_gene_symbol)
@@ -89,7 +93,10 @@ class GeneSymbolMatcher:
             if all_oversized:
                 apply_oversized_warning(gene_list, all_oversized)
             gene_list.set_modified_to_now()
-            self._match_symbols_to_genes_in_releases()
+            # Only the symbols this list added can be unmatched - rematching every HGNC and gene list
+            # symbol per release scans the whole gene list table and is what the import commands do
+            gene_symbol_ids = {glgs.gene_symbol_id for glgs in gene_list_gene_symbols if glgs.gene_symbol_id}
+            self._match_unmatched_symbols_in_releases(gene_symbol_ids)
 
         return gene_list_gene_symbols
 
