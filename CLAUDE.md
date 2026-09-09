@@ -155,7 +155,8 @@ A message with a question mark, or one kicking an idea around ("what's going on?
 "does it need to do all of them?"), is asking for an investigation and an answer - measure, read the code, report
 what you found and what you'd recommend. Change code only when told to ("do it", "make that change", "just do the
 quick fix"). A question that comes in while you are already implementing is a question about the work, not a change
-of instruction: answer it and keep the code as it was until told otherwise.
+of instruction: answer it, then carry on with the implementation. Once told to do something, finish it before
+reporting back.
 
 ### Testing
 Tests extend `django.test.TestCase`; page tests use `URLTestCase` from `library/django_utils/unittest_utils.py` (Celery
