@@ -96,7 +96,7 @@ register_award(AwardDefinition(
     kind=UserAwardKind.TITLE,
     title="Top analyst",
     description="Most analyses created, tagged in or edited",
-    icon="fa-project-diagram",
+    icon="fa-diagram-project",
     counter=_analyses_worked_on,
     periods=ALL_PERIODS,
 ))
@@ -116,7 +116,7 @@ register_award(AwardDefinition(
     kind=UserAwardKind.BADGE,
     title="Analyst",
     description="Analyses created, tagged in or edited",
-    icon="fa-project-diagram",
+    icon="fa-diagram-project",
     counter=_analyses_worked_on,
     tiers=(10, 100, 1000),
 ))

@@ -2,6 +2,7 @@
 {% load static %}
 {% load js_tags %}
 {% load crispy_forms_tags %}
+{% load upload_tags %}
 {% block title %}Upload file{% endblock %}
 
 {% block head %}
@@ -80,75 +81,6 @@ form#fileupload tr {
     margin: 5px 0px 5px 0px;
 }
 
-.file_type_icon {
-    float: left;
-    width: 40px;
-    height: 40px;
-    background-size: 40px 40px;
-}
-
-.file-type-A {
-    background-image: url({% static 'icons/tags_colored.png' %})
-}
-
-
-.file-type-B {
-    background-image: url({% static 'images/node_icons/intersection.png' %})
-}
-
-.file-type-L {
-    width: 40px;
-    height: 45px;
-    background-size: 40px 45px;
-    background-image: url({% static 'icons/ncbi_logo.png' %})
-}
-
-.file-type-C {
-    background-image: url({% static 'images/node_icons/expression.png' %})
-}
-
-.file-type-D {
-    background-image: url({% static 'icons/excel_icon.png' %})
-}
-
-.file-type-G {
-    background-image: url({% static 'images/node_icons/filter_list.png' %})
-}
-
-.file-type-R {
-    background-image: url({% static 'icons/patient-icon-png-3.png' %})
-
-}
-
-.file-type-I {
-    background-image: url({% static 'icons/liftover.png' %})
-}
-
-.file-type-P {
-    background-image: url({% static 'images/node_icons/pedigree.png' %})
-}
-
-.file-type-V {
-    background-image: url({% static 'icons/vcf_64.png' %})
-}
-
-.file-type-O {
-    background-image: url({% static 'icons/gene_coverage.png' %})
-}
-
-
-.file-type-S {
-    background-image: url({% static 'images/diagnose_icon.png' %})    
-}
-
-.file-type-w, .file-type-W {
-    background-image: url({% static 'icons/wiki_icon_64.png' %})
-}
-
-.file-type-Y {
-    background-image: url({% static 'icons/manual_variant_entry.png' %})    
-}
-
 img.thumbnail {
     width: 16px;
     height: 16px;
@@ -185,11 +117,10 @@ img.thumbnail {
             return;
         }
         const tbody = $("#upload-files-table tbody");
-        const fileTypeCode = ufd['file_type_code'] || '';
         const row = $('<tr/>');
         row.append('<td><span class="status-icon"></span></td>');
         const nameTd = $('<td/>').addClass('upload-name').attr('uploaded_file_id', file_upload_id);
-        nameTd.append($('<div/>').addClass('file_type_icon file-type-' + fileTypeCode));
+        nameTd.append(ufd['file_type_icon'] || '');
         const details = $('<div/>').addClass('uploaded-file-details');
         details.append($('<div/>').addClass('name').text(ufd['name'] || ''));
         details.append($('<div/>').addClass('file-type'));
@@ -415,7 +346,7 @@ img.thumbnail {
 						</span>
 					</td>
 					<td class="upload-name" uploaded_file_id="{{ ufd.file_upload_id }}">
-						<div title="{{ ufd.file_type }}" class="file_type_icon file-type-{{ ufd.file_type_code }}"></div>
+						{% file_type_icon ufd.file_type_code %}
 						<div class="uploaded-file-details">
 							<div class="name" file_type="{{ ufd.file_type }}">
 								{% if ufd.url %}
@@ -498,7 +429,7 @@ img.thumbnail {
 				const tr = $('<tr/>', {id: stubRowId(file.id)});
 				tr.append('<td><span class="status-icon"><i class="fas fa-spinner fa-spin" title="Uploading"></i></span></td>');
 				const nameTd = $('<td/>').addClass('upload-name');
-				nameTd.append($('<div/>').addClass('file_type_icon'));
+				nameTd.append($('<div/>').addClass('file-type-icon'));
 				const details = $('<div/>').addClass('uploaded-file-details');
 				details.append($('<div/>').addClass('name').text(file.filename));
 				const progress = $('<div/>').addClass('progress')

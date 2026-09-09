@@ -5,6 +5,8 @@ Start with:
 - models/models.py — FileUpload (the model; there is no UploadedFile), UploadPipeline, UploadStep, UploadedVCF,
   UploadedVCFPipelineMaxVariant, UploadedVCFPendingAnnotation, ModifiedImportedVariant. models/models_enums.py has
   VCFPipelineStage and UploadedFileTypes.
+- file_type_icons.py — the icon each UploadedFileTypes value wears on the upload pages (FILE_TYPE_ICONS); a new
+  type needs an entry there, test_file_type_icons checks. Drawn ones are file-icon-* in uicore's svg_icon_sprite.html.
 - upload_processing.py — process_uploaded_file / process_upload_pipeline (retry) / process_vcf_file: entry points
   that pick a factory and fire the celery chain.
 - import_task_factories/abstract_vcf_import_task_factory.py — AbstractVCFImportTaskFactory.create_import_task builds
