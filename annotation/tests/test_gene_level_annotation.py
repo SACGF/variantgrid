@@ -22,6 +22,7 @@ from genes.tests.gene_fusion_test_utils import create_gene_fusion, create_gene_f
 from genes.models import (
     HGNC,
     FusionGeneId,
+    GeneFusion,
     GeneSymbol,
     HGNCImport,
     ReleaseGeneSymbol,
@@ -167,6 +168,17 @@ class GeneLevelAnnotationTest(TestCase):
         self.assertEqual(annotation_run, variant_annotation.annotation_run)
         self.assertTrue(variant_annotation.is_gene_level_annotation)
         self.assertFalse(variant_annotation.has_conservation)
+
+    def test_run_before_the_upload_step_creates_the_gene_fusion(self):
+        """ The scheduler is kicked as soon as the Variants exist, before the upload pipeline's
+            GeneFusion step - a run that gets in first still annotates from the Variant """
+        variant = self.gene_fusion.variant
+        GeneFusion.objects.filter(variant=variant).delete()
+        annotation_run = self._run_annotation()
+        gene_ids = set(VariantGeneOverlap.objects.filter(annotation_run=annotation_run)
+                       .values_list("gene_id", flat=True))
+        self.assertEqual({self.cd74_gene.pk, self.ros1_gene.pk}, gene_ids)
+        self.assertTrue(GeneFusion.objects.filter(variant=variant).exists())
 
     def test_run_finishes(self):
         """ There is no import lane for gene-level, so the run completes in annotate_gene_level_run """

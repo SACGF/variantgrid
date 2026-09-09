@@ -44,6 +44,7 @@ from annotation.models.models import (
 )
 from annotation.models.damage_enums import PathogenicityImpact
 from annotation.signals.manual_signals import annotation_run_complete_signal
+from genes.gene_fusions import create_gene_fusions_for_variants
 from genes.models import FusionGeneId, Gene, GeneAnnotationRelease, GeneFusion, TranscriptVersion
 from library.django_utils.django_partition import temporary_db_table
 from library.genomics.vcf_enums import VariantClass
@@ -217,12 +218,18 @@ def _bulk_create_in_partition(variant_annotation_version: VariantAnnotationVersi
 
 
 def _gene_fusions_for_run(annotation_run):
+    """ The upload pipeline kicks the annotation scheduler as soon as the Variants exist, and its
+        GeneFusion step runs after the genotype insert, so a run dispatched straight away can arrive
+        before the rows do. The Variant carries everything a GeneFusion holds, so the run makes its
+        own; the insert is idempotent, so the upload step still finding them is fine. """
+
     annotation_version = annotation_run.annotation_range_lock.version.get_any_annotation_version()
     range_lock = annotation_run.annotation_range_lock
     variant_qs = get_variants_qs_for_annotation(annotation_version,
                                                 pipeline_type=annotation_run.pipeline_type,
                                                 min_variant_id=range_lock.min_variant_id,
                                                 max_variant_id=range_lock.max_variant_id)
+    create_gene_fusions_for_variants(variant_qs)
     return GeneFusion.objects.filter(variant__in=variant_qs) \
         .select_related("variant", "anchor", "partner")
 
