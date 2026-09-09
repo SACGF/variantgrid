@@ -136,6 +136,12 @@ function AnalysisMessagePoller(node_status_url, task_status_url) {
 		node_actions[action].push(callback);
 	};
 
+	// Watchers are per action and fire together, so a caller that must only act once needs to check
+	this.is_observing = function(node_id, action) {
+		const node_actions = this.observed_nodes[node_id];
+		return Boolean(node_actions && node_actions[action]);
+	};
+
 	this.delete_node = function(node_id) {
 		delete this.observed_nodes[node_id];
 		delete this.counts_watches[node_id];
