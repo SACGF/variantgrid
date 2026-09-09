@@ -18,6 +18,7 @@ from snpdb.admin_utils import (
 from snpdb.liftover import liftover_alleles
 from snpdb.models import (
     Allele,
+    AlleleConversionTool,
     AlleleLiftover,
     ClinVarKey,
     ClinVarKeyExcludePattern,
@@ -86,7 +87,9 @@ class AlleleAdmin(ModelAdminBasics):
 
     @admin_action("Liftover")
     def liftover(self, request, queryset):
-        liftover_alleles(allele_qs=queryset, user=request.user)
+        # Explicitly selected alleles, so retry tools that have already failed on them
+        liftover_alleles(allele_qs=queryset, user=request.user,
+                         retry_conversion_tools=list(AlleleConversionTool))
         self.message_user(request, message='Liftover queued', level=messages.INFO)
 
 

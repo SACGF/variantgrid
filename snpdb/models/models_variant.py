@@ -243,6 +243,15 @@ class Allele(FlagsMixin, PreviewModelMixin, models.Model):
         # distinct as the variantallele join returns an allele once per build it's already in
         return alleles_with_variants_qs.filter(~Q(variantallele__genome_build=genome_build)).distinct()
 
+    @staticmethod
+    def failed_liftover_for_build(genome_build, conversion_tool) -> QuerySet['Allele']:
+        """ Alleles still missing a variant in genome_build, where conversion_tool has already failed on them.
+            Mirrors AlleleLiftover.get_failed_conversion_tools - ie exactly the alleles a retry re-attempts """
+        return Allele.missing_variants_for_build(genome_build).filter(
+            alleleliftover__status=ProcessingStatus.ERROR,
+            alleleliftover__liftover__genome_build=genome_build,
+            alleleliftover__liftover__conversion_tool=conversion_tool).distinct()
+
     def __str__(self):
         name = f"Allele {self.pk}"
         if self.clingen_allele:

@@ -2,6 +2,8 @@
 
 Written by Claude Fable 5 (claude-fable-5), 2026-08-31
 
+Status: in progress
+
 [#1273](https://github.com/SACGF/variantgrid/issues/1273): after fixing a bug or config problem we want to
 re-run liftover for the alleles that failed, broken down by tool (e.g. "relaunch all failed bcftools
 +liftover jobs").
@@ -121,7 +123,7 @@ Everything else (batching by pk range, `log_traceback`, one task per batch) stay
 
 ## 4. Liftover page
 
-### View — `snpdb/views/views.py:liftover_runs`
+### View — `snpdb/views/views_liftover.py:liftover_runs`
 
 **POST**: alongside the existing `liftover_to_{build}` buttons, accept `retry_{build}_{tool}` where
 `tool` is the `AlleleConversionTool` value. Parse both in one loop over
@@ -167,7 +169,7 @@ below. Bootstrap 4 (`btn btn-secondary`, `table`), matching the "Alleles Missing
 These are the two other places a human explicitly asks for a liftover, and both currently go quiet after
 every tool has failed. Same kwarg, so each is a one-liner:
 
-- `variantopedia/views.py:create_variant_for_allele` — pass
+- `variantopedia/views_allele.py:create_variant_for_allele` — pass
   `retry_conversion_tools=list(AlleleConversionTool)`: the user clicked "Create Variant", so try every
   tool again.
 - `classification/variant_card.py` / `allele_can_attempt_liftover()` — for the button to *appear* on an
@@ -213,9 +215,9 @@ needed — the view logic is button-name parsing; the pipeline behaviour is cove
 | `snpdb/liftover.py` | `retry_conversion_tools` kwarg on `create_liftover_pipelines`, `_create_liftover_pipelines_for_batch`, `_get_build_liftover_dicts`, `liftover_alleles`, `allele_can_attempt_liftover` |
 | `snpdb/models/models_variant.py` | `Allele.failed_liftover_for_build()` |
 | `snpdb/tasks/liftover_tasks.py` | `retry_conversion_tool` on both tasks, `_alleles_to_liftover()` helper |
-| `snpdb/views/views.py` | `liftover_runs`: parse `retry_{build}_{tool}` POST, `retry_counts` context |
+| `snpdb/views/views_liftover.py` | `liftover_runs`: parse `retry_{build}_{tool}` POST, `retry_counts` context |
 | `snpdb/templates/snpdb/liftover/liftover_runs.html` | per-build retry table + note |
-| `variantopedia/views.py` | `create_variant_for_allele` retries all tools |
+| `variantopedia/views_allele.py` | `create_variant_for_allele` retries all tools |
 | `classification/variant_card.py` | `allele_can_attempt_liftover(..., retry_conversion_tools=list(AlleleConversionTool))` |
 | `snpdb/admin.py` | admin action retries all tools |
 | `snpdb/management/commands/liftover_alleles.py` | `--retry-tool` option |
