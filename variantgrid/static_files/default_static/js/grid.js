@@ -599,6 +599,12 @@ function setupNodeGrid(config_url, handler_url, analysisId, nodeId, versionId, u
         if (!built) {
             return null;  // node errors - on_error_function has already put them on the page
         }
+        if (built !== definition) {
+            // Another load of this node is already driving the table - leave its definition and row
+            // handlers alone rather than doubling them up
+            nodeGridDefinitions[nodeId] = built;
+            return null;
+        }
         const dataTable = built.dataTable;
         dataTable.on('draw.dt', function() {
             gridComplete();

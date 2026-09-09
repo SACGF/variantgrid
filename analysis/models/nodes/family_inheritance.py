@@ -72,8 +72,16 @@ def mosaic_absent_q(cohort_genotype_collection, sample, min_alt_reads: int) -> Q
     return _packed_sample_q(cohort_genotype_collection, sample, "samples_allele_depth", "lt", min_alt_reads)
 
 
-def mosaic_evidence_description(max_af: float, min_alt_reads: int) -> str:
+def mosaic_evidence_description(max_af, min_alt_reads) -> str:
+    """ The thresholds a mosaic parent has to meet, in words. The editor's zygosity table is built
+        once from a stub node, so it passes the placeholders below and fills them in client side """
     return f"\u2265{min_alt_reads} alt reads at AF \u2264 {max_af}"
+
+
+# What the zygosity table carries for a mosaic mode - the editor substitutes its own live fields
+MOSAIC_EVIDENCE_TEMPLATE = mosaic_evidence_description("{af}", "{alt_reads}")
+# Either parent can be the mosaic one, so both parent rows show both sides of the OR
+MOSAIC_PARENT_ROW_TEMPLATE = f"mosaic: {MOSAIC_EVIDENCE_TEMPLATE}, or clean: <{{alt_reads}} alt reads"
 
 
 def _dominant_requires_affected_parent_error(mother_affected: bool, father_affected: bool):

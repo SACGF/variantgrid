@@ -334,3 +334,13 @@ class TestQuadNodeInheritance(InheritanceNodeTestsMixin, TestCase):
         entry = QuadNode.get_zygosity_table_data()[QuadInheritance.MOSAIC_PARENT]
         self.assertNotEqual(entry['sibling_affected'], entry['sibling_unaffected'])
         self.assertIn('alt reads', entry['other_filters_mother'])
+
+    def test_zygosity_table_mosaic_thresholds_are_on_the_parent_rows_only(self):
+        """ Both parents carry the threshold template the editor fills in; the proband and sibling
+            rows are constitutional calls, so they say nothing about parental read support """
+        entry = QuadNode.get_zygosity_table_data()[QuadInheritance.MOSAIC_PARENT]
+        for key in ("other_filters_mother", "other_filters_father"):
+            self.assertIn("{alt_reads}", entry[key])
+            self.assertIn("{af}", entry[key])
+        self.assertNotIn("other_filters_proband", entry)
+        self.assertNotIn("other_filters_sibling", entry)

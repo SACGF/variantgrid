@@ -134,6 +134,10 @@ Gotchas:
   VCF (AD, no PL) emptied the node while the cached stats still answered with its whole count, and the two disagreeing
   is what `_raise_or_warn_count_mismatch` raises on. Anything reading a threshold - query, cache check, method summary -
   goes through there.
+- The Duo/Trio/Quad editors' zygosity table is built once per page from a stub node
+  (`analysis/models/nodes/sources/trio_node.py:TrioNode.get_zygosity_table_data`), so it cannot see a field's live
+  value - anything that depends on one ships as a `{placeholder}` the editor's `updateZygosityTable()` substitutes
+  (the mosaic thresholds, #1830). A member with no `other_filters_<member>` key renders a blank cell.
 - Changing `Analysis.VERSION_BUMP_FIELDS` (custom columns, default sort) must bump `Analysis.version`
   (`analysis/forms/forms.py:AnalysisForm`): node grids and editors are `cache_page`d under the analysis version in the
   URL (`analysis/views/views_node.py:node_view`).

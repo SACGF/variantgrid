@@ -956,13 +956,18 @@ function loadGridAndEditorForNode(nodeId, extra_filters, fromSelectNode) {
             load_node_url += "?extra_filters=" + extra_filters;
         }
 
-        if (fromSelectNode) {
-            if (dataContainer.attr("node_url") === load_node_url) {
+        if (dataContainer.attr("node_url") === load_node_url) {
+            if (fromSelectNode) {
+                return;
+            }
+            if (dataContainer.attr("node_loading") === "true") {
+                // A node going ready can be reloaded by more than one watcher - loading it twice at
+                // once puts two copies of the same ids in the container, whose scripts then race
                 return;
             }
         }
 
-        dataContainer.attr("node_url", load_node_url);
+        dataContainer.attr({node_url: load_node_url, node_loading: "true"});
         removeGridLoadingOverlay();  // tear down any in-progress grid overlay from the previous node
         registerDeferredGridLoad(null);  // the pending load belonged to the node we're leaving
         $("#node-editor-container").empty();
@@ -971,14 +976,17 @@ function loadGridAndEditorForNode(nodeId, extra_filters, fromSelectNode) {
         openNodeEditorDrawer();  // selecting a node is what opens the drawer
         showLoadingOverlay();
         dataContainer.load(load_node_url, function() {
-            $(this).attr('node_id', nodeId);
+            const dc = $(this);
+            if (dc.attr("node_url") === load_node_url) {  // still the node we asked for
+                dc.attr('node_id', nodeId).removeAttr("node_loading");
+            }
         });
     } else {
         removeGridLoadingOverlay();
         closeNodeEditorDrawer();
         closeAllVariantDetailsTabs();
         $("#node-editor-container").html("Please select a node");
-        dataContainer.empty();
+        dataContainer.empty().removeAttr("node_url").removeAttr("node_loading");
         const tipBox = analysisTipBox();
         if (tipBox) {
             dataContainer.append(tipBox);  // the grid area is blank until a node is picked
@@ -1164,9 +1172,18 @@ function finishedLoadingEditor(node_id, version_id) {
 }
 
 
+function sliderPercentLabel(value) {
+    return Math.round(parseFloat(value) * 100) + "%";
+}
+
 function setVisibleSliderValue(inputSelector, sliderSelector, value) {
     const container = sliderSelector.parents(".slider-container");
     const sliderValue = $(".slider-value", container);
+    // A unit fraction the rest of the site shows as a percent (allele frequency) reads that way here too
+    if (inputSelector.attr("percent")) {
+        sliderValue.html(sliderPercentLabel(value));
+        return;
+    }
     let decimalPlaces = inputSelector.attr("decimal_places");
     if (typeof decimalPlaces == 'undefined') {
         decimalPlaces = 2;
@@ -1202,6 +1219,11 @@ function setupSlider(inputSelector, sliderSelector) {
         inputSelector.val(this.value);
     });
 
-    $(".min-value", container).html(sliderMinVal);
-    $(".max-value", container).html(sliderMaxVal);
+    if (inputSelector.attr("percent")) {
+        $(".min-value", container).html(sliderPercentLabel(sliderMinVal));
+        $(".max-value", container).html(sliderPercentLabel(sliderMaxVal));
+    } else {
+        $(".min-value", container).html(sliderMinVal);
+        $(".max-value", container).html(sliderMaxVal);
+    }
 }
