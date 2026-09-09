@@ -257,3 +257,14 @@ class TestTrioNodeInheritance(InheritanceNodeTestsMixin, TestCase):
                 return_value=999999) as m:
             self.assertIsNone(node._get_cached_label_count(BuiltInFilters.TOTAL))
             m.assert_not_called()
+
+    # ── Zygosity table ────────────────────────────────────────────────────────
+
+    def test_zygosity_table_mosaic_thresholds_are_on_the_parent_rows_only(self):
+        """ Both parents carry the threshold template the editor fills in; the proband row is
+            about the proband, so it says nothing about parental read support """
+        entry = TrioNode.get_zygosity_table_data()[TrioInheritance.MOSAIC_PARENT]
+        for key in ("other_filters_mother", "other_filters_father"):
+            self.assertIn("{alt_reads}", entry[key])
+            self.assertIn("{af}", entry[key])
+        self.assertNotIn("other_filters_proband", entry)

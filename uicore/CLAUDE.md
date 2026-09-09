@@ -97,6 +97,10 @@ Deep reference: __uicore_readme.md · claude/research/uicore.md
   `@cache_page`, `table-layout: fixed` so every column needs a `width` (`default_column_width` fills in), sort the
   Variant column genomically (`_genomic_order_by`) and filter `variantallele` to the grid's build so shared contigs
   (MT) do not duplicate rows.
+- A field with `choices` (any type, not just CharField) reaches the grid, the CSV and the column summary as its
+  label - snpdb/grid_columns/custom_columns.py:_model_field_column_kwargs gives it a `select` column filter and the
+  label renderer - so a client renderer for one keys by label, not by the stored value, and
+  analysis/views/views_node.py:node_column_summary counts it rather than drawing a box plot.
 - The analysis node grid skips DatabaseTableView and calls snpdb/views/datatable_view.py:datatable_response
   directly; grid tests do the same on a RequestFactory request (analysis/tests/test_grid_export.py:GridExportTestCase).
 - Filter rules become Django lookups on the column key via library/django_utils/filter_rules.py:rules_to_q; they are

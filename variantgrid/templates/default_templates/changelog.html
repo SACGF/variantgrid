@@ -260,8 +260,31 @@
 
     {% else %}
        <div class="card mt-4">
-            <div class="card-header">8 September 2026</div>
+            <div class="card-header">9 September 2026</div>
             <div class="card-body">
+                <h4>Analysis</h4>
+                <ul>
+                    <li>Analyses grid - filter by analysis type</li>
+                </ul>
+                <h4>Structural Variants</h4>
+                <ul>
+                    <li>#1558 - Variant kind badge (FUSION/AMP/LOSS, DEL/DUP/INV/CNV/INS with size) on every grid</li>
+                    <li>#1558 - Analysis grid - copy number per sample, and a fusion calls column</li>
+                    <li>#1558 - EffectNode - filter on structural variant type; All Variants gains a Fusion type</li>
+                </ul>
+                <h4>Classification</h4>
+                <ul>
+                    <li>sapath#246 - Classify &amp; Report tab on the sample and patient pages, with outstanding counts</li>
+                    <li>#1419 - Reuse prior curation at gene level, grouped by distinct gene-scope content</li>
+                </ul>
+                <h4>Relatedness</h4>
+                <ul>
+                    <li>#183 - Somalier relatedness fixups - relatedness was badly overcalled on merged VCFs</li>
+                </ul>
+                <h4>Patients / Samples</h4>
+                <ul>
+                    <li>private#933 - Cohort page - tick samples to launch a Duo/Trio/Quad or spawn a sub cohort</li>
+                </ul>
                 <h4>Liftover</h4>
                 <ul>
                     <li>#1273 - Liftover page - retry failed liftovers per tool (eg all failed bcftools +liftover)</li>
@@ -276,28 +299,11 @@
                 <ul>
                     <li>#1829 - Duo analysis (proband + one parent) - wizard, Duo page and DuoNode</li>
                     <li>#1830 - Trio/Duo/Quad nodes - "Dominant (mosaic parent)" inheritance mode</li>
-                </ul>
-            </div>
-       </div>
-
-       <div class="card mt-4">
-            <div class="card-header">3 September 2026</div>
-            <div class="card-body">
-                <h4>Analysis</h4>
-                <ul>
+                    <li>#1830 - Mosaic parent - AF ceiling as a slider, and the zygosity table's parent rows show the thresholds</li>
                     <li>private#223 - SampleNode - FILTER, zygosity and allele frequency get per sample overrides</li>
                     <li>sapath#439 - Analysis templates - reveal a node hidden by ignorable errors (useful for trio analysis where part stopped due to detected sex)</li>
                     <li>#21 - Tag counts draw as pills in the node counts settings lists and tag autocomplete</li>
                     <li>private#686 - Analysis grid - multi-value column refinements</li>
-                </ul>
-            </div>
-       </div>
-
-       <div class="card mt-4">
-            <div class="card-header">2 September 2026</div>
-            <div class="card-body">
-                <h4>Analysis</h4>
-                <ul>
                     <li>#1789 - ClassificationsNode split into separate Classifications and ClinVar nodes</li>
                     <li>#1789 - IntersectionNode - paste variants/regions as text (anything search understands)</li>
                     <li>#1789 - DamageNode - filter on variant class</li>

@@ -76,6 +76,7 @@ const DataTableDefinition = (function() {
         this.serverParams = null;
         this.dtParams = null;
         this.dataTable = null;
+        this.setupPromise = null;
         this.expandData = {
             expandedTr: null,
             expandedRow: null,
@@ -704,11 +705,20 @@ const DataTableDefinition = (function() {
         /* Resolves with this definition once the table is built, so a caller can wire up row
            interactions or announce itself (the analysis editor waits on its grid) */
         setup: function() {
-            if (this.dom.hasClass('dataTable')) {
+            // Two definitions can land on the one table - the analysis node grid loads its markup
+            // afresh each time and a node can be asked to load twice at once - so hand back the
+            // definition that owns it rather than this one, whose dataTable would still be null
+            const owner = this.dom.data('dtDefinition');
+            if (owner) {
+                return owner.setupPromise;
+            }
+            if ($.fn.DataTable.isDataTable(this.dom)) {
+                this.dataTable = this.dom.DataTable();
                 return Promise.resolve(this);
             }
             this.ensureState();
-            return this.loadDefinition().then(() => {
+            this.dom.data('dtDefinition', this);
+            this.setupPromise = this.loadDefinition().then(() => {
                 if (this.onDefinition && this.onDefinition(this.serverParams) === false) {
                     return null;
                 }
@@ -722,6 +732,7 @@ const DataTableDefinition = (function() {
                     return this;
                 });
             });
+            return this.setupPromise;
         }
     };
 

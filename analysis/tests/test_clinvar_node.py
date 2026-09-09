@@ -5,7 +5,7 @@ from analysis.forms.forms_nodes import ClinVarNodeForm
 from analysis.models.enums import NodeMatchInput
 from analysis.models.nodes.filters.clinvar_node import ClinVarNode
 from analysis.tests.utils import AnalysisSetupMixin
-from annotation.models.models_enums import ClinVarOncogenicity, ClinVarPathogenicity, ClinVarReviewStatus
+from annotation.models.models_enums import ClinVarOncogenicity, ClinVarReviewStatus, Pathogenicity
 from classification.enums import SomaticClinicalSignificance
 from snpdb.models.models_enums import AlleleOriginFilterDefault
 
@@ -40,9 +40,9 @@ class ClinVarNodeQTest(AnalysisSetupMixin, TestCase):
     def test_deselecting_one_pill_filters_the_row(self):
         node = ClinVarNode(analysis=self.analysis, germline_benign=False, germline_likely_benign=False,
                            germline_other=False)
-        expected = self.HAS_RECORD & Q(clinvar__highest_pathogenicity__in=[ClinVarPathogenicity.PATHOGENIC,
-                                                                          ClinVarPathogenicity.LIKELY_PATHOGENIC,
-                                                                          ClinVarPathogenicity.UNCERTAIN])
+        expected = self.HAS_RECORD & Q(clinvar__highest_pathogenicity__in=[Pathogenicity.PATHOGENIC,
+                                                                          Pathogenicity.LIKELY_PATHOGENIC,
+                                                                          Pathogenicity.UNCERTAIN])
         self.assertEqual(node._get_node_q(), expected)
 
     def test_germline_catch_all_pill_selects_no_call(self):

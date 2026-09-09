@@ -7,18 +7,18 @@
 """
 from typing import Optional
 
-from annotation.models.models_enums import ClinVarOncogenicity, ClinVarPathogenicity
+from annotation.models.models_enums import ClinVarOncogenicity, Pathogenicity
 from classification.enums import SomaticClinicalSignificance
 
 # Ordered low -> high, matched as substrings so combined forms ("Benign/Likely_benign") and
 # count-suffixed conflicting values ("Pathogenic(2)|Uncertain_significance(1)") resolve.
 # Keys are case-sensitive, which is what keeps "Benign" clear of "Likely_benign".
 CLINSIG_TO_PATHOGENICITY = {
-    "Benign": ClinVarPathogenicity.BENIGN,
-    "Likely_benign": ClinVarPathogenicity.LIKELY_BENIGN,
-    "Uncertain_significance": ClinVarPathogenicity.UNCERTAIN,
-    "Likely_pathogenic": ClinVarPathogenicity.LIKELY_PATHOGENIC,
-    "Pathogenic": ClinVarPathogenicity.PATHOGENIC,
+    "Benign": Pathogenicity.BENIGN,
+    "Likely_benign": Pathogenicity.LIKELY_BENIGN,
+    "Uncertain_significance": Pathogenicity.UNCERTAIN,
+    "Likely_pathogenic": Pathogenicity.LIKELY_PATHOGENIC,
+    "Pathogenic": Pathogenicity.PATHOGENIC,
 }
 
 ONC_TO_ONCOGENICITY = {
