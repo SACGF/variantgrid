@@ -19,6 +19,7 @@ from typing import Optional, TypeAlias
 import intervaltree
 from django.conf import settings
 
+from annotation import annotsv_columns as annotsv_columns_registry
 from annotation import vep_columns as vep_columns_registry
 from annotation.annotation_run_files import ANNOTATION_RUN_IMPORT_PROCESSING_PREFIX
 from annotation.models.models import (
@@ -196,6 +197,8 @@ class BulkVEPVCFAnnotationInserter:
         "spliceai_max_ds",
     ]
     DB_IGNORED_COLUMNS = ["id", "transcript", "MaveDB_nt", "MaveDB_pro"]
+    # Written by import_vcf_annotations for variants VEP skipped, so never sourced from CSQ
+    DB_NOT_FROM_VEP_COLUMNS = ["vep_skipped_reason"]
     VEP_NOT_COPIED_FIELDS = [
         "Allele",
         "BIOTYPE",
@@ -338,6 +341,8 @@ class BulkVEPVCFAnnotationInserter:
 
         self.source_field_to_columns = defaultdict(set)
         self.ignored_vep_fields = self.VEP_NOT_COPIED_FIELDS.copy()
+        if self.annotation_run.annotation_consortium == AnnotationConsortium.REFSEQ:
+            self.ignored_vep_fields.extend(self.VEP_NOT_COPIED_REFSEQ_ONLY)
 
         # cvf_list is already filtered through vep_config so unconfigured customs are dropped.
         # Sort to have consistent VCF headers (case-insensitive to match postgres `ORDER BY source_field`)
@@ -360,9 +365,11 @@ class BulkVEPVCFAnnotationInserter:
 
         ignore_columns = set(self.DB_FIXED_COLUMNS +
                              self.DB_MANUALLY_POPULATED_COLUMNS +
-                             self.DB_IGNORED_COLUMNS)
-        if self.annotation_run.annotation_consortium == AnnotationConsortium.REFSEQ:
-            ignore_columns.update(self.VEP_NOT_COPIED_REFSEQ_ONLY)
+                             self.DB_MANUALLY_POPULATED_VARIANT_ONLY_COLUMNS +
+                             self.DB_IGNORED_COLUMNS +
+                             self.DB_NOT_FROM_VEP_COLUMNS)
+        # AnnotSV columns are filled by its own pipeline type, never from CSQ
+        ignore_columns.update(annotsv_columns_registry.all_variant_grid_column_ids())
 
         # Find the ones that don't apply to this version, and exclude them
         in_scope = {vgc for c in cvf_list for vgc in c.variant_grid_columns}
