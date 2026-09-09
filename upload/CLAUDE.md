@@ -68,6 +68,13 @@ Gotchas:
   schedule_pipeline_stage_steps; everything else lands on db_workers.
 - settings.UPLOAD_ENABLED=False makes InsertUnknownVariantsTask raise; IMPORT_PROCESSING_DELETE_TEMP_FILES_ON_SUCCESS
   wipes the processing dir on success, so inspect a failed pipeline's files before retrying it.
+- upload/tasks/vcf/import_vcf_step_task.py:pipeline_success_task is the only thing that closes a VCF pipeline, and it is
+  guarded on status == PROCESSING (FINISH can be scheduled twice). A FINISH task that sets SUCCESS itself therefore
+  silently swallows the timings, the success Event and the file cleanup - #928 was exactly that. Leave the status alone
+  in get_finish_task_classes tasks.
+- library/django_utils/django_file_utils.py:get_import_processing_dir creates the directory; use
+  import_processing_dir_path when you only want to name one, and remove_import_processing_dir to remove it.
+  manage.py import_processing_cleanup --dry-run reports what is reclaimable under settings.IMPORT_PROCESSING_DIR.
 Tests:
 - Whole pipeline in-process: create a FileUpload, then process_uploaded_file(file_upload, run_async=False) under
   CELERY_TASK_ALWAYS_EAGER (library/django_utils/unittest_utils.py:URLTestCase sets it) —

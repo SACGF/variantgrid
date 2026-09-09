@@ -52,8 +52,7 @@ FIXTURE_VEP_VERSIONS = {
 
 
 def get_fake_annotation_settings_dict(columns_version: int) -> dict:
-    TEST_IMPORT_PROCESSING_DIR = os.path.join(settings.PRIVATE_DATA_ROOT, 'import_processing',
-                                              "test", str(uuid4()))
+    TEST_IMPORT_PROCESSING_DIR = os.path.join(settings.IMPORT_PROCESSING_DIR, "test", str(uuid4()))
 
     TEST_ANNOTATION = copy.deepcopy(settings.ANNOTATION)
     # phastCons/phyloP custom tracks: v1-v3 fixtures were generated without the bigwig data, so disable
