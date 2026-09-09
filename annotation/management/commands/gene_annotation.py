@@ -20,7 +20,10 @@ from annotation.models import (
 from annotation.models.models import SubVersionPartition
 from genes.gene_matching import ReleaseGeneMatcher
 from genes.models import Gene, GeneAnnotationRelease, GnomADGeneConstraint, ReleaseGeneSymbolGene
-from library.django_utils.django_file_utils import get_import_processing_filename
+from library.django_utils.django_file_utils import (
+    get_import_processing_filename,
+    remove_import_processing_dir,
+)
 from ontology.models import (
     ONTOLOGY_RELATIONSHIP_MEDIUM_QUALITY_FILTER,
     GeneDiseaseClassification,
@@ -546,6 +549,8 @@ class Command(BaseCommand):
         self.stdout.write(f"Inserting file '{csv_filename}' into partition {partition_table}\n")
         sql_copy_csv(csv_filename, partition_table, self.GENE_ANNOTATION_HEADER, delimiter=delimiter)
         self.stdout.write("Done!\n")
+        if settings.IMPORT_PROCESSING_DELETE_TEMP_FILES_ON_SUCCESS:
+            remove_import_processing_dir(gene_annotation_version.pk, prefix='gene_annotation')
 
 
 def bad_gene_annotation():
