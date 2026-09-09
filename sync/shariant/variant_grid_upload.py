@@ -17,7 +17,7 @@ from classification.models.classification_utils import ClassificationJsonParams
 from classification.models.evidence_key import EvidenceKey, EvidenceKeyMap
 from library.constants import MINUTE_SECS
 from library.guardian_utils import admin_bot
-from snpdb.models import Lab
+from snpdb.models import Lab, Variant
 from sync.models.models import SyncDestination
 from sync.models.models_classification_sync import ClassificationModificationSyncRecord
 from sync.shariant.historical_ekey_converter import HistoricalEKeyConverter
@@ -33,6 +33,8 @@ SHARIANT_PRIVATE_FIELDS = [
 UPLOAD_TIMEOUT_SECS = 5 * MINUTE_SECS
 UPLOAD_ATTEMPTS = 3
 UPLOAD_RETRY_DELAY_SECS = 30
+
+GENE_LEVEL_EXCLUSION_REASON = "Gene fusions and copy number events are not shared with {destination} until it is upgraded to accept them"
 
 
 def insert_nones(data: dict) -> dict:
@@ -80,6 +82,7 @@ class VariantGridUploadSyncer(ClassificationUploadSyncRunner):
         self.filters = {}
         self.filter_labels = {}
         self.remote_lab_record_url = False
+        self.remote_gene_level = False
         self.lab_mappings = {}
         self.share_level_mappings = {}
         self.user_mappings = {}
@@ -93,6 +96,9 @@ class VariantGridUploadSyncer(ClassificationUploadSyncRunner):
         self.filter_labels = config.get('filter_labels', {})
         # only true once the remote has been upgraded to a version serving view_classification_lab_record
         self.remote_lab_record_url = config.get('remote_lab_record_url', False)
+        # only true once the remote resolves 'BCR::ABL1' / 'EGFR amplification' as a gene-level Variant (#1506, #1836) -
+        # an older remote accepts the record but leaves it as Matching Failed
+        self.remote_gene_level = config.get('remote_gene_level', False)
         mapping = config.get('mapping', {})
 
         self.lab_mappings = mapping.get('labs', {})
@@ -114,6 +120,8 @@ class VariantGridUploadSyncer(ClassificationUploadSyncRunner):
         if apply_filters and self.filters:
             q = QueryJsonFilter.classification_value_filter().convert_to_q(self.filters)
             qs = qs.filter(q)
+        if apply_filters and not self.remote_gene_level:
+            qs = qs.exclude(Variant.get_gene_level_q(path_to_variant="classification__allele_info__matched_variant__"))
 
         if not full_sync:
             qs = ClassificationModificationSyncRecord.filter_out_synced(
@@ -142,7 +150,17 @@ class VariantGridUploadSyncer(ClassificationUploadSyncRunner):
                 if not single_record_qs.filter(q).exists():
                     reasons.append(self.describe_filter_clause(key, value, cm))
 
+        if not self.remote_gene_level and self._is_gene_level(cm):
+            reasons.append(GENE_LEVEL_EXCLUSION_REASON.format(destination=self.sync_destination))
+
         return reasons
+
+    @staticmethod
+    def _is_gene_level(cm: ClassificationModification) -> bool:
+        if allele_info := cm.classification.allele_info:
+            if variant := allele_info.matched_variant:
+                return variant.is_gene_level
+        return False
 
     def describe_filter_clause(self, key: str, value: Any, cm: ClassificationModification) -> str:
         if label := self.filter_labels.get(key):
