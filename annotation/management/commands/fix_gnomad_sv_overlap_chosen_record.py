@@ -99,6 +99,11 @@ def fix_variant_annotation_version(vav: VariantAnnotationVersion, dry_run: bool 
         logging.info("%s has no gnomAD-SV configured for %s - skipping", vav, vav.genome_build)
         results["no_gnomad_sv_configured"] += 1
         return results
+    except OSError as e:
+        # A build can be configured on a deployment that doesn't have its annotation data downloaded
+        logging.info("%s - can't open gnomAD-SV VCF for %s (%s) - skipping", vav, vav.genome_build, e)
+        results["gnomad_sv_vcf_unreadable"] += 1
+        return results
 
     partition_qs = _partition_qs(vav)
     # The symbolic alt narrows this to the SV rows through an index, rather than scanning the partition
