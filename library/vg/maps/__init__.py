@@ -2,8 +2,7 @@
 `vg map`: generated facts about the codebase, written to the gitignored claude/maps/.
 
 Each generator returns a list of MapTable; `write_map` renders it to claude/maps/<name>.md. The maps are
-rebuilt by the SessionStart hook and in CI rather than committed, so they never appear in a diff; `check`
-compares an on-disk copy against a fresh render for anyone who wants it.
+rebuilt by the SessionStart hook and in CI rather than committed, so they never appear in a diff.
 
 Maps are canonical under the CI settings module (variantgrid.settings.env.github_actions) because
 `models` and `urls` depend on INSTALLED_APPS and settings-gated URL includes. scripts/vg sets that
@@ -52,13 +51,3 @@ def write_map(name: str, **kwargs) -> bool:
         MAPS_DIR.mkdir(parents=True, exist_ok=True)
         path.write_text(content)
     return changed
-
-
-def check(names) -> list[str]:
-    """ Names of maps whose committed copy is missing or differs from a fresh render """
-    stale = []
-    for name in names:
-        path = map_path(name)
-        if not path.exists() or path.read_text() != render(name):
-            stale.append(name)
-    return stale

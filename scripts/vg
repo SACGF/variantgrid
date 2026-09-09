@@ -63,13 +63,6 @@ def _static_tests(argv: list[str]) -> int:
 
 def _static_map(argv: list[str]) -> int:
     name = argv[1]
-    if "--check" in argv:
-        stale = maps.check([name])
-        if stale:
-            print(f"Stale maps: {', '.join(stale)} — run `scripts/vg map` and commit claude/maps/")
-            return 1
-        print(f"Maps up to date: {name}")
-        return 0
     if "--json" in argv or "--print" in argv:
         print(maps.render(name, as_json="--json" in argv), end="")
         return 0

@@ -2,7 +2,7 @@
 manage.py vg — introspection for driving VariantGrid from an agent or a terminal.
 
     vg status [--json]
-    vg map [models|urls|commands|tasks|signals|settings|all] [--check] [--json] [--app X] [--counts]
+    vg map [models|urls|commands|tasks|signals|settings|all] [--json] [--app X] [--counts]
     vg tests [--changed] [--base REF] [--run] [--parallel N] [--explain]
     vg page <url-or-url-name> [--as USER] [--kwargs k=v ...] [--text|--html|--links|--forms|--json] [--queries]
     vg page --create-user
@@ -52,9 +52,8 @@ class Command(BaseCommand):
         status_parser = subparsers.add_parser("status", help="What is running on this box: db, builds, services, queues, errors")
         status_parser.add_argument("--json", action="store_true")
 
-        map_parser = subparsers.add_parser("map", help="Generate claude/maps/*.md (or --check them)")
+        map_parser = subparsers.add_parser("map", help="Generate claude/maps/*.md")
         map_parser.add_argument("name", nargs="?", default="all", choices=MAP_CHOICES)
-        map_parser.add_argument("--check", action="store_true", help="Exit 1 if any committed map is stale")
         map_parser.add_argument("--json", action="store_true", help="Print JSON to stdout instead of writing")
         map_parser.add_argument("--print", action="store_true", help="Print Markdown to stdout instead of writing")
         map_parser.add_argument("--app", help="Restrict to one app (with --json/--print only)")
@@ -113,19 +112,13 @@ class Command(BaseCommand):
 
     # --- map ---
 
-    def handle_map(self, name, check, json: bool, print: bool, app, counts, **_):  # pylint: disable=redefined-outer-name
+    def handle_map(self, name, json: bool, print: bool, app, counts, **_):  # pylint: disable=redefined-outer-name
         names = list(maps.MAP_GENERATORS) if name == "all" else [name]
         settings_module = os.environ.get("DJANGO_SETTINGS_MODULE")
         if settings_module != maps.CANONICAL_SETTINGS_MODULE and any(maps.MAP_GENERATORS[n] for n in names):
             self.stderr.write(f"Note: maps are canonical under {maps.CANONICAL_SETTINGS_MODULE} "
                               f"(settings-gated apps/URLs differ); use scripts/vg map to generate them that way.")
         kwargs = {"app": app} if app else {}
-        if check:
-            stale = maps.check(names)
-            if stale:
-                raise CommandError(f"Stale maps: {', '.join(stale)} — run `scripts/vg map` and commit claude/maps/")
-            self.stdout.write(f"Maps up to date: {', '.join(names)}")
-            return
         for map_name in names:
             map_kwargs = {**kwargs, "counts": counts} if map_name == "models" else kwargs
             if json or print:

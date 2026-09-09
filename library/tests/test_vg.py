@@ -213,14 +213,15 @@ class DocsCheckTest(SimpleTestCase):
         return Path(f.name)
 
     def test_backticked_paths_and_symbols_are_citations_but_commands_and_urls_are_not(self):
+        # Cite committed files only: claude/maps/ is generated, so a maps citation resolves here but not on a fresh checkout
         doc = self._doc("See `snpdb/models/models_variant.py:Variant.get_contigs_q`, `library/vg/repo.py`, "
-                        "`claude/maps/models.md#snpdb`, `vg page /variantopedia/dashboard`, `settings.UNIT_TEST`, "
-                        "`org/lab`, `.scss` and [ops](guides/operations.md#scale).\n"
+                        "`claude/domain.md#genome-and-variants-snpdb`, `vg page /variantopedia/dashboard`, "
+                        "`settings.UNIT_TEST`, `org/lab`, `.scss` and [ops](guides/operations.md#scale).\n"
                         "```\nsnpdb/does_not_exist.py\n```\n")
         citations = docs.citations_in(doc)
         self.assertEqual([c.text for c in citations],
                          ["snpdb/models/models_variant.py:Variant.get_contigs_q", "library/vg/repo.py",
-                          "claude/maps/models.md#snpdb", "guides/operations.md#scale"])
+                          "claude/domain.md#genome-and-variants-snpdb", "guides/operations.md#scale"])
         self.assertEqual([docs.check_citation(c) for c in citations], [None] * 4)
 
     def test_bare_module_symbol_and_relative_path_resolve_against_the_doc_directory(self):

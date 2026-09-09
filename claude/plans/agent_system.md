@@ -186,9 +186,9 @@ ClassificationModification, published vs draft, share level; discordance buckets
 Analysis / AnalysisNode / NodeVersion / NodeCount; Cohort vs CohortGenotypeCollection; Lab / Organization /
 group_name and Guardian groups. This is the vocabulary every other doc and every `vg` output uses.
 
-**Generated maps in `claude/maps/`, committed, checked in CI.** These are the facts prose keeps
-restating and getting wrong. `vg map` writes them as Markdown tables (and JSON with `--json`); `vg map
---check` fails when the committed copy is stale, exactly like `makemigrations --check`:
+**Generated maps in `claude/maps/`, gitignored, rebuilt each session and in CI.** These are the facts
+prose keeps restating and getting wrong. `vg map` writes them as Markdown tables (and JSON with
+`--json`); nothing has to keep a committed copy in step, because there is no committed copy:
 
 - `models.md` – per app: model, base classes (TimeStampedModel? GuardianPermissionsMixin?
   PreviewModelMixin?), FKs out, notable managers, row count on this box (optional, `--counts`).
@@ -263,12 +263,12 @@ vg settings [NAME] [--diff]
     Value, and the file that last set it, walking the split-settings chain (diffsettings tells me the
     value; this tells me where it came from).
 
-vg map [models|urls|commands|tasks|signals|settings|all] [--app X] [--json] [--check]
+vg map [models|urls|commands|tasks|signals|settings|all] [--app X] [--json]
 vg outline <file.py>
 vg docs check
 vg health
     Ratchets: module docstring coverage, dead citations, one-off command count, lint line count,
-    mypy-strict apps, stale maps, test wall time from last CI run.
+    mypy-strict apps, test wall time from last CI run.
 ```
 
 Startup cost: `map`, `outline`, `docs`, `tests --list` need no database and are pure AST. They are also
@@ -371,7 +371,7 @@ A short **Definition of done** in CLAUDE.md, applied to every change:
 1. Tests that earn their keep are kept (existing rule), and `vg tests --changed` names them.
 2. If I created a module, it has a contract docstring. If I learned a gotcha the hard way, it is one
    line in the relevant app CLAUDE.md, not a memory.
-3. `vg map --check` and `vg docs check` pass (CI enforces; a small DB-free job that *does* run on
+3. `vg map` renders and `vg docs check` passes (CI enforces; a small DB-free job that *does* run on
    `claude/**` and `*.md` changes, which the test job rightly ignores).
 4. The plan file records its outcome: a `Status:` line (`draft | approved | in progress | landed <sha> |
    superseded by <plan>`), so a landed plan can be deleted with its knowledge already moved into docs.
@@ -388,7 +388,7 @@ commands` groups them. Fewer, labelled commands are a better index than a longer
 
 **Ratchets, not campaigns.** `vg health` reports the numbers (docstring coverage, dead citations, lint
 lines, one-offs, mypy-strict apps, suite wall time). Each is expected to move in one direction; CI can
-fail on regressions for the cheap ones (dead citations, stale maps) once they reach zero.
+fail on regressions for the cheap one (dead citations) once it reaches zero.
 
 ---
 
@@ -450,7 +450,7 @@ fail on regressions for the cheap ones (dead citations, stale maps) once they re
   were then deleted; `vg status`, `vg outline`, `vg settings` (`library/vg/status.py`, `outline.py`, `settings_chain.py`).
 - **Phase 2 core landed** (2026-09-06): `vg docs check` (`library/vg/docs.py`: every backticked path, bare path-colon-symbol spellings
   and Markdown link in `claude/**`, `*/CLAUDE.md`, `*/__*_readme.md` and root `CLAUDE.md` resolved by AST; plans checked
-  while their `Status:` is draft / approved / in progress; `claude/maps/` left to `vg map --check`; runs from `scripts/vg`
+  while their `Status:` is draft / approved / in progress; `claude/maps/` is generated, so it is cited but not itself checked; runs from `scripts/vg`
   in under a second and in the `agent-maps.yml` job) - 600 dead citations on the first run, 0 outside the research docs
   after fixing the guides, the plan and the app notes. `vg inspect <kind> <key>` (`library/vg/inspect/`, one module per
   kind: variant, allele, sample, vcf, classification, analysis, gene, transcript, user, lab; a shared renderer, `--depth`,
@@ -466,7 +466,7 @@ fail on regressions for the cheap ones (dead citations, stale maps) once they re
      pathtests, review, flags, sync, vcauth_oidc_auth. `vg docs check` reports the 5 dead citations they still carry, so
      CI's docs step fails until they are done (or those five lines are patched).
   2. `vg health`: the ratchet numbers in one place (`vg outline --coverage` already gives docstring coverage; add dead
-     citations, stale maps, one-off command count, lint line count, last suite wall time).
+     citations, one-off command count, lint line count, last suite wall time).
   3. `vg logs`, then `vg sql --explain`, then `vg browse` (Playwright is installed on vg-test2).
   4. Skills (`vg-plan`, `vg-implement`, `vg-research`, `vg-run`) and the two subagents; `vg-research` is the research-doc
      recipe from §6.2 written down so the remaining docs and future refreshes cost one prompt.
@@ -488,7 +488,7 @@ fail on regressions for the cheap ones (dead citations, stale maps) once they re
   it without an anchor; `models.md`, `urls.md`, `tasks.md` have `#<app>` anchors, `signals.md` has none). Finish when
   `scripts/vg docs check claude/research/<app>.md` reports 0 dead. Ask for: line count before and after, the stale claims
   found, the final check line.
-- **Verify with the existing loops.** `scripts/vg docs check`, `scripts/vg map --check`,
+- **Verify with the existing loops.** `scripts/vg docs check`, `scripts/vg map`,
   `python3 manage.py test --keepdb --parallel 4` (2,945 tests in about 75 s on vg-test2), `scripts/vg outline --coverage`.
 - **Two facts the tools now encode.** `library/vg/inspect/__init__.py:inspect` calls `transaction.set_rollback(True)`
   only after the inspector returns - marking rollback first makes Django refuse every query in the block. A bare
@@ -504,7 +504,7 @@ fail on regressions for the cheap ones (dead citations, stale maps) once they re
 **How we know it worked.** Pick three representative past issues (a node change, a classification
 change, a grid change) and measure, before and after: tool calls before the first correct edit, tokens
 read, minutes to a verified change, and whether the session left a doc/docstring behind. Plus the
-ratchets: dead citations 0, stale maps 0, docstring coverage climbing, suite time falling.
+ratchets: dead citations 0, docstring coverage climbing, suite time falling.
 
 ---
 

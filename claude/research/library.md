@@ -156,10 +156,10 @@ and `scripts/vg` is the thin dispatcher that runs the Django-free subcommands (`
 maps) without booting the project and delegates the rest to `manage.py vg` under the repo's venv. The split is the
 design: `library/vg/repo.py`, `import_graph.py`, `test_selection.py`, `outline.py`, `settings_chain.py`, `docs.py` and
 the signals / settings / tasks map generators are AST and filesystem only, so `scripts/vg tests --explain` answers in
-well under a second and CI runs `vg map --check` and `vg docs check` without a database. `library/vg/maps/__init__.py`
-renders each map to `claude/maps/<name>.md` and `check` reports the ones whose committed copy differs from a fresh
-render - the `makemigrations --check` idea - under the canonical CI settings module, because `models` and `urls`
-depend on `INSTALLED_APPS` and settings-gated URL includes. `library/vg/test_selection.py:select_tests` maps changed
+well under a second and CI runs `vg map` and `vg docs check` without a database. `library/vg/maps/__init__.py`
+renders each map to `claude/maps/<name>.md`, which is gitignored: the SessionStart hook and the `agent-maps.yml` job
+rebuild them rather than a committed copy being kept in step. They render under the canonical CI settings module,
+because `models` and `urls` depend on `INSTALLED_APPS` and settings-gated URL includes. `library/vg/test_selection.py:select_tests` maps changed
 files to test labels through the first-party import graph (a changed module selects every test module that
 transitively imports it; templates, JS and `urls.py` select the app's `tests.test_urls`; a migration the app's whole
 `tests` package). `library/vg/page.py:render_page` logs the `claude_agent` user in through the test client inside an
@@ -253,6 +253,6 @@ the shorter timeout applies.
 
 `library/vg/inspect/__init__.py:inspect` and `library/vg/page.py:render_page` call `set_rollback(True)` only after the
 work is done; marking rollback first makes Django refuse every query in the block. `vg map` under any settings module
-but `variantgrid.settings.env.github_actions` produces maps that differ from CI's, which `--check` will then fail on.
+but `variantgrid.settings.env.github_actions` produces maps that differ from CI's.
 `library/vg/docs.py` skips fenced code blocks and treats a bare filename such as `default_settings.py` as a citation, so a filename mentioned in
 prose must exist somewhere in the tree.
