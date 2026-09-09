@@ -46,7 +46,6 @@ class VCFRow(ExportVCF):
         else:
             return [e_key.pretty_value(val) for val in sorted_values]
 
-
     @export_vcf_info_cell(
         header_id="SVLEN",
         number=VCFHeaderNumberSpecial.UNBOUND,

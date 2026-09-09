@@ -51,7 +51,21 @@ class ClassificationGroupingExportFormatterJSON(ClassificationGroupingExportForm
         )
 
     def single_row_generator(self) -> Iterator[str]:
-        for cg in self.queryset().iterator():
+        # classification export looks at a lot of relationships dangling of the latest_classification_modification
+        # so select related for records branching off that
+        queryset = self.queryset().select_related(
+            "allele_origin_grouping",
+            "allele_origin_grouping__allele",
+            "allele_origin_grouping__allele__clingen_allele",
+            "latest_allele_info__grch37",
+            "latest_allele_info__grch38",
+            "latest_classification_modification__classification__lab__organization",
+            "latest_classification_modification__classification__allele",
+            "latest_classification_modification__classification__allele_info",
+            "latest_classification_modification__classification__clinical_context",
+            "latest_classification_modification__classification__classificationgroupingentry_set"
+        )
+        for cg in queryset.iterator():
             yield json.dumps(cg.latest_classification_modification.as_json(
                 self.json_params
             ))

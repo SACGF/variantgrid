@@ -16,7 +16,7 @@ from classification.models import ClassificationGrouping, ImportedAlleleInfo, \
 from classification.models import EvidenceKeyMap
 from genes.hgvs import HGVSComponents
 from library.utils import local_date_string
-from snpdb.models import Organization, Lab, GenomeBuild, Variant, Allele
+from snpdb.models import Organization, Lab, GenomeBuild, Variant, Allele, VariantAllele
 import re
 
 
@@ -115,10 +115,11 @@ class ClassificationGroupingExportFilter:
         groupings = groupings.select_related(
             "allele_origin_grouping",
             "allele_origin_grouping__allele",
+            "allele_origin_grouping__allele__clingen_allele",
             "latest_allele_info__grch37",
             "latest_allele_info__grch38",
             "latest_classification_modification__classification",
-            "lab__organization"
+            "lab__organization",
         )
 
         return groupings
@@ -162,9 +163,13 @@ class ClassificationGroupingByAllele:
     @cached_property
     def variant(self) -> Optional[Variant]:
         if genome_build := self.genome_build:
-            allele = Allele.objects.get(pk=self.allele_id)
-            variant = allele.variant_for_build_optional(genome_build)
-            return variant
+            # written to try to reduce SQL calls
+            if va := VariantAllele.objects.filter(allele_id=self.allele_id, genome_build=genome_build).select_related(
+                    'variant__locus',
+                    'variant__locus__contig',
+                    'variant__locus__ref',
+                    'variant__alt').first():
+                return va.variant
         return None
 
     @cached_property
