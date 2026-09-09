@@ -4,6 +4,7 @@ from importlib import metadata
 from django import forms
 from django.conf import settings
 from django.contrib import messages
+from django.contrib.auth import authenticate, login
 from django.contrib.auth.models import User
 from django.contrib.sites.models import Site
 from django.http.response import HttpResponseNotFound, HttpResponseServerError, JsonResponse
@@ -15,6 +16,8 @@ from django.views.generic import FormView
 from django_recaptcha.fields import ReCaptchaField
 from django_recaptcha.widgets import ReCaptchaV3
 from global_login_required import login_not_required
+from registration.backends.simple.views import RegistrationView as SimpleRegistrationView
+from registration.signals import user_registered
 
 from email_manager.models import EmailLog
 from library.django_utils import require_superuser
@@ -26,6 +29,21 @@ from library.utils.database_utils import get_postgresql_version
 from manual.models import Deployment
 from snpdb.forms import KeycloakUserForm
 from snpdb.models import UserSettings
+
+
+class OneStepRegistrationView(SimpleRegistrationView):
+    """ django-registration's one-step view calls authenticate() without a request, which django-axes
+        rejects with AxesBackendRequestParameterRequired """
+
+    def register(self, form):
+        new_user = form.save()
+        username_field = getattr(new_user, 'USERNAME_FIELD', 'username')
+        new_user = authenticate(request=self.request,
+                                username=getattr(new_user, username_field),
+                                password=form.cleaned_data['password1'])
+        login(self.request, new_user)
+        user_registered.send(sender=self.__class__, user=new_user, request=self.request)
+        return new_user
 
 
 @login_not_required

@@ -5,10 +5,11 @@ from django.conf.urls.static import static
 from django.contrib import admin
 from django.contrib.staticfiles.urls import staticfiles_urlpatterns
 from django.urls import path
+from django.views.generic.base import TemplateView
 from drf_spectacular.views import SpectacularAPIView, SpectacularRedocView, SpectacularSwaggerView
 
 from variantgrid import views
-from variantgrid.views import ContactFormView
+from variantgrid.views import ContactFormView, OneStepRegistrationView
 
 admin.autodiscover()
 
@@ -68,10 +69,18 @@ if settings.CONTACT_US_ENABLED:
     ]
 
 if getattr(settings, "REGISTRATION_OPEN", False):
-    registration_include = include('registration.backends.simple.urls')
+    # registration.backends.simple.urls, but with our own view (see OneStepRegistrationView)
+    urlpatterns += [
+        path('accounts/register/closed/',
+             TemplateView.as_view(template_name='registration/registration_closed.html'),
+             name='registration_disallowed'),
+        path('accounts/register/',
+             OneStepRegistrationView.as_view(success_url=getattr(settings, 'SIMPLE_BACKEND_REDIRECT_URL', '/')),
+             name='registration_register'),
+        path('accounts/', include('registration.auth_urls')),
+    ]
 else:
-    registration_include = include('registration.backends.default.urls')
-urlpatterns += [path('accounts/', registration_include)]
+    urlpatterns += [path('accounts/', include('registration.backends.default.urls'))]
 
 
 if settings.USE_OIDC:
