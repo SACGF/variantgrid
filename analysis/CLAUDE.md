@@ -113,9 +113,16 @@ Gotchas:
   `analysis/models/nodes/node_utils.py:reload_analysis_nodes` when writing a new bulk bump.
 - The Q-object cache is on by default (`ANALYSIS_NODE_CACHE_Q`) and keyed only on NodeVersion pk. A test that changes a
   node and expects a different queryset without saving needs `@override_settings(ANALYSIS_NODE_CACHE_Q=False)`.
-- Small parents are inlined as `Q(pk__in=[...])` from `NodeVersion.variant_ids`
-  (`analysis/models/nodes/analysis_node.py:AnalysisNode.get_small_parent_arg_q_dict`, issue #546); a parent loaded before
-  those pks were stored falls back to the subquery — a count mismatch between the two paths is a real bug.
+- A small node answers `get_arg_q_dict` with `Q(pk__in=[...])` from `NodeVersion.variant_ids` (issue #546) - for its
+  own grid and export as much as for the children composing it, and ahead of the Redis Q cache, which holds the real
+  filter the load ran. A node loaded before those pks were stored falls back to its filter chain - a count mismatch
+  between the two paths is a real bug.
+- Anything that evaluates a node's Variant queryset runs under
+  `analysis/models/nodes/analysis_node.py:node_query_planner_settings` (grid handler, export task, `update_node_task`,
+  tag recounts, Venn cache). With the grid's columns selected the query joins 50+ relations, past Postgres's
+  `join_collapse_limit` of 8, and the planner keeps the SQL's join order - whole variant table first, the node's
+  selective filter last. It is per operation rather than server-wide because the extra planning time regressed
+  unrelated queries.
 - `load_seconds` is one number - `NodeVersion.load_data["timings"]` is where to look when it's big: seconds per load
   phase (`load`, `live_data_sources`, `counts`, `variant_ids`, `load_data`), also logged as a warning past
   `settings.ANALYSIS_NODE_SLOW_LOAD_SECONDS` and printed by `manage.py profile_analysis_nodes` (#1838).

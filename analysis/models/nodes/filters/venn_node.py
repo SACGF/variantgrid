@@ -13,7 +13,12 @@ from django.db.models.signals import post_delete
 from django.dispatch import receiver
 
 from analysis.models.enums import SetOperations
-from analysis.models.nodes.analysis_node import AnalysisNode, NodeStatus, NodeVersion
+from analysis.models.nodes.analysis_node import (
+    AnalysisNode,
+    NodeStatus,
+    NodeVersion,
+    node_query_planner_settings,
+)
 from analysis.models.nodes.node_display import NodeIcon
 from library.django_utils.django_partition import temporary_db_table
 from snpdb.models import ProcessingStatus, VariantCollection, VariantCollectionRecord
@@ -264,7 +269,8 @@ def _node_is_empty(node: AnalysisNode) -> bool:
 
 
 def _node_variant_ids(node: AnalysisNode) -> set[int]:
-    return set(node.get_queryset().values_list("pk", flat=True))
+    with node_query_planner_settings():
+        return set(node.get_queryset().values_list("pk", flat=True))
 
 
 @celery.shared_task

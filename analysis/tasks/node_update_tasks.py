@@ -24,6 +24,7 @@ from analysis.models.nodes.analysis_node import (
     NodeStatus,
     NodeTask,
     NodeVersion,
+    node_query_planner_settings,
 )
 from eventlog.models import create_event
 from library.constants import MINUTE_SECS
@@ -116,7 +117,8 @@ def update_node_task(node_id, version):
                 try:
                     # Even if no errors now, parent nodes can be removed on us during load causing failure
                     # Also will throw NodeOutOfDateException if node already bumped (before calling expensive load())
-                    node.load()
+                    with node_query_planner_settings():
+                        node.load()
                     # Check if we need to clear shadow color
                     if node.shadow_color == NodeColors.ERROR and node.is_valid:
                         node.update(shadow_color=None)

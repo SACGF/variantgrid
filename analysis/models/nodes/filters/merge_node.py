@@ -130,12 +130,8 @@ class MergeNode(AnalysisNode):
     def _get_arg_q_dict_from_parents_and_node(self):
         parent_arg_q_dict = {}
         for parent in self.get_non_empty_parents():
-            if (small_arg_q_dict := AnalysisNode.get_small_parent_arg_q_dict(parent)) is not None:
-                arg_q_dict = small_arg_q_dict
-            else:
-                # disable_cache=True: see comment in _split_common_filters above (#240, ad35a7fb1).
-                arg_q_dict = parent.get_arg_q_dict(disable_cache=True)
-            parent_arg_q_dict[parent] = arg_q_dict
+            # disable_cache=True: see comment in _split_common_filters above (#240, ad35a7fb1).
+            parent_arg_q_dict[parent] = parent.get_arg_q_dict(disable_cache=True)
         return self._get_merged_q_dict(parent_arg_q_dict)
 
     def _get_node_q(self) -> Optional[Q]:

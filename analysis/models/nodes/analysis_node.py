@@ -4,6 +4,7 @@ import logging
 import operator
 from collections import defaultdict
 from collections.abc import Sequence
+from contextlib import contextmanager
 from datetime import timedelta
 from functools import cached_property, reduce
 from random import random
@@ -55,6 +56,7 @@ from classification.models import Classification
 from library.constants import DAY_SECS, MINUTE_SECS
 from library.django_utils import thread_safe_unique_together_get_or_create
 from library.django_utils.django_postgres import get_backend_pid
+from library.django_utils.major_operation import planner_join_collapse_limit
 from library.log_utils import log_traceback
 from library.utils import add_exception_note, format_percent
 from library.utils.database_utils import queryset_to_sql
@@ -86,10 +88,21 @@ def _phase_seconds(phase_start: float) -> float:
     return round(perf_counter() - phase_start, 3)
 
 
+@contextmanager
+def node_query_planner_settings():
+    """ Wrap anything that evaluates a node's Variant queryset - grid pages, exports, loads, tag recounts.
+        With the grid's columns selected a node query joins 50+ relations, past the planner's default
+        join_collapse_limit, and the SQL's join order starts from the whole variant table with the node's
+        selective filter applied last (a 421 variant gene search grid took over two minutes).
+        @see settings.ANALYSIS_NODE_QUERY_JOIN_COLLAPSE_LIMIT """
+    with planner_join_collapse_limit(settings.ANALYSIS_NODE_QUERY_JOIN_COLLAPSE_LIMIT):
+        yield
+
+
 def queryset_to_pk_in_q(qs: QuerySet) -> Q:
     """ Embed a queryset as pk IN (subquery), NOT list(qs.values_list("pk")).
-        Callers reach this with querysets that are large by construction - small ones are substituted
-        to a literal PK list upstream by get_small_parent_arg_q_dict - so list() here could pull an
+        Callers reach this with querysets that are large by construction - a small node answers
+        get_arg_q_dict with the literal PK list it stored at load - so list() here could pull an
         unbounded number of PKs into Python (e.g. a 7.4M-row cohort).
         We render to RawSQL, capturing the compiled SQL + params (incl. the partition table rewrite the
         TransformerQuerySet applies in as_sql), so it runs as a single DB-side semi-join. RawSQL also keeps
@@ -469,8 +482,6 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
             if parent.count == 0:
                 q_none = self.q_none()
                 arg_q_dict[None] = {str(q_none): q_none}
-            elif (small_arg_q_dict := AnalysisNode.get_small_parent_arg_q_dict(parent)) is not None:
-                arg_q_dict = small_arg_q_dict
             else:
                 arg_q_dict = parent.get_arg_q_dict()
         else:
@@ -575,6 +586,15 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
 
             @see https://github.com/SACGF/variantgrid/wiki/Analysis-Nodes#node-q-objects
         """
+        # Issue #546 explicit-PK substitution, in the one place every consumer passes through: a node
+        # whose load stored its exact pk list answers with a literal Q(pk__in=[...]) - for its own grid,
+        # export and recounts, and for every child composing it - so Postgres plans a bitmap-or over the
+        # pk index instead of re-running the filter chain. Checked ahead of the Redis Q cache, which
+        # holds the real filter the load itself ran (the pks only exist once that load has finished)
+        if (variant_ids := AnalysisNode.get_cached_node_pks(self)) is not None:
+            q = Q(pk__in=variant_ids)
+            return {None: {q: q}}
+
         # We need this for node counts, and doing a grid query (each page) - and it can take a few secs to generate
         # for some nodes (Comp HET / pheno) so cache it
         cache_key = self._get_cache_key() + f"q_cache={disable_cache}"
@@ -668,25 +688,16 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
     @staticmethod
     def get_cached_node_pks(node) -> Optional[list[int]]:
         """ The exact PK set stored at load for nodes <= ANALYSIS_NODE_STORE_ID_SIZE_MAX (@see node_counts),
-            or None for a large node - or one loaded before the PKs were stored with the count """
+            or None for a large node - or one loaded before the PKs were stored with the count.
+            A list over the current setting is treated as absent, so lowering it (or the profiler's
+            --pk-substitution off) takes effect without a reload """
         try:
-            return node.node_version.variant_ids
+            variant_ids = node.node_version.variant_ids
         except NodeVersion.DoesNotExist:
             return None
-
-    @staticmethod
-    def get_small_parent_arg_q_dict(parent) -> Optional[dict[Optional[str], dict[str, Q]]]:
-        """ Issue #546 explicit-PK substitution. When the parent holds only a small number of variants,
-            substitute its contribution with a literal Q(pk__in=[...]) of the PKs it stored at load, so
-            Postgres plans a tight bitmap-or over the variant PK index instead of re-running the parent's
-            full filter chain wrapped in pk IN (subquery).
-
-            Returns None when the parent has no stored PKs, in which case callers fall back to
-            parent.get_arg_q_dict() - a subquery, which is always self-consistent. """
-        if (variant_ids := AnalysisNode.get_cached_node_pks(parent)) is not None:
-            q = Q(pk__in=variant_ids)
-            return {None: {q: q}}
-        return None
+        if variant_ids is not None and len(variant_ids) > settings.ANALYSIS_NODE_STORE_ID_SIZE_MAX:
+            return None
+        return variant_ids
 
     def _get_node_q(self) -> Optional[Q]:
         return None

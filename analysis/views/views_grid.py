@@ -12,6 +12,7 @@ from django.views.decorators.vary import vary_on_cookie
 
 from analysis import grids
 from analysis.models import AnalysisNode
+from analysis.models.nodes.analysis_node import node_query_planner_settings
 from analysis.tasks.analysis_grid_export_tasks import (
     NODE_EXPORT_GENERATOR,
     export_cohort_to_downloadable_file,
@@ -83,7 +84,7 @@ class NodeGridHandler(NodeJSONViewMixin):
             try:
                 logging.info("Got the lock...")
                 # Cap concurrent expensive queries per-user (distinct nodes bypass the per-node lock above)
-                with major_operation(request.user, "node_grid"):
+                with major_operation(request.user, "node_grid"), node_query_planner_settings():
                     response = self.get_response(request, *args, **kwargs)
             except TooManyMajorOperationsError:
                 logging.info("Too many major operations - going to sleep then retry...")

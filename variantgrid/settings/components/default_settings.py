@@ -586,6 +586,13 @@ ANALYSIS_NODE_GRID_AUTO_LOAD_MAX_VARIANTS = 50_000
 # large result set forces a full sort that blows the statement_timeout. At/above this row count we
 # disable sorting entirely and fall back to ORDER BY -pk (indexed). Users filter down to re-enable.
 ANALYSIS_GRID_SORT_MAX_ROWS = 10_000
+# Analysis node Variant queries (grid pages, exports, loads, tag recounts) join 50+ relations once the
+# grid's columns are selected. Past Postgres's join_collapse_limit (server default 8) the planner keeps
+# the SQL's join order, starting from the whole variant table, and a selective filter such as a gene's
+# overlap subquery is applied last - a 421 variant gene search grid took 2+ minutes and blew the
+# statement_timeout. Node queries run under this limit instead (@see node_query_planner_settings); it
+# is not set server-wide as the extra planning time regressed unrelated queries. None = server default.
+ANALYSIS_NODE_QUERY_JOIN_COLLAPSE_LIMIT = 32
 # Node exports are cached per (node, version, user, filter set, export type) so accumulate much faster
 # than the cohort/sample ones - a beat task drops the CachedGeneratedFile rows (and files) older than this
 ANALYSIS_NODE_EXPORT_CACHE_DAYS = 7
