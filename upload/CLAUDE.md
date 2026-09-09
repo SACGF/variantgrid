@@ -31,6 +31,9 @@ Patterns here:
   with bcftools sort when the unsorted marker file appears. Normalisation history rides in the INFO tag
   upload/models/models.py:ModifiedImportedVariant.BCFTOOLS_OLD_VARIANT_TAG. Change record filtering in
   upload/management/commands/vcf_clean_and_filter.py:Command, not in the processors.
+- The split stage needs GNU split, bash and the bgzip binary (htslib, apt package tabix) - a missing one only fails
+  inside split's --filter at import time. upload/vcf/vcf_preprocess.py:get_split_vcf_command is the one place the
+  command lives; manage.py deployment_check runs it on a tiny VCF ("VCF import split pipe") so a new box fails early.
 - Variants are created in bulk by hash. upload/tasks/vcf/unknown_variants_task.py:SeparateUnknownVariantsTask runs per
   split file, batches coordinates through snpdb/variant_pk_lookup.py:VariantPKLookup and writes CSVs of unknowns;
   upload/tasks/vcf/unknown_variants_task.py:InsertUnknownVariantsTask re-checks and inserts them under a cache lock on
