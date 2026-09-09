@@ -143,6 +143,13 @@ touching `snpdb_variant`, `snpdb_allele`, genotypes, annotation or variant tags 
 
 ## Working
 
+### Questions are questions
+A message with a question mark, or one kicking an idea around ("what's going on?", "could we just do X?",
+"does it need to do all of them?"), is asking for an investigation and an answer - measure, read the code, report
+what you found and what you'd recommend. Change code only when told to ("do it", "make that change", "just do the
+quick fix"). A question that comes in while you are already implementing is a question about the work, not a change
+of instruction: answer it and keep the code as it was until told otherwise.
+
 ### Testing
 Tests extend `django.test.TestCase`; page tests use `URLTestCase` from `library/django_utils/unittest_utils.py` (Celery
 eager, plain static storage, `_test_urls()` for batch status checks). Fixture builders are indexed in
