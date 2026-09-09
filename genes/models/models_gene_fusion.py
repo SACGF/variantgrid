@@ -5,7 +5,7 @@ from django.db import IntegrityError, models, transaction
 from django.db.models import TextField
 from django.db.models.deletion import CASCADE, PROTECT, SET_NULL
 
-from genes.models.models_gene import HGNC, GeneSymbol
+from genes.models.models_gene import HGNC, Gene, GeneSymbol
 from library.genomics.vcf_enums import GeneIdNamespace, GeneLevelSymbolicAlt
 
 
@@ -26,9 +26,10 @@ class FusionGeneId(models.Model):
         through its own table. @see GeneLevelSymbolicAlt for where the numbers are used, and
         GeneFusion.canonical_str for the string form.
 
-        A symbol that later gains an HGNC entry has its hgnc FK filled in, which improves annotation.
-        Existing variants keep the custom pk they were created with - identity, once handed out, is
-        fixed, the same way a Variant's coordinates are. """
+        Identity, once handed out, is fixed - the same way a Variant's coordinates are - so a name
+        that only later becomes resolvable keeps the custom pk its variants were created with. What
+        moves it onto the HGNC number is re-loading the caller's file: resolution mints the right
+        identity from the start, and the old rows stay as they are. """
 
     CUSTOM_ID_START = 1_000_000
     CUSTOM_ID_RETRIES = 5
@@ -38,6 +39,10 @@ class FusionGeneId(models.Model):
     symbol_str = TextField(unique=True, db_collation='case_insensitive')
     gene_symbol = models.ForeignKey(GeneSymbol, null=True, on_delete=SET_NULL)
     hgnc = models.ForeignKey(HGNC, null=True, on_delete=SET_NULL)
+    # What the caller's breakpoint landed in - the same gene as an Entrez id and an ENSG, since a
+    # release is one consortium's. Annotation reads these before falling back to the symbol, which
+    # is what makes a side found by position reachable from a gene list @see gene_level_annotation
+    genes = models.ManyToManyField(Gene, blank=True)
 
     def __str__(self):
         return self.symbol_str
@@ -77,8 +82,6 @@ class FusionGeneId(models.Model):
             if fusion_gene_id := FusionGeneId.objects.filter(symbol_str=symbol_str).first():
                 return fusion_gene_id
         raise IntegrityError(f"Could not allocate a FusionGeneId id for '{symbol_str}'")
-
-    CUSTOM_ID_RETRIES = 5
 
 
 def fusion_canonical_str(anchor: FusionGeneId, partner: Optional[FusionGeneId]) -> str:

@@ -8,7 +8,8 @@ the VCF/Sample/Cohort come from the header the way every other import's do, and 
 rows are written by the same SQL COPY path. Only the bcftools stages are skipped, since they all
 need a reference base a gene-level locus does not have. Nothing here names a genome build - the
 file's '# Source =' line becomes '##source' and VCFSourceSettings says what that caller is run
-against (@see upload.vcf.vcf_import.resolve_genome_build).
+against (@see upload.vcf.vcf_import.resolve_genome_build). The create-VCF step resolves that build
+itself, since the breakpoints it resolves gene names against are positions in one.
 @see snpdb.gene_level_variants for why these are Variants at all, and
 upload.vcf.gene_level_vcf_preprocess for exactly what is skipped and why.
 
@@ -40,6 +41,7 @@ from library.genomics.vcf_writer import (
     percent_encode_info_value,
 )
 from snpdb.gene_level_variants import GENE_LEVEL_CONTIG_LENGTH, GENE_LEVEL_CONTIG_NAME
+from snpdb.models import GenomeBuild
 from upload.models import (
     ModifiedImportedVariant,
     ModifiedImportedVariantOperation,
@@ -55,6 +57,7 @@ from upload.tso500.dragen_all_fusions_parser import (
     reference_reads,
     supporting_reads,
 )
+from upload.vcf.vcf_import import resolve_genome_build_from_source
 from variantgrid.celery import app
 
 # The sample's FORMAT fields - read support rather than a genotype
@@ -72,13 +75,18 @@ def _source_from_comments(comments) -> str:
     return ""
 
 
-def _observations_by_variant_coordinate(rows) -> dict:
-    """ {variant coordinate: [the rows that named that gene pair, as the caller wrote them]} """
+def _observations_by_variant_coordinate(rows, genome_build: Optional[GenomeBuild]) -> dict:
+    """ {variant coordinate: [the rows that named that gene pair, as the caller wrote them]}
+
+        The breakpoints decide which gene each side is where we know the build to look them up in;
+        with no build resolvable the names are all there is, which is where this started """
     resolver = GeneFusionResolver()
     observations = defaultdict(list)
     for row in rows:
-        gene_a = resolver.resolve_side(row.gene_a)
-        gene_b = resolver.resolve_side(row.gene_b)
+        gene_a = resolver.resolve_side(row.gene_a, breakpoint=row.gene_a_breakpoint,
+                                       genome_build=genome_build)
+        gene_b = resolver.resolve_side(row.gene_b, breakpoint=row.gene_b_breakpoint,
+                                       genome_build=genome_build)
         resolved_fusion = resolver.resolve_fusion(gene_a, gene_b, row.directionality_known)
         observations[resolved_fusion].append(row.data)
     return observations
@@ -143,10 +151,14 @@ class DragenTSO500AllFusionsCreateVCFTask(ImportVCFStepTask):
 
     def process_items(self, upload_step):
         comments, rows = read_all_fusions(upload_step.input_filename)
-        observations = _observations_by_variant_coordinate(rows)
+        source = _source_from_comments(comments)
         file_upload = upload_step.upload_pipeline.file_upload
+        # The VCF this step writes is what the build would normally be resolved from, so the source
+        # line has to answer it here - @see upload.vcf.vcf_import.resolve_genome_build
+        genome_build = resolve_genome_build_from_source(source, file_upload)
+        observations = _observations_by_variant_coordinate(rows, genome_build)
         _write_gene_level_vcf(upload_step.output_filename, observations,
-                              sample_name=file_upload.name, source=_source_from_comments(comments))
+                              sample_name=file_upload.name, source=source)
         return len(rows)
 
 

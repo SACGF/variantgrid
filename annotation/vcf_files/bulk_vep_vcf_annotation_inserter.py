@@ -3,20 +3,18 @@ Loading a VEP-annotated VCF into the annotation tables. BulkVEPVCFAnnotationInse
 field through the VEPColumnDef registry (vep_columns.py) into CSVs for COPY, choosing the
 representative transcript row for VariantAnnotation and every transcript for
 VariantTranscriptAnnotation, adding the PTC / NMD columns (add_calculated_ptc) and gene overlaps;
-SVOverlapProcessor and SVGeneOverlapResolver handle the structural variants VEP skipped or annotated
-via --custom. Runs inside an AnnotationRun's upload step.
+SVOverlapProcessor and genes.gene_overlaps.SVGeneOverlapResolver handle the structural variants VEP
+skipped or annotated via --custom. Runs inside an AnnotationRun's upload step.
 """
 import logging
 import operator
 import os
-import time
 from collections import Counter, defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass
 from functools import cached_property
 from typing import Optional, TypeAlias
 
-import intervaltree
 from django.conf import settings
 
 from annotation import annotsv_columns as annotsv_columns_registry
@@ -41,6 +39,7 @@ from annotation.vcf_files.vcf_types import VCFVariant
 from annotation.vep_annotation import VEPConfig
 from annotation.vep_columns import VEPColumnDef
 from annotation.vep_field_formatters import EMPTY_VALUES, VEP_SEPARATOR
+from genes.gene_overlaps import SVGeneOverlapResolver
 from genes.hgvs import HGVSMatcher
 from genes.models import GeneVersion, TranscriptVersion
 from genes.models_enums import AnnotationConsortium
@@ -284,7 +283,8 @@ class BulkVEPVCFAnnotationInserter:
         sv_gene_overlap_resolver = None
         if self.annotation_run.pipeline_type == VariantAnnotationPipelineType.STRUCTURAL_VARIANT:
             sv_overlap_processor = SVOverlapProcessor(cvf_list)
-            sv_gene_overlap_resolver = SVGeneOverlapResolver(self.annotation_run.variant_annotation_version)
+            sv_gene_overlap_resolver = SVGeneOverlapResolver.for_variant_annotation_version(
+                self.annotation_run.variant_annotation_version)
         self.sv_overlap_processor = sv_overlap_processor
         self.sv_gene_overlap_resolver = sv_gene_overlap_resolver
         self._generated_hgvs_c = Counter()
@@ -1065,68 +1065,3 @@ class SVOverlapProcessor:
             raise ValueError(f"Unknown value for {settings.ANNOTATION_VEP_SV_OVERLAP_SINGLE_VALUE_METHOD=}")
 
         return chosen_record
-
-
-class SVGeneOverlapResolver:
-    """ Resolves gene overlaps for long SVs that VEP skipped due to TOO_LONG.
-
-        Builds an in-memory per-contig IntervalTree of TranscriptVersions in the
-        VariantAnnotationVersion's gene_annotation_release. For each variant, returns
-        the set of overlapping (symbol, gene_id) pairs.
-    """
-
-    def __init__(self, variant_annotation_version: VariantAnnotationVersion):
-        self.variant_annotation_version = variant_annotation_version
-        gene_annotation_release = variant_annotation_version.gene_annotation_release
-        self._trees: dict[str, intervaltree.IntervalTree] = defaultdict(intervaltree.IntervalTree)
-
-        if gene_annotation_release is None:
-            logging.warning("SVGeneOverlapResolver: no gene_annotation_release on %s", variant_annotation_version)
-            return
-
-        start_time = time.monotonic()
-        tv_qs = TranscriptVersion.objects.filter(
-            releasetranscriptversion__release=gene_annotation_release,
-        ).select_related("gene_version__gene_symbol", "contig")
-
-        count = 0
-        for tv in tv_qs:
-            try:
-                start = tv.start
-                end = tv.end
-            except (KeyError, IndexError):
-                continue
-            if end <= start:
-                # intervaltree treats zero-length intervals as empty
-                end = start + 1
-            symbol = tv.gene_version.gene_symbol_id
-            gene_id = tv.gene_version.gene_id
-            self._trees[tv.contig.name].addi(start, end, (gene_id, symbol))
-            count += 1
-
-        elapsed = time.monotonic() - start_time
-        logging.info(
-            "SVGeneOverlapResolver: built %d intervals across %d contigs for %s in %.2fs",
-            count, len(self._trees), variant_annotation_version, elapsed,
-        )
-
-    def get_overlaps(self, variant_coordinate: VariantCoordinate) -> tuple[set[str], set[str]]:
-        """ Returns (overlapping_symbols, overlapping_gene_ids) for the given variant. """
-        symbols: set[str] = set()
-        gene_ids: set[str] = set()
-        tree = self._trees.get(variant_coordinate.chrom)
-        if tree is None:
-            return symbols, gene_ids
-
-        start = variant_coordinate.position
-        end = variant_coordinate.end
-        if end <= start:
-            end = start + 1
-
-        for interval in tree.overlap(start, end):
-            gene_id, symbol = interval.data
-            if gene_id is not None:
-                gene_ids.add(gene_id)
-            if symbol is not None:
-                symbols.add(symbol)
-        return symbols, gene_ids

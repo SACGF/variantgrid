@@ -18,9 +18,10 @@ from annotation.models import (
     VariantTranscriptAnnotation,
 )
 from annotation.tests.test_data_fake_genes import _create_fake_gene_version, _insert_transcript_data
-from genes.tests.gene_fusion_test_utils import create_gene_fusion
+from genes.tests.gene_fusion_test_utils import create_gene_fusion, create_gene_fusion_for_ids
 from genes.models import (
     HGNC,
+    FusionGeneId,
     GeneSymbol,
     HGNCImport,
     ReleaseGeneSymbol,
@@ -275,6 +276,70 @@ class GeneLevelAnnotationTest(TestCase):
         self.assertEqual(self.ros1_gene.pk, ros1.gene_id)
         self.assertEqual("CD74::ROS1", ros1.hgvs_c,
                          "the c.HGVS column keeps its value when a kit's transcript is swapped in")
+
+
+class GeneLevelAnnotationFromBreakpointGenesTest(TestCase):
+    """ A side whose symbol no release carries, reachable only through the genes its breakpoint
+        landed in - the ACPP::ETV1 case from the plan """
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.genome_build = GenomeBuild.get_name_or_alias("GRCh38")
+        cls.annotation_version = get_fake_annotation_version(cls.genome_build)
+        cls.vav = cls.annotation_version.variant_annotation_version
+        release = cls.vav.gene_annotation_release
+
+        hgnc_import = HGNCImport.objects.create()
+        for pk, symbol in [(125, "ACP3"), (3490, "ETV1")]:
+            GeneSymbol.objects.get_or_create(symbol=symbol)
+            HGNC.objects.create(pk=pk, gene_symbol_id=symbol, hgnc_import=hgnc_import,
+                                status=HGNCStatus.APPROVED, approved_name=f"{symbol} approved name")
+
+        cls.acp3_gene, _ = _make_gene(cls.genome_build, release, "ENSG00000000010", "ACP3",
+                                      "ENST00000000010.1", "3", 132_000_000)
+        cls.etv1_gene, _ = _make_gene(cls.genome_build, release, "ENSG00000000011", "ETV1",
+                                      "ENST00000000011.1", "7", 13_930_000)
+
+        # A side minted before the rename was understood: the symbol is one no release matched, and
+        # the gene is only known because a breakpoint landed in it
+        GeneSymbol.objects.get_or_create(symbol="ACPP")
+        cls.anchor = FusionGeneId.objects.create(pk=FusionGeneId.CUSTOM_ID_START,
+                                                 symbol_str="ACPP", gene_symbol_id="ACPP")
+        cls.anchor.genes.add(cls.acp3_gene)
+        cls.partner = FusionGeneId.get_or_create_for_symbol("ETV1", "ETV1", HGNC.objects.get(pk=3490))
+        cls.gene_fusion = create_gene_fusion_for_ids(cls.anchor, cls.partner)
+
+    def _run_annotation(self) -> AnnotationRun:
+        variant = self.gene_fusion.variant
+        range_lock = AnnotationRangeLock.objects.create(version=self.vav, min_variant=variant,
+                                                        max_variant=variant, count=1)
+        annotation_run = AnnotationRun.objects.create(
+            annotation_range_lock=range_lock,
+            pipeline_type=VariantAnnotationPipelineType.GENE_LEVEL)
+        annotate_gene_level_run(annotation_run)
+        return annotation_run
+
+    def test_genes_are_used_where_the_symbol_resolves_to_nothing(self):
+        annotation_run = self._run_annotation()
+        gene_ids = set(VariantGeneOverlap.objects.filter(annotation_run=annotation_run)
+                       .values_list("gene_id", flat=True))
+        self.assertEqual({self.acp3_gene.pk, self.etv1_gene.pk}, gene_ids)
+
+    def test_gene_page_queryset_finds_the_fusion_from_the_renamed_side(self):
+        """ What a gene list node on ACP3 joins - the plan's failing case """
+        self._run_annotation()
+        qs = get_variant_queryset_for_gene_symbol(GeneSymbol.objects.get(pk="ACP3"),
+                                                  self.annotation_version)
+        self.assertIn(self.gene_fusion.variant, list(qs))
+
+    def test_a_side_the_release_cannot_place_writes_no_overlap(self):
+        """ Nothing to fall back on - no genes, and a symbol no release matched """
+        self.anchor.genes.clear()
+        annotation_run = self._run_annotation()
+        gene_ids = set(VariantGeneOverlap.objects.filter(annotation_run=annotation_run)
+                       .values_list("gene_id", flat=True))
+        self.assertEqual({self.etv1_gene.pk}, gene_ids)
 
 
 class GeneLevelVariantContainmentTest(TestCase):

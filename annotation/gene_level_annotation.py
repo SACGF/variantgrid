@@ -13,10 +13,12 @@ It is a pipeline type rather than a one-off at import because VariantGeneOverlap
 annotation version and symbol-to-gene resolution is per GeneAnnotationRelease. Written once at
 import, fusions would quietly drop out of gene lists at the next annotation version.
 
-Resolution runs HGNC/symbol -> release genes rather than HGNC -> gene: HGNC carries no Entrez ID
-while Gene.identifier is the Entrez ID for RefSeq releases, so the symbol is the only bridge. That
-also means a later HGNC import improving SEPT14 -> SEPTIN14 improves the mapping without touching a
-single Variant, since identity keys on the id and only resolution is versioned.
+Resolution reads FusionGeneId.genes first - the genes the caller's breakpoint landed in, which is
+the only route that survives a symbol no release still carries (@see genes.gene_fusions) - and falls
+back to HGNC/symbol -> release genes. It is symbol rather than HGNC -> gene because HGNC carries no
+Entrez ID while Gene.identifier is the Entrez ID for RefSeq releases. Either way a later HGNC import
+improving SEPT14 -> SEPTIN14 improves the mapping without touching a single Variant, since identity
+keys on the id and only resolution is versioned.
 
 A fusion sits on no transcript, so there is no VEP 'pick' to inherit. VariantAnnotation is per
 (version, variant) and has no sample, so the enrichment kit that would name the lab's transcript is
@@ -42,7 +44,7 @@ from annotation.models.models import (
 )
 from annotation.models.damage_enums import PathogenicityImpact
 from annotation.signals.manual_signals import annotation_run_complete_signal
-from genes.models import FusionGeneId, GeneAnnotationRelease, GeneFusion, TranscriptVersion
+from genes.models import FusionGeneId, Gene, GeneAnnotationRelease, GeneFusion, TranscriptVersion
 from library.django_utils.django_partition import temporary_db_table
 from library.genomics.vcf_enums import VariantClass
 
@@ -80,11 +82,10 @@ class FusionGeneIdResolver:
 
         gene_ids = []
         transcript_versions = []
-        gene_symbol_id = fusion_gene_id.gene_symbol_id
-        if self.gene_annotation_release and gene_symbol_id:
-            gene_qs = self.gene_annotation_release.genes_for_symbol(gene_symbol_id)
+        if self.gene_annotation_release:
+            gene_qs = self._release_genes(fusion_gene_id)
             gene_ids = sorted(gene_qs.values_list("identifier", flat=True))
-            tv_qs = self.gene_annotation_release.transcript_versions_for_symbol(gene_symbol_id)
+            tv_qs = self.gene_annotation_release.transcript_versions_for_genes(gene_qs)
             transcript_versions = list(tv_qs.select_related("transcript", "gene_version"))
 
         gene_id = gene_ids[0] if gene_ids else None
@@ -96,6 +97,22 @@ class FusionGeneIdResolver:
             representative_transcript_version=_representative_transcript_version(transcript_versions, gene_id))
         self._cache[fusion_gene_id.pk] = result
         return result
+
+    def _release_genes(self, fusion_gene_id: FusionGeneId):
+        """ The genes the release has for this side. The breakpoint's genes are the ones that are
+            certainly right, but a release only holds one consortium's, so a side resolved against
+            an Ensembl release has to fall back to the symbol in a RefSeq one """
+        gene_qs = Gene.objects.filter(pk__in=fusion_gene_id.genes.values_list("pk", flat=True),
+                                      geneversion__releasegeneversion__release=self.gene_annotation_release)
+        if gene_qs.exists():
+            return gene_qs.distinct()
+
+        # hgnc names the approved symbol, which is what a release matched its genes under
+        gene_symbol_id = fusion_gene_id.hgnc.gene_symbol_id if fusion_gene_id.hgnc_id \
+            else fusion_gene_id.gene_symbol_id
+        if gene_symbol_id:
+            return self.gene_annotation_release.genes_for_symbol(gene_symbol_id)
+        return Gene.objects.none()
 
 
 def _is_canonical(transcript_version: Optional[TranscriptVersion]) -> Optional[bool]:

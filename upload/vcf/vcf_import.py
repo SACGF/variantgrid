@@ -331,7 +331,19 @@ def resolve_genome_build(vcf_reader, file_upload) -> Optional[GenomeBuild]:
     if genome_build := detected_genome_build or declared_genome_build:
         return genome_build
 
-    for vss in VCFSourceSettings.get_for_source(get_vcf_source(vcf_reader, file_upload)):
+    return resolve_genome_build_from_source(get_vcf_source(vcf_reader, file_upload), file_upload)
+
+
+def resolve_genome_build_from_source(source: str, file_upload) -> Optional[GenomeBuild]:
+    """ The build for a file with nothing in it to detect from: what the submitter declared at
+        upload, then the build the source is called against (@see VCFSourceSettings). Split out for
+        the loaders that need the build before there is a VCF to read a header from - a fusion
+        caller's csv knows its '# Source =' line and nothing else. """
+
+    if declared_genome_build := get_metadata_genome_build(file_upload):
+        return declared_genome_build
+
+    for vss in VCFSourceSettings.get_for_source(source):
         if vss.genome_build:
             return vss.genome_build
 

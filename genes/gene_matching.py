@@ -62,6 +62,15 @@ class GeneSymbolMatcher:
                 gene_symbol_id, alias_id = gene_symbol_and_alias
         return gene_symbol_id, alias_id
 
+    def get_alias_gene_symbol_id(self, original_gene_symbol: str) -> Optional[str]:
+        """ The symbol an alias points at, whether or not the alias is itself a GeneSymbol.
+            get_gene_symbol_id_and_alias_id stops at a direct hit, which is not what a caller
+            resolving an old name wants - Ensembl still has a GeneSymbol row for ACPP """
+        uc_original_gene_symbol = clean_string(original_gene_symbol).upper()
+        if gene_symbol_and_alias := self._alias_dict.get(uc_original_gene_symbol):
+            return gene_symbol_and_alias[0]
+        return None
+
     def get_gene_symbol_id(self, original_gene_symbol: str):
         gene_symbol_id, _alias_id = self.get_gene_symbol_id_and_alias_id(original_gene_symbol)
         return gene_symbol_id

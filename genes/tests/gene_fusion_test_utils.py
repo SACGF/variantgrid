@@ -9,8 +9,8 @@ from typing import Optional
 
 from django.db import transaction
 
-from genes.gene_fusions import GeneFusionResolver, create_gene_fusions_for_variants
-from genes.models import GeneFusion
+from genes.gene_fusions import GeneFusionResolver, ResolvedFusion, create_gene_fusions_for_variants
+from genes.models import FusionGeneId, GeneFusion
 from library.utils import sha256sum_str
 from snpdb.gene_level_variants import GENE_LEVEL_REF, GENE_LEVEL_SVLEN
 from snpdb.models import Contig, Locus, Sequence, Variant
@@ -31,6 +31,19 @@ def create_gene_fusion(gene_a: Optional[str], gene_b: Optional[str], directional
     resolved_fusion = resolver.resolve_fusion(resolver.resolve_side(gene_a) if gene_a else None,
                                               resolver.resolve_side(gene_b) if gene_b else None,
                                               directionality_known)
+    return _create_from_resolved_fusion(resolved_fusion)
+
+
+@transaction.atomic
+def create_gene_fusion_for_ids(anchor: FusionGeneId, partner: Optional[FusionGeneId] = None,
+                               is_ordered: bool = True) -> GeneFusion:
+    """ The same rows, from identities a test built itself - for a side whose resolution is the
+        thing under test rather than the thing being set up """
+    return _create_from_resolved_fusion(ResolvedFusion(anchor=anchor, partner=partner,
+                                                       is_ordered=is_ordered))
+
+
+def _create_from_resolved_fusion(resolved_fusion: ResolvedFusion) -> GeneFusion:
     variant_coordinate = resolved_fusion.variant_coordinate
     locus, _ = Locus.objects.get_or_create(contig=Contig.get_gene_level(),
                                            position=variant_coordinate.position,

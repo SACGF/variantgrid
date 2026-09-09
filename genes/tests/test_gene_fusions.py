@@ -1,20 +1,56 @@
 """Gene fusion identity - resolution, the alt encoding, and what collapses onto one Variant."""
-from django.test import TestCase
-
-from django.core.exceptions import ValidationError
-
 from typing import Optional
 
+from django.core.exceptions import ValidationError
+from django.test import TestCase
+
+from annotation.fake_annotation import get_fake_annotation_version
+from annotation.tests.test_data_fake_genes import _create_fake_gene_version, _insert_transcript_data
 from genes.gene_fusions import (
     GeneFusionResolver,
     find_gene_fusions_for_string,
     resolve_fusion_string,
 )
+from genes.models import (
+    HGNC,
+    FusionGeneId,
+    GeneFusion,
+    GeneSymbol,
+    GeneSymbolAlias,
+    HGNCImport,
+    ReleaseTranscriptVersion,
+)
+from genes.models_enums import AnnotationConsortium, GeneSymbolAliasSource, HGNCStatus
 from genes.tests.gene_fusion_test_utils import create_gene_fusion
-from genes.models import HGNC, GeneFusion, FusionGeneId, GeneSymbol, GeneSymbolAlias, HGNCImport
-from genes.models_enums import GeneSymbolAliasSource, HGNCStatus
 from library.genomics.vcf_enums import GeneIdNamespace, GeneLevelSymbolicAlt
 from snpdb.models import Contig, GenomeBuild, SequenceRole
+
+
+def _make_release_gene(genome_build, release, gene_id, gene_symbol, transcript_id, contig, start,
+                       hgnc_id=None):
+    """ A gene of the release with one transcript, so a breakpoint inside it resolves """
+    gene_version = _create_fake_gene_version(genome_build, gene_id, gene_symbol,
+                                             AnnotationConsortium.ENSEMBL)
+    gene_version.hgnc_id = hgnc_id
+    gene_version.save()
+    data = {
+        "id": transcript_id,
+        "gene_name": gene_symbol,
+        "biotype": [],
+        "genome_builds": {
+            genome_build.name: {
+                "url": "fake",
+                "exons": [[start, start + 10_000, 0, 1, 10_001, None]],
+                "contig": contig,
+                "strand": "+",
+                "cds_end": start + 10_000,
+                "cds_start": start,
+            }
+        },
+    }
+    transcript_version = _insert_transcript_data(genome_build, data, gene_version, release)
+    ReleaseTranscriptVersion.objects.get_or_create(release=release, transcript_version=transcript_version)
+    return gene_version.gene
 
 
 class GeneFusionTestCase(TestCase):
@@ -42,6 +78,27 @@ class GeneFusionTestCase(TestCase):
         GeneSymbolAlias.objects.create(alias="SEPT14", gene_symbol_id="SEPTIN14",
                                        source=GeneSymbolAliasSource.HGNC)
         cls.hgnc_ids["SEPTIN14"] = 17167
+
+        # ACPP is HGNC's previous symbol for ACP3, and Ensembl still writes it, so there is a
+        # GeneSymbol row for it and no GeneSymbolAlias - the matcher stops at the direct hit
+        GeneSymbol.objects.get_or_create(symbol="ACP3")
+        GeneSymbol.objects.get_or_create(symbol="ACPP")
+        HGNC.objects.create(pk=125, gene_symbol_id="ACP3", hgnc_import=hgnc_import,
+                            status=HGNCStatus.APPROVED, approved_name="acid phosphatase 3",
+                            previous_symbols="ACPP")
+        cls.hgnc_ids["ACP3"] = 125
+
+        # SEPT2 is SEPTIN2's previous symbol and, on an unrelated gene, one of SEPTIN6's aliases -
+        # GeneSymbolAlias holds a row for each, and keeps only one of them per alias
+        for pk, symbol, previous, alias in [(7729, "SEPTIN2", "SEPT2", ""),
+                                            (15848, "SEPTIN6", "SEPT6", "SEP2,SEPT2")]:
+            GeneSymbol.objects.get_or_create(symbol=symbol)
+            HGNC.objects.create(pk=pk, gene_symbol_id=symbol, hgnc_import=hgnc_import,
+                                status=HGNCStatus.APPROVED, approved_name=f"{symbol} approved name",
+                                previous_symbols=previous, alias_symbols=alias)
+            cls.hgnc_ids[symbol] = pk
+        GeneSymbolAlias.objects.create(alias="SEPT2", gene_symbol_id="SEPTIN6",
+                                       source=GeneSymbolAliasSource.HGNC)
 
         # Clone-based identifiers: known to the annotation as gene symbols, but HGNC carries neither
         for symbol in ["RP11-458D21.5", "AC016683.6"]:
@@ -114,6 +171,20 @@ class TestFusionResolution(GeneFusionTestCase):
         self.assertTrue(gene.fusion_gene_id.is_custom)
         self.assertEqual("CTD-2035E11.3", gene.fusion_gene_id.symbol_str)
         self.assertIsNone(gene.fusion_gene_id.gene_symbol_id)
+
+    def test_previous_symbol_resolves_when_a_gene_symbol_row_shadows_it(self):
+        """ ACPP is a GeneSymbol in its own right, so the matcher never reaches an alias - HGNC's
+            own previous symbols are what places it on ACP3 """
+        gene = self.resolver.resolve_side("ACPP")
+        self.assertEqual("ACP3", gene.resolved_symbol)
+        self.assertEqual(self.hgnc_ids["ACP3"], gene.fusion_gene_id.pk)
+        self.assertTrue(gene.was_renamed)
+
+    def test_a_rename_outranks_another_gene_alias_of_the_same_name(self):
+        """ SEPT2 became SEPTIN2; SEPTIN6 merely lists it as an alias, and GeneSymbolAlias has kept
+            that one. A rename says 'the same gene', an alias does not """
+        gene = self.resolver.resolve_side("SEPT2")
+        self.assertEqual("SEPTIN2", gene.resolved_symbol)
 
     def test_local_ids_are_allocated_without_collision(self):
         first = self.resolver.resolve_side("RP11-458D21.5").fusion_gene_id
@@ -190,6 +261,76 @@ class TestFusionVariant(GeneFusionTestCase):
         gene_fusion.is_ordered = False
         with self.assertRaises(ValidationError):
             gene_fusion.clean()
+
+
+class TestBreakpointResolution(TestCase):
+    """ Position rather than spelling - the caller's breakpoint against the release's transcripts """
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.genome_build = GenomeBuild.get_name_or_alias("GRCh38")
+        annotation_version = get_fake_annotation_version(cls.genome_build)
+        cls.release = annotation_version.variant_annotation_version.gene_annotation_release
+
+        hgnc_import = HGNCImport.objects.create()
+        cls.hgnc_ids = {}
+        for pk, symbol in [(125, "ACP3"), (3490, "ETV1"), (900, "OVER_A"), (901, "OVER_B")]:
+            GeneSymbol.objects.get_or_create(symbol=symbol)
+            HGNC.objects.create(pk=pk, gene_symbol_id=symbol, hgnc_import=hgnc_import,
+                                status=HGNCStatus.APPROVED, approved_name=f"{symbol} approved name")
+            cls.hgnc_ids[symbol] = pk
+
+        cls.acp3_gene = _make_release_gene(cls.genome_build, cls.release, "ENSG00000000010", "ACP3",
+                                           "ENST00000000010.1", "3", 132_000_000, hgnc_id=125)
+        # Two genes over one position: the name written is all there is to choose between them
+        cls.over_a_gene = _make_release_gene(cls.genome_build, cls.release, "ENSG00000000011", "OVER_A",
+                                             "ENST00000000011.1", "3", 140_000_000, hgnc_id=900)
+        cls.over_b_gene = _make_release_gene(cls.genome_build, cls.release, "ENSG00000000012", "OVER_B",
+                                             "ENST00000000012.1", "3", 140_000_000, hgnc_id=901)
+
+    def setUp(self):
+        self.resolver = GeneFusionResolver()
+
+    def test_breakpoint_beats_the_name_written(self):
+        """ A name no release and no HGNC carries, at a position that is unambiguously ACP3 """
+        gene = self.resolver.resolve_side("WHATEVER1", breakpoint="chr3:132005000",
+                                          genome_build=self.genome_build)
+        self.assertEqual("ACP3", gene.resolved_symbol)
+        self.assertEqual(self.hgnc_ids["ACP3"], gene.fusion_gene_id.pk)
+        self.assertEqual({self.acp3_gene.pk},
+                         set(gene.fusion_gene_id.genes.values_list("pk", flat=True)))
+
+    def test_chromosome_is_resolved_through_the_build(self):
+        """ A caller writes chr3 and a VCF writes 3 - both are the same contig """
+        gene = self.resolver.resolve_side("WHATEVER2", breakpoint="3:132005000",
+                                          genome_build=self.genome_build)
+        self.assertEqual("ACP3", gene.resolved_symbol)
+
+    def test_overlapping_genes_are_decided_by_the_name(self):
+        gene = self.resolver.resolve_side("OVER_B", breakpoint="chr3:140005000",
+                                          genome_build=self.genome_build)
+        self.assertEqual("OVER_B", gene.resolved_symbol)
+        self.assertEqual({self.over_b_gene.pk},
+                         set(gene.fusion_gene_id.genes.values_list("pk", flat=True)))
+
+    def test_overlapping_genes_with_no_name_match_fall_back_to_the_name(self):
+        """ Picking one of two would be a guess, so the caller's name stands and no gene is recorded """
+        gene = self.resolver.resolve_side("WHATEVER3", breakpoint="chr3:140005000",
+                                          genome_build=self.genome_build)
+        self.assertEqual("WHATEVER3", gene.resolved_symbol)
+        self.assertFalse(gene.fusion_gene_id.genes.exists())
+
+    def test_breakpoint_in_nothing_falls_back_to_the_name(self):
+        gene = self.resolver.resolve_side("ACP3", breakpoint="chr3:1000",
+                                          genome_build=self.genome_build)
+        self.assertEqual(self.hgnc_ids["ACP3"], gene.fusion_gene_id.pk)
+        self.assertFalse(gene.fusion_gene_id.genes.exists())
+
+    def test_no_build_leaves_resolution_on_the_name(self):
+        gene = self.resolver.resolve_side("ACP3", breakpoint="chr3:132005000")
+        self.assertEqual(self.hgnc_ids["ACP3"], gene.fusion_gene_id.pk)
+        self.assertFalse(gene.fusion_gene_id.genes.exists())
 
 
 class TestFusionString(GeneFusionTestCase):

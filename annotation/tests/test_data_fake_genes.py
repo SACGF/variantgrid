@@ -6,6 +6,7 @@ from genes.models import (
     GeneVersion,
     ReleaseGeneSymbol,
     ReleaseGeneSymbolGene,
+    ReleaseGeneVersion,
     Transcript,
     TranscriptVersion,
 )
@@ -46,6 +47,8 @@ def _insert_transcript_data(genome_build, data: dict, gene_version: GeneVersion,
     if release:
         release_symbol = ReleaseGeneSymbol.objects.create(release=release, gene_symbol=gene_version.gene_symbol)
         ReleaseGeneSymbolGene.objects.create(release_gene_symbol=release_symbol, gene=gene_version.gene)
+        # What import_cdot_gene_annotation_release writes - which gene versions the release holds
+        ReleaseGeneVersion.objects.get_or_create(release=release, gene_version=gene_version)
 
     return transcript_version
 

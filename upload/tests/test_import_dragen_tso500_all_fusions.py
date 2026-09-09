@@ -149,6 +149,20 @@ class TestGeneFusionVCF(GeneFusionTestCase):
         self.assertTrue(vcf.has_depth)
         self.assertFalse(vcf.has_genotype)
 
+    def test_create_vcf_step_resolves_the_build_from_the_source_line(self):
+        """ The step needs a build before the VCF exists, to look breakpoints up in - with nothing
+            declared at upload the '# Source =' line is what answers it """
+        self.file_upload.metadata = {}
+        self.file_upload.save()
+        vcf_filename = os.path.join(settings.PRIVATE_DATA_ROOT, "gene_fusion_variants_no_metadata.vcf")
+        upload_step = UploadStep.objects.create(upload_pipeline=self.upload_pipeline,
+                                                name="Create Gene Fusion Variant VCF", sort_order=1,
+                                                input_filename=ALL_FUSIONS_CSV,
+                                                output_filename=vcf_filename)
+        self.assertEqual(EXPECTED_ROWS, DragenTSO500AllFusionsCreateVCFTask.process_items(upload_step))
+        fusions = {record.INFO.get(FUSION_INFO) for record in cyvcf2.VCF(vcf_filename)}
+        self.assertIn("EGFR::SEPTIN14", fusions, "the approved symbol, whichever way the build came")
+
     def test_sept14_resolves_to_septin14(self):
         """ The file says SEPT14; the fusion is EGFR::SEPTIN14 """
         fusions = {record.INFO.get(FUSION_INFO) for record in self.records}

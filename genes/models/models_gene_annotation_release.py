@@ -57,13 +57,15 @@ class GeneAnnotationRelease(models.Model):
         return TranscriptVersion.objects.filter(releasetranscriptversion__release=self,
                                                 transcript=transcript)
 
-    def transcript_versions_for_gene(self, gene) -> QuerySet:
+    def transcript_versions_for_genes(self, genes) -> QuerySet:
         return TranscriptVersion.objects.filter(releasetranscriptversion__release=self,
-                                                gene_version__gene=gene)
+                                                gene_version__gene__in=genes)
+
+    def transcript_versions_for_gene(self, gene) -> QuerySet:
+        return self.transcript_versions_for_genes([gene])
 
     def transcript_versions_for_symbol(self, gene_symbol) -> QuerySet:
-        return TranscriptVersion.objects.filter(releasetranscriptversion__release=self,
-                                                gene_version__gene__in=self.genes_for_symbol(gene_symbol))
+        return self.transcript_versions_for_genes(self.genes_for_symbol(gene_symbol))
 
     def __str__(self):
         return f"{self.genome_build.slug}/{self.get_annotation_consortium_display()} - v{self.version}"
