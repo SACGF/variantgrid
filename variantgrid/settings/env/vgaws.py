@@ -77,6 +77,7 @@ ALLOWED_HOSTS = ['variantgrid.com', 'www.variantgrid.com', WEB_HOSTNAME, WEB_IP]
 CSRF_TRUSTED_ORIGINS = [f"https://{WEB_HOSTNAME}"]
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTOCOL', 'https')
 
+LIFTOVER_BCFTOOLS_SYMBOLIC = True
 PEDIGREE_MADELINE2_COMMAND = "madeline2"
 
 # Lock down menu - hide some VariantGrid urls / menu
