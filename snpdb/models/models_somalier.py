@@ -7,7 +7,7 @@ from subprocess import CalledProcessError
 
 from django.conf import settings
 from django.db import models
-from django.db.models import CASCADE, Q
+from django.db.models import CASCADE, Count, Q
 from django.db.models.signals import pre_delete
 from django.dispatch import receiver
 from django.utils.text import slugify
@@ -18,7 +18,7 @@ from library.django_utils import get_url_from_media_root_filename
 from library.utils import execute_cmd
 from patients.models_enums import Sex
 from pedigree.ped.export_ped import write_trio_ped, write_unrelated_ped
-from snpdb.models import VCF, Cohort, ImportStatus, Sample, SuperPopulationCode, Trio
+from snpdb.models import VCF, Cohort, GenomeBuild, ImportStatus, Sample, SuperPopulationCode, Trio
 from snpdb.models.models_enums import ProcessingStatus
 
 
@@ -166,6 +166,11 @@ class SomalierRelate(AbstractSomalierModel):
         return []
 
     @property
+    def genome_build(self) -> GenomeBuild:
+        """ Which build's sites VCF relate is given (@see SomalierConfig.get_relate_sites_args) """
+        raise NotImplementedError()
+
+    @property
     def has_hom_ref_calls(self) -> bool:
         """ A VCF that records 0/0 calls means an absent site is unknown. Without them (merged
             single-sample calls, benchmark VCFs, anything gVCF-derived) absent means hom-ref, which
@@ -199,12 +204,20 @@ class SomalierCohortRelate(SomalierRelate):
     def get_samples(self) -> Iterable[Sample]:
         return self.cohort.get_samples_qs().filter(no_dna_control=False)
 
+    @property
+    def genome_build(self) -> GenomeBuild:
+        return self.cohort.genome_build
+
 
 class SomalierTrioRelate(SomalierRelate):
     trio = models.OneToOneField(Trio, on_delete=CASCADE)
 
     def get_samples(self) -> Iterable[Sample]:
         return self.trio.get_samples()
+
+    @property
+    def genome_build(self) -> GenomeBuild:
+        return self.trio.genome_build
 
     def has_ped_file(self) -> bool:
         return True
@@ -227,6 +240,17 @@ class SomalierAllSamplesRelate(SomalierRelate):
 
     def get_samples(self) -> Iterable[Sample]:
         return Sample.objects.filter(import_status=ImportStatus.SUCCESS)
+
+    @property
+    def genome_build(self) -> GenomeBuild:
+        """ These samples span builds and relate takes one sites VCF. The builds' sites files are the
+            same variants at different coordinates, differing in alleles at well under 1% of sites, so
+            the build most samples are in is the closest fit """
+        build_counts = self.get_samples().values("vcf__genome_build") \
+            .annotate(num_samples=Count("pk")).order_by("-num_samples")
+        if row := build_counts.first():
+            return GenomeBuild.get_name_or_alias(row["vcf__genome_build"])
+        return GenomeBuild.builds_with_annotation().first()
 
     @property
     def has_hom_ref_calls(self) -> bool:
@@ -293,6 +317,19 @@ class SomalierConfig:
     def get_sites(self, genome_build: 'GenomeBuild'):
         sites = self.settings["annotation"]["sites"][genome_build.name]
         return self._annotation_dir(sites)
+
+    def get_relate_sites_args(self, genome_build: 'GenomeBuild') -> list[str]:
+        """ somalier only counts hom-ref/hom-alt the right way round if relate is given the sites VCF
+            (v0.3.5, brentp/somalier#163). Older ones have no --sites at all, and we compensate in the
+            exported AD order instead - @see snpdb.variants_to_vcf.somalier_alleles_flipped """
+        if self.settings["compensate_allele_order"]:
+            return []
+        sites = self.get_sites(genome_build)
+        if not os.path.exists(sites):
+            raise ValueError(f"somalier relate needs the {genome_build} sites VCF '{sites}', which "
+                             "doesn't exist - it is what makes the counts right with "
+                             "SOMALIER['compensate_allele_order'] off")
+        return ["--sites", sites]
 
     def get_sites_vcf_name(self, genome_build: 'GenomeBuild') -> str:
         return os.path.basename(self.get_sites(genome_build))

@@ -142,13 +142,14 @@ def somalier_alleles_flipped(ref: str, alt: str) -> bool:
     """ somalier keeps each site's two alleles in alphabetical order and reads the genotype against
         that pair rather than against the record's own REF/ALT, so a record whose ALT sorts first is
         read inside out - 20 hom-ref calls come back as 10 hom-ref and 10 hom-alt
-        (https://github.com/brentp/somalier/issues/163, on 0.2.12 and 0.3.4).
+        (https://github.com/brentp/somalier/issues/163, on 0.2.12 up to 0.3.4).
 
         We compensate in the AD pair, which is the field somalier misreads and the only reason this
         file exists; REF, ALT and GT stay as they should be. Only a VCF with no depths to write has
         to carry it in the genotype instead. settings.SOMALIER["compensate_allele_order"] turns it
-        off for a somalier that reads the record's alleles - deployment_check says which way it
-        should be set for the installed binary. """
+        off for 0.3.5+, where relate reads each site's REF/ALT out of the sites VCF instead (@see
+        snpdb.models.models_somalier.SomalierConfig.get_relate_sites_args) - deployment_check says
+        which way it should be set for the installed binary. """
     if not settings.SOMALIER["compensate_allele_order"]:
         return False
     return alt < ref

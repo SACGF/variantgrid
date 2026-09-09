@@ -1,11 +1,14 @@
 """
 Somalier: what we hand to `somalier extract` (issue #183 - the exported depths decide how somalier
-genotypes), whether a relate needs --unknown, and that a failing stage never takes the import down.
+genotypes), what `relate` is run with (--unknown, and the sites VCF of brentp/somalier#163), and that
+a failing stage never takes the import down.
 """
 import os
 import tempfile
+from pathlib import Path
 
 import cyvcf2
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 
@@ -13,10 +16,12 @@ from analysis.tests.inheritance_node_mixin import make_cohort_genotype
 from snpdb.models import (
     CohortGenotype,
     GenomeBuild,
+    ImportStatus,
     ProcessingStatus,
     Sample,
     SomalierAllSamplesRelate,
     SomalierCohortRelate,
+    SomalierConfig,
     SomalierRelatePairs,
     SomalierSampleExtract,
     SomalierVCFExtract,
@@ -121,12 +126,15 @@ class SomalierVCFExportTest(TestCase):
         # 25% of the reads are alt, so 10 alt reads means 30 ref
         self.assertEqual((30, 10), _allele_depths(self.vcf, 10, None, 25.0))
 
-    def _flipped_site_records(self):
-        """ A variant whose ALT sorts before its REF, so somalier reads it against the other allele """
+    def _flipped_site_records(self, compensate_allele_order=True):
+        """ A variant whose ALT sorts before its REF, which a pre-0.3.5 somalier reads against the
+            other allele - the deployment setting decides, so never the box the tests run on """
         variant = slowly_create_test_variant("3", 4000, "T", "A", self.genome_build)
         make_cohort_genotype(self.cohort.cohort_genotype_collection, variant, "ROE",
                              allele_depth=[10, 0, 25], allele_frequency=[0.45, 0.0, 1.0])
-        _, records = self._export()
+        with override_settings(SOMALIER={**settings.SOMALIER,
+                                         "compensate_allele_order": compensate_allele_order}):
+            _, records = self._export()
         return next(r for r in records if r.POS == 4000)
 
     def test_allele_depths_written_in_somalier_site_order(self):
@@ -137,6 +145,14 @@ class SomalierVCFExportTest(TestCase):
         flipped = self._flipped_site_records()
         self.assertEqual(("T", ["A"]), (flipped.REF, flipped.ALT), "REF is the reference base")
         self.assertEqual(["0/0:10,20", "1/1:0,30", "0/1:25,5"], self._calls(flipped))
+
+    def test_allele_depths_left_as_called_for_a_fixed_somalier(self):
+        """ v0.3.5+ reads the site's REF/ALT out of the sites VCF at relate, so nothing is swapped """
+        self.vcf.read_depth_field = "DP"
+        self.vcf.save()
+
+        flipped = self._flipped_site_records(compensate_allele_order=False)
+        self.assertEqual(["0/0:20,10", "1/1:30,0", "0/1:5,25"], self._calls(flipped))
 
     def test_genotype_carries_it_when_there_are_no_depths(self):
         """ Nothing else can, so a depth-less VCF flips the genotype instead (brentp/somalier#163) """
@@ -170,6 +186,44 @@ class SomalierRelateTest(TestCase):
 
     def test_all_samples_relate_never_joint_called(self):
         self.assertFalse(SomalierAllSamplesRelate.objects.create().has_hom_ref_calls)
+
+    def test_all_samples_relate_uses_the_build_most_samples_are_in(self):
+        """ relate takes one sites file and these samples span builds """
+        grch38 = GenomeBuild.get_name_or_alias("GRCh38")
+        create_fake_cohort(self.user, grch38)  # 3 GRCh37 samples in setUpTestData, 3 here
+        create_fake_cohort(self.user, grch38)
+        Sample.objects.all().update(import_status=ImportStatus.SUCCESS)
+        self.assertEqual(grch38, SomalierAllSamplesRelate.objects.create().genome_build)
+
+
+class SomalierRelateSitesTest(TestCase):
+    """ relate is handed the sites VCF exactly when we're not compensating in the AD order (#163) """
+
+    def setUp(self):
+        self.genome_build = GenomeBuild.get_name_or_alias("GRCh37")
+        self.annotation_dir = tempfile.mkdtemp()
+        self.sites_filename = os.path.join(self.annotation_dir, "sites.GRCh37.vcf.gz")
+
+    def _somalier_settings(self, compensate_allele_order: bool) -> dict:
+        return {**settings.SOMALIER, "annotation_base_dir": self.annotation_dir,
+                "annotation": {**settings.SOMALIER["annotation"],
+                               "sites": {"GRCh37": "sites.GRCh37.vcf.gz"}},
+                "compensate_allele_order": compensate_allele_order}
+
+    def test_no_sites_arg_while_compensating(self):
+        with override_settings(SOMALIER=self._somalier_settings(True)):
+            self.assertEqual([], SomalierConfig().get_relate_sites_args(self.genome_build))
+
+    def test_sites_passed_when_not_compensating(self):
+        Path(self.sites_filename).touch()
+        with override_settings(SOMALIER=self._somalier_settings(False)):
+            self.assertEqual(["--sites", self.sites_filename],
+                             SomalierConfig().get_relate_sites_args(self.genome_build))
+
+    def test_missing_sites_file_is_fatal_when_not_compensating(self):
+        with override_settings(SOMALIER=self._somalier_settings(False)):
+            with self.assertRaises(ValueError):
+                SomalierConfig().get_relate_sites_args(self.genome_build)
 
 
 PAIRS_HEADER = "#sample_a\tsample_b\trelatedness\tibs0\tibs2\thom_concordance\thets_a\thets_b\thets_ab\t" \

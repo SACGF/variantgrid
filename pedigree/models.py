@@ -19,7 +19,7 @@ from library.django_utils.guardian_permissions_mixin import (
 )
 from library.preview_request import PreviewModelMixin, SvgSymbolPreviewIconMixin
 from patients.models_enums import Sex
-from snpdb.models import Cohort, CohortSample, ImportStatus, Sample, SomalierRelate
+from snpdb.models import Cohort, CohortSample, GenomeBuild, ImportStatus, Sample, SomalierRelate
 
 
 class PedFile(GuardianPermissionsMixin, models.Model):
@@ -183,6 +183,10 @@ class SomalierPedigreeRelate(SomalierRelate):
 
     def get_samples(self) -> Iterable[Sample]:
         return self.pedigree.get_samples()
+
+    @property
+    def genome_build(self) -> GenomeBuild:
+        return self.pedigree.genome_build
 
     def write_ped_file(self, filename):
         pass

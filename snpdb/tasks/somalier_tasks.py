@@ -214,7 +214,7 @@ def _somalier_relate(somalier_relate: SomalierRelate) -> Path:
     somalier_bin = cfg.get_annotation("command")
     processing_dir = get_import_processing_dir(somalier_relate.pk, "somalier_relate")
 
-    command = [somalier_bin, "relate"]
+    command = [somalier_bin, "relate", *cfg.get_relate_sites_args(somalier_relate.genome_build)]
     if not somalier_relate.has_hom_ref_calls:
         # Somalier --unknown    set unknown genotypes to hom-ref.
         # Without 0/0 calls in the VCF an absent site means hom-ref, not unknown

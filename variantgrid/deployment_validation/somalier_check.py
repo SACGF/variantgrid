@@ -28,6 +28,9 @@ ALLELE_ORDER_SITES_PER_ORDER = 10
 ALLELE_ORDER_DEPTH = 80
 ALLELE_ORDER_SAMPLE = "allele_order_check"
 SOMALIER_ALLELE_ORDER_ISSUE = "https://github.com/brentp/somalier/issues/163"
+RELATE_SITES_OPTION = "--sites"
+# What a pre-0.3.5 relate says when we hand it the sites VCF the fixed one needs
+RELATE_NO_SITES_OPTION = f"unknown option: {RELATE_SITES_OPTION}"
 
 
 def verify_somalier_config() -> Optional[str]:
@@ -41,6 +44,17 @@ def verify_somalier_config() -> Optional[str]:
         log_traceback()
 
     return somalier
+
+
+def _relate_takes_sites(cfg: SomalierConfig) -> bool:
+    """ Whether the installed somalier is one of the fixed ones - asking relate beats parsing a version """
+    somalier_bin = cfg.get_annotation("command")
+    try:
+        relate_help = check_output([somalier_bin, "relate", "--help"], stderr=subprocess.STDOUT).decode()
+    except Exception:
+        log_traceback()
+        return False
+    return RELATE_SITES_OPTION in relate_help
 
 
 def _write_allele_order_vcf(genome_build: GenomeBuild, sites_filename: str, vcf_filename: str) -> int:
@@ -99,7 +113,8 @@ def _somalier_genotype_counts(cfg: SomalierConfig, genome_build: GenomeBuild, wo
         raise ValueError(f"somalier extract failed: {stderr}")
 
     somalier_file = os.path.join(extract_dir, f"{ALLELE_ORDER_SAMPLE}.somalier")
-    return_code, _stdout, stderr = execute_cmd([somalier_bin, "relate", somalier_file], cwd=relate_dir)
+    relate_cmd = [somalier_bin, "relate", *cfg.get_relate_sites_args(genome_build), somalier_file]
+    return_code, _stdout, stderr = execute_cmd(relate_cmd, cwd=relate_dir)
     if return_code != 0:
         raise ValueError(f"somalier relate failed: {stderr}")
 
@@ -108,12 +123,13 @@ def _somalier_genotype_counts(cfg: SomalierConfig, genome_build: GenomeBuild, wo
 
 
 def verify_somalier_allele_order() -> dict:
-    """ somalier reads a record against its own alphabetically sorted site alleles rather than the
-        record's REF/ALT, so snpdb.variants_to_vcf writes the AD pair in the site's order to
-        compensate. If somalier is ever fixed the compensation becomes the bug and every relatedness
-        inverts, and nothing else would say so - a deployment upgrades somalier on its own schedule.
-        So genotype a handful of hom-ref calls of each allele order through the installed binary and
-        check they come back hom-ref. @see snpdb/variants_to_vcf.py:somalier_alleles_flipped """
+    """ A somalier before v0.3.5 reads a record against its own alphabetically sorted site alleles
+        rather than the record's REF/ALT, so snpdb.variants_to_vcf writes the AD pair in the site's
+        order to compensate. Against a v0.3.5+ handed the sites VCF at relate the compensation becomes
+        the bug and every relatedness inverts, and nothing else would say so - a deployment upgrades
+        somalier on its own schedule. So genotype a handful of hom-ref calls of each allele order
+        through the installed binary, the way the setting says to, and check they come back hom-ref.
+        @see snpdb/variants_to_vcf.py:somalier_alleles_flipped """
     cfg = SomalierConfig()
     for genome_build in GenomeBuild.builds_with_annotation():
         sites_filename = cfg.get_sites(genome_build)
@@ -133,10 +149,31 @@ def verify_somalier_allele_order() -> dict:
             counts = _somalier_genotype_counts(cfg, genome_build, work_dir, vcf_filename)
     except Exception as e:
         log_traceback()
-        return {"valid": True, "warning": f"Somalier allele order unchecked: {e}"}
+        return allele_order_unchecked(str(e))
 
-    return allele_order_result(str(genome_build), num_sites, int(counts["n_hom_ref"]),
-                               int(counts["n_hom_alt"]), settings.SOMALIER["compensate_allele_order"])
+    compensating = settings.SOMALIER["compensate_allele_order"]
+    result = allele_order_result(str(genome_build), num_sites, int(counts["n_hom_ref"]),
+                                 int(counts["n_hom_alt"]), compensating)
+    if result["valid"] and compensating and _relate_takes_sites(cfg):
+        # Both settings genotype correctly on a fixed somalier, so nothing above fails - but the
+        # workaround is only carried for the binaries that need it
+        result["warning"] = ("This somalier's relate takes --sites, so it doesn't need the exported AD "
+                             "pair swapped around: set SOMALIER[\"compensate_allele_order\"] = False and "
+                             "re-run 'somalier_existing_vcfs --clear' to rebuild the extracts")
+    return result
+
+
+def allele_order_unchecked(error: str) -> dict:
+    """ The probe couldn't run, which is usually a local problem and not something to fail a deploy
+        over - except when relate rejected the --sites this deployment's settings say to pass it,
+        which is the answer rather than the absence of one. """
+    if RELATE_NO_SITES_OPTION in error:
+        return {"valid": False,
+                "fix": "This somalier predates v0.3.5, whose relate --sites is the only thing that makes "
+                       "its hom-ref/hom-alt counts right. Set SOMALIER[\"compensate_allele_order\"] = True "
+                       "and re-run 'somalier_existing_vcfs --clear', or install a later somalier. "
+                       f"See {SOMALIER_ALLELE_ORDER_ISSUE}"}
+    return {"valid": True, "warning": f"Somalier allele order unchecked: {error}"}
 
 
 def allele_order_result(genome_build_name: str, num_sites: int, hom_ref: int, hom_alt: int,
@@ -151,8 +188,9 @@ def allele_order_result(genome_build_name: str, num_sites: int, hom_ref: int, ho
            f"{genome_build_name} - this somalier and SOMALIER[\"compensate_allele_order\"] "
            f"({compensating}) disagree, see {SOMALIER_ALLELE_ORDER_ISSUE}")
     if hom_ref == ALLELE_ORDER_SITES_PER_ORDER and hom_alt == ALLELE_ORDER_SITES_PER_ORDER:
-        fix += (f". Set SOMALIER[\"compensate_allele_order\"] = {not compensating} in this deployment's "
-                "settings and re-run 'somalier_existing_vcfs --clear' to rebuild the extracts")
+        needs = " (needs somalier v0.3.5+, whose relate takes --sites)" if compensating else ""
+        fix += (f". Set SOMALIER[\"compensate_allele_order\"] = {not compensating}{needs} in this "
+                "deployment's settings and re-run 'somalier_existing_vcfs --clear' to rebuild the extracts")
     else:
         fix += (". Neither setting explains this, so somalier is genotyping some third way - check that "
                 "issue before trusting relatedness")

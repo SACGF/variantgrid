@@ -7,6 +7,7 @@ from django.test import SimpleTestCase
 from variantgrid.deployment_validation.somalier_check import (
     ALLELE_ORDER_SITES_PER_ORDER,
     allele_order_result,
+    allele_order_unchecked,
 )
 
 NUM_SITES = 2 * ALLELE_ORDER_SITES_PER_ORDER
@@ -35,3 +36,18 @@ class SomalierAlleleOrderResultTest(SimpleTestCase):
         self.assertFalse(result["valid"])
         self.assertNotIn("compensate_allele_order\"] =", result["fix"])
         self.assertIn("third way", result["fix"])
+
+
+class SomalierAlleleOrderUncheckedTest(SimpleTestCase):
+    def test_relate_refusing_sites_is_an_answer_not_a_missing_one(self):
+        """ Only a somalier before v0.3.5 has no relate --sites, so it can't be the one the settings
+            are written for """
+        result = allele_order_unchecked("somalier relate failed: Error: unhandled exception: "
+                                        "unknown option: --sites [UsageError]")
+        self.assertFalse(result["valid"])
+        self.assertIn('compensate_allele_order"] = True', result["fix"])
+
+    def test_anything_else_is_a_warning(self):
+        result = allele_order_unchecked("tabix failed: no such file")
+        self.assertTrue(result["valid"])
+        self.assertIn("unchecked", result["warning"])
