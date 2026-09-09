@@ -1,4 +1,6 @@
 import os
+import shutil
+import tempfile
 from unittest.mock import patch
 
 from django.conf import settings
@@ -140,20 +142,17 @@ class TestAnnotationVCFCNV4(TestAnnotationVCFCNV):
 
     def setUp(self):
         super().setUp()
-        self._sidecars = []
-
-    def tearDown(self):
-        for sidecar in self._sidecars:
-            if os.path.exists(sidecar):
-                os.remove(sidecar)
-        super().tearDown()
+        # The sidecar lives next to the annotated VCF, so each test imports from its own copy of the
+        # fixture in a temp dir - nothing is written into test_data, whatever the test does
+        temp_dir = tempfile.mkdtemp(prefix="vg_sv_conservation_")
+        self.addCleanup(shutil.rmtree, temp_dir, ignore_errors=True)
+        self.TEST_ANNOTATION_VCF_GRCH37 = shutil.copy(type(self).TEST_ANNOTATION_VCF_GRCH37, temp_dir)
+        self.TEST_ANNOTATION_VCF_GRCH38 = shutil.copy(type(self).TEST_ANNOTATION_VCF_GRCH38, temp_dir)
 
     def _write_conservation_sidecar(self, vcf_filename, conservation):
         columns = sorted({c for values in conservation.values() for c in values})
         tracks = [ConservationTrack(name=c, path="", db_column=c) for c in columns]
-        sidecar = conservation_sidecar_filename(vcf_filename)
-        write_conservation_sidecar(sidecar, conservation, tracks)
-        self._sidecars.append(sidecar)
+        write_conservation_sidecar(conservation_sidecar_filename(vcf_filename), conservation, tracks)
 
     def test_import_variant_annotations_grch37(self):
         # Write the pyBigWig sidecar next to the annotated VCF so the import path picks it up.
