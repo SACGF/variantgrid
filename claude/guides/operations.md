@@ -119,7 +119,7 @@ and many more variants and samples.
 
 CI (`.github/workflows/django-tests.yml`) runs the suite with `--parallel 4 --keepdb` against Postgres 16, Redis and
 RabbitMQ service containers under `variantgrid/settings/env/github_actions.py`, skipping pushes that only touch `*.md` or `claude/**`;
-`.github/workflows/agent-maps.yml` runs `vg map --check` on every push without a database. Browser regression tests live in
+`.github/workflows/agent-maps.yml` generates the maps and runs `vg docs check` on every push without a database. Browser regression tests live in
 the private [variantgrid_autotests](https://github.com/SACGF/variantgrid_autotests) repo (Selenium, run with
 `run_tests.py <instance.ini> [test | +keyword | -keyword]` against a deployed instance) - the after-deploy net, not the edit
 loop. GitHub issues are closed by a human after that pipeline, never by a commit keyword.

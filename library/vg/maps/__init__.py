@@ -1,8 +1,9 @@
 """
-`vg map`: generated facts about the codebase, committed under claude/maps/ and checked in CI.
+`vg map`: generated facts about the codebase, written to the gitignored claude/maps/.
 
-Each generator returns a list of MapTable; `write_map` renders it to claude/maps/<name>.md and `check`
-reports the maps whose committed copy differs from a fresh render (the `makemigrations --check` idea).
+Each generator returns a list of MapTable; `write_map` renders it to claude/maps/<name>.md. The maps are
+rebuilt by the SessionStart hook and in CI rather than committed, so they never appear in a diff; `check`
+compares an on-disk copy against a fresh render for anyone who wants it.
 
 Maps are canonical under the CI settings module (variantgrid.settings.env.github_actions) because
 `models` and `urls` depend on INSTALLED_APPS and settings-gated URL includes. scripts/vg sets that

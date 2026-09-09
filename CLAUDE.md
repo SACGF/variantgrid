@@ -39,7 +39,7 @@ Route by task. The app notes (`<app>/CLAUDE.md`) load automatically when you wor
 | a management command that must run on deploy | `manual/__manual_readme.md` | `manage.py manual_outstanding` |
 | a setting, secrets, services, deploy, scale | `claude/guides/operations.md` | `vg settings NAME`, `vg status` |
 | writing a test | `claude/guides/testing.md` (fixture index) | `scripts/vg tests --explain` |
-| where a URL / task / signal / command lives | `claude/maps/*.md` (generated, never hand-edited) | `scripts/vg map --check` |
+| where a URL / task / signal / command lives | `claude/maps/*.md` (generated, gitignored, never hand-edited) | `scripts/vg map` |
 
 `claude/research/<app>.md` are the longer narratives - flows, why, history, traps - each with a `Verified against <sha>` header
 and citations that `scripts/vg docs check` keeps live. A research doc still without that header is from an earlier model:
@@ -72,15 +72,15 @@ scripts/vg outline --coverage                     # module docstring coverage pe
 scripts/vg tests --explain [--run]                # only the test modules a change puts at risk
 scripts/vg docs check [doc.md]                    # every path / path:Symbol citation in the docs resolves; CI runs it
 python3 manage.py vg page /variantopedia/dashboard --queries   # render a page as claude_agent: status, outline, N+1s
-scripts/vg map [--check]                          # regenerate claude/maps/*.md; --check is what CI runs
+scripts/vg map                                    # regenerate claude/maps/*.md (gitignored; the session hook does this)
 python3 manage.py test --keepdb [label]           # --keepdb always; whole suite: --parallel 4 (~2 min)
 ./scripts/linting/run_pylint.sh                   # pylint to lint.txt; ruff runs per file from the edit hook
 python3 manage.py runserver | migrate | shell
 ```
 
 Tests: `python3 manage.py test --keepdb snpdb.tests.test_variant.VariantTest.test_something` for one method. Per-app
-rules live in `<app>/CLAUDE.md`; `claude/maps/` are generated facts - run `scripts/vg map` after changing a model, URL,
-task, signal, setting or command, and commit the result.
+rules live in `<app>/CLAUDE.md`; `claude/maps/` are generated facts, gitignored and rebuilt by the SessionStart hook -
+run `scripts/vg map` to refresh them after changing a model, URL, task, signal, setting or command.
 
 Python packages: this project uses **uv** - the `.venv` is uv-created and `requirements.txt` is compiled from
 `requirements.in`. Use `uv pip install <package>`, `uv pip compile requirements.in -o requirements.txt`, `uv pip sync requirements.txt`.
@@ -210,8 +210,7 @@ When asked to draft a prompt for an agent to implement a plan in another convers
 1. `scripts/vg tests --explain` names the tests at risk and they pass; the ones kept earn their keep (Testing, above).
 2. A new module has a docstring stating what it owns and its entry points. A gotcha learned the hard way is one line in
    the app's `CLAUDE.md`, next to the code it is about - not a memory, not this file.
-3. `scripts/vg map --check` passes when a model, URL, task, signal, setting or command changed, and `scripts/vg docs check`
-   passes after any doc edit (CI enforces both). A citation is a repo path or `snpdb/models/models_variant.py:Variant`-style path:Symbol in backticks; a plan is checked while
+3. `scripts/vg docs check` passes after any doc edit (CI enforces it). A citation is a repo path or `snpdb/models/models_variant.py:Variant`-style path:Symbol in backticks; a plan is checked while
    its `Status:` is draft, approved or in progress.
 4. The plan file's `Status:` line records the outcome; a landed plan whose knowledge has moved into docs is deleted.
 5. The report-back ends with what the next agent should know, one to three lines; a durable project fact among them goes

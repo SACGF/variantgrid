@@ -11,4 +11,6 @@ else
 fi
 newest_plan=$(ls -t claude/plans/*.md 2>/dev/null | head -1)
 [ -n "$newest_plan" ] && echo "newest plan: $newest_plan ($(sed -n 's/^Status: *//p' "$newest_plan" | head -1))"
+# claude/maps/*.md are gitignored: regenerate in the background so they are fresh and never in a diff.
+(scripts/vg map >/dev/null 2>&1 &)
 echo "orient with: python3 manage.py vg status · scripts/vg tests --explain · vg page <url> --queries (CLAUDE.md 'Start here')"
