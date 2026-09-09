@@ -15,10 +15,12 @@ from analysis.models.nodes.analysis_node import (
     NodeAlleleFrequencyFilter,
     NodeAuditLogMixin,
     NodeVCFFilter,
-    annotate_and_filter_queryset,
-    queryset_to_pk_in_q,
 )
-from analysis.models.nodes.cohort_mixin import SampleMixin
+from analysis.models.nodes.cohort_mixin import (
+    SampleMixin,
+    get_sample_annotation_kwargs,
+    get_sample_pk_in_q,
+)
 from analysis.models.nodes.node_display import NodeChip, NodeIcon
 from analysis.models.nodes.stats_cache import (
     get_cached_label_count_for_cohort,
@@ -185,14 +187,7 @@ class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
         if self.is_group_level:
             kwargs["override"] = False
             for sample in self.get_source_samples():
-                annotation_kwargs.update(self._get_sample_annotation_kwargs(sample, **kwargs))
-        return annotation_kwargs
-
-    @staticmethod
-    def _get_sample_annotation_kwargs(sample: Sample, **kwargs) -> dict:
-        """ The genotype join for one sample's VCF, plus its zygosity alias """
-        annotation_kwargs = dict(sample.cohort_genotype_collection.get_annotation_kwargs(**kwargs))
-        annotation_kwargs.update(sample.get_annotation_kwargs(**kwargs))
+                annotation_kwargs.update(get_sample_annotation_kwargs(sample, **kwargs))
         return annotation_kwargs
 
     def _get_cache_key(self) -> str:
@@ -324,16 +319,6 @@ class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
             q_hash = str(q)
         return {None: {q_hash: q}}
 
-    def _get_sample_pk_q(self, sample: Sample) -> Q:
-        """ One sample's variants as pk IN (subquery). Annotated with only its own VCF's genotype join,
-            so the subquery doesn't drag the group's other outer joins through with it """
-        qs = self._get_model_queryset()
-        a_kwargs = self._get_sample_annotation_kwargs(sample)
-        qs, q_list = annotate_and_filter_queryset(qs, a_kwargs, self._get_sample_arg_q_dict(sample))
-        if q_list:
-            qs = qs.filter(reduce(operator.and_, q_list))
-        return queryset_to_pk_in_q(qs)
-
     def _get_node_arg_q_dict(self) -> dict[Optional[str], dict[str, Q]]:
         samples = self.get_source_samples()
         if not samples:
@@ -348,7 +333,8 @@ class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
             return arg_q_dict
 
         # pk__in subqueries don't fan out rows the way joins do, so no distinct() is needed
-        q = reduce(operator.or_, [self._get_sample_pk_q(sample) for sample in samples])
+        q = reduce(operator.or_, [get_sample_pk_in_q(self, sample, self._get_sample_arg_q_dict(sample))
+                                  for sample in samples])
         return {None: {self._get_node_q_hash(): q}}
 
     # ── VCF FILTER - one node level selection, resolved per VCF ───────────────

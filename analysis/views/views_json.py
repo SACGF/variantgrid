@@ -2,6 +2,7 @@ import json
 import logging
 import random
 from collections import Counter
+from typing import Optional
 
 from celery.result import AsyncResult
 from django.conf import settings
@@ -54,7 +55,8 @@ from analysis.views.node_json_view import NodeJSONPostView
 from library.django_utils import require_superuser
 from ontology.models import OntologyTerm, OntologyVersion
 from ontology.serializers import OntologyTermSerializer
-from snpdb.models import BuiltInFilters, GenomeBuild, Sample, Tag
+from patients.models import Patient
+from snpdb.models import BuiltInFilters, GenomeBuild, Tag
 from snpdb.models.models_enums import TagFilter
 from variantgrid.celery import app
 
@@ -420,27 +422,19 @@ def create_selected_child(request, analysis_id, node_id):
     return JsonResponse(data)
 
 
-def get_sample_patient_gene_disease_data(sample: Sample, ontology_version: OntologyVersion):
+def get_patient_gene_disease_data(patient: Optional[Patient], ontology_version: OntologyVersion) -> dict:
+    """ A patient's MONDO terms that are associated with gene/disease. Used by the MOI node """
     data = {
-        "patient_id": sample.patient_id
+        "patient_id": patient.pk if patient else None
     }
-    if sample.patient:
-        all_terms = OntologyTerm.objects.filter(pk__in=sample.patient.get_ontology_term_ids())
+    if patient:
+        all_terms = OntologyTerm.objects.filter(pk__in=patient.get_ontology_term_ids())
         gene_disease_qs = ontology_version.get_gene_disease_relations_qs()
         gene_disease_terms = all_terms.filter(subject__in=gene_disease_qs).distinct()
-        data["patient"] = str(sample.patient)
+        data["patient"] = str(patient)
         data["total_terms"] = all_terms.count()
         data["terms"] = [OntologyTermSerializer(t).data for t in gene_disease_terms]
     return data
-
-
-def sample_patient_gene_disease(request, sample_id, ontology_version_id):
-    """ For a sample, return patient MONDO terms that are associated with gene/disease
-        Used by MOI Node """
-    sample = Sample.get_for_user(request.user, sample_id)
-    ontology_version = get_object_or_404(OntologyVersion, pk=ontology_version_id)
-    data = get_sample_patient_gene_disease_data(sample, ontology_version)
-    return JsonResponse(data)
 
 
 @require_POST

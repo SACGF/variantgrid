@@ -7,9 +7,16 @@ import simplejson
 from django.db.models import Q
 
 from analysis.models.enums import GroupOperation
-from analysis.models.nodes.analysis_node import NodeAlleleFrequencyFilter, NodeVCFFilter
+from analysis.models.nodes.analysis_node import (
+    NodeAlleleFrequencyFilter,
+    NodeVCFFilter,
+    annotate_and_filter_queryset,
+    queryset_to_pk_in_q,
+)
 from library.genomics.vcf_writer import percent_decode_info_value
-from patients.models_enums import Zygosity
+from patients.models import Patient
+from patients.models_enums import SampleSourceLevel, Zygosity
+from patients.sample_grouping import get_patient_for_source
 from snpdb.archive import DataArchivedError
 from snpdb.models import Cohort, CohortGenotypeCollection, ImportStatus, Sample, VCFFilter, VCFInfo
 from snpdb.views.datatable_view import CellData, NullOrder, RichColumn
@@ -26,6 +33,33 @@ def _render_fusion_calls(cell: CellData) -> str:
     if not (encoded := cell.value):
         return ""
     return format_fusion_observations(simplejson.loads(percent_decode_info_value(encoded)))
+
+
+def get_sample_annotation_kwargs(sample: Sample, **kwargs) -> dict:
+    """ The genotype join for one sample's VCF, plus its zygosity alias """
+    annotation_kwargs = dict(sample.cohort_genotype_collection.get_annotation_kwargs(**kwargs))
+    annotation_kwargs.update(sample.get_annotation_kwargs(**kwargs))
+    return annotation_kwargs
+
+
+def get_sample_pk_in_q(node, sample: Sample, arg_q_dict: dict[Optional[str], dict[str, Q]]) -> Q:
+    """ One sample's variants as pk IN (subquery). Annotated with only its own VCF's genotype join,
+        so the subquery doesn't drag the other samples' outer joins through with it """
+    qs = node._get_model_queryset()  # pylint: disable=protected-access
+    a_kwargs = get_sample_annotation_kwargs(sample)
+    qs, q_list = annotate_and_filter_queryset(qs, a_kwargs, arg_q_dict)
+    if q_list:
+        qs = qs.filter(reduce(operator.and_, q_list))
+    return queryset_to_pk_in_q(qs)
+
+
+def get_sample_any_zygosity_arg_q_dict(sample: Sample) -> dict[Optional[str], dict[str, Q]]:
+    """ A sample's rows, unfiltered - the zygosity IN is what restricts the outer join to them, so a
+        VCF with nothing to filter on passes through rather than being left out
+        (@see analysis/models/nodes/sources/sample_node.py:SampleNode._get_sample_arg_q_dict) """
+    alias, field = sample.get_cohort_genotype_alias_and_field("zygosity")
+    q = Q(**{f"{field}__in": [code for code, _ in Zygosity.CHOICES]})
+    return {alias: {str(q): q}}
 
 
 class CohortMixin:
@@ -399,17 +433,85 @@ class SampleMixin(CohortMixin):
 
 
 class AncestorSampleMixin(SampleMixin):
-    """ Must have a "sample" field that is set from ancestor """
+    """ A filter node that applies to either one sample or one patient, set from its ancestors.
+
+        The model needs a "sample" and a "patient" field, at most one of which is set - both null
+        means unset. In patient mode the filter applies to every ancestor sample of that patient and
+        the node's query is the OR of the per-sample filters, the shape a group level SampleNode
+        produces (@see analysis/models/nodes/sources/sample_node.py:SampleNode). "Every ancestor
+        sample" is the scope rather than every sample of the patient, so the source node decides the
+        reach and the filter follows it. """
 
     def _set_sample(self, sample):
         self.sample = sample
+        self.patient = None
+
+    def _set_patient(self, patient):
+        self.patient = patient
+        self.sample = None
+
+    def get_filter_patient(self) -> Optional[Patient]:
+        """ Who the node is about - the patient it was set to, or the one its sample belongs to """
+        if self.patient:
+            return self.patient
+        return get_patient_for_source(SampleSourceLevel.SAMPLE, self.sample)
+
+    def get_filter_samples(self) -> list[Sample]:
+        """ The samples this node's genotype filters apply to - every path that used self.sample
+            for a genotype join goes through here """
+        if self.sample:
+            return [self.sample]
+        if self.patient:
+            samples = [s for s in self._get_ancestor_samples()
+                       if get_patient_for_source(SampleSourceLevel.SAMPLE, s) == self.patient]
+            return sorted(samples, key=lambda s: s.pk)
+        return []
+
+    def _get_filter_samples_arg_q_dict(self, per_sample) -> dict[Optional[str], dict[str, Q]]:
+        """ The one place the per-sample OR is built. per_sample(sample) returns that sample's
+            arg_q_dict, keyed on its own alias.
+
+            Sample mode returns it as is. Patient mode wraps each sample's filters in a pk__in
+            subquery annotated with only that sample's genotype join - a Q keyed on an alias runs as
+            soon as that alias is annotated (@see analysis_node.annotate_and_filter_queryset), so an
+            OR across two aliases has nowhere to hang until both are """
+        samples = self.get_filter_samples()
+        if not samples:
+            return {}
+        if self.sample:
+            return per_sample(samples[0])
+        q = reduce(operator.or_, [get_sample_pk_in_q(self, sample, per_sample(sample)) for sample in samples])
+        return {None: {self._get_node_q_hash(): q}}
+
+    def _get_cohorts_and_sample_visibility_for_node(self):
+        if not self.patient:
+            return super()._get_cohorts_and_sample_visibility_for_node()
+
+        cohorts = []
+        visibility = {}
+        for sample in self.get_filter_samples():
+            cohort = sample.vcf.cohort
+            if cohort not in cohorts:
+                cohorts.append(cohort)
+            visibility[sample] = sample.has_sample_columns
+        return cohorts, visibility
+
+    def _get_annotation_kwargs_for_node(self, **kwargs) -> dict:
+        annotation_kwargs = super()._get_annotation_kwargs_for_node(**kwargs)
+        if self.patient:
+            kwargs["override"] = False
+            for sample in self.get_filter_samples():
+                annotation_kwargs.update(get_sample_annotation_kwargs(sample, **kwargs))
+        return annotation_kwargs
 
     def _get_configuration_errors(self) -> list:
         errors = super()._get_configuration_errors()
         if self.sample:
-            parent_sample_set = self._get_ancestor_samples()
-            if self.sample not in parent_sample_set:
+            if self.sample not in self._get_ancestor_samples():
                 errors.append(f"Sample: {self.sample} is not set as a sample in any ancestors of this node")
+        elif self.patient:
+            if not self.get_filter_samples():
+                errors.append(f"Patient: {self.patient} has no samples in any ancestors of this node")
         return errors
 
     def _get_ancestor_samples(self) -> set[Sample]:
@@ -422,7 +524,7 @@ class AncestorSampleMixin(SampleMixin):
         return parent_sample_set
 
     def handle_ancestor_input_samples_changed(self):
-        """ Auto-set to single sample ancestor (or remove if no longer ancestor) """
+        """ Auto-set to the ancestors' proband (or remove if no longer reachable from them) """
 
         parent_sample_set = self._get_ancestor_samples()
 
@@ -433,10 +535,17 @@ class AncestorSampleMixin(SampleMixin):
             if self.sample and self.sample not in parent_sample_set:
                 self._set_sample(None)
                 modified = True
+            if self.patient and not self.get_filter_samples():
+                self._set_patient(None)
+                modified = True
 
-        if self.sample is None:
+        if self.sample is None and self.patient is None:
             if proband_sample := self.get_proband_sample():
                 self._set_sample(proband_sample)
+                modified = True
+            elif proband_patient := self.get_proband_patient():
+                # Several callers on the one extraction have no single sample, but are one person
+                self._set_patient(proband_patient)
                 modified = True
             elif len(parent_sample_set) == 1:
                 self._set_sample(parent_sample_set.pop())

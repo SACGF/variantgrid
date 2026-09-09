@@ -28,6 +28,7 @@ from genes.models import (
 from genes.models_enums import PanelAppConfidence
 from genes.panel_app import get_panel_app_local_cache
 from pathtests.models import PathologyTestVersion
+from patients.models import Patient
 from snpdb.models import Contig, Sample
 from snpdb.models.models_enums import ImportStatus
 
@@ -40,6 +41,7 @@ class GeneListNode(AncestorSampleMixin, GeneCoverageMixin, AnalysisNode):
     PANEL_APP_GENE_LIST = 4
 
     sample = models.ForeignKey(Sample, null=True, blank=True, on_delete=SET_NULL)
+    patient = models.ForeignKey(Patient, null=True, blank=True, on_delete=SET_NULL)
     sample_gene_list = models.ForeignKey(SampleGeneList, null=True, blank=True, on_delete=SET_NULL)
     has_gene_coverage = models.BooleanField(null=True)
     custom_text_gene_list = models.OneToOneField(CustomTextGeneList, null=True, on_delete=models.SET_NULL)
@@ -64,7 +66,7 @@ class GeneListNode(AncestorSampleMixin, GeneCoverageMixin, AnalysisNode):
         GENE_LISTS = [
             lambda: [gln_gl.gene_list for gln_gl in self.genelistnodegenelist_set.all()],
             lambda: [self.custom_text_gene_list.gene_list] if self.custom_text_gene_list else [],
-            lambda: [self.sample_gene_list.gene_list] if self.sample_gene_list else [],
+            self._get_sample_qc_gene_lists,
             lambda: [self.pathology_test_version.gene_list] if self.pathology_test_version else [],
             # Skip soft-deleted PanelApp panels (issue #405) — they have no cache and
             # accessing .gene_list would re-hit PanelApp and raise NotFound, 500ing the editor view.
@@ -73,6 +75,22 @@ class GeneListNode(AncestorSampleMixin, GeneCoverageMixin, AnalysisNode):
         ]
         getter = GENE_LISTS[int(self.accordion_panel)]
         return [gl for gl in getter() if gl is not None]
+
+    def _get_sample_qc_gene_lists(self) -> list:
+        """ The QC gene list of each sample the node applies to. In patient mode these are resolved
+            when asked for rather than stored, so a sample linked to the patient later is picked up -
+            _get_node_q_hash folds in the gene list pks, so nothing stored goes stale """
+        if self.patient:
+            gene_lists = []
+            for sample in self.get_filter_samples():
+                try:
+                    gene_list = sample.activesamplegenelist.sample_gene_list.gene_list
+                except ActiveSampleGeneList.DoesNotExist:
+                    continue  # Samples without one are skipped
+                if gene_list not in gene_lists:
+                    gene_lists.append(gene_list)
+            return gene_lists
+        return [self.sample_gene_list.gene_list] if self.sample_gene_list else []
 
     def _get_node_q_hash(self) -> str:
         # sorted (by string) so it's consistent for hash
@@ -214,6 +232,11 @@ class GeneListNode(AncestorSampleMixin, GeneCoverageMixin, AnalysisNode):
                 # Will have to select manually
                 logging.warning("%s - couldn't set active gene list", self.node_version)
         self.sample_gene_list = sample_gene_list
+
+    def _set_patient(self, patient):
+        """ The patient's samples resolve their own gene lists @see _get_sample_qc_gene_lists """
+        super()._set_patient(patient)
+        self.sample_gene_list = None
 
     def _load(self):
         deleted_panels = []

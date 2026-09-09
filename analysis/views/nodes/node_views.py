@@ -54,11 +54,12 @@ from analysis.models.nodes.sources.pedigree_node import PedigreeNode
 from analysis.models.nodes.sources.quad_node import QuadNode
 from analysis.models.nodes.sources.trio_node import TrioNode
 from analysis.views.nodes.node_view import NodeView
-from analysis.views.views_json import get_sample_patient_gene_disease_data
+from analysis.views.views_json import get_patient_gene_disease_data
 from classification.models.classification import Classification
 from classification.views.classification_datatables import ClassificationColumns
-from library.django_utils import highest_pk
-from library.django_utils import resolve_field_path
+from library.django_utils import highest_pk, resolve_field_path
+from patients.models_enums import SampleSourceLevel
+from patients.sample_grouping import get_patient_for_source
 from snpdb.models.models_user_settings import UserSettings
 from snpdb.models.models_variant import Variant
 
@@ -245,11 +246,22 @@ class MOINodeView(NodeView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        if self.object.sample:
-            ontology_version = self.object.analysis.annotation_version.ontology_version
-            context["sample_patient_gene_disease"] = get_sample_patient_gene_disease_data(self.object.sample,
-                                                                                          ontology_version)
+        context["applies_to_gene_disease"] = self._get_applies_to_gene_disease()
         return context
+
+    def _get_applies_to_gene_disease(self) -> dict:
+        """ The patient's gene/disease terms for every choice the picker offers, keyed on its
+            "<kind>:<pk>" value - the editor's "From Patient" panel reads what is selected """
+        ontology_version = self.object.analysis.annotation_version.ontology_version
+        data_by_patient = {}
+        applies_to_gene_disease = {}
+        for sample in self.object.get_samples():
+            patient = get_patient_for_source(SampleSourceLevel.SAMPLE, sample)
+            if patient and patient.pk not in data_by_patient:
+                data_by_patient[patient.pk] = get_patient_gene_disease_data(patient, ontology_version)
+                applies_to_gene_disease[f"patient:{patient.pk}"] = data_by_patient[patient.pk]
+            applies_to_gene_disease[f"sample:{sample.pk}"] = data_by_patient.get(patient.pk) if patient else {}
+        return applies_to_gene_disease
 
 
 class PedigreeNodeView(NodeView):

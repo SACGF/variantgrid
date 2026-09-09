@@ -14,7 +14,7 @@
     accordionForm(moiNodeForm);
     ajaxForm(moiNodeForm);
 
-    $("#id_sample", moiNodeForm).change(changeSample);
+    $("#id_applies_to", moiNodeForm).change(changeAppliesTo);
 
     function setupCollapse(selector) {
         let allMessage = $(selector + "-all-message");
@@ -48,7 +48,7 @@
     }
 
     // Initial setup from loading config
-    populateMOIPatient({{ node.sample_id|jsonify }}, {{ sample_patient_gene_disease|jsonify }});
+    populateMOIPatient($("#id_applies_to", moiNodeForm).val());
 
 {% endblock docreadyjs %}
 
@@ -73,14 +73,19 @@
         $("#moi-accordion-patient-control", accordion).addClass("disabled");
     }
 
-    function populateMOIPatient(sampleId, data, changed) {
+    // Gene/disease terms for every choice the picker offers, keyed on its "<kind>:<pk>" value -
+    // the set is the ancestors', so it is small enough to send with the editor
+    const APPLIES_TO_GENE_DISEASE = {{ applies_to_gene_disease|jsonify }};
+
+    function populateMOIPatient(appliesTo, changed) {
         let accordion = $("#moi-terms-accordion");
         let patientInfo = $("#moi-patient-info");
         let patientTerms = $("#moi-patient-terms");
         patientInfo.empty();
         patientTerms.empty();
 
-        if (sampleId) {
+        if (appliesTo) {
+            let data = APPLIES_TO_GENE_DISEASE[appliesTo] || {};
             if (!data["patient_id"]) {
                 disableAccordion(accordion);
                 patientInfo.text("Sample is not assigned to a patient.");
@@ -109,24 +114,12 @@
             patientInfo.append(patientText);
         } else {
             disableAccordion(accordion);
-            patientInfo.text("No sample selected");
+            patientInfo.text("No sample or patient selected");
         }
     }
 
-    function changeSample() {
-        let sampleId = $("#id_sample", "form#moi-node").val();
-        let ontologyVersionId = {{ node.analysis.annotation_version.ontology_version_id }};
-        if (sampleId) {
-            $.ajax({
-                type: "GET",
-                url: Urls.sample_patient_gene_disease(sampleId, ontologyVersionId),
-                success: function(data) {
-                    populateMOIPatient(sampleId, data, true);
-                }
-            });
-        } else {
-            populateMOIPatient(null, {});
-        }
+    function changeAppliesTo() {
+        populateMOIPatient($("#id_applies_to", "form#moi-node").val(), true);
     }
 
 {% endblock inlinejs%}
@@ -155,9 +148,9 @@
     {% endfor %}
 
     <div class="editor-row">
-        <label class="editor-label" for="{{ form.sample.id_for_label }}">Sample</label>
-        {{ form.sample }}
-        <label title="Sample is optional, and used to also apply a zygosity filter">{{ form.require_zygosity }} Require exact zygosity calls</label>{{ form.require_zygosity.errors }}
+        <label class="editor-label" for="{{ form.applies_to.id_for_label }}">Applies to</label>
+        {{ form.applies_to }}
+        <label title="Sample or patient is optional, and used to also apply a zygosity filter">{{ form.require_zygosity }} Require exact zygosity calls</label>{{ form.require_zygosity.errors }}
     </div>
     <div class="editor-row">
         <span class="editor-label">Patient</span>

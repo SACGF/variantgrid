@@ -246,7 +246,7 @@ class AncestorSampleNoGenotypeTestCase(TestCase):
                                             "extra_filters": "default"})
 
     def test_gene_list_node_editor_round_trip(self):
-        """ The ancestor sample has to be in the editor's sample choices, or the node can't be saved """
+        """ The ancestor sample has to be in the editor's picker choices, or the node can't be saved """
         gene_list_node = self._create_child_node(GeneListNode)
         client = Client()
         client.force_login(self.user)
@@ -254,7 +254,7 @@ class AncestorSampleNoGenotypeTestCase(TestCase):
         response = client.get(url)
         self.assertEqual(200, response.status_code)
         data = form_submit_data(response.content.decode(), "node-gene-list-form")
-        self.assertEqual(str(self.sample.pk), data.get("sample"), "Sample selected in editor")
+        self.assertEqual(f"sample:{self.sample.pk}", data.get("applies_to"), "Sample selected in editor")
 
         # JSON back means saved - an invalid form comes back as the re-rendered editor HTML
         self.assertEqual({}, client.post(url, data).json())
