@@ -332,7 +332,8 @@ def node_errors(request, analysis_id, analysis_version, node_id, node_version, e
     try:
         node = get_node_subclass_or_404(request.user, node_id, version=node_version)
     except NodeOutOfDateException:
-        return HttpResponseRedirect(reverse("node_load", kwargs={"node_id": node_id}))
+        return HttpResponseRedirect(reverse("node_load",
+                                            kwargs={"analysis_id": analysis_id, "node_id": node_id}))
 
     context = {"analysis_id": analysis_id,
                "analysis_version": analysis_version,
