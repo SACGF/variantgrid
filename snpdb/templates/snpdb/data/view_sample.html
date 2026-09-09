@@ -230,25 +230,27 @@ $(document).ready(function() {
     {% if sample_genotype_stats.import_status == 'S' %}
         <div class="tab-pane" role="tabpanel" id="sample-stats">
         <div class="stats-cards">
-        {% if not sample_stats_variant_class_df.empty %}
-            <div class="card stats-card">
-                <div class="card-header">Variant Class</div>
-                <div class="card-body">{% render_dataframe sample_stats_variant_class_df 1 %}</div>
-            </div>
-        {% endif %}
+        {% if sample_stats %}
+            {% if not sample_stats.variant_class_df.empty %}
+                <div class="card stats-card">
+                    <div class="card-header">Variant Class</div>
+                    <div class="card-body">{% render_dataframe sample_stats.variant_class_df 1 %}</div>
+                </div>
+            {% endif %}
 
-        {% if not sample_stats_zygosity_df.empty %}
-            <div class="card stats-card">
-                <div class="card-header">{% if sample.has_genotype %}Zygosity{% else %}Variants{% endif %}</div>
-                <div class="card-body">{% render_dataframe sample_stats_zygosity_df 1 %}</div>
-            </div>
-        {% endif %}
+            {% if not sample_stats.zygosity_df.empty %}
+                <div class="card stats-card">
+                    <div class="card-header">{% if sample.has_genotype %}Zygosity{% else %}Variants{% endif %}</div>
+                    <div class="card-body">{% render_dataframe sample_stats.zygosity_df 1 %}</div>
+                </div>
+            {% endif %}
 
-        {% if not sample_stats_annotated_df.empty %}
-            <div class="card stats-card">
-                <div class="card-header">Annotated</div>
-                <div class="card-body">{% render_dataframe sample_stats_annotated_df 1 %}</div>
-            </div>
+            {% if not sample_stats.annotated_df.empty %}
+                <div class="card stats-card">
+                    <div class="card-header">Annotated</div>
+                    <div class="card-body">{% render_dataframe sample_stats.annotated_df 1 %}</div>
+                </div>
+            {% endif %}
         {% endif %}
 
         {% if sample_locus_count %}

@@ -1,6 +1,8 @@
 import json
 import os
 from collections import defaultdict
+from dataclasses import dataclass
+from typing import Optional
 
 import numpy as np
 import pandas as pd
@@ -340,13 +342,21 @@ def get_patient_upload_csv_for_vcf(request, pk):
     return get_patient_upload_csv(filename, sample_qs)
 
 
-def _sample_stats(sample) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+@dataclass
+class SampleStats:
+    """ The three tables on the sample Stats tab, each possibly empty """
+    variant_class_df: pd.DataFrame
+    zygosity_df: pd.DataFrame
+    annotated_df: pd.DataFrame
+
+
+def _sample_stats(sample) -> Optional[SampleStats]:
     annotation_version = AnnotationVersion.latest(sample.genome_build)
     try:
         cohort = sample.vcf.cohort
         cgc = cohort.cohort_genotype_collection
     except (Cohort.DoesNotExist, CohortGenotypeCollection.DoesNotExist, DataArchivedError):
-        return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
+        return None
 
     # Each stats model contributes a variant class column and a zygosity column, which count different
     # things: the variant annotation model's classes are the dbSNP ones, but its per-zygosity fields
@@ -415,23 +425,23 @@ def _sample_stats(sample) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
                 if annotated_row := ANNOTATED.get(field):
                     annotated_data.setdefault(annotated_column, {})[annotated_row] = getattr(o, field)
 
-    sample_stats_variant_class_df = pd.DataFrame.from_dict(variant_class_data).reindex(VARIANT_CLASS)
-    if "Total" in sample_stats_variant_class_df.columns:
-        total = sample_stats_variant_class_df["Total"]
-        sample_stats_variant_class_df["Total %"] = 100 * total / total["variant"]
+    variant_class_df = pd.DataFrame.from_dict(variant_class_data).reindex(VARIANT_CLASS)
+    if "Total" in variant_class_df.columns:
+        total = variant_class_df["Total"]
+        variant_class_df["Total %"] = 100 * total / total["variant"]
         if not total["fusions"]:  # Most samples have none, so keep the row for those that do
-            sample_stats_variant_class_df = sample_stats_variant_class_df.drop("fusions")
+            variant_class_df = variant_class_df.drop("fusions")
 
-    sample_stats_zygosity_df = pd.DataFrame.from_dict(zygosity_data).reindex(ZYGOSITY)
+    zygosity_df = pd.DataFrame.from_dict(zygosity_data).reindex(ZYGOSITY)
     if not sample.has_genotype:
         # Without a GT field every call is unknown zygosity, so one row of totals says it all
-        sample_stats_zygosity_df = sample_stats_zygosity_df.sum().to_frame("all").T
-    sample_stats_annotated_df = pd.DataFrame.from_dict(annotated_data).reindex(list(ANNOTATED.values()))
+        zygosity_df = zygosity_df.sum().to_frame("all").T
+    annotated_df = pd.DataFrame.from_dict(annotated_data).reindex(list(ANNOTATED.values()))
 
     if missing_stats:
         enqueue_cohort_stats_recompute(cohort, annotation_version)
 
-    return sample_stats_variant_class_df, sample_stats_zygosity_df, sample_stats_annotated_df
+    return SampleStats(variant_class_df, zygosity_df, annotated_df)
 
 
 # A pair this close is the same DNA, so two different patients means a sample swap or a mislabel (#196)
@@ -503,7 +513,10 @@ def view_sample(request, sample_id):
     if settings.SOMALIER.get("enabled"):
         somalier_context = _somalier_sample_context(sample)
 
-    sample_stats_variant_class_df, sample_stats_zygosity_df, sample_stats_annotated_df = _sample_stats(sample)
+    # Stats only exist (and a missing row is only worth a recompute) once the import has finished
+    sample_stats = None
+    if sample.import_status == ImportStatus.SUCCESS:
+        sample_stats = _sample_stats(sample)
     sample_genotype_stats = sample.get_genotype_stats()
 
     # VEP-skipped variants for the latest annotation version (VG only - see issue #1409)
@@ -528,9 +541,7 @@ def view_sample(request, sample_id):
         'has_write_permission': has_write_permission,
         'igv_data': igv_data,
         "bam_list": sample.get_bam_files(),
-        "sample_stats_variant_class_df": sample_stats_variant_class_df,
-        "sample_stats_zygosity_df": sample_stats_zygosity_df,
-        "sample_stats_annotated_df": sample_stats_annotated_df,
+        "sample_stats": sample_stats,
         "sample_genotype_stats": sample_genotype_stats,
         "skipped_annotation_count": skipped_annotation_count,
         **somalier_context,
