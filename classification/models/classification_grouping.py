@@ -121,13 +121,6 @@ class AlleleOriginGrouping(TimeStampedModel):
                 parts.append(self.tumor_type_category)
         return parts
 
-    # class Meta:
-    #     unique_together = ("lab", "allele_origin_grouping", "allele_origin_bucket", "testing_context_bucket")
-    #     indexes = [
-    #         models.Index(fields=["allele_origin_grouping"]),
-    #         models.Index(fields=["testing_context_bucket", "tumor_type_category"])
-    #     ]
-
     @property
     def allele_origin_bucket_obj(self):
         return AlleleOriginBucket(self.allele_origin_bucket)
@@ -168,6 +161,9 @@ class ClassificationGrouping(TimeStampedModel):
     latest_classification_modification = models.ForeignKey(ClassificationModification, on_delete=SET_NULL, null=True, blank=True)
     latest_cached_summary = models.JSONField(null=False, blank=True, default=dict)
     latest_allele_info = models.ForeignKey(ImportedAlleleInfo, on_delete=SET_NULL, null=True, blank=True)
+
+    class Meta:
+        unique_together = ('allele_origin_grouping', 'lab', 'share_level')
 
     @property
     def latest_cached_summary_obj(self):
@@ -575,7 +571,7 @@ class ClassificationGroupingEntry(TimeStampedModel):
 
     @staticmethod
     def grouping_for(classification: Classification) -> Optional[ClassificationGrouping]:
-        if entry := ClassificationGroupingEntry.objects.filter(classification=classification).select_related("grouping").first():
+        if entry := classification.classificationgroupingentry_set.select_related("grouping").first():
             return entry.grouping
         return None
 
