@@ -181,7 +181,7 @@ Still-open entries below, and the PRs are #1705, #1709, #1712, #1715, #1716, #17
   `ENTPD3-RPL14` appears three times from one caller with three different 5′ breakpoints, so identity is
   the gene pair and the coordinates live in `CohortGenotype.info` with the rest of the per-row data.
 
-  The one design change that came out of building it: partners are identified by a **`FusionGeneId`** row
+  The one design change that came out of building it: partners are identified by a **`GeneLevelId`** row
   whose pk is the HGNC ID where there is one, and a locally allocated id above 1,000,000 where there is
   not. Clone-based identifiers are routine fusion partners (`RP11-458D21.5`, `AC016683.6` are both in
   the test file), and HGNC-only identity left them unrepresentable. The alt namespaces the two apart
@@ -199,8 +199,8 @@ Still-open entries below, and the PRs are #1705, #1709, #1712, #1715, #1716, #17
   VICC's `GENE1::GENE2`**, never the single-hyphen form, which means a read-through transcript; that
   string is written into `VariantAnnotation.hgvs_c` and `hgvs_g`, so the grid columns that read those
   directly show `BCR::ABL1` rather than a blank where g.HGVS is otherwise never blank. Anything parsing
-  the vendor's file says so in its name (`DragenTSO500AllFusions…`), while `GeneFusion`, `FusionGeneId`
-  and `snpdb.gene_level_variants` stay generic — a classification naming a fusion is a second,
+  the vendor's file says so in its name (`DragenTSO500AllFusions…`), while `GeneFusion`, `GeneLevelId`
+  (`FusionGeneId` when this was written) and `snpdb.gene_level_variants` stay generic — a classification naming a fusion is a second,
   non-TSO500 source.
 
   Since a `Sample` belongs to exactly one `VCF`, the file creates its own VCF and Sample rather than
@@ -480,9 +480,9 @@ missing was surfacing `CohortGenotype.info["CN"]` and TSO 500's `FORMAT/SM` line
 importer v21+ already kept in the format JSON blob but which was not queryable. That is now
 `VCF.copy_number_field` plus a read of the JSON at query time.
 
-cnv.vcf's `SEGID` gene symbol came down from Phase 2 with it, and was deliberately left unsurfaced:
-it is whatever the caller wrote — `MYCL1` where the rest of the pipeline says `MYCL` — and the gene and
-overlapping-symbol columns already say which gene a segment hits, resolved properly.
+cnv.vcf's `SEGID` gene symbol came down from Phase 2 with it, and was left unsurfaced at the time:
+it is whatever the caller wrote — `MYCL1` where the rest of the pipeline says `MYCL`. #1836 made it the
+thing that decides the file is gene-level, resolving the name the way a fusion partner's is.
 
 Fusions were the genuinely new case. **One grid, not several** — a fusion is a row like any other, so
 compound-het detection, gene lists and every downstream node keep working over the same result set
@@ -558,14 +558,13 @@ scientist's choice.
   Whether VEP parses BND ALT syntax at all is unverified — a 20-minute experiment before anyone designs
   around either answer — but what VEP would give is per-position feature overlap rather than frame or
   domain analysis, and the caller already reports that as `Gene A/B Location`.
-- **Coordinate-free gene-level CNV** — designed alongside Phase 5 and purely additive to it:
-  `<AMP:HGNC:nnn>` / `<LOSS:HGNC:nnn>` on the same gene-level contig, same anchor, same annotation run —
-  one enum value and one alt prefix. Only for a caller that reports a gene-level event with no
-  coordinates at all (the CombinedVariantOutput "JAK2 amplification (5 copies)" style); cnv.vcf's
-  `<DUP>`/`<DEL>` carry real coordinates and stay structural variants. Copy number stays
-  observation-level in `CohortGenotype.info` rather than in the alt, because labs use different
-  amplification thresholds and per-count identity would stop two labs ever agreeing on "JAK2
-  amplification". Build it when a file needs it.
+- **Coordinate-free gene-level CNV** — built as `claude/plans/1836_gene_amplifications_plan.md` (#1836):
+  `<GAIN:HGNC:nnn>` / `<LOSS:HGNC:nnn>` on the same gene-level contig, same annotation run. What decides
+  that a record is one is the caller naming a gene in a segment field (`SEGID`), not its alt — cnv.vcf's
+  `<DUP>`/`<DEL>` coordinates are the panel's target window rather than the event, so those files import
+  as gene-level events and the windows are not stored as Variants. Copy number stays observation-level in
+  `CohortGenotype` rather than in the alt, because labs use different amplification thresholds and
+  per-count identity would stop two labs ever agreeing on "JAK2 amplification".
 - **abcn_annotated.vcf / gene-level LOH** — cannot start until TAU supplies a file; the format is
   undocumented and not usefully mockable.
 - **DragenExonCNV exact field spelling** — provisional until a run with a real large rearrangement

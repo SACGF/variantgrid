@@ -1,7 +1,7 @@
 """
-Annotation for gene-level variants (gene fusions), computed locally.
+Annotation for gene-level variants (gene fusions, whole-gene copy number events), computed locally.
 
-@see snpdb.gene_level_variants for why a fusion is stored as a Variant.
+@see snpdb.gene_level_variants for why one of these is stored as a Variant.
 
 These never reach VEP - their alt is not something VEP can parse, and there is no coordinate to
 annotate anyway. What they do need is the same thing VEP output gives everything else: a
@@ -11,16 +11,16 @@ VariantGeneOverlap rows so gene lists and compound-het two-hit detection find th
 
 It is a pipeline type rather than a one-off at import because VariantGeneOverlap is keyed on the
 annotation version and symbol-to-gene resolution is per GeneAnnotationRelease. Written once at
-import, fusions would quietly drop out of gene lists at the next annotation version.
+import, these would quietly drop out of gene lists at the next annotation version.
 
-Resolution reads FusionGeneId.genes first - the genes the caller's breakpoint landed in, which is
+Resolution reads GeneLevelId.genes first - the genes the caller's breakpoint landed in, which is
 the only route that survives a symbol no release still carries (@see genes.gene_fusions) - and falls
 back to HGNC/symbol -> release genes. It is symbol rather than HGNC -> gene because HGNC carries no
 Entrez ID while Gene.identifier is the Entrez ID for RefSeq releases. Either way a later HGNC import
 improving SEPT14 -> SEPTIN14 improves the mapping without touching a single Variant, since identity
 keys on the id and only resolution is versioned.
 
-A fusion sits on no transcript, so there is no VEP 'pick' to inherit. VariantAnnotation is per
+A gene-level variant sits on no transcript, so there is no VEP 'pick' to inherit. VariantAnnotation is per
 (version, variant) and has no sample, so the enrichment kit that would name the lab's transcript is
 out of reach - the representative is MANE Select, then RefSeq Select, then the highest version we
 hold. The kit's own choice is served by the per-transcript rows, which the grid export swaps in
@@ -44,19 +44,46 @@ from annotation.models.models import (
 )
 from annotation.models.damage_enums import PathogenicityImpact
 from annotation.signals.manual_signals import annotation_run_complete_signal
+from genes.gene_copy_number import create_gene_copy_number_events_for_variants
 from genes.gene_fusions import create_gene_fusions_for_variants
-from genes.models import FusionGeneId, Gene, GeneAnnotationRelease, GeneFusion, TranscriptVersion
+from genes.models import (
+    Gene,
+    GeneAnnotationRelease,
+    GeneCopyNumberEvent,
+    GeneCopyNumberEventKind,
+    GeneFusion,
+    GeneLevelId,
+    TranscriptVersion,
+)
 from library.django_utils.django_partition import temporary_db_table
 from library.genomics.vcf_enums import VariantClass
 
 BULK_INSERT_BATCH_SIZE = 2000
 
-# The columns VEP fills for every variant it sees, so a fusion is not the one row where they are blank.
-# SO:0001565 - VEP has no fusion consequence, and the impact matches what it gives transcript_ablation.
-# variant_class is variant-level, so it goes on the representative annotation only
-GENE_FUSION_CONSEQUENCE = "gene_fusion"
-GENE_FUSION_IMPACT = PathogenicityImpact.HIGH
-GENE_FUSION_VARIANT_CLASS = VariantClass.GENE_FUSION
+
+@dataclass(frozen=True)
+class GeneLevelTerms:
+    """ The columns VEP fills for every variant it sees, so a gene-level variant is not the one row
+        where they are blank. variant_class is variant-level, so it goes on the representative
+        annotation only. """
+    consequence: str
+    impact: str
+    variant_class: str
+
+
+# SO:0001565 - VEP has no fusion consequence, and the impact matches what it gives transcript_ablation
+GENE_FUSION_TERMS = GeneLevelTerms(consequence="gene_fusion",
+                                   impact=PathogenicityImpact.HIGH,
+                                   variant_class=VariantClass.GENE_FUSION)
+# The SO terms VEP itself uses for a transcript wholly duplicated or wholly lost
+GENE_COPY_NUMBER_TERMS = {
+    GeneCopyNumberEventKind.GAIN: GeneLevelTerms(consequence="transcript_amplification",
+                                                 impact=PathogenicityImpact.HIGH,
+                                                 variant_class=VariantClass.COPY_NUMBER_GAIN),
+    GeneCopyNumberEventKind.LOSS: GeneLevelTerms(consequence="transcript_ablation",
+                                                 impact=PathogenicityImpact.HIGH,
+                                                 variant_class=VariantClass.COPY_NUMBER_LOSS),
+}
 
 
 @dataclass(frozen=True)
@@ -69,48 +96,48 @@ class ReleaseGeneAnnotation:
     representative_transcript_version: Optional[TranscriptVersion]
 
 
-class FusionGeneIdResolver:
-    """ FusionGeneId -> the genes and transcripts of a GeneAnnotationRelease. One per run, since it
+class GeneLevelIdResolver:
+    """ GeneLevelId -> the genes and transcripts of a GeneAnnotationRelease. One per run, since it
         caches per-symbol lookups across what is usually a lot of repeated partners. """
 
     def __init__(self, gene_annotation_release: GeneAnnotationRelease):
         self.gene_annotation_release = gene_annotation_release
         self._cache: dict[int, ReleaseGeneAnnotation] = {}
 
-    def get_release_gene_annotation(self, fusion_gene_id: FusionGeneId) -> ReleaseGeneAnnotation:
-        if (cached := self._cache.get(fusion_gene_id.pk)) is not None:
+    def get_release_gene_annotation(self, gene_level_id: GeneLevelId) -> ReleaseGeneAnnotation:
+        if (cached := self._cache.get(gene_level_id.pk)) is not None:
             return cached
 
         gene_ids = []
         transcript_versions = []
         if self.gene_annotation_release:
-            gene_qs = self._release_genes(fusion_gene_id)
+            gene_qs = self._release_genes(gene_level_id)
             gene_ids = sorted(gene_qs.values_list("identifier", flat=True))
             tv_qs = self.gene_annotation_release.transcript_versions_for_genes(gene_qs)
             transcript_versions = list(tv_qs.select_related("transcript", "gene_version"))
 
         gene_id = gene_ids[0] if gene_ids else None
         result = ReleaseGeneAnnotation(
-            symbol=fusion_gene_id.symbol_str,
+            symbol=gene_level_id.symbol_str,
             gene_ids=gene_ids,
             gene_id=gene_id,
             transcript_versions=transcript_versions,
             representative_transcript_version=_representative_transcript_version(transcript_versions, gene_id))
-        self._cache[fusion_gene_id.pk] = result
+        self._cache[gene_level_id.pk] = result
         return result
 
-    def _release_genes(self, fusion_gene_id: FusionGeneId):
+    def _release_genes(self, gene_level_id: GeneLevelId):
         """ The genes the release has for this side. The breakpoint's genes are the ones that are
             certainly right, but a release only holds one consortium's, so a side resolved against
             an Ensembl release has to fall back to the symbol in a RefSeq one """
-        gene_qs = Gene.objects.filter(pk__in=fusion_gene_id.genes.values_list("pk", flat=True),
+        gene_qs = Gene.objects.filter(pk__in=gene_level_id.genes.values_list("pk", flat=True),
                                       geneversion__releasegeneversion__release=self.gene_annotation_release)
         if gene_qs.exists():
             return gene_qs.distinct()
 
         # hgnc names the approved symbol, which is what a release matched its genes under
-        gene_symbol_id = fusion_gene_id.hgnc.gene_symbol_id if fusion_gene_id.hgnc_id \
-            else fusion_gene_id.gene_symbol_id
+        gene_symbol_id = gene_level_id.hgnc.gene_symbol_id if gene_level_id.hgnc_id \
+            else gene_level_id.gene_symbol_id
         if gene_symbol_id:
             return self.gene_annotation_release.genes_for_symbol(gene_symbol_id)
         return Gene.objects.none()
@@ -150,7 +177,7 @@ def annotate_gene_level_run(annotation_run) -> int:
         reads the timestamp fields, so they are walked through the same states a VEP run passes. """
 
     variant_annotation_version = annotation_run.variant_annotation_version
-    resolver = FusionGeneIdResolver(variant_annotation_version.gene_annotation_release)
+    resolver = GeneLevelIdResolver(variant_annotation_version.gene_annotation_release)
     if variant_annotation_version.gene_annotation_release is None:
         logging.warning("%s has no gene_annotation_release - gene-level variants get symbols but no "
                         "gene overlaps, so gene lists will not find them", variant_annotation_version)
@@ -165,12 +192,12 @@ def annotate_gene_level_run(annotation_run) -> int:
     variant_annotations = []
     transcript_annotations = []
     gene_overlaps = []
-    for gene_fusion in _gene_fusions_for_run(annotation_run).iterator():
-        variant_annotation, fusion_transcript_annotations, fusion_gene_overlaps = \
-            _build_gene_fusion_annotation(annotation_run, resolver, gene_fusion)
+    for event, terms in _gene_level_events_for_run(annotation_run):
+        variant_annotation, event_transcript_annotations, event_gene_overlaps = \
+            _build_gene_level_annotation(annotation_run, resolver, event, terms)
         variant_annotations.append(variant_annotation)
-        transcript_annotations.extend(fusion_transcript_annotations)
-        gene_overlaps.extend(fusion_gene_overlaps)
+        transcript_annotations.extend(event_transcript_annotations)
+        gene_overlaps.extend(event_gene_overlaps)
         results["annotated"] += 1
 
     with transaction.atomic():
@@ -217,11 +244,13 @@ def _bulk_create_in_partition(variant_annotation_version: VariantAnnotationVersi
         klass.objects.bulk_create(records, batch_size=BULK_INSERT_BATCH_SIZE)
 
 
-def _gene_fusions_for_run(annotation_run):
-    """ The upload pipeline kicks the annotation scheduler as soon as the Variants exist, and its
-        GeneFusion step runs after the genotype insert, so a run dispatched straight away can arrive
-        before the rows do. The Variant carries everything a GeneFusion holds, so the run makes its
-        own; the insert is idempotent, so the upload step still finding them is fine. """
+def _gene_level_events_for_run(annotation_run):
+    """ (event, terms) for every gene-level variant in the run's range.
+
+        The upload pipeline kicks the annotation scheduler as soon as the Variants exist, and its
+        event step runs after the genotype insert, so a run dispatched straight away can arrive
+        before the rows do. The Variant carries everything an event holds, so the run makes its own;
+        the inserts are idempotent, so the upload step still finding them is fine. """
 
     annotation_version = annotation_run.annotation_range_lock.version.get_any_annotation_version()
     range_lock = annotation_run.annotation_range_lock
@@ -230,41 +259,55 @@ def _gene_fusions_for_run(annotation_run):
                                                 min_variant_id=range_lock.min_variant_id,
                                                 max_variant_id=range_lock.max_variant_id)
     create_gene_fusions_for_variants(variant_qs)
-    return GeneFusion.objects.filter(variant__in=variant_qs) \
+    create_gene_copy_number_events_for_variants(variant_qs)
+
+    gene_fusion_qs = GeneFusion.objects.filter(variant__in=variant_qs) \
         .select_related("variant", "anchor", "partner")
+    for gene_fusion in gene_fusion_qs.iterator():
+        yield gene_fusion, GENE_FUSION_TERMS
+
+    copy_number_qs = GeneCopyNumberEvent.objects.filter(variant__in=variant_qs) \
+        .select_related("variant", "gene")
+    for event in copy_number_qs.iterator():
+        yield event, GENE_COPY_NUMBER_TERMS[GeneCopyNumberEventKind(event.kind)]
 
 
-def _build_gene_fusion_annotation(annotation_run, resolver: FusionGeneIdResolver, gene_fusion: GeneFusion):
-    """ (representative annotation, per-transcript annotations, gene overlaps) for one fusion """
+def _build_gene_level_annotation(annotation_run, resolver: GeneLevelIdResolver, event,
+                                 terms: GeneLevelTerms):
+    """ (representative annotation, per-transcript annotations, gene overlaps) for one gene-level
+        event - a GeneFusion or a GeneCopyNumberEvent, which differ only in how many genes they name
+        and what VEP would have called them """
 
     variant_annotation_version = annotation_run.variant_annotation_version
-    # The anchor's release annotation is the representative one, matching "the gene this row is about"
-    # everywhere else
-    release_annotations = [resolver.get_release_gene_annotation(fgi) for fgi in gene_fusion.fusion_gene_ids]
-    anchor = release_annotations[0]
+    # The first gene's release annotation is the representative one (a fusion's anchor), matching
+    # "the gene this row is about" everywhere else
+    release_annotations = [resolver.get_release_gene_annotation(gli) for gli in event.gene_level_ids]
+    representative = release_annotations[0]
 
-    # hgvs_c/hgvs_g both carry the VICC gene-level nomenclature - HGVS defers to VICC for fusions,
-    # and a blank g.HGVS reads as broken rather than as "not applicable"
-    canonical_str = gene_fusion.canonical_str
-    representative_transcript_version = anchor.representative_transcript_version
+    # hgvs_c/hgvs_g both carry the gene-level nomenclature - HGVS defers to VICC for fusions and has
+    # nothing to say about a coordinate-free copy number call, and a blank g.HGVS reads as broken
+    # rather than as "not applicable"
+    canonical_str = event.canonical_str
+    representative_transcript_version = representative.representative_transcript_version
     variant_annotation = VariantAnnotation(
         version=variant_annotation_version,
-        variant=gene_fusion.variant,
+        variant=event.variant,
         annotation_run=annotation_run,
-        symbol=anchor.symbol,
+        symbol=representative.symbol,
         overlapping_symbols=",".join(sorted({ra.symbol for ra in release_annotations})),
-        gene_id=anchor.gene_id,
+        gene_id=representative.gene_id,
         transcript_id=representative_transcript_version.transcript_id if representative_transcript_version else None,
         transcript_version=representative_transcript_version,
         canonical=_is_canonical(representative_transcript_version),
-        consequence=GENE_FUSION_CONSEQUENCE,
-        impact=GENE_FUSION_IMPACT,
-        variant_class=GENE_FUSION_VARIANT_CLASS,
+        consequence=terms.consequence,
+        impact=terms.impact,
+        variant_class=terms.variant_class,
         hgvs_c=canonical_str,
         hgvs_g=canonical_str,
     )
 
-    # Both partners, so an enrichment kit's canonical transcript on either side has a row to swap in
+    # Every gene named, so an enrichment kit's canonical transcript on either side of a fusion has a
+    # row to swap in
     transcript_annotations = []
     gene_ids = set()
     seen_transcript_version_ids = set()
@@ -276,22 +319,22 @@ def _build_gene_fusion_annotation(annotation_run, resolver: FusionGeneIdResolver
             seen_transcript_version_ids.add(transcript_version.pk)
             transcript_annotations.append(VariantTranscriptAnnotation(
                 version=variant_annotation_version,
-                variant=gene_fusion.variant,
+                variant=event.variant,
                 annotation_run=annotation_run,
                 symbol=release_annotation.symbol,
                 gene_id=transcript_version.gene_version.gene_id,
                 transcript_id=transcript_version.transcript_id,
                 transcript_version=transcript_version,
                 canonical=_is_canonical(transcript_version),
-                consequence=GENE_FUSION_CONSEQUENCE,
-                impact=GENE_FUSION_IMPACT,
+                consequence=terms.consequence,
+                impact=terms.impact,
                 hgvs_c=canonical_str,
             ))
 
     gene_overlaps = [
         VariantGeneOverlap(version=variant_annotation_version,
                            annotation_run=annotation_run,
-                           variant=gene_fusion.variant,
+                           variant=event.variant,
                            gene_id=gene_id)
         for gene_id in sorted(gene_ids)
     ]

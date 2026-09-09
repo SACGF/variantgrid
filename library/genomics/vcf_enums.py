@@ -34,27 +34,29 @@ class VCFSymbolicAllele:
 class GeneIdNamespace(models.TextChoices):
     """ Whether the number in a gene-level alt means anything outside this deployment.
         HGNC is the same gene everywhere; GENE is a local id for a symbol HGNC doesn't carry -
-        @see genes.models.FusionGeneId for what to send instead when a record leaves. """
+        @see genes.models.GeneLevelId for what to send instead when a record leaves. """
     HGNC = "HGNC", "HGNC ID"
     GENE = "GENE", "Local gene ID"
 
 
 class GeneLevelSymbolicAlt(models.TextChoices):
-    """ Symbolic alts for gene-level events (gene fusions), which live on the shared gene-level contig
-        with the anchor gene's FusionGeneId as position. The alt carries the partner's id, so
-        biological identity hashes to its own Sequence and therefore its own Variant.
+    """ Symbolic alts for gene-level events, which live on the shared gene-level contig with a
+        GeneLevelId as position. The alt carries the id the event is about, so biological identity
+        hashes to its own Sequence and therefore its own Variant.
 
         Encoding identity in the alt is what lets the existing (locus, alt, svlen) unique constraint do
         the work - @see snpdb.gene_level_variants for why these are Variants at all.
 
         FUSION is directional - the anchor is the 5' partner, so BCR-ABL1 and ABL1-BCR are distinct.
         FUSION_UNORDERED anchors on the smaller id, because an unordered report asserts no direction.
-        AMP/LOSS are for callers reporting a gene-level copy event with no coordinates at all. """
+        GAIN/LOSS are a whole-gene copy number call with no coordinates at all: they repeat the
+        position's own gene, so the alt alone says what the variant is. GAIN rather than AMP because
+        the threshold that makes a gain an amplification is the lab's, not ours. """
 
     FUSION = "FUSION", "Gene fusion"
     FUSION_UNORDERED = "FUSION_UNORDERED", "Gene fusion (direction not asserted)"
-    AMP = "AMP", "Gene amplification"
-    LOSS = "LOSS", "Gene loss"
+    GAIN = "GAIN", "Gene copy number gain"
+    LOSS = "LOSS", "Gene copy number loss"
 
     # A partner the caller left unspecified, in place of the namespace:id
     UNKNOWN_PARTNER = Constant("UNKNOWN")

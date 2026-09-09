@@ -1,34 +1,29 @@
 """
 Turning the gene names a fusion caller writes into GeneFusion records.
 
-@see snpdb.gene_level_variants for why a fusion becomes a Variant at all.
+@see snpdb.gene_level_variants for why a fusion becomes a Variant at all, and
+genes.gene_level_resolver for how one name becomes the identity it is stored under - the half of
+this shared with whole-gene copy number calls.
 
 A caller writes each side of a fusion as a list of the genes overlapping that breakpoint
-(`ROS1;GOPC`, `PPARG/AC016683.6`) using whatever symbol was current when the panel was designed
-(`SEPT14` where HGNC now says `SEPTIN14`). Identity needs exactly one gene per side, so a side goes
-through alias resolution and then picks its best candidate. Everything the caller wrote is kept
-per-observation by the loader, so nothing here is lossy.
+(`ROS1;GOPC`, `PPARG/AC016683.6`). Identity needs exactly one gene per side, and everything the
+caller wrote is kept per-observation by the loader, so nothing here is lossy.
 
 Where the caller gave a breakpoint, position decides: it does not depend on which symbol the panel
 was designed with, and it is the only evidence that survives a symbol being retired to a different
 gene. The name is then the tiebreaker between genes that overlap the same position, and the fallback
-where nothing does. Genes found this way are recorded on the FusionGeneId so annotation can reach
+where nothing does. Genes found this way are recorded on the GeneLevelId so annotation can reach
 them without going back through the symbol (@see annotation.gene_level_annotation).
-
-Names HGNC doesn't carry - clone-based identifiers are routine fusion partners - still get an
-identity, via FusionGeneId's local id space, so every call the caller made becomes a Variant.
 """
 import re
 from dataclasses import dataclass, field
-from functools import cached_property
 from typing import Optional
 
 from django.db.models import Q
 
-from genes.gene_matching import GeneSymbolMatcher
+from genes.gene_level_resolver import GeneLevelNameResolver, ResolvedGeneLevelGene
 from genes.gene_overlaps import GeneOverlap, SVGeneOverlapResolver
-from genes.models import GeneAnnotationRelease, GeneFusion, FusionGeneId, HGNC, fusion_canonical_str
-from genes.models_enums import HGNCStatus
+from genes.models import HGNC, GeneAnnotationRelease, GeneFusion, GeneLevelId, fusion_canonical_str
 from library.genomics.vcf_enums import GeneLevelSymbolicAlt
 from snpdb.clingen_allele import get_variant_allele_for_variant
 from snpdb.gene_level_variants import (
@@ -38,12 +33,12 @@ from snpdb.gene_level_variants import (
 )
 from snpdb.models import GenomeBuild, Variant, VariantCoordinate
 
-# Within one cell - a hyphen can't separate, as clone-based identifiers contain them (RP11-458D21.5)
-GENE_LIST_SEPARATOR = re.compile(r"[;/]")
 # A fusion written as one string, eg by a lab submitting 'BCR::ABL1' as a classification target
 FUSION_STRING_SEPARATOR = re.compile(r"::|~|/|--")
 # 'chr3:132036420' - what a caller writes as one side's breakpoint
 BREAKPOINT = re.compile(r"^\s*(?P<chrom>[^:\s]+)\s*:\s*(?P<position>[0-9,]+)\s*$")
+# The gene-level alts that are a fusion - a gene-level Variant can also be a copy number event
+FUSION_ALTS = (GeneLevelSymbolicAlt.FUSION, GeneLevelSymbolicAlt.FUSION_UNORDERED)
 
 
 def parse_breakpoint(breakpoint: Optional[str]) -> Optional[tuple[str, int]]:
@@ -63,32 +58,12 @@ class _GeneCandidate:
     gene_ids: set[str] = field(default_factory=set)
 
 
-@dataclass(frozen=True)
-class ResolvedFusionGene:
-    """ One side of a fusion, resolved to the identity it will be stored under """
-    written: str  # The cell exactly as the caller wrote it
-    fusion_gene_id: FusionGeneId
-
-    @property
-    def resolved_symbol(self) -> str:
-        return self.fusion_gene_id.symbol_str
-
-    @property
-    def was_renamed(self) -> bool:
-        return self.written != self.resolved_symbol
-
-
-class GeneFusionResolver:
+class GeneFusionResolver(GeneLevelNameResolver):
     """ Holds the symbol caches, so build one per file rather than one per row """
 
-    def __init__(self, gene_matcher: GeneSymbolMatcher = None):
-        self.gene_matcher = gene_matcher or GeneSymbolMatcher()
+    def __init__(self, gene_matcher=None):
+        super().__init__(gene_matcher)
         self._overlap_resolvers: dict[int, list[SVGeneOverlapResolver]] = {}
-
-    @staticmethod
-    def split_gene_names(cell: str) -> list[str]:
-        names = [n.strip() for n in GENE_LIST_SEPARATOR.split(cell or "")]
-        return [n for n in names if n]
 
     @staticmethod
     def split_fusion_string(fusion_string: str) -> Optional[tuple[str, str]]:
@@ -102,72 +77,6 @@ class GeneFusionResolver:
             if gene_a and gene_b:
                 return gene_a, gene_b
         return None
-
-    def canonical_symbol(self, name: str) -> str:
-        """ The approved symbol where 'name' is an alias (SEPT14 -> SEPTIN14), else the name as given """
-        gene_symbol_id, _hgnc = self.resolve_name(name)
-        return gene_symbol_id or name
-
-    @cached_property
-    def _hgnc_by_previous_symbol(self) -> dict[str, HGNC]:
-        """ HGNC's previous symbols, upper-cased - a rename, so the strongest statement that an old
-            name and a current one are the same gene """
-        return self._hgnc_symbol_lookup("previous_symbols")
-
-    @cached_property
-    def _hgnc_by_alias_symbol(self) -> dict[str, HGNC]:
-        """ HGNC's alias symbols - a nickname rather than a rename, and routinely shared with an
-            unrelated gene, so the last thing consulted """
-        return self._hgnc_symbol_lookup("alias_symbols")
-
-    @staticmethod
-    def _hgnc_symbol_lookup(field: str) -> dict[str, HGNC]:
-        lookup: dict[str, HGNC] = {}
-        for hgnc in HGNC.objects.all():
-            approved = hgnc.status == HGNCStatus.APPROVED
-            for symbol in (getattr(hgnc, field) or "").split(","):
-                symbol = symbol.strip().upper()
-                if not symbol:
-                    continue
-                existing = lookup.get(symbol)
-                if existing is None or (approved and existing.status != HGNCStatus.APPROVED):
-                    lookup[symbol] = hgnc
-        return lookup
-
-    @staticmethod
-    def _hgnc_for_symbol(gene_symbol_id: str) -> Optional[HGNC]:
-        hgnc_qs = HGNC.objects.filter(gene_symbol_id=gene_symbol_id)
-        # gene_symbol isn't unique in HGNC (eg MMP21 has multiple entries) so prefer the approved one
-        return hgnc_qs.filter(status=HGNCStatus.APPROVED).first() or hgnc_qs.first()
-
-    def resolve_name(self, name: str) -> tuple[Optional[str], Optional[HGNC]]:
-        """ (gene symbol, HGNC) - the symbol is the approved one where 'name' was an old name.
-
-            A name that is a current symbol in its own right is taken as written. Otherwise HGNC's
-            rename is the strongest evidence two names are one gene, so it outranks an alias: SEPT2
-            is SEPTIN2's previous symbol and also, on an unrelated gene, one of SEPTIN6's aliases,
-            and GeneSymbolAlias holds a row for each of them. """
-
-        gene_symbol_id, alias_id = self.gene_matcher.get_gene_symbol_id_and_alias_id(name)
-        if gene_symbol_id is not None and alias_id is None:
-            if hgnc := self._hgnc_for_symbol(gene_symbol_id):
-                return gene_symbol_id, hgnc
-
-        uc_name = name.strip().upper()
-        if hgnc := self._hgnc_by_previous_symbol.get(uc_name):
-            return hgnc.gene_symbol_id, hgnc
-        if gene_symbol_id is not None:
-            if hgnc := self._hgnc_for_symbol(gene_symbol_id):
-                return gene_symbol_id, hgnc
-
-        # A GeneSymbol row for the old name stops the matcher ever reaching its aliases - Ensembl
-        # still calls ACP3 'ACPP' - so that hop is taken explicitly here
-        if alias_symbol_id := self.gene_matcher.get_alias_gene_symbol_id(name):
-            if hgnc := self._hgnc_for_symbol(alias_symbol_id):
-                return alias_symbol_id, hgnc
-        if hgnc := self._hgnc_by_alias_symbol.get(uc_name):
-            return hgnc.gene_symbol_id, hgnc
-        return gene_symbol_id, None
 
     def _gene_overlap_resolvers(self, genome_build: GenomeBuild) -> list[SVGeneOverlapResolver]:
         """ One per GeneAnnotationRelease of the build - a RefSeq release gives the gene its Entrez
@@ -224,7 +133,7 @@ class GeneFusionResolver:
             return candidates[0]
         return None
 
-    def _identity_for_candidate(self, candidate: _GeneCandidate) -> FusionGeneId:
+    def _identity_for_candidate(self, candidate: _GeneCandidate) -> GeneLevelId:
         hgnc = HGNC.objects.filter(pk=candidate.hgnc_id).first() if candidate.hgnc_id else None
         if hgnc is not None:
             symbol_str = hgnc.gene_symbol_id
@@ -232,22 +141,17 @@ class GeneFusionResolver:
         else:
             symbol_str = candidate.symbol
             gene_symbol_id = candidate.symbol
-        fusion_gene_id = FusionGeneId.get_or_create_for_symbol(symbol_str, gene_symbol_id, hgnc)
-        fusion_gene_id.genes.add(*candidate.gene_ids)
-        return fusion_gene_id
+        gene_level_id = GeneLevelId.get_or_create_for_symbol(symbol_str, gene_symbol_id, hgnc)
+        gene_level_id.genes.add(*candidate.gene_ids)
+        return gene_level_id
 
     def resolve_side(self, cell: str, allow_unknown: bool = True, breakpoint: Optional[str] = None,
-                     genome_build: Optional[GenomeBuild] = None) -> Optional[ResolvedFusionGene]:
+                     genome_build: Optional[GenomeBuild] = None) -> Optional[ResolvedGeneLevelGene]:
         """ Picks the identity for one side of a fusion.
 
             The breakpoint decides where the caller gave one and it lands in a gene we know - the
-            position does not depend on which symbol the panel was designed with. Failing that an
-            HGNC-backed name wins, since that id means the same gene everywhere, then a known gene
-            symbol, then the first name as written - a caller naming only clone-based identifiers
-            still described a real event.
-
-            allow_unknown=False stops at a known gene symbol, for callers where a name we can't place
-            means "this probably isn't a fusion" rather than "this is a fusion of something unusual". """
+            position does not depend on which symbol the panel was designed with. Failing that the
+            name answers it, @see GeneLevelNameResolver.resolve_gene. """
 
         names = self.split_gene_names(cell)
         if not names:
@@ -255,27 +159,13 @@ class GeneFusionResolver:
 
         resolved_names = [self.resolve_name(name) for name in names]
         if candidate := self._breakpoint_candidate(breakpoint, genome_build, resolved_names):
-            return ResolvedFusionGene(written=cell, fusion_gene_id=self._identity_for_candidate(candidate))
+            return ResolvedGeneLevelGene(written=cell, gene_level_id=self._identity_for_candidate(candidate))
+        return self._resolve_from_names(cell, names, resolved_names, allow_unknown)
 
-        first_known_symbol = None
-        for gene_symbol_id, hgnc in resolved_names:
-            if hgnc is not None:
-                fusion_gene_id = FusionGeneId.get_or_create_for_symbol(gene_symbol_id, gene_symbol_id, hgnc)
-                return ResolvedFusionGene(written=cell, fusion_gene_id=fusion_gene_id)
-            if gene_symbol_id is not None and first_known_symbol is None:
-                first_known_symbol = gene_symbol_id
-
-        if first_known_symbol is None and not allow_unknown:
-            return None
-
-        symbol_str = first_known_symbol or names[0]
-        fusion_gene_id = FusionGeneId.get_or_create_for_symbol(symbol_str, first_known_symbol, None)
-        return ResolvedFusionGene(written=cell, fusion_gene_id=fusion_gene_id)
-
-    def resolve_fusion(self, gene_a: Optional[ResolvedFusionGene], gene_b: Optional[ResolvedFusionGene],
+    def resolve_fusion(self, gene_a: Optional[ResolvedGeneLevelGene], gene_b: Optional[ResolvedGeneLevelGene],
                        directionality_known: bool) -> 'ResolvedFusion':
         """ gene_a is the 5' side. Exactly one side may be None - a caller that named neither has
-            described nothing to key on. No database writes beyond the FusionGeneIds themselves, so
+            described nothing to key on. No database writes beyond the GeneLevelIds themselves, so
             the loader can call this before the Variants exist. """
 
         if gene_a is None and gene_b is None:
@@ -289,8 +179,8 @@ class GeneFusionResolver:
 class ResolvedFusion:
     """ A fusion's identity, before it has a Variant. anchor/partner are the ids that become the
         Locus.position and the alt - @see snpdb.gene_level_variants """
-    anchor: FusionGeneId
-    partner: Optional[FusionGeneId]
+    anchor: GeneLevelId
+    partner: Optional[GeneLevelId]
     is_ordered: bool
 
     @property
@@ -322,19 +212,19 @@ def _candidate_key(gene_overlap: GeneOverlap):
     return None
 
 
-def _order_partners(gene_a: Optional[ResolvedFusionGene], gene_b: Optional[ResolvedFusionGene],
-                    directionality_known: bool) -> tuple[FusionGeneId, Optional[FusionGeneId], bool]:
+def _order_partners(gene_a: Optional[ResolvedGeneLevelGene], gene_b: Optional[ResolvedGeneLevelGene],
+                    directionality_known: bool) -> tuple[GeneLevelId, Optional[GeneLevelId], bool]:
     if gene_a is None or gene_b is None:
         # One partner unspecified. Where it's the 5' side that's missing, anchoring the known gene as
         # 5' would assert a direction the caller didn't, so those stay unordered
         known = gene_a or gene_b
-        return known.fusion_gene_id, None, gene_b is None and directionality_known
+        return known.gene_level_id, None, gene_b is None and directionality_known
 
     if directionality_known:
-        return gene_a.fusion_gene_id, gene_b.fusion_gene_id, True
+        return gene_a.gene_level_id, gene_b.gene_level_id, True
 
     # Unordered anchors on the lower id, so the pair lands on one Variant whichever way it's reported
-    anchor, partner = sorted([gene_a.fusion_gene_id, gene_b.fusion_gene_id], key=lambda g: g.pk)
+    anchor, partner = sorted([gene_a.gene_level_id, gene_b.gene_level_id], key=lambda g: g.pk)
     return anchor, partner, False
 
 
@@ -343,7 +233,8 @@ def create_gene_fusions_for_variants(variant_qs) -> int:
 
         Everything a GeneFusion holds is already in the Variant - the anchor is Locus.position and the
         alt carries the partner and whether a direction was asserted - so this reads the variants
-        rather than the file they came from, and one implementation serves every loader.
+        rather than the file they came from, and one implementation serves every loader. Copy number
+        events share the contig, so the fusion alts are what this claims.
 
         :return: how many were created """
 
@@ -351,6 +242,8 @@ def create_gene_fusions_for_variants(variant_qs) -> int:
     for variant in variant_qs.filter(Variant.get_gene_level_q(), genefusion__isnull=True) \
                              .select_related("locus", "alt"):
         kind, _namespace, partner_id = GeneLevelSymbolicAlt.parse(variant.alt.seq)
+        if kind not in FUSION_ALTS:
+            continue
         gene_fusions.append(GeneFusion(variant=variant,
                                        anchor_id=variant.locus.position,
                                        partner_id=partner_id,
@@ -392,7 +285,7 @@ def find_gene_fusions_for_string(fusion_string: str, resolver: GeneFusionResolve
     gene_ids = []
     for name in genes:
         symbols = {resolver.canonical_symbol(n) for n in resolver.split_gene_names(name)}
-        ids = set(FusionGeneId.objects.filter(symbol_str__in=symbols).values_list("pk", flat=True))
+        ids = set(GeneLevelId.objects.filter(symbol_str__in=symbols).values_list("pk", flat=True))
         if not ids:
             return []
         gene_ids.append(ids)

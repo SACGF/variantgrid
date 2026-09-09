@@ -1,90 +1,14 @@
 from typing import Optional
 
 from django.core.exceptions import ValidationError
-from django.db import IntegrityError, models, transaction
-from django.db.models import TextField
-from django.db.models.deletion import CASCADE, PROTECT, SET_NULL
+from django.db import models
+from django.db.models.deletion import CASCADE, PROTECT
 
-from genes.models.models_gene import HGNC, Gene, GeneSymbol
-from library.genomics.vcf_enums import GeneIdNamespace, GeneLevelSymbolicAlt
-
-
-class FusionGeneId(models.Model):
-    """ A stable number for one side of a gene fusion - the pk is what a fusion Variant carries as its
-        Locus.position and inside its symbolic alt (@see GeneLevelSymbolicAlt), so this table is the
-        identifier space fusion identity is built on. @see snpdb.gene_level_variants for why a fusion
-        is stored as a Variant in the first place.
-
-        pk is the HGNC ID where the gene has one, so the identity of an ordinary fusion is the same
-        number on every deployment. Symbols HGNC doesn't carry - clone-based identifiers like
-        RP11-458D21.5, which turn up as fusion partners routinely - get a pk allocated above
-        CUSTOM_ID_START, so every call the caller made can still become a Variant.
-
-        Custom numbers are local to this deployment, which is why the alt namespaces them as GENE
-        rather than HGNC. Anything leaving the system - display, export, a classification sent to
-        another instance - uses symbol_str rather than the pk, and the receiver resolves it back
-        through its own table. @see GeneLevelSymbolicAlt for where the numbers are used, and
-        GeneFusion.canonical_str for the string form.
-
-        Identity, once handed out, is fixed - the same way a Variant's coordinates are - so a name
-        that only later becomes resolvable keeps the custom pk its variants were created with. What
-        moves it onto the HGNC number is re-loading the caller's file: resolution mints the right
-        identity from the start, and the old rows stay as they are. """
-
-    CUSTOM_ID_START = 1_000_000
-    CUSTOM_ID_RETRIES = 5
-
-    # The name to use whenever this leaves the system - the approved symbol where we have one,
-    # otherwise the name exactly as the caller wrote it
-    symbol_str = TextField(unique=True, db_collation='case_insensitive')
-    gene_symbol = models.ForeignKey(GeneSymbol, null=True, on_delete=SET_NULL)
-    hgnc = models.ForeignKey(HGNC, null=True, on_delete=SET_NULL)
-    # What the caller's breakpoint landed in - the same gene as an Entrez id and an ENSG, since a
-    # release is one consortium's. Annotation reads these before falling back to the symbol, which
-    # is what makes a side found by position reachable from a gene list @see gene_level_annotation
-    genes = models.ManyToManyField(Gene, blank=True)
-
-    def __str__(self):
-        return self.symbol_str
-
-    @property
-    def is_custom(self) -> bool:
-        return self.pk >= FusionGeneId.CUSTOM_ID_START
-
-    @property
-    def alt_namespace(self) -> str:
-        return GeneIdNamespace.GENE if self.is_custom else GeneIdNamespace.HGNC
-
-    @staticmethod
-    def get_or_create_for_symbol(symbol_str: str, gene_symbol_id: Optional[str],
-                                 hgnc: Optional[HGNC]) -> 'FusionGeneId':
-        """ symbol_str is what to show and send - callers resolve aliases first, so SEPT14 arrives
-            here as SEPTIN14 and collapses onto the one row """
-
-        if hgnc is not None:
-            defaults = {"symbol_str": symbol_str, "gene_symbol_id": gene_symbol_id, "hgnc": hgnc}
-            fusion_gene_id, _ = FusionGeneId.objects.get_or_create(pk=hgnc.pk, defaults=defaults)
-            return fusion_gene_id
-
-        if fusion_gene_id := FusionGeneId.objects.filter(symbol_str=symbol_str).first():
-            return fusion_gene_id
-
-        # Allocating our own pk, so another worker can take the number between the max() and the insert
-        for _ in range(FusionGeneId.CUSTOM_ID_RETRIES):
-            try:
-                with transaction.atomic():
-                    last = FusionGeneId.objects.filter(pk__gte=FusionGeneId.CUSTOM_ID_START).order_by("-pk").first()
-                    pk = last.pk + 1 if last else FusionGeneId.CUSTOM_ID_START
-                    return FusionGeneId.objects.create(pk=pk, symbol_str=symbol_str,
-                                                        gene_symbol_id=gene_symbol_id)
-            except IntegrityError:
-                pass
-            if fusion_gene_id := FusionGeneId.objects.filter(symbol_str=symbol_str).first():
-                return fusion_gene_id
-        raise IntegrityError(f"Could not allocate a FusionGeneId id for '{symbol_str}'")
+from genes.models.models_gene_level import GeneLevelId
+from library.genomics.vcf_enums import GeneLevelSymbolicAlt
 
 
-def fusion_canonical_str(anchor: FusionGeneId, partner: Optional[FusionGeneId]) -> str:
+def fusion_canonical_str(anchor: GeneLevelId, partner: Optional[GeneLevelId]) -> str:
     """ 'BCR::ABL1' - the VICC gene-level form, which HGNC and HGVS both point at for fusions.
         '::' is the fusion separator; a single hyphen means a read-through transcript, which is a
         different event, so it is never written here. An unnamed partner shows as '?'. """
@@ -106,14 +30,9 @@ class GeneFusion(models.Model):
         partner is null only where the caller named one gene and left the other unspecified. """
 
     variant = models.OneToOneField('snpdb.Variant', on_delete=CASCADE)
-    anchor = models.ForeignKey(FusionGeneId, related_name='fusions_as_anchor', on_delete=PROTECT)
-    partner = models.ForeignKey(FusionGeneId, null=True, related_name='fusions_as_partner', on_delete=PROTECT)
+    anchor = models.ForeignKey(GeneLevelId, related_name='fusions_as_anchor', on_delete=PROTECT)
+    partner = models.ForeignKey(GeneLevelId, null=True, related_name='fusions_as_partner', on_delete=PROTECT)
     is_ordered = models.BooleanField(default=False)
-
-    @property
-    def canonical_str(self) -> str:
-        """ The form to display and to send anywhere off this deployment - @see FusionGeneId """
-        return fusion_canonical_str(self.anchor, self.partner)
 
     def __str__(self):
         return self.canonical_str
@@ -122,7 +41,12 @@ class GeneFusion(models.Model):
         return self.variant.get_absolute_url()
 
     @property
-    def fusion_gene_ids(self) -> list[FusionGeneId]:
+    def canonical_str(self) -> str:
+        """ The form to display and to send anywhere off this deployment - @see GeneLevelId """
+        return fusion_canonical_str(self.anchor, self.partner)
+
+    @property
+    def gene_level_ids(self) -> list[GeneLevelId]:
         """ Both partners, so gene lists and comp-het find the fusion from either side """
         genes = [self.anchor]
         if self.partner:

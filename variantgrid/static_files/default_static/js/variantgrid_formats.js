@@ -852,8 +852,8 @@ const GENE_LEVEL_KINDS = {
     'FUSION': {code: 'FUSION', css: 'fusion', title: 'Gene fusion'},
     'FUSION_UNORDERED': {code: 'FUSION \u21c4', css: 'fusion',
                          title: 'Gene fusion - direction not asserted by the caller'},
-    'AMP': {code: 'AMP', css: 'amp', title: 'Gene-level copy number'},
-    'LOSS': {code: 'LOSS', css: 'loss', title: 'Gene-level copy number'},
+    'GAIN': {code: 'GAIN', css: 'gain', title: 'Gene-level copy number gain'},
+    'LOSS': {code: 'LOSS', css: 'loss', title: 'Gene-level copy number loss'},
 };
 const SV_KIND_CSS = {'DEL': 'del', 'DUP': 'dup', 'INV': 'inv', 'CNV': 'cnv', 'INS': 'ins'};
 

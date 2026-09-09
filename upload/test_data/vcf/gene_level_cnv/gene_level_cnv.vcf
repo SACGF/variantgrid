@@ -1,0 +1,20 @@
+##fileformat=VCFv4.2
+##DRAGENVersion=<ID=dragen,Version="SW: 07.021.624.3.11.2, HW: 07.021.624">
+##contig=<ID=chr1,length=249250621>
+##contig=<ID=chr7,length=159138663>
+##ALT=<ID=DEL,Description="Deletion relative to the reference">
+##ALT=<ID=DUP,Description="Region of elevated copy number relative to the reference">
+##INFO=<ID=SVLEN,Number=.,Type=Integer,Description="Difference in length between REF and ALT alleles">
+##INFO=<ID=SVTYPE,Number=1,Type=String,Description="Type of structural variant">
+##INFO=<ID=END,Number=1,Type=Integer,Description="End position of the variant described in this record">
+##INFO=<ID=SEGID,Number=1,Type=String,Description="Segment ID">
+##FILTER=<ID=cnvQual,Description="CNV with quality below 0">
+##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
+##FORMAT=<ID=SM,Number=1,Type=Float,Description="Linear copy ratio of the segment mean">
+##FORMAT=<ID=BC,Number=1,Type=Integer,Description="Number of bins in the region">
+#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	ExampleSample
+chr1	2489163	DRAGEN:REF:chr1:2489163-2494714	N	.	3	PASS	END=2494714;SEGID=BRAF	GT:SM:BC	./.:1.39098:7
+chr7	55086724	DRAGEN:GAIN:chr7:55086725-55279321	N	<DUP>	9	PASS	SVLEN=192597;SVTYPE=CNV;END=55279321;SEGID=EGFR	GT:SM:BC	./1:4.31428:22
+chr7	55879730	DRAGEN:LOSS:chr7:55879731-55972789	N	<DEL>	43	cnvQual	SVLEN=-93058;SVTYPE=CNV;END=55972789;SEGID=SEPT14	GT:SM:BC	0/1:0.614134:43
+chr7	61000000	DRAGEN:GAIN:chr7:61000001-61010000	N	<DUP>	11	PASS	SVLEN=10000;SVTYPE=CNV;END=61010000;SEGID=RP11-458D21.5	GT:SM:BC	./1:1.94:9
+chr7	62000000	DRAGEN:GAIN:chr7:62000001-62010000	N	<DUP>	11	PASS	SVLEN=10000;SVTYPE=CNV;END=62010000;SEGID=.	GT:SM:BC	./1:1.88:9

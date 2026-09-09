@@ -2,6 +2,7 @@
 {% load classification_tags %}
 {% load js_tags %}
 {% load fieldset_tags %}
+{% load gene_copy_number_tags %}
 {% load gene_fusion_tags %}
 {% load ui_utils %}
 {% load ui_help %}
@@ -514,6 +515,8 @@ function applyVariantValues() {
                 {% labelled id="g-hgvs" label="g.HGVS" value_css="variant-coordinate variant_coordinate" %}{% c_hgvs hgvs_g %}{% endlabelled %}
                 {% if gene_fusion %}
                     {% labelled label="Fusion" %}{% gene_fusion gene_fusion %}{% endlabelled %}
+                {% elif gene_copy_number_event %}
+                    {% labelled label="Copy number" %}{% gene_copy_number gene_copy_number_event %}{% endlabelled %}
                 {% else %}
                     {% labelled id="variant_coordinate" label="Variant Coordinate" value_css="variant-coordinate variant_coordinate" %}Loading...{% endlabelled %}
                 {% endif %}

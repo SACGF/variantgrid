@@ -17,9 +17,9 @@ The chain that breaks:
 1. `genes/gene_matching.py:GeneSymbolMatcher.get_gene_symbol_id_and_alias_id` returns a direct `GeneSymbol`
    hit before consulting aliases. A `GeneSymbol` row `ACPP` exists (Ensembl still uses it), so the alias
    ACPP -> ACP3 is never applied.
-2. `genes/gene_fusions.py:GeneFusionResolver.resolve_name` then finds no `HGNC` row with `gene_symbol=ACPP`,
+2. `genes/gene_level_resolver.py:GeneLevelNameResolver.resolve_name` then finds no `HGNC` row with `gene_symbol=ACPP`,
    so `resolve_side` mints a custom `FusionGeneId` (pk 1000002, `gene_symbol=ACPP`, `hgnc=None`).
-3. `annotation/gene_level_annotation.py:FusionGeneIdResolver` resolves the side through
+3. `annotation/gene_level_annotation.py:GeneLevelIdResolver` resolves the side through
    `GeneAnnotationRelease.genes_for_symbol("ACPP")`, which is empty in every RefSeq release (they know
    `ACP3` -> gene 55). Only the ETV1 side gets a `VariantGeneOverlap` row.
 4. `analysis/models/nodes/filters/gene_list_node.py:GeneListNode` filters on `VariantGeneOverlap`, so ACP3
@@ -56,7 +56,7 @@ docstring already states. New migration in `genes/`.
 
 ### 1. Name resolution learns HGNC previous and alias symbols
 
-`genes/gene_fusions.py:GeneFusionResolver.resolve_name`, in order:
+`genes/gene_level_resolver.py:GeneLevelNameResolver.resolve_name`, in order:
 
 1. Current behaviour: matcher symbol -> `HGNC` row with that `gene_symbol` (approved preferred).
 2. If no HGNC: the matcher's alias dict (`GeneSymbolAlias`), then a new upper-cased lookup built once per
@@ -107,7 +107,7 @@ HGNC-numbered identity instead.
 
 ### 4. Annotation reads genes first, symbols second
 
-`annotation/gene_level_annotation.py:FusionGeneIdResolver.get_release_gene_annotation`:
+`annotation/gene_level_annotation.py:GeneLevelIdResolver.get_release_gene_annotation`:
 
 1. `fusion_gene_id.genes` restricted to genes in the release (`ReleaseGeneVersion`).
 2. Else the symbol route as today, using `hgnc.gene_symbol_id` when `hgnc` is set and `gene_symbol_id`

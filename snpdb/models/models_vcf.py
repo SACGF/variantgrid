@@ -95,6 +95,10 @@ class VCF(GuardianPermissionsMixin, DataArchiveMixin, PreviewModelMixin):
     # ratio - CN, SM, FC. There is no packed column for it: the grid reads it out of the stored
     # CohortGenotype JSON at query time, labelled with this name (@see VCFConstant.COPY_NUMBER_FIELDS)
     copy_number_field = models.TextField(null=True)
+    # The INFO key whose value named the gene each record is about, for a VCF whose records are
+    # gene-level copy number events rather than coordinates (@see snpdb.gene_level_variants). Set at
+    # import from settings.VCF_GENE_LEVEL_SEGMENT_FIELDS - what claimed the file in the first place
+    gene_level_segment_field = models.TextField(null=True)
     allele_frequency_percent = models.BooleanField(default=False)  # Legacy data used AF as percent
     # We don't want some VCFs to add to variant zygosity count (see VCFSourceSettings)
     variant_zygosity_count = models.BooleanField(default=True)

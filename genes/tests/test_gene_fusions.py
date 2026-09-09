@@ -13,7 +13,7 @@ from genes.gene_fusions import (
 )
 from genes.models import (
     HGNC,
-    FusionGeneId,
+    GeneLevelId,
     GeneFusion,
     GeneSymbol,
     GeneSymbolAlias,
@@ -128,15 +128,15 @@ class TestFusionResolution(GeneFusionTestCase):
 
     def test_hgnc_id_is_the_identity(self):
         gene = self.resolver.resolve_side("BRAF")
-        self.assertEqual(self.hgnc_ids["BRAF"], gene.fusion_gene_id.pk)
-        self.assertFalse(gene.fusion_gene_id.is_custom)
-        self.assertEqual(GeneIdNamespace.HGNC, gene.fusion_gene_id.alt_namespace)
+        self.assertEqual(self.hgnc_ids["BRAF"], gene.gene_level_id.pk)
+        self.assertFalse(gene.gene_level_id.is_custom)
+        self.assertEqual(GeneIdNamespace.HGNC, gene.gene_level_id.alt_namespace)
 
     def test_renamed_symbol_resolves_to_approved(self):
         """ The file says SEPT14; HGNC says SEPTIN14 """
         gene = self.resolver.resolve_side("SEPT14")
         self.assertEqual("SEPTIN14", gene.resolved_symbol)
-        self.assertEqual(self.hgnc_ids["SEPTIN14"], gene.fusion_gene_id.pk)
+        self.assertEqual(self.hgnc_ids["SEPTIN14"], gene.gene_level_id.pk)
         self.assertTrue(gene.was_renamed)
 
     def test_multi_gene_side_prefers_the_hgnc_member(self):
@@ -158,26 +158,26 @@ class TestFusionResolution(GeneFusionTestCase):
 
     def test_gene_with_no_hgnc_gets_a_local_id(self):
         gene = self.resolver.resolve_side("RP11-458D21.5")
-        fusion_gene_id = gene.fusion_gene_id
-        self.assertTrue(fusion_gene_id.is_custom)
-        self.assertGreaterEqual(fusion_gene_id.pk, FusionGeneId.CUSTOM_ID_START)
-        self.assertEqual("RP11-458D21.5", fusion_gene_id.gene_symbol_id)
-        self.assertIsNone(fusion_gene_id.hgnc_id)
-        self.assertEqual(GeneIdNamespace.GENE, fusion_gene_id.alt_namespace)
+        gene_level_id = gene.gene_level_id
+        self.assertTrue(gene_level_id.is_custom)
+        self.assertGreaterEqual(gene_level_id.pk, GeneLevelId.CUSTOM_ID_START)
+        self.assertEqual("RP11-458D21.5", gene_level_id.gene_symbol_id)
+        self.assertIsNone(gene_level_id.hgnc_id)
+        self.assertEqual(GeneIdNamespace.GENE, gene_level_id.alt_namespace)
 
     def test_unknown_name_still_gets_an_identity(self):
         """ A caller naming only symbols we've never seen still described a real event """
         gene = self.resolver.resolve_side("CTD-2035E11.3")
-        self.assertTrue(gene.fusion_gene_id.is_custom)
-        self.assertEqual("CTD-2035E11.3", gene.fusion_gene_id.symbol_str)
-        self.assertIsNone(gene.fusion_gene_id.gene_symbol_id)
+        self.assertTrue(gene.gene_level_id.is_custom)
+        self.assertEqual("CTD-2035E11.3", gene.gene_level_id.symbol_str)
+        self.assertIsNone(gene.gene_level_id.gene_symbol_id)
 
     def test_previous_symbol_resolves_when_a_gene_symbol_row_shadows_it(self):
         """ ACPP is a GeneSymbol in its own right, so the matcher never reaches an alias - HGNC's
             own previous symbols are what places it on ACP3 """
         gene = self.resolver.resolve_side("ACPP")
         self.assertEqual("ACP3", gene.resolved_symbol)
-        self.assertEqual(self.hgnc_ids["ACP3"], gene.fusion_gene_id.pk)
+        self.assertEqual(self.hgnc_ids["ACP3"], gene.gene_level_id.pk)
         self.assertTrue(gene.was_renamed)
 
     def test_a_rename_outranks_another_gene_alias_of_the_same_name(self):
@@ -187,10 +187,10 @@ class TestFusionResolution(GeneFusionTestCase):
         self.assertEqual("SEPTIN2", gene.resolved_symbol)
 
     def test_local_ids_are_allocated_without_collision(self):
-        first = self.resolver.resolve_side("RP11-458D21.5").fusion_gene_id
-        second = self.resolver.resolve_side("AC016683.6").fusion_gene_id
+        first = self.resolver.resolve_side("RP11-458D21.5").gene_level_id
+        second = self.resolver.resolve_side("AC016683.6").gene_level_id
         self.assertNotEqual(first.pk, second.pk)
-        self.assertEqual(first.pk, self.resolver.resolve_side("RP11-458D21.5").fusion_gene_id.pk)
+        self.assertEqual(first.pk, self.resolver.resolve_side("RP11-458D21.5").gene_level_id.pk)
 
 
 class TestFusionVariant(GeneFusionTestCase):
@@ -297,9 +297,9 @@ class TestBreakpointResolution(TestCase):
         gene = self.resolver.resolve_side("WHATEVER1", breakpoint="chr3:132005000",
                                           genome_build=self.genome_build)
         self.assertEqual("ACP3", gene.resolved_symbol)
-        self.assertEqual(self.hgnc_ids["ACP3"], gene.fusion_gene_id.pk)
+        self.assertEqual(self.hgnc_ids["ACP3"], gene.gene_level_id.pk)
         self.assertEqual({self.acp3_gene.pk},
-                         set(gene.fusion_gene_id.genes.values_list("pk", flat=True)))
+                         set(gene.gene_level_id.genes.values_list("pk", flat=True)))
 
     def test_chromosome_is_resolved_through_the_build(self):
         """ A caller writes chr3 and a VCF writes 3 - both are the same contig """
@@ -312,25 +312,25 @@ class TestBreakpointResolution(TestCase):
                                           genome_build=self.genome_build)
         self.assertEqual("OVER_B", gene.resolved_symbol)
         self.assertEqual({self.over_b_gene.pk},
-                         set(gene.fusion_gene_id.genes.values_list("pk", flat=True)))
+                         set(gene.gene_level_id.genes.values_list("pk", flat=True)))
 
     def test_overlapping_genes_with_no_name_match_fall_back_to_the_name(self):
         """ Picking one of two would be a guess, so the caller's name stands and no gene is recorded """
         gene = self.resolver.resolve_side("WHATEVER3", breakpoint="chr3:140005000",
                                           genome_build=self.genome_build)
         self.assertEqual("WHATEVER3", gene.resolved_symbol)
-        self.assertFalse(gene.fusion_gene_id.genes.exists())
+        self.assertFalse(gene.gene_level_id.genes.exists())
 
     def test_breakpoint_in_nothing_falls_back_to_the_name(self):
         gene = self.resolver.resolve_side("ACP3", breakpoint="chr3:1000",
                                           genome_build=self.genome_build)
-        self.assertEqual(self.hgnc_ids["ACP3"], gene.fusion_gene_id.pk)
-        self.assertFalse(gene.fusion_gene_id.genes.exists())
+        self.assertEqual(self.hgnc_ids["ACP3"], gene.gene_level_id.pk)
+        self.assertFalse(gene.gene_level_id.genes.exists())
 
     def test_no_build_leaves_resolution_on_the_name(self):
         gene = self.resolver.resolve_side("ACP3", breakpoint="chr3:132005000")
-        self.assertEqual(self.hgnc_ids["ACP3"], gene.fusion_gene_id.pk)
-        self.assertFalse(gene.fusion_gene_id.genes.exists())
+        self.assertEqual(self.hgnc_ids["ACP3"], gene.gene_level_id.pk)
+        self.assertFalse(gene.gene_level_id.genes.exists())
 
 
 class TestFusionString(GeneFusionTestCase):
@@ -376,7 +376,7 @@ class TestFusionLookup(GeneFusionTestCase):
         self.assertEqual([gene_fusion], find_gene_fusions_for_string("EGFR::SEPT14"))
 
     def test_creates_nothing(self):
-        before = (GeneFusion.objects.count(), FusionGeneId.objects.count())
+        before = (GeneFusion.objects.count(), GeneLevelId.objects.count())
         self.assertEqual([], find_gene_fusions_for_string("BCR::ABL1"))
         self.assertEqual([], find_gene_fusions_for_string("NOTAGENE::ALSONOTAGENE"))
-        self.assertEqual(before, (GeneFusion.objects.count(), FusionGeneId.objects.count()))
+        self.assertEqual(before, (GeneFusion.objects.count(), GeneLevelId.objects.count()))

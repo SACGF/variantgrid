@@ -10,7 +10,7 @@ from django.test import TestCase
 
 from annotation.fake_annotation import get_fake_annotation_version
 from genes.gene_fusions import GeneFusionResolver, create_gene_fusions_for_variants
-from genes.models import FusionGeneId, GeneFusion
+from genes.models import GeneLevelId, GeneFusion
 from genes.tests.gene_fusion_test_utils import create_gene_fusion
 from genes.tests.test_gene_fusions import GeneFusionTestCase
 from library.genomics.vcf_enums import GeneLevelSymbolicAlt
@@ -203,8 +203,8 @@ class TestGeneFusionInsert(GeneFusionTestCase):
 
         self.assertEqual(1, create_gene_fusions_for_variants(Variant.objects.filter(pk=variant.pk)))
         recreated = GeneFusion.objects.get(variant=variant)
-        self.assertEqual(FusionGeneId.objects.get(symbol_str="BCR"), recreated.anchor)
-        self.assertEqual(FusionGeneId.objects.get(symbol_str="ABL1"), recreated.partner)
+        self.assertEqual(GeneLevelId.objects.get(symbol_str="BCR"), recreated.anchor)
+        self.assertEqual(GeneLevelId.objects.get(symbol_str="ABL1"), recreated.partner)
         self.assertTrue(recreated.is_ordered)
 
     def test_is_idempotent(self):

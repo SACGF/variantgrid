@@ -1,7 +1,7 @@
 # Gene amplifications and losses as gene-level variants
 
 Written by Claude Fable 5.1 (claude-fable-5-1), 2026-09-09
-Status: draft
+Status: in progress
 
 Issue: [#1836](https://github.com/SACGF/variantgrid/issues/1836). Builds on the gene-level variant design in
 `snpdb/gene_level_variants.py` (#1506) and is the "coordinate-free gene-level CNV" follow-on that
@@ -47,7 +47,7 @@ coordinate SVs. Only the segment field, not any gene-naming field, triggers the 
 
 ### Rename `FusionGeneId` to `GeneLevelId`
 
-`genes/models/models_gene_fusion.py:FusionGeneId` is already the right thing: pk is the HGNC id where the gene has
+`genes/models/models_gene_level.py:GeneLevelId` (`FusionGeneId` as it was) is already the right thing: pk is the HGNC id where the gene has
 one, a local number above one million otherwise, with `symbol_str` for anything that leaves the deployment. Only its
 name and docstring say fusion. It moves to its own module with the fields unchanged:
 
@@ -139,13 +139,14 @@ throughout.
 `genes/gene_fusions.py:create_gene_fusions_for_variants` today takes every variant on the gene-level contig with no
 `GeneFusion` and parses its alt as a fusion. It filters on the fusion alt kinds from now on. A sibling
 `create_gene_copy_number_events_for_variants` does the same for GAIN / LOSS, and
-`upload/tasks/vcf/import_vcf_tasks.py:GeneLevelInsertGeneFusionsTask` becomes the task that runs both, so the
+`upload/tasks/vcf/import_vcf_tasks.py:GeneLevelInsertEventsTask` (`GeneLevelInsertGeneFusionsTask` as it
+was) becomes the task that runs both, so the
 classification-driven `GENE_LEVEL_INSERT_VARIANTS_ONLY` pipeline mints events as well as fusions.
 
 ### 3. Annotation
 
 `annotation/gene_level_annotation.py:annotate_gene_level_run` already claims every variant on the gene-level contig.
-It gains a copy number branch beside the fusion one, and `annotation/gene_level_annotation.py:FusionGeneIdResolver`
+It gains a copy number branch beside the fusion one, and `annotation/gene_level_annotation.py:GeneLevelIdResolver`
 is renamed with the model. For an event: one representative `VariantAnnotation` for the gene, per-transcript rows for
 the release's transcripts, a `VariantGeneOverlap` for the one gene, `symbol` and `overlapping_symbols` the gene,
 `hgvs_c` / `hgvs_g` the canonical string. Consequence is the SO term `transcript_amplification` for GAIN and
