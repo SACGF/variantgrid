@@ -31,10 +31,18 @@ from django.urls import reverse
 from django.utils.timezone import now
 from model_utils.models import TimeStampedModel
 
+from genes.gene_copy_number import resolve_gene_copy_number_string
 from genes.gene_fusions import resolve_fusion_string
 from genes.hgvs import (HGVSComponents, HGVSDiff, HGVSConverterType, HGVSDisplay, HGVSMatcher,
                        HGVSNoRepresentationException, hgvs_diff_description)
-from genes.models import GeneFusion, GeneSymbol, NoTranscript, Transcript, TranscriptVersion
+from genes.models import (
+    GeneCopyNumberEvent,
+    GeneFusion,
+    GeneSymbol,
+    NoTranscript,
+    Transcript,
+    TranscriptVersion,
+)
 from library.cache import timed_cache
 from library.django_utils.django_object_managers import ObjectManagerCachingRequest
 from library.log_utils import report_exc_info
@@ -196,9 +204,10 @@ class ResolvedVariantInfo(TimeStampedModel):
 
         if variant.is_gene_level:
             # Sits on no transcript, so there is nothing to write a c.HGVS against. The gene symbol is
-            # the fusion's anchor - what a grid sorts and groups on
-            if gene_fusion := self.allele_info.gene_fusion:
-                self.gene_symbol = GeneSymbol.objects.filter(pk=gene_fusion.anchor.gene_symbol_id).first()
+            # the event's first gene (a fusion's anchor) - what a grid sorts and groups on
+            if gene_level_event := self.allele_info.gene_level_event:
+                gene_level_id = gene_level_event.gene_level_ids[0]
+                self.gene_symbol = GeneSymbol.objects.filter(pk=gene_level_id.gene_symbol_id).first()
             self.save()
             return self
 
@@ -534,6 +543,20 @@ class ImportedAlleleInfo(TimeStampedModel):
             return GeneFusion.objects.filter(variant=variant).first()
         return None
 
+    @property
+    def gene_copy_number_event(self) -> Optional['GeneCopyNumberEvent']:
+        """ Set where the imported value named a whole-gene copy number call ('EGFR amplification'),
+        read off the matched Variant the way gene_fusion is """
+        if variant := self.matched_variant:
+            return GeneCopyNumberEvent.objects.filter(variant=variant).first()
+        return None
+
+    @property
+    def gene_level_event(self):
+        """ Whichever kind of gene-level event the matched Variant is, for the places that want the
+        genes it names rather than what sort of event it is """
+        return self.gene_fusion or self.gene_copy_number_event
+
     allele = ForeignKey(Allele, null=True, blank=True, on_delete=SET_NULL)
     """ set this once it's matched, but record can exist prior to variant matching """
 
@@ -856,25 +879,25 @@ class ImportedAlleleInfo(TimeStampedModel):
                                            message=message, hgvs_converter_version=hgvs_converter_version,
                                            hgvs_converter_data_version=data_version)
 
-    def resolve_gene_fusion(self) -> bool:
-        """ A lab submitting 'BCR::ABL1' names a gene pair, not a coordinate - so there is no HGVS to
-            resolve. The identity it resolves to has a variant coordinate of its own, which goes
-            through the VCF insert pipeline like every other coordinate, so a fusion enters the
-            database exactly the way a small variant submitted the same way does.
+    def resolve_gene_level(self) -> bool:
+        """ A lab submitting 'BCR::ABL1' or 'EGFR amplification' names genes, not a coordinate - so
+            there is no HGVS to resolve. The identity it resolves to has a variant coordinate of its
+            own, which goes through the VCF insert pipeline like every other coordinate, so a
+            gene-level event enters the database exactly the way a small variant submitted the same
+            way does.
 
-            Returns whether this was a fusion, so the caller can skip HGVS resolution. """
+            Returns whether this was a gene-level event, so the caller can skip HGVS resolution. """
 
         imported = self.imported_hgvs
         if not imported or HGVS_UNCLEANED_PATTERN.search(imported):
             return False
 
-        resolved_fusion = resolve_fusion_string(imported)
-        if resolved_fusion is None:
-            return False
-
-        self.variant_coordinate = str(resolved_fusion.variant_coordinate)
-        self.message = f"Matched gene fusion {resolved_fusion.canonical_str}"
-        return True
+        for resolve in (resolve_fusion_string, resolve_gene_copy_number_string):
+            if resolved := resolve(imported):
+                self.variant_coordinate = str(resolved.variant_coordinate)
+                self.message = f"Matched {resolved.canonical_str}"
+                return True
+        return False
 
     def update_variant_coordinate(self):
         """ returns if a valid variant_coordinate could be derived """
@@ -991,7 +1014,7 @@ class ImportedAlleleInfo(TimeStampedModel):
         try:
             allele_info, created = ImportedAlleleInfo.objects.get_or_create(**tidied)
             if created:
-                if not allele_info.resolve_gene_fusion():
+                if not allele_info.resolve_gene_level():
                     allele_info.update_variant_coordinate()
                 allele_info.apply_validation()
                 allele_info.save()

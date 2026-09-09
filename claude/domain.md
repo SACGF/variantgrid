@@ -23,10 +23,19 @@ locus); exclude them with `Variant.get_no_reference_q` when you mean real calls.
 
 **Symbolic variant / SVLEN** - alts at or beyond `settings.VARIANT_SYMBOLIC_ALT_SIZE` are stored as `<DEL>` / `<DUP>` /
 `<INV>` with `svlen`; `snpdb/models/models_variant.py:VariantCoordinate.as_internal_canonical_form` does the conversion, and
-`Variant.qs_from_variant_coordinate` applies it for you. Gene-level events (fusions) are Variants on a fake contig - guard
+`Variant.qs_from_variant_coordinate` applies it for you. Gene-level events are Variants on a fake contig - guard
 coordinate code with `Variant.get_gene_level_q`.
 
-**Variant kind** - what the grids' kind badge says a row is, read off the alt: `FUSION` / `AMP` / `LOSS` for a gene-level
+**Gene-level ID** - `genes/models/models_gene_level.py:GeneLevelId`, the number a gene-level Variant carries as its
+`Locus.position` and inside its alt. The HGNC id where the gene has one, otherwise a local id above 1,000,000; anything
+leaving the deployment sends `symbol_str`, never the number.
+
+**Gene-level event** - what a gene-level Variant is: a `genes/models/models_gene_fusion.py:GeneFusion` (a gene pair,
+written `BCR::ABL1`) or a `genes/models/models_gene_level.py:GeneCopyNumberEvent` (one gene plus a direction, written
+`EGFR amplification` / `EGFR loss`). Identity never includes coordinates or a copy number threshold - the caller's
+segment and copy ratio are per observation, on the `CohortGenotype`.
+
+**Variant kind** - what the grids' kind badge says a row is, read off the alt: `FUSION` / `GAIN` / `LOSS` for a gene-level
 alt (`library/genomics/vcf_enums.py:GeneLevelSymbolicAlt`), `DEL` / `DUP` / `INV` / `CNV` / `INS` with the size from `svlen`
 for a symbolic one, and nothing at all for a small variant. Not VEP's `variant_class`
 (`library/genomics/vcf_enums.py:VariantClass`), which the Effect node filters on: VEP calls a 1 Mb `<DEL>` and a 1 bp

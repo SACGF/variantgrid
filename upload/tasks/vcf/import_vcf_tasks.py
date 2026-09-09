@@ -8,6 +8,7 @@ from django.conf import settings
 from django.contrib.auth.models import User
 
 from annotation.tasks.annotation_scheduler_task import annotation_scheduler
+from genes.gene_copy_number import create_gene_copy_number_events_for_variants
 from genes.gene_fusions import create_gene_fusions_for_variants
 from library.log_utils import log_traceback
 from library.utils import import_class
@@ -73,15 +74,19 @@ class GeneLevelPreprocessVCFTask(ImportVCFStepTask):
         return upload_step.items_processed
 
 
-class GeneLevelInsertGeneFusionsTask(ImportVCFStepTask):
-    """ The GeneFusion rows for gene-level variants a pipeline has just inserted.
+class GeneLevelInsertEventsTask(ImportVCFStepTask):
+    """ The GeneFusion and GeneCopyNumberEvent rows for gene-level variants a pipeline has just
+        inserted.
 
-        A gene-level Variant with no GeneFusion is one that has just arrived - everything the row
-        holds is in the Variant, so there is nothing to carry through from the file that named it.
-        @see genes.gene_fusions.create_gene_fusions_for_variants """
+        A gene-level Variant with no event is one that has just arrived - everything the row holds is
+        in the Variant, so there is nothing to carry through from the file that named it. Which kind
+        it is comes off the alt. @see genes.gene_fusions.create_gene_fusions_for_variants and
+        genes.gene_copy_number.create_gene_copy_number_events_for_variants """
 
     def process_items(self, upload_step):
-        return create_gene_fusions_for_variants(Variant.objects.all())
+        variant_qs = Variant.objects.all()
+        return create_gene_fusions_for_variants(variant_qs) + \
+            create_gene_copy_number_events_for_variants(variant_qs)
 
 
 class LiftoverPreprocessVCFTask(ImportVCFStepTask):
@@ -266,7 +271,7 @@ PreprocessVCFTask = app.register_task(PreprocessVCFTask())
 PreprocessAndAnnotateVCFTask = app.register_task(PreprocessAndAnnotateVCFTask())
 LiftoverPreprocessVCFTask = app.register_task(LiftoverPreprocessVCFTask())
 GeneLevelPreprocessVCFTask = app.register_task(GeneLevelPreprocessVCFTask())
-GeneLevelInsertGeneFusionsTask = app.register_task(GeneLevelInsertGeneFusionsTask())
+GeneLevelInsertEventsTask = app.register_task(GeneLevelInsertEventsTask())
 CheckStartAnnotationTask = app.register_task(CheckStartAnnotationTask())
 ScheduleMultiFileOutputTasksTask = app.register_task(ScheduleMultiFileOutputTasksTask())
 ImportCreateUploadedVCFTask = app.register_task(ImportCreateUploadedVCFTask())

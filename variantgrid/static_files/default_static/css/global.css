@@ -1006,7 +1006,7 @@ table.variantgrid-datatable .fusion-calls {
 }
 .rv-kind-dup,
 .rv-kind-cnv,
-.rv-kind-amp {
+.rv-kind-gain {
   background: #e8f0fe;
   color: #1a56b8;
 }

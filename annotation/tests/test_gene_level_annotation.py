@@ -1,4 +1,4 @@
-"""The GENE_LEVEL annotation pipeline - what makes gene lists and comp-het find a fusion."""
+"""The GENE_LEVEL annotation pipeline - what makes gene lists and comp-het find a gene-level event."""
 from django.test import TestCase
 
 from annotation.annotation_version_querysets import (
@@ -19,9 +19,11 @@ from annotation.models import (
 )
 from annotation.tests.test_data_fake_genes import _create_fake_gene_version, _insert_transcript_data
 from genes.tests.gene_fusion_test_utils import create_gene_fusion, create_gene_fusion_for_ids
+from genes.tests.gene_level_test_utils import create_gene_copy_number_event
 from genes.models import (
     HGNC,
-    FusionGeneId,
+    GeneCopyNumberEventKind,
+    GeneLevelId,
     GeneFusion,
     GeneSymbol,
     HGNCImport,
@@ -316,10 +318,10 @@ class GeneLevelAnnotationFromBreakpointGenesTest(TestCase):
         # A side minted before the rename was understood: the symbol is one no release matched, and
         # the gene is only known because a breakpoint landed in it
         GeneSymbol.objects.get_or_create(symbol="ACPP")
-        cls.anchor = FusionGeneId.objects.create(pk=FusionGeneId.CUSTOM_ID_START,
+        cls.anchor = GeneLevelId.objects.create(pk=GeneLevelId.CUSTOM_ID_START,
                                                  symbol_str="ACPP", gene_symbol_id="ACPP")
         cls.anchor.genes.add(cls.acp3_gene)
-        cls.partner = FusionGeneId.get_or_create_for_symbol("ETV1", "ETV1", HGNC.objects.get(pk=3490))
+        cls.partner = GeneLevelId.get_or_create_for_symbol("ETV1", "ETV1", HGNC.objects.get(pk=3490))
         cls.gene_fusion = create_gene_fusion_for_ids(cls.anchor, cls.partner)
 
     def _run_annotation(self) -> AnnotationRun:
@@ -435,4 +437,119 @@ class GeneFusionClassificationTest(TestCase):
         """ Checked directly rather than through get_or_create, so the HGVS resolver isn't invoked """
         for imported_c_hgvs in ["NM_000059.3:c.1234A>G", "NC_000007.13:g.140453136A>T"]:
             allele_info = ImportedAlleleInfo(imported_c_hgvs=imported_c_hgvs)
-            self.assertFalse(allele_info.resolve_gene_fusion(), imported_c_hgvs)
+            self.assertFalse(allele_info.resolve_gene_level(), imported_c_hgvs)
+
+
+class GeneLevelCopyNumberAnnotationTest(TestCase):
+    """ A whole-gene copy number event - one gene, and the terms VEP would have used for a
+        transcript wholly duplicated or wholly lost """
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.genome_build = GenomeBuild.get_name_or_alias("GRCh38")
+        cls.annotation_version = get_fake_annotation_version(cls.genome_build)
+        cls.vav = cls.annotation_version.variant_annotation_version
+        release = cls.vav.gene_annotation_release
+
+        hgnc_import = HGNCImport.objects.create()
+        GeneSymbol.objects.get_or_create(symbol="EGFR")
+        HGNC.objects.create(pk=3236, gene_symbol_id="EGFR", hgnc_import=hgnc_import,
+                            status=HGNCStatus.APPROVED, approved_name="epidermal growth factor receptor")
+        cls.egfr_gene, cls.egfr_transcript_version = _make_gene(
+            cls.genome_build, release, "ENSG00000000010", "EGFR", "ENST00000000010.1", "7", 55_019_000)
+
+        cls.gain = create_gene_copy_number_event("EGFR", GeneCopyNumberEventKind.GAIN)
+        cls.loss = create_gene_copy_number_event("EGFR", GeneCopyNumberEventKind.LOSS)
+
+    def _run_annotation(self) -> AnnotationRun:
+        variants = sorted([self.gain.variant, self.loss.variant], key=lambda v: v.pk)
+        range_lock = AnnotationRangeLock.objects.create(version=self.vav,
+                                                        min_variant=variants[0], max_variant=variants[-1],
+                                                        count=len(variants))
+        annotation_run = AnnotationRun.objects.create(
+            annotation_range_lock=range_lock,
+            pipeline_type=VariantAnnotationPipelineType.GENE_LEVEL)
+        annotate_gene_level_run(annotation_run)
+        return annotation_run
+
+    def test_writes_the_overlap_for_the_gene(self):
+        """ What makes a gene list containing EGFR find 'EGFR amplification' """
+        annotation_run = self._run_annotation()
+        gene_ids = set(VariantGeneOverlap.objects.filter(annotation_run=annotation_run,
+                                                         variant=self.gain.variant)
+                       .values_list("gene_id", flat=True))
+        self.assertEqual({self.egfr_gene.pk}, gene_ids)
+
+    def test_gene_list_on_the_gene_finds_the_event(self):
+        self._run_annotation()
+        qs = get_variant_queryset_for_gene_symbol(GeneSymbol.objects.get(pk="EGFR"),
+                                                  self.annotation_version)
+        self.assertIn(self.gain.variant, list(qs))
+
+    def test_consequence_and_variant_class_per_kind(self):
+        """ The grid's kind display and the Effect node both read variant_class """
+        self._run_annotation()
+        expected = {
+            self.gain.variant_id: ("transcript_amplification", VariantClass.COPY_NUMBER_GAIN),
+            self.loss.variant_id: ("transcript_ablation", VariantClass.COPY_NUMBER_LOSS),
+        }
+        for variant_id, (consequence, variant_class) in expected.items():
+            variant_annotation = VariantAnnotation.objects.get(version=self.vav, variant_id=variant_id)
+            self.assertEqual(consequence, variant_annotation.consequence)
+            self.assertEqual(variant_class, variant_annotation.variant_class)
+            self.assertEqual(PathogenicityImpact.HIGH, variant_annotation.impact)
+            self.assertEqual("EGFR", variant_annotation.symbol)
+
+    def test_hgvs_carries_the_canonical_string(self):
+        self._run_annotation()
+        self.assertEqual("EGFR amplification", VariantAnnotation.get_hgvs_g(self.gain.variant))
+        self.assertEqual("EGFR loss", VariantAnnotation.get_hgvs_g(self.loss.variant))
+
+
+class GeneCopyNumberClassificationTest(TestCase):
+    """ A lab submitting 'EGFR amplification' as a classification target - @see ImportedAlleleInfo """
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.genome_build = GenomeBuild.get_name_or_alias("GRCh37")
+        hgnc_import = HGNCImport.objects.create()
+        GeneSymbol.objects.get_or_create(symbol="EGFR")
+        HGNC.objects.create(pk=3236, gene_symbol_id="EGFR", hgnc_import=hgnc_import,
+                            status=HGNCStatus.APPROVED, approved_name="epidermal growth factor receptor")
+
+    def _allele_info(self, imported_c_hgvs: str) -> ImportedAlleleInfo:
+        return ImportedAlleleInfo.get_or_create(
+            imported_c_hgvs=imported_c_hgvs,
+            imported_genome_build_patch_version=GenomeBuildPatchVersion.get_unspecified_patch_version_for(
+                self.genome_build))
+
+    def test_the_words_a_lab_writes_all_reach_one_coordinate(self):
+        """ 'amp' and 'gain' are input spellings of what is written out as 'amplification' """
+        coordinates = set()
+        for imported in ["EGFR amplification", "egfr amp", "EGFR Gain"]:
+            allele_info = self._allele_info(imported)
+            self.assertTrue(allele_info.variant_coordinate_obj.is_gene_level, imported)
+            coordinates.add(allele_info.variant_coordinate)
+        self.assertEqual(1, len(coordinates), coordinates)
+
+    def test_loss_and_gain_are_different_coordinates(self):
+        self.assertNotEqual(self._allele_info("EGFR amplification").variant_coordinate,
+                            self._allele_info("EGFR deletion").variant_coordinate)
+
+    def test_event_is_read_off_the_matched_variant(self):
+        allele_info = self._allele_info("EGFR amplification")
+        self.assertIsNone(allele_info.gene_copy_number_event,
+                          "nothing is matched until the pipeline inserts it")
+
+        event = create_gene_copy_number_event("EGFR", GeneCopyNumberEventKind.GAIN)
+        allele_info.set_variant_and_save(matched_variant=event.variant)
+        self.assertEqual(event, allele_info.gene_copy_number_event)
+        resolved = allele_info[self.genome_build]
+        self.assertIsNone(resolved.c_hgvs, "a copy number event sits on no transcript")
+        self.assertEqual("EGFR", resolved.gene_symbol_id)
+
+    def test_a_gene_we_do_not_know_mints_nothing(self):
+        allele_info = ImportedAlleleInfo(imported_c_hgvs="NOTAGENE amplification")
+        self.assertFalse(allele_info.resolve_gene_level())

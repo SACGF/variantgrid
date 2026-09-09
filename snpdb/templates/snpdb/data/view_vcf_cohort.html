@@ -496,6 +496,11 @@ $(document).ready(function() {
                                 <td>Copy Number: {{ vcf.copy_number_field }}</td>
                             </tr>
                         {% endif %}
+                        {% if vcf.gene_level_segment_field %}
+                            <tr>
+                                <td>Gene-level segment: {{ vcf.gene_level_segment_field }}</td>
+                            </tr>
+                        {% endif %}
                     </table>
                 </span>
             </p>

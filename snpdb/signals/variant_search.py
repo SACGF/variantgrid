@@ -17,6 +17,10 @@ from classification.models import Classification, CreateNoClassificationForbidde
 from genes.hgvs import HGVSException, HGVSImplementationException, HGVSMatcher, \
     HGVSNomenclatureException, HgvsOriginallyNormalized, VariantResolvingError
 from genes.hgvs.hgvs_converter import HgvsMatchRefAllele
+from genes.gene_copy_number import (
+    COPY_NUMBER_STRING_PATTERN,
+    find_gene_copy_number_events_for_string,
+)
 from genes.gene_fusions import find_gene_fusions_for_string
 from genes.models import MANE, BadTranscript, MissingTranscript, TranscriptVersion
 from genes.models_enums import AnnotationConsortium, MANEStatus
@@ -869,15 +873,38 @@ def search_variant_gene_fusion(search_input: SearchInputInstance):
 
         A fusion Variant sits on the contig every build shares, so it is found once rather than per
         build, and get_visible_variants still applies each build's permissions. """
+    events = find_gene_fusions_for_string(search_input.search_string)
+    yield from _yield_gene_level_results(search_input, events, "Gene fusion")
+
+
+@search_receiver(
+    search_type=Variant,
+    pattern=COPY_NUMBER_STRING_PATTERN,
+    sub_name="Gene Copy Number",
+    example=SearchExample(
+        note="A whole-gene copy number event, named by its gene",
+        examples=["EGFR amplification", "PTEN loss"]
+    )
+)
+def search_variant_gene_copy_number(search_input: SearchInputInstance):
+    """ Lookup only - searching must never mint a copy number identity. 'amp', 'gain', 'deletion'
+        and 'del' all find what is written out as 'amplification' / 'loss' """
+    events = find_gene_copy_number_events_for_string(search_input.search_string)
+    yield from _yield_gene_level_results(search_input, events, "Gene copy number")
+
+
+def _yield_gene_level_results(search_input: SearchInputInstance, events, label: str):
+    """ A gene-level Variant sits on the contig every build shares, so it is found once rather than
+        per build, and get_visible_variants still applies each build's permissions. """
     seen = set()
-    for gene_fusion in find_gene_fusions_for_string(search_input.search_string):
-        if gene_fusion.variant_id in seen:
+    for event in events:
+        if event.variant_id in seen:
             continue
-        seen.add(gene_fusion.variant_id)
+        seen.add(event.variant_id)
         for genome_build in search_input.genome_builds:
             visible_variants_qs = search_input.get_visible_variants(genome_build)
-            if variant := visible_variants_qs.filter(pk=gene_fusion.variant_id).first():
+            if variant := visible_variants_qs.filter(pk=event.variant_id).first():
                 yield SearchResult(variant.preview,
-                                   messages=[SearchMessage(f"Gene fusion {gene_fusion.canonical_str}",
+                                   messages=[SearchMessage(f"{label} {event.canonical_str}",
                                                            severity=LogLevel.INFO)])
                 break

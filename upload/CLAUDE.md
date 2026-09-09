@@ -54,6 +54,11 @@ Patterns here:
   upload/signals/signals.py:vcf_import_success_signal (analysis/signals/signal_handlers.py:handle_vcf_import_success
   auto-creates analyses off it; connect further consumers in an AppConfig.ready).
 Gotchas:
+- A CNV VCF whose header declares a segment field naming a gene (settings.VCF_GENE_LEVEL_SEGMENT_FIELDS, DRAGEN
+  TSO 500's `SEGID`) is claimed by import_task_factories/import_task_factories.py:GeneLevelCNVImportTaskFactory and
+  rewritten onto the gene-level contig - the caller's segment is the panel's target window, not the event, so it is
+  never stored as a Variant (tasks/import_gene_level_cnv_task.py, @see snpdb.gene_level_variants). A file naming a gene
+  on partial calls (DragenExonCNV's `GENE=`) is not a segment field and keeps importing as coordinate SVs.
 - Failure is one-way: UploadStep.error_exception → upload/models/models.py:UploadPipeline.error sets ERROR, marks the
   VCF/samples ImportStatus.ERROR, logs an Event and reports to Rollbar. Later steps see status != PROCESSING and mark
   themselves SKIPPED; BulkGenotypeVCFProcessor.check_pipeline_for_failures bails mid-file. Running steps are not killed.

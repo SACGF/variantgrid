@@ -198,7 +198,8 @@ HGNC, MANE, LRG, gnomAD constraint, Pfam, UniProt, RefSeq gene summaries and the
 download on a worker and the row's description records what arrived. Pfam domains are the exception:
 `genes/interpro.py:store_domains_for_transcripts` fetches them per gene from InterPro the first time a gene page
 needs them (#1554). Gene fusions live here too: `genes/gene_fusions.py:GeneFusionResolver` turns `BCR::ABL1` into
-`genes/models/models_gene_fusion.py:FusionGeneId` pairs that become gene-level Variants (#1506).
+`genes/models/models_gene_level.py:GeneLevelId` pairs that become gene-level Variants (#1506); a whole-gene
+copy number call is the same shape (`genes/gene_copy_number.py`, #1836).
 
 ## Why it is shaped this way
 

@@ -127,7 +127,7 @@ MAJOR_OPERATION_SLOT_EXPIRE_SECONDS = 10 * 60  # Safety TTL so a crashed request
 CACHE_HOURS = 48
 TIMEOUT = 60 * 60 * CACHE_HOURS
 REDIS_PORT = 6379
-CACHE_VERSION = 54  # increment to flush caches (eg if invalid due to upgrade)
+CACHE_VERSION = 55  # increment to flush caches (eg if invalid due to upgrade)
 if UNIT_TEST:
     # In-process cache, so tests don't read/write the dev Redis (state leaking between runs)
     CACHES = {
@@ -388,6 +388,11 @@ VCF_DOWNLOAD_ADMIN_ONLY = False
 VCF_IMPORT_CREATE_COHORT_FROM_MULTISAMPLE_VCFS = True
 VCF_IMPORT_NO_DNA_CONTROL_SAMPLE_REGEX = None
 VCF_IMPORT_FILE_SPLIT_ROWS = 50000
+# The INFO keys a CNV caller names the gene of a whole-gene call in - DRAGEN's TSO500 CNV output
+# writes SEGID. A VCF declaring one is imported as gene-level copy number events rather than
+# coordinates (@see snpdb.gene_level_variants), so this decides what claims the file at upload, the
+# way VCFConstant.COPY_NUMBER_FIELDS decides which key the copy ratio is read from
+VCF_GENE_LEVEL_SEGMENT_FIELDS = ("SEGID",)
 VCF_IMPORT_SKIP_RECORD_REGEX = {
     "Fusion": "VARTYPE=fusion",
 }

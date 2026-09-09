@@ -27,7 +27,12 @@ from annotation.models import (
 )
 from annotation.transcripts_annotation_selections import VariantTranscriptSelections
 from eventlog.models import create_event
-from genes.models import CanonicalTranscriptCollection, GeneFusion, GeneSymbol
+from genes.models import (
+    CanonicalTranscriptCollection,
+    GeneCopyNumberEvent,
+    GeneFusion,
+    GeneSymbol,
+)
 from library.django_utils import get_field_counts
 from library.django_utils.grid_export import EXPORT_ROWS_PER_CHUNK
 from library.git import Git
@@ -161,6 +166,7 @@ def variant_grid_row_detail(request, variant_id: int, annotation_version_id: int
         "clinvar": clinvar,
         "overlapping_symbols": overlapping_symbols,
         "gene_fusion": _get_gene_fusion(variant),
+        "gene_copy_number_event": _get_gene_copy_number_event(variant),
     }
     return render(request, "variantopedia/variant_grid_row_detail.html", context)
 
@@ -171,6 +177,13 @@ def _get_gene_fusion(variant: Variant) -> Optional[GeneFusion]:
     if not variant.is_gene_level:
         return None
     return GeneFusion.objects.filter(variant=variant).select_related("anchor", "partner").first()
+
+
+def _get_gene_copy_number_event(variant: Variant) -> Optional[GeneCopyNumberEvent]:
+    """ The other kind of gene-level variant - the gene and which way it went """
+    if not variant.is_gene_level:
+        return None
+    return GeneCopyNumberEvent.objects.filter(variant=variant).select_related("gene").first()
 
 
 def view_variant(request, variant_id, genome_build_name=None):
@@ -422,6 +435,7 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
         "variant_allele": variant_allele_data,
         "variant_annotation": variant_annotation,
         "gene_fusion": _get_gene_fusion(variant),
+        "gene_copy_number_event": _get_gene_copy_number_event(variant),
         # Names the page and the analysis' variant details tab, which have no room for a transcript
         "variant_short_label": variant_annotation.get_short_label() if variant_annotation else hgvs_g or str(variant),
         "variant_tag_stale_days": user_settings.variant_tag_stale_days,

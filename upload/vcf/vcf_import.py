@@ -106,6 +106,16 @@ def get_copy_number_field(vcf_formats, vcf_infos, single_sample: bool):
     return None
 
 
+def get_gene_level_segment_field(vcf_infos) -> Optional[str]:
+    """ The INFO key naming the gene each record is about, for a VCF of whole-gene copy number
+        events. Declared in the header by the caller, and by the VCF we rewrite it into, so a
+        reload binds it again - @see snpdb.gene_level_variants """
+    for field in settings.VCF_GENE_LEVEL_SEGMENT_FIELDS:
+        if field in vcf_infos:
+            return field
+    return None
+
+
 def set_allele_depth_format_fields(vcf: VCF, vcf_formats, vcf_source, default_allele_field):
     # Use FreeBayes AO/RO fields due to AD field not being decomposed properly on multi-alts
     # @see https://github.com/SACGF/variantgrid/issues/2126
@@ -371,8 +381,10 @@ def configure_vcf_from_header(vcf, vcf_reader):
     create_vcf_filters(vcf, header_types.get("FILTER", {}))
     create_vcf_format(vcf, header_types.get("FORMAT", {}))
     vcf_formats = set(header_types["FORMAT"])
+    vcf_infos = set(header_types.get("INFO", {}))
     source = get_vcf_source(vcf_reader, _get_file_upload(vcf))
     vcf.source = source
+    vcf.gene_level_segment_field = get_gene_level_segment_field(vcf_infos)
     if vcf.genotype_samples:  # Has sample format fields
         set_allele_depth_format_fields(vcf, vcf_formats, source, VCFConstant.DEFAULT_ALLELE_FIELD)
         vcf.genotype_field = get_format_field(vcf_formats, VCFConstant.DEFAULT_GENOTYPE_FIELD)
@@ -382,7 +394,7 @@ def configure_vcf_from_header(vcf, vcf_reader):
                                                                 VCFConstant.DEFAULT_PHRED_LIKILIHOOD_FIELD)
         vcf.allele_frequency_field = get_format_field(vcf_formats, VCFConstant.DEFAULT_ALLELE_FREQUENCY_FIELD)
         vcf.sample_filters_field = get_format_field(vcf_formats, VCFConstant.DEFAULT_SAMPLE_FILTERS_FIELD)
-        vcf.copy_number_field = get_copy_number_field(vcf_formats, set(header_types.get("INFO", {})),
+        vcf.copy_number_field = get_copy_number_field(vcf_formats, vcf_infos,
                                                       single_sample=vcf.genotype_samples == 1)
 
     vcf.allele_frequency_percent = False  # Explicitly set for when reloading old VCFs
