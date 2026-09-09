@@ -908,7 +908,14 @@ VariantGridFormat.representativeVariantLabel = (variantId, rowData) => {
     if (hgvsC && hgvsC !== HGVS_NOT_CALCULATED) {
         const c = _splitHgvs(hgvsC);
         if (!c) {
-            // Gene-level (fusion) nomenclature has no accession prefix - show it whole
+            // Gene-level nomenclature has no accession prefix. A copy number call is "RAF1 loss" - the
+            // kind badge already says the direction (and says GAIN where the report says amplification),
+            // so the label is the gene alone; the tooltip keeps the canonical form. A fusion is shown whole
+            const geneLevelKind = String(alt).slice(1, -1).split(":")[0];
+            if (geneLevelKind === 'GAIN' || geneLevelKind === 'LOSS') {
+                const gene = symbol || hgvsC.split(" ")[0];
+                return {html: `<span class='rv-gene'>${escapeHtml(gene)}</span>`, title: hgvsC};
+            }
             return {html: `<span class='rv-hgvs'>${escapeHtml(hgvsC)}</span>`, title: hgvsC};
         }
         const gene = c.symbol || symbol;
