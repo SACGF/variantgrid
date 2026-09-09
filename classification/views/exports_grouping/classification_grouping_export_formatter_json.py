@@ -62,8 +62,7 @@ class ClassificationGroupingExportFormatterJSON(ClassificationGroupingExportForm
             "latest_classification_modification__classification__lab__organization",
             "latest_classification_modification__classification__allele",
             "latest_classification_modification__classification__allele_info",
-            "latest_classification_modification__classification__clinical_context",
-            "latest_classification_modification__classification__classificationgroupingentry_set"
+            "latest_classification_modification__classification__clinical_context"
         )
         for cg in queryset.iterator():
             yield json.dumps(cg.latest_classification_modification.as_json(
