@@ -1172,9 +1172,18 @@ function finishedLoadingEditor(node_id, version_id) {
 }
 
 
+function sliderPercentLabel(value) {
+    return Math.round(parseFloat(value) * 100) + "%";
+}
+
 function setVisibleSliderValue(inputSelector, sliderSelector, value) {
     const container = sliderSelector.parents(".slider-container");
     const sliderValue = $(".slider-value", container);
+    // A unit fraction the rest of the site shows as a percent (allele frequency) reads that way here too
+    if (inputSelector.attr("percent")) {
+        sliderValue.html(sliderPercentLabel(value));
+        return;
+    }
     let decimalPlaces = inputSelector.attr("decimal_places");
     if (typeof decimalPlaces == 'undefined') {
         decimalPlaces = 2;
@@ -1210,6 +1219,11 @@ function setupSlider(inputSelector, sliderSelector) {
         inputSelector.val(this.value);
     });
 
-    $(".min-value", container).html(sliderMinVal);
-    $(".max-value", container).html(sliderMaxVal);
+    if (inputSelector.attr("percent")) {
+        $(".min-value", container).html(sliderPercentLabel(sliderMinVal));
+        $(".max-value", container).html(sliderPercentLabel(sliderMaxVal));
+    } else {
+        $(".min-value", container).html(sliderMinVal);
+        $(".max-value", container).html(sliderMaxVal);
+    }
 }

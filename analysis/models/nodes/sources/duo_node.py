@@ -12,6 +12,7 @@ from django.db.models.query_utils import Q
 from analysis.models.enums import DuoInheritance
 from analysis.models.nodes.sources import AbstractCohortBasedNode
 from analysis.models.nodes.family_inheritance import (
+    MOSAIC_EVIDENCE_TEMPLATE,
     MOSAIC_PARENT_WARNINGS,
     AbstractCompHetInheritance,
     AbstractFamilyInheritance,
@@ -99,8 +100,7 @@ class DuoMosaicParent(AbstractDuoInheritance):
         return f"{zygosities}, with the {self.parent_label.lower()} having {self._evidence_description()}"
 
     def get_other_filters_description(self) -> str:
-        # The thresholds themselves are the editor's own inputs, right above the table
-        return "Parent has alt reads at a low AF"
+        return MOSAIC_EVIDENCE_TEMPLATE
 
 
 class DuoAbsentInParent(SimpleDuoInheritance):
@@ -393,11 +393,14 @@ class DuoNode(FamilyInheritanceNodeMixin, AbstractCohortBasedNode):
                 data[mode] = entry
                 continue
             elif klass is DuoMosaicParent:
+                # Only the parent is filtered on read support, so the proband row stays blank
                 handler = klass(stub_node)
                 data[mode] = {
                     'parent': fmt(klass.MOSAIC_ZYGOSITIES),
                     'proband': fmt(klass.HAS_VARIANT),
+                    'other_filters_parent': handler.get_other_filters_description(),
                 }
+                continue
             elif klass is DuoAnyAffected:
                 handler = klass(stub_node)
                 has_variant = fmt(DuoAnyAffected.HAS_VARIANT)

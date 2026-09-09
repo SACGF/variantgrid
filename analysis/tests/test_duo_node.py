@@ -332,3 +332,11 @@ class TestDuoNodeInheritance(TestCase):
         entry = data[DuoInheritance.ANY_AFFECTED]
         self.assertTrue(entry['parent_affected'])
         self.assertNotEqual(entry['parent_affected'], entry['parent_unaffected'])
+
+    def test_zygosity_table_mosaic_thresholds_are_on_the_parent_row_only(self):
+        """ The parent row carries the threshold template the editor fills in; the proband row is
+            about the proband, so it says nothing about parental read support """
+        entry = DuoNode.get_zygosity_table_data()[DuoInheritance.MOSAIC_PARENT]
+        self.assertIn("{alt_reads}", entry["other_filters_parent"])
+        self.assertIn("{af}", entry["other_filters_parent"])
+        self.assertNotIn("other_filters_proband", entry)

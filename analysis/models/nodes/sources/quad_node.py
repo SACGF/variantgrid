@@ -11,6 +11,8 @@ from django.db.models.query_utils import Q
 from analysis.models.enums import QuadInheritance
 from analysis.models.nodes.sources import AbstractCohortBasedNode
 from analysis.models.nodes.family_inheritance import (
+    MOSAIC_EVIDENCE_TEMPLATE,
+    MOSAIC_PARENT_ROW_TEMPLATE,
     MOSAIC_PARENT_WARNINGS,
     AbstractCompHetInheritance,
     AbstractFamilyInheritance,
@@ -119,8 +121,7 @@ class QuadMosaicParent(AbstractQuadInheritance):
                 f"Sibling: {sibling}")
 
     def get_other_filters_description(self) -> str:
-        # The thresholds themselves are the editor's own inputs, right above the table
-        return "One parent has alt reads at a low AF, the other has none"
+        return MOSAIC_EVIDENCE_TEMPLATE
 
 
 class QuadDenovo(SimpleQuadInheritance):
@@ -421,10 +422,14 @@ class QuadNode(FamilyInheritanceNodeMixin, AbstractCohortBasedNode):
                     'sibling': f"AR: {fmt(ar_zyg[3])}\nXLR: {fmt(xlr_zyg[3])}",
                 }
             elif klass is QuadMosaicParent:
+                # Only the parents are filtered on read support - the proband and sibling rows,
+                # both constitutional calls, stay blank
                 entry = {
                     'mother': fmt(klass.MOSAIC_ZYGOSITIES),
                     'father': fmt(klass.MOSAIC_ZYGOSITIES),
                     'proband': fmt(klass.HAS_VARIANT),
+                    'other_filters_mother': MOSAIC_PARENT_ROW_TEMPLATE,
+                    'other_filters_father': MOSAIC_PARENT_ROW_TEMPLATE,
                 }
                 for affected_val in (False, True):
                     stub_node.quad.sibling_affected = affected_val
@@ -432,6 +437,7 @@ class QuadNode(FamilyInheritanceNodeMixin, AbstractCohortBasedNode):
                     suffix = '_affected' if affected_val else '_unaffected'
                     entry['sibling' + suffix] = fmt(handler._sibling_zyg())
                 data[mode] = entry
+                continue
             elif klass is QuadAnyAffected:
                 handler = klass(stub_node)
                 has_variant = fmt(QuadAnyAffected.HAS_VARIANT)
