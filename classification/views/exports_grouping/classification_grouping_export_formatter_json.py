@@ -1,12 +1,11 @@
 from dataclasses import dataclass
 from functools import cached_property
 from typing import Iterator
-
 from django.conf import settings
-
 from classification.models import ClassificationJsonParams, EvidenceKeyMap
 from classification.views.exports_grouping.classification_grouping_export_filter import \
     ClassificationGroupingExportFormat, ClassificationGroupingExportFormatProperties, ClassificationGroupingExportFilter
+import json
 
 
 @dataclass(frozen=True)
@@ -31,7 +30,7 @@ class ClassificationGroupingExportFormatterJSON(ClassificationGroupingExportForm
         super().__init__(classification_grouping_filter)
 
     def header(self) -> list[str]:
-        return ['{"records:[']
+        return ['{"records":[']
 
     @cached_property
     def json_params(self):
@@ -53,9 +52,9 @@ class ClassificationGroupingExportFormatterJSON(ClassificationGroupingExportForm
 
     def single_row_generator(self) -> Iterator[str]:
         for cg in self.queryset().iterator():
-            yield cg.latest_classification_modification.as_json(
+            yield json.dumps(cg.latest_classification_modification.as_json(
                 self.json_params
-            )
+            ))
 
     def footer(self) -> list[str]:
         return [']}']

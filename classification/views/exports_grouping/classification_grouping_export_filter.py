@@ -146,6 +146,7 @@ class ClassificationGroupingExportFileSettings:
 class ClassificationGroupingExportFormatProperties:
     http_content_type: str = "text/html"
     extension: str = "txt"
+    delimiter_for_header: str = "\n"
     delimiter_for_row: str = "\n"
 
 

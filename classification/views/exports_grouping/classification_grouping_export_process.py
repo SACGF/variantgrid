@@ -1,5 +1,6 @@
 import zipfile
 from datetime import datetime
+from enum import Enum, auto
 from io import StringIO
 from typing import Optional, Iterator, Any
 
@@ -13,6 +14,12 @@ from classification.views.exports_grouping.classification_grouping_export_filter
     ClassificationGroupingExportFormat, ClassificationGroupingExportFileSettings
 from library.log_utils import report_exc_info, NotificationBuilder
 from library.utils import http_header_date_now
+
+
+class RowType(Enum):
+    HEADER = auto()
+    ROW = auto()
+    FOOTER = auto()
 
 
 class ClassificationGroupingExportProcess:
@@ -101,17 +108,22 @@ class ClassificationGroupingExportProcess:
     def _peekable_data(self) -> peekable:  # peekable[list[str]]
         return self.classification_export_format.peekable()
 
-    def with_new_lines(self, data: list[str]) -> list[str]:
+    def with_new_lines(self, data: list[str], row_type: RowType) -> list[str]:
         if data:
-            return [str(row) + self.format_properties.delimiter_for_row for row in data]
-        else:
-            return []
+            if row_type == RowType.ROW:
+                return [str(row) + self.format_properties.delimiter_for_row for row in data]
+            elif row_type == RowType.HEADER:
+                return [str(row) + self.format_properties.delimiter_for_header for row in data]
+            elif row_type == RowType.FOOTER:
+                return [self.format_properties.delimiter_for_header + str(row) for row in data]
+
+        return []
 
     def _yield_streaming_entry_str(self, source: peekable) -> Iterator[list[str]]:
         # source should be a peekable of list[str]
         # yield's a file's worth of data (in several chunks)
 
-        if header := self.with_new_lines(self.classification_export_format.header()):
+        if header := self.with_new_lines(self.classification_export_format.header(), row_type=RowType.HEADER):
             yield header
 
         this_entry_row_count = 0
@@ -150,7 +162,7 @@ class ClassificationGroupingExportProcess:
             else:
                 break
 
-        if footer := self.with_new_lines(self.classification_export_format.footer()):
+        if footer := self.with_new_lines(self.classification_export_format.footer(), row_type=RowType.FOOTER):
             yield footer
 
     def _yield_streaming_entry_bytes(self, source: peekable) -> Iterator[bytes]:
@@ -167,8 +179,10 @@ class ClassificationGroupingExportProcess:
                 yield self.filename(part=self.file_count), modified_at, perms, ZIP_64, self._yield_streaming_entry_bytes(data_peek)
         except:
             report_exc_info()
+
             def yield_error_bytes():
                 yield "An error occurred generating the file".encode()
+
             yield "error.txt", modified_at, perms, ZIP_64, yield_error_bytes()
             raise
 
@@ -198,11 +212,6 @@ class ClassificationGroupingExportProcess:
 
                 zf.writestr(self.filename(part=self.file_count), next_file())
 
-            # if extra := self.extra_data(as_individual_file=True):
-            #     str_buffer = StringIO()
-            #     str_buffer.write(extra.content)
-            #     zf.writestr(self.filename(part=extra.filename_part), str_buffer.getvalue())
-
         response['Last-Modified'] = self.latest_header_date
         response['Content-Disposition'] = f'attachment; filename="{self.filename(extension_override="zip")}"'
         self.send_stats()
@@ -212,27 +221,22 @@ class ClassificationGroupingExportProcess:
         """
         :return: An iterator for a single streaming file, call either this or yield_file
         """
+        is_first_row = True
         try:
-            for header in self.with_new_lines(self.classification_export_format.header()):
+            for header in self.with_new_lines(self.classification_export_format.header(), row_type=RowType.HEADER):
                 yield header
 
             for rows in self.classification_export_format.row_generator():
-                rows = self.with_new_lines(rows)
                 for row in rows:
                     self.row_count += 1
+                    if is_first_row:
+                        is_first_row = False
+                        yield row
+                    else:
+                        yield f"{self.format_properties.delimiter_for_row}{row}"
 
-                    # if not is_first_row:
-                    #     row = f"{self.format_properties.delimiter_for_row}{row}"
-                    # else:
-                    #     is_first_row = False
-
-                    yield row
-
-            for footer in self.with_new_lines(self.classification_export_format.footer()):
+            for footer in self.with_new_lines(self.classification_export_format.footer(), row_type=RowType.FOOTER):
                 yield footer
-
-            # if extra_data := self.extra_data(as_individual_file=False):
-            #     yield extra_data.content
 
         except:
             report_exc_info()
