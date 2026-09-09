@@ -115,9 +115,9 @@ def populate_classification_json(classification: Classification, params: Classif
         clinical_context = classification.clinical_context.name
 
     triages_json = {}
-    grouping = ClassificationGroupingEntry.grouping_for(classification)
-    for contribution in grouping.overlapcontribution_set:
-        triages_json[contribution.value_type] = contribution.triage_state_obj.to_dict()
+    if grouping := ClassificationGroupingEntry.grouping_for(classification):
+        for contribution in grouping.overlapcontribution_set:
+            triages_json[contribution.value_type] = contribution.triage_state_obj.to_dict()
     # attach this directly to the record for now, might make it part of the default generation
 
     content = {
