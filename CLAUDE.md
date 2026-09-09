@@ -49,16 +49,11 @@ Deeper still: `<app>/__<app>_readme.md`. Plans live in `claude/plans/`, runbooks
 
 ## This box
 
-`vg-test2` (test.variantgrid.com) is a shared lab: gunicorn and the celery workers run against a 175 GB database that human
-testers are also using, so what you change they see. `python3 manage.py vg status` is the first thing to run in a session.
-
-Safe without asking: anything read-only (`git`, `vg *`, `gh issue/pr view`, `manage.py shell` that only reads, `EXPLAIN`),
-rendering pages as `claude_agent` with `vg page`, and tests with `--keepdb` (they use `test_snpdb`).
-Ask first: restarting or stopping services, `manage.py migrate`, creating or deleting annotation versions or running VEP,
-liftover across the database, and any write to `snpdb_variant`, `snpdb_allele` or `annotation_variantannotation`. The
-`.claude/hooks/pre_bash.py` hook turns those into a confirmation prompt with the reason.
-
-Row counts, data roots, logs and the deploy procedure are in `claude/guides/operations.md`.
+What this machine is (shared lab or private dev box, which database, who else is using it) lives in
+CLAUDE.local.md (gitignored); `claude/CLAUDE.local.vgtest2.md` is the copy for vg-test2. On any box: `python3 manage.py vg status`
+first, read-only work and `--keepdb` tests without asking, and ask before restarting services, `manage.py migrate`,
+creating or deleting annotation versions or running VEP, liftover across the database, or any write to `snpdb_variant`,
+`snpdb_allele` or `annotation_variantannotation` (`.claude/hooks/pre_bash.py` prompts for these).
 
 ## Commands
 
@@ -109,13 +104,9 @@ Write comments as if you were a senior developer who knows the codebase, and hav
 write comments about failed paths or reverted decisions, just let the existing code stand. If you are tempted to write a
 lot of comments, perhaps you could make the code clearer by extracting logic into better named variables.
 
-### Frontend and static files
-- **Bootstrap 4**: use `data-toggle` (not `data-bs-toggle`) and `data-target` (not `data-bs-target`).
-- Source JS/CSS/images live in `variantgrid/static_files/<site>_static/` (`default_static` unless site specific) - always
-  edit there. `variantgrid/sitestatic/` is collectstatic output: gitignored and overwritten.
-- `global.css` and friends are compiled from `.scss` by a PyCharm file watcher - do not run `sassc`/`sass` yourself (its
-  formatting creates huge diffs). Edit the `.scss`, then hand-apply the same minimal change to the generated `.css`
-  matching its formatting, so it works before the next recompile. Leave `.css.map` files alone.
+### Frontend
+Bootstrap 4: use `data-toggle` (not `data-bs-toggle`) and `data-target` (not `data-bs-target`). JS/CSS/SCSS sources and
+the compile rules are in `variantgrid/static_files/CLAUDE.md`.
 
 ### Migrations are frozen once pushed
 Assume a pushed migration has been run on a deployment: keep its filename and operations as they are, and express any
@@ -125,23 +116,16 @@ repaired by hand on every database. A migration that only exists locally (unpush
 Check with `git log origin/master -- <migration file>`.
 
 ### Renaming a class that Redis has pickled
-Bump `CACHE_VERSION` in `variantgrid/settings/components/default_settings.py` whenever you rename, move or remove a class
-whose instances end up pickled in the Redis cache - enum choices inside a node's `arg_q_dict` Q objects, dataclasses,
-model subclasses. Cache keys are built from pks (`analysis_node.py` keys node Q dicts on `node_version.pk`), so old
-entries survive a deploy and fail on unpickle with `AttributeError: Can't get attribute 'OldName'`. Deployments only
-recover by flushing Redis; the version bump does that for all of them.
+Bump `CACHE_VERSION` in `variantgrid/settings/components/default_settings.py`; old cache entries survive a deploy and fail
+on unpickle. Details under Gotchas in `analysis/CLAUDE.md`.
 
 ### Manual migrations (management commands on deploy)
-If a new management command needs to run on existing deployments as part of an upgrade, add a migration containing a
-`ManualOperation` (from `manual/operations/manual_operations.py`) - the upgrade script surfaces these as required tasks.
-Use `ManualOperation.task_id_manage(["command_name"])` (or the `operation_manage` / `operation_other` helpers) and pass an
-optional `test=` callable (receives `apps`) so the task is only registered when the deployment actually has data needing it.
-Example: `snpdb/migrations/0188_one_off_migrate_common_filter_gnomad_versions.py`.
+A new management command that must run on existing deployments goes in a migration as a `ManualOperation`
+(`manual/operations/manual_operations.py`, example `snpdb/migrations/0188_one_off_migrate_common_filter_gnomad_versions.py`).
 
 ### Celery
-Queues: `analysis_workers`, `annotation_workers`, `db_workers` (default), `web_workers`, plus the single-process
-`scheduling_single_worker` and `variant_id_single_worker`. Assign tasks with `@app.task(queue='...')` or
-`CELERY_TASK_ROUTES`; `claude/guides/operations.md#services-queues-logs` says what each is for.
+Every task names its queue (`@app.task(queue='...')` or `CELERY_TASK_ROUTES`); the queues and what each is for are in
+`claude/guides/operations.md#services-queues-logs`.
 
 ### Scale
 Whole-database work is batched by pk range and fanned out as celery tasks; aggregation happens in SQL, not in Python
@@ -159,9 +143,7 @@ of instruction: answer it, then carry on with the implementation. Once told to d
 reporting back.
 
 ### Testing
-Tests extend `django.test.TestCase`; page tests use `URLTestCase` from `library/django_utils/unittest_utils.py` (Celery
-eager, plain static storage, `_test_urls()` for batch status checks). Fixture builders are indexed in
-`claude/guides/testing.md`. `UNIT_TEST = sys.argv[1:2] == ['test']` in default_settings skips expensive setup.
+`claude/guides/testing.md` has the base classes and the fixture index.
 
 Write as many tests as you like while developing - they're a great way to check your work as you go. When the code is
 finished, audit them and delete the ones that don't earn their keep. Every test kept is code to run, read and maintain,
@@ -172,9 +154,7 @@ rather than ours - that `blank=True` makes a field optional, that a `disabled` f
 restates a field declaration, drop it.
 
 ### Verifying pages
-`vg page <url-or-name> [--kwargs k=v] [--text|--links|--forms] --queries` renders through the test client against the live
-data as `claude_agent` (a plain `all_users` member; create with `vg page --create-user`) inside a rolled-back transaction.
-Use it before and after a template or view change; a rising production query count is an N+1.
+Run `vg page <url> --queries` before and after a template or view change; a rising query count is an N+1.
 
 ### Git commits
 Do NOT commit unless the user explicitly asks you to commit. Instructions like "apply the fix", "make the change", or
@@ -197,30 +177,9 @@ confirm with the user before proceeding - do not include them in the commit.
 ### GitHub comments
 Preface any comment on a GitHub issue or pull request with 🤖 Written by Claude. Do NOT close GitHub issues.
 
-### Plans
-Plans live in `claude/plans/<issue>_<slug>_plan.md`. Directly under the title, record which Claude model wrote it, e.g.
-`Written by Claude Fable 5 (claude-fable-5), 2026-08-31` - so when a plan is picked up later it is clear which model's
-judgement it reflects. Update the line if a different model revises the plan. Add a `Status:` line
-(`draft | approved | in progress | landed <sha> | superseded by <plan>`) and keep it current.
-
-Put the data front and centre. Code can be changed later; data stays in the database for years and limits what can be
-built on it, so the database models are what the reviewer most wants to see. When a plan adds or changes a Django model,
-show the model as a code block with just its fields, relations, constraints and `Meta` - near the top of the plan, before
-the code that uses it. Same for a dataclass or other data holder: show the member variables only. Leave methods and
-properties out of the plan; they belong in the implementation.
-
-### Implementation prompts
-When asked to draft a prompt for an agent to implement a plan in another conversation:
-- The plan file is the spec. Reference it; don't restate it.
-- Phrase everything positively. Do not include "do not", "don't", "no X", or any "Constraints" section listing things to
-  avoid - even for defaults the agent would otherwise do, and even for ideas that came up and were rejected during
-  planning. Naming the unwanted thing plants it ("don't think of an elephant"). If a default needs to be overridden,
-  either fix the plan to carry the positive instruction, or state the positive behaviour you want ("update all callers to
-  use the new kwarg" rather than "don't add a backwards-compat shim").
-- The plan reflects the final decision; the agent reading it won't see the alternatives. Mentioning rejected options only
-  confuses or implies the plan is incomplete.
-- Keep prompts short: read-list, "follow plan §X-§Y", any positive overrides, report-back format. No "pre-resolved
-  decisions" section.
+### Plans and implementation prompts
+Plans live in `claude/plans/<issue>_<slug>_plan.md`; the format (model line, `Status:`, models first) and how to draft a
+prompt for an agent to implement one are in `claude/plans/CLAUDE.md`.
 
 ## Definition of done
 

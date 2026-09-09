@@ -153,6 +153,11 @@ Gotchas:
 - Templates run by cloning the snapshot then setting AnalysisVariable-bound fields in toposort order
   (`analysis/models/models_analysis.py:AnalysisTemplateRun.populate_arguments`); a source node's editor gets the variable
   widget only when `analysis.template_type == TEMPLATE` (`analysis/views/nodes/node_view.py:NodeView.get_form`).
+- Renaming, moving or removing a class whose instances are pickled into Redis - enum choices inside a node's
+  `arg_q_dict` Q objects, dataclasses, model subclasses - needs a `CACHE_VERSION` bump in
+  `variantgrid/settings/components/default_settings.py`. Cache keys are pks (`analysis/models/nodes/analysis_node.py`
+  keys node Q dicts on `node_version.pk`), so old entries survive a deploy and fail on unpickle with
+  `AttributeError: Can't get attribute 'OldName'`; the bump flushes every deployment's cache at once.
 Tests:
 - `analysis/tests/utils.py:AnalysisSetupMixin` gives `cls.analysis` + `cls.grch37` with a fake annotation version
   (`annotation/fake_annotation.py:get_fake_annotation_version`); samples/cohorts/trios/quads/pedigrees from
