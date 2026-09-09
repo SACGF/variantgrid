@@ -924,15 +924,18 @@ VariantGridFormat.representativeVariantLabel = (variantId, rowData) => {
               + (p ? ` <span class='rv-hgvs-p'>${escapeHtml(p.change)}</span>` : '') + '</span>';
         return {html: html, title: hgvsC + (hgvsP ? " " + hgvsP : "")};
     }
-    // 2. g.HGVS (no transcript - intergenic, or annotation not run yet for this variant). The contig
-    // leads the way the gene symbol does above, and the accession it stands in for moves to line 2
+    // 2. g.HGVS (no transcript - an SV, intergenic, or annotation not run yet for this variant). The
+    // lead slot is what a reader calls the row: an SV over a gene is an event on that gene ("FGF3
+    // amplification"), so its symbol leads the way it does above; otherwise the contig stands in.
+    // Either way the accession moves to line 2
     const g = _splitHgvs(hgvsG);
     if (g && g.change.length <= REPRESENTATIVE_MAX_HGVS_CHARS) {
-        const contig = _contigLabel(chrom);
-        const html = (contig ? `<span class='rv-gene'>${escapeHtml(contig)}</span> ` : '')
+        const geneLead = (alt != null && String(alt).startsWith("<")) ? symbol : null;
+        const lead = geneLead || _contigLabel(chrom);
+        const html = (lead ? `<span class='rv-gene'>${escapeHtml(lead)}</span> ` : '')
                    + `<span class='rv-hgvs'>${escapeHtml(g.change)}</span>`
                    + `<span class='rv-line2'>${escapeHtml(g.accession)}</span>`;
-        return {html: html, title: hgvsG};
+        return {html: html, title: geneLead ? `${geneLead} ${hgvsG}` : hgvsG};
     }
     // 3/4. Coordinate - symbolic as a span with the type, otherwise ref>alt with long alleles collapsed
     if (chrom != null && position != null && alt != null) {
