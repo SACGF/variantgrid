@@ -37,14 +37,26 @@ def _build_family_zyg_q(cohort_genotype_collection, sample_zyg_require: list[tup
     )
 
 
-MOSAIC_PARENT_WARNINGS = [
+MOSAIC_JOINT_CALL_WARNING = (
     "Mosaic parent needs a joint called (multi-sample) VCF - per sample VCFs merged into a cohort "
-    "have no parent record at the proband's site, so there's no parental allele depth to read",
+    "have no parent record at the proband's site, so there's no parental allele depth to read"
+)
+MOSAIC_PARENT_WARNINGS = [
     "A 5% mosaic at 30x is ~1.5 reads - this is meaningful at ~100x+ / targeted panels, and mostly "
     "sequencing noise on standard WGS. Sort by the parent's allele depth column to triage",
     "Blood mosaicism is not gonadal mosaicism - absent signal in blood doesn't rule out germline "
     "mosaicism. A recurrence risk hint, not a rule out",
 ]
+
+
+def mosaic_parent_warnings(cohort) -> list[str]:
+    """ Mosaic detection depends on the data as much as the filter. A cohort built from one VCF
+        (directly or as a sub cohort) is joint called, so the parent record exists at every site """
+    warnings = []
+    if cohort.get_vcf() is None:
+        warnings.append(MOSAIC_JOINT_CALL_WARNING)
+    warnings.extend(MOSAIC_PARENT_WARNINGS)
+    return warnings
 
 
 def _packed_sample_q(cohort_genotype_collection, sample, column: str, lookup: str, value) -> Q:

@@ -13,7 +13,6 @@ from analysis.models.enums import DuoInheritance
 from analysis.models.nodes.sources import AbstractCohortBasedNode
 from analysis.models.nodes.family_inheritance import (
     MOSAIC_EVIDENCE_TEMPLATE,
-    MOSAIC_PARENT_WARNINGS,
     AbstractCompHetInheritance,
     AbstractFamilyInheritance,
     FamilyInheritanceNodeMixin,
@@ -23,6 +22,7 @@ from analysis.models.nodes.family_inheritance import (
     _xlinked_recessive_errors,
     mosaic_evidence_description,
     mosaic_evidence_q,
+    mosaic_parent_warnings,
 )
 from analysis.models.nodes.node_display import NodeIcon
 from patients.models_enums import Zygosity
@@ -275,7 +275,7 @@ class DuoNode(FamilyInheritanceNodeMixin, AbstractCohortBasedNode):
                 warnings.append(f"One parent only - de novo cannot be confirmed; variant may be inherited "
                                 f"from the missing {missing}")
             elif self.inheritance == DuoInheritance.MOSAIC_PARENT:
-                warnings.extend(MOSAIC_PARENT_WARNINGS)
+                warnings.extend(mosaic_parent_warnings(self.duo.cohort))
         return warnings
 
     def _get_cohort(self):

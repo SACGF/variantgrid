@@ -61,7 +61,7 @@ ANALYSIS_NODE_FIELDS = fields_for_model(AnalysisNode)
 WIDGET_INTEGER_MIN_0 = NumberInput(attrs={'class': 'narrow', 'min': '0', 'step': '1'})
 WIDGET_INTEGER_MIN_1 = NumberInput(attrs={'class': 'narrow', 'min': '1', 'step': '1'})
 # Hidden field written by setupSlider() - the visible control is the .slider-container in the template
-WIDGET_UNIT_INTERVAL_SLIDER = HiddenInput(attrs={'min': '0', 'max': '1', 'step': '0.01', 'decimal_places': '2'})
+WIDGET_UNIT_INTERVAL_SLIDER = HiddenInput(attrs={'min': '0', 'max': '1', 'step': '0.05', 'decimal_places': '2'})
 
 
 class AlleleFrequencyMixin(forms.Form):

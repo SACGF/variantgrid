@@ -13,7 +13,6 @@ from analysis.models.nodes.sources import AbstractCohortBasedNode
 from analysis.models.nodes.family_inheritance import (
     MOSAIC_EVIDENCE_TEMPLATE,
     MOSAIC_PARENT_ROW_TEMPLATE,
-    MOSAIC_PARENT_WARNINGS,
     AbstractCompHetInheritance,
     AbstractFamilyInheritance,
     FamilyInheritanceNodeMixin,
@@ -24,6 +23,7 @@ from analysis.models.nodes.family_inheritance import (
     mosaic_absent_q,
     mosaic_evidence_description,
     mosaic_evidence_q,
+    mosaic_parent_warnings,
 )
 from analysis.models.nodes.node_display import NodeIcon
 from patients.models_enums import Zygosity
@@ -288,7 +288,7 @@ class QuadNode(FamilyInheritanceNodeMixin, AbstractCohortBasedNode):
         """ Mosaic detection depends on the data as much as the filter - say so every time """
         warnings = super().get_warnings()
         if self.quad and self.inheritance == QuadInheritance.MOSAIC_PARENT:
-            warnings.extend(MOSAIC_PARENT_WARNINGS)
+            warnings.extend(mosaic_parent_warnings(self.quad.cohort))
         return warnings
 
     def _get_cohort(self):

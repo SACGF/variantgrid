@@ -16,6 +16,7 @@ from django.test import TestCase, override_settings
 
 from analysis.models import Analysis, DuoNode
 from analysis.models.enums import DuoInheritance
+from analysis.models.nodes.family_inheritance import MOSAIC_JOINT_CALL_WARNING
 from analysis.tests.inheritance_node_mixin import DEFAULT_GENOTYPE_VALUES, make_cohort_genotype
 from annotation.fake_annotation import get_fake_annotation_version
 from patients.models_enums import Sex
@@ -184,8 +185,15 @@ class TestDuoNodeInheritance(TestCase):
         node = self._make_node(DuoInheritance.MOSAIC_PARENT, mosaic_max_af=0.6)
         self.assertIn(self.inherited_het_v.pk, self._filter_variants(node))
 
-    def test_mosaic_always_warns_about_the_data_it_needs(self):
-        self.assertTrue(self._make_node(DuoInheritance.MOSAIC_PARENT).get_warnings())
+    def test_mosaic_joint_called_cohort_skips_the_joint_call_warning(self):
+        warnings = self._make_node(DuoInheritance.MOSAIC_PARENT).get_warnings()
+        self.assertTrue(warnings)
+        self.assertNotIn(MOSAIC_JOINT_CALL_WARNING, warnings)
+
+    def test_mosaic_multi_vcf_cohort_warns_it_needs_a_joint_call(self):
+        node = self._make_node(DuoInheritance.MOSAIC_PARENT)
+        node.duo.cohort.vcf = None
+        self.assertIn(MOSAIC_JOINT_CALL_WARNING, node.get_warnings())
 
     def test_mosaic_needs_no_affected_parent(self):
         self.assertEqual(DuoNode.get_duo_inheritance_errors(self.duo, DuoInheritance.MOSAIC_PARENT), [])
