@@ -38,6 +38,9 @@ Gotchas:
 - models/models_vcf.py:VCF.delete_internal_data keeps the VCF and Sample rows and drops or recreates the partitions (recreate_partitions=False is the archive path in archive.py).
 - Whole-table work on snpdb_variant or snpdb_allele is millions of rows in prod: page by pk range and fan out celery tasks (tasks/liftover_tasks.py:liftover_allele_batch, settings.LIFTOVER_BATCH_SIZE) rather than iterating one queryset.
 - Liftover is per Allele, not per Variant: liftover.py:create_liftover_pipelines batches AlleleLiftover records and liftover.py:allele_can_attempt_liftover decides eligibility. Builds sharing a contig link with AlleleConversionTool.SAME_CONTIG and no external call.
+- Liftover has left an Allele with 2 VariantAlleles in the destination build - the real match plus a
+  "build difference" variant that other Alleles at the locus also picked up. That's what a variant with 2
+  ClinGen Alleles is; `one_off_dedupe_variant_alleles` drops the artefact link rather than merging them.
 - A tool that has ever errored on an allele/build is skipped forever (models/models_variant.py:AlleleLiftover.get_failed_conversion_tools),
   which is why re-clicking liftover does nothing. Pass `retry_conversion_tools=` to liftover.py:create_liftover_pipelines to
   override it for chosen tools - the liftover page's per-tool retry buttons, "Create Variant" and the admin action all do (#1273).
