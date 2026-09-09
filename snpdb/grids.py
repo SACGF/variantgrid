@@ -603,6 +603,9 @@ def get_standard_overrides(af_show_in_percent: bool) -> dict[str, dict]:
         'variantannotation__annotsv_pathogenic_overlaps': {
             'renderer': render_annotsv_pathogenic_overlaps, 'csv_rendered': True,
         },
+        # A Pathogenicity choice field, so the cell (and the annotsv_acmg composite headline it leads)
+        # gets the class label, drawn as the abbreviated chip the classification columns use
+        'variantannotation__annotsv_acmg_class': {'client_renderer': 'VariantGridFormat.pathogenicityChip'},
     }
 
     if af_show_in_percent:

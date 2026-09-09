@@ -41,8 +41,14 @@
             return val;
         }
 
+        // The table is built from a stub node - the mosaic thresholds come from the live fields
+        function fillMosaicThresholds(text) {
+            return text.replace(/\{alt_reads\}/g, $("#id_mosaic_min_alt_reads").val())
+                       .replace(/\{af\}/g, $("#mosaic-max-af-value").text());
+        }
+
         function otherFilters(key) {
-            return lookup('other_filters_', key, parentAffected) || '';
+            return fillMosaicThresholds(lookup('other_filters_', key, parentAffected) || '');
         }
 
         $(".zyg-parent").text(memberZyg('parent', parentAffected, requireZyg));
@@ -97,6 +103,11 @@
         updateMosaicFields();
     });
     $("#id_require_zygosity").change(updateZygosityTable);
+    // mosaic_max_af is a HiddenInput (rendered in the hidden fields loop) the slider writes into
+    {% if af_show_in_percent %}$("#id_mosaic_max_af").attr("percent", "1");{% endif %}
+    setupSlider($("#id_mosaic_max_af"), $("#mosaic-max-af-slider"));
+    $("#id_mosaic_min_alt_reads").on("input", updateZygosityTable);
+    $("#mosaic-max-af-slider").on("input", updateZygosityTable);
 
     /* Dominant needs an affected parent, and X-linked recessive needs the mother - offer them only
        when the loaded duo fits, or when the user has ticked "ignore" to run them anyway */
@@ -156,7 +167,18 @@
     <div class='genotype-row' id='mosaic-fields' style='display: none'>
         <label class="editor-label" for="{{ form.mosaic_min_alt_reads.id_for_label }}">Mosaic parent</label>
         <span class="genotype-field"><b title="Alt reads the mosaic parent needs at the proband's site">Alt reads</b>&ge;{{ form.mosaic_min_alt_reads }}{{ form.mosaic_min_alt_reads.errors }}</span>
-        <span class="genotype-field"><b title="Ceiling on the parent's VAF - a full HET parent is plain dominant, not mosaic">AF</b>&le;{{ form.mosaic_max_af }}{{ form.mosaic_max_af.errors }}</span>
+        <span class="genotype-field"><b title="Ceiling on the parent's VAF - a full HET parent is plain dominant, not mosaic">AF</b>&le;{{ form.mosaic_max_af.errors }}
+            <span class='slider-container'>
+                <div class="display-flex">
+                    <input type="range" id="mosaic-max-af-slider" class='slider' />
+                    <div class='label slider-value' id='mosaic-max-af-value'></div>
+                </div>
+                <div class='slider-labels'>
+                    <span class='label min-value left'></span>
+                    <span class='label max-value right'></span>
+                </div>
+            </span>
+        </span>
     </div>
     {{ zygosity_table_data|json_script:"zygosity-data" }}
     <div>

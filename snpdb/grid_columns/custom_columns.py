@@ -79,7 +79,9 @@ def _model_field_column_kwargs(field) -> dict:
                 break
         kwargs["column_filter"] = FilterField(filter_type)
 
-    if isinstance(field, fields.CharField) and field.choices:
+    if field.choices:
+        # The row (and the CSV, and the column summary's counts) carries the label, whatever the
+        # stored type - so a client renderer for a choice column keys by label
         kwargs["renderer"] = _make_choices_renderer(dict(field.choices))
         kwargs["csv_rendered"] = True
     elif isinstance(field, fields.DateTimeField):

@@ -75,6 +75,10 @@ class TestRowToUpdate(TestCase):
         self.assertNotIn("annotsv_repeat_type_left", update)  # NA is skipped
         self.assertEqual(update["annotsv_b_gain_af_max"], 0.005)
 
+    def test_acmg_class_outside_the_scale_is_skipped(self):
+        """ The field is a Pathogenicity choice now - AnnotSV documents 1..5 only """
+        self.assertNotIn("annotsv_acmg_class", _row_to_update({"ACMG_class": "7"}))
+
     def test_skips_empty_and_dot(self):
         row = {
             "ACMG_class": "",

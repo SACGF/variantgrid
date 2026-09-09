@@ -11,11 +11,13 @@ from django.test.client import Client
 from django.urls.base import reverse
 
 from annotation.fake_annotation import get_fake_annotation_version
+from annotation.models.models_enums import Pathogenicity
 from library.django_utils.composite_columns import collapse_into_composite
-from snpdb.grid_columns.custom_columns import get_variant_grid_columns
+from snpdb.grid_columns.custom_columns import get_variant_grid_columns, variant_column_rich_column
 from snpdb.grids import variant_grid_client_extra
 from snpdb.models import CompositeColumnMember, CustomColumn, CustomColumnsCollection, VariantGridColumn
 from snpdb.models.models_genome import GenomeBuild
+from snpdb.views.datatable_view import CellData
 
 SPLICEAI_MEMBERS = ["spliceai_max_ds", "spliceai_pred_ds_ag", "spliceai_pred_ds_al",
                     "spliceai_pred_ds_dg", "spliceai_pred_ds_dl", "spliceai_pred_dp_ag",
@@ -111,6 +113,19 @@ class CompositeColumnGridTest(TestCase):
             self.assertTrue(composite.is_composite, composite.pk)
             for member in composite.member_columns:
                 self.assertIn(member.pk, catalogue, member.pk)
+
+
+class ChoiceFieldColumnTest(TestCase):
+    """ An IntegerField with choices reaches the grid, the CSV and the column summary as its label -
+        which is what makes node_column_summary count it rather than draw a box plot """
+
+    def test_integer_choice_column_is_select_filtered_and_label_rendered(self):
+        rich_column = variant_column_rich_column("variantannotation__annotsv_acmg_class")
+        self.assertEqual("select", rich_column.column_filter.type)
+        self.assertTrue(rich_column.csv_rendered)
+        cell = CellData(all_data={"variantannotation__annotsv_acmg_class": Pathogenicity.LIKELY_PATHOGENIC},
+                        key="variantannotation__annotsv_acmg_class")
+        self.assertEqual("Likely pathogenic", rich_column.renderer(cell))
 
 
 class CollapseIntoCompositeTest(TestCase):

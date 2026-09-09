@@ -7,7 +7,7 @@ from django.db.models.query_utils import Q
 from analysis.exceptions import NonFatalNodeError
 from annotation.models import AnnotationVersion, GeneAnnotation
 from annotation.models.damage_enums import PathogenicityImpact
-from annotation.models.models_enums import ClinVarOncogenicity, ClinVarPathogenicity
+from annotation.models.models_enums import ClinVarOncogenicity, Pathogenicity
 from classification.enums import ClinicalSignificance, SomaticClinicalSignificance
 from classification.models import Classification
 from snpdb.models import Tag, Variant
@@ -50,7 +50,7 @@ def get_extra_filters_q(analysis, extra_filters) -> Q:
     annotation_version = analysis.annotation_version
     if extra_filters == BuiltInFilters.CLINVAR:
         # ClinVar's 3 classification axes - a variant is significant if any of them says so
-        q = Q(clinvar__highest_pathogenicity__gte=ClinVarPathogenicity.LIKELY_PATHOGENIC) \
+        q = Q(clinvar__highest_pathogenicity__gte=Pathogenicity.LIKELY_PATHOGENIC) \
             | Q(clinvar__somatic_tier__in=SomaticClinicalSignificance.TIER_1_AND_2_VALUES) \
             | Q(clinvar__highest_oncogenicity__gte=ClinVarOncogenicity.LIKELY_ONCOGENIC)
     elif extra_filters == BuiltInFilters.OMIM:

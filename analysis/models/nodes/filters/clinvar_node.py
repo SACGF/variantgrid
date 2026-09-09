@@ -10,37 +10,17 @@ from analysis.models.enums import NodeMatchInput
 from analysis.models.nodes.analysis_node import AnalysisNode
 from analysis.models.nodes.node_display import NodeChip, NodeIcon, significance_chips
 from analysis.models.nodes.significance_filter_mixin import SignificanceFilterNodeMixin
-from annotation.models.models_enums import ClinVarOncogenicity, ClinVarPathogenicity, ClinVarReviewStatus
+from annotation.models.models_enums import ClinVarOncogenicity, ClinVarReviewStatus, Pathogenicity
 from classification.enums import SomaticClinicalSignificance
 from snpdb.models.models_enums import AlleleOriginFilterDefault
 
 NO_CLINVAR_CALL = 0
 """ ClinVar.highest_pathogenicity for a record ClinVar hasn't given a germline classification on """
 
-PATHOGENICITY_LABELS = {
-    ClinVarPathogenicity.PATHOGENIC: "Pathogenic",
-    ClinVarPathogenicity.LIKELY_PATHOGENIC: "Likely pathogenic",
-    ClinVarPathogenicity.UNCERTAIN: "Uncertain",
-    ClinVarPathogenicity.LIKELY_BENIGN: "Likely benign",
-    ClinVarPathogenicity.BENIGN: "Benign",
-    NO_CLINVAR_CALL: "Other",
-}
-PATHOGENICITY_SHORT_LABELS = {
-    ClinVarPathogenicity.PATHOGENIC: "P",
-    ClinVarPathogenicity.LIKELY_PATHOGENIC: "LP",
-    ClinVarPathogenicity.UNCERTAIN: "VUS",
-    ClinVarPathogenicity.LIKELY_BENIGN: "LB",
-    ClinVarPathogenicity.BENIGN: "B",
-    NO_CLINVAR_CALL: "O",
-}
-PATHOGENICITY_CSS_CLASSES = {
-    ClinVarPathogenicity.PATHOGENIC: "cs-p",
-    ClinVarPathogenicity.LIKELY_PATHOGENIC: "cs-lp",
-    ClinVarPathogenicity.UNCERTAIN: "cs-vus",
-    ClinVarPathogenicity.LIKELY_BENIGN: "cs-lb",
-    ClinVarPathogenicity.BENIGN: "cs-b",
-    NO_CLINVAR_CALL: "cs-none",
-}
+# The scale plus the "ClinVar has no germline call" entry only this node has
+PATHOGENICITY_LABELS = {p: p.label for p in Pathogenicity} | {NO_CLINVAR_CALL: "Other"}
+PATHOGENICITY_SHORT_LABELS = {p: p.short_label for p in Pathogenicity} | {NO_CLINVAR_CALL: "O"}
+PATHOGENICITY_CSS_CLASSES = {p: p.css_class for p in Pathogenicity} | {NO_CLINVAR_CALL: "cs-none"}
 
 ONCOGENICITY_LABELS = {
     ClinVarOncogenicity.ONCOGENIC: "Oncogenic",
@@ -98,11 +78,11 @@ class ClinVarNode(SignificanceFilterNodeMixin, AnalysisNode):
 
     # Ordering is user-facing - the editor pills, node chips and summaries all read most pathogenic first
     FIELD_PATHOGENICITY = {
-        'germline_pathogenic': ClinVarPathogenicity.PATHOGENIC,
-        'germline_likely_pathogenic': ClinVarPathogenicity.LIKELY_PATHOGENIC,
-        'germline_uncertain': ClinVarPathogenicity.UNCERTAIN,
-        'germline_likely_benign': ClinVarPathogenicity.LIKELY_BENIGN,
-        'germline_benign': ClinVarPathogenicity.BENIGN,
+        'germline_pathogenic': Pathogenicity.PATHOGENIC,
+        'germline_likely_pathogenic': Pathogenicity.LIKELY_PATHOGENIC,
+        'germline_uncertain': Pathogenicity.UNCERTAIN,
+        'germline_likely_benign': Pathogenicity.LIKELY_BENIGN,
+        'germline_benign': Pathogenicity.BENIGN,
         'germline_other': NO_CLINVAR_CALL,
     }
     FIELD_SOMATIC_TIER = {

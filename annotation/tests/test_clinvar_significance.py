@@ -1,6 +1,6 @@
 from django.test import TestCase
 
-from annotation.models.models_enums import ClinVarOncogenicity, ClinVarPathogenicity
+from annotation.models.models_enums import ClinVarOncogenicity, Pathogenicity
 from annotation.vcf_files.clinvar_significance import (
     NO_CLASSIFICATION_FOR_THE_SINGLE_VARIANT,
     highest_oncogenicity,
@@ -47,12 +47,12 @@ class HighestOncogenicityTest(TestCase):
 
 class HighestPathogenicityTest(TestCase):
     def test_combined_form(self):
-        self.assertEqual(highest_pathogenicity("Benign/Likely_benign", None), ClinVarPathogenicity.LIKELY_BENIGN)
+        self.assertEqual(highest_pathogenicity("Benign/Likely_benign", None), Pathogenicity.LIKELY_BENIGN)
 
     def test_conflicting_reads_clnsigconf(self):
         conflicting = "Pathogenic(2)|Uncertain_significance(1)"
         self.assertEqual(highest_pathogenicity("Conflicting_interpretations_of_pathogenicity", conflicting),
-                         ClinVarPathogenicity.PATHOGENIC)
+                         Pathogenicity.PATHOGENIC)
 
     def test_conflicting_without_clnsigconf_is_undecidable(self):
         """ None so the importer can count these and die if ClinVar has changed its INFO fields """

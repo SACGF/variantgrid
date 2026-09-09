@@ -836,6 +836,10 @@ function setupConnections(nodes_selector, readOnly) {
 }
 
 function loadNodeWhenReady(node_id) {
+	if (messagePoller.is_observing(node_id, "ready")) {
+		return;  // already waiting on this node - a second watcher would reload it twice at once
+	}
+
 	const updateNode = function (node) {
 		// console.log("loadNodeWhenReady.updateNode:" + node);
 		// Reload the data container if it's showing for this node

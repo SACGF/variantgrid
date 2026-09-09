@@ -1,5 +1,6 @@
 import json
 
+from django.conf import settings
 from django.http.response import HttpResponse
 
 from analysis.exceptions import NonFatalNodeError
@@ -352,6 +353,8 @@ class ZygosityTableMixin:
         user_settings = UserSettings.get_for_user(self.request.user)
         context["zygosity_table_data"] = self.model.get_zygosity_table_data()
         context["initially_show_zygosity_table"] = user_settings.initially_show_zygosity_table
+        # The mosaic AF slider reads as a percent wherever the grid's AF columns do
+        context["af_show_in_percent"] = settings.VARIANT_ALLELE_FREQUENCY_CLIENT_SIDE_PERCENT
         return context
 
 

@@ -11,6 +11,8 @@ from django.db.models.query_utils import Q
 from analysis.models.enums import TrioInheritance
 from analysis.models.nodes.sources import AbstractCohortBasedNode
 from analysis.models.nodes.family_inheritance import (
+    MOSAIC_EVIDENCE_TEMPLATE,
+    MOSAIC_PARENT_ROW_TEMPLATE,
     MOSAIC_PARENT_WARNINGS,
     AbstractCompHetInheritance,
     AbstractFamilyInheritance,
@@ -108,8 +110,7 @@ class MosaicParent(AbstractTrioInheritance):
                 f"while the other ({other}) has <{self.node.mosaic_min_alt_reads} alt reads")
 
     def get_other_filters_description(self) -> str:
-        # The thresholds themselves are the editor's own inputs, right above the table
-        return "One parent has alt reads at a low AF, the other has none"
+        return MOSAIC_EVIDENCE_TEMPLATE
 
 
 class Denovo(SimpleTrioInheritance):
@@ -390,12 +391,15 @@ class TrioNode(FamilyInheritanceNodeMixin, AbstractCohortBasedNode):
                     'proband': f"AR: {fmt(ar_zyg[2])}\nXLR: {fmt(xlr_zyg[2])}",
                 }
             elif klass is MosaicParent:
-                handler = klass(stub_node)
+                # Only the parents are filtered on read support, so the proband row stays blank
                 data[mode] = {
                     'mother': fmt(klass.MOSAIC_ZYGOSITIES),
                     'father': fmt(klass.MOSAIC_ZYGOSITIES),
                     'proband': fmt(klass.HAS_VARIANT),
+                    'other_filters_mother': MOSAIC_PARENT_ROW_TEMPLATE,
+                    'other_filters_father': MOSAIC_PARENT_ROW_TEMPLATE,
                 }
+                continue
             elif klass is TrioAnyAffected:
                 handler = klass(stub_node)
                 has_variant = fmt(TrioAnyAffected.HAS_VARIANT)
