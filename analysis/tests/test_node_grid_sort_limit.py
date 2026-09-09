@@ -66,6 +66,10 @@ class NodeGridSortLimitTest(TestCase):
         self.assertTrue(grid.enabled_columns)
         self.assertTrue(all(rc.orderable is False for rc in grid.enabled_columns))
 
+    def test_large_node_headers_say_why(self):
+        grid = self._grid(count=50_000)
+        self.assertTrue(all("Sorting disabled (50,000 variants)" in rc.header_title for rc in grid.enabled_columns))
+
     def test_small_node_columns_orderable_default(self):
         grid = self._grid(count=500)
         # Sorting isn't force-disabled - columns keep their normal orderable setting

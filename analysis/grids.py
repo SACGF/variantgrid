@@ -14,6 +14,7 @@ from typing import Any, Optional
 import pandas as pd
 from auditlog.models import LogEntry
 from django.conf import settings
+from django.contrib.humanize.templatetags.humanize import intcomma
 from django.core.exceptions import PermissionDenied
 from django.db.models import F, FloatField, Max, Q, QuerySet, StringAgg, Value
 from django.db.models.functions import Cast, Substr
@@ -158,6 +159,12 @@ class VariantGrid(AbstractVariantGrid):
         count = self._grid_row_count()
         return count is None or count >= settings.ANALYSIS_GRID_SORT_MAX_ROWS
 
+    def sorting_disabled_title(self) -> str:
+        count = self._grid_row_count()
+        count_display = intcomma(count) if count is not None else "?"
+        return (f"Sorting disabled ({count_display} variants) - sorting is off above "
+                f"{intcomma(settings.ANALYSIS_GRID_SORT_MAX_ROWS)} variants, add more filters to re-enable it")
+
     def get_extra(self) -> JsonObjType:
         extra = super().get_extra()
         # Node state the renderers need, once per grid rather than repeated in every column
@@ -238,8 +245,11 @@ class VariantGrid(AbstractVariantGrid):
             rich_columns = insert_columns(rich_columns, sample_columns)
 
         if self.sorting_disabled():
+            # The note under the grid is easy to miss - say why on the header the user just clicked
+            sorting_disabled_title = self.sorting_disabled_title()
             for rc in rich_columns:
                 rc.orderable = False
+                rc.header_title = f"{sorting_disabled_title}\n{rc.header_title}" if rc.header_title else sorting_disabled_title
         elif default_sort_by_column := self.node.analysis.default_sort_by_column:
             # Only set an initial sort column when sorting is allowed (below the row limit) - otherwise
             # the first grid load would request that sort and blow the statement_timeout
