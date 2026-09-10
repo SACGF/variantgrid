@@ -1147,14 +1147,14 @@ class FilterNodePatientScopeTest(SampleNodeLevelsTestCase):
         node = self._child(ZygosityNode, self._extraction_node())
         form = ZygosityNodeForm(instance=ZygosityNode.objects.get(pk=node.pk))
 
-        self.assertEqual(form.fields["applies_to"].initial, f"patient:{self.patient.pk}")
+        self.assertEqual(form.fields["sample_source"].initial, f"patient:{self.patient.pk}")
         self.assertIn((f"patient:{self.patient.pk}", f"{self.patient} (all 2 samples)"),
-                      form.fields["applies_to"].choices)
-        self.assertEqual(form.get_analysis_variable_field("applies_to"), "patient")
+                      form.fields["sample_source"].choices)
+        self.assertEqual(form.get_analysis_variable_field("sample_source"), "patient")
 
     def test_the_picker_saves_a_sample(self):
         node = self._child(ZygosityNode, self._extraction_node())
-        form = ZygosityNodeForm({"applies_to": f"sample:{self.snv_sample.pk}",
+        form = ZygosityNodeForm({"sample_source": f"sample:{self.snv_sample.pk}",
                                  "zygosity": Zygosity.HET},
                                 instance=ZygosityNode.objects.get(pk=node.pk))
         self.assertTrue(form.is_valid(), form.errors)
@@ -1162,13 +1162,13 @@ class FilterNodePatientScopeTest(SampleNodeLevelsTestCase):
 
         self.assertEqual(node.sample, self.snv_sample)
         self.assertIsNone(node.patient)
-        self.assertEqual(ZygosityNodeForm(instance=node).get_analysis_variable_field("applies_to"),
+        self.assertEqual(ZygosityNodeForm(instance=node).get_analysis_variable_field("sample_source"),
                          "sample")
 
     def test_a_sample_out_of_reach_is_a_form_error(self):
         _, other_sample, _ = self._other_patient_node()
         node = self._child(ZygosityNode, self._extraction_node())
-        form = ZygosityNodeForm({"applies_to": f"sample:{other_sample.pk}", "zygosity": Zygosity.HET},
+        form = ZygosityNodeForm({"sample_source": f"sample:{other_sample.pk}", "zygosity": Zygosity.HET},
                                 instance=ZygosityNode.objects.get(pk=node.pk))
         self.assertFalse(form.is_valid())
 

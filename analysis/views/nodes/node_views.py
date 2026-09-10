@@ -246,22 +246,22 @@ class MOINodeView(NodeView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context["applies_to_gene_disease"] = self._get_applies_to_gene_disease()
+        context["sample_source_gene_disease"] = self._get_sample_source_gene_disease()
         return context
 
-    def _get_applies_to_gene_disease(self) -> dict:
+    def _get_sample_source_gene_disease(self) -> dict:
         """ The patient's gene/disease terms for every choice the picker offers, keyed on its
             "<kind>:<pk>" value - the editor's "From Patient" panel reads what is selected """
         ontology_version = self.object.analysis.annotation_version.ontology_version
         data_by_patient = {}
-        applies_to_gene_disease = {}
-        for sample in self.object.get_samples():
+        sample_source_gene_disease = {}
+        for sample in self.object.get_ancestor_samples():
             patient = get_patient_for_source(SampleSourceLevel.SAMPLE, sample)
             if patient and patient.pk not in data_by_patient:
                 data_by_patient[patient.pk] = get_patient_gene_disease_data(patient, ontology_version)
-                applies_to_gene_disease[f"patient:{patient.pk}"] = data_by_patient[patient.pk]
-            applies_to_gene_disease[f"sample:{sample.pk}"] = data_by_patient.get(patient.pk) if patient else {}
-        return applies_to_gene_disease
+                sample_source_gene_disease[f"patient:{patient.pk}"] = data_by_patient[patient.pk]
+            sample_source_gene_disease[f"sample:{sample.pk}"] = data_by_patient.get(patient.pk) if patient else {}
+        return sample_source_gene_disease
 
 
 class PedigreeNodeView(NodeView):

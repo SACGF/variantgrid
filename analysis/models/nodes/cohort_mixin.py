@@ -462,7 +462,7 @@ class AncestorSampleMixin(SampleMixin):
         if self.sample:
             return [self.sample]
         if self.patient:
-            samples = [s for s in self._get_ancestor_samples()
+            samples = [s for s in self.get_ancestor_samples()
                        if get_patient_for_source(SampleSourceLevel.SAMPLE, s) == self.patient]
             return sorted(samples, key=lambda s: s.pk)
         return []
@@ -507,14 +507,14 @@ class AncestorSampleMixin(SampleMixin):
     def _get_configuration_errors(self) -> list:
         errors = super()._get_configuration_errors()
         if self.sample:
-            if self.sample not in self._get_ancestor_samples():
+            if self.sample not in self.get_ancestor_samples():
                 errors.append(f"Sample: {self.sample} is not set as a sample in any ancestors of this node")
         elif self.patient:
             if not self.get_filter_samples():
                 errors.append(f"Patient: {self.patient} has no samples in any ancestors of this node")
         return errors
 
-    def _get_ancestor_samples(self) -> set[Sample]:
+    def get_ancestor_samples(self) -> set[Sample]:
         """ Get all samples from ancestor nodes, including those from VCFs without genotypes,
             so that variant-only VCFs (has_sample_columns=False) are still valid ancestors """
         parent_sample_set = set()
@@ -526,7 +526,7 @@ class AncestorSampleMixin(SampleMixin):
     def handle_ancestor_input_samples_changed(self):
         """ Auto-set to the ancestors' proband (or remove if no longer reachable from them) """
 
-        parent_sample_set = self._get_ancestor_samples()
+        parent_sample_set = self.get_ancestor_samples()
 
         modified = False
         # Don't do anything if new as the get_samples won't work

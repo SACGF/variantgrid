@@ -78,7 +78,7 @@ model needs `sample` and `patient` fields and that one at most is set.
   `patients/sample_grouping.py:get_patient_for_source` at `SampleSourceLevel.SAMPLE` (the sample may be linked
   directly or through its extraction). MOINode's patient panel and the MOI editor read this.
 - `get_filter_samples() -> list[Sample]`: `[sample]` in sample mode; in patient mode the ancestor samples
-  (`_get_ancestor_samples`) whose patient is `self.patient`, sorted by pk. Every path that used
+  (`get_ancestor_samples`) whose patient is `self.patient`, sorted by pk. Every path that used
   `self.sample` for a genotype join goes through this.
 - `_get_sample()` (the `SampleMixin` hook) returns None in patient mode, as the group SampleNode does, so the
   single-cohort machinery in `CohortMixin` stays out of the way; `_get_cohorts_and_sample_visibility_for_node`
@@ -136,11 +136,13 @@ stored choice. `GeneCoverageMixin` iterates `get_samples()` and needs no change.
 ## Editor
 
 One picker replaces the sample `<select>` in the four editors, following
-`analysis/forms/forms_nodes.py:SampleNodeForm` (`source` carries `"<level>:<pk>"`): a form field `applies_to`
-with choices `sample:<pk>` for each ancestor sample and `patient:<pk>` for each patient those samples resolve
-to, labelled "<patient> (all N samples)". The choices are a plain `Select` - the set is the ancestors', small
-and already permission-checked. `save()` unpacks it through `_set_sample` / `_set_patient`, and
-`get_analysis_variable_field("applies_to")` answers `"patient"` or `"sample"` from what the instance holds, so
+`analysis/forms/forms_nodes.py:SampleNodeForm` (`source` carries `"<level>:<pk>"`): a form field `sample_source`
+on `analysis/forms/forms_nodes.py:AncestorSampleSourceMixin`, with choices `sample:<pk>` for each ancestor
+sample and `patient:<pk>` for each patient those samples resolve to, labelled "<patient> (all N samples)".
+The choices come from `get_ancestor_samples()` - the same set `_get_configuration_errors` validates against -
+in a plain `Select`, small and already permission-checked. `save()` unpacks it through
+`_set_sample` / `_set_patient`, and
+`get_analysis_variable_field("sample_source")` answers `"patient"` or `"sample"` from what the instance holds, so
 an analysis template variable binds to the FK that is set. Node name and method summary say
 "Patient X (3 samples)" in patient mode.
 

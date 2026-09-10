@@ -14,7 +14,7 @@
     accordionForm(moiNodeForm);
     ajaxForm(moiNodeForm);
 
-    $("#id_applies_to", moiNodeForm).change(changeAppliesTo);
+    $("#id_sample_source", moiNodeForm).change(changeSampleSource);
 
     function setupCollapse(selector) {
         let allMessage = $(selector + "-all-message");
@@ -48,7 +48,7 @@
     }
 
     // Initial setup from loading config
-    populateMOIPatient($("#id_applies_to", moiNodeForm).val());
+    populateMOIPatient($("#id_sample_source", moiNodeForm).val());
 
 {% endblock docreadyjs %}
 
@@ -75,17 +75,17 @@
 
     // Gene/disease terms for every choice the picker offers, keyed on its "<kind>:<pk>" value -
     // the set is the ancestors', so it is small enough to send with the editor
-    const APPLIES_TO_GENE_DISEASE = {{ applies_to_gene_disease|jsonify }};
+    const SAMPLE_SOURCE_GENE_DISEASE = {{ sample_source_gene_disease|jsonify }};
 
-    function populateMOIPatient(appliesTo, changed) {
+    function populateMOIPatient(sampleSource, changed) {
         let accordion = $("#moi-terms-accordion");
         let patientInfo = $("#moi-patient-info");
         let patientTerms = $("#moi-patient-terms");
         patientInfo.empty();
         patientTerms.empty();
 
-        if (appliesTo) {
-            let data = APPLIES_TO_GENE_DISEASE[appliesTo] || {};
+        if (sampleSource) {
+            let data = SAMPLE_SOURCE_GENE_DISEASE[sampleSource] || {};
             if (!data["patient_id"]) {
                 disableAccordion(accordion);
                 patientInfo.text("Sample is not assigned to a patient.");
@@ -118,8 +118,8 @@
         }
     }
 
-    function changeAppliesTo() {
-        populateMOIPatient($("#id_applies_to", "form#moi-node").val(), true);
+    function changeSampleSource() {
+        populateMOIPatient($("#id_sample_source", "form#moi-node").val(), true);
     }
 
 {% endblock inlinejs%}
@@ -148,8 +148,8 @@
     {% endfor %}
 
     <div class="editor-row">
-        <label class="editor-label" for="{{ form.applies_to.id_for_label }}">Applies to</label>
-        {{ form.applies_to }}
+        <label class="editor-label" for="{{ form.sample_source.id_for_label }}">Applies to</label>
+        {{ form.sample_source }}
         <label title="Sample or patient is optional, and used to also apply a zygosity filter">{{ form.require_zygosity }} Require exact zygosity calls</label>{{ form.require_zygosity.errors }}
     </div>
     <div class="editor-row">

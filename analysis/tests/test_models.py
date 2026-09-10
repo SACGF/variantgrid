@@ -202,9 +202,9 @@ class AncestorSampleNoGenotypeTestCase(TestCase):
         self.assertFalse(self.sample.has_genotype)
 
     def test_ancestor_samples_includes_no_genotype_sample(self):
-        """ _get_ancestor_samples should find samples from no-genotype VCFs """
+        """ get_ancestor_samples should find samples from no-genotype VCFs """
         gene_list_node = self._create_child_node(GeneListNode)
-        ancestor_samples = gene_list_node._get_ancestor_samples()
+        ancestor_samples = gene_list_node.get_ancestor_samples()
         self.assertIn(self.sample, ancestor_samples)
 
     def test_gene_list_node_no_config_error_for_no_genotype_sample(self):
@@ -254,7 +254,7 @@ class AncestorSampleNoGenotypeTestCase(TestCase):
         response = client.get(url)
         self.assertEqual(200, response.status_code)
         data = form_submit_data(response.content.decode(), "node-gene-list-form")
-        self.assertEqual(f"sample:{self.sample.pk}", data.get("applies_to"), "Sample selected in editor")
+        self.assertEqual(f"sample:{self.sample.pk}", data.get("sample_source"), "Sample selected in editor")
 
         # JSON back means saved - an invalid form comes back as the re-rendered editor HTML
         self.assertEqual({}, client.post(url, data).json())

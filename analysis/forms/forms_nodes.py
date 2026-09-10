@@ -130,23 +130,23 @@ class VCFLocusFiltersMixin(forms.Form):
                 NodeVCFFilter.objects.create(node=node, vcf_filter=vcf_filter)
 
 
-class AppliesToMixin(forms.Form):
-    """ The sample-or-patient picker the four AncestorSampleMixin filter nodes share.
+class AncestorSampleSourceMixin(forms.Form):
+    """ How the four AncestorSampleMixin filter nodes work out the samples they filter on.
 
-        `applies_to` carries "<sample|patient>:<pk>" - one control rather than a sample select and a
-        patient select, since the node applies to exactly one of them
+        `sample_source` carries "<sample|patient>:<pk>" - one control rather than a sample select and
+        a patient select, since the node reads exactly one of them
         (@see analysis/models/nodes/cohort_mixin.py:AncestorSampleMixin). The choices are the
-        ancestors' samples and the patients they resolve to, so they are already permission
-        checked and small enough for a plain Select. """
-    applies_to = forms.ChoiceField(required=False, label="Applies to")
+        ancestor samples the node validates against and the patients they resolve to, so they are
+        already permission checked and small enough for a plain Select. """
+    sample_source = forms.ChoiceField(required=False, label="Applies to")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["applies_to"].choices = self._get_applies_to_choices()
-        self.fields["applies_to"].initial = self._get_applies_to_initial()
+        self.fields["sample_source"].choices = self._get_sample_source_choices()
+        self.fields["sample_source"].initial = self._get_sample_source_initial()
 
-    def _get_applies_to_choices(self) -> list:
-        samples = sorted(self.instance.get_samples(), key=lambda s: s.pk)
+    def _get_sample_source_choices(self) -> list:
+        samples = sorted(self.instance.get_ancestor_samples(), key=lambda s: s.pk)
         samples_by_patient = {}
         for sample in samples:
             if patient := get_patient_for_source(SampleSourceLevel.SAMPLE, sample):
@@ -158,7 +158,7 @@ class AppliesToMixin(forms.Form):
         choices.extend((f"sample:{sample.pk}", str(sample.name)) for sample in samples)
         return choices
 
-    def _get_applies_to_initial(self) -> str:
+    def _get_sample_source_initial(self) -> str:
         if self.instance.sample:
             return f"sample:{self.instance.sample_id}"
         if self.instance.patient:
@@ -168,13 +168,13 @@ class AppliesToMixin(forms.Form):
     def get_analysis_variable_field(self, field_name: str) -> str:
         """ The picker stands in for whichever FK is set - that FK is what a template's
             AnalysisVariable is keyed on, since populate_arguments sets node fields by name """
-        if field_name == "applies_to":
+        if field_name == "sample_source":
             return "patient" if self.instance.patient else "sample"
         return super().get_analysis_variable_field(field_name)
 
-    def set_applies_to(self, node):
+    def set_sample_source(self, node):
         """ Unpack the picker into the node's sample / patient - exactly one of them is set """
-        value = self.cleaned_data.get("applies_to")
+        value = self.cleaned_data.get("sample_source")
         kind, _, pk = (value or "").partition(":")
         if kind == "sample":
             node._set_sample(Sample.objects.get(pk=pk))
@@ -231,14 +231,14 @@ class VCFSourceNodeForm(AlleleFrequencyMixin, VCFLocusFiltersMixin, BaseNodeForm
         return node
 
 
-class AlleleFrequencyNodeForm(AppliesToMixin, AlleleFrequencyMixin, BaseNodeForm):
+class AlleleFrequencyNodeForm(AncestorSampleSourceMixin, AlleleFrequencyMixin, BaseNodeForm):
     class Meta:
         model = models.AlleleFrequencyNode
         fields = ()
 
     def save(self, commit=True):
         node = super().save(commit=False)
-        self.set_applies_to(node)
+        self.set_sample_source(node)
         self.save_allele_frequency(node)
         if commit:
             node.save()
@@ -625,7 +625,7 @@ class FilterNodeForm(BaseNodeForm):
         exclude = ANALYSIS_NODE_FIELDS
 
 
-class GeneListNodeForm(AppliesToMixin, BaseNodeForm):
+class GeneListNodeForm(AncestorSampleSourceMixin, BaseNodeForm):
     custom_gene_list_text = forms.CharField(widget=forms.Textarea(attrs={'placeholder': 'Gene names...'}),
                                             required=False)
     gene_list = forms.ModelMultipleChoiceField(required=False,
@@ -702,7 +702,7 @@ class GeneListNodeForm(AppliesToMixin, BaseNodeForm):
                 pap_set.create(panel_app_panel=pap)
 
         # _set_sample also resolves the sample's active QC gene list
-        self.set_applies_to(node)
+        self.set_sample_source(node)
 
         if commit:
             node.save()
@@ -776,7 +776,7 @@ class MergeNodeForm(BaseNodeForm):
         exclude = ANALYSIS_NODE_FIELDS
 
 
-class MOINodeForm(AppliesToMixin, BaseNodeForm):
+class MOINodeForm(AncestorSampleSourceMixin, BaseNodeForm):
     mondo = forms.ModelMultipleChoiceField(required=False,
                                            queryset=OntologyTerm.objects.all(),
                                            widget=ModelSelect2Multiple(url='mondo_autocomplete',
@@ -833,7 +833,7 @@ class MOINodeForm(AppliesToMixin, BaseNodeForm):
 
     def save(self, commit=True):
         node = super().save(commit=False)
-        self.set_applies_to(node)
+        self.set_sample_source(node)
 
         ontology_term_set = self.instance.moinodeontologyterm_set
         ontology_term_set.all().delete()  # Clear existing
@@ -1233,14 +1233,14 @@ class DuoNodeForm(GenomeBuildAutocompleteForwardMixin, VCFSourceNodeForm):
         }
 
 
-class ZygosityNodeForm(AppliesToMixin, BaseNodeForm):
+class ZygosityNodeForm(AncestorSampleSourceMixin, BaseNodeForm):
     class Meta:
         model = models.ZygosityNode
         fields = ("zygosity", 'exclude')
 
     def save(self, commit=True):
         node = super().save(commit=False)
-        self.set_applies_to(node)
+        self.set_sample_source(node)
         if commit:
             node.save()
         return node

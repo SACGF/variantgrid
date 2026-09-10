@@ -114,7 +114,8 @@ Patterns here:
   as done. Tag stats and the analyses list pills are history and count everything.
 - A sample-bound filter node (Zygosity, Allele Frequency, MOI, Gene List) applies to one sample **or** one patient
   (`analysis/models/nodes/cohort_mixin.py:AncestorSampleMixin` - exactly one of `sample`/`patient` is set, both null is
-  unset, and the editors pick either through the one `applies_to` control). `handle_ancestor_input_samples_changed` sets
+  unset, and the editors pick either through the one `sample_source` control,
+  `analysis/forms/forms_nodes.py:AncestorSampleSourceMixin`). `handle_ancestor_input_samples_changed` sets
   the proband sample where there is one, else the proband patient - which is what a group level SampleNode gives it
   (#1855). In patient mode `get_filter_samples()` is every ancestor sample of that patient, so the source node decides
   the reach, and `AncestorSampleMixin._get_filter_samples_arg_q_dict` ORs one `pk IN (subquery)` per sample
