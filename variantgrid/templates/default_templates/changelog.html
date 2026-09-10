@@ -17,7 +17,42 @@
 
     {% if sapath_enabled %}
         <!-- Do all as 1 big change -->
-        <!-- Last audited/updated: 28 August 2026 (includes features up to the 28 August 2026 deploy) -->
+        <!-- Last audited/updated: 10 September 2026 (includes features up to the 10 September 2026 deploy) -->
+
+        <div class="card mt-4">
+            <div class="card-header">VariantGrid 4.0 - FAQ</div>
+            <div class="card-body">
+                <h4>Key new features - Germline</h4>
+                <ul>
+                    <li>Duo node - proband plus one sequenced parent</li>
+                    <li>Quad node - trio plus an affected sibling</li>
+                    <li>Mosaic / partial inheritance - a parent carrying the variant in a fraction of cells</li>
+                </ul>
+
+                <h4>Key new features - Somatic</h4>
+                <ul>
+                    <li>All TSO VCFs are loaded (an API to link them by patient is coming)</li>
+                    <li>SampleNode works off patients / extractions, not just samples</li>
+                    <li>Tag "SomaticReportable", then use the "Classify and report" tab on the sample or patient page
+                        (multi-variant reports under construction)</li>
+                </ul>
+
+                <h4>How does support for new variant types (eg Structural Variants) work?</h4>
+                <p>
+                    VG4 supports structural variants (symbolic alts &lt;INV&gt;, &lt;DEL&gt;, &lt;DUP&gt;, &lt;CNV&gt;),
+                    and - TSO only - gene level amplifications and fusions.
+                </p>
+                <p>
+                    In VG3, loading a VCF containing any of the above skipped those records, with a warning message on the VCF.
+                </p>
+                <p>
+                    Only new VCFs load with the new variant types. We track which version imported each historical VCF and
+                    can reload VCFs in place, so we may go back and re-load them - though that adds extra variants to samples,
+                    so a historical analysis would then contain SVs it didn't at the time. We can decide what to do about that
+                    any time after the upgrade.
+                </p>
+            </div>
+        </div>
 
         <div class="card mt-4">
             <div class="card-header">VariantGrid 4.0</div>
@@ -57,6 +92,13 @@
                         and variant details shown as tabs</li>
                     <li>Somatic classifications - node germline/somatic toggle and tier pills, grid germline/somatic boxes, Tier I/II node count</li>
                     <li>Node counts record their data sources - exact vs advisory when the data may have changed</li>
+                    <li>ClinVar node - somatic tier and oncogenicity pills, review stars chip</li>
+                    <li>EffectNode - filter on the new path scores (EVE, popEVE, ProtVar ddG, PromoterAI), and on variant types</li>
+                    <li>IntersectionNode - paste variants/regions as text (anything search understands)</li>
+                    <li>SampleNode - works at patient / specimen / extraction level through a patient tree picker, and
+                        FILTER, zygosity and allele frequency get per sample overrides</li>
+                    <li>A node count badge per tag - click it to filter the grid or make a TagNode</li>
+                    <li>Analysis templates - reveal a node hidden by ignorable errors (eg a trio where part stopped due to detected sex)</li>
                 </ul>
 
                 <h4>Annotation</h4>
@@ -109,6 +151,10 @@
                     <li>Annotation descriptions page covers AnnotSV and calculated columns, not just VEP</li>
                     <li>Annotation pipeline - runs are merged into larger batches, new runs pause when the annotation disk is low,
                         and temporary files are cleaned up once a run has imported. The VCF/Sample page shows any variants that couldn't be annotated</li>
+                    <li>New columns - EVE class, popEVE, ProtVar ddG, PromoterAI (VEP 116 plugins)</li>
+                    <li>New column - Open Targets GWAS L2G scores (one per record)</li>
+                    <li>ClinVar somatic clinical impact and oncogenicity columns</li>
+                    <li>gnomAD-SV population frequencies for structural variants</li>
                 </ul>
 
                 <h4>Classification</h4>
@@ -119,6 +165,9 @@
                         or whose classification has since changed</li>
                     <li>Setting to highlight research classifications</li>
                     <li>Reclassification analytics - reclassification rates, VUS rate over time, gene burden</li>
+                    <li>Classify &amp; Report tab on the sample and patient pages, with outstanding counts</li>
+                    <li>Reuse prior curation at gene level, grouped by distinct gene-scope content</li>
+                    <li>Gene page - clinical significance summary counts above the groupings grid, click one to filter</li>
                 </ul>
 
                 <h4>Data</h4>
@@ -129,6 +178,7 @@
                     <li>Data archive - VCF data can be dumped without losing the metadata, so previous analyses still make sense</li>
                     <li>Upload / Download API</li>
                     <li>File upload widget replaced with Filepond (the old jQuery File Upload had been abandoned upstream)</li>
+                    <li>Cohort page - tick samples to launch a Duo/Trio/Quad, or to spawn a sub cohort</li>
                 </ul>
 
                 <h4>Data Sharing</h4>
@@ -164,6 +214,7 @@
                     <li>bcftools +liftover handles anything the ClinGen Allele Registry can't lift over, and an event is raised
                         when the registry is unavailable</li>
                     <li>Liftover runs in parallel batches - faster, a failure only loses its batch</li>
+                    <li>Liftover page - retry failed liftovers per tool (eg all failed bcftools +liftover)</li>
                 </ul>
 
                 <h4>Ontology</h4>
@@ -201,7 +252,11 @@
                         symbolic INV, and VCF export includes SVLEN</li>
                     <li>Gene overlaps calculated for structural variants</li>
                     <li>Variant page works correctly for very long variants</li>
-                    <li>Gene fusions imported as variants (VICC nomenclature)</li>
+                    <li>Gene fusions imported as variants (VICC nomenclature), with the sides resolved by breakpoint
+                        and falling back to HGNC previous symbols</li>
+                    <li>Gene level amplifications and losses (TSO 500 CNV VCFs) imported as gene level variants</li>
+                    <li>Variant kind badge (FUSION/AMP/LOSS, DEL/DUP/INV/CNV/INS with size) on every grid</li>
+                    <li>Analysis grid - copy number per sample, and a fusion calls column</li>
                 </ul>
 
                 <h4>Tagging</h4>
@@ -211,6 +266,7 @@
                     <li>Tag stats page - counts, over time, by user / lab / gene, co-occurrence</li>
                     <li>Merge duplicate tags, tag operations logged</li>
                     <li>Tag sort order set on tag colors page, old tags marked stale</li>
+                    <li>Tag counts drawn as pills in the node counts settings lists and tag autocomplete</li>
                 </ul>
 
                 <h4>User Interface</h4>
@@ -237,12 +293,15 @@
                     <li>#668 - add tooltips to show help about columns on gene / variant pages</li>
                     <li>Nearby variants shows tags and classification summary counts, works across builds</li>
                     <li>Page appears differently for Structural Variants (hiding unavailable annotations, add notes)</li>
+                    <li>Open Targets card - a row per gene, with de-duplicated diseases / biosamples</li>
                 </ul>
 
                <h4>Variant Grids</h4>
                 <ul>
                     <li>#743 - variant grids - fix up column labels. Make some new links (ontology terms,pubmed, dbsnp) - </li>
                     <li>#733 - Variant pages (gene symbol, all variants, tags etc) now styled/links the same as on Anaylsis grid</li>
+                    <li>Composite columns (eg Pop Freq Other, UniProt), sample glyphs, 2 line rows and sort menus</li>
+                    <li>Conservation drawn as a dot per score</li>
                 </ul>
 
                 <h4>VCF upload</h4>
@@ -253,6 +312,7 @@
                     <li>Progress is shown while an uploaded VCF is being annotated</li>
                     <li>Manual variant entry import handles partial failures gracefully</li>
                     <li>Unsorted VCFs are sorted during import (with a warning) rather than failing</li>
+                    <li>Imports record their timings and clean up their temp files, and deleting an import removes them</li>
                 </ul>
             </div>
         </div>
@@ -260,6 +320,56 @@
 
 
     {% else %}
+       <div class="card mt-4">
+            <div class="card-header">10 September 2026</div>
+            <div class="card-body">
+                <h4>Analysis</h4>
+                <ul>
+                    <li>#1855 - Zygosity / Allele Frequency / Gene List / MOI nodes can take a patient as their sample source</li>
+                    <li>#1651 - Node grid column tooltips say why sorting is disabled</li>
+                    <li>#546 - Node grid queries raise join_collapse_limit, so big joins stop hitting statement timeouts</li>
+                    <li>Faster gene list matching (node loading and everywhere else)</li>
+                </ul>
+                <h4>Tagging</h4>
+                <ul>
+                    <li>#1854 - Tag a variant against a patient when the sample isn't known - grids and Classify &amp; Report follow</li>
+                </ul>
+                <h4>Structural Variants</h4>
+                <ul>
+                    <li>#1836 - Gene level amplifications and losses (TSO 500 CNV VCFs) imported as gene level variants</li>
+                    <li>#1506 - Fusion sides resolved by breakpoint, falling back to HGNC previous symbols</li>
+                    <li>Grid formatting for CNVs, and for SVs that overlap a gene</li>
+                </ul>
+                <h4>Annotation</h4>
+                <ul>
+                    <li>gnomAD-SV overlaps found via the symbolic alt index, and builds without the VCF downloaded are skipped</li>
+                    <li>No more warnings about columns that are fine (eg AnnotSV not yet populated)</li>
+                </ul>
+                <h4>Data Sharing</h4>
+                <ul>
+                    <li>Sync - gene level fusions are only sent to a destination that can accept them</li>
+                </ul>
+                <h4>Data / Upload</h4>
+                <ul>
+                    <li>Upload page - file type icons</li>
+                    <li>Common filter - warns and treats classified variants as common when the gnomAD annotation is missing</li>
+                </ul>
+                <h4>Liftover</h4>
+                <ul>
+                    <li>bcftools +liftover enabled on variantgrid.com</li>
+                </ul>
+                <h4>Relatedness</h4>
+                <ul>
+                    <li>#183 - Support Somalier 0.3.5, whose relate takes the sites VCF</li>
+                </ul>
+                <h4>User Interface</h4>
+                <ul>
+                    <li>Registration works again (it was being rejected by the login lockout check)</li>
+                    <li>Sample page handles sample stats not being there</li>
+                </ul>
+            </div>
+       </div>
+
        <div class="card mt-4">
             <div class="card-header">9 September 2026</div>
             <div class="card-body">
