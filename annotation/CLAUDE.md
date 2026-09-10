@@ -82,6 +82,10 @@ Gotchas:
 Tests:
 - annotation/fake_annotation.py:get_fake_annotation_version builds a full valid AnnotationVersion (ACTIVE VAV at
   columns_version 2, fake gene release, ontology, ClinVar, HPA); refuses to run outside UNIT_TEST.
+- variantgrid/test_runner.py:VariantGridTestRunner seeds get_fake_annotation_version for GRCh37/GRCh38 into the
+  main test database before Django clones it for the workers, so the per-class calls are lookups. A test that
+  needs its own ACTIVE VariantAnnotationVersion (one_active_vav_per_build) calls
+  annotation/fake_annotation.py:retire_seeded_annotation_version(genome_build) first.
 - annotation/fake_annotation.py:create_fake_variants loads the fixture VCF's variants (wraps
   snpdb/tests/utils/vcf_testing_utils.py:slowly_create_loci_and_variants_for_vcf); create_fake_variant_annotation and
   create_fake_clinvar_data add rows. annotation/tests/test_data_fake_genes.py:create_fake_transcript_version (and the

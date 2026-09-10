@@ -50,6 +50,10 @@ Gotchas:
   Organization, ResolvedVariantInfo). Put a caching manager only on tables never updated in place.
 - `library/guardian_utils.py:assign_permission_to_user_and_groups` imports `snpdb.models.UserSettings` inside the
   function: `library` depends on `snpdb` at runtime, and that inline import is the one sanctioned cycle-break here.
+- `library/guardian_utils.py:assign_permission_to_user_and_groups` resolves the two `Permission` rows in one
+  query and writes through guardian's `assign_perm_to_many(..., ignore_conflicts=True)` rather than a
+  `get_or_create` per row - a VCF import pays it per sample. Add a permission holder by extending the bulk write,
+  not by calling `assign_perm` alongside it.
 - `library/guardian_utils.py:admin_bot` skips its lru_cache under `UNIT_TEST` because a cached User outlives the
   test transaction rollback; do the same for any module-level cache of a model instance.
 - `library/django_utils/guardian_permissions_mixin.py:GuardianPermissionsMixin.filter_for_user` resolves permitted

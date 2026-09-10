@@ -206,9 +206,10 @@ def get_fake_annotation_version(genome_build: GenomeBuild):
     # Each sub-version save() would otherwise bump AnnotationVersion, so we'd build and discard 4 of
     # them on the way to the one we create below.
     with SubVersionPartition.defer_new_sub_version():
+        # gnomad_import_date is a default, not a lookup key - as a key every call created a new row
         gene_annotation_version = GeneAnnotationVersion.objects.get_or_create(gene_annotation_release=gene_annotation_release,
                                                                               ontology_version=ontology_version,
-                                                                              gnomad_import_date=timezone.now())[0]
+                                                                              defaults={"gnomad_import_date": timezone.now()})[0]
 
         vav_kwargs = get_fake_vep_version(genome_build, AnnotationConsortium.ENSEMBL, 2)
         vav_kwargs["gene_annotation_release"] = gene_annotation_release
@@ -233,6 +234,15 @@ def get_fake_annotation_version(genome_build: GenomeBuild):
                                                     human_protein_atlas_version=human_protein_atlas_version,
                                                     ontology_version=ontology_version)
     return av
+
+
+def retire_seeded_annotation_version(genome_build: GenomeBuild):
+    """ variantgrid/test_runner.py:VariantGridTestRunner seeds an ACTIVE VariantAnnotationVersion per build,
+        and one_active_vav_per_build allows only one - so a test that needs its own (a particular consortium,
+        columns_version or unpinned fields) retires the seeded one first. """
+    VariantAnnotationVersion.objects.filter(genome_build=genome_build,
+                                            status=VariantAnnotationVersion.Status.ACTIVE) \
+                                    .update(status=VariantAnnotationVersion.Status.HISTORICAL)
 
 
 def create_fake_variants(genome_build: GenomeBuild):

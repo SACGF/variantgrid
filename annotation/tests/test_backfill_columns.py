@@ -16,7 +16,11 @@ from annotation.backfill_columns import (
     normalise_source_value,
     resolve_backfill_columns,
 )
-from annotation.fake_annotation import get_fake_annotation_settings_dict, get_fake_vep_version
+from annotation.fake_annotation import (
+    get_fake_annotation_settings_dict,
+    get_fake_vep_version,
+    retire_seeded_annotation_version,
+)
 from annotation.models import AnnotationVersion, VariantAnnotation, VariantAnnotationVersion
 from annotation.models.models import AnnotationRangeLock, AnnotationRun
 from annotation.vep_field_formatters import format_pick_highest_int
@@ -35,6 +39,7 @@ class BackfillColumnResolutionTests(TestCase):
     def setUpTestData(cls):
         super().setUpTestData()
         cls.genome_build = GenomeBuild.get_name_or_alias("GRCh37")
+        retire_seeded_annotation_version(cls.genome_build)
         kwargs = get_fake_vep_version(cls.genome_build, AnnotationConsortium.ENSEMBL, 3)
         kwargs["cosmic"] = COSMIC_V99
         cls.vav = VariantAnnotationVersion.objects.create(**kwargs,
@@ -106,6 +111,7 @@ class BackfillColumnRoundTripTests(TestCase):
     def setUpTestData(cls):
         super().setUpTestData()
         cls.genome_build = GenomeBuild.get_name_or_alias("GRCh37")
+        retire_seeded_annotation_version(cls.genome_build)
         kwargs = get_fake_vep_version(cls.genome_build, AnnotationConsortium.ENSEMBL, 3)
         cls.vav = VariantAnnotationVersion.objects.create(**kwargs,
                                                           status=VariantAnnotationVersion.Status.ACTIVE)

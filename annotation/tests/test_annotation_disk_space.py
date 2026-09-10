@@ -16,7 +16,11 @@ from django.test import TestCase
 from django.test.utils import override_settings
 from django.utils import timezone
 
-from annotation.fake_annotation import get_fake_annotation_settings_dict, get_fake_vep_version
+from annotation.fake_annotation import (
+    get_fake_annotation_settings_dict,
+    get_fake_vep_version,
+    retire_seeded_annotation_version,
+)
 from annotation.models import (
     AnnotationRangeLock,
     AnnotationRun,
@@ -72,6 +76,7 @@ class AnnotationRunCleanupTestCase(TestCase):
         cls.grch37 = GenomeBuild.get_name_or_alias("GRCh37")
         cls.variants = [slowly_create_test_variant("1", 100000 + i * 10, 'A', 'T', cls.grch37)
                         for i in range(2)]
+        retire_seeded_annotation_version(cls.grch37)
         kwargs = get_fake_vep_version(cls.grch37, AnnotationConsortium.ENSEMBL, 2)
         kwargs["status"] = VariantAnnotationVersion.Status.ACTIVE
         cls.vav = VariantAnnotationVersion.objects.create(**kwargs)
@@ -208,6 +213,7 @@ class AnnotationDiskGateTestCase(TestCase):
         cls.grch37 = GenomeBuild.get_name_or_alias("GRCh37")
         cls.variants = [slowly_create_test_variant("1", 200000 + i * 10, 'A', 'T', cls.grch37)
                         for i in range(4)]
+        retire_seeded_annotation_version(cls.grch37)
         kwargs = get_fake_vep_version(cls.grch37, AnnotationConsortium.ENSEMBL, 2)
         kwargs["status"] = VariantAnnotationVersion.Status.ACTIVE
         cls.vav = VariantAnnotationVersion.objects.create(**kwargs)

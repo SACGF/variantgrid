@@ -1,6 +1,6 @@
 # Testing guide
 
-Verified against 421c2d4ac on 2026-09-02
+Verified against fbff51279 on 2026-09-10
 
 The fixture index for "how do I conjure a Variant / Sample / Trio / Classification / Analysis in three
 lines of a test" (`claude/plans/agent_system.md` §4.3). Every builder line is `path:function(signature)`;
@@ -9,7 +9,7 @@ read the builder before relying on a detail not stated here.
 ## Running tests
 
 ```bash
-python3 manage.py test --keepdb                                             # whole suite (~25 min)
+python3 manage.py test --keepdb                                             # whole suite (~3 min)
 python3 manage.py test --keepdb snpdb.tests.test_variant                    # one module
 python3 manage.py test --keepdb snpdb.tests.test_variant.VariantTest.test_x # one class / method
 python3 manage.py vg tests --changed                                        # only the modules a change puts at risk
@@ -22,13 +22,20 @@ python3 manage.py vg tests --changed                                        # on
   app's whole `tests` package. The engine is `library/vg/test_selection.py:select_tests(changed=None, base=None)`.
   `scripts/vg tests --explain` shows which changed file selected each label without booting Django; `--run`
   executes them.
-- `--parallel 4 --keepdb` runs the whole suite (2,741 tests) in about 2 minutes wall on vg-test2 with nothing
-  failing (2026-09-02); Django clones `test_snpdb` into `test_snpdb_1..4`. `VariantGridTestRunner` drops the
-  clones before each `--keepdb` run (about 3 s each to recreate) because Django would otherwise reuse them
-  unmigrated. CI runs it the same way (`.github/workflows/django-tests.yml`). A test that fails only in parallel
+- `--parallel 4 --keepdb` runs the whole suite (3,212 tests) in about 65 s wall on vg-test2 (4 cores) with
+  nothing failing (2026-09-10); serially it is about 3 minutes. Django clones `test_snpdb` into
+  `test_snpdb_1..4`. `VariantGridTestRunner` drops the clones before each `--keepdb` run (about 3 s each to
+  recreate) because Django would otherwise reuse them unmigrated. CI runs it the same way (`.github/workflows/django-tests.yml`). A test that fails only in parallel
   is sharing a file under `data/` or a fixed temp path - give it its own directory rather than marking it serial.
   `tblib` (in requirements) lets a worker ship a failing test's traceback back to the parent; without it any
   error under `--parallel` aborts the whole run with `cannot pickle 'traceback' object`.
+- `VariantGridTestRunner.setup_databases` seeds the fake annotation versions for GRCh37 and GRCh38 into the
+  main test database *before* Django clones it, so the per-class `get_fake_annotation_version` calls are a few
+  `get_or_create` lookups rather than 240 ontology re-imports. Two consequences: a test that counts
+  `AnnotationVersion` / `VariantAnnotationVersion` / `OntologyTerm` rows sees the seeded ones, and a test that
+  needs its own ACTIVE `VariantAnnotationVersion` (`one_active_vav_per_build`) calls
+  `annotation/fake_annotation.py:retire_seeded_annotation_version(genome_build)` first. Under `--keepdb` the
+  seeded rows persist between runs; the seed is idempotent.
 - Every app package needs an `__init__.py`: `manage.py test <app>.tests` fails at discovery with
   `expected str ... not NoneType` when the app is an implicit namespace package.
 - `TEST_RUNNER` is `variantgrid/test_runner.py:VariantGridTestRunner` (see External services below).
@@ -66,6 +73,7 @@ Almost everything wants a `GenomeBuild` and a `User`; get them with
 - `annotation/tests/test_data_fake_genes.py:create_pten_transcript_version(genome_build)` → NM_000314.8 (PTEN, RefSeq, plus strand, chr10) - use with GATA2 to cover both orientations.
 - `mme/tests/fakes.py:make_gene_version(gene_id, symbol, annotation_consortium, version=1)` → `GeneVersion` on GRCh38; call twice with the same `gene_id` to model a symbol rename.
 - `annotation/fake_annotation.py:get_fake_annotation_version(genome_build)` → `AnnotationVersion` (the thing `Analysis.set_defaults_and_save` and most views need). Creates a `GeneAnnotationRelease` "42.20240101", the test ontology, an ACTIVE `VariantAnnotationVersion` (columns_version 2, gnomAD 2.1.1/3.1, dbNSFP 4.0a), a `ClinVarVersion` and an HPA version. Raises unless `settings.UNIT_TEST`. Call it once per build in `setUpTestData`.
+- `annotation/fake_annotation.py:retire_seeded_annotation_version(genome_build)` → None; demotes the runner-seeded ACTIVE `VariantAnnotationVersion` to HISTORICAL, for a test that creates its own ACTIVE one (only one per build is allowed).
 - `annotation/fake_annotation.py:get_fake_vep_version(genome_build, annotation_consortium, columns_version)` → dict of `VariantAnnotationVersion` kwargs (not saved); for tests that need a VAV at another `columns_version` - pair it with `FIXTURE_VEP_VERSIONS` and the `test_columns_version<N>_<build>.vep_annotated.vcf` fixtures in `annotation/tests/test_data/`.
 - `annotation/fake_annotation.py:create_fake_variant_annotation(variant, variant_annotation_version)` → `VariantAnnotation` (with its `AnnotationRangeLock` and `AnnotationRun`); only `hgvs_g` is filled, set other columns on the returned row.
 - `annotation/fake_annotation.py:create_fake_clinvar_data(clinvar_version)` → None; a `ClinVar` row (Pathogenic, 42/42 ids) on the first fake variant plus a PubMed `ClinVarCitation`; calls `create_fake_variants` itself.
@@ -123,9 +131,9 @@ points there). A test that passes locally but sees `N` bases on CI fetches a reg
 
 ## Slow tests / traps
 
-- `UNIT_TEST = sys.argv[1:2] == ['test']` (`default_settings.py`). Under it: the cache is in-process `LocMemCache`, the celery broker is `memory://`, Postgres JIT is off, axes and rollbar are off, `ObjectManagerCachingImmutable` / `ObjectManagerCachingRequest` stop caching, and `admin_bot()` is uncached. Nothing in the suite should touch the dev Redis or RabbitMQ; if it does, a setting override is leaking.
+- `UNIT_TEST = sys.argv[1:2] == ['test']` (`default_settings.py`). Under it: the cache is in-process `LocMemCache`, the celery broker is `memory://`, Postgres JIT is off, axes and rollbar are off, passwords hash with MD5 rather than PBKDF2 (~1 s a hash, and the suite creates ~75 users), `ObjectManagerCachingImmutable` / `ObjectManagerCachingRequest` stop caching, and `admin_bot()` is uncached. Nothing in the suite should touch the dev Redis or RabbitMQ; if it does, a setting override is leaking.
 - `CELERY_TASK_ALWAYS_EAGER` is `False` in `celery_settings.py`; with the memory broker a `.delay()` in a plain `TestCase` is enqueued and never runs. Use `URLTestCase` or override it.
-- `get_fake_annotation_version` is the expensive fixture (ontology import, several versions): call it in `setUpTestData`, once per build, never per test.
+- `get_fake_annotation_version` is the expensive fixture (ontology import, several versions): call it in `setUpTestData`, once per build, never per test. The runner seeds GRCh37 and GRCh38 (see Running tests), so those two builds are cheap; a test running alone still pays for the first call.
 - Bulk variant builders are named `slowly_*` for a reason: fine for a handful of records, wrong for thousands.
 - `snpdb/tests/test_fasta_index.py` loads the genome fasta `.fai`; `upload/tests/vcf/test_vcf_preprocess.py` writes a placeholder fasta and only asserts the command line (the bcftools pipe itself is not run in tests).
 - Skipped on purpose: `genes/tests/test_hgvs.py` "Needs Ensembl contigs", and four `classification/tests/views/test_classification_view.py` cases pending variantgrid_private#3740.

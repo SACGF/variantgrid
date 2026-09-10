@@ -10,7 +10,11 @@ from annotation.annotation_run_files import get_annotsv_dir, write_qs_to_vcf
 from annotation.annotsv_columns import ANNOTSV_COLUMNS, all_variant_grid_column_ids
 from annotation.annotation_versions import get_annotation_range_lock_and_unannotated_count
 from annotation.annotsv_annotation import get_annotsv_command, get_annotsv_tsv_filename
-from annotation.fake_annotation import get_fake_annotation_settings_dict, get_fake_vep_version
+from annotation.fake_annotation import (
+    get_fake_annotation_settings_dict,
+    get_fake_vep_version,
+    retire_seeded_annotation_version,
+)
 from annotation.models import VariantAnnotation, VariantAnnotationPipelineType
 from annotation.models.models import (
     AnnotationPipelineVersion,
@@ -233,6 +237,7 @@ class TestRunAnnotsvSubprocessMocked(TestCase):
         cls.genome_build = GenomeBuild.get_name_or_alias("GRCh37")
         cls.variants = [slowly_create_test_variant("1", 100000 + i * 10, 'A', 'T', cls.genome_build)
                         for i in range(2)]
+        retire_seeded_annotation_version(cls.genome_build)
         kwargs = get_fake_vep_version(cls.genome_build, AnnotationConsortium.REFSEQ, 4)
         kwargs["status"] = VariantAnnotationVersion.Status.ACTIVE
         cls.vav = VariantAnnotationVersion.objects.create(**kwargs)

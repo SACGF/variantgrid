@@ -20,7 +20,11 @@ from django.test.utils import override_settings
 from django.utils import timezone
 
 from annotation.annotation_versions import _absorb_range_lock, merge_pending_range_locks
-from annotation.fake_annotation import get_fake_annotation_settings_dict, get_fake_vep_version
+from annotation.fake_annotation import (
+    get_fake_annotation_settings_dict,
+    get_fake_vep_version,
+    retire_seeded_annotation_version,
+)
 from annotation.models import (
     AnnotationRangeLock,
     AnnotationRun,
@@ -67,6 +71,7 @@ class AnnotationDispatchTestCase(TestCase):
         # A handful of real Variants (increasing pk) to anchor range-lock min/max FKs.
         cls.variants = [slowly_create_test_variant("1", 100000 + i * 10, 'A', 'T', cls.grch37)
                         for i in range(8)]
+        retire_seeded_annotation_version(cls.grch37)
         kwargs = get_fake_vep_version(cls.grch37, AnnotationConsortium.ENSEMBL, 2)
         kwargs["status"] = VariantAnnotationVersion.Status.ACTIVE
         cls.vav = VariantAnnotationVersion.objects.create(**kwargs)

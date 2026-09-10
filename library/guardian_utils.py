@@ -9,9 +9,11 @@ from functools import lru_cache
 from typing import Union
 
 from django.conf import settings
-from django.contrib.auth.models import Group, User
+from django.contrib.auth.models import Group, Permission, User
 from django.core.exceptions import PermissionDenied
 from django.db.models import Model, QuerySet
+from guardian.ctypes import get_content_type
+from guardian.models import GroupObjectPermission, UserObjectPermission
 from guardian.shortcuts import assign_perm, get_groups_with_perms, get_users_with_perms, remove_perm
 
 
@@ -110,25 +112,31 @@ class DjangoPermission:
 
 
 def assign_permission_to_user_and_groups(user: User, obj):
-    """ adds to all non-public groups """
+    """ adds to all non-public groups
+
+        One Permission query and a bulk_create per permission: guardian's assign_perm resolves the
+        ContentType and Permission and does a get_or_create per row, which a VCF import pays for
+        every sample. ignore_conflicts leans on the same unique constraint get_or_create did. """
 
     from snpdb.models import UserSettings
 
-    # Read permission to use and non-public groups
-    read_perm = DjangoPermission.perm(obj, DjangoPermission.READ)
-    write_perm = DjangoPermission.perm(obj, DjangoPermission.WRITE)
-
-    assign_perm(read_perm, user, obj)
-    assign_perm(write_perm, user, obj)
+    # Read permission to user and non-public groups
+    ctype = get_content_type(obj)
+    codenames = [DjangoPermission.perm(obj, DjangoPermission.READ),
+                 DjangoPermission.perm(obj, DjangoPermission.WRITE)]
+    permissions = {p.codename: p for p in Permission.objects.filter(content_type=ctype, codename__in=codenames)}
+    missing = set(codenames) - permissions.keys()
+    if missing:
+        raise Permission.DoesNotExist(f"No {ctype.app_label} permission(s) {sorted(missing)}")
+    read_perm, write_perm = (permissions[codename] for codename in codenames)
 
     user_settings = UserSettings.get_for_user(user)
     read_groups, write_groups = user_settings.initial_perm_read_and_write_groups
 
-    for group in read_groups:
-        assign_perm(read_perm, group, obj)
-
-    for group in write_groups:
-        assign_perm(write_perm, group, obj)
+    for permission, groups in [(read_perm, read_groups), (write_perm, write_groups)]:
+        UserObjectPermission.objects.assign_perm_to_many(permission, [user], obj, ignore_conflicts=True)
+        if groups:
+            GroupObjectPermission.objects.assign_perm_to_many(permission, groups, obj, ignore_conflicts=True)
 
 
 def clear_permissions(obj, permissions):

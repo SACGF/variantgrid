@@ -6,7 +6,11 @@ from django.contrib.auth.models import User
 from django.test import RequestFactory, TestCase
 from django.test.utils import override_settings
 
-from annotation.fake_annotation import get_fake_annotation_settings_dict, get_fake_vep_version
+from annotation.fake_annotation import (
+    get_fake_annotation_settings_dict,
+    get_fake_vep_version,
+    retire_seeded_annotation_version,
+)
 from annotation.models import VariantAnnotationVersion
 from annotation.vep_config import parse_cosmic_version_from_filename, vep_component_version_kwargs
 from genes.models_enums import AnnotationConsortium
@@ -166,6 +170,7 @@ class VEPComponentVersionBackfillTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.grch37 = GenomeBuild.get_name_or_alias("GRCh37")
+        retire_seeded_annotation_version(cls.grch37)
 
     def _make_unpinned_vav(self, status) -> VariantAnnotationVersion:
         kwargs = get_fake_vep_version(self.grch37, AnnotationConsortium.ENSEMBL, 2)

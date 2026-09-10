@@ -140,6 +140,9 @@ if UNIT_TEST:
             "LOCATION": "debug-panel",
         },
     }
+    # Django's PBKDF2 is ~1s per hash (1.5M iterations) and the suite creates ~75 users. Nothing
+    # asserts on the hash format, and client.login() works because the same hasher verifies.
+    PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
 else:
     CACHES = {
         'default': {

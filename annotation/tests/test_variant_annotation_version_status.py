@@ -5,6 +5,7 @@ from django.test.utils import override_settings
 from annotation.fake_annotation import (
     get_fake_annotation_settings_dict,
     get_fake_vep_version,
+    retire_seeded_annotation_version,
 )
 from annotation.models import (
     AnnotationRangeLock,
@@ -34,6 +35,8 @@ class VariantAnnotationVersionStatusTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.grch37 = GenomeBuild.get_name_or_alias("GRCh37")
+        # These tests own the ACTIVE/NEW/HISTORICAL rules, so they start from no ACTIVE version
+        retire_seeded_annotation_version(cls.grch37)
 
     def test_default_status_is_new(self):
         vav = _make_vav(self.grch37)
@@ -161,6 +164,8 @@ class AnnotationSchedulerStatusTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.grch37 = GenomeBuild.get_name_or_alias("GRCh37")
+        # These tests own the ACTIVE/NEW/HISTORICAL rules, so they start from no ACTIVE version
+        retire_seeded_annotation_version(cls.grch37)
 
     def test_scheduler_refuses_historical(self):
         with self.assertRaises(ValueError):

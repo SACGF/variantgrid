@@ -618,11 +618,15 @@ class UserSettings:
 
     @staticmethod
     def get_initial_perm_read_and_write_groups(groups, settings_overrides) -> tuple[set[Group], set[Group]]:
-        group_read = defaultdict(lambda x: False)
-        group_write = defaultdict(lambda x: False)
-        qs = SettingsInitialGroupPermission.objects.filter(group__in=groups)
+        group_read = {}
+        group_write = {}
+        # One query for every override, then applied in override order (later overrides earlier)
+        by_settings = defaultdict(list)
+        qs = SettingsInitialGroupPermission.objects.filter(group__in=groups).select_related("group")
+        for sigp in qs:
+            by_settings[sigp.settings_id].append(sigp)
         for so in settings_overrides:
-            for sigp in qs.filter(settings=so):
+            for sigp in by_settings[so.pk]:
                 if sigp.read is not None:
                     group_read[sigp.group] = sigp.read
                 if sigp.write is not None:

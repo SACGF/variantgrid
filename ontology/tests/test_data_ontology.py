@@ -6,6 +6,7 @@ from django.utils import timezone
 
 from ontology.management.commands import ontology_import
 from ontology.models import OntologyImport, OntologyVersion
+from ontology.ontology_builder import OntologyBuilderDataUpToDateException
 
 
 def create_ontology_test_data():
@@ -17,10 +18,14 @@ def create_ontology_test_data():
         biomart_filename = test_data_dir / "biomart_omim.tsv"
         hpo_filename = test_data_dir / "small.owl"
 
-        ontology_import.load_biomart(str(biomart_filename), True)
-        # ontology_import.load_mondo(filename, False)
-        ontology_import.load_hpo(str(hpo_filename), True)
-        # ontology_import.load_hpo_disease(filename, False)
+        # force=False so a database the test runner already seeded (see VariantGridTestRunner) costs
+        # an md5 of the file rather than another pronto parse of the OWL
+        for loader, filename in [(ontology_import.load_biomart, biomart_filename),
+                                 (ontology_import.load_hpo, hpo_filename)]:
+            try:
+                loader(str(filename), False)
+            except OntologyBuilderDataUpToDateException:
+                pass
 
 
 def create_test_ontology_version() -> OntologyVersion:

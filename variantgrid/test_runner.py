@@ -5,14 +5,16 @@ import shutil
 
 import cdot.hgvs.dataproviders.fasta_seqfetcher as fasta_seqfetcher
 from django.conf import settings
-from django.db import connections
+from django.db import DEFAULT_DB_ALIAS, connections
 from django.db.migrations.loader import MigrationLoader
 from django.test.runner import DiscoverRunner
 
 import library.genomics.fasta_wrapper as fasta_wrapper
+from annotation.fake_annotation import get_fake_annotation_version
 from genes.tests.utils.mock_transcript_sequence_retrieval import MockTranscriptSequenceFetcher
 from genes.transcript_sequence_retrieval import TranscriptSequenceFetcher
 from snpdb.clingen_allele_api import ClinGenAlleleRegistryAPI
+from snpdb.models.models_genome import GenomeBuild
 from snpdb.tests.utils.mock_clingen_api import MockClinGenAlleleRegistryAPI
 
 
@@ -34,12 +36,41 @@ class VariantGridTestRunner(DiscoverRunner):
         shutil.rmtree(settings.IMPORT_PROCESSING_DIR, ignore_errors=True)
 
     def setup_databases(self, **kwargs):
+        """ Django creates the main test database and clones it for the workers in the one call; the fake
+            annotation versions are seeded between the two, so every worker starts with them (below). """
         if self.keepdb and self.parallel > 1:
             self._drop_test_db_clones()
-        old_config = super().setup_databases(**kwargs)
+        parallel = self.parallel
+        self.parallel = 1  # create the main test database only - we clone it ourselves, after seeding
+        try:
+            old_config = super().setup_databases(**kwargs)
+        finally:
+            self.parallel = parallel
+        test_connections = [connection for connection, _old_name, _created in old_config]
         if self.keepdb:
-            self._check_kept_test_db_matches_disk([connection for connection, _old_name, _destroy in old_config])
+            self._check_kept_test_db_matches_disk(test_connections)
+        # A run of SimpleTestCase-only modules sets up no database at all - seeding then would write the
+        # fixture rows into the real one
+        if any(connection.alias == DEFAULT_DB_ALIAS for connection in test_connections):
+            self._seed_fake_annotation_versions()
+        if parallel > 1:
+            for connection, _old_name, created in old_config:
+                if created:
+                    for index in range(parallel):
+                        connection.creation.clone_test_db(suffix=str(index + 1), verbosity=self.verbosity,
+                                                          keepdb=self.keepdb)
         return old_config
+
+    def _seed_fake_annotation_versions(self):
+        """ 240-odd test classes call get_fake_annotation_version in setUpTestData, each re-importing the
+            ontology OWL and rebuilding an identical version chain inside a transaction that is then rolled
+            back. Seeded here (outside any transaction, before the workers are cloned) the per-class calls
+            become a handful of get_or_create lookups.
+
+            A test that counts AnnotationVersion / VariantAnnotationVersion / OntologyTerm rows, or creates
+            its own ACTIVE VariantAnnotationVersion for a build, now sees these - use the fixture. """
+        for genome_build in [GenomeBuild.grch37(), GenomeBuild.grch38()]:
+            get_fake_annotation_version(genome_build)
 
     def _check_kept_test_db_matches_disk(self, test_connections):
         """ --keepdb only migrates forwards: a migration applied while another branch was checked out keeps

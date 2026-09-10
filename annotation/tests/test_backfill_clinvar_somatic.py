@@ -27,6 +27,9 @@ class BackfillClinVarSomaticTest(TestCase):
         variants = list(Variant.objects.filter(Variant.get_no_reference_q())[:3])
         cls.somatic_variant, cls.oncogenic_variant, cls.germline_variant = variants
 
+        # The backfill takes the latest version per build, so the fixture ClinVarVersion the test runner
+        # seeds (annotation_date is auto_now_add, so "now") is backdated out of the way
+        ClinVarVersion.objects.filter(genome_build=cls.genome_build).update(annotation_date=_utc(2000))
         cls.old_version = cls._create_version("clinvar_20240101.vcf.gz", _utc(2024))
         cls.latest_version = cls._create_version("clinvar_20260101.vcf.gz", _utc(2026))
         for clinvar_version in (cls.old_version, cls.latest_version):

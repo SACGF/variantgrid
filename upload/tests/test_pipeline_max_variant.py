@@ -13,7 +13,11 @@ from django.utils import timezone
 
 from annotation.annotation_version_querysets import pipeline_type_variant_q
 from annotation.annotation_versions import get_lowest_unannotated_variant_id
-from annotation.fake_annotation import get_fake_annotation_settings_dict, get_fake_vep_version
+from annotation.fake_annotation import (
+    get_fake_annotation_settings_dict,
+    get_fake_vep_version,
+    retire_seeded_annotation_version,
+)
 from annotation.models import (
     AnnotationRangeLock,
     AnnotationRun,
@@ -63,6 +67,7 @@ class PipelineMaxVariantTestCase(TestCase):
                               for i in range(5)]
         cls.sv_variant = cls._create_symbolic_variant("1", 200000, 205000, -5000, cls.grch37)
 
+        retire_seeded_annotation_version(cls.grch37)
         kwargs = get_fake_vep_version(cls.grch37, AnnotationConsortium.ENSEMBL, 2)
         kwargs["status"] = VariantAnnotationVersion.Status.ACTIVE
         cls.vav = VariantAnnotationVersion.objects.create(**kwargs)
