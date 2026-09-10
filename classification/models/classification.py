@@ -499,81 +499,35 @@ class ConditionResolved:
 
     def to_json(self, include_join: bool = True) -> ConditionResolvedDict:
         jsoned: ConditionResolvedDict
-        if self.terms:
-            from classification.models import MultiCondition
 
-            def format_term(term: OntologyTerm) -> str:
-                if name := term.name:
-                    return f"{term.id} {name}"
-                return term.id
+        from classification.models import MultiCondition
 
-            terms = self.terms
-            text = ", ".join([format_term(term) for term in terms])
-            if self.plain_text_terms:
-                text += ",".join(self.plain_text_terms)
+        def format_term(term: OntologyTerm) -> str:
+            if name := term.name:
+                return f"{term.id} {name}"
+            return term.id
 
-            sort_text = ", ".join([term.name for term in terms]).lower()
-            join: Optional[MultiCondition] = None
-            if len(terms) > 1 and include_join:
-                join = self.join or MultiCondition.NOT_DECIDED
-                text = f"{text}; {join.label}"
+        terms = self.terms
+        text = ", ".join([format_term(term) for term in terms])
+        if self.plain_text_terms:
+            text += ",".join(self.plain_text_terms)
 
-            resolved_term_dicts: list[ConditionResolvedTermDict] = [ConditionResolved.term_to_dict(term) for term in
-                                                                    self.terms]
-            jsoned: ConditionResolvedDict = {
-                "resolved_terms": resolved_term_dicts,
-                "resolved_join": join,
-                "plain_text_terms": self.plain_text_terms,
-                "display_text": text,
-                "sort_text": sort_text
-            }
-            return jsoned
-        else:
-            jsoned: ConditionResolvedDict = {
-                "plain_text_terms": self.plain_text_terms,
-                "display_text": ", ".join(pt.lower() for pt in self.plain_text) if self.plain_text else None,
-                "sort_text": ", ".join(pt.lower() for pt in self.plain_text) if self.plain_text else None
-            }
+        sort_text = ", ".join([term.name or "" for term in terms]).lower()
+        join: Optional[MultiCondition] = None
+        if len(terms) > 1 and include_join:
+            join = self.join or MultiCondition.NOT_DECIDED
+            text = f"{text}; {join.label}"
+
+        resolved_term_dicts: list[ConditionResolvedTermDict] = [ConditionResolved.term_to_dict(term) for term in
+                                                                self.terms]
+        jsoned: ConditionResolvedDict = {
+            "resolved_terms": resolved_term_dicts,
+            "resolved_join": join,
+            "plain_text_terms": self.plain_text_terms,
+            "display_text": text,
+            "sort_text": sort_text
+        }
         return jsoned
-
-        #
-        #
-        # if self.terms:
-        #     from classification.models import MultiCondition
-        #
-        #     def format_term(term: OntologyTerm) -> str:
-        #         if name := term.name:
-        #             return f"{term.id} {name}"
-        #         return term.id
-        #
-        #     terms = self.terms
-        #     text = ", ".join([format_term(term) for term in terms])
-        #     if self.plain_text_terms:
-        #         text += ",".join(self.plain_text_terms)
-        #
-        #     sort_text = ", ".join([term.name for term in terms]).lower()
-        #     join: Optional[MultiCondition] = None
-        #     if len(terms) > 1 and include_join:
-        #         join = self.join or MultiCondition.NOT_DECIDED
-        #         text = f"{text}; {join.label}"
-        #
-        #     resolved_term_dicts: List[ConditionResolvedTermDict] = [ConditionResolved.term_to_dict(term) for term in
-        #                                                             self.terms]
-        #     jsoned: ConditionResolvedDict = {
-        #         "resolved_terms": resolved_term_dicts,
-        #         "resolved_join": join,
-        #         "plain_text_terms": self.plain_text_terms,
-        #         "display_text": text,
-        #         "sort_text": sort_text
-        #     }
-        #     return jsoned
-        # else:
-        #     jsoned: ConditionResolvedDict = {
-        #         "plain_text_terms": self.plain_text_terms,
-        #         "display_text": ", ".join(pt.lower() for pt in self.plain_text) if self.plain_text else None,
-        #         "sort_text": ", ".join(pt.lower() for pt in self.plain_text) if self.plain_text else None
-        #     }
-        # return jsoned
 
     @cached_property
     def join_text(self) -> Optional[str]:

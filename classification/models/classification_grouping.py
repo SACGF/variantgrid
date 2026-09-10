@@ -210,8 +210,8 @@ class ClassificationGrouping(TimeStampedModel):
             tumor_type_category=self.tumor_type_category)
 
     @property
-    def allele_origin_bucket(self):
-        return self.allele_origin_grouping.allele_origin_bucket
+    def allele_origin_bucket(self) -> AlleleOriginBucket:
+        return self.allele_origin_grouping.allele_origin_bucket_obj
 
     @property
     def share_level_obj(self):

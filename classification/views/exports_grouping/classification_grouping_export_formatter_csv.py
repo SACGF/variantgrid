@@ -1,14 +1,13 @@
-import itertools
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Iterator, Any
-
+from typing import Iterator
 from classification.models import EvidenceKeyMap, ClassificationGrouping
 from classification.views.classification_export_utils import UsedKeyTracker, KeyValueFormatter
 from classification.views.exports.classification_export_formatter_csv import CSVCellFormatting
+from classification.views.exports.classification_export_utils import CitationCounter
 from classification.views.exports_grouping.classification_grouping_export_filter import \
     ClassificationGroupingExportFormat, ClassificationGroupingExportFormatProperties, \
-    ClassificationGroupingExportFilter, ClassificationGroupingExportFileSettings
+    ClassificationGroupingExportFilter
 from library.django_utils import get_url_from_view_path
 from library.utils import delimited_row, ExportRow, export_column, ExportTweak
 from snpdb.models import GenomeBuild
@@ -57,9 +56,27 @@ class CSVNonEvidence(ExportRow):
     def clingen_allele(self):
         return self.classification_grouping.allele.clingen_allele
 
+    @export_column(label="Allele Origin Bucket")
+    def allele_origin_bucket(self):
+        return self.classification_grouping.allele_origin_grouping.allele_origin_bucket_obj.label
+
+    @export_column(label="Testing Context Bucket")
+    def testing_context_bucket(self):
+        return self.classification_grouping.allele_origin_grouping.testing_context_bucket_obj.label
+
+    @export_column(label="Resolved Condition")
+    def resolved_condition(self) -> str:
+        return self.classification_grouping.latest_classification_modification.condition_resolution_obj_fallback.as_plain_text
+
     @export_column(label="Classification Count")
     def record_count(self):
         return self.classification_grouping.classification_count
+
+    @export_column(label="Citations")
+    def citations(self):
+        cc = CitationCounter()
+        cc.reference_citations(self.classification_grouping.latest_classification_modification)
+        return ', '.join(cc.citation_ids())
 
 
 class ClassificationGroupingExportFormatterCSV(ClassificationGroupingExportFormat):

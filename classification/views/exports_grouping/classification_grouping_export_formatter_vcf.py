@@ -32,7 +32,7 @@ class VCFRow(ExportVCF):
     def get_variant(self) -> Variant:
         return self.entry.variant
 
-    def unique_values(self, evidence_key: str, raw: bool = False):
+    def unique_values(self, evidence_key: str, raw: bool = False) -> list[str]:
         e_key = EvidenceKeyMap.cached_key(evidence_key)
         unique_values = set()
         for cgs in self.entry.classification_groupings:
@@ -76,10 +76,40 @@ class VCFRow(ExportVCF):
         number=1,
         header_type=VCFHeaderType.String,
         description="$site_name URL",
-        categories={"system": VCFTargetSystem.GENERIC})
+        categories={"system": VCFTargetSystem.GENERIC}
+    )
     def link(self):
         return get_url_from_view_path(reverse("view_allele_compact", kwargs={"allele_id": self.entry.allele_id})) + f"?seen={self.date_str}"
 
+    @export_vcf_info_cell(
+        header_id="labs",
+        number=1,
+        header_type=VCFHeaderType.String,
+        description="Contributing Labs",
+        categories={"system": VCFTargetSystem.GENERIC}
+    )
+    def link(self):
+        return sorted(set([cg.lab for cg in self.entry.classification_groupings]))
+
+    @export_vcf_info_cell(
+        header_id="allele_origins",
+        number=VCFHeaderNumberSpecial.UNBOUND,
+        header_type=VCFHeaderType.String,
+        description="Germline, Somatic, Unknown",
+        categories={"system": VCFTargetSystem.GENERIC}
+    )
+    def allele_origin(self):
+        return sorted(set([cg.allele_origin_bucket.label for cg in self.entry.classification_groupings]))
+
+    @export_vcf_info_cell(
+        header_id="allele_origins",
+        number=VCFHeaderNumberSpecial.UNBOUND,
+        header_type=VCFHeaderType.String,
+        description="Testing Context - useful for Somatic classifications",
+        categories={"system": VCFTargetSystem.GENERIC}
+    )
+    def testing_context(self):
+        return sorted(set([cg.testing_context.label for cg in self.entry.classification_groupings]))
 
     @export_vcf_info_cell(
         header_id="classification",
