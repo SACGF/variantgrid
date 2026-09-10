@@ -8,8 +8,8 @@
 <form id="zygosity-node-form" method="post" action="{{ request.path }}">
     {% csrf_token %}
     <div class="editor-row">
-        <label class="editor-label" for="{{ form.sample.id_for_label }}">Sample</label>
-        {{ form.sample }}
+        <label class="editor-label" for="{{ form.sample_source.id_for_label }}">Applies to</label>
+        {{ form.sample_source }}
     </div>
     <div class="editor-row">
         <label class="editor-label" for="{{ form.zygosity.id_for_label }}">Genotype</label>

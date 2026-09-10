@@ -15,6 +15,7 @@ variant, CNV, exon CNV), so these build a patient with two specimens and pin:
 """
 import csv
 import json
+from unittest.mock import patch
 
 from django.contrib.auth.models import User
 from django.core.management import call_command
@@ -23,29 +24,35 @@ from django.test import TestCase, override_settings
 from django.urls.base import reverse
 from django.utils import timezone
 
-from analysis.grid_export import node_grid_get_export_iterator
-from analysis.forms.forms_nodes import SampleFiltersMixin, SampleNodeForm
-from analysis.grids import VariantGrid
 from analysis.analysis_templates import run_analysis_template
+from analysis.forms.forms_nodes import SampleFiltersMixin, SampleNodeForm, ZygosityNodeForm
+from analysis.grid_export import node_grid_get_export_iterator
+from analysis.grids import VariantGrid
 from analysis.models import (
+    AlleleFrequencyNode,
     Analysis,
     AnalysisTemplate,
     AnalysisTemplateType,
     AnalysisTemplateVersion,
     AnalysisVariable,
+    GeneListNode,
+    MOINode,
+    NodeAlleleFrequencyFilter,
     VariantTag,
+    ZygosityNode,
 )
 from analysis.models.enums import NodeStatus, TagLocation
-from analysis.models.nodes.filters.merge_node import MergeNode
 from analysis.models.nodes.analysis_node import NodeVCFFilter
+from analysis.models.nodes.filters.merge_node import MergeNode
 from analysis.models.nodes.sources.sample_node import SampleNode
 from analysis.templatetags.related_analyses_tags import analysis_templates_tag
 from analysis.views.views import CreateClassificationForVariantTagView
 from annotation.fake_annotation import get_fake_annotation_version
+from genes.models import GeneList, SampleGeneList
 from library.django_utils import FakeRequest
 from library.guardian_utils import assign_permission_to_user_and_groups
 from patients.models import Extraction, Patient, Specimen
-from patients.models_enums import NucleicAcid, SampleSourceLevel, Sex
+from patients.models_enums import NucleicAcid, SampleSourceLevel, Sex, Zygosity
 from patients.sample_grouping import get_sample_group
 from snpdb.models import (
     VCF,
@@ -1005,3 +1012,198 @@ class VariantTagPatientTest(SampleNodeLevelsTestCase):
         sample_ids = {int(r["id"]) for r in json.loads(response.content)["results"]}
         self.assertEqual(sample_ids, {s.pk for s in self.patient.get_samples()})
         self.assertNotIn(other_sample.pk, sample_ids)
+
+
+@override_settings(ANALYSIS_NODE_CACHE_Q=False)
+class FilterNodePatientScopeTest(SampleNodeLevelsTestCase):
+    """ #1855 - a Zygosity / Allele Frequency / MOI / Gene List node under a group level source has
+        no single sample to hang its genotype filter off, so it applies to the patient: every
+        ancestor sample of theirs, OR'd """
+
+    @staticmethod
+    def _ready(node):
+        """ Run the counts as the load pipeline would, so a child can compose the node """
+        status, count = node.node_counts()
+        node.update(status=status, count=count)
+        node.status = status
+        node.count = count
+        return node
+
+    def _child(self, node_class, parent, **kwargs):
+        node = node_class.objects.create(analysis=self.analysis, **kwargs)
+        node.add_parent(self._ready(parent))
+        node._cached_parents = None  # Clear stale cache from create()'s save()
+        node.version = 1  # Auto-set only clears fields on a node that has been saved
+        node.save()
+        return node
+
+    def _other_patient_node(self) -> tuple[Patient, Sample, SampleNode]:
+        patient = Patient.objects.create(first_name="Other", last_name="Person", sex=Sex.MALE)
+        assign_permission_to_user_and_groups(self.user, patient)
+        specimen = Specimen.objects.create(reference_id="2600000009", patient=patient)
+        extraction = Extraction.objects.create(specimen=specimen, nucleic_acid_source=NucleicAcid.DNA)
+        sample, _ = self._create_vcf_sample("other_patient", self.grch37, extraction)
+        return patient, sample, SampleNode.objects.create(analysis=self.analysis, sample=sample)
+
+    # ── What the node applies to ─────────────────────────────────────────────
+
+    def test_ambiguous_proband_sample_sets_the_patient(self):
+        node = self._child(ZygosityNode, self._extraction_node())
+        self.assertIsNone(node.sample)
+        self.assertEqual(node.patient, self.patient)
+        self.assertEqual(node.get_filter_samples(), [self.snv_sample, self.cnv_sample])
+
+    def test_single_sample_ancestor_still_sets_the_sample(self):
+        sample_node = SampleNode.objects.create(analysis=self.analysis, sample=self.snv_sample)
+        node = self._child(ZygosityNode, sample_node, zygosity=Zygosity.HET)
+        self.assertEqual(node.sample, self.snv_sample)
+        self.assertIsNone(node.patient)
+        # Sample mode is the query it has always been - keyed on the sample's own alias
+        self.assertEqual(list(node._get_node_arg_q_dict()), [self.snv_sample.zygosity_alias])
+
+    def test_a_patient_no_longer_in_reach_is_cleared(self):
+        node = self._child(ZygosityNode, self._extraction_node())
+        _, other_sample, other_node = self._other_patient_node()
+
+        node.remove_parent(node.get_single_parent())
+        node.add_parent(self._ready(other_node))
+        node._cached_parents = None
+        node.save()
+
+        self.assertIsNone(node.patient)
+        self.assertEqual(node.sample, other_sample)
+
+    def test_a_patient_with_no_ancestor_samples_is_a_configuration_error(self):
+        other_patient, _, _ = self._other_patient_node()
+        node = self._child(ZygosityNode, self._extraction_node())
+        node.patient = other_patient
+        errors = node._get_configuration_errors()
+        self.assertTrue(any("has no samples in any ancestors" in e for e in errors), errors)
+
+    # ── Zygosity, per sample ─────────────────────────────────────────────────
+
+    def test_zygosity_filters_every_caller_of_the_extraction(self):
+        node = self._child(ZygosityNode, self._extraction_node(), zygosity=Zygosity.HET)
+        # Both callers' HET calls - v_both is HOM_ALT in both, so it goes
+        self.assertEqual(self._pks(node), {self.v_snv.pk, self.v_cnv.pk})
+
+    def test_exclude_is_applied_inside_each_samples_filter(self):
+        parent = self._extraction_node(zygosity_ref=True)
+        node = self._child(ZygosityNode, parent, zygosity=Zygosity.HET, exclude=True)
+        # Each caller's rows that aren't HET - the other caller's HET rows are not dragged back in
+        self.assertEqual(self._pks(node), {self.v_both.pk, self.v_ref.pk})
+
+    def test_the_patients_other_samples_are_only_in_reach_at_patient_level(self):
+        extraction_node = self._child(ZygosityNode, self._extraction_node(), zygosity=Zygosity.HET)
+        self.assertEqual(self._pks(extraction_node), {self.v_snv.pk, self.v_cnv.pk})
+
+        patient_node = self._child(ZygosityNode, self._node(SampleSourceLevel.PATIENT, self.patient),
+                                   zygosity=Zygosity.HET)
+        self.assertEqual(patient_node.get_filter_samples(),
+                         sorted([self.snv_sample, self.cnv_sample, self.rna_sample,
+                                 self.blood_sample, self.unlinked_sample], key=lambda s: s.pk))
+        self.assertEqual(self._pks(patient_node),
+                         {self.v_snv.pk, self.v_cnv.pk, self.v_rna.pk,
+                          self.v_blood.pk, self.v_unlinked.pk})
+
+    def test_a_caller_without_genotype_passes_its_rows_through(self):
+        """ A fusion caller reports read support and no GT, so it has no zygosity to filter on """
+        VCF.objects.filter(pk=self.cnv_sample.vcf_id).update(genotype_field=None)
+        node = self._child(ZygosityNode, self._extraction_node(), zygosity=Zygosity.HET)
+        # snv's HET call, plus every CNV row rather than none of them
+        self.assertEqual(self._pks(node), {self.v_snv.pk, self.v_cnv.pk, self.v_both.pk})
+        self.assertIn(self.cnv_sample.name, node._get_method_summary())
+
+    # ── Allele frequency, per sample ─────────────────────────────────────────
+
+    def _af_node(self, parent, af_min, af_max) -> AlleleFrequencyNode:
+        node = self._child(AlleleFrequencyNode, parent)
+        naff = NodeAlleleFrequencyFilter.objects.get(node=node)
+        naff.nodeallelefrequencyrange_set.all().delete()
+        naff.nodeallelefrequencyrange_set.create(min=af_min, max=af_max)
+        return node
+
+    def test_allele_frequency_applies_to_each_sample(self):
+        v_low_snv = slowly_create_test_variant("1", 11000, "A", "T", self.grch37)
+        self._add_genotype(self.snv_cgc, v_low_snv, "E", ad=50, dp=50, af=0.1)
+
+        node = self._af_node(self._extraction_node(), 0.4, 1)
+        self.assertTrue(node.modifies_parents())
+        # Every 0.5 row of both callers, and not the small variant caller's 0.1 one
+        self.assertEqual(self._pks(node), {self.v_snv.pk, self.v_cnv.pk, self.v_both.pk})
+
+    def test_a_caller_without_allele_frequency_passes_its_rows_through(self):
+        v_low_cnv = slowly_create_test_variant("1", 12000, "A", "T", self.grch37)
+        self._add_genotype(self.cnv_cgc, v_low_cnv, "E", ad=50, dp=50, af=0.1)
+        VCF.objects.filter(pk=self.cnv_sample.vcf_id).update(allele_depth_field=None)
+
+        node = self._af_node(self._extraction_node(), 0.4, 1)
+        self.assertIn(v_low_cnv.pk, self._pks(node))
+        self.assertIn(self.cnv_sample.name, node._get_method_summary())
+
+    # ── The picker ───────────────────────────────────────────────────────────
+
+    def test_the_picker_round_trips_a_patient(self):
+        node = self._child(ZygosityNode, self._extraction_node())
+        form = ZygosityNodeForm(instance=ZygosityNode.objects.get(pk=node.pk))
+
+        self.assertEqual(form.fields["sample_source"].initial, f"patient:{self.patient.pk}")
+        self.assertIn((f"patient:{self.patient.pk}", f"{self.patient} (all 2 samples)"),
+                      form.fields["sample_source"].choices)
+        self.assertEqual(form.get_analysis_variable_field("sample_source"), "patient")
+
+    def test_the_picker_saves_a_sample(self):
+        node = self._child(ZygosityNode, self._extraction_node())
+        form = ZygosityNodeForm({"sample_source": f"sample:{self.snv_sample.pk}",
+                                 "zygosity": Zygosity.HET},
+                                instance=ZygosityNode.objects.get(pk=node.pk))
+        self.assertTrue(form.is_valid(), form.errors)
+        node = form.save()
+
+        self.assertEqual(node.sample, self.snv_sample)
+        self.assertIsNone(node.patient)
+        self.assertEqual(ZygosityNodeForm(instance=node).get_analysis_variable_field("sample_source"),
+                         "sample")
+
+    def test_a_sample_out_of_reach_is_a_form_error(self):
+        _, other_sample, _ = self._other_patient_node()
+        node = self._child(ZygosityNode, self._extraction_node())
+        form = ZygosityNodeForm({"sample_source": f"sample:{other_sample.pk}", "zygosity": Zygosity.HET},
+                                instance=ZygosityNode.objects.get(pk=node.pk))
+        self.assertFalse(form.is_valid())
+
+    def test_the_editors_render_in_patient_mode(self):
+        self.client.force_login(self.user)
+        for node_class in (ZygosityNode, AlleleFrequencyNode, MOINode, GeneListNode):
+            with self.subTest(node_class=node_class.__name__):
+                node = self._child(node_class, self._extraction_node())
+                url = reverse("node_view", kwargs={"analysis_id": self.analysis.pk,
+                                                   "analysis_version": self.analysis.version,
+                                                   "node_id": node.pk,
+                                                   "node_version": node.version,
+                                                   "extra_filters": "default"})
+                response = self.client.get(url)
+                self.assertEqual(response.status_code, 200)
+                self.assertIn(f"patient:{self.patient.pk}", response.content.decode())
+
+    # ── MOI and Gene List read the patient ───────────────────────────────────
+
+    def test_moi_patient_panel_terms_come_from_the_nodes_patient(self):
+        node = self._child(MOINode, self._extraction_node(), accordion_panel=MOINode.PANEL_PATIENT)
+        self.assertEqual(node.get_filter_patient(), self.patient)
+        with patch.object(Patient, "get_ontology_term_ids", return_value=["MONDO:0000001"]):
+            self.assertEqual(node._get_all_ontology_term_ids(), ["MONDO:0000001"])
+
+    def test_gene_list_sample_qc_panel_unions_the_patients_sample_gene_lists(self):
+        gene_lists = []
+        for sample in (self.snv_sample, self.cnv_sample):
+            gene_list = GeneList.objects.create(name=f"{sample.name} QC", user=self.user,
+                                                import_status=ImportStatus.SUCCESS)
+            # A sample's only gene list becomes its active one @see sample_gene_list_created
+            SampleGeneList.objects.create(sample=sample, gene_list=gene_list)
+            gene_lists.append(gene_list)
+
+        node = self._child(GeneListNode, self._extraction_node(),
+                           accordion_panel=GeneListNode.SAMPLE_GENE_LIST)
+        self.assertIsNone(node.sample_gene_list)
+        self.assertEqual(node.get_gene_lists(), gene_lists)

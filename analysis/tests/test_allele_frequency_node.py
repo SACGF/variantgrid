@@ -38,9 +38,9 @@ class TestAlleleFrequencyNode(TestCase):
     def test_unrestricted_range_does_not_filter(self):
         self.assertFalse(self._node().modifies_parents())
 
-    def test_no_sample_is_a_configuration_error(self):
+    def test_no_sample_or_patient_is_a_configuration_error(self):
         node = AlleleFrequencyNode.objects.create(analysis=self.analysis)
-        self.assertIn("No sample selected.", node._get_configuration_errors())
+        self.assertIn("No sample or patient selected.", node._get_configuration_errors())
 
     def test_restricted_range_filters_on_the_samples_allele_frequency(self):
         node = self._node()

@@ -19,6 +19,8 @@ from django.db import transaction
 from django.db.models import Q
 
 from analysis.models.nodes.analysis_node import AnalysisNode
+from patients.models_enums import SampleSourceLevel
+from patients.sample_grouping import get_patient_for_source
 
 
 def _bump_nodes(q):
@@ -56,8 +58,9 @@ def handle_sample_pre_delete(sender, instance, **kwargs):
     # Source SampleNode + AncestorSampleMixin filter nodes (Zygosity/GeneList/AlleleFrequency/MOI)
     # all carry a `sample` FK. Walk them via the multi-table inheritance reverse relations
     # on AnalysisNode in a single query.
-    # A group level SampleNode resolves its samples at query time, so deleting one changes its result
-    # without touching any of its FKs - it has to be bumped via the object the sample belonged to.
+    # A group level SampleNode, and a filter node applying to a patient, resolve their samples at
+    # query time, so deleting one changes their result without touching any of their FKs - they have
+    # to be bumped via the object the sample belonged to (#1855).
     q = (
         Q(samplenode__sample=instance)
         | Q(zygositynode__sample=instance)
@@ -67,6 +70,13 @@ def handle_sample_pre_delete(sender, instance, **kwargs):
     )
     if instance.extraction_id:
         q |= Q(samplenode__extraction=instance.extraction_id)
+    if patient := get_patient_for_source(SampleSourceLevel.SAMPLE, instance):
+        q |= (
+            Q(zygositynode__patient=patient)
+            | Q(genelistnode__patient=patient)
+            | Q(allelefrequencynode__patient=patient)
+            | Q(moinode__patient=patient)
+        )
     _schedule_analysis_updates(_bump_nodes(q))
 
 

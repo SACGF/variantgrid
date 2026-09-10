@@ -13,7 +13,6 @@ from django.utils.text import slugify
 from analysis import models
 from analysis.models import Analysis, AnalysisNode, AnalysisTemplateType, MOINode
 from analysis.models.enums import NodeMatchInput
-from analysis.variant_text import resolve_variant_text
 from analysis.models.nodes.analysis_node import NodeAlleleFrequencyFilter, NodeVCFFilter
 from analysis.models.nodes.filters.classifications_node import ClassificationsNode
 from analysis.models.nodes.filters.clinvar_node import ClinVarNode
@@ -39,6 +38,7 @@ from analysis.models.nodes.sources.pedigree_node import PedigreeNode
 from analysis.models.nodes.sources.quad_node import QuadNode
 from analysis.models.nodes.sources.sample_node import SampleNode
 from analysis.models.nodes.sources.trio_node import TrioNode
+from analysis.variant_text import resolve_variant_text
 from annotation.models import VariantAnnotation
 from annotation.pathogenicity_predictions import TOOLS
 from genes.custom_text_gene_list import create_custom_text_gene_list
@@ -48,8 +48,9 @@ from library.forms import NumberInput, StarsWidget
 from library.genomics.vcf_enums import VARIANT_CLASS_GROUPS
 from library.utils import sha256sum_str
 from ontology.models import OntologyTerm
+from patients.models import Patient
 from patients.models_enums import GnomADPopulation, SampleSourceLevel
-from patients.sample_grouping import SOURCE_LEVELS
+from patients.sample_grouping import SOURCE_LEVELS, get_patient_for_source
 from snpdb.forms import GenomeBuildAutocompleteForwardMixin
 from snpdb.models import Lab, Sample, Tag, VCFFilter
 from snpdb.models.models_enums import AlleleOriginFilterDefault
@@ -129,6 +130,60 @@ class VCFLocusFiltersMixin(forms.Form):
                 NodeVCFFilter.objects.create(node=node, vcf_filter=vcf_filter)
 
 
+class AncestorSampleSourceMixin(forms.Form):
+    """ How the four AncestorSampleMixin filter nodes work out the samples they filter on.
+
+        `sample_source` carries "<sample|patient>:<pk>" - one control rather than a sample select and
+        a patient select, since the node reads exactly one of them
+        (@see analysis/models/nodes/cohort_mixin.py:AncestorSampleMixin). The choices are the
+        ancestor samples the node validates against and the patients they resolve to, so they are
+        already permission checked and small enough for a plain Select. """
+    sample_source = forms.ChoiceField(required=False, label="Applies to")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["sample_source"].choices = self._get_sample_source_choices()
+        self.fields["sample_source"].initial = self._get_sample_source_initial()
+
+    def _get_sample_source_choices(self) -> list:
+        samples = sorted(self.instance.get_ancestor_samples(), key=lambda s: s.pk)
+        samples_by_patient = {}
+        for sample in samples:
+            if patient := get_patient_for_source(SampleSourceLevel.SAMPLE, sample):
+                samples_by_patient.setdefault(patient, []).append(sample)
+
+        choices = [("", "---------")]
+        choices.extend((f"patient:{patient.pk}", f"{patient} (all {len(patient_samples)} samples)")
+                       for patient, patient_samples in samples_by_patient.items())
+        choices.extend((f"sample:{sample.pk}", str(sample.name)) for sample in samples)
+        return choices
+
+    def _get_sample_source_initial(self) -> str:
+        if self.instance.sample:
+            return f"sample:{self.instance.sample_id}"
+        if self.instance.patient:
+            return f"patient:{self.instance.patient_id}"
+        return ""
+
+    def get_analysis_variable_field(self, field_name: str) -> str:
+        """ The picker stands in for whichever FK is set - that FK is what a template's
+            AnalysisVariable is keyed on, since populate_arguments sets node fields by name """
+        if field_name == "sample_source":
+            return "patient" if self.instance.patient else "sample"
+        return super().get_analysis_variable_field(field_name)
+
+    def set_sample_source(self, node):
+        """ Unpack the picker into the node's sample / patient - exactly one of them is set """
+        value = self.cleaned_data.get("sample_source")
+        kind, _, pk = (value or "").partition(":")
+        if kind == "sample":
+            node._set_sample(Sample.objects.get(pk=pk))
+        elif kind == "patient":
+            node._set_patient(Patient.objects.get(pk=pk))
+        else:
+            node._set_sample(None)
+
+
 class BaseNodeForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -176,18 +231,14 @@ class VCFSourceNodeForm(AlleleFrequencyMixin, VCFLocusFiltersMixin, BaseNodeForm
         return node
 
 
-class AlleleFrequencyNodeForm(AlleleFrequencyMixin, BaseNodeForm):
+class AlleleFrequencyNodeForm(AncestorSampleSourceMixin, AlleleFrequencyMixin, BaseNodeForm):
     class Meta:
         model = models.AlleleFrequencyNode
-        fields = ("sample",)
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        samples_queryset = Sample.objects.filter(pk__in=self.instance.get_sample_ids())
-        self.fields['sample'].queryset = samples_queryset
+        fields = ()
 
     def save(self, commit=True):
         node = super().save(commit=False)
+        self.set_sample_source(node)
         self.save_allele_frequency(node)
         if commit:
             node.save()
@@ -574,7 +625,7 @@ class FilterNodeForm(BaseNodeForm):
         exclude = ANALYSIS_NODE_FIELDS
 
 
-class GeneListNodeForm(BaseNodeForm):
+class GeneListNodeForm(AncestorSampleSourceMixin, BaseNodeForm):
     custom_gene_list_text = forms.CharField(widget=forms.Textarea(attrs={'placeholder': 'Gene names...'}),
                                             required=False)
     gene_list = forms.ModelMultipleChoiceField(required=False,
@@ -598,19 +649,13 @@ class GeneListNodeForm(BaseNodeForm):
 
     class Meta:
         model = GeneListNode
-        fields = ("pathology_test_version", "sample", "min_panel_app_confidence", "exclude", "accordion_panel")
+        fields = ("pathology_test_version", "min_panel_app_confidence", "exclude", "accordion_panel")
         widgets = {
             "pathology_test_version": ModelSelect2(url='pathology_test_version_autocomplete',
                                                    attrs={'data-placeholder': 'Pathology Test...'},
                                                    forward=(forward.Const(True, "active"),)),
             'accordion_panel': HiddenInput(),
         }
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-        samples_queryset = Sample.objects.filter(pk__in=self.instance.get_sample_ids())
-        self.fields['sample'].queryset = samples_queryset
 
     def save(self, commit=True):
         node = super().save(commit=False)
@@ -656,9 +701,8 @@ class GeneListNodeForm(BaseNodeForm):
             for pap in self.cleaned_data[form_name]:
                 pap_set.create(panel_app_panel=pap)
 
-        # Make sure that if we select sample qc gene list
-        if sample := self.cleaned_data["sample"]:
-            node._set_sample(sample)
+        # _set_sample also resolves the sample's active QC gene list
+        self.set_sample_source(node)
 
         if commit:
             node.save()
@@ -732,7 +776,7 @@ class MergeNodeForm(BaseNodeForm):
         exclude = ANALYSIS_NODE_FIELDS
 
 
-class MOINodeForm(BaseNodeForm):
+class MOINodeForm(AncestorSampleSourceMixin, BaseNodeForm):
     mondo = forms.ModelMultipleChoiceField(required=False,
                                            queryset=OntologyTerm.objects.all(),
                                            widget=ModelSelect2Multiple(url='mondo_autocomplete',
@@ -742,7 +786,7 @@ class MOINodeForm(BaseNodeForm):
 
     class Meta:
         model = MOINode
-        exclude = ANALYSIS_NODE_FIELDS
+        exclude = list(ANALYSIS_NODE_FIELDS) + ["sample", "patient"]
         widgets = {
             'min_date': NativeDateInput(allow_future=True),
             'max_date': NativeDateInput(allow_future=True),
@@ -752,9 +796,6 @@ class MOINodeForm(BaseNodeForm):
     def __init__(self, *args, **kwargs):
         """ We save data as the raw fields, only slugify in the form """
         super().__init__(*args, **kwargs)
-
-        # Restrict sample to ancestors
-        self.fields['sample'].queryset = Sample.objects.filter(pk__in=self.instance.get_sample_ids())
 
         # Dynamically add fields
         ontology_version = self.instance.analysis.annotation_version.ontology_version
@@ -792,6 +833,7 @@ class MOINodeForm(BaseNodeForm):
 
     def save(self, commit=True):
         node = super().save(commit=False)
+        self.set_sample_source(node)
 
         ontology_term_set = self.instance.moinodeontologyterm_set
         ontology_term_set.all().delete()  # Clear existing
@@ -1191,12 +1233,14 @@ class DuoNodeForm(GenomeBuildAutocompleteForwardMixin, VCFSourceNodeForm):
         }
 
 
-class ZygosityNodeForm(BaseNodeForm):
+class ZygosityNodeForm(AncestorSampleSourceMixin, BaseNodeForm):
     class Meta:
         model = models.ZygosityNode
-        fields = ("sample", "zygosity", 'exclude')
+        fields = ("zygosity", 'exclude')
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        # Restrict samples to ancestors
-        self.fields['sample'].queryset = Sample.objects.filter(pk__in=self.instance.get_sample_ids())
+    def save(self, commit=True):
+        node = super().save(commit=False)
+        self.set_sample_source(node)
+        if commit:
+            node.save()
+        return node

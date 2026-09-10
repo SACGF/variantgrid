@@ -15,6 +15,7 @@ from analysis.models.nodes.node_display import NodeIcon
 from annotation.models import OntologyTerm, VariantTranscriptAnnotation
 from genes.models import GeneSymbol
 from ontology.models import GeneDiseaseClassification, OntologyTermRelation
+from patients.models import Patient
 from patients.models_enums import Zygosity
 from snpdb.models import Contig, Sample
 
@@ -26,6 +27,7 @@ class MOINode(AncestorSampleMixin, AnalysisNode):
     # Sample isn't mandatory, but if you supply it, you can use the zygosity
     # Probably want to be able to swap the panel out if sample changes as per cohort node and the zyg filter
     sample = models.ForeignKey(Sample, null=True, blank=True, on_delete=SET_NULL)
+    patient = models.ForeignKey(Patient, null=True, blank=True, on_delete=SET_NULL)
     require_zygosity = models.BooleanField(default=True)
     min_classification = models.CharField(max_length=1, choices=GeneDiseaseClassification.choices,
                                           default=GeneDiseaseClassification.MODERATE)
@@ -90,9 +92,8 @@ class MOINode(AncestorSampleMixin, AnalysisNode):
         """ Returns all terms (not filtered by any settings) """
         ontology_term_ids = []
         if self.accordion_panel == self.PANEL_PATIENT:
-            if self.sample:
-                if patient := self.sample.patient:
-                    ontology_term_ids = patient.get_ontology_term_ids()
+            if patient := self.get_filter_patient():
+                ontology_term_ids = patient.get_ontology_term_ids()
         else:
             ontology_term_ids = self.moinodeontologyterm_set.values_list("ontology_term", flat=True)
         return ontology_term_ids
@@ -130,11 +131,13 @@ class MOINode(AncestorSampleMixin, AnalysisNode):
         }
         return MOI_ZYGOSITY_Q[moi]
 
-    def _get_zygosity_q(self, moi: str) -> Optional[Q]:
+    def _get_zygosity_q(self, moi: str, sample: Sample) -> Optional[Q]:
+        """ None means any zygosity - a caller that reports no GT has nothing to filter on """
         q = None
-        if zygosities := self._get_zygosities(moi):
-            _alias, field = self.sample.get_cohort_genotype_alias_and_field("zygosity")
-            q = Q(**{f"{field}__in": zygosities})
+        if sample.has_genotype:
+            if zygosities := self._get_zygosities(moi):
+                _alias, field = sample.get_cohort_genotype_alias_and_field("zygosity")
+                q = Q(**{f"{field}__in": zygosities})
         return q
 
     def _get_genes_q_from_hgnc(self, hgnc_names: set[str]):
@@ -150,26 +153,29 @@ class MOINode(AncestorSampleMixin, AnalysisNode):
                 moi_genes[source["mode_of_inheritance"]].add(otr.dest_term.name)
         return moi_genes
 
-    def _get_node_arg_q_dict(self) -> dict[Optional[str], dict[str, Q]]:
+    def _get_sample_arg_q_dict(self, sample: Sample) -> dict[Optional[str], dict[str, Q]]:
+        """ One sample's zygosity-and-genes OR, keyed on its own zygosity alias """
         arg_q_dict = {}
-        if self.sample:
-            moi_genes = self._get_moi_genes()
-            or_filters = []
-            for moi, hgnc_names in moi_genes.items():
-                q_genes = self._get_genes_q_from_hgnc(hgnc_names)
-                if q_zygosity := self._get_zygosity_q(moi):
-                    or_filters.append(q_zygosity & q_genes)
-                else:
-                    or_filters.append(q_genes)  # Any zygosity
-            if or_filters:
-                q = reduce(operator.or_, or_filters)
-                arg_q_dict[self.sample.zygosity_alias] = {str(q): q}
-        else:
-            gene_qs = self._get_gene_qs()
-            variant_annotation_version = self.analysis.annotation_version.variant_annotation_version
-            q_genes = VariantTranscriptAnnotation.get_overlapping_genes_q(variant_annotation_version, gene_qs)
-            arg_q_dict[None] = {str(q_genes): q_genes}
+        or_filters = []
+        for moi, hgnc_names in self._get_moi_genes().items():
+            q_genes = self._get_genes_q_from_hgnc(hgnc_names)
+            if q_zygosity := self._get_zygosity_q(moi, sample):
+                or_filters.append(q_zygosity & q_genes)
+            else:
+                or_filters.append(q_genes)  # Any zygosity
+        if or_filters:
+            q = reduce(operator.or_, or_filters)
+            arg_q_dict[sample.zygosity_alias] = {str(q): q}
         return arg_q_dict
+
+    def _get_node_arg_q_dict(self) -> dict[Optional[str], dict[str, Q]]:
+        if self.get_filter_samples():
+            return self._get_filter_samples_arg_q_dict(self._get_sample_arg_q_dict)
+
+        gene_qs = self._get_gene_qs()
+        variant_annotation_version = self.analysis.annotation_version.variant_annotation_version
+        q_genes = VariantTranscriptAnnotation.get_overlapping_genes_q(variant_annotation_version, gene_qs)
+        return {None: {str(q_genes): q_genes}}
 
     def _get_node_contigs(self) -> Optional[set[Contig]]:
         contig_qs = Contig.objects.filter(transcriptversion__genome_build=self.analysis.genome_build,
@@ -179,7 +185,10 @@ class MOINode(AncestorSampleMixin, AnalysisNode):
     def _get_method_summary(self):
         if self.modifies_parents():
             method_list = []
-            if self.sample:
+            if filter_samples := self.get_filter_samples():
+                if self.patient:
+                    sample_names = ", ".join(s.name for s in filter_samples)
+                    method_list.append(f"{self.patient} ({len(filter_samples)} samples): {sample_names}")
                 moi_genes = self._get_moi_genes()
                 li_list = []
                 for moi, hgnc_names in moi_genes.items():

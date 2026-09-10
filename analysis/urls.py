@@ -109,7 +109,6 @@ urlpatterns = [
     path('<int:analysis_id>/node_reveal_hidden/<int:node_id>/', views_json.node_reveal_hidden, name='node_reveal_hidden'),
     path('<int:analysis_id>/reload/', views_json.analysis_reload, name='analysis_reload'),
     path('<int:analysis_id>/input_samples/', views_analysis_settings.analysis_input_samples, name='analysis_input_samples'),
-    path('sample_patient_gene_disease/<int:sample_id>', views_json.sample_patient_gene_disease, name='sample_patient_gene_disease'),
 
     path('<int:analysis_id>/node_graph/<int:node_id>/<int:graph_type_id>/<slug:cmap>/', views_node.node_graph, name='node_graph'),
     path('<int:analysis_id>/column_summary_boxplot/<int:node_id>/<label>/<slug:variant_column>/', views_node.column_summary_boxplot, name='column_summary_boxplot'),

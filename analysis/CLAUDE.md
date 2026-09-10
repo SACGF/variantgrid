@@ -112,6 +112,16 @@ Patterns here:
   `analysis/models/models_variant_tag.py:VariantTag.unresolved_q` - the SQL twin of `is_resolved` - never a bare
   `resolved__isnull=True`. The analysis grid keeps the pill, since clicking it is how a tag is removed, and draws it
   as done. Tag stats and the analyses list pills are history and count everything.
+- A sample-bound filter node (Zygosity, Allele Frequency, MOI, Gene List) applies to one sample **or** one patient
+  (`analysis/models/nodes/cohort_mixin.py:AncestorSampleMixin` - exactly one of `sample`/`patient` is set, both null is
+  unset, and the editors pick either through the one `sample_source` control,
+  `analysis/forms/forms_nodes.py:AncestorSampleSourceMixin`). `handle_ancestor_input_samples_changed` sets
+  the proband sample where there is one, else the proband patient - which is what a group level SampleNode gives it
+  (#1855). In patient mode `get_filter_samples()` is every ancestor sample of that patient, so the source node decides
+  the reach, and `AncestorSampleMixin._get_filter_samples_arg_q_dict` ORs one `pk IN (subquery)` per sample
+  (`analysis/models/nodes/cohort_mixin.py:get_sample_pk_in_q`, the same helper SampleNode's group levels use) - a Q keyed
+  on an alias runs as soon as that alias is annotated, so an OR across two samples' aliases has nowhere to hang. A sample
+  with nothing to filter on (no GT, no AF) contributes its rows unfiltered rather than emptying the node.
 - Load nodes with `AnalysisNode.objects.get_subclass(pk=...)` / `.select_subclasses()` (`analysis/models/nodes/analysis_node.py:NodeInheritanceManager`);
   in views use `analysis/views/analysis_permissions.py:get_node_subclass_or_404`, which enforces
   `analysis/models/models_analysis.py:Analysis.can_write` (locked analyses and template snapshots are read-only).
