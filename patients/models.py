@@ -316,11 +316,14 @@ class Patient(GuardianPermissionsMixin, HasPhenotypeDescriptionMixin, Externally
             .select_related("vcf__genome_build", "extraction__specimen").order_by("vcf__date")
 
     def __str__(self):
-        # De-identified patients have no name, so fall back to the code they're known by
+        # The code is the identity (grids and previews lead with it) - the name follows so a
+        # patient known by both reads "SAP123 - SMITH, Jane". De-identified patients have only a code
+        parts = []
+        if code := self.patient_code or self.external_pk:
+            parts.append(str(code))
         if self.first_name or self.last_name:
-            description = self.name
-        else:
-            description = str(self.code)
+            parts.append(self.name_last_name_first)
+        description = " - ".join(parts) or str(self.code)
         if self.sex != Sex.UNKNOWN:
             description += f" ({self.sex})"
         return description

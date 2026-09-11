@@ -390,6 +390,15 @@ class TestDeIdentifiedPatientName(TestCase):
         patient = Patient.objects.create(patient_code="DEID-101")
         self.assertEqual(str(patient), "DEID-101")
 
+    def test_str_leads_with_code_when_both_set(self):
+        patient = Patient.objects.create(patient_code="SAP123", first_name="Jane", last_name="SMITH", sex=Sex.FEMALE)
+        self.assertEqual(str(patient), "SAP123 - SMITH, Jane (F)")
+
+    def test_str_uses_name_alone_when_no_code(self):
+        # The pk fallback in .code is for previews and search, not something to show beside a name
+        patient = Patient.objects.create(first_name="Jane", last_name="SMITH")
+        self.assertEqual(str(patient), "SMITH, Jane")
+
     def test_name_with_first_name_only(self):
         patient = Patient.objects.create(first_name="BOB")
         self.assertEqual(patient.name, "BOB")
