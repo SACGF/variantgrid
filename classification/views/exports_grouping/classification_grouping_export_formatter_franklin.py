@@ -8,7 +8,7 @@ from django.conf import settings
 from django.template.loader import render_to_string
 from django.urls import reverse
 
-from classification.enums import ClassificationResultValue, SpecialEKeys, AlleleOriginBucket
+from classification.enums import SpecialEKeys, AlleleOriginBucket
 from classification.models import EvidenceKeyMap
 from classification.models.evidence_mixin import SomaticClinicalSignificanceValue
 from classification.views.exports_grouping.classification_grouping_export_filter import \
@@ -126,7 +126,7 @@ class FranklinExportRow(ExportRow):
     @export_column("Conditions")
     def conditions_column(self):
         return ""
-        #return f"{settings.SITE_NAME} {self.mode[0]}{self.mode[1:].lower()}"
+        # return f"{settings.SITE_NAME} {self.mode[0]}{self.mode[1:].lower()}"
 
     def conditions(self) -> list[str]:
         # Don't make condition a column, as if it changes it'll go into a new section in Franklin

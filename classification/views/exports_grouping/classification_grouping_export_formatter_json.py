@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from functools import cached_property
 from typing import Iterator
 from django.conf import settings
-from classification.models import ClassificationJsonParams, EvidenceKeyMap
+from classification.models import ClassificationJsonParams
 from classification.views.exports_grouping.classification_grouping_export_filter import \
     ClassificationGroupingExportFormat, ClassificationGroupingExportFormatProperties, ClassificationGroupingExportFilter
 import json
@@ -39,7 +39,6 @@ class ClassificationGroupingExportFormatterJSON(ClassificationGroupingExportForm
         if self.json_format_details.full_detail:
             include_data = True
         else:
-            e_keys = EvidenceKeyMap.cached()
             include_data = [e_key.key for e_key in self.e_keys.all_keys if e_key.is_vital_key]
             populate_literature_with_citations = settings.CLASSIFICATION_DOWNLOADABLE_JSON_LITERATURE_CITATIONS
 

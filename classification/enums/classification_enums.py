@@ -19,10 +19,10 @@ CRITERIA_NEUTRAL = 'N'
 class OverlapOverrideStatus(IntegerChoices):
     # TODO resolution might be a better term, or ongoing
     NO_OVERRIDE = 0, "No Override"
-    COMPLEX = 10, "Complex"
-    CONTINUED_DISCORDANCE = 20, "Continued Discordance"
-    CONFIDENT_VS_CLINVAR = 30, "Confident vs ClinVar"
-    IGNORING_OLD_CLINVAR = 40, "Ignoring Older ClinVar Records"
+    COMPLEX = 10, "Complex"   # all labs have agreed that the overlap is complex
+    CONTINUED_DISCORDANCE = 20, "Continued Discordance"   # there was a review and all labs match the values agreed at the review
+    CONFIDENT_VS_CLINVAR = 30, "Confident vs ClinVar"  # the discordance only happens due to expert panels and everyone else is confident
+    IGNORING_OLD_CLINVAR = 40, "Ignoring Older ClinVar Records"  # the discordance only happens due to expert panels and they're older than the classifications
 
     @property
     def is_auto_review(self):

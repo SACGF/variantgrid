@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Iterable, Iterator
+from typing import Iterator
 
 from django.urls import reverse
 
@@ -15,7 +15,7 @@ from classification.views.exports_grouping.classification_grouping_export_filter
     ClassificationGroupingExportFilter
 from library.django_utils import get_url_from_view_path
 from library.utils import ExportTweak
-from snpdb.models import Variant, GenomeBuild, Contig, GenomeBuildContig
+from snpdb.models import Variant, GenomeBuild, GenomeBuildContig
 
 
 @dataclass(frozen=True)
