@@ -331,6 +331,26 @@ class ClassificationGrouping(TimeStampedModel):
     def allele(self) -> Allele:
         return self.allele_origin_grouping.allele
 
+    @cached_property
+    def onc_path_contribution(self) -> Optional['OverlapContribution']:
+        """
+        Written to optimize for prefetch_related
+        """
+        for contribution in self.overlapcontribution_set.all():
+            if contribution.value_type == ClassificationResultValue.ONC_PATH:
+                return contribution
+        return None
+
+    @cached_property
+    def somatic_clin_sig_contribution(self) -> Optional['OverlapContribution']:
+        """
+        Written to optimize for prefetch_related
+        """
+        for contribution in self.overlapcontribution_set.all():
+            if contribution.value_type == ClassificationResultValue.SOMATIC_CLINICAL_SIGNIFICANCE:
+                return contribution
+        return None
+
     @transaction.atomic
     def update(self):
 

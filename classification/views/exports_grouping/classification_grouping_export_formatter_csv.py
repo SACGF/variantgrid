@@ -1,7 +1,9 @@
 from dataclasses import dataclass
 from functools import cached_property
 from typing import Iterator
-from classification.models import EvidenceKeyMap, ClassificationGrouping
+
+from classification.enums import ClassificationResultValue, TriageStatus
+from classification.models import EvidenceKeyMap, ClassificationGrouping, OverlapContribution
 from classification.views.classification_export_utils import UsedKeyTracker, KeyValueFormatter
 from classification.views.exports.classification_export_formatter_csv import CSVCellFormatting
 from classification.views.exports.classification_export_utils import CitationCounter
@@ -72,6 +74,24 @@ class CSVNonEvidence(ExportRow):
     def record_count(self):
         return self.classification_grouping.classification_count
 
+    @export_column(label="Onc-Path Triage")
+    def classification(self):
+        contribution: OverlapContribution
+        if contribution := self.classification_grouping.onc_path_contribution:
+            if triage := contribution.triage_state_obj:
+                if triage.status != TriageStatus.PENDING:
+                    return str(triage)
+        return None
+
+    @export_column(label="Somatic Clin Sig Value")
+    def somatic_clin_sig(self):
+        contribution: OverlapContribution
+        if contribution := self.classification_grouping.somatic_clin_sig_contribution:
+            if triage := contribution.triage_state_obj:
+                if triage.status != TriageStatus.PENDING:
+                    return str(triage)
+        return None
+
     @export_column(label="Citations")
     def citations(self):
         cc = CitationCounter()
@@ -134,7 +154,8 @@ class ClassificationGroupingExportFormatterCSV(ClassificationGroupingExportForma
         return [delimited_row(CSVNonEvidence.csv_header(export_tweak=self.export_tweak) + self.used_keys.header(), include_new_line=False)]
 
     def single_row_generator(self) -> Iterator[str]:
-        for row in self.queryset().iterator():
+        queryset = self.queryset().prefetch_related("overlapcontribution_set")
+        for row in queryset.iterator(chunk_size=4000):
             cm = row.latest_classification_modification
             row_data = []
             row_data.extend(CSVNonEvidence(row, date_str=self.classification_grouping_filter.date_str, formatter=self.csv_format_details).to_csv(export_tweak=self.export_tweak))
