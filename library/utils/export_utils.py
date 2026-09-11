@@ -194,29 +194,35 @@ def get_decorated_methods(cls, categories: Optional[dict[Any, Any]], attribute: 
                 return True
 
             decorated_values = export_method.categories or {}
-            # for every requirement of categories
-            for key, value in categories.items():
-                # get the decorated value
-                value_set: set
+
+            # for every requirement of the export method
+            for key, value in decorated_values.items():
+                required_set: set
                 if isinstance(value, (set, tuple, list)):
-                    value_set = set(value)
+                    required_set = set(value)
                 else:
-                    value_set = {value}
+                    required_set = {value}
 
-                if decorated_value := decorated_values.get(key):
-                    decorated_set: set
-                    if isinstance(decorated_value, (set, tuple, list)):
-                        decorated_set = set(decorated_value)
+                if provided_value := categories.get(key):
+                    provided_set: set
+                    if isinstance(provided_value, (set, tuple, list)):
+                        provided_set = set(provided_value)
                     else:
-                        decorated_set = {decorated_value}
-                    return bool(value_set.intersection(decorated_set))
+                        provided_set = {provided_value}
 
-                    # handle decorated value being a collection (and matching a single value in that collection)
-                # if the requirement for the category is None and there's no value at all in the decorator
-                # it passes the test
-                elif value is not None:
-                    return False
+                    # if just one of the values in categories of the method
+                    # matches one of the values in the provided categories, the export is in
+                    # allows you to say categories={"tsv", "json"} on a method and then have
+                    # categories="tsv" pass that
+                    if not provided_set.intersection(required_set):
+                        return False
 
+                else:
+                    if False not in required_set:
+                        # can require something to be False, which passes it through if there
+                        # are no other values
+                        return False
+            # either there was no requirements, or they were all met
             return True
 
         export_methods = [em for em in export_methods if passes_filter(em)]
