@@ -62,8 +62,9 @@ class ClassificationGroupingExportFormatterJSON(ClassificationGroupingExportForm
             "latest_classification_modification__classification__allele",
             "latest_classification_modification__classification__allele_info",
             "latest_classification_modification__classification__clinical_context"
-        )
-        for cg in queryset.iterator():
+        ).prefetch_related("overlapcontribution_set")
+
+        for cg in queryset.iterator(chunk_size=4000):
             yield json.dumps(cg.latest_classification_modification.as_json(
                 self.json_params
             ))

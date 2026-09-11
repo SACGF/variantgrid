@@ -5,11 +5,12 @@ from functools import cached_property
 from typing import Iterator, Optional
 
 from django.conf import settings
+from django.db.models import QuerySet
 from django.template.loader import render_to_string
 from django.urls import reverse
 
 from classification.enums import SpecialEKeys, AlleleOriginBucket
-from classification.models import EvidenceKeyMap
+from classification.models import EvidenceKeyMap, ClassificationGrouping
 from classification.models.evidence_mixin import SomaticClinicalSignificanceValue
 from classification.views.exports_grouping.classification_grouping_export_filter import \
     ClassificationGroupingExportFormat, ClassificationGroupingExportFormatProperties, \
@@ -147,12 +148,14 @@ class FranklinExportRow(ExportRow):
         allele_url = f"{get_url_from_view_path(partial_url)}"
 
         classification_key = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE)
-        all_classification_values = [cm.latest_cached_summary_obj.pathogenicity.classification for cm in self.data.classification_groupings]
-        all_classification_values = [v for v in all_classification_values if v is not None]  # clear out unclassified
+        onc_paths = [cg.onc_path_contribution for cg in self.data.classification_groupings if cg.onc_path_contribution]
+        all_classification_values = [contribution.effective_value for contribution in onc_paths if contribution.effective_value]  # clear out unclassified
         all_classification_values = list(classification_key.sort_values(set(all_classification_values)))
         formatted_classification_values = [classification_key.pretty_value(v) for v in all_classification_values]
 
-        all_clinsig_values = [cm.latest_cached_summary_obj.somatic.somatic_clinical_significance_value for cm in self.data.classification_groupings]
+        # FIXME triaged values for somatic clin sig wont include amp level - A,B,C etc
+        all_clinsig_values = [cm.latest_cached_summary_obj.somatic.somatic_clinical_significance_value for cm in
+                              self.data.classification_groupings]
         all_clinsig_values = [v for v in all_clinsig_values if v is not None]  # clear out unclassified
         all_clinsig_values = [cs.pretty_value for cs in sorted(set(all_clinsig_values))]
 
@@ -226,6 +229,9 @@ class ClassificationGroupingExportFormatterFranklin(ClassificationGroupingExport
     def header(self) -> list[str]:
         return [delimited_row(FranklinExportRow.csv_header(), delimiter='\t', include_new_line=False)]
 
+    def queryset(self, genome_build: Optional[GenomeBuild] = None) -> QuerySet[ClassificationGrouping]:
+        return self.classification_grouping_filter.queryset(genome_build=genome_build).prefetch_related("overlapcontribution_set")
+
     def single_row_generator(self) -> Iterator[str]:
 
         def data_iterator():
@@ -244,13 +250,3 @@ class ClassificationGroupingExportFormatterFranklin(ClassificationGroupingExport
 
         for row in data_iterator():
             yield delimited_row(row.to_csv(), delimiter='\t', include_new_line=False, quoting=csv.QUOTE_MINIMAL)
-        # for row in FranklinExportRow.csv_generator(
-        #     data_iterator(),
-        #     delimiter='\t',
-        #     include_header=False,
-        #     quoting=csv.QUOTE_MINIMAL
-        #     # export_tweak=ExportTweak(categories={"format": "tsv"})
-        # ):
-        #     print(f"** {row}")
-        #     # yield row
-        #     yield "jojo"

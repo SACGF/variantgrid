@@ -332,11 +332,15 @@ class ClassificationGrouping(TimeStampedModel):
         return self.allele_origin_grouping.allele
 
     @cached_property
+    def _contributions(self):
+        return list(self.overlapcontribution_set.all())
+
+    @cached_property
     def onc_path_contribution(self) -> Optional['OverlapContribution']:
         """
         Written to optimize for prefetch_related
         """
-        for contribution in self.overlapcontribution_set.all():
+        for contribution in self._contributions:
             if contribution.value_type == ClassificationResultValue.ONC_PATH:
                 return contribution
         return None
@@ -346,7 +350,7 @@ class ClassificationGrouping(TimeStampedModel):
         """
         Written to optimize for prefetch_related
         """
-        for contribution in self.overlapcontribution_set.all():
+        for contribution in self._contributions:
             if contribution.value_type == ClassificationResultValue.SOMATIC_CLINICAL_SIGNIFICANCE:
                 return contribution
         return None
