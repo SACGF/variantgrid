@@ -310,6 +310,7 @@ class CohortGenotypeCollectionType(models.TextChoices):
 
 
 class DuoRelationship(models.TextChoices):
-    """ Which parent of the proband a Duo's single parent is """
+    """ How a Duo's second member is related to the proband - a parent, or a sibling (#1861) """
     MOTHER = 'M', 'Mother'
     FATHER = 'F', 'Father'
+    SIBLING = 'S', 'Sibling'

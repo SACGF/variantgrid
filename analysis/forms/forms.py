@@ -456,8 +456,8 @@ class UserQuadWizardForm(FamilyWizardForm):
 
 
 class UserDuoWizardForm(FamilyWizardForm):
-    """ Mother/Father/Proband like the trio, with only two samples to place - the parent's role is
-        what the Duo stores as its relationship """
+    """ Mother/Father/Sibling/Proband, with only two samples to place - the relative's role is what
+        the Duo stores as its relationship """
     ROLE_ENUM = DuoSample
     SAMPLE_FIELDS = ["sample_1", "sample_2"]
     PARENT_ROLE_BY_SEX = {Sex.MALE: DuoSample.FATHER, Sex.FEMALE: DuoSample.MOTHER}
@@ -468,8 +468,8 @@ class UserDuoWizardForm(FamilyWizardForm):
     sample_2_affected = forms.BooleanField(required=False, widget=_affected_widget())
 
     @property
-    def parent_role(self) -> str:
-        """ Mother or Father - whichever of the two samples isn't the proband """
+    def relative_role(self) -> str:
+        """ Mother, Father or Sibling - whichever of the two samples isn't the proband """
         return next(role for role in self.roles if role != DuoSample.PROBAND)
 
 

@@ -184,9 +184,10 @@ class QuadSample(models.TextChoices):
 
 
 class DuoSample(models.TextChoices):
-    """ Values match DuoRelationship, so the parent's role is the Duo's relationship """
+    """ Values match DuoRelationship, so the relative's role is the Duo's relationship """
     MOTHER = 'M', 'Mother'
     FATHER = 'F', 'Father'
+    SIBLING = 'S', 'Sibling'
     PROBAND = 'P', 'Proband'
 
 

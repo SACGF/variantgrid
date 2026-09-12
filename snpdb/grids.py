@@ -437,14 +437,14 @@ class QuadsListColumns(FamilyGroupListColumns[Quad]):
 class DuosListColumns(FamilyGroupListColumns[Duo]):
     MODEL = Duo
     GRID_NAME = 'Duos'
-    FAMILY_MEMBERS = [("parent", "Parent", True), ("proband", "Proband", False)]
+    FAMILY_MEMBERS = [("relative", "Relative", True), ("proband", "Proband", False)]
 
     def __init__(self, request: HttpRequest):
         super().__init__(request)
         relationship_column = RichColumn(key='relationship', label='Relationship', orderable=True,
                                          client_renderer=RichColumn.choices_client_renderer(DuoRelationship.choices))
-        parent_affected = next(i for i, rc in enumerate(self.rich_columns) if rc.key == 'parent_affected')
-        self.rich_columns.insert(parent_affected + 1, relationship_column)
+        relative_affected = next(i for i, rc in enumerate(self.rich_columns) if rc.key == 'relative_affected')
+        self.rich_columns.insert(relative_affected + 1, relationship_column)
 
 
 class GenomicIntervalsListColumns(DatatableConfig[GenomicIntervalsCollection]):

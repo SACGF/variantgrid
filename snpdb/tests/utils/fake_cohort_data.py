@@ -115,14 +115,15 @@ def create_fake_quad(user: User, genome_build: GenomeBuild, sibling_affected: bo
 
 def create_fake_duo(user: User, genome_build: GenomeBuild,
                     relationship: str = DuoRelationship.MOTHER,
-                    parent_affected: bool = False) -> Duo:
-    """2-sample Cohort (proband, parent) + a Duo."""
+                    relative_affected: bool = False) -> Duo:
+    """2-sample Cohort (proband, relative) + a Duo - the relative is named after the relationship."""
     vcf = VCF.objects.create(
         name="test_duo_vcf", genotype_samples=1, genotype_field="GT", allele_depth_field="AD", genome_build=genome_build,
         import_status=ImportStatus.SUCCESS, user=user, date=timezone.now()
     )
+    relative_name = DuoRelationship(relationship).label.lower()
     proband_sample = Sample.objects.create(name="proband", vcf=vcf, import_status=ImportStatus.SUCCESS)
-    parent_sample = Sample.objects.create(name="parent", vcf=vcf)
+    relative_sample = Sample.objects.create(name=relative_name, vcf=vcf)
 
     assign_permission_to_user_and_groups(user, vcf)
     assign_permission_to_user_and_groups(user, proband_sample)
@@ -131,7 +132,7 @@ def create_fake_duo(user: User, genome_build: GenomeBuild,
         name="test_duo_cohort", user=user, vcf=vcf,
         genome_build=genome_build, import_status=ImportStatus.SUCCESS
     )
-    for i, sample in enumerate([proband_sample, parent_sample]):
+    for i, sample in enumerate([proband_sample, relative_sample]):
         CohortSample.objects.create(
             cohort=cohort, sample=sample,
             cohort_genotype_packed_field_index=i, sort_order=i
@@ -148,9 +149,9 @@ def create_fake_duo(user: User, genome_build: GenomeBuild,
         user=user,
         cohort=cohort,
         proband=cohort.cohortsample_set.get(sample__name='proband'),
-        parent=cohort.cohortsample_set.get(sample__name='parent'),
+        relative=cohort.cohortsample_set.get(sample__name=relative_name),
         relationship=relationship,
-        parent_affected=parent_affected,
+        relative_affected=relative_affected,
     )
 
 

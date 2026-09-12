@@ -79,7 +79,8 @@ each collection is its own partition table (`library/django_utils/django_partiti
 Query with `CohortGenotypeCollection.get_annotation_kwargs` / `get_zygosity_q`.
 
 **Trio / Duo / Quad** - `snpdb/models/models_cohort.py:Trio`, `Duo`, `Quad`. Named family structures over a Cohort
-(proband, parents, sibling) with affected flags; analysis inheritance nodes read them. **Pedigree** is the general form:
+(proband, parents, sibling) with affected flags; analysis inheritance nodes read them. A Duo is the proband plus one
+`relative` - a parent or a sibling, said by its `relationship`. **Pedigree** is the general form:
 `pedigree/models.py:Pedigree` over a PED file.
 
 **VariantZygosityCountCollection** - `snpdb/models/models_zygosity_counts.py:VariantZygosityCountCollection`. Per-deployment
