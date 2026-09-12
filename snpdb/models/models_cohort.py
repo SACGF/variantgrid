@@ -848,7 +848,7 @@ class FamilyGroupMixin:
     def get_permission_class(cls):
         return Cohort
 
-    pedigree_icon_members = ("mother", "father")  # Quad adds the sibling, Duo has one parent
+    pedigree_icon_members = ("mother", "father")  # Quad adds the sibling, Duo has one relative
 
     @classmethod
     def preview_icon(cls) -> str:
@@ -981,38 +981,43 @@ class Quad(FamilyGroupMixin, GuardianPermissionsAutoInitialSaveMixin, SvgSymbolP
 
 class Duo(FamilyGroupMixin, GuardianPermissionsAutoInitialSaveMixin, SvgSymbolPreviewIconMixin, PreviewModelMixin,
           SortByPKMixin, TimeStampedModel):
-    """Proband + one sequenced parent.
+    """Proband + one relative - a parent, or a sibling (#1861).
 
-    The other parent is unavailable (deceased, not consented, cost, or a prenatal case entered under
-    the mother's record) so a Trio can't be made. One `parent` FK that is always set, plus the
-    `relationship` the inheritance modes need - X-linked recessive is only meaningful through the
-    mother, and comp het is half phased on "one from the parent, one not".
+    The rest of the family is unavailable (deceased, not consented, cost, or a prenatal case entered
+    under the mother's record) so a Trio can't be made. One `relative` FK that is always set, plus
+    the `relationship` the inheritance modes need - X-linked recessive is only meaningful through the
+    mother, comp het is half phased on "one from the parent, one not", and a sibling pair carries no
+    parental transmission at all, so the parent-only modes have nothing to filter on.
     """
     name = models.TextField(blank=True)
     user = models.ForeignKey(User, null=True, on_delete=CASCADE)
     cohort = models.ForeignKey(Cohort, on_delete=CASCADE)
     proband = models.ForeignKey(CohortSample, related_name='duo_proband', on_delete=CASCADE)
-    parent = models.ForeignKey(CohortSample, related_name='duo_parent', on_delete=CASCADE)
+    relative = models.ForeignKey(CohortSample, related_name='duo_relative', on_delete=CASCADE)
     relationship = models.CharField(max_length=1, choices=DuoRelationship.choices)
-    parent_affected = models.BooleanField(default=False)
+    relative_affected = models.BooleanField(default=False)
     # Set in the duo wizard when the scientist resolves patient.sex vs sample.detected_sex
     proband_sex = models.CharField(max_length=1, choices=Sex.choices, null=True, blank=True)
 
     preview_icon_symbol = "node-icon-duo"  # DuoNode wears this too - see get_node_class_icon
-    pedigree_icon_members = ("parent",)
+    pedigree_icon_members = ("relative",)
 
     @classmethod
     def preview_if_url_visible(cls) -> str:
         return "duos"
 
     def get_cohort_samples(self):
-        return [self.parent, self.proband]
+        return [self.relative, self.proband]
 
     def get_absolute_url(self):
         return reverse('view_duo', kwargs={"pk": self.pk})
 
     def get_listing_url(self):
         return reverse('duos')
+
+    @property
+    def relative_is_sibling(self) -> bool:
+        return self.relationship == DuoRelationship.SIBLING
 
     @property
     def parent_is_mother(self) -> bool:
@@ -1024,21 +1029,22 @@ class Duo(FamilyGroupMixin, GuardianPermissionsAutoInitialSaveMixin, SvgSymbolPr
 
     @property
     def missing_parent_label(self) -> str:
-        """ The parent we don't have - named in the "absent in parent" warning """
+        """ The parent we don't have - named in the "absent in parent" warning. Only meaningful for a
+            parent duo: a sibling duo is missing both, so callers ask relative_is_sibling first """
         if self.parent_is_mother:
             return DuoRelationship.FATHER.label
         return DuoRelationship.MOTHER.label
 
     def get_preview_icon_css_class(self) -> str:
-        """ The symbol draws both parent shapes - the relationship class picks which one shows """
-        css_classes = ["duo-mother" if self.parent_is_mother else "duo-father"]
+        """ The symbol draws all three relative shapes - the relationship class picks which shows """
+        css_classes = [f"duo-{self.relationship_label.lower()}"]
         if affected := super().get_preview_icon_css_class():
             css_classes.append(affected)
         return " ".join(css_classes)
 
     @property
-    def parent_details(self):
-        return self._member_details(self.parent, self.parent_affected)
+    def relative_details(self):
+        return self._member_details(self.relative, self.relative_affected)
 
 
 # This has to be in this file so we don't end up with circular references

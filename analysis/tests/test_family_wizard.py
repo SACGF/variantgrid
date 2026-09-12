@@ -90,27 +90,27 @@ class QuadWizardFormTest(TestCase):
 
 
 class DuoWizardFormTest(TestCase):
-    """ The parent's role is which parent it is, so the Duo's relationship comes off the select """
+    """ The relative's role is which relative they are, so the Duo's relationship comes off the select """
 
     def _form(self, data=None, sample_sexes=None):
         return UserDuoWizardForm(data, sample_sexes=sample_sexes or [Sex.FEMALE, Sex.MALE])
 
-    def test_sex_narrows_the_roles_on_offer(self):
+    def test_sex_narrows_the_parent_roles_but_leaves_sibling_to_either(self):
         form = self._form()
         female_roles = [value for value, _ in form.fields["sample_1"].choices]
         male_roles = [value for value, _ in form.fields["sample_2"].choices]
 
-        self.assertEqual(["", DuoSample.MOTHER, DuoSample.PROBAND], female_roles)
-        self.assertEqual(["", DuoSample.FATHER, DuoSample.PROBAND], male_roles)
+        self.assertEqual(["", DuoSample.MOTHER, DuoSample.SIBLING, DuoSample.PROBAND], female_roles)
+        self.assertEqual(["", DuoSample.FATHER, DuoSample.SIBLING, DuoSample.PROBAND], male_roles)
 
-    def test_parent_role_and_affected_come_off_the_form(self):
+    def test_relative_role_and_affected_come_off_the_form(self):
         form = self._form({"sample_1": DuoSample.FATHER,
                            "sample_2": DuoSample.PROBAND,
                            "sample_1_affected": "on"},
                           sample_sexes=[Sex.MALE, Sex.FEMALE])
         self.assertTrue(form.is_valid(), form.errors)
         self.assertEqual({DuoSample.FATHER: True, DuoSample.PROBAND: True}, form.affected_by_role)
-        self.assertEqual(DuoSample.FATHER, form.parent_role)
+        self.assertEqual(DuoSample.FATHER, form.relative_role)
 
     def test_two_parents_without_a_proband_is_rejected(self):
         form = self._form({"sample_1": DuoSample.MOTHER,
@@ -134,21 +134,29 @@ class DuoWizardViewTest(URLTestCase):
         fixture_duo = create_fake_duo(cls.user, GenomeBuild.get_name_or_alias("GRCh37"))
         cls.cohort = fixture_duo.cohort
         cls.proband_sample_id = fixture_duo.proband.sample_id
-        cls.parent_sample_id = fixture_duo.parent.sample_id
+        cls.relative_sample_id = fixture_duo.relative.sample_id
         fixture_duo.delete()
 
-    def test_post_creates_duo_from_roles(self):
+    def _post_roles(self, relative_role, **extra):
         self.client.force_login(self.user)
         url = reverse("duo_wizard", kwargs={"cohort_id": self.cohort.pk,
                                             "sample1_id": self.proband_sample_id,
-                                            "sample2_id": self.parent_sample_id})
-        response = self.client.post(url, {"sample_1": DuoSample.PROBAND,
-                                          "sample_2": DuoSample.FATHER,
-                                          "sample_2_affected": "on",
-                                          "proband_sex": ""})
+                                            "sample2_id": self.relative_sample_id})
+        data = {"sample_1": DuoSample.PROBAND, "sample_2": relative_role, "proband_sex": "", **extra}
+        return self.client.post(url, data)
+
+    def test_post_creates_duo_from_roles(self):
+        response = self._post_roles(DuoSample.FATHER, sample_2_affected="on")
         duo = Duo.objects.get(cohort=self.cohort)
         self.assertEqual(response.url, duo.get_absolute_url())
-        self.assertEqual(duo.parent.sample_id, self.parent_sample_id)
+        self.assertEqual(duo.relative.sample_id, self.relative_sample_id)
         self.assertEqual(duo.proband.sample_id, self.proband_sample_id)
         self.assertEqual(duo.relationship, DuoRelationship.FATHER)
-        self.assertTrue(duo.parent_affected)
+        self.assertTrue(duo.relative_affected)
+
+    def test_post_creates_sibling_duo(self):
+        self._post_roles(DuoSample.SIBLING, sample_2_affected="on")
+        duo = Duo.objects.get(cohort=self.cohort)
+        self.assertEqual(duo.relationship, DuoRelationship.SIBLING)
+        self.assertTrue(duo.relative_is_sibling)
+        self.assertTrue(duo.relative_affected)

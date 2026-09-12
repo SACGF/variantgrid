@@ -5,15 +5,18 @@
 
    options.roleClasses maps a role value to the class that fills that symbol in, and
    options.roleShapeClasses to the class that picks which shape the role is drawn as - the Duo symbol
-   draws both parents and blanks one out (see --pedigree-*-fill in uicore/tags/svg_icon_sprite.html).
+   draws a parent and a sibling and hides all but the one picked (see --pedigree-* in
+   uicore/tags/svg_icon_sprite.html).
    options.autoAssignRoles maps a sex to the role a sample of that sex takes once the proband is
-   chosen - pass it where sex, plus what is left over, decide the rest. */
+   chosen - pass it where sex, plus what is left over, decide the rest. options.autoAffectedRoles
+   lists the roles that tick their own affected box when picked, for the ones usually affected. */
 const FAMILY_PROBAND = 'P';
 
 function setupFamilyRoles(sampleSexes, options) {
     const roleClasses = options.roleClasses || {};
     const roleShapeClasses = options.roleShapeClasses || {};
     const autoAssignRoles = options.autoAssignRoles;
+    const autoAffectedRoles = options.autoAffectedRoles || [];
     const roleSelects = $("select", ".sample-select");
 
     function affectedCheckbox(i) {
@@ -84,8 +87,12 @@ function setupFamilyRoles(sampleSexes, options) {
     }
 
     roleSelects.change(function() {
-        if (autoAssignRoles && $(this).val() === FAMILY_PROBAND) {
+        const role = $(this).val();
+        if (autoAssignRoles && role === FAMILY_PROBAND) {
             autoAssignFromProband(roleSelects.index(this));
+        }
+        if (autoAffectedRoles.includes(role)) {
+            affectedCheckbox(roleSelects.index(this)).prop("checked", true);
         }
         refresh();
     });

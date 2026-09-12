@@ -38,7 +38,7 @@ def duo_table(duo: Duo):
     """ Duo details + a row per family member - the proband is affected by definition """
     members = [
         {"role": "Proband", "cohort_sample": duo.proband, "affected": True},
-        {"role": duo.relationship_label, "cohort_sample": duo.parent, "affected": duo.parent_affected},
+        {"role": duo.relationship_label, "cohort_sample": duo.relative, "affected": duo.relative_affected},
     ]
     return {"duo": duo, "members": members}
 

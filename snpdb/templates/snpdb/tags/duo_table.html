@@ -42,8 +42,12 @@
         </tbody>
     </table>
     <div class="card-footer text-muted small">
-        The {{ duo.missing_parent_label|lower }} was not sequenced - de novo can't be confirmed and
-        compound het is only half phased.
+        {% if duo.relative_is_sibling %}
+            No parent was sequenced - de novo can't be confirmed and compound het is unphased.
+        {% else %}
+            The {{ duo.missing_parent_label|lower }} was not sequenced - de novo can't be confirmed and
+            compound het is only half phased.
+        {% endif %}
     </div>
 </div>
 

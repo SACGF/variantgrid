@@ -6,10 +6,16 @@ from annotation.fake_annotation import get_fake_annotation_version
 from annotation.tests.test_data_fake_genes import create_fake_transcript_version
 from library.django_utils.unittest_utils import URLTestCase, prevent_request_warnings
 from library.guardian_utils import assign_permission_to_user_and_groups
-from snpdb.models import TagColorsCollection, UserAward
+from snpdb.models import Duo, TagColorsCollection, UserAward
 from snpdb.models.models_cohort import Cohort
 from snpdb.models.models_columns import CustomColumnsCollection
-from snpdb.models.models_enums import AwardPeriod, ImportStatus, UserAwardKind, UserAwardLevel
+from snpdb.models.models_enums import (
+    AwardPeriod,
+    DuoRelationship,
+    ImportStatus,
+    UserAwardKind,
+    UserAwardLevel,
+)
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_genomic_interval import (
     GenomicIntervalsCategory,
@@ -39,6 +45,11 @@ class Test(URLTestCase):
         cls.cohort = cls.trio.cohort
         cls.quad = create_fake_quad(cls.user_owner, grch37)
         cls.duo = create_fake_duo(cls.user_owner, grch37)
+        # Same samples read as a sibling pair - the view page words itself off the relationship
+        cls.duo_sibling = Duo.objects.create(name="test_duo_sibling", user=cls.user_owner,
+                                             cohort=cls.duo.cohort, proband=cls.duo.proband,
+                                             relative=cls.duo.relative, relative_affected=True,
+                                             relationship=DuoRelationship.SIBLING)
         cls.vcf = cls.cohort.vcf
         cls.sample = cls.vcf.sample_set.first()
 
@@ -84,6 +95,7 @@ class Test(URLTestCase):
             ('view_trio', {"pk": cls.trio.pk}, 200),
             ('view_quad', {"pk": cls.quad.pk}, 200),
             ('view_duo', {"pk": cls.duo.pk}, 200),
+            ('view_duo', {"pk": cls.duo_sibling.pk}, 200),
 
             # Data objects
             ('view_genomic_intervals', {"genomic_intervals_collection_id": cls.genomic_intervals_collection.pk}, 200),

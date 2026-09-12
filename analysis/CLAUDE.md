@@ -41,7 +41,14 @@ Patterns here:
 - The Duo/Trio/Quad wizards are one view and one template: `analysis/views/views_wizard.py:FamilyWizardView` +
   `analysis/templates/analysis/family_wizard.html`, driven by the subclass's `family_*`/`role_*` attributes. A sample's
   role says which family member it is (Mother/Father/Proband/Sibling), and the sample's sex narrows the roles on offer
-  (`analysis/forms/forms.py:FamilyWizardForm`) - a Duo stores its parent's role as the Duo's relationship.
+  (`analysis/forms/forms.py:FamilyWizardForm`) - a Duo stores its relative's role as the Duo's relationship.
+- A Duo's second member is a *relative*, not necessarily a parent: `relationship` is Mother, Father or Sibling (#1861).
+  A sibling pair carries no transmission, so the parent-only modes ('Absent in parent', 'Dominant (mosaic parent)') raise
+  an inheritance error; the recessive modes ask the sibling for the proband's own genotype when they're affected and
+  anything short of homozygous when they're not (`analysis/models/nodes/family_inheritance.py:AbstractFamilyInheritance.sibling_zygosities`),
+  and comp het collapses to one unphased branch. The node editor's zygosity table is keyed on the plainest name that
+  still tells its rows apart - `relative`, plus a `_<relationship>` and/or `_affected`/`_unaffected` suffix only where
+  the mode reads differently - and `duonode_editor.html`'s `lookup()` tries those in the same order.
 - Node editor = ModelForm subclass of `analysis/forms/forms_nodes.py:BaseNodeForm` + a `NodeView` subclass in views/nodes/
   with `model` set + template `analysis/node_editors/<classname>_editor.html`.
   `analysis/views/views_node.py:get_node_views_by_class` finds the view by `model`, so defining the class registers it;

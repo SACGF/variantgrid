@@ -58,6 +58,7 @@ class FamilyWizardView(FormView):
     role_classes: dict = {}  # Role -> the class that fills that member of the pedigree figure in
     role_shape_classes: dict = {}  # Role -> the class that picks which shape it's drawn as (Duo)
     auto_assign_roles: dict = {}  # Sex -> the role a sample of that sex takes once the proband is picked
+    auto_affected_roles: list = []  # Roles that tick their own affected box when picked
 
     def dispatch(self, request, *args, **kwargs):
         self.cohort = Cohort.get_for_user(request.user, kwargs["cohort_id"])
@@ -97,7 +98,8 @@ class FamilyWizardView(FormView):
             "role_help": self.role_help,
             "role_options": {"roleClasses": self.role_classes,
                              "roleShapeClasses": self.role_shape_classes,
-                             "autoAssignRoles": self.auto_assign_roles},
+                             "autoAssignRoles": self.auto_assign_roles,
+                             "autoAffectedRoles": self.auto_affected_roles},
         })
         return context
 
@@ -172,18 +174,23 @@ class DuoWizardView(FamilyWizardView):
     family_icon = "node-icon-duo"
     figure_width = "90px"
     heading_icon_width = "1.1em"
-    role_help = ("say which parent you have and which sample is the proband, then tick the parent if "
-                 "they're affected. Picking the proband fills the parent in where its sex settles it.")
-    role_classes = {DuoSample.MOTHER: "parent-affected", DuoSample.FATHER: "parent-affected"}
-    role_shape_classes = {DuoSample.MOTHER: "duo-mother", DuoSample.FATHER: "duo-father"}
+    role_help = ("say which relative you have - a parent, or a sibling - and which sample is the "
+                 "proband, then tick the relative if they're affected. Picking the proband fills a "
+                 "parent in where its sex settles it.")
+    role_classes = {DuoSample.MOTHER: "relative-affected", DuoSample.FATHER: "relative-affected",
+                    DuoSample.SIBLING: "relative-affected"}
+    role_shape_classes = {DuoSample.MOTHER: "duo-mother", DuoSample.FATHER: "duo-father",
+                          DuoSample.SIBLING: "duo-sibling"}
     auto_assign_roles = {Sex.FEMALE: DuoSample.MOTHER, Sex.MALE: DuoSample.FATHER}
+    # A sibling duo is usually two affected siblings - #1861
+    auto_affected_roles = [DuoSample.SIBLING]
 
     def get_or_create_family(self, form, cohort_samples, defaults):
-        parent_role = form.parent_role
+        relative_role = form.relative_role
         return Duo.objects.get_or_create(cohort=self.cohort,
                                          user=self.request.user,
                                          proband=cohort_samples[DuoSample.PROBAND],
-                                         parent=cohort_samples[parent_role],
-                                         relationship=parent_role,
-                                         parent_affected=form.affected_by_role[parent_role],
+                                         relative=cohort_samples[relative_role],
+                                         relationship=relative_role,
+                                         relative_affected=form.affected_by_role[relative_role],
                                          defaults=defaults)
