@@ -1,7 +1,7 @@
 # #1862 — HPO terms not pulling associated genes
 
 Written by Claude Fable 5.1 (claude-fable-5-1), 2026-09-11
-Status: draft
+Status: in progress - implemented; backfill reuses the latest version's import (no new OntologyVersion) rather than step 4's fresh import
 
 [#1862](https://github.com/SACGF/variantgrid/issues/1862): every HPO term on a phenotype node warns "have no
 associated genes" and the node passes all variants through.

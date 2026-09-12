@@ -1,0 +1,13 @@
+hpo_id	hpo_name	ncbi_gene_id	gene_symbol	disease_id
+HP:0001507	Growth abnormality	593	BCKDHA	OMIM:248600
+HP:0001507	Growth abnormality	594	BCKDHB	OMIM:248600
+HP:0001507	Growth abnormality	4221	MEN1	OMIM:131100
+HP:0001507	Growth abnormality	8029	CUBN	ORPHA:35858
+HP:0004323	Abnormality of body weight	593	BCKDHA	OMIM:248600
+HP:0004323	Abnormality of body weight	8029	CUBN	OMIM:261100
+HP:0004323	Abnormality of body weight	81693	AMN	OMIM:261100
+HP:0004323	Abnormality of body weight	4221	MEN1	ORPHA:652
+HP:0002925	Increased circulating thyroid-stimulating hormone concentration	4221	MEN1	OMIM:131100
+HP:0002925	Increased circulating thyroid-stimulating hormone concentration	8029	CUBN	OMIM:261100
+HP:0001657	Prolonged QT interval	861	RUNX1	OMIM:601399
+HP:0001657	Prolonged QT interval	861	RUNX1	ORPHA:71290
