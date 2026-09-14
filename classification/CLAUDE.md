@@ -38,6 +38,10 @@ Patterns here:
   classification_revalidate_signal, variants_classification_changed_signal). Receivers live in signals/ and are imported by
   apps.py:ClassificationConfig.ready; annotation/apps.py and snpdb/signals/common_variants_classification_changed.py subscribe
   from outside the app.
+- The case report (#444) is one Django template per lab rendered server side: report/case_report_context.py builds
+  ReportVariant / ReportContext (ordering, amp_tier, kinds, measures), report/renderers.py turns one HTML into the PDF
+  (xhtml2pdf) and DOCX (html2docx), and the JSON comes off the same context. ClassificationReport.context() builds its
+  rows from the same ReportVariant, so `record` / `classifications` / `gene_groups` mean one thing.
 Gotchas:
 - "Every edit makes a ClassificationModification" has one exception: models/classification.py:ClassificationModification.is_edit_appendable
   folds a patch into the previous unpublished modification when it is the same user and source within a minute.
@@ -85,6 +89,10 @@ Gotchas:
 - Withdrawing is a soft delete (models/classification.py:Classification.set_withdrawn) that sends classification_withdraw_signal;
   the record stays in the lab's lists and can be un-withdrawn. A hard delete goes through pre_delete / post_delete receivers
   that recalc contexts and groupings.
+- report/__init__.py stays empty on purpose: models/classification_report_models.py imports report/template_validation.py
+  for the save-time fixture render, so a package __init__ that reached into classification.models would be a cycle. For
+  the same reason template_validation.FIXTURE_CONTEXT is hand written rather than built from ReportContext -
+  tests/report/test_case_report_context.py:FixtureContextTest is what keeps the two in step.
 Tests:
 - tests/models/test_utils.py:ClassificationTestUtils.setUp builds the Org / Lab / user pair (lab_and_user, external_lab_and_user);
   create records with Classification.create(user=..., lab=..., data={SpecialEKeys.C_HGVS: {'value': ...}}, source=SubmissionSource.API).

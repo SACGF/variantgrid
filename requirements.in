@@ -43,6 +43,7 @@ easy_thumbnails
 fontawesomefree==6.4.0
 git+https://github.com/biocommons/hgvs#egg=hgvs
 gunicorn
+html2docx
 HTSeq
 ijson
 inflection
@@ -82,6 +83,7 @@ sqlparse>=0.6.0
 tblib  # picklable tracebacks for manage.py test --parallel
 toposort
 Unidecode
+xhtml2pdf
 # below are only required for environments directly integrating with s3
 # separate to django-amazon-ses
 boto3

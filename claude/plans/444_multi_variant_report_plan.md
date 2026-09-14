@@ -1,7 +1,7 @@
 # Multi-variant case report - HTML, PDF, DOCX and JSON from a case's classifications (#444)
 
 Written by Claude Fable 5.1 (claude-fable-5-1), 2026-09-14
-Status: draft
+Status: in progress
 
 Design for [#444](https://github.com/SACGF/variantgrid/issues/444) (multi-variant classification + reporting), the
 reporting half of [sapath#431](https://github.com/SACGF/variantgrid_sapath/issues/431) (TSO 500), and the "#444
@@ -158,7 +158,7 @@ the single-record HTML path and the case report share one definition of a varian
 @dataclass
 class ReportVariant:
     modification: ClassificationModification
-    kind: str                     # 'small_variant' | 'copy_number' | 'fusion' | 'splice'
+    kind: str                     # 'small_variant' | 'copy_number' | 'fusion'
     gene_symbol: str              # sort key; fusions use the 5' partner
     gene_symbols: list[str]       # both fusion partners
     tier: Optional[str]           # somatic:clinical_significance value, eg 'tier_2'
@@ -226,10 +226,11 @@ Templates receive `asdict()` of this, with model instances replaced by small dic
 
 The report order is fixed by the context builder; templates loop in the order given.
 
-1. **Kind**: small variants, then copy number changes, then fusions, then splice variants. `kind` comes from the
+1. **Kind**: small variants, then copy number changes, then fusions. `kind` comes from the
    `Variant` the classification resolved to - a gene-level alt (`snpdb/gene_level_variants.py`, `GeneFusion` in
    `genes/models/models_gene_fusion.py`) says copy number or fusion; a classification with no resolved variant falls back
-   to the `variant_class` evidence key (`copy_number_gain` / `copy_number_loss` → copy number, otherwise small variant).
+   to the `variant_class` evidence key (`copy_number_gain` → copy number, otherwise small variant). Alteration is only
+   ever `var`, `amp` or `fusion` - the three values real TSO 500 reports carry.
 2. **Tier**: `IA`, `IB`, `IIC`, `IID`, `III`, `IV`, then unclassified. Derived per §Tier.
 3. **Gene symbol**: alphabetical.
 4. **VAF**: descending, then copy number descending, then c.HGVS - so two variants in one gene print highest VAF

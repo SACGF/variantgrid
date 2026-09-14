@@ -124,6 +124,10 @@ class SpecialEKeys:
     CURATION_VERIFIED_BY = 'curation_verified_by'
     SAMPLE_DATE = 'sample_date'
     VARIANT_TAGS = 'variant_tags'
+    VARIANT_CLASS = 'variant_class'
+    VARIANT_REPORTED = 'variant_reported'
+    COPY_NUMBER = 'copy_number'
+    H_SUMMARY = 'h_summary'  # the gene level paragraph a case report prints after a gene's variants
 
     # POPULATED
     # Note: Some fields not here are populated - those with variantgrid_column
