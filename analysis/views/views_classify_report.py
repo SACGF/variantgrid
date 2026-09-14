@@ -32,6 +32,7 @@ from analysis.variant_tag_operations import (
 )
 from annotation.transcripts_annotation_selections import VariantTranscriptSelections
 from classification.models import (
+    CaseReport,
     Classification,
     ClassificationConsensus,
     ClassificationModification,
@@ -251,6 +252,28 @@ def _flat_case_values(case_values: Optional[dict]) -> dict:
     return flat
 
 
+def _case_values_for_form(template: Optional[ClassificationReportTemplate],
+                          modifications: list[ClassificationModification],
+                          draft: Optional[CaseReport]) -> dict:
+    """ What the form starts from: a draft's own answers, else each field's default and its
+        prefill_key read off the case's classifications - a case level value the records already
+        carry, like SA Path's clinical indication, is not worth retyping """
+    values = _flat_case_values(draft.case_values if draft else None)
+    for field in (template.case_fields if template else None) or []:
+        key = field.get("key")
+        if not key or key in values:
+            continue
+        value = field.get("default")
+        if prefill_key := field.get("prefill_key"):
+            for modification in modifications:
+                if prefilled := modification.get(prefill_key):
+                    value = prefilled
+                    break
+        if value is not None:
+            values[key] = value
+    return values
+
+
 def _report_lab(request, user) -> Lab:
     """ Whose report it is - the report is the lab's document, so the lab decides who may finalise it """
     if lab_id := request.POST.get("lab"):
@@ -283,7 +306,7 @@ def case_report_build_dialog(request, case_type: str, case_id: int):
             case_allele_origin_bucket(modifications)),
         "variants": build_report_variants(modifications, request.user),
         "summary": draft.summary if draft else "",
-        "case_values": _flat_case_values(draft.case_values if draft else None),
+        "case_values": _case_values_for_form(template, modifications, draft),
         "lab": lab,
         "lab_error": lab_error,
         "lab_form": UserLabChoiceForm(user=request.user, default_lab=lab) if lab else None,

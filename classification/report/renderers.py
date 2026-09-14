@@ -9,6 +9,7 @@ classifications at the same versions.
 Entry point: render_case_report(template, context, title) -> RenderedCaseReport.
 """
 import json
+import re
 from dataclasses import dataclass
 from typing import Optional
 
@@ -41,8 +42,13 @@ def render_json(json_template: str, context: dict) -> dict:
     return json.loads(render_html(json_template, context))
 
 
+# html2docx has no notion of a document head: it prints the contents of <style> and <script> as the
+# first paragraph of the Word file. They are the print design, not the report, so they come out first
+NON_CONTENT_PATTERN = re.compile(r"<(head|style|script)\b.*?</\1\s*>", re.DOTALL | re.IGNORECASE)
+
+
 def render_docx(html: str, title: str) -> bytes:
-    return html2docx(html, title=title).getvalue()
+    return html2docx(NON_CONTENT_PATTERN.sub("", html), title=title).getvalue()
 
 
 def render_case_report(template: ClassificationReportTemplate, context: dict,

@@ -1,9 +1,9 @@
 # Multi-variant case report - HTML, PDF, DOCX and JSON from a case's classifications (#444)
 
-Written by Claude Fable 5.1 (claude-fable-5-1), 2026-09-14
-Status: in progress - steps 1-4 and 6 landed (models, context, renderers, the tab and finalise);
-step 5 (the SA Path TSO 500 `case_template` / `json_template` / `case_fields`) is the remaining work,
-and lives in the sapath repo.
+Written by Claude Fable 5.1 (claude-fable-5-1), 2026-09-14; step 5 by Claude Opus 5 (claude-opus-5)
+Status: in progress - every step is built. Steps 1-4 and 6 (models, context, renderers, the tab and
+finalise) are in this repo; step 5 (the SA Path TSO 500 `case_template` / `json_template` /
+`case_fields`, and the migration that seeds them) is in the sapath repo, unreleased.
 
 Design for [#444](https://github.com/SACGF/variantgrid/issues/444) (multi-variant classification + reporting), the
 reporting half of [sapath#431](https://github.com/SACGF/variantgrid_sapath/issues/431) (TSO 500), and the "#444

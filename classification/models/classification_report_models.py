@@ -40,7 +40,8 @@ class ClassificationReportTemplate(TimeStampedModel):
     # Blank renders the canonical context dump rather than nothing
     json_template = models.TextField(null=False, blank=True, default="")
     # Case level inputs the build form asks for, so a deployment adds them without a schema change:
-    # [{"key", "label", "type": "text"|"bool"|"choice", "options": [...], "default", "group"}]
+    # [{"key", "label", "type": "text"|"bool"|"choice", "options": [...], "default", "group",
+    #   "prefill_key": the evidence key the form starts the field from}]
     case_fields = models.JSONField(default=list, blank=True)
     # Which cases this template is offered for - null is every case
     allele_origin_bucket = models.CharField(max_length=1, choices=AlleleOriginBucket.choices,

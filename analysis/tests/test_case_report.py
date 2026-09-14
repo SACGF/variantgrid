@@ -217,6 +217,21 @@ class CaseReportBuildFormTest(ClassifyReportTestCase):
         self.assertContains(response, "case_field_panel")
         self.assertContains(response, "assay_success")
 
+    def test_the_dialog_starts_a_field_from_its_default_and_its_prefill_key(self):
+        """ A case level value the records already carry is not worth retyping, and a flag that is
+            normally on starts on - both only reach the form through the field definition """
+        self.template.case_fields = [
+            {"key": "panel", "label": "Panel", "type": "text", "default": "TSO500"},
+            {"key": "gene", "label": "Gene", "type": "text", "prefill_key": SpecialEKeys.GENE_SYMBOL},
+        ]
+        self.template.save()
+
+        response = self.client.post(self._url("case_report_build_dialog"), self._post_data())
+
+        content = response.content.decode()
+        self.assertRegex(content, r'name="case_field_panel"[^>]*>TSO500</textarea>')
+        self.assertRegex(content, r'name="case_field_gene"[^>]*>(RUNX1|TP53)</textarea>')
+
     def test_building_pins_the_report_flags_and_the_case_fields(self):
         response = self.client.post(self._url("create_case_report"), self._post_data())
         self.assertEqual(response.status_code, 200)

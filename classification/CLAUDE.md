@@ -104,6 +104,12 @@ Gotchas:
 - `variant_reported` says which *kind* of finding a variant was (primary / secondary / incidental), which is the
   curator's call - so finalising only ever settles reported against `not_included`, and a record that already names a
   kind keeps it.
+- html2docx has no head: it prints the contents of `<style>` and `<script>` as the Word file's first paragraph, so
+  report/renderers.py:render_docx strips them. A template's print CSS is design, not report content.
+- `kind_groups` always carries all three kinds, empty variants and all (the way the tiers are always printed), so a
+  template can say "Gene Fusions - None detected". A Results Summary that skips a kind reads as though it wasn't looked for.
+- A `case_field` can carry `prefill_key`: the build form starts that field from the named evidence key on the case's
+  first classification that has one (SA Path's clinical indication), and its `default` otherwise.
 - report/__init__.py stays empty on purpose: models/classification_report_models.py imports report/template_validation.py
   for the save-time fixture render, so a package __init__ that reached into classification.models would be a cycle. For
   the same reason template_validation.FIXTURE_CONTEXT is hand written rather than built from ReportContext -

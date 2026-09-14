@@ -387,14 +387,12 @@ def build_gene_groups(variants: list[ReportVariant]) -> list[GeneGroup]:
 
 
 def build_kind_groups(variants: list[ReportVariant]) -> list[KindGroup]:
-    """ The Results Summary - one table per kind, in report order, of what is being reported """
-    kind_groups = []
-    for kind in ReportVariantKind.ORDER:
-        in_kind = [v for v in variants if v.kind == kind and v.reported]
-        if in_kind:
-            kind_groups.append(KindGroup(kind=kind, label=ReportVariantKind.LABELS[kind],
-                                         variants=in_kind))
-    return kind_groups
+    """ The Results Summary - one table per kind, in report order, of what is being reported. Every
+        kind is printed whether or not the case has any, the way the tiers are: a summary that skips
+        Gene Fusions leaves the reader to wonder whether they were looked for """
+    return [KindGroup(kind=kind, label=ReportVariantKind.LABELS[kind],
+                      variants=[v for v in variants if v.kind == kind and v.reported])
+            for kind in ReportVariantKind.ORDER]
 
 
 def build_tier_groups(variants: list[ReportVariant]) -> list[TierGroup]:

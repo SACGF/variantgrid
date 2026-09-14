@@ -36,6 +36,7 @@
 <h2>Results summary</h2>
 {% for kind_group in kind_groups %}
 <h3>{{ kind_group.label }}</h3>
+{% if not kind_group.variants %}<p>None detected.</p>{% endif %}
 <table>
     <tr><th>Tier</th><th>Gene</th><th>Change</th><th>VAF</th><th>Copies</th></tr>
     {% for v in kind_group.variants %}
@@ -45,8 +46,6 @@
         <td>{{ v.copy_number|default_if_none:"" }}</td></tr>
     {% endfor %}
 </table>
-{% empty %}
-<p>No reportable findings.</p>
 {% endfor %}
 
 {% if summary %}
