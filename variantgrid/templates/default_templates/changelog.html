@@ -17,14 +17,14 @@
 
     {% if sapath_enabled %}
         <!-- Do all as 1 big change -->
-        <!-- Last audited/updated: 10 September 2026 (includes features up to the 10 September 2026 deploy) -->
+        <!-- Last audited/updated: 14 September 2026 (includes features up to the 14 September 2026 deploy) -->
 
         <div class="card mt-4">
             <div class="card-header">VariantGrid 4.0 - FAQ</div>
             <div class="card-body">
                 <h4>Key new features - Germline</h4>
                 <ul>
-                    <li>Duo node - proband plus one sequenced parent</li>
+                    <li>Duo node - proband plus one sequenced relative, a parent or a sibling</li>
                     <li>Quad node - trio plus an affected sibling</li>
                     <li>Mosaic / partial inheritance - a parent carrying the variant in a fraction of cells</li>
                 </ul>
@@ -74,8 +74,9 @@
                     <li>New analysis type - Quad (a trio plus an affected sibling). Has its own creation wizard and page, and the
                         Trio/Quad nodes show a table of zygosities, with options for combined recessive filtering, "any affected",
                         and requiring the affected sibling's zygosity</li>
-                    <li>New analysis type - Duo (a proband plus one sequenced parent, where the other isn't available).
-                        Own wizard, page and node, with the inheritance modes that make sense with one parent</li>
+                    <li>New analysis type - Duo (a proband plus one sequenced relative, where the rest of the family
+                        isn't available). The relative is a parent or a sibling, and it has its own wizard, page and node,
+                        with the inheritance modes that make sense for that relationship</li>
                     <li>Trio/Duo/Quad nodes - new "Dominant (mosaic parent)" inheritance, which finds a parent carrying the
                         variant in a fraction of cells by their alt reads at a low allele frequency, rather than by
                         the germline caller's genotype</li>
@@ -320,6 +321,26 @@
 
 
     {% else %}
+       <div class="card mt-4">
+            <div class="card-header">14 September 2026</div>
+            <div class="card-body">
+                <h4>Analysis</h4>
+                <ul>
+                    <li>#1861 - A Duo's second member can now be a sibling, not only a parent</li>
+                    <li>#1861 - Duo inheritance modes follow the relationship - a sibling pair carries no parental transmission</li>
+                </ul>
+                <h4>Patients / Phenotype</h4>
+                <ul>
+                    <li>#1862 - HPO's newer phenotype to genes file loads again, so phenotype nodes find genes</li>
+                    <li>#1860 - A patient reads "code - name", so grids and previews lead with the code</li>
+                </ul>
+                <h4>Genes</h4>
+                <ul>
+                    <li>#1530 - Legacy gene pages redirect to the gene symbol page instead of erroring</li>
+                </ul>
+            </div>
+       </div>
+
        <div class="card mt-4">
             <div class="card-header">10 September 2026</div>
             <div class="card-body">
