@@ -55,8 +55,7 @@ two-arm case. The CSV gets the same three fields and the same matching rule.
   errors follow the existing convention (`patients/import_records.py:match_sample`: the message is recorded, the thing
   that failed is left `None`, the rest of the row is applied). The docstring is corrected in the same change.
 - **All 21 columns are required today** (`patients/import_records.py:import_patient_records` raises on any missing
-  header). Backwards compatibility for the new columns therefore needs an optional-column notion, which there is not
-  yet.
+  header). The three extraction columns join that list; a file in the old shape fails the same check.
 - `claude/research/patients.md` has no `Verified against` header; its PatientRecord section is a lead, not a fact.
   The patients app has no CLAUDE.md of its own.
 
@@ -105,9 +104,6 @@ class PatientColumns:
                       (EXTRACTION_NUCLEIC_ACID_SOURCE, "Nucleic Acid Source", ""),
                       (EXTRACTION_DATE, "Date", "Tells two extractions of the same acid apart")]
     COLUMNS = [c[0] for c in COLUMN_DETAILS]                 # header order; extraction columns last
-    OPTIONAL_COLUMNS = {EXTRACTION_REFERENCE_ID, EXTRACTION_DATE}
-    # Header a file may still carry from before #1870 -> the column it means
-    LEGACY_COLUMNS = {'Specimen Nucleic acid source (DNA/RNA)': EXTRACTION_NUCLEIC_ACID_SOURCE}
 
     SAMPLE_QUERYSET_PATH = {...,
                             EXTRACTION_REFERENCE_ID: "extraction__reference_id",
@@ -126,7 +122,8 @@ specimen reference plus `reference_id`, `nucleic_acid_source`, `extraction_date`
 
 The nucleic acid column is renamed from `Specimen Nucleic acid source (DNA/RNA)` to
 `Extraction Nucleic acid source (DNA/RNA)` because it sits beside `Extraction Reference id` and `Extraction date`
-and has described the extraction since #1704; the old header is accepted through `LEGACY_COLUMNS`. The constant
+and has described the extraction since #1704; the old header is gone, so a file still carrying it fails the header
+check. The constant
 `SPECIMEN_NUCLEIC_ACID_SOURCE` becomes `EXTRACTION_NUCLEIC_ACID_SOURCE` (`grep` shows its users are
 `patients/import_records.py`, the two test modules and `patients/models.py` itself).
 
@@ -134,12 +131,13 @@ A row with a `Specimen Reference id` and blank extraction columns means what it 
 `Extraction Reference id` and no `Specimen Reference id` is a validation error (an extraction has nowhere to live;
 `patients/serializers.py:SpecimenSerializer` gives the API's version of the same rule).
 
-### Backwards compatibility
+### Old files
 
-`import_patient_records`: rename `LEGACY_COLUMNS` headers on the DataFrame first, then require
-`set(COLUMNS) - OPTIONAL_COLUMNS`, then add any absent optional column as `None` so `process_record` reads every
-column the same way. A pre-#1870 file - the 21 old headers - imports exactly as today: one extraction per row, the
-sample discriminating, `test_one_specimen_two_arms` still passing against a legacy copy (Tests, below).
+The three new columns are required like the 21 before them: `import_patient_records` keeps its single header check
+and a pre-#1870 file fails it with the existing missing-header message naming the three columns. The downloadable
+example (`/patients/example_upload_csv/empty` and `/all`, rendered from `COLUMNS`) is the reference shape and the
+migration path - download, paste, upload. Cells in the new columns may be blank; a blank reference and date mean
+what a row means today.
 
 ## Matching rules on re-import
 
@@ -167,7 +165,7 @@ extraction_date=None)`, in this order, first hit wins:
 
 Step 1 beats step 2 deliberately: a file that names `2600000001B` on a sample currently linked to `2600000001C` is
 correcting the link, and `patients/import_records.py:assign_extraction_to_sample` records the change as a
-`PatientModification`. Step 3 matches named extractions too, so a legacy file (acid, sample, no reference) fills in
+`PatientModification`. Step 3 matches named extractions too, so a row with acid and sample but no reference fills in
 the sample link on arms the API accessioned - today's behaviour for `SPEC-042`. The one behaviour change in an
 existing file is that two same-acid extractions with nothing to tell them apart now raise instead of picking
 `.first()`.
@@ -203,7 +201,7 @@ edit -> upload is the round trip: every row names its extraction, so step 1 matc
 - `patients/models.py`: `PatientColumns` and `PatientRecord` as above; `Specimen.get_or_create_extraction` gains
   `reference_id` and `extraction_date` and the order in "Matching rules"; its docstring is the one place the rule is
   written down. `AmbiguousExtraction`.
-- `patients/import_records.py`: header aliasing and optional columns in `import_patient_records`; `process_record`
+- `patients/import_records.py`: the three columns join the required header set; `process_record`
   reads the three columns, passes them through, catches `AmbiguousExtraction`, writes the new `PatientRecord`
   fields; the reconcile call; the module docstring corrected to what the code does.
 - `patients/templates/patients/view_patient_record.html`: three labelled rows under the specimen ones (rename the
@@ -228,19 +226,15 @@ The matching order and the column handling are ours; pandas, `RenameField` and `
   sample-less rows `2600000001` / `2600000001C` DNA and `2600000001B` RNA make two named extractions, and importing
   them again makes none; a row naming `2600000001B` relinks the sample from `2600000001C` and a `PatientModification`
   says so; an extraction reference without a specimen reference is a validation message and no extraction; an
-  ambiguous row is a validation message, no sample link, and the specimen is otherwise updated; a row under the
-  legacy nucleic acid header (built with `_make_row` and the old key) behaves as the new one;
+  ambiguous row is a validation message, no sample link, and the specimen is otherwise updated;
   `test_export_columns_round_trip` reads the two new paths back.
 
 `upload/tests/test_import_patient_records.py` (the whole pipeline, `TestPatientUploadImport`): regenerate
 `upload/test_data/patient_upload.csv` as #1745 did - the renamed header, the two new columns, and the `ONC-042`
 rows become block `2600000001` with arms `2600000001C` (DNA, dated) and `2600000001B` (RNA, dated), plus a third
 sample-less row for a re-extraction `2600000001D` (DNA, later date). `test_one_specimen_two_arms` asserts the
-references and dates; a new `test_legacy_header_imports` writes the same file back to the old shape in
-`setUpTestData` (pandas: drop the two columns, rename the header, `tempfile`) and runs it through the pipeline,
-asserting the old outcome (two arms under the sample rule, the re-extraction row now a validation message since it
-is a second unnamed DNA). That single test is the whole backwards-compatibility promise; the file it needs is
-derived, so there is no second CSV to keep in step.
+references and dates. The old header shape gets no test of its own: the missing-header check is existing code and
+the new columns are three more names in the set it checks.
 
 ## Manual verification
 
@@ -258,18 +252,17 @@ On this box, as a user with a VCF whose sample names end in `..._2600000001C` / 
 5. `/patients/example_upload_csv/all`, then upload the file unchanged: same count of extractions; then change one
    `Extraction date` and re-upload: the date changes in place.
 6. Upload the pre-#1870 `upload/test_data/patient_upload.csv` from `git show 36e3f4e5b:upload/test_data/patient_upload.csv`:
-   imports as it did, seven rows, two arms under `SPEC-042`.
+   the import fails with the missing-header message naming the three extraction columns.
 
 ## Decisions made
 
 - **Flat rows, one per extraction, `EXTRACTION_*` columns**, not a second section - the API's payload flattened
   onto the row shape the file, the export and the file-type detection already have.
-- **Rename the nucleic acid header** and accept the old one as an alias. Leaving `Specimen Nucleic acid source`
-  beside `Extraction Reference id` would have the help page contradict itself; the alias is a one-line
-  `df.rename` and a test.
-- **The two new columns are optional; everything else stays required.** Making all columns optional was
-  tempting and out of scope - the strict header check is what stops a half-edited spreadsheet from silently
-  importing.
+- **Rename the nucleic acid header, no alias.** Leaving `Specimen Nucleic acid source` beside
+  `Extraction Reference id` would have the help page contradict itself.
+- **All three new columns are required; old-shape files fail the header check.** The downloadable example is the
+  shape people copy from, so it is the one source of truth; the strict header check is what stops a half-edited
+  spreadsheet from silently importing, and an alias or optional-column notion would weaken it.
 - **Reference beats sample beats discriminators.** The reference is the identity the API upserts on; the sample
   rule is what existing files rely on; the discriminators are for rows that have neither.
 - **Ambiguity is a validation message, not a guess.** Today's `.first()` is silent data loss for a re-extraction;
