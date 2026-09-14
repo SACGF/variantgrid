@@ -390,9 +390,11 @@ class TestDeIdentifiedPatientName(TestCase):
         patient = Patient.objects.create(patient_code="DEID-101")
         self.assertEqual(str(patient), "DEID-101")
 
-    def test_str_leads_with_code_when_both_set(self):
+    def test_str_hides_name_when_code_set(self):
+        # Showing the name beside a de-identified code would re-identify the patient #1860
         patient = Patient.objects.create(patient_code="SAP123", first_name="Jane", last_name="SMITH", sex=Sex.FEMALE)
-        self.assertEqual(str(patient), "SAP123 - SMITH, Jane (F)")
+        self.assertEqual(str(patient), "SAP123 (F)")
+        self.assertEqual(patient.preview.title, "SAP123")
 
     def test_str_uses_name_alone_when_no_code(self):
         # The pk fallback in .code is for previews and search, not something to show beside a name

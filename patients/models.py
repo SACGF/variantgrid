@@ -196,7 +196,7 @@ class Patient(GuardianPermissionsMixin, HasPhenotypeDescriptionMixin, Externally
 
         return self.preview_with(
             identifier=self.short_identifier,
-            title=self.name_last_name_first,
+            title=self.display_identity,
             summary_extra=parts
         )
 
@@ -315,15 +315,18 @@ class Patient(GuardianPermissionsMixin, HasPhenotypeDescriptionMixin, Externally
         return sample_model.objects.filter(reaches_patient).distinct() \
             .select_related("vcf__genome_build", "extraction__specimen").order_by("vcf__date")
 
-    def __str__(self):
-        # The code is the identity (grids and previews lead with it) - the name follows so a
-        # patient known by both reads "SAP123 - SMITH, Jane". De-identified patients have only a code
-        parts = []
+    @property
+    def display_identity(self) -> str:
+        """ The code alone when there is one - showing the name beside a de-identified code would
+            re-identify the patient. Only a patient with no code is known by name """
         if code := self.patient_code or self.external_pk:
-            parts.append(str(code))
+            return str(code)
         if self.first_name or self.last_name:
-            parts.append(self.name_last_name_first)
-        description = " - ".join(parts) or str(self.code)
+            return self.name_last_name_first
+        return str(self.code)
+
+    def __str__(self):
+        description = self.display_identity
         if self.sex != Sex.UNKNOWN:
             description += f" ({self.sex})"
         return description
