@@ -357,20 +357,43 @@ def load_hpo(filename: str, force: bool):
     logging.info("Committing...")
 
 
-def load_phenotype_to_genes(filename: str, force: bool):
+def _read_phenotype_to_genes(filename: str) -> pd.DataFrame:
+    """ HPO changed phenotype_to_genes.txt in 2023 from seven columns behind a '#Format:' comment line to five
+        columns with a header row. Both are read to the same frame, keeping only OMIM diseases (which is what the
+        old file's `source == mim2gene` meant); ORPHA rows are dropped as ORPHA terms are not stored locally. """
+    with open(filename, encoding="utf-8") as f:
+        old_format = f.readline().startswith("#")
+
+    if old_format:
+        df = pd.read_csv(filename, index_col=None, comment='#', sep='\t',
+                         names=['hpo_id', 'hpo_name', 'entrez_gene_id', 'entrez_gene_symbol', 'status', 'source',
+                                'omim_id'])
+        df = df[df.source.isin(["mim2gene"])]
+    else:
+        df = pd.read_csv(filename, index_col=None, header=0, sep='\t')
+        df = df.rename(columns={"ncbi_gene_id": "entrez_gene_id",
+                                "gene_symbol": "entrez_gene_symbol",
+                                "disease_id": "omim_id"})
+    df = df[df.omim_id.str.startswith(f"{OntologyService.OMIM}:", na=False)]
+    if df.empty:
+        raise ValueError(f"{filename} has no HPO/OMIM/gene rows - unrecognised phenotype_to_genes.txt format?")
+    return df
+
+
+def load_phenotype_to_genes(filename: str, force: bool, existing_import: Optional[OntologyImport] = None):
+    """ existing_import: backfill into that import's partition rather than creating a new import - so the
+        OntologyVersion pointing at it gains the relations without a new version (@see backfill_phenotype_to_genes) """
     ontology_builder = OntologyBuilder(
         filename=filename,
         context="phenotype_to_genes",
         import_source=OntologyImportSource.HPO,
-        processor_version=1,
-        force_update=force)
+        processor_version=2,
+        force_update=force,
+        existing_import=existing_import)
     file_hash = file_md5sum(filename)
     ontology_builder.ensure_hash_changed(data_hash=file_hash)  # don't re-import if hash hasn't changed
     ontology_builder.cache_everything()
-    df = pd.read_csv(filename, index_col=None, comment='#', sep='\t',
-                     names=['hpo_id', 'hpo_name', 'entrez_gene_id', 'entrez_gene_symbol', 'status', 'source', 'omim_id'])
-
-    df = df[df.source.isin(["mim2gene"])]
+    df = _read_phenotype_to_genes(filename)
 
     # first kill of old data
     old_imports = OntologyImport.objects.filter(filename="OMIM_ALL_FREQUENCIES_diseases_to_genes_to_phenotypes.txt")

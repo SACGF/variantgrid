@@ -36,7 +36,13 @@ per (term, other term) in priority order (exact, related, xref - one edge per pa
 traversal), and axioms and edges become `is_a` edges between MONDO terms and gene edges to HGNC nodes named by the RO
 relations in `GENE_RELATIONS`. `load_hpo` reads hp.owl through pronto for terms and
 `is_a` edges; `load_phenotype_to_genes` reads HPO's phenotype_to_genes.txt for HPO->OMIM associations and
-OMIM->gene `mim2gene` edges, deleting the relations of the older `OMIM_ALL_FREQUENCIES` file it replaced. `load_omim`
+OMIM->gene `mim2gene` edges, deleting the relations of the older `OMIM_ALL_FREQUENCIES` file it replaced. HPO changed
+that file in 2023 from seven columns behind a `#Format:` comment (`source` column, `mim2gene` rows kept) to five columns
+with a header row (`disease_id`, OMIM rows kept); the loader tells them apart by the first line and raises if the frame
+comes out empty, because the 2023 file once imported as zero relations and left every HPO term without genes (#1862).
+`ontology/management/commands/backfill_phenotype_to_genes.py` repairs such a deployment in place: it loads the file
+into the import the latest `OntologyVersion` already points at (`OntologyBuilder(existing_import=...)`), so no new
+version or gene annotation build follows. `load_omim`
 reads mimTitles.txt as the primary source for OMIM names and aliases and marks gene and removed entries
 `NON_CONDITION`; deployments without an OMIM licence use `load_biomart` instead, which fills the same terms from
 Ensembl BioMart's morbid descriptions. `sync_hgnc` mirrors the genes app's HGNC table into HGNC terms (previous
