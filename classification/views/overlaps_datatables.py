@@ -97,7 +97,11 @@ class ContributionValues:
 
     def sorted(self) -> list[ContributionValueSource]:
         sorter_func = self.e_key.classification_sorter_value
-        return list(sorted([value for value in self._values.values()], key=lambda cvs: sorter_func(cvs.value)))
+        results = list(sorted([value for value in self._values.values()], key=lambda cvs: sorter_func(cvs.value)))
+        # somatic values are listed in the evidence key from Tier 1 to Tier 4, instead of Benign to Pathogenic
+        if self.e_key.key == SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE:
+            results = list(reversed(results))
+        return results
 
 
 class OverlapColumns(DatatableConfig[ClassificationGrouping]):
