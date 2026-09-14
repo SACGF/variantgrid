@@ -296,7 +296,7 @@ class OverlapColumns(DatatableConfig[ClassificationGrouping]):
             "show_next_step": max_triage_status and overlap.is_active_supported_discordance
         }
 
-        return render_to_string('classification/snippets/overlap_value_cell_3.html',
+        return render_to_string('classification/snippets/overlap_value_cell.html',
                                 context,
                                 request=self.request,
                                 )
