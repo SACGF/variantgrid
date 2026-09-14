@@ -186,6 +186,11 @@ Gotchas:
   `variantgrid/settings/components/default_settings.py`. Cache keys are pks (`analysis/models/nodes/analysis_node.py`
   keys node Q dicts on `node_version.pk`), so old entries survive a deploy and fail on unpickle with
   `AttributeError: Can't get attribute 'OldName'`; the bump flushes every deployment's cache at once.
+- A node mixin is listed before `AnalysisNode`, so a `def` on the mixin wins the MRO ahead of the node's
+  implementation. State what the mixin only reads from the node as a class-level annotation
+  (`get_warnings: Callable[[], list[str]]` on `analysis/models/nodes/family_inheritance.py:FamilyInheritanceNodeMixin`),
+  and keep a `raise NotImplementedError()` body for what each subclass provides
+  (`analysis/models/nodes/cohort_mixin.py:CohortMixin._get_cohort`) - a subclass is ahead of the mixin either way.
 Tests:
 - `analysis/tests/utils.py:AnalysisSetupMixin` gives `cls.analysis` + `cls.grch37` with a fake annotation version
   (`annotation/fake_annotation.py:get_fake_annotation_version`); samples/cohorts/trios/quads/pedigrees from

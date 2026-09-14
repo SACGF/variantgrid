@@ -1,12 +1,27 @@
 import logging
+from collections.abc import Callable, Iterable
+from typing import Optional
 
 from django.conf import settings
 
 from analysis.models.enums import NodeColors
-from genes.models import GeneCoverageCollection, GeneSymbol
+from analysis.models.models_analysis import Analysis
+from genes.models import GeneCoverageCollection, GeneList, GeneSymbol
+from snpdb.models import Sample
 
 
 class GeneCoverageMixin:
+    """ Nodes with genes of interest - warns where the samples' coverage of those genes is incomplete.
+        Subclasses provide get_gene_lists() and a has_gene_coverage field. """
+    analysis: Analysis
+    has_gene_coverage: Optional[bool]
+    modifies_parents: Callable[[], bool]
+    get_samples: Callable[[], Iterable[Sample]]
+
+    def get_gene_lists(self) -> list[GeneList]:
+        """ The gene lists whose coverage this node cares about """
+        raise NotImplementedError()
+
     def _load(self):
         update_kwargs = super()._load() or {}
         if settings.SEQAUTO_ENABLED:

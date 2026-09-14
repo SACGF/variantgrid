@@ -4,6 +4,7 @@ family members there are. The per-family bits (which zygosity each member needs)
 duo_node/trio_node/quad_node.
 """
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from typing import Optional
 
 from cache_memoize import cache_memoize
@@ -123,6 +124,7 @@ def _xlinked_recessive_errors(proband_sample, proband_sex: Sex, mother_affected:
 class FamilyInheritanceNodeMixin:
     """ Mix into DuoNode/TrioNode/QuadNode: the inheritance mode is checked against the family's
         affected status and proband sex, and those checks are the ones ignore_field_errors can waive """
+    get_warnings: Callable[[], list[str]]
 
     @abstractmethod
     def _get_inheritance_errors(self) -> list[str]:

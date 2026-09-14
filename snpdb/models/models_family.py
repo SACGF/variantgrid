@@ -5,6 +5,7 @@ which is where their permissions and genome build come from; FamilyGroupMixin ho
 Each provides get_cohort_samples() in pedigree order - that is what the analysis inheritance nodes and
 the pedigree figures read.
 """
+from collections.abc import Callable
 from typing import Optional
 
 from django.contrib.auth.models import User
@@ -15,7 +16,7 @@ from django_extensions.db.models import TimeStampedModel
 
 from library.django_utils import SortByPKMixin
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsAutoInitialSaveMixin
-from library.preview_request import PreviewModelMixin, SvgSymbolPreviewIconMixin
+from library.preview_request import PreviewData, PreviewModelMixin, SvgSymbolPreviewIconMixin
 from patients.models_enums import Sex
 from snpdb.models.models_cohort import Cohort, CohortSample
 from snpdb.models.models_enums import DuoRelationship
@@ -35,6 +36,7 @@ class FamilyGroupMixin:
     proband: CohortSample
     proband_sex: Optional[str]
     pedigree_icon_members: tuple[str, ...]
+    preview_with: Callable[..., PreviewData]
 
     @classmethod
     def get_permission_class(cls):
@@ -50,7 +52,7 @@ class FamilyGroupMixin:
                         if getattr(self, f"{member}_affected"))
 
     @property
-    def preview(self) -> 'PreviewData':
+    def preview(self) -> PreviewData:
         return self.preview_with(identifier=str(self))
 
     def get_permission_object(self):

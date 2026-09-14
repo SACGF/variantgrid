@@ -5,6 +5,8 @@ from snpdb.models.models_enums import AlleleOriginFilterDefault
 class SignificanceFilterNodeMixin:
     """ Nodes that filter on clinical significance pills, split by allele origin, over either a parent's
         variants or everything matching. Expects `node_input` and `allele_origin` fields. """
+    node_input: str
+    allele_origin: str
 
     @property
     def min_inputs(self):

@@ -6,7 +6,7 @@ that delegate to another object's permissions. GuardianPermissionsAutoInitialSav
 owner's initial groups on first save. filter_for_user resolves pks on the bare model, so pass an
 annotated queryset as `queryset=` rather than the class.
 """
-from typing import Union
+from typing import Any, Union
 
 from django.conf import settings
 from django.contrib.auth.models import Group, User
@@ -19,6 +19,7 @@ from library.guardian_utils import DjangoPermission, assign_permission_to_user_a
 
 
 class GuardianPermissionsMixin:
+    pk: Any
 
     @classmethod
     def get_read_perm(cls):

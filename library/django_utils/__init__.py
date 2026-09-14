@@ -11,6 +11,7 @@ import operator
 import os
 from functools import reduce
 from functools import wraps, partial
+from typing import Any
 
 import nameparser
 from dateutil import parser
@@ -22,6 +23,7 @@ from django.db.models import F, JSONField
 from django.db.models.aggregates import Count, Max
 from django.db.models.base import ModelBase
 from django.db.models.fields.reverse_related import OneToOneRel
+from django.db.models.options import Options
 from django.db.models.query_utils import Q
 from django.http import HttpRequest
 from django.urls.base import reverse_lazy
@@ -297,6 +299,8 @@ def discrimine(pred, sequence):
 
 class SortMetaOrderingMixin:
     """ Declares a '<' operator on Model - so you can sort lists same as querysets (driven by Meta.ordering) """
+    _meta: Options
+
     def __lt__(self, other):
         for f in self._meta.ordering:
             v = getattr(self, f)
@@ -307,6 +311,8 @@ class SortMetaOrderingMixin:
 
 
 class SortByPKMixin:
+    pk: Any
+
     def __lt__(self, other):
         return self.pk < other.pk
 

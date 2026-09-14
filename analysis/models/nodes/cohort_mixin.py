@@ -1,5 +1,6 @@
 import operator
 import re
+from collections.abc import Callable
 from functools import cached_property, reduce
 from typing import Optional
 
@@ -7,6 +8,7 @@ import simplejson
 from django.db.models import Q
 
 from analysis.models.enums import GroupOperation
+from analysis.models.models_analysis import Analysis
 from analysis.models.nodes.analysis_node import (
     NodeAlleleFrequencyFilter,
     NodeVCFFilter,
@@ -64,6 +66,10 @@ def get_sample_any_zygosity_arg_q_dict(sample: Sample) -> dict[Optional[str], di
 
 class CohortMixin:
     """ Since a Cohort is based off a VCF we also  """
+    analysis: Analysis
+    nodeallelefrequencyfilter: NodeAlleleFrequencyFilter
+    q_none: Callable[[], Q]
+    get_samples_with_genotype: Callable[[], list[Sample]]
 
     def _get_cohort(self):
         """ Each subclass needs to implement the way to get their Cohort """
@@ -404,6 +410,7 @@ class CohortMixin:
 
 class SampleMixin(CohortMixin):
     """ Adds sample to query via annotation kwargs, must have a "sample" field """
+    sample: Optional[Sample]
 
     def _get_sample(self) -> Optional[Sample]:
         """ The sample this node's genotype joins hang off - overridden by nodes that group samples """
@@ -441,6 +448,12 @@ class AncestorSampleMixin(SampleMixin):
         produces (@see analysis/models/nodes/sources/sample_node.py:SampleNode). "Every ancestor
         sample" is the scope rather than every sample of the patient, so the source node decides the
         reach and the filter follows it. """
+    patient: Optional[Patient]
+    version: int
+    _get_node_q_hash: Callable[[], str]
+    get_parent_subclasses_and_errors: Callable[[], tuple[list, list]]
+    get_proband_sample: Callable[..., Optional[Sample]]
+    get_proband_patient: Callable[..., Optional[Patient]]
 
     def _set_sample(self, sample):
         self.sample = sample
