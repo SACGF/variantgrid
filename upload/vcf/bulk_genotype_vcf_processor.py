@@ -135,8 +135,8 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
         # These are variant IDs that won't be kept in "common" CGC regardless of frequency
         self.uncommon_variant_ids = self._get_uncommon_variant_ids()
 
+        self.get_ref_alt_allele_depth = None  # No samples (BulkNoGenotypeVCFProcessor) so no depths to read
         if self.num_samples:
-            # Only need this if we have genotypes (otherwise will be NoGenotypeProcessor)
             self.get_ref_alt_allele_depth = self.get_ref_alt_allele_depth_function(self.vcf)
         self.vcf_filter_map = uploaded_vcf.vcf.get_filter_dict()
         self.last_read_depth_str = None
