@@ -9,7 +9,8 @@ analysis / specimen launch points remain)
 Design for [#1419](https://github.com/SACGF/variantgrid/issues/1419) (separate out gene / disease
 curation), [sapath#246](https://github.com/SACGF/variantgrid_sapath/issues/246) (SomaticReportable →
 easy classifications), and the entry point [#444](https://github.com/SACGF/variantgrid/issues/444)
-will consume. This is Phase 8 of [`tso500_overall_plan.md`](tso500_overall_plan.md).
+will consume. This was Phase 8 of the TSO 500 plan, closed out on
+[SACGF/variantgrid_sapath#431](https://github.com/SACGF/variantgrid_sapath/issues/431).
 
 The driving observation: in somatic work the same variants recur constantly, and the lab has usually
 curated them before. Copy consensus already reuses prior work per allele. What is missing is a way to
