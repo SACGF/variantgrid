@@ -19,6 +19,9 @@ that has run it.
 
 Plans are checked while they are live: a `Status:` of draft, approved or in progress. A landed or superseded
 plan, or one with no Status line, describes code as it was and is reported as unchecked rather than failed.
+A plan citing another plan that has since been deleted is counted and reported, not failed - a landed plan is
+deleted and git history is its record, so the citation going missing is the normal end of that plan's life.
+Every other doc keeps the full check, so a research doc or CLAUDE.md citing a plan path must still resolve.
 """
 import ast
 import re
@@ -33,6 +36,7 @@ GENERATED_DIRS = ("claude/maps",)
 # Gitignored build output: present on a box that has run the build, absent from a fresh checkout
 BUILD_OUTPUTS = ("variantgrid/sitestatic", "lint.txt")
 LIVE_PLAN_STATUSES = ("draft", "approved", "in progress")
+NO_SUCH_FILE = "no such file"
 _STATUS_RE = re.compile(r"^Status:\s*(.+)$", re.MULTILINE)
 
 # Extensions that make a bare token a file citation even without a directory separator
@@ -104,6 +108,11 @@ def is_build_output(path: str) -> bool:
 def is_plan(doc: Path) -> bool:
     relative = doc.relative_to(REPO_ROOT).as_posix()
     return relative.startswith("claude/") and (relative.startswith("claude/plans/") or relative.endswith("_plan.md"))
+
+
+def is_plan_path(path: str) -> bool:
+    """ A citation pointing at a plan file: a landed plan is deleted, and git history is where it lives on """
+    return path.startswith("claude/plans/") or path.endswith("_plan.md")
 
 
 def plan_status(doc: Path) -> str | None:
@@ -345,7 +354,7 @@ def check_citation(citation: Citation) -> str | None:
         return None
     path = resolve_path(citation)
     if path is None:
-        return "no such file"
+        return NO_SUCH_FILE
     if citation.symbol:
         return resolve_symbol(path, citation.symbol)
     if citation.anchor and path.suffix == ".md" and citation.anchor not in _markdown_anchors(path):
@@ -359,6 +368,7 @@ class DocsReport:
     docs_checked: int
     citations_checked: int
     unchecked_plans: dict[str, str]   # repo-relative path -> status (or "no Status line")
+    deleted_plan_citations: int = 0    # plan-to-plan citations whose target plan has been deleted
 
     @property
     def ok(self) -> bool:
@@ -370,17 +380,23 @@ def check_docs(paths=None, all_plans: bool = False) -> DocsReport:
     unchecked: dict[str, str] = {}
     checked = 0
     citations_checked = 0
+    deleted_plans = 0
     for doc in doc_files(paths):
-        if not all_plans and is_plan(doc) and not is_live_plan(doc):
+        doc_is_plan = is_plan(doc)
+        if not all_plans and doc_is_plan and not is_live_plan(doc):
             unchecked[str(doc.relative_to(REPO_ROOT))] = plan_status(doc) or "no Status line"
             continue
         checked += 1
         for citation in citations_in(doc):
             citations_checked += 1
             reason = check_citation(citation)
-            if reason:
-                dead.append(DeadCitation(citation, reason))
-    return DocsReport(dead, checked, citations_checked, unchecked)
+            if not reason:
+                continue
+            if doc_is_plan and reason == NO_SUCH_FILE and is_plan_path(citation.path):
+                deleted_plans += 1
+                continue
+            dead.append(DeadCitation(citation, reason))
+    return DocsReport(dead, checked, citations_checked, unchecked, deleted_plans)
 
 
 def render_report(report: DocsReport) -> str:
@@ -391,6 +407,8 @@ def render_report(report: DocsReport) -> str:
     for doc, items in sorted(by_doc.items()):
         lines.append(f"{doc}: {len(items)} dead")
         lines += [f"  L{item.citation.lineno}  {item.citation.text}  - {item.reason}" for item in items]
+    if report.deleted_plan_citations:
+        lines.append(f"{report.deleted_plan_citations} citation(s) of deleted plans, in plans: git history has them")
     if report.unchecked_plans:
         lines.append(f"{len(report.unchecked_plans)} plan(s) not live (landed / superseded / no Status line), not checked; "
                      "--all-plans includes them")

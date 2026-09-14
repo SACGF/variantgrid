@@ -260,6 +260,15 @@ class DocsCheckTest(SimpleTestCase):
         self.assertEqual(list(report.unchecked_plans.values()), ["landed abc123"])
         self.assertEqual(len(docs.check_docs([live, landed], all_plans=True).dead), 2)
 
+    def test_a_plan_citing_a_deleted_plan_is_counted_not_dead(self):
+        plans = REPO_ROOT / "claude" / "plans"
+        plan = self._doc("Status: draft\n`claude/plans/999_gone_plan.md` and `nope/missing.py`", directory=plans)
+        research = self._doc("`claude/plans/999_gone_plan.md`", directory=REPO_ROOT / "claude" / "research")
+        report = docs.check_docs([plan])
+        self.assertEqual([d.citation.path for d in report.dead], ["nope/missing.py"])
+        self.assertEqual(report.deleted_plan_citations, 1)
+        self.assertEqual(len(docs.check_docs([research]).dead), 1)  # only plans get the exemption
+
 
 class InspectRenderTest(SimpleTestCase):
     """ The shared `vg inspect` renderer and list cap (library/vg/inspect/__init__.py) """
