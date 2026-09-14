@@ -6,6 +6,7 @@ from typing import Any, Optional
 from django.conf import settings
 from django.contrib import messages
 from django.db.models.aggregates import Count
+from django.http import Http404
 from django.http.response import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -66,6 +67,12 @@ def genes(request, genome_build_name=None):
 
 def view_gene(request, gene_id):
     gene = get_object_or_404(Gene, pk=gene_id)
+    if gene.is_legacy:
+        # Fake genes have nothing to show beyond their symbol - send the user to the symbol page instead
+        symbol = gene.identifier[len(Gene.FAKE_GENE_ID_PREFIX):]
+        if not symbol:
+            raise Http404(f"Legacy gene {gene_id} has no symbol")
+        return redirect(get_object_or_404(GeneSymbol, pk=symbol))
 
     gene_versions_by_build = defaultdict(dict)
 

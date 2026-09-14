@@ -43,12 +43,12 @@
                                     {% if d.hgnc %}
                                         {% labelled label="Gene Symbol" hint="chunky" %}<a class="hover-link" href="{% url 'view_gene_symbol' d.hgnc.gene_symbol %}">{{ d.hgnc.gene_symbol }}</a>{% endlabelled %}
                                         {% labelled label="Ontology Links" hint="chunky" %}<a class="hover-link" href="{{ d.hgnc.get_absolute_url }}">HGNC:{{ d.hgnc.pk }}</a>{% endlabelled %}
-                                        {% if d.hgnc.gene_symbol != d.gene_symbol %}
-                                            {% labelled label="Other Gene Symbol" hint="chunky" %} <a class="hover-link" href="{% url 'view_gene_symbol' d.gene_symbol %}">{{ d.gene_symbol }}</a>
+                                        {% if d.gene_symbol_id and d.hgnc.gene_symbol_id != d.gene_symbol_id %}
+                                            {% labelled label="Other Gene Symbol" hint="chunky" %} <a class="hover-link" href="{% url 'view_gene_symbol' d.gene_symbol_id %}">{{ d.gene_symbol_id }}</a>
                                             ({{ gene.get_annotation_consortium_display }}){% endlabelled %}
                                         {% endif %}
-                                    {% else %}
-                                        {% labelled label="Gene Symbol" hint="chunky" %}<a class="hover-link" href="{% url 'view_gene_symbol' d.gene_symbol %}">{{ d.gene_symbol }}</a>{% endlabelled %}
+                                    {% elif d.gene_symbol_id %}
+                                        {% labelled label="Gene Symbol" hint="chunky" %}<a class="hover-link" href="{% url 'view_gene_symbol' d.gene_symbol_id %}">{{ d.gene_symbol_id }}</a>{% endlabelled %}
                                     {% endif %}
                                     {% labelled label="Coordinate" hint="chunky" %}{{ d.coordinate }}{% endlabelled %}
                                     <a class="toggle-link" data-toggle="collapse" href="#gene-import-{{ d.pk }}">Toggle Source Details</a>
