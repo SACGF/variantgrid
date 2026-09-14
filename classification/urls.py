@@ -37,6 +37,14 @@ from classification.views.classification_view import (
     LabGeneClassificationCountsView,
 )
 from classification.views.classification_reclassification_view import view_reclassification_analytics
+from classification.views.views_case_report import (
+    case_report_download,
+    case_report_finalise,
+    case_report_lis_details,
+    case_report_new_version,
+    case_report_rebuild,
+    view_case_report,
+)
 from classification.views.classification_view_metrics import (
     view_classification_metrics,
     view_page_metrics_detail,
@@ -111,6 +119,17 @@ urlpatterns = [
 
     path('classification/<int:classification_id>/gene_consensus', gene_consensus_panel,
          name='classification_gene_consensus'),
+
+    # A built case report - the case it belongs to is on the Classify & Report tab (analysis/urls.py)
+    path('case_report/<int:case_report_id>', view_case_report, name='view_case_report'),
+    path('case_report/<int:case_report_id>/download/<slug:document_format>', case_report_download,
+         name='case_report_download'),
+    path('case_report/<int:case_report_id>/finalise', case_report_finalise, name='case_report_finalise'),
+    path('case_report/<int:case_report_id>/rebuild', case_report_rebuild, name='case_report_rebuild'),
+    path('case_report/<int:case_report_id>/new_version', case_report_new_version,
+         name='case_report_new_version'),
+    path('case_report/<int:case_report_id>/lis_details', case_report_lis_details,
+         name='case_report_lis_details'),
 
     path('classification/reclassification_analytics', view_reclassification_analytics, name="classification_reclassification_analytics"),
     path('classification/view_metrics', view_classification_metrics, name="classification_view_metrics"),

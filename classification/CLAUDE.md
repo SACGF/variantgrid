@@ -42,6 +42,15 @@ Patterns here:
   ReportVariant / ReportContext (ordering, amp_tier, kinds, measures), report/renderers.py turns one HTML into the PDF
   (xhtml2pdf) and DOCX (html2docx), and the JSON comes off the same context. ClassificationReport.context() builds its
   rows from the same ReportVariant, so `record` / `classifications` / `gene_groups` mean one thing.
+- One run is a CaseReport, built / rebuilt / finalised through report/case_report_builder.py. `Rebuild documents`
+  re-renders over `context_snapshot` so a template fix never moves the numbers a report has quoted; `New version`
+  builds a fresh context from each pinned classification's current published version and marks the old report
+  SUPERSEDED. Finalising stamps report_date, variant_reported and report_id onto each pinned classification, publishes
+  it and re-points the CaseReportClassification at the new published version - all through patch_value, so
+  re-finalising or re-entering the same LIS id writes nothing.
+- A CaseReport's permissions are its own (models/classification_report_models.py:CaseReport.can_view / can_write):
+  its lab's users may build, finalise and rebuild, and anyone who can see the case may read. Every document is served
+  by views/views_case_report.py rather than a media URL - MEDIA_ROOT has no permissions of its own.
 Gotchas:
 - "Every edit makes a ClassificationModification" has one exception: models/classification.py:ClassificationModification.is_edit_appendable
   folds a patch into the previous unpublished modification when it is the same user and source within a minute.
@@ -89,6 +98,12 @@ Gotchas:
 - Withdrawing is a soft delete (models/classification.py:Classification.set_withdrawn) that sends classification_withdraw_signal;
   the record stays in the lab's lists and can be un-withdrawn. A hard delete goes through pre_delete / post_delete receivers
   that recalc contexts and groupings.
+- Finalising leaves a classification with unsubmitted edits alone and names it
+  (report/case_report_builder.py:has_unsubmitted_edits): publishing it would push someone's work in progress out under
+  the report's name. The finalise response lists them and the tab alerts, rather than silently skipping.
+- `variant_reported` says which *kind* of finding a variant was (primary / secondary / incidental), which is the
+  curator's call - so finalising only ever settles reported against `not_included`, and a record that already names a
+  kind keeps it.
 - report/__init__.py stays empty on purpose: models/classification_report_models.py imports report/template_validation.py
   for the save-time fixture render, so a package __init__ that reached into classification.models would be a cycle. For
   the same reason template_validation.FIXTURE_CONTEXT is hand written rather than built from ReportContext -

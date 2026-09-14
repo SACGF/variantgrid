@@ -2,11 +2,13 @@
 The Classify & Report tab on the sample and patient pages - tags that are asking to be classified, the
 classifications made for the case, and what's needed to turn one into the other.
 
-A case is a set of samples (one for a sample page, the patient's samples for a patient page) and the patient
-they reach. A tagging is in the case's queue when its tag is in the classify queue vocabulary
-(Tag.requires_classification) and it belongs to the case - by its own sample FK, by its patient FK (a tagging
-made above sample level names the person and leaves which of their samples open), or by having been made in an
-analysis whose proband is one of them.
+A case is a set of samples and the patient they reach - one sample for a sample page, and everything
+`patients/sample_grouping.py:get_sample_group` resolves for a patient, specimen or extraction page, so a TSO 500
+case with a DNA and an RNA arm is one case from the specimen the measures hang off.
+
+A tagging is in the case's queue when its tag is in the classify queue vocabulary (Tag.requires_classification)
+and it belongs to the case - by its own sample FK, by its patient FK (a tagging made above sample level names the
+person and leaves which of their samples open), or by having been made in an analysis whose proband is one of them.
 
 A tagging is done once it is resolved against a classification (@see analysis.variant_tag_operations), which
 happens by itself when the classification is of the tagging's own sample and by the row's button otherwise.
@@ -27,10 +29,15 @@ from django.urls import reverse
 from analysis.models import Analysis, VariantTag
 from analysis.variant_tag_operations import sample_carries_variant
 from classification.enums import AlleleOriginBucket, SpecialEKeys
-from classification.models import Classification, ClassificationModification
-from patients.models import Patient
+from classification.models import (
+    CaseReport,
+    CaseReportStatus,
+    Classification,
+    ClassificationModification,
+)
+from patients.models import Extraction, Patient, Specimen
 from patients.models_enums import SampleSourceLevel
-from patients.sample_grouping import get_patient_for_source
+from patients.sample_grouping import get_patient_for_source, get_sample_group
 from snpdb.models import Lab, Sample, Tag
 
 
@@ -131,10 +138,11 @@ def _allele_keys(allele_id, variant_id) -> set[tuple[str, int]]:
 class ClassifyReportCase:
     """ The samples a Classify & Report tab covers, seen as one case """
 
-    def __init__(self, user: User, obj, samples: list[Sample],
+    def __init__(self, user: User, obj, samples: list[Sample], source_level: str,
                  patients: Optional[list[Patient]] = None):
         self.user = user
-        self.obj = obj  # Sample or Patient the tab is on
+        self.obj = obj  # The level of the hierarchy the tab is on - Sample, Extraction, Specimen or Patient
+        self.source_level = source_level
         self.samples = samples
         # Who the case is - a tagging made above sample level names the person rather than one of their VCFs
         self.patients = patients or []
@@ -142,12 +150,36 @@ class ClassifyReportCase:
     @staticmethod
     def for_sample(user: User, sample: Sample) -> 'ClassifyReportCase':
         patient = get_patient_for_source(SampleSourceLevel.SAMPLE, sample)
-        return ClassifyReportCase(user, sample, [sample], [patient] if patient else [])
+        return ClassifyReportCase(user, sample, [sample], SampleSourceLevel.SAMPLE,
+                                  [patient] if patient else [])
 
     @staticmethod
     def for_patient(user: User, patient: Patient) -> 'ClassifyReportCase':
         samples = list(Sample.filter_for_user(user).filter(pk__in=patient.get_samples()))
-        return ClassifyReportCase(user, patient, samples, [patient])
+        return ClassifyReportCase(user, patient, samples, SampleSourceLevel.PATIENT, [patient])
+
+    @staticmethod
+    def for_specimen(user: User, specimen: Specimen) -> 'ClassifyReportCase':
+        return ClassifyReportCase._for_source(user, SampleSourceLevel.SPECIMEN, specimen)
+
+    @staticmethod
+    def for_extraction(user: User, extraction: Extraction) -> 'ClassifyReportCase':
+        return ClassifyReportCase._for_source(user, SampleSourceLevel.EXTRACTION, extraction)
+
+    @staticmethod
+    def _for_source(user: User, source_level: str, source) -> 'ClassifyReportCase':
+        """ One answer to "which samples is this?" - the same get_sample_group the analysis grouping node
+            resolves, so the tab and the node never disagree about a specimen's arms """
+        patient = get_patient_for_source(source_level, source)
+        return ClassifyReportCase(user, source, get_sample_group(user, source_level, source).samples,
+                                  source_level, [patient] if patient else [])
+
+    def case_reports(self) -> QuerySet[CaseReport]:
+        return CaseReport.for_case(self.source_level, self.obj)
+
+    def latest_draft_report(self) -> Optional[CaseReport]:
+        """ What the build form prefills from - the case level text is usually being iterated on """
+        return self.case_reports().filter(status=CaseReportStatus.DRAFT).first()
 
     @property
     def sample_ids(self) -> set[int]:
@@ -223,7 +255,9 @@ class ClassifyReportCase:
         """ Latest published classification of each of the case's samples """
         qs = ClassificationModification.latest_for_user(self.user, published=True,
                                                         classification__sample__in=self.samples)
-        return qs.order_by("classification__pk")
+        # Every caller reads the record off the modification - the tab's rows, the report's bucket
+        return qs.select_related("classification", "classification__sample", "classification__lab") \
+            .order_by("classification__pk")
 
     def _case_classifications(self) -> QuerySet[Classification]:
         """ What the case has classified - the published records the user can see plus their own lab's work in
@@ -292,6 +326,15 @@ class ClassifyReportCase:
                                          previous=previous_by_tag.get(variant_tag.pk, [])))
         rows.sort(key=lambda row: (str(row.gene_symbol or ""), row.variant_tag.pk))
         return rows
+
+
+def case_allele_origin_bucket(modifications: list[ClassificationModification]) -> Optional[str]:
+    """ Which templates the case is offered, and only where its records agree - a template designed for
+        somatic work is not the one a mixed case wants, so a mixed case is offered every template """
+    buckets = {cm.classification.allele_origin_bucket for cm in modifications}
+    if len(buckets) == 1:
+        return buckets.pop()
+    return None
 
 
 def outstanding_tag_count(rows: list[ClassifyQueueRow]) -> int:

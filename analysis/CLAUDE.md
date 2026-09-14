@@ -53,10 +53,12 @@ Patterns here:
   with `model` set + template `analysis/node_editors/<classname>_editor.html`.
   `analysis/views/views_node.py:get_node_views_by_class` finds the view by `model`, so defining the class registers it;
   `analysis/views/nodes/node_view.py:NodeView.form_valid` does the dirty/save/update_analysis dance for you.
-- The sample / patient page's Classify & Report tab is `analysis/classify_report.py` +
+- The sample / patient / specimen / extraction page's Classify & Report tab is `analysis/classify_report.py` +
   `analysis/views/views_classify_report.py` (it lives here because it is built on VariantTag - analysis may import
-  classification, never the other way round). A tagging is in a case's queue when `Tag.requires_classification` and it
-  belongs to one of the case's samples: its own `VariantTag.sample` (the study's proband, from
+  classification, never the other way round). Above sample level a case is whatever
+  `patients/sample_grouping.py:get_sample_group` resolves, so a TSO 500 case's DNA and RNA arms are one case reported
+  from the specimen its measures hang off (`analysis/classify_report.py:ClassifyReportCase._for_source`).
+  A tagging is in a case's queue when `Tag.requires_classification` and it belongs to one of the case's samples: its own `VariantTag.sample` (the study's proband, from
   `analysis/models/nodes/analysis_node.py:AnalysisNode.get_proband_sample` at tag time), else its `VariantTag.patient`
   (`AnalysisNode.get_proband_patient` - a node above sample level names the person while leaving which of their VCFs
   open, so the tagging is on the patient's tab and on each of that patient's sample tabs), else the analysis it was made
@@ -77,6 +79,11 @@ Patterns here:
   POST - what the user sees is narrowed by forwarding the tagging's patient to the autocomplete
   (`analysis/views/views.py:CreateClassificationForVariantTagView`, the same `forward.Const` the specimen autocomplete
   takes).
+- The tab's case report half is server rendered throughout: the ticked classifications are posted to
+  `case_report_build_dialog`, changing the template re-posts it (a different template asks for different
+  `case_fields`), and `create_case_report` replaces the modal body with the preview and the downloads. Finalise,
+  Rebuild documents, New version and the LIS fields act on one CaseReport (`classification/views/views_case_report.py`)
+  and then reload the tab, so the Reports card is always redrawn from the database rather than patched in place.
 - The Classify & Report tab's label carries the counts (`analysis/views/views_classify_report.py:classify_report_summary`,
   drawn by `analysis/templates/analysis/classify_report_tab_counts.html`), so a page says whether there is anything to do
   before the tab is opened. It is fetched after render - deciding which taggings are the case's walks every analysis its

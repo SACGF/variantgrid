@@ -121,11 +121,15 @@ urlpatterns = [
     path('classification/create_from_variant_tag/<int:variant_tag_id>',
          views.create_classification_from_variant_tag, name='create_classification_from_variant_tag'),
 
-    # Classify & Report tab (sample / patient pages)
+    # Classify & Report tab (sample / patient / specimen / extraction pages)
     path('classify_report/sample/<int:sample_id>', views_classify_report.sample_classify_report_tab,
          name='sample_classify_report_tab'),
     path('classify_report/patient/<int:patient_id>', views_classify_report.patient_classify_report_tab,
          name='patient_classify_report_tab'),
+    path('classify_report/specimen/<int:specimen_id>', views_classify_report.specimen_classify_report_tab,
+         name='specimen_classify_report_tab'),
+    path('classify_report/extraction/<int:extraction_id>', views_classify_report.extraction_classify_report_tab,
+         name='extraction_classify_report_tab'),
     path('classify_report/<slug:case_type>/<int:case_id>/summary',
          views_classify_report.classify_report_summary, name='classify_report_summary'),
     path('classify_report/<slug:case_type>/<int:case_id>/variant_tag/<int:variant_tag_id>',
@@ -136,6 +140,12 @@ urlpatterns = [
          views_classify_report.resolve_variant_tag_for_case, name='resolve_variant_tag_for_case'),
     path('classify_report/<slug:case_type>/<int:case_id>/report',
          views_classify_report.multi_classification_report, name='multi_classification_report'),
+    path('classify_report/<slug:case_type>/<int:case_id>/case_report/dialog',
+         views_classify_report.case_report_build_dialog, name='case_report_build_dialog'),
+    path('classify_report/<slug:case_type>/<int:case_id>/case_report/build',
+         views_classify_report.create_case_report, name='create_case_report'),
+    path('classify_report/<slug:case_type>/<int:case_id>/case_report/preview',
+         views_classify_report.preview_case_report, name='preview_case_report'),
 
     # Node Data (bottom right window)
     path('<int:analysis_id>/<int:analysis_version>/node_data_grid/cfg/<int:node_id>/<int:node_version>/<str:extra_filters>/', views_node.node_data_grid, name='node_data_grid'),

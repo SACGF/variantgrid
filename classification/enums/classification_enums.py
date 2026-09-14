@@ -126,6 +126,8 @@ class SpecialEKeys:
     VARIANT_TAGS = 'variant_tags'
     VARIANT_CLASS = 'variant_class'
     VARIANT_REPORTED = 'variant_reported'
+    REPORT_ID = 'report_id'  # stamped by a case report from the LIS's report ID
+    REPORT_DATE = 'report_date'  # stamped by a case report when it is finalised
     COPY_NUMBER = 'copy_number'
     H_SUMMARY = 'h_summary'  # the gene level paragraph a case report prints after a gene's variants
 

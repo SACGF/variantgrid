@@ -12,6 +12,8 @@ Entry points:
 - build_report_variants(modifications, user, reported_by_pk) - ReportVariants in report order
 - build_report_context(...) - the whole ReportContext for a case
 - context_as_dict(report_context) - what the templates and CaseReport.context_snapshot see
+
+Building, rebuilding and finalising the CaseReport itself is classification/report/case_report_builder.py.
 """
 import re
 from dataclasses import dataclass, field
@@ -521,6 +523,15 @@ def _model_as_dict(obj, fields: list[str]) -> Optional[dict]:
     return as_dict
 
 
+# What a template and the JSON record read off the report itself - the LIS fields can be entered
+# after a report is final, so a rebuild refreshes this block over the stored snapshot
+CASE_REPORT_DICT_FIELDS = ["status", "external_report_id", "report_date"]
+
+
+def case_report_as_dict(case_report) -> Optional[dict]:
+    return _model_as_dict(case_report, CASE_REPORT_DICT_FIELDS)
+
+
 def _variant_as_dict(variant: ReportVariant) -> dict:
     return {
         "classification_modification_id": variant.modification.pk,
@@ -560,8 +571,7 @@ def context_as_dict(report_context: ReportContext) -> dict:
         can be re-rendered later without re-deriving numbers whose source rows may have changed """
     return {
         "source_level": report_context.source_level,
-        "case_report": _model_as_dict(report_context.case_report,
-                                      ["status", "external_report_id", "report_date"]),
+        "case_report": case_report_as_dict(report_context.case_report),
         "patient": _model_as_dict(report_context.patient,
                                   ["patient_code", "date_of_birth", "sex"]),
         "specimen": _model_as_dict(report_context.specimen,

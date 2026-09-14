@@ -14,9 +14,9 @@ from typing import Optional
 
 from django.conf import settings
 from django.contrib.auth.models import User
-from django.core.exceptions import ValidationError
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import models
-from django.db.models import CASCADE, PROTECT, SET_NULL, Q
+from django.db.models import CASCADE, PROTECT, SET_NULL, Prefetch, Q, QuerySet
 from model_utils.models import TimeStampedModel
 
 from classification.enums import AlleleOriginBucket
@@ -50,6 +50,40 @@ class ClassificationReportTemplate(TimeStampedModel):
     def has_case_report(self) -> bool:
         """ A template can build a case report once it has the document design for one """
         return bool(self.case_template)
+
+    @property
+    def case_field_groups(self) -> list[dict]:
+        """ case_fields laid out for the build form - the fields sharing a `group` are one row of
+            checkboxes, and the context exposes that group as a dict """
+        groups = []
+        by_name = {}
+        for field in self.case_fields or []:
+            name = field.get("group") or ""
+            if name not in by_name:
+                by_name[name] = {"name": name, "fields": []}
+                groups.append(by_name[name])
+            by_name[name]["fields"].append(field)
+        return groups
+
+    def case_values_from_form(self, posted) -> dict:
+        """ The build form's answers to case_fields, read back by key. A bool field is the presence
+            of its checkbox, and the fields sharing a `group` come back as one dict - which is the
+            shape a JSON template reads (`case_values.assay_success`) """
+        values = {}
+        groups: dict[str, dict] = {}
+        for field in self.case_fields or []:
+            if not (key := field.get("key")):
+                continue
+            if field.get("type") == "bool":
+                value = f"case_field_{key}" in posted
+            else:
+                value = posted.get(f"case_field_{key}") or field.get("default") or ""
+            if group := field.get("group"):
+                groups.setdefault(group, {})[key] = value
+            else:
+                values[key] = value
+        values.update(groups)
+        return values
 
     def clean(self):
         super().clean()
@@ -93,6 +127,16 @@ class CaseReportStatus(models.TextChoices):
 
 def case_report_upload_path(instance: 'CaseReport', filename: str) -> str:
     return os.path.join("case_reports", str(instance.lab_id), str(instance.pk), filename)
+
+
+# Which FK each level of the hierarchy uses - the level says which, so one table covers creating a
+# report, finding a case's reports and resolving the one it is about
+SOURCE_LEVEL_FIELDS = {
+    SampleSourceLevel.PATIENT: "patient",
+    SampleSourceLevel.SPECIMEN: "specimen",
+    SampleSourceLevel.EXTRACTION: "extraction",
+    SampleSourceLevel.SAMPLE: "sample",
+}
 
 
 class CaseReport(TimeStampedModel):
@@ -147,17 +191,55 @@ class CaseReport(TimeStampedModel):
     @property
     def source(self):
         """ The object the case is - whichever level source_level names """
-        return {
-            SampleSourceLevel.PATIENT: self.patient,
-            SampleSourceLevel.SPECIMEN: self.specimen,
-            SampleSourceLevel.EXTRACTION: self.extraction,
-            SampleSourceLevel.SAMPLE: self.sample,
-        }[self.source_level]
+        return getattr(self, SOURCE_LEVEL_FIELDS[self.source_level])
 
     @property
     def is_editable(self) -> bool:
         """ A FINAL report is the copy that went out with the case - a change makes a new version """
         return self.status == CaseReportStatus.DRAFT
+
+    @staticmethod
+    def source_kwargs(source_level: str, source) -> dict:
+        """ The level and the one FK it uses, for creating a report or finding a case's """
+        return {"source_level": source_level, SOURCE_LEVEL_FIELDS[source_level]: source}
+
+    @staticmethod
+    def for_case(source_level: str, source) -> QuerySet['CaseReport']:
+        """ A case's reports, newest first - whoever in the lab built them. The Reports card lists
+            every report's pinned classifications, so they come along rather than one query a row """
+        pinned = CaseReportClassification.objects.select_related(
+            "classification_modification__classification__lab")
+        return CaseReport.objects.filter(**CaseReport.source_kwargs(source_level, source)) \
+            .select_related("template", "user", "lab") \
+            .prefetch_related(Prefetch("casereportclassification_set", queryset=pinned)) \
+            .order_by("-pk")
+
+    def can_write(self, user: User) -> bool:
+        """ Building, finalising and deleting a report is the owning lab's - it is their document """
+        if user.is_superuser:
+            return True
+        return Lab.valid_labs_qs(user).filter(pk=self.lab_id).exists()
+
+    def can_view(self, user: User) -> bool:
+        """ The lab's own users, plus anyone who could already see the case it is about """
+        if self.can_write(user):
+            return True
+        if source := self.source:
+            return source.can_view(user)
+        return False
+
+    def check_can_view(self, user: User):
+        if not self.can_view(user):
+            raise PermissionDenied(f"You do not have permission to view case report {self.pk}")
+
+    def check_can_write(self, user: User):
+        if not self.can_write(user):
+            raise PermissionDenied(f"Only {self.lab}'s users can change case report {self.pk}")
+
+    @property
+    def rows(self) -> QuerySet['CaseReportClassification']:
+        """ The pinned classifications in report order - plain, so for_case's prefetch is used """
+        return self.casereportclassification_set.all()
 
     def get_media_dir(self) -> str:
         return os.path.join(settings.MEDIA_ROOT, "case_reports", str(self.lab_id), str(self.pk))
