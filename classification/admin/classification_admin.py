@@ -693,7 +693,6 @@ class ClassificationReportTemplateAdmin(admin.ModelAdmin):
             'name': admin.widgets.AdminTextInputWidget(),
             'template': admin.widgets.AdminTextareaWidget(),
             'case_template': admin.widgets.AdminTextareaWidget(),
-            'json_template': admin.widgets.AdminTextareaWidget(),
         }, **kwargs)
 
     @admin.display(boolean=True, description="Case report")

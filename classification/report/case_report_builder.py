@@ -9,9 +9,11 @@ supersedes the old report.
 
 Finalising is the other half. The report becomes the copy that went out with the case, and the three
 keys that say so - report_date, variant_reported and report_id - are stamped onto each pinned
-classification and re-published. Every stamp is idempotent (patch_value writes nothing when the
-values already match), and a classification with unsubmitted edits is left alone and named, because
-publishing it would push someone's work in progress out under the report's name.
+classification and re-published. Going FINAL sends case_report_finalised_signal, which is how a
+deployment specific app files the report somewhere else. Every stamp is idempotent (patch_value
+writes nothing when the values already match), and a classification with unsubmitted edits is left
+alone and named, because publishing it would push someone's work in progress out under the report's
+name.
 
 Entry points: build_case_report, preview_case_report_html, rebuild_documents, build_new_version,
 finalise_case_report, stamp_report_onto_classifications.
@@ -30,6 +32,7 @@ from classification.models.classification_report_models import (
     CaseReportClassification,
     CaseReportStatus,
     ClassificationReportTemplate,
+    case_report_finalised_signal,
 )
 from classification.report.case_report_context import (
     NOT_REPORTED,
@@ -206,9 +209,14 @@ def finalise_case_report(case_report: CaseReport, user: User) -> FinaliseResult:
     """ The report becomes the copy that went out with the case, and says so on its classifications.
         Finalising an already final report re-stamps, which is how a LIS id entered later reaches
         the records without making a new version """
-    if case_report.status == CaseReportStatus.DRAFT:
+    newly_final = case_report.status == CaseReportStatus.DRAFT
+    if newly_final:
         case_report.status = CaseReportStatus.FINAL
         if case_report.report_date is None:
             case_report.report_date = timezone.localdate()
         case_report.save()
-    return stamp_report_onto_classifications(case_report, user)
+    result = stamp_report_onto_classifications(case_report, user)
+    if newly_final:
+        # After the stamping, so a receiver filing the report elsewhere sees the finished state
+        case_report_finalised_signal.send(sender=CaseReport, case_report=case_report, user=user)
+    return result

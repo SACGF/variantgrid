@@ -2,16 +2,19 @@
 Report templates and the case reports built from them.
 
 ClassificationReportTemplate is a lab maintained document design: `template` is the single record
-HTML/Vue report, `case_template` / `json_template` the multi-variant case report, which is rendered
-server side so the HTML preview, the PDF and the Word file cannot disagree.
+HTML/Vue report and `case_template` the multi-variant case report, which is rendered server side so
+the HTML preview, the PDF and the Word file cannot disagree. The report's JSON is not a template -
+@see classification/report/renderers.py:render_json.
 
 CaseReport is one run of a case_template over a case's classifications, pinned to the
 ClassificationModifications it rendered, so a later edit changes nothing about a report already
 issued. @see classification/report/case_report_context.py for what the templates are handed.
 """
+import logging
 import os
 from typing import Optional
 
+import django.dispatch
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied, ValidationError
@@ -21,10 +24,38 @@ from model_utils.models import TimeStampedModel
 
 from classification.enums import AlleleOriginBucket
 from classification.models.classification import ClassificationModification
-from classification.report.template_validation import validate_case_template, validate_json_template
+from classification.report.template_validation import validate_case_template
+from library.case_report_delivery import CaseReportDelivery
 from patients.models import Extraction, Patient, Specimen
 from patients.models_enums import SampleSourceLevel
 from snpdb.models import Lab, Sample
+
+# A report has gone out with the case, so a deployment that files it somewhere else can now do so.
+# Only the DRAFT -> FINAL step sends it - re-finalising is how a LIS id entered later reaches the records
+case_report_finalised_signal = django.dispatch.Signal()  # args: "case_report", "user"
+# What each of those deliveries came to, for the Reports card - a receiver answers with
+# dict[case report pk, list[CaseReportDelivery]]
+case_report_deliveries_signal = django.dispatch.Signal()  # args: "case_reports"
+# A report's JSON, built in Python by whichever app owns that template's shape. The JSON is an
+# interface to another system rather than a document, so the app that has to keep it in step with
+# that system writes it - see classification/report/renderers.py:render_json
+case_report_json_signal = django.dispatch.Signal()  # args: "report_template", "context"; returns dict
+
+
+def get_case_report_deliveries(case_reports: list['CaseReport']) -> dict[int, list[CaseReportDelivery]]:
+    """ The deliveries every app has for these reports, keyed by report pk. send_robust, the way
+        library/integration_status.py collects its statuses - an app that can't answer costs the
+        card its column, not the tab """
+    deliveries: dict[int, list[CaseReportDelivery]] = {}
+    if not case_reports:
+        return deliveries
+    for caller, result in case_report_deliveries_signal.send_robust(sender=CaseReport, case_reports=case_reports):
+        if isinstance(result, Exception):
+            logging.error("Exception getting case report deliveries from %s: %s", caller, result)
+        elif result:
+            for case_report_id, report_deliveries in result.items():
+                deliveries.setdefault(case_report_id, []).extend(report_deliveries)
+    return deliveries
 
 
 class ReportNames:
@@ -37,8 +68,6 @@ class ClassificationReportTemplate(TimeStampedModel):
     template = models.TextField(null=False, blank=True, default="")
     # The case report - one Django template rendered to HTML, with the PDF and DOCX derived from it
     case_template = models.TextField(null=False, blank=True, default="")
-    # Blank renders the canonical context dump rather than nothing
-    json_template = models.TextField(null=False, blank=True, default="")
     # Case level inputs the build form asks for, so a deployment adds them without a schema change:
     # [{"key", "label", "type": "text"|"bool"|"choice", "options": [...], "default", "group",
     #   "prefill_key": the evidence key the form starts the field from}]
@@ -92,9 +121,6 @@ class ClassificationReportTemplate(TimeStampedModel):
         if self.case_template:
             if message := validate_case_template(self.case_template):
                 errors["case_template"] = message
-        if self.json_template:
-            if message := validate_json_template(self.json_template):
-                errors["json_template"] = message
         if errors:
             raise ValidationError(errors)
 

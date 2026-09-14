@@ -48,6 +48,14 @@ Patterns here:
   SUPERSEDED. Finalising stamps report_date, variant_reported and report_id onto each pinned classification, publishes
   it and re-points the CaseReportClassification at the new published version - all through patch_value, so
   re-finalising or re-entering the same LIS id writes nothing.
+- Going DRAFT -> FINAL sends models/classification_report_models.py:case_report_finalised_signal (once - re-finalising
+  does not), which is how a deployment specific app files the report somewhere else; what it made of it comes back to
+  the Reports card through case_report_deliveries_signal as library/case_report_delivery.py:CaseReportDelivery rows
+  (models/classification_report_models.py:get_case_report_deliveries collects them). SA Path answers both to send
+  finalised TSO 500 reports to Mocha.
+- A report's JSON is the app that owns that template's shape answering case_report_json_signal, else the canonical
+  context dump (report/renderers.py:render_json). A JSON another system parses is an interface, so the app that has
+  to keep it in step with that system writes it in Python (SA Path's TSO 500 shape) - there is no JSON template.
 - A CaseReport's permissions are its own (models/classification_report_models.py:CaseReport.can_view / can_write):
   its lab's users may build, finalise and rebuild, and anyone who can see the case may read. Every document is served
   by views/views_case_report.py rather than a media URL - MEDIA_ROOT has no permissions of its own.

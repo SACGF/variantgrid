@@ -3,7 +3,12 @@
     built, newest first. A draft can be finalised, rebuilt from its own context (a template fix) or
     replaced by a new version; a final report's LIS fields are still editable, and saving them stamps
     report_id onto the pinned classifications without making another version.
+
+    Delivery is whatever a deployment specific app did with the report - SA Path tells Mocha where
+    the documents are. Nothing answers case_report_deliveries_signal elsewhere, so the column is
+    empty on every other deployment.
 {% endcomment %}
+{% load js_tags %}
 <div class="card mt-3" id="case-reports">
     <div class="card-header">
         <span>Reports</span>
@@ -18,6 +23,7 @@
                 <th>Classifications</th>
                 <th>Documents</th>
                 <th>Report ID / date</th>
+                <th>Delivery</th>
                 <th class="text-right">Action</th>
             </tr>
         </thead>
@@ -54,6 +60,19 @@
                         <button class="btn btn-outline-secondary btn-sm">Save</button>
                     </form>
                 </td>
+                <td>
+                    {% for delivery in deliveries_by_report_id|get_item:case_report.pk %}
+                        <div class="mb-1">
+                            <span class="badge badge-{{ delivery.status }}">{{ delivery.label }}</span>
+                            <span class="small">{{ delivery.text }}</span>
+                            {% if delivery.timestamp %}<div class="text-muted small">{{ delivery.timestamp|date:"d M Y H:i" }}</div>{% endif %}
+                            {% if delivery.action_url %}
+                                <button type="button" class="btn btn-outline-secondary btn-sm case-report-action"
+                                        data-action-url="{{ delivery.action_url }}">{{ delivery.action_label }}</button>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+                </td>
                 <td class="text-right text-nowrap">
                     {% if case_report.is_editable %}
                         <button type="button" class="btn btn-primary btn-sm case-report-action mb-1"
@@ -71,7 +90,7 @@
                 </td>
             </tr>
         {% empty %}
-            <tr><td colspan="7" class="text-muted text-center py-3">No reports have been built for this case</td></tr>
+            <tr><td colspan="8" class="text-muted text-center py-3">No reports have been built for this case</td></tr>
         {% endfor %}
         </tbody>
     </table>

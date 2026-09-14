@@ -2,15 +2,14 @@
 The render a case template has to survive before it can be saved.
 
 A report template is lab maintained config edited in the admin, and a template that only fails when
-someone builds a real case fails in front of a patient's report. So both templates are rendered over
-a fixture case here: the HTML has to convert through xhtml2pdf, and the JSON has to json.loads.
+someone builds a real case fails in front of a patient's report. So it is rendered over a fixture
+case here, and has to convert through xhtml2pdf.
 
 Deliberately free of any classification.models import - classification_report_models imports this,
 so anything model-shaped here would be a cycle. FIXTURE_CONTEXT is therefore a hand written stand-in
 for classification/report/case_report_context.py:context_as_dict, and a test asserts they match.
 """
 import io
-import json
 from datetime import UTC, date, datetime
 from typing import Optional
 
@@ -129,18 +128,4 @@ def validate_case_template(template_str: str) -> Optional[str]:
         html_to_pdf(html)
     except Exception as e:  # pylint: disable=broad-except
         return f"This template does not convert to PDF: {e}"
-    return None
-
-
-def validate_json_template(template_str: str) -> Optional[str]:
-    if not template_str.strip():
-        return None  # Blank is the canonical context dump, not a broken template
-    try:
-        rendered = render_html(template_str, FIXTURE_CONTEXT)
-    except TemplateSyntaxError as e:
-        return f"Template error: {e}"
-    try:
-        json.loads(rendered)
-    except json.JSONDecodeError as e:
-        return f"This template does not render valid JSON: {e}"
     return None

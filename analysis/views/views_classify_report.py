@@ -37,6 +37,7 @@ from classification.models import (
     ClassificationConsensus,
     ClassificationModification,
     ClassificationReportTemplate,
+    get_case_report_deliveries,
 )
 from classification.report.case_report_builder import build_case_report, preview_case_report_html
 from classification.report.case_report_context import build_report_variants
@@ -69,6 +70,7 @@ def _get_case(user, case_type: str, case_id: int) -> ClassifyReportCase:
 def _classify_report_context(case: ClassifyReportCase, case_type: str, case_id: int) -> dict:
     rows = case.queue_rows()
     modifications = list(case.classification_modifications())
+    case_reports = list(case.case_reports())
     return {
         "case": case,
         "case_type": case_type,
@@ -81,7 +83,9 @@ def _classify_report_context(case: ClassifyReportCase, case_type: str, case_id: 
         "report_templates": ClassificationReportTemplate.objects.exclude(template="").order_by("name"),
         "case_report_templates": ClassificationReportTemplate.case_templates_for_bucket(
             case_allele_origin_bucket(modifications)),
-        "case_reports": list(case.case_reports()),
+        "case_reports": case_reports,
+        # What a deployment specific app did with each report - empty everywhere no app answers
+        "deliveries_by_report_id": get_case_report_deliveries(case_reports),
         "can_create_classifications": Classification.can_create_via_web_form(case.user),
     }
 

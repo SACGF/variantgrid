@@ -1,16 +1,14 @@
 """
 The case report templates this repo ships, under classification/test_data/.
 
-The generic pair is what a deployment gets before it writes its own: an HTML document with the
-header, results summary, tier sections and method block, and a blank JSON template, which means the
-canonical context dump. A deployment's own templates (SA Path's TSO 500 pair) replace the content of
-the row, not these files.
+The generic one is what a deployment gets before it writes its own: an HTML document with the
+header, results summary, tier sections and method block. A deployment's own case template (SA Path's
+TSO 500 one) replaces the content of the row, not this file.
 """
 import os
 
 TEST_DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "test_data")
 GENERIC_CASE_TEMPLATE_FILENAME = "generic_case_report.html"
-GENERIC_JSON_TEMPLATE_FILENAME = "generic_case_report.json"
 
 
 def _read(filename: str) -> str:
@@ -23,5 +21,6 @@ def generic_case_template() -> str:
 
 
 def generic_json_template() -> str:
-    """ Blank - the canonical context dump is the default structured record """
-    return _read(GENERIC_JSON_TEMPLATE_FILENAME)
+    """ Nothing has a json_template any more (@see report/renderers.py:render_json) - this survives
+        only because the pushed migration 0179_default_case_report_template imports it """
+    return ""

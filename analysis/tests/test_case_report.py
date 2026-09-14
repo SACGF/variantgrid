@@ -18,8 +18,13 @@ from classification.models import (
     ClassificationModification,
     ClassificationReportTemplate,
 )
+from classification.models.classification_report_models import (
+    case_report_deliveries_signal,
+    case_report_finalised_signal,
+)
 from classification.report.case_report_builder import build_case_report, finalise_case_report
 from classification.report.default_templates import generic_case_template
+from library.case_report_delivery import CaseReportDelivery
 from library.guardian_utils import assign_permission_to_user_and_groups
 from patients.models import Extraction, Patient, Specimen
 from patients.models_enums import NucleicAcid, SampleSourceLevel
@@ -123,6 +128,57 @@ class CaseReportFinaliseTest(ClassifyReportTestCase):
             classification=classification).count(), versions)
         classification.refresh_from_db()
         self.assertIsNone(classification.get(SpecialEKeys.REPORT_DATE))
+
+
+@override_settings(CELERY_TASK_ALWAYS_EAGER=True, LIFTOVER_CLASSIFICATIONS=False,
+                   CLINGEN_ALLELE_REGISTRY_LOGIN=None)
+class CaseReportDeploymentHooksTest(ClassifyReportTestCase):
+    """ The two hooks a deployment specific app files a report through - SA Path sends finalised
+        TSO 500 reports to Mocha off these """
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.template = ClassificationReportTemplate.objects.create(
+            name="case report hooks template", case_template=generic_case_template())
+        classification = Classification.create(user=cls.user, lab=cls.lab, sample=cls.proband,
+                                               source=SubmissionSource.VARIANT_GRID, variant=cls.variant)
+        classification.publish_latest(cls.user)
+        cls.case_report = build_case_report(cls.user, cls.template, cls.lab, SampleSourceLevel.SAMPLE,
+                                            cls.proband, [classification.last_published_version])
+
+    def test_finalised_signal_fires_only_on_the_draft_to_final_step(self):
+        """ Re-finalising is how a LIS id entered later reaches the records - it sends nothing out again """
+        finalised = []
+
+        def receiver(sender, case_report, user, **kwargs):
+            finalised.append((case_report, user))
+
+        case_report_finalised_signal.connect(receiver)
+        try:
+            finalise_case_report(self.case_report, self.user)
+            self.assertEqual(finalised, [(self.case_report, self.user)])
+            finalise_case_report(self.case_report, self.user)
+            self.assertEqual(len(finalised), 1)
+        finally:
+            case_report_finalised_signal.disconnect(receiver)
+
+    def test_the_card_shows_what_a_delivery_receiver_returns(self):
+        def receiver(sender, case_reports, **kwargs):
+            return {cr.pk: [CaseReportDelivery(label="Mocha", status="warning", text="Sent, pending",
+                                               action_url="/sapath/mocha/send", action_label="Send to Mocha")]
+                    for cr in case_reports}
+
+        case_report_deliveries_signal.connect(receiver)
+        self.client.force_login(self.user)
+        try:
+            response = self.client.get(reverse("sample_classify_report_tab",
+                                               kwargs={"sample_id": self.proband.pk}))
+        finally:
+            case_report_deliveries_signal.disconnect(receiver)
+
+        self.assertContains(response, "Sent, pending")
+        self.assertContains(response, "Send to Mocha")
 
 
 @override_settings(CELERY_TASK_ALWAYS_EAGER=True, LIFTOVER_CLASSIFICATIONS=False,
