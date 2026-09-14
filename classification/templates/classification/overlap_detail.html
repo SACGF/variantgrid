@@ -39,7 +39,7 @@
                 {% endlabelled %}
             {% endif %}
             {% labelled label="Context" %}
-                {% for testing_context in overlap.testing_contexts_objs %}{% if not forloop.first %}/{% endif %}<span class="testing-context-box testing-context-{{ testing_context.value }}">{{ testing_context.name | pretty_label:"lower" }}</span>{% endfor %}
+                {% for testing_context in overlap.testing_contexts_objs %}{% if not forloop.first %}/{% endif %}<span class="testing-context-box testing-context-{{ testing_context.value }}">{{ testing_context.label }}</span>{% endfor %}
                 {{ overlap.value_type_label }}
                 {% if overlap_details.other_relevant_overlaps %}
                     <div class="mt-2"><a class="toggle-link" href="#other-overlaps" data-toggle="collapse">Toggle Other Relevant Overlaps</a></div>
