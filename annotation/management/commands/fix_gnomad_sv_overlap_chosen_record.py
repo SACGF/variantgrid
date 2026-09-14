@@ -92,6 +92,11 @@ def _partition_qs(vav: VariantAnnotationVersion):
 def fix_variant_annotation_version(vav: VariantAnnotationVersion, dry_run: bool = False) -> Counter:
     results = Counter()
 
+    if vav.data_archived:
+        logging.info("%s is archived - its partition has been dropped - skipping", vav)
+        results["data_archived"] += 1
+        return results
+
     targets = _sv_column_targets(vav.genome_build)
     try:
         reader = GnomADSVRecordReader(vav.genome_build)
