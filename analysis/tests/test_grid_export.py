@@ -8,7 +8,6 @@ entry point the view and the Celery export tasks use.
 import csv
 import json
 import tempfile
-import zipfile
 from datetime import datetime, timezone
 from unittest import mock
 from urllib.parse import urlencode
@@ -20,7 +19,7 @@ from django.test.client import Client
 from django.test.utils import CaptureQueriesContext
 from django.urls.base import resolve, reverse
 
-from analysis.grid_export import format_items_iterator, node_grid_get_export_iterator
+from analysis.grid_export import format_items_iterator, get_node_export_basename, node_grid_get_export_iterator
 from analysis.grids import ExportVariantGrid
 from analysis.models import Analysis
 from analysis.models.enums import NodeStatus
@@ -365,7 +364,15 @@ class TestNodeExportLaunch(GridExportTestCase):
         self.assertNotEqual(unfiltered.pk, filtered.pk)
         self.assertEqual(self._num_cached_files(), 2)
 
-    def test_export_task_writes_zipped_csv(self):
+    def test_export_basename_is_short_and_unique(self):
+        node = self.node
+        node.name = "Pathogenic / likely (v2)"
+        expected = f"Pathogenic_likely_v2_{self.sample.name}_a{self.analysis.pk}_n{node.pk}_v{node.version}"
+        self.assertEqual(get_node_export_basename(node), expected)
+        node.name = ""
+        self.assertTrue(get_node_export_basename(node).startswith(node.get_node_class_label() + "_"))
+
+    def test_export_task_writes_plain_csv(self):
         cgf = self._launch_export()
         # The view strips version_id from the grid params it hands the task (node.version is authoritative)
         task_grid_params = self._grid_params()
@@ -377,10 +384,9 @@ class TestNodeExportLaunch(GridExportTestCase):
                 cgf.refresh_from_db()
                 self.assertEqual(cgf.task_status, "SUCCESS")
                 self.assertEqual(cgf.progress, 1)
-                self.assertTrue(cgf.filename.endswith(".csv.zip"), cgf.filename)
-                with zipfile.ZipFile(cgf.filename) as zipf:
-                    csv_name = zipf.namelist()[0]
-                    lines = zipf.read(csv_name).decode().splitlines()
+                self.assertTrue(cgf.filename.endswith(".csv"), cgf.filename)
+                with open(cgf.filename) as f:
+                    lines = f.read().splitlines()
                 self.assertEqual(len(lines), self.node.count + 1)  # header
 
 

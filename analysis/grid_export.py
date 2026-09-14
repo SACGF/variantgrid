@@ -68,28 +68,17 @@ def node_grid_get_export_iterator(request, node, export_type, canonical_transcri
     return filename, file_iterator
 
 def get_node_export_basename(node: AnalysisNode) -> str:
-    """ For CSV/VCF etc """
-    name_parts = []
+    """ Short enough to survive Windows path limits once it lands in a downloads folder - the analysis pk,
+        node pk and version keep it unique; the node name (or class when unnamed) says what it is """
+    if node.name:
+        label = re.sub(r"\W+", "_", node.name).strip("_")
+    else:
+        label = node.get_node_class_label()
+    name_parts = [label]
     if samples := node.get_samples():
         if len(samples) == 1:
             name_parts.append(samples[0].name)
-
-    name_parts.append(f"analysis_{node.analysis.pk}")
-
-    node_label = node.get_node_class_label()
-    if not node_label.endswith("Node"):
-        node_label += "Node"
-    name_parts.append(node_label)
-    name_parts.append(str(node.pk))
-
-    if node.name:
-        name_underscores = re.sub(r"\s", "_", node.name)
-        name_parts.append(name_underscores)
-    name_parts.append(f"v{node.version}")
-    # A live-source node's rows depend on data that changes under it - say which version this file reflects
-    if live_data_sources := node.live_data_sources:
-        sources = "_".join(f"{k}.{v}" for k, v in sorted(live_data_sources.items()))
-        name_parts.append(re.sub(r"\W", "_", sources))
+    name_parts += [f"a{node.analysis.pk}", f"n{node.pk}", f"v{node.version}"]
     return "_".join(name_parts)
 
 
