@@ -5,7 +5,7 @@
 {% endif %}
 <div>
     <span {% if overlap.overlap_status.is_attention %}class="text-danger"{% endif %}>
-        {% if overlap.overlap_status == 90 %}Discordance <i class="fa-solid fa-briefcase-medical" title="Medically Significant"></i>{% else %}{{ overlap.overlap_status.label }}{% endif %}
+        {% if overlap.overlap_status == 90 %}{% if overlap.value_type == "O" %}Discordance{% else %}Difference{% endif %} <i class="fa-solid fa-briefcase-medical" title="Medically Significant"></i>{% else %}{{ overlap.overlap_status_label }}{% endif %}
     </span>
     {% if overlap.overlap_status_change_timestamp %} : {% timestamp overlap.overlap_status_change_timestamp time_ago=True %}{% endif %}
     {% for c_value in values.sorted %}
