@@ -518,7 +518,10 @@ classifications, and "Apply to this sample" copying consensus. Still to do, in o
 - **#444 remainder** — `ClassificationReport` takes a list and the context carries `gene_groups`, but the
   vue report template still wants an array-aware version, Phase 4's TMB/MSI `SpecimenMeasure`s are not
   yet pulled into the report, and the tab launches from sample and patient pages but not the specimen
-  page. Linked-classification semantics (compound het / ID linkage) were left out of #1834 as
+  page.
+  Designed in [`444_multi_variant_report_plan.md`](444_multi_variant_report_plan.md): a pinned `CaseReport`
+  per run producing DOCX, PDF and JSON from one context, ordering and AMP sub-tier in Python, specimen and
+  extraction as case types. Linked-classification semantics (compound het / ID linkage) were left out of #1834 as
   selection at report time covers the reporting need without new data.
 
 ---
