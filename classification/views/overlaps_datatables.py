@@ -1,5 +1,6 @@
 from collections import Counter
 from dataclasses import dataclass, field
+from enum import StrEnum
 from functools import cached_property
 from typing import Optional, Set
 from django.db.models import QuerySet, Subquery, Q, OuterRef
@@ -18,6 +19,14 @@ from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.lab_picker import LabPickerData
 from snpdb.models import Lab
 from snpdb.views.datatable_view import DatatableConfig, DatatableConfigQuerySetMode, RichColumn, CellData, SortOrder, DC
+
+
+class _SpecialNextStep(StrEnum):
+    VUS = "V",
+    ALL_OVERLAPS = "X",
+    SOLVED = "S",
+    AWAITING = "TT"
+    SOMATIC_CLIN_SIG = "SCS"
 
 
 @dataclass
@@ -100,9 +109,9 @@ class OverlapColumns(DatatableConfig[ClassificationGrouping]):
     @property
     def triage_next_step_filter(self) -> Set[TriageNextStep]:
         if triage_status_str := self.get_query_param("skew_status"):
-            if triage_status_str == "S":
+            if triage_status_str == _SpecialNextStep.SOLVED:
                 return None  # shouldn't be checking status for solved overlaps
-            if triage_status_str == "TT":  # special code for meaning both awaiting and awaiting others have triaged
+            if triage_status_str == _SpecialNextStep.AWAITING:  # special code for meaning both awaiting and awaiting others have triaged
                 return {TriageNextStep.AWAITING_YOUR_TRIAGE, TriageNextStep.AWAITING_YOUR_TRIAGE_OTHERS_TRIAGED}
             else:
                 return {TriageNextStep(int(triage_status_str))}
@@ -130,8 +139,12 @@ class OverlapColumns(DatatableConfig[ClassificationGrouping]):
         # only display single context overlaps, but later we merge with cross context data
         qs = qs.filter(overlap_type=OverlapType.SINGLE_CONTEXT)
 
+        next_step = self.get_query_param("skew_status")
+
         # only ONC PATH for now
-        if not OVERLAP_CLIN_SIG_ENABLED:
+        if next_step == _SpecialNextStep.SOMATIC_CLIN_SIG:
+            qs = qs.filter(value_type=ClassificationResultValue.SOMATIC_CLINICAL_SIGNIFICANCE)
+        elif not OVERLAP_CLIN_SIG_ENABLED:
             qs = qs.filter(value_type=ClassificationResultValue.ONC_PATH)
 
         lab_filter_q = Q()
@@ -139,7 +152,7 @@ class OverlapColumns(DatatableConfig[ClassificationGrouping]):
             lab_filter_q = Q(contribution__classification_grouping__lab__in=self.lab_picker.lab_ids) & Q(
                 contribution__contribution_status=OverlapContributionStatus.CONTRIBUTING)
 
-        if self.get_query_param("skew_status") == "S":  # solved overlaps
+        if next_step == _SpecialNextStep.SOLVED:  # solved overlaps
             qs = qs.filter(
                 Q(overlap_max_ever_status__gte=OverlapStatus.MAJOR_DIFFERENCES,
                   overlap_status__lt=OverlapStatus.MAJOR_DIFFERENCES) |
@@ -150,14 +163,14 @@ class OverlapColumns(DatatableConfig[ClassificationGrouping]):
                     overlap=OuterRef('pk')
                 ).annotate(max_status=Max('next_step')).values_list('max_status')[:1]
             ))
-        elif self.get_query_param("skew_status") == "X":  # show all overlaps (don't care about next step)
+        elif next_step == _SpecialNextStep.ALL_OVERLAPS or next_step == _SpecialNextStep.SOMATIC_CLIN_SIG:  # show all overlaps (don't care about next step)
             qs = qs.filter(overlap_status__gt=OverlapStatus.SINGLE_SUBMITTER)
             qs = qs.annotate(skew_status=Subquery(
                 OverlapContributionNextStep.objects.filter(lab_filter_q).filter(
                     overlap=OuterRef('pk')
                 ).annotate(max_status=Max('next_step')).values_list('max_status')[:1]
             ))
-        elif self.get_query_param("skew_status") == "V":  # V for VUS (don't care about next step)
+        elif next_step == _SpecialNextStep.VUS:  # V for VUS (don't care about next step)
             qs = qs.filter(overlap_status__gt=OverlapStatus.SINGLE_SUBMITTER, all_vus=True)
             qs = qs.annotate(skew_status=Subquery(
                 OverlapContributionNextStep.objects.filter(lab_filter_q).filter(
@@ -270,7 +283,8 @@ class OverlapColumns(DatatableConfig[ClassificationGrouping]):
                         value.clinvar = True
 
         max_overlap_status = None
-        if self.get_query_param("skew_status") == "S":  # solved overlaps
+        next_step = self.get_query_param("skew_status")
+        if next_step == _SpecialNextStep.SOLVED:  # solved overlaps
             if not overlap.overlap_override_status and overlap.overlap_max_ever_status > overlap.overlap_status:
                 max_overlap_status = overlap.overlap_max_ever_status
 
@@ -278,7 +292,8 @@ class OverlapColumns(DatatableConfig[ClassificationGrouping]):
             "values": values,
             "overlap": cell.obj,
             "max_triage_status": max_triage_status,
-            "max_overlap_status": max_overlap_status
+            "max_overlap_status": max_overlap_status,
+            "show_next_step": max_triage_status and overlap.is_active_supported_discordance
         }
 
         return render_to_string('classification/snippets/overlap_value_cell_3.html',

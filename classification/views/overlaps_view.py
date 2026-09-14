@@ -99,7 +99,12 @@ def view_overlaps(request: HttpRequest, lab_id=None) -> HttpResponseBase:
     # TT for pending and pending and other labs have triaged
     # S for solved
     # V for VUS
-    for skew_status in ["TT", "S", "V", TriageNextStep.TO_DISCUSS, TriageNextStep.AWAITING_OTHER_LAB, TriageNextStep.UNANIMOUSLY_COMPLEX, TriageNextStep.AWAITING_YOUR_AMEND]:
+    for skew_status in [
+        "TT",
+        "S",
+        "V",
+        "SCS",
+        TriageNextStep.TO_DISCUSS, TriageNextStep.AWAITING_OTHER_LAB, TriageNextStep.UNANIMOUSLY_COMPLEX, TriageNextStep.AWAITING_YOUR_AMEND]:
         counts[skew_status] = OverlapColumns(request, {"skew_status": str(skew_status), "lab_selection": lab_id}).get_initial_queryset().count()
 
     return render(request, "classification/overlaps.html", {

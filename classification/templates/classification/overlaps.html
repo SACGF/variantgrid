@@ -54,6 +54,9 @@
             <label class="btn btn-outline-success"><input type="radio" name="triage_status_filter" id="triage_status_filter-v" value="V" {% if tab == "S" %}checked="checked"{% endif %}>VUS {{ counts.V | badge }}</label>
             <label class="btn btn-outline-success"><input type="radio" name="triage_status_filter" id="triage_status_filter-s" value="S" {% if tab == "S" %}checked="checked"{% endif %}>Solved {{ counts.S | badge }}</label>
             <label class="btn btn-outline-success"><input type="radio" name="triage_status_filter" id="triage_status_filter-c" value="X" {% if tab == "A" %}checked="checked"{% endif %}>All Overlaps</label>
+            {% if counts.SCS %}
+            <label class="btn btn-outline-secondary"><input type="radio" name="triage_status_filter" id="triage_status_filter-scs" value="SCS" {% if tab == "SCS" %}checked="checked"{% endif %}>Somatic Clin Sig {{ counts.SCS | badge }}</label>
+            {% endif %}
         </div>
     </div>
 

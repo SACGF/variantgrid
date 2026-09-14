@@ -1,6 +1,6 @@
 {% load js_tags %}
 <div style="position:relative; top:-4px">
-{% if max_triage_status and not overlap.overlap_override_status %}
+{% if show_next_step %}
     <div style="font-style:italic; color:#aaa">{{ max_triage_status.label }}</div>
 {% endif %}
 <div>
