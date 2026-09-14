@@ -13,6 +13,7 @@ from django.urls import reverse
 from django.utils.datastructures import OrderedSet
 from django.views.decorators.cache import cache_page
 from django.views.decorators.http import require_POST
+from requests import RequestException
 
 from annotation.models.models import AnnotationVersion
 from classification.views.exports import ClassificationExportFormatterCSV
@@ -279,7 +280,7 @@ def view_transcript_version(request, transcript_id, version):
         # Call this before retrieving TranscriptVersions - as it will retrieve it and set alignment_gap
         # if lengths are different
         tv_sequence_info = TranscriptVersionSequenceInfo.get(accession)
-    except NoTranscript as e:
+    except (NoTranscript, RequestException) as e:
         tv_sequence_info = None
         no_transcript_message = str(e)
 
