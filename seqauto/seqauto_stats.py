@@ -2,7 +2,7 @@ import logging
 import operator
 import re
 from functools import reduce
-from typing import Optional
+from typing import NamedTuple, Optional
 
 import numpy as np
 import pandas as pd
@@ -80,14 +80,29 @@ def year_month_formatter_start_to_end(start, end, year_month_start):
     return month_range(start_month, start_year, start, end)
 
 
-def group_enrichment_kits_df(df, by_column, max_groups=None, max_years=None):
-    """ returns (array of (enrichment_kit_name, data), labels)
-        max_groups=10 gives 9 groups with everything else as "other" """
+class EnrichmentKitGroups(NamedTuple):
+    """ Stacked bar series per enrichment kit, with the smallest kits summed into an "other" series """
+    data: list[tuple[str, list[int]]]
+    labels: list[str]
+    collapsed_count: int = 0
+
+    @property
+    def collapsed_help(self) -> Optional[str]:
+        if not self.collapsed_count:
+            return None
+        named_count = len(self.data) - 1
+        return (f"Showing the top {named_count} enrichment kits by sample count - "
+                f"the remaining {self.collapsed_count} are summed into 'other'")
+
+
+def group_enrichment_kits_df(df, by_column, max_groups=None, max_years=None) -> EnrichmentKitGroups:
+    """ max_groups=10 gives 9 named kits with everything else as "other" """
     LABELS_FOR_COLUMNS = {"year": year_formatter_start_to_end,
                           "month_offset": year_month_formatter_start_to_end}
 
     enrichment_kit_data = []
     labels = []
+    collapsed_count = 0
 
     if not df.empty:
         if max_years is not None:
@@ -118,6 +133,7 @@ def group_enrichment_kits_df(df, by_column, max_groups=None, max_years=None):
 
     if max_groups is not None and len(enrichment_kit_data) > max_groups:
         named_groups = max_groups - 1
+        collapsed_count = len(enrichment_kit_data) - named_groups
         enrichment_kit_data_sum = [(name, array, sum(array)) for name, array in enrichment_kit_data]
         enrichment_kit_data_sum = sorted(enrichment_kit_data_sum, key=operator.itemgetter(2), reverse=True)
         enrichment_kit_data = []
@@ -127,4 +143,4 @@ def group_enrichment_kits_df(df, by_column, max_groups=None, max_years=None):
         other_sum = reduce(operator.add, [np.array(array) for _, array, _ in enrichment_kit_data_sum[named_groups:]])
         enrichment_kit_data.append(("other", other_sum.tolist()))
 
-    return enrichment_kit_data, labels
+    return EnrichmentKitGroups(enrichment_kit_data, labels, collapsed_count)
