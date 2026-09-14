@@ -4,12 +4,14 @@
 $(document).ready(function() {
     let enrichment_kits_over_time = {{ enrichment_kits_over_time | jsonify }};
     let enrichment_kit_labels = {{ enrichment_kit_labels | jsonify }};
+    let series_colors = {{ series_colors | jsonify }};
     let title = "{{ title }}";
 
     let container = 'enrichment_kits-by-time-{{ uuid }}';
-    let width = $(`#${container}`).width();
+    // Inside a carousel the inactive slide is display:none, so measure the nearest visible ancestor
+    let width = $(`#${container}`).closest(':visible').width();
 
-    showStackedBar(container, title, width, 500, enrichment_kits_over_time, enrichment_kit_labels)
+    showStackedBar(container, title, width, 500, enrichment_kits_over_time, enrichment_kit_labels, series_colors)
 });
 </script>
 <div id='enrichment_kits-by-time-{{ uuid }}'></div>

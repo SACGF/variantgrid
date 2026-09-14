@@ -154,7 +154,8 @@ function plotLineArrays(selector, x, y, layout) {
 }
 
 
-function showStackedBar(elementId, title, width, height, named_data, x_labels) {
+// series_colors (optional) maps a series name to its colour; unnamed series keep Plotly's defaults
+function showStackedBar(elementId, title, width, height, named_data, x_labels, series_colors) {
     const x = [];
     for (let i=0 ; i<x_labels.length ; ++i) {
         x.push(i);
@@ -163,10 +164,15 @@ function showStackedBar(elementId, title, width, height, named_data, x_labels) {
     const data = [];
     for(let i=0 ; i<named_data.length ; ++i) {
         const nd = named_data[i];
-        data.push({ 'x' : x,
-                    'y' : nd[1],
-                    'name' : nd[0],
-                    'type' : 'bar'});
+        const trace = { 'x' : x,
+                        'y' : nd[1],
+                        'name' : nd[0],
+                        'type' : 'bar'};
+        const color = series_colors && series_colors[nd[0]];
+        if (color) {
+            trace.marker = {color: color};
+        }
+        data.push(trace);
     }
 
     const layout = defaultLayout(title, width, height);

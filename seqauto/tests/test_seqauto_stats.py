@@ -2,7 +2,12 @@
 import pandas as pd
 from django.test import TestCase
 
-from seqauto.seqauto_stats import group_enrichment_kits_df
+from seqauto.seqauto_stats import (
+    VARIANTS_TYPE_COL,
+    VARIANTS_TYPE_SERIES_COL,
+    add_variants_type_series,
+    group_enrichment_kits_df,
+)
 
 
 def _kits_df(num_kits: int) -> pd.DataFrame:
@@ -30,3 +35,19 @@ class EnrichmentKitGroupsTest(TestCase):
         self.assertEqual(10, len(groups.data))
         self.assertEqual(0, groups.collapsed_count)
         self.assertIsNone(groups.collapsed_help)
+
+
+class VariantsTypeSeriesTest(TestCase):
+    def test_somatic_types_combine_and_missing_kit_is_unknown(self):
+        df = pd.DataFrame({VARIANTS_TYPE_COL: ["G", "M", "S", "U", None],
+                           "year": [24] * 5, "year_month": [2401] * 5, "month_offset": [0] * 5})
+        add_variants_type_series(df)
+        self.assertEqual(["Germline", "Somatic", "Somatic", "Unknown", "Unknown"],
+                         list(df[VARIANTS_TYPE_SERIES_COL]))
+
+        groups = group_enrichment_kits_df(df, "year", group_column=VARIANTS_TYPE_SERIES_COL)
+        self.assertEqual({"Germline": [1], "Somatic": [2], "Unknown": [2]}, dict(groups.data))
+
+    def test_fake_csv_without_the_column_is_all_unknown(self):
+        df = add_variants_type_series(pd.DataFrame({"enrichment_kit__name": ["a", "b"]}))
+        self.assertEqual(["Unknown", "Unknown"], list(df[VARIANTS_TYPE_SERIES_COL]))
