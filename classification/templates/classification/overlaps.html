@@ -25,6 +25,11 @@
     <script>
         function groupingFilter(data) {
             let selectedMode = $('[name=triage_status_filter]:checked').val();
+            if (selectedMode === "SCS") {
+                $('#clin-sig-warning').show();
+            } else {
+                $('#clin-sig-warning').hide();
+            }
             data.skew_status = selectedMode;
             data.lab_selection = {{ lab_picker_data.selection | jsonify }};
         }
@@ -37,6 +42,22 @@
             });
         });
     </script>
+
+    {% page_help_embedded title="Overlaps and Discordances" %}
+        <p>
+        An overlap is defined as an allele where two or more different labs provide records within the same testing context.<br/>
+        Testing contexts include Germline, Non-Cancer Somatic, Haematology, Solid Tumour.<br/>
+        When an overlap is discordant, labs can triage their submissions from this page.
+        </p>
+            <div><label>Awaiting Triage</label> : overlaps that are discordant where your lab(s) records have not yet been triaged.</div>
+            <div><label>Ready to Discuss</label> : all relevant labs have triaged but not come to a concordance.</div>
+            <div><label>Awaiting Amendment</label> : if during a previous triage you agreed to change a value, the changes will be listed here.</div>
+            <div><label>Waiting on Other Lab</label> : your lab(s) have triaged, but another lab still needs to triage.</div>
+            <div><label>VUS</label> : shows all overlaps where every involved lab has provided VUS (or VUS-A,B,C). No action is required here.</div>
+            <div><label>Solved</label> : shows overlaps your lab(s) contribute towards that were once actively discordant.</div>
+            <div><label>All Overlaps</label> : shows every instance where you and another lab contribute to the same overlap, regardless of agreement/disagreement.</div>
+            <div><label>Somatic Clin Sig</label> : only relevant for somatic labs, shows all overlaps where two or more labs have provided somatic clinical significance.</div>
+    {% end_page_help_embedded %}
 
     {% lab_picker data=lab_picker_data %}
 
@@ -58,6 +79,12 @@
             <label class="btn btn-outline-secondary"><input type="radio" name="triage_status_filter" id="triage_status_filter-scs" value="SCS" {% if tab == "SCS" %}checked="checked"{% endif %}>Somatic Clin Sig {{ counts.SCS | badge }}</label>
             {% endif %}
         </div>
+    </div>
+
+    <div id="clin-sig-warning" class="text-info" style="display:none">
+        Discordances for Somatic Clinical Significance aren't yet supported<br/>
+        Solid Tumour overlaps are not yet sub-divided by cancer type.<br/>
+        These Somatic Clinical Significance overlaps are provided for your manual review if you find them useful.
     </div>
 
     <table
