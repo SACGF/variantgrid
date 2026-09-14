@@ -124,7 +124,7 @@ class TrioSerializer(serializers.ModelSerializer):
 
 
 class DuoSerializer(serializers.ModelSerializer):
-    parent = serializers.SerializerMethodField()
+    relative = serializers.SerializerMethodField()
     proband = serializers.SerializerMethodField()
     relationship_label = serializers.CharField(read_only=True)
 
@@ -132,8 +132,8 @@ class DuoSerializer(serializers.ModelSerializer):
         model = Duo
         fields = '__all__'
 
-    def get_parent(self, obj) -> str:
-        return obj.parent.name
+    def get_relative(self, obj) -> str:
+        return obj.relative.name
 
     def get_proband(self, obj) -> str:
         return obj.proband.name

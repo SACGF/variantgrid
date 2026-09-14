@@ -64,21 +64,31 @@ their own viewBox, so <use> scales them to whatever width/height the <svg class=
     </symbol>
 
     {% comment %}
-    Duo - one parent above an affected proband. Both parent shapes are drawn and the page blanks out
-    the one its relationship rules out with duo-mother/duo-father (see --pedigree-duo-* in
-    global.scss); parent-affected fills the one that's left. With neither class the overlapped square
-    and circle read as "a parent", which is what the empty DuoNode icon wants.
+    Duo - the affected proband with one relative, drawn as a parent above them or a sibling beside
+    them under a sibship bar. Both halves are in the symbol and duo-sibling swaps which one shows
+    (see --pedigree-duo-* in global.scss); within the parent half both shapes are drawn and
+    duo-mother/duo-father blanks out the one the relationship rules out. relative-affected fills
+    whichever relative shape is left. With none of those classes the overlapped square and circle
+    read as "a relative", which is what the empty DuoNode icon wants.
     {% endcomment %}
     <symbol id="node-icon-duo" viewBox="0 0 20 26">
         <g fill="none" stroke="currentColor" style="stroke-width: var(--pedigree-stroke-width, 2.6)">
-            <rect x="6" y="2" width="8" height="8"
-                  style="fill: var(--pedigree-duo-square-fill, var(--pedigree-parent-fill, none));
-                         stroke: var(--pedigree-duo-square-stroke, currentColor)"/>
-            <circle cx="10" cy="6" r="4.5"
-                    style="fill: var(--pedigree-duo-circle-fill, var(--pedigree-parent-fill, none));
-                           stroke: var(--pedigree-duo-circle-stroke, currentColor)"/>
-            <path d="M10 10.5 V15.5"/>
-            <circle cx="10" cy="20" r="4.5" fill="currentColor"/>
+            <g style="display: var(--pedigree-duo-parent-display, inline)">
+                <rect x="6" y="2" width="8" height="8"
+                      style="fill: var(--pedigree-duo-square-fill, var(--pedigree-relative-fill, none));
+                             stroke: var(--pedigree-duo-square-stroke, currentColor)"/>
+                <circle cx="10" cy="6" r="4.5"
+                        style="fill: var(--pedigree-duo-circle-fill, var(--pedigree-relative-fill, none));
+                               stroke: var(--pedigree-duo-circle-stroke, currentColor)"/>
+                <path d="M10 10.5 V15.5"/>
+                <circle cx="10" cy="20" r="4.5" fill="currentColor"/>
+            </g>
+            <g style="display: var(--pedigree-duo-sibling-display, none)">
+                <path d="M5 12 H15 M5 12 V15.5 M15 12 V15.5"/>
+                <circle cx="5" cy="20" r="4.5" fill="currentColor"/>
+                <rect x="11" y="16" width="8" height="8" style="fill: var(--pedigree-relative-fill, none)"/>
+                <circle cx="15" cy="20" r="4.5" style="fill: var(--pedigree-relative-fill, none)"/>
+            </g>
         </g>
     </symbol>
 

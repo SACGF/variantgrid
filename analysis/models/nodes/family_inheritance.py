@@ -152,9 +152,18 @@ class AbstractFamilyInheritance(ABC):
     # A mosaic parent carries the variant in a fraction of cells - any call short of a full HOM_ALT.
     # The mosaic modes lean on allele depth rather than the call itself @see issue #1830
     MOSAIC_ZYGOSITIES = NO_VARIANT | {Zygosity.HET}
+    # An unaffected sibling shares the parents but not the phenotype, so they can carry a recessive
+    # hit without being homozygous for it
+    NOT_HOM_ALT = {Zygosity.HET, Zygosity.MISSING, Zygosity.HOM_REF}
 
     def __init__(self, node):
         self.node = node
+
+    @classmethod
+    def sibling_zygosities(cls, affected: bool, affected_zyg: set) -> set:
+        """ What a recessive mode asks of a sibling - the proband's own genotype when they share the
+            phenotype, anything short of homozygous when they don't """
+        return affected_zyg if affected else cls.NOT_HOM_ALT
 
     @staticmethod
     def _zygosity_options(zyg: set, allow_unknown=False):

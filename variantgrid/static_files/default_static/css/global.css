@@ -2952,8 +2952,8 @@ li.help-item :last-child {
   --pedigree-sibling-fill: currentColor;
 }
 
-.parent-affected {
-  --pedigree-parent-fill: currentColor;
+.relative-affected {
+  --pedigree-relative-fill: currentColor;
 }
 
 .duo-mother {
@@ -2964,6 +2964,11 @@ li.help-item :last-child {
 .duo-father {
   --pedigree-duo-circle-fill: none;
   --pedigree-duo-circle-stroke: none;
+}
+
+.duo-sibling {
+  --pedigree-duo-parent-display: none;
+  --pedigree-duo-sibling-display: inline;
 }
 
 .preview-data .preview-category,

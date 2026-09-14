@@ -3460,11 +3460,12 @@ li.help-item {
 	--pedigree-sibling-fill: currentColor;
 }
 
-.parent-affected {
-	--pedigree-parent-fill: currentColor;
+.relative-affected {
+	--pedigree-relative-fill: currentColor;
 }
 
-/* node-icon-duo draws both parent shapes - blank out the one the relationship rules out */
+/* node-icon-duo draws a parent above the proband and a sibling beside them - the relationship class
+   picks the half that shows, and for a parent which of its two shapes the sex rules out */
 .duo-mother {
 	--pedigree-duo-square-fill: none;
 	--pedigree-duo-square-stroke: none;
@@ -3473,6 +3474,11 @@ li.help-item {
 .duo-father {
 	--pedigree-duo-circle-fill: none;
 	--pedigree-duo-circle-stroke: none;
+}
+
+.duo-sibling {
+	--pedigree-duo-parent-display: none;
+	--pedigree-duo-sibling-display: inline;
 }
 
 .preview-data {

@@ -4,7 +4,7 @@
     var duoForm = $("#duo-form");
     var ZYGOSITY_MAP = JSON.parse(document.getElementById('zygosity-data').textContent);
     // Until a Duo loads, preview the modes as they'd read with the mother
-    var parentAffected = false, relationship = 'M';
+    var relativeAffected = false, relationship = 'M';
     var duoLoadable = {{ duo_loadable|yesno:"true,false" }};
 
     function getDuoId() {
@@ -22,10 +22,11 @@
 
         var requireZyg = $("#id_require_zygosity").is(":checked");
 
-        // Most rows are a plain key; some vary with the parent's affected status, and All Recessive
-        // varies with which parent we have (no XLR branch through the father)
+        // Most rows are a plain key; some vary with the relative's affected status, and some with
+        // who the relative is (no XLR branch through the father, sibling rules of their own)
         function lookup(prefix, key, affected) {
-            var candidates = [key + '_' + relationship, key + (affected ? '_affected' : '_unaffected'), key];
+            var suffix = affected ? '_affected' : '_unaffected';
+            var candidates = [key + '_' + relationship + suffix, key + '_' + relationship, key + suffix, key];
             for (var i = 0; i < candidates.length; ++i) {
                 var name = prefix + candidates[i];
                 if (name in map) return map[name];
@@ -48,24 +49,25 @@
         }
 
         function otherFilters(key) {
-            return fillMosaicThresholds(lookup('other_filters_', key, parentAffected) || '');
+            return fillMosaicThresholds(lookup('other_filters_', key, relativeAffected) || '');
         }
 
-        $(".zyg-parent").text(memberZyg('parent', parentAffected, requireZyg));
+        $(".zyg-relative").text(memberZyg('relative', relativeAffected, requireZyg));
         $(".zyg-proband").text(memberZyg('proband', false, true));
-        $(".other-parent").text(otherFilters('parent'));
+        $(".other-relative").text(otherFilters('relative'));
         $(".other-proband").text(otherFilters('proband'));
     }
 
     function displayDuoInfo(data) {
         var duoInfo = $("#duo-info");
-        $(".parent", duoInfo).text(data.parent);
+        $(".relative", duoInfo).text(data.relative);
         $(".proband", duoInfo).text(data.proband);
-        $(".parent_affected", duoInfo).text(data.parent_affected ? "affected" : "unaffected");
-        $(".parent-role", duoInfo).text(data.relationship_label);
-        $(".parent-role-zyg").text(data.relationship_label);
+        $(".relative_affected", duoInfo).text(data.relative_affected ? "affected" : "unaffected");
+        $(".relative-role", duoInfo).text(data.relationship_label);
+        $(".relative-role-zyg").text(data.relationship_label);
+        $(".relative-role-lower").text(data.relationship_label.toLowerCase());
 
-        parentAffected = data.parent_affected;
+        relativeAffected = data.relative_affected;
         relationship = data.relationship;
         duoInfo.show();
         setModeAvailability();
@@ -109,12 +111,15 @@
     $("#id_mosaic_min_alt_reads").on("input", updateZygosityTable);
     $("#mosaic-max-af-slider").on("input", updateZygosityTable);
 
-    /* Dominant needs an affected parent, and X-linked recessive needs the mother - offer them only
-       when the loaded duo fits, or when the user has ticked "ignore" to run them anyway */
+    /* Dominant needs an affected parent, X-linked recessive needs the mother, and the parent-only
+       modes need a parent at all - offer them only when the loaded duo fits, or when the user has
+       ticked "ignore" to run them anyway */
     function setModeAvailability() {
         var inheritanceSelect = $("#id_inheritance", duoForm);
         var ignoring = $("#id_ignore_field_errors", duoForm).is(":checked");
-        var available = {"D": parentAffected, "X": relationship === 'M'};
+        var sibling = relationship === 'S';
+        var available = {"D": relativeAffected || sibling, "X": relationship !== 'F',
+                         "N": !sibling, "M": !sibling};
         for (var value in available) {
             var option = $("option[value=" + value + "]", inheritanceSelect);
             var enabled = available[value] || ignoring;
@@ -149,7 +154,7 @@
     <div id='duo-info' class="editor-section">
         <div class="editor-section-title">Family</div>
         <table class="editor-table">
-                <tr><th class='parent-role'>Parent</th><td><span class='parent'></span> <span class='editor-help'>(<span class='affected parent_affected'></span>)</span></td></tr>
+                <tr><th class='relative-role'>Relative</th><td><span class='relative'></span> <span class='editor-help'>(<span class='affected relative_affected'></span>)</span></td></tr>
                 <tr><th>Proband</th><td><span class='proband'></span></td></tr>
         </table>
     </div>
@@ -161,7 +166,7 @@
         <span class="editor-label"></span>
         <span class="editor-checks">
             <label for="{{ form.ignore_field_errors.id_for_label }}" title="Save and run even though the inheritance mode doesn't fit this family - the reasons show as warnings">{{ form.ignore_field_errors }} {{ form.ignore_field_errors.label }}</label>
-            <label for="{{ form.require_zygosity.id_for_label }}">{{ form.require_zygosity }} Require parent zygosity calls</label>{{ form.require_zygosity.errors }}
+            <label for="{{ form.require_zygosity.id_for_label }}">{{ form.require_zygosity }} Require <span class='relative-role-lower'>relative</span> zygosity calls</label>{{ form.require_zygosity.errors }}
         </span>
     </div>
     <div class='genotype-row' id='mosaic-fields' style='display: none'>
@@ -194,7 +199,7 @@
                     <tr><th>Member</th><th>Expected zygosity</th><th>Other filters</th></tr>
                 </thead>
                 <tbody>
-                        <tr><th class='parent-role-zyg'>Parent</th><td class="zyg-parent" style="white-space: pre-line"></td><td class="other-parent"></td></tr>
+                        <tr><th class='relative-role-zyg'>Relative</th><td class="zyg-relative" style="white-space: pre-line"></td><td class="other-relative"></td></tr>
                         <tr><th>Proband</th><td class="zyg-proband" style="white-space: pre-line"></td><td class="other-proband"></td></tr>
                 </tbody>
             </table>

@@ -198,7 +198,8 @@ zygosities (`CohortNodeZygosityFiltersCollection`), and adds the ref/het/hom cou
 `analysis/models/nodes/family_inheritance.py:FamilyInheritanceNodeMixin` (inheritance-versus-family checks, waivable as
 warnings) and one `AbstractFamilyInheritance` strategy object per mode, built by the node's `_inheritance_factory`;
 `analysis/models/nodes/sources/trio_node.py:TrioNode`, `analysis/models/nodes/sources/duo_node.py:DuoNode` (#1829, a
-proband and one parent, with Denovo becoming "absent in parent") and `analysis/models/nodes/sources/quad_node.py:QuadNode`
+proband and one relative - a parent, or a sibling (#1861) - with Denovo becoming "absent in parent", which along with
+the mosaic mode errors when there is no parent to read) and `analysis/models/nodes/sources/quad_node.py:QuadNode`
 (a sibling too) differ only in the zygosity tuples. Compound het is
 `analysis/models/nodes/family_inheritance.py:AbstractCompHetInheritance`: three queries find genes with a maternal-only
 and a paternal-only hit (over `VariantGeneOverlap`, not transcript annotation, so a long SV VEP skipped still counts, #940),
