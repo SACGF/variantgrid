@@ -26,7 +26,6 @@ from psqlextra.types import PostgresPartitioningMethod
 from genes.models import GeneSymbol
 from library.cache import timed_cache
 from library.constants import DAY_SECS, WEEK_SECS
-from library.log_utils import report_exc_info
 from library.preview_request import PreviewData, PreviewModelMixin
 from library.utils import Constant, first
 
@@ -1140,7 +1139,9 @@ class OntologySnake:
             gene_symbol: Union[str, GeneSymbol],
             quality_filter: OntologyRelationshipQualityFilter = ONTOLOGY_RELATIONSHIP_STANDARD_QUALITY_FILTER
         ) -> list[OntologyTermRelation]:
-        gene_ontology = OntologyTerm.get_gene_symbol(gene_symbol)
+        if (gene_ontology := OntologyTerm.get_gene_symbol_or_none(gene_symbol)) is None:
+            return []
+
         from ontology.panel_app_ontology import update_gene_relations
         update_gene_relations(gene_symbol)
         otr_qs = OntologyVersion.get_latest_and_live_ontology_qs()
@@ -1153,7 +1154,9 @@ class OntologySnake:
 
     @staticmethod
     def mondo_terms_for_gene_symbol(gene_symbol: Union[str, GeneSymbol]) -> set[OntologyTerm]:
-        gene_ontology = OntologyTerm.get_gene_symbol(gene_symbol)
+        if (gene_ontology := OntologyTerm.get_gene_symbol_or_none(gene_symbol)) is None:
+            return set()
+
         from ontology.panel_app_ontology import update_gene_relations
         update_gene_relations(gene_symbol)
         terms = set()
@@ -1215,64 +1218,62 @@ class OntologySnake:
     def has_gene_relationship(term: Union[OntologyTerm, str], gene_symbol: Union[GeneSymbol, str], quality_filter: OntologyRelationshipQualityFilter = ONTOLOGY_RELATIONSHIP_STANDARD_QUALITY_FILTER) -> bool:
         # TODO, have this run off get_all_term_to_gene_relationships
         # just need to filter through results until we reach one of a high enough quality
+        if (gene_term := OntologyTerm.get_gene_symbol_or_none(gene_symbol)) is None:
+            return False
+
         from ontology.panel_app_ontology import update_gene_relations
         update_gene_relations(gene_symbol)
         if isinstance(term, str):
             term = OntologyTerm.get_or_stub(term)
             if term.is_stub:
                 return False
-        try:
-            gene_term = OntologyTerm.get_gene_symbol(gene_symbol)
-            # try direct link first
-            quality_q = quality_filter.filter_q
-            otr_qs = OntologyVersion.get_latest_and_live_ontology_qs().filter(dest_term=gene_term).filter(quality_q)
-            if otr_qs.filter(source_term=term).exists():
-                return True
 
-            if term.ontology_service == OntologyService.OMIM:
-                if mondo_term := OntologyTermRelation.as_mondo(term):
-                    if otr_qs.filter(source_term=mondo_term).exists():
-                        return True
-            elif term.ontology_service == OntologyService.MONDO:
-                if omim_term := OntologyTermRelation.as_omim(term):
-                    if otr_qs.filter(source_term=omim_term).exists():
-                        return True
+        # try direct link first
+        quality_q = quality_filter.filter_q
+        otr_qs = OntologyVersion.get_latest_and_live_ontology_qs().filter(dest_term=gene_term).filter(quality_q)
+        if otr_qs.filter(source_term=term).exists():
+            return True
 
-            return False
-        except ValueError:
-            report_exc_info()
-            return False
+        if term.ontology_service == OntologyService.OMIM:
+            if mondo_term := OntologyTermRelation.as_mondo(term):
+                if otr_qs.filter(source_term=mondo_term).exists():
+                    return True
+        elif term.ontology_service == OntologyService.MONDO:
+            if omim_term := OntologyTermRelation.as_omim(term):
+                if otr_qs.filter(source_term=omim_term).exists():
+                    return True
+
+        return False
 
     @staticmethod
     def get_all_term_to_gene_relationships(term: Union[OntologyTerm, str], gene_symbol: Union[GeneSymbol, str], try_related_terms: bool = True) -> Iterator['OntologySnake']:
         # iterates all ontology term relationships between the term and the gene symbol (as well as any relationships to the equiv MONDO/OMIM)
+        if (gene_term := OntologyTerm.get_gene_symbol_or_none(gene_symbol)) is None:
+            return None
+
         from ontology.panel_app_ontology import update_gene_relations
         update_gene_relations(gene_symbol)
         if isinstance(term, str):
             term = OntologyTerm.get_or_stub(term)
             if term.is_stub:
                 return None
-        try:
-            gene_term = OntologyTerm.get_gene_symbol(gene_symbol)
-            # try direct link first
-            otr_qs = OntologyVersion.get_latest_and_live_ontology_qs()
-            for relationship in otr_qs.filter(source_term=term, dest_term=gene_term):
-                yield OntologySnake(source_term=term, leaf_term=gene_term, paths=[relationship])
 
-            if not try_related_terms:
-                return None
+        # try direct link first
+        otr_qs = OntologyVersion.get_latest_and_live_ontology_qs()
+        for relationship in otr_qs.filter(source_term=term, dest_term=gene_term):
+            yield OntologySnake(source_term=term, leaf_term=gene_term, paths=[relationship])
 
-            # optimisations for OMIM/MONDO
-            if term.ontology_service in {OntologyService.MONDO, OntologyService.OMIM}:
-                if term.ontology_service == OntologyService.MONDO:
-                    if omim := OntologyTermRelation.as_omim(term):
-                        yield from OntologySnake.get_all_term_to_gene_relationships(omim, gene_symbol, try_related_terms=False)
-                elif term.ontology_service == OntologyService.OMIM:
-                    if mondo := OntologyTermRelation.as_mondo(term):
-                        yield from OntologySnake.get_all_term_to_gene_relationships(mondo, gene_symbol, try_related_terms=False)
-        except ValueError:
-            report_exc_info()
+        if not try_related_terms:
             return None
+
+        # optimisations for OMIM/MONDO
+        if term.ontology_service in {OntologyService.MONDO, OntologyService.OMIM}:
+            if term.ontology_service == OntologyService.MONDO:
+                if omim := OntologyTermRelation.as_omim(term):
+                    yield from OntologySnake.get_all_term_to_gene_relationships(omim, gene_symbol, try_related_terms=False)
+            elif term.ontology_service == OntologyService.OMIM:
+                if mondo := OntologyTermRelation.as_mondo(term):
+                    yield from OntologySnake.get_all_term_to_gene_relationships(mondo, gene_symbol, try_related_terms=False)
 
     @staticmethod
     def get_children(term: OntologyTerm) -> set[OntologyTerm]:
