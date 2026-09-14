@@ -78,7 +78,7 @@ Genotypes are packed one row per variant per cohort, in arrays indexed by `Cohor
 each collection is its own partition table (`library/django_utils/django_partition.py:RelatedModelsPartitionModel`).
 Query with `CohortGenotypeCollection.get_annotation_kwargs` / `get_zygosity_q`.
 
-**Trio / Duo / Quad** - `snpdb/models/models_cohort.py:Trio`, `Duo`, `Quad`. Named family structures over a Cohort
+**Trio / Duo / Quad** - `snpdb/models/models_family.py:Trio`, `Duo`, `Quad`. Named family structures over a Cohort
 (proband, parents, sibling) with affected flags; analysis inheritance nodes read them. A Duo is the proband plus one
 `relative` - a parent or a sibling, said by its `relationship`. **Pedigree** is the general form:
 `pedigree/models.py:Pedigree` over a PED file.

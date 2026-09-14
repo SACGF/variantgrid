@@ -5,7 +5,7 @@ import django_extensions.db.fields
 import library.django_utils
 import library.django_utils.guardian_permissions_mixin
 import library.preview_request
-import snpdb.models.models_cohort
+import snpdb.models.models_family
 from django.conf import settings
 from django.db import migrations, models
 
@@ -37,6 +37,6 @@ class Migration(migrations.Migration):
                 'get_latest_by': 'modified',
                 'abstract': False,
             },
-            bases=(snpdb.models.models_cohort.FamilyGroupMixin, library.django_utils.guardian_permissions_mixin.GuardianPermissionsAutoInitialSaveMixin, library.preview_request.SvgSymbolPreviewIconMixin, library.preview_request.PreviewModelMixin, library.django_utils.SortByPKMixin, models.Model),
+            bases=(snpdb.models.models_family.FamilyGroupMixin, library.django_utils.guardian_permissions_mixin.GuardianPermissionsAutoInitialSaveMixin, library.preview_request.SvgSymbolPreviewIconMixin, library.preview_request.PreviewModelMixin, library.django_utils.SortByPKMixin, models.Model),
         ),
     ]

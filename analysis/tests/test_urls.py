@@ -32,9 +32,9 @@ from snpdb.models.models_cohort import (
     CohortGenotype,
     CohortGenotypeCollection,
     CohortSample,
-    Trio,
 )
 from snpdb.models.models_enums import ImportStatus
+from snpdb.models.models_family import Trio
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_vcf import VCF, Sample
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_loci_and_variants_for_vcf
