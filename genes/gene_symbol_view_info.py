@@ -41,13 +41,10 @@ from snpdb.variant_queries import get_has_classifications_q, get_variant_queryse
 
 def _get_omim_and_hpo_for_gene_symbol(gene_symbol: GeneSymbol) -> list[tuple[OntologyTerm, list[OntologyTerm]]]:
     omim_and_hpo_for_gene = []
-    try:
-        # max_depth = 0 for direct links only
-        for omim in OntologySnake.terms_for_gene_symbol(gene_symbol, OntologyService.OMIM, max_depth=0).leafs():
-            hpo_list = OntologySnake.snake_from(omim, OntologyService.HPO, max_depth=0).leafs()
-            omim_and_hpo_for_gene.append((omim, hpo_list))
-    except ValueError:  # in case we don't have this gene symbol available
-        pass
+    # max_depth = 0 for direct links only
+    for omim in OntologySnake.terms_for_gene_symbol(gene_symbol, OntologyService.OMIM, max_depth=0).leafs():
+        hpo_list = OntologySnake.snake_from(omim, OntologyService.HPO, max_depth=0).leafs()
+        omim_and_hpo_for_gene.append((omim, hpo_list))
 
     return omim_and_hpo_for_gene
 

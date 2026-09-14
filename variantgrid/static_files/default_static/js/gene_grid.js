@@ -78,6 +78,7 @@ function updateUrl() {
             "enrichment-kit": enrichmentKits,
             "pathology-test-version": pathologyTestVersions,
             "gene-list": getSavedGeneLists(),
+            "lab-classification-count": labClassificationCounts,
         };
 
         let allColumns = [];
@@ -102,6 +103,7 @@ function addInitialColumn(columnName) {
         "gene-annotation-release": addAndRetrieveGeneAnnotationReleaseColumnIfNotExists,
         "pathology-test-version": addAndRetrievePathologyTestVersionColumnIfNotExists,
         "gene-list": addAndRetrieveGeneListColumnIfNotExists,
+        "lab-classification-count": addAndRetrieveLabGeneClassificationCountColumnIfNotExists,
     };
 
     for (let columnPrefix in COLUMN_LOADERS_BY_PREFIX) {

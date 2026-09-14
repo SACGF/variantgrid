@@ -38,6 +38,7 @@ Gotchas:
 - gene_matching.py:GeneSymbolMatcher and gene_matching.py:ReleaseGeneMatcher cache whole-table dicts on first use; build one per import, not per symbol.
 - gene_matching.py:ReleaseGeneMatcher takes exactly one GeneSymbolAlias hop (either direction) - chaining hops lets an alias string shared by two unrelated genes bridge them (#1669). Keep it single-hop.
 - Matching only ever inserts ReleaseGeneSymbolGene rows, so a rematch can't remove a match that's since become wrong; `manage.py fix_rematch_release_symbols_to_genes` (`--dry-run` first) is the full resync that also updates and deletes.
+- GeneGrid's gene/disease (GenCC) column asks for relations by symbol, and a symbol with no HGNC record yields empty relations rather than an error from both traversers (`ontology/models/models_ontology.py:OntologySnake.terms_for_gene_symbol` and `ontology/ontology_traversal.py:MemoryOntologyTraverser`), so column and page code needs no guard.
 - `<CNV>` and `<INS>` have no HGVS at all - neither a ranged form nor an explicit expansion - so hgvs/hgvs_matcher.py:HGVSMatcher raises hgvs/hgvs_converter.py:HGVSNoRepresentationException before any converter runs, and classification records it as `ResolvedVariantInfo.error` rather than a Rollbar bug.
 Tests:
 - annotation/tests/test_data_fake_genes.py:create_fake_transcript_version builds Gene/GeneVersion/Transcript/TranscriptVersion (RUNX1, ENST00000300305.7) for a build; `create_gata2_transcript_version` / `create_pten_transcript_version` add RefSeq examples.

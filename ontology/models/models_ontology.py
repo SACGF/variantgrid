@@ -518,6 +518,15 @@ class OntologyTerm(TimeStampedModel, PreviewModelMixin):
         raise ValueError(f"Cannot find HGNC for {gene_symbol}")
 
     @staticmethod
+    def get_gene_symbol_or_none(gene_symbol: Union[str, GeneSymbol]) -> Optional['OntologyTerm']:
+        """ As per get_gene_symbol, but returns None for a symbol with no HGNC record, for callers
+            that treat "no HGNC" as "no relationships" rather than an error """
+        try:
+            return OntologyTerm.get_gene_symbol(gene_symbol)
+        except ValueError:
+            return None
+
+    @staticmethod
     @timed_cache(size_limit=30, ttl=60)
     def get_or_stub_cached(id_str: str) -> 'OntologyTerm':
         """
@@ -1189,11 +1198,15 @@ class OntologySnake:
             for the gene before traversal. Batch callers that pre-warm PanelApp once up-front
             should pass False to skip the per-call hook.
         """
+        # A symbol with no HGNC record has no relationships - resolve before the PanelApp hook so an
+        # unknown symbol never triggers a live fetch. Matches MemoryOntologyTraverser.terms_for_gene_symbol
+        if (gene_ontology := OntologyTerm.get_gene_symbol_or_none(gene_symbol)) is None:
+            return OntologySnakes([])
+
         # TODO, do this with hooks
         if call_update_gene_relations:
             from ontology.panel_app_ontology import update_gene_relations
             update_gene_relations(gene_symbol)
-        gene_ontology = OntologyTerm.get_gene_symbol(gene_symbol)
         return OntologySnake.snake_from(term=gene_ontology, to_ontology=desired_ontology,
                                         max_depth=max_depth, quality_filter=quality_filter,
                                         otr_qs=otr_qs)

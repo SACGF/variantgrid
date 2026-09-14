@@ -1,6 +1,8 @@
+import json
 import unittest
 
 from django.contrib.auth.models import User
+from django.urls import reverse
 from django.utils import timezone
 
 from annotation.tests.test_data_fake_genes import create_fake_transcript_version
@@ -39,8 +41,18 @@ class Test(URLTestCase):
             # API
             ("api_ontology_term_gene_list", {"term": self.omim.url_safe_id}, 200),
             ("api_view_gene_disease_relationship", {"gene_symbol": self.gene_symbol}, 200),
+            # A symbol with no HGNC record is empty relations, not an error (#999)
+            ("api_view_gene_disease_relationship", {"gene_symbol": "NOTAGENE123"}, 200),
         ]
         self._test_urls(URL_NAMES_AND_KWARGS, self.user)
+
+    def test_gene_disease_relationship_unknown_symbol_is_empty(self):
+        """ #999 - GeneGrid GenCC column for a symbol with no HGNC record """
+        self.client.force_login(self.user)
+        url = reverse("api_view_gene_disease_relationship", kwargs={"gene_symbol": "NOTAGENE123"})
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual([], json.loads(response.content))
 
     def testAutocompleteUrls(self):
         AUTOCOMPLETE_URLS = [
