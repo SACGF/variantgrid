@@ -5,6 +5,8 @@ which is where their permissions and genome build come from; FamilyGroupMixin ho
 Each provides get_cohort_samples() in pedigree order - that is what the analysis inheritance nodes and
 the pedigree figures read.
 """
+from typing import Optional
+
 from django.contrib.auth.models import User
 from django.db import models
 from django.db.models.deletion import CASCADE
@@ -20,15 +22,23 @@ from snpdb.models.models_enums import DuoRelationship
 from snpdb.models.models_vcf import Sample
 
 
+def _member_details(member, affected: bool) -> str:
+    return f"{member} ({'affected' if affected else 'unaffected'})"
+
+
 class FamilyGroupMixin:
     """ Shared by Duo, Trio and Quad - permissions and display that don't care how many members
-        there are. Subclasses provide get_cohort_samples() and their own urls. """
+        there are. Subclasses provide get_cohort_samples(), pedigree_icon_members and their own urls. """
+    pk: int
+    name: str
+    cohort: Cohort
+    proband: CohortSample
+    proband_sex: Optional[str]
+    pedigree_icon_members: tuple[str, ...]
 
     @classmethod
     def get_permission_class(cls):
         return Cohort
-
-    pedigree_icon_members = ("mother", "father")  # Quad adds the sibling, Duo has one relative
 
     @classmethod
     def preview_icon(cls) -> str:
@@ -59,6 +69,10 @@ class FamilyGroupMixin:
     def data_archived(self) -> bool:
         return self.cohort.data_archived
 
+    def get_cohort_samples(self) -> list[CohortSample]:
+        """ The members in pedigree order - what the inheritance nodes and pedigree figures read """
+        raise NotImplementedError()
+
     def get_samples(self):
         return Sample.objects.filter(cohortsample__in=self.get_cohort_samples()).order_by("pk")
 
@@ -69,23 +83,29 @@ class FamilyGroupMixin:
             return Sex(self.proband_sex)
         return self.proband.sample.patient_sex
 
-    @staticmethod
-    def _member_details(member, affected: bool) -> str:
-        return f"{member} ({'affected' if affected else 'unaffected'})"
-
-    @property
-    def mother_details(self):
-        return self._member_details(self.mother, self.mother_affected)
-
-    @property
-    def father_details(self):
-        return self._member_details(self.father, self.father_affected)
-
     def __str__(self):
         return self.name or f"{type(self).__name__} {self.pk}"
 
 
-class Trio(FamilyGroupMixin, GuardianPermissionsAutoInitialSaveMixin, SvgSymbolPreviewIconMixin, PreviewModelMixin,
+class ParentsMixin:
+    """ Trio and Quad - both parents are present. A Duo has one relative that may be neither. """
+    mother: CohortSample
+    mother_affected: bool
+    father: CohortSample
+    father_affected: bool
+
+    pedigree_icon_members = ("mother", "father")  # Quad adds the sibling
+
+    @property
+    def mother_details(self):
+        return _member_details(self.mother, self.mother_affected)
+
+    @property
+    def father_details(self):
+        return _member_details(self.father, self.father_affected)
+
+
+class Trio(ParentsMixin, FamilyGroupMixin, GuardianPermissionsAutoInitialSaveMixin, SvgSymbolPreviewIconMixin, PreviewModelMixin,
            SortByPKMixin, TimeStampedModel):
     """ A simple pedigree used frequently for Mendellian disease (TrioNode in analysis)
         and karyomapping """
@@ -117,7 +137,7 @@ class Trio(FamilyGroupMixin, GuardianPermissionsAutoInitialSaveMixin, SvgSymbolP
         return reverse('trios')
 
 
-class Quad(FamilyGroupMixin, GuardianPermissionsAutoInitialSaveMixin, SvgSymbolPreviewIconMixin, PreviewModelMixin,
+class Quad(ParentsMixin, FamilyGroupMixin, GuardianPermissionsAutoInitialSaveMixin, SvgSymbolPreviewIconMixin, PreviewModelMixin,
            SortByPKMixin, TimeStampedModel):
     """Mother + Father + Proband + Sibling.
 
@@ -156,7 +176,7 @@ class Quad(FamilyGroupMixin, GuardianPermissionsAutoInitialSaveMixin, SvgSymbolP
 
     @property
     def sibling_details(self):
-        return self._member_details(self.sibling, self.sibling_affected)
+        return _member_details(self.sibling, self.sibling_affected)
 
 
 class Duo(FamilyGroupMixin, GuardianPermissionsAutoInitialSaveMixin, SvgSymbolPreviewIconMixin, PreviewModelMixin,
@@ -224,4 +244,4 @@ class Duo(FamilyGroupMixin, GuardianPermissionsAutoInitialSaveMixin, SvgSymbolPr
 
     @property
     def relative_details(self):
-        return self._member_details(self.relative, self.relative_affected)
+        return _member_details(self.relative, self.relative_affected)
