@@ -6,12 +6,18 @@ from bs4 import BeautifulSoup
 from django.contrib.auth.models import User
 from django.http import HttpResponse
 from django.template import engines
+from django.utils import timezone
 
 from classification.enums import SpecialEKeys
 from classification.models import ClassificationJsonParams, ClassificationReportTemplate
 from classification.models.classification import Classification, ClassificationModification
 from classification.models.evidence_key import EvidenceKeyMap
 from snpdb.models import GenomeBuild
+
+UNSUBMITTED_CHANGES_WARNING = (
+    '<div style="margin: 8px; padding: 8px 12px; border: 1px solid #f5c6cb; border-radius: 4px;'
+    ' background-color: #f8d7da; color: #721c24; font-family: sans-serif; font-size: 14px;">{message}</div>'
+)
 
 
 class ClassificationReport:
@@ -61,9 +67,33 @@ class ClassificationReport:
             'gene_groups': gene_groups,
         }
 
+    def _unsubmitted_changes_warning(self) -> Optional[str]:
+        """ Reports are rendered from submitted versions, so say so when the form is showing newer data """
+        stale = [record for record in self.classifications if not record.is_last_edited]
+        if not stale:
+            return None
+
+        if len(self.classifications) == 1:
+            submitted = timezone.localtime(stale[0].created).strftime("%d %b %Y %H:%M")
+            message = (f"This report was generated from the version submitted on {submitted}. "
+                       "Changes made since then have not been submitted and do not appear below.")
+        else:
+            message = (f"{len(stale)} of {len(self.classifications)} classifications have unsubmitted changes - "
+                       "this report was generated from their submitted versions.")
+        return UNSUBMITTED_CHANGES_WARNING.format(message=message)
+
+    @staticmethod
+    def _insert_warning(content: str, warning: str) -> str:
+        """ The templates are lab maintained config, so the warning goes in the rendered page rather than in them """
+        if body := re.search(r"<body[^>]*>", content, re.IGNORECASE):
+            return content[:body.end()] + warning + content[body.end():]
+        return warning + content
+
     def serve(self):
         template = self.get_template()
         content = template.render(self.context())
+        if warning := self._unsubmitted_changes_warning():
+            content = self._insert_warning(content, warning)
         response = HttpResponse(content=content, content_type='text/html')
         return response
 

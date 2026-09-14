@@ -198,6 +198,14 @@ const VCForm = (function() {
                 
         generateExportButtons() {
             const wrapper = $('<div>', {html: $('<h5>', {text:'Export as', class: 'mt-4'})});
+            if (this.reportEnabled && this.record.has_changes) {
+                // the report is rendered from the submitted version, not what the form is showing
+                const submitted = this.record.published_version ?
+                    ` (${moment(this.record.published_version * 1000).format('DD/MMM/YYYY HH:mm')})` : '';
+                $('<div>', {class: 'font-weight-bold text-danger mb-2', style: 'font-size:14px',
+                    html: `<i class="fas fa-exclamation-triangle text-warning"></i> The report is generated from the last submitted version${submitted}, so the unsubmitted changes above won't appear in it.`
+                }).appendTo(wrapper);
+            }
             const buttons = $('<div>', {class: 'btn-toolbar'}).appendTo(wrapper);
             const csvButton = $('<button>', {class:'btn btn-outline-primary btn-lg', id: 'export-csv', html: '<i class="fas fa-file-csv"></i> CSV', click: () => {this.csv();}});
             csvButton.appendTo(buttons);
