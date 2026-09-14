@@ -1,9 +1,10 @@
 # Multi-variant case report - HTML, PDF, DOCX and JSON from a case's classifications (#444)
 
-Written by Claude Fable 5.1 (claude-fable-5-1), 2026-09-14; step 5 by Claude Opus 5 (claude-opus-5)
-Status: in progress - every step is built. Steps 1-4 and 6 (models, context, renderers, the tab and
-finalise) are in this repo; step 5 (the SA Path TSO 500 `case_template` / `json_template` /
-`case_fields`, and the migration that seeds them) is in the sapath repo, unreleased.
+Written by Claude Fable 5.1 (claude-fable-5-1), 2026-09-14; steps 5 and 7 by Claude Opus 5 (claude-opus-5)
+Status: in progress - every step is built. Steps 1-4, 6 and 7 (models, context, renderers, the tab,
+finalise and the amplification magnitudes) are in this repo; step 5 (the SA Path TSO 500
+`case_template` / `json_template` / `case_fields`, and the migration that seeds them) is in the
+sapath repo, unreleased.
 
 Design for [#444](https://github.com/SACGF/variantgrid/issues/444) (multi-variant classification + reporting), the
 reporting half of [sapath#431](https://github.com/SACGF/variantgrid_sapath/issues/431) (TSO 500), and the "#444
@@ -167,7 +168,8 @@ class ReportVariant:
     amp_tier: str                 # 'IA' 'IB' 'IIC' 'IID' 'III' 'IV' or '' - see §Tier
     tier_rank: int                # sort key derived from amp_tier then tier
     vaf: Optional[float]          # allele_frequency as a fraction
-    copy_number: Optional[int]
+    copy_number: Optional[int]    # the caller's absolute count (VCF CN)
+    fold_change: Optional[float]  # the caller's ratio against the normal (VCF SM / FC)
     reported: bool
     sample: Optional[Sample]
     evidence: dict                # ClassificationReport.row_data(): every ekey as {value, note, formatted, label}
@@ -235,8 +237,9 @@ The report order is fixed by the context builder; templates loop in the order gi
    ever `var`, `amp` or `fusion` - the three values real TSO 500 reports carry.
 2. **Tier**: `IA`, `IB`, `IIC`, `IID`, `III`, `IV`, then unclassified. Derived per §Tier.
 3. **Gene symbol**: alphabetical.
-4. **VAF**: descending, then copy number descending, then c.HGVS - so two variants in one gene print highest VAF
-   first, as the example does.
+4. **VAF**: descending, then copy number descending, then fold change descending, then c.HGVS - so two variants in
+   one gene print the biggest finding first, as the example does. A caller that writes only a ratio still orders its
+   amplifications.
 
 `kind_groups` applies 1 then 2-4 within each kind (the Results Summary). `tier_groups` applies 2, then groups by gene
 (3), then 4 within the gene, with kinds interleaved (a Tier IIC amplification prints under Tier II beside the Tier IIC
@@ -315,7 +318,7 @@ read; the gap column is what this plan adds or what stays outside VariantGrid.
 | Transcript, c., p. | `refseq_transcript_id`, `c_hgvs`, `p_hgvs` keys; both builds via `get_c_hgvs` | have |
 | VAF | `allele_frequency` key (autopopulated from the sample genotype) | have |
 | AMP tier incl. sub-tier | derived from `somatic:clinical_significance` + `amp:level_*` | §Tier |
-| Copy number, fold change | `copy_number` key; `CohortGenotype.info["CN"]` / `FORMAT/SM` | have; fold change stays per observation |
+| Copy number, fold change | `copy_number` and `fold_change` keys, autopopulated from the sample genotype | have (§Order of work 7) |
 | Report Y/N | `variant_reported` key → `CaseReportClassification.reported` | have, editable at build |
 | Exon "5 of 11" | `exon` key | have as entered |
 | COSMIC count, gnomAD | `cosmic_cnt`, `gnomad_af` keys | have |
@@ -471,6 +474,19 @@ record of what was shown.
    version, which differs from the rendered one only in those three keys, so the tab's stale check stays quiet and
    the pinned version is the one Shariant receives.
 
+7. **Amplification magnitudes.** A classification held `copy_number` and nothing filled it from a VCF, so the
+   printed `Fold change: 5.22, copy number: 12` had no source. `fold_change` is a new EvidenceKey
+   (classification/migrations/0180_fold_change_ekey.py) beside `copy_number`, and both are autopopulated from the
+   sample's genotype: snpdb/models/models_cohort.py:SampleGenotype.copy_number_value reads the caller's value out of
+   the stored `format` / `info` JSON (the ORM twin of
+   snpdb/grid_columns/grid_sample_columns.py:get_copy_number_annotation), and
+   classification/autopopulate_evidence_keys/evidence_from_sample_and_patient.py:get_copy_number_evidence routes it on
+   the VCF's declared field - `CN` is an absolute count and lands on `copy_number` rounded, `SM` / `FC` are ratios
+   against the normal and land on `fold_change`. The one statement of which is which is
+   library/genomics/vcf_enums.py:VCFConstant.COPY_NUMBER_FIELD_IS_RATIO, shared with the grid column. `ReportVariant`
+   carries both, the generic template's "Copies" cell falls back to `4.31x` where there is no count, and the SA Path
+   JSON template's amplification `Description` is built from whichever values the record has.
+
 ## Tests that earn their keep
 
 - Ordering: kind → sub-tier → gene → VAF, with a fusion filed under its 5' partner and an amplification under Tier II
@@ -481,6 +497,8 @@ record of what was shown.
   error, and a `reported=False` variant is absent from the tier text and present in the JSON with `"Report": "N"`.
 - Specimen and extraction cases resolve to the same sample set as `get_sample_group`.
 - A user outside the lab cannot download or finalise.
+- `copy_number_value` reads FORMAT, falls back to INFO, and is `None` with no declared field; the field name routes
+  the value to `copy_number` or `fold_change`; the gene-level CNV loader's own `SM` reaches the accessor.
 
 ## Decisions
 
@@ -490,3 +508,5 @@ record of what was shown.
   and only where nothing is unsubmitted (§Order of work 6).
 - **`"Patient"` in the JSON is `Patient.patient_code`**, the Omico ID.
 - **Somatic only for now**; the models leave room for a germline case template later.
+- **`copy_number` and `fold_change` are separate keys**: one is an absolute count and the other a ratio against the
+  normal, so a single key would make `12` and `5.22` the same quantity.

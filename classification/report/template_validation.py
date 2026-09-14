@@ -39,6 +39,7 @@ def _fixture_variant(gene_symbol: str, reported: bool = True) -> dict:
         "vaf": 0.42,
         "vaf_percent": 42.0,
         "copy_number": None,
+        "fold_change": None,
         "reported": reported,
         "sample": {"pk": 1, "str": "fixture sample", "name": "fixture sample"},
         "evidence": _fixture_evidence(c_hgvs="c.123A>G", p_hgvs="p.Lys41Arg",

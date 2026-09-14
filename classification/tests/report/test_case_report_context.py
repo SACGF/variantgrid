@@ -77,6 +77,28 @@ class AmpTierTest(TestCase):
         self.assertEqual(amp_tier(FakeModification(values={})), ("", []))
 
 
+class AmplificationMagnitudeTest(TestCase):
+    """ copy_number is the caller's absolute count, fold_change its ratio against the normal - an
+        amplification may carry either or both, and a template prints what it has """
+
+    def test_both_reach_the_context_the_templates_read(self):
+        amplification = fake_report_variant("ZGENE", copy_number=12, fold_change=5.22,
+                                            variant=fake_gene_level_variant("<GAIN:HGNC:9>"))
+
+        as_dict = context_as_dict(ReportContext(
+            source_level="S", variants=[amplification], kind_groups=[], tier_groups=[],
+            gene_groups=[]))["variants"][0]
+
+        self.assertEqual(12, as_dict["copy_number"])
+        self.assertEqual(5.22, as_dict["fold_change"])
+
+    def test_a_ratio_only_call_has_no_copy_number(self):
+        amplification = fake_report_variant("ZGENE", fold_change=4.31428,
+                                            variant=fake_gene_level_variant("<GAIN:HGNC:9>"))
+        self.assertIsNone(amplification.copy_number)
+        self.assertEqual(4.31428, amplification.fold_change)
+
+
 class ReportVariantKindTest(TestCase):
 
     def test_gene_level_alts_say_what_the_event_is(self):
@@ -131,6 +153,18 @@ class ReportOrderTest(TestCase):
                          [small_high.modification.pk, small_low.modification.pk,
                           small_b_gene.modification.pk, small_tier_2.modification.pk,
                           amplification.modification.pk, fusion.modification.pk])
+
+    def test_the_bigger_fold_change_prints_first_when_neither_has_a_copy_number(self):
+        """ A caller that writes only a ratio still orders the amplifications in a gene """
+        smaller = fake_report_variant("ZGENE", tier=TIER_2, amp_levels=["C"], fold_change=3.6,
+                                      variant=fake_gene_level_variant("<GAIN:HGNC:9>"), pk=1)
+        bigger = fake_report_variant("ZGENE", tier=TIER_2, amp_levels=["C"], fold_change=5.2,
+                                     variant=fake_gene_level_variant("<GAIN:HGNC:9>"), pk=2)
+
+        ordered = sort_report_variants([smaller, bigger])
+
+        self.assertEqual([v.modification.pk for v in ordered],
+                         [bigger.modification.pk, smaller.modification.pk])
 
     def test_sub_tier_orders_ahead_of_the_bare_tier(self):
         ia = fake_report_variant("ZGENE", tier=TIER_1, amp_levels=["A"], pk=1)

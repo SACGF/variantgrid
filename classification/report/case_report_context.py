@@ -225,6 +225,7 @@ class ReportVariant:
     tier_rank: int
     vaf: Optional[float]  # allele_frequency, as a fraction
     copy_number: Optional[int]
+    fold_change: Optional[float]  # fold_change key, as the caller wrote it
     reported: bool
     sample: Optional[Sample]
     evidence: dict
@@ -250,6 +251,7 @@ class ReportVariant:
             tier_rank=AMP_TIER_RANK.get(tier_label, UNTIERED_RANK),
             vaf=_as_float(record.get(SpecialEKeys.ALLELE_FREQUENCY)),
             copy_number=_as_int(record.get(SpecialEKeys.COPY_NUMBER)),
+            fold_change=_as_float(record.get(SpecialEKeys.FOLD_CHANGE)),
             reported=reported,
             sample=record.classification.sample,
             evidence=evidence if evidence is not None else evidence_row_data(record, user),
@@ -280,6 +282,7 @@ class ReportVariant:
         return (self.tier_rank, self.gene_symbol or "￿",
                 -(self.vaf if self.vaf is not None else -1),
                 -(self.copy_number if self.copy_number is not None else -1),
+                -(self.fold_change if self.fold_change is not None else -1),
                 self.c_hgvs or "")
 
 
@@ -545,6 +548,7 @@ def _variant_as_dict(variant: ReportVariant) -> dict:
         "vaf": variant.vaf,
         "vaf_percent": variant.vaf_percent,
         "copy_number": variant.copy_number,
+        "fold_change": variant.fold_change,
         "reported": variant.reported,
         "sample": _model_as_dict(variant.sample, ["name"]),
         "evidence": variant.evidence,

@@ -43,7 +43,7 @@
     <tr><td>{{ v.amp_tier }}</td><td>{{ v.gene_label }}</td>
         <td>{{ v.evidence.p_hgvs.value|default_if_none:"" }}</td>
         <td>{% if v.vaf_percent is not None %}{{ v.vaf_percent }}%{% endif %}</td>
-        <td>{{ v.copy_number|default_if_none:"" }}</td></tr>
+        <td>{% if v.copy_number is not None %}{{ v.copy_number }}{% elif v.fold_change is not None %}{{ v.fold_change }}x{% endif %}</td></tr>
     {% endfor %}
 </table>
 {% endfor %}

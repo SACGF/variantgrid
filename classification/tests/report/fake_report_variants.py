@@ -42,7 +42,8 @@ def fake_gene_level_variant(alt: str, gene_symbols: Optional[list[str]] = None):
 
 def fake_report_variant(gene_symbol: str, tier: Optional[str] = None,
                         amp_levels: Optional[list[str]] = None, vaf: Optional[float] = None,
-                        copy_number: Optional[int] = None, c_hgvs: Optional[str] = None,
+                        copy_number: Optional[int] = None, fold_change: Optional[float] = None,
+                        c_hgvs: Optional[str] = None,
                         reported: bool = True, variant=None, pk: int = 1,
                         modified: Optional[datetime] = None,
                         gene_summary: Optional[str] = None) -> ReportVariant:
@@ -55,6 +56,8 @@ def fake_report_variant(gene_symbol: str, tier: Optional[str] = None,
         values[SpecialEKeys.ALLELE_FREQUENCY] = vaf
     if copy_number is not None:
         values[SpecialEKeys.COPY_NUMBER] = copy_number
+    if fold_change is not None:
+        values[SpecialEKeys.FOLD_CHANGE] = fold_change
 
     evidence = {"gene_symbol": {"value": gene_symbol, "note": None, "formatted": gene_symbol,
                                 "label": "Gene"},

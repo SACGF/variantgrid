@@ -757,6 +757,7 @@ class SampleGenotype:
         self._cohort_genotype = cohort_genotype
         self.variant = cohort_genotype.variant
         self.sample = sample
+        self.sample_index = sample_index
         self.zygosity = self._get_sample_value("samples_zygosity", sample_index)
         self.allele_depth = self._get_sample_value("samples_allele_depth", sample_index)
         allele_frequency = self._get_sample_value("samples_allele_frequency", sample_index)
@@ -775,6 +776,32 @@ class SampleGenotype:
         else:
             value = array[sample_index]
         return value
+
+    @property
+    def copy_number_value(self) -> Optional[float]:
+        """ The caller's copy number or copy ratio, read out of the stored CohortGenotype JSON: this
+            sample's dict in the per-sample FORMAT list then the field's one-element array, falling
+            back to INFO for the single-sample VCFs that put it there. None when the VCF declares no
+            such field, or the record carries no value. Which quantity it is depends on the field -
+            @see VCF.copy_number_field and VCFConstant.COPY_NUMBER_FIELD_IS_RATIO.
+            The ORM twin of snpdb.grid_columns.grid_sample_columns.get_copy_number_annotation """
+        field = self.sample.vcf.copy_number_field
+        if not field:
+            return None
+
+        value = None
+        sample_formats = self._cohort_genotype.format
+        if sample_formats and self.sample_index < len(sample_formats):
+            value = sample_formats[self.sample_index].get(field)
+            if isinstance(value, list):
+                value = value[0] if value else None
+        if value is None:
+            value = self._cohort_genotype.info.get(field)
+
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return None
 
     def get_vcf_filters(self) -> list:
         """ List of VCF Filters (string) """

@@ -129,6 +129,7 @@ class SpecialEKeys:
     REPORT_ID = 'report_id'  # stamped by a case report from the LIS's report ID
     REPORT_DATE = 'report_date'  # stamped by a case report when it is finalised
     COPY_NUMBER = 'copy_number'
+    FOLD_CHANGE = 'fold_change'
     H_SUMMARY = 'h_summary'  # the gene level paragraph a case report prints after a gene's variants
 
     # POPULATED

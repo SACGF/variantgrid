@@ -100,6 +100,9 @@ class VCFConstant:
     # The FORMAT (or, for a single-sample VCF, INFO) keys a caller writes copy number under, best
     # first: CN is an integer copy number, SM a linear copy ratio (DRAGEN), FC a fold change (Pisces)
     COPY_NUMBER_FIELDS = ("CN", "SM", "FC")
+    # Which of those is a ratio against the normal rather than an absolute count. They are different
+    # quantities, so a classification stores each under its own evidence key (copy_number / fold_change)
+    COPY_NUMBER_FIELD_IS_RATIO = {"CN": False, "SM": True, "FC": True}
 
 
 class VariantClass(models.TextChoices):

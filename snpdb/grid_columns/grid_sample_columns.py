@@ -71,7 +71,8 @@ def get_copy_number_annotation(cgc: CohortGenotypeCollection, sample: Sample) ->
     """ The caller's copy number or copy ratio, read out of the stored CohortGenotype JSON: this
         sample's dict in the per-sample FORMAT list then the field's one-element array, falling back
         to INFO for the single-sample VCFs that put it there. None when the VCF declares no such
-        field. @see VCF.copy_number_field """
+        field. @see VCF.copy_number_field, and SampleGenotype.copy_number_value for the Python twin
+        that reads the same JSON shape """
     field = sample.vcf.copy_number_field
     if not field:
         return None

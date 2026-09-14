@@ -17,7 +17,8 @@ from library.genomics.vcf_utils import (
     vcf_get_ref_alt_svlen_and_modification,
 )
 from snpdb.gene_level_variants import GENE_LEVEL_CONTIG_NAME
-from snpdb.models import ImportSource, Variant
+from snpdb.models import CohortGenotype, GenomeBuild, ImportSource, Variant
+from snpdb.tests.utils.fake_cohort_data import create_fake_cohort
 from upload.import_task_factories.import_task_factory import get_import_task_factories
 from upload.models import (
     FileUpload,
@@ -34,6 +35,7 @@ from upload.tasks.import_gene_level_cnv_task import (
     can_process_file,
     read_gene_level_cnv_records,
 )
+from upload.vcf.bulk_genotype_vcf_processor import BulkGenotypeVCFProcessor
 from upload.vcf.vcf_import import get_copy_number_field, get_gene_level_segment_field
 
 TSO500_DNA_DIR = os.path.join(settings.BASE_DIR, "upload", "test_data", "tso500",
@@ -134,6 +136,26 @@ class TestGeneLevelCNVRewrite(GeneFusionTestCase):
                                                      set(header_types.get("INFO", {})),
                                                      single_sample=True))
         self.assertEqual(4.31428, round(self.events["EGFR amplification"].format("SM").flatten()[0], 5))
+
+    def test_the_stored_genotype_reports_the_copy_ratio(self):
+        """ Packed the way the genotype processor stores it, the loader's SM is what a classification
+            autopopulates a fold change from """
+        user = User.objects.get_or_create(username='testuser')[0]
+        cohort = create_fake_cohort(user, GenomeBuild.get_name_or_alias("GRCh37"))
+        sample = cohort.cohortsample_set.get(sample__name="proband").sample
+        sample.vcf.copy_number_field = "SM"
+        sample.vcf.save()
+        record = self.events["EGFR amplification"]
+
+        cohort_genotype = CohortGenotype.objects.create(
+            collection=cohort.cohort_genotype_collection,
+            variant=create_gene_copy_number_event("EGFR", GeneCopyNumberEventKind.GAIN).variant,
+            samples_zygosity="O" * cohort.cohortsample_set.count(),
+            # The CNV file is single sample - the fixture cohort's other two have no call here
+            format=[*BulkGenotypeVCFProcessor._get_format_json(1, record), {}, {}])
+
+        sample_genotype = cohort_genotype.get_sample_genotype(sample)
+        self.assertEqual(4.31428, round(sample_genotype.copy_number_value, 5))
 
     def test_the_segment_field_is_declared_so_a_reload_binds_it(self):
         header_types = cyvcf2_header_types(self.reader)
