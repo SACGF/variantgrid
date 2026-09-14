@@ -519,10 +519,11 @@ classifications, and "Apply to this sample" copying consensus. Still to do, in o
   vue report template still wants an array-aware version, Phase 4's TMB/MSI `SpecimenMeasure`s are not
   yet pulled into the report, and the tab launches from sample and patient pages but not the specimen
   page.
-  Designed in [`444_multi_variant_report_plan.md`](444_multi_variant_report_plan.md): a pinned `CaseReport`
-  per run producing DOCX, PDF and JSON from one context, ordering and AMP sub-tier in Python, specimen and
-  extraction as case types. Linked-classification semantics (compound het / ID linkage) were left out of #1834 as
-  selection at report time covers the reporting need without new data.
+  Built: a pinned `CaseReport` per run producing HTML, DOCX, PDF and JSON from one context
+  (`classification/report/case_report_context.py`, `classification/report/renderers.py`), ordering and AMP sub-tier in
+  Python, specimen and extraction as case types, and SA Path's TSO 500 templates in the sapath repo. The case report
+  notes in `classification/CLAUDE.md` are the reference. Linked-classification semantics (compound het / ID linkage)
+  were left out of #1834 as selection at report time covers the reporting need without new data.
 
 ---
 
