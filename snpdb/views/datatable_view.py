@@ -21,7 +21,8 @@ from typing import Any, Generic, Optional, TypeVar, Union
 from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
 from django.db import models
-from django.db.models import F, OrderBy, Q, QuerySet
+from django.db.models import CharField, Expression, F, OrderBy, Q, QuerySet, Value
+from django.db.models.functions import Concat
 from django.http import HttpRequest, QueryDict, StreamingHttpResponse
 from django.urls import reverse
 from kombu.utils import json
@@ -169,7 +170,8 @@ class RichColumn:
                  client_renderer_kwargs: Optional[dict] = None,
                  sort_menu: Optional[list[dict]] = None,
                  column_filter: Optional[FilterField] = None,
-                 null_order: NullOrder = NullOrder.LAST):
+                 null_order: NullOrder = NullOrder.LAST,
+                 search_annotations: Optional[dict[str, Expression]] = None):
         """
         #TODO consolidate, orderable, default_sort, sort_order_sequence
         :param key: A column name to be retrieved and returned and sorted on
@@ -198,6 +200,8 @@ class RichColumn:
         :param sort_menu: [{label, column}] alternative sort keys offered on a composite cell's header
         :param column_filter: offer this column in the client's filter builder, and accept rules on it
         :param null_order: where NULLs sort
+        :param search_annotations: {alias: expression} the search box also matches against - annotated onto
+                                   the queryset only while searching, so they never reach .values()
         """
         self.key = key
         self.sort_keys = sort_keys
@@ -248,6 +252,7 @@ class RichColumn:
         self.sort_menu = sort_menu
         self.column_filter = column_filter
         self.null_order = null_order
+        self.search_annotations = search_annotations or {}
 
     @property
     def css_classes(self) -> str:
@@ -404,10 +409,24 @@ class DatatableConfig(Generic[DC]):
     def viewer_settings(self) -> UserSettings:
         return UserSettings.get_for_user(self.user)
 
+    def user_column(self, fk: str = "user", **kwargs) -> RichColumn:
+        """ The column for a User FK: sorts and exports on the username, renders through render_user,
+            and the search box matches the username or the "First Last" the cell shows (#1200) """
+        full_name_alias = f"{fk}__full_name"
+        kwargs.setdefault("orderable", True)
+        return RichColumn(key=f"{fk}__username",
+                          extra_columns=[f"{fk}__id"],
+                          renderer=self.render_user,
+                          search=[f"{fk}__username"],
+                          search_annotations={full_name_alias: Concat(f"{fk}__first_name", Value(" "),
+                                                                      f"{fk}__last_name",
+                                                                      output_field=CharField())},
+                          **kwargs)
+
     def render_user(self, cell: CellData) -> JsonDataType:
-        """ For a "<fk>__username" column with extra_columns=["<fk>__id"]: renders the name through
-            AvatarDetails so a title holder gets their crown (#1819). Sort/search/CSV
-            stay on the username """
+        """ For a "<fk>__username" column with extra_columns=["<fk>__id"] (see user_column): renders the
+            name through AvatarDetails so a title holder gets their crown (#1819). Sort/CSV stay on
+            the username """
         user_id = cell.get(cell.key.removesuffix("__username") + "__id")
         if user_id is None:
             return ""
@@ -434,12 +453,16 @@ class DatatableConfig(Generic[DC]):
 
     def power_search(self, qs: QuerySet[DC], search_string: str) -> QuerySet[DC]:
         search_cols = set()
+        search_annotations: dict[str, Expression] = {}
         rich_col: RichColumn
         for rich_col in self.enabled_columns:  # TODO do we want to check not enabled columns too?
             search_cols = search_cols.union(rich_col.search)
+            search_annotations.update(rich_col.search_annotations)
+        if search_annotations:
+            qs = qs.annotate(**search_annotations)
 
         filters: list[Q] = []
-        for search_col in search_cols:
+        for search_col in itertools.chain(search_cols, search_annotations):
             filters.append(Q(**{f'{search_col}__icontains': search_string}))
 
         if self.search_pk_enabled and search_string.isdigit():

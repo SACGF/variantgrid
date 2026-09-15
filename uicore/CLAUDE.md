@@ -72,6 +72,9 @@ Deep reference: __uicore_readme.md · claude/research/uicore.md
   `client_renderer` is a JS expression, usually `TableFormat.*`
   (variantgrid/static_files/default_static/js/datatable_definition.js:TableFormat) or a function in
   datatables_client_renderers.js; `visible=False` sends data without a column; `detail=True` moves it to the expand row.
+- A User FK column is `self.user_column(fk, label=...)` (snpdb/views/datatable_view.py:DatatableConfig.user_column):
+  it sorts/exports on the username, renders through `render_user` and its search matches the "First Last" the cell
+  shows via `RichColumn.search_annotations` - expressions power_search annotates only while a search is in flight.
 - Sorting: orderable needs a `key` or `sort_keys`; `default_sort=SortOrder.ASC` picks the initial order, else the
   first enabled column sorts (snpdb/views/datatable_view.py:DatatableConfig.initial_order); a pk tiebreaker is
   always appended (`_get_sort_tiebreaker` - override on grouped querysets); `null_order` places NULLs.

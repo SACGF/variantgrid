@@ -17,7 +17,8 @@ class GridSearchTests(TestCase):
         column left in the search set is a 500 on the first thing anyone types """
 
     def setUp(self):
-        self.user = User.objects.create(username='grid_search_user', is_superuser=True)
+        self.user = User.objects.create(username='grid_search_user', first_name="Findable", last_name="Person",
+                                        is_superuser=True)
         genome_build = GenomeBuild.get_name_or_alias("GRCh38")
         self.vcf = VCF.objects.create(name="findme_vcf", genome_build=genome_build, user=self.user,
                                       date=now(), genotype_samples=1, genotype_field="GT", allele_depth_field="AD", import_status=ImportStatus.SUCCESS)
@@ -46,6 +47,12 @@ class GridSearchTests(TestCase):
     def test_vcf(self):
         self.assertEqual(len(self._rows('vcfs_datatable', VCFListColumns, "findme")), 1)
         self.assertEqual(len(self._rows('vcfs_datatable', VCFListColumns, "nope")), 0)
+
+    def test_user_full_name(self):
+        """ user_column matches the "First Last" the cell displays, not just the username (#1200) """
+        self.assertEqual(len(self._rows('vcfs_datatable', VCFListColumns, "Findable Person")), 1)
+        self.assertEqual(len(self._rows('samples_list_datatable', SamplesListColumns, "findable person")), 1)
+        self.assertEqual(len(self._rows('vcfs_datatable', VCFListColumns, "Person Findable")), 0)
 
     def test_sample(self):
         self.assertEqual(len(self._rows('samples_list_datatable', SamplesListColumns, "findme")), 1)

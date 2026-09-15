@@ -254,7 +254,7 @@ class VariantTagsColumns(DatatableConfig[VariantTag]):
             RichColumn("analysis__name", name="analysis", label="Analysis", orderable=True,
                        extra_columns=["analysis__id"],
                        renderer=self.render_analysis, client_renderer="renderVariantTagAnalysis"),
-            RichColumn("user__username", name="user", label="Username", orderable=True),
+            self.user_column(name="user", label="User"),
             RichColumn("created", label="Created", orderable=True, default_sort=SortOrder.DESC,
                        client_renderer="TableFormat.timestamp"),
             RichColumn("id", name="delete", label="", extra_columns=["analysis__id"],
