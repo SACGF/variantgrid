@@ -22,7 +22,9 @@ Patterns here:
   hides the tab when the URL is unregistered on this deployment; `{% ui_register_tab_embedded %}` inlines content.
 - Deployment-visible URLs come from variantgrid/perm_path.py:get_visible_url_names - menus
   (uicore/templatetags/ui_menus.py:menu_item) and snpdb/grids.py:url_if_visible check it; guard any link to a view
-  a site unregisters (patients on Shariant) the same way.
+  a site unregisters (patients on Shariant) the same way. Only names passed through `variantgrid/perm_path.py:path`
+  are enforced - a DRF router's patterns must go through `variantgrid/perm_path.py:router_urls` or the register
+  does not apply to them.
 - An object viewed inline, as a card, or edited in a modal is one template rendered through
   uicore/views/ajax_form_view.py:LazyRender - `{% embed lazy_render %}` in the page (uicore/templatetags/ui_utils.py:_embed),
   `.render(request, saved=True)` from the POST view; its wrappers (`embed-wrapper`, `data-replace`,

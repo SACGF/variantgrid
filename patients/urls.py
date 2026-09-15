@@ -1,4 +1,3 @@
-from django.urls import include
 from rest_framework import routers
 
 from library.django_utils.datatable_dataframe import DataFrameTableView
@@ -21,7 +20,7 @@ from patients.views_rest import (
     SpecimenViewSet,
 )
 from snpdb.views.datatable_view import DatabaseTableView
-from variantgrid.perm_path import path
+from variantgrid.perm_path import path, router_urls
 
 urlpatterns = [
     path('patient_imports', views.patient_imports, name='patient_imports'),
@@ -100,5 +99,5 @@ urlpatterns += [
     # Ahead of the router, whose detail route would otherwise read 'bulk_create' as a primary key
     path('api/v1/specimen_measure/bulk_create', SpecimenMeasureBulkCreateView.as_view(),
          name='api_specimen_measure_bulk_create'),
-    path('', include(router.urls), name='patients_apis'),
 ]
+urlpatterns += router_urls(router)

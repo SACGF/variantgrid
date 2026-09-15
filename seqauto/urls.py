@@ -1,4 +1,3 @@
-from django.urls import include
 from rest_framework import routers
 
 from library.django_utils.datatable_dataframe import DataFrameTableView
@@ -62,7 +61,7 @@ from seqauto.views_rest import (
     VariantCallerViewSet,
 )
 from snpdb.views.datatable_view import DatabaseTableView
-from variantgrid.perm_path import path
+from variantgrid.perm_path import path, router_urls
 
 urlpatterns = [
     path('', views.sequencing_data, name='sequencing_data'),
@@ -185,8 +184,9 @@ router.register(r'api/v1/qc_gene_list', QCGeneListViewSet, basename='api_qc_gene
 router.register(r'api/v1/qc_gene_coverage', QCGeneCoverageViewSet, basename='api_qc_gene_coverage')
 router.register(r'api/v1/qc_exec_summary', QCExecSummaryViewSet, basename='api_qc_exec_summary')
 
+urlpatterns += router_urls(router)
+
 urlpatterns += [
-    path('', include(router.urls), name='seqauto_apis'),
     path('api/view_enrichment_kit_summary/<int:pk>', views_rest.EnrichmentKitSummaryView.as_view(), name='api_view_enrichment_kit_summary'),
     path('api/view_enrichment_kit/<int:pk>', EnrichmentKitViewSet.as_view({'get': 'retrieve'}),
          name='api_view_enrichment_kit'),  # Deprecated, used for backwards compatibility
