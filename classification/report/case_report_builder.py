@@ -129,9 +129,11 @@ def preview_case_report_html(user: User, template: ClassificationReportTemplate,
 def rebuild_documents(case_report: CaseReport) -> CaseReport:
     """ A template fix, re-rendered over the context the report was built from - the numbers a
         report has already quoted stay as they were. Only the report's own block is refreshed, so
-        an external_report_id entered after the build reaches the documents """
+        an external_report_id entered after the build reaches the documents. `draft` travels with
+        it: the DRAFT watermark is the difference between a draft and the issued copy """
     context = dict(case_report.context_snapshot or {})
     context["case_report"] = case_report_as_dict(case_report)
+    context["draft"] = case_report.status == CaseReportStatus.DRAFT
     return _render_and_save(case_report, context)
 
 
@@ -215,6 +217,9 @@ def finalise_case_report(case_report: CaseReport, user: User) -> FinaliseResult:
         if case_report.report_date is None:
             case_report.report_date = timezone.localdate()
         case_report.save()
+        # The same context re-rendered, so nothing but the report's own block moves - what comes
+        # off is the DRAFT watermark, which is what the issued copy is not allowed to carry
+        rebuild_documents(case_report)
     result = stamp_report_onto_classifications(case_report, user)
     if newly_final:
         # After the stamping, so a receiver filing the report elsewhere sees the finished state

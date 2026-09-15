@@ -38,6 +38,7 @@ def _fixture_variant(gene_symbol: str, reported: bool = True) -> dict:
         "tier_rank": 10,
         "vaf": 0.42,
         "vaf_percent": 42.0,
+        "vaf_percent_whole": 42,
         "copy_number": None,
         "fold_change": None,
         "reported": reported,
@@ -86,6 +87,7 @@ def _build_fixture_context() -> dict:
         # Every kind, so a template's "none detected" branch is rendered before it can be saved
         "kind_groups": [{"kind": "small_variant", "label": "Somatic Variants", "variants": [reported]},
                         {"kind": "copy_number", "label": "Copy Number Changes", "variants": []},
+                        {"kind": "copy_number_loss", "label": "Copy Number Losses", "variants": []},
                         {"kind": "fusion", "label": "Gene Fusions", "variants": []},
                         {"kind": "splice", "label": "Splicing Variants", "variants": []}],
         "tier_groups": [{"tier": "tier_1", "label": "Tier I - Variants of Strong Clinical Significance",
@@ -96,7 +98,10 @@ def _build_fixture_context() -> dict:
                          "genes": [], "unreported_count": 0}],
         "gene_groups": gene_groups,
         "summary": "Fixture summary interpretation.",
+        "splice_note": "Fixture splice note.",
         "case_values": {"panel": "FIXTURE500", "mutations_comment": "Fixture comment"},
+        # Draft, so a template's watermark branch is rendered before the template can be saved
+        "draft": True,
         "lab": {"pk": 1, "str": "fixture lab", "name": "fixture lab"},
         "user": {"pk": 1, "str": "fixture user", "username": "fixture user"},
         "generated": datetime(2026, 1, 1, tzinfo=UTC),

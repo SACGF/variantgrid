@@ -18,6 +18,7 @@ Building, rebuilding and finalising the CaseReport itself is classification/repo
 import re
 from dataclasses import dataclass, field
 from datetime import datetime
+from decimal import ROUND_HALF_UP, Decimal
 from typing import Any, Optional
 
 from django.contrib.auth.models import User
@@ -29,6 +30,7 @@ from classification.enums import SpecialEKeys
 from classification.enums.classification_enums import SomaticClinicalSignificance
 from classification.models.classification import Classification, ClassificationModification
 from classification.models.classification_json import ClassificationJsonParams
+from classification.models.classification_report_models import CaseReportStatus
 from classification.models.evidence_key import EvidenceKeyMap
 from library.genomics.vcf_enums import GeneLevelSymbolicAlt, VariantClass
 from library.utils.django_utils import get_cached_project_git_hash
@@ -42,13 +44,15 @@ class ReportVariantKind:
     """ What sort of event the report is printing. The Results Summary is one table per kind """
     SMALL_VARIANT = 'small_variant'
     COPY_NUMBER = 'copy_number'
+    COPY_NUMBER_LOSS = 'copy_number_loss'
     FUSION = 'fusion'
     SPLICE = 'splice'
 
-    ORDER = [SMALL_VARIANT, COPY_NUMBER, FUSION, SPLICE]
+    ORDER = [SMALL_VARIANT, COPY_NUMBER, COPY_NUMBER_LOSS, FUSION, SPLICE]
     LABELS = {
         SMALL_VARIANT: "Somatic Variants",
         COPY_NUMBER: "Copy Number Changes",
+        COPY_NUMBER_LOSS: "Copy Number Losses",
         FUSION: "Gene Fusions",
         SPLICE: "Splicing Variants",
     }
@@ -56,7 +60,9 @@ class ReportVariantKind:
 
 class Alteration:
     """ The short form the JSON record uses for what changed - the four values the TSO 500 reports
-        have ever carried, so a downstream consumer never meets one it has not seen """
+        have ever carried, so a downstream consumer never meets one it has not seen. A gene level
+        loss goes out as an amplification with its real copy number below two, rather than as a
+        fifth value no consumer has a parser for """
     VARIANT = 'var'
     AMPLIFICATION = 'amp'
     FUSION = 'fusion'
@@ -73,6 +79,8 @@ AMP_TIER_RANK = {
     'IV': 40,
 }
 UNTIERED_RANK = 99
+# Behind every real copy number, counting either way about - @see ReportVariant.copies_rank
+NO_COPY_NUMBER_RANK = 10 ** 9
 
 TIER_GROUP_LABELS = {
     SomaticClinicalSignificance.TIER_1: "Tier I - Variants of Strong Clinical Significance",
@@ -105,6 +113,12 @@ MEASURE_CONTEXT_KEYS = {
 NOT_REPORTED = "not_included"
 
 GENE_SUMMARY_KEY = SpecialEKeys.H_SUMMARY
+
+# The protein designation a curator gives a variant that changes no codon. A small variant carrying
+# it is an intronic call the report has to say something about, or the reader is left with a blank
+# protein column. TERT is left out: its promoter variants are non-coding for a different reason
+SPLICE_NOTE_PROTEIN = "p.(?)"
+SPLICE_NOTE_EXCLUDED_GENES = {"TERT"}
 
 
 def evidence_row_data(record: ClassificationModification, user: User) -> dict:
@@ -197,10 +211,14 @@ def _kind_and_alteration(record: ClassificationModification) -> tuple[str, str]:
                 return ReportVariantKind.FUSION, Alteration.FUSION
             if kind_alt == GeneLevelSymbolicAlt.GAIN:
                 return ReportVariantKind.COPY_NUMBER, Alteration.AMPLIFICATION
+            if kind_alt == GeneLevelSymbolicAlt.LOSS:
+                return ReportVariantKind.COPY_NUMBER_LOSS, Alteration.AMPLIFICATION
 
     variant_class = record.get(SpecialEKeys.VARIANT_CLASS)
     if variant_class == VariantClass.COPY_NUMBER_GAIN.label:
         return ReportVariantKind.COPY_NUMBER, Alteration.AMPLIFICATION
+    if variant_class == VariantClass.COPY_NUMBER_LOSS.label:
+        return ReportVariantKind.COPY_NUMBER_LOSS, Alteration.AMPLIFICATION
     return ReportVariantKind.SMALL_VARIANT, Alteration.VARIANT
 
 
@@ -295,8 +313,27 @@ class ReportVariant:
         return round(self.vaf * 100, 1)
 
     @property
+    def vaf_percent_whole(self) -> Optional[int]:
+        """ The whole percent the document prints, rounded half up off the fraction the caller
+            wrote - a 12.5% VAF is 13%. Rounding here rather than in the template is what stops a
+            value being rounded twice, which is where half up and Python's half to even disagree """
+        if self.vaf is None:
+            return None
+        return int((Decimal(str(self.vaf)) * 100).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+
+    @property
     def c_hgvs(self) -> Optional[str]:
         return (self.evidence.get("c_hgvs") or {}).get("value")
+
+    @property
+    def copies_rank(self) -> int:
+        """ Most copies first, except a loss, where the fewest copies is the biggest finding. A
+            call with no count sorts behind the ones that have one, whichever way the kind sorts """
+        if self.copy_number is None:
+            return NO_COPY_NUMBER_RANK
+        if self.kind == ReportVariantKind.COPY_NUMBER_LOSS:
+            return self.copy_number
+        return -self.copy_number
 
     @property
     def sort_key(self) -> tuple:
@@ -304,7 +341,7 @@ class ReportVariant:
             VAF first. Negated rather than reverse sorted, so the gene stays ascending """
         return (self.tier_rank, self.gene_symbol or "￿",
                 -(self.vaf if self.vaf is not None else -1),
-                -(self.copy_number if self.copy_number is not None else -1),
+                self.copies_rank,
                 -(self.fold_change if self.fold_change is not None else -1),
                 self.c_hgvs or "")
 
@@ -359,7 +396,10 @@ class ReportContext:
     sequencing_runs: list[str] = field(default_factory=list)
     measures: dict[str, SpecimenMeasure] = field(default_factory=dict)
     summary: str = ""
+    splice_note: Optional[str] = None
     case_values: dict = field(default_factory=dict)
+    # Anything that is not a finalised report is a draft, so a preview carries the watermark too
+    draft: bool = True
     generated: Optional[datetime] = None
     versions: dict = field(default_factory=dict)
 
@@ -421,9 +461,38 @@ def build_kind_groups(variants: list[ReportVariant]) -> list[KindGroup]:
             for kind in ReportVariantKind.ORDER]
 
 
+def build_splice_note(variants: list[ReportVariant]) -> Optional[str]:
+    """ The sentence the document puts above the tier sections when a reported small variant has
+        no protein change to print. Generated rather than typed, so the document and the JSON's
+        mutations comment name the same genes; a template's own comment field overrides it """
+    genes = []
+    for variant in variants:
+        if not variant.reported or variant.kind != ReportVariantKind.SMALL_VARIANT:
+            continue
+        if (variant.evidence.get(SpecialEKeys.P_HGVS) or {}).get("value") != SPLICE_NOTE_PROTEIN:
+            continue
+        symbol = variant.gene_symbol
+        if symbol and symbol not in SPLICE_NOTE_EXCLUDED_GENES and symbol not in genes:
+            genes.append(symbol)
+
+    if not genes:
+        return None
+    if len(genes) == 1:
+        return (f"Note that the {genes[0]} variant with protein designation {SPLICE_NOTE_PROTEIN} "
+                "is an intronic variant that is predicted to disrupt splicing, see below.")
+    named = f"{', '.join(genes[:-1])} and {genes[-1]}"
+    return (f"Note that the {named} variants with protein designation {SPLICE_NOTE_PROTEIN} are "
+            "intronic variants that are predicted to disrupt splicing, see below.")
+
+
 def build_tier_groups(variants: list[ReportVariant]) -> list[TierGroup]:
     """ The Variant Interpretation - tier, then gene, with the kinds interleaved so a Tier IIC
-        amplification prints under Tier II beside the Tier IIC small variants """
+        amplification prints under Tier II beside the Tier IIC small variants.
+
+        A tier outside ALWAYS_PRINTED_TIERS with nothing being reported from it is left out
+        entirely rather than printed empty. That is what keeps Tier IV off a somatic report: a
+        Tier IV variant is a not-reported record and `reported` already says so, so the section
+        would be a heading over "no reportable variants detected" on every case that has one """
     tiers = list(TIER_GROUP_ORDER)
     for variant in variants:
         tier = variant.tier or UNTIERED
@@ -436,7 +505,7 @@ def build_tier_groups(variants: list[ReportVariant]) -> list[TierGroup]:
     for tier in tiers:
         in_tier = [v for v in variants if (v.tier or UNTIERED) == tier]
         reported = [v for v in in_tier if v.reported]
-        if not in_tier and tier not in ALWAYS_PRINTED_TIERS:
+        if not reported and tier not in ALWAYS_PRINTED_TIERS:
             continue
         label = TIER_GROUP_LABELS.get(tier, UNTIERED_LABEL)
         tier_groups.append(TierGroup(tier=tier, label=label, genes=build_gene_groups(reported),
@@ -529,7 +598,9 @@ def build_report_context(user: User, source_level: str, source,
         sequencing_runs=_sequencing_runs(samples),
         measures=_specimen_measures(specimen),
         summary=summary,
+        splice_note=build_splice_note(variants),
         case_values=case_values or {},
+        draft=case_report is None or case_report.status == CaseReportStatus.DRAFT,
         generated=timezone.now(),
         versions=build_versions(samples),
     )
@@ -571,6 +642,7 @@ def _variant_as_dict(variant: ReportVariant) -> dict:
         "tier_rank": variant.tier_rank,
         "vaf": variant.vaf,
         "vaf_percent": variant.vaf_percent,
+        "vaf_percent_whole": variant.vaf_percent_whole,
         "copy_number": variant.copy_number,
         "fold_change": variant.fold_change,
         "reported": variant.reported,
@@ -618,7 +690,9 @@ def context_as_dict(report_context: ReportContext) -> dict:
                         for tg in report_context.tier_groups],
         "gene_groups": [_gene_group_as_dict(g) for g in report_context.gene_groups],
         "summary": report_context.summary,
+        "splice_note": report_context.splice_note,
         "case_values": report_context.case_values,
+        "draft": report_context.draft,
         "lab": _model_as_dict(report_context.lab, ["name"]),
         "user": _model_as_dict(report_context.user, ["username"]),
         "generated": report_context.generated,

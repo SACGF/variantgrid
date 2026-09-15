@@ -1,4 +1,6 @@
+import io
 import json
+import zipfile
 
 from django.core.exceptions import ValidationError
 from django.test import TestCase
@@ -15,18 +17,34 @@ from classification.report.case_report_context import (
     sort_report_variants,
 )
 from classification.report.default_templates import generic_case_template
-from classification.report.renderers import render_case_report
+from classification.report.renderers import (
+    DRAFT_BANNER_TEXT,
+    PRE_FONT_NAME,
+    render_case_report,
+    render_docx,
+)
 from classification.tests.report.fake_report_variants import fake_report_variant
 
 TIER_1 = SomaticClinicalSignificance.TIER_1
 
 
-def _report_context(variants) -> dict:
+def _report_context(variants, draft: bool = True) -> dict:
     variants = sort_report_variants(variants)
     return context_as_dict(ReportContext(source_level="S", variants=variants,
                                          kind_groups=build_kind_groups(variants),
                                          tier_groups=build_tier_groups(variants),
-                                         gene_groups=build_gene_groups(variants)))
+                                         gene_groups=build_gene_groups(variants),
+                                         draft=draft))
+
+
+# The class the renderer strips for the Word file - the CSS rule for it is in the head either way
+WATERMARK_ELEMENT = '<div class="draft-watermark">'
+
+
+def _docx_xml(docx: bytes) -> str:
+    """ What Word will actually read - the only way to see what html2docx made of the HTML """
+    with zipfile.ZipFile(io.BytesIO(docx)) as archive:
+        return archive.read("word/document.xml").decode("utf-8")
 
 
 class CaseReportRenderingTest(TestCase):
@@ -118,3 +136,45 @@ class ContextSnapshotTest(TestCase):
         rendered = render_case_report(template, context)
 
         json.dumps(rendered.context_snapshot)  # raises if not
+
+
+class DraftWatermarkTest(TestCase):
+    """ A draft has to be unmistakable on paper, and the two document formats say so differently:
+        the PDF gets the template's watermark element, the Word file a banner the renderer adds
+        because html2docx has nothing that can be positioned or rotated """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.template = ClassificationReportTemplate.objects.create(
+            name="draft watermark", case_template=generic_case_template())
+        cls.variants = [fake_report_variant("AGENE", tier=TIER_1, amp_levels=["A"], vaf=0.42)]
+
+    def test_a_draft_is_watermarked_in_the_pdf_and_bannered_in_the_word_file(self):
+        rendered = render_case_report(self.template, _report_context(self.variants, draft=True))
+
+        self.assertIn(WATERMARK_ELEMENT, rendered.html)
+        docx_xml = _docx_xml(rendered.docx)
+        self.assertIn(DRAFT_BANNER_TEXT, docx_xml)
+        # The watermark element itself is print design - it would arrive as a stray DRAFT paragraph
+        self.assertEqual(docx_xml.count("DRAFT"), 1)
+
+    def test_the_issued_report_carries_neither(self):
+        rendered = render_case_report(self.template, _report_context(self.variants, draft=False))
+
+        self.assertNotIn(WATERMARK_ELEMENT, rendered.html)
+        self.assertNotIn("DRAFT", _docx_xml(rendered.docx))
+
+
+class ResultsSummaryDocxTest(TestCase):
+    """ A Results Summary is column aligned text, and html2docx gives a <pre> block its spaces and
+        line breaks but no font at all - in Word's proportional default nothing lines up """
+
+    PRE_HTML = ('<html><body><pre class="results-summary">Somatic Variants   Tier   Gene\n'
+                '                   IA     BRAF\n</pre></body></html>')
+
+    def test_a_pre_block_reaches_word_monospaced_and_line_for_line(self):
+        docx_xml = _docx_xml(render_docx(self.PRE_HTML, title="pre"))
+
+        self.assertIn(f'w:ascii="{PRE_FONT_NAME}"', docx_xml)
+        self.assertIn("<w:br/>", docx_xml)
+        self.assertIn('<w:t xml:space="preserve">                   IA     BRAF</w:t>', docx_xml)

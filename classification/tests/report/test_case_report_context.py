@@ -12,6 +12,7 @@ from classification.report.case_report_context import (
     ReportVariantKind,
     amp_tier,
     build_gene_groups,
+    build_splice_note,
     build_tier_groups,
     context_as_dict,
     sort_report_variants,
@@ -121,12 +122,26 @@ class ReportVariantKindTest(TestCase):
         self.assertEqual(fusion.gene_symbols, ["GENE1", "GENE2"])
         self.assertEqual(fusion.gene_label, "GENE1::GENE2")
 
+    def test_a_gene_level_loss_is_its_own_kind(self):
+        """ A loss printed among the small variants has a blank protein column and reads as one -
+            it is a copy number call, and its own table because it sorts the other way about """
+        loss = fake_report_variant("GENE4", copy_number=0,
+                                   variant=fake_gene_level_variant("<LOSS:HGNC:4>"))
+        self.assertEqual(loss.kind, ReportVariantKind.COPY_NUMBER_LOSS)
+        self.assertEqual(loss.alteration, Alteration.AMPLIFICATION)
+
     def test_an_unmatched_classification_falls_back_to_variant_class(self):
         record = FakeModification(values={SpecialEKeys.GENE_SYMBOL: "GENE5",
                                           SpecialEKeys.VARIANT_CLASS: "copy_number_gain"})
         variant = ReportVariant.build(record, user=None, evidence={})
         self.assertEqual(variant.kind, ReportVariantKind.COPY_NUMBER)
         self.assertEqual(variant.alteration, Alteration.AMPLIFICATION)
+
+    def test_the_variant_class_fallback_knows_a_loss_too(self):
+        record = FakeModification(values={SpecialEKeys.GENE_SYMBOL: "GENE5",
+                                          SpecialEKeys.VARIANT_CLASS: "copy_number_loss"})
+        self.assertEqual(ReportVariant.build(record, user=None, evidence={}).kind,
+                         ReportVariantKind.COPY_NUMBER_LOSS)
 
     def test_anything_else_is_a_small_variant(self):
         variant = fake_report_variant("GENE6")
@@ -209,6 +224,81 @@ class ReportOrderTest(TestCase):
         self.assertEqual([v.amp_tier for v in ordered], ["IA", "IB", "IIC", ""])
 
 
+class CopyNumberOrderTest(TestCase):
+    """ Most copies first is the biggest finding for a gain and the smallest for a loss, so the
+        two tables sort the same column opposite ways """
+
+    @staticmethod
+    def _call(alt, copy_number, pk):
+        return fake_report_variant("ZGENE", tier=TIER_2, amp_levels=["C"], copy_number=copy_number,
+                                   variant=fake_gene_level_variant(alt), pk=pk)
+
+    def test_a_gain_prints_the_most_copies_first(self):
+        fewer = self._call("<GAIN:HGNC:9>", 6, 1)
+        more = self._call("<GAIN:HGNC:9>", 14, 2)
+        self.assertEqual([v.modification.pk for v in sort_report_variants([fewer, more])], [2, 1])
+
+    def test_a_loss_prints_the_fewest_copies_first(self):
+        one_copy = self._call("<LOSS:HGNC:9>", 1, 1)
+        no_copies = self._call("<LOSS:HGNC:9>", 0, 2)
+        self.assertEqual([v.modification.pk for v in sort_report_variants([one_copy, no_copies])],
+                         [2, 1])
+
+    def test_a_call_with_no_count_sorts_behind_the_ones_that_have_one(self):
+        counted = self._call("<LOSS:HGNC:9>", 1, 1)
+        uncounted = self._call("<LOSS:HGNC:9>", None, 2)
+        self.assertEqual([v.modification.pk for v in sort_report_variants([uncounted, counted])],
+                         [1, 2])
+
+
+class VafPercentTest(TestCase):
+
+    def test_the_whole_percent_is_rounded_half_up(self):
+        """ Python rounds 12.5 to 12 - the report rounds it to 13, the way the lab's documents
+            have always been explicit about """
+        self.assertEqual(fake_report_variant("AGENE", vaf=0.125).vaf_percent_whole, 13)
+        self.assertEqual(fake_report_variant("AGENE", vaf=0.115).vaf_percent_whole, 12)
+        self.assertEqual(fake_report_variant("AGENE", vaf=0.4239).vaf_percent_whole, 42)
+
+    def test_a_variant_with_no_vaf_has_no_whole_percent(self):
+        self.assertIsNone(fake_report_variant("AGENE").vaf_percent_whole)
+
+
+class SpliceNoteTest(TestCase):
+    """ The sentence the document puts above the tier sections for a reported variant whose only
+        protein designation is p.(?) - generated, so the document and the JSON name the same genes """
+
+    @staticmethod
+    def _variant(gene_symbol, p_hgvs="p.(?)", reported=True, pk=1):
+        return fake_report_variant(gene_symbol, p_hgvs=p_hgvs, reported=reported, pk=pk)
+
+    def test_one_gene_reads_in_the_singular(self):
+        note = build_splice_note([self._variant("MET")])
+        self.assertEqual(note, "Note that the MET variant with protein designation p.(?) is an "
+                               "intronic variant that is predicted to disrupt splicing, see below.")
+
+    def test_two_genes_read_in_the_plural(self):
+        note = build_splice_note([self._variant("MET", pk=1), self._variant("BRCA1", pk=2)])
+        self.assertEqual(note, "Note that the MET and BRCA1 variants with protein designation "
+                               "p.(?) are intronic variants that are predicted to disrupt "
+                               "splicing, see below.")
+
+    def test_three_genes_are_listed_with_commas_and_an_and(self):
+        note = build_splice_note([self._variant("MET", pk=1), self._variant("BRCA1", pk=2),
+                                  self._variant("ATM", pk=3)])
+        self.assertIn("the MET, BRCA1 and ATM variants", note)
+
+    def test_tert_is_left_out(self):
+        """ A TERT promoter variant has no protein designation for a different reason """
+        self.assertIsNone(build_splice_note([self._variant("TERT")]))
+
+    def test_a_variant_that_is_not_being_reported_is_not_noted(self):
+        self.assertIsNone(build_splice_note([self._variant("MET", reported=False)]))
+
+    def test_a_variant_with_a_protein_change_is_not_noted(self):
+        self.assertIsNone(build_splice_note([self._variant("MET", p_hgvs="p.(Val600Glu)")]))
+
+
 class TierGroupTest(TestCase):
 
     def test_an_amplification_prints_under_its_tier_beside_the_small_variants(self):
@@ -224,6 +314,20 @@ class TierGroupTest(TestCase):
         tier_groups = build_tier_groups([fake_report_variant("AGENE", tier=TIER_1, amp_levels=["A"])])
         self.assertEqual([tg.tier for tg in tier_groups], [TIER_1, TIER_2, TIER_3])
         self.assertEqual([tg.genes for tg in tier_groups][1:], [[], []])
+
+    def test_a_tier_nothing_is_reported_from_prints_nothing(self):
+        """ Tier IV is how this shows up: the lab records it as seen and never reports it, so the
+            section would be a heading over "no reportable variants" on every case that has one """
+        tier_4 = fake_report_variant("AGENE", tier=SomaticClinicalSignificance.TIER_4,
+                                     reported=False)
+        tiers = [tg.tier for tg in build_tier_groups([tier_4])]
+        self.assertNotIn(SomaticClinicalSignificance.TIER_4, tiers)
+
+    def test_a_tier_iv_variant_the_lab_does_report_still_prints(self):
+        tier_4 = fake_report_variant("AGENE", tier=SomaticClinicalSignificance.TIER_4)
+        by_tier = {tg.tier: tg for tg in build_tier_groups([tier_4])}
+        self.assertEqual([g.gene_symbol for g in by_tier[SomaticClinicalSignificance.TIER_4].genes],
+                         ["AGENE"])
 
     def test_an_unreported_variant_is_left_out_but_counted(self):
         """ The tier prints "no reportable variants" rather than "none detected" when the case has

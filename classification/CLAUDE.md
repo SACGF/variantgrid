@@ -114,7 +114,11 @@ Gotchas:
   kind keeps it.
 - html2docx has no head: it prints the contents of `<style>` and `<script>` as the Word file's first paragraph, so
   report/renderers.py:render_docx strips them. A template's print CSS is design, not report content.
-- `kind_groups` always carries all four kinds, empty variants and all (the way the tiers are always printed), so a
+- A column aligned Results Summary survives html2docx as a `<table>` (a real `<w:tbl>`, equal column widths) and not as a
+  `<pre>` (spaces and `<w:br/>`s, but no `<w:rFonts>`, so Word sets it proportional): the TSO 500 template keeps `<pre>`
+  because its PDF is read against the legacy document, and report/renderers.py:render_docx opens a `<code>` run at each
+  `<pre>` and rewrites html2docx's "Mono" to Courier New - closing that `<code>` instead loses every line break.
+- `kind_groups` always carries all five kinds, empty variants and all (the way the tiers are always printed), so a
   template can say "Gene Fusions - None detected". A Results Summary that skips a kind reads as though it wasn't looked for.
   The legacy TSO 500 report is the one exception, omitting Splicing Variants entirely when empty - the template decides.
 - What makes a classification a splicing variant is the VCF its sample came off, not anything on the record: a

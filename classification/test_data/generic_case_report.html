@@ -9,9 +9,13 @@
     table { width: 100% }
     th, td { border: 1px solid #999; padding: 3pt; text-align: left; font-size: 9pt }
     .field-label { color: #555 }
+    .draft-watermark { text-align: center; color: #e0a0a0; font-size: 30pt; font-weight: bold }
+    /* xhtml2pdf implements neither transform nor position, so the PDF's DRAFT sits in the flow */
+    @media screen { .draft-watermark { transform: rotate(-20deg) } }
 </style>
 </head>
 <body>
+{% if draft %}<div class="draft-watermark">DRAFT</div>{% endif %}
 <h1>Case report</h1>
 <table>
     <tr><td class="field-label">Patient</td><td>{{ patient.str|default_if_none:"" }}</td>
@@ -42,7 +46,7 @@
     {% for v in kind_group.variants %}
     <tr><td>{{ v.amp_tier }}</td><td>{{ v.gene_label }}</td>
         <td>{{ v.evidence.p_hgvs.value|default_if_none:"" }}</td>
-        <td>{% if v.vaf_percent is not None %}{{ v.vaf_percent }}%{% endif %}</td>
+        <td>{% if v.vaf_percent_whole is not None %}{{ v.vaf_percent_whole }}%{% endif %}</td>
         <td>{% if v.copy_number is not None %}{{ v.copy_number }}{% elif v.fold_change is not None %}{{ v.fold_change }}x{% endif %}</td></tr>
     {% endfor %}
 </table>
@@ -54,6 +58,7 @@
 {% endif %}
 
 <h2>Variant interpretation</h2>
+{% if splice_note %}<p>{{ splice_note }}</p>{% endif %}
 {% for tier in tier_groups %}
 <h3>{{ tier.label }}</h3>
 {% if not tier.genes %}
