@@ -64,6 +64,11 @@
 	    content: ': ';
 	}
 
+	li.mandatory .mandatory-lock {
+		float: right;
+		color: #888;
+	}
+
 {% if not has_write_permission %}
 	.cursor-move {
 		cursor: auto;
@@ -155,8 +160,23 @@
 		    dropAnywhereInList(document.querySelector(listSelector), placeholder);
 		}
 
+		// A mandatory column can be reordered but not removed. acceptFrom can't refuse a single item,
+		// so a mandatory item dropped into "Available Columns" is put back where it came from
+		function putBackIfMandatory(detail) {
+		    const item = detail.item;
+		    if (!$(item).hasClass("mandatory") || detail.destination.container.id !== "available_columns_sortable") {
+		        return false;
+		    }
+		    const origin = detail.origin.container;
+		    origin.insertBefore(item, origin.children[detail.origin.elementIndex] || null);
+		    return true;
+		}
+
 		// html5sortable fires sortupdate on the list the item was dropped into
-		$("#my_columns_sortable, #available_columns_sortable").on("sortupdate", function() {
+		$("#my_columns_sortable, #available_columns_sortable").on("sortupdate", function(event) {
+		    if (putBackIfMandatory(event.originalEvent.detail)) {
+		        return;
+		    }
             const result_my_columns = serialize_columns("#my_columns_sortable");
 
             $.ajax({
@@ -238,6 +258,9 @@
 		<ul id="my_columns_sortable">
 			{% for column in my_columns_list %}
 			<li class="{{ column.get_css_classes }} cursor-move" id="{{ column.pk }}" column_id="{{ column.pk }}">
+				{% if column.is_mandatory %}
+				<i class="fas fa-lock mandatory-lock" title="Mandatory: analyses need this column, so it can be reordered but not removed"></i>
+				{% endif %}
 				<div class="column-name">{{ column.pk }}</div>
 				<div class="column-description">{{ column.description | safe }}</div>
 				{% if column.is_composite %}

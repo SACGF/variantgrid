@@ -281,13 +281,16 @@ def view_custom_columns(request, custom_columns_collection_id):
     variant_grid_columns = {vgc.pk: vgc for vgc in
                             VariantGridColumn.objects.prefetch_related("composite_members__column")}
     VariantGridColumn.annotate_composite_membership(variant_grid_columns.values())
-    # Mandatory columns are never drawn in either list: html5sortable only lets a drop land anywhere
-    # in a list that has no items, so a hidden item would shrink an empty list's drop zone to nothing
+    # The row id is never drawn in either list: html5sortable only lets a drop land anywhere in a list
+    # that has no items, so a hidden item would shrink an empty list's drop zone to nothing. The other
+    # mandatory columns are drawn locked in "My Columns" - a collection missing one is shown with it
+    # so the next save puts it back
     mandatory = CustomColumnsCollection.MANDATORY_COLUMNS
+    row_id = CustomColumnsCollection.ROW_ID_COLUMN
     my_column_ids = list(ccc.customcolumn_set.order_by("sort_order").values_list("column_id", flat=True))
-    my_columns = [variant_grid_columns[column_id] for column_id in my_column_ids if column_id not in mandatory]
-    hidden_column_ids = set(my_column_ids) | set(mandatory)
-    available_columns = [vgc for pk, vgc in variant_grid_columns.items() if pk not in hidden_column_ids]
+    my_column_ids += [c for c in mandatory if c not in my_column_ids]
+    my_columns = [variant_grid_columns[column_id] for column_id in my_column_ids if column_id != row_id]
+    available_columns = [vgc for pk, vgc in variant_grid_columns.items() if pk not in my_column_ids]
 
     has_write_permission = ccc.can_write(request.user)
     if not has_write_permission:
@@ -309,8 +312,10 @@ def view_custom_columns(request, custom_columns_collection_id):
                 # Delete any not in id_list
                 CustomColumn.objects.filter(custom_columns_collection=ccc).exclude(column__in=id_list).delete()
 
-            posted = [c for c in my_columns_str.split(',') if c and c not in mandatory]
-            my_columns_list = list(mandatory) + posted
+            # Locked columns keep the order they were posted in; one the client let slip out goes on the end
+            posted = [c for c in my_columns_str.split(',') if c and c != row_id]
+            slipped = [c for c in mandatory if c not in posted and c != row_id]
+            my_columns_list = [row_id, *posted, *slipped]
             active = 'my_columns' in request.POST
             update_user_columns(my_columns_list, active)
         return HttpResponse()  # Nobody ever looks at this
