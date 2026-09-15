@@ -57,7 +57,11 @@ from snpdb.variant_filters import (
     resolve_gene_symbols,
 )
 from variantopedia import forms
-from variantopedia.grids import VariantTagsColumns, filter_unresolved_variant_tags
+from variantopedia.grids import (
+    VariantTagsColumns,
+    filter_unresolved_variant_tags,
+    variant_tags_for_user,
+)
 from variantopedia.interesting_nearby import (
     get_method_summaries,
     get_nearby_qs,
@@ -113,7 +117,8 @@ def variant_tag_detail(request, variant_id, tag):
 
     variant = get_object_or_404(Variant, pk=variant_id)
     tag = get_object_or_404(Tag, pk=tag)
-    if not VariantTag.filter_for_user(request.user).filter(variant=variant, tag=tag).exists():
+    # Same taggings as the counts grid this expands from - the tag may sit on another build of the allele
+    if not variant_tags_for_user(variant, request.user).filter(tag=tag).exists():
         raise PermissionDenied
     context = {
         "variant": variant,

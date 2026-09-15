@@ -6,7 +6,18 @@ from typing import Any, Optional
 
 from django.db import connection
 from django.db.models import (
-    Case, Count, FilteredRelation, IntegerField, OuterRef, Q, QuerySet, Subquery, TextField, Value, When,
+    Case,
+    Count,
+    FilteredRelation,
+    IntegerField,
+    Max,
+    OuterRef,
+    Q,
+    QuerySet,
+    Subquery,
+    TextField,
+    Value,
+    When,
 )
 from django.db.models.functions import Coalesce, Concat
 from django.http import HttpRequest
@@ -29,7 +40,6 @@ from snpdb.variant_filters import get_all_variants_filters, get_variant_filter_q
 from snpdb.views.datatable_view import CellData, DatatableConfig, FilterField, RichColumn, SortOrder
 from variantopedia.interesting_nearby import get_nearby_qs
 
-
 # One setting for every tag work list - the variant page and the variant tags page share it, so the
 # choice follows the user between them
 VARIANT_TAGS_GRID_NAME = 'Variant Tags'
@@ -45,6 +55,15 @@ def filter_unresolved_variant_tags(qs: QuerySet[VariantTag], user) -> QuerySet[V
     if show_resolved_variant_tags(user):
         return qs
     return qs.filter(VariantTag.unresolved_q())
+
+
+def variant_tags_for_user(variant: Variant, user) -> QuerySet[VariantTag]:
+    """ The taggings the variant page shows for a variant: any build of its allele, visible to this user,
+        and not yet resolved unless the user asked to see those. """
+    genome_build = variant.any_genome_build
+    qs = VariantTag.get_for_build(genome_build, variant_qs=variant.equivalent_variants)
+    qs = VariantTag.filter_for_user(user, queryset=qs)
+    return filter_unresolved_variant_tags(qs, user)
 
 
 def _format_approx_count(n: int) -> str:
@@ -484,8 +503,8 @@ class VariantTagCountsColumns(DatatableConfig[VariantTag]):
     def get_initial_queryset(self) -> QuerySet[VariantTag]:
         variant_id = self.get_query_param('variant_id')
         variant = Variant.objects.get(pk=variant_id)
-        tags_qs = filter_unresolved_variant_tags(VariantTag.objects.all(), self.user)
-        qs = VariantTag.get_variant_tag_counts_qs(variant, tags_qs=tags_qs)
+        qs = variant_tags_for_user(variant, self.user).values("tag") \
+            .annotate(count=Count("id"), last_created=Max("created")).order_by("tag")
         if self.tag_stale_date:
             qs = qs.annotate(fresh_count=Count("id", filter=Q(created__gte=self.tag_stale_date)))
         if self.sort_order_by_tag:
@@ -523,9 +542,4 @@ class VariantTagDetailColumns(DatatableConfig[VariantTag]):
 
         variant = Variant.objects.get(pk=variant_id)
         tag = Tag.objects.get(pk=tag_name)
-        # Not going to use anything build specific so don't care about build
-        genome_build = variant.any_genome_build
-        qs = VariantTag.get_for_build(genome_build, variant_qs=variant.equivalent_variants)
-        qs = VariantTag.filter_for_user(self.user, queryset=qs)
-        qs = qs.filter(tag=tag)
-        return filter_unresolved_variant_tags(qs, self.user)
+        return variant_tags_for_user(variant, self.user).filter(tag=tag)

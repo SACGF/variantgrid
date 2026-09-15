@@ -236,6 +236,20 @@ class TaggedVariantGridTest(TestCase):
 
         self.assertEqual(self._variant_tag_counts_tags(), ["Reportable", "Artefact"])
 
+    def test_tag_detail_expands_for_a_tag_on_another_build_of_the_allele(self):
+        """ The variant page counts tags across every build of the allele. Expanding one must look at the
+            same tags, or a tag made on the other build's variant is counted but then denied. """
+        other_build = GenomeBuild.get_name_or_alias("GRCh38")
+        lifted_variant = Variant.objects.order_by("pk").exclude(
+            pk__in=[self.both_variant.pk, self.artefact_variant.pk, self.other_user_variant.pk]).first()
+        VariantAllele.objects.create(variant=lifted_variant, genome_build=other_build,
+                                     allele=self.both_variant.allele, origin=AlleleOrigin.LIFTOVER)
+        self.assertFalse(VariantTag.objects.filter(variant=lifted_variant).exists())
+
+        self.client.force_login(self.user)
+        url = reverse('variant_tag_detail', kwargs={"variant_id": lifted_variant.pk, "tag": self.reportable.pk})
+        self.assertEqual(self.client.get(url).status_code, 200)
+
     def test_user_filter_overrides_show_group_data(self):
         """ An explicit user filter must still show another user's (permission-visible) tags
             even when the grid config is set to only show your own data """
