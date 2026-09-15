@@ -17,15 +17,16 @@ A citation of gitignored build output (BUILD_OUTPUTS - collectstatic's `variantg
 report) resolves without touching the filesystem, so a doc describing the build reads the same on CI as on a box
 that has run it.
 
-Plans are checked while they are live: a `Status:` of draft, approved or in progress. A landed or superseded
-plan, or one with no Status line, describes code as it was and is reported as unchecked rather than failed.
-A plan citing another plan that has since been deleted is counted and reported, not failed - a landed plan is
-deleted and git history is its record, so the citation going missing is the normal end of that plan's life.
-Every other doc keeps the full check, so a research doc or CLAUDE.md citing a plan path must still resolve.
+Plans never fail the check, so CI does not stand between a finished plan and deleting it. A dead citation
+inside a plan, and a citation of a plan that has since been deleted wherever that citation is made, are both
+reported and counted but do not fail: a landed plan is deleted and git history is its record, so deleting one
+must not mean editing every doc that mentioned it. Plans are still read while they are live - a `Status:` of
+draft, approved or in progress - so what is reported about them is current; a landed or superseded plan, or one
+with no Status line, is reported as unchecked. Every other citation in every other doc keeps the full check.
 """
 import ast
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import cache
 from pathlib import Path
 
@@ -368,7 +369,9 @@ class DocsReport:
     docs_checked: int
     citations_checked: int
     unchecked_plans: dict[str, str]   # repo-relative path -> status (or "no Status line")
-    deleted_plan_citations: int = 0    # plan-to-plan citations whose target plan has been deleted
+    deleted_plan_citations: int = 0    # citations of a plan that has been deleted, from any doc
+    # Dead citations inside plans: reported so they can be fixed, never fatal - a plan is a working note
+    plan_dead: list[DeadCitation] = field(default_factory=list)
 
     @property
     def ok(self) -> bool:
@@ -377,6 +380,7 @@ class DocsReport:
 
 def check_docs(paths=None, all_plans: bool = False) -> DocsReport:
     dead: list[DeadCitation] = []
+    plan_dead: list[DeadCitation] = []
     unchecked: dict[str, str] = {}
     checked = 0
     citations_checked = 0
@@ -392,23 +396,31 @@ def check_docs(paths=None, all_plans: bool = False) -> DocsReport:
             reason = check_citation(citation)
             if not reason:
                 continue
-            if doc_is_plan and reason == NO_SUCH_FILE and is_plan_path(citation.path):
+            if reason == NO_SUCH_FILE and is_plan_path(citation.path):
                 deleted_plans += 1
                 continue
-            dead.append(DeadCitation(citation, reason))
-    return DocsReport(dead, checked, citations_checked, unchecked, deleted_plans)
+            (plan_dead if doc_is_plan else dead).append(DeadCitation(citation, reason))
+    return DocsReport(dead, checked, citations_checked, unchecked, deleted_plans, plan_dead)
+
+
+def _dead_lines(items: list[DeadCitation]) -> list[str]:
+    lines = []
+    by_doc: dict[str, list[DeadCitation]] = {}
+    for item in items:
+        by_doc.setdefault(str(item.citation.doc.relative_to(REPO_ROOT)), []).append(item)
+    for doc, in_doc in sorted(by_doc.items()):
+        lines.append(f"{doc}: {len(in_doc)} dead")
+        lines += [f"  L{item.citation.lineno}  {item.citation.text}  - {item.reason}" for item in in_doc]
+    return lines
 
 
 def render_report(report: DocsReport) -> str:
-    lines = []
-    by_doc: dict[str, list[DeadCitation]] = {}
-    for item in report.dead:
-        by_doc.setdefault(str(item.citation.doc.relative_to(REPO_ROOT)), []).append(item)
-    for doc, items in sorted(by_doc.items()):
-        lines.append(f"{doc}: {len(items)} dead")
-        lines += [f"  L{item.citation.lineno}  {item.citation.text}  - {item.reason}" for item in items]
+    lines = _dead_lines(report.dead)
+    if report.plan_dead:
+        lines += _dead_lines(report.plan_dead)
+        lines.append(f"{len(report.plan_dead)} dead in plans: reported, not failing")
     if report.deleted_plan_citations:
-        lines.append(f"{report.deleted_plan_citations} citation(s) of deleted plans, in plans: git history has them")
+        lines.append(f"{report.deleted_plan_citations} citation(s) of deleted plans: git history has them")
     if report.unchecked_plans:
         lines.append(f"{len(report.unchecked_plans)} plan(s) not live (landed / superseded / no Status line), not checked; "
                      "--all-plans includes them")

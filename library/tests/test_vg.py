@@ -252,22 +252,32 @@ class DocsCheckTest(SimpleTestCase):
         reasons = [docs.check_citation(c) for c in docs.citations_in(doc)]
         self.assertEqual(reasons, [None, None, "no such file"])
 
-    def test_only_live_plans_are_checked(self):
+    def test_only_live_plans_are_read(self):
         live = self._doc("Status: in progress\n`nope/missing.py`", directory=REPO_ROOT / "claude" / "plans")
         landed = self._doc("Status: landed abc123\n`nope/missing.py`", directory=REPO_ROOT / "claude" / "plans")
         report = docs.check_docs([live, landed])
-        self.assertEqual(len(report.dead), 1)
+        self.assertEqual([d.citation.path for d in report.plan_dead], ["nope/missing.py"])
         self.assertEqual(list(report.unchecked_plans.values()), ["landed abc123"])
-        self.assertEqual(len(docs.check_docs([live, landed], all_plans=True).dead), 2)
+        self.assertEqual(len(docs.check_docs([live, landed], all_plans=True).plan_dead), 2)
 
-    def test_a_plan_citing_a_deleted_plan_is_counted_not_dead(self):
-        plans = REPO_ROOT / "claude" / "plans"
-        plan = self._doc("Status: draft\n`claude/plans/999_gone_plan.md` and `nope/missing.py`", directory=plans)
-        research = self._doc("`claude/plans/999_gone_plan.md`", directory=REPO_ROOT / "claude" / "research")
+    def test_a_dead_citation_in_a_plan_is_reported_but_never_fatal(self):
+        plan = self._doc("Status: draft\n`nope/missing.py`", directory=REPO_ROOT / "claude" / "plans")
         report = docs.check_docs([plan])
-        self.assertEqual([d.citation.path for d in report.dead], ["nope/missing.py"])
-        self.assertEqual(report.deleted_plan_citations, 1)
-        self.assertEqual(len(docs.check_docs([research]).dead), 1)  # only plans get the exemption
+        self.assertEqual(report.dead, [])
+        self.assertTrue(report.ok)
+        self.assertEqual([d.citation.path for d in report.plan_dead], ["nope/missing.py"])
+
+    def test_citing_a_deleted_plan_is_counted_not_dead_wherever_it_is_cited(self):
+        """ A landed plan is deleted and git history is its record, so deleting one must not mean
+            editing every doc that mentioned it """
+        plan = self._doc("Status: draft\n`claude/plans/999_gone_plan.md`", directory=REPO_ROOT / "claude" / "plans")
+        research = self._doc("`claude/plans/999_gone_plan.md`", directory=REPO_ROOT / "claude" / "research")
+        for doc in (plan, research):
+            report = docs.check_docs([doc])
+            self.assertEqual(report.dead, [])
+            self.assertEqual(report.plan_dead, [])
+            self.assertEqual(report.deleted_plan_citations, 1)
+            self.assertTrue(report.ok)
 
 
 class InspectRenderTest(SimpleTestCase):
