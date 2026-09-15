@@ -22,16 +22,20 @@ class AbstractOntologyTermAutocompleteView(abc.ABC, AutocompleteView):
     def sort_queryset(self, qs):
         return qs.order_by(Length("name").asc(), 'name')
 
-    def _get_term_id_q(self) -> Q | None:
-        """ A bare number matches the term with that index ("1061" -> HPO:0001061 in the HPO autocomplete),
-            a prefixed id matches after normalisation ("HPO:1061", "mondo_7") """
+    def _get_term_id_q(self) -> tuple[Q, Q] | None:
+        """ Returns (id_q, exact_q): digits match anywhere in the id ("123" -> HP:0000123, HP:0012323),
+            a prefixed id ("HPO:123", "mondo_7") the same within that prefix. exact_q is the term whose
+            index is exactly the digits typed, for ranking """
         q = self.q.strip()
         if q.isdigit():
-            return Q(index=int(q))
+            return Q(id__contains=q), Q(index=int(q))
         try:
-            return Q(id=OntologyIdNormalized.normalize(q).full_id)
+            normalized = OntologyIdNormalized.normalize(q)
         except ValueError:
             return None
+        digits = normalized.postfix.lstrip("0") or "0"
+        id_q = Q(id__startswith=f"{normalized.prefix}:") & Q(id__icontains=digits)
+        return id_q, Q(id=normalized.full_id)
 
     def get_queryset(self):
         user = self.request.user
@@ -41,11 +45,13 @@ class AbstractOntologyTermAutocompleteView(abc.ABC, AutocompleteView):
 
         if self.q:
             name_q = Q(name__icontains=self.q)
-            if term_id_q := self._get_term_id_q():
-                # The term whose id was typed goes first, ahead of any names that happen to contain the digits
-                is_term_match = Case(When(term_id_q, then=Value(0)), default=Value(1), output_field=IntegerField())
-                qs = qs.filter(name_q | term_id_q).annotate(is_term_match=is_term_match)
-                return qs.order_by("is_term_match", Length("name").asc(), 'name')
+            if term_id_qs := self._get_term_id_q():
+                id_q, exact_q = term_id_qs
+                # The term with exactly that id first, then other ids containing the digits, then names that do
+                term_match_rank = Case(When(exact_q, then=Value(0)), When(id_q, then=Value(1)), default=Value(2),
+                                       output_field=IntegerField())
+                qs = qs.filter(name_q | id_q).annotate(term_match_rank=term_match_rank)
+                return qs.order_by("term_match_rank", Length("name").asc(), 'name')
             qs = qs.filter(name_q)
 
         return self.sort_queryset(qs)

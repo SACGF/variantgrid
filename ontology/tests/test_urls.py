@@ -61,6 +61,9 @@ class Test(URLTestCase):
             ('hpo_autocomplete', self.hpo, {"q": str(self.hpo.index)}),
             ('hpo_autocomplete', self.hpo, {"q": f"HPO:{self.hpo.index}"}),
             ('omim_autocomplete', self.omim, {"q": str(self.omim.index)}),
+            # Digits anywhere in the id, bare or prefixed (HP:0001061)
+            ('hpo_autocomplete', self.hpo, {"q": "106"}),
+            ('hpo_autocomplete', self.hpo, {"q": "HP:106"}),
         ]
         self._test_autocomplete_urls(AUTOCOMPLETE_URLS, self.user, True)
         # The index of one term is not another term
