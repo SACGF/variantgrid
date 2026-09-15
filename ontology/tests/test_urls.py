@@ -19,12 +19,11 @@ class Test(URLTestCase):
 
         cls.user = User.objects.get_or_create(username='testuser')[0]
         ontology_import = OntologyImport.objects.get_or_create(import_source="fake", processed_date=timezone.now())[0]
-        index = 0
-        cls.hpo = OntologyTerm.objects.get_or_create(id="HPO:0000001", name="fake hpo term", from_import=ontology_import,
-                                                     index=index, ontology_service=OntologyService.HPO)[0]
-        index += 1
+        cls.hpo = OntologyTerm.objects.get_or_create(id="HP:0001061", name="fake hpo term", from_import=ontology_import,
+                                                     index=1061, ontology_service=OntologyService.HPO)[0]
         cls.omim = OntologyTerm.objects.get_or_create(id="OMIM:000001", name="fake omim term", from_import=ontology_import,
-                                                      index=index, ontology_service=OntologyService.OMIM)[0]
+                                                      index=1, ontology_service=OntologyService.OMIM)[0]
+        index = 1
 
         grch37 = GenomeBuild.get_name_or_alias("GRCh37")
         transcript_version = create_fake_transcript_version(grch37)
@@ -58,8 +57,14 @@ class Test(URLTestCase):
         AUTOCOMPLETE_URLS = [
             ('hpo_autocomplete', self.hpo, {"q": self.hpo.name}),
             ('omim_autocomplete', self.omim, {"q": self.omim.name}),
+            # Bare index and un-padded prefixed id both find the term
+            ('hpo_autocomplete', self.hpo, {"q": str(self.hpo.index)}),
+            ('hpo_autocomplete', self.hpo, {"q": f"HPO:{self.hpo.index}"}),
+            ('omim_autocomplete', self.omim, {"q": str(self.omim.index)}),
         ]
         self._test_autocomplete_urls(AUTOCOMPLETE_URLS, self.user, True)
+        # The index of one term is not another term
+        self._test_autocomplete_urls([('omim_autocomplete', self.omim, {"q": str(self.hpo.index)})], self.user, False)
 
 
 if __name__ == "__main__":
