@@ -26,6 +26,7 @@ urlpatterns = [
     path('cases/datatable/', DatabaseTableView.as_view(column_class=CasesColumns), name='cases_datatable'),
     path('pathology_test/datatable/', DatabaseTableView.as_view(column_class=PathologyTestsColumns), name='pathology_tests_datatable'),
     # Autocompletes
+    path('autocomplete/Case', views_autocomplete.CaseAutocompleteView.as_view(), name='case_autocomplete'),
     path('autocomplete/PathologyTest/v2', views_autocomplete.PathologyTestAutocompleteView.as_view(), name='pathology_test_autocomplete'),
     path('autocomplete/PathologyTestVersion', views_autocomplete.PathologyTestVersionAutocompleteView.as_view(), name='pathology_test_version_autocomplete'),
     path('api/view_pathology_test_version/<int:pk>', views_rest.PathologyTestVersionView.as_view(), name='api_view_pathology_test_version'),

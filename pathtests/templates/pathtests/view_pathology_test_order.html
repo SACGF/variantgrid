@@ -7,12 +7,10 @@
 
 {% block jsdocumentready %}
 function setCaseLink() {
-    console.log("set case link");
     var caseSelector = $("#id_case");
     caseSelector.after("<a class='cross-link' id='case-link'>View Case</a>");
     function mySetCaseLink() {
-        var pk = caseSelector.find(":selected").val();
-        setCrossLink($("#case-link"), Urls.view_case, pk);
+        setCrossLink($("#case-link"), Urls.view_case, caseSelector.val());
     }
     mySetCaseLink();
     caseSelector.change(mySetCaseLink);
