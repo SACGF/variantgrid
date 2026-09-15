@@ -7,6 +7,7 @@ from django.test.utils import CaptureQueriesContext
 from django.urls import resolve, reverse
 from django.utils.timezone import now
 from guardian.shortcuts import assign_perm
+from threadlocals.threadlocals import set_thread_variable
 
 from analysis.models import Analysis, VariantTag
 from annotation.models import (
@@ -58,6 +59,11 @@ class TaggedVariantGridTest(TestCase):
         # Initial group read permissions depend on deployment settings, so grant explicitly
         other_user_tag = cls._tag(cls.other_user_variant, cls.artefact, user=cls.other_user)
         assign_perm(VariantTag.get_read_perm(), cls.user, other_user_tag)
+
+    def setUp(self):
+        # UserSettings.get_for_user caches on the thread-local request, which a client request in an
+        # earlier test leaves behind - the sort order test would then miss its tag colours collection
+        set_thread_variable('request', None)
 
     @classmethod
     def _tag(cls, variant: Variant, tag: Tag, user: User = None) -> VariantTag:
