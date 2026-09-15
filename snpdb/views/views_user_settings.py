@@ -281,9 +281,13 @@ def view_custom_columns(request, custom_columns_collection_id):
     variant_grid_columns = {vgc.pk: vgc for vgc in
                             VariantGridColumn.objects.prefetch_related("composite_members__column")}
     VariantGridColumn.annotate_composite_membership(variant_grid_columns.values())
+    # Mandatory columns are never drawn in either list: html5sortable only lets a drop land anywhere
+    # in a list that has no items, so a hidden item would shrink an empty list's drop zone to nothing
+    mandatory = CustomColumnsCollection.MANDATORY_COLUMNS
     my_column_ids = list(ccc.customcolumn_set.order_by("sort_order").values_list("column_id", flat=True))
-    my_columns = [variant_grid_columns[column_id] for column_id in my_column_ids]
-    available_columns = [vgc for pk, vgc in variant_grid_columns.items() if pk not in set(my_column_ids)]
+    my_columns = [variant_grid_columns[column_id] for column_id in my_column_ids if column_id not in mandatory]
+    hidden_column_ids = set(my_column_ids) | set(mandatory)
+    available_columns = [vgc for pk, vgc in variant_grid_columns.items() if pk not in hidden_column_ids]
 
     has_write_permission = ccc.can_write(request.user)
     if not has_write_permission:
@@ -296,7 +300,7 @@ def view_custom_columns(request, custom_columns_collection_id):
         if name := request.POST.get("name"):
             ccc.name = name
             ccc.save()
-        elif my_columns_str := request.POST.get("columns"):
+        elif (my_columns_str := request.POST.get("columns")) is not None:
             def update_user_columns(id_list, active):
                 for i, col in enumerate(id_list):
                     column = variant_grid_columns[col]
@@ -305,7 +309,8 @@ def view_custom_columns(request, custom_columns_collection_id):
                 # Delete any not in id_list
                 CustomColumn.objects.filter(custom_columns_collection=ccc).exclude(column__in=id_list).delete()
 
-            my_columns_list = my_columns_str.split(',') if my_columns_str else []
+            posted = [c for c in my_columns_str.split(',') if c and c not in mandatory]
+            my_columns_list = list(mandatory) + posted
             active = 'my_columns' in request.POST
             update_user_columns(my_columns_list, active)
         return HttpResponse()  # Nobody ever looks at this

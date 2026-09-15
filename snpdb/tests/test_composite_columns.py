@@ -199,6 +199,29 @@ class CustomColumnsArrangePageTest(TestCase):
         self.assertIn('composite-member cursor-move" column_id="spliceai_max_ds"', content)
         self.assertIn("Show columns already inside a composite", content)
 
+    def test_mandatory_column_is_kept_out_of_both_lists(self):
+        """ A hidden item in "My Columns" stops html5sortable treating the list as empty, which shrinks
+            the drop zone to the header (#1859) """
+        client = Client()
+        client.force_login(self.user)
+        url = reverse("view_custom_columns", kwargs={"custom_columns_collection_id": self.ccc.pk})
+        content = client.get(url).content.decode()
+        self.assertNotIn('column_id="variant"', content)
+
+    def test_saving_columns_keeps_the_mandatory_column(self):
+        client = Client()
+        client.force_login(self.user)
+        url = reverse("view_custom_columns", kwargs={"custom_columns_collection_id": self.ccc.pk})
+        response = client.post(url, {"columns": "spliceai,conservation", "my_columns": "true"})
+        self.assertEqual(200, response.status_code)
+        saved = list(self.ccc.customcolumn_set.order_by("sort_order").values_list("column_id", flat=True))
+        self.assertEqual(["variant", "spliceai", "conservation"], saved)
+
+        # Dragging the last column out posts an empty list, which must still save
+        client.post(url, {"columns": "", "my_columns": "true"})
+        saved = list(self.ccc.customcolumn_set.values_list("column_id", flat=True))
+        self.assertEqual(["variant"], saved)
+
 
 class ConservationCellScalesTest(TestCase):
     """ The conservation cell colours each dot off ctx.extra.conservation - a member without a scale

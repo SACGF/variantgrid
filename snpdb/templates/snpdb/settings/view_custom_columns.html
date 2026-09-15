@@ -14,15 +14,22 @@
 	}
 
 	.sort_placeholder {height: 15px; border: red 3px solid;}
-	.list_placeholder { font-weight: bolder; }
 	.columns-list {
 		margin: 5px; float: left;
 		width: 40%;
 		height: 100%;
 		border: 1px solid black;
+		display: flex;
+		flex-direction: column;
 	}
+	.columns-list h2 {
+		margin: 10px;
+	}
+	/* The list is the drop zone, so it fills whatever the pane's items leave empty */
 	.columns-list ul {
-		height: 100%;
+		flex: 1 1 auto;
+		margin: 0;
+		min-height: 100px;
 		list-style: none;
 		user-select: none;
 	}
@@ -55,11 +62,6 @@
 	.column-name:after {
 	    content: ': ';
 	}
-
-    /* Don't allow people to move magic column! */
-    li#variant {
-        display: none;
-    }
 
 {% if not has_write_permission %}
 	.cursor-move {
@@ -207,8 +209,8 @@
 
 <div id="columns-widget">
 	<div id="my_columns" class="columns-list">
+		<h2>My Columns</h2>
 		<ul id="my_columns_sortable">
-			<li id="active_placeholder" class="list_placeholder"><h2>My Columns</h2></li>
 			{% for column in my_columns_list %}
 			<li class="{{ column.get_css_classes }} cursor-move" id="{{ column.pk }}" column_id="{{ column.pk }}">
 				<div class="column-name">{{ column.pk }}</div>
@@ -228,8 +230,8 @@
 	</div>
 	<div id="available_columns" class="columns-list">
 		<label id="show-members-label"><input type="checkbox" id="show-members-checkbox" /> Show columns already inside a composite</label>
+		<h2>Available Columns</h2>
 		<ul id="available_columns_sortable">
-			<li id="inactive_placeholder" class="list_placeholder"><h2>Available Columns</h2></li>
 			{% for column in available_columns_list %}
 			<li class="{{ column.get_css_classes }} cursor-move" id="{{ column.pk }}" column_id="{{ column.pk }}">
 				<div class="column-name">{{ column.pk }}</div>
