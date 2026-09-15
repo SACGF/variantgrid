@@ -1,5 +1,7 @@
 # Analysis Benchmarking Plan
 
+Status: draft
+
 Admin-only feature for capturing reload-time snapshots of an analysis, storing them with code/environment provenance, and auto-running them on a Celery Beat schedule so we can spot regressions and confirm tuning wins (e.g. `random_page_cost`, #1547 max_af gate, future #1551 sub-cohort caches) without ad-hoc `profile_analysis_nodes` runs.
 
 Motivating context: the `random_page_cost = 1.1` win that closed out #1546 was discovered manually with `profile_analysis_nodes --planner-diagnostic`. The same kind of regression in the other direction — say, a query plan that accidentally falls back to a sequential scan — would today only surface as a user complaint. This feature catches those before deploy by snapshotting periodically.

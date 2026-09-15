@@ -1,5 +1,7 @@
 # Plan: Store both raw and masked SpliceAI in one annotation version (#1579)
 
+Status: draft
+
 ## Background & decision
 
 SpliceAI ships two precomputed score sets: **raw** and **masked**. The masked files

@@ -1,5 +1,7 @@
 # Classification Explorer — evidence key and reclassification filters (#1395)
 
+Status: draft
+
 ## Goal
 
 Let a curator ask questions of the classification catalogue that today need a database session:

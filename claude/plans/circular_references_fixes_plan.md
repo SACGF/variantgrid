@@ -1,5 +1,7 @@
 # Circular Import Reduction Plan
 
+Status: draft
+
 How the import graph looks today, which cycles are worth breaking, and how to stop new ones
 appearing. Ordered so that each stage is independently shippable.
 

@@ -1,5 +1,7 @@
 # Issue #1619 — Analysis MergeNode optimisation
 
+Status: draft
+
 ## Goal
 
 When multiple arms that filter over the **same cohort** (same `CohortGenotypeCollection`, i.e. the same
