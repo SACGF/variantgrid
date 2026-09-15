@@ -532,6 +532,8 @@ VARIANT_TAGS_EXPORT_COLUMNS = {
     "tag__id": "Tag",
     "analysis__id": "Analysis ID",
     "analysis__name": "Analysis",
+    "sample__name": "Sample",
+    "patient_identity": "Patient",
     "user__username": "Username",
     "created": "Created",
     "variant__id": "Variant ID",

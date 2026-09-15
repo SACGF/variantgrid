@@ -1,3 +1,4 @@
+import csv
 import json
 
 from django.contrib.auth.models import User
@@ -21,6 +22,8 @@ from annotation.fake_annotation import create_fake_variants, get_fake_annotation
 from annotation.tests.test_data_fake_genes import create_fake_transcript_version, create_gata2_transcript_version
 from library.django_utils import FakeRequest
 from library.django_utils.django_partition import temporary_db_table
+from library.guardian_utils import assign_permission_to_user_and_groups
+from patients.models import Patient
 from snpdb.models import (
     Allele,
     AlleleOrigin,
@@ -33,6 +36,7 @@ from snpdb.models import (
     Variant,
     VariantAllele,
 )
+from snpdb.tests.utils.fake_cohort_data import create_fake_cohort
 from snpdb.tests.utils.tag_testing_utils import create_classify_queue_tag
 from variantopedia.grids import TaggedVariantGrid, VariantTagCountsColumns, VariantTagsColumns
 
@@ -452,3 +456,110 @@ class ResolvedVariantTagsTest(TestCase):
         self._set_show_resolved(True)
         counts = list(VariantTagCountsColumns(request).get_initial_queryset())
         self.assertEqual([c["tag"] for c in counts], [self.tag.pk])
+
+
+class VariantTagCaseColumnsTest(TestCase):
+    """ The tag grids say who a tagging is about, and link it only where the viewer may open it """
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.user = User.objects.get_or_create(username='tag_case_user')[0]
+        cls.other_user = User.objects.get_or_create(username='tag_case_other_user')[0]
+        cls.genome_build = GenomeBuild.get_name_or_alias("GRCh37")
+        get_fake_annotation_version(cls.genome_build)
+        create_fake_variants(cls.genome_build)
+        cls.tag = Tag.objects.create(pk="CaseColumns")
+
+        cls.my_sample = create_fake_cohort(cls.user, cls.genome_build).cohortsample_set.get(
+            sample__name="proband").sample
+        cls.their_sample = create_fake_cohort(cls.other_user, cls.genome_build).cohortsample_set.get(
+            sample__name="proband").sample
+
+        cls.my_patient = Patient.objects.create(patient_code="CASE-1")
+        assign_permission_to_user_and_groups(cls.user, cls.my_patient)
+        cls.my_sample.patient = cls.my_patient
+        cls.my_sample.save()
+
+        cls.mine_variant, cls.theirs_variant, cls.patient_only_variant = list(Variant.objects.order_by("pk")[:3])
+        cls.mine = cls._tag(cls.mine_variant, sample=cls.my_sample, patient=cls.my_patient)
+        cls.theirs = cls._tag(cls.theirs_variant, sample=cls.their_sample)
+        cls.patient_only = cls._tag(cls.patient_only_variant, patient=cls.my_patient)
+
+    @classmethod
+    def _tag(cls, variant: Variant, sample=None, patient=None) -> VariantTag:
+        allele, _ = VariantAllele.objects.get_or_create(
+            variant=variant, genome_build=cls.genome_build, origin=AlleleOrigin.IMPORTED_TO_DATABASE,
+            defaults={"allele": Allele.objects.create()})
+        return VariantTag.objects.create(variant=variant, allele=allele.allele, tag=cls.tag, sample=sample,
+                                         patient=patient, genome_build=cls.genome_build, user=cls.user)
+
+    def _rows_by_tag_id(self) -> dict[int, dict]:
+        self.client.force_login(self.user)
+        url = reverse('variant_tags_datatable', kwargs={"genome_build_name": self.genome_build.name})
+        response = self.client.get(url, {"tag": self.tag.pk})
+        self.assertEqual(response.status_code, 200)
+        return {row["id"]: row for row in response.json()["data"]}
+
+    def test_sample_the_viewer_can_open_is_linked(self):
+        row = self._rows_by_tag_id()[self.mine.pk]
+        self.assertEqual(row["sample"], {"text": self.my_sample.name,
+                                         "url": reverse("view_sample", kwargs={"sample_id": self.my_sample.pk})})
+        self.assertEqual(row["patient"], {"text": self.my_patient.display_identity,
+                                          "url": reverse("view_patient",
+                                                         kwargs={"patient_id": self.my_patient.pk})})
+
+    def test_sample_the_viewer_cannot_open_is_named_but_not_linked(self):
+        """ Seeing a tagging says nothing about permission on the sample it is about """
+        row = self._rows_by_tag_id()[self.theirs.pk]
+        self.assertEqual(row["sample"], {"text": self.their_sample.name})
+        self.assertIsNone(row["patient"])
+
+    def test_patient_level_tagging_has_no_sample(self):
+        row = self._rows_by_tag_id()[self.patient_only.pk]
+        self.assertIsNone(row["sample"])
+        self.assertEqual(row["patient"]["text"], self.my_patient.display_identity)
+
+    def test_detail_grid_carries_the_same_cells(self):
+        self.client.force_login(self.user)
+        url = reverse('variant_tag_detail_datatable',
+                      kwargs={"variant_id": self.mine_variant.pk, "tag": self.tag.pk})
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+
+        rows = response.json()["data"]
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["sample"]["text"], self.my_sample.name)
+        self.assertEqual(rows[0]["patient"]["text"], self.my_patient.display_identity)
+
+    def test_export_names_the_sample_and_patient(self):
+        self.client.force_login(self.user)
+        url = reverse('variant_tags_export', kwargs={"genome_build_name": self.genome_build.name})
+        response = self.client.get(url, {"tag": self.tag.pk})
+        self.assertEqual(response.status_code, 200)
+
+        lines = b"".join(response.streaming_content).decode().strip().splitlines()
+        rows = {row["Tag ID"]: row for row in csv.DictReader(lines)}
+
+        mine = rows[str(self.mine.pk)]
+        self.assertEqual((mine["Sample"], mine["Patient"]),
+                         (self.my_sample.name, self.my_patient.display_identity))
+        theirs = rows[str(self.theirs.pk)]
+        self.assertEqual((theirs["Sample"], theirs["Patient"]), (self.their_sample.name, ""))
+        patient_only = rows[str(self.patient_only.pk)]
+        self.assertEqual((patient_only["Sample"], patient_only["Patient"]),
+                         ("", self.my_patient.display_identity))
+
+    def test_link_permissions_cost_the_same_however_many_rows(self):
+        """ Resolved per page, not per row - a pair of Guardian lookups a row is the most expensive
+            thing a grid can do (@see DatatableConfig._writable_pks_for_page) """
+        self._rows_by_tag_id()  # Warm the caches the first request of a session fills
+        with CaptureQueriesContext(connection) as three_rows:
+            self.assertEqual(len(self._rows_by_tag_id()), 3)
+
+        for variant in (self.mine_variant, self.theirs_variant, self.patient_only_variant):
+            self._tag(variant, sample=self.their_sample, patient=self.my_patient)
+        with CaptureQueriesContext(connection) as six_rows:
+            self.assertEqual(len(self._rows_by_tag_id()), 6)
+
+        self.assertEqual(len(six_rows.captured_queries), len(three_rows.captured_queries))

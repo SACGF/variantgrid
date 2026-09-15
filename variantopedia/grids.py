@@ -31,9 +31,10 @@ from annotation.annotation_version_querysets import (
 from annotation.models import AnnotationVersion, VariantAnnotation
 from library.django_utils.django_queryset_sql_transformer import get_queryset_with_transformer_hook
 from library.utils import JsonDataType
+from patients.models import Patient
 from snpdb.grid_columns.custom_columns import variant_column_rich_column
 from snpdb.grids import AbstractVariantGrid, url_if_visible
-from snpdb.models import GenomeBuild, Tag, Variant, VariantWiki, VariantZygosityCountCollection
+from snpdb.models import GenomeBuild, Sample, Tag, Variant, VariantWiki, VariantZygosityCountCollection
 from snpdb.models.models_user_settings import UserGridConfig, UserSettings
 from snpdb.utils import get_tag_sort_order_by_tag
 from snpdb.variant_filters import get_all_variants_filters, get_variant_filter_q, is_selective
@@ -247,7 +248,65 @@ class NearbyVariantsGrid(AbstractVariantGrid):
         return rich_columns
 
 
-class VariantTagsColumns(DatatableConfig[VariantTag]):
+class VariantTagCaseColumnsMixin:
+    """ The Sample and Patient columns for a tagging-per-row grid - who the tagging is about.
+        @see VariantTagsColumns, VariantTagDetailColumns """
+
+    def __init__(self, request: HttpRequest):
+        super().__init__(request)
+        self._page_visible_pks: dict[str, set] = {}
+
+    def case_columns(self) -> list[RichColumn]:
+        return [
+            RichColumn("sample__name", name="sample", label="Sample", orderable=True,
+                       extra_columns=["sample__id"],
+                       renderer=self.render_sample, client_renderer="TableFormat.linkUrl"),
+            RichColumn("patient_identity", name="patient", label="Patient", orderable=True,
+                       extra_columns=["patient__id"],
+                       renderer=self.render_patient, client_renderer="TableFormat.linkUrl"),
+        ]
+
+    @staticmethod
+    def annotate_patient_identity(qs: QuerySet[VariantTag]) -> QuerySet[VariantTag]:
+        """ The Patient column sorts and exports on a values() key, so the identity the cell shows has
+            to be built in SQL - @see patients.models.Patient.display_identity_expression """
+        return qs.annotate(patient_identity=Patient.display_identity_expression("patient__"))
+
+    def pre_render(self, qs: QuerySet[VariantTag], rows: list[dict]):
+        super().pre_render(qs, rows)
+        self._page_visible_pks = {}
+
+    def render_sample(self, cell: CellData) -> JsonDataType:
+        return self._render_case_cell(cell, "sample__id", Sample, "view_sample", "sample_id")
+
+    def render_patient(self, cell: CellData) -> JsonDataType:
+        return self._render_case_cell(cell, "patient__id", Patient, "view_patient", "patient_id")
+
+    def _render_case_cell(self, cell: CellData, id_column: str, model, url_name: str,
+                          url_kwarg: str) -> JsonDataType:
+        pk = cell[id_column]
+        if pk is None:
+            return None
+        data = {"text": cell.value}
+        # Seeing the tagging doesn't imply being allowed to open what it is about, so name it either
+        # way but only link it where the viewer can view the object
+        if pk in self._visible_pks_for_page(id_column, model):
+            if url := url_if_visible(url_name, **{url_kwarg: pk}):
+                data["url"] = url
+        return data
+
+    def _visible_pks_for_page(self, id_column: str, model) -> set:
+        """ Which of the page's samples / patients this user may open - one query per column per page,
+            the way render_delete resolves write permissions (@see DatatableConfig._writable_pks_for_page) """
+        visible = self._page_visible_pks.get(id_column)
+        if visible is None:
+            pks = {pk for row in self._page_rows if (pk := row.get(id_column)) is not None}
+            visible = set(model.filter_for_user(self.user).filter(pk__in=pks).values_list("pk", flat=True))
+            self._page_visible_pks[id_column] = visible
+        return visible
+
+
+class VariantTagsColumns(VariantTagCaseColumnsMixin, DatatableConfig[VariantTag]):
     """ List VariantTags (Tag-centric) - @see variant_tags.html and base_related_analyses.html """
     GRID_NAME = VARIANT_TAGS_GRID_NAME
     # The initial queryset is every tag in the build - a DISTINCT over a dozen joins - and recordsTotal
@@ -273,6 +332,7 @@ class VariantTagsColumns(DatatableConfig[VariantTag]):
             RichColumn("analysis__name", name="analysis", label="Analysis", orderable=True,
                        extra_columns=["analysis__id"],
                        renderer=self.render_analysis, client_renderer="renderVariantTagAnalysis"),
+            *self.case_columns(),
             self.user_column(name="user", label="User"),
             RichColumn("created", label="Created", orderable=True, default_sort=SortOrder.DESC,
                        client_renderer="TableFormat.timestamp"),
@@ -318,7 +378,8 @@ class VariantTagsColumns(DatatableConfig[VariantTag]):
         qs = qs.annotate(build_variant_allele=FilteredRelation(
             "allele__variantallele",
             condition=Q(allele__variantallele__genome_build=self.genome_build)))
-        return self._annotate_gene_symbol(self._annotate_variant_string(qs))
+        qs = self._annotate_gene_symbol(self._annotate_variant_string(qs))
+        return self.annotate_patient_identity(qs)
 
     def _annotation_version_queryset(self) -> QuerySet[VariantTag]:
         """ Join VariantAnnotation through the build's partition rather than the parent table - every
@@ -514,7 +575,7 @@ class VariantTagCountsColumns(DatatableConfig[VariantTag]):
         return qs
 
 
-class VariantTagDetailColumns(DatatableConfig[VariantTag]):
+class VariantTagDetailColumns(VariantTagCaseColumnsMixin, DatatableConfig[VariantTag]):
     """ This is the detail expanded on variant tags page """
     def __init__(self, request: HttpRequest):
         super().__init__(request)
@@ -523,6 +584,7 @@ class VariantTagDetailColumns(DatatableConfig[VariantTag]):
             RichColumn('id', client_renderer='tagDetailRenderer'),
             RichColumn('id', name='can_write', visible=False, renderer=self.can_write),
             RichColumn('analysis', client_renderer='analysisLinkRenderer'),
+            *self.case_columns(),
             RichColumn('user__username', name='user', orderable=True),
             RichColumn('created', client_renderer='TableFormat.timestamp', orderable=True,
                        default_sort=SortOrder.DESC),
@@ -542,4 +604,4 @@ class VariantTagDetailColumns(DatatableConfig[VariantTag]):
 
         variant = Variant.objects.get(pk=variant_id)
         tag = Tag.objects.get(pk=tag_name)
-        return variant_tags_for_user(variant, self.user).filter(tag=tag)
+        return self.annotate_patient_identity(variant_tags_for_user(variant, self.user).filter(tag=tag))

@@ -14,8 +14,9 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
 from django.db import models
-from django.db.models import Q
+from django.db.models import Case, F, Q, TextField, Value, When
 from django.db.models.deletion import CASCADE, SET_NULL
+from django.db.models.functions import Concat
 from django.dispatch.dispatcher import receiver
 from django.urls.base import reverse
 from django.utils import timezone
@@ -324,6 +325,34 @@ class Patient(GuardianPermissionsMixin, HasPhenotypeDescriptionMixin, Externally
         if self.first_name or self.last_name:
             return self.name_last_name_first
         return str(self.code)
+
+    @staticmethod
+    def display_identity_expression(prefix: str = "") -> Case:
+        """ display_identity as SQL, so a grid can sort, filter and export on the identity its cells show.
+            Change it alongside the property above - the two rules have to give the same answer.
+            prefix: the lookup path to the patient, eg "patient__" from a model that has one """
+        def field(name: str) -> str:
+            return f"{prefix}{name}"
+
+        def present(name: str) -> Q:
+            """ Python treats a blank TextField as absent, so a NOT NULL test isn't enough """
+            return Q(**{f"{field(name)}__isnull": False}) & ~Q(**{field(name): ""})
+
+        has_first = present("first_name")
+        has_last = present("last_name")
+        return Case(
+            # A prefixed path can arrive at no patient at all - that is a blank cell, not "Patient:"
+            When(Q(**{f"{field('pk')}__isnull": True}), then=Value(None)),
+            When(present("patient_code"), then=F(field("patient_code"))),
+            When(Q(**{f"{field('external_pk')}__isnull": False}),
+                 then=Concat(field("external_pk__code"), Value(" ("), field("external_pk__external_type"),
+                             Value(")"), output_field=TextField())),
+            When(has_first & has_last, then=Concat(field("last_name"), Value(", "), field("first_name"),
+                                                   output_field=TextField())),
+            When(has_first, then=F(field("first_name"))),
+            When(has_last, then=F(field("last_name"))),
+            default=Concat(Value("Patient:"), field("pk"), output_field=TextField()),
+            output_field=TextField())
 
     def __str__(self):
         description = self.display_identity

@@ -405,3 +405,37 @@ class TestDeIdentifiedPatientName(TestCase):
         patient = Patient.objects.create(first_name="BOB")
         self.assertEqual(patient.name, "BOB")
         self.assertEqual(patient.name_last_name_first, "BOB")
+
+
+# ---------------------------------------------------------------------------
+# display_identity in SQL - what the grids sort and export on
+# ---------------------------------------------------------------------------
+
+class TestPatientDisplayIdentityExpression(TestCase):
+    """ A grid cell shows the property but sorts and exports on the expression - they have to agree """
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.emm = ExternalModelManager.objects.create(name="display_identity_manager")
+
+    def _assert_agrees_with_property(self, patient: Patient):
+        qs = Patient.objects.filter(pk=patient.pk).annotate(identity=Patient.display_identity_expression())
+        self.assertEqual(qs.values_list("identity", flat=True)[0], patient.display_identity)
+
+    def test_patient_code(self):
+        self._assert_agrees_with_property(Patient.objects.create(patient_code="DEID-201", last_name="SMITH"))
+
+    def test_external_code(self):
+        ext = ExternalPK.objects.create(code="EXT-201", external_type="t", external_manager=self.emm)
+        self._assert_agrees_with_property(Patient.objects.create(external_pk=ext, last_name="SMITH"))
+
+    def test_name_only(self):
+        self._assert_agrees_with_property(Patient.objects.create(first_name="Jane", last_name="SMITH"))
+
+    def test_no_code_and_no_name(self):
+        self._assert_agrees_with_property(Patient.objects.create())
+
+    def test_blank_is_not_a_value(self):
+        """ A cleared form field saves as "", which Python reads as absent and a NOT NULL test does not """
+        self._assert_agrees_with_property(Patient.objects.create(patient_code="", first_name="", last_name="SMITH"))
