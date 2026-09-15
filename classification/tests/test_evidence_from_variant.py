@@ -1,10 +1,26 @@
 from django.test import TestCase
 
-from annotation.models import AnnotationVersion, VariantAnnotationVersion
+from annotation.fake_annotation import get_fake_annotation_version
+from annotation.gene_level_annotation import annotate_gene_level_run
+from annotation.models import (
+    AnnotationRangeLock,
+    AnnotationRun,
+    AnnotationVersion,
+    VariantAnnotationPipelineType,
+    VariantAnnotationVersion,
+)
 from classification.autopopulate_evidence_keys.evidence_from_variant import (
     _get_gnomad_sv_overlap_note,
     _gnomad_sv_sourced_columns,
+    get_evidence_fields_for_variant,
 )
+from classification.enums import SpecialEKeys
+from classification.models import EvidenceKey
+from genes.models import HGNC, GeneCopyNumberEventKind, GeneSymbol, HGNCImport
+from genes.models_enums import HGNCStatus
+from genes.tests.gene_fusion_test_utils import create_gene_fusion
+from genes.tests.gene_level_test_utils import create_gene_copy_number_event
+from snpdb.models import GenomeBuild
 
 
 class GnomADSVOverlapNoteTest(TestCase):
@@ -42,3 +58,53 @@ class GnomADSVOverlapNoteTest(TestCase):
         self.assertIn("gnomad_af", sv_sourced_columns)
         self.assertIn("gnomad_popmax_af", sv_sourced_columns)
         self.assertNotIn("gnomad_sv_overlap_af", sv_sourced_columns)
+
+
+class GeneLevelGeneSymbolTest(TestCase):
+    """ A gene-level variant sits on no transcript, so gene_symbol comes off its resolved identity -
+        the CNV caller's MYCL1 is MYCL """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.genome_build = GenomeBuild.get_name_or_alias("GRCh38")
+        cls.annotation_version = get_fake_annotation_version(cls.genome_build)
+
+        hgnc_import = HGNCImport.objects.create()
+        for pk, symbol in [(1014, "BCR"), (76, "ABL1")]:
+            GeneSymbol.objects.get_or_create(symbol=symbol)
+            HGNC.objects.create(pk=pk, gene_symbol_id=symbol, hgnc_import=hgnc_import,
+                                status=HGNCStatus.APPROVED, approved_name=f"{symbol} approved name")
+        # MYCL1 is what the panel's CNV VCF writes; HGNC renamed it MYCL
+        GeneSymbol.objects.get_or_create(symbol="MYCL")
+        HGNC.objects.create(pk=7553, gene_symbol_id="MYCL", hgnc_import=hgnc_import,
+                            status=HGNCStatus.APPROVED, approved_name="MYCL proto-oncogene",
+                            previous_symbols="MYCL1")
+
+        cls.copy_number_variant = create_gene_copy_number_event(
+            "MYCL1", GeneCopyNumberEventKind.GAIN).variant
+        cls.fusion_variant = create_gene_fusion("BCR", "ABL1").variant
+        cls._annotate_gene_level()
+
+    @classmethod
+    def _annotate_gene_level(cls):
+        """ Run the GENE_LEVEL pipeline over them, so autopopulate sees what it sees in production """
+        vav = cls.annotation_version.variant_annotation_version
+        variants = sorted([cls.copy_number_variant, cls.fusion_variant], key=lambda v: v.pk)
+        range_lock = AnnotationRangeLock.objects.create(version=vav, min_variant=variants[0],
+                                                       max_variant=variants[-1], count=len(variants))
+        annotate_gene_level_run(AnnotationRun.objects.create(
+            annotation_range_lock=range_lock,
+            pipeline_type=VariantAnnotationPipelineType.GENE_LEVEL))
+
+    def _autopopulated_gene_symbol(self, variant) -> str:
+        evidence_keys_list = list(EvidenceKey.objects.all().select_related("variantgrid_column"))
+        data = get_evidence_fields_for_variant(self.genome_build, variant, None, None,
+                                               evidence_keys_list, self.annotation_version)
+        return EvidenceKey.get_value(data.data.get(SpecialEKeys.GENE_SYMBOL))
+
+    def test_gain_autopopulates_the_approved_symbol(self):
+        self.assertEqual("MYCL", self._autopopulated_gene_symbol(self.copy_number_variant))
+
+    def test_fusion_autopopulates_the_anchor(self):
+        """ The 5' partner - what the Variant is filed under and what the report sorts on """
+        self.assertEqual("BCR", self._autopopulated_gene_symbol(self.fusion_variant))

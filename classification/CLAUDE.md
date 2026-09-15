@@ -129,6 +129,10 @@ Gotchas:
   absolute count (VCF `CN`) and `fold_change` its ratio against the normal (VCF `SM` / `FC`). Both are
   autopopulated from the sample genotype, routed on `VCF.copy_number_field` by
   library/genomics/vcf_enums.py:VCFConstant.COPY_NUMBER_FIELD_IS_RATIO, so a record may hold either or both.
+- A gene-level variant sits on no transcript, so `gene_symbol` is autopopulated from the event's GeneLevelId (a fusion's
+  anchor first), which already holds the approved symbol the caller's MYCL1 resolved to
+  (`autopopulate_evidence_keys/evidence_from_variant.py:get_evidence_fields_from_gene_level_event`) - the transcript path
+  fills that key for everything else.
 - A `case_field` can carry `prefill_key`: the build form starts that field from the named evidence key on the case's
   first classification that has one (SA Path's clinical indication), and its `default` otherwise.
 - report/__init__.py stays empty on purpose: models/classification_report_models.py imports report/template_validation.py

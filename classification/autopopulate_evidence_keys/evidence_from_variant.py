@@ -26,7 +26,7 @@ from annotation.vcf_files.bulk_vep_vcf_annotation_inserter import VEP_SEPARATOR
 from classification.enums import SpecialEKeys, SubmissionSource
 from classification.models.evidence_key import EvidenceKey, EvidenceKeyMap
 from genes.hgvs import HGVSMatcher
-from genes.models import GnomADGeneConstraint, TranscriptVersion
+from genes.models import GeneCopyNumberEvent, GeneFusion, GnomADGeneConstraint, TranscriptVersion
 from genes.models_enums import AnnotationConsortium
 from library.django_utils import get_choices_formatter
 from library.genomics.vcf_enums import VariantClass
@@ -259,6 +259,9 @@ def get_evidence_fields_for_variant(genome_build: GenomeBuild, variant: Variant,
         if not obj.get("value"):
             obj["value"] = hgvs_matcher.variant_to_g_hgvs(variant)
 
+        if gene_level_data := get_evidence_fields_from_gene_level_event(variant):
+            data.update(gene_level_data)
+
     if refseq_transcript_accession or ensembl_transcript_accession:
         transcript_values = {"refseq_transcript_accession": refseq_transcript_accession,
                              "ensembl_transcript_accession": ensembl_transcript_accession}
@@ -282,6 +285,26 @@ def get_evidence_fields_for_variant(genome_build: GenomeBuild, variant: Variant,
     except:
         pass
 
+    return data
+
+
+def get_evidence_fields_from_gene_level_event(variant: Variant) -> Optional[AutopopulateData]:
+    """ A gene-level event sits on no transcript, so there is no gene version to take a symbol off.
+        Its identity carries the approved one - the caller's MYCL1 was resolved to MYCL before the
+        Variant existed (@see genes.gene_level_resolver) - so the record names the same gene as the
+        SNV rows beside it. A fusion's first gene is its anchor, matching what the representative
+        annotation and the report print. @see snpdb.gene_level_variants """
+
+    if not variant.is_gene_level:
+        return None
+
+    event = GeneFusion.objects.filter(variant=variant).first() or \
+        GeneCopyNumberEvent.objects.filter(variant=variant).first()
+    if event is None:
+        return None
+
+    data = AutopopulateData("gene-level event")
+    data[SpecialEKeys.GENE_SYMBOL] = event.gene_level_ids[0].symbol_str
     return data
 
 
