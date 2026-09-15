@@ -114,8 +114,13 @@ Gotchas:
   kind keeps it.
 - html2docx has no head: it prints the contents of `<style>` and `<script>` as the Word file's first paragraph, so
   report/renderers.py:render_docx strips them. A template's print CSS is design, not report content.
-- `kind_groups` always carries all three kinds, empty variants and all (the way the tiers are always printed), so a
+- `kind_groups` always carries all four kinds, empty variants and all (the way the tiers are always printed), so a
   template can say "Gene Fusions - None detected". A Results Summary that skips a kind reads as though it wasn't looked for.
+  The legacy TSO 500 report is the one exception, omitting Splicing Variants entirely when empty - the template decides.
+- What makes a classification a splicing variant is the VCF its sample came off, not anything on the record: a
+  SpliceGirl call imports as an ordinary `<DEL>` variant with coordinates and a c.HGVS
+  (report/case_report_context.py:SPLICE_CALLER_SOURCE_PATTERN). The printed name of the event ("MET exon 14
+  skipping") is the `splice_label` evidence key, which the scientist types - nothing in the call carries it.
 - An amplification carries two magnitudes and they are different quantities: `copy_number` is the caller's
   absolute count (VCF `CN`) and `fold_change` its ratio against the normal (VCF `SM` / `FC`). Both are
   autopopulated from the sample genotype, routed on `VCF.copy_number_field` by

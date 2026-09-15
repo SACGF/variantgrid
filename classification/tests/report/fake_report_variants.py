@@ -40,12 +40,18 @@ def fake_gene_level_variant(alt: str, gene_symbols: Optional[list[str]] = None):
     return SimpleNamespace(is_gene_level=True, alt=SimpleNamespace(seq=alt), genefusion=gene_fusion)
 
 
+def fake_sample(vcf_source: str, name: str = "fake sample"):
+    """ A sample carrying its VCF's source header - what says which caller made the call """
+    return SimpleNamespace(pk=1, name=name, vcf=SimpleNamespace(source=vcf_source))
+
+
 def fake_report_variant(gene_symbol: str, tier: Optional[str] = None,
                         amp_levels: Optional[list[str]] = None, vaf: Optional[float] = None,
                         copy_number: Optional[int] = None, fold_change: Optional[float] = None,
                         c_hgvs: Optional[str] = None,
-                        reported: bool = True, variant=None, pk: int = 1,
+                        reported: bool = True, variant=None, sample=None, pk: int = 1,
                         modified: Optional[datetime] = None,
+                        splice_label: Optional[str] = None,
                         gene_summary: Optional[str] = None) -> ReportVariant:
     values = {SpecialEKeys.GENE_SYMBOL: gene_symbol}
     if tier:
@@ -58,6 +64,8 @@ def fake_report_variant(gene_symbol: str, tier: Optional[str] = None,
         values[SpecialEKeys.COPY_NUMBER] = copy_number
     if fold_change is not None:
         values[SpecialEKeys.FOLD_CHANGE] = fold_change
+    if splice_label:
+        values[SpecialEKeys.SPLICE_LABEL] = splice_label
 
     evidence = {"gene_symbol": {"value": gene_symbol, "note": None, "formatted": gene_symbol,
                                 "label": "Gene"},
@@ -67,5 +75,5 @@ def fake_report_variant(gene_symbol: str, tier: Optional[str] = None,
                               "label": "Gene summary"},
                 "somatic_summary_interpretation": {"value": f"{gene_symbol} narrative.", "note": None,
                                                    "formatted": "", "label": "Interpretation"}}
-    record = FakeModification(pk=pk, values=values, variant=variant, modified=modified)
+    record = FakeModification(pk=pk, values=values, variant=variant, sample=sample, modified=modified)
     return ReportVariant.build(record, user=None, reported=reported, evidence=evidence)

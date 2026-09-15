@@ -32,6 +32,7 @@ def _fixture_variant(gene_symbol: str, reported: bool = True) -> dict:
         "gene_symbol": gene_symbol,
         "gene_symbols": [gene_symbol],
         "gene_label": gene_symbol,
+        "splice_label": None,
         "tier": "tier_1",
         "amp_tier": "IA",
         "tier_rank": 10,
@@ -85,7 +86,8 @@ def _build_fixture_context() -> dict:
         # Every kind, so a template's "none detected" branch is rendered before it can be saved
         "kind_groups": [{"kind": "small_variant", "label": "Somatic Variants", "variants": [reported]},
                         {"kind": "copy_number", "label": "Copy Number Changes", "variants": []},
-                        {"kind": "fusion", "label": "Gene Fusions", "variants": []}],
+                        {"kind": "fusion", "label": "Gene Fusions", "variants": []},
+                        {"kind": "splice", "label": "Splicing Variants", "variants": []}],
         "tier_groups": [{"tier": "tier_1", "label": "Tier I - Variants of Strong Clinical Significance",
                          "genes": [gene_groups[0]], "unreported_count": 0},
                         {"tier": "tier_2", "label": "Tier II - Variants of Potential Clinical Significance",

@@ -255,8 +255,10 @@ class ClassifyReportCase:
         """ Latest published classification of each of the case's samples """
         qs = ClassificationModification.latest_for_user(self.user, published=True,
                                                         classification__sample__in=self.samples)
-        # Every caller reads the record off the modification - the tab's rows, the report's bucket
-        return qs.select_related("classification", "classification__sample", "classification__lab") \
+        # Every caller reads the record off the modification - the tab's rows, the report's bucket.
+        # The VCF comes along because the report reads its source to tell a splice call from a variant
+        return qs.select_related("classification", "classification__sample", "classification__sample__vcf",
+                                 "classification__lab") \
             .order_by("classification__pk")
 
     def _case_classifications(self) -> QuerySet[Classification]:

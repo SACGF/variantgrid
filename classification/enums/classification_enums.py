@@ -131,6 +131,7 @@ class SpecialEKeys:
     COPY_NUMBER = 'copy_number'
     FOLD_CHANGE = 'fold_change'
     H_SUMMARY = 'h_summary'  # the gene level paragraph a case report prints after a gene's variants
+    SPLICE_LABEL = 'splice_label'  # what the report calls a splice event, eg "MET exon 14 skipping"
 
     # POPULATED
     # Note: Some fields not here are populated - those with variantgrid_column

@@ -43,21 +43,24 @@ class ReportVariantKind:
     SMALL_VARIANT = 'small_variant'
     COPY_NUMBER = 'copy_number'
     FUSION = 'fusion'
+    SPLICE = 'splice'
 
-    ORDER = [SMALL_VARIANT, COPY_NUMBER, FUSION]
+    ORDER = [SMALL_VARIANT, COPY_NUMBER, FUSION, SPLICE]
     LABELS = {
         SMALL_VARIANT: "Somatic Variants",
         COPY_NUMBER: "Copy Number Changes",
         FUSION: "Gene Fusions",
+        SPLICE: "Splicing Variants",
     }
 
 
 class Alteration:
-    """ The short form the JSON record uses for what changed - the three values the TSO 500 reports
+    """ The short form the JSON record uses for what changed - the four values the TSO 500 reports
         have ever carried, so a downstream consumer never meets one it has not seen """
     VARIANT = 'var'
     AMPLIFICATION = 'amp'
     FUSION = 'fusion'
+    SPLICE = 'spl'
 
 
 # amp_tier, ranked. The bare tiers are the fallbacks §Tier gives a classification whose AMP levels
@@ -165,9 +168,27 @@ def amp_tier(record: ClassificationModification) -> tuple[str, list[str]]:
     return short, []
 
 
+# The RNA splice caller of the TSO 500 pipeline (snpdb/migrations/0204_vcf_source_settings_splicegirl.py).
+# Its calls import as ordinary <DEL> variants with coordinates and a c.HGVS, so the file they came off
+# is what says the event is a splicing one
+SPLICE_CALLER_SOURCE_PATTERN = re.compile(r"^SpliceGirl")
+
+
+def _is_splice_call(record: ClassificationModification) -> bool:
+    """ Everything in a SpliceGirl VCF is a splice event - the pipeline runs it for nothing else. A
+        classification with no sample link has nothing to go on, and reads as a small variant """
+    if sample := record.classification.sample:
+        return bool(SPLICE_CALLER_SOURCE_PATTERN.match(sample.vcf.source or ""))
+    return False
+
+
 def _kind_and_alteration(record: ClassificationModification) -> tuple[str, str]:
-    """ A gene-level alt says what the event is outright; otherwise the variant_class evidence key
-        is what a classification with no resolved variant has to go on """
+    """ The caller the classification came off says a splice call outright, as a gene-level alt does
+        for a fusion or a copy number call; otherwise the variant_class evidence key is what a
+        classification with no resolved variant has to go on """
+    if _is_splice_call(record):
+        return ReportVariantKind.SPLICE, Alteration.SPLICE
+
     variant = record.classification.variant
     if variant is not None and variant.is_gene_level:
         if parsed := GeneLevelSymbolicAlt.parse(variant.alt.seq):
@@ -220,6 +241,7 @@ class ReportVariant:
     alteration: str
     gene_symbol: str  # sort key; a fusion uses the 5' partner
     gene_symbols: list[str]
+    splice_label: Optional[str]  # what the lab calls a splice event, eg "MET exon 14 skipping"
     tier: Optional[str]  # the raw somatic:clinical_significance value
     amp_tier: str
     tier_rank: int
@@ -246,6 +268,7 @@ class ReportVariant:
             alteration=alteration,
             gene_symbol=gene_symbols[0] if gene_symbols else "",
             gene_symbols=gene_symbols,
+            splice_label=record.get(SpecialEKeys.SPLICE_LABEL),
             tier=tier,
             amp_tier=tier_label,
             tier_rank=AMP_TIER_RANK.get(tier_label, UNTIERED_RANK),
@@ -542,6 +565,7 @@ def _variant_as_dict(variant: ReportVariant) -> dict:
         "gene_symbol": variant.gene_symbol,
         "gene_symbols": variant.gene_symbols,
         "gene_label": variant.gene_label,
+        "splice_label": variant.splice_label,
         "tier": variant.tier,
         "amp_tier": variant.amp_tier,
         "tier_rank": variant.tier_rank,
