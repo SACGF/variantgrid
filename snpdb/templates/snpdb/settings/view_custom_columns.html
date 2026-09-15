@@ -25,10 +25,12 @@
 	.columns-list h2 {
 		margin: 10px;
 	}
-	/* The list is the drop zone, so it fills whatever the pane's items leave empty */
+	/* The list is the drop zone: it fills whatever the pane's items leave empty, and has no padding
+	   of its own so that hovering the list itself (not an item) always means "below the last item" */
 	.columns-list ul {
 		flex: 1 1 auto;
 		margin: 0;
+		padding: 0 10px;
 		min-height: 100px;
 		list-style: none;
 		user-select: none;
@@ -43,7 +45,6 @@
 	{
 		margin: 0;
 		padding: 5px;
-		margin-right: 10px;
 		border: 1px solid #eee;
 	}
 
@@ -82,6 +83,23 @@
 				window.location = Urls.view_custom_columns(data["pk"]);
 			},
 		});
+	}
+
+	// html5sortable positions its placeholder when the pointer is over an item, or anywhere in a list
+	// with no items. Hovering the empty part of a list that has items does nothing, so a reader
+	// scrolled down beside a short "My Columns" had nowhere to drop - treat that as "after the last item"
+	function dropAnywhereInList(list, placeholder) {
+	    list.addEventListener("dragover", function(e) {
+	        const dragging = document.querySelector("li.user-column[aria-grabbed='true']");
+	        if (e.target !== list || !dragging) {
+	            return;
+	        }
+	        if (list.lastElementChild !== placeholder) {
+	            $(".sort_placeholder").remove();
+	            list.appendChild(placeholder);
+	        }
+	        e.preventDefault();
+	    });
 	}
 
 	// Library serializers split ids on underscore - ours contain them, so build the list by hand
@@ -124,11 +142,18 @@
 
 		// acceptFrom is the whole answer to "can this list take that item", so both lists need
 		// to be named - listing only the other one stops a list accepting its own items
-		sortable("#my_columns_sortable, #available_columns_sortable", {
-		    items: "li.user-column",
-		    placeholderClass: "sort_placeholder",
-		    acceptFrom: '#my_columns_sortable, #available_columns_sortable',
-		});
+		const listSelectors = ["#my_columns_sortable", "#available_columns_sortable"];
+		for (const listSelector of listSelectors) {
+		    // Our own placeholder element, so dropAnywhereInList can position it
+		    const placeholder = document.createElement("li");
+		    sortable(listSelector, {
+		        items: "li.user-column",
+		        placeholder: placeholder,
+		        placeholderClass: "sort_placeholder",
+		        acceptFrom: listSelectors.join(", "),
+		    });
+		    dropAnywhereInList(document.querySelector(listSelector), placeholder);
+		}
 
 		// html5sortable fires sortupdate on the list the item was dropped into
 		$("#my_columns_sortable, #available_columns_sortable").on("sortupdate", function() {
