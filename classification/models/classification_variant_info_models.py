@@ -31,9 +31,9 @@ from django.urls import reverse
 from django.utils.timezone import now
 from model_utils.models import TimeStampedModel
 
-from genes.gene_copy_number import resolve_gene_copy_number_string
-from genes.gene_fusions import resolve_fusion_string
-from genes.gene_splice import SpliceEventVariant, get_splice_event_variant, resolve_splice_string
+from genes.gene_level_resolver import GeneLevelResolution
+from genes.gene_level_strings import looks_gene_level, resolve_gene_level_string
+from genes.gene_splice import SpliceEventVariant, get_splice_event_variant
 from genes.hgvs import (HGVSComponents, HGVSDiff, HGVSConverterType, HGVSDisplay, HGVSMatcher,
                        HGVSNoRepresentationException, hgvs_diff_description)
 from genes.models import (
@@ -50,7 +50,6 @@ from library.log_utils import report_exc_info
 from library.utils import IconWithTooltip, md5sum_str, pretty_label
 from library.utils.django_utils import get_cached_project_git_hash
 from snpdb.models import Allele, GenomeBuild, GenomeBuildPatchVersion, Variant, VariantCoordinate
-from snpdb.models.models_variant import HGVS_UNCLEANED_PATTERN
 
 """
 Now we have
@@ -314,6 +313,7 @@ _VALIDATION_TO_SEVERITY: [str, ALLELE_INFO_VALIDATION_SEVERITY] = {
     'missing_37': "W",
     'missing_38': "W",
     'cant_resolve_to_variant_coordinate': "E",
+    'gene_level_unresolved': "E",
     'hgvs_issue': "E"  # deprecated as too generic
 }
 
@@ -333,6 +333,7 @@ class ImportedAlleleValidationTagsBuilds(TypedDict, total=False):
 class ImportedAlleleValidationTagsGeneral(TypedDict, total=False):
     transcript_type_not_supported: ALLELE_INFO_VALIDATION_SEVERITY
     cant_resolve_to_variant_coordinate: ALLELE_INFO_VALIDATION_SEVERITY
+    gene_level_unresolved: ALLELE_INFO_VALIDATION_SEVERITY
     hgvs_issue: ALLELE_INFO_VALIDATION_SEVERITY
 
 
@@ -679,8 +680,12 @@ class ImportedAlleleInfo(TimeStampedModel):
         if self.imported_as_c_hgvs and not ImportedAlleleInfo.is_supported_transcript(self.get_transcript):
             general["transcript_type_not_supported"] = _VALIDATION_TO_SEVERITY.get("transcript_type_not_supported", "E")
         if not self.variant_coordinate:
-            # we couldn't derive a variant coordinate, should be the end of it
-            general["cant_resolve_to_variant_coordinate"] = _VALIDATION_TO_SEVERITY.get("cant_resolve_to_variant_coordinate", "E")
+            # we couldn't derive a variant coordinate, should be the end of it - a gene-level value
+            # has no coordinate to derive, so it says which stage refused it instead
+            if self.is_gene_level:
+                general["gene_level_unresolved"] = _VALIDATION_TO_SEVERITY.get("gene_level_unresolved", "E")
+            else:
+                general["cant_resolve_to_variant_coordinate"] = _VALIDATION_TO_SEVERITY.get("cant_resolve_to_variant_coordinate", "E")
         if general:
             validation_dict["general"] = general
 
@@ -765,11 +770,11 @@ class ImportedAlleleInfo(TimeStampedModel):
     def is_gene_level(self) -> bool:
         """ The submitted value named genes ('BCR::ABL1', 'EGFR amplification', 'AR V7') rather than an HGVS
             (@see resolve_gene_level). Read off the resolved coordinate so it holds before a variant is
-            matched - and off the imported value itself for a record that failed before it resolved one,
-            which is the state an import that died leaves behind """
+            matched - and off the shape of the imported value itself for a record with no coordinate,
+            which is both an import that died and one whose gene turned out to be a typo """
         if vc := self.variant_coordinate_obj:
             return vc.is_gene_level
-        return self.resolved_gene_level() is not None
+        return looks_gene_level(self.imported_hgvs)
 
     @property
     def imported_as_c_hgvs(self) -> bool:
@@ -903,18 +908,12 @@ class ImportedAlleleInfo(TimeStampedModel):
                                            message=message, hgvs_converter_version=hgvs_converter_version,
                                            hgvs_converter_data_version=data_version)
 
-    def resolved_gene_level(self):
-        """ The gene-level identity the imported value names, or None. Writes nothing, so the callers that
-            have to know whether a record is gene-level before it has a coordinate can ask as well.
-            The HGVS pattern check short circuits anything shaped like an HGVS before any resolver runs. """
-        imported = self.imported_hgvs
-        if not imported or HGVS_UNCLEANED_PATTERN.search(imported):
-            return None
-
-        for resolve in (resolve_fusion_string, resolve_gene_copy_number_string, resolve_splice_string):
-            if resolved := resolve(imported):
-                return resolved
-        return None
+    def resolved_gene_level(self) -> GeneLevelResolution:
+        """ The gene-level identity the imported value names, or the reason it was refused. Writes
+            nothing, so the callers that have to know what a record resolves to before it has a
+            coordinate can ask as well. A junction named by its breakpoints is canonicalised under
+            the imported build, which is part of what it names (@see genes.gene_splice). """
+        return resolve_gene_level_string(self.imported_hgvs, self.imported_genome_build)
 
     def resolve_gene_level(self) -> bool:
         """ A lab submitting 'BCR::ABL1', 'EGFR amplification' or 'AR V7' names genes, not a coordinate - so
@@ -923,11 +922,20 @@ class ImportedAlleleInfo(TimeStampedModel):
             gene-level event enters the database exactly the way a small variant submitted the same
             way does.
 
+            A value that names genes and does not validate - a typo'd fusion partner - fails here
+            with the reason as its message, rather than going on to be reported as a bad HGVS.
+
             Returns whether this was a gene-level event, so the caller can skip HGVS resolution. """
 
-        if resolved := self.resolved_gene_level():
+        resolution = self.resolved_gene_level()
+        if resolved := resolution.resolved:
             self.variant_coordinate = str(resolved.variant_coordinate)
             self.message = f"Matched {resolved.canonical_str}"
+            return True
+        if resolution.reason:
+            self.variant_coordinate = None
+            self.message = resolution.reason
+            self.status = ImportedAlleleInfoStatus.FAILED
             return True
         return False
 

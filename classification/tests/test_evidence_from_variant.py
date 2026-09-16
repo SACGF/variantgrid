@@ -92,7 +92,7 @@ class GeneLevelGeneSymbolTest(TestCase):
             "MYCL1", GeneCopyNumberEventKind.GAIN).variant
         cls.fusion_variant = create_gene_fusion("BCR", "ABL1").variant
         cls.splice_variant = create_splice_event_variant("AR", "V7").variant
-        cls.unnamed_splice_variant = create_splice_event_variant("AR", "X_1_2").variant
+        cls.unnamed_splice_variant = create_splice_event_variant("AR", "grch37_x_1_2").variant
         cls._annotate_gene_level()
 
     @classmethod
@@ -129,6 +129,9 @@ class GeneLevelGeneSymbolTest(TestCase):
         self.assertEqual("AR-V7 splice variant",
                          self._autopopulated(self.splice_variant, SpecialEKeys.SPLICE_LABEL))
 
-    def test_a_junction_we_have_no_name_for_is_left_for_the_scientist(self):
-        self.assertIsNone(self._autopopulated(self.unnamed_splice_variant, SpecialEKeys.SPLICE_LABEL))
+    def test_a_junction_we_have_no_name_for_is_printed_as_its_breakpoints(self):
+        """ Which reads as raw coordinates on a report, and is the prompt for the scientist to
+            replace it with a name """
+        self.assertEqual("AR GRCh37 X:1-2",
+                         self._autopopulated(self.unnamed_splice_variant, SpecialEKeys.SPLICE_LABEL))
         self.assertTrue(SpliceEvent.objects.exists(), "the seeded junctions are still there")

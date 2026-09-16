@@ -308,10 +308,9 @@ def get_evidence_fields_from_gene_level_event(variant: Variant) -> Optional[Auto
     data = AutopopulateData("gene-level event")
     data[SpecialEKeys.GENE_SYMBOL] = event.gene_level_ids[0].symbol_str
     if isinstance(event, SpliceEventVariant):
-        # What the report calls the junction, where we have a name for it. A junction labelled with
-        # its own coordinates is left for the scientist to name (@see genes.gene_splice)
-        if splice_event := event.splice_event:
-            data[SpecialEKeys.SPLICE_LABEL] = splice_event.display
+        # What the report calls the junction - the panel's own wording where a SpliceEvent names it,
+        # else the label written out (@see genes.gene_splice.display_splice_label)
+        data[SpecialEKeys.SPLICE_LABEL] = event.display
     return data
 
 

@@ -905,8 +905,12 @@ def search_variant_gene_copy_number(search_input: SearchInputInstance):
 )
 def search_variant_splice_event(search_input: SearchInputInstance):
     """ Lookup only - searching must never mint a splice identity. A label shape not in
-        SPLICE_STRING_PATTERN never reaches this, so widen the pattern when one is seeded """
-    events = find_splice_events_for_string(search_input.search_string)
+        SPLICE_STRING_PATTERN never reaches this, so widen the pattern when a new one is accepted.
+        A junction named by its breakpoints is a different junction in each build, so each build the
+        search covers is asked for its own label """
+    events = []
+    for genome_build in search_input.genome_builds:
+        events.extend(find_splice_events_for_string(search_input.search_string, genome_build=genome_build))
     yield from _yield_gene_level_results(search_input, events, "Splice event")
 
 

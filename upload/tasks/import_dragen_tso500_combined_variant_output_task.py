@@ -130,7 +130,7 @@ def _write_gene_level_vcf(filename: str, events: dict, sample_name: str, source:
         info=[
             VCFInfoHeader(id="END", type="Integer", description="Stop position of the interval"),
             VCFInfoHeader(id=SPLICE_INFO, type="String",
-                          description="Splice event as gene and label, eg 'AR V7'"),
+                          description="Splice event as gene and label, eg 'AR-V7'"),
             VCFInfoHeader(id=SPLICE_OBSERVATION_INFO, type="String",
                           description="JSON of the caller row this splice event was called from"),
         ],

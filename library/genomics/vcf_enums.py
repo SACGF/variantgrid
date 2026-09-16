@@ -54,7 +54,7 @@ class GeneLevelSymbolicAlt(models.TextChoices):
         the threshold that makes a gain an amplification is the lab's, not ours.
 
         SPLICE repeats the gene too, and carries the name of the junction as a third segment
-        (<SPLICE:HGNC:644:V7>), so two events in one gene are two variants. @see genes.gene_splice
+        (<SPLICE:HGNC:644:V_7>), so two events in one gene are two variants. @see genes.gene_splice
         for what the labels are and where the coordinates go. """
 
     FUSION = "FUSION", "Gene fusion"
@@ -69,26 +69,33 @@ class GeneLevelSymbolicAlt(models.TextChoices):
     @staticmethod
     def format(kind: str, namespace: Optional[str], gene_id: Optional[int],
                label: Optional[str] = None) -> str:
+        """ The label is upper-cased: the alt is a Sequence, and everything that inserts a Sequence
+            upper-cases it first, so this is the form the Variant is stored under. Labels are
+            canonicalised lower-case, so parse lowers it back - @see genes.gene_splice """
         if gene_id is None:
             return f"<{kind}:{GeneLevelSymbolicAlt.UNKNOWN_PARTNER}>"
         if label is not None:
-            return f"<{kind}:{namespace}:{gene_id}:{label}>"
+            return f"<{kind}:{namespace}:{gene_id}:{label.upper()}>"
         return f"<{kind}:{namespace}:{gene_id}>"
 
     @staticmethod
     def parse(alt) -> Optional[tuple[str, Optional[str], Optional[int], Optional[str]]]:
         """ Returns (kind, namespace, gene id, label) - namespace/id are None for an unknown partner
-            and the label is None for every kind but SPLICE. None if this isn't a gene-level alt """
+            and the label is None for every kind but SPLICE. The label comes back lower-cased,
+            which is the canonical form format upper-cased to store. None if this isn't a
+            gene-level alt """
         if m := GENE_LEVEL_ALT_PATTERN.fullmatch(str(alt)):
             kind = m.group("splice_kind") or m.group("kind")
             namespace = m.group("splice_namespace") or m.group("namespace")
             gene_id = m.group("splice_gene_id") or m.group("gene_id")
-            return kind, namespace, int(gene_id) if gene_id else None, m.group("label")
+            label = m.group("label")
+            return kind, namespace, int(gene_id) if gene_id else None, label.lower() if label else None
         return None
 
 
-# What a splice junction is named by - a seeded label (V7, vIII, ex14skip) or, for a junction we have
-# no name for, its own coordinates (X_66905968_66914514). @see genes.gene_splice
+# What a splice junction is named by - a canonical label (V_7, V_III, EXON_14_SKIPPING) or, for a
+# junction the lab named by its breakpoints, GRCH37_X_66905968_66914514. Stored upper-case; the
+# pattern stays permissive so an alt written before canonical labels still parses. @see genes.gene_splice
 GENE_LEVEL_LABEL = r"[A-Za-z0-9._-]+"
 # The kinds whose alt is <KIND:NAMESPACE:id>, longest first so FUSION_UNORDERED isn't shadowed by
 # FUSION. SPLICE is its own branch, as it alone carries the label segment

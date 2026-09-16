@@ -29,7 +29,8 @@ class Command(BaseCommand):
         parser.add_argument('--older-than-hours', type=int, default=24,
                             help="Only records untouched for this long (default 24)")
         parser.add_argument('--gene-level', action='store_true',
-                            help="Only records whose coordinate is gene-level (fusion, splice, CNV)")
+                            help="Only records that name genes (fusion, splice, CNV) - by coordinate where "
+                                 "one was derived, by the imported value where none was")
         parser.add_argument('--dry-run', action='store_true', help="List what would be re-matched")
 
     def handle(self, *args, **options):

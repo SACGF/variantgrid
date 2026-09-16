@@ -50,5 +50,5 @@ class TestGeneLevelSearch(TestCase):
 
     def test_splice_event(self):
         splice_event_variant = create_splice_event_variant("AR", "V7")
-        for written in ["AR V7", "ARV7"]:
+        for written in ["AR V7", "ARV7", "AR-V7"]:
             self._assert_finds(written, splice_event_variant.variant)

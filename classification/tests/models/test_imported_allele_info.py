@@ -119,12 +119,19 @@ class ImportedAlleleInfoValidationTest(TestCase):
         self.assertFalse(allele_info.imported_as_c_hgvs)
 
     def test_gene_level_without_a_coordinate_still_reads_as_gene_level(self):
-        """ an import that died leaves records with no coordinate to read, so the imported value has to answer """
-        allele_info = self._allele_info(imported_c_hgvs="BRCA2::PICALM")
+        """ a record whose gene turned out to be a typo has no coordinate to read, so the shape of the
+            imported value has to answer - or it would be reported as a broken HGVS """
+        allele_info = self._allele_info(imported_c_hgvs="ARHGEF::TP53")
         allele_info.variant_coordinate = None
-        with patch.object(ImportedAlleleInfo, "resolved_gene_level", return_value=object()):
-            self.assertTrue(allele_info.is_gene_level)
-            self.assertFalse(allele_info.imported_as_c_hgvs)
+        self.assertTrue(allele_info.is_gene_level)
+        self.assertFalse(allele_info.imported_as_c_hgvs)
+
+    def test_gene_level_that_did_not_resolve_says_so(self):
+        """ the value names genes, so the error is about the genes rather than about a transcript """
+        allele_info = self._allele_info(imported_c_hgvs="ARHGEF::TP53")
+        allele_info.variant_coordinate = None
+        general = allele_info._calculate_validation()["general"]
+        self.assertEqual({"gene_level_unresolved": "E"}, general)
 
     def test_gene_level_resolved_in_both_builds_is_included(self):
         """ a gene-level variant sits on no transcript, so its ResolvedVariantInfo has no c.HGVS - the build

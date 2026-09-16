@@ -129,14 +129,17 @@ Gotchas:
   (`classification/report/case_report_context.py:_kind_and_alteration`) - a fusion, a copy number call or a splice
   junction. A SpliceGirl VCF's own `<DEL>` records still read as small variants; a splice call is what the TSO 500
   CombinedVariantOutput loaded. The printed name of the event ("MET exon 14 skipping") is the `splice_label` evidence
-  key, autopopulated from the junction's `genes/models/models_splice_event.py:SpliceEvent` and left for the scientist
-  to type where we have no name for it.
+  key, autopopulated from the junction's label through `genes/gene_splice.py:display_splice_label` - the panel's own
+  wording where a `genes/models/models_splice_event.py:SpliceEvent` names it, and the breakpoints written out
+  ("AR GRCh37 X:66905968-66914514") where nothing does, which is the prompt for the scientist to name it.
 - A gene-level classification target is named rather than given as HGVS: `models/classification_variant_info_models.py:ImportedAlleleInfo.resolve_gene_level`
-  tries the fusion, whole-gene copy number and splice string resolvers in turn before any HGVS conversion, and the value
-  reaches them with its spaces already removed (`ImportedAlleleInfo._tidy_input_value`), so `AR V7` arrives as `ARV7`.
-  A new splice label shape needs `genes/gene_splice.py:SPLICE_STRING_PATTERN` widened before search will offer it;
-  resolution itself matches on the name, so a `genes/models/models_splice_event.py:SpliceEvent` row is enough for that
-  half. claude/research/classifications.md has the table of written forms.
+  runs the fusion, whole-gene copy number and splice string resolvers through `genes/gene_level_strings.py:resolve_gene_level_string`
+  before any HGVS conversion, and the value reaches them with its spaces already removed
+  (`ImportedAlleleInfo._tidy_input_value`), so `AR V7` arrives as `ARV7`. What takes that path is the *shape* of the
+  value (`genes/gene_level_strings.py:looks_gene_level`), so one whose gene turned out to be a typo fails as a
+  gene-level record - `gene_level_unresolved`, with the resolver's reason as its message - rather than as a broken
+  HGVS. A splice label shape has to be in `genes/gene_splice.py:SPLICE_STRING_PATTERN` to be recognised at all;
+  nothing has to be pre-registered beyond that. claude/research/classifications.md has the table of written forms.
 - A gene-level variant sits on no transcript, so `gene_symbol` is autopopulated from the event's GeneLevelId (a fusion's
   anchor first), which already holds the approved symbol the caller's MYCL1 resolved to
   (`autopopulate_evidence_keys/evidence_from_variant.py:get_evidence_fields_from_gene_level_event`) - the transcript path

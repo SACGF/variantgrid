@@ -32,15 +32,28 @@ Gotchas:
 - Name-to-identity resolution is shared by both kinds of gene-level event: gene_level_resolver.py:GeneLevelNameResolver turns a caller's cell into a models/models_gene_level.py:GeneLevelId, gene_fusions.py:GeneFusionResolver adds the breakpoint half, and gene_copy_number.py resolves the one gene a whole-gene copy number call names. 'EGFR amplification' is what is written out; 'amp', 'gain', 'deletion' and 'del' are accepted on input (gene_copy_number.py:COPY_NUMBER_KIND_WORDS).
 - Re-running gene-level annotation needs no special code: delete the GENE_LEVEL AnnotationRuns and their VariantAnnotation/VariantTranscriptAnnotation/VariantGeneOverlap rows cascade with them, then annotation/tasks/annotation_scheduler_task.py:_handle_variant_annotation_version recreates a run for every lock missing one (the #720 orphan scan, also how a newly-enabled pipeline backfills). That fixes annotation, not identity — a GeneLevelId with no hgnc and no genes still resolves through a symbol no release carries, so for identities minted before resolution improved, re-load the caller's file: there is no backfill command.
 - A splice call is the third kind of gene-level event and the only one with no record of its own: gene_splice.py reads
-  it straight off the alt, which carries the gene and the junction's label (`<SPLICE:HGNC:644:V7>`). What the label is
-  comes from models/models_splice_event.py:SpliceEvent, a naming table seeded with the junctions the TSO 500 panel
-  reports (genes/migrations/0093_seed_splice_events.py); a junction with no row still imports, labelled with its own
-  coordinates (`X_66905968_66914514`), which reads as raw coordinates on a report and is the prompt to add a row.
-  The two halves of a splice identity meet on that table from different directions: the importer resolves by coordinates
-  (gene_splice.py:SpliceEventResolver), while a classification or a search box arrives by name and resolves on
-  (gene_symbol, label) - gene_splice.py:resolve_splice_string for the string-in path, gene_splice.py:find_splice_events_for_string
-  for the lookup-only one search uses. Names are matched on a normalised key (gene_splice.py:splice_key), since an
-  imported c.HGVS has had its spaces stripped by the time it gets here.
+  it straight off the alt, which carries the gene and the junction's label (`<SPLICE:HGNC:644:V_7>`). The lab's label
+  is the identity, the way a fusion's is its two symbols: a splice string goes through the stages an HGVS does and
+  mints its Variant whenever it validates, whether or not anything has been observed under that name (#1835).
+  Duplicates are prevented by canonicalisation, not by a table - gene_splice.py:canonical_splice_label turns every
+  written form of one junction (`AR-V7`, `ARV7`, `AR-V7 splice variant`) into one label, lower-case tokens joined by
+  underscores (`v_7`, `v_iii`, `v_iva`, `exon_14_skipping`), and gene_splice.py:display_splice_label writes it back out
+  (`AR-V7`, `EGFRvIVa`). A junction named by its breakpoints carries the build, since a gene-level Variant sits on the
+  contig every build shares (`grch37_x_66905968_66914514` -> `AR GRCh37 X:66905968-66914514`).
+  models/models_splice_event.py:SpliceEvent has one job left: gene_splice.py:SpliceEventResolver turns the TSO 500
+  caller's breakpoints into the label a classification for the same junction arrives under (seeded in
+  genes/migrations/0093_seed_splice_events.py, canonicalised in 0095), and its `display` is the wording a report gets.
+  It is never consulted on the classification path - gene_splice.py:resolve_splice_string for the string-in path,
+  gene_splice.py:find_splice_events_for_string for the lookup-only one search uses.
+  The label on the alt is upper-case (`<SPLICE:HGNC:7029:EXON_14_SKIPPING>`) because the alt is a Sequence and every
+  path that inserts one upper-cases it (library/genomics/vcf_enums.py:GeneLevelSymbolicAlt.format); that is the storage
+  form only, and `parse` lowers it back to the canonical label.
+- Which kind of gene-level event a written value is, and whether it is one at all, is gene_level_strings.py:looks_gene_level
+  and gene_level_strings.py:resolve_gene_level_string - the only module that knows all three kinds. Each
+  `resolve_*_string` answers with a gene_level_resolver.py:GeneLevelResolution: the identity, or the reason the kind
+  that recognised the string refused it (a typo'd fusion partner), which is what the record's message and its
+  `gene_level_unresolved` validation tag say. A resolution is falsy until it resolved, so test `.recognised` /
+  `.reason` rather than `or`-ing one.
 - models/models_gene_list.py:GeneList.get_q imports from annotation inside the method — the genes/annotation import cycle is real; keep new cross-imports out of module level.
 - Creating a second SampleGeneList for a sample deletes the ActiveSampleGeneList instead of switching it (models/models_gene_list.py:sample_gene_list_created); set the active one explicitly.
 - `PanelAppPanel.cache_valid` expires after `settings.PANEL_APP_CACHE_DAYS` (models/models_panel_app.py:PanelAppPanel.cache_valid); panel_app.py:get_panel_app_local_cache re-fetches from the live API when stale, so tests must not depend on it.

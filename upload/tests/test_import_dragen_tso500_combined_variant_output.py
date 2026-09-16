@@ -165,10 +165,11 @@ class TestSpliceVariantVCF(TestCase):
             self.assertTrue(label)
 
     def test_seeded_junctions_get_their_label(self):
+        """ The canonical label, upper-cased on the alt as a Sequence is """
         alts = {record.ALT[0] for record in self.records}
-        self.assertEqual({f"<SPLICE:HGNC:{self.hgnc_ids['AR']}:V7>",
-                          f"<SPLICE:HGNC:{self.hgnc_ids['EGFR']}:vIII>",
-                          f"<SPLICE:HGNC:{self.hgnc_ids['MET']}:ex14skip>"}, alts)
+        self.assertEqual({f"<SPLICE:HGNC:{self.hgnc_ids['AR']}:V_7>",
+                          f"<SPLICE:HGNC:{self.hgnc_ids['EGFR']}:V_III>",
+                          f"<SPLICE:HGNC:{self.hgnc_ids['MET']}:EXON_14_SKIPPING>"}, alts)
 
     def _by_splice(self) -> dict:
         """ INFO values are stored as the VCF wrote them - a space is percent encoded, so decode """
@@ -176,7 +177,7 @@ class TestSpliceVariantVCF(TestCase):
                 for record in self.records}
 
     def test_position_is_the_gene(self):
-        self.assertEqual(self.hgnc_ids["AR"], self._by_splice()["AR V7"].POS)
+        self.assertEqual(self.hgnc_ids["AR"], self._by_splice()["AR-V7"].POS)
 
     def test_read_support_is_the_junction_and_the_reference_transcript(self):
         """ A caller asserts the junction is present, so there is no GT - the sample column holds
@@ -186,24 +187,24 @@ class TestSpliceVariantVCF(TestCase):
             self.assertEqual([ALT_READS_FORMAT, REF_READS_FORMAT], record.FORMAT)
             support[splice] = (int(record.format(ALT_READS_FORMAT).flatten()[0]),
                                int(record.format(REF_READS_FORMAT).flatten()[0]))
-        self.assertEqual({"AR V7": (27, 573), "EGFR vIII": (64, 1), "MET ex14skip": (91, 1)}, support)
+        self.assertEqual({"AR-V7": (27, 573), "EGFRvIII": (64, 1), "MET exon 14 skipping": (91, 1)}, support)
 
     def test_the_callers_row_rides_along_in_info(self):
-        encoded = self._by_splice()["MET ex14skip"].INFO.get(SPLICE_OBSERVATION_INFO)
+        encoded = self._by_splice()["MET exon 14 skipping"].INFO.get(SPLICE_OBSERVATION_INFO)
         observation = simplejson.loads(percent_decode_info_value(encoded))
         self.assertEqual("chr7:116411708", observation[BREAKPOINT_1])
         self.assertEqual("14", observation[AFFECTED_EXON])
 
-    def test_unnamed_junction_is_labelled_with_its_coordinates(self):
-        """ A junction no SpliceEvent names still imports - the label reads as raw coordinates,
-            which is the prompt to add a row """
-        splice_event = SpliceEvent.objects.get(genome_build=self.genome_build, label="V7")
+    def test_unnamed_junction_is_labelled_with_its_breakpoints(self):
+        """ A junction no SpliceEvent names still imports - the label is its breakpoints in the
+            build they were called in, which reads as raw coordinates on a report """
+        splice_event = SpliceEvent.objects.get(genome_build=self.genome_build, label="v_7")
         contig = splice_event.contig
         splice_event.delete()
 
         records = self._process()
-        expected = coordinate_label(contig, 66905968, 66914514)
-        self.assertIn(f"<SPLICE:HGNC:{self.hgnc_ids['AR']}:{expected}>",
+        expected = coordinate_label(self.genome_build, contig, 66905968, 66914514)
+        self.assertIn(f"<SPLICE:HGNC:{self.hgnc_ids['AR']}:{expected.upper()}>",
                       {record.ALT[0] for record in records})
 
     def test_source_settings_bind_read_support_as_depth(self):

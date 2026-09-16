@@ -345,18 +345,21 @@ class TestFusionString(GeneFusionTestCase):
         """ A classification target and the loader put the same coordinate through the pipeline, so
             both arrive at one Variant """
         from_loader = create_gene_fusion("BCR", "ABL1", resolver=self.resolver)
-        resolved = resolve_fusion_string("BCR::ABL1")
+        resolved = resolve_fusion_string("BCR::ABL1").resolved
         self.assertEqual(from_loader.variant.coordinate, resolved.variant_coordinate)
 
     def test_unknown_genes_do_not_mint_a_fusion(self):
-        """ Otherwise any hyphenated string would become a gene fusion """
-        self.assertIsNone(resolve_fusion_string("SOME-JUNK"))
-        self.assertIsNone(resolve_fusion_string("not a fusion at all"))
+        """ Otherwise any hyphenated string would become a gene fusion - the side we don't know is
+            the reason the record ends up carrying """
+        resolution = resolve_fusion_string("SOME-JUNK")
+        self.assertFalse(resolution)
+        self.assertEqual("gene 'SOME' is not a symbol we know", resolution.reason)
+        self.assertFalse(resolve_fusion_string("not a fusion at all").recognised)
 
     def test_resolving_a_string_creates_no_variant(self):
         """ The Variant is the insert pipeline's to make - @see snpdb.gene_level_variants """
         before = GeneFusion.objects.count()
-        self.assertIsNotNone(resolve_fusion_string("BCR::ABL1"))
+        self.assertTrue(resolve_fusion_string("BCR::ABL1"))
         self.assertEqual(before, GeneFusion.objects.count())
 
 

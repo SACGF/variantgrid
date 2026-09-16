@@ -21,7 +21,12 @@ from typing import Optional
 
 from django.db.models import Q
 
-from genes.gene_level_resolver import GeneLevelNameResolver, ResolvedGeneLevelGene
+from genes.gene_level_resolver import (
+    GeneLevelNameResolver,
+    GeneLevelResolution,
+    ResolvedGeneLevelGene,
+    unknown_gene_reason,
+)
 from genes.gene_overlaps import GeneOverlap, SVGeneOverlapResolver
 from genes.models import HGNC, GeneAnnotationRelease, GeneFusion, GeneLevelId, fusion_canonical_str
 from library.genomics.vcf_enums import GeneLevelSymbolicAlt
@@ -252,22 +257,28 @@ def create_gene_fusions_for_variants(variant_qs) -> int:
     return len(created)
 
 
-def resolve_fusion_string(fusion_string: str, resolver: GeneFusionResolver = None) -> Optional[ResolvedFusion]:
+def resolve_fusion_string(fusion_string: str, resolver: GeneFusionResolver = None) -> GeneLevelResolution:
     """ 'BCR::ABL1' -> the identity it will be stored under, whose variant_coordinate goes through the
         VCF insert pipeline like any other coordinate.
 
         Direction is taken from the order written, which is the convention every fusion nomenclature
         uses. Both sides have to be genes we already know, so an arbitrary hyphenated string doesn't
-        mint a fusion. @see ImportedAlleleInfo for where a classification target comes in this way. """
+        mint a fusion, and a side we don't know is the reason the record carries.
+        @see ImportedAlleleInfo for where a classification target comes in this way. """
 
     if resolver is None:
         resolver = GeneFusionResolver()
-    if genes := resolver.split_fusion_string(fusion_string):
-        gene_a = resolver.resolve_side(genes[0], allow_unknown=False)
-        gene_b = resolver.resolve_side(genes[1], allow_unknown=False)
-        if gene_a and gene_b:
-            return resolver.resolve_fusion(gene_a, gene_b, directionality_known=True)
-    return None
+    genes = resolver.split_fusion_string(fusion_string)
+    if genes is None:
+        return GeneLevelResolution.not_applicable()
+
+    sides = []
+    for name in genes:
+        side = resolver.resolve_side(name, allow_unknown=False)
+        if side is None:
+            return GeneLevelResolution.refused(unknown_gene_reason(name))
+        sides.append(side)
+    return GeneLevelResolution.identity(resolver.resolve_fusion(*sides, directionality_known=True))
 
 
 def find_gene_fusions_for_string(fusion_string: str, resolver: GeneFusionResolver = None) -> list[GeneFusion]:

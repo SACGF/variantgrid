@@ -408,10 +408,11 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
     @staticmethod
     def from_gene_level_match(match) -> 'VariantCoordinate':
         """ No genome build involved - a gene-level coordinate is the same on every build, and there
-            is no reference to read. @see snpdb.gene_level_variants """
+            is no reference to read. The alt is upper-cased like every other Sequence, so a splice
+            label written in its display case is the same coordinate. @see snpdb.gene_level_variants """
         # Explicit group numbers - the alt sub-pattern brings its own groups along
         return VariantCoordinate(chrom=GENE_LEVEL_CONTIG_NAME, position=int(match.group(1)),
-                                 ref=GENE_LEVEL_REF, alt=match.group(2), svlen=GENE_LEVEL_SVLEN)
+                                 ref=GENE_LEVEL_REF, alt=match.group(2).upper(), svlen=GENE_LEVEL_SVLEN)
 
     @staticmethod
     def from_string(variant_string: str, genome_build):

@@ -3,9 +3,11 @@ The names a report gives a recurrent splice junction - AR-V7, EGFRvIII, MET exon
 
 A splice call arrives as two breakpoints in one gene and becomes a gene-level Variant whose alt
 carries the junction's label (@see genes.gene_splice, and snpdb.gene_level_variants for why it is a
-Variant at all). This table is what turns those coordinates into the label: it is a naming table,
-not a per-variant record, so a junction we have no row for still imports - under a label made from
-its own coordinates.
+Variant at all). This table has one job: it turns a caller's breakpoints into the label a
+classification for the same junction arrives under, so a report's EGFRvIII and the caller's junction
+land on one Variant. A junction with no row still imports - under a label made from its own
+breakpoints - and a name nobody registered here still mints its Variant: this table is never asked
+whether a name is real.
 
 Seeded with the junctions the TSO 500 panel reports; a lab adds rows for the ones its own panel
 reports that we have not named.
@@ -20,11 +22,14 @@ class SpliceEvent(models.Model):
     """ A recurrent splice junction and the name a report gives it.
 
         Identity has two halves, each unique: the coordinates a caller writes (what an import looks
-        up), and the gene plus label (what a classification and the alt meet on). The breakpoints
-        are build-specific, so a junction is one row per build. """
+        up), and the gene plus label (what the alt meets it on). The breakpoints are build-specific,
+        so a junction is one row per build. """
 
     gene_symbol = models.ForeignKey(GeneSymbol, on_delete=CASCADE)
-    label = models.TextField()    # what the alt carries: V7, vIII, ex14skip
+    # the canonical label the alt carries: v_7, v_iii, exon_14_skipping
+    # (@see genes.gene_splice.canonical_splice_label). The alt stores it upper-cased (it is a
+    # Sequence), and the collation keeps (gene_symbol, label) unique whatever case a row is added in
+    label = models.TextField(db_collation='case_insensitive')
     display = models.TextField()  # what the report writes: "AR-V7 splice variant"
     genome_build = models.ForeignKey('snpdb.GenomeBuild', on_delete=CASCADE)
     contig = models.ForeignKey('snpdb.Contig', on_delete=CASCADE)
