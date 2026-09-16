@@ -90,10 +90,12 @@ Gotchas:
 - Queues (celery_settings.py:CELERY_TASK_ROUTES, keyed by dotted class path): web_workers reads uploaded files,
   variant_id_single_worker inserts variants and zygosity counts, scheduling_single_worker runs
   schedule_pipeline_stage_steps; everything else lands on db_workers.
-- The retry button (upload/views/views.py:upload_retry_import) needs the file still on disk and is hidden on Shariant
-  (URL_NAME_VISIBILITY), and internally generated pipelines (classification import, liftover) have no page a user visits -
-  restart those with `manage.py reload_imports --uploaded_file_type=y --status=E` (`--dry-run` first,
-  `--upload_pipeline_id` for one).
+- The retry button (upload/views/views.py:upload_retry_import) only shows for the file's owner or a superuser, with the
+  input file still on disk, UPLOAD_ENABLED, and the URL visible (Shariant hides it). `manage.py reload_imports` is the
+  way in without it - `--uploaded_file_type`, `--status`, `--upload_pipeline_id`, `--dry-run`. An import whose failure
+  was before UploadPipeline.objects.create has only an orphan FileUpload to show for itself and nothing to reload;
+  classification imports get back in through `manage.py classification_rematch_stuck`, which re-derives the coordinates
+  and runs new pipelines.
 - settings.UPLOAD_ENABLED=False makes InsertUnknownVariantsTask raise; IMPORT_PROCESSING_DELETE_TEMP_FILES_ON_SUCCESS
   wipes the processing dir on success, so inspect a failed pipeline's files before retrying it.
 - upload/tasks/vcf/import_vcf_step_task.py:pipeline_success_task is the only thing that closes a VCF pipeline, and it is
