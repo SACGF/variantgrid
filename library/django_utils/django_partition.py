@@ -1,3 +1,10 @@
+"""
+RelatedModelsPartitionModel: a model whose related records live in their own Postgres child table
+per instance (CREATE TABLE ... INHERITS with a check constraint on the FK), created on save and
+dropped by delete_related_objects - CohortGenotypeCollection, VariantCollection and the zygosity
+counts use it. Bracket any query aimed at a partition with temporary_db_table; _warn_if_no_archive
+logs a drop that has no PartitionArchive but does not block it.
+"""
 import logging
 from contextlib import contextmanager
 

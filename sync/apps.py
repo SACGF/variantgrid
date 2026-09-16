@@ -10,4 +10,5 @@ class SyncConfig(AppConfig):
         # Registers receivers on import - noqa: F401 keeps the unused-import autofix from
         # silently unregistering them
         from sync.signals import sync_health_check  # noqa: F401
+        from sync.signals import sync_integration_status  # noqa: F401
         # pylint: enable=import-outside-toplevel,unused-import

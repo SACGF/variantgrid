@@ -1,4 +1,7 @@
+import numbers
+
 import markdown
+import pandas as pd
 from django import template
 
 from library import tag_utils
@@ -84,15 +87,24 @@ class PandasDataFrameTableTag(template.Node):
             df = self.df_variable.resolve(context)
             significant_figures = self.significant_figures.resolve(context)
             border = self.border.resolve(context)
-            kwargs = {"border": border}
 
-            if significant_figures is not None:
-                format_string = "%%.%df" % significant_figures
-                kwargs['float_format'] = lambda f: format_string % f
+            def format_value(value):
+                """ Counts read as 1,234,567 - a reindexed row with no stats reads as blank """
+                if pd.isna(value):
+                    return ""
+                if isinstance(value, numbers.Integral):
+                    return f"{value:,}"
+                if isinstance(value, numbers.Real):
+                    if significant_figures is not None:
+                        return f"{value:,.{significant_figures}f}"
+                    return f"{value:,}"
+                return str(value)
 
-            kwargs['classes'] = 'table df-table'
-            # we want to justify everything right, but data columns seem to be justified left
-
+            kwargs = {
+                "border": border,
+                "classes": "table df-table",
+                "formatters": {c: format_value for c in df.columns},
+            }
             return df.to_html(**kwargs)
         except template.VariableDoesNotExist:
             return ''

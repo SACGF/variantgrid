@@ -318,6 +318,7 @@ class Command(BaseCommand):
         Version 5 - Start replacing hardcoded files with examining files
         Version 6 - Extract into library / example script
     """
+    category = "dev"
     TEST_DATA_DIR = os.path.join(settings.BASE_DIR, 'seqauto', 'test_data')
     HAEM_DIR = os.path.join(TEST_DATA_DIR, "clinical_hg38", "idt_haem",
                             "Haem_20_999_201231_M02027_0112_000000000_JFT79")

@@ -12,6 +12,7 @@ from django.views.decorators.vary import vary_on_cookie
 
 from analysis import grids
 from analysis.models import AnalysisNode
+from analysis.models.nodes.analysis_node import node_query_planner_settings
 from analysis.tasks.analysis_grid_export_tasks import (
     NODE_EXPORT_GENERATOR,
     export_cohort_to_downloadable_file,
@@ -30,19 +31,23 @@ from library.constants import WEEK_SECS
 from library.django_utils.major_operation import TooManyMajorOperationsError, major_operation
 from library.utils.hash_utils import sha256sum_str
 from snpdb.models import CachedGeneratedFile, Cohort, Sample
+from snpdb.views.datatable_view import datatable_definition, datatable_response
 
+EXPORT_TYPES = {"csv", "vcf"}
+
+# What a node grid request may carry, so the cache key and the export params hash are built off a
+# known set - node_grid_export builds its params from this list too, and the export path reads them
+# off the request.
 _NODE_GRID_ALLOWED_PARAMS = {
-    '_filters',
-    '_search',
     'ccc_id',
     'ccc_version_id',
     'extra_filters',
     'filters',
+    'length',
     'node_id',
-    'page',
-    'rows',
-    'sidx',
-    'sord',
+    'order[0][column]',
+    'order[0][dir]',
+    'start',
     'version_id',
     'zygosity_samples_hash',
 }
@@ -79,7 +84,7 @@ class NodeGridHandler(NodeJSONViewMixin):
             try:
                 logging.info("Got the lock...")
                 # Cap concurrent expensive queries per-user (distinct nodes bypass the per-node lock above)
-                with major_operation(request.user, "node_grid"):
+                with major_operation(request.user, "node_grid"), node_query_planner_settings():
                     response = self.get_response(request, *args, **kwargs)
             except TooManyMajorOperationsError:
                 logging.info("Too many major operations - going to sleep then retry...")
@@ -111,9 +116,9 @@ class NodeGridHandler(NodeJSONViewMixin):
     def _get_data(self, request, node, **kwargs):
         # Don't build queryset if invalid (stale q-dict cache)
         if errors := node.get_errors(flat=True):
-            return {"errors": errors, "rows": [], "records": 0, "page": 1, "total": 0}
-        grid = _variant_grid_from_request(request, node)
-        return grid.get_data(request)
+            return {"errors": errors, "data": [], "recordsTotal": 0, "recordsFiltered": 0}
+        config = _variant_grid_from_request(request, node)
+        return datatable_response(config, draw=request.GET.get("draw"))
 
 
 @method_decorator([cache_page(WEEK_SECS), vary_on_cookie], name='get')
@@ -127,46 +132,47 @@ class NodeGridConfig(NodeJSONGetView):
         if errors:
             ret = {"errors": errors}
         else:
-            grid = grids.VariantGrid(request.user, node, kwargs["extra_filters"])
-            ret = grid.get_config(as_json=False)
+            config = grids.VariantGrid(request, node, kwargs["extra_filters"])
+            # The definition carries the node's own per-request state as postData, which the page
+            # sends as the ajax params of every row request (@see VariantGrid.post_data)
+            ret = datatable_definition(config)
         return ret
 
 
-def cohort_grid_export(request, cohort_id, export_type):
-    EXPORT_TYPES = {"csv", "vcf"}
-    Cohort.get_for_user(request.user, cohort_id)  # Permission check
+def _check_export_type(export_type: str):
     if export_type not in EXPORT_TYPES:
         raise ValueError(f"{export_type} must be one of: {EXPORT_TYPES}")
 
-    params_hash = get_grid_downloadable_file_params_hash(cohort_id, export_type)
-    task = export_cohort_to_downloadable_file.si(cohort_id, export_type)
-    cgf = CachedGeneratedFile.get_or_create_and_launch("export_cohort_to_downloadable_file", params_hash, task)
+
+def _source_grid_export(request, model, obj_id: int, export_type: str, export_task, generator_name: str):
+    """ Launches (or joins) a Celery export of a source node's whole grid and redirects to the
+        CachedGeneratedFile poll URL. generator_name is stored against the cached file, so it stays put """
+    model.get_for_user(request.user, obj_id)  # Permission check
+    _check_export_type(export_type)
+
+    params_hash = get_grid_downloadable_file_params_hash(obj_id, export_type)
+    task = export_task.si(obj_id, export_type)
+    cgf = CachedGeneratedFile.get_or_create_and_launch(generator_name, params_hash, task)
     if cgf.exception:
         raise ValueError(cgf.exception)
     return redirect(cgf)
+
+
+def cohort_grid_export(request, cohort_id, export_type):
+    return _source_grid_export(request, Cohort, cohort_id, export_type,
+                               export_cohort_to_downloadable_file, "export_cohort_to_downloadable_file")
 
 
 def sample_grid_export(request, sample_id, export_type):
-    EXPORT_TYPES = {"csv", "vcf"}
-    Sample.get_for_user(request.user, sample_id)  # Permission check
-    if export_type not in EXPORT_TYPES:
-        raise ValueError(f"{export_type} must be one of: {EXPORT_TYPES}")
-
-    params_hash = get_grid_downloadable_file_params_hash(sample_id, export_type)
-    task = export_sample_to_downloadable_file.si(sample_id, export_type)
-    cgf = CachedGeneratedFile.get_or_create_and_launch("export_sample_to_downloadable_file", params_hash, task)
-    if cgf.exception:
-        raise ValueError(cgf.exception)
-    return redirect(cgf)
+    return _source_grid_export(request, Sample, sample_id, export_type,
+                               export_sample_to_downloadable_file, "export_sample_to_downloadable_file")
 
 
 def node_grid_export(request, analysis_id):
     """ Launches (or joins) a Celery export and redirects to the CachedGeneratedFile poll URL, so a big
         node isn't bound by the gunicorn request timeout (issue #1257) """
-    EXPORT_TYPES = {"csv", "vcf"}
     export_type = request.GET["export_type"]
-    if export_type not in EXPORT_TYPES:
-        raise ValueError(f"{export_type} must be one of: {EXPORT_TYPES}")
+    _check_export_type(export_type)
 
     # Always export the latest version (node.version below) - deliberately don't check the
     # client's version_id, which goes stale whenever the node is updated, eg a tag delete (#789)
@@ -199,4 +205,4 @@ def _node_from_request(request) -> AnalysisNode:
 
 def _variant_grid_from_request(request, node: AnalysisNode, **kwargs):
     extra_filters = request.GET.get("extra_filters")
-    return grids.VariantGrid(request.user, node, extra_filters, **kwargs)
+    return grids.VariantGrid(request, node, extra_filters, **kwargs)

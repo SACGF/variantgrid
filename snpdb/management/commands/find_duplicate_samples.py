@@ -9,6 +9,8 @@ from snpdb.models import CohortGenotypeStats
 
 
 class Command(BaseCommand):
+    category = "maintenance"
+
     def handle(self, *args, **options):
         duplicate_samples = defaultdict(list)
         # Per-sample CohortGenotypeStats rows (sample IS NOT NULL, filter_key NULL,

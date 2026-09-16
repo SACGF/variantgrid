@@ -26,7 +26,7 @@ from variantgrid.celery import app
 
 class VariantTagsCreateVCFTask(ImportVCFStepTask):
     """ Write a VCF with variants in VariantTags so they can go through normal insert pipeline """
-    # These are the original names (JQGrid js export with raw IDs)
+    # These are the original names (grid CSV export with raw IDs)
     COL_VARIANT_STRING = "variant_string"
     COL_NODE = "node__id"
     COL_CREATED = "created"

@@ -433,7 +433,7 @@ class ConditionResolved:
         else:
             return self
 
-    def same_or_more_specific_step_count(self, other: 'ConditionResolved') -> Optional[int]:
+    def is_same_or_more_specific(self, other: 'ConditionGroup') -> bool:
         """
         Returns the number of steps to go from this condition to the specific other condition
         Returns None if self doesn't appear to be a descendant of other
@@ -441,24 +441,24 @@ class ConditionResolved:
         :return:
         """
         if self.is_multi_condition or other.is_multi_condition:
-            # when looking at multiple conditions, do not attempt to merge unless we're the exact same
-            if self.terms == other.terms and self.join == other.join:
+            # when looking at multiple conditions, do not attempt merging unless we're the exact same
+            return self.terms == other.terms and self.join == other.join
                 return 0
             else:
                 return None
         elif self.single_term == other.single_term:
-            return 0
+            return True
         else:
             if other_mondo := other.mondo_term:
                 if self_mondo := self.mondo_term:
                     if other_mondo.index == 1:
                         return 99  # MOND:000001 is always going to be an ancestor
-                    if descendant_relationships := OntologySnake.check_if_ancestor(descendant=self_mondo,
-                                                                               ancestor=other_mondo):
-                        return len(descendant_relationships)
+                    descendant_relationships = OntologySnake.check_if_ancestor(descendant=self_mondo,
+                                                                               ancestor=other_mondo)
+                    return bool(descendant_relationships)
 
             # terms cant be converted to MONDO and not exact match, just return False
-            return None
+            return False
 
     def is_same_or_more_specific(self, other: 'ConditionResolved') -> bool:
         return self.same_or_more_specific_step_count(other) is not None

@@ -16,6 +16,8 @@ class Command(BaseCommand):
         one at a time from NCBI Entrez is slow and rate-limited (see fix_variant_matching --extra), so we
         can persist the fetched stragglers to a supplementary FASTA and reload them here on future deploys.
     """
+    category = "import"
+
     def add_arguments(self, parser):
         parser.add_argument('fasta', help='FASTA file (optionally gzipped) of transcript sequences')
         parser.add_argument('--annotation-consortium', default=AnnotationConsortium.REFSEQ.label,

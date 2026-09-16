@@ -5,9 +5,9 @@ function defaultFor(arg, val) {
 /** Pass width=null for a plot that fills (and resizes with) its container */
 function defaultLayout(title, width, height) {
     const layout = {
-      title: title,
+      title: {text: title},
       'height': defaultFor(height, 400),
-      xaxis: { autotick: false },
+      xaxis: { tickmode: 'linear' },
     };
     if (width === null) {
         layout.autosize = true;
@@ -132,7 +132,7 @@ function plotHBarArrays(selector, title, x, y, width, height, color, margin) {
         data["marker"] = {color: color};
     }
     const layout = defaultLayout(title, width, height);
-    layout["xaxis"] = {autotick: true};
+    layout["xaxis"] = {tickmode: 'auto'};
 
     if (margin) {
         layout["margin"] = margin;
@@ -154,7 +154,8 @@ function plotLineArrays(selector, x, y, layout) {
 }
 
 
-function showStackedBar(elementId, title, width, height, named_data, x_labels) {
+// series_colors (optional) maps a series name to its colour; unnamed series keep Plotly's defaults
+function showStackedBar(elementId, title, width, height, named_data, x_labels, series_colors) {
     const x = [];
     for (let i=0 ; i<x_labels.length ; ++i) {
         x.push(i);
@@ -163,10 +164,15 @@ function showStackedBar(elementId, title, width, height, named_data, x_labels) {
     const data = [];
     for(let i=0 ; i<named_data.length ; ++i) {
         const nd = named_data[i];
-        data.push({ 'x' : x,
-                    'y' : nd[1],
-                    'name' : nd[0],
-                    'type' : 'bar'});
+        const trace = { 'x' : x,
+                        'y' : nd[1],
+                        'name' : nd[0],
+                        'type' : 'bar'};
+        const color = series_colors && series_colors[nd[0]];
+        if (color) {
+            trace.marker = {color: color};
+        }
+        data.push(trace);
     }
 
     const layout = defaultLayout(title, width, height);
@@ -191,18 +197,18 @@ function showHeatMap(elementId, title, x, y, z, labels) {
     }];
     
     const layout = {
-      title: title,
-      titlefont: {
-        size: 32,
+      title: {
+        text: title,
+        font: {size: 32},
       },
       annotations: [],
       xaxis: {
-        title: 'Old Category',
+        title: {text: 'Old Category'},
         ticks: '',
         side: 'top'
       },
       yaxis: {
-        title: 'New Category',
+        title: {text: 'New Category'},
         ticks: '',
         ticksuffix: ' ',
         width: 700,

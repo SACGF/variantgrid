@@ -22,6 +22,7 @@ def ensure_string(data):
 
 
 class Command(BaseCommand):
+    category = "one-off"
 
     def handle(self, *args, **options):
         classifications = Classification.objects.all()

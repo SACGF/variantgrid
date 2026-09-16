@@ -1,5 +1,9 @@
 import operator
+<<<<<<< HEAD
 from collections import Counter
+=======
+from collections import defaultdict
+>>>>>>> refs/heads/master
 from dataclasses import dataclass, field
 from functools import cached_property, reduce
 from typing import Optional, Self
@@ -8,9 +12,14 @@ import django
 from django.contrib.auth.models import User
 from django.contrib.postgres.fields import ArrayField
 from django.core.exceptions import PermissionDenied
+<<<<<<< HEAD
 from django.db.models import CASCADE, SET_NULL, IntegerChoices, Q, QuerySet, TextChoices, F, OuterRef, Count
 from django.db.models.signals import pre_delete
 from django.dispatch import receiver
+=======
+from django.db import models, transaction
+from django.db.models import CASCADE, SET_NULL, Count, IntegerChoices, Q, QuerySet, TextChoices
+>>>>>>> refs/heads/master
 from django.urls import reverse
 from django_extensions.db.models import TimeStampedModel
 from frozendict import frozendict
@@ -29,7 +38,12 @@ from classification.models.evidence_mixin_summary_cache import (
     ClassificationSummaryCacheObj
 )
 from genes.models import GeneSymbol
+<<<<<<< HEAD
 from library.utils import strip_json
+=======
+from library.utils import JsonDataType, strip_json
+from ontology.models import OntologyTerm
+>>>>>>> refs/heads/master
 from snpdb.models import Allele, Lab
 
 classification_grouping_search_term_signal = django.dispatch.Signal()  # args: "grouping", expects iterable of ClassificationGroupingSearchTermStub
@@ -68,8 +82,16 @@ class ClassificationClassificationBucket(TextChoices):
         # this goes a little against the buckets that we store directly into
 
 
-def classification_sort_order(clin_sig: str) -> int:
-    return EvidenceKeyMap.instance().get(SpecialEKeys.CLINICAL_SIGNIFICANCE).option_indexes.get(clin_sig, 0)
+def classification_significance_sort_key(clin_sig: Optional[str]) -> tuple[bool, int, int]:
+    """
+    Orders clinical significance values most significant first (P/LP/VUS/LB/B, with the oncogenic values
+    alongside their germline equivalents), values the evidence key doesn't rank last.
+    """
+    e_key = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE)
+    significance = e_key.option_dictionary_property("sort_order").get(clin_sig)
+    # ties (P/O, LP/LO) fall back to the option order, which lists the germline value first
+    option_index = (e_key.option_indexes or {}).get(clin_sig, 0)
+    return significance is None, -(significance or 0), option_index
 
 #
 # class OverlapStatus(IntegerChoices):
@@ -132,6 +154,31 @@ class AlleleOriginGrouping(TimeStampedModel):
         if id_diff := self.allele.pk - other.allele.pk:
             return id_diff
         return self.allele_origin_bucket < other.allele_origin_bucket
+
+
+@dataclass(frozen=True)
+class ClassificationGroupingCount:
+    """ How many groupings sit at a single clinical significance value - for the summary above a grouping grid """
+    clinical_significance: Optional[str]
+    count: int
+
+    @property
+    def label(self) -> str:
+        e_key = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE)
+        return e_key.pretty_value(self.clinical_significance) or "No Data"
+
+    @property
+    def css_class(self) -> str:
+        """ Class for the .c-pill.cs-* rules in global.scss """
+        return f"cs-{self.clinical_significance.lower()}" if self.clinical_significance else "cs-none"
+
+    def to_json(self) -> JsonDataType:
+        return {
+            "clinical_significance": self.clinical_significance,
+            "label": self.label,
+            "css_class": self.css_class,
+            "count": self.count
+        }
 
 
 class ClassificationGroupingPathogenicDifference(IntegerChoices):
@@ -487,6 +534,45 @@ class ClassificationGrouping(TimeStampedModel):
     @property
     def conditions_obj(self) -> ConditionResolved:
         return ConditionResolved.from_dict(self.conditions)
+
+    VUS_SUB_VALUES = frozenset({"VUS_A", "VUS_B", "VUS_C"})
+    CLINICAL_SIGNIFICANCE_COLUMN = "latest_classification_modification__classification__summary__pathogenicity__classification"
+    NO_CLINICAL_SIGNIFICANCE = "none"
+    """ Filter value for the "No Data" summary count, as the significance itself is absent """
+
+    @staticmethod
+    def clinical_significance_counts(qs: QuerySet['ClassificationGrouping']) -> list['ClassificationGroupingCount']:
+        """
+        Counts groupings by the clinical significance of their latest classification, VUS sub-levels merged into VUS.
+        Ordered most significant first, with values the evidence key doesn't rank (and No Data) last.
+        :param qs: Groupings to summarise - already filtered for the user
+        """
+        clin_sig_column = ClassificationGrouping.CLINICAL_SIGNIFICANCE_COLUMN
+        counts: dict[Optional[str], int] = defaultdict(int)
+        # some filters (e.g. protein position) join through variants, so only count each grouping once
+        for row in qs.order_by().values(clin_sig_column).annotate(count=Count("pk", distinct=True)):
+            clinical_significance = row[clin_sig_column]
+            if clinical_significance in ClassificationGrouping.VUS_SUB_VALUES:
+                clinical_significance = "VUS"
+            counts[clinical_significance] += row["count"]
+
+        return sorted(
+            (ClassificationGroupingCount(clinical_significance=clin_sig, count=count) for clin_sig, count in counts.items()),
+            key=lambda grouping_count: classification_significance_sort_key(grouping_count.clinical_significance))
+
+    @staticmethod
+    def clinical_significance_q(clinical_significance: str) -> Q:
+        """
+        Filters to the groupings behind one of the summary counts, so clicking a count matches the number it showed.
+        :param clinical_significance: a value of the clinical significance evidence key, or NO_CLINICAL_SIGNIFICANCE
+        """
+        clin_sig_column = ClassificationGrouping.CLINICAL_SIGNIFICANCE_COLUMN
+        if clinical_significance == ClassificationGrouping.NO_CLINICAL_SIGNIFICANCE:
+            return Q(**{f"{clin_sig_column}__isnull": True})
+        values = [clinical_significance]
+        if clinical_significance == "VUS":
+            values += sorted(ClassificationGrouping.VUS_SUB_VALUES)
+        return Q(**{f"{clin_sig_column}__in": values})
 
     def gene_symbols(self):
         terms = set(self.classificationgroupingsearchterm_set.filter(term_type=ClassificationGroupingSearchTermType.GENE_SYMBOL).values_list("term", flat=True))

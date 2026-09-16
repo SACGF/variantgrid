@@ -14,7 +14,6 @@ from upload.tasks.vcf.import_vcf_tasks import (
     DoNothingVCFTask,
     PreprocessVCFTask,
     ScheduleMultiFileOutputTasksTask,
-    UploadPipelineFinishedTask,
 )
 
 
@@ -48,7 +47,9 @@ class AbstractVCFImportTaskFactory(ImportTaskFactory):
         return []
 
     def get_finish_task_classes(self):
-        return [UploadPipelineFinishedTask]
+        """ Steps run at the end of the FINISH chain, before pipeline_success_task closes the pipeline.
+            Anything here must leave the status PROCESSING - @see pipeline_success_task """
+        return []
 
     def get_pre_vcf_task(self, upload_pipeline):
         """ Run before loading initial VCF (use for e.g. retrieving/making it) """

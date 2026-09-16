@@ -9,9 +9,11 @@ from analysis.forms.forms_nodes import (
     AllVariantsNodeForm,
     BuiltInFilterNodeForm,
     ClassificationsNodeForm,
+    ClinVarNodeForm,
     CohortNodeForm,
     ConservationNodeForm,
     DamageNodeForm,
+    DuoNodeForm,
     FilterNodeForm,
     IntersectionNodeForm,
     MergeNodeForm,
@@ -31,6 +33,8 @@ from analysis.models import MOINode, OntologyTerm, TagNode
 from analysis.models.enums import SetOperations
 from analysis.models.nodes.filters.allele_frequency_node import AlleleFrequencyNode
 from analysis.models.nodes.filters.built_in_filter_node import BuiltInFilterNode
+from analysis.models.nodes.filters.classifications_node import ClassificationsNode
+from analysis.models.nodes.filters.clinvar_node import ClinVarNode
 from analysis.models.nodes.filters.conservation_node import ConservationNode
 from analysis.models.nodes.filters.damage_node import DamageNode
 from analysis.models.nodes.filters.filter_node import FilterNode, FilterNodeItem
@@ -44,17 +48,18 @@ from analysis.models.nodes.filters.venn_node import VennNode
 from analysis.models.nodes.filters.zygosity_node import ZygosityNode
 from analysis.models.nodes.node_utils import update_analysis
 from analysis.models.nodes.sources.all_variants_node import AllVariantsNode
-from analysis.models.nodes.sources.classifications_node import ClassificationsNode
 from analysis.models.nodes.sources.cohort_node import CohortNode
+from analysis.models.nodes.sources.duo_node import DuoNode
 from analysis.models.nodes.sources.pedigree_node import PedigreeNode
 from analysis.models.nodes.sources.quad_node import QuadNode
 from analysis.models.nodes.sources.trio_node import TrioNode
 from analysis.views.nodes.node_view import NodeView
-from analysis.views.views_json import get_sample_patient_gene_disease_data
+from analysis.views.views_json import get_patient_gene_disease_data
 from classification.models.classification import Classification
 from classification.views.classification_datatables import ClassificationColumns
-from library.django_utils import highest_pk
-from library.jqgrid.jqgrid import JqGrid
+from library.django_utils import highest_pk, resolve_field_path
+from patients.models_enums import SampleSourceLevel
+from patients.sample_grouping import get_patient_for_source
 from snpdb.models.models_user_settings import UserSettings
 from snpdb.models.models_variant import Variant
 
@@ -111,20 +116,27 @@ class ClassificationsNodeView(NodeView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        modified = self.object.modified
-        count = Classification.objects.filter(modified__gt=modified).count()
-        if count:
-            if count == 1:
-                plural = ""
-            else:
-                plural = "s"
-            context["out_of_date_message"] = f"{count} new classification{plural} since last save."
+        # ClinVar comes from a fixed annotation version, so only classification filters go out of date
+        if self.object.has_classification_filters():
+            modified = self.object.modified
+            count = Classification.objects.filter(modified__gt=modified).count()
+            if count:
+                if count == 1:
+                    plural = ""
+                else:
+                    plural = "s"
+                context["out_of_date_message"] = f"{count} new classification{plural} since last save."
         return context
 
     def _get_form_initial(self):
         form_initial = super()._get_form_initial()
         form_initial["lab"] = self.object.get_labs()
         return form_initial
+
+
+class ClinVarNodeView(NodeView):
+    model = ClinVarNode
+    form_class = ClinVarNodeForm
 
 
 class CohortNodeView(NodeView):
@@ -173,10 +185,9 @@ class FilterNodeView(NodeView):
             for i, rule in enumerate(filters['rules']):
                 op, field, data = rule['op'], rule['field'], rule['data']
                 if op == "eq":
-                    # To be able to search JqGrid for isnull, field must have required=False (from blank=True)
-                    # But it can thus send through '' for no value. Some fields can't deal with that - so in those cases
-                    # we convert "equals blank" to "is null"
-                    django_field = JqGrid.lookup_foreign_key_field(opts, field)
+                    # The filter builder sends '' for an empty value box. Some fields can't deal with
+                    # that - so in those cases we convert "equals blank" to "is null"
+                    django_field = resolve_field_path(opts, field)
                     if data == '' and not django_field.empty_strings_allowed:
                         if django_field.null:
                             op = 'nu'
@@ -202,12 +213,7 @@ class IntersectionNodeView(NodeView):
 
     def _get_form_initial(self):
         form_initial = super()._get_form_initial()
-        if self.object.genomic_interval:
-            form_initial["chrom"] = self.object.genomic_interval.chrom
-            form_initial["start"] = self.object.genomic_interval.start
-            form_initial["end"] = self.object.genomic_interval.end
         form_initial["contigs"] = self.object.intersectionnodecontig_set.all().values_list("contig", flat=True)
-
         return form_initial
 
     def get_form_kwargs(self):
@@ -240,11 +246,22 @@ class MOINodeView(NodeView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        if self.object.sample:
-            ontology_version = self.object.analysis.annotation_version.ontology_version
-            context["sample_patient_gene_disease"] = get_sample_patient_gene_disease_data(self.object.sample,
-                                                                                          ontology_version)
+        context["sample_source_gene_disease"] = self._get_sample_source_gene_disease()
         return context
+
+    def _get_sample_source_gene_disease(self) -> dict:
+        """ The patient's gene/disease terms for every choice the picker offers, keyed on its
+            "<kind>:<pk>" value - the editor's "From Patient" panel reads what is selected """
+        ontology_version = self.object.analysis.annotation_version.ontology_version
+        data_by_patient = {}
+        sample_source_gene_disease = {}
+        for sample in self.object.get_ancestor_samples():
+            patient = get_patient_for_source(SampleSourceLevel.SAMPLE, sample)
+            if patient and patient.pk not in data_by_patient:
+                data_by_patient[patient.pk] = get_patient_gene_disease_data(patient, ontology_version)
+                sample_source_gene_disease[f"patient:{patient.pk}"] = data_by_patient[patient.pk]
+            sample_source_gene_disease[f"sample:{sample.pk}"] = data_by_patient.get(patient.pk) if patient else {}
+        return sample_source_gene_disease
 
 
 class PedigreeNodeView(NodeView):
@@ -316,8 +333,18 @@ class TagNodeView(NodeView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["datatable_config"] = ClassificationColumns(self.request)
-        context["requires_classification_tags"] = self.object.analysis.varianttag_set.filter(tag=settings.TAG_REQUIRES_CLASSIFICATION)
+        context.update(self._get_tag_counts_context())
         return context
+
+    def _get_tag_counts_context(self) -> dict:
+        """ The pills above the form are the node's tag picker - toggling one updates the form's
+            tags, applied on save like the rest of the editor. Counted here rather than at load:
+            it's the tagging table alone, so it costs nothing to work out when the editor opens """
+        node = self.object
+        return {
+            "tag_counts": list(node.get_tag_counts().items()),
+            "selected_tag_ids": node.tag_ids,
+        }
 
     def _get_form_initial(self):
         form_initial = super()._get_form_initial()
@@ -338,7 +365,17 @@ class ZygosityTableMixin:
         user_settings = UserSettings.get_for_user(self.request.user)
         context["zygosity_table_data"] = self.model.get_zygosity_table_data()
         context["initially_show_zygosity_table"] = user_settings.initially_show_zygosity_table
+        # The mosaic AF slider reads as a percent wherever the grid's AF columns do
+        context["af_show_in_percent"] = settings.VARIANT_ALLELE_FREQUENCY_CLIENT_SIDE_PERCENT
         return context
+
+
+def _source_visible_to_user(source, user) -> bool:
+    """ The editors AJAX their family member details from the REST API, which applies the same
+        permission filter - it 404s for eg a Trio whose cohort import failed """
+    if source is None:
+        return False
+    return type(source).filter_for_user(user).filter(pk=source.pk).exists()
 
 
 class TrioNodeView(ZygosityTableMixin, NodeView):
@@ -350,6 +387,11 @@ class TrioNodeView(ZygosityTableMixin, NodeView):
         form_kwargs["genome_build"] = self.object.analysis.genome_build
         return form_kwargs
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["trio_loadable"] = _source_visible_to_user(self.object.trio, self.request.user)
+        return context
+
 
 class QuadNodeView(ZygosityTableMixin, NodeView):
     model = QuadNode
@@ -359,6 +401,26 @@ class QuadNodeView(ZygosityTableMixin, NodeView):
         form_kwargs = super().get_form_kwargs()
         form_kwargs["genome_build"] = self.object.analysis.genome_build
         return form_kwargs
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["quad_loadable"] = _source_visible_to_user(self.object.quad, self.request.user)
+        return context
+
+
+class DuoNodeView(ZygosityTableMixin, NodeView):
+    model = DuoNode
+    form_class = DuoNodeForm
+
+    def get_form_kwargs(self):
+        form_kwargs = super().get_form_kwargs()
+        form_kwargs["genome_build"] = self.object.analysis.genome_build
+        return form_kwargs
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["duo_loadable"] = _source_visible_to_user(self.object.duo, self.request.user)
+        return context
 
 
 class VennNodeView(NodeView):

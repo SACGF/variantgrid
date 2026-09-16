@@ -10,14 +10,16 @@ from django.db.models.functions import Concat, Length, Replace, Substr
 
 from analysis.models import AnalysisNode, GroupOperation
 from analysis.models.nodes.cohort_mixin import CohortMixin
-from analysis.models.nodes.sources._stats_cache import (
+from analysis.models.nodes.stats_cache import (
     UNCACHEABLE,
     get_cached_label_count_for_cohort,
     get_handler_for_node,
 )
 from analysis.models.nodes.zygosity_count_node import AbstractZygosityCountNode
+from analysis.models.nodes.node_display import NodeIcon
 from patients.models_enums import SimpleZygosity, Zygosity
 from snpdb.models import Cohort, CohortGenotypeCollection, CohortSample, VariantsType
+from snpdb.views.datatable_view import NullOrder, RichColumn
 
 
 class AbstractCohortBasedNode(CohortMixin, AnalysisNode):
@@ -48,18 +50,41 @@ class AbstractCohortBasedNode(CohortMixin, AnalysisNode):
             in count_for_zygosity. """
         return [True, True, True, True]
 
+    def _get_cached_label_count(self, label):
+        cohort = self._get_cohort()
+        if cohort is None:
+            return None
+        if self._has_filters_that_affect_label_counts():
+            return None
+        filter_code = self.get_filter_code()
+        if filter_code not in (0, 1):
+            return None
+        handler = get_handler_for_node(self)
+        filter_key = handler.filter_key_for_node(self)
+        if filter_key is UNCACHEABLE:
+            return None
+        return get_cached_label_count_for_cohort(
+            cohort=cohort,
+            sample=None,  # aggregate row
+            filter_key=filter_key,
+            annotation_version=self.analysis.annotation_version,
+            passing_filter=bool(filter_code),
+            zygosities=self._cached_label_count_zygosities(),
+            label=label,
+        )
+
     def _get_q_and_list(self) -> list[Q]:
         q_and = super()._get_q_and_list()
 
         cohort = self._get_cohort()
         cgc = cohort.cohort_genotype_collection
 
-        # get_sample_ids() returns all ancestor samples - for a compound het Trio/Quad (the only
+        # get_sample_ids_with_genotype() returns all ancestor samples - for a compound het Trio/Quad (the only
         # mode that takes a parent input) this includes samples from the parent node that aren't in
         # this node's cohort. The per-sample quality filters only apply to samples in this cohort's
         # genotype array, so restrict to those (avoids KeyError in get_array_index_for_sample_id).
         packed_index_by_sample_id = cgc.get_packed_index_by_sample_id
-        array_indicies = [packed_index_by_sample_id[sample_id] for sample_id in self.get_sample_ids()
+        array_indicies = [packed_index_by_sample_id[sample_id] for sample_id in self.get_sample_ids_with_genotype()
                           if sample_id in packed_index_by_sample_id]
         for field, cg_path, q_op in self.COHORT_GENOTYPE_FIELD_MAPPINGS:
             value = getattr(self, field)
@@ -86,10 +111,16 @@ class CohortNode(AbstractCohortBasedNode, AbstractZygosityCountNode):
     min_inputs = 0
     max_inputs = 0
 
+    @property
+    def zygosity_count_max_samples(self) -> Optional[int]:
+        if self.cohort:
+            return self.cohort.sample_count
+        return None
+
     def get_warnings(self) -> list[str]:
         warnings = super().get_warnings()
         if self.cohort and self.accordion_panel == self.COUNT:
-            if msg := self.get_min_above_max_warning_message(self.cohort.sample_count):
+            if msg := self.get_min_above_max_warning_message(self.zygosity_count_max_samples):
                 warnings.append(msg)
         return warnings
 
@@ -102,28 +133,6 @@ class CohortNode(AbstractCohortBasedNode, AbstractZygosityCountNode):
         if self.accordion_panel != self.COUNT:
             return True
         return False
-
-    def _get_cached_label_count(self, label):
-        if self.cohort is None:
-            return None
-        if self._has_filters_that_affect_label_counts():
-            return None
-        filter_code = self.get_filter_code()
-        if filter_code not in (0, 1):
-            return None
-        handler = get_handler_for_node(self)
-        filter_key = handler.filter_key_for_node(self)
-        if filter_key is UNCACHEABLE:
-            return None
-        return get_cached_label_count_for_cohort(
-            cohort=self.cohort,
-            sample=None,  # aggregate row
-            filter_key=filter_key,
-            annotation_version=self.analysis.annotation_version,
-            passing_filter=bool(filter_code),
-            zygosities=self._cached_label_count_zygosities(),
-            label=label,
-        )
 
     def _get_cohort(self):
         return self.cohort
@@ -289,6 +298,10 @@ class CohortNode(AbstractCohortBasedNode, AbstractZygosityCountNode):
     def get_node_class_label():
         return "Cohort"
 
+    @classmethod
+    def get_node_class_icon(cls) -> NodeIcon:
+        return NodeIcon(fa="fa-solid fa-users")
+
     def _get_configuration_errors(self) -> list:
         errors = super()._get_configuration_errors()
         if not self.cohort:
@@ -297,26 +310,36 @@ class CohortNode(AbstractCohortBasedNode, AbstractZygosityCountNode):
             errors.extend(self._get_genome_build_errors("cohort", self.cohort.genome_build))
         return errors
 
-    def _get_node_extra_columns(self):
+    @property
+    def _count_columns(self) -> list:
+        """ The het count carries the cell; hom and ref ride along in it.
+            @see VariantGridFormat.dbZygosityCounts """
+        return [self.het_count_column, self.hom_count_column, self.ref_count_column]
+
+    def _get_node_extra_columns(self) -> list[RichColumn]:
         extra_columns = super()._get_node_extra_columns()
         if self.cohort and self.count_column_prefix is not None:
-            extra_columns.append(self.hom_count_column)
-            extra_columns.append(self.het_count_column)
+            drawn_column = self._count_columns[0]
+            for c in self._count_columns:
+                kwargs = {"key": c, "orderable": True, "search": False, "include_in_csv": True,
+                          "null_order": NullOrder.FIRST_ON_ASC}
+                if c == drawn_column:
+                    # hom · het in the one cell, the counts it doesn't draw on hover
+                    kwargs.update({
+                        "label": "Cohort Counts",
+                        "width": 70,
+                        "client_renderer": "VariantGridFormat.dbZygosityCounts",
+                        "client_renderer_kwargs": {"countPrefix": self.count_column_prefix},
+                        "sort_menu": [
+                            {"label": "Het count", "column": self.het_count_column},
+                            {"label": "Hom count", "column": self.hom_count_column},
+                            {"label": "Ref count", "column": self.ref_count_column},
+                        ],
+                    })
+                else:
+                    kwargs["visible"] = False
+                extra_columns.append(RichColumn(**kwargs))
         return extra_columns
-
-    def _get_node_extra_colmodel_overrides(self):
-        extra_colmodel_overrides = super()._get_node_extra_colmodel_overrides()
-        if self.cohort and self.count_column_prefix is not None:
-            labels = ["Cohort Hom Count", "Cohort Het Count"]
-            for c, l in zip([self.hom_count_column, self.het_count_column], labels):
-                override = extra_colmodel_overrides.get(c, {})
-                override["label"] = l
-                override["name"] = c
-                override["model_field"] = False
-                override["queryset_field"] = True
-                extra_colmodel_overrides[c] = override
-
-        return extra_colmodel_overrides
 
     def save(self, *args, **kwargs):
         is_new = self.version == 0

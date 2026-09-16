@@ -45,13 +45,18 @@ if SYNC_DETAILS and any(sd["enabled"] for sd in SYNC_DETAILS.values()):
     }
 
 SAPATH_ENABLED = any(a.startswith("sapath") for a in settings.INSTALLED_APPS)
-if SAPATH_ENABLED:
-    helix_user = getattr(settings, "SAPATH_HELIX_USER", None)
-    if helix_user:
-        app.conf.beat_schedule['sapath-helix-load-if-changed'] = {
-            'task': 'sapath.tasks.import_helix_task.sapath_helix_load_if_changed',
-            'schedule': HOUR_SECS,  # Check every hour, only update if hash changed
-        }
+if SAPATH_ENABLED and getattr(settings, "SAPATH_HELIX_SHARED_FILE", None):
+    app.conf.beat_schedule['sapath-helix-load-if-changed'] = {
+        'task': 'sapath.tasks.import_helix_task.sapath_helix_load_if_changed',
+        'schedule': HOUR_SECS,  # Check every hour, only update if hash changed
+    }
+
+# Reclassification timelines (issue #1523): the analytics page builds what it can in the request,
+# this picks up anything left over, e.g. the morning after a large sync.
+app.conf.beat_schedule['reclassification-events-update'] = {
+    'task': 'classification.tasks.classification_reclassification_tasks.reclassification_events_update',
+    'schedule': crontab(hour=3, minute=30),
+}
 
 # Reclassification timelines (issue #1523): the analytics page builds what it can in the request,
 # this picks up anything left over, e.g. the morning after a large sync.
@@ -93,6 +98,19 @@ app.conf.beat_schedule['clear-old-node-export-cached-generated-files'] = {
     'schedule': crontab(hour=3, minute=15),
 }
 
+# User awards (#1819). The "today" trophy should move during the day; crowns, medals and badges
+# nightly. Raw seconds rather than crontab - see the timezone note above.
+if settings.USER_AWARDS_ENABLED:
+    app.conf.beat_schedule['user-awards-daily'] = {
+        'task': 'snpdb.tasks.user_award_tasks.update_user_awards',
+        'schedule': HOUR_SECS,
+        'kwargs': {'periods': ['D']},
+    }
+    app.conf.beat_schedule['user-awards-nightly'] = {
+        'task': 'snpdb.tasks.user_award_tasks.update_user_awards',
+        'schedule': HOUR_SECS * 24,
+        'kwargs': {'periods': ['A', 'M'], 'badges': True},
+    }
 
 # send update emails once a day (if there has been activity)
 if settings.DISCORDANCE_EMAIL:
@@ -106,6 +124,14 @@ if settings.MME_ENABLED:
     app.conf.beat_schedule['mme-refresh-metrics'] = {
         'task': 'mme.tasks.refresh_mme_metrics_task',
         'schedule': crontab(hour=2, minute=30),
+    }
+
+# All-vs-all sample relatedness (#393). Nightly rather than per-import: it globs every sample's
+# .somalier file, so it only makes sense once the day's imports have all extracted.
+if settings.SOMALIER["enabled"] and settings.SOMALIER["all_samples_relate_hour"] is not None:
+    app.conf.beat_schedule['somalier-all-samples-relate'] = {
+        'task': 'snpdb.tasks.somalier_tasks.somalier_all_samples',
+        'schedule': crontab(hour=settings.SOMALIER["all_samples_relate_hour"], minute=0),
     }
 
 # Server monitoring tasks - send RollBar warnings

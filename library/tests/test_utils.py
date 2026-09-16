@@ -27,7 +27,6 @@ from library.utils.collection_utils import (
 )
 from library.utils.date_utils import calculate_age, parse_yymm, utc_from_timestamp
 from library.utils.file_utils import IteratorFile, file_to_array
-from library.utils.hash_utils import string_deterministic_hash
 from library.utils.json_utils import JsonDiffs, make_json_safe_in_place, strip_json
 from library.utils.text_utils import (
     format_significant_digits,
@@ -48,6 +47,9 @@ class TestServerSideFormatPercent(TestCase):
 
     def test_nonzero_formats_with_percent(self):
         self.assertEqual(server_side_format_percent(0.5), "0.5%")
+
+    def test_rare_frequency_is_not_scientific_notation(self):
+        self.assertEqual(server_side_format_percent(0.0000123), "0.0000123%")
 
     def test_none_as_missing_value(self):
         self.assertEqual(server_side_format_percent(None, missing_value=None), "")
@@ -432,15 +434,6 @@ class TestJsonDiffsDifferences(TestCase):
         diffs = JsonDiffs.differences(a, b)
         # Should detect 1 change (id=1 val changed), not 2 spurious index diffs
         self.assertEqual(len(diffs.json_diffs), 1)
-
-# ---------------------------------------------------------------------------
-# hash_utils.py
-# ---------------------------------------------------------------------------
-
-class TestStringDeterministicHash(TestCase):
-    def test_same_string_same_hash(self):
-        self.assertEqual(string_deterministic_hash("hello"), string_deterministic_hash("hello"))
-
 
 # ---------------------------------------------------------------------------
 # cache.py

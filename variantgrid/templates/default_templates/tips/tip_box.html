@@ -1,0 +1,9 @@
+{% if tip %}
+    <div class="tip-box" data-tips="{{ tips_json }}">
+        <i class="fa-solid fa-lightbulb tip-icon"></i>
+        <span class="tip-label">Tip:</span>
+        <span class="tip-text">{{ tip.tip }}</span>
+        <a class="tip-next" href="javascript:void(0)" title="Show another tip"><i class="fa-solid fa-arrows-rotate"></i></a>
+        <a class="tip-dismiss" href="javascript:void(0)" title="Turn tips off - you can switch them back on in User Settings"><i class="fa-solid fa-xmark"></i></a>
+    </div>
+{% endif %}

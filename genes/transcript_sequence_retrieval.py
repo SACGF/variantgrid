@@ -92,7 +92,12 @@ class TranscriptSequenceFetcher:
         transcript_id, requested_version = get_transcript_id_and_version(transcript_accession)
         url = f"{base_url}/sequence/id/{transcript_id}?type=cdna"
         r = requests.get(url, headers={"Content-Type": "application/json"}, timeout=MINUTE_SECS)
-        data = r.json()
+        try:
+            data = r.json()
+        except requests.JSONDecodeError as e:
+            # Ensembl outages come back as an HTML error page rather than JSON
+            r.raise_for_status()
+            raise NoTranscript(f"Unable to understand Ensembl API response: {r.text[:200]}") from e
 
         if r.ok:
             return FetchedTranscriptSequence(transcript_id=data["id"],

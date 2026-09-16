@@ -1,5 +1,6 @@
 from django.test import TestCase
 
+from annotation.cosmic import CosmicAPI
 from snpdb.models import GenomeBuild, Sequence, VariantCoordinate
 from snpdb.signals.variant_search import _alt_description
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
@@ -36,3 +37,17 @@ class VariantSearchAltDescriptionTestCase(TestCase):
         """ VariantCoordinate.alt is a plain str - long alts are still abbreviated. """
         vc = VariantCoordinate(chrom="3", position=128198995, ref="G", alt=self.long_alt)
         self.assertEqual(_alt_description(vc), Sequence.abbreviate(self.long_alt))
+
+
+class CosmicSearchGenomeBuildTestCase(TestCase):
+    """ The clinicaltables COSMIC API only has GRCh37/38 data - other builds 500 out (issue #1783) """
+
+    def test_t2t_is_not_supported(self):
+        t2t = GenomeBuild.t2tv2()
+        self.assertFalse(CosmicAPI.supports_genome_build(t2t))
+        with self.assertRaises(ValueError):
+            CosmicAPI("COSV53567516", t2t)
+
+    def test_grch37_and_38_are_supported(self):
+        for build_name in ["GRCh37", "GRCh38"]:
+            self.assertTrue(CosmicAPI.supports_genome_build(GenomeBuild.get_name_or_alias(build_name)))

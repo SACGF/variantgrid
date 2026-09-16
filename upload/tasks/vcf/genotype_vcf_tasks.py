@@ -177,8 +177,7 @@ class SomalierVCFTask(ImportVCFStepTask):
         vcf = uploaded_vcf.vcf
         if vcf.has_genotype:
             somalier_vcf_id(vcf.pk)
-            # Disabled at end of VCF - see https://github.com/SACGF/variantgrid/issues/393
-            # somalier_all_samples()
+            # The all-vs-all relate is beat scheduled nightly rather than run per import (#393)
 
 
 class ImportGenotypeVCFSuccessTask(ImportVCFStepTask):

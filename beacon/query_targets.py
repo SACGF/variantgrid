@@ -4,8 +4,9 @@ Before we fan a variant out to an external Beacon we test whether that server is
 to it - a germline SNV against a cancer copy-number Beacon is wasted latency and a guaranteed
 miss. Each target pairs a gate (`accepts`) with a coordinate query (`build_params`); a node in
 settings.BEACON_QUERY_NODES selects its target via `type` (and may restrict `assemblies`).
-`eligible_queries()` loops the configured nodes and returns params only for the servers whose
-gate the variant passes, so a variant page shows only the Beacons that apply to that variant.
+`evaluate_queries()` loops the configured nodes and returns params only for the servers whose
+gate the variant passes, plus a reason for each one it skipped, so a variant page shows only the
+Beacons that apply to that variant and why the rest did not.
 """
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -98,8 +99,7 @@ def evaluate_queries(variant: Variant, genome_build: GenomeBuild, node_configs: 
     """ Per-node eligibility for this variant. A node is skipped (with a `reason`) when its
         `type` is unknown/omitted, its `assemblies` (if set) do not include this build, or its
         target's gate rejects the variant. The variant page uses the reasons to show which
-        Beacons apply and why the rest were not queried; eligible_queries() is the params-only
-        projection used by the headless outbound path. """
+        Beacons apply and why the rest were not queried. """
     results = []
     for node_id, node in node_configs.items():
         node_type = node.get("type")
@@ -121,9 +121,3 @@ def evaluate_queries(variant: Variant, genome_build: GenomeBuild, node_configs: 
         results.append(NodeEligibility(node_id, node_type, True,
                                        params=target.build_params(variant, genome_build)))
     return results
-
-
-def eligible_queries(variant: Variant, genome_build: GenomeBuild, node_configs: dict) -> dict:
-    """ {node_id: query_params} for every configured node whose target accepts this variant. """
-    return {e.node_id: e.params
-            for e in evaluate_queries(variant, genome_build, node_configs) if e.eligible}

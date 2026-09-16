@@ -1,0 +1,99 @@
+{% load js_tags %}
+{% load ui_utils %}
+{% comment %}
+    The Build report form. Rendered into the Classify & Report tab's case report modal, and re-posted
+    when the template changes - a different template asks for different case_fields.
+{% endcomment %}
+{% if lab_error %}
+    <div class="alert alert-danger">{{ lab_error }}<br/><a href="{% url 'view_user_settings' %}">Please review your default lab here.</a></div>
+{% endif %}
+{% if not template %}
+    <div class="alert alert-warning">No case report template has been configured for this case.</div>
+{% else %}
+<form id="case-report-form" method="post"
+      data-dialog-url="{% url 'case_report_build_dialog' case_type case_id %}"
+      data-build-url="{% url 'create_case_report' case_type case_id %}"
+      action="{% url 'preview_case_report' case_type case_id %}" target="_blank">
+    {% csrf_token %}
+    {% for variant in variants %}
+        <input type="hidden" name="classification_modification_id" value="{{ variant.modification.pk }}" />
+    {% endfor %}
+
+    {% labelled label="Template" %}
+        <select class="form-control form-control-sm case-report-template" name="report_template">
+            {% for case_report_template in case_report_templates %}
+                <option value="{{ case_report_template.pk }}"{% if case_report_template.pk == template.pk %} selected{% endif %}>{{ case_report_template.pk }}</option>
+            {% endfor %}
+        </select>
+    {% endlabelled %}
+    {% if lab_form %}
+        {% labelled label="Lab" %}{{ lab_form.lab }}{{ lab_form.media }}{% endlabelled %}
+    {% endif %}
+
+    {% for group in template.case_field_groups %}
+        {% if group.name %}<h6 class="mt-3">{{ group.name }}</h6>{% endif %}
+        {% for field in group.fields %}
+            {% if field.type == "bool" %}
+                <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="checkbox" id="case_field_{{ field.key }}"
+                           name="case_field_{{ field.key }}"
+                           {% if case_values|get_item:field.key %}checked{% endif %} />
+                    <label class="form-check-label" for="case_field_{{ field.key }}">{{ field.label|default:field.key }}</label>
+                </div>
+            {% elif field.type == "choice" %}
+                {% labelled label=field.label|default:field.key %}
+                    {% with current=case_values|get_item:field.key %}
+                    <select class="form-control form-control-sm" name="case_field_{{ field.key }}">
+                        <option value=""></option>
+                        {% for option in field.options %}<option value="{{ option }}"{% if option == current %} selected{% endif %}>{{ option }}</option>{% endfor %}
+                    </select>
+                    {% endwith %}
+                {% endlabelled %}
+            {% else %}
+                {% labelled label=field.label|default:field.key %}
+                    <textarea class="form-control form-control-sm" rows="2" name="case_field_{{ field.key }}">{{ case_values|get_item:field.key|default_if_none:"" }}</textarea>
+                {% endlabelled %}
+            {% endif %}
+        {% endfor %}
+    {% endfor %}
+
+    {% labelled label="Summary interpretation" hint="the case level paragraph the report opens with" %}
+        <textarea class="form-control form-control-sm" rows="4" name="summary">{{ summary }}</textarea>
+    {% endlabelled %}
+
+    <h6 class="mt-3">Classifications, in report order</h6>
+    <table class="table table-sm">
+        <thead>
+            <tr><th>#</th><th>Gene</th><th>Change</th><th>Tier</th><th>VAF</th><th class="text-center">Report</th></tr>
+        </thead>
+        <tbody>
+        {% for variant in variants %}
+            <tr>
+                <td>{{ forloop.counter }}</td>
+                <td>{{ variant.gene_label }}</td>
+                <td>
+                    {{ variant.c_hgvs|default_if_none:variant.modification.classification.variant }}
+                    <a href="{{ variant.modification.classification.get_absolute_url }}" target="_blank"
+                       class="ml-1 small">{{ variant.modification.classification.friendly_label }}</a>
+                    {% for warning in variant.warnings %}
+                        <div class="text-danger small"><i class="fas fa-exclamation-triangle mr-1"></i>{{ warning }}</div>
+                    {% endfor %}
+                </td>
+                <td>{{ variant.amp_tier|default:"-" }}</td>
+                <td>{% if variant.vaf_percent is not None %}{{ variant.vaf_percent }}%{% endif %}</td>
+                <td class="text-center">
+                    <input type="checkbox" name="reported_{{ variant.modification.pk }}"
+                           aria-label="Include {{ variant.gene_label }} in the report"
+                           {% if variant.reported %}checked{% endif %} />
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="d-flex align-items-center mt-3">
+        <button type="submit" class="btn btn-outline-secondary btn-sm mr-2">Preview</button>
+        <button type="button" class="btn btn-primary btn-sm build-case-report">Build report</button>
+    </div>
+</form>
+{% endif %}

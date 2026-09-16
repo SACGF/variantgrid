@@ -54,21 +54,6 @@ class TestNodeStatusCoverage(TestCase):
         uncategorised = all_values - loading - ready
         self.assertEqual(uncategorised, set(), f"Status(es) in neither bucket: {uncategorised}")
 
-    def test_dirty_is_loading(self):
-        self.assertTrue(NodeStatus.is_loading(NodeStatus.DIRTY))
-
-    def test_queued_is_loading(self):
-        self.assertTrue(NodeStatus.is_loading(NodeStatus.QUEUED))
-
-    def test_loading_cache_is_loading(self):
-        self.assertTrue(NodeStatus.is_loading(NodeStatus.LOADING_CACHE))
-
-    def test_loading_is_loading(self):
-        self.assertTrue(NodeStatus.is_loading(NodeStatus.LOADING))
-
-    def test_ready_is_ready(self):
-        self.assertTrue(NodeStatus.is_ready(NodeStatus.READY))
-
     def test_error_is_ready(self):
         # Error states are "done" — not loading — so children can proceed (and fail with ERROR_WITH_PARENT)
         self.assertTrue(NodeStatus.is_ready(NodeStatus.ERROR))

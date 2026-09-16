@@ -5,22 +5,16 @@
 {{ block.super }}
 <script>
 	var mapIds = ["Locations-Map", "Families_Map"]
-	function tabActivateFunc(event, ui) {
-		var active = $("#tabs").tabs('option', 'active');
-		var mapName = mapIds[active];
-		var map = (window.leafletMaps || {})[mapName];
-		if (map) {
-			map.invalidateSize();
-		}
-	}
 
+	// Leaflet sizes a map to its container, so a map drawn in a hidden pane needs re-measuring
 	$(document).ready(function() {
-		console.log("init maps");
-		var tabs = $("#tabs");
-		tabs.tabs({"activate" : tabActivateFunc}).css({height: '100%'});
-		tabs.bind('tabsselect', function(event, ui) {
-   			$(".ui-tabs-panel", this).empty();
-				//;
+		const links = $("#tabs .nav-link");
+		links.on('shown.bs.tab', function() {
+			const mapName = mapIds[links.index(this)];
+			const map = (window.leafletMaps || {})[mapName];
+			if (map) {
+				map.invalidateSize();
+			}
 		});
 	});
 
@@ -49,12 +43,14 @@
 
 <div id='runx1-lab-locations'>
   <div id='tabs'>
-      <ul id='tab_selected'>
-        <li><a href='#Map1' data-toggle="tab">Labs</a></li>
-        <li><a href='#Map2' data-toggle="tab">Families</a></li>
+      <ul id='tab_selected' class="nav nav-tabs mb-4" role="tablist">
+        <li class="nav-item"><a class="nav-link show active" href='#Map1' data-toggle="tab" role="tab">Labs</a></li>
+        <li class="nav-item"><a class="nav-link" href='#Map2' data-toggle="tab" role="tab">Families</a></li>
       </ul>
-    <div id='Map1'>{% lab_locations samples_only=False involved_only=True zoom_level=2 %}</div>
-    <div id='Map2'>{% lab_families samples_only=False involved_only=False zoom_level=2 %}</div>
+    <div class="tab-content">
+      <div class="tab-pane show active" role="tabpanel" id='Map1'>{% lab_locations samples_only=False involved_only=True zoom_level=2 %}</div>
+      <div class="tab-pane" role="tabpanel" id='Map2'>{% lab_families samples_only=False involved_only=False zoom_level=2 %}</div>
+    </div>
   </div>
 </div>
 

@@ -10,6 +10,7 @@ from classification.models.discordance_models_utils import DiscordanceReportRowD
 from library.log_utils import log_saved_form
 from snpdb.lab_picker import LabPickerData
 from uicore.views.ajax_form_view import AjaxFormView, LazyRender
+from uicore.widgets.date_widget import NativeDateInput
 
 
 # IMPORTANT, THESE ARE THE OLD TRIAGE OBJECTS
@@ -22,7 +23,7 @@ class DiscordanceReportTriageForm(forms.ModelForm):
 
     triage_date = forms.DateField(
         label="Triage Date",
-        widget=forms.TextInput(attrs={"class": "date-picker form-control"}),
+        widget=NativeDateInput(attrs={"class": "form-control"}),
         required=True,
     )
     triage_status = forms.ChoiceField(

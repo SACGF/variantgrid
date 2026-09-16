@@ -1,3 +1,13 @@
+"""
+Cohorts and packed genotypes. Cohort orders a set of Samples (every VCF has one automatically; custom
+cohorts pick across VCFs, sub-cohorts share a parent's packing); CohortSample carries the packed
+index; CohortGenotypeCollection is one partition table per (cohort, version) - split into a common and
+an uncommon side by CohortGenotypeCommonFilterVersion - and CohortGenotype is one row per variant
+with every sample packed into arrays and the samples_zygosity string. Membership changes go through
+Cohort.set_samples (one version bump); query genotypes with CohortGenotypeCollection.get_annotation_kwargs
+and get_zygosity_q. The build task is snpdb/tasks/cohort_genotype_tasks.py; the named family
+structures over a Cohort (Trio, Quad, Duo) are in models_family.py.
+"""
 import logging
 from functools import cached_property
 from typing import Optional, Union
@@ -75,8 +85,14 @@ class Cohort(GuardianPermissionsAutoInitialSaveMixin, PreviewModelMixin, SortByP
         return super().can_write(user_or_group)
 
     @classmethod
+    def filter_writable_for_user(cls, user):
+        """ Batch can_write - a cohort behind a VCF takes the VCF's permission """
+        own = super().filter_writable_for_user(user)
+        return cls.objects.filter(Q(vcf__in=VCF.filter_writable_for_user(user)) | Q(pk__in=own))
+
+    @classmethod
     def preview_icon(cls) -> str:
-        return "fa-solid fa-people-arrows"
+        return "fa-solid fa-users"  # CohortNode wears this too - see get_node_class_icon
 
     @classmethod
     def preview_if_url_visible(cls) -> str:
@@ -93,10 +109,22 @@ class Cohort(GuardianPermissionsAutoInitialSaveMixin, PreviewModelMixin, SortByP
         )
 
     @property
-    def has_genotype(self):
+    def has_sample_columns(self) -> bool:
+        if self.vcf:
+            return self.vcf.has_sample_columns
+        return True  # Created cohorts must contain genotype
+
+    @property
+    def has_genotype(self) -> bool:
         if self.vcf:
             return self.vcf.has_genotype
-        return True  # Created cohorts must contain genotype
+        return True
+
+    @property
+    def has_depth(self) -> bool:
+        if self.vcf:
+            return self.vcf.has_depth
+        return True
 
     @property
     def data_archived(self) -> bool:
@@ -169,6 +197,54 @@ class Cohort(GuardianPermissionsAutoInitialSaveMixin, PreviewModelMixin, SortByP
                                              sort_order=i)
             # Will call increment_version() to bump cohort
         return ss
+
+    def set_samples(self, ordered_sample_ids: list[int]):
+        """ Replace membership with ordered_sample_ids (in display order) under a single version bump.
+
+            CohortGenotype packs every sample into fixed width arrays, so any membership change costs a
+            full rebuild regardless of how many samples moved - edits are batched and committed in one go.
+            Goes around CohortSample.save()/delete() as those bump the version per row. """
+        sample_ids = list(dict.fromkeys(ordered_sample_ids))
+        if not sample_ids:
+            raise ValueError("A cohort needs at least one sample")
+        sample_id_set = set(sample_ids)
+
+        cohort_sample_by_sample_id = {cs.sample_id: cs for cs in self.cohortsample_set.all()}
+        if removed_sample_ids := set(cohort_sample_by_sample_id) - sample_id_set:
+            self.cohortsample_set.filter(sample_id__in=removed_sample_ids).delete()
+
+        parent_packed_index = {}
+        if self.parent_cohort:
+            # Sub cohorts share the parent's packing so the parent's CohortGenotype rows stay usable
+            parent_packed_index = dict(self.parent_cohort.cohortsample_set.values_list(
+                "sample_id", "cohort_genotype_packed_field_index"))
+
+        used_packed_indexes = {cs.cohort_genotype_packed_field_index
+                               for sample_id, cs in cohort_sample_by_sample_id.items() if sample_id in sample_id_set}
+        next_packed_index = max(used_packed_indexes, default=-1) + 1
+
+        new_cohort_samples = []
+        resorted_cohort_samples = []
+        for sort_order, sample_id in enumerate(sample_ids):
+            if cohort_sample := cohort_sample_by_sample_id.get(sample_id):
+                if cohort_sample.sort_order != sort_order:
+                    cohort_sample.sort_order = sort_order
+                    resorted_cohort_samples.append(cohort_sample)
+                continue
+
+            packed_index = parent_packed_index.get(sample_id)
+            if packed_index is None or packed_index in used_packed_indexes:
+                while next_packed_index in used_packed_indexes:
+                    next_packed_index += 1
+                packed_index = next_packed_index
+            used_packed_indexes.add(packed_index)
+            new_cohort_samples.append(CohortSample(cohort=self, sample_id=sample_id,
+                                                   cohort_genotype_packed_field_index=packed_index,
+                                                   sort_order=sort_order))
+
+        CohortSample.objects.bulk_create(new_cohort_samples)
+        CohortSample.objects.bulk_update(resorted_cohort_samples, ["sort_order"])
+        self.increment_version()
 
     def get_cohort_samples(self):
         return self.cohortsample_set.all().select_related("sample", "sample__vcf").order_by("sort_order")
@@ -681,6 +757,7 @@ class SampleGenotype:
         self._cohort_genotype = cohort_genotype
         self.variant = cohort_genotype.variant
         self.sample = sample
+        self.sample_index = sample_index
         self.zygosity = self._get_sample_value("samples_zygosity", sample_index)
         self.allele_depth = self._get_sample_value("samples_allele_depth", sample_index)
         allele_frequency = self._get_sample_value("samples_allele_frequency", sample_index)
@@ -699,6 +776,32 @@ class SampleGenotype:
         else:
             value = array[sample_index]
         return value
+
+    @property
+    def copy_number_value(self) -> Optional[float]:
+        """ The caller's copy number or copy ratio, read out of the stored CohortGenotype JSON: this
+            sample's dict in the per-sample FORMAT list then the field's one-element array, falling
+            back to INFO for the single-sample VCFs that put it there. None when the VCF declares no
+            such field, or the record carries no value. Which quantity it is depends on the field -
+            @see VCF.copy_number_field and VCFConstant.COPY_NUMBER_FIELD_IS_RATIO.
+            The ORM twin of snpdb.grid_columns.grid_sample_columns.get_copy_number_annotation """
+        field = self.sample.vcf.copy_number_field
+        if not field:
+            return None
+
+        value = None
+        sample_formats = self._cohort_genotype.format
+        if sample_formats and self.sample_index < len(sample_formats):
+            value = sample_formats[self.sample_index].get(field)
+            if isinstance(value, list):
+                value = value[0] if value else None
+        if value is None:
+            value = self._cohort_genotype.info.get(field)
+
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return None
 
     def get_vcf_filters(self) -> list:
         """ List of VCF Filters (string) """
@@ -762,156 +865,6 @@ class CohortGenotype(models.Model):
 
     class Meta:
         unique_together = ("collection", "variant")
-
-
-class Trio(GuardianPermissionsAutoInitialSaveMixin, PreviewModelMixin, SortByPKMixin, TimeStampedModel):
-    """ A simple pedigree used frequently for Mendellian disease (TrioNode in analysis)
-        and karyomapping """
-    name = models.TextField(blank=True)
-    user = models.ForeignKey(User, null=True, on_delete=CASCADE)
-    cohort = models.ForeignKey(Cohort, on_delete=CASCADE)
-    mother = models.ForeignKey(CohortSample, related_name='trio_mother', on_delete=CASCADE)
-    mother_affected = models.BooleanField(default=False)
-    father = models.ForeignKey(CohortSample, related_name='trio_father', on_delete=CASCADE)
-    father_affected = models.BooleanField(default=False)
-    proband = models.ForeignKey(CohortSample, related_name='trio_proband', on_delete=CASCADE)
-
-    @classmethod
-    def get_permission_class(cls):
-        return Cohort
-
-    @classmethod
-    def preview_icon(cls) -> str:
-        return "fa-solid fa-people-roof"
-
-    @classmethod
-    def preview_if_url_visible(cls) -> str:
-        return "pedigree"
-
-    @property
-    def preview(self) -> 'PreviewData':
-        return self.preview_with(identifier=str(self))
-
-    def get_permission_object(self):
-        # Trio permissions based on cohort
-        return self.cohort
-
-    @classmethod
-    def _filter_from_permission_object_qs(cls, queryset):
-        return cls.objects.filter(cohort__in=queryset)
-
-    @property
-    def genome_build(self):
-        return self.cohort.genome_build
-
-    @property
-    def data_archived(self) -> bool:
-        return self.cohort.data_archived
-
-    def get_cohort_samples(self):
-        return [self.mother, self.father, self.proband]
-
-    def get_samples(self):
-        return Sample.objects.filter(cohortsample__in=self.get_cohort_samples()).order_by("pk")
-
-    def get_absolute_url(self):
-        return reverse('view_trio', kwargs={"pk": self.pk})
-
-    def get_listing_url(self):
-        return reverse('trios')
-
-    @property
-    def mother_details(self):
-        affected = "affected" if self.mother_affected else "unaffected"
-        return f"{self.mother} ({affected})"
-
-    @property
-    def father_details(self):
-        affected = "affected" if self.father_affected else "unaffected"
-        return f"{self.father} ({affected})"
-
-    def __str__(self):
-        return self.name or f"Trio {self.pk}"
-
-
-class Quad(GuardianPermissionsAutoInitialSaveMixin, PreviewModelMixin, SortByPKMixin, TimeStampedModel):
-    """Mother + Father + Proband + Sibling.
-
-    Extends the Trio concept to 4 family members. The sibling (typically
-    unaffected) narrows down candidate variants because they share the same
-    parental genome without sharing the proband's phenotype.
-    """
-    name = models.TextField(blank=True)
-    user = models.ForeignKey(User, null=True, on_delete=CASCADE)
-    cohort = models.ForeignKey(Cohort, on_delete=CASCADE)
-    mother = models.ForeignKey(CohortSample, related_name='quad_mother', on_delete=CASCADE)
-    mother_affected = models.BooleanField(default=False)
-    father = models.ForeignKey(CohortSample, related_name='quad_father', on_delete=CASCADE)
-    father_affected = models.BooleanField(default=False)
-    proband = models.ForeignKey(CohortSample, related_name='quad_proband', on_delete=CASCADE)
-    sibling = models.ForeignKey(CohortSample, related_name='quad_sibling', on_delete=CASCADE)
-    sibling_affected = models.BooleanField(default=False)
-
-    @classmethod
-    def get_permission_class(cls):
-        return Cohort
-
-    @classmethod
-    def preview_icon(cls) -> str:
-        return "fa-solid fa-people-roof"
-
-    @classmethod
-    def preview_if_url_visible(cls) -> str:
-        return "pedigree"
-
-    @property
-    def preview(self) -> 'PreviewData':
-        return self.preview_with(identifier=str(self))
-
-    def get_permission_object(self):
-        return self.cohort
-
-    @classmethod
-    def _filter_from_permission_object_qs(cls, queryset):
-        return cls.objects.filter(cohort__in=queryset)
-
-    @property
-    def genome_build(self):
-        return self.cohort.genome_build
-
-    @property
-    def data_archived(self) -> bool:
-        return self.cohort.data_archived
-
-    def get_cohort_samples(self):
-        return [self.mother, self.father, self.proband, self.sibling]
-
-    def get_samples(self):
-        return Sample.objects.filter(cohortsample__in=self.get_cohort_samples()).order_by("pk")
-
-    def get_absolute_url(self):
-        return reverse('view_quad', kwargs={"pk": self.pk})
-
-    def get_listing_url(self):
-        return reverse('quads')
-
-    @property
-    def mother_details(self):
-        affected = "affected" if self.mother_affected else "unaffected"
-        return f"{self.mother} ({affected})"
-
-    @property
-    def father_details(self):
-        affected = "affected" if self.father_affected else "unaffected"
-        return f"{self.father} ({affected})"
-
-    @property
-    def sibling_details(self):
-        affected = "affected" if self.sibling_affected else "unaffected"
-        return f"{self.sibling} ({affected})"
-
-    def __str__(self):
-        return self.name or f"Quad {self.pk}"
 
 
 # This has to be in this file so we don't end up with circular references

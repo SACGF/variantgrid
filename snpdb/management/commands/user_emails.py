@@ -5,6 +5,8 @@ from django.utils import timezone
 
 
 class Command(BaseCommand):
+    category = "ops"
+
     def add_arguments(self, parser):
         parser.add_argument('--weeks', type=int, default=26)
         parser.add_argument('--separator', default=";")

@@ -28,6 +28,8 @@ def random_base(not_base=None):
 
 
 class Command(BaseCommand):
+    category = "dev"
+
     def add_arguments(self, parser):
         parser.add_argument('--num-variants', type=int, default=10)
 

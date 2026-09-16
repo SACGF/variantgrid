@@ -81,28 +81,23 @@
 
         <form id="active-template-version-form" method="post">
             {% csrf_token %}
-        {%  if analysis_template_versions.exists %}
-            <h4>Historical versions:</h4>
-
-
-            {{ atv_form.non_field_errors }}
-            {% for hidden_field in atv_form.hidden_fields %}
-                {{ hidden_field.errors }}
-                {{ hidden_field }}
-            {% endfor %}
+        {%  if has_versions %}
+            <h4>Versions:</h4>
 
             <table class="table">
                 <tr>
                     <th>Version</th>
                     <th>Created</th>
-                    <th>Active</th>
+                    <th>Status</th>
                     <th>Name template</th>
                     <th>Autocomplete</th>
                     <th>Links</th>
                     <th>Requires Somatic</th>
                     <th>Requires Sample Gene List</th>
+                    <th></th>
+                    <th></th>
                 </tr>
-            {% for atv in analysis_template_versions %}
+            {% for atv, atv_form in analysis_template_versions %}
                 <tr>
                     <td>
                         <a href="{% url 'analysis' atv.analysis_snapshot.pk %}">v.{{ atv.version }}</a>
@@ -110,8 +105,19 @@
                     <td>
                         {{ atv.created | localtime }}
                     </td>
-                    <td>{{ atv.active }}</td>
-                {% if atv.active and atv_form and has_write_permission %}
+                    <td>
+                        {% if atv.active %}
+                            <span class="badge badge-success">Active</span>
+                        {% elif atv.is_draft %}
+                            <span class="badge badge-warning">Draft</span>
+                        {% endif %}
+                    </td>
+                {% if atv_form and has_write_permission %}
+                        {{ atv_form.non_field_errors }}
+                        {% for hidden_field in atv_form.hidden_fields %}
+                            {{ hidden_field.errors }}
+                            {{ hidden_field }}
+                        {% endfor %}
                         <td>{{ atv_form.analysis_name_template }}{{ atv_form.analysis_name_template.errors }}</td>
                         <td>{{ atv_form.appears_in_autocomplete }}{{ atv_form.appears_in_autocomplete.errors }}</td>
                         <td>{{ atv_form.appears_in_links }}{{ atv_form.appears_in_links.errors }}</td>
@@ -119,7 +125,7 @@
                         <td>{{ atv_form.requires_sample_gene_list }}{{ atv_form.requires_sample_gene_list.errors }}</td>
                         <td>
                             {{ atv_form.errors }}
-                            <button type="submit" name="{{atv_form.prefix}}" class="btn btn-primary">save</button>
+                            <button type="submit" name="{{ atv_form.prefix }}" class="btn btn-primary">save</button>
                         </td>
                 {% else %}
                     <td>{{ atv.analysis_name_template }}</td>
@@ -129,17 +135,38 @@
                     <td>{{ atv.requires_sample_gene_list }}</td>
                     <td><!-- Empty to make space for button on atv_form --></td>
                 {% endif %}
+                    <td>
+                    {% if has_write_permission and not atv.active %}
+                        {# The activate form itself sits outside this one - forms can't nest #}
+                        {% if atv.is_draft %}
+                            <button type="submit" form="activate-atv-{{ atv.pk }}"
+                                    class="btn btn-primary btn-sm">Make active</button>
+                        {% else %}
+                            <button type="submit" form="activate-atv-{{ atv.pk }}" class="btn btn-outline-primary btn-sm"
+                                    title="Re-activate this version">Make active</button>
+                        {% endif %}
+                    {% endif %}
+                    </td>
                 </tr>
             {% endfor %}
 
             </table>
-            {{ atv_form.media }}
 
         {% else %}
            This analysis has no saved template versions.
         {% endif %}
 
         </form>
+
+        {% if has_write_permission %}
+            {% for atv, atv_form in analysis_template_versions %}
+                {% if not atv.active %}
+                <form id="activate-atv-{{ atv.pk }}" method="post"
+                      action="{% url 'analysis_template_version_activate' atv.pk %}">{% csrf_token %}</form>
+                {% endif %}
+            {% endfor %}
+        {% endif %}
+
     </p>
 
 {% endblock submenu_page_content %}

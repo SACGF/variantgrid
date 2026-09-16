@@ -1,3 +1,10 @@
+"""
+Telling humans and Rollbar what happened: report_exc_info / report_message for caught problems,
+log_admin_change for audit, and the NotificationBuilder family (AdminNotificationBuilder here,
+LabNotificationBuilder in snpdb) that renders header / field / markdown blocks to Slack and email.
+`send_notification` is the raw Slack hook, falling back to Rollbar when Slack is unconfigured and
+truncating at SLACK_CHARACTER_LIMIT. The current request is found through django-threadlocals.
+"""
 import json
 import logging
 import re

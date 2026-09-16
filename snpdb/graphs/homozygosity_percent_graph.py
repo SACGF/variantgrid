@@ -6,7 +6,7 @@ import numpy as np
 from django.db.models import Count, ExpressionWrapper, F, IntegerField
 
 from library.genomics import get_genomic_size_description
-from library.graphs.chromosomes_graph import plot_chromosomes
+from library.graphs.chromosomes_graph import plot_chromosome_bin_values, plot_chromosomes
 from library.utils import sha256sum_str
 from snpdb.graphs.graphcache import CacheableGraph
 from snpdb.models import Sample, Variant
@@ -110,30 +110,8 @@ class HomozygosityPercentGraph(CacheableGraph):
 
         logging.debug("HomozygosityPercentGraph: %d bins", num_bins)
 
-        for chrom, (xranges, yranges) in chrom_ranges.items():
-            bins = chrom_homo_percent[chrom]
-            num_bins = len(bins) + 1
-            x_pos = np.arange(num_bins) * BIN_SIZE
-
-            # Get into right dimensions
-            bins = [bins]
-            # pcolor says x,y should have dimensions 1 greater than colors
-            x_pos = [x_pos, x_pos]
-            y_top = np.empty(num_bins)
-            y_top.fill(yranges[0])
-            y_bottom = np.empty(num_bins)
-            y_bottom.fill(yranges[0] + yranges[1])
-            y_pos = [y_top + density_padding,
-                     y_bottom - density_padding]
-
-            x = np.array(x_pos)
-            y = np.array(y_pos)
-            c = np.array(bins)
-
-            masked_c = np.ma.masked_invalid(c)
-            quadmesh = ax.pcolormesh(x, y, masked_c, cmap=self.cmap, alpha=density_alpha)
-            quadmesh.set_clim(vmin=0, vmax=100.0)
-            self.im = quadmesh  # Just need one
+        self.im = plot_chromosome_bin_values(ax, chrom_ranges, chrom_homo_percent, BIN_SIZE, self.cmap,
+                                             100.0, density_padding, density_alpha)
 
         bin_size_description = get_genomic_size_description(BIN_SIZE)
         ax.set_title(f"{self.sample.name}\n(min depth {MIN_DEPTH}, min {MIN_VARIANTS_PER_BIN} variants per {bin_size_description})")

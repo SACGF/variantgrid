@@ -7,6 +7,7 @@ from django.db import models
 from django.db.models.query_utils import Q
 
 from analysis.models import AnalysisNode
+from analysis.models.nodes.node_display import NodeIcon
 from annotation.models import VariantAnnotation
 
 
@@ -183,6 +184,10 @@ class ConservationNode(AnalysisNode):
     @staticmethod
     def get_node_class_label():
         return "Conservation"
+
+    @classmethod
+    def get_node_class_icon(cls) -> NodeIcon:
+        return NodeIcon(symbol="node-icon-conservation")
 
 
 auditlog.register(ConservationNode)

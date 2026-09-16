@@ -12,7 +12,6 @@
                 target: targetParent,
             };
             $('form#patient-extractions-form').ajaxForm(options);
-            $(".date-picker").datepicker({changeYear: true, yearRange: "-120:+0"});
 
             var title = "Extractions";
             {% if num_extractions %}

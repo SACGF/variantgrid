@@ -9,6 +9,8 @@ from genes.hgvs import HGVSMatcher
 
 
 class Command(BaseCommand):
+    category = "one-off"
+
     def handle(self, *args, **options):
         update_time = 5
 

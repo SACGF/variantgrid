@@ -9,6 +9,8 @@ from snpdb.models import Allele, AlleleLiftover, ClinGenAllele, Contig, Variant
 class Command(BaseCommand):
     """ Indel representation in g.HGVS doesn't have reference base - so we may have variants with
         different reference bases linked to an allele """
+    category = "maintenance"
+
     def add_arguments(self, parser):
         parser.add_argument('--dry-run', help="Just report, don't unlink variants from allele if incorrect", action='store_true')
 

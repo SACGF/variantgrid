@@ -28,6 +28,8 @@ class Command(BaseCommand):
         We can't just look up the reference as it may need to be normalized
 
     """
+    category = "one-off"
+
     def add_arguments(self, parser):
         parser.add_argument('--dry-run', action='store_true')
 

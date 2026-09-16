@@ -37,10 +37,22 @@ from snpdb.models import Variant
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_loci_and_variants_for_vcf
 
+# VEP version each columns_version's fixtures were generated against (see the ##VEP= header in
+# annotation/tests/test_data/test_columns_version*.vep_annotated.vcf). VEPColumnDefs are gated on
+# vep_version as well as columns_version, so this has to be pinned alongside the data files below -
+# a developer whose env settings point at an older local VEP install would otherwise silently drop
+# columns from the importer bindings and leave the scores unset.
+FIXTURE_VEP_VERSIONS = {
+    1: "110",
+    2: "110",
+    3: "112",
+    4: "115",
+    5: "116",
+}
+
 
 def get_fake_annotation_settings_dict(columns_version: int) -> dict:
-    TEST_IMPORT_PROCESSING_DIR = os.path.join(settings.PRIVATE_DATA_ROOT, 'import_processing',
-                                              "test", str(uuid4()))
+    TEST_IMPORT_PROCESSING_DIR = os.path.join(settings.IMPORT_PROCESSING_DIR, "test", str(uuid4()))
 
     TEST_ANNOTATION = copy.deepcopy(settings.ANNOTATION)
     # phastCons/phyloP custom tracks: v1-v3 fixtures were generated without the bigwig data, so disable
@@ -125,6 +137,7 @@ def get_fake_annotation_settings_dict(columns_version: int) -> dict:
         "IMPORT_PROCESSING_DIR": TEST_IMPORT_PROCESSING_DIR,
         "VARIANT_ZYGOSITY_GLOBAL_COLLECTION": "global",
         "ANNOTATION_VEP_FAKE_VERSION": True,
+        "ANNOTATION_VEP_VERSION": FIXTURE_VEP_VERSIONS[columns_version],
         # AnnotSV is off in the shipped defaults - pin it so a developer who enables it locally doesn't
         # trip the SV guards. Tests that want it on override at the method level.
         "ANNOTATION_ANNOTSV_ENABLED": False,
@@ -179,7 +192,8 @@ def get_fake_annotation_version(genome_build: GenomeBuild):
     gene_annotation_import = GeneAnnotationImport.objects.get_or_create(genome_build=genome_build,
                                                                         annotation_consortium=AnnotationConsortium.ENSEMBL,
                                                                         url="fake")[0]
-    gene_annotation_release = GeneAnnotationRelease.objects.get_or_create(version="42",  # TextField
+    # Dotted version, like the real NCBI/Ensembl releases - it ends up in labels and column names
+    gene_annotation_release = GeneAnnotationRelease.objects.get_or_create(version="42.20240101",  # TextField
                                                                           genome_build=genome_build,
                                                                           annotation_consortium=AnnotationConsortium.ENSEMBL,
                                                                           defaults={
@@ -192,9 +206,10 @@ def get_fake_annotation_version(genome_build: GenomeBuild):
     # Each sub-version save() would otherwise bump AnnotationVersion, so we'd build and discard 4 of
     # them on the way to the one we create below.
     with SubVersionPartition.defer_new_sub_version():
+        # gnomad_import_date is a default, not a lookup key - as a key every call created a new row
         gene_annotation_version = GeneAnnotationVersion.objects.get_or_create(gene_annotation_release=gene_annotation_release,
                                                                               ontology_version=ontology_version,
-                                                                              gnomad_import_date=timezone.now())[0]
+                                                                              defaults={"gnomad_import_date": timezone.now()})[0]
 
         vav_kwargs = get_fake_vep_version(genome_build, AnnotationConsortium.ENSEMBL, 2)
         vav_kwargs["gene_annotation_release"] = gene_annotation_release
@@ -219,6 +234,15 @@ def get_fake_annotation_version(genome_build: GenomeBuild):
                                                     human_protein_atlas_version=human_protein_atlas_version,
                                                     ontology_version=ontology_version)
     return av
+
+
+def retire_seeded_annotation_version(genome_build: GenomeBuild):
+    """ variantgrid/test_runner.py:VariantGridTestRunner seeds an ACTIVE VariantAnnotationVersion per build,
+        and one_active_vav_per_build allows only one - so a test that needs its own (a particular consortium,
+        columns_version or unpinned fields) retires the seeded one first. """
+    VariantAnnotationVersion.objects.filter(genome_build=genome_build,
+                                            status=VariantAnnotationVersion.Status.ACTIVE) \
+                                    .update(status=VariantAnnotationVersion.Status.HISTORICAL)
 
 
 def create_fake_variants(genome_build: GenomeBuild):

@@ -14,6 +14,11 @@ from django.conf import settings
 from library.utils.file_utils import name_from_filename
 from snpdb.variants_to_vcf import VARIANT_GRID_INFO_DICT, write_contig_sorted_values_to_vcf_file
 
+# Prefix of a run's scratch dir under settings.IMPORT_PROCESSING_DIR (where the bulk inserter writes the
+# CSVs it SQL COPYs from). Here rather than on the inserter so AnnotationRun can name the dir it owns
+# without importing the annotation pipeline.
+ANNOTATION_RUN_IMPORT_PROCESSING_PREFIX = "annotation_run"
+
 
 def get_annotated_filename(annotation_run, vcf_dump_filename) -> str:
     """ Path VEP writes its annotated VCF to for a given dump. Derived from the dump stem, which #1658

@@ -5,6 +5,7 @@ from snpdb.models.vcf_replace_data import vcf_replace_data
 
 
 class Command(BaseCommand):
+    category = "maintenance"
     help = 'Copy data from a one VCF to another (with the same samples)'
 
     def add_arguments(self, parser):

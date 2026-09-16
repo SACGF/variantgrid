@@ -9,6 +9,7 @@ from snpdb.models import Lab
 
 
 class Command(BaseCommand):
+    category = "maintenance"
 
     def add_arguments(self, parser):
         parser.add_argument('--key', type='str', required=True)

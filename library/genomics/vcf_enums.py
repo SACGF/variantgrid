@@ -1,3 +1,8 @@
+"""
+VCF-level constants that both the importer and the writers share: column positions (VCFColumns),
+the symbolic alts (VCFSymbolicAllele, and GeneLevelSymbolicAlt for gene-level events on the fake
+contig), header constants, and VariantClass (Ensembl's VARIANT_CLASS terms).
+"""
 import re
 from typing import Optional
 
@@ -29,27 +34,29 @@ class VCFSymbolicAllele:
 class GeneIdNamespace(models.TextChoices):
     """ Whether the number in a gene-level alt means anything outside this deployment.
         HGNC is the same gene everywhere; GENE is a local id for a symbol HGNC doesn't carry -
-        @see genes.models.FusionGeneId for what to send instead when a record leaves. """
+        @see genes.models.GeneLevelId for what to send instead when a record leaves. """
     HGNC = "HGNC", "HGNC ID"
     GENE = "GENE", "Local gene ID"
 
 
 class GeneLevelSymbolicAlt(models.TextChoices):
-    """ Symbolic alts for gene-level events (gene fusions), which live on the shared gene-level contig
-        with the anchor gene's FusionGeneId as position. The alt carries the partner's id, so
-        biological identity hashes to its own Sequence and therefore its own Variant.
+    """ Symbolic alts for gene-level events, which live on the shared gene-level contig with a
+        GeneLevelId as position. The alt carries the id the event is about, so biological identity
+        hashes to its own Sequence and therefore its own Variant.
 
         Encoding identity in the alt is what lets the existing (locus, alt, svlen) unique constraint do
         the work - @see snpdb.gene_level_variants for why these are Variants at all.
 
         FUSION is directional - the anchor is the 5' partner, so BCR-ABL1 and ABL1-BCR are distinct.
         FUSION_UNORDERED anchors on the smaller id, because an unordered report asserts no direction.
-        AMP/LOSS are for callers reporting a gene-level copy event with no coordinates at all. """
+        GAIN/LOSS are a whole-gene copy number call with no coordinates at all: they repeat the
+        position's own gene, so the alt alone says what the variant is. GAIN rather than AMP because
+        the threshold that makes a gain an amplification is the lab's, not ours. """
 
     FUSION = "FUSION", "Gene fusion"
     FUSION_UNORDERED = "FUSION_UNORDERED", "Gene fusion (direction not asserted)"
-    AMP = "AMP", "Gene amplification"
-    LOSS = "LOSS", "Gene loss"
+    GAIN = "GAIN", "Gene copy number gain"
+    LOSS = "LOSS", "Gene copy number loss"
 
     # A partner the caller left unspecified, in place of the namespace:id
     UNKNOWN_PARTNER = Constant("UNKNOWN")
@@ -90,6 +97,12 @@ class VCFConstant:
     GENOTYPE_LIKELIHOOD = "GL"
     ALT_DEPTH_FIELD = "AO"  # FreeBayes - Alternate allele observation count
     REF_DEPTH_FIELD = "RO"  # FreeBayes - Reference allele observation count
+    # The FORMAT (or, for a single-sample VCF, INFO) keys a caller writes copy number under, best
+    # first: CN is an integer copy number, SM a linear copy ratio (DRAGEN), FC a fold change (Pisces)
+    COPY_NUMBER_FIELDS = ("CN", "SM", "FC")
+    # Which of those is a ratio against the normal rather than an absolute count. They are different
+    # quantities, so a classification stores each under its own evidence key (copy_number / fold_change)
+    COPY_NUMBER_FIELD_IS_RATIO = {"CN": False, "SM": True, "FC": True}
 
 
 class VariantClass(models.TextChoices):
@@ -145,6 +158,64 @@ class VariantClass(models.TextChoices):
     INSERTION = 'IS', "insertion"
     SEQUENCE_ALTERATION = 'SA', "sequence_alteration"
     PROBE = 'PR', "probe"
+    # Not an Ensembl class - VEP has none for a fusion, and a gene-level variant never reaches it anyway.
+    # SO:0001565, the term SnpEff emits. @see snpdb.gene_level_variants
+    GENE_FUSION = 'GF', "gene_fusion"
+
+
+# Presentation grouping for variant type filters - every VariantClass belongs to exactly one group.
+# A new VEP class is an enum member plus a line here.
+VARIANT_CLASS_GROUPS = {
+    "SNV": [
+        VariantClass.SNV,
+    ],
+    "Indel": [
+        VariantClass.INSERTION,
+        VariantClass.DELETION,
+        VariantClass.INDEL,
+        VariantClass.SUBSTITUTION,
+        VariantClass.COMPLEX_SUBSTITUTION,
+        VariantClass.SEQUENCE_ALTERATION,
+    ],
+    "Copy number": [
+        VariantClass.COPY_NUMBER_GAIN,
+        VariantClass.COPY_NUMBER_LOSS,
+        VariantClass.COPY_NUMBER_VARIATION,
+        VariantClass.DUPLICATION,
+        VariantClass.TANDEM_DUPLICATION,
+    ],
+    "Rearrangement": [
+        VariantClass.INVERSION,
+        VariantClass.TRANSLOCATION,
+        VariantClass.INTERCHROMOSOMAL_TRANSLOCATION,
+        VariantClass.INTRACHROMOSOMAL_TRANSLOCATION,
+        VariantClass.CHROMOSOME_BREAKPOINT,
+        VariantClass.INTERCHROMOSOMAL_BREAKPOINT,
+        VariantClass.INTRACHROMOSOMAL_BREAKPOINT,
+        VariantClass.COMPLEX_STRUCTURAL_ALTERATION,
+        VariantClass.LOSS_OF_HETEROZYGOSITY,
+    ],
+    "Fusion": [
+        VariantClass.GENE_FUSION,
+    ],
+    "Other": [
+        VariantClass.ALU_INSERTION,
+        VariantClass.HERV_INSERTION,
+        VariantClass.LINE1_INSERTION,
+        VariantClass.SVA_INSERTION,
+        VariantClass.MOBILE_ELEMENT_INSERTION,
+        VariantClass.MOBILE_ELEMENT_DELETION,
+        VariantClass.ALU_DELETION,
+        VariantClass.HERV_DELETION,
+        VariantClass.LINE1_DELETION,
+        VariantClass.SVA_DELETION,
+        VariantClass.NOVEL_SEQUENCE_INSERTION,
+        VariantClass.TANDEM_REPEAT,
+        VariantClass.SHORT_TANDEM_REPEAT_VARIATION,
+        VariantClass.GENETIC_MARKER,
+        VariantClass.PROBE,
+    ],
+}
 
 
 INFO_LIFTOVER_SWAPPED_REF_ALT = "VG_LIFTOVER_SWAPPED_REF_ALT"

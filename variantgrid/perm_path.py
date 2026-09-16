@@ -6,6 +6,9 @@ Replace path() with perm_path in your urls.urlpatterns[]
 
 You can't return None to urlpatterns so need to redirect or something...
 
+A named view goes through path() / re_perm_path(); a DRF router's patterns, which Django builds itself and
+so never pass through here, go through router_urls().
+
 """
 import logging
 from collections import defaultdict
@@ -14,7 +17,7 @@ from collections.abc import Mapping
 from django.conf import settings
 from django.urls.conf import path as django_path
 from django.urls.conf import re_path
-from django.urls.resolvers import get_resolver
+from django.urls.resolvers import URLPattern, get_resolver
 
 from library.cache import timed_cache
 from library.django_utils import require_superuser
@@ -42,6 +45,16 @@ def path(route, view, **kwargs):
 
 def re_perm_path(route, view, **kwargs):
     return _perm_path(route, view, re_path, **kwargs)
+
+
+def router_urls(router) -> list[URLPattern]:
+    """ A DRF router's patterns with URLS_NAME_REGISTER applied, as path() does for a named view """
+    urls = []
+    for url in router.urls:
+        if url.name is not None and not settings.URLS_NAME_REGISTER[url.name]:
+            url = URLPattern(url.pattern, require_superuser(url.callback), url.default_args, url.name)
+        urls.append(url)
+    return urls
 
 
 @timed_cache()

@@ -1,3 +1,10 @@
+"""
+Raw-SQL helpers: queryset_to_sql and get_queryset_select_from_where_parts turn a QuerySet into SQL
+text to embed in COPY / INSERT statements, dictfetchall / iter_dictfetchall / iter_db_results read
+cursors, sql_delete_qs deletes by a queryset's WHERE without loading rows (dangerous - read it first)
+and postgres_arrays formats array literals.
+"""
+import contextlib
 import json
 from collections.abc import Iterable
 from typing import Any, Optional, TypeVar, Generic, Type, Callable
@@ -8,6 +15,8 @@ from django.db import connection, transaction, models
 
 # 970: Added transaction wrapper due to Postgres hanging query
 from django.db.models import QuerySet
+from django.db.models.lookups import In
+from django.db.models.sql.where import NothingNode
 from django.db.models.enums import TextChoices, IntegerChoices
 from django_json_widget.widgets import JSONEditorWidget
 
@@ -31,6 +40,34 @@ def get_postgresql_version() -> str:
         cursor.execute('SHOW server_version')
         version = cursor.fetchone()[0]
     return version
+
+
+@contextlib.contextmanager
+def render_empty_result_set_sql():
+    """ Django short circuits provably empty predicates (eg "pk__in=[]") by raising EmptyResultSet during
+        compilation, so there's no SQL to look at. For debugging we want to see the query anyway, so compile
+        those to equivalent SQL that matches nothing.
+
+        Patches are global for the duration - a concurrent query that would have short circuited runs the
+        (still empty) SQL instead. """
+
+    def _in_process_rhs(self, compiler, connection_):
+        if self.rhs_is_direct_value() and not [r for r in self.rhs if r is not None]:
+            return "(NULL)", []
+        return original_in_process_rhs(self, compiler, connection_)
+
+    def _nothing_as_sql(*_args, **_kwargs):
+        return "0 = 1", []
+
+    original_in_process_rhs = In.process_rhs
+    original_nothing_as_sql = NothingNode.as_sql
+    In.process_rhs = _in_process_rhs
+    NothingNode.as_sql = _nothing_as_sql
+    try:
+        yield
+    finally:
+        In.process_rhs = original_in_process_rhs
+        NothingNode.as_sql = original_nothing_as_sql
 
 
 def queryset_to_sql(queryset: QuerySet, pretty=False) -> str:

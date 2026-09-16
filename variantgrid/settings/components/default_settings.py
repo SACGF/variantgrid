@@ -10,6 +10,7 @@ import os
 import re
 import socket
 import sys
+import tempfile
 from collections import defaultdict
 
 from library.django_utils.django_secret_key import get_or_create_django_secret_key
@@ -126,7 +127,7 @@ MAJOR_OPERATION_SLOT_EXPIRE_SECONDS = 10 * 60  # Safety TTL so a crashed request
 CACHE_HOURS = 48
 TIMEOUT = 60 * 60 * CACHE_HOURS
 REDIS_PORT = 6379
-CACHE_VERSION = 45  # increment to flush caches (eg if invalid due to upgrade)
+CACHE_VERSION = 55  # increment to flush caches (eg if invalid due to upgrade)
 if UNIT_TEST:
     # In-process cache, so tests don't read/write the dev Redis (state leaking between runs)
     CACHES = {
@@ -139,6 +140,9 @@ if UNIT_TEST:
             "LOCATION": "debug-panel",
         },
     }
+    # Django's PBKDF2 is ~1s per hash (1.5M iterations) and the suite creates ~75 users. Nothing
+    # asserts on the hash format, and client.login() works because the same hasher verifies.
+    PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
 else:
     CACHES = {
         'default': {
@@ -387,6 +391,11 @@ VCF_DOWNLOAD_ADMIN_ONLY = False
 VCF_IMPORT_CREATE_COHORT_FROM_MULTISAMPLE_VCFS = True
 VCF_IMPORT_NO_DNA_CONTROL_SAMPLE_REGEX = None
 VCF_IMPORT_FILE_SPLIT_ROWS = 50000
+# The INFO keys a CNV caller names the gene of a whole-gene call in - DRAGEN's TSO500 CNV output
+# writes SEGID. A VCF declaring one is imported as gene-level copy number events rather than
+# coordinates (@see snpdb.gene_level_variants), so this decides what claims the file at upload, the
+# way VCFConstant.COPY_NUMBER_FIELDS decides which key the copy ratio is read from
+VCF_GENE_LEVEL_SEGMENT_FIELDS = ("SEGID",)
 VCF_IMPORT_SKIP_RECORD_REGEX = {
     "Fusion": "VARTYPE=fusion",
 }
@@ -439,7 +448,8 @@ PATIENT_PHENOTYPE_EXCLUDE_STRING = "----needs human review"
 PATIENT_EXTRACTION_MATCH_PENDING_DAYS = 3
 # Deployments with no tracking system to quote identifiers: a regex read against a VCF sample name,
 # whose 'extraction' named group is the extraction's reference_id. Only consulted where nothing was
-# posted, so it can never override a client
+# posted, so it can never override a client. The group names only the extraction, and reference_id is
+# unique per specimen rather than globally, so a match under two specimens parks as Needs attention
 PATIENT_EXTRACTION_SAMPLE_NAME_REGEX = None  # eg r"(?P<extraction>\d{10}[A-Z])$"
 # An external_manager the API doesn't recognise is a typo on an intranet deployment, where the set of
 # tracking systems is known - so only a superuser creates one via the API. A public server taking
@@ -447,6 +457,11 @@ PATIENT_EXTRACTION_SAMPLE_NAME_REGEX = None  # eg r"(?P<extraction>\d{10}[A-Z])$
 PATIENTS_API_EXTERNAL_MANAGER_CREATE_ADMIN_ONLY = True
 IMPORT_PROCESSING_DIR = os.path.join(PRIVATE_DATA_ROOT, 'import_processing')
 IMPORT_PROCESSING_DELETE_TEMP_FILES_ON_SUCCESS = True
+if UNIT_TEST:
+    # A test that builds an UploadPipeline writes pipeline_<test-db pk> wherever this points, and test-db
+    # pks collide with the dev database's - so keep the suite out of the real tree entirely (#928).
+    # VariantGridTestRunner.teardown_test_environment removes this
+    IMPORT_PROCESSING_DIR = os.path.join(tempfile.gettempdir(), "variantgrid_unit_test_import_processing")
 
 # Where partition dump files are written when an archivable model (VAV, ClinVarVersion, CohortGenotypeCollection, ...)
 # is archived via the pre-drop archival pipeline (#1537).
@@ -473,6 +488,16 @@ LIFTOVER_BCFTOOLS_PLUGIN_DIR = "/usr/share/bcftools/plugins"
 LIFTOVER_BCFTOOLS_ALLOW_SWAP = False
 
 BCFTOOLS_COMMAND = "bcftools"  # if not absolute, needs to be in path
+
+# Pfam protein domains are fetched per-gene from the InterPro API the first time a gene's graph is
+# viewed, then cached in PfamDomains - @see https://github.com/SACGF/variantgrid/issues/1554
+PFAM_INTERPRO_LAZY_DOMAINS = True
+PFAM_INTERPRO_API_URL = "https://www.ebi.ac.uk/interpro/api"
+PFAM_INTERPRO_TIMEOUT_SECONDS = 30
+PFAM_INTERPRO_MAX_WORKERS = 8
+# Genes with a lot of UniProt sequences would otherwise stall a page - whatever hasn't come back by
+# then is left unstamped, and picked up by the next view
+PFAM_INTERPRO_DEADLINE_SECONDS = 20
 
 PANEL_APP_CACHE_DAYS = 7  # Automatically re-check after this time
 GENE_RELATION_PANEL_APP_LIVE_UPDATE = False  # Use GenCC cached result if False, poll panel app if True
@@ -540,6 +565,9 @@ ANALYSIS_DUAL_SCREEN_MODE_FEATURE_ENABLED = False  # Currently broken
 ANALYSIS_TEMPLATES_AUTO_SAMPLE = "Sample tab auto analysis"
 ANALYSIS_TEMPLATES_AUTO_COHORT_EXPORT = "Cohort VCF Export auto analysis"
 ANALYSIS_WARN_IF_NO_QC_GENE_LIST_MESSAGE = None  # disabled by default
+# Which Patient -> Specimen -> Extraction -> Sample levels a SampleNode can be pointed at in its
+# editor. A deployment with no patient data trims this down to just the sample
+ANALYSIS_SAMPLE_NODE_LEVELS = ["S", "E", "P", "T"]
 ANALYSIS_NODE_CACHE_Q = True
 # Node dispatch throttles (see analysis.tasks.analysis_update_tasks). A single dispatch leases at
 # most this many nodes for one analysis - a node finishing re-triggers the dispatcher, so a wide
@@ -555,6 +583,9 @@ ANALYSIS_NODE_DISPATCH_BACKLOG_MAX_ANALYSES = 20
 # query with a literal Q(pk__in=[...]) instead of re-running its full filter chain. Applies to all
 # single-parent nodes and MergeNode inputs. 0 disables the substitution.
 ANALYSIS_NODE_STORE_ID_SIZE_MAX = 1000
+# A load taking longer than this logs a warning with its per-phase timings (which Rollbar picks up),
+# so a slow load on a deployment arrives with the phase that took the time named. None disables it.
+ANALYSIS_NODE_SLOW_LOAD_SECONDS = 30
 ANALYSIS_RELATED_DOWNLOAD_OUTPUT_NODES = True  # Have download links on sample/vcf pages
 # Fallback when no Global/Org/Lab/User override is set. None = always auto-load.
 # Analysis nodes with at least this many variants don't auto-load their grid - the user clicks
@@ -564,6 +595,13 @@ ANALYSIS_NODE_GRID_AUTO_LOAD_MAX_VARIANTS = 50_000
 # large result set forces a full sort that blows the statement_timeout. At/above this row count we
 # disable sorting entirely and fall back to ORDER BY -pk (indexed). Users filter down to re-enable.
 ANALYSIS_GRID_SORT_MAX_ROWS = 10_000
+# Analysis node Variant queries (grid pages, exports, loads, tag recounts) join 50+ relations once the
+# grid's columns are selected. Past Postgres's join_collapse_limit (server default 8) the planner keeps
+# the SQL's join order, starting from the whole variant table, and a selective filter such as a gene's
+# overlap subquery is applied last - a 421 variant gene search grid took 2+ minutes and blew the
+# statement_timeout. Node queries run under this limit instead (@see node_query_planner_settings); it
+# is not set server-wide as the extra planning time regressed unrelated queries. None = server default.
+ANALYSIS_NODE_QUERY_JOIN_COLLAPSE_LIMIT = 32
 # Node exports are cached per (node, version, user, filter set, export type) so accumulate much faster
 # than the cohort/sample ones - a beat task drops the CachedGeneratedFile rows (and files) older than this
 ANALYSIS_NODE_EXPORT_CACHE_DAYS = 7
@@ -571,6 +609,14 @@ ANALYSIS_NODE_EXPORT_CACHE_DAYS = 7
 
 VARIANT_ALLELE_FREQUENCY_CLIENT_SIDE_PERCENT = True  # For analysis Grid/CSV export. VCF export is always unit
 VARIANT_SHOW_CANONICAL_HGVS = True
+
+# The variant grid's sample cell marks the call's genotype quality rather than spelling it out - the
+# numbers are on hover. GQ is a minimum (at or under 'bad' is red, under 'marginal' amber); PL is the
+# phred likelihood of the called genotype, so it reads the other way (at or over 'bad' is red)
+VARIANT_GRID_GENOTYPE_QUALITY_THRESHOLDS = {
+    "gq": {"bad": 20, "marginal": 30},
+    "pl": {"bad": 50, "marginal": 20},
+}
 
 # if True, CR_lab_id will be used in all instances
 CLASSIFICATION_ID_OVERRIDE_PREFIX = False
@@ -647,6 +693,7 @@ USER_SETTINGS_SHOW_GROUPS = True
 SQL_BATCH_INSERT_SIZE = 50000
 SQL_SCRIPTS_DIR = os.path.join(BASE_DIR, "dbscripts")
 SITE_NAME = "VariantGrid"
+SITE_SHORT_NAME = "VG"  # Prefixes page titles, where there's no room for the full name
 SITE_DESCRIPTION = "VariantGrid - genomic variant curation and classification platform"
 
 # TODO instead of make settings for admin and non-admin enabled searches, have a search value that can be
@@ -709,6 +756,12 @@ SLACK = {
 # if true, automated health checks will post to Slack if enabled
 HEALTH_CHECK_ENABLED = True
 
+# if true, the Server Status page shows an "Integrations" section of registered integration statuses
+INTEGRATION_STATUS_ENABLED = True
+
+# {url path prefix: display name} - records when each external client last called those endpoints
+INTEGRATION_API_TRACKING = {}
+
 SERVER_MIN_DISK_WARNING_GIGS = 1
 USER_FEEDBACK_ENABLED = True  # note that Rollbar enabled must also be true to enable user feedback
 
@@ -735,7 +788,9 @@ STATICFILES_FINDERS = (
 # django_secret_key.txt in this dir (which is hidden via .gitignore)
 SECRET_KEY = get_or_create_django_secret_key(SETTINGS_DIR)
 
-TAG_REQUIRES_CLASSIFICATION = "RequiresClassification"  # tags can't have spaces
+# Seed data only: the classify queue tag a fresh install is created with (tags can't have spaces).
+# What behaves as a queue tag is Tag.requires_classification, set per tag on the tag settings page
+TAG_REQUIRES_CLASSIFICATION = "RequiresClassification"
 
 TEMPLATES = [
     {
@@ -783,6 +838,7 @@ MIDDLEWARE = (
     'htmlmin.middleware.HtmlMinifyMiddleware',
     'htmlmin.middleware.MarkRequestMiddleware',
     'threadlocals.middleware.ThreadLocalMiddleware',
+    'eventlog.middleware.IntegrationApiMiddleware',
     # 'querycount.middleware.QueryCountMiddleware',
     # 'mozilla_django_oidc.middleware.SessionRefresh',
 
@@ -1056,6 +1112,12 @@ LOGGING = {
         'hgvs': {
             'level': 'WARNING',
         },
+        # Named here so dictConfig spares celery's loggers (and its children) from
+        # disable_existing_loggers - celery is imported before django.setup() runs.
+        # Handlers are left to celery, which hijacks the root logger to honour --logfile
+        'celery': {
+            'level': LOG_LEVEL,
+        },
         #        'django.request': {
         #            'handlers': ['mail_admins'],
         #            'level': 'ERROR',
@@ -1116,6 +1178,18 @@ SOMALIER = {
             "T2T-CHM13v2.0": "sites.chm13v2.T2T.vcf.gz",
         },
     },
+    # A somalier before v0.3.5 reads a record against its own alphabetically sorted site alleles rather
+    # than the record's REF/ALT (https://github.com/brentp/somalier/issues/163), so we write the AD pair
+    # in the site's order. Turn this off for v0.3.5+, where relate is instead handed the sites VCF and
+    # reads REF/ALT from it (older ones have no --sites, so the two move together) - deployment_check's
+    # somalier_allele_order tells you which way this should be set, and the extracts need rebuilding
+    # with 'somalier_existing_vcfs --clear' whenever it changes
+    "compensate_allele_order": True,
+    "ancestry_enabled": True,  # The expensive stage - it reads all 2,504 1kg .somalier files each run
+    # A VCF whose best sample has fewer het+hom sites than this is extracted, but ancestry and relate
+    # are recorded as SKIPPED rather than run on numbers that mean nothing
+    "min_genotyped_sites": 100,
+    "all_samples_relate_hour": 2,  # Nightly all-vs-all relate. None disables it
     # Minimums for related samples to appear at bottom of view_sample page
     "relatedness": {
         "min_relatedness": 0.1,
@@ -1208,6 +1282,14 @@ VIEW_GENE_HOTSPOT_GRAPH_CLASSIFICATIONS_PREFER_CANONICAL_WITH_DIFF_VERSION = Tru
 VIEW_GENE_HOTSPOT_GRAPH = True
 VIEW_GENE_HOTSPOT_GRAPH_PREFER_CANONICAL_WITH_DIFF_VERSION = True
 VIEW_GENE_WIKI = True
+
+TIPS_ENABLED = True  # Show feature tips in loading screens / blank grids
+
+# User awards (#1819): computed titles (crown/medal/trophy) and badges, plus admin-given kudos.
+# Off = no computation, no decoration on grids, settings UI hidden. Individual definitions
+# (see <app>/user_awards.py) can be switched off by key, e.g. {"top_classifier"}
+USER_AWARDS_ENABLED = True
+USER_AWARDS_DISABLED_KEYS = set()
 
 KEY_CLOAK_REALM = None
 

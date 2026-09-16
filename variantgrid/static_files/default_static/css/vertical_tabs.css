@@ -1,52 +1,43 @@
-/* From: http://jsfiddle.net/tj_vantoll/nn2Qw/ */
+/* Bootstrap nav-tabs laid out down the left, with the panes beside them */
 
-.ui-tabs.ui-tabs-vertical {
+.vertical-tabs {
+    display: flex;
+    align-items: stretch;
     padding: 0;
     width: 42em;
 }
-.ui-tabs.ui-tabs-vertical .ui-widget-header {
-    border: none;
-}
-.ui-tabs.ui-tabs-vertical .ui-tabs-nav {
-    float: left;
-    width: 10em;
+
+.vertical-tabs > ul.nav-tabs {
+    flex: 0 0 10em;
     background: #FFF;
     border-radius: 4px 0 0 4px;
     border-right: 1px solid gray;
+    border-bottom: none;
 }
-.ui-tabs.ui-tabs-vertical .ui-tabs-nav li {
-    clear: left;
-    width: 100%;
+
+.vertical-tabs > ul.nav-tabs > li.nav-item {
     margin: 0.2em 0;
+    margin-right: -1px;  /* the active tab's white edge sits over the container border */
+}
+
+.vertical-tabs > ul.nav-tabs > li.nav-item > a.nav-link {
+    display: block;
+    padding: 0.6em 1em;
+    cursor: pointer;
     border: 1px solid gray;
     border-width: 1px 0 1px 1px;
     border-radius: 4px 0 0 4px;
-    overflow: hidden;
-    position: relative;
-    right: -2px;
-    z-index: 2;
 }
-.ui-tabs.ui-tabs-vertical .ui-tabs-nav li a {
-    display: block;
-    width: 100%;
-    padding: 0.6em 1em;
-}
-.ui-tabs.ui-tabs-vertical .ui-tabs-nav li a:hover {
-    cursor: pointer;
-}
-.ui-tabs.ui-tabs-vertical .ui-tabs-nav li.ui-tabs-active {
-    margin-bottom: 0.2em;
-    padding-bottom: 0;
+
+.vertical-tabs > ul.nav-tabs > li.nav-item > a.nav-link.active {
     border-right: 1px solid white;
 }
-.ui-tabs.ui-tabs-vertical .ui-tabs-nav li:last-child {
+
+.vertical-tabs > ul.nav-tabs > li.nav-item:last-child {
     margin-bottom: 10px;
 }
-.ui-tabs.ui-tabs-vertical .ui-tabs-panel {
-    float: left;
-    width: 28em;
+
+.vertical-tabs > .tab-content {
+    flex: 1 1 28em;
     border-left: 1px solid gray;
-    border-radius: 0;
-    position: relative;
-    left: -1px;
 }

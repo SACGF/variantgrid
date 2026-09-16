@@ -1,11 +1,12 @@
+import json
 import unittest
 
 from django.contrib.auth.models import User
+from django.urls import reverse
 from django.utils import timezone
 
 from annotation.tests.test_data_fake_genes import create_fake_transcript_version
 from library.django_utils.unittest_utils import URLTestCase
-from library.utils import secure_random_string
 from ontology.models import OntologyImport, OntologyService, OntologyTerm
 from ontology.tests.test_data_ontology import create_test_ontology_version
 from snpdb.models import GenomeBuild
@@ -18,12 +19,11 @@ class Test(URLTestCase):
 
         cls.user = User.objects.get_or_create(username='testuser')[0]
         ontology_import = OntologyImport.objects.get_or_create(import_source="fake", processed_date=timezone.now())[0]
-        index = 0
-        cls.hpo = OntologyTerm.objects.get_or_create(id="HPO:0000001", name=secure_random_string(), from_import=ontology_import,
-                                                     index=index, ontology_service=OntologyService.HPO)[0]
-        index += 1
-        cls.omim = OntologyTerm.objects.get_or_create(id="OMIM:000001", name=secure_random_string(), from_import=ontology_import,
-                                                      index=index, ontology_service=OntologyService.OMIM)[0]
+        cls.hpo = OntologyTerm.objects.get_or_create(id="HP:0001061", name="fake hpo term", from_import=ontology_import,
+                                                     index=1061, ontology_service=OntologyService.HPO)[0]
+        cls.omim = OntologyTerm.objects.get_or_create(id="OMIM:000001", name="fake omim term", from_import=ontology_import,
+                                                      index=1, ontology_service=OntologyService.OMIM)[0]
+        index = 1
 
         grch37 = GenomeBuild.get_name_or_alias("GRCh37")
         transcript_version = create_fake_transcript_version(grch37)
@@ -40,15 +40,34 @@ class Test(URLTestCase):
             # API
             ("api_ontology_term_gene_list", {"term": self.omim.url_safe_id}, 200),
             ("api_view_gene_disease_relationship", {"gene_symbol": self.gene_symbol}, 200),
+            # A symbol with no HGNC record is empty relations, not an error (#999)
+            ("api_view_gene_disease_relationship", {"gene_symbol": "NOTAGENE123"}, 200),
         ]
         self._test_urls(URL_NAMES_AND_KWARGS, self.user)
+
+    def test_gene_disease_relationship_unknown_symbol_is_empty(self):
+        """ #999 - GeneGrid GenCC column for a symbol with no HGNC record """
+        self.client.force_login(self.user)
+        url = reverse("api_view_gene_disease_relationship", kwargs={"gene_symbol": "NOTAGENE123"})
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual([], json.loads(response.content))
 
     def testAutocompleteUrls(self):
         AUTOCOMPLETE_URLS = [
             ('hpo_autocomplete', self.hpo, {"q": self.hpo.name}),
             ('omim_autocomplete', self.omim, {"q": self.omim.name}),
+            # Bare index and un-padded prefixed id both find the term
+            ('hpo_autocomplete', self.hpo, {"q": str(self.hpo.index)}),
+            ('hpo_autocomplete', self.hpo, {"q": f"HPO:{self.hpo.index}"}),
+            ('omim_autocomplete', self.omim, {"q": str(self.omim.index)}),
+            # Digits anywhere in the id, bare or prefixed (HP:0001061)
+            ('hpo_autocomplete', self.hpo, {"q": "106"}),
+            ('hpo_autocomplete', self.hpo, {"q": "HP:106"}),
         ]
         self._test_autocomplete_urls(AUTOCOMPLETE_URLS, self.user, True)
+        # The index of one term is not another term
+        self._test_autocomplete_urls([('omim_autocomplete', self.omim, {"q": str(self.hpo.index)})], self.user, False)
 
 
 if __name__ == "__main__":

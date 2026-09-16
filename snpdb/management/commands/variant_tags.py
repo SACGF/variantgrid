@@ -2,8 +2,9 @@
 Variant tag maintenance.
 
 Tag names are their primary key, so deployments accumulate case variants of the same tag (eg 'artefact' and
-'Artefact') that split reporting and node filters. Merging them can leave the same user tagging the same
-variant with the same tag in the same analysis twice, which is also worth cleaning up on its own.
+'Artefact') that split reporting and node filters. Repeats of one analysis tagging can no longer be written
+(@see VariantTag.Meta - its migration deleted the ones made before it); global taggings can still repeat,
+and delete-duplicates clears those.
 
 @see https://github.com/SACGF/variantgrid/issues/1751
 """
@@ -24,8 +25,9 @@ from snpdb.tag_operations import get_case_collision_groups, get_tag_usage, merge
 MERGE_CASE_COLLISIONS = "merge-case-collisions"
 DELETE_DUPLICATES = "delete-duplicates"
 
-# What makes one variant tag a repeat of another. A different user re-tagging is agreement, so is kept
-DUPLICATE_FIELDS = ["variant_id", "tag_id", "analysis_id", "user_id"]
+# What makes one variant tag a repeat of another - the analysis tagging identity (@see VariantTag.Meta).
+# A different user re-tagging is agreement, and a different sample is a different person's to-do, so both stay
+DUPLICATE_FIELDS = ["variant_id", "tag_id", "analysis_id", "user_id", "sample_id"]
 
 
 @contextmanager
@@ -47,12 +49,15 @@ def get_duplicate_variant_tags_qs() -> QuerySet[VariantTag]:
 
 
 class Command(BaseCommand):
+    category = "maintenance"
+
     def add_arguments(self, parser):
         subparsers = parser.add_subparsers(dest="subcommand", required=True)
         merge_parser = subparsers.add_parser(
             MERGE_CASE_COLLISIONS, help="Merge every set of tags that differ only by case, keeping the most used")
         duplicates_parser = subparsers.add_parser(
-            DELETE_DUPLICATES, help="Delete variant tags repeating the same variant/tag/analysis/user")
+            DELETE_DUPLICATES,
+            help="Delete variant tags repeating the same variant/tag/analysis/user/sample")
         for subparser in [merge_parser, duplicates_parser]:
             subparser.add_argument('--dry-run', action='store_true',
                                    help="Report what would change without doing it")

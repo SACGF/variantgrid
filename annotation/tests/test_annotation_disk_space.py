@@ -16,7 +16,11 @@ from django.test import TestCase
 from django.test.utils import override_settings
 from django.utils import timezone
 
-from annotation.fake_annotation import get_fake_annotation_settings_dict, get_fake_vep_version
+from annotation.fake_annotation import (
+    get_fake_annotation_settings_dict,
+    get_fake_vep_version,
+    retire_seeded_annotation_version,
+)
 from annotation.models import (
     AnnotationRangeLock,
     AnnotationRun,
@@ -37,7 +41,7 @@ from annotation.tasks.annotate_variants import (
     import_annotation_run,
 )
 from annotation.tasks.annotation_scheduler_task import (
-    count_annotation_run,
+    count_annotation_runs,
     dispatch_annotation_runs,
     has_free_disk_for_annotation,
 )
@@ -49,6 +53,20 @@ from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
 STANDARD = VariantAnnotationPipelineType.STANDARD
 
 
+def past_vep_kwargs() -> dict:
+    """ Timestamps/counts a run carries once VEP has finished, ie ANNOTATION_COMPLETED - what the import
+        lane checks before it does anything. """
+    now = timezone.now()
+    return {
+        "count": 100,
+        "dump_start": now - timedelta(minutes=5),
+        "dump_end": now - timedelta(minutes=4),
+        "dump_count": 100,
+        "annotation_start": now - timedelta(minutes=4),
+        "annotation_end": now,
+    }
+
+
 @override_settings(**get_fake_annotation_settings_dict(columns_version=2))
 class AnnotationRunCleanupTestCase(TestCase):
     """ Each way into the cleanup module, and the one case that must not reach it. """
@@ -58,6 +76,7 @@ class AnnotationRunCleanupTestCase(TestCase):
         cls.grch37 = GenomeBuild.get_name_or_alias("GRCh37")
         cls.variants = [slowly_create_test_variant("1", 100000 + i * 10, 'A', 'T', cls.grch37)
                         for i in range(2)]
+        retire_seeded_annotation_version(cls.grch37)
         kwargs = get_fake_vep_version(cls.grch37, AnnotationConsortium.ENSEMBL, 2)
         kwargs["status"] = VariantAnnotationVersion.Status.ACTIVE
         cls.vav = VariantAnnotationVersion.objects.create(**kwargs)
@@ -134,7 +153,8 @@ class AnnotationRunCleanupTestCase(TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir, \
                 override_settings(ANNOTATION_VCF_DUMP_DIR=tmp_dir,
                                   ANNOTATION_DELETE_TEMP_FILES_ON_SUCCESS=True):
-            run, paths, _ = self._run_with_output(tmp_dir)
+            run, paths, _ = self._run_with_output(tmp_dir, **past_vep_kwargs())
+            self.assertEqual(run.status, AnnotationStatus.ANNOTATION_COMPLETED)
 
             with mock.patch.object(VEPRunner, "import_results",
                             side_effect=RuntimeError("import blew up")), \
@@ -193,6 +213,7 @@ class AnnotationDiskGateTestCase(TestCase):
         cls.grch37 = GenomeBuild.get_name_or_alias("GRCh37")
         cls.variants = [slowly_create_test_variant("1", 200000 + i * 10, 'A', 'T', cls.grch37)
                         for i in range(4)]
+        retire_seeded_annotation_version(cls.grch37)
         kwargs = get_fake_vep_version(cls.grch37, AnnotationConsortium.ENSEMBL, 2)
         kwargs["status"] = VariantAnnotationVersion.Status.ACTIVE
         cls.vav = VariantAnnotationVersion.objects.create(**kwargs)
@@ -201,14 +222,11 @@ class AnnotationDiskGateTestCase(TestCase):
     def _make_run(self, lo_idx, hi_idx, status=AnnotationStatus.CREATED):
         lock = AnnotationRangeLock.objects.create(version=self.vav, min_variant=self.variants[lo_idx],
                                                   max_variant=self.variants[hi_idx], count=100)
-        run = AnnotationRun.objects.create(annotation_range_lock=lock, pipeline_type=STANDARD)
+        # count stamped as the count lane would have, so the run is ready for the run lanes
+        run = AnnotationRun.objects.create(annotation_range_lock=lock, pipeline_type=STANDARD, count=100)
         if status == AnnotationStatus.ANNOTATION_COMPLETED:
-            now = timezone.now()  # past VEP, waiting on the import lane
-            run.dump_start = now - timedelta(minutes=5)
-            run.dump_end = now - timedelta(minutes=4)
-            run.dump_count = 100
-            run.annotation_start = now - timedelta(minutes=4)
-            run.annotation_end = now
+            for k, v in past_vep_kwargs().items():  # past VEP, waiting on the import lane
+                setattr(run, k, v)
             run.vcf_annotated_filename = "/does/not/need/to/exist.vcf.gz"
             run.save()
             self.assertEqual(run.status, AnnotationStatus.ANNOTATION_COMPLETED)
@@ -225,7 +243,7 @@ class AnnotationDiskGateTestCase(TestCase):
                                   return_value=self._disk_usage(free_gigs)), \
                 mock.patch.object(annotate_variants, "apply_async") as vep_launch, \
                 mock.patch.object(import_annotation_run, "apply_async") as import_launch, \
-                mock.patch.object(count_annotation_run, "apply_async"):
+                mock.patch.object(count_annotation_runs, "apply_async"):
             dispatch_annotation_runs(self.vav.pk)
         return vep_launch, import_launch
 

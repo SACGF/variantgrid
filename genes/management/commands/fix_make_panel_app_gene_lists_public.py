@@ -7,6 +7,7 @@ from library.guardian_utils import add_public_group_read_permission
 
 
 class Command(BaseCommand):
+    category = "one-off"
 
     def handle(self, *args, **options):
         for gene_list in GeneList.objects.filter(category__name=GeneListCategory.PANEL_APP_CACHE):

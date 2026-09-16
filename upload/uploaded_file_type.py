@@ -5,7 +5,7 @@ from typing import Optional
 
 from library.utils.file_utils import get_extension_without_gzip
 from upload.import_task_factories.import_task_factory import get_import_task_factories
-from upload.models import UploadData, UploadedFileTypes
+from upload.models import UploadData, UploadedVCF
 from upload.tasks.vcf.genotype_vcf_tasks import reload_vcf_task
 from upload.upload_processing import process_upload_pipeline
 
@@ -85,6 +85,16 @@ def get_upload_data_for_uploaded_file(file_upload) -> Optional[UploadData]:
     return None
 
 
+def reloads_vcf_in_place(upload_data) -> bool:
+    """ True for every file type that loads a VCF - which is more than the '.vcf' ones, eg DRAGEN
+        TSO500 AllFusions rows become a VCF (@see AbstractVCFImportTaskFactory).
+
+        These reload through reload_vcf_task, which keeps the VCF and rebuilds its internal data.
+        Deleting the UploadedVCF instead takes the VCF with it (@see pre_delete_uploaded_vcf), losing
+        anything set on it by hand - eg a genome build the user picked because the file declared none. """
+    return isinstance(upload_data, UploadedVCF)
+
+
 def retry_upload_pipeline(upload_pipeline):
     upload_pipeline.remove_processing_files()
 
@@ -92,12 +102,8 @@ def retry_upload_pipeline(upload_pipeline):
     file_upload = upload_pipeline.file_upload
 
     upload_data = get_upload_data_for_uploaded_file(file_upload)
-    if upload_pipeline.file_type == UploadedFileTypes.VCF:
-        if upload_data.vcf:
-            vcf_id = upload_data.vcf.pk
-        else:
-            vcf_id = None
-        task = reload_vcf_task.si(upload_pipeline.pk, vcf_id)  # @UndefinedVariable
+    if reloads_vcf_in_place(upload_data):
+        task = reload_vcf_task.si(upload_pipeline.pk, upload_data.vcf_id)  # @UndefinedVariable
         task.apply_async()
     else:
         if upload_data and upload_data.created_by_pipeline:

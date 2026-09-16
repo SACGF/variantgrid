@@ -73,6 +73,10 @@ class AnnotationPipelineRunner(abc.ABC):
             it, promote it, let the scheduler create fresh runs - so silently writing 3.5.8 output into a
             range the runs page reports as 3.5.7 would be the only way to lose that history. """
         expected = annotation_run.pipeline_version
+        if expected is None:
+            raise ValueError(f"{annotation_run} has no pipeline_version to check the installed tool "
+                             f"against - register and promote one "
+                             f"(manage.py create_new_annotation_pipeline_version)")
         current = self.get_current_tool_version(annotation_run.genome_build)
         diff = {k: (getattr(expected, k), v) for k, v in current.items() if getattr(expected, k) != v}
         if diff:

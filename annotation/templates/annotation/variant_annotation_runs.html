@@ -3,7 +3,6 @@
 {% load static %}
 {% load ui_help %}
 {% load js_tags %}
-{% load jqgrid_tags %}
 {% load ui_utils %}
 {% load ui_tabs_builder %}
 {% block title %}Annotation Status{% endblock title %}
@@ -16,7 +15,7 @@
         margin-top: 16px;
     }
 </style>
-<script type="text/javascript" src="{% static 'js/lib/plotly-latest.min.js' %}"></script>
+<script type="text/javascript" src="{% static 'js/lib/plotly-custom-3.7.0.min.js' %}"></script>
 <script type="text/javascript" src="{% static 'js/plotly_helper.js' %}"></script>
 <script>
     let filter_data = {"status": "", "variant_annotation_version_id": ""}
@@ -62,7 +61,6 @@
                     showgrid: false,
                     zeroline: false,
                     showline: false,
-                    autotick: true,
                     ticks: '',
                     showticklabels: false
                 },
@@ -297,7 +295,7 @@
                 </select>
             {% endlabelled %}
         </div>
-        <table id="annotation-runs-table" data-datatable-url="{% url 'annotation_run_datatable' %}" data-datatable-data='datatableFilter' data-adjust-columns="false" class="sticky-header"></table>
+        <table id="annotation-runs-table" data-datatable-url="{% url 'annotation_run_datatable' %}" data-datatable-data='datatableFilter' class="sticky-header"></table>
     </div>
 
 {% endblock content %}

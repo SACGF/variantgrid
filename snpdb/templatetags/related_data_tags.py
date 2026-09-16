@@ -6,7 +6,7 @@ from django.template import Library
 
 from classification.models import Classification
 from classification.views.classification_datatables import ClassificationColumns
-from pedigree.models import CohortSamplePedFileRecord
+from pedigree.models import CohortSamplePedFileRecord, Pedigree
 from snpdb.models import CohortSample, Trio
 from snpdb.models.models_enums import ImportStatus
 
@@ -89,14 +89,20 @@ def related_data_for_samples(context, samples, show_sample_info=True):
 @register.inclusion_tag("snpdb/tags/related_data_for_cohort.html", takes_context=True)
 def related_data_for_cohort(context, cohort):
     context = related_data_context(context, cohort.get_samples())
+    # Trios/pedigrees are often built off a sub cohort (@see VCF page) - show them on the parent too
+    sub_cohorts = list(cohort.sub_cohort_set.all())
+    cohorts = [cohort] + sub_cohorts
     context["cohort"] = cohort
-    context["trios"] = list(cohort.trio_set.select_related(*TRIO_SAMPLES_SELECT_RELATED))
+    context["sub_cohorts"] = sub_cohorts
+    context["trios"] = list(Trio.objects.filter(cohort__in=cohorts).select_related(*TRIO_SAMPLES_SELECT_RELATED))
+    context["pedigrees"] = list(Pedigree.objects.filter(cohort__in=cohorts))
     return context
 
 
-@register.inclusion_tag("snpdb/tags/related_data_for_trio.html", takes_context=True)
-def related_data_for_trio(context, trio):
-    return related_data_context(context, trio.get_samples())
+@register.inclusion_tag("snpdb/tags/related_data_for_family.html", takes_context=True)
+def related_data_for_family(context, family):
+    """ Duo/Trio/Quad - anything with FamilyGroupMixin.get_samples() """
+    return related_data_context(context, family.get_samples())
 
 
 @register.inclusion_tag("snpdb/tags/related_data_for_pedigree.html")

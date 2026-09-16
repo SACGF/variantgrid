@@ -194,6 +194,8 @@ URLS_NAME_REGISTER.update({  # Disable selected snpdb urls
     "view_trio": False,
     "quads": False,
     "view_quad": False,
+    "duos": False,
+    "view_duo": False,
     "patient_imports": False,
     "patient_term_approvals": False,
     "patients": False,
@@ -251,7 +253,8 @@ URLS_NAME_REGISTER.update({  # Disable selected snpdb urls
     "view_upload_pipeline": False,
     "view_upload_pipeline_warnings_and_errors": False,
     "upload_retry_import": False,
-    "upload_pipeline_modified_variants_grid": False,
+    "upload_pipeline_modified_variants_datatable": False,
+    "upload_pipeline_skipped_annotation_datatable": False,
     "view_upload_stats_detail": False,
     "accept_vcf_import_info_tag": False,
     "upload_file": False,
@@ -290,6 +293,8 @@ VARIANT_SYMBOLIC_ALT_ENABLED = True
 
 VIEW_GENE_HOTSPOT_GRAPH_CLASSIFICATIONS = False
 VIEW_GENE_WIKI = False
+
+TIPS_ENABLED = False
 
 USER_SETTINGS_SHOW_GROUPS = False
 USER_SETTINGS_SHOW_BUILDS = False

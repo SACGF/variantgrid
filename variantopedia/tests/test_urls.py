@@ -91,6 +91,8 @@ class Test(URLTestCase):
             ("view_allele", {"allele_id": self.allele.pk}, 200),
             ("variant_details_annotation_version", {"variant_id": self.variant.pk,
                                                     "annotation_version_id": self.annotation_version.pk}, 200),
+            ("variant_grid_row_detail", {"variant_id": self.variant.pk,
+                                         "annotation_version_id": self.annotation_version.pk}, 200),
             ('gene_coverage', {"gene_symbol_id": self.gene_symbol.symbol}, 200),
             ("variant_sample_information", {"variant_id": self.variant.pk,
                                             "genome_build_name": self.grch37.name}, 200),
@@ -125,12 +127,15 @@ class Test(URLTestCase):
         """ Grids w/o permissions """
         build_name_kwargs = {"genome_build_name": self.grch37.name}
 
-        GRID_LIST_URLS = [
+        DATATABLE_GRID_LIST_URLS = [
             ("all_variants_grid", build_name_kwargs, self.variant),
-            ("variant_tags_grid", build_name_kwargs, self.variant_tag),
             ("tagged_variant_grid", build_name_kwargs, self.variant),
+            # Nearby excludes the variant itself, so this just checks the URL serves a data envelope
+            ("nearby_variants_grid", {"variant_id": self.variant.pk, **build_name_kwargs,
+                                      "region_type": "range"}, None),
+            ("variant_tags_datatable", build_name_kwargs, self.variant_tag),
         ]
-        self._test_jqgrid_urls_contains_objs(GRID_LIST_URLS, self.user, True)
+        self._test_datatables_grid_urls_contains_objs(DATATABLE_GRID_LIST_URLS, self.user, True)
 
     def testDataGridUrls(self):
         DATATABLE_GRID_LIST_URLS = [

@@ -9,6 +9,7 @@ class Command(BaseCommand):
 
         Runs the build synchronously so the operator can monitor progress, and skips sub-cohorts that
         already have a current collection. """
+    category = "one-off"
 
     def add_arguments(self, parser):
         parser.add_argument('--force', action='store_true',

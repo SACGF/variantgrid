@@ -11,7 +11,7 @@ from django.test import TestCase
 
 from library.guardian_utils import assign_permission_to_user_and_groups
 from patients.forms import PatientForm
-from patients.import_records import parse_boolean, parse_choice, process_record
+from patients.import_records import parse_boolean, parse_choice, parse_date, process_record
 from patients.models import (
     Clinician,
     ExternalModelManager,
@@ -52,6 +52,23 @@ def _make_patient_records(user):
     )
     UploadedPatientRecords.objects.create(file_upload=uf, patient_records=pr)
     return pr
+
+
+# ---------------------------------------------------------------------------
+# parse_date
+# ---------------------------------------------------------------------------
+
+class TestParseDateFunction(TestCase):
+    def test_day_first_as_the_column_header_says(self):
+        self.assertEqual(date(2015, 7, 5), parse_date({"col": "05/07/2015"}, "col", []).date())
+
+    def test_iso_dates_are_not_read_day_first(self):
+        self.assertEqual(date(2015, 7, 5), parse_date({"col": "2015-07-05"}, "col", []).date())
+
+    def test_unparseable_date_is_a_validation_message(self):
+        msgs = []
+        self.assertIsNone(parse_date({"col": "not a date"}, "col", msgs))
+        self.assertTrue(msgs)
 
 
 # ---------------------------------------------------------------------------
@@ -373,7 +390,52 @@ class TestDeIdentifiedPatientName(TestCase):
         patient = Patient.objects.create(patient_code="DEID-101")
         self.assertEqual(str(patient), "DEID-101")
 
+    def test_str_hides_name_when_code_set(self):
+        # Showing the name beside a de-identified code would re-identify the patient #1860
+        patient = Patient.objects.create(patient_code="SAP123", first_name="Jane", last_name="SMITH", sex=Sex.FEMALE)
+        self.assertEqual(str(patient), "SAP123 (F)")
+        self.assertEqual(patient.preview.title, "SAP123")
+
+    def test_str_uses_name_alone_when_no_code(self):
+        # The pk fallback in .code is for previews and search, not something to show beside a name
+        patient = Patient.objects.create(first_name="Jane", last_name="SMITH")
+        self.assertEqual(str(patient), "SMITH, Jane")
+
     def test_name_with_first_name_only(self):
         patient = Patient.objects.create(first_name="BOB")
         self.assertEqual(patient.name, "BOB")
         self.assertEqual(patient.name_last_name_first, "BOB")
+
+
+# ---------------------------------------------------------------------------
+# display_identity in SQL - what the grids sort and export on
+# ---------------------------------------------------------------------------
+
+class TestPatientDisplayIdentityExpression(TestCase):
+    """ A grid cell shows the property but sorts and exports on the expression - they have to agree """
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.emm = ExternalModelManager.objects.create(name="display_identity_manager")
+
+    def _assert_agrees_with_property(self, patient: Patient):
+        qs = Patient.objects.filter(pk=patient.pk).annotate(identity=Patient.display_identity_expression())
+        self.assertEqual(qs.values_list("identity", flat=True)[0], patient.display_identity)
+
+    def test_patient_code(self):
+        self._assert_agrees_with_property(Patient.objects.create(patient_code="DEID-201", last_name="SMITH"))
+
+    def test_external_code(self):
+        ext = ExternalPK.objects.create(code="EXT-201", external_type="t", external_manager=self.emm)
+        self._assert_agrees_with_property(Patient.objects.create(external_pk=ext, last_name="SMITH"))
+
+    def test_name_only(self):
+        self._assert_agrees_with_property(Patient.objects.create(first_name="Jane", last_name="SMITH"))
+
+    def test_no_code_and_no_name(self):
+        self._assert_agrees_with_property(Patient.objects.create())
+
+    def test_blank_is_not_a_value(self):
+        """ A cleared form field saves as "", which Python reads as absent and a NOT NULL test does not """
+        self._assert_agrees_with_property(Patient.objects.create(patient_code="", first_name="", last_name="SMITH"))

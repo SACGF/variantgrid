@@ -7,9 +7,14 @@ from django.test import TestCase
 from django.test.utils import override_settings
 
 from annotation.annotation_run_files import get_annotsv_dir, write_qs_to_vcf
+from annotation.annotsv_columns import ANNOTSV_COLUMNS, all_variant_grid_column_ids
 from annotation.annotation_versions import get_annotation_range_lock_and_unannotated_count
 from annotation.annotsv_annotation import get_annotsv_command, get_annotsv_tsv_filename
-from annotation.fake_annotation import get_fake_annotation_settings_dict, get_fake_vep_version
+from annotation.fake_annotation import (
+    get_fake_annotation_settings_dict,
+    get_fake_vep_version,
+    retire_seeded_annotation_version,
+)
 from annotation.models import VariantAnnotation, VariantAnnotationPipelineType
 from annotation.models.models import (
     AnnotationPipelineVersion,
@@ -31,8 +36,10 @@ from annotation.vep_annotation import (
     vep_dict_to_variant_annotation_version_kwargs,
 )
 from genes.models_enums import AnnotationConsortium
-from snpdb.models import Variant
+from snpdb.grids import render_annotsv_pathogenic_overlaps
+from snpdb.models import Variant, VariantGridColumn
 from snpdb.models.models_genome import GenomeBuild
+from snpdb.views.datatable_view import CellData
 from snpdb.tests.utils.vcf_testing_utils import (
     slowly_create_loci_and_variants_for_vcf,
     slowly_create_test_variant,
@@ -71,6 +78,10 @@ class TestRowToUpdate(TestCase):
         self.assertEqual(update["annotsv_re_gene"], "enh_X")
         self.assertNotIn("annotsv_repeat_type_left", update)  # NA is skipped
         self.assertEqual(update["annotsv_b_gain_af_max"], 0.005)
+
+    def test_acmg_class_outside_the_scale_is_skipped(self):
+        """ The field is a Pathogenicity choice now - AnnotSV documents 1..5 only """
+        self.assertNotIn("annotsv_acmg_class", _row_to_update({"ACMG_class": "7"}))
 
     def test_skips_empty_and_dot(self):
         row = {
@@ -226,6 +237,7 @@ class TestRunAnnotsvSubprocessMocked(TestCase):
         cls.genome_build = GenomeBuild.get_name_or_alias("GRCh37")
         cls.variants = [slowly_create_test_variant("1", 100000 + i * 10, 'A', 'T', cls.genome_build)
                         for i in range(2)]
+        retire_seeded_annotation_version(cls.genome_build)
         kwargs = get_fake_vep_version(cls.genome_build, AnnotationConsortium.REFSEQ, 4)
         kwargs["status"] = VariantAnnotationVersion.Status.ACTIVE
         cls.vav = VariantAnnotationVersion.objects.create(**kwargs)
@@ -279,6 +291,21 @@ class TestRunAnnotsvSubprocessMocked(TestCase):
                 self.assertTrue(records)
                 for record in records:
                     self.assertTrue(record.endswith("\tGT\t0/1"), record)
+
+    def test_retry_keeps_pipeline_version(self):
+        """ #720: a retry stays on the version the run was scheduled against - dropping it leaves
+            check_tool_version with nothing to compare the installed tool against, so the retried run
+            errors instead of annotating. """
+        annotation_run = self._make_annotsv_run()
+        pipeline_version = annotation_run.pipeline_version
+        annotation_run.error_exception = "boom"
+        annotation_run.save()
+
+        with mock.patch.object(AnnotationRun, "delete_related_objects"):
+            annotation_run.reset_for_retry()
+
+        self.assertEqual(annotation_run.pipeline_version, pipeline_version)
+        self.assertIsNone(annotation_run.error_exception)
 
 
 class TestDumpSamples(TestCase):
@@ -483,3 +510,34 @@ class TestImportAnnotsvTsv(TestCase):
         self.assertTrue(VariantAnnotation.objects.filter(annotation_run=self.vep_run).exists())
         self.annotation_run.delete_related_objects()
         self.assertTrue(VariantAnnotation.objects.filter(annotation_run=self.vep_run).exists())
+
+
+class AnnotSVColumnsRegistryTest(TestCase):
+
+    def test_referenced_variant_grid_columns_exist(self):
+        known = set(VariantGridColumn.objects.values_list("pk", flat=True))
+        missing = all_variant_grid_column_ids() - known
+        self.assertFalse(missing, f"annotsv_columns.py references unknown VariantGridColumn ids: {sorted(missing)}")
+
+    def test_registry_covers_every_annotsv_field(self):
+        """ New AnnotSV fields need a registry entry so they show up on the annotation descriptions page """
+        model_fields = {f.name for f in VariantAnnotation._meta.fields if f.name.startswith("annotsv_")}
+        self.assertFalse(model_fields - all_variant_grid_column_ids())
+
+    def test_source_fields_unique(self):
+        source_fields = [c.source_field for c in ANNOTSV_COLUMNS]
+        self.assertEqual(len(source_fields), len(set(source_fields)))
+
+
+class AnnotSVPathogenicOverlapsFormatterTest(TestCase):
+    FIELD = "variantannotation__annotsv_pathogenic_overlaps"
+
+    def test_formats_each_event_type(self):
+        row = {self.FIELD: {"gain": {"source": "ClinVar", "phen": "Seizures", "coord": "1:100-200"},
+                            "loss": {"source": "dbVar"}}}
+        self.assertEqual(render_annotsv_pathogenic_overlaps(CellData(all_data=row, key=self.FIELD)),
+                         "gain: ClinVar / Seizures / 1:100-200, loss: dbVar")
+
+    def test_empty(self):
+        cell = CellData(all_data={self.FIELD: None}, key=self.FIELD)
+        self.assertIsNone(render_annotsv_pathogenic_overlaps(cell))

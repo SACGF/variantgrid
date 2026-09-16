@@ -9,6 +9,8 @@ from annotation.pathogenicity_predictions import TOOLS
 
 
 class Command(BaseCommand):
+    category = "one-off"
+
     def handle(self, *args, **options):
         patho_kwargs = {}
         benign_kwargs = {}

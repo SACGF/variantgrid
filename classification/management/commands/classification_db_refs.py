@@ -7,6 +7,8 @@ from library.utils import JsonDiffs
 
 
 class Command(BaseCommand):
+    category = "maintenance"
+
     def add_arguments(self, parser):
         parser.add_argument('--update', action='store_true',
                             help="Updates the data")

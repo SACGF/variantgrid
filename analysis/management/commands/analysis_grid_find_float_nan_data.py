@@ -8,6 +8,7 @@ from django.db.models import Q
 from analysis.grids import VariantGrid
 from analysis.models import AnalysisNode
 from annotation.models import AnnotationVersion
+from library.django_utils import FakeRequest
 from library.guardian_utils import admin_bot
 from snpdb.models import CustomColumnsCollection, GenomeBuild
 
@@ -15,6 +16,8 @@ from snpdb.models import CustomColumnsCollection, GenomeBuild
 class Command(BaseCommand):
     """ Occasionally we run into a JSON serialization issue because some data was inserted without
         converting np.nan to None - this looks for it: """
+    category = "dev"
+
     def handle(self, *args, **options):
         genome_build = GenomeBuild.grch38()
         annotation_version = AnnotationVersion.latest(genome_build)
@@ -42,9 +45,9 @@ class Command(BaseCommand):
         if not node:
             raise AnalysisNode.DoesNotExist(f"No nodes for {annotation_version=}")
         node.analysis.custom_columns_collection = all_columns  # Don't save this!
-        grid = VariantGrid(user, node)
+        grid = VariantGrid(FakeRequest(user=user), node)
         float_fields = []
-        for cm in grid.get_colmodels():
-            if cm.get("sorttype") == "float":
-                float_fields.append(cm["index"])
+        for rc in grid.enabled_columns:
+            if rc.column_filter and rc.column_filter.type == "float":
+                float_fields.append(rc.name)
         return node, float_fields

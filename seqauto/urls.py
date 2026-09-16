@@ -1,28 +1,27 @@
-from django.urls import include
 from rest_framework import routers
 
-from library.django_utils.jqgrid_view import JQGridView
-from seqauto import views, views_autocomplete, views_rest
+from library.django_utils.datatable_dataframe import DataFrameTableView
+from seqauto import views, views_admin, views_autocomplete, views_qc_graphs, views_rest
 from seqauto.grids.qc_data_grids import (
-    FastQCGrid,
-    FlagstatsGrid,
-    IlluminaFlowcellQCGrid,
-    QCExecSummaryGrid,
+    FastQCColumns,
+    FlagstatsColumns,
+    IlluminaFlowcellQCColumns,
+    QCExecSummaryColumns,
 )
 from seqauto.grids.seqauto_grids import (
-    EnrichmentKitGeneCoverageGrid,
-    GoldCoverageSummaryGrid,
-    SequencingSamplesGrid,
-    SequencingSamplesHistoricalGrid,
+    EnrichmentKitGeneCoverageColumns,
+    GoldCoverageSummaryColumns,
+    SequencingSamplesColumns,
+    SequencingSamplesHistoricalConfig,
 )
 from seqauto.grids.sequencing_data_grids import (
-    BamFileListGrid,
+    BamFileColumns,
     EnrichmentKitColumns,
     ExperimentColumns,
-    QCFileListGrid,
-    SequencingRunListGrid,
-    SingleSampleVCFListGrid,
-    UnalignedReadsListGrid,
+    QCColumns,
+    SequencingRunColumns,
+    SingleSampleVCFColumns,
+    UnalignedReadsColumns,
 )
 from seqauto.grids.sequencing_software_versions_grids import (
     AlignerColumns,
@@ -32,7 +31,7 @@ from seqauto.grids.sequencing_software_versions_grids import (
     VariantCallerColumns,
     VariantCallingPipelineColumns,
 )
-from seqauto.views import (
+from seqauto.views_admin import (
     AlignerUpdate,
     AssayUpdate,
     LibraryUpdate,
@@ -62,7 +61,7 @@ from seqauto.views_rest import (
     VariantCallerViewSet,
 )
 from snpdb.views.datatable_view import DatabaseTableView
-from variantgrid.perm_path import path
+from variantgrid.perm_path import path, router_urls
 
 urlpatterns = [
     path('', views.sequencing_data, name='sequencing_data'),
@@ -77,17 +76,17 @@ urlpatterns = [
     path('enrichment_kits_list', views.enrichment_kits_list, name='enrichment_kits_list'),
     path('enrichment_kit/<int:pk>', views.view_enrichment_kit, name='view_enrichment_kit'),
 
-    path('sequencing_stats', views.sequencing_stats, name='sequencing_stats'),
-    path('sequencing_stats/data', views.sequencing_stats_data, name='sequencing_stats_data'),
-    path('qc_data', views.qc_data, name='qc_data'),
-    path('qc_graphs', views.qc_graphs, name='qc_graphs'),
-    path('graphs/sequencing_run_qc_graph/<sequencing_run_id>/<qc_compare_type>', views.sequencing_run_qc_graph, name='sequencing_run_qc_graph'),
-    path('graphs/sequencing_run_qc_json_graph/<sequencing_run_id>/<qc_compare_type>', views.sequencing_run_qc_json_graph, name='sequencing_run_qc_json_graph'),
-    path('graphs/qc_column_graph/<int:qc_column_id>/<use_percent>', views.qc_column_graph, name='qc_column_graph'),
+    path('sequencing_stats', views_qc_graphs.sequencing_stats, name='sequencing_stats'),
+    path('sequencing_stats/data', views_qc_graphs.sequencing_stats_data, name='sequencing_stats_data'),
+    path('qc_data', views_qc_graphs.qc_data, name='qc_data'),
+    path('qc_graphs', views_qc_graphs.qc_graphs, name='qc_graphs'),
+    path('graphs/sequencing_run_qc_graph/<sequencing_run_id>/<qc_compare_type>', views_qc_graphs.sequencing_run_qc_graph, name='sequencing_run_qc_graph'),
+    path('graphs/sequencing_run_qc_json_graph/<sequencing_run_id>/<qc_compare_type>', views_qc_graphs.sequencing_run_qc_json_graph, name='sequencing_run_qc_json_graph'),
+    path('graphs/qc_column_graph/<int:qc_column_id>/<use_percent>', views_qc_graphs.qc_column_graph, name='qc_column_graph'),
 
-    path('graphs/index_metrics_qc_graph/<illumina_qc_id>', views.index_metrics_qc_graph, name='index_metrics_qc_graph'),
-    path('graphs/qc_exec_summary_graph/<qc_exec_summary_id>/<qc_compare_type>', views.qc_exec_summary_graph, name='qc_exec_summary_graph'),
-    path('graphs/qc_exec_summary_json_graph/<qc_exec_summary_id>/<qc_compare_type>', views.qc_exec_summary_json_graph, name='qc_exec_summary_json_graph'),
+    path('graphs/index_metrics_qc_graph/<illumina_qc_id>', views_qc_graphs.index_metrics_qc_graph, name='index_metrics_qc_graph'),
+    path('graphs/qc_exec_summary_graph/<qc_exec_summary_id>/<qc_compare_type>', views_qc_graphs.qc_exec_summary_graph, name='qc_exec_summary_graph'),
+    path('graphs/qc_exec_summary_json_graph/<qc_exec_summary_id>/<qc_compare_type>', views_qc_graphs.qc_exec_summary_json_graph, name='qc_exec_summary_json_graph'),
 
     path('view_sequencing_run/<sequencing_run_id>/tab/<int:tab_id>', views.view_sequencing_run, name='view_sequencing_run_tab'),
     path('view_sequencing_run_stats_tab/<sequencing_run_id>', views.view_sequencing_run_stats_tab, name='view_sequencing_run_stats_tab'),
@@ -115,21 +114,32 @@ urlpatterns = [
     # Grids
     path('experiments/grid/', DatabaseTableView.as_view(column_class=ExperimentColumns),
          name='experiments_datatable'),
-    path('sequencing_run/grid/<slug:op>/', JQGridView.as_view(grid=SequencingRunListGrid), name='sequencing_run_grid'),
-    path('unaligned_reads/grid/<slug:op>/', JQGridView.as_view(grid=UnalignedReadsListGrid), name='unaligned_reads_grid'),
-    path('bam_file/grid/<slug:op>/', JQGridView.as_view(grid=BamFileListGrid), name='bam_file_grid'),
-    path('vcf_file/grid/<slug:op>/', JQGridView.as_view(grid=SingleSampleVCFListGrid), name='vcf_file_grid'),
-    path('qc/grid/<slug:op>/', JQGridView.as_view(grid=QCFileListGrid), name='qc_grid'),
+    path('sequencing_run/datatable/', DatabaseTableView.as_view(column_class=SequencingRunColumns),
+         name='sequencing_run_datatable'),
+    path('unaligned_reads/datatable/', DatabaseTableView.as_view(column_class=UnalignedReadsColumns),
+         name='unaligned_reads_datatable'),
+    path('bam_file/datatable/', DatabaseTableView.as_view(column_class=BamFileColumns), name='bam_file_datatable'),
+    path('vcf_file/datatable/', DatabaseTableView.as_view(column_class=SingleSampleVCFColumns),
+         name='vcf_file_datatable'),
+    path('qc/datatable/', DatabaseTableView.as_view(column_class=QCColumns), name='qc_datatable'),
     path('enrichment_kit/grid/', DatabaseTableView.as_view(column_class=EnrichmentKitColumns), name='enrichment_kit_datatable'),
-    path('enrichment_kit/gene/grid/<int:enrichment_kit_id>/<genome_build_name>/<gene_symbol>/<slug:op>/', JQGridView.as_view(grid=EnrichmentKitGeneCoverageGrid), name='enrichment_kit_gene_coverage_grid'),
-    path('gold_coverage_summary/grid/<pk>/<slug:op>/', JQGridView.as_view(grid=GoldCoverageSummaryGrid), name='gold_coverage_summary_grid'),
-    path('sequencing_stats/sequencing_samples/grid/<slug:op>/', JQGridView.as_view(grid=SequencingSamplesGrid, csv_download=True), name='sequencing_samples_grid'),
-    path('sequencing_stats/sequencing_samples_historical/grid/<slug:time_frame>/<slug:op>/', JQGridView.as_view(grid=SequencingSamplesHistoricalGrid, csv_download=True), name='sequencing_samples_historical_grid'),
+    path('enrichment_kit/gene/datatable/<int:enrichment_kit_id>/<genome_build>/<gene_symbol>/',
+         DatabaseTableView.as_view(column_class=EnrichmentKitGeneCoverageColumns),
+         name='enrichment_kit_gene_coverage_datatable'),
+    path('gold_coverage_summary/datatable/<pk>/', DatabaseTableView.as_view(column_class=GoldCoverageSummaryColumns),
+         name='gold_coverage_summary_datatable'),
+    path('sequencing_stats/sequencing_samples/datatable/',
+         DatabaseTableView.as_view(column_class=SequencingSamplesColumns), name='sequencing_samples_datatable'),
+    path('sequencing_stats/sequencing_samples_historical/datatable/<slug:time_frame>/',
+         DataFrameTableView.as_view(column_class=SequencingSamplesHistoricalConfig),
+         name='sequencing_samples_historical_datatable'),
     # QC Data
-    path('illumina_flowcell_qc/grid/<slug:op>/', JQGridView.as_view(grid=IlluminaFlowcellQCGrid, csv_download=True), name='illumina_flowcell_qc_grid'),
-    path('fastqc/grid/<slug:op>/', JQGridView.as_view(grid=FastQCGrid, csv_download=True), name='fastqc_grid'),
-    path('flagstats/grid/<slug:op>/', JQGridView.as_view(grid=FlagstatsGrid, csv_download=True), name='flagstats_grid'),
-    path('qc_exec_summary/grid/<slug:op>/', JQGridView.as_view(grid=QCExecSummaryGrid, csv_download=True), name='qc_exec_summary_grid'),
+    path('illumina_flowcell_qc/datatable/', DatabaseTableView.as_view(column_class=IlluminaFlowcellQCColumns),
+         name='illumina_flowcell_qc_datatable'),
+    path('fastqc/datatable/', DatabaseTableView.as_view(column_class=FastQCColumns), name='fastqc_datatable'),
+    path('flagstats/datatable/', DatabaseTableView.as_view(column_class=FlagstatsColumns), name='flagstats_datatable'),
+    path('qc_exec_summary/datatable/', DatabaseTableView.as_view(column_class=QCExecSummaryColumns),
+         name='qc_exec_summary_datatable'),
     # Software/settings
     path('sequencing_software_versions/library/datatables/', DatabaseTableView.as_view(column_class=LibraryColumns), name='library_datatable'),
     path('sequencing_software_versions/sequencer/datatables/', DatabaseTableView.as_view(column_class=SequencerColumns), name='sequencer_datatable'),
@@ -138,7 +148,7 @@ urlpatterns = [
     path('sequencing_software_versions/variant_caller/datatables/', DatabaseTableView.as_view(column_class=VariantCallerColumns), name='variant_caller_datatable'),
     path('sequencing_software_versions/variant_calling_pipeline/datatables/', DatabaseTableView.as_view(column_class=VariantCallingPipelineColumns), name='variant_calling_pipeline_datatable'),
 
-    path('sequencing_software_versions', views.sequencing_software_versions, name='sequencing_software_versions'),
+    path('sequencing_software_versions', views_admin.sequencing_software_versions, name='sequencing_software_versions'),
     path('view_sequencer/<pk>', SequencerUpdate.as_view(), name='view_sequencer'),
     path('view_library/<pk>', LibraryUpdate.as_view(), name='view_library'),
     path('view_assay/<pk>', AssayUpdate.as_view(), name='view_assay'),
@@ -174,8 +184,9 @@ router.register(r'api/v1/qc_gene_list', QCGeneListViewSet, basename='api_qc_gene
 router.register(r'api/v1/qc_gene_coverage', QCGeneCoverageViewSet, basename='api_qc_gene_coverage')
 router.register(r'api/v1/qc_exec_summary', QCExecSummaryViewSet, basename='api_qc_exec_summary')
 
+urlpatterns += router_urls(router)
+
 urlpatterns += [
-    path('', include(router.urls), name='seqauto_apis'),
     path('api/view_enrichment_kit_summary/<int:pk>', views_rest.EnrichmentKitSummaryView.as_view(), name='api_view_enrichment_kit_summary'),
     path('api/view_enrichment_kit/<int:pk>', EnrichmentKitViewSet.as_view({'get': 'retrieve'}),
          name='api_view_enrichment_kit'),  # Deprecated, used for backwards compatibility

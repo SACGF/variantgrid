@@ -13,7 +13,13 @@ from django.db.models.signals import post_delete
 from django.dispatch import receiver
 
 from analysis.models.enums import SetOperations
-from analysis.models.nodes.analysis_node import AnalysisNode, NodeStatus, NodeVersion
+from analysis.models.nodes.analysis_node import (
+    AnalysisNode,
+    NodeStatus,
+    NodeVersion,
+    node_query_planner_settings,
+)
+from analysis.models.nodes.node_display import NodeIcon
 from library.django_utils.django_partition import temporary_db_table
 from snpdb.models import ProcessingStatus, VariantCollection, VariantCollectionRecord
 
@@ -45,9 +51,10 @@ class VennNode(AnalysisNode):
         return super().add_parent(parent, *args, **kwargs)
 
     def remove_parent(self, parent):
-        if self.left_parent == parent:
+        # Compare on pk - the FKs hold AnalysisNode rows while callers pass subclasses, which never compare equal
+        if self.left_parent_id == parent.pk:
             self.left_parent = None
-        elif self.right_parent == parent:
+        elif self.right_parent_id == parent.pk:
             self.right_parent = None
         else:
             msg = f"Parent {parent} not on left or right side!"
@@ -58,9 +65,9 @@ class VennNode(AnalysisNode):
         return super().remove_parent(parent)
 
     def get_side_for_parent(self, parent):
-        if self.left_parent == parent:
+        if self.left_parent_id == parent.pk:
             return VennNode.LEFT_PARENT
-        if self.right_parent == parent:
+        if self.right_parent_id == parent.pk:
             return VennNode.RIGHT_PARENT
         msg = f"Parent {parent} not on left or right side!"
         logging.error(msg)
@@ -168,6 +175,7 @@ class VennNode(AnalysisNode):
 
     def get_vennodecache_intersection_types(self):
         INTERSECTIONS = {
+            SetOperations.NONE: [],  # Nothing selected in the venn widget - nothing to cache
             SetOperations.UNION: [VennNodeCache.A_ONLY, VennNodeCache.INTERSECTION, VennNodeCache.B_ONLY],
             SetOperations.A_NOT_B: [VennNodeCache.A_ONLY],
             SetOperations.INTERSECTION: [VennNodeCache.INTERSECTION],
@@ -219,6 +227,10 @@ class VennNode(AnalysisNode):
     def get_node_class_label():
         return "Venn"
 
+    @classmethod
+    def get_node_class_icon(cls) -> NodeIcon:
+        return NodeIcon(symbol="node-icon-venn")
+
 
 class VennNodeCache(models.Model):
     A_ONLY = 'A'
@@ -251,6 +263,16 @@ def post_delete_intersection_cache(sender, instance, **kwargs):  # pylint: disab
         pass  # OK as deleted elsewhere (eg version was bumped and old ones cleaned up)
 
 
+def _node_is_empty(node: AnalysisNode) -> bool:
+    """ Nodes store their count when they load, so an empty parent is known without touching variants """
+    return node.is_ready and node.count == 0
+
+
+def _node_variant_ids(node: AnalysisNode) -> set[int]:
+    with node_query_planner_settings():
+        return set(node.get_queryset().values_list("pk", flat=True))
+
+
 @celery.shared_task
 def venn_cache_count(vennode_cache_id):
     try:
@@ -273,10 +295,7 @@ def venn_cache_count(vennode_cache_id):
                                               version=vennode_cache.parent_a_node_version.version)
         b = AnalysisNode.objects.get_subclass(pk=vennode_cache.parent_b_node_version.node_id,
                                               version=vennode_cache.parent_b_node_version.version)
-        a_qs = a.get_queryset()
-        b_qs = b.get_queryset()
-
-        # We now retrieve variant ids and do set operations in Python
+        # We retrieve variant ids and do set operations in Python
         # We originally did this via except/intersect then select into but sometimes
         # died w/ "too many range tables" (joining across too many partitions)
 
@@ -284,15 +303,26 @@ def venn_cache_count(vennode_cache_id):
         # https://docs.djangoproject.com/en/4.1/ref/models/querysets/#union
         # and then write_sql_to_variant_collection
 
-        a_variants = set(a_qs.values_list("pk", flat=True))
-        b_variants = set(b_qs.values_list("pk", flat=True))
-        variants = set()
-        if vennode_cache.intersection_type == VennNodeCache.A_ONLY:
-            variants = a_variants - b_variants
-        elif vennode_cache.intersection_type == VennNodeCache.INTERSECTION:
-            variants = a_variants & b_variants
-        elif vennode_cache.intersection_type == VennNodeCache.B_ONLY:
-            variants = b_variants - a_variants
+        # Pulling a side's variant ids is the expensive part, so skip the ones an empty parent
+        # already decides - an empty intersection stays empty however big the other side is
+        if vennode_cache.intersection_type == VennNodeCache.INTERSECTION:
+            variants = set()
+            if not (_node_is_empty(a) or _node_is_empty(b)):
+                if a_variants := _node_variant_ids(a):
+                    variants = a_variants & _node_variant_ids(b)
+        else:
+            # The result comes out of "keep", so an empty one gives an empty result, and an empty
+            # "subtract" takes nothing away
+            if vennode_cache.intersection_type == VennNodeCache.A_ONLY:
+                keep, subtract = a, b
+            else:
+                keep, subtract = b, a
+
+            variants = set()
+            if not _node_is_empty(keep):
+                variants = _node_variant_ids(keep)
+                if variants and not _node_is_empty(subtract):
+                    variants -= _node_variant_ids(subtract)
 
         if variants:
             # We need to write into our partition, so point the model at it for the insert

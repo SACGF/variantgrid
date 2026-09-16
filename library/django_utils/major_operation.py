@@ -6,6 +6,9 @@ from launching a flood of these concurrently and thrashing Postgres, we:
   * cap how many major operations a user can have running at once (per-user concurrency limit)
   * lower the DB ``statement_timeout`` for the duration of the operation so runaway queries die sooner
 
+``planner_join_collapse_limit`` is the other per-connection knob for expensive work: the analysis node
+Variant queries wrap themselves in it (@see ``analysis.models.nodes.analysis_node.node_query_planner_settings``).
+
 Wrap expensive work in the ``major_operation`` context manager. It raises
 ``TooManyMajorOperationsError`` when the per-user limit is exceeded - callers decide how to respond
 (eg redirect-and-retry for grids, or HTTP 503 for APIs).
@@ -14,10 +17,12 @@ See variantgrid_private #1502.
 """
 import logging
 from contextlib import contextmanager
+from typing import Optional
 
 from django.conf import settings
 from django.core.cache import cache
 from django.db import connection
+from django.http import JsonResponse
 
 from library.utils.hash_utils import sha256sum_str
 
@@ -38,6 +43,19 @@ def _major_operation_count_key(user) -> str:
     return sha256sum_str(f"major_operation_count_{user}")
 
 
+def _release_slot(count_key: str):
+    """ Give back a slot, tolerating the key having gone.
+
+        The counter carries a safety TTL that is set when it is first created and never extended, so
+        an operation running as it lapses finds nothing left to decrement - and that is exactly the
+        slow kind of operation this limit exists for. Redis decr raises on a missing key, and this
+        runs in a finally, so an unguarded call replaces the operation's own result with a 500. """
+    try:
+        cache.decr(count_key)
+    except ValueError:
+        logging.info("Major operation slot key had already expired - nothing to release")
+
+
 @contextmanager
 def _statement_timeout(seconds: int):
     """ Temporarily lower the Postgres statement_timeout on the current connection.
@@ -55,6 +73,32 @@ def _statement_timeout(seconds: int):
         default_ms = settings.DATABASE_STATEMENT_TIMEOUT_SECONDS * 1000
         with connection.cursor() as cursor:
             cursor.execute("SET statement_timeout TO %s;", [default_ms])
+
+
+@contextmanager
+def planner_join_collapse_limit(limit: Optional[int]):
+    """ Let the Postgres planner reorder joins across up to ``limit`` relations on the current connection.
+        Past join_collapse_limit / from_collapse_limit (server default 8) the planner keeps the joins in
+        the order the SQL wrote them, so a query that joins a wide table set has its most selective
+        filter applied last. Restores the previous values on exit - connections are reused and this may
+        run inside another caller's raised limit. None leaves the server settings alone. """
+    if limit is None or connection.vendor != 'postgresql':
+        yield
+        return
+
+    with connection.cursor() as cursor:
+        cursor.execute("SHOW join_collapse_limit;")
+        previous_join_limit = int(cursor.fetchone()[0])
+        cursor.execute("SHOW from_collapse_limit;")
+        previous_from_limit = int(cursor.fetchone()[0])
+        cursor.execute("SET join_collapse_limit TO %s;", [limit])
+        cursor.execute("SET from_collapse_limit TO %s;", [limit])
+    try:
+        yield
+    finally:
+        with connection.cursor() as cursor:
+            cursor.execute("SET join_collapse_limit TO %s;", [previous_join_limit])
+            cursor.execute("SET from_collapse_limit TO %s;", [previous_from_limit])
 
 
 @contextmanager
@@ -81,7 +125,7 @@ def major_operation(user, operation_name: str = "major_operation"):
         current = 1
 
     if current > limit:
-        cache.decr(count_key)
+        _release_slot(count_key)
         logging.warning("User '%s' hit major operation limit of %d (attempted '%s')",
                         user, limit, operation_name)
         raise TooManyMajorOperationsError(user, operation_name, limit)
@@ -90,4 +134,24 @@ def major_operation(user, operation_name: str = "major_operation"):
         with _statement_timeout(settings.MAJOR_OPERATION_STATEMENT_TIMEOUT_SECONDS):
             yield
     finally:
-        cache.decr(count_key)
+        _release_slot(count_key)
+
+
+class MajorOperationViewMixin:
+    """ Opt a class based view into the major operation limits by setting major_operation_name.
+
+        Answers with 503 when the user is already at their concurrency limit - the grid endpoints
+        this wraps are DataTables ajax POSTs, whose params live in the body, so there is nothing to
+        redirect-and-retry with the way the analysis node grid does. """
+
+    major_operation_name: Optional[str] = None
+
+    def dispatch(self, request, *args, **kwargs):
+        if not self.major_operation_name:
+            return super().dispatch(request, *args, **kwargs)
+
+        try:
+            with major_operation(request.user, self.major_operation_name):
+                return super().dispatch(request, *args, **kwargs)
+        except TooManyMajorOperationsError as e:
+            return JsonResponse({"error": str(e)}, status=503)

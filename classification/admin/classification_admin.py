@@ -31,6 +31,8 @@ from classification.enums.classification_enums import (
 )
 from classification.models import (
     AlleleOriginGrouping,
+    CaseReport,
+    CaseReportClassification,
     ClassificationGrouping,
     ClassificationGroupingEntry,
     ClassificationGroupingSearchTerm,
@@ -652,7 +654,8 @@ class EvidenceKeyAdmin(ModelAdminBasics):
                              'crit_allows_override_strengths', 'crit_uses_points')}),
         ('Overrides', {'fields': ('namespace_overrides',)}),
         ('Help', {'fields': ('description', 'examples', 'see')}),
-        ('Admin', {'fields': ('max_share_level', 'copy_consensus', 'variantgrid_column', 'immutable')}),
+        ('Admin', {'fields': ('max_share_level', 'copy_scope', 'copy_allele_origin', 'variantgrid_column',
+                              'immutable')}),
         ('History', {'fields': ('created', 'modified')})
     )
 
@@ -692,13 +695,45 @@ class EvidenceKeyAdmin(ModelAdminBasics):
 
 @admin.register(ClassificationReportTemplate)
 class ClassificationReportTemplateAdmin(admin.ModelAdmin):
-    list_display = ('name', 'modified')
+    """ The report templates are lab maintained config, so the case and JSON templates are checked
+        against a fixture case on save (ClassificationReportTemplate.clean) rather than failing in
+        front of a patient's report """
+    list_display = ('name', 'allele_origin_bucket', 'has_case_report', 'modified')
 
     def get_form(self, request, obj=None, **kwargs):
         return super().get_form(request, obj, widgets={
             'name': admin.widgets.AdminTextInputWidget(),
-            'template': admin.widgets.AdminTextareaWidget()
+            'template': admin.widgets.AdminTextareaWidget(),
+            'case_template': admin.widgets.AdminTextareaWidget(),
         }, **kwargs)
+
+    @admin.display(boolean=True, description="Case report")
+    def has_case_report(self, obj: ClassificationReportTemplate) -> bool:
+        return obj.has_case_report
+
+
+class CaseReportClassificationAdmin(admin.TabularInline):
+    model = CaseReportClassification
+    readonly_fields = ["classification_modification", "order", "reported"]
+    fields = ["order", "classification_modification", "reported"]
+    extra = 0
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(CaseReport)
+class CaseReportAdmin(admin.ModelAdmin):
+    """ A report that has gone out is a record of what was said - read only here, rebuilt from the tab """
+    list_display = ('pk', 'template', 'lab', 'status', 'source_level', 'external_report_id', 'report_date', 'created')
+    list_filter = ('status', 'lab', 'template')
+    search_fields = ('external_report_id',)
+    inlines = (CaseReportClassificationAdmin,)
+    readonly_fields = ('template', 'lab', 'user', 'source_level', 'patient', 'specimen', 'extraction',
+                       'sample', 'context_snapshot', 'html', 'json_output', 'pdf_file', 'docx_file')
+
+    def has_add_permission(self, request):
+        return False
 
 
 class DiscordanceReportAdminLabFilter(admin.SimpleListFilter):
@@ -1514,6 +1549,11 @@ class AlleleOriginGroupingTabularAdmin(TabularInline):
 
     def has_change_permission(self, request, obj=None):
         return False
+
+
+@admin.register(AlleleGrouping)
+class AlleleGroupingAdmin(ModelAdminBasics):
+    inlines = (AlleleOriginGroupingTabularAdmin,)
 
 
 @admin.register(ReclassificationEventBuildState)

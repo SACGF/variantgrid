@@ -1,3 +1,7 @@
+"""
+pandas helpers for the stats pages and exports: percentage columns and rows, NaN to None conversion
+before JSON, minimum-float handling and read_csv_skip_header for '#'-commented files.
+"""
 import os
 import sys
 

@@ -1,40 +1,84 @@
 {% extends menu_patients_base %}
-{% load static %}
 {% load model_tags %}
+{% load ui_utils %}
 {% load related_data_tags %}
 {% load related_analyses_tags %}
 
 {% block title %}Trio {{ trio }}{% endblock %}
 
 {% block head %}
-{{ block.super }}
-<script type="text/javascript">
-    $(document).ready(function() {
-        $("#trio-tabs").tabs();
-    });
-</script>
-<script type="text/javascript" src="{% static 'js/grid.js' %}"></script>
-{% endblock %}
+<style>
+/* Pedigree figure - the same sprite symbol the TrioNode and trio wizard wear */
+.pedigree-figure {
+    width: 150px;
+    height: 122px;
+    color: #495057;
+    /* the sprite's stroke is weighted for a 15px badge - lighten it at this size */
+    --pedigree-stroke-width: 1.5;
+}
+
+#trio-heading .svg-symbol-icon {
+    margin-right: 0.35em;
+    width: 1.5em;
+    height: 1.2em;
+    vertical-align: -0.15em;
+    color: #495057;
+}
+
+#details .card table th {
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+#details .trio-details-table th {
+    width: 1%;
+}
+
+#details .card td, #details .card th {
+    vertical-align: middle;
+}
+</style>
+{% endblock head %}
 
 {% block submenu_page_content %}
 
+    <h3 id="trio-heading">
+        {% preview_icon trio %} Trio: {{ trio }}
+    </h3>
+
     <div id="trio-tabs">
-        <ul>
-            <li><a id='details-tab' href="#details">Details</a></li>
+        <ul class="nav nav-tabs mb-4" role="tablist">
+            <li class="nav-item"><a id='details-tab' class="nav-link show active" data-toggle="tab" role="tab" href="#details">Details</a></li>
             {% if has_write_permission %}
-            <li><a href="{% url 'group_permissions' 'snpdb.models.Trio' trio.pk %}">Sharing / Permissions</a></li>
+            <li class="nav-item"><a class="nav-link" data-toggle="tab" role="tab" href="#trio-permissions" data-href="{% url 'group_permissions' 'snpdb.models.Trio' trio.pk %}">Sharing / Permissions</a></li>
             {% endif %}
         </ul>
-        <div id="details">
-            {% trio_table trio %}
+        <div class="tab-content">
+            <div class="tab-pane show active" role="tabpanel" id="details">
+                <div class="row">
+                    <div class="col-lg-8">
+                        {% trio_table trio %}
+                    </div>
+                    <div class="col-lg-4">
+                        <div class="card mb-3">
+                            <div class="card-header">Pedigree</div>
+                            <div class="card-body text-center">
+                                <svg class="pedigree-figure {% if trio.mother_affected %}mother-affected{% endif %} {% if trio.father_affected %}father-affected{% endif %}"><use href="#node-icon-trio"></use></svg>
+                                <div class="text-muted small">Filled symbols are affected</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% if has_write_permission %}
+            <div class="tab-pane" role="tabpanel" id="trio-permissions"></div>
+            {% endif %}
         </div>
     </div>
 
     <div id='related-data-container'>
-    {% related_data_for_trio trio %}
+    {% related_data_for_family trio %}
     {% related_analyses_for_trio trio %}
     </div>
 
 {% endblock %}
-
-

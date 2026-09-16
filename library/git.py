@@ -1,3 +1,7 @@
+"""
+Git: the repo's current hash, branch, last modified date and a GitHub link, read by the site footer,
+`vg status` and deployment checks.
+"""
 import re
 import subprocess
 from functools import cached_property

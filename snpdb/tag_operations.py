@@ -3,8 +3,9 @@ Admin operations on the tag vocabulary - merging, retiring, reinstating, setting
 case-collision checks that stop confusable tags being created in the first place.
 
 Tag.id is the tag name (CharField primary key) so a merge repoints every foreign key at the surviving tag
-then retires the dying one. Variant tags have no unique constraint involving tag so they move in a single
-UPDATE - the two settings tables that are unique_together with tag have rows that can't be repointed.
+then retires the dying one. Variant tags move in a single UPDATE, after the analysis taggings the merge
+would turn into duplicates are dropped - the two settings tables that are unique_together with tag have
+rows that can't be repointed either.
 
 Retiring rather than deleting means an old tag name still resolves, so "where did my tag go?" has an answer.
 Each operation writes an auditlog LogEntry. Tag isn't registered with auditlog - we only want the deliberate
@@ -40,6 +41,7 @@ class TagOperation(TextChoices):
     RETIRE = "retire", "Retired"
     REINSTATE = "reinstate", "Reinstated"
     SET_ALLELE_ORIGIN = "allele_origin", "Allele origin"
+    SET_REQUIRES_CLASSIFICATION = "requires_classification", "Classify queue"
 
 
 @dataclass(frozen=True)
@@ -152,9 +154,30 @@ def get_merge_suggestions() -> dict[str, list[str]]:
     return {tag_id: sorted(others) for tag_id, others in suggestions.items()}
 
 
+# What an analysis tagging is unique on alongside tag - @see VariantTag.Meta
+VARIANT_TAG_ANALYSIS_UNIQUE_FIELDS = ["variant_id", "analysis_id", "user_id", "sample_id"]
+
+
+def _delete_variant_tags_the_merge_would_repeat(dying_tag: Tag, surviving_tag: Tag) -> int:
+    """ One tagging per (variant, tag, analysis, user, sample), so a dying tag row whose key the surviving
+        tag already holds would say the same thing twice - it goes rather than blocking the repoint.
+        Global (variant page) taggings are outside the constraint and all move """
+    analysis_tags_qs = VariantTag.objects.filter(analysis__isnull=False)
+    surviving_keys = set(analysis_tags_qs.filter(tag=surviving_tag)
+                         .values_list(*VARIANT_TAG_ANALYSIS_UNIQUE_FIELDS))
+    dying_rows = analysis_tags_qs.filter(tag=dying_tag).values_list("pk", *VARIANT_TAG_ANALYSIS_UNIQUE_FIELDS)
+    repeat_pks = [row[0] for row in dying_rows if row[1:] in surviving_keys]
+    if not repeat_pks:
+        return 0
+    num_deleted, _ = VariantTag.objects.filter(pk__in=repeat_pks).delete()
+    return num_deleted
+
+
 def _repoint_tag(fk: TagForeignKey, dying_tag: Tag, surviving_tag: Tag) -> TagMergeCounts:
     """ Move fk's rows from dying_tag to surviving_tag """
     counts = TagMergeCounts(label=fk.label)
+    if fk.model is VariantTag:
+        counts.deleted = _delete_variant_tags_the_merge_would_repeat(dying_tag, surviving_tag)
     dying_qs = fk.model.objects.filter(tag=dying_tag)
     if fk.unique_with is None:
         counts.moved = dying_qs.update(tag=surviving_tag)
@@ -229,6 +252,8 @@ def describe_tag_operation(log_entry: LogEntry) -> str:
         return ""
     if operation == TagOperation.SET_ALLELE_ORIGIN:
         return f"{_allele_origin_label(data.get('from'))} -> {_allele_origin_label(data.get('to'))}"
+    if operation == TagOperation.SET_REQUIRES_CLASSIFICATION:
+        return "added to the classify queue" if data.get("to") else "removed from the classify queue"
     return ""
 
 
@@ -245,8 +270,8 @@ def get_tag_operations(tag: Tag = None) -> QuerySet[LogEntry]:
 def merge_tag(dying_tag: Tag, surviving_tag: Tag, user: User) -> TagMergeResult:
     """ Repoint everything using dying_tag at surviving_tag, then retire dying_tag. The repointing cannot
         be undone - reinstating the tag afterwards gets the name back, not the rows.
-        Repeated variant tags this leaves behind are indistinguishable from ones that were already there
-        - @see the variant_tags delete-duplicates management command. """
+        An analysis tagging the surviving tag already holds for the same variant, analysis, user and sample
+        is dropped rather than moved (@see VariantTag.Meta). """
     if dying_tag.pk == surviving_tag.pk:
         raise ValueError("Cannot merge a tag into itself")
     if not surviving_tag.active:
@@ -301,6 +326,24 @@ def reinstate_tag(tag: Tag, user: User) -> Tag:
         log_tag_operation(tag, TagOperation.REINSTATE, user, was_merged_into=merged_into_id)
 
     logging.info("Reinstated tag '%s'", tag)
+    return tag
+
+
+def set_tag_requires_classification(tag: Tag, requires_classification: bool, user: User) -> Tag:
+    """ Whether tagging a variant with this is asking for it to be classified - it's what the classify queue
+        on the sample/patient page is built from. Existing tagging is unchanged, it just starts (or stops)
+        showing up as outstanding work """
+    previous = tag.requires_classification
+    if previous == requires_classification:
+        return tag
+
+    with transaction.atomic():
+        tag.requires_classification = requires_classification
+        tag.save()
+        log_tag_operation(tag, TagOperation.SET_REQUIRES_CLASSIFICATION, user,
+                          **{"from": previous, "to": requires_classification})
+
+    logging.info("Tag '%s' requires_classification %s -> %s", tag, previous, requires_classification)
     return tag
 
 

@@ -16,7 +16,11 @@ from annotation.backfill_columns import (
     normalise_source_value,
     resolve_backfill_columns,
 )
-from annotation.fake_annotation import get_fake_annotation_settings_dict, get_fake_vep_version
+from annotation.fake_annotation import (
+    get_fake_annotation_settings_dict,
+    get_fake_vep_version,
+    retire_seeded_annotation_version,
+)
 from annotation.models import AnnotationVersion, VariantAnnotation, VariantAnnotationVersion
 from annotation.models.models import AnnotationRangeLock, AnnotationRun
 from annotation.vep_field_formatters import format_pick_highest_int
@@ -25,6 +29,7 @@ from library.django_utils.django_partition import temporary_db_table
 from snpdb.models import GenomeBuild
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
 
+COSMIC_V99 = 99
 COSMIC_V101_SAMPLE_COUNT = "GENOME_SCREEN_SAMPLE_COUNT"
 
 
@@ -34,13 +39,15 @@ class BackfillColumnResolutionTests(TestCase):
     def setUpTestData(cls):
         super().setUpTestData()
         cls.genome_build = GenomeBuild.get_name_or_alias("GRCh37")
+        retire_seeded_annotation_version(cls.genome_build)
         kwargs = get_fake_vep_version(cls.genome_build, AnnotationConsortium.ENSEMBL, 3)
+        kwargs["cosmic"] = COSMIC_V99
         cls.vav = VariantAnnotationVersion.objects.create(**kwargs,
                                                           status=VariantAnnotationVersion.Status.ACTIVE)
 
     def test_registry_supplies_source_field_and_formatter(self):
         target, = resolve_backfill_columns(self.vav, ["cosmic_count"])
-        # columns_version 3 reads COSMIC's v99 SAMPLE_COUNT, under the --custom label prefix
+        # COSMIC v99 writes the count as SAMPLE_COUNT, under the --custom label prefix
         self.assertEqual(target.source_field, "COSMIC_SAMPLE_COUNT")
         self.assertFalse(target.from_csq)
         self.assertEqual(target.formatter, format_pick_highest_int)
@@ -104,6 +111,7 @@ class BackfillColumnRoundTripTests(TestCase):
     def setUpTestData(cls):
         super().setUpTestData()
         cls.genome_build = GenomeBuild.get_name_or_alias("GRCh37")
+        retire_seeded_annotation_version(cls.genome_build)
         kwargs = get_fake_vep_version(cls.genome_build, AnnotationConsortium.ENSEMBL, 3)
         cls.vav = VariantAnnotationVersion.objects.create(**kwargs,
                                                           status=VariantAnnotationVersion.Status.ACTIVE)
@@ -202,6 +210,24 @@ class BackfillColumnRoundTripTests(TestCase):
             import_backfill_vcf(self.vav, annotated_filename, self.targets)
 
         self.assertEqual(self._cosmic_counts(), [None, 5, 3])
+
+    def test_not_null_skips_variants_the_source_never_matched(self):
+        """ cosmic_legacy_id stands in for a sibling column the same source writes - only variants
+            holding one can gain a count, so the rest stay out of the dump """
+        VariantAnnotation.objects.filter(version=self.vav, variant=self.variants[1]) \
+                                 .update(cosmic_legacy_id=None)
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            dump_filename = os.path.join(tmp_dir, "dump.vcf")
+            count = dump_annotated_variants(self.vav, dump_filename, targets=self.targets,
+                                            only_missing=True, not_null_columns=["cosmic_legacy_id"])
+        self.assertEqual(count, 1)
+
+    def test_not_null_rejects_a_column_that_is_not_a_field(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            dump_filename = os.path.join(tmp_dir, "dump.vcf")
+            with self.assertRaises(BackfillColumnError):
+                dump_annotated_variants(self.vav, dump_filename, targets=self.targets,
+                                        not_null_columns=["not_a_column"])
 
     def test_batches_smaller_than_the_file(self):
         with tempfile.TemporaryDirectory() as tmp_dir:

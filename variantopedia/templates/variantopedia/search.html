@@ -166,7 +166,7 @@
                             <div class="list-group-item list-group-item-{{ message.severity|severity_bs }}">
                                 <div class="row d-flex align-items-center" style="color:#444">
                                     <div class="col-3 text-right">
-                                        {{ message.severity | severity_icon }}{% if message.search_info.preview_icon %}<i class="{{ message.search_info.preview_icon }} text-info mr-2" style="opacity:0.75"></i>{% endif %}
+                                        {{ message.severity | severity_icon }}{% if message.search_info.preview_icon %}<span class="text-info mr-2" style="opacity:0.75">{{ message.search_info.preview_icon_html }}</span>{% endif %}
                                         <label>{{ message.search_info.preview_category }}</label>
                                         {% if message.search_info.sub_name %}<div class="text-info text-small">via {{ message.search_info.sub_name }} Search</div>{% endif %}
                                         {% if message.genome_builds %}
@@ -198,7 +198,7 @@
                                         {% comment %}"Header" information on the left{% endcomment %}
                                         <div class="col-3 text-right">
                                             {% if single_preferred_result and single_preferred_result == search_result %}<i class="fa-solid fa-star text-success" title="This is the best result"></i>{% endif %}
-                                            {% if preview.icon %}<i class="{{ search_result.preview_icon_with_severity }} mr-2" style="opacity:0.75"></i>{% endif %}
+                                            {% if preview.icon %}<span style="opacity:0.75">{{ search_result.preview_icon_html_with_severity }}</span>{% endif %}
                                             <label>{{ preview.category }}</label>
                                             {% if search_result.sub_name %}<div class="text-small text-info">via {{ search_result.sub_name }} Search</div>{% endif %}
                                             {% if search_result.annotation_consortia %}
@@ -269,7 +269,7 @@
                     <div class="row d-flex align-items-center" style="min-height:30px;">
                         <div class="col-3 text-right {% if not search_response.sub_name and search_response.matched_pattern %}searched{% endif %}">
                             {% ifchanged search_response.preview_category %}
-                                <i class="{{ search_response.preview_icon }} mr-2" style="opacity:0.75"></i>
+                                <span class="mr-2" style="opacity:0.75">{{ search_response.preview_icon_html }}</span>
                                 <label>
                                     {{ search_response.preview_category }}
                                 </label>

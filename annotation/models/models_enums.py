@@ -1,3 +1,10 @@
+"""
+Enums for the annotation pipeline: AnnotationStatus (an AnnotationRun's lifecycle, with the
+completed / error sets), VariantAnnotationPipelineType (which tool handles which class of variant),
+VEPPlugin / VEPCustom (what a VariantAnnotationVersion recorded running), ClinVar review status
+and pathogenicity / oncogenicity scales, and the Human Protein Atlas abundance levels. Stored
+codes: add values, never renumber. Predictor scales live in damage_enums.py.
+"""
 from django.db import models
 
 from library.utils import Constant
@@ -114,6 +121,7 @@ class ColumnAnnotationCategory(models.TextChoices):
     PROTEIN_DOMAINS = 'D', "Protein Domains"
     SEQUENCE = 'Q', "Sequence"
     SPLICING_PREDICTIONS = 'S', "Splicing Predictions"
+    CLASSIFICATIONS = 'K', "Classifications"
     VARIANT_DATA = 'V', "Variant Data"
 
 
@@ -214,6 +222,43 @@ class ClinVarReviewStatus(models.TextChoices):
             if stars >= min_stars:
                 statuses.append(rs)
         return statuses
+
+
+class Pathogenicity(models.IntegerChoices):
+    """ The five-tier ACMG germline scale as an ordered integer: ClinVar.highest_pathogenicity (CLNSIG
+        mapped onto it, 0 = none of the below) and VariantAnnotation.annotsv_acmg_class (AnnotSV's ACMG_class) """
+    BENIGN = 1, "Benign"
+    LIKELY_BENIGN = 2, "Likely benign"
+    UNCERTAIN = 3, "Uncertain"
+    LIKELY_PATHOGENIC = 4, "Likely pathogenic"
+    PATHOGENIC = 5, "Pathogenic"
+
+    SHORT_LABELS = Constant({
+        1: "B",
+        2: "LB",
+        3: "VUS",
+        4: "LP",
+        5: "P",
+    })
+
+    @property
+    def short_label(self) -> str:
+        """ Also the classification clinical_significance evidence key option values """
+        return Pathogenicity.SHORT_LABELS[self.value]
+
+    @property
+    def css_class(self) -> str:
+        return f"cs-{self.short_label.lower()}"
+
+
+class ClinVarOncogenicity(models.IntegerChoices):
+    """ ClinVar.highest_oncogenicity - ONC mapped onto an ordered scale (0 = ClinVar has given no
+        oncogenicity call for this variant) """
+    BENIGN = 1, "Benign"
+    LIKELY_BENIGN = 2, "Likely benign"
+    UNCERTAIN = 3, "Uncertain"
+    LIKELY_ONCOGENIC = 4, "Likely oncogenic"
+    ONCOGENIC = 5, "Oncogenic"
 
 
 class ManualVariantEntryType(models.TextChoices):

@@ -1,11 +1,5 @@
 {% extends base_template %}
 
-{% block jsdocumentready %}
-    {{ block.super }}
-    $("button#save-button").button();
-
-{% endblock %}
-
 {% block submenu_page_content %}
 
 <h1>{{ title }}</h1>
@@ -13,6 +7,6 @@
 <form method="post">
     {% csrf_token %}
     {{ form.as_p }}
-    <button id='save-button'>save</button>
+    <button id='save-button' class="btn btn-primary">save</button>
 </form>
 {% endblock %}

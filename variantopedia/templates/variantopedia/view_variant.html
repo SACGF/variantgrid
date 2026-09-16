@@ -1,5 +1,4 @@
 {% extends "uicore/page/base.html" %}
-{% load static %}
 {% load avatar_tags %}
 {% load crispy_forms_tags %}
 {% load crispy_forms_field %}
@@ -10,7 +9,6 @@
 {% load genome_build_tags %}
 
 {% block head %}
-    <script type="text/javascript" src="{% static 'js/grid.js' %}"></script>
     <script>
         window.ANALYSIS_SETTINGS = {
             show_igv_links : true,
@@ -19,7 +17,7 @@
     </script>
 {% endblock %}
 
-{% block title %}View Variant{% endblock %}
+{% block title %}{{ variant_short_label }}{% endblock %}
 {% block submenu %}{% menu_bar_variants %}{% endblock submenu %}
 
 {% block content %}
@@ -28,6 +26,4 @@
     {% endif %}
 
 	{% include "variantopedia/variant_details.html" %}
-    <div id="error-dialog" class="no-close" title="Error">
-    </div>
 {% endblock content %}

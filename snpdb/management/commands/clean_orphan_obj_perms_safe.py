@@ -15,6 +15,7 @@ class Command(BaseCommand):
         Removed 11 object permission entries with no targets
 
     """
+    category = "ops"
     help = "Removes object permissions with not existing targets"
 
     def handle(self, **options):

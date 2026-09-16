@@ -12,26 +12,6 @@ function showForm() {
 {% endblock jshead %}
 
 {% block jsdocumentready %}
-jQuery.extend($.fn.fmatter , {
-        viewPathologyTestLink : function(cellvalue, options, rowObject) {
-            var pathologyTest = encodeURIComponent(rowObject.name);
-            const VIEW_PATHOLOGY_TEST_URL = Urls.view_pathology_test(pathologyTest);
-            var viewLink = "<a class='grid-link' href=" + VIEW_PATHOLOGY_TEST_URL + "><div class='grid-link-icon view-details-link'></div> " + cellvalue + " </a>";
-            return "<span>" + viewLink + "</span>";
-        },
-        viewPathologyTestVersionLink : function(cellvalue, options, rowObject) {
-            if (cellvalue) {
-                const ptvId = rowObject.activepathologytestversion__pathology_test_version__id;
-                const VIEW_PATHOLOGY_TEST_VERSION_URL = Urls.view_pathology_test_version(ptvId);
-                cellvalue = "<a href='" + VIEW_PATHOLOGY_TEST_VERSION_URL + "'>Version " + cellvalue + "</a>";
-            } else {
-                cellvalue = '';
-            }
-            return cellvalue;
-        },
-
-});
-
 $('select', "#pathology-test-form").change(function() {
     var name = $(this).val();
     window.location = Urls.view_pathology_test(name);
@@ -112,8 +92,7 @@ $("#new-pathology-test").click(showForm);
       </form>
     </div>
 
-    {% load jqgrid_tags %}
-    {% jqgrid 'pathology_tests_grid' 'Pathology Tests' False None 'jqgrid/jqgrid.html' %}
+    <table id="pathology-tests-grid" data-datatable-url="{% url 'pathology_tests_datatable' %}" class="sticky-header"></table>
 
 {% endblock submenu_page_content %}
 

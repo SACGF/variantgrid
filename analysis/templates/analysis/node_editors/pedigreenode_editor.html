@@ -14,42 +14,39 @@
 {% endblock docreadyjs %}
 
 {% block content %}
-<div>
-	<form id="pedigree-form" method="post" action="{{ request.path }}">
-        {% csrf_token %}
-        {% for hidden in form.hidden_fields %}
-            {{ hidden }}
-        {% endfor %}
-		<div>
-		  <b>Pedigree:</b> {{ form.pedigree }}<a class="cross-link" id="pedigree-link">View Pedigree</a>
-        </div>
-        <div>
-            {% load vcf_locus_filter_tags %}
-            {% vcf_locus_filter node node.pedigree.cohort.vcf %}
-        </div>
-        <div class='genotype-row'>
-            <b title='Allelic Depth'>AD</b>&ge;{{ form.min_ad }} {{ form.min_ad_op }}
-            <b title='Read Depth'>DP</b>&ge;{{ form.min_dp }} {{ form.min_dp_op }}
-            <b title='Genotype Quality'>GQ</b>&ge;{{ form.min_gq }} {{ form.min_gq_op }}
-            <b title='Phred-scaled Likelihoods for Genotypes'>PL</b>&le; {{ form.max_pl }} {{ form.max_pl_op }}
-        </div>
-        <div>
-            <a id='view-allele-frequency-filter-link' href='javascript:viewAlleleFrequencyFilter()'>Allele Frequency...</a>
-            {% load allele_frequency_tags %}
-            {% allele_frequency_controls node %}
-        </div>
-        <div>
-    		<span>
-        		<b>Inheritance:</b> {{ form.inheritance_model }}
-        	</span>
-            <span>
-                <b>Require All Zygosity Calls:</b> {{ form.require_zygosity }}
-            </span>
-		</div>
+<form id="pedigree-form" method="post" action="{{ request.path }}">
+    {% csrf_token %}
+    {% for hidden in form.hidden_fields %}
+        {{ hidden }}
+    {% endfor %}
+    <div class="editor-row">
+        <label class="editor-label" for="{{ form.pedigree.id_for_label }}">Pedigree</label>
+        {{ form.pedigree }}
+        <a class="cross-link" id="pedigree-link" target="_blank">View Pedigree</a>
+    </div>
+    <div class="editor-row">
+        <label class="editor-label" for="{{ form.inheritance_model.id_for_label }}">Inheritance</label>
+        {{ form.inheritance_model }}
+        <label for="{{ form.require_zygosity.id_for_label }}">{{ form.require_zygosity }} Require all zygosity calls</label>
+    </div>
+    {% load vcf_locus_filter_tags %}
+    {% vcf_locus_filter node node.pedigree.cohort.vcf %}
+    <div class='genotype-row'>
+        <span class="genotype-field"><b title='Allelic Depth'>AD</b>&ge;{{ form.min_ad }} {{ form.min_ad_op }}</span>
+        <span class="genotype-field"><b title='Read Depth'>DP</b>&ge;{{ form.min_dp }} {{ form.min_dp_op }}</span>
+        <span class="genotype-field"><b title='Genotype Quality'>GQ</b>&ge;{{ form.min_gq }} {{ form.min_gq_op }}</span>
+        <span class="genotype-field"><b title='Phred-scaled Likelihoods for Genotypes'>PL</b>&le;{{ form.max_pl }} {{ form.max_pl_op }}</span>
+    </div>
+    <div>
+        <a id='view-allele-frequency-filter-link' class="hover-link" href='javascript:viewAlleleFrequencyFilter()'>Allele Frequency...</a>
+        {% load allele_frequency_tags %}
+        {% allele_frequency_controls node %}
+    </div>
+    <div class="editor-actions">
         {% if has_write_permission %}
-    		<button id='pedigree-save' class="btn btn-primary">save</button>
+            <button id='pedigree-save' class="btn btn-primary">Save</button>
         {% endif %}
-		{{ form.media }}
-	</form>
-</div>
+    </div>
+    {{ form.media }}
+</form>
 {% endblock content %}

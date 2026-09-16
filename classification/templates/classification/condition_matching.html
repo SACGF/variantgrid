@@ -101,10 +101,11 @@
                     "w": 3,
                     "e": 4
                 }
-                let maxMessage = _.maxBy(suggestion.messages, (message) => {
-                    return severity[message.severity.toLowerCase()[0]] || 0;
-                });
-                return maxMessage ? maxMessage.severity : null;
+                let maxMessage = suggestion.messages.reduce((best, message) => {
+                    const rank = severity[message.severity.toLowerCase()[0]] || 0;
+                    return (best === null || rank > best.rank) ? {rank, message} : best;
+                }, null);
+                return maxMessage ? maxMessage.message.severity : null;
             }
         }
 

@@ -8,25 +8,20 @@
 	<script src="{% static 'js/cached_generated_files.js' %}"></script>
 {% endblock %}
 
-{% block jsdocumentready %}
-
-    $("#genomic-intervals-tabs").tabs();
-
-{% endblock %}
-
 {% block submenu_page_content %}
 	<div id="genomic_intervals">
 		<h3>Genomic Intervals: {{ gic.name }}</h3>
 
         <div id="genomic-intervals-tabs">
-            <ul>
-                <li><a href="#details">Details</a></li>
-                <li><a href="{% url 'genomic_intervals_graphs_tab' gic.pk %}">Graphs</a></li>
+            <ul class="nav nav-tabs mb-4" role="tablist">
+                <li class="nav-item"><a class="nav-link show active" data-toggle="tab" role="tab" href="#details">Details</a></li>
+                <li class="nav-item"><a class="nav-link" data-toggle="tab" role="tab" href="#genomic-intervals-graphs" data-href="{% url 'genomic_intervals_graphs_tab' gic.pk %}">Graphs</a></li>
                 {% if has_write_permission %}
-                <li><a href="{% url 'group_permissions' 'snpdb.models.GenomicIntervalsCollection' gic.pk %}">Sharing / Permissions</a></li>
+                <li class="nav-item"><a class="nav-link" data-toggle="tab" role="tab" href="#genomic-intervals-permissions" data-href="{% url 'group_permissions' 'snpdb.models.GenomicIntervalsCollection' gic.pk %}">Sharing / Permissions</a></li>
                 {% endif %}
             </ul>
-            <div id="details">
+            <div class="tab-content">
+            <div class="tab-pane show active" role="tabpanel" id="details">
                 {% page_help user 'data/view_genomic_intervals_help' 'Genomic Intervals Help' %}
 
                 <form method="post" id='genomic-intervals-collection-form'>
@@ -40,6 +35,11 @@
                     {% endif %}
             		{% include "messages/messages.html" %}
                 </form>
+            </div>
+            <div class="tab-pane" role="tabpanel" id="genomic-intervals-graphs"></div>
+            {% if has_write_permission %}
+            <div class="tab-pane" role="tabpanel" id="genomic-intervals-permissions"></div>
+            {% endif %}
             </div>
         </div>
 	</div>

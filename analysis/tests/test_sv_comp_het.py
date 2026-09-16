@@ -7,8 +7,9 @@ from django.contrib.auth.models import User
 from django.db import connection
 from django.test import TestCase, override_settings
 
-from analysis.models import Analysis, QuadNode, SampleNode, TrioNode
-from analysis.models.enums import NodeStatus, QuadInheritance, TrioInheritance
+from analysis.models import Analysis, DuoNode, QuadNode, SampleNode, TrioNode
+from analysis.models.enums import DuoInheritance, NodeStatus, QuadInheritance, TrioInheritance
+from analysis.models.nodes.sources.duo_node import DuoCompHet
 from analysis.models.nodes.sources.quad_node import QuadCompHet
 from analysis.models.nodes.sources.trio_node import CompHet
 from annotation.fake_annotation import get_fake_annotation_version
@@ -23,27 +24,27 @@ from genes.models_enums import AnnotationConsortium
 from library.utils import sha256sum_str
 from snpdb.models import GenomeBuild, Locus, Sequence, Variant
 from snpdb.models.models_cohort import CohortGenotype, CohortGenotypeCollection
-from snpdb.tests.utils.fake_cohort_data import create_fake_quad, create_fake_trio
+from snpdb.tests.utils.fake_cohort_data import create_fake_duo, create_fake_quad, create_fake_trio
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
 
 
-def _create_second_gene_on_chr21(genome_build, release):
-    """ Gene B - downstream of RUNX1 (chr21) so an SV can span both """
-    gene_version = _create_fake_gene_version(genome_build, "ENSG00000000001", "GENEB",
+def _create_extra_gene_on_chr21(genome_build, release, ensembl_id: str, symbol: str, start: int, end: int):
+    """ A gene downstream of RUNX1 (chr21) so an SV can span both """
+    gene_version = _create_fake_gene_version(genome_build, ensembl_id, symbol,
                                              AnnotationConsortium.ENSEMBL)
     data = {
-        "id": "ENST00000000001.1",
+        "id": f"{ensembl_id.replace('ENSG', 'ENST')}.1",
         "hgnc": "99999",
         "biotype": ["protein_coding"],
-        "gene_name": "GENEB",
+        "gene_name": symbol,
         "genome_builds": {
             genome_build.name: {
                 "url": "fake",
-                "exons": [[35100000, 35110000, 0, 1, 10000, None]],
+                "exons": [[start, end, 0, 1, end - start, None]],
                 "contig": "21",
                 "strand": "+",
-                "cds_start": 35100000,
-                "cds_end": 35110000,
+                "cds_start": start,
+                "cds_end": end,
             }
         },
     }
@@ -104,7 +105,8 @@ class AbstractSVCompHetTest:
         release = cls.annotation_version.gene_annotation_version.gene_annotation_release
 
         cls.tv_a = create_fake_transcript_version(cls.grch37, release=release)  # RUNX1 chr21:34.7M-35.0M
-        cls.tv_b = _create_second_gene_on_chr21(cls.grch37, release)  # GENEB chr21:35.1M-35.11M
+        cls.tv_b = _create_extra_gene_on_chr21(cls.grch37, release, "ENSG00000000001", "GENEB",
+                                               35_100_000, 35_110_000)
         cls.gene_a = cls.tv_a.gene_version.gene
         cls.gene_b = cls.tv_b.gene_version.gene
 
@@ -241,3 +243,39 @@ class TestQuadSVCompHet(AbstractSVCompHetTest, TestCase):
     @classmethod
     def _inheritance_handler(cls, node):
         return QuadCompHet(node)
+
+
+@override_settings(ANALYSIS_NODE_CACHE_Q=False)
+class TestDuoSVCompHet(AbstractSVCompHetTest, TestCase):
+    """ Half phased - "from the parent" vs "not from the parent" stands in for the two sides """
+    MOTHER_SIDE = "EE"  # proband HET, parent HET
+    FATHER_SIDE = "ER"  # proband HET, parent HOM_REF
+
+    @classmethod
+    def _create_family(cls, user):
+        duo = create_fake_duo(user, cls.grch37)
+        return duo, CohortGenotypeCollection.objects.get(cohort=duo.cohort)
+
+    @classmethod
+    def _make_comp_het_node(cls):
+        return DuoNode.objects.create(analysis=cls.analysis, duo=cls.family,
+                                      inheritance=DuoInheritance.COMPOUND_HET)
+
+    @classmethod
+    def _inheritance_handler(cls, node):
+        return DuoCompHet(node)
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        release = cls.annotation_version.gene_annotation_version.gene_annotation_release
+        cls.tv_c = _create_extra_gene_on_chr21(cls.grch37, release, "ENSG00000000002", "GENEC",
+                                               35_300_000, 35_310_000)
+        cls.gene_c = cls.tv_c.gene_version.gene
+        # Both hits come from the parent - nothing says they're on different alleles
+        cls._make_snv(35_301_000, cls.MOTHER_SIDE, cls.tv_c)
+        cls._make_snv(35_302_000, cls.MOTHER_SIDE, cls.tv_c)
+        _move_annotation_to_partitions(cls.vav)
+
+    def test_gene_with_both_hits_in_the_parent_is_not_a_two_hit_gene(self):
+        self.assertNotIn(self.gene_c.pk, self._two_hit_genes())

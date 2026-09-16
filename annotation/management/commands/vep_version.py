@@ -9,6 +9,7 @@ from snpdb.models.models_genome import GenomeBuild
 
 
 class Command(BaseCommand):
+    category = "ops"
 
     def add_arguments(self, parser):
         parser.add_argument('--genome-build', required=True)

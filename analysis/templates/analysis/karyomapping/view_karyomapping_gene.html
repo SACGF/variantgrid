@@ -1,6 +1,6 @@
 {% load static %}
 {% load js_tags %}
-<script type="text/javascript" src="{% static 'js/lib/plotly-latest.min.js' %}"></script>
+<script type="text/javascript" src="{% static 'js/lib/plotly-custom-3.7.0.min.js' %}"></script>
 <script>
 // data goes here
 var VARIANT_ID_LOOKUP = {{ variant_id_lookup | jsonify }};
@@ -42,7 +42,7 @@ function showKaryotypeScatter() {
     const coordinates = "{{ iv }}";
     
     let layout = {
-        title: [description, geneDescription, coordinates].join('\n'),
+        title: {text: [description, geneDescription, coordinates].join('\n')},
         showlegend: false,
         type: 'category',
         xaxis : {

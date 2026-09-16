@@ -1,0 +1,143 @@
+table#gene-grid {
+    border-collapse: collapse;
+    margin-bottom: 50px;
+} 
+
+table#gene-grid td, table#gene-grid th {
+    width: 200px;
+    text-align: center;
+}
+
+table#gene-grid td.sub-column, table#gene-grid th.sub-column {
+    width: 50px;
+}
+
+table#gene-grid thead th {
+    padding: 5px;
+}
+
+table#gene-grid tbody th, table#gene-grid tbody td {
+    padding: 0px 1px 0px 1px;
+}
+
+table#gene-grid tr {
+    border-bottom: 1px solid #ccc;
+}
+
+.gene-grid-control-box > div {
+    margin-top: 0;
+    margin-bottom: 0;
+}
+
+.gene-grid-control-box label {
+    word-break: break-word;
+}
+
+.icon-container {
+    margin: auto;
+    display: inline-block;
+}
+
+.click-to-add-button {
+    margin: auto;
+}
+
+.copy-button {
+    background-image: url(../icons/copy.png);
+    cursor: pointer;
+    height: 16px;
+    width: 16px;
+}
+
+
+.delete-button {
+    background-image: url(../icons/delete-icon.png);
+    cursor: pointer;
+    height: 16px;
+    width: 16px;
+}
+
+.gene-coverage-tooltip {
+    min-width: 600px;
+    min-height: 320px;
+    text-align: center;
+}
+
+.field-plot {
+    float: left;
+}
+
+.enrichment-kit-icon {
+    background-image: url(../icons/sequencing_capture.png);
+}
+
+.locked-icon {
+    background-image: url(../icons/lock.gif);
+}
+
+.gencc-icon {
+    background-image: url(../images/gencc-logo-standard.jpg);
+}
+
+.hp-icon {
+    width: 35px;
+    height: 55px;
+    background-size: 35px 55px;
+    background-image: url(../icons/HPO-logo-stacked-black.png);
+}
+
+.omim-icon {
+    width: 55px;
+    height: 40px;
+    background-size: 55px 40px;
+    background-image: url(../icons/omim.png);
+}
+
+.lab-icon {
+    background-image: url(../icons/share_level/lab.png);
+}
+
+.gene-container {
+    height: 25px;
+}
+
+.disease-name {
+}
+
+table#gene-grid .gene-disease {
+    width: 400px;
+}
+
+tr.gene-type-alias {
+    background-color: #FEBC00;
+}
+
+tr.gene-type-unmatched {
+    background-color: #F0C9DD;
+}
+
+// gene-grid table can add/remove "color-coverage" class to enable coloring
+table#gene-grid.color-coverage td.sub-column.coverage-full {
+    background-color: #e6ffe6;
+}
+
+table#gene-grid.color-coverage td.sub-column.coverage-low {
+    background-color: #fff2e6;
+}
+
+table#gene-grid.color-coverage td.sub-column.coverage-none {
+    background-color: #ffe6e6;
+}
+
+#color-coverage-container {
+    display: none;
+}
+
+.classification-count-summary {
+    display: none;
+}
+
+.gene-disease-classification {
+    font-weight: bold;
+}
+

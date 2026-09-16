@@ -1,3 +1,9 @@
+"""
+Ordered pathogenicity scales for the prediction columns VEP and dbNSFP fill: AbstractPathogenicity
+subclasses (impact, SIFT, PolyPhen2, MutationTaster, FATHMM, MutationAssessor and the rest) declare
+CHOICES in ascending order of damage so filters can say 'at least this bad'. Keep that order when
+adding a value.
+"""
 from django.db import models
 from django.db.models.query_utils import Q
 
@@ -174,3 +180,11 @@ class MetaRNNPrediction(ToleratedDamagingPrediction):
 
 class PrimateAIPrediction(ToleratedDamagingPrediction):
     VARIANT_PATH = "variantannotation__primateai_pred"
+
+
+class EVEClass(models.TextChoices):
+    """ EVE plugin's own call at its 75% uncertain threshold. Unlike the dbNSFP preds these are
+        stored as words, so the DamageNode filter matches VariantAnnotation.eve_class directly. """
+    BENIGN = 'Benign', 'Benign'
+    UNCERTAIN = 'Uncertain', 'Uncertain'
+    PATHOGENIC = 'Pathogenic', 'Pathogenic'

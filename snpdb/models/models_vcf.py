@@ -1,5 +1,6 @@
 import logging
 import operator
+import re
 from collections import namedtuple
 from functools import cached_property, reduce
 from typing import Optional, Union
@@ -26,8 +27,9 @@ from library.django_utils.guardian_permissions_mixin import GuardianPermissionsM
 from library.genomics.vcf_enums import VariantClass
 from library.guardian_utils import DjangoPermission
 from library.log_utils import log_traceback
-from library.preview_request import PreviewKeyValue, PreviewModelMixin
+from library.preview_request import PreviewKeyValue, PreviewModelMixin, SvgSymbolPreviewIconMixin
 from patients.models import ExtractionMatchMixin, FakeData, Patient, Specimen
+from patients.models_enums import Sex
 from snpdb.models.models import LabProject
 from snpdb.models.models_enums import (
     ImportStatus,
@@ -89,6 +91,14 @@ class VCF(GuardianPermissionsMixin, DataArchiveMixin, PreviewModelMixin):
     genotype_quality_field = models.TextField(null=True)
     phred_likelihood_field = models.TextField(null=True)
     sample_filters_field = models.TextField(null=True)
+    # The FORMAT (or, for a single-sample VCF, INFO) key carrying the sample's copy number or copy
+    # ratio - CN, SM, FC. There is no packed column for it: the grid reads it out of the stored
+    # CohortGenotype JSON at query time, labelled with this name (@see VCFConstant.COPY_NUMBER_FIELDS)
+    copy_number_field = models.TextField(null=True)
+    # The INFO key whose value named the gene each record is about, for a VCF whose records are
+    # gene-level copy number events rather than coordinates (@see snpdb.gene_level_variants). Set at
+    # import from settings.VCF_GENE_LEVEL_SEGMENT_FIELDS - what claimed the file in the first place
+    gene_level_segment_field = models.TextField(null=True)
     allele_frequency_percent = models.BooleanField(default=False)  # Legacy data used AF as percent
     # We don't want some VCFs to add to variant zygosity count (see VCFSourceSettings)
     variant_zygosity_count = models.BooleanField(default=True)
@@ -104,6 +114,17 @@ class VCF(GuardianPermissionsMixin, DataArchiveMixin, PreviewModelMixin):
     class Meta:
         verbose_name = 'VCF'
         verbose_name_plural = 'VCFs'
+
+    @cached_property
+    def copy_number_description(self) -> Optional[str]:
+        """ The header's own description of copy_number_field - what the grid cell says on hover """
+        if not self.copy_number_field:
+            return None
+        for klass in (VCFFormat, VCFInfo):
+            if field := klass.objects.filter(vcf=self, identifier=self.copy_number_field).first():
+                # Header descriptions are stored as the file quoted them
+                return field.description.strip('"')
+        return None
 
     @property
     def data_archive_in_progress(self) -> bool:
@@ -193,8 +214,47 @@ class VCF(GuardianPermissionsMixin, DataArchiveMixin, PreviewModelMixin):
         return reverse('data')
 
     @property
-    def has_genotype(self):
+    def has_sample_columns(self) -> bool:
+        """ FORMAT plus sample columns - a variant-only (sites) VCF has none. What decides whether the
+            genotype importer ran and whether there is anything per sample to show in a grid """
         return self.genotype_samples > 0
+
+    @property
+    def has_genotype(self) -> bool:
+        """ A GT field, so zygosity means something. A caller that reports only depths (eg TSO 500
+            splice variants) has sample columns but every zygosity is unknown """
+        return self.has_sample_columns and self.genotype_field is not None
+
+    @property
+    def has_depth(self) -> bool:
+        """ Allele or read depths, so the AD/DP/GQ/PL thresholds mean something """
+        depth_fields = (self.allele_depth_field, self.alt_depth_field, self.read_depth_field)
+        return self.has_sample_columns and any(depth_fields)
+
+    @property
+    def has_allele_depth(self) -> bool:
+        """ AD was declared, or built from ref+alt depths on import (@see BulkGenotypeVCFProcessor) """
+        allele_depths = self.allele_depth_field or (self.ref_depth_field and self.alt_depth_field)
+        return self.has_sample_columns and bool(allele_depths)
+
+    @property
+    def has_read_depth(self) -> bool:
+        return self.has_sample_columns and self.read_depth_field is not None
+
+    @property
+    def has_genotype_quality(self) -> bool:
+        return self.has_sample_columns and self.genotype_quality_field is not None
+
+    @property
+    def has_phred_likelihood(self) -> bool:
+        return self.has_sample_columns and self.phred_likelihood_field is not None
+
+    @property
+    def has_allele_frequency(self) -> bool:
+        """ AF was read from the VCF, or derived from allele depths on import. A VCF with only DP has
+            depth but nothing to make a frequency from (@see BulkGenotypeVCFProcessor) """
+        allele_depths = self.allele_depth_field or (self.ref_depth_field and self.alt_depth_field)
+        return self.has_sample_columns and bool(self.allele_frequency_field or allele_depths)
 
     @cached_property
     def samples_by_vcf_name(self) -> dict[str, 'Sample']:
@@ -311,15 +371,18 @@ class VCFFilter(models.Model):
 
     @staticmethod
     def get_formatter(vcf: VCF):
+        """ A grid column renderer (@see snpdb.views.datatable_view.RichColumn) - the VCF's filter
+            codes expanded to their descriptions. Per VCF, so the lookup happens once not per row """
         lookup = VCFFilter.get_code_lookup(vcf)
 
-        def filter_string_formatter(row, field):
-            return VCFFilter.format_filter_codes(lookup, row[field])
+        def filter_string_renderer(cell):
+            return VCFFilter.format_filter_codes(lookup, cell.value)
 
-        return filter_string_formatter
+        return filter_string_renderer
 
 
-class Sample(GuardianPermissionsMixin, SortByPKMixin, PreviewModelMixin, ExtractionMatchMixin, models.Model):
+class Sample(GuardianPermissionsMixin, SortByPKMixin, SvgSymbolPreviewIconMixin, PreviewModelMixin,
+             ExtractionMatchMixin, models.Model):
     """ A VCF sample storing genotype information
         Sample data is stored as packed fields in CohortGenotype (via vcf.cohort.cohortgenotypecollection) """
     vcf = models.ForeignKey(VCF, on_delete=CASCADE)
@@ -331,9 +394,20 @@ class Sample(GuardianPermissionsMixin, SortByPKMixin, PreviewModelMixin, Extract
     import_status = models.CharField(max_length=1, choices=ImportStatus.choices, default=ImportStatus.CREATED)
     variants_type = models.CharField(max_length=1, choices=VariantsType.choices, default=VariantsType.UNKNOWN)
 
+    preview_icon_symbol = "node-icon-sample"  # SampleNode wears this too - see get_node_class_icon
+
     @classmethod
     def preview_icon(cls) -> str:
         return "fa-solid fa-microscope"
+
+    def get_preview_icon_symbol(self) -> str:
+        """ Pedigree notation - square/circle for sex, struck through if deceased """
+        patient = self.patient
+        if patient is None:
+            return self.preview_icon_symbol
+        sex = "female" if patient.sex == Sex.FEMALE else "male"
+        deceased = "-deceased" if patient.deceased else ""
+        return f"node-icon-sample-{sex}{deceased}"
 
     @classmethod
     def preview_if_url_visible(cls) -> Optional[str]:
@@ -358,12 +432,64 @@ class Sample(GuardianPermissionsMixin, SortByPKMixin, PreviewModelMixin, Extract
         return self.vcf.genome_build
 
     @property
-    def has_genotype(self):
+    def has_sample_columns(self) -> bool:
+        return self.vcf.has_sample_columns
+
+    @property
+    def has_genotype(self) -> bool:
         return self.vcf.has_genotype
+
+    @property
+    def has_depth(self) -> bool:
+        return self.vcf.has_depth
+
+    @property
+    def has_allele_depth(self) -> bool:
+        return self.vcf.has_allele_depth
+
+    @property
+    def has_read_depth(self) -> bool:
+        return self.vcf.has_read_depth
+
+    @property
+    def has_genotype_quality(self) -> bool:
+        return self.vcf.has_genotype_quality
+
+    @property
+    def has_phred_likelihood(self) -> bool:
+        return self.vcf.has_phred_likelihood
+
+    @property
+    def has_allele_frequency(self) -> bool:
+        return self.vcf.has_allele_frequency
 
     @property
     def data_archived(self) -> bool:
         return self.vcf.data_archived
+
+    def get_genotype_stats(self) -> Optional['CohortGenotypeStats']:
+        """ Per-sample CohortGenotypeStats row (passing_filter=False, no filter_key).
+            None if missing (legacy data, archived, or stats not yet calculated) """
+        if self.data_archived:
+            return None
+        try:
+            cgc = self.vcf.cohort.cohort_genotype_collection
+        except ObjectDoesNotExist:
+            return None
+        return self.cohortgenotypestats_set.filter(cohort_genotype_collection=cgc,
+                                                   filter_key__isnull=True, passing_filter=False).first()
+
+    @cached_property
+    def detected_sex(self) -> Sex:
+        """ Sex we detect from the sample's chrX genotypes - UNKNOWN if we have too little data.
+            Compare against patient.sex (which comes from the patient record system) """
+        if stats := self.get_genotype_stats():
+            return stats.chrx_sex_guess
+        return Sex.UNKNOWN
+
+    @property
+    def patient_sex(self) -> Sex:
+        return Sex(self.patient.sex) if self.patient else Sex.UNKNOWN
 
     @property
     def is_somatic(self):
@@ -394,6 +520,12 @@ class Sample(GuardianPermissionsMixin, SortByPKMixin, PreviewModelMixin, Extract
     def can_write(self, user_or_group: Union[User, Group]) -> bool:
         write_perm = DjangoPermission.perm(self, DjangoPermission.WRITE)
         return self.vcf.can_write(user_or_group) or user_or_group.has_perm(write_perm, self)
+
+    @classmethod
+    def filter_writable_for_user(cls, user):
+        """ Batch can_write - permission may be on the whole VCF or just this sample """
+        own = super().filter_writable_for_user(user)
+        return cls.objects.filter(Q(vcf__in=VCF.filter_writable_for_user(user)) | Q(pk__in=own))
 
     def check_can_write(self, user_or_group: Union[User, Group]):
         if not self.can_write(user_or_group):
@@ -660,14 +792,25 @@ class VCFSourceSettings(models.Model):
         "genotype_quality_field",
         "phred_likelihood_field",
         "sample_filters_field",
+        "copy_number_field",
     })
 
     source_regex = models.TextField()
     sample_variants_type = models.CharField(max_length=1, choices=VariantsType.choices, default=VariantsType.UNKNOWN)
     variant_zygosity_count = models.BooleanField(default=True)
+    # The build a source's files are called against - used when nothing else resolves one, ie the header
+    # has no contigs/reference to detect from and the submitter declared none (@see resolve_genome_build)
+    genome_build = models.ForeignKey(GenomeBuild, null=True, blank=True, on_delete=CASCADE)
     # A key present sets that field, including to null - which is how you clear a by-name default. A JSON
     # blob rather than nullable columns because null can't tell "no override" from "clear this field"
     sample_field_overrides = models.JSONField(default=dict, blank=True)
+
+    @staticmethod
+    def get_for_source(source: str) -> list['VCFSourceSettings']:
+        """ Every setting whose regex matches the VCF's source, in the order they'll be applied """
+        if not source:
+            return []
+        return [vss for vss in VCFSourceSettings.objects.all() if re.match(vss.source_regex, source)]
 
     def clean(self):
         super().clean()

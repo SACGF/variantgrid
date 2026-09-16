@@ -4,9 +4,12 @@ from django.urls import reverse
 
 from classification.enums import ShareLevel, SubmissionSource
 from classification.models.classification import Classification
+from classification.models.classification_variant_info_models import ImportedAlleleInfo
 from classification.tests.models.test_utils import ClassificationTestUtils
+from genes.tests.gene_level_test_utils import create_gene_level_variant
 from library.django_utils.unittest_utils import PLAIN_STATICFILES_STORAGES
-from snpdb.models import Lab
+from snpdb.gene_level_variants import GENE_LEVEL_CONTIG_NAME, GENE_LEVEL_REF, GENE_LEVEL_SVLEN
+from snpdb.models import Lab, VariantCoordinate
 from sync.classification_sync_status import ClassificationSyncState, classification_sync_status
 from sync.models.enums import SyncStatus
 from sync.models.models import SyncDestination, SyncRun
@@ -57,6 +60,17 @@ class ClassificationSyncStatusTestCase(TestCase):
             source=SubmissionSource.API
         )
         vc.publish_latest(user or self.user, share_level=share_level)
+        return vc
+
+    def _create_gene_level_classification(self) -> Classification:
+        """ A classification matched to a gene-level Variant, as 'EGFR amplification' would be once resolved """
+        variant = create_gene_level_variant(VariantCoordinate(chrom=GENE_LEVEL_CONTIG_NAME, position=1,
+                                                              ref=GENE_LEVEL_REF, alt="<GAIN:HGNC:3236>",
+                                                              svlen=GENE_LEVEL_SVLEN))
+        vc = self._create_classification()
+        vc.allele_info = ImportedAlleleInfo.objects.create(imported_c_hgvs="EGFR amplification",
+                                                           matched_variant=variant)
+        vc.save()
         return vc
 
     def _create_sync_record(self, vc: Classification, remote_pk: int = 999):
@@ -180,6 +194,22 @@ class ClassificationSyncStatusTestCase(TestCase):
         status = self._only_status(vc)
         self.assertEqual(status.state, ClassificationSyncState.EXCLUDED)
         self.assertIsNone(status.note)
+
+    def test_gene_level_held_back_until_remote_is_upgraded(self):
+        vc = self._create_gene_level_classification()
+
+        status = self._only_status(vc)
+        self.assertEqual(status.state, ClassificationSyncState.EXCLUDED)
+        self.assertEqual(["Gene fusions and copy number events are not shared with Test Shariant until it is upgraded to accept them"],
+                         status.reasons)
+
+    def test_gene_level_sent_once_remote_is_upgraded(self):
+        self.sync_destination.config["remote_gene_level"] = True
+        self.sync_destination.save()
+        vc = self._create_gene_level_classification()
+
+        status = self._only_status(vc)
+        self.assertEqual(status.state, ClassificationSyncState.PENDING)
 
     def test_excluded_by_filter_clause_with_label_override(self):
         self.sync_destination.config["filter_labels"] = {"allele_origin": "Germline records upload to Shariant"}

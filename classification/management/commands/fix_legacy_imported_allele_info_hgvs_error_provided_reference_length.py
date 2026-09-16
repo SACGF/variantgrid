@@ -25,6 +25,7 @@ class Command(BaseCommand):
         ImportedAlleleInfo caches hgvs resolution, so need to find these historical ones and re-validate them
 
     """
+    category = "one-off"
 
     def handle(self, *args, **options):
         regex_span_plus_provided = r"\d+_\d+(del|dup)[GATC]+"

@@ -60,8 +60,12 @@ class Test(URLTestCase):
             ('view_patient_specimens', patient_kwargs, 200),
             ('view_patient_extractions', patient_kwargs, 200),
             ('view_specimen', {"specimen_id": cls.specimen.pk}, 200),
+            ('specimen_classify_report_tab', {"specimen_id": cls.specimen.pk}, 200),
             ('view_extraction', {"extraction_id": cls.extraction.pk}, 200),
+            ('extraction_classify_report_tab', {"extraction_id": cls.extraction.pk}, 200),
             ('view_patient_genes', patient_kwargs, 200),
+            ('patient_classify_report_tab', patient_kwargs, 200),
+            ('patient_ontology_genes_datatable', patient_kwargs, 200),
             ('view_patient_modifications', patient_kwargs, 200),
             ('view_patient_import', {"patient_records_id": patient_records.pk}, 200),
         ]
@@ -73,11 +77,8 @@ class Test(URLTestCase):
         ]
 
         # (url_name, url_kwargs, object to check appears in grid pk column or (grid column, object)
-        cls.PRIVATE_GRID_LIST_URLS = [
-            ("patient_grid", {}, cls.patient)
-        ]
-
         cls.PRIVATE_DATATABLES_GRID_LIST_URLS = [
+            ("patient_datatables", {}, cls.patient),
             ("specimen_datatables", {}, cls.specimen),
             ("extraction_datatables", {}, cls.extraction),
         ]
@@ -152,13 +153,6 @@ class Test(URLTestCase):
     @prevent_request_warnings
     def testAutocompleteNoPermission(self):
         self._test_autocomplete_urls(self.PRIVATE_AUTOCOMPLETE_URLS, self.user_non_owner, False)
-
-    def testJqGridListPermission(self):
-        self._test_jqgrid_urls_contains_objs(self.PRIVATE_GRID_LIST_URLS, self.user_owner, True)
-
-    @prevent_request_warnings
-    def testJqGridListNoPermission(self):
-        self._test_jqgrid_urls_contains_objs(self.PRIVATE_GRID_LIST_URLS, self.user_non_owner, False)
 
     def testDatatableListPermission(self):
         self._test_datatables_grid_urls_contains_objs(self.PRIVATE_DATATABLES_GRID_LIST_URLS, self.user_owner, True)

@@ -1,3 +1,11 @@
+"""
+The filter every classification export starts from: ClassificationFilter turns request
+parameters (labs, share levels, since, genome build, transcript strategy, allele origin, discordance
+status, free-text strings via classification_export_user_strings_to_q) into the ordered stream of
+AlleleData - all the visible modifications for one allele - that a formatter
+(classification_export_formatter.py) renders. ClassificationIssue carries per-record problems into
+the output.
+"""
 import operator
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field

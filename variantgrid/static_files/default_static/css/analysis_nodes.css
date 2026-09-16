@@ -25,39 +25,32 @@
     user-select: none;
 }
 
+/* jsPlumb positions endpoints/connectors/overlays absolutely inside its container, so the
+   container has to be the coordinate system the nodes are laid out in */
+#analysis {
+	position: relative;
+}
+
 .window, .label { 
     z-index:24;
 	cursor:pointer;
 }
 
-.default-node-container {
-    background-color:white;
-    text-align:center;
-	box-shadow: 2px 2px 19px;
-   -o-box-shadow: 2px 2px 19px;
-   -webkit-box-shadow: 2px 2px 19px;
-   -moz-box-shadow: 2px 2px 19px;
-}
+path, .jtk-endpoint { cursor:pointer; }
 
-path, ._jsPlumb_endpoint { cursor:pointer; }
+/* z index stuff. windows are at z-index 24.
+   The +/- overlays sit on top of the endpoint dot and connector line they belong to, so they have to
+   outrank both even while those are hovered - otherwise the line covers the icon, the icon loses the
+   hover that raised the line, and the two fight over the cursor. */
 
-/* z index stuff. windows are at z-index 24. */
+.jtk-connector { z-index:18; }
+.jtk-connector.jtk-hover { z-index:19; }
 
-._jsPlumb_connector { z-index:18; }
-._jsPlumb_endpoint { z-index:19; }
-._jsPlumb_overlay { z-index:20; }
+.jtk-endpoint { z-index:20; }
+.jtk-endpoint.jtk-hover { z-index:21; }
 
-._jsPlumb_connector._jsPlumb_hover {
-    z-index:21 !important;
-}
-
-._jsPlumb_endpoint._jsPlumb_hover {
-    z-index:22 !important;
-}
-
-._jsPlumb_overlay._jsPlumb_hover {
-    z-index:23 !important;
-}
+.jtk-overlay { z-index:22; }
+.jtk-overlay.jtk-hover { z-index:23; }
 
 
 span.attach-label {
@@ -127,132 +120,115 @@ button.add-analysis-variable-button {
 	margin: 5px;
 }
 
-/* Icons in select */
+/* Add node dropdown - Bootstrap dropdown over the node types select, see setupNodeTypeSelect() */
+#analysis-toolbar .node-type-item {
+    float: none;  /* #analysis-toolbar floats its divs - the dropdown rows lay themselves out */
+}
+
 #id_node_types-button {
-    padding: 0.1em;
+    display: flex;
+    align-items: center;
+    width: 180px;
+    padding: 3px 6px;
+    border: 1px solid #c6cdd6;
+    border-radius: 6px;
+    background: white;
+    font-family: -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-size: 12px;
+    line-height: 20px;
+    color: #24292f;
 }
 
-/* select with custom icons */
-.ui-selectmenu-menu .ui-menu.customicons .ui-menu-item-wrapper {
-  padding: 0.1em 0 0.1em 3em;
-}
-.ui-selectmenu-menu .ui-menu.customicons .ui-menu-item .ui-icon {
-  height: 24px;
-  width: 24px;
-  top: 0.1em;
+#id_node_types-button:hover,
+.dropdown.show > #id_node_types-button {
+    border-color: #3455a4;
+    background: #f4f6f8;
 }
 
-ul.customicons .ui-icon {
-    background-size: 24px 24px;
+#id_node_types-button .node-type-button-text {
+    flex: 1;
+    margin-right: 0;
 }
 
-.ui-icon.AlleleFrequencyNode { 
-    background-image: url(/static/images/node_icons/variant_allele_frequency.png);
+.node-type-menu {
+    min-width: 180px; /* match #id_node_types-button */
+    max-height: 60vh;
+    overflow-y: auto;
+    padding: 3px;
+    border: 1px solid #c6cdd6;
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, .18);
+    font-size: 12px;
 }
 
-.ui-icon.PedigreeNode {
-    background-image: url(/static/images/node_icons/pedigree.png);
+.node-type-menu .dropdown-item {
+    padding: 2px 6px;
+    border: none;
+    border-radius: 4px;
 }
 
-.ui-icon.TrioNode { 
-    background-image: url(/static/images/node_icons/trio.png);
+.node-type-menu .dropdown-item:hover,
+.node-type-menu .dropdown-item.active {
+    background: #eef2fb;
+    color: #24292f;
 }
 
-.ui-icon.QuadNode {
-    background-image: url(/static/images/node_icons/quad.png);
+.node-type-menu .dropdown-header {
+    margin-top: 4px;
+    padding: 2px 6px;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: #6b7280;
+    border-bottom: 1px solid #e4e7ec;
 }
 
-.ui-icon.FilterNode { 
-    background-image: url(/static/images/node_icons/filter.png);
+.node-type-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    overflow: hidden;
 }
 
-.ui-icon.IntersectionNode { 
-    background-image: url(/static/images/node_icons/intersection.png);
+.node-type-item > span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
-.ui-icon.GeneListNode { 
-    background-image: url(/static/images/node_icons/filter_list.png);
+.node-type-item .node-icon {
+    width: 18px;
+    height: 18px;
+    font-size: 14px;
+    text-align: center;
+    flex-shrink: 0;
+    color: var(--node-classification-color);
 }
 
-.ui-icon.AnalysisNode { 
-    background-image: url(/static/images/node_icons/analysis_node.png);
+/* Analysis grid create gene list child icon - the sprite symbol the GeneListNode badge draws */
+.gene-list-node-icon {
+    width: 14px;
+    height: 14px;
+    vertical-align: -2px;
+    color: #6b3fa0;  /* .GeneListNode's --node-accent-color, which is scoped to the node card */
 }
-
-.ui-icon.CohortNode { 
-    background-image: url(/static/images/node_icons/cohort.png);
-}
-
-.ui-icon.ConservationNode {
-    background-image: url(/static/images/node_icons/conservation_node.png);
-}
-
-.ui-icon.SelectedInParentNode {
-    background-image: url(/static/images/node_icons/checklist_icon.png);
-}
-
-.ui-icon.MOINode {
-    background-image: url(/static/images/node_icons/moi.svg);
-}
-
-.ui-icon.PopulationNode { 
-    background-image: url(/static/images/node_icons/population_node.png);
-}
-
-.ui-icon.PhenotypeNode { 
-    background-image: url(/static/images/node_icons/phenotype_node.png);
-}
-
-.ui-icon.ZygosityNode { 
-    background-image: url(/static/images/node_icons/punnet_square.png);
-}
-
-.ui-icon.DamageNode { 
-    background-image: url(/static/images/node_icons/damage_node.png);
-}
-
-.ui-icon.TissueNode { 
-    background-image: url(/static/images/node_icons/tissue_node.jpg);
-}
-
-.ui-icon.ClassificationsNode { 
-    background-image: url(/static/images/diagnose_icon.png);
-}
-
-.ui-icon.SampleNode { 
-    background-image: url(/static/images/node_icons/sample_icon_24.png);
-}
-
-.ui-icon.BuiltInFilterNode { 
-    background-image: url(/static/images/node_icons/built_in_filter_icon_24.png);
-}
-
-.ui-icon.AllVariantsNode { 
-    background-image: url(/static/icons/database-1-1.png);
-}
-
-.ui-icon.VennNode { 
-    background-image: url(/static/images/node_icons/venn_icon_24.png);
-}
-
-.ui-icon.TagNode { 
-    background-image: url(/static/icons/tags_colored.png);
-}
-
-
-.ui-icon.MergeNode { 
-    background-image: url(/static/images/node_icons/merge.png);
-}
-
 
 /*
-	AnalysisNodes have an outer div with classes ".ClassName" and ".window" (from jsPlumb)
-	So set size off that, and then
+	AnalysisNodes are a "Design A" card - an outer div with classes ".window .design-a-node .ClassName"
+	(.window is jsPlumb's) containing:
 
-	Stacked on top of that is:
-		.node-overlay (which also has .ClassName and other classes set from node) - cleared each appearance change
-		.node-color-overlay
-		.count-overlay
+		.node-overlay (also has .ClassName and the classes from get_css_classes()) - class attribute is
+		               replaced wholesale on each appearance change, so state lives on its children:
+			.node-badge		- corner circle, icon from NodeIcon
+			.node-klass		- class strip, text from get_node_class_label_short()
+			.node-name-holder > .node-name
+			.node-chips		- pills from get_node_chips()
+			.node-color-overlay - analysis variable / output node tint
+		.node-counts-strip > .node-counts > .node-count-<type>
+		.node-counts-strip > .node-counts.node-tag-counts > .node-count-<type> (tag counts, if any)
 
+	Everything on the card is data driven from the rendering dict - see node_display.py
 */
 
 .window {
@@ -261,121 +237,245 @@ ul.customicons .ui-icon {
 	box-sizing: unset;
 }
 
-.window.AlleleFrequencyNode {
-	width: 50px;
-	height: 40px;
+/* Source/filter colour scheme - anything carrying node_classification (the card, the node editor
+   title badge, the add-node dropdown rows) picks up the matching colour */
+[node_classification="source"] {
+	--node-classification-color: #0e7a4a;
 }
 
-.node-overlay.AlleleFrequencyNode {
-    background-image: url(/static/images/node_icons/variant_allele_frequency.png);
-    background-size: 50px 40px;
+[node_classification="filter"] {
+	--node-classification-color: #3455a4;
 }
 
-.node-overlay.AllVariantsNode {
-    background-image: url(/static/icons/database-1-1.png);
+/* Per-node accent - the glyph colour on the white badge. Nodes without one draw in their
+   classification colour. Kept to a similar mid-darkness so a canvas of them stays calm */
+.DamageNode { --node-accent-color: #f2b705; }
+.GeneListNode { --node-accent-color: #6b3fa0; }
+.PopulationNode { --node-accent-color: #1e88a8; }
+.AlleleFrequencyNode { --node-accent-color: #e07a2f; }
+.PhenotypeNode { --node-accent-color: #c2185b; }
+.TissueNode { --node-accent-color: #d1566e; }
+.ZygosityNode { --node-accent-color: #4a5fd0; }
+.MOINode { --node-accent-color: #2f7d4f; }
+.IntersectionNode { --node-accent-color: #8a6d3b; }
+.ConservationNode { --node-accent-color: #2e7d8f; }
+.MergeNode { --node-accent-color: #5c6bc0; }
+
+.window.design-a-node {
+	width: 64px;
+	height: auto;
+	background-color: white;
+	/* border-color is currentColor, which updateDirtyNode animates to flash node status */
+	border: 1px solid;
+	border-radius: 8px;
+	box-shadow: 2px 2px 8px rgba(0, 0, 0, .25);
+	font-family: -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+	font-style: normal;
+	font-size: 10px;
+	text-align: left;
 }
 
-.node-overlay.MOINode {
-    background-image: url(/static/images/node_icons/moi.svg);
+/* Circular badge carrying the node's icon - on the card corner, and in the node editor title.
+   White disc so the glyph can carry the node's own colour, ring keeps the source/filter signal */
+.node-icon-badge {
+	width: 22px;
+	height: 22px;
+	border-radius: 50%;
+	color: var(--node-accent-color, var(--node-classification-color));
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 12px;
+	box-shadow: 0 0 0 2px var(--node-classification-color), 0 1px 3px rgba(0, 0, 0, .3);
+	background-color: white;
 }
 
-.node-overlay.PedigreeNode {
-	background-image: url(/static/images/node_icons/pedigree.png);
+.design-a-node .node-badge {
+	position: absolute;
+	top: -9px;
+	left: -9px;
+	z-index: 3;
 }
 
-.TrioNode { width: 64px; height: 50px; }
-.QuadNode { width: 80px; height: 55px; }
-
-.node-overlay.FilterNode {
-	background-image: url(/static/images/node_icons/filter.png);
+/* EXTRACTION doesn't fit the strip's ~45px at 7px - nodes whose strip label can be that long
+   ask for the smaller rule from get_css_classes() */
+.node-klass-long .node-klass {
+	font-size: 6px;
+	letter-spacing: .02em;
 }
 
-.node-overlay.IntersectionNode {
-	background-image: url(/static/images/node_icons/intersection.png);
+.design-a-node .node-klass {
+	display: block;
+	font-size: 7px;
+	font-weight: 700;
+	letter-spacing: .04em;
+	text-transform: uppercase;
+	color: white;
+	background-color: var(--node-classification-color);
+	padding: 2px 4px 1px 15px;
+	border-radius: 7px 7px 0 0;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
 }
 
-.node-overlay.GeneListNode {
-	background-image: url(/static/images/node_icons/filter_list.png);
+.design-a-node .node-name-holder {
+	padding: 4px 5px;
+	min-height: 2.4em;
 }
 
-.node-overlay.AnalysisNode {
-	background-image: url(/static/images/node_icons/analysis_node.png);
+.design-a-node .node-name {
+	display: -webkit-box;
+	-webkit-line-clamp: 3;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+	overflow-wrap: anywhere;
+	color: #24292f;
+	font-weight: 600;
 }
 
-.window.CohortNode {
-	width: 70px;
-	height: 70px;
+.design-a-node .node-chips {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 2px;
+	padding: 0 4px 4px;
 }
 
-.node-overlay.CohortNode {
-    background-size: 70px 70px;
-	background-image: url(/static/images/node_icons/cohort.png);
+/* NodeChip(row_break=True) - a zero height full width flex item wraps everything after it */
+.design-a-node .node-chip-row-break {
+	flex-basis: 100%;
+	height: 0;
 }
 
-.node-overlay.ConservationNode {
-	background-image: url(/static/images/node_icons/conservation_node.png);
+.design-a-node .node-chips:empty {
+	display: none;
 }
 
-.window.SelectedInParentNode {
-	width: 40px;
-	height: 40px;
+.node-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 2px;
+	max-width: 100%;
+	font-size: 8px;
+	font-weight: 600;
+	border: 1px solid #c6cdd6;
+	border-radius: 99px;
+	padding: 0 4px;
+	background-color: #f4f6f8;
+	color: #3d4550;
+	/* .node-overlay is pointer-events: none, but chips need hover for their title */
+	pointer-events: auto;
 }
 
-.node-overlay.SelectedInParentNode {
-	background-size: 40px 40px;
-	background-image: url(/static/images/node_icons/checklist_icon.png);
+.node-chip .node-chip-text {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
-.node-overlay.PopulationNode {
-	background-image: url(/static/images/node_icons/population_node.png);
+/* The warning chip is icon + count - see SampleNode.get_node_chips() */
+.node-chip-text:empty {
+	display: none;
 }
 
-.window.PhenotypeNode {
-	width: 50px;
-	height: 60px;
+/* How many things a chip stands for - the x3 on a "VCF" chip */
+.node-chip-count {
+	background: #dfe3e8;
+	color: #3d4550;
+	border-radius: 99px;
+	padding: 0 3px;
+	font-size: 7px;
+	line-height: 9px;
+	margin-left: 1px;
 }
 
-.node-overlay.PhenotypeNode {
-	background-image: url(/static/images/node_icons/phenotype_node.png);
-	background-size: 50px 60px;
+/* Samples the node's group left out - archived VCF, another build, no permission */
+.node-chip-warning {
+	border-color: #e6b566;
+	background-color: #fff4dc;
+	color: #7a4b00;
 }
 
-
-.window.SampleNode {
-	width: 60px;
-	height: 60px;
+.node-chip-warning .node-chip-count {
+	background: #f3d9a4;
 }
 
-.window.ZygosityNode {
-	width: 53px;
-	height: 39px;
+/* A chip wrapping its children's chips - specimen holding extractions holding their VCFs */
+.node-chip-group {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 2px;
+	align-items: center;
+	width: 100%;
+	box-sizing: border-box;
+	padding: 1px 2px 2px 4px;
+	border: 1px solid #c6cdd6;
+	border-radius: 6px;
+	background: #e9edf1;
+	/* .node-overlay is pointer-events: none, but chips need hover for their title */
+	pointer-events: auto;
 }
 
-.node-overlay.ZygosityNode {
-	background-image: url(/static/images/node_icons/punnet_square_30_perc_opacity.png);
-	background-size: 53px 39px;
+.node-chip-group .node-chip-group-label {
+	display: inline-flex;
+	align-items: center;
+	gap: 2px;
+	font-size: 8px;
+	font-weight: 600;
+	color: #3d4550;
+	white-space: nowrap;
 }
 
-.node-overlay.DamageNode {
-	background-image: url(/static/images/node_icons/damage_node.png);
+.node-chip-group .node-chip {
+	background: white;
 }
 
-.node-overlay.DamageNode.EffectNodeSplicing {
-	background-image: url(/static/images/node_icons/effect_node_splicing.png);
+/* A nested group one shade lighter, so the levels read apart */
+.node-chip-group .node-chip-group {
+	background: #f4f6f8;
+	padding-left: 3px;
 }
 
-
-.node-overlay.TissueNode {
-	background-image: url(/static/images/node_icons/tissue_node.jpg);
+.design-a-node .node-venn {
+	display: flex;
+	justify-content: center;
+	overflow: hidden;
+	padding-top: 3px;
+	color: var(--node-classification-color);
 }
 
-.node-overlay.ClassificationsNode {
-    background-image: url(/static/images/diagnose_icon.png);
+/* Venn and the node editor's widget draw their rings in currentColor - see venn_intersect.js */
+[id^="vennnode-"] {
+	color: var(--node-classification-color, #3455a4);
 }
 
-/* Analysis grid create gene list child icon */
-.grid-link-icon.GeneListNode {
-    background-image: url(/static/images/node_icons/filter_list.png);
+/* Merge - the glyph sits in the middle of the card in place of a name and class strip */
+.design-a-node .node-graphic {
+	display: flex;
+	justify-content: center;
+	padding: 5px 0 3px;
+	color: var(--node-classification-color);
+}
+
+.design-a-node .node-graphic svg {
+	width: 30px;
+	height: 28px;
+}
+
+/* Venn and Merge are all picture - the name stays off the card and only shows in the hover title */
+.VennNode .node-name-holder,
+.MergeNode .node-name-holder {
+	display: none;
+}
+
+/* The venn widget is the card - no room left over either side of it */
+.window.design-a-node.VennNode {
+	width: 56px;
+}
+
+svg.node-icon {
+	width: 15.4px;
+	height: 15.4px;
 }
 
 #analysis-toolbar {
@@ -387,50 +487,69 @@ ul.customicons .ui-icon {
 	clear: none;
 }
 
-.toolbar-buttons {
-	float: right;
-	height: 20px;
+#toolbar-buttons {
+	display: flex;
+	align-items: center;
+	gap: 2px;
 }
 
 .toolbar-button {
-	display: block;
-	float: left;
-	width: 16px;
-	height: 16px;
-	margin: 2px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	position: relative;
+	width: 26px;
+	height: 26px;
+	border-radius: 5px;
+	color: #3d4550;
+	font-size: 15px;
+	line-height: 1;
 }
 
-#add-node-button {
-	background-image: url(/static/icons/add-icon.png);
+.toolbar-icon {
+	width: 17px;
+	height: 17px;
 }
 
-#copy-node-button {
-	background-image: url(/static/icons/copy.png);
+.toolbar-button:hover {
+	background-color: #eef1f4;
+	color: #111;
+	text-decoration: none;
 }
 
-#del-node-button {
-	background-image: url(/static/icons/delete-icon.png);
+.toolbar-status {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 26px;
+	height: 26px;
+	font-size: 15px;
 }
 
-#settings-button {
-	background-image: url(/static/icons/settings-icon.png);
+.toolbar-separator {
+	width: 1px;
+	height: 18px;
+	background-color: #d8dce3;
+	margin: 0 5px;
 }
 
-#view-tags-button {
-	background-image: url(/static/icons/tags_colored.png);
-	width: 22px;
-	height: 19px;
+#number-of-tags {
+	position: absolute;
+	top: -1px;
+	right: -2px;
+	min-width: 14px;
+	padding: 0 3px;
+	border-radius: 99px;
+	background-color: #b42318;
+	color: white;
+	font-size: 9px;
+	font-weight: 700;
+	line-height: 14px;
+	text-align: center;
 }
 
-#dual-screen-button {
-	background-image: url(/static/icons/multiple_monitors.png);
-}
-
-
-#input-samples-button {
-    background-image: url(/static/icons/samples_icon_small.png);
-    width: 21px;
-    height: 19px;
+#number-of-tags:empty {
+	display: none;
 }
 
 
@@ -438,28 +557,90 @@ ul.customicons .ui-icon {
 	width: 200px;
 }
 
-.default-node-container {
-	border: 1px dotted gray;
-}
-
 .node-editor-description #node-name {
 	font-weight: bold;
 }
- 
-.ui-selected.default-node-container {
-	border: 1px solid red;
+
+.node-editor-title {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin: 4px 0 8px;
+	font-size: 15px;
+	font-weight: 600;
 }
 
-.ui-selected .sample-node {
-	stroke: #ff0000;
+.node-editor-title a {
+	color: #6b7280;
+	font-size: 13px;
 }
 
-#node-size-slider {
-	width: 100px;
+.node-editor-title a:hover {
+	color: #3455a4;
 }
 
-.ui-jqgrid-titlebar {
-	display: none;
+/* Node editor selects - same chrome as the add-node dropdown. Select2 hides its original select
+   off-screen and draws its own box, so leave those alone and style the box instead */
+#node-editor-wrapper select:not(.select2-hidden-accessible) {
+	appearance: none;
+	max-width: 100%;
+	padding: 4px 26px 4px 8px;
+	border: 1px solid #c6cdd6;
+	border-radius: 6px;
+	background-color: white;
+	background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%233d4550' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+	background-repeat: no-repeat;
+	background-position: right 8px center;
+	background-size: 10px 6px;
+	font-family: inherit;
+	font-size: 13px;
+	line-height: 20px;
+	color: #24292f;
+	cursor: pointer;
+}
+
+#node-editor-wrapper select:not(.select2-hidden-accessible):hover {
+	border-color: #3455a4;
+}
+
+#node-editor-wrapper select:not(.select2-hidden-accessible):focus {
+	outline: none;
+	border-color: #3455a4;
+	box-shadow: 0 0 0 3px rgba(52, 85, 164, .15);
+}
+
+/* List boxes have no collapsed value to point a chevron at */
+#node-editor-wrapper select[multiple],
+#node-editor-wrapper select[size]:not([size="1"]) {
+	padding-right: 8px;
+	background-image: none;
+	cursor: default;
+}
+
+#node-editor-wrapper select:disabled {
+	background-color: #f4f6f8;
+	color: #6b7280;
+	cursor: default;
+}
+
+#node-editor-wrapper .select2-container--default .select2-selection--single,
+#node-editor-wrapper .select2-container--default .select2-selection--multiple {
+	border-color: #c6cdd6;
+	border-radius: 6px;
+}
+
+.node-selected.design-a-node {
+	border-color: red;
+	box-shadow: 0 0 0 2px rgba(255, 0, 0, .35), 2px 2px 8px rgba(0, 0, 0, .25);
+}
+
+/* Rubber band drawn over empty canvas, see setupNodeModifications() */
+.node-marquee {
+	position: absolute;
+	z-index: 30; /* over the nodes, which are 24 */
+	border: 1px dotted black;
+	background-color: rgba(52, 85, 164, .1);
+	pointer-events: none;
 }
 
 .tag-counter {
@@ -479,10 +660,6 @@ tr.jqgrow {
 	background-image: None;
 }
 
-table.grid tr.ui-state-highlight {
-	background-image: None;
-}
-
 input.narrow {
 	width: 60px;
 }
@@ -494,6 +671,8 @@ div.node-color-overlay {
 	pointer-events: none;
 	width: 100%;
 	height: 100%;
+	border-radius: 8px;
+	z-index: 1;
 }
 
 .variable-node .node-color-overlay {
@@ -506,44 +685,36 @@ div.node-color-overlay {
 
 
 div.node-overlay {
-	color: black; 
+	color: black;
 	pointer-events: none;
-	width: inherit;
-	height: inherit;
-	background-size: inherit;
-	background-repeat: no-repeat;
 }
 
-div.count-overlay {
-	z-index: 40;
-	position: absolute;
-	top: 0px;
-	left: 0px;
-	pointer-events: none;
+.design-a-node .node-counts-strip {
+	position: relative;
+	/* One count row, reserved whether the node is loading, invalid or showing counts, so the card
+	   doesn't resize (and drag jsPlumb connections around) when the update lands */
+	min-height: 14px;
+	border-top: 1px solid #e4e7ec;
+}
+
+.design-a-node .node-counts-strip:empty {
+	min-height: 0;
+	border-top: none;
 }
 
 span.node-counts {
-	bottom: 0px;
-	right: 0px;
-	position: absolute;
+	display: flex;
+	/* Narrow cards can't fit 4 counts across, so wrap at 2 per row rather than clipping the numbers */
+	flex-wrap: wrap;
 }
 
 .node-counts .clickable-count {
 	pointer-events: auto;
+	cursor: pointer;
 }
 
 .node-counts .node-counts-selected  {
-	border: 1px solid red;
-}
-
-span.gene-list-security {
-	bottom: 0px;
-	position: absolute;
-    width: 20px;
-    height: 20px;
-    background-size: 20px 20px;
-	background-image: url(/static/icons/lock.gif);
-	pointer-events: auto;
+	outline: 1px solid red;
 }
 
 .autocomplete-light-widget {
@@ -551,26 +722,89 @@ span.gene-list-security {
 }
 
 .node-count {
-	clear: both;
+	flex: 1 0 45%;
 	display: none;
+	height: 14px;
+	line-height: 12px;
+	text-align: center;
+	font-size: 8px;
+	font-weight: 700;
+	padding: 1px 0px;
+	overflow: hidden;
 }
 
-.grid-tag .user-tag-colored {
-    margin: 2px;
-    padding: 2px;
-    display: inline-block;
-    cursor: pointer;
+/* Tag counts sit below the built-in counts, behind a tag icon so it's clear they're tags */
+.node-tag-counts {
+	align-items: center;
+	border-top: 1px dotted #e4e7ec;
 }
 
-.add-variant-tag {
-    width: 16px;
-    height: 16px;
-    background-size: 16px 16px;
-    background-image: url(/static/icons/add-icon.png);
-    display: inline-block;
-    cursor: pointer;
+.node-tag-counts .tag-counts-icon {
+	flex: 0 0 auto;
+	font-size: 8px;
+	line-height: 12px;
+	padding: 0 2px 0 1px;
+	color: #98a2b3;
 }
 
+/* A tag count is a handful of variants at most, so pack them in at their own width - a node with
+   a dozen tags reads as a row of colours rather than six rows of two */
+.node-tag-counts .node-count {
+	flex: 0 0 auto;
+	height: 12px;
+	line-height: 12px;
+	padding: 0 2px;
+}
+
+/* Counts are unknown until the node update comes back (updateDirtyNode sets loading), so spin
+   where the total will land rather than showing a row of question marks */
+.design-a-node[loading] .node-counts {
+	visibility: hidden;
+}
+
+.design-a-node[loading] .node-counts-strip::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	margin: auto;
+	width: 10px;
+	height: 10px;
+	border: 2px solid #e4e7ec;
+	border-top-color: var(--node-classification-color);
+	border-radius: 50%;
+	animation: node-count-spin .7s linear infinite;
+}
+
+@keyframes node-count-spin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+/* An errored node never gets counts, so put a cross where the spinner was rather than
+   leaving the strip blank - see updateDirtyNode() */
+.design-a-node[node_error] .node-counts {
+	visibility: hidden;
+}
+
+.design-a-node[node_error] .node-counts-strip::after {
+	content: "\2715";
+	position: absolute;
+	inset: 0;
+	margin: auto;
+	width: 12px;
+	height: 12px;
+	line-height: 12px;
+	text-align: center;
+	font-size: 11px;
+	font-weight: 700;
+	color: #c02b2b;
+}
+
+.node-count .live-data-marker {
+	font-size: 0.8em;
+	opacity: 0.7;
+}
 
 @keyframes redpulse {
   0% {
@@ -591,10 +825,6 @@ span.gene-list-security {
 
 #right-panel {
 	height: 100%;
-}
-
-.no-close .ui-dialog-titlebar-close {
-  display: none;
 }
 
 #node-count-legend {
@@ -638,8 +868,845 @@ span.gene-list-security {
 	display: none;
 }
 
-#node-editor-container .warning {
-    width: 500px;
-    padding: 20px;
-    margin: 10px;
+
+/* Deleted nodes fade out together with their endpoints/connectors - see fadeOutAndRemoveNode() */
+.node-deleting {
+	opacity: 0;
+	pointer-events: none;
+	transition: opacity 300ms ease-out;
+}
+
+/*
+	Horizontal mode (analysis.analysis_horizontal_mode) - nodes flow left to right on a full width
+	canvas, with the editor/grid panel docked along the bottom. See analysis.js
+*/
+
+/* The toolbar and the editor drawer are pinned to this pane, so the canvas does its own scrolling */
+.analysis-horizontal #left-panel {
+	overflow: hidden;
+}
+
+.analysis-horizontal #analysis-container {
+	overflow: auto;
+}
+
+.analysis-horizontal #right-panel {
+	overflow: auto;
+}
+
+/* The grid is sized to fill the bottom panel, so it doesn't need the top bar sized margin */
+.analysis-horizontal #node-grid-container {
+	margin-bottom: 0;
+}
+
+/* Bottom panel tab strip - Editor | Grid ("Swap") */
+.bottom-pane-tabs {
+	display: flex;
+	align-items: stretch;
+	gap: 2px;
+	background-color: #eee;
+	border-bottom: 1px solid #ccc;
+	padding: 0 4px;
+}
+
+.bottom-pane-tab {
+	padding: 1px 12px;
+	border: 1px solid transparent;
+	border-bottom: none;
+	border-radius: 4px 4px 0 0;
+	color: #333;
+	text-decoration: none;
+	font-weight: 600;
+	font-size: 13px;
+	line-height: 20px;
+}
+
+.bottom-pane-tab:hover {
+	text-decoration: none;
+	background-color: #f6f6f6;
+}
+
+.bottom-pane-tab.active {
+	background-color: white;
+	border-color: #ccc;
+	margin-bottom: -1px;
+}
+
+/* Variant details tabs - one pane each, closed with the x on the tab. See openVariantDetailsTab() */
+.variant-tab {
+	display: inline-flex;
+	align-items: center;
+}
+
+.close-variant-tab {
+	margin-left: 6px;
+	font-size: 0.85em;
+	opacity: 0.5;
+}
+
+.close-variant-tab:hover {
+	opacity: 1;
+}
+
+.variant-details-pane {
+	padding: 5px;
+}
+
+.bottom-pane-tab-action {
+	margin-left: auto;
+	align-self: center;
+	padding: 2px 8px;
+	color: #555;
+	text-decoration: none;
+	font-size: 0.9em;
+}
+
+.bottom-pane-node-tabs {
+	display: flex;
+	align-items: stretch;
+	gap: 2px;
+}
+
+/* One row of tabs - the node editor's own strip is mirrored into the bar of whichever home it's in */
+.analysis-horizontal #node-editor-tabs > ul.nav-tabs {
+	display: none;
+}
+
+/* Bootstrap's default tab padding costs ~40px of the editor pane before any content.
+   Match the bottom pane strip instead - that height is rows on the grid. */
+#node-editor-tabs > ul.nav-tabs {
+	padding: 0;
+	font-size: 13px;
+}
+
+#node-editor-tabs > ul.nav-tabs > li > a {
+	padding: 1px 12px;
+	line-height: 20px;
+}
+
+/* Node counts legend - moved into the toolbar (see layoutAnalysisPanels), so it reads as a single row */
+.analysis-horizontal #analysis-toolbar {
+	position: relative;  /* anchor for the node counts legend */
+}
+
+.analysis-horizontal #node-count-legend {
+	position: absolute;
+	right: 10px;
+	top: 50%;
+	transform: translateY(-50%);
+	bottom: auto;
+	left: auto;
+	float: none;  /* #analysis-toolbar floats its divs - this one is right justified on its own */
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	height: auto;
+}
+
+.analysis-horizontal #node-count-legend .legend-row {
+	display: flex;
+	align-items: center;
+	min-height: 0;
+	margin: 0;
+}
+
+.analysis-horizontal #node-count-legend .legend-color-box {
+	float: none;
+	width: 14px;
+	height: 14px;
+	margin-right: 4px;
+}
+
+.analysis-horizontal #node-count-legend .legend-label {
+	float: none;
+	white-space: nowrap;
+}
+
+/* The Venn rings and the Merge glyph turn with the flow, so they line up with their input endpoints */
+.analysis-horizontal .design-a-node .node-venn {
+	align-items: center;
+	height: 56px;
+}
+
+.analysis-horizontal .design-a-node .node-venn svg,
+.analysis-horizontal .design-a-node .node-graphic svg {
+	flex-shrink: 0;
+	transform: rotate(-90deg);
+}
+
+/* The editor's other home - slides in over the right of the canvas ("Drawer") */
+#node-editor-drawer {
+	position: absolute;
+	top: 0;
+	right: 0;
+	bottom: 0;
+	width: 450px;
+	z-index: 200; /* over #analysis-toolbar, so header tooltips aren't drawn behind it */
+	display: flex;
+	flex-direction: column;
+	background-color: white;
+	border-left: 1px solid #ccc;
+	box-shadow: -2px 0 8px rgba(0, 0, 0, .2);
+}
+
+.drawer-resize-handle {
+	position: absolute;
+	left: -3px;
+	top: 0;
+	bottom: 0;
+	width: 6px;
+	cursor: col-resize;
+}
+
+.drawer-header {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	padding: 4px 6px 4px 12px;
+	border-bottom: 1px solid #ddd;
+	background-color: #eee;
+}
+
+.drawer-title {
+	font-weight: bold;
+	margin-right: 4px;
+}
+
+#node-editor-drawer.has-node-tabs .drawer-title {
+	display: none;
+}
+
+.drawer-header .toolbar-button:first-of-type {
+	margin-left: auto;
+}
+
+/* The editor's tabs, mirrored into the drawer header - see syncNodeEditorTabs() */
+.drawer-node-tabs {
+	display: flex;
+	align-items: center;
+	gap: 2px;
+	overflow: hidden;
+}
+
+.drawer-tab {
+	padding: 2px 8px;
+	border: 1px solid transparent;
+	border-radius: 4px;
+	color: #333;
+	text-decoration: none;
+	white-space: nowrap;
+}
+
+.drawer-tab:hover {
+	text-decoration: none;
+	background-color: #f6f6f6;
+}
+
+.drawer-tab.active {
+	background-color: white;
+	border-color: #ccc;
+	font-weight: 600;
+}
+
+#node-editor-drawer-body {
+	flex: 1;
+	overflow: auto;
+	padding: 6px;
+}
+
+/* Node editor accordions - the stand-alone editor window has Bootstrap but not global.css, so the
+   header affordances live here rather than with the .accordion rules in global.scss */
+/* Bootstrap clips .accordion > .card, which would cut off the select2 drop-downs in the panels */
+.node-editor-accordion > .card {
+	overflow: inherit;
+}
+
+.node-editor-accordion .card-header {
+	cursor: pointer;
+	position: relative;
+	padding: 0.5rem 1rem;
+	font-weight: 600;
+}
+
+.node-editor-accordion .card-header:before {
+	font-family: 'Font Awesome 6 Free', 'FontAwesome';
+	font-weight: 900;
+	content: "\f077";
+	position: absolute;
+	right: 1rem;
+	color: #88b;
+}
+
+.node-editor-accordion .card-header.collapsed:before {
+	content: "\f078";
+}
+
+.node-editor-accordion .card-header.disabled {
+	pointer-events: none;
+	opacity: 0.65;
+}
+
+/* Significance pill rows in the Classifications / ClinVar node editors */
+.significance-pills {
+	margin: 4px 0;
+	white-space: nowrap;
+}
+
+.significance-pills .row-label {
+	display: inline-block;
+	min-width: 90px;
+	margin-right: 8px;
+	font-weight: 600;
+	color: #3d4550;
+}
+
+.significance-pills label.pill-toggle {
+	width: auto;
+	min-width: 42px;
+	padding: 2px 8px;
+	margin: 0 2px;
+	cursor: pointer;
+	user-select: none;
+}
+
+.significance-pills label.pill-toggle input {
+	position: absolute;
+	opacity: 0;
+	pointer-events: none;
+}
+
+.significance-pills label.pill-toggle.unchecked {
+	opacity: 0.35;
+}
+
+/* The row for the origin the node isn't filtering on - greyed off so it's clear it isn't applied */
+.significance-pills.origin-disabled .row-label {
+	opacity: 0.5;
+}
+
+.significance-pills.origin-disabled label.pill-toggle {
+	opacity: 0.3;
+	filter: grayscale(1);
+	cursor: default;
+	pointer-events: none;
+}
+
+.clinvar-row {
+	margin: 4px 0;
+}
+
+.clinvar-row label {
+	font-weight: normal;
+	margin-right: 6px;
+}
+
+/*
+	Node editor forms - one look for every editor under #node-editor-wrapper, sharing the chrome of
+	the selects above. The building blocks the editor templates are written in:
+	  .editor-row       a label and its control on one line (.editor-label is the label)
+	  .editor-section   a titled group of rows (.editor-section-title)
+	  .editor-table     a compact table of settings (min/max counts, slider rows)
+	  .editor-note      an inline message; .editor-warning / .warning for something to act on
+	  .editor-actions   the save row, with .editor-meta for "last saved" style detail
+	  .editor-checks    a run of checkbox/radio labels; .editor-choices for Django's widget wrapper
+	  .slider-container the range slider + readout used by the Damage/Conservation/Built-in editors
+*/
+#node-editor-wrapper {
+	font-size: 13px;
+	color: #24292f;
+}
+
+#node-editor-wrapper > #node-editor-tabs > .tab-content > .tab-pane {
+	padding: 6px 4px;
+}
+
+#node-editor-wrapper label {
+	margin-bottom: 0;
+	font-weight: normal;
+}
+
+#node-editor-wrapper .editor-label {
+	font-weight: 600;
+}
+
+#node-editor-wrapper b,
+#node-editor-wrapper th {
+	font-weight: 600;
+}
+
+#node-editor-wrapper input[type=checkbox],
+#node-editor-wrapper input[type=radio] {
+	margin: 0 3px 0 0;
+	vertical-align: -1px;
+	accent-color: #3455a4;
+}
+
+#node-editor-wrapper input[type=text],
+#node-editor-wrapper input[type=number],
+#node-editor-wrapper input[type=date],
+#node-editor-wrapper textarea {
+	max-width: 100%;
+	padding: 3px 8px;
+	border: 1px solid #c6cdd6;
+	border-radius: 6px;
+	background-color: white;
+	font-family: inherit;
+	font-size: 13px;
+	line-height: 20px;
+	color: #24292f;
+}
+
+#node-editor-wrapper input[type=number] {
+	width: 5em;
+	padding-right: 4px;
+}
+
+#node-editor-wrapper input[type=text]:focus,
+#node-editor-wrapper input[type=number]:focus,
+#node-editor-wrapper input[type=date]:focus,
+#node-editor-wrapper textarea:focus {
+	outline: none;
+	border-color: #3455a4;
+	box-shadow: 0 0 0 3px rgba(52, 85, 164, .15);
+}
+
+#node-editor-wrapper input:disabled,
+#node-editor-wrapper textarea:disabled {
+	background-color: #f4f6f8;
+	color: #6b7280;
+}
+
+#node-editor-wrapper .select2-container {
+	max-width: 100%;
+}
+
+/* select2 sizes its box from the original select, which is tiny in a flex row - let it fill the row */
+#node-editor-wrapper .editor-row > .select2-container,
+#node-editor-wrapper .editor-row > span > .select2-container {
+	flex: 1 1 160px;
+	min-width: 160px;
+}
+
+#node-editor-wrapper .editor-row > span:has(> .select2-container) {
+	display: flex;
+	flex: 1 1 160px;
+	min-width: 160px;
+}
+
+.editor-row {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 4px 8px;
+	margin: 5px 0;
+}
+
+.editor-row.editor-row-top {
+	align-items: flex-start;
+}
+
+.editor-label {
+	flex: 0 0 auto;
+	min-width: 90px;
+	font-weight: 600;
+	color: #3d4550;
+}
+
+.editor-row .editor-label {
+	margin: 0;
+}
+
+.editor-help {
+	margin: 2px 0;
+	color: #6b7280;
+	font-size: 12px;
+}
+
+.editor-row .editor-help {
+	margin: 0;
+}
+
+.editor-section {
+	margin: 8px 0;
+	padding: 6px 10px 8px;
+	border: 1px solid #e3e7ec;
+	border-radius: 6px;
+	background-color: white;
+}
+
+.editor-section-title {
+	margin: 0 0 4px;
+	font-size: 11px;
+	font-weight: 600;
+	letter-spacing: .04em;
+	text-transform: uppercase;
+	color: #6b7280;
+}
+
+.editor-section-title .hover-link,
+.editor-section-title a {
+	text-transform: none;
+	letter-spacing: 0;
+	font-weight: normal;
+	margin-left: 6px;
+}
+
+/* Inline messages. .warning is what base_editor and the per-node warnings already use */
+.editor-note,
+#node-editor-wrapper .warning:not(.alert-warning),
+#node-editor-wrapper .editor-warning,
+#node-editor-wrapper .live-data-note {
+	width: auto;
+	margin: 6px 0;
+	padding: 5px 10px;
+	border-left: 3px solid #3455a4;
+	border-radius: 0 6px 6px 0;
+	background-color: #f4f6f8;
+	color: #24292f;
+}
+
+#node-editor-wrapper .warning:not(.alert-warning),
+#node-editor-wrapper .editor-warning {
+	border-left-color: #d97706;
+	background-color: #fff7e6;
+}
+
+#node-editor-wrapper .live-data-note {
+	border-left-color: #2a9d5c;
+	background-color: #edf9f1;
+}
+
+#node-editor-wrapper .alert {
+	padding: 6px 10px;
+	margin: 6px 0;
+	font-size: 13px;
+}
+
+#node-editor-wrapper .alert .errorlist {
+	margin: 0;
+	padding-left: 16px;
+}
+
+#node-editor-wrapper .errorlist {
+	margin: 2px 0;
+	padding-left: 16px;
+	color: #b42318;
+	font-size: 12px;
+}
+
+/* Save row */
+.editor-actions {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	margin-top: 10px;
+	padding-top: 8px;
+	border-top: 1px solid #e3e7ec;
+}
+
+.editor-actions .btn {
+	padding: 3px 16px;
+	font-size: 13px;
+	border-radius: 6px;
+}
+
+.editor-meta {
+	margin-left: auto;
+	color: #6b7280;
+	font-size: 12px;
+}
+
+/* Settings tables - min/max counts, slider rows, family members */
+.editor-table {
+	border-collapse: collapse;
+	margin: 4px 0;
+}
+
+.editor-table th,
+.editor-table td {
+	padding: 3px 8px 3px 0;
+	vertical-align: middle;
+	text-align: left;
+}
+
+.editor-table th {
+	font-weight: 600;
+	color: #3d4550;
+	white-space: nowrap;
+}
+
+.editor-table thead th,
+.editor-table tr.editor-table-head th,
+.editor-table tr.editor-table-head td {
+	padding-bottom: 2px;
+	font-size: 11px;
+	font-weight: 600;
+	letter-spacing: .04em;
+	text-transform: uppercase;
+	color: #6b7280;
+	border-bottom: 1px solid #e3e7ec;
+}
+
+.editor-table td.editor-table-help {
+	color: #6b7280;
+	font-size: 12px;
+}
+
+.editor-table.editor-table-centered th,
+.editor-table.editor-table-centered td {
+	text-align: center;
+	padding: 3px 8px;
+}
+
+.editor-table.editor-table-centered th:first-child,
+.editor-table.editor-table-centered td:first-child {
+	text-align: left;
+	padding-left: 0;
+}
+
+/* Checkbox and radio runs - Django renders each choice in its own div */
+.editor-checks,
+.editor-choices > div {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 2px 12px;
+}
+
+.editor-choices > div > div {
+	display: inline-flex;
+	align-items: center;
+}
+
+.editor-choices.editor-choices-stacked > div {
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 2px;
+}
+
+.editor-checks label,
+.editor-choices label {
+	display: inline-flex;
+	align-items: center;
+	white-space: nowrap;
+}
+
+.editor-checks label .editor-help {
+	margin-left: 4px;
+}
+
+/* Genotype thresholds (AD/DP/GQ/PL) shared by the VCF source nodes */
+.genotype-row {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 4px 12px;
+	margin: 5px 0;
+}
+
+.genotype-row b {
+	color: #3d4550;
+}
+
+.genotype-row input[type=number] {
+	width: 4.5em;
+	margin: 0 4px 0 2px;
+}
+
+/* One threshold (label, input, all/any) wraps as a unit */
+.genotype-field {
+	display: inline-flex;
+	align-items: center;
+	white-space: nowrap;
+}
+
+/* Range sliders (scoped - genes/hotspot_graph.html has its own .slider-container) - setupSlider() writes the readout into .slider-value and the ends into .min-value/.max-value */
+#node-editor-wrapper .slider-container {
+	display: inline-block;
+	margin-left: 4px;
+	vertical-align: middle;
+}
+
+#node-editor-wrapper .slider-container .slider,
+#node-editor-wrapper .slider-container .slider-track {
+	display: inline-block;
+	width: 150px;
+	vertical-align: middle;
+}
+
+#node-editor-wrapper .slider-container .slider {
+	margin: 0;
+	accent-color: #3455a4;
+}
+
+#node-editor-wrapper .slider-container .slider-track {
+	position: relative;
+}
+
+#node-editor-wrapper .slider-container .slider-track .slider {
+	display: block;
+	height: 20px;
+}
+
+#node-editor-wrapper .slider-container .slider-labels {
+	display: flex;
+	justify-content: space-between;
+	width: 150px;
+	font-size: 11px;
+	color: #6b7280;
+}
+
+#node-editor-wrapper .slider-container .slider-labels .label {
+	float: none;
+	font-weight: normal;
+}
+
+#node-editor-wrapper .slider-container .slider-value {
+	display: inline-block;
+	min-width: 40px;
+	margin-left: 8px;
+	font-weight: 600;
+	font-variant-numeric: tabular-nums;
+}
+
+#node-editor-wrapper .slider-container .slider:disabled {
+	opacity: 0.4;
+}
+
+#node-editor-wrapper .enable-slider {
+	margin-right: 4px;
+	vertical-align: middle;
+}
+
+/* The tick and its slider stay on one line */
+.editor-table td:has(> .enable-slider) {
+	white-space: nowrap;
+}
+
+/* Allele frequency ranges (allele_frequency_tag.html) */
+#allele-frequency-filter {
+	margin: 4px 0;
+}
+
+#af-tool-container {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin-bottom: 6px;
+}
+
+.af-slider-row {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin: 4px 0 10px;
+}
+
+.af-slider-row .af-slider {
+	width: 200px;
+	margin: 0 8px; /* noUiSlider's handles overhang its track */
+}
+
+.af-slider-row .slider-label {
+	min-width: 36px;
+	font-variant-numeric: tabular-nums;
+	color: #3d4550;
+}
+
+.af-slider-row .slider-max {
+	text-align: right;
+}
+
+#allele-frequency-filter .noUi-connect {
+	background-color: #3455a4;
+}
+
+#allele-frequency-filter .noUi-horizontal {
+	height: 10px;
+}
+
+#allele-frequency-filter .noUi-horizontal .noUi-handle {
+	width: 18px;
+	height: 18px;
+	top: -5px;
+	right: -9px;
+	border-radius: 50%;
+	box-shadow: 0 1px 2px rgba(0, 0, 0, .2);
+}
+
+#allele-frequency-filter .noUi-handle:before,
+#allele-frequency-filter .noUi-handle:after {
+	display: none;
+}
+
+.btn-icon {
+	padding: 0 7px;
+	line-height: 20px;
+	border-radius: 6px;
+}
+
+/* Zygosity tick tables - the Sample node's own row and the Cohort node's per-sample rows */
+.zygosity-table th,
+.zygosity-table td {
+	text-align: center;
+	padding: 2px 10px;
+}
+
+.zygosity-table th.zygosity-sample {
+	text-align: left;
+	padding-left: 0;
+}
+
+.zygosity-table tr.editor-table-head th {
+	text-align: center;
+}
+
+.zygosity-table tr.editor-table-head th.zygosity-sample {
+	text-align: left;
+}
+
+.zygosity-table td.zygosity-toggle {
+	text-align: left;
+	font-style: italic;
+	color: #6b7280;
+}
+
+.zygosity-table th.zygosity-toggle {
+	color: #6b7280;
+	font-weight: normal;
+	font-style: italic;
+	text-align: left;
+}
+
+/* Accordion panels get the section chrome rather than Bootstrap's card padding */
+.node-editor-accordion {
+	margin: 8px 0;
+}
+
+.node-editor-accordion .card-header {
+	padding: 6px 12px;
+	font-size: 13px;
+}
+
+.node-editor-accordion .card-body {
+	padding: 8px 12px 10px;
+}
+
+/* Summary / graph tabs */
+#node-summary-tabs form {
+	padding: 4px 0;
+}
+
+#node-editor-wrapper .vertical-tabs > ul.nav-tabs {
+	font-size: 13px;
+}
+
+/* Filtering-to line and the locked notice above the editor title */
+.node-editor-filter-info {
+	margin: 4px 0;
+}
+
+#locked-warning-icon {
+	font-size: 15px;
+	margin-right: 4px;
 }

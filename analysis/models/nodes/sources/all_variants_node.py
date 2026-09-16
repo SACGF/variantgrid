@@ -7,6 +7,7 @@ from django.db.models import CASCADE, SET_NULL, Q
 
 from analysis.models.nodes.analysis_node import AnalysisNode, NodeAuditLogMixin
 from analysis.models.nodes.zygosity_count_node import AbstractZygosityCountNode
+from analysis.models.nodes.node_display import NodeIcon
 from genes.models import GeneSymbol
 from snpdb.models import Variant, VariantZygosityCountCollection
 from snpdb.models.models_genome import Contig
@@ -30,9 +31,13 @@ class AllVariantsNode(AnalysisNode, AbstractZygosityCountNode):
     min_inputs = 0
     max_inputs = 0
 
+    @property
+    def zygosity_count_max_samples(self) -> int:
+        return self.num_samples_for_build
+
     def get_warnings(self) -> list[str]:
         warnings = super().get_warnings()
-        if msg := self.get_min_above_max_warning_message(self.num_samples_for_build):
+        if msg := self.get_min_above_max_warning_message(self.zygosity_count_max_samples):
             warnings.append(msg)
         return warnings
 
@@ -125,6 +130,10 @@ class AllVariantsNode(AnalysisNode, AbstractZygosityCountNode):
     @staticmethod
     def get_node_class_label():
         return "All Variants"
+
+    @classmethod
+    def get_node_class_icon(cls) -> NodeIcon:
+        return NodeIcon(fa="fa-solid fa-database")
 
     def _get_method_summary(self):
         class_name = AllVariantsNode.get_node_class_label()

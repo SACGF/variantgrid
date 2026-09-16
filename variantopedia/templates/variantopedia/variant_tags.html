@@ -1,9 +1,8 @@
 {% extends menu_variants_base %}
 {% load settings_tags %}
-{% load static %}
 {% load crispy_forms_tags %}
 {% load genome_build_tags %}
-{% load jqgrid_tags %}
+{% load datatable_tags %}
 {% load user_tag_color_tags %}
 {% load js_tags %}
 
@@ -18,65 +17,53 @@
         open_variant_details_in_new_window: true,
     };
 
-    function addCSVDownloadToGrid(grid, pagerId, url) {
-        grid.jqGrid(
-                'navButtonAdd', pagerId, {
-                caption : "CSV",
-                buttonicon : "ui-icon-arrowthickstop-1-s",
-                onClickButton : function() {
-                    let url_with_params = url + "?extra_filters=" + getVariantTagsGridExtraFilters();
-                    window.location = url_with_params;
-                },
-                title : "Download as CSV",
-                cursor : "pointer"
-        });
-    }
-
+    const TAG_COUNTS_SUMMARY = "[data-tag-counts-summary]";
     const initialTags = {{ initial_tags|jsonify }};
     const filterUserId = {% if filter_user %}{{ filter_user.pk }}{% else %}null{% endif %};
+    // Shared filter state - both tables on this page read it
     gridParams = initialTags.length ? {"tags": initialTags} : {};
     if (filterUserId) {
         gridParams["user"] = filterUserId;
     }
-    function getVariantTagsGridExtraFilters() {
-        return JSON.stringify(gridParams);
+
+    // Called by DataTables before each ajax call - lists go down as JSON, everything else as a plain param
+    function variantTagsDatatableFilter(data) {
+        for (const [key, value] of Object.entries(gridParams)) {
+            data[key] = Array.isArray(value) ? JSON.stringify(value) : value;
+        }
     }
 
-    function getVariantTagsConfigUrl() {
-        return "extra_filters=" + getVariantTagsGridExtraFilters();
+    // The variant-centric grid class takes the same selection as a single extra_filters blob
+    function taggedVariantDatatableFilter(data) {
+        data["extra_filters"] = JSON.stringify(gridParams);
     }
 
-    function taggedVariantGridInitFunc(grid, pagerId) {
-        grid[0].p.postData["extra_filters"] = getVariantTagsGridExtraFilters;
-        let url = Urls.tagged_variant_export("{{ genome_build.name }}");
-        addCSVDownloadToGrid(grid, pagerId, url);
-    }
-
-
-    function variantTagsGridInitFunc(grid, pagerId) {
-        grid[0].p.postData["extra_filters"] = getVariantTagsGridExtraFilters;
-        let url = Urls.variant_tags_export("{{ genome_build.name }}");
-        addCSVDownloadToGrid(grid, pagerId, url);
+    function downloadVariantTagsCSV() {
+        const params = {};
+        variantTagsDatatableFilter(params);
+        window.location = Urls.variant_tags_export("{{ genome_build.name }}") + "?" + EncodeQueryData(params);
     }
 
     function showAll() {
         gridParams = {};
+        clearTagCountsSummary(TAG_COUNTS_SUMMARY);
         $("#user-filter-banner").hide();
         $("#id_user").val(null).trigger('change.select2'); // clear without firing our change handler
         reloadGrid();
     }
 
     function reloadGrid() {
-        let grid = $("#tagged_variant-grid");
-        grid.trigger("reloadGrid");
-
-        let grid2 = $("#variant_tags-grid");
-        grid2.trigger("reloadGrid");
+        for (const table of [$("#tagged-variants-datatable"), $("#variant-tags-datatable")]) {
+            if ($.fn.DataTable.isDataTable(table)) {
+                table.DataTable().ajax.reload();
+            }
+        }
     }
 
-    function tagClick(tagId) {
+    // The toggles mean "carries any of these" - the co-occurrence links' "tags" means all of them
+    function tagsChanged(tagIds) {
         const userId = gridParams["user"];
-        gridParams = {"tag" : tagId};
+        gridParams = tagIds.length ? {"any_tags": tagIds} : {};
         if (userId) {
             gridParams["user"] = userId;
         }
@@ -84,6 +71,7 @@
     }
 
     $(document).ready(function() {
+        setupTagCountsSummary(TAG_COUNTS_SUMMARY, tagsChanged);
         {% if filter_user %}
             setAutocompleteValue("#id_user", filterUserId, "{{ filter_user.username }}");
         {% endif %}
@@ -100,7 +88,6 @@
     });
 
 </script>
-<script type="text/javascript" src="{% static 'js/grid.js' %}"></script>
 <style>
 {% render_node_count_colors_css %}
 .new-classification-button {
@@ -127,8 +114,12 @@
             last 30 days.
             {% if tags_without_build_coordinate %}
                 <p class="text-muted small mb-0 mt-2">
-                    <strong>{{ tags_without_build_coordinate }}</strong> tag events have no
-                    {{ genome_build }} coordinate, so aren't shown in the grids below. See
+                    <strong>{{ tags_without_build_coordinate }}</strong> tag
+                    event{{ tags_without_build_coordinate|pluralize }}
+                    {{ tags_without_build_coordinate|pluralize:"has,have" }} no
+                    {{ genome_build }} coordinate, so
+                    {{ tags_without_build_coordinate|pluralize:"isn't,aren't" }} shown in the grids
+                    below. See
                     <a href="{% url 'tag_stats' %}">tag stats</a> for counts across all builds.
                 </p>
             {% endif %}
@@ -138,7 +129,7 @@
     <a class="btn btn-outline-secondary fas fa-tags" href="{% url 'tag_settings' %}">Tag Settings</a>
     <a class="btn btn-outline-secondary fas fa-chart-bar" href="{% url 'tag_stats' %}">Tag Stats</a>
 
-    {% tag_counts_filter genome_build=genome_build click_func='tagClick' show_all_func='showAll' any_tag_button=False %}
+    {% tag_counts_summary genome_build=genome_build tag_counts=tag_counts %}
 
     <div class="form-inline my-2">
         <label class="mr-2">Filter to user:</label>
@@ -149,13 +140,20 @@
 
     (One variant per row, with all associated tags)
 
-    {% jqgrid 'tagged_variant_grid' 'tagged_variant' template_name='jqgrid/variant_details_link_grid.html' genome_build_name=genome_build.name search=False init_func='taggedVariantGridInitFunc' jqgrid_config_get_parameters_func='getVariantTagsConfigUrl' %}
-
+    <table id="tagged-variants-datatable" class="sticky-header"
+           data-datatable-url="{% url 'tagged_variant_grid' genome_build_name=genome_build.name %}"
+           data-datatable-data="taggedVariantDatatableFilter"></table>
     <h3>Tags</h3>
 
     (One tag per row, showing full information)
 
-    {% user_data_grid_filter 'variant_tags' 'Variant Tags' %}
-    {% jqgrid 'variant_tags_grid' 'variant_tags' template_name='jqgrid/variant_details_link_grid.html' genome_build_name=genome_build.name search=False init_func='variantTagsGridInitFunc' jqgrid_config_get_parameters_func='getVariantTagsConfigUrl' %}
+    {% datatable_user_data_filter 'variant-tags-datatable' 'Variant Tags' hidden_data=True hidden_label="Show resolved" %}
+    <table id="variant-tags-datatable" class="sticky-header"
+           data-filter-reloads-page
+           data-datatable-url="{% url 'variant_tags_datatable' genome_build.name %}"
+           data-datatable-data="variantTagsDatatableFilter"></table>
+    <div data-toolbar-bottom="#variant-tags-datatable">
+        <a class="btn btn-outline-secondary fas fa-download" href="javascript:downloadVariantTagsCSV()">CSV</a>
+    </div>
 
 {% endblock submenu_page_content %}

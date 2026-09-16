@@ -3,7 +3,6 @@ import tempfile
 import cyvcf2
 from django.test import TestCase
 
-from library.genomics.vcf_utils import vcf_allele_is_symbolic
 from snpdb.variants_to_vcf import VARIANT_GRID_INFO_DICT, _write_sorted_values_to_vcf_file
 from snpdb.vcf_export_utils import get_vcf_header_lines
 
@@ -57,7 +56,7 @@ class TestVariantsToVCF(TestCase):
                     self.assertEqual(data["locus__ref__seq"], v.REF)
                     self.assertEqual(data["alt__seq"], v.ALT[0])
                     self.assertEqual(data["id"], v.INFO.get("variant_id"))
-                    if vcf_allele_is_symbolic(data["alt__seq"]):
+                    if v.INFO.get("SVTYPE"):  # symbolic alt
                         self.assertEqual(data["end"], v.INFO.get("END"))
                         self.assertEqual(data["svlen"], v.INFO.get("SVLEN"))
                         self.assertEqual(data["alt__seq"][1:-1], v.INFO.get("SVTYPE"))

@@ -1,8 +1,16 @@
+"""
+The annotation version models and the annotation itself. SubVersionPartition is the base for every
+per-version partitioned table (ClinVarVersion, GeneAnnotationVersion, HumanProteinAtlasAnnotationVersion,
+VariantAnnotationVersion); AnnotationVersion bundles one of each per build and is what analyses pin;
+AnnotationRangeLock / AnnotationRun are one batch of variants through VEP; VariantAnnotation (the
+representative transcript row) and VariantTranscriptAnnotation (every transcript) hold the columns
+VEPColumnDef writes. Query a version's rows through annotation/annotation_version_querysets.py,
+never VariantAnnotation.objects directly. Enums are in models_enums.py and damage_enums.py;
+annotation/CLAUDE.md has the rules. Large: use `scripts/vg outline`.
+"""
 import logging
 import os
 import re
-import django
-import shutil
 from collections import defaultdict
 from collections.abc import Callable, Iterable
 from contextlib import contextmanager
@@ -28,6 +36,7 @@ from django_extensions.db.models import TimeStampedModel
 from psqlextra.models import PostgresPartitionedModel
 from psqlextra.types import PostgresPartitioningMethod
 
+from annotation.annotation_run_files import ANNOTATION_RUN_IMPORT_PROCESSING_PREFIX
 from annotation.external_search_terms import (
     get_variant_pubmed_search_terms,
     get_variant_search_terms,
@@ -53,6 +62,7 @@ from annotation.models.damage_enums import (
 from annotation.models.models_citations import Citation, CitationFetchRequest, CitationFetchResponse
 from annotation.models.models_enums import (
     AnnotationStatus,
+    ClinVarOncogenicity,
     ClinVarReviewStatus,
     EssentialGeneCRISPR,
     EssentialGeneCRISPR2,
@@ -60,6 +70,7 @@ from annotation.models.models_enums import (
     HumanProteinAtlasAbundance,
     ManualVariantEntryType,
     NMDEscapeStatus,
+    Pathogenicity,
     VariantAnnotationPipelineType,
     VEPSkippedReason,
 )
@@ -67,17 +78,25 @@ from annotation.models.repeat_masker import RepeatMaskerSummary
 from annotation.utils.clinvar_constants import CLINVAR_REVIEW_EXPERT_PANEL_STARS_VALUE
 from annotation.vep_columns import visible_columns_for
 from annotation.vep_config import VEPConfig
-from classification.enums import AlleleOriginBucket
-from genes.models import Gene, GeneAnnotationRelease, GeneSymbol, Transcript, TranscriptVersion
+from classification.enums import AlleleOriginBucket, SomaticClinicalSignificance
+from genes.models import (
+    Gene,
+    GeneAnnotationRelease,
+    GeneSymbol,
+    GeneVersion,
+    Transcript,
+    TranscriptVersion,
+)
 from genes.models_enums import AnnotationConsortium
 from library.django_utils import object_is_referenced
+from library.django_utils.django_file_utils import remove_import_processing_dir
 from library.django_utils.data_archive_mixin import DataArchiveMixin
 from library.django_utils.django_partition import RelatedModelsPartitionModel
 from library.genomics import parse_gnomad_coord
 from library.genomics.vcf_enums import VariantClass
 from library.log_utils import report_message
 from library.utils import all_equal, first, invert_dict
-from ontology.models import OntologyVersion
+from ontology.models import OntologyIdNormalized, OntologyTerm, OntologyVersion
 from patients.models_enums import GnomADPopulation
 from snpdb.archive import DataArchivedError
 from snpdb.models import (
@@ -218,6 +237,8 @@ class ClinVar(models.Model):
     # ONCCONF
     oncogenic_conflicting_classification = models.TextField(null=True, blank=True)
 
+    highest_oncogenicity = models.IntegerField(default=0)  # Highest of oncogenic_classification
+
     # ONCDN
     oncogenic_preferred_disease_name = models.TextField(null=True, blank=True)
     # ONCDISDB
@@ -227,6 +248,9 @@ class ClinVar(models.Model):
     somatic_review_status = models.CharField(max_length=1, null=True, choices=ClinVarReviewStatus.choices)
     # SCI
     somatic_clinical_significance = models.TextField(null=True, blank=True)
+    # Derived from SCI
+    somatic_tier = models.CharField(max_length=20, null=True, blank=True,
+                                    choices=SomaticClinicalSignificance.CHOICES)
 
     # SCIDN
     somatic_preferred_disease_name = models.TextField(null=True, blank=True)
@@ -278,6 +302,18 @@ class ClinVar(models.Model):
         return []
 
     @property
+    def preferred_disease_names(self) -> list[str]:
+        """ CLNDN packs every condition into one pipe joined run of underscored words - split it
+            back out so it reads as a list and wraps """
+        return ClinVar._pipe_names(self.preferred_disease_name)
+
+    @staticmethod
+    def _pipe_names(value: Optional[str]) -> list[str]:
+        if not value:
+            return []
+        return [name.lstrip("_").replace("_", " ").strip() for name in value.split("|")]
+
+    @property
     def stars(self):
         """
         deprecated - use .germline_stars
@@ -301,6 +337,15 @@ class ClinVar(models.Model):
     @property
     def oncogenic_stars(self) -> int:
         return ClinVar._stars_for(self.oncogenic_review_status)
+
+    @property
+    def somatic_tier_label(self) -> Optional[str]:
+        return SomaticClinicalSignificance.LABELS.get(self.somatic_tier)
+
+    def get_highest_oncogenicity_display(self) -> Optional[str]:
+        if self.highest_oncogenicity:
+            return ClinVarOncogenicity(self.highest_oncogenicity).label
+        return None
 
     @property
     def is_expert_panel_or_greater(self):
@@ -371,12 +416,6 @@ class ClinVar(models.Model):
         return f"ClinVar: variant: {self.variant}, path: {self.highest_pathogenicity}"
 
 
-clinvar_record_collection_refreshed = django.dispatch.Signal()
-"""
-Takers ClinVarRecordCollection as sender, and the instance of a ClinVarRecordCollection that has just been refreshed
-as the 2nd parameter
-"""
-
 class ClinVarRecordCollection(TimeStampedModel):
     """
     Stores data about when we've retrieved individual ClinVar records for a clinvar variation id.
@@ -416,16 +455,10 @@ class ClinVarRecordCollection(TimeStampedModel):
 
     def update_with_records_and_save(self, records: list['ClinVarRecord']):
         records = sorted(records, reverse=True)
-        self.clinvarrecord_set.exclude(record_id__in={r.record_id for r in records}).delete()
+        self.clinvarrecord_set.all().delete()
         for record in records:
             record.clinvar_record_collection = self
-
-        # since the primary key of a ClinVarRecord is the record_id, we should just be able to upsert
-        # If these newly created "ClinVarRecord"s have a record_id that matches a record already in the DB
-        # it should just update anyway
-        all_field_names = [field.name for field in ClinVarRecord._meta.concrete_fields if field.name != "record_id"]
-
-        ClinVarRecord.objects.bulk_create(records, update_conflicts=True, unique_fields=["record_id"], update_fields=all_field_names)
+        ClinVarRecord.objects.bulk_create(records)
         self.expert_panel = None
         self.max_stars = None
         if best_record := first(records):
@@ -433,7 +466,6 @@ class ClinVarRecordCollection(TimeStampedModel):
             if best_record.is_expert_panel_or_greater:
                 self.expert_panel = best_record
         self.save()
-        clinvar_record_collection_refreshed.send(ClinVarRecordCollection, instance=self)
 
 
 class ClinVarRecord(TimeStampedModel):
@@ -982,6 +1014,25 @@ class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
     def has_phylop_46_way_mammalian(self) -> bool:
         return self._vep_config.get("phylop46way")
 
+    def get_visible_columns(self, pipeline_type: Optional[VariantAnnotationPipelineType] = None) -> frozenset[str]:
+        """ VariantGrid columns this version populates, off the same VEP_COLUMNS table that controls what
+            annotation writes (#1148). Pass a pipeline_type to narrow to what that pipeline wrote. """
+        return visible_columns_for(
+            vep_config=VEPConfig(self.genome_build),
+            genome_build_name=self.genome_build.name,
+            pipeline_type=pipeline_type,
+            columns_version=self.columns_version,
+            vep_version=self.vep,
+            cosmic_version=self.cosmic,
+            gnomad4_minor_version=self.gnomad,
+        )
+
+    @cached_property
+    def visible_columns(self) -> frozenset[str]:
+        """ Columns populated by any pipeline on this version - what filter nodes can offer, as they
+            work off the version rather than an individual annotation run. """
+        return self.get_visible_columns()
+
     @cached_property
     def vep_gene_set_versions(self) -> VepGeneSetVersions:
         """ The VEP version strings describing which gene set was annotated against """
@@ -1177,7 +1228,10 @@ class AnnotationRun(TimeStampedModel):
     # worker's run be reclaimed. task_id remains the in-annotate_variants execution lock.
     leased_by = models.CharField(max_length=64, null=True)  # worker/dispatch id holding the lease
     lease_expires = models.DateTimeField(null=True)  # for dead-worker reclaim
-    attempt_count = models.IntegerField(default=0)  # bounded retries before giving up
+    attempt_count = models.IntegerField(default=0)  # executions that reached a worker; bounds retries
+    # dispatches (lease + task launch). Unbounded and diagnostic only: dispatch_count pulling far ahead
+    # of attempt_count means tasks are being queued but never consumed - a broken or starved queue.
+    dispatch_count = models.IntegerField(default=0)
     # External annotation (#1568): set by the annotation_external --dump command. The normal scheduler /
     # annotate_variants skip these so VEP is never auto-run on a run the operator is managing externally.
     external = models.BooleanField(default=False)
@@ -1205,7 +1259,7 @@ class AnnotationRun(TimeStampedModel):
     # #1701: VEP's --skipped_variants_file for this attempt - one row per record VEP deliberately dropped,
     # which the import lane counts against dump_count to catch a silently truncated annotated VCF
     vep_skipped_variants_filename = models.TextField(null=True)
-    # #1646: variants to process, pre-counted off-thread by count_annotation_run (null until counted;
+    # #1646: variants to process, pre-counted off-thread by count_annotation_runs (null until counted;
     # 0 finishes an empty run without a dump). Reset to null when a merge grows the range lock.
     count = models.IntegerField(null=True)
     dump_count = models.IntegerField(null=True)
@@ -1352,7 +1406,12 @@ class AnnotationRun(TimeStampedModel):
             # Overwrite the row in place with a fresh run carrying the same pk + range lock, so every other
             # field returns to its default (no field-by-field reset to keep in sync as the model grows).
             # pk is already set -> save() does an UPDATE of all columns; get_status() -> CREATED.
-            fresh = AnnotationRun(annotation_range_lock=self.annotation_range_lock, pipeline_type=self.pipeline_type)
+            # pipeline_version (#720) is part of what this run was scheduled against, like its lock and
+            # type - a retry has to stay on the same version or check_tool_version has nothing to compare
+            # the installed tool against.
+            fresh = AnnotationRun(annotation_range_lock=self.annotation_range_lock,
+                                  pipeline_type=self.pipeline_type,
+                                  pipeline_version=self.pipeline_version)
             fresh.pk = self.pk
             fresh.created = self.created  # auto_now_add isn't re-applied on the UPDATE below
             fresh.save()
@@ -1362,10 +1421,8 @@ class AnnotationRun(TimeStampedModel):
         # the upload_attempts>1 cleanup in import_vcf_annotations is skipped - so the leftover files trip
         # write_sql_copy_csv's "don't want to overwrite" guard, which is meant only for genuinely out-of-sync
         # dirs (moved dump / double launch). Done outside the transaction (filesystem op) and after the DB
-        # reset commits, so a rolled-back reset leaves the scratch dir intact. Prefix matches
-        # BulkVEPVCFAnnotationInserter.PREFIX.
-        import_processing_dir = os.path.join(settings.IMPORT_PROCESSING_DIR, f"annotation_run_{self.pk}")
-        shutil.rmtree(import_processing_dir, ignore_errors=True)
+        # reset commits, so a rolled-back reset leaves the scratch dir intact.
+        remove_import_processing_dir(self.pk, prefix=ANNOTATION_RUN_IMPORT_PROCESSING_PREFIX)
 
     def revert_external_to_local(self):
         """ #1568: return an external run to the normal local pipeline. Clears the external flag and dump
@@ -1519,6 +1576,29 @@ def _protvar_confidence(value, *, low_below: float, high_max: float) -> Optional
     else:
         label = "very high"
     return {"label": label, "css": _PROTVAR_CONFIDENCE_CSS[label]}
+
+
+OPEN_TARGETS_NA = "NA"  # OpenTargets.pm pads every column for records that have no value for it
+OPEN_TARGETS_GWAS = "gwas"
+# Model field -> key in a zipped record. The plugin emits every column for every association, so
+# these are parallel arrays - @see VariantAnnotation.open_targets_records
+OPEN_TARGETS_RECORD_FIELDS = {
+    "open_targets_study_type": "study_type",
+    "open_targets_study_id": "study_id",
+    "open_targets_is_lead": "is_lead",
+    "open_targets_variant_id": "variant_id",
+    "open_targets_gwas_gene_id": "gwas_gene_id",
+    "open_targets_gwas_l2g_scores": "l2g_score",
+    "open_targets_qtl_gene_id": "qtl_gene_id",
+    "open_targets_qtl_biosample": "qtl_biosample",
+}
+OPEN_TARGETS_STUDY_TYPE_LABELS = {
+    "gwas": "GWAS", "eqtl": "eQTL", "pqtl": "pQTL", "sqtl": "sQTL", "tuqtl": "tuQTL", "sceqtl": "sc-eQTL",
+}
+OPEN_TARGETS_URL = "https://platform.opentargets.org/"
+# Disease ids are ontology CURIEs (EFO, OBA, MONDO, HP, GO, Orphanet, NCIT...) - all have an Open
+# Targets disease page, and these two we can also name from our own ontology
+OPEN_TARGETS_LOCAL_ONTOLOGY_PREFIXES = ("MONDO_", "HP_")
 
 
 class AbstractVariantAnnotation(models.Model):
@@ -1675,18 +1755,25 @@ class AbstractVariantAnnotation(models.Model):
             hgvs_c = str(hgvs_variant)
         return hgvs_c
 
+    def get_short_label(self) -> str:
+        """ Shortest label that still tells a human which variant this is, eg "RUNX1:p.Ala547Val" -
+            for tabs and other places with no room for the transcript """
+        change = None
+        if self.hgvs_p:
+            change = self.hgvs_p.split(":", 1)[-1]
+        elif self.has_hgvs_c:
+            change = self.hgvs_c.split(":", 1)[-1]
+
+        if change is None:
+            return str(self.variant)
+        if self.symbol:
+            return f"{self.symbol}:{change}"
+        return change
+
 
 class VariantAnnotation(AbstractVariantAnnotation):
     """ This is the "representative transcript" chosen (1 per variant/annotation version) """
     GENE_COLUMN = "variantannotation__gene"
-    # AnnotSV's ACMG_class tiers line up 1:1 with the classification clinical_significance ekey options
-    ANNOTSV_ACMG_CLASS_CLINICAL_SIGNIFICANCE = {
-        1: "B",
-        2: "LB",
-        3: "VUS",
-        4: "LP",
-        5: "P",
-    }
 
     # Only need this once per variant
     hgvs_g = models.TextField(null=True, blank=True)
@@ -1728,6 +1815,10 @@ class VariantAnnotation(AbstractVariantAnnotation):
 
     # These are populated for SVs using VEP plugin StructuralVariantOverlap
     # They are text as they can have multiple entries joined via '&'
+    # SVOverlapProcessor picks one of those records (ANNOTATION_VEP_SV_OVERLAP_SINGLE_VALUE_METHOD) and copies its
+    # values onto the regular gnomad_af/gnomad_ac/gnomad_popmax_af/per-population columns, so that the analysis
+    # PopulationNode (which compares floats) filters SVs the same way it does small variants. These text fields
+    # keep every overlapping record, for display and to show which one was used.
     gnomad_sv_overlap_af = models.TextField(null=True, blank=True)
     gnomad_sv_overlap_percent = models.TextField(null=True, blank=True)
     gnomad_sv_overlap_name = models.TextField(null=True, blank=True)
@@ -1737,7 +1828,7 @@ class VariantAnnotation(AbstractVariantAnnotation):
 
     # AnnotSV (full-line) annotations - SV-only, populated by the AnnotSV stage on
     # the STRUCTURAL_VARIANT pipeline. Per-gene split-line rows are deferred (#1533).
-    annotsv_acmg_class = models.IntegerField(null=True, blank=True)        # 1..5 - see ANNOTSV_ACMG_CLASS_CLINICAL_SIGNIFICANCE
+    annotsv_acmg_class = models.IntegerField(null=True, blank=True, choices=Pathogenicity.choices)
     annotsv_acmg_score = models.FloatField(null=True, blank=True)          # AnnotSV_ranking_score
     annotsv_re_gene = models.TextField(null=True, blank=True)              # RE_gene
     annotsv_repeat_type_left = models.TextField(null=True, blank=True)
@@ -1789,11 +1880,15 @@ class VariantAnnotation(AbstractVariantAnnotation):
     protvar_pocket = models.TextField(null=True, blank=True)  # id&score&MpLDDT&energy&buriedness&RoG&residues
     protvar_int = models.TextField(null=True, blank=True)  # protein_id&pDockQ
     # Open Targets (columns_version >= 5, GRCh38) - https://platform.opentargets.org/
-    open_targets_gwas_l2g_score = models.FloatField(null=True, blank=True)  # Locus-to-gene score
+    open_targets_gwas_l2g_score = models.FloatField(null=True, blank=True)  # Locus-to-gene score (max)
+    # Raw '&'-joined per-record L2G scores, parallel to the other open_targets_* arrays
+    open_targets_gwas_l2g_scores = models.TextField(null=True, blank=True)
     open_targets_gwas_gene_id = models.TextField(null=True, blank=True)  # Ensembl gene id
     open_targets_gwas_diseases = models.TextField(null=True, blank=True)
     open_targets_study_type = models.TextField(null=True, blank=True)
     open_targets_study_id = models.TextField(null=True, blank=True)  # external lookup key
+    # 'true'/'false' per record - whether this variant is the credible set's lead, or just a member
+    open_targets_is_lead = models.TextField(null=True, blank=True)
     open_targets_variant_id = models.TextField(null=True, blank=True)  # external lookup key
     open_targets_qtl_gene_id = models.TextField(null=True, blank=True)  # Ensembl gene id
     open_targets_qtl_biosample = models.TextField(null=True, blank=True)
@@ -1902,11 +1997,17 @@ class VariantAnnotation(AbstractVariantAnnotation):
         "DL": ("spliceai_pred_ds_dl", "spliceai_pred_dp_dl"),
     }
 
+    # 'conserved' is where a score starts to read as conserved - the variant grid conservation cell
+    # fills a dot at or above it. GERP++ and PhyloP 46 way are the deleterious thresholds from
+    # https://academic.oup.com/hmg/article/24/8/2125/651446, PhyloP 100 way and PhastCons the ones the
+    # conservation filter node was built around (@see ConservationNode). PhyloP 30 way has no published
+    # cutoff - 1.0 is ~75% of the way to its 1.312 ceiling, in line with the PhyloP 100 way cutoff
     CONSERVATION_SCORES = {
         "gerp_pp_rs": {
             # UCSC says RS scores range from a maximum of 6.18 down to a below-zero minimum, which we cap at -12.36
             "min": -12.36,
             "max": 6.18,
+            "conserved": 4.4,
         },
         # BigWig stats obtained via kent-335 bigWigInfo
         "phylop_30_way_mammalian": {
@@ -1914,36 +2015,42 @@ class VariantAnnotation(AbstractVariantAnnotation):
             "min": -20.0,
             "max": 1.312,
             "std": 0.727453,
+            "conserved": 1.0,
         },
         "phylop_46_way_mammalian": {
             "mean": 0.035934,
             "min": -13.796,
             "max": 2.941,
             "std": 0.779426,
+            "conserved": 1.6,
         },
         "phylop_100_way_vertebrate": {
             "mean": 0.093059,
             "min": -20.0,
             "max": 10.003,
             "std": 1.036944,
+            "conserved": 1.4,
         },
         "phastcons_30_way_mammalian": {
             "mean": 0.128025,
             "min": 0.0,
             "max": 1.0,
             "std": 0.247422,
+            "conserved": 0.85,
         },
         "phastcons_46_way_mammalian": {
             "mean": 0.088576,
             "min": 0.0,
             "max": 1.0,
             "std": 0.210242,
+            "conserved": 0.85,
         },
         "phastcons_100_way_vertebrate": {
             "mean": 0.101765,
             "min": 0.0,
             "max": 1.0,
             "std": 0.237072,
+            "conserved": 0.85,
         }
     }
 
@@ -2015,13 +2122,17 @@ class VariantAnnotation(AbstractVariantAnnotation):
 
     @property
     def has_gnomad(self) -> bool:
-        return bool(self.gnomad_af or self.gnomad2_liftover_af)
+        """ A gnomAD site with AC=0 has a real af of 0.0, so test for a value not a truthy one -
+            'absent from gnomAD' and 'present, never observed' are different answers """
+        return self.gnomad_af is not None or self.gnomad2_liftover_af is not None
 
     @property
     def annotsv_acmg_clinical_significance(self) -> Optional[str]:
         """ AnnotSV's 5-tier ACMG_class as a clinical_significance ekey value, so SVs can be shown
             with the same pill as classifications """
-        return self.ANNOTSV_ACMG_CLASS_CLINICAL_SIGNIFICANCE.get(self.annotsv_acmg_class)
+        if self.annotsv_acmg_class is None:
+            return None
+        return Pathogenicity(self.annotsv_acmg_class).short_label
 
     @property
     def has_annotsv(self) -> bool:
@@ -2038,15 +2149,7 @@ class VariantAnnotation(AbstractVariantAnnotation):
             table that controls what annotation writes, so the two can't drift (#1148). Passing `vep_config`
             drops columns whose data file isn't configured - matching the `VariantAnnotationVersion.has_*`
             flags (e.g. PhastCons/PhyloP mammalian tracks). """
-        return visible_columns_for(
-            vep_config=VEPConfig(self.version.genome_build),
-            genome_build_name=self.version.genome_build.name,
-            pipeline_type=self.annotation_run.pipeline_type,
-            columns_version=self.version.columns_version,
-            vep_version=self.version.vep,
-            cosmic_version=self.version.cosmic,
-            gnomad4_minor_version=self.version.gnomad,
-        )
+        return self.version.get_visible_columns(self.annotation_run.pipeline_type)
 
     @property
     def has_non_gnomad_population_frequency(self) -> bool:
@@ -2194,9 +2297,213 @@ class VariantAnnotation(AbstractVariantAnnotation):
                 record["count"] += 1
         return list(records.values())
 
+    @staticmethod
+    def _open_targets_split(value: Optional[str]) -> list[Optional[str]]:
+        """ Split one '&'-joined Open Targets column into per-record values. VEP escapes ',' and '|'
+            inside a CSQ value to '&' - the same character the plugin joins records with - but a comma
+            is always followed by a space, which VEP escapes to '_', so a fragment starting with '_'
+            is a continuation of the one before it (e.g. 'CD4-positive, alpha-beta T cell'). """
+        if not value:
+            return []
+        values = []
+        for part in value.split("&"):
+            if part.startswith("_") and values:
+                values[-1] = f"{values[-1]}, {part[1:]}"
+            else:
+                values.append(part)
+        return [None if v in ("", OPEN_TARGETS_NA) else v for v in values]
+
+    def _open_targets_record_diseases(self, study_types: list[Optional[str]]) -> list[list[str]]:
+        """ Diseases are the one Open Targets column holding several values per record, '|'-separated
+            before VEP escapes them to '&', so the array can be longer than the record count. Only GWAS
+            records carry diseases, so the 'NA' of each QTL record bounds a run of consecutive GWAS
+            records: where a run's disease count matches its record count they line up exactly,
+            otherwise the run's diseases go to every gene in it (genes sharing a study locus share
+            its diseases). """
+        diseases: list[list[str]] = [[] for _ in study_types]
+        values = self._open_targets_split(self.open_targets_gwas_diseases)
+        if not values:
+            return diseases
+
+        value_index = 0
+        record_index = 0
+        while record_index < len(study_types) and value_index < len(values):
+            if study_types[record_index] != OPEN_TARGETS_GWAS:
+                value_index += 1  # the record's 'NA'
+                record_index += 1
+                continue
+
+            run_start = record_index
+            while record_index < len(study_types) and study_types[record_index] == OPEN_TARGETS_GWAS:
+                record_index += 1
+            run_values = []
+            while value_index < len(values) and values[value_index] is not None:
+                run_values.append(values[value_index])
+                value_index += 1
+
+            run_length = record_index - run_start
+            if len(run_values) == run_length:
+                for i, disease in enumerate(run_values):
+                    diseases[run_start + i] = [disease]
+            else:
+                for i in range(run_start, record_index):
+                    diseases[i] = list(run_values)
+        return diseases
+
+    @cached_property
+    def open_targets_records(self) -> list[dict]:
+        """ The OpenTargets plugin emits one record per overlapping association, every requested column
+            for every record, '&'-joined with 'NA' where a record has no value - so the open_targets_*
+            fields are parallel arrays. Zip them back into one dict per association.
+            open_targets_gwas_l2g_scores is null until backfilled (#1822), in which case records simply
+            have no score. """
+        study_types = self._open_targets_split(self.open_targets_study_type)
+        if not study_types:
+            return []
+
+        records = [{"diseases": d} for d in self._open_targets_record_diseases(study_types)]
+        for field, key in OPEN_TARGETS_RECORD_FIELDS.items():
+            values = self._open_targets_split(getattr(self, field))
+            if values and len(values) != len(study_types):
+                logging.error("%s has %d values for %d Open Targets records",
+                              field, len(values), len(study_types))
+                values = []
+            for i, record in enumerate(records):
+                record[key] = values[i] if i < len(values) else None
+
+        for record in records:
+            if biosample := record["qtl_biosample"]:
+                record["qtl_biosample"] = biosample.replace("_", " ")  # VEP escapes whitespace
+            if score := record["l2g_score"]:
+                record["l2g_score"] = float(score)
+            if (is_lead := record["is_lead"]) is not None:
+                record["is_lead"] = is_lead == "true"  # None where the column predates the record
+        return records
+
+    def _open_targets_gene_details(self, gene_ids: Iterable[str]) -> dict[str, dict]:
+        """ Open Targets is GRCh38/Ensembl only and Gene.pk is the Ensembl gene id, so look the symbols
+            up in one query, falling back to an Ensembl link for genes we don't have locally """
+        gene_ids = list(gene_ids)
+        symbols = {}
+        gv_qs = GeneVersion.objects.filter(gene__in=gene_ids, genome_build=self.version.genome_build)
+        for gene_id, gene_symbol_id in gv_qs.order_by("version").values_list("gene_id", "gene_symbol_id"):
+            symbols[gene_id] = gene_symbol_id  # latest version wins
+
+        details = {}
+        for gene_id in gene_ids:
+            if gene_id in symbols:
+                gene_url = reverse("view_gene", kwargs={"gene_id": gene_id})
+            else:
+                gene_url = f"https://ensembl.org/Homo_sapiens/Gene/Summary?g={gene_id}"
+            details[gene_id] = {
+                "gene_id": gene_id,
+                "gene_symbol": symbols.get(gene_id) or gene_id,
+                "gene_url": gene_url,
+            }
+        return details
+
+    @staticmethod
+    def _open_targets_diseases(disease_ids: Iterable[str]) -> list[dict]:
+        """ Name the MONDO / HP diseases from our own ontology - the rest display as their raw id """
+        disease_ids = sorted(set(disease_ids))
+        ontology_term_ids = {}
+        for disease_id in disease_ids:
+            if disease_id.startswith(OPEN_TARGETS_LOCAL_ONTOLOGY_PREFIXES):
+                try:
+                    ontology_term_ids[disease_id] = str(OntologyIdNormalized.normalize(disease_id))
+                except ValueError:
+                    pass
+
+        names = {}
+        if ontology_term_ids:
+            ontology_names = dict(OntologyTerm.objects.filter(pk__in=ontology_term_ids.values())
+                                  .values_list("pk", "name"))
+            for disease_id, term_id in ontology_term_ids.items():
+                if name := ontology_names.get(term_id):
+                    names[disease_id] = name
+
+        return [{"id": disease_id,
+                 "name": names.get(disease_id, disease_id),
+                 "url": f"{OPEN_TARGETS_URL}disease/{disease_id}"} for disease_id in disease_ids]
+
+    @property
+    def open_targets_gwas_genes(self) -> list[dict]:
+        """ GWAS records collapsed to a row per implicated gene - highest L2G score, de-duplicated
+            diseases, and how many studies contributed. Sorted by score, unscored last. """
+        genes = {}  # keyed by gene id, insertion ordered
+        for record in self.open_targets_records:
+            if record["study_type"] != OPEN_TARGETS_GWAS:
+                continue
+            if gene_id := record["gwas_gene_id"]:
+                gene = genes.setdefault(gene_id, {"scores": [], "diseases": set(), "study_ids": set(),
+                                                  "lead_study_ids": set()})
+                if (score := record["l2g_score"]) is not None:
+                    gene["scores"].append(score)
+                gene["diseases"].update(record["diseases"])
+                if study_id := record["study_id"]:
+                    gene["study_ids"].add(study_id)
+                    if record["is_lead"]:
+                        gene["lead_study_ids"].add(study_id)
+
+        gene_details = self._open_targets_gene_details(genes)
+        gwas_genes = []
+        for gene_id, gene in genes.items():
+            gwas_genes.append({
+                **gene_details[gene_id],
+                "l2g_score": max(gene["scores"]) if gene["scores"] else None,
+                "diseases": self._open_targets_diseases(gene["diseases"]),
+                "study_count": len(gene["study_ids"]),
+                "lead_study_count": len(gene["lead_study_ids"]),
+            })
+        gwas_genes.sort(key=lambda g: (g["l2g_score"] is None, -(g["l2g_score"] or 0)))
+        return gwas_genes
+
+    @property
+    def open_targets_qtl_genes(self) -> list[dict]:
+        """ QTL (non-GWAS) records collapsed to a row per (gene, study type), with the biosamples the
+            association was measured in """
+        genes = {}  # keyed by (gene id, study type)
+        for record in self.open_targets_records:
+            study_type = record["study_type"]
+            if not study_type or study_type == OPEN_TARGETS_GWAS:
+                continue
+            if gene_id := record["qtl_gene_id"]:
+                gene = genes.setdefault((gene_id, study_type), {"biosamples": set(), "study_ids": set(),
+                                                                "lead_study_ids": set()})
+                if biosample := record["qtl_biosample"]:
+                    gene["biosamples"].add(biosample)
+                if study_id := record["study_id"]:
+                    gene["study_ids"].add(study_id)
+                    if record["is_lead"]:
+                        gene["lead_study_ids"].add(study_id)
+
+        gene_details = self._open_targets_gene_details({gene_id for gene_id, _ in genes})
+        qtl_genes = []
+        for (gene_id, study_type), gene in genes.items():
+            qtl_genes.append({
+                **gene_details[gene_id],
+                "study_type": study_type,
+                "study_type_label": OPEN_TARGETS_STUDY_TYPE_LABELS.get(study_type, study_type),
+                "biosamples": sorted(gene["biosamples"]),
+                "study_count": len(gene["study_ids"]),
+                "lead_study_count": len(gene["lead_study_ids"]),
+            })
+        qtl_genes.sort(key=lambda g: (g["gene_symbol"], g["study_type"]))
+        return qtl_genes
+
+    @property
+    def open_targets_variant(self) -> Optional[dict]:
+        """ The variant id is repeated once per record - they all describe this variant """
+        for variant_id in self._open_targets_split(self.open_targets_variant_id):
+            if variant_id:
+                return {"id": variant_id, "url": f"{OPEN_TARGETS_URL}variant/{variant_id}"}
+        return None
+
     def has_spliceai(self):
-        return any((self.spliceai_pred_ds_ag, self.spliceai_pred_ds_al,
-                    self.spliceai_pred_ds_dg, self.spliceai_pred_ds_dl))
+        """ SpliceAI scoring a variant 0 for all 4 deltas is a prediction (no splicing impact),
+            not missing data - only a null means VEP found no SpliceAI record """
+        return any(ds is not None for ds in (self.spliceai_pred_ds_ag, self.spliceai_pred_ds_al,
+                                             self.spliceai_pred_ds_dg, self.spliceai_pred_ds_dl))
 
     def highest_spliceai(self) -> int|None:
         values = []
@@ -2325,6 +2632,12 @@ class VariantAnnotation(AbstractVariantAnnotation):
     @property
     def gnomad_sv_overlap(self) -> list[dict]:
         return self.get_gnomad_sv_overlap(self.__dict__, self.version.gnomad_sv)
+
+    def get_short_label(self) -> str:
+        """ Falls back to g.HGVS, which only this (per-variant) annotation has """
+        if self.hgvs_p or self.has_hgvs_c:
+            return super().get_short_label()
+        return self.hgvs_g or str(self.variant)
 
     @staticmethod
     def get_hgvs_g(variant: Variant) -> Optional[str]:
@@ -2588,7 +2901,7 @@ class AnnotationVersion(models.Model):
         else:
             av_qs = av_qs.filter(variant_annotation_version__status=VariantAnnotationVersion.Status.ACTIVE)
         av: AnnotationVersion = av_qs.order_by("annotation_date").last()
-        if validate and settings.VARIANT_ANNOTATION_VALIDATE:
+        if validate:
             if av is None:
                 raise AnnotationVersion.DoesNotExist(f"Warning: GenomeBuild {genome_build} has no annotation version!")
             av.validate()

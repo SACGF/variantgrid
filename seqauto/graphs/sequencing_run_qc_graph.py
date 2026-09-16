@@ -19,7 +19,7 @@ from snpdb.graphs.graphcache import CacheableGraph
 
 
 class SequencingRunQCGraph(CacheableGraph):
-    VERSION = 11  # Change to force cache update
+    VERSION = 12  # Change to force cache update
     POINT_SIZE = 40
     POINT_COLOR = 'red'
     DEFAULT_BOXPLOT_COLOR = 'blue'
@@ -100,12 +100,15 @@ class SequencingRunQCGraph(CacheableGraph):
         labels = [self.sequencing_run, comparison_description]
         figure.legend(patches, labels, loc='upper center', bbox_to_anchor=(0.5, 1), numpoints=1)
 
-        num_rows = len(values)
+        plots = [(column_name, column_values, sequencing_run_qc.get(column_name))
+                 for column_name, column_values in values]
+        plots = [(cn, cv, rv) for cn, cv, rv in plots if cv or rv is not None]
+
+        num_rows = len(plots)
         num_cols = 1
 
-        for i, (column_name, column_values) in enumerate(values):
+        for i, (column_name, column_values, run_value) in enumerate(plots):
             ax = figure.add_subplot(num_rows, num_cols, i + 1)
-            run_value = sequencing_run_qc[column_name]
             self.plot_enrichment_kit(ax, column_name, column_values, run_value)
 
         figure.tight_layout(rect=[0, 0, 1, 0.85])
@@ -127,7 +130,8 @@ class SequencingRunQCGraph(CacheableGraph):
             whisker.set(color=SequencingRunQCGraph.EDGE_COLOR, linewidth=1.2, linestyle='-')
             whisker.set_zorder(1)
 
-        ax.scatter([run_value], [1], c=SequencingRunQCGraph.POINT_COLOR, s=[SequencingRunQCGraph.POINT_SIZE], zorder=2)
+        if run_value is not None:
+            ax.scatter([run_value], [1], c=SequencingRunQCGraph.POINT_COLOR, s=[SequencingRunQCGraph.POINT_SIZE], zorder=2)
         if column_name in NICER_COLUMN_NAMES:
             column_name = NICER_COLUMN_NAMES[column_name]
         else:

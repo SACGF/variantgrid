@@ -101,7 +101,6 @@ def classification_groups(
     :param genome_build: Preferred genome build
     :param title: Heading to give the table
     :param context_object: If all these records are from an allele, provide "allele" if from a discordance report provide "discordance_report" etc
-    :param old_classification_modifications: For showing what a discordance report used to be
     :param default_sort: The column to sort by default
     """
     if isinstance(classification_modifications, QuerySet):
@@ -171,7 +170,7 @@ def classification_groups(
 
 
 @register.inclusion_tag("classification/tags/classification_groupings.html", takes_context=True)
-def classification_groupings(context, show_allele_origin_filter=True):
+def classification_groupings(context, show_allele_origin_filter=True, show_summary_counts=False):
     """
     Shows the new database based classification grouping table. To filter the data implement a JavaScript method on the page
     <script>
@@ -180,8 +179,14 @@ def classification_groupings(context, show_allele_origin_filter=True):
         }
     </script>
     :param show_allele_origin_filter: True by default, set to False to hardcode the filtering to all records
+    :param show_summary_counts: Set to True to show clinical significance counts above the table, worth it where the
+    table can run to many rows
     """
-    return {"show_allele_origin_filter": show_allele_origin_filter, "genome_build": GenomeBuildManager.get_current_genome_build()}
+    return {
+        "show_allele_origin_filter": show_allele_origin_filter,
+        "show_summary_counts": show_summary_counts,
+        "genome_build": GenomeBuildManager.get_current_genome_build()
+    }
 
 
 def render_ekey(val, key: Optional[str] = None, value_if_none: Optional[str] = None):

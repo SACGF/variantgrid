@@ -10,8 +10,8 @@ from analysis.models import AnalysisTemplateType
 from analysis.models.nodes.node_utils import update_analysis
 from library.django_utils import set_form_read_only
 from snpdb.archive import DataArchivedError
-from snpdb.models.models_enums import BuiltInFilters
-from snpdb.models.models_user_settings import UserSettings
+from snpdb.models.models_enums import TagFilter
+from snpdb.models.models_user_settings import AbstractNodeCountSettings, UserSettings
 from snpdb.utils import get_all_tags_and_user_colors
 
 
@@ -36,23 +36,27 @@ class NodeView(UpdateView):
             "analysis_id": self.object.analysis_id,
             "annotation_version": self.object.analysis.annotation_version,
             "extra_filters": extra_filters,
-            "extra_filters_label": dict(BuiltInFilters.CHOICES).get(extra_filters),
+            "extra_filters_label": AbstractNodeCountSettings.get_node_count_description(extra_filters),
+            # (tag, node count label) so the banner can colour each tag of a multi-tag selection
+            "extra_filters_tags": [(tag_id, TagFilter.label(tag_id))
+                                   for tag_id in TagFilter.get_tag_ids(extra_filters)],
             'has_write_permission': self.object.analysis.can_write(self.request.user),
             "node_warnings": self.object.get_warnings(),
+            "node_live_data_notes": self.object.get_live_data_notes(),
         })
 
         if configuration_errors := self.object._get_configuration_errors():
             context["node_warnings"] = list(context.get("node_warnings") or []) + configuration_errors
 
         try:
-            grid = VariantGrid(self.request.user, self.object, extra_filters)
-            colmodels = grid.get_colmodels()
-            columns = [data['name'] for data in colmodels]
+            grid = VariantGrid(self.request, self.object, extra_filters)
+            rich_columns = grid.enabled_columns
+            columns = [rc.name for rc in rich_columns]
             graph_form = GraphTypeChoiceForm(self.object, columns)
             if graph_form.has_graph_types:
                 context['graph_form'] = graph_form
 
-            context['column_summary_form'] = ColumnSummaryForm(colmodels)
+            context['column_summary_form'] = ColumnSummaryForm(rich_columns)
             context['snp_matrix_form'] = SNPMatrixForm(initial={'significant_figures': 2})
 
             user_settings = UserSettings.get_for_user(self.request.user)
@@ -97,9 +101,11 @@ class NodeView(UpdateView):
         if self.object.analysis.template_type == AnalysisTemplateType.TEMPLATE and self.object.is_source:
             for field_name, field in form.fields.items():
                 if not field.widget.is_hidden:
-                    if field_name in ["pedigree", "trio", "cohort", "sample", "extraction", "sample_gene_list"]:
+                    if field_name in ["pedigree", "trio", "cohort", "source", "sample_gene_list"]:
                         field.required = False  # Need to be able to save if analysis variable
-                        self._monkey_patch_widget_render(field.widget)
+                        # The variable is keyed on the node field, which a picker may stand in for
+                        self._monkey_patch_widget_render(field.widget,
+                                                         form.get_analysis_variable_field(field_name))
 
         if not form.instance.analysis.can_write(self.request.user):
             set_form_read_only(form)
@@ -107,14 +113,14 @@ class NodeView(UpdateView):
         return form
 
     @staticmethod
-    def _monkey_patch_widget_render(widget):
+    def _monkey_patch_widget_render(widget, variable_field: str):
         old_render = widget.render
 
         def render(self, name, value, attrs=None, renderer=None):
             html = old_render(name, value, attrs=attrs, renderer=renderer)
             button_id = f"id_{name}_template_variable_button"
             span_attributes_list = ["class=analysis-variable-node-field-wrapper",
-                                    f"field='{name}'"]
+                                    f"field='{variable_field}'"]
             span_attributes = " ".join(span_attributes_list)
             html = f"""
 <span {span_attributes}>

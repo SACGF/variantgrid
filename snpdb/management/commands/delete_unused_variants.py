@@ -3,6 +3,7 @@ from django.db import transaction
 from django.db.models import Max
 
 from analysis.models import AllVariantsNode, Candidate, IntersectionNode, NodeVariant, VariantTag
+from beacon.models import BeaconQueryCache
 from annotation.models import (
     AnnotationRangeLock,
     ClinVar,
@@ -12,6 +13,7 @@ from annotation.models import (
     VariantTranscriptAnnotation,
 )
 from classification.models import Classification, ImportedAlleleInfo, ResolvedVariantInfo
+from genes.models import GeneCopyNumberEvent, GeneFusion
 from snpdb.models import (
     CohortGenotype,
     CommonVariantClassified,
@@ -51,8 +53,12 @@ PRELOAD_VARIANT_RELATIONS = [
     (AnnotationRangeLock, "min_variant_id"),
     (AnnotationRangeLock, "max_variant_id"),
     (AllVariantsNode, "max_variant_id"),
-    (IntersectionNode, "hgvs_variant_id"),
     (UploadedVCFPipelineMaxVariant, "max_variant_id"),
+]
+
+# Same idea, but the column is an ArrayField of variant PKs rather than an FK
+PRELOAD_VARIANT_ARRAY_RELATIONS = [
+    (IntersectionNode, "variant_ids"),
 ]
 
 
@@ -61,6 +67,8 @@ class Command(BaseCommand):
         Until 210622 - (PythonKnownVariantsImporter v.16) we used to insert a reference variant (alt='=') for each ALT
         We also didn't have a way to delete variants that are no longer referenced
     """
+    category = "maintenance"
+
     def add_arguments(self, parser):
         parser.add_argument('--batch-size', type=int, default=5000, required=False,
                             help="Number of (actual) variants to examine per step")
@@ -84,6 +92,9 @@ class Command(BaseCommand):
         preloaded_referenced_ids = set()
         for klass, fk in PRELOAD_VARIANT_RELATIONS:
             preloaded_referenced_ids.update(klass.objects.values_list(fk, flat=True))
+        for klass, array_field in PRELOAD_VARIANT_ARRAY_RELATIONS:
+            for variant_ids in klass.objects.values_list(array_field, flat=True):
+                preloaded_referenced_ids.update(variant_ids or [])
 
         while True:
             batch_pks = list(Variant.objects.filter(pk__gt=last_pk).order_by("pk")
@@ -123,9 +134,11 @@ class Command(BaseCommand):
             with transaction.atomic():
                 # If there is a VariantCollectionRecord, but no sample, the analysis won't work anyway
                 # VariantGeneOverlap/annotation rows are derived data that can be regenerated.
+                # A GeneFusion/GeneCopyNumberEvent only gives its variant a gene-level identity (the
+                # GeneLevelId rows they point at are PROTECT and survive), and BeaconQueryCache is a cache.
                 for klass in [VariantCollectionRecord, VariantZygosityCount,
                               VariantAnnotation, VariantTranscriptAnnotation, VariantGeneOverlap,
-                              ModifiedImportedVariant]:
+                              ModifiedImportedVariant, GeneFusion, GeneCopyNumberEvent, BeaconQueryCache]:
                     qs = klass.objects.filter(variant_id__in=unused_variant_ids)
                     num_deleted = qs._raw_delete(qs.db)
                     print(f"{klass}: deleted {num_deleted} records")

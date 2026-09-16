@@ -14,12 +14,9 @@ def gene_disease(gene_symbol):
     }
 
     ontology_version = OntologyVersion.latest()
-    try:
-        gene_disease_relations = ontology_version.gene_disease_relations(gene_symbol, quality_filter=ONTOLOGY_RELATIONSHIP_NO_QUALITY_FILTER)
-        context["gene_disease_relations"] = gene_disease_relations
-        context["gene_disease_summary"] = _get_gene_disease_summary(gene_disease_relations)
-    except ValueError:  # No HGNC for symbol
-        pass
+    gene_disease_relations = ontology_version.gene_disease_relations(gene_symbol, quality_filter=ONTOLOGY_RELATIONSHIP_NO_QUALITY_FILTER)
+    context["gene_disease_relations"] = gene_disease_relations
+    context["gene_disease_summary"] = _get_gene_disease_summary(gene_disease_relations)
 
     return context
 

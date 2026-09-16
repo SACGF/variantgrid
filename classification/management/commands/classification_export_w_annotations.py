@@ -10,6 +10,7 @@ from snpdb.models import GenomeBuild, Variant
 
 
 class Command(BaseCommand):
+    category = "dev"
 
     def add_arguments(self, parser):
         pass

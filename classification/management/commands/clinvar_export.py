@@ -6,6 +6,7 @@ from snpdb.models import ClinVarKey
 
 
 class Command(BaseCommand):
+    category = "ops"
 
     def add_arguments(self, parser):
         parser.add_argument('--key', type=str, required=False)

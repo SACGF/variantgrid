@@ -13,9 +13,9 @@ Where this sits in the TSO 500 work: claude/plans/tso500_overall_plan.md (Phase 
 
 Some findings are real but have no position. A gene fusion is the case that forced this: a caller
 reports "CD74-ROS1", and the biological identity is the *gene pair*, not a coordinate - the same
-fusion turns up with different breakpoints in different reads of the same sample. (Coordinate-free
-gene-level CNV, where a caller says only "JAK2 amplification", is the same shape and is designed for
-but not yet built.)
+fusion turns up with different breakpoints in different reads of the same sample. A whole-gene copy
+number call is the same shape (#1836): "EGFR amplification" is the gene and the direction, and the
+segment a caller writes is the panel's target window rather than the event.
 
 
 ## Why they are stored as Variants anyway
@@ -42,10 +42,11 @@ a fusion is, and comp-het reaches them through the same `VariantGeneOverlap` row
     inter-chromosomal fusion names two chromosomes, and a gene list on the far partner would silently
     drop it. Sharing one contig across builds also means one `Variant` serves every build, so
     liftover has nothing to do.
-  * `Locus.position` is a gene ID (a `genes.FusionGeneId` pk), NOT a coordinate. `Locus.ref` = 'N'.
-  * The partner gene is encoded in the alt (`<FUSION:HGNC:nnn>`, @see `GeneLevelSymbolicAlt`), so identity
-    hashes to its own `Sequence` row and the existing `(locus, alt, svlen)` unique constraint does the
-    work with no new uniqueness machinery.
+  * `Locus.position` is a gene ID (a `genes.GeneLevelId` pk), NOT a coordinate. `Locus.ref` = 'N'.
+  * What kind of event it is, and the other gene it names, are encoded in the alt (`<FUSION:HGNC:nnn>`
+    for a fusion's partner, `<GAIN:HGNC:nnn>` / `<LOSS:HGNC:nnn>` repeating the position's own gene,
+    @see `GeneLevelSymbolicAlt`), so identity hashes to its own `Sequence` row and the existing
+    `(locus, alt, svlen)` unique constraint does the work with no new uniqueness machinery.
   * `svlen` is 0 rather than null, because Postgres treats nulls as distinct, so a null `svlen` would
     mean that constraint enforced nothing at all.
 
@@ -59,13 +60,16 @@ it. Grep for it to find every such place.
 
 VEP never sees a gene-level variant - it cannot parse the alt, and there is no coordinate to annotate
 anyway. A third pipeline type (`VariantAnnotationPipelineType.GENE_LEVEL`) computes their annotation
-from the gene identity instead, writing the `VariantGeneOverlap` rows for both partners that make
+from the gene identity instead, writing the `VariantGeneOverlap` rows for every gene named that make
 gene lists and comp-het work.
 
-The VCF-writing paths need no check of their own: they build their contig list from
+Most VCF-writing paths need no check of their own: they build their contig list from
 `GenomeBuild.standard_contigs`, which filters on `SequenceRole.ASSEMBLED_MOLECULE`, so the gene-level
-contig is excluded before anything asks for a reference base. Worth keeping true - a writer that
-switched to `contigs` rather than `standard_contigs` would start emitting them.
+contig is excluded before anything asks for a reference base. The analysis node export is the
+deliberate exception (#1558) - dropping fusions out of every CSV/VCF was worse than writing them, so
+`ExportVariantGrid.export_contigs` adds the contig and `get_contigs_header_lines(include_gene_level=True)`
+declares it, which is what makes the file re-import. A writer that wants the plain genome keeps
+`standard_contigs` and gets it.
 """
 
 # The contig every build shares. Deliberately non-genomic names so nothing mistakes it for a sequence,

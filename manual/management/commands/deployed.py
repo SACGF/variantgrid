@@ -7,6 +7,7 @@ from manual.models.deployment_models import Deployment
 
 
 class Command(BaseCommand):
+    category = "ops"
 
     def add_arguments(self, parser: CommandParser):
         pass

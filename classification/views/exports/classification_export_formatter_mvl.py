@@ -8,7 +8,7 @@ from django.http import HttpRequest
 from django.template.loader import render_to_string
 from django.urls import reverse
 
-from annotation.views import simple_citation_html
+from annotation.views_citations import simple_citation_html
 from classification.enums import SpecialEKeys
 from classification.models import ClassificationModification, EvidenceKeyMap
 from classification.models.classification_groups import (

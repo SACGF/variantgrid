@@ -1,3 +1,10 @@
+"""
+Matching text to genes: GeneSymbolMatcher and HGNCMatcher resolve symbols and aliases to GeneSymbol
+rows, ReleaseGeneMatcher records which Gene a symbol meant in a particular GeneAnnotationRelease (symbols
+move between genes over time, so matching is per release), and tokenize_gene_symbols /
+partition_oversized_names split gene-list text and reject tokens over MAX_GENE_SYMBOL_LENGTH with a
+recorded warning.
+"""
 import logging
 import re
 from collections import defaultdict, namedtuple
@@ -42,6 +49,10 @@ class GeneSymbolMatcher:
         for gm in self._release_gene_matchers:
             gm.match_unmatched_in_hgnc_and_gene_lists()
 
+    def _match_unmatched_symbols_in_releases(self, gene_symbol_ids):
+        for gm in self._release_gene_matchers:
+            gm.match_unmatched_symbols(gene_symbol_ids)
+
     def get_gene_symbol_id_and_alias_id(self, original_gene_symbol: str):
         uc_original_gene_symbol = clean_string(original_gene_symbol).upper()
         gene_symbol_id = self._gene_symbol_lookup.get(uc_original_gene_symbol)
@@ -50,6 +61,15 @@ class GeneSymbolMatcher:
             if gene_symbol_and_alias := self._alias_dict.get(uc_original_gene_symbol):
                 gene_symbol_id, alias_id = gene_symbol_and_alias
         return gene_symbol_id, alias_id
+
+    def get_alias_gene_symbol_id(self, original_gene_symbol: str) -> Optional[str]:
+        """ The symbol an alias points at, whether or not the alias is itself a GeneSymbol.
+            get_gene_symbol_id_and_alias_id stops at a direct hit, which is not what a caller
+            resolving an old name wants - Ensembl still has a GeneSymbol row for ACPP """
+        uc_original_gene_symbol = clean_string(original_gene_symbol).upper()
+        if gene_symbol_and_alias := self._alias_dict.get(uc_original_gene_symbol):
+            return gene_symbol_and_alias[0]
+        return None
 
     def get_gene_symbol_id(self, original_gene_symbol: str):
         gene_symbol_id, _alias_id = self.get_gene_symbol_id_and_alias_id(original_gene_symbol)
@@ -82,7 +102,10 @@ class GeneSymbolMatcher:
             if all_oversized:
                 apply_oversized_warning(gene_list, all_oversized)
             gene_list.set_modified_to_now()
-            self._match_symbols_to_genes_in_releases()
+            # Only the symbols this list added can be unmatched - rematching every HGNC and gene list
+            # symbol per release scans the whole gene list table and is what the import commands do
+            gene_symbol_ids = {glgs.gene_symbol_id for glgs in gene_list_gene_symbols if glgs.gene_symbol_id}
+            self._match_unmatched_symbols_in_releases(gene_symbol_ids)
 
         return gene_list_gene_symbols
 
@@ -163,70 +186,33 @@ class ReleaseGeneMatcher:
 
     @cached_property
     def aliases_dict(self) -> dict[str, dict]:
-        """ Get symbols from other GeneVersions that match genes from our release """
+        """ Upper case symbol -> {gene_id: match_info} for symbols the release doesn't have, reached either
+            from an older GeneVersion's symbol or by a single GeneSymbolAlias hop (in either direction) to a
+            symbol the release does have.
+
+            One hop is deliberate: HGNC lists every previous symbol of a gene, so renames never need
+            chaining, while chaining lets an alias string shared by two unrelated genes bridge them - e.g.
+            'RP8' is an alias of both MT-TS2 and PDCD2, which used to match MT-TS2 gene lists to PDCD2 (#1669) """
         genes_dict = self._get_genes_dict()
 
-        # Gene Symbol alias
-        qs = GeneSymbolAlias.objects.filter(gene_symbol__releasegenesymbol__release=self.release)
-        gene_symboli_alias_list = [gsa for gsa in qs if gsa.alias != gsa.gene_symbol_id]
+        # Ordered so the match_info a symbol/gene pair reached by several alias rows gets is stable across runs
+        alias_values = GeneSymbolAlias.objects.order_by("pk").values_list("alias", "gene_symbol_id", "source")
+        for alias, symbol, source in alias_values.iterator():
+            uc_alias = alias.upper()
+            uc_symbol = symbol.upper()
+            if uc_alias == uc_symbol:
+                continue
 
-        alias_graph = defaultdict(list)
-        for gsa in gene_symboli_alias_list:
-            alias_graph[gsa.alias].append(gsa)
-            alias_graph[gsa.gene_symbol_id].append(gsa)
-
-        for gene_symbol_alias in gene_symboli_alias_list:
-            for gene_symbol in [gene_symbol_alias.alias, gene_symbol_alias.gene_symbol_id]:
-                symbol_match_path = {gene_symbol: gene_symbol_alias.match_info}
-
-                self._aliases(alias_graph, genes_dict, gene_symbol, symbol_match_path)
+            # "alias is an alias for symbol" - a gene list can use either end and mean the other
+            for query, target_symbol in ((uc_alias, uc_symbol), (uc_symbol, uc_alias)):
+                if query in self.genes:
+                    continue  # Release has the symbol itself, so aliases are never consulted for it
+                if gene_id_list := self.genes.get(target_symbol):
+                    match_info = GeneSymbolAlias(alias=alias, gene_symbol_id=symbol, source=source).match_info
+                    for gene_id in gene_id_list:
+                        genes_dict[query].setdefault(gene_id, match_info)
 
         return genes_dict
-
-    def _aliases(self, alias_graph, genes_dict, gene_symbol, symbol_match_path, visited_symbols=None):
-        # print(f"_aliases(alias_graph, genes_dict, {gene_symbol} - ({symbol_match_path})")
-        # Keep track of visited symbols to detect loops in graph
-        if visited_symbols is None:
-            visited_symbols = set()
-        else:
-            if gene_symbol in visited_symbols:  # Stop unnecessary descent
-                return
-            visited_symbols.add(gene_symbol)
-
-        if gene_id_list := self.genes.get(gene_symbol):
-            # Only need to build up match path for where we are
-            symbol_total_path = {}
-            match_paths = list(symbol_match_path.values())
-            for i, symbol in enumerate(symbol_match_path):
-                mp = ", ".join(match_paths[i+1:])
-                symbol_total_path[symbol] = mp
-
-            for symbol in symbol_match_path:
-                if symbol != gene_symbol:  # No point putting actual one in
-                    match_info = symbol_total_path[symbol]
-                    for gene_id in gene_id_list:
-                        if existing_match_info := genes_dict[symbol].get(gene_id):
-                            if len(match_info) >= len(existing_match_info):
-                                continue  # Don't override with longer
-                        genes_dict[symbol][gene_id] = match_info
-        else:
-            if aliases_list := alias_graph.get(gene_symbol):
-                original_gene_symbol = gene_symbol
-
-                for gene_symbol_alias in aliases_list:
-                    # We may have looked it up via alias or gene symbol - use the other one
-
-                    if gene_symbol_alias.gene_symbol_id == original_gene_symbol:
-                        gene_symbol = gene_symbol_alias.alias
-                    else:
-                        gene_symbol = gene_symbol_alias.gene_symbol_id
-
-                    # Make a copy for recursion
-                    child_symbol_match_path = symbol_match_path.copy()
-                    child_symbol_match_path[gene_symbol] = gene_symbol_alias.match_info
-
-                    self._aliases(alias_graph, genes_dict, gene_symbol, child_symbol_match_path,
-                                  visited_symbols=visited_symbols)
 
     def _get_gene_id_and_match_info_for_symbol(self, gene_symbols) -> dict[str, list]:
         gene_symbol_gene_id_and_match_info = defaultdict(list)  # list items = (gene_id, match_info)

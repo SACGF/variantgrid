@@ -102,6 +102,7 @@ def get_last_term_symbol_relationships(ontology_term: OntologyTerm) -> dict[Gene
 
 
 class Command(BaseCommand):
+    category = "maintenance"
 
     def handle(self, *args, **options):
 

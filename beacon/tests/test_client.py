@@ -6,9 +6,9 @@ from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
-from beacon.client import query_external_beacons_for_variant, query_node
+from beacon.client import query_node, query_nodes
 from beacon.models import BeaconQueryCache
-from beacon.query_targets import eligible_queries, evaluate_queries
+from beacon.query_targets import evaluate_queries
 from beacon.variant_mapping import parse_beacon_response, variant_to_beacon_query_params
 from snpdb.models import GenomeBuild
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
@@ -17,6 +17,13 @@ NODES = {
     "nodeA": {"base_url": "https://a.beacon", "api_version": "v2.0.0", "token": None, "type": "snv"},
     "nodeB": {"base_url": "https://b.beacon", "api_version": "v2.0.0", "token": "secret", "type": "snv"},
 }
+
+
+def _eligible_queries(variant, genome_build, node_configs) -> dict:
+    """ {node_id: params} for the nodes this variant is fanned out to - the projection the
+        variant-page view builds from evaluate_queries(). """
+    return {e.node_id: e.params
+            for e in evaluate_queries(variant, genome_build, node_configs) if e.eligible}
 
 
 def _mock_response(payload):
@@ -83,8 +90,9 @@ class BeaconClientTestCase(TestCase):
                 raise requests.ConnectionError("node A down")
             return _mock_response({"responseSummary": {"exists": True, "numTotalResults": 1}})
 
+        node_params = _eligible_queries(self.variant, self.grch37, NODES)
         with patch("beacon.client.requests.get", side_effect=fake_get):
-            results = {r["node_id"]: r for r in query_external_beacons_for_variant(self.variant, self.grch37)}
+            results = {r["node_id"]: r for r in query_nodes(node_params)}
         self.assertIsNotNone(results["nodeA"]["error"])
         self.assertTrue(results["nodeB"]["exists"])
 
@@ -136,7 +144,7 @@ class ExternalBeaconsViewTestCase(TestCase):
 
 
 class BeaconQueryGatingTestCase(TestCase):
-    """ eligible_queries() routes each variant only to servers whose domain it matches. """
+    """ Eligibility routes each variant only to servers whose domain it matches. """
 
     def setUp(self):
         self.grch38 = GenomeBuild.get_name_or_alias("GRCh38")
@@ -150,7 +158,7 @@ class BeaconQueryGatingTestCase(TestCase):
     def test_snv_routes_to_snv_node_only(self):
         variant = self._variant(is_symbolic=False, chrom="3", position=1000,
                                 ref="A", alt="T", svlen=None)
-        eligible = eligible_queries(variant, self.grch38, self.both_nodes)
+        eligible = _eligible_queries(variant, self.grch38, self.both_nodes)
         self.assertEqual(list(eligible), ["seq"])
         self.assertEqual(eligible["seq"]["start"], 999)  # 1-based -> 0-based
         self.assertEqual(eligible["seq"]["alternateBases"], "T")
@@ -158,7 +166,7 @@ class BeaconQueryGatingTestCase(TestCase):
     def test_cnv_deletion_routes_to_cnv_node_as_range_query(self):
         variant = self._variant(is_symbolic=True, chrom="9", position=21967752,
                                 ref="N", alt="<DEL>", svlen=-27549, end=21995301)
-        eligible = eligible_queries(variant, self.grch38, self.both_nodes)
+        eligible = _eligible_queries(variant, self.grch38, self.both_nodes)
         self.assertEqual(list(eligible), ["cnv"])
         params = eligible["cnv"]
         self.assertEqual(params["start"], 21967751)  # 0-based
@@ -169,24 +177,24 @@ class BeaconQueryGatingTestCase(TestCase):
     def test_cnv_duplication_maps_to_gain(self):
         variant = self._variant(is_symbolic=True, chrom="2", position=15940550,
                                 ref="N", alt="<DUP>", svlen=5000, end=15945550)
-        eligible = eligible_queries(variant, self.grch38, {"cnv": {"type": "cnv"}})
+        eligible = _eligible_queries(variant, self.grch38, {"cnv": {"type": "cnv"}})
         self.assertEqual(eligible["cnv"]["variantType"], "EFO:0030070")  # <DUP> -> gain
 
     def test_assembly_gate_skips_wrong_build(self):
         variant = self._variant(is_symbolic=True, chrom="9", position=21967752,
                                 ref="N", alt="<DEL>", svlen=-27549, end=21995301)
         nodes = {"cnv": {"type": "cnv", "assemblies": ["GRCh38"]}}
-        self.assertEqual(eligible_queries(variant, self.grch37, nodes), {})
+        self.assertEqual(_eligible_queries(variant, self.grch37, nodes), {})
 
     def test_unsupported_symbolic_type_is_skipped(self):
         variant = self._variant(is_symbolic=True, chrom="1", position=100,
                                 ref="N", alt="<INV>", svlen=500, end=600)
-        self.assertEqual(eligible_queries(variant, self.grch38, {"cnv": {"type": "cnv"}}), {})
+        self.assertEqual(_eligible_queries(variant, self.grch38, {"cnv": {"type": "cnv"}}), {})
 
     def test_unknown_node_type_is_skipped(self):
         variant = self._variant(is_symbolic=False, chrom="3", position=1000,
                                 ref="A", alt="T", svlen=None)
-        self.assertEqual(eligible_queries(variant, self.grch38, {"x": {"type": "mystery"}}), {})
+        self.assertEqual(_eligible_queries(variant, self.grch38, {"x": {"type": "mystery"}}), {})
 
     def test_evaluate_queries_reports_skip_reasons(self):
         # An SNV against a GRCh38-only CNV node: skipped, and evaluate_queries says why.

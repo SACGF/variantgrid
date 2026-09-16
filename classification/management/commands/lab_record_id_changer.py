@@ -10,6 +10,7 @@ from snpdb.models import GenomeBuild, Lab
 
 
 class Command(BaseCommand):
+    category = "ops"
 
     def add_arguments(self, parser):
         parser.add_argument('--lab_id', type=int, default=0)

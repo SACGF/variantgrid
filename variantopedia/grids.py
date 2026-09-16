@@ -1,11 +1,25 @@
+import json
 import operator
 import re
 from functools import cached_property, reduce
 from typing import Any, Optional
 
-from django.conf import settings
 from django.db import connection
-from django.db.models import Case, Count, IntegerField, OuterRef, Q, QuerySet, Subquery, Value, When
+from django.db.models import (
+    Case,
+    Count,
+    FilteredRelation,
+    IntegerField,
+    Max,
+    OuterRef,
+    Q,
+    QuerySet,
+    Subquery,
+    TextField,
+    Value,
+    When,
+)
+from django.db.models.functions import Coalesce, Concat
 from django.http import HttpRequest
 from django.shortcuts import get_object_or_404
 
@@ -15,16 +29,42 @@ from annotation.annotation_version_querysets import (
     get_variant_queryset_for_latest_annotation_version,
 )
 from annotation.models import AnnotationVersion, VariantAnnotation
-from library.jqgrid.jqgrid_user_row_config import JqGridUserRowConfig
-from library.utils import JsonDataType, update_dict_of_dict_values
-from snpdb.grid_columns.custom_columns import get_custom_column_fields_override_and_sample_position
-from snpdb.grids import AbstractVariantGrid
-from snpdb.models import GenomeBuild, Tag, Variant, VariantWiki, VariantZygosityCountCollection
+from library.django_utils.django_queryset_sql_transformer import get_queryset_with_transformer_hook
+from library.utils import JsonDataType
+from patients.models import Patient
+from snpdb.grid_columns.custom_columns import variant_column_rich_column
+from snpdb.grids import AbstractVariantGrid, url_if_visible
+from snpdb.models import GenomeBuild, Sample, Tag, Variant, VariantWiki, VariantZygosityCountCollection
 from snpdb.models.models_user_settings import UserGridConfig, UserSettings
 from snpdb.utils import get_tag_sort_order_by_tag
 from snpdb.variant_filters import get_all_variants_filters, get_variant_filter_q, is_selective
-from snpdb.views.datatable_view import CellData, DatatableConfig, RichColumn, SortOrder
+from snpdb.views.datatable_view import CellData, DatatableConfig, FilterField, RichColumn, SortOrder
 from variantopedia.interesting_nearby import get_nearby_qs
+
+# One setting for every tag work list - the variant page and the variant tags page share it, so the
+# choice follows the user between them
+VARIANT_TAGS_GRID_NAME = 'Variant Tags'
+
+
+def show_resolved_variant_tags(user) -> bool:
+    """ Whether the tag work lists show taggings a classification has already satisfied """
+    return UserGridConfig.get(user, VARIANT_TAGS_GRID_NAME).show_hidden_data
+
+
+def filter_unresolved_variant_tags(qs: QuerySet[VariantTag], user) -> QuerySet[VariantTag]:
+    """ Drop the taggings that are done, unless this user asked to see them """
+    if show_resolved_variant_tags(user):
+        return qs
+    return qs.filter(VariantTag.unresolved_q())
+
+
+def variant_tags_for_user(variant: Variant, user) -> QuerySet[VariantTag]:
+    """ The taggings the variant page shows for a variant: any build of its allele, visible to this user,
+        and not yet resolved unless the user asked to see those. """
+    genome_build = variant.any_genome_build
+    qs = VariantTag.get_for_build(genome_build, variant_qs=variant.equivalent_variants)
+    qs = VariantTag.filter_for_user(user, queryset=qs)
+    return filter_unresolved_variant_tags(qs, user)
 
 
 def _format_approx_count(n: int) -> str:
@@ -73,34 +113,29 @@ class VariantWikiColumns(DatatableConfig[VariantWiki]):
 
 
 class AllVariantsGrid(AbstractVariantGrid):
-    caption = 'All Variants'
+    grid_name = 'All Variants'
     # Sorting on a joined or unindexed column full-sorts the whole result set before LIMIT, blowing the
     # statement_timeout (@see issues #1279, #1651). Nothing is user-sortable - every page is served in genomic
     # order (see DEFAULT_ORDER_BY), which is the one ordering a contig-filtered page can stream. @see issue #1663
-    SORTABLE_FIELDS: set[str] = set()
     # (contig, position) is the leading edge of the snpdb_locus(contig_id, position, ref_id) unique index, so a
     # contig-filtered page streams straight off it via an incremental sort instead of full-sorting the result set
     # (id-descending walks the whole variant table under a contig filter - measured 100-1000x slower). The pk
     # tiebreaker makes pagination stable. @see issue #1663
     DEFAULT_ORDER_BY = ("locus__contig_id", "locus__position", "pk")
+    APPROXIMATE_COUNT_MIN = 1_000_000
 
-    def __init__(self, user, genome_build_name, **kwargs):
-        user_settings = UserSettings.get_for_user(user)
-        genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
-        self.genome_build = genome_build
-        self.annotation_version = AnnotationVersion.latest(genome_build)
-        fields, override, _ = get_custom_column_fields_override_and_sample_position(user_settings.columns,
-                                                                                    self.annotation_version)
-        self.fields = fields
-        super().__init__(user)
-        af_show_in_percent = settings.VARIANT_ALLELE_FREQUENCY_CLIENT_SIDE_PERCENT
-        update_dict_of_dict_values(self._overrides, self._get_standard_overrides(af_show_in_percent))
-        update_dict_of_dict_values(self._overrides, override)
+    def __init__(self, request: HttpRequest, genome_build_name: Optional[str] = None,
+                 extra_filters: Optional[dict] = None, **kwargs):
+        url_kwargs = request.resolver_match.kwargs if request.resolver_match else {}
+        genome_build_name = genome_build_name or url_kwargs["genome_build_name"]
+        self.genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
+        self.annotation_version = AnnotationVersion.latest(self.genome_build)
         self.vzcc = VariantZygosityCountCollection.get_global_germline_counts()
-        self.extra_filters = kwargs.pop("extra_filters", {})
-        self.extra_config.update({'sortname': 'locus__position',
-                                  'sortorder': "asc",
-                                  'shrinkToFit': False})
+        self._extra_filters = extra_filters
+        self._approximate_count: Optional[int] = None
+        super().__init__(request, **kwargs)
+        for rc in self.rich_columns:
+            rc.orderable = False
 
     def _get_base_queryset(self) -> QuerySet:
         return get_variant_queryset_for_annotation_version(self.annotation_version)
@@ -109,8 +144,11 @@ class AllVariantsGrid(AbstractVariantGrid):
     def filters(self) -> dict:
         """ The page sends the current selection as extra_filters. A direct grid hit (CSV export, bookmarked
             grid URL) has none, so fall back to what the user last chose on the page """
-        if self.extra_filters:
-            return self.extra_filters
+        extra_filters = self._extra_filters
+        if extra_filters is None:
+            extra_filters = self.get_query_json("extra_filters")
+        if extra_filters:
+            return extra_filters
         return get_all_variants_filters(self.user, self.genome_build)
 
     def _get_q(self) -> Optional[Q]:
@@ -136,19 +174,14 @@ class AllVariantsGrid(AbstractVariantGrid):
 
         return reduce(operator.and_, filter_list)
 
-    def get_colmodels(self, remove_server_side_only=False):
-        """ Only the allowlisted columns keep their sort arrows """
-        colmodels = super().get_colmodels(remove_server_side_only=remove_server_side_only)
-        for cm in colmodels:
-            if cm.get("name") not in self.SORTABLE_FIELDS:
-                cm["sortable"] = False
-        return colmodels
+    def initial_order(self) -> Optional[list]:
+        return None  # every page is served in genomic order, whatever the client asks for
 
-    def _sort_items(self, items, sidx, sord):
-        """ Serve every page in genomic order regardless of any sidx a hand-crafted grid URL supplies. Emitted as
-            a plain order_by so it matches the snpdb_locus(contig_id, position, ref_id) btree exactly - the base
-            class's F(sidx).asc(nulls_first=...) path defeats that index. @see issue #1663 """
-        return items.order_by(*self.DEFAULT_ORDER_BY)
+    def ordering(self, qs: QuerySet) -> QuerySet:
+        """ Serve every page in genomic order regardless of any order the request supplies. Emitted as
+            a plain order_by so it matches the snpdb_locus(contig_id, position, ref_id) btree exactly -
+            an F().asc(nulls_first=...) sort defeats that index. @see issue #1663 """
+        return qs.order_by(*self.DEFAULT_ORDER_BY)
 
     def _get_approx_count(self, qs) -> int:
         sql, params = qs.query.sql_with_params()
@@ -160,51 +193,42 @@ class AllVariantsGrid(AbstractVariantGrid):
             raise ValueError(f"Could not parse row estimate from EXPLAIN output: {first_line!r}")
         return int(match.group(1))
 
-    def get_known_count(self, request, items) -> Optional[int]:
-        """ A COUNT(*) over a huge table costs more than the page itself - hand the paginator the
-            planner's estimate instead, and tell the user it's approximate """
-        if self.get_filters(request):
-            return None  # jqGrid column filters narrow the rows the estimate was taken over
+    def known_count(self, qs) -> Optional[int]:
+        """ A COUNT(*) over a huge table costs more than the page itself - report the planner's
+            estimate instead, and tell the user it's approximate """
+        self._approximate_count = None
+        if self.filter_rules_supplied:
+            return None  # column filters narrow the rows the estimate was taken over
 
         try:
-            estimate = self._get_approx_count(items)
+            estimate = self._get_approx_count(qs)
         except Exception:
             return None
 
-        if estimate >= 1_000_000:
-            self._used_approx_count = True
+        if estimate >= self.APPROXIMATE_COUNT_MIN:
+            self._approximate_count = estimate
             return estimate
         return None
 
-    def get_data(self, request) -> dict:
-        self._used_approx_count = False
-        data = super().get_data(request)
-        if self._used_approx_count:
-            data['approximate_records'] = _format_approx_count(data['records'])
-        return data
+    def approximate_count(self, qs) -> Optional[str]:
+        if self._approximate_count is not None:
+            return _format_approx_count(self._approximate_count)
+        return None
 
 
 class NearbyVariantsGrid(AbstractVariantGrid):
-    caption = 'Nearby Variants'
+    grid_name = 'Nearby Variants'
 
-    def __init__(self, user, variant_id, genome_build_name, region_type, gene_symbol=None, **kwargs):
-        self.variant = get_object_or_404(Variant, pk=variant_id)
-        self.genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
-        self.region_type = region_type
-        self.gene_symbol = gene_symbol
-
-        user_settings = UserSettings.get_for_user(user)
+    def __init__(self, request: HttpRequest, variant_id=None, genome_build_name=None, region_type=None,
+                 gene_symbol=None, **kwargs):
+        url_kwargs = request.resolver_match.kwargs if request.resolver_match else {}
+        self.variant = get_object_or_404(Variant, pk=variant_id or url_kwargs["variant_id"])
+        self.genome_build = GenomeBuild.get_name_or_alias(genome_build_name
+                                                          or url_kwargs["genome_build_name"])
+        self.region_type = region_type or url_kwargs["region_type"]
+        self.gene_symbol = gene_symbol or url_kwargs.get("gene_symbol")
         self.annotation_version = AnnotationVersion.latest(self.genome_build)
-        fields, override, _ = get_custom_column_fields_override_and_sample_position(user_settings.columns,
-                                                                                    self.annotation_version)
-        self.fields = fields
-        super().__init__(user)
-        af_show_in_percent = settings.VARIANT_ALLELE_FREQUENCY_CLIENT_SIDE_PERCENT
-        update_dict_of_dict_values(self._overrides, self._get_standard_overrides(af_show_in_percent))
-        update_dict_of_dict_values(self._overrides, override)
-        self.extra_config.update({'sortname': "locus__position",
-                                  'sortorder': "desc",
-                                  'shrinkToFit': False})
+        super().__init__(request, **kwargs)
 
     def _get_base_queryset(self) -> QuerySet:
         region_filters = get_nearby_qs(self.variant, self.annotation_version)
@@ -215,102 +239,230 @@ class NearbyVariantsGrid(AbstractVariantGrid):
             qs = rf_data
         return qs
 
+    def _get_rich_columns(self) -> list[RichColumn]:
+        rich_columns = super()._get_rich_columns()
+        for rc in rich_columns:
+            if rc.name == "locus__position":
+                rc.default_sort = SortOrder.DESC
+                break
+        return rich_columns
 
-class VariantTagsGrid(JqGridUserRowConfig):
-    """ List VariantTags (Tag-centric) """
-    model = VariantTag
-    caption = 'Variant Tags'
-    fields = ["id", "variant__variantannotation__transcript_version__gene_version__gene_symbol__symbol",
-              "variant__id", "node__id", "tag__id", "analysis__name", "analysis__id", "user__username", "created"]
 
-    colmodel_overrides = {
-        'id': {'hidden': True, "Label": "TagID"},
-        "variant__id": {"hidden": True, "label": "VariantID"},
-        "node__id": {"hidden": True, "label": "NodeID"},
-        "variant__variantannotation__transcript_version__gene_version__gene_symbol__symbol": {'label': 'Gene', 'formatter': 'geneSymbolNewWindowLink'},
-        "tag__id": {'label': "Tag", "formatter": "formatVariantTag"},
-        "analysis__name": {'label': 'Analysis', "formatter": "formatAnalysis"},
-        "analysis__id": {'hidden': True, "label": "AnalysisID"},
-        "user__username": {'label': "Username"},
-        "created": {'label': "Created"},
-    }
+class VariantTagCaseColumnsMixin:
+    """ The Sample and Patient columns for a tagging-per-row grid - who the tagging is about.
+        @see VariantTagsColumns, VariantTagDetailColumns """
 
-    def __init__(self, user, genome_build_name, extra_filters=None, **kwargs):
-        super().__init__(user)
+    def __init__(self, request: HttpRequest):
+        super().__init__(request)
+        self._page_visible_pks: dict[str, set] = {}
 
-        genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
-        self.genome_build_name = genome_build.name
-        queryset = VariantTag.get_for_build(genome_build)
+    def case_columns(self) -> list[RichColumn]:
+        return [
+            RichColumn("sample__name", name="sample", label="Sample", orderable=True,
+                       extra_columns=["sample__id"],
+                       renderer=self.render_sample, client_renderer="TableFormat.linkUrl"),
+            RichColumn("patient_identity", name="patient", label="Patient", orderable=True,
+                       extra_columns=["patient__id"],
+                       renderer=self.render_patient, client_renderer="TableFormat.linkUrl"),
+        ]
 
-        filter_user_id = None
-        if extra_filters:
-            analysis_ids = extra_filters.get("analysis_ids")
-            if analysis_ids is not None:
-                analyses_queryset = Analysis.filter_for_user(user).filter(pk__in=analysis_ids)
-                queryset = queryset.filter(analysis__in=analyses_queryset)
+    @staticmethod
+    def annotate_patient_identity(qs: QuerySet[VariantTag]) -> QuerySet[VariantTag]:
+        """ The Patient column sorts and exports on a values() key, so the identity the cell shows has
+            to be built in SQL - @see patients.models.Patient.display_identity_expression """
+        return qs.annotate(patient_identity=Patient.display_identity_expression("patient__"))
 
-            gene_id = extra_filters.get("gene")
-            if gene_id:
-                queryset = queryset.filter(variant__variantannotation__transcript_version__gene_version__gene_id=gene_id)
+    def pre_render(self, qs: QuerySet[VariantTag], rows: list[dict]):
+        super().pre_render(qs, rows)
+        self._page_visible_pks = {}
 
-            tag_id = extra_filters.get("tag")
-            if tag_id is not None:
-                tag = Tag.objects.get(pk=tag_id)
-                queryset = queryset.filter(tag=tag)
+    def render_sample(self, cell: CellData) -> JsonDataType:
+        return self._render_case_cell(cell, "sample__id", Sample, "view_sample", "sample_id")
 
-            if tag_ids := extra_filters.get("tags"):
-                queryset = queryset.filter(tag__in=tag_ids)
+    def render_patient(self, cell: CellData) -> JsonDataType:
+        return self._render_case_cell(cell, "patient__id", Patient, "view_patient", "patient_id")
 
-            if filter_user_id := extra_filters.get("user"):
-                queryset = queryset.filter(user_id=filter_user_id)
+    def _render_case_cell(self, cell: CellData, id_column: str, model, url_name: str,
+                          url_kwarg: str) -> JsonDataType:
+        pk = cell[id_column]
+        if pk is None:
+            return None
+        data = {"text": cell.value}
+        # Seeing the tagging doesn't imply being allowed to open what it is about, so name it either
+        # way but only link it where the viewer can view the object
+        if pk in self._visible_pks_for_page(id_column, model):
+            if url := url_if_visible(url_name, **{url_kwarg: pk}):
+                data["url"] = url
+        return data
 
-        user_grid_config = UserGridConfig.get(user, self.caption)
+    def _visible_pks_for_page(self, id_column: str, model) -> set:
+        """ Which of the page's samples / patients this user may open - one query per column per page,
+            the way render_delete resolves write permissions (@see DatatableConfig._writable_pks_for_page) """
+        visible = self._page_visible_pks.get(id_column)
+        if visible is None:
+            pks = {pk for row in self._page_rows if (pk := row.get(id_column)) is not None}
+            visible = set(model.filter_for_user(self.user).filter(pk__in=pks).values_list("pk", flat=True))
+            self._page_visible_pks[id_column] = visible
+        return visible
+
+
+class VariantTagsColumns(VariantTagCaseColumnsMixin, DatatableConfig[VariantTag]):
+    """ List VariantTags (Tag-centric) - @see variant_tags.html and base_related_analyses.html """
+    GRID_NAME = VARIANT_TAGS_GRID_NAME
+    # The initial queryset is every tag in the build - a DISTINCT over a dozen joins - and recordsTotal
+    # only feeds the "(filtered from N total)" text, so it isn't worth a second count of it
+    count_unfiltered = False
+
+    def __init__(self, request: HttpRequest):
+        super().__init__(request)
+        self.genome_build = GenomeBuild.get_name_or_alias(self.get_query_param("genome_build_name"))
+        self.annotation_version = AnnotationVersion.latest_or_none(self.genome_build, context=self.GRID_NAME)
+
+        self.rich_columns = [
+            RichColumn("id", visible=False),
+            RichColumn("variant_string", label="Variant", orderable=True,
+                       extra_columns=["id", "variant__id", "tag__id", "tag__requires_classification",
+                                      "tag__retired", "analysis__id"],
+                       renderer=self.render_variant, client_renderer="renderVariantTagVariant"),
+            RichColumn(name="genome_build", label="Genome Build", renderer=self.render_genome_build),
+            RichColumn("gene_symbol", label="Gene", orderable=True,
+                       client_renderer="renderGeneSymbolNewWindow"),
+            RichColumn("tag__id", name="tag", label="Tag", orderable=True, extra_columns=["variant__id"],
+                       renderer=self.render_tag, client_renderer="renderVariantTagPill"),
+            RichColumn("analysis__name", name="analysis", label="Analysis", orderable=True,
+                       extra_columns=["analysis__id"],
+                       renderer=self.render_analysis, client_renderer="renderVariantTagAnalysis"),
+            *self.case_columns(),
+            self.user_column(name="user", label="User"),
+            RichColumn("created", label="Created", orderable=True, default_sort=SortOrder.DESC,
+                       client_renderer="TableFormat.timestamp"),
+            RichColumn("id", name="delete", label="", extra_columns=["analysis__id"],
+                       renderer=self.render_delete, client_renderer="TableFormat.deleteRow"),
+        ]
+
+    def render_genome_build(self, _cell: CellData) -> JsonDataType:
+        return self.genome_build.name
+
+    @staticmethod
+    def render_variant(cell: CellData) -> JsonDataType:
+        data = {
+            "variant_string": cell.value,
+            "url": url_if_visible("view_variant", variant_id=cell["variant__id"]),
+        }
+        # A live classify queue tag is a to-do item - offer to complete it @see Tag.classify_queue_qs
+        if cell["tag__requires_classification"] and cell["tag__retired"] is None:
+            data["classify_url"] = url_if_visible("create_classification_for_variant_tag",
+                                                  variant_tag_id=cell["id"])
+        return data
+
+    @staticmethod
+    def render_tag(cell: CellData) -> JsonDataType:
+        return {"tag": cell.value, "variant_id": cell["variant__id"]}
+
+    @staticmethod
+    def render_analysis(cell: CellData) -> JsonDataType:
+        analysis_id = cell["analysis__id"]
+        if analysis_id is None:
+            return None
+        return {
+            "text": f"{analysis_id} - {cell.value}",
+            "url": url_if_visible("analysis", analysis_id=analysis_id),
+        }
+
+    def get_initial_queryset(self) -> QuerySet[VariantTag]:
+        # get_for_build has already restricted this to tags visible in the build, either via their
+        # allele or - for a tag made in this build - via the tag's own variant
+        qs = VariantTag.get_for_build(self.genome_build, tags_qs=self._annotation_version_queryset())
+        # Pick the variant for *this* build out of the allele, rather than whichever one a plain join
+        # would land on
+        qs = qs.annotate(build_variant_allele=FilteredRelation(
+            "allele__variantallele",
+            condition=Q(allele__variantallele__genome_build=self.genome_build)))
+        qs = self._annotate_gene_symbol(self._annotate_variant_string(qs))
+        return self.annotate_patient_identity(qs)
+
+    def _annotation_version_queryset(self) -> QuerySet[VariantTag]:
+        """ Join VariantAnnotation through the build's partition rather than the parent table - every
+            historical version otherwise multiplies the rows the DISTINCT has to sort through """
+        qs = get_queryset_with_transformer_hook(klass=VariantTag)
+        if self.annotation_version:
+            qs.add_sql_transformer(self.annotation_version.sql_partition_transformer)
+        return qs
+
+    @staticmethod
+    def _build_variant_field(name: str):
+        """ A field off the build's variant, falling back to the one the tag was made on - a tag keeps
+            its own variant until the liftover task assigns it an allele (@see
+            analysis.tasks.variant_tag_tasks._liftover_variant_tag), and that variant is in this build
+            by definition. Dropping those rows made the grid disagree with the tag counts. """
+        return Coalesce(f"build_variant_allele__variant__{name}", f"variant__{name}")
+
+    @classmethod
+    def _annotate_variant_string(cls, qs: QuerySet[VariantTag]) -> QuerySet[VariantTag]:
+        """ A "1:123321 G>C" string.
+
+            The fallback is per field because Concat renders a NULL argument as empty rather than
+            returning NULL, so coalescing the finished strings would never reach the second one. """
+        field = cls._build_variant_field
+        return qs.annotate(variant_string=Concat(
+            field("locus__contig__name"), Value(":"), field("locus__position"), Value(" "),
+            field("locus__ref__seq"), Value(">"), field("alt__seq"), output_field=TextField()))
+
+    @classmethod
+    def _annotate_gene_symbol(cls, qs: QuerySet[VariantTag]) -> QuerySet[VariantTag]:
+        symbol = "variantannotation__transcript_version__gene_version__gene_symbol__symbol"
+        return qs.annotate(gene_symbol=cls._build_variant_field(symbol))
+
+    def filter_queryset(self, qs: QuerySet[VariantTag]) -> QuerySet[VariantTag]:
+        analysis_ids = self.get_query_json("analysis_ids")
+        if analysis_ids is not None:
+            analyses_queryset = Analysis.filter_for_user(self.user).filter(pk__in=analysis_ids)
+            qs = qs.filter(analysis__in=analyses_queryset)
+
+        if gene_id := self.get_query_param("gene"):
+            qs = qs.filter(variant__variantannotation__transcript_version__gene_version__gene_id=gene_id)
+
+        if tag_id := self.get_query_param("tag"):
+            qs = qs.filter(tag_id=tag_id)
+
+        if tag_ids := self.get_query_json("tags"):
+            qs = qs.filter(tag__in=tag_ids)
+
+        if any_tag_ids := self.get_query_json("any_tags"):
+            qs = qs.filter(tag__in=any_tag_ids)
+
+        filter_user_id = self.get_query_param("user")
+        if filter_user_id:
+            qs = qs.filter(user_id=filter_user_id)
+
+        user_grid_config = UserGridConfig.get(self.user, self.GRID_NAME)
         if user_grid_config.show_group_data or filter_user_id:
             # An explicit user filter overrides show_group_data - still permission checked
-            queryset = VariantTag.filter_for_user(user, queryset=queryset)
+            qs = VariantTag.filter_for_user(self.user, queryset=qs)
         else:
-            queryset = queryset.filter(user=user)
-
-        # Need to go through Allele to get variant in this build
-        queryset = queryset.filter(allele__variantallele__genome_build=genome_build)
-        queryset = Variant.annotate_variant_string(queryset,
-                                                   path_to_variant="allele__variantallele__variant__")
-        field_names = self.get_field_names() + ["variant_string"]
-        self.queryset = queryset.values(*field_names)
-        self.extra_config.update({'sortname': 'variant_string',
-                                  'sortorder': 'asc'})
-
-    def iter_format_items(self, items):
-        """ Inject constant genome build value into iterator results """
-        items = super().iter_format_items(items)
-        genome_build_name = self.genome_build_name
-        for row in items:
-            row['view_genome_build'] = genome_build_name
-            yield row
-
-    def get_colmodels(self, remove_server_side_only=False):
-        before_colmodels = [
-            {'index': 'variant_string', 'name': 'variant_string',
-             'label': 'Variant', 'formatter': 'formatVariantTagFirstColumn'},
-            {'index': 'view_genome_build', 'name': 'view_genome_build', 'label': 'Genome Build', 'sortable': False},
-        ]
-        colmodels = super().get_colmodels(remove_server_side_only=remove_server_side_only)
-        return before_colmodels + colmodels
+            qs = qs.filter(user=self.user)
+        return filter_unresolved_variant_tags(qs, self.user)
 
 
 class TaggedVariantGrid(AbstractVariantGrid):
     """ Shows Variants that have been tagged (Variant-centric) """
-    caption = 'Variant with tags'
+    grid_name = 'Variant with tags'
+    csv_name = 'tagged_variant_export'
 
-    TAG_COUNT_OVERRIDE = {
-        'model_field': False, 'queryset_field': False,
-        'name': 'tag_count', 'index': 'tag_count', 'label': 'Tag Events',
-        'width': 60, 'sorttype': 'int',
+    TAG_COUNT_COLUMN = {
+        'model_field': False, 'label': 'Tag Events', 'width': 60,
+        'column_filter': FilterField('int'),
     }
 
-    def __init__(self, user, genome_build_name, extra_filters=None):
-        genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
-        self.genome_build = genome_build
+    def __init__(self, request: HttpRequest, genome_build_name: Optional[str] = None,
+                 extra_filters: Optional[dict] = None, **kwargs):
+        url_kwargs = request.resolver_match.kwargs if request.resolver_match else {}
+        genome_build_name = genome_build_name or url_kwargs["genome_build_name"]
+        self.genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
+        self.annotation_version = AnnotationVersion.latest(self.genome_build)
+
+        if extra_filters is None:
+            extra_filters = self.get_query_json_from_request(request, "extra_filters")
         tag_ids = []
         require_all_tags = False
         filter_user_id = None
@@ -321,30 +473,42 @@ class TaggedVariantGrid(AbstractVariantGrid):
             if all_tag_ids := extra_filters.get("tags"):
                 tag_ids.extend(all_tag_ids)
                 require_all_tags = True
+            # Variants carrying ANY of these tags - @see the tag counts summary above the grid
+            if any_tag_ids := extra_filters.get("any_tags"):
+                tag_ids.extend(any_tag_ids)
             filter_user_id = extra_filters.get("user")
         self.tag_ids = tag_ids
         self.require_all_tags = require_all_tags
         self.filter_user_id = filter_user_id
+        super().__init__(request, **kwargs)
 
-        user_settings = UserSettings.get_for_user(user)
-        self.annotation_version = AnnotationVersion.latest(genome_build)
-        fields, override, _ = get_custom_column_fields_override_and_sample_position(user_settings.columns,
-                                                                                    self.annotation_version)
-        self.fields = fields + ["tag_count"]
-        super().__init__(user)
+    @staticmethod
+    def get_query_json_from_request(request: HttpRequest, param: str) -> Optional[dict]:
+        querydict = request.POST if request.method == 'POST' else request.GET
+        if value := querydict.get(param):
+            return json.loads(value)
+        return None
 
-        af_show_in_percent = settings.VARIANT_ALLELE_FREQUENCY_CLIENT_SIDE_PERCENT
-        update_dict_of_dict_values(self._overrides, self._get_standard_overrides(af_show_in_percent))
-        update_dict_of_dict_values(self._overrides, override)
-        update_dict_of_dict_values(self._overrides, {"tag_count": self.TAG_COUNT_OVERRIDE})
-        self.extra_config.update({'sortname': "locus__position",
-                                  'sortorder': "asc",
-                                  'shrinkToFit': False})
+    def _get_rich_columns(self) -> list[RichColumn]:
+        rich_columns = super()._get_rich_columns()
+        for rc in rich_columns:
+            if rc.name == "locus__position":
+                rc.default_sort = SortOrder.ASC
+                break
+        rich_columns.append(variant_column_rich_column("tag_count", **self.TAG_COUNT_COLUMN))
+        return rich_columns
+
+    def get_csv_name(self) -> str:
+        """ Say which tag the export was of, the way the page's own filename did """
+        name_parts = [super().get_csv_name()]
+        if self.tag_ids:
+            name_parts.extend(["tag"] + [str(t) for t in self.tag_ids])
+        return "_".join(name_parts)
 
     def _get_grid_only_annotation_kwargs(self):
         """ How many times this variant has been tagged - sort on it to find the most re-tagged variants """
         a_kwargs = super()._get_grid_only_annotation_kwargs()
-        tag_count_qs = VariantTag.filter_for_user(self.user).filter(
+        tag_count_qs = filter_unresolved_variant_tags(VariantTag.filter_for_user(self.user), self.user).filter(
             allele__variantallele__variant_id=OuterRef("id")).values("allele").annotate(
             tag_count=Count("pk")).values_list("tag_count")
         a_kwargs["tag_count"] = Subquery(tag_count_qs[:1])
@@ -358,8 +522,9 @@ class TaggedVariantGrid(AbstractVariantGrid):
 
     def _get_q(self) -> Optional[Q]:
         genome_build = self.annotation_version.genome_build
-        user_grid_config = UserGridConfig.get(self.user, self.caption)
-        tags_qs = VariantTag.filter_for_user(self.user)
+        user_grid_config = UserGridConfig.get(self.user, self.grid_name)
+        # The tag work list setting is shared with the tags grid beside this one, so the two agree
+        tags_qs = filter_unresolved_variant_tags(VariantTag.filter_for_user(self.user), self.user)
         if self.filter_user_id:
             # An explicit user filter overrides show_group_data - still permission checked
             tags_qs = tags_qs.filter(user_id=self.filter_user_id)
@@ -399,7 +564,8 @@ class VariantTagCountsColumns(DatatableConfig[VariantTag]):
     def get_initial_queryset(self) -> QuerySet[VariantTag]:
         variant_id = self.get_query_param('variant_id')
         variant = Variant.objects.get(pk=variant_id)
-        qs = VariantTag.get_variant_tag_counts_qs(variant)
+        qs = variant_tags_for_user(variant, self.user).values("tag") \
+            .annotate(count=Count("id"), last_created=Max("created")).order_by("tag")
         if self.tag_stale_date:
             qs = qs.annotate(fresh_count=Count("id", filter=Q(created__gte=self.tag_stale_date)))
         if self.sort_order_by_tag:
@@ -409,7 +575,7 @@ class VariantTagCountsColumns(DatatableConfig[VariantTag]):
         return qs
 
 
-class VariantTagDetailColumns(DatatableConfig[VariantTag]):
+class VariantTagDetailColumns(VariantTagCaseColumnsMixin, DatatableConfig[VariantTag]):
     """ This is the detail expanded on variant tags page """
     def __init__(self, request: HttpRequest):
         super().__init__(request)
@@ -418,6 +584,7 @@ class VariantTagDetailColumns(DatatableConfig[VariantTag]):
             RichColumn('id', client_renderer='tagDetailRenderer'),
             RichColumn('id', name='can_write', visible=False, renderer=self.can_write),
             RichColumn('analysis', client_renderer='analysisLinkRenderer'),
+            *self.case_columns(),
             RichColumn('user__username', name='user', orderable=True),
             RichColumn('created', client_renderer='TableFormat.timestamp', orderable=True,
                        default_sort=SortOrder.DESC),
@@ -437,9 +604,4 @@ class VariantTagDetailColumns(DatatableConfig[VariantTag]):
 
         variant = Variant.objects.get(pk=variant_id)
         tag = Tag.objects.get(pk=tag_name)
-        # Not going to use anything build specific so don't care about build
-        genome_build = variant.any_genome_build
-        qs = VariantTag.get_for_build(genome_build, variant_qs=variant.equivalent_variants)
-        qs = VariantTag.filter_for_user(self.user, queryset=qs)
-        qs = qs.filter(tag=tag)
-        return qs
+        return self.annotate_patient_identity(variant_tags_for_user(variant, self.user).filter(tag=tag))

@@ -164,28 +164,24 @@ class ReclassificationBuildResult:
     """ Another build holds the state row, so the timelines are being written as we read them """
 
     @property
-    def in_progress(self) -> bool:
-        return self.building or bool(self.outstanding)
-
-    @property
     def progress(self) -> 'ReclassificationBuildProgress':
-        """ Counted on demand, for the progress message while a build is running """
+        """ Counted on demand, for the progress message while a batch is waiting """
         return ReclassificationBuildProgress(
-            built=ReclassificationEvent.objects.filter(step=1).count(),
             tracked=ReclassificationEventBuilder.tracked_classifications_qs().count(),
             outstanding=self.outstanding)
 
 
 @dataclass(frozen=True)
 class ReclassificationBuildProgress:
-    """ How much of the catalogue has a timeline, while a build is still running """
-    built: int
+    """ How much of the catalogue has a current timeline, while a batch is still waiting """
     tracked: int
+    """ Classifications the page can show """
     outstanding: int
+    """ Of those, the ones still waiting on a timeline """
 
     @property
-    def remaining(self) -> int:
-        return max(self.tracked - self.built, self.outstanding)
+    def built(self) -> int:
+        return self.tracked - self.outstanding
 
     @property
     def percent(self) -> float:
@@ -447,6 +443,11 @@ class ReclassificationEventBuilder:
         return rows_written
 
     @staticmethod
+    def _touched_since(built_to: Optional[datetime],
+                       classification_qs: QuerySet[Classification]) -> QuerySet[Classification]:
+        return classification_qs.filter(modified__gt=built_to) if built_to else classification_qs
+
+    @staticmethod
     def bring_up_to_date(max_classifications: Optional[int] = None) -> ReclassificationBuildResult:
         """
         Rebuilds the timeline of every classification touched since the last run, then advances the
@@ -465,13 +466,15 @@ class ReclassificationEventBuilder:
                 return ReclassificationEventBuilder._result_for(
                     ReclassificationEventBuildState.instance(), outstanding=0, building=True)
 
-            touched_qs = Classification.objects.all()
-            if state.built_to:
-                touched_qs = touched_qs.filter(modified__gt=state.built_to)
-
+            touched_qs = ReclassificationEventBuilder._touched_since(state.built_to,
+                                                                    Classification.objects.all())
             classification_count = touched_qs.count()
             if max_classifications is not None and classification_count > max_classifications:
-                return ReclassificationEventBuilder._result_for(state, outstanding=classification_count)
+                # the batch covers every origin so a record turning somatic loses its timeline, but the
+                # page only ever shows the tracked ones, so that's what the progress message counts
+                outstanding = ReclassificationEventBuilder._touched_since(
+                    state.built_to, ReclassificationEventBuilder.tracked_classifications_qs()).count()
+                return ReclassificationEventBuilder._result_for(state, outstanding=outstanding)
 
             events = ReclassificationEventBuilder.rebuild(touched_qs)
             state.built_to = started_at

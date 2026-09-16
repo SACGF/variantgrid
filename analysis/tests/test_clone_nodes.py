@@ -4,6 +4,7 @@ from django.test import TestCase, override_settings
 from analysis.models import (
     AlleleFrequencyNode,
     Analysis,
+    AnalysisNodeCountConfiguration,
     CohortNode,
     CohortNodeZygosityFiltersCollection,
     FilterNode,
@@ -21,6 +22,7 @@ from analysis.models import (
     TrioNode,
     VariantTag,
 )
+from analysis.tests.utils import AnalysisSetupMixin
 from annotation.fake_annotation import create_fake_variants, get_fake_annotation_version
 from annotation.models import AnnotationRun, VariantGeneOverlap
 from annotation.tests.test_data_fake_genes import create_fake_transcript_version
@@ -28,7 +30,7 @@ from genes.models import GeneList, GeneListGeneSymbol
 from ontology.models import OntologyTerm
 from patients.models_enums import GnomADPopulation
 from pedigree.models import PedigreeInheritance
-from snpdb.models import GenomeBuild, GenomicInterval, ImportStatus, Tag, Variant
+from snpdb.models import AbstractNodeCountSettings, BuiltInFilters, GenomeBuild, ImportStatus, Tag, Variant
 from snpdb.tests.utils.fake_cohort_data import create_fake_pedigree, create_fake_trio
 
 
@@ -139,14 +141,23 @@ class TestCloneAnalysisNodes(TestCase):
                          [self.gene_list], "Clone gets its own link to the same GeneList")
 
     def test_clone_intersection_node(self):
-        # Doesn't have any related objects, but does need to make its own copy of GenomicInterval so test that
-        genomic_interval = GenomicInterval.objects.create(chrom="1", start=10000, end=20000)
-        intersection_node = IntersectionNode.objects.create(analysis=self.analysis, genomic_interval=genomic_interval)
-        # Save the PK as the actual object gets changed (known issue - ok if we don't save the node)
-        original_genomic_interval_id = genomic_interval.pk
+        # Resolved entries are concrete fields, so the clone carries them without save_clone() plumbing
+        intersection_node = IntersectionNode.objects.create(analysis=self.analysis,
+                                                            accordion_panel=IntersectionNode.VARIANTS,
+                                                            variant_text="1:10000-20000",
+                                                            variant_regions=["1:10000-20000"])
         clone = intersection_node.save_clone()
-        self.assertNotEqual(original_genomic_interval_id, clone.genomic_interval.pk,
-                            "Intersection node made copy of genomic interval")
+        self.assertEqual(clone.variant_text, "1:10000-20000")
+        self.assertEqual(clone.variant_regions, ["1:10000-20000"])
+
+    def test_clone_intersection_node_contigs(self):
+        intersection_node = IntersectionNode.objects.create(analysis=self.analysis,
+                                                            accordion_panel=IntersectionNode.CONTIG)
+        contig = self.analysis.genome_build.contigs.first()
+        intersection_node.intersectionnodecontig_set.create(contig=contig)
+        intersection_node = IntersectionNode.objects.get(pk=intersection_node.pk)  # contig_ids is cached
+        clone = intersection_node.save_clone()
+        self.assertEqual([inc.contig for inc in clone.intersectionnodecontig_set.all()], [contig])
 
     def test_clone_moi_node(self):
         # TODO: Need to also test patient setup w/ontology etc
@@ -192,3 +203,27 @@ class TestCloneAnalysisNodes(TestCase):
         self._set_af_for_node(trio_node)
         self._set_vcf_filter_for_node(trio_node, self.trio.cohort.vcf)
         self._test_clone_node(trio_node)
+
+
+class TestCloneAnalysisNodeCounts(AnalysisSetupMixin, TestCase):
+    """ Node counts don't need nodes - the 3 states are records, no records, and no configuration """
+
+    def _clone_and_get_node_count_types(self):
+        analysis = Analysis.objects.get(pk=self.analysis.pk)
+        analysis_copy = analysis.clone()
+        return Analysis.objects.get(pk=analysis_copy.pk).get_node_count_types()
+
+    def test_clone_copies_node_counts(self):
+        node_counts = [BuiltInFilters.OMIM, BuiltInFilters.TOTAL, BuiltInFilters.COSMIC]
+        Analysis.objects.get(pk=self.analysis.pk).set_node_count_types(node_counts)
+        expected = AbstractNodeCountSettings.get_types_from_labels(node_counts)
+        self.assertEqual(self._clone_and_get_node_count_types(), expected)
+
+    def test_clone_copies_all_node_counts_switched_off(self):
+        Analysis.objects.get(pk=self.analysis.pk).set_node_count_types([])
+        self.assertEqual(self._clone_and_get_node_count_types(), [])
+
+    def test_clone_without_config_uses_defaults(self):
+        AnalysisNodeCountConfiguration.objects.filter(analysis=self.analysis).delete()
+        expected = AbstractNodeCountSettings.get_types_from_labels(BuiltInFilters.DEFAULT_NODE_COUNT_FILTERS)
+        self.assertEqual(self._clone_and_get_node_count_types(), expected)

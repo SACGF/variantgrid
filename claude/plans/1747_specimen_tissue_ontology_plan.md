@@ -1,5 +1,7 @@
 # #1747 — specimen tissue as a UBERON ontology term
 
+Status: draft
+
 [#1747](https://github.com/SACGF/variantgrid/issues/1747), split out of
 [#1706](https://github.com/SACGF/variantgrid/issues/1706) once the "there's currently no way to create
 tissue" comment turned out to be bigger than that issue's scope.
@@ -11,7 +13,7 @@ extraction grids — and the two are independent.
 `Tissue` (`patients/models.py:315`) is inert. `Specimen.tissue` is a nullable FK to it, and both
 `SpecimenForm` (`patients/forms.py:137`) and `PatientSpecimenFormSet` (`patients/forms.py:122`) render
 a tissue `<select>` that is empty on every deployment. There is no creation path outside
-`patients/admin.py:13`, no seed data (`Tissue` appears only in `patients/migrations/0001_initial`), no
+`patients/admin.py:13`, no seed data (`Tissue` appears only in `patients/migrations/0001_initial.py`), no
 API field (`SpecimenSerializer`, `patients/serializers.py:184`), and the patient CSV importer has it
 commented out at `patients/import_records.py:360`.
 

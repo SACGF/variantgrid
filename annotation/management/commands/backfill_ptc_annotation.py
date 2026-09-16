@@ -26,6 +26,8 @@ PTC_FIELDS = ["ptc_distance_codons", "ptc_last_junction_distance", "nmd_escape_s
 
 
 class Command(BaseCommand):
+    category = "one-off"
+
     def handle(self, *args, **options):
         for vav in VariantAnnotationVersion.objects.filter(columns_version=5):
             print(f"Updating {vav}...")

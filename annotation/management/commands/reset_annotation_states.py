@@ -8,6 +8,7 @@ from annotation.models import AnnotationRangeLock, AnnotationRun
 
 
 class Command(BaseCommand):
+    category = "ops"
 
     def add_arguments(self, parser):
         parser.add_argument('--clear', action='store_true')

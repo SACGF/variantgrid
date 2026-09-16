@@ -17,7 +17,16 @@ from classification.views.classification_email_view import (
     summary_email_preview_text,
 )
 from classification.views.classification_export_view import ClassificationApiExportView
-from classification.views.classification_grouping_datatables import ClassificationGroupingColumns
+from classification.views.classification_grouping_datatables import (
+    ClassificationGroupingColumns,
+    ClassificationGroupingCountsView,
+)
+from classification.views.classification_overlaps_view import (
+    post_clinical_context,
+    view_clinical_context,
+    view_overlaps,
+    view_overlaps_detail,
+)
 from classification.views.classification_overlaps_vus_view import (
     view_overlaps_vus,
     view_overlaps_vus_detail,
@@ -27,6 +36,14 @@ from classification.views.classification_view import (
     LabGeneClassificationCountsView,
 )
 from classification.views.classification_reclassification_view import view_reclassification_analytics
+from classification.views.views_case_report import (
+    case_report_download,
+    case_report_finalise,
+    case_report_lis_details,
+    case_report_new_version,
+    case_report_rebuild,
+    view_case_report,
+)
 from classification.views.classification_view_metrics import (
     view_classification_metrics,
     view_page_metrics_detail,
@@ -65,6 +82,7 @@ from classification.views.overlaps_datatables import OverlapColumns
 from classification.views.overlaps_view import view_overlaps, view_overlap_history, overlap_report_review, \
     action_overlap_review, discordance_calculator, TriageView, view_overlap, download_overlaps
 from classification.views.views import AutopopulateView, classification_import_tool
+from classification.views.views_gene_consensus import gene_consensus_panel
 from classification.views.views_hgvs_resolution_tool import hgvs_resolution_tool
 from classification.views.views_uploaded_classifications_unmapped import (
     UploadedClassificationsUnmappedColumns,
@@ -97,6 +115,20 @@ urlpatterns = [
 
     path('create_for_variant/<int:variant_id>/<genome_build_name>', views.CreateClassificationForVariantView.as_view(),
          name='create_classification_for_variant'),
+
+    path('classification/<int:classification_id>/gene_consensus', gene_consensus_panel,
+         name='classification_gene_consensus'),
+
+    # A built case report - the case it belongs to is on the Classify & Report tab (analysis/urls.py)
+    path('case_report/<int:case_report_id>', view_case_report, name='view_case_report'),
+    path('case_report/<int:case_report_id>/download/<slug:document_format>', case_report_download,
+         name='case_report_download'),
+    path('case_report/<int:case_report_id>/finalise', case_report_finalise, name='case_report_finalise'),
+    path('case_report/<int:case_report_id>/rebuild', case_report_rebuild, name='case_report_rebuild'),
+    path('case_report/<int:case_report_id>/new_version', case_report_new_version,
+         name='case_report_new_version'),
+    path('case_report/<int:case_report_id>/lis_details', case_report_lis_details,
+         name='case_report_lis_details'),
 
     path('classification/reclassification_analytics', view_reclassification_analytics, name="classification_reclassification_analytics"),
     path('classification/view_metrics', view_classification_metrics, name="classification_view_metrics"),
@@ -268,6 +300,9 @@ urlpatterns = [
     path('api/classifications/export', ClassificationApiExportView.as_view(), name='classification_export_api'),
     path('api/classifications/datatables/', DatabaseTableView.as_view(column_class=ClassificationColumns), name='classification_datatables'),
     path('api/classification/groups/datatables/', DatabaseTableView.as_view(column_class=ClassificationGroupingColumns), name='classification_grouping_datatables'),
+    path('api/classification/groups/counts/', ClassificationGroupingCountsView.as_view(), name='classification_grouping_counts'),
+    path('api/classification/allele_groups/datatables/<str:lab_id>', DatabaseTableView.as_view(column_class=AlleleGroupingColumns), name='allele_grouping_datatables'),
+
     path('api/classifications/gene_counts/<lab_id>', LabGeneClassificationCountsView.as_view(),
          name='lab_gene_classification_counts_api'),
 

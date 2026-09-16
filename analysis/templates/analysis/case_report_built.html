@@ -1,0 +1,10 @@
+{% comment %}
+    What the modal shows once the report is built: the preview, the three downloads, and the pinned
+    classifications. The Reports card on the tab behind is where it is finalised.
+{% endcomment %}
+<div class="alert alert-success">
+    Report built as a draft &ndash; finalise it from the Reports card once it has been checked.
+</div>
+<div class="mb-3">{% include "analysis/case_report_downloads.html" %}</div>
+<iframe class="w-100 border" style="height: 55vh" title="Case report preview"
+        src="{% url 'view_case_report' case_report.pk %}"></iframe>

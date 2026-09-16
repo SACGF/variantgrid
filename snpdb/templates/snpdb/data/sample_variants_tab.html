@@ -18,8 +18,11 @@
         <script>
         // Tags are shown read only here - they are added/removed in the analysis itself
         variantTags = {% render_variant_tags_dict analysis %};
+        analysisSamples = {% render_analysis_samples_dict analysis %};
         variantTagOrder = {% render_variant_tag_order %};
         variantTagsReadOnly = true;
+        // Every grid on this page is this sample's, so its pills are read against them
+        var nodeProbandSampleId = {{ sample.pk }};
 
         function gridLoadError() {
             console.log("gridLoadError");
@@ -35,10 +38,12 @@
             let nodeId = nodeStatus.id;
             let version = nodeStatus.version;
 
-            let grid_url = Urls.node_grid_config(analysisId, analysisVersion, nodeId, version, "default");
+            let config_url = Urls.node_grid_config(analysisId, analysisVersion, nodeId, version, "default");
+            let handler_url = Urls.node_grid_handler(analysisId);
             let unique_code = "sample-variants-grid";  // ok to be constant on this page
             function noOp() {};
-            setupGrid(grid_url, analysisId, nodeId, version, unique_code, noOp, gridLoadError, on_error_function);
+            setupNodeGrid(config_url, handler_url, analysisId, nodeId, version, unique_code,
+                          noOp, gridLoadError, on_error_function);
         }
 
         $(document).ready(function() {
@@ -55,8 +60,7 @@
                     $("<table/>").attr({
                         id: 'grid-' + nodeId,
                         class: 'grid'
-                    }).text("loading...").appendTo(gridContainer);
-                    $("<div/>").attr({id: 'pager-' + nodeId}).appendTo(gridContainer);
+                    }).appendTo(gridContainer);
                     messagePoller.observe_node(nodeId, "ready", showNodeGrid);
                 }
             });

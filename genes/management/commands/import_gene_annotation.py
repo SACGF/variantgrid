@@ -51,6 +51,7 @@ class Command(BaseCommand):
         This makes use of files produced by a spin-off project: cdot
         @see https://github.com/SACGF/cdot
     """
+    category = "import"
     BATCH_SIZE = 2000
 
     def add_arguments(self, parser):
@@ -157,6 +158,9 @@ class Command(BaseCommand):
 
         for gene_accession, gv_data in genes_iter():
             gene_accession = fix_accession(gene_accession)
+            if gene_accession == Gene.FAKE_GENE_ID_PREFIX:
+                logging.warning("Skipping gene with neither accession nor symbol: %s", gv_data)
+                continue
             gene_id, version = GeneVersion.get_gene_id_and_version(gene_accession)
             if version is None:
                 version = 0  # RefSeq genes have no version, store as 0
@@ -185,7 +189,7 @@ class Command(BaseCommand):
             import_source = ga_import_manager.get_or_create_import_source_by_url(genome_build, annotation_consortium, gv_data["url"])
             gene_version = GeneVersion(gene_id=gene_id,
                                        version=version,
-                                       gene_symbol_id=symbol,
+                                       gene_symbol_id=symbol or None,
                                        hgnc_identifier=hgnc_identifier,
                                        hgnc_id=hgnc_id,
                                        description=gv_data.get("description"),

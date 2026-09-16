@@ -3,6 +3,7 @@ from typing import Optional
 
 from classification.autopopulate_evidence_keys.evidence_from_variant import AutopopulateData
 from classification.enums import SpecialEKeys
+from library.genomics.vcf_enums import VCFConstant
 from patients.models_enums import Sex, TissueStatus, Zygosity
 from patients.models import Extraction
 from snpdb.models import Sample, SampleGenotype
@@ -68,6 +69,9 @@ def get_evidence_fields_for_sample_and_patient(variant: Variant, sample: Sample)
             data[SpecialEKeys.GENOTYPE_QUALITY] = negative_as_none(sample_genotype.genotype_quality)
             data[SpecialEKeys.ALLELE_FREQUENCY] = negative_as_none(sample_genotype.allele_frequency)
             data[SpecialEKeys.VCF_FILTER] = ", ".join(sample_genotype.get_vcf_filters())
+            if copy_number_evidence := get_copy_number_evidence(sample_genotype):
+                key, value = copy_number_evidence
+                data[key] = value
         else:
             logging.error("%s does not have ObservedVariant record for %s", sample, variant)
 
@@ -96,6 +100,19 @@ def get_evidence_fields_for_sample_and_patient(variant: Variant, sample: Sample)
         data.update(get_evidence_fields_for_patient(sample.patient))
 
     return data
+
+
+def get_copy_number_evidence(sample_genotype: SampleGenotype) -> Optional[tuple[str, float]]:
+    """ The evidence key and value for the caller's copy number call. CN is an absolute count and
+        SM/FC are ratios against the normal, so the field the VCF declared decides which key it is """
+    is_ratio = VCFConstant.COPY_NUMBER_FIELD_IS_RATIO.get(sample_genotype.sample.vcf.copy_number_field)
+    if is_ratio is None:
+        return None
+    if (value := sample_genotype.copy_number_value) is None:
+        return None
+    if is_ratio:
+        return SpecialEKeys.FOLD_CHANGE, value
+    return SpecialEKeys.COPY_NUMBER, round(value)  # a caller may write the count as 12.0
 
 
 def get_evidence_fields_for_extraction(extraction: Extraction) -> AutopopulateData:

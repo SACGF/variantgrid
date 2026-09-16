@@ -4,6 +4,13 @@
 #gene-coverage-logo {
     float: left;
     margin-right: 20px;
+    text-align: center;
+}
+
+#gene-coverage-logo svg {
+    width: 64px;
+    height: 64px;
+    color: #3455a4;
 }
 
 #gene-coverage-data {
@@ -22,7 +29,7 @@ table#coverage-table .coverage-sample-column {
 <h3>Gene Coverage</h3>
 
 <div id='gene-coverage-logo'>
-    <img  src="{% static 'icons/gene_coverage.png' %}" />
+    <svg class="svg-symbol-icon"><use href="#file-icon-gene-coverage"></use></svg>
     <div>
     {{ gene_symbol }}
     </div>

@@ -7,9 +7,14 @@ from contextlib import ExitStack
 from unittest import mock
 
 from django.core.cache import cache
+from django.db import connection
 from django.test import TestCase, override_settings
 
-from library.django_utils.major_operation import TooManyMajorOperationsError, major_operation
+from library.django_utils.major_operation import (
+    TooManyMajorOperationsError,
+    major_operation,
+    planner_join_collapse_limit,
+)
 
 LOCMEM_CACHE = {
     "default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"},
@@ -68,8 +73,57 @@ class MajorOperationTests(TestCase):
             with major_operation("user_b", "grid"):
                 pass
 
+    def test_expired_slot_key_does_not_break_the_operation(self, _mock_timeout):
+        """ The counter's TTL is set when it's created and never extended, so an operation that is
+            still running when it lapses has no key left to decrement. Redis decr raises there, and
+            the release runs in a finally - so it used to replace the result with a 500. """
+        with major_operation(self.USER, "grid"):
+            cache.clear()  # stand in for the safety TTL lapsing mid-operation
+
+        # ...and the counter is usable again afterwards
+        with ExitStack() as stack:
+            for _ in range(3):
+                stack.enter_context(major_operation(self.USER, "grid"))
+
+    def test_expired_slot_key_does_not_mask_the_operations_own_error(self, _mock_timeout):
+        with self.assertRaises(ValueError) as cm:
+            with major_operation(self.USER, "grid"):
+                cache.clear()
+                raise ValueError("boom")
+        self.assertEqual("boom", str(cm.exception))
+
     @override_settings(MAJOR_OPERATION_LIMITS_ENABLED=False)
     def test_disabled_does_not_limit(self, _mock_timeout):
         with ExitStack() as stack:
             for _ in range(10):
                 stack.enter_context(major_operation(self.USER, "grid"))
+
+
+def _collapse_limits() -> tuple[int, int]:
+    with connection.cursor() as cursor:
+        cursor.execute("SHOW join_collapse_limit;")
+        join_limit = int(cursor.fetchone()[0])
+        cursor.execute("SHOW from_collapse_limit;")
+        from_limit = int(cursor.fetchone()[0])
+    return join_limit, from_limit
+
+
+class PlannerJoinCollapseLimitTests(TestCase):
+    def setUp(self):
+        if connection.vendor != "postgresql":
+            self.skipTest("Postgres planner setting")
+
+    def test_raises_inside_and_restores_the_previous_values(self):
+        before = _collapse_limits()
+        with planner_join_collapse_limit(before[0] + 10):
+            self.assertEqual((before[0] + 10, before[0] + 10), _collapse_limits())
+            # Nested use restores the outer raised value, not the server default
+            with planner_join_collapse_limit(before[0] + 20):
+                self.assertEqual((before[0] + 20, before[0] + 20), _collapse_limits())
+            self.assertEqual((before[0] + 10, before[0] + 10), _collapse_limits())
+        self.assertEqual(before, _collapse_limits())
+
+    def test_none_leaves_the_connection_alone(self):
+        before = _collapse_limits()
+        with planner_join_collapse_limit(None):
+            self.assertEqual(before, _collapse_limits())

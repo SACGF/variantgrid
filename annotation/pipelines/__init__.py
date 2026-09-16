@@ -3,8 +3,8 @@ The annotation pipelines: what each VariantAnnotationPipelineType actually is.
 
 A pipeline is a tool applied to a class of variant - VEP over short variants, VEP over structural
 variants, local computation over gene fusions - so the enum value stored on AnnotationRun is the key
-into this registry, and everything that used to be an `if pipeline_type == ...` branch in the tasks,
-scheduler and import lives on the PipelineDef or its runner. Adding a tool is adding an entry here.
+into this registry, and the tasks, scheduler and import ask the PipelineDef or its runner rather than
+branching on the type themselves. Adding a tool is adding an entry here.
 """
 from annotation.models.models_enums import VariantAnnotationPipelineType
 from annotation.pipelines.annotsv import AnnotSVRunner

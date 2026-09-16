@@ -12,7 +12,7 @@ from annotation.models import (
     VariantGeneOverlap,
     VEPSkippedReason,
 )
-from annotation.vcf_files.bulk_vep_vcf_annotation_inserter import SVGeneOverlapResolver
+from genes.gene_overlaps import SVGeneOverlapResolver
 
 
 def fix_annotation_sv_overlaps():
@@ -20,7 +20,7 @@ def fix_annotation_sv_overlaps():
         that VEP skipped. Idempotent: skips rows that already have overlapping_symbols set. """
     for vav in VariantAnnotationVersion.objects.filter(gene_annotation_release__isnull=False):
         logging.info("Processing %s", vav)
-        resolver = SVGeneOverlapResolver(vav)
+        resolver = SVGeneOverlapResolver.for_variant_annotation_version(vav)
 
         qs = VariantAnnotation.objects.filter(
             version=vav,
@@ -74,6 +74,7 @@ class Command(BaseCommand):
         with vep_skipped_reason=TOO_LONG and no overlapping_symbols / VariantGeneOverlap rows.
         This command resolves gene overlaps locally from each VariantAnnotationVersion's
         gene_annotation_release transcripts and fills them in. """
+    category = "one-off"
 
     def handle(self, *args, **options):
         fix_annotation_sv_overlaps()

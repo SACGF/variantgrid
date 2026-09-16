@@ -7,6 +7,7 @@ from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
 from django.views.decorators.vary import vary_on_cookie
 
+from genes.interpro import store_domains_for_transcripts
 from genes.models import (
     Gene,
     GeneAnnotationRelease,
@@ -99,6 +100,10 @@ class TranscriptAutocompleteView(AutocompleteView):
             qs = qs.filter(transcriptversion__releasetranscriptversion__release=gene_annotation_release)
 
         if has_protein_domains:
+            # Always scoped to a gene symbol, so this is the same bounded per-gene InterPro batch as
+            # the hotspot graph - and this view is cached for a week, so pay for the complete list now
+            store_domains_for_transcripts(qs.values_list("identifier", flat=True))
+
             transcripts_with_domains = set()
             for transcript in qs:
                 tv_qs = gene_annotation_release.transcript_versions_for_transcript(transcript)

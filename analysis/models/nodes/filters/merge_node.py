@@ -7,6 +7,7 @@ from auditlog.registry import auditlog
 from django.db.models import Q
 
 from analysis.models.nodes.analysis_node import AnalysisNode, queryset_to_pk_in_q
+from analysis.models.nodes.node_display import NodeIcon
 
 
 class MergeNode(AnalysisNode):
@@ -129,12 +130,8 @@ class MergeNode(AnalysisNode):
     def _get_arg_q_dict_from_parents_and_node(self):
         parent_arg_q_dict = {}
         for parent in self.get_non_empty_parents():
-            if (small_arg_q_dict := AnalysisNode.get_small_parent_arg_q_dict(parent)) is not None:
-                arg_q_dict = small_arg_q_dict
-            else:
-                # disable_cache=True: see comment in _split_common_filters above (#240, ad35a7fb1).
-                arg_q_dict = parent.get_arg_q_dict(disable_cache=True)
-            parent_arg_q_dict[parent] = arg_q_dict
+            # disable_cache=True: see comment in _split_common_filters above (#240, ad35a7fb1).
+            parent_arg_q_dict[parent] = parent.get_arg_q_dict(disable_cache=True)
         return self._get_merged_q_dict(parent_arg_q_dict)
 
     def _get_node_q(self) -> Optional[Q]:
@@ -145,7 +142,7 @@ class MergeNode(AnalysisNode):
         return f"Merged from parents: {parent_names}"
 
     def get_node_name(self):
-        return "Merge"
+        return ""  # The card draws the merge glyph instead - see createMergeNode() in analysis_nodes.js
 
     @staticmethod
     def get_help_text() -> str:
@@ -154,6 +151,10 @@ class MergeNode(AnalysisNode):
     @staticmethod
     def get_node_class_label():
         return "Merge"
+
+    @classmethod
+    def get_node_class_icon(cls) -> NodeIcon:
+        return NodeIcon(symbol="node-icon-merge")
 
 
 auditlog.register(MergeNode)

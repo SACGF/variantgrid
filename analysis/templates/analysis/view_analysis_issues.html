@@ -6,7 +6,7 @@
 {% block title %}Analysis Issues{% endblock title %}
 {% block submenu %}{% menu_bar_analysis %}{% endblock %}
 {% block head %}
-    <script type="text/javascript" src="{% static 'js/lib/plotly-latest.min.js' %}"></script>
+    <script type="text/javascript" src="{% static 'js/lib/plotly-custom-3.7.0.min.js' %}"></script>
     <script type="text/javascript" src="{% static 'js/plotly_helper.js' %}"></script>
     <script>
         $(document).ready(() => {
@@ -50,7 +50,6 @@
                         showgrid: false,
                         zeroline: false,
                         showline: false,
-                        autotick: true,
                         ticks: '',
                         showticklabels: false
                     },

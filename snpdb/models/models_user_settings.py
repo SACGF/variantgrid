@@ -1,3 +1,11 @@
+"""
+Per-user preferences and their layering: SettingsOverride rows at Global, Organization, Lab and
+User level are merged by `UserSettings.get_for_user` (later wins) into the UserSettings dataclass -
+default build, columns, initial permission groups, tag colours, node count settings. Also the
+small per-user state models (UserGridConfig, UserPageAck, AllVariantsFilter, UserContact) and
+UserPreview / AvatarDetails for display. Read preferences through get_for_user, never the override
+rows directly.
+"""
 import dataclasses
 from collections import defaultdict
 from collections.abc import Iterable
@@ -15,6 +23,8 @@ from django.db import models
 from django.db.models.deletion import CASCADE, SET_NULL
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.html import escape
+from django.utils.safestring import SafeString
 from django_extensions.db.models import TimeStampedModel
 from model_utils.managers import InheritanceManager
 
@@ -23,10 +33,10 @@ from library.django_utils.avatar import SpaceThemedAvatarProvider
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsAutoInitialSaveMixin
 from library.preview_request import PreviewData, PreviewKeyValue, PreviewModelMixin
 from library.utils import rgb_contrasting_text, string_deterministic_hash
-from snpdb.models import AlleleOriginFilterDefault, UserAwards
+from snpdb.models import AlleleOriginFilterDefault, UserAward, UserAwards
 from snpdb.models.models import Lab, Organization, Tag
 from snpdb.models.models_columns import CustomColumn, CustomColumnsCollection
-from snpdb.models.models_enums import BuiltInFilters
+from snpdb.models.models_enums import BuiltInFilters, TagFilter
 from snpdb.models.models_genome import GenomeBuild
 
 
@@ -128,7 +138,7 @@ class UserPageAck(TimeStampedModel):
 
 class UserGridConfig(models.Model):
     user = models.ForeignKey(User, on_delete=CASCADE)
-    grid_name = models.TextField()  # JQGrid caption
+    grid_name = models.TextField()  # DatatableConfig.grid_name
     rows = models.IntegerField(default=10)
     show_group_data = models.BooleanField(default=True)
     show_incomplete_data = models.BooleanField(default=False)
@@ -138,9 +148,21 @@ class UserGridConfig(models.Model):
     class Meta:
         unique_together = ("user", "grid_name")
 
+    DEFAULT_ROWS = 10
+    DEFAULT_ROW_SELECTIONS = {DEFAULT_ROWS, 15, 20, 25, 50, 100}
+
     @staticmethod
     def get(user: User, grid_name: str) -> 'UserGridConfig':
         return thread_safe_unique_together_get_or_create(UserGridConfig, user=user, grid_name=grid_name)[0]
+
+    @staticmethod
+    def get_rows_and_selections(user: User, grid_name: str) -> tuple[int, list[int]]:
+        """ (this user's rows per page, the selections to offer) - the stored value is always offered """
+        try:
+            rows = UserGridConfig.objects.get(user=user, grid_name=grid_name).rows
+        except UserGridConfig.DoesNotExist:
+            rows = UserGridConfig.DEFAULT_ROWS
+        return rows, sorted(UserGridConfig.DEFAULT_ROW_SELECTIONS | {rows})
 
     def __str__(self):
         details = []
@@ -243,7 +265,9 @@ class SettingsOverride(models.Model):
     show_candidates_classification_evidence_update = models.BooleanField(null=True, blank=True, help_text="Show candidates on sample / classification pages (You can always explicitly go to the candidate pages)")
 
     initially_show_zygosity_table = models.BooleanField(null=True, blank=True,
-                                                         help_text="Initially expand the zygosity requirements table in Trio/Quad node editors")
+                                                         help_text="Initially expand the zygosity requirements table in Duo/Trio/Quad node editors")
+    variant_grid_two_line_rows = models.BooleanField(null=True, blank=True,
+                                                     help_text="Variant grid rows are two lines high, with the transcript, protein change and impact on the second line. Fewer variants per screen, more of each one")
     node_grid_auto_load_max_variants = models.IntegerField(
         null=True, blank=True,
         help_text="Analysis nodes with at least this many variants don't auto-load "
@@ -263,6 +287,9 @@ class SettingsOverride(models.Model):
         help_text="Tag events older than this are considered stale: grids show "
                   "fresh vs total counts and mark tags whose most recent event is older. "
                   "Blank inherits the next level up / disables.")
+    show_user_awards = models.BooleanField(null=True, blank=True,
+                                           help_text="Decorate users currently holding a title (crown, medal, "
+                                                     "trophy) on grids and in user labels")
 
 
 class GlobalSettings(SettingsOverride):
@@ -306,6 +333,9 @@ class UserSettingsOverride(SettingsOverride):
     # null/empty = DEFAULT_GRID_LOADING_ANIMATIONS. See GridLoadingAnimation for valid values.
     loading_animations = models.JSONField(null=True, blank=True,
                                           help_text="Animations randomly shown while a node's variant grid loads.")
+    # Personal (not org/lab) preference - can be turned off from the tip box itself, see set_show_tips
+    show_tips = models.BooleanField(default=True, verbose_name="Show Tips",
+                                    help_text="Show feature tips on loading screens and blank grids.")
 
     def auto_set_default_lab(self):
         user = self.user
@@ -391,6 +421,32 @@ class AvatarDetails:
         return UserAwards(user=self.user)
 
     @cached_property
+    def titles(self) -> list[UserAward]:
+        """ Active titles held, ALL_TIME -> MONTH -> DAY. Empty when awards are off for the deployment """
+        if not settings.USER_AWARDS_ENABLED:
+            return []
+        return self.awards.titles
+
+    @cached_property
+    def title_icon_html(self) -> SafeString:
+        """ The highest title's icon (crown beats medal beats trophy), tooltip listing every title held """
+        if not (titles := self.titles):
+            return SafeString("")
+        tooltip = escape("\n".join(t.award_text for t in titles))
+        return SafeString(f'<i class="{titles[0].icon_class} user-title" title="{tooltip}"></i>')
+
+    def shows_titles_for(self, viewer_settings: "UserSettings") -> bool:
+        """ Whether this user is decorated for a viewer - the single rule shared by grids and {% user %} """
+        return bool(self.titles) and viewer_settings.show_user_awards
+
+    def grid_label_html(self, viewer_settings: "UserSettings") -> SafeString:
+        """ Plain name, or "<crown> Name" while holding a title and the viewer wants to see it """
+        label = escape(self.preferred_label)
+        if self.shows_titles_for(viewer_settings):
+            label = f"{self.title_icon_html} {label}"
+        return SafeString(label)
+
+    @cached_property
     def preferred_label(self) -> str:
         user = self.user
         preferred_label = user.username
@@ -444,8 +500,10 @@ class UserSettings:
     show_candidates_cross_sample_classification: bool
     show_candidates_classification_evidence_update: bool
     initially_show_zygosity_table: bool
+    variant_grid_two_line_rows: bool
     node_grid_auto_load_max_variants: Optional[int]
     variant_tag_stale_days: Optional[int]
+    show_user_awards: bool
 
     @property
     def variant_tag_stale_date(self) -> Optional[datetime]:
@@ -471,6 +529,7 @@ class UserSettings:
     oauth_sub: str
     timezone: str
     loading_animations: Optional[list[str]]
+    show_tips: bool
     _settings_overrides: list[SettingsOverride]
 
     @property
@@ -559,11 +618,15 @@ class UserSettings:
 
     @staticmethod
     def get_initial_perm_read_and_write_groups(groups, settings_overrides) -> tuple[set[Group], set[Group]]:
-        group_read = defaultdict(lambda x: False)
-        group_write = defaultdict(lambda x: False)
-        qs = SettingsInitialGroupPermission.objects.filter(group__in=groups)
+        group_read = {}
+        group_write = {}
+        # One query for every override, then applied in override order (later overrides earlier)
+        by_settings = defaultdict(list)
+        qs = SettingsInitialGroupPermission.objects.filter(group__in=groups).select_related("group")
+        for sigp in qs:
+            by_settings[sigp.settings_id].append(sigp)
         for so in settings_overrides:
-            for sigp in qs.filter(settings=so):
+            for sigp in by_settings[so.pk]:
                 if sigp.read is not None:
                     group_read[sigp.group] = sigp.read
                 if sigp.write is not None:
@@ -680,27 +743,45 @@ class NodeCountSettingsCollection(models.Model):
 
     def get_node_count_filters(self):
         qs = self.nodecountsettings_set.all().order_by("sort_order")
-        return [nc.built_in_filter for nc in qs]
+        return [nc.node_count_type for nc in qs]
 
 
 class AbstractNodeCountSettings(models.Model):
-    built_in_filter = models.CharField(max_length=1, choices=BuiltInFilters.CHOICES, null=True)
+    # A BuiltInFilters choice, or a per-tag label @see TagFilter
+    node_count_type = models.CharField(max_length=100, null=True)
     sort_order = models.IntegerField()
 
     class Meta:
         abstract = True
 
     @staticmethod
+    def get_node_count_description(node_count_type: str) -> Optional[str]:
+        """ Human readable name for a node count type (or an extra_filters selection of several
+            tags), or None if it no longer exists """
+        if tag_ids := TagFilter.get_tag_ids(node_count_type):
+            existing = set(Tag.objects.filter(pk__in=tag_ids).values_list("pk", flat=True))
+            if description := ", ".join(t for t in tag_ids if t in existing):
+                return description
+            return None
+        return dict(BuiltInFilters.CHOICES).get(node_count_type)
+
+    @staticmethod
     def get_types_from_labels(node_count_labels):
         # Convert from labels to types
-        labels = dict(BuiltInFilters.CHOICES)
         node_count_types = []
         for label in node_count_labels:
-            type_info = {"label": labels[label]}
+            description = AbstractNodeCountSettings.get_node_count_description(label)
+            if description is None:
+                continue  # Tag was deleted since it was configured
+            type_info = {"label": description}
             if label == BuiltInFilters.TOTAL:
                 type_info.update({"show_zero": True, "link": False})
             else:
                 type_info.update({"show_zero": False, "link": True})
+            if tag_id := TagFilter.get_tag_id(label):
+                # Adding a tag count doesn't need a node reload, the server fills it in - see
+                # changeAnalysisSettings() in analysis_nodes.js
+                type_info["tag"] = tag_id
 
             node_count_types.append((label, type_info))
         return node_count_types
@@ -709,10 +790,9 @@ class AbstractNodeCountSettings(models.Model):
     def save_count_configs_from_array(record_set, node_counts_array):
         record_set.all().delete()  # Delete and recreate
 
-        valid_choices = dict(BuiltInFilters.CHOICES)
         for i, nc in enumerate(node_counts_array):
-            if nc in valid_choices:
-                record_set.create(built_in_filter=nc,
+            if AbstractNodeCountSettings.get_node_count_description(nc) is not None:
+                record_set.create(node_count_type=nc,
                                   sort_order=i)
 
 

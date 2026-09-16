@@ -7,7 +7,7 @@ class NodeHomozygosityPercentGraph(HomozygosityPercentGraph):
 
     def __init__(self, cmap, node_id):
         self.node = AnalysisNode.objects.get_subclass(pk=node_id)
-        sample_ids = self.node.get_sample_ids()
+        sample_ids = self.node.get_sample_ids_with_genotype()
         if len(sample_ids) != 1:
             msg = f"NodeHomozygosityPercentGraph expected node {self.node} to have exactly 1 sample (had {sample_ids})!"
             raise ValueError(msg)

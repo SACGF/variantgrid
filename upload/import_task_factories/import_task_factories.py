@@ -1,4 +1,6 @@
 
+import json
+
 import pandas as pd
 from django.conf import settings
 
@@ -10,6 +12,7 @@ from upload.import_task_factories.abstract_vcf_import_task_factory import (
 )
 from upload.import_task_factories.import_task_factory import ImportTaskFactory
 from upload.models import (
+    UploadedAnalysis,
     UploadedBed,
     UploadedClassificationImport,
     UploadedFileTypes,
@@ -27,11 +30,17 @@ from upload.models import (
     VCFPipelineStage,
 )
 from upload.tso500 import dragen_all_fusions_parser
+from upload.tasks.import_analysis_task import ImportAnalysisTask
 from upload.tasks.import_bedfile_task import ImportBedFileTask
 from upload.tasks.import_gene_coverage_task import ImportGeneCoverageTask
 from upload.tasks.import_dragen_tso500_all_fusions_task import (
     DragenTSO500AllFusionsCreateVCFTask,
     DragenTSO500AllFusionsInsertTask,
+)
+from upload.tasks import import_gene_level_cnv_task
+from upload.tasks.import_gene_level_cnv_task import (
+    GeneLevelCNVCreateVCFTask,
+    GeneLevelCNVInsertTask,
 )
 from upload.tasks.import_gene_list_task import ImportGeneListTask
 from upload.tasks.import_patient_records_task import ImportPatientRecords
@@ -52,6 +61,7 @@ from upload.tasks.vcf.genotype_vcf_tasks import (
     VCFCheckAnnotationTask,
 )
 from upload.tasks.vcf.import_vcf_tasks import (
+    GeneLevelInsertEventsTask,
     GeneLevelPreprocessVCFTask,
     ImportCreateUploadedVCFTask,
     LiftoverCompleteTask,
@@ -62,7 +72,6 @@ from upload.tasks.vcf.import_vcf_tasks import (
     ProcessVCFLinkAllelesSetMaxVariantTask,
     ProcessVCFLinkManualVariantEntrySetMaxVariantTask,
     ProcessVCFSetMaxVariantTask,
-    UploadPipelineFinishedTask,
 )
 from upload.upload_metadata import VCF_METADATA_KEYS
 
@@ -162,7 +171,97 @@ class DragenTSO500AllFusionsImportTaskFactory(AbstractVCFImportTaskFactory):
         return [DragenTSO500AllFusionsInsertTask, VCFCheckAnnotationTask]
 
     def get_finish_task_classes(self):
-        return [UploadPipelineFinishedTask, ImportGenotypeVCFSuccessTask]
+        # pipeline_success_task closes the pipeline off the end of the FINISH chain, so nothing here
+        # takes it out of PROCESSING before ImportGenotypeVCFSuccessTask releases the VCF
+        return [ImportGenotypeVCFSuccessTask]
+
+
+class GeneLevelCNVImportTaskFactory(AbstractVCFImportTaskFactory):
+    """ A CNV caller's VCF whose records are whole-gene calls - what says so is the segment field
+        naming a gene (settings.VCF_GENE_LEVEL_SEGMENT_FIELDS, DRAGEN TSO 500's SEGID).
+
+        The records are rewritten onto the gene-level contig and inserted by the normal pipeline;
+        only the bcftools stages are skipped, as they need a reference base a gene-level locus does
+        not have. @see upload.tasks.import_gene_level_cnv_task
+
+        An ordinary VCF, so GenotypeVCFImportFactory would otherwise claim it and store the caller's
+        target windows as structural variants. """
+
+    def get_uploaded_file_type(self):
+        return UploadedFileTypes.GENE_LEVEL_CNV_VCF
+
+    def get_data_classes(self):
+        return [UploadedVCF]
+
+    def get_metadata_keys(self):
+        return VCF_METADATA_KEYS
+
+    def get_processing_ability(self, user, filename, file_extension):
+        if import_gene_level_cnv_task.can_process_file(filename):
+            return 1000
+        return 0
+
+    def _get_vcf_filename(self, upload_pipeline) -> str:
+        return get_import_processing_filename(upload_pipeline.pk, "gene_level_cnv.vcf")
+
+    def get_pre_vcf_task(self, upload_pipeline):
+        """ Rewrite the caller's whole-gene calls as gene-level records for the pipeline to insert """
+        upload_step = UploadStep.objects.create(upload_pipeline=upload_pipeline,
+                                                name="Create Gene-Level CNV VCF",
+                                                sort_order=self.get_sort_order(),
+                                                task_type=UploadStepTaskType.CELERY,
+                                                pipeline_stage=VCFPipelineStage.PRE_DATA_INSERTION,
+                                                script=full_class_name(GeneLevelCNVCreateVCFTask),
+                                                input_filename=upload_pipeline.file_upload.get_filename(),
+                                                output_filename=self._get_vcf_filename(upload_pipeline))
+        return GeneLevelCNVCreateVCFTask.si(upload_step.pk, 0)
+
+    def get_create_data_from_vcf_header_task_class(self):
+        # The VCF we wrote keeps the caller's samples, contigs and FORMAT lines, so the standard
+        # header path makes the VCF/Sample/Cohort/CohortGenotypeCollection it would have made anyway
+        return ImportCreateVCFModelForGenotypeVCFTask
+
+    def _get_preprocess_class(self) -> type:
+        return GeneLevelPreprocessVCFTask
+
+    def get_known_variants_parallel_vcf_processing_task_class(self):
+        # Each record carries the sample's copy ratio, so the standard bulk importer writes the
+        # CohortGenotypes by SQL COPY
+        return ProcessGenotypeVCFDataTask
+
+    def get_post_data_insertion_classes(self):
+        return [GeneLevelCNVInsertTask, VCFCheckAnnotationTask]
+
+    def get_finish_task_classes(self):
+        # pipeline_success_task closes the pipeline off the end of the FINISH chain, so nothing here
+        # takes it out of PROCESSING before ImportGenotypeVCFSuccessTask releases the VCF
+        return [ImportGenotypeVCFSuccessTask]
+
+
+class AnalysisImportTaskFactory(ImportTaskFactory):
+
+    def get_uploaded_file_type(self):
+        return UploadedFileTypes.ANALYSIS
+
+    def get_possible_extensions(self):
+        return ['json']
+
+    def get_data_classes(self):
+        return [UploadedAnalysis]
+
+    def get_processing_ability(self, user, filename, file_extension):
+        # Analysis exports are small, so read it to claim only our own JSON
+        try:
+            with open(filename, encoding="utf-8") as f:
+                analysis_data = json.load(f)
+        except Exception:  # Every JSON factory is asked, so a shape we can't read is someone else's file
+            return 0
+        if isinstance(analysis_data, dict) and {"analysis", "nodes", "edges"} <= analysis_data.keys():
+            return 1
+        return 0
+
+    def create_import_task(self, upload_pipeline):
+        return ImportAnalysisTask.si(upload_pipeline.pk)
 
 
 class GeneCoverageImportTaskFactory(ImportTaskFactory):
@@ -299,7 +398,7 @@ class GeneLevelInsertVariantsOnlyImportFactory(VCFInsertVariantsOnlyImportFactor
         return GeneLevelPreprocessVCFTask
 
     def get_post_data_insertion_classes(self):
-        return [GeneLevelInsertGeneFusionsTask, VCFCheckAnnotationTask]
+        return [GeneLevelInsertEventsTask, VCFCheckAnnotationTask]
 
 
 class ManualVariantEntryImportFactory(AbstractVCFImportTaskFactory):
@@ -370,8 +469,7 @@ class LiftoverImportFactory(AbstractVCFImportTaskFactory):
         return [VCFCheckAnnotationTask]
 
     def get_finish_task_classes(self):
-        task_classes = super().get_finish_task_classes()
-        return [LiftoverCompleteTask] + task_classes
+        return [LiftoverCompleteTask]
 
 
 class VariantTagsImportTaskFactory(VCFInsertVariantsOnlyImportFactory):

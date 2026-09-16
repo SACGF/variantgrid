@@ -13,7 +13,8 @@ class ReadOnlyPedFileForm(ModelForm, ROFormMixin):
     class Meta:
         model = PedFile
         fields = ALL_FIELDS
-        read_only = ('user', 'import_status')
+        read_only = ('import_status', )
+        read_only_display = ('user', )
         widgets = {'name': TextInput()}
 
 
@@ -21,7 +22,7 @@ class PedigreeForm(ModelForm, ROFormMixin):
     class Meta:
         model = Pedigree
         fields = ALL_FIELDS
-        read_only = ('user', )
+        read_only_display = ('user', )
         widgets = {'name': TextInput()}
 
 

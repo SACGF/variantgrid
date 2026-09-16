@@ -1,7 +1,7 @@
-""" Regression tests for SACGF/variantgrid_com#22.
+""" Source nodes must cope with their input going bad.
 
-When a Trio (or other source-node input) is deleted, source nodes that referenced it
-must:
+When a Trio (or other source-node input) is deleted, or its cohort's import didn't
+finish successfully, source nodes that referenced it must:
   - report a configuration error rather than silently producing stale querysets,
   - have their cached q-dicts invalidated (via version bump from a pre_delete signal),
     so downstream nodes do not raise FieldError for now-missing CohortGenotype
@@ -14,8 +14,9 @@ from django.test import TestCase, override_settings
 
 from analysis.models import Analysis, FilterNode, TrioNode
 from analysis.models.enums import NodeStatus, TrioInheritance
+from analysis.tasks.node_update_tasks import update_node_task
 from annotation.fake_annotation import get_fake_annotation_version
-from snpdb.models import GenomeBuild
+from snpdb.models import GenomeBuild, ImportStatus
 from snpdb.tests.utils.fake_cohort_data import create_fake_trio
 
 
@@ -52,6 +53,31 @@ class TestSourceNodeTolerance(TestCase):
 
         status = node.get_status_from_errors(node.get_errors())
         self.assertEqual(status, NodeStatus.ERROR_CONFIGURATION)
+
+    def test_cohort_import_status_error_fails_node_and_children(self):
+        node = TrioNode.objects.create(
+            analysis=self.analysis, trio=self.trio,
+            inheritance=TrioInheritance.RECESSIVE,
+        )
+        node.save()
+        self.assertFalse(node.get_errors(flat=True))
+
+        child = FilterNode.objects.create(analysis=self.analysis)
+        child.add_parent(node)
+        child.save()
+
+        cohort = self.trio.cohort
+        cohort.import_status = ImportStatus.ERROR
+        cohort.save()
+
+        update_node_task(node.pk, node.version)
+        node.refresh_from_db()
+        self.assertEqual(node.status, NodeStatus.ERROR_CONFIGURATION)
+
+        child = FilterNode.objects.get(pk=child.pk)
+        update_node_task(child.pk, child.version)
+        child.refresh_from_db()
+        self.assertEqual(child.status, NodeStatus.ERROR_WITH_PARENT)
 
     def test_trio_deletion_invalidates_downstream_node(self):
         """Downstream node version is bumped via the cascade in AnalysisNode.save()."""

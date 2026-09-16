@@ -8,6 +8,8 @@ from genes.models import GeneListGeneSymbol
 
 
 class Command(BaseCommand):
+    category = "maintenance"
+
     def handle(self, *args, **options):
         # Some legacy gene list may not have been stripped properly.
         stripped = []

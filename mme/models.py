@@ -1,3 +1,9 @@
+"""
+MatchMaker Exchange records: MMESubmission (one classification sent to one remote node, with its
+status), MMEMatchResult (a candidate a remote node returned), MMEInboundQuery (an audit row per
+query we served) and MMEInboundMatch (which of our classifications we returned). Labs opt in through
+Lab.mme_enabled.
+"""
 from django.contrib.auth.models import User
 from django.db import models
 from django.utils import timezone

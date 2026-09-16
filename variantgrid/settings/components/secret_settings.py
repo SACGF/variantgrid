@@ -86,12 +86,9 @@ _default_settings = {
     "OIDC": {
         "client_secret": as assigned by keycloak or similar,
     },
-    # Used for SAPath's Helix
+    # Used for SAPath's Mocha (Molecular Oncology tracking system) API
     "SAPATH": {
-        "HELIX": {
-            "user": None,
-            "password": None
-        }
+        "MOCHA_TOKEN": None
     },
     # Used to connect to Keycloak for admin powers (not for authentication)
     "KEYCLOAK": {

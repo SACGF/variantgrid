@@ -12,13 +12,6 @@
     </style>
     <script>
         $(document).ready(() => {
-            jQuery.extend($.fn.fmatter, {
-                viewCaseLink: function (cellvalue, options, rowObject) {
-                    const VIEW_CASE_URL = Urls.view_case(rowObject.id);
-                    var viewLink = "<a class='grid-link' href=" + VIEW_CASE_URL + "><div class='grid-link-icon view-details-link'></div></a>";
-                    return "<span>" + viewLink + "</span>";
-                }
-            });
             $('#id_external_pk').change(function () {
                 var externalPK = $(this).val();
                 window.location = Urls.view_external_case(externalPK);
@@ -39,7 +32,6 @@
         <div id='top-buttons-container'>
         </div>
 
-        {% load jqgrid_tags %}
-        {% jqgrid 'cases_grid' 'cases' False None 'jqgrid/jqgrid.html' %}
+        <table id="cases-grid" data-datatable-url="{% url 'cases_datatable' %}" class="sticky-header"></table>
     </div>
 {% endblock content %}

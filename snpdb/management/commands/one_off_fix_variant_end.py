@@ -17,6 +17,8 @@ class Command(BaseCommand):
 
         @see https://github.com/SACGF/variantgrid/issues/990
     """
+    category = "one-off"
+
     def add_arguments(self, parser):
         # Usually an annotation range lock is 100k, so you'd expect 50k ref variants in there.
         # So steps=20 will look in a 5k range

@@ -1,15 +1,12 @@
 {% load static %}
-<link rel="stylesheet" type="text/css" media="screen" href="{% static 'js/lib/free-jqgrid/css/ui.jqgrid.min.css' %}" />
-<link rel="stylesheet" type="text/css" media="screen" href="{% static 'js/lib/highlight/styles/default.css' %}" />
-
-<script src="{% static 'js/lib/free-jqgrid/jquery.jqgrid.min.js' %}"></script>
-<script type="text/javascript" src="{% static 'js/lib/d3.v2.js' %}"></script>
-<script type="text/javascript" src="{% static 'js/lib/highlight/highlight.pack.js' %}"></script>
 <script type="text/javascript" src="{% static 'js/lib/double-helix.jquery.js' %}"></script>
 <script type="text/javascript" src="{% static 'js/lib/loaders/vg-loaders.js' %}"></script>
 <script type="text/javascript" src="{% static 'js/lib/loaders/base-fx.loader.js' %}"></script>
 <script type="text/javascript" src="{% static 'js/lib/loaders/flowcell.loader.js' %}"></script>
 <script type="text/javascript" src="{% static 'js/lib/loaders/pileup.loader.js' %}"></script>
 
-<script type="text/javascript" src="{% static 'js/grid.js' %}"></script>
 <script type="text/javascript" src="{% static 'js/venn_intersect.js' %}"></script>
+
+{# The node editors' allele frequency filter (allele_frequency_tag.html) is a two-handle slider #}
+<link rel="stylesheet" href="{% static 'js/lib/nouislider-15.8.1/nouislider.min.css' %}">
+<script type="text/javascript" src="{% static 'js/lib/nouislider-15.8.1/nouislider.min.js' %}"></script>

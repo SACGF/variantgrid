@@ -6,6 +6,9 @@ from django.conf import settings
 from django.db.models import Q, QuerySet
 from django.http import HttpRequest
 from more_itertools import first
+from rest_framework.request import Request
+from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from classification.enums import (
     AlleleOriginBucket,
@@ -245,7 +248,12 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
         else:
             return qs
 
-    def filter_queryset(self, qs: QuerySet[ClassificationGrouping]) -> QuerySet[ClassificationGrouping]:
+    def filter_queryset(self, qs: QuerySet[ClassificationGrouping],
+                        filter_clinical_significance: bool = True) -> QuerySet[ClassificationGrouping]:
+        """
+        :param filter_clinical_significance: False for the summary counts, which keep showing every clinical
+        significance while the grid is filtered down to one of them
+        """
         page = self.get_query_param('page_id')
 
         # run the filters that are optionally applied
@@ -265,6 +273,10 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
 
         if testing_context := self.get_query_param("testing_context"):
             filters.append(Q(allele_origin_grouping__testing_context_bucket=testing_context))
+
+        if filter_clinical_significance:
+            if clinical_significance := self.get_query_param("clinical_significance"):
+                filters.append(ClassificationGrouping.clinical_significance_q(clinical_significance))
 
         if settings.CLASSIFICATION_GRID_EXTERNAL_LAB_FILTER:
             if lab_external := self.get_query_param("lab_external"):
@@ -528,3 +540,16 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
                 default_sort=SortOrder.DESC
             )
         ]
+
+
+class ClassificationGroupingCountsView(APIView):
+    """
+    Clinical significance counts for exactly the rows the grouping datatable would return, so the summary above
+    a grid stays in step with the filters applied to it.
+    """
+
+    def get(self, request: Request, *args, **kwargs) -> Response:
+        columns = ClassificationGroupingColumns(request)
+        qs = columns.filter_queryset(columns.get_initial_queryset(), filter_clinical_significance=False)
+        counts = ClassificationGrouping.clinical_significance_counts(qs)
+        return Response({"counts": [count.to_json() for count in counts]})

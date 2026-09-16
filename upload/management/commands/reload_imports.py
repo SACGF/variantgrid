@@ -8,6 +8,7 @@ from upload.uploaded_file_type import retry_upload_pipeline
 
 
 class Command(BaseCommand):
+    category = "maintenance"
 
     def add_arguments(self, parser):
         parser.add_argument('--uploaded_file_type', required=True)

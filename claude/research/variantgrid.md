@@ -131,7 +131,7 @@ The analysis app provides an interactive, graph-based variant filtering system:
 - **NodeCache** — Cached query results per node
 - **VariantTag** — User-applied tags to variants within an analysis
 
-Users build analyses visually by connecting nodes into a directed graph. Each node filters or computes on variants, with results cached and displayed in a JQGrid datatable.
+Users build analyses visually by connecting nodes into a directed graph. Each node filters or computes on variants, with results cached and displayed in a DataTables grid.
 
 ---
 

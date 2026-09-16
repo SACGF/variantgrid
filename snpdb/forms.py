@@ -1,3 +1,10 @@
+"""
+snpdb's Django forms: the BaseForm / BaseModelForm variants that drop the ':' label suffix, the
+autocomplete-backed pickers (user, lab, genome build via GenomeBuildAutocompleteForwardMixin), the
+Lab / Organization / VCF / user settings model forms (ROFormMixin gives read-only rendering), the
+Guardian GroupPermissionForm, and manual variant entry. VCFForm hides unused sample-field columns, so
+not every model field is on the form.
+"""
 import collections
 from functools import cached_property
 
@@ -268,7 +275,9 @@ class VCFForm(forms.ModelForm, ROFormMixin):
         model = models.VCF
         fields = ['name', 'date', 'genome_build', 'user', 'project', 'import_status']
         read_only = ('date', 'import_status')
-        widgets = {'name': TextInput()}
+        widgets = {'name': TextInput(),
+                   'user': ModelSelect2(url='user_autocomplete',
+                                        attrs={'data-placeholder': 'User...'})}
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -361,12 +370,13 @@ EXTRACTION_MATCH_FIELDS = ('extraction_reference', 'extraction_match_status',
 
 class SampleForm(forms.ModelForm, ROFormMixin):
     genome_build = forms.CharField()  # From VCF.genome_build
+    uploaded_by = forms.CharField()  # From VCF.user
     grid_sample_label = forms.CharField(help_text="Calculated from your current user settings. May be different in analysis due to analysis settings")
 
     class Meta:
         model = models.Sample
         exclude = ['vcf', 'has_genotype']
-        read_only = ('genome_build', 'vcf_sample_name', 'import_status',
+        read_only = ('genome_build', 'uploaded_by', 'vcf_sample_name', 'import_status',
                      'grid_sample_label') + EXTRACTION_MATCH_FIELDS
         widgets = {'vcf_sample_name': TextInput(),
                    'name': TextInput(),
@@ -383,6 +393,7 @@ class SampleForm(forms.ModelForm, ROFormMixin):
         super().__init__(*args, **kwargs)
         self.order_fields(self._field_order())
         self.fields['genome_build'].initial = self.instance.vcf.genome_build
+        self.fields['uploaded_by'].initial = self.instance.vcf.user
         self.fields['grid_sample_label'].initial = self._get_sample_label(user, self.instance)
 
     def _field_order(self) -> list[str]:
@@ -481,8 +492,7 @@ class SettingsFormFeatures:
 
     @cached_property
     def analysis_horizontal_mode(self) -> bool:
-        implemented_analysis_horizontal_mode = False  # Not yet
-        return self.analysis_enabled and implemented_analysis_horizontal_mode
+        return self.analysis_enabled
 
     @cached_property
     def upload_enabled(self) -> bool:
@@ -528,6 +538,7 @@ class SettingsOverrideForm(BaseModelForm):
             "variant_link_in_analysis_opens_new_tab": BlankNullBooleanSelect(),
             "tool_tips": BlankNullBooleanSelect(),
             "node_debug_tab": BlankNullBooleanSelect(),
+            "analysis_horizontal_mode": BlankNullBooleanSelect(),
             "import_messages": BlankNullBooleanSelect(),
             'default_sort_by_column': ModelSelect2(url='custom_column_autocomplete',
                                                   forward=['columns'],
@@ -536,6 +547,8 @@ class SettingsOverrideForm(BaseModelForm):
             "allele_origin_exclude_filter": BlankNullBooleanSelect(),
             "grid_sample_label_template": TextInput(),
             "initially_show_zygosity_table": BlankNullBooleanSelect(),
+            "variant_grid_two_line_rows": BlankNullBooleanSelect(),
+            "show_user_awards": BlankNullBooleanSelect(),
         }
         labels = {
             "email_weekly_updates": "Email Regular Updates",
@@ -544,6 +557,7 @@ class SettingsOverrideForm(BaseModelForm):
             "tool_tips": "Tooltips",
             "tag_colors": "Tag Colours",
             "node_debug_tab": "Node Debug Tab",
+            "analysis_horizontal_mode": "Analysis Horizontal Mode",
             "import_messages": "Import Messages",
             "default_sort_by_column": "Default Sort by Column",
             "igv_port": "IGV Port",
@@ -554,9 +568,11 @@ class SettingsOverrideForm(BaseModelForm):
             "allele_origin_focus": "Allele Origin focus",
             "allele_origin_exclude_filter": "Allele Origin (filter by default)",
             "grid_sample_label_template": "Grid Sample Label Template",
-            "initially_show_zygosity_table": "Initially Show Trio/Quad Zygosity Table",
+            "initially_show_zygosity_table": "Initially Show Duo/Trio/Quad Zygosity Table",
+            "variant_grid_two_line_rows": "Variant Grid Two Line Rows",
             "node_grid_auto_load_max_variants": "Node Grid Auto Load Max Variants",
             "variant_tag_stale_days": "Variant Tags Stale After",
+            "show_user_awards": "Show User Awards",
         }
 
     def __init__(self, *args, **kwargs):
@@ -603,7 +619,7 @@ class SettingsOverrideForm(BaseModelForm):
             "variant_link_in_analysis_opens_new_tab": settings_config.analysis_enabled,
             "tool_tips": settings_config.analysis_enabled,
             "node_debug_tab": settings_config.analysis_enabled,
-            "analysis_horizontal_mode": False,
+            "analysis_horizontal_mode": settings_config.analysis_horizontal_mode,
             "tag_colors": settings_config.analysis_enabled,
             "import_messages": settings_config.upload_enabled,
             "igv_port": settings_config.igv_links_enabled,
@@ -612,8 +628,10 @@ class SettingsOverrideForm(BaseModelForm):
             "show_candidates_cross_sample_classification":  settings_config.cross_sample_classification_enabled,
             "show_candidates_classification_evidence_update": settings_config.classification_evidence_update_enabled,
             "initially_show_zygosity_table": settings_config.analysis_enabled,
+            "variant_grid_two_line_rows": settings_config.analysis_enabled,
             "node_grid_auto_load_max_variants": settings_config.analysis_enabled,
             "variant_tag_stale_days": settings_config.analysis_enabled,
+            "show_user_awards": settings.USER_AWARDS_ENABLED,
         }
 
         for f, visible in field_visibility.items():
@@ -665,9 +683,8 @@ class CreateCohortForm(BaseModelForm):
 
     class Meta:
         model = models.Cohort
-        fields = ['user', 'name', "genome_build"]
-        widgets = {'user': HiddenInput(),
-                   'name': TextInput()}
+        fields = ['name', "genome_build"]
+        widgets = {'name': TextInput()}
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -758,6 +775,9 @@ class CreateTagForm(forms.Form):
     tag = forms.CharField(widget=forms.TextInput(attrs={'placeholder': 'New Tag Name...'}), required=True)
     allele_origin_bucket = forms.ChoiceField(choices=TAG_ALLELE_ORIGIN_CHOICES, label="Allele origin",
                                              initial=AlleleOriginBucket.UNKNOWN, required=True)
+    requires_classification = forms.BooleanField(label="Classify queue", required=False,
+                                                 help_text="Tagged variants are listed as needing classification "
+                                                           "on the sample and patient pages")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -766,6 +786,7 @@ class CreateTagForm(forms.Form):
         helper.layout = Layout(
             FieldWithButtons('tag', Submit(name="Create", value="create", css_class="btn btn-primary")),
             Field('allele_origin_bucket'),
+            Field('requires_classification'),
         )
         self.helper = helper
 
@@ -782,7 +803,8 @@ class CreateTagForm(forms.Form):
 
     def save(self) -> Tag:
         return Tag.objects.create(pk=self.cleaned_data['tag'],
-                                  allele_origin_bucket=self.cleaned_data['allele_origin_bucket'])
+                                  allele_origin_bucket=self.cleaned_data['allele_origin_bucket'],
+                                  requires_classification=self.cleaned_data['requires_classification'])
 
 
 class UserSettingsGenomeBuildMixin:
@@ -812,7 +834,9 @@ class GenomicIntervalsCollectionForm(forms.ModelForm, ROFormMixin):
         exclude = ['category']
         read_only = ('processed_file', 'processed_records', 'import_status')
         widgets = {'name': TextInput(),
-                   'processed_file': TextInput()}
+                   'processed_file': TextInput(),
+                   'user': ModelSelect2(url='user_autocomplete',
+                                        attrs={'data-placeholder': 'User...'})}
 
     def save(self, commit=True):
         instance = super().save(commit=False)

@@ -18,6 +18,8 @@ class Command(BaseCommand):
     """
         This looks to see whether we forgot to add any eg Annotation fields as VariantGrid columns
     """
+    category = "dev"
+
     def handle(self, *args, **options):
         model_ignore_fields = {"id", "variant", "created", "modified", "version", "genome_build",
                                "import_source", "hgnc_import", "cached_web_resource"}

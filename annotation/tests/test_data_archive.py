@@ -14,7 +14,11 @@ from annotation.annotation_version_querysets import (
     get_variant_queryset_for_annotation_version,
     get_variants_qs_for_annotation,
 )
-from annotation.fake_annotation import get_fake_annotation_settings_dict, get_fake_vep_version
+from annotation.fake_annotation import (
+    get_fake_annotation_settings_dict,
+    get_fake_vep_version,
+    retire_seeded_annotation_version,
+)
 from annotation.models import (
     AnnotationVersion,
     VariantAnnotationVersion,
@@ -31,6 +35,7 @@ class AnnotationArchiveGuardTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.grch37 = GenomeBuild.get_name_or_alias("GRCh37")
+        retire_seeded_annotation_version(cls.grch37)
         kwargs = get_fake_vep_version(cls.grch37, AnnotationConsortium.ENSEMBL, 2)
         cls.vav = VariantAnnotationVersion.objects.create(
             **kwargs, status=VariantAnnotationVersion.Status.ACTIVE

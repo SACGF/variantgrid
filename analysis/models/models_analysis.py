@@ -1,3 +1,10 @@
+"""
+Analysis (a DAG of nodes over one build and AnnotationVersion, Guardian-permissioned, with a
+version that invalidates every node cache) and its template machinery: AnalysisTemplate /
+AnalysisTemplateVersion snapshot an analysis, AnalysisVariable exposes node fields as parameters,
+AnalysisTemplateRun records a run and its arguments, and Sample/CohortAnalysisTemplateRun plus
+AutoLaunchAnalysisTemplate drive the auto-analyses on import. Nodes are in nodes/analysis_node.py.
+"""
 from collections import defaultdict
 from datetime import datetime, timedelta
 from functools import cached_property
@@ -9,8 +16,8 @@ from auditlog.registry import auditlog
 from django.apps import apps
 from django.conf import settings
 from django.contrib.auth.models import Group, User
-from django.db import models
-from django.db.models import Count, Max, Model, Q, QuerySet
+from django.db import models, transaction
+from django.db.models import Count, F, Max, Model, OuterRef, Q, QuerySet, Subquery
 from django.db.models.deletion import CASCADE, PROTECT, SET_DEFAULT, SET_NULL, ProtectedError
 from django.db.models.signals import pre_delete
 from django.dispatch import receiver
@@ -68,6 +75,10 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel, Previe
     visible = models.BooleanField(default=True)
     template_type = models.CharField(max_length=1, choices=AnalysisTemplateType.choices, null=True, blank=True)
     node_queryset_filter_contigs = models.BooleanField(default=False)
+    node_count_auto_add_tags = models.BooleanField(
+        default=True,
+        help_text="Tagging a variant adds a node count for that tag. "
+                  "Turn this off to choose the tag counts yourself on the Node Counts tab.")
 
     class Meta:
         verbose_name = 'Analysis'
@@ -133,6 +144,17 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel, Previe
         if super().can_write(user_or_group):
             return not self.is_locked
         return False
+
+    @classmethod
+    def filter_writable_for_user(cls, user):
+        """ Batch can_write - a locked analysis, and a snapshot (which is locked by definition),
+            are read only @see is_locked """
+        last_lock_locked = Subquery(AnalysisLock.objects.filter(analysis=OuterRef("pk"))
+                                    .order_by("-pk").values("locked")[:1])
+        unlocked = cls.objects.annotate(last_lock_locked=last_lock_locked).filter(
+            Q(last_lock_locked__isnull=True) | Q(last_lock_locked=False),
+            analysistemplateversion__isnull=True)
+        return super().filter_writable_for_user(user).filter(pk__in=unlocked.values("pk"))
 
     def get_absolute_url(self):
         return reverse('analysis', kwargs={"analysis_id": self.pk})
@@ -223,6 +245,7 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel, Previe
         self.default_sort_by_column = user_settings.default_sort_by_column
         self.grid_sample_label_template = user_settings.grid_sample_label_template
         self.variant_tag_stale_days = user_settings.variant_tag_stale_days
+        self.analysis_horizontal_mode = bool(user_settings.analysis_horizontal_mode)
         self.save()
 
         default_node_count_config = user_settings.get_node_count_settings_collection()
@@ -237,7 +260,7 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel, Previe
         try:
             node_count_config = self.analysisnodecountconfiguration
             for nc in node_count_config.analysisnodecountconfigrecord_set.all().order_by("sort_order"):
-                node_count_labels.append(nc.built_in_filter)
+                node_count_labels.append(nc.node_count_type)
         except AnalysisNodeCountConfiguration.DoesNotExist:
             node_count_labels = BuiltInFilters.DEFAULT_NODE_COUNT_FILTERS
 
@@ -249,6 +272,47 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel, Previe
         record_set = node_count_config.analysisnodecountconfigrecord_set
 
         AbstractNodeCountSettings.save_count_configs_from_array(record_set, node_counts_array)
+
+    def add_node_count_type(self, node_count_type: str):
+        """ Appends a node count, keeping the order of the existing ones """
+        existing_types = [nc[0] for nc in self.get_node_count_types()]
+        if node_count_type not in existing_types:
+            self.set_node_count_types(existing_types + [node_count_type])
+
+    def remove_node_count_type(self, node_count_type: str):
+        existing_types = [nc[0] for nc in self.get_node_count_types()]
+        if node_count_type in existing_types:
+            self.set_node_count_types([nc for nc in existing_types if nc != node_count_type])
+
+    def rotate_node_positions(self):
+        """ Node positions are laid out for an orientation (vertical DAGs are tall and narrow) so
+            switching analysis_horizontal_mode turns them a quarter turn to line up with the new flow
+            direction - anti-clockwise going horizontal, so what flowed down now flows right, and
+            clockwise coming back. A turn (rather than a diagonal flip) keeps the layout's handedness,
+            so a Venn's left parent stays on the side its ring and input endpoint are on.
+
+            Self-inverse - switching back restores the original layout. Doesn't affect queries, so no
+            version bump """
+        nodes = list(self.analysisnode_set.all())
+        if not nodes:
+            return
+
+        old_top_left = (min(n.x for n in nodes), min(n.y for n in nodes))
+        anti_clockwise = self.analysis_horizontal_mode
+        for node in nodes:
+            if anti_clockwise:
+                node.x, node.y = node.y, -node.x
+            else:
+                node.x, node.y = -node.y, node.x
+
+        # Turning about the origin swings the layout off the canvas - put it back where it was
+        x_offset = old_top_left[0] - min(n.x for n in nodes)
+        y_offset = old_top_left[1] - min(n.y for n in nodes)
+        for node in nodes:
+            node.x += x_offset
+            node.y += y_offset
+
+        self.analysisnode_set.bulk_update(nodes, ["x", "y"])
 
     def get_samples(self) -> list[Sample]:
         samples = set()
@@ -318,6 +382,15 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel, Previe
                 av.pk = None
                 av.node = new_node
                 av.save()
+
+            if source_config := AnalysisNodeCountConfiguration.objects.filter(analysis_id=analysis_id).first():
+                # An empty record set is a real setting (every count switched off), so copy the
+                # configuration itself - falling back to the defaults would be a different analysis
+                config_copy = AnalysisNodeCountConfiguration.objects.create(analysis=analysis_copy)
+                for record in source_config.analysisnodecountconfigrecord_set.all().order_by("sort_order"):
+                    record.pk = None
+                    record.node_count_config = config_copy
+                    record.save()
 
         return analysis_copy
 
@@ -391,6 +464,13 @@ class AnalysisVariable(models.Model):
         return f"{self.node_id}/{self.field}"
 
 
+# What a template can be launched from - the source node fields the launch pages hand it. VCF backed
+# sources first, then the Patient -> Specimen -> Extraction levels that resolve to a set of samples
+ANALYSIS_TEMPLATE_VCF_SOURCE_FIELDS = ("pedigree", "trio", "quad", "duo", "cohort", "sample")
+ANALYSIS_TEMPLATE_SAMPLE_GROUP_FIELDS = ("extraction", "specimen", "patient")
+ANALYSIS_TEMPLATE_SOURCE_FIELDS = ANALYSIS_TEMPLATE_VCF_SOURCE_FIELDS + ANALYSIS_TEMPLATE_SAMPLE_GROUP_FIELDS
+
+
 class AnalysisTemplate(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
     """ A snapshot of an analysis - locked-down to be used as a template """
     name = models.TextField(unique=True)
@@ -443,53 +523,31 @@ class AnalysisTemplate(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel
     def latest_version_obj(self):
         return self.analysistemplateversion_set.order_by("-pk").first()
 
+    @property
+    def draft(self) -> Optional['AnalysisTemplateVersion']:
+        """ The latest version, when it hasn't been made active - only writers can run it """
+        latest = self.latest_version_obj
+        if latest and not latest.active:
+            return latest
+        return None
+
     @classmethod
     def filter_for_user(cls, user, queryset=None, **kwargs):
         """ Hides deleted objects """
         qs = super().filter_for_user(user, queryset=queryset, **kwargs)
         return qs.filter(deleted=False)
 
-    @staticmethod
-    def filter(user: User, requires_sample_somatic=None, requires_sample_gene_list=None, class_name=None, atv_kwargs=None):
-        """ requires_sample_somatic/requires_sample_gene_list - leave None for all """
-        if atv_kwargs is None:
-            atv_kwargs = {}
-
-        qs = AnalysisTemplateVersion.objects.filter(active=True, **atv_kwargs)
-
-        if requires_sample_somatic is not None:
-            qs = qs.filter(requires_sample_somatic=requires_sample_somatic)
-
-        if requires_sample_gene_list is not None:
-            qs = qs.filter(requires_sample_gene_list=requires_sample_gene_list)
-
-        if class_name:
-            # Must not have any other types not supported
-            supported_types = {class_name}
-            EXTRA_PROVIDED_TYPES = {
-                'snpdb.Sample': {'genes.SampleGeneList'},
-                'snpdb.Trio': {'snpdb.Sample'},
-                'snpdb.Quad': {'snpdb.Sample'},
-            }
-
-            if extra_types := EXTRA_PROVIDED_TYPES.get(class_name):
-                supported_types.update(extra_types)
-            q_provided_types = Q(analysis_snapshot__analysisnode__analysisvariable__class_name__in=supported_types)
-            count_kwargs = {"filter": ~q_provided_types}
-
-            count_unsupported = Count("analysis_snapshot__analysisnode__analysisvariable__class_name", **count_kwargs)
-            qs = qs.annotate(unsupported_args=count_unsupported).filter(unsupported_args=0)
-            # Required to take main type as variable
-            qs = qs.filter(analysis_snapshot__analysisnode__analysisvariable__class_name=class_name)
-
-        return AnalysisTemplate.filter_for_user(user).filter(analysistemplateversion__in=qs)
+    @classmethod
+    def filter_writable_for_user(cls, user):
+        """ Hides deleted objects """
+        return super().filter_writable_for_user(user).filter(deleted=False)
 
     def default_name_template(self):
         """ The initial analysis_name_template in form for save version """
         analysis_name_template = "%(template)s for %(input)s"  # default
-        if self.active:
+        if latest := self.latest_version_obj:
             # Use last value if available
-            analysis_name_template = self.active.analysis_name_template
+            analysis_name_template = latest.analysis_name_template
         return analysis_name_template
 
     @staticmethod
@@ -513,15 +571,12 @@ class AnalysisTemplate(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel
         if not analysis_variables.exists():
             error = "You have not configured any analysis variables."
         else:
-            required_fields = ["pedigree", "trio", "quad", "cohort", "sample"]
-            if not analysis_variables.filter(field__in=required_fields).exists():
-                error = f"You need at at least one analysis variable of: {', '.join(required_fields)}"
+            if not analysis_variables.filter(field__in=ANALYSIS_TEMPLATE_SOURCE_FIELDS).exists():
+                error = f"You need at at least one analysis variable of: " \
+                        f"{', '.join(ANALYSIS_TEMPLATE_SOURCE_FIELDS)}"
 
         if error:
             raise ValueError(error)
-
-        # Mark all previous as inactive
-        self.analysistemplateversion_set.all().update(active=False)
 
         analysis_snapshot = self.analysis.clone()
         analysis_snapshot.visible = False
@@ -539,7 +594,7 @@ class AnalysisTemplate(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel
                                                       version=version,
                                                       analysis_name_template=analysis_name_template,
                                                       analysis_snapshot=analysis_snapshot,
-                                                      active=True,
+                                                      active=False,
                                                       requires_sample_gene_list=requires_sample_gene_list)
 
     def clone(self, user: User = None):
@@ -581,7 +636,7 @@ class AnalysisTemplateVersion(TimeStampedModel):
     version = models.IntegerField()
     analysis_name_template = models.TextField(null=True)  # Python string template
     analysis_snapshot = models.OneToOneField(Analysis, null=True, on_delete=PROTECT)
-    active = models.BooleanField(default=True)
+    active = models.BooleanField(default=False)
     appears_in_autocomplete = models.BooleanField(default=True)
     appears_in_links = models.BooleanField(default=False)
     requires_sample_somatic = models.BooleanField(default=False)
@@ -590,8 +645,77 @@ class AnalysisTemplateVersion(TimeStampedModel):
     class Meta:
         unique_together = ('template', 'version')
 
+    @transaction.atomic
+    def activate(self):
+        """ Make this the one version everyone who can view the template runs """
+        self.template.analysistemplateversion_set.update(active=False)
+        self.active = True
+        self.save()
+
+    @property
+    def is_draft(self) -> bool:
+        """ The latest saved version, before it's been made active - only writers can run it """
+        if self.active:
+            return False
+        latest = self.template.latest_version_obj
+        return latest is not None and latest.pk == self.pk
+
+    @property
+    def status_label(self) -> str:
+        if self.active:
+            return "Active"
+        if self.is_draft:
+            return "Draft"
+        return ""
+
+    @classmethod
+    def filter_for_user(cls, user: User, requires_sample_somatic=None, requires_sample_gene_list=None,
+                        class_name=None, **kwargs) -> QuerySet['AnalysisTemplateVersion']:
+        """ The versions a user can launch - the active one of any template they can see, plus the
+            draft of any template they can write.
+            requires_sample_somatic/requires_sample_gene_list - leave None for all """
+        qs = cls.objects.filter(**kwargs)
+
+        if requires_sample_somatic is not None:
+            qs = qs.filter(requires_sample_somatic=requires_sample_somatic)
+
+        if requires_sample_gene_list is not None:
+            qs = qs.filter(requires_sample_gene_list=requires_sample_gene_list)
+
+        if class_name:
+            # Must not have any other types not supported
+            supported_types = {class_name}
+            EXTRA_PROVIDED_TYPES = {
+                'snpdb.Sample': {'genes.SampleGeneList'},
+                'snpdb.Trio': {'snpdb.Sample'},
+                'snpdb.Quad': {'snpdb.Sample'},
+                'snpdb.Duo': {'snpdb.Sample'},
+            }
+
+            if extra_types := EXTRA_PROVIDED_TYPES.get(class_name):
+                supported_types.update(extra_types)
+            q_provided_types = Q(analysis_snapshot__analysisnode__analysisvariable__class_name__in=supported_types)
+            count_kwargs = {"filter": ~q_provided_types}
+
+            count_unsupported = Count("analysis_snapshot__analysisnode__analysisvariable__class_name", **count_kwargs)
+            qs = qs.annotate(unsupported_args=count_unsupported).filter(unsupported_args=0)
+            # Required to take main type as variable
+            qs = qs.filter(analysis_snapshot__analysisnode__analysisvariable__class_name=class_name)
+
+        # Subquery rather than Max() - an aggregate here would multiply out against unsupported_args
+        latest_version = Subquery(cls.objects.filter(template=OuterRef("template"))
+                                  .order_by("-version").values("version")[:1])
+        qs = qs.annotate(latest_version=latest_version)
+        q_active = Q(active=True, template__in=AnalysisTemplate.filter_for_user(user))
+        q_draft = Q(active=False, version=F("latest_version"),
+                    template__in=AnalysisTemplate.filter_writable_for_user(user))
+        return qs.filter(q_active | q_draft)
+
     def __str__(self):
-        return f"{self.template} v.{self.version}"
+        s = f"{self.template} v.{self.version}"
+        if self.is_draft:
+            s += " (draft)"
+        return s
 
 
 class AnalysisTemplateRun(TimeStampedModel):
@@ -599,11 +723,16 @@ class AnalysisTemplateRun(TimeStampedModel):
     analysis = models.OneToOneField(Analysis, on_delete=CASCADE)  # Created new analysis
 
     @staticmethod
-    def create(analysis_template: AnalysisTemplate, genome_build: GenomeBuild, user: User = None):
+    def create(analysis_template: AnalysisTemplate, genome_build: GenomeBuild, user: User = None,
+               template_version: 'AnalysisTemplateVersion' = None):
         if user is None:
             user = admin_bot()
 
-        template_version = analysis_template.active
+        if template_version is None:
+            template_version = analysis_template.active
+            if template_version is None:
+                raise ValueError(f"{analysis_template} has no active version")
+
         analysis = template_version.analysis_snapshot.clone()
         analysis.user = user
         analysis.genome_build = genome_build
@@ -664,14 +793,14 @@ class AnalysisTemplateRun(TimeStampedModel):
     def populate_analysis_name(self):
         """ Populate analysis_name_template with params based on AnalysisVariable fields, and the magic values:
                 * template - TemplateVersion string representation
-                * input - 1st we find of "pedigree", "trio", "cohort", "sample" """
+                * input - 1st we find of "pedigree", "trio", "quad", "duo", "cohort", "sample" """
 
         params = {"template": str(self.template_version)}
         for arg in self.analysistemplaterunargument_set.all():
             params[arg.variable.field] = arg.value
 
-        # Do trio/quad before sample so it's used first (trio/quad set proband as sample)
-        for field in ["pedigree", "trio", "quad", "cohort", "sample"]:
+        # Do the family sources before sample so they're used first (they set proband as sample)
+        for field in ["pedigree", "trio", "quad", "duo", "cohort", "sample"]:
             if field in params:
                 params["input"] = params[field]
                 break

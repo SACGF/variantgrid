@@ -4,6 +4,7 @@ from snpdb.models import JobsControl
 
 
 class Command(BaseCommand):
+    category = "ops"
     help = ("Pause / resume / show the analysis + annotation job dispatchers (operational safety "
             "brake). Pausing stops new work being leased or launched; in-flight work is untouched.")
 

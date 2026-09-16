@@ -1,5 +1,6 @@
 from kombu import Exchange, Queue
 
+from variantgrid.settings.components.default_settings import UNIT_TEST
 from variantgrid.settings.components.secret_settings import get_secret
 
 # Using RabbitMQ as Redis broker was re-executing long tasks (eg variant annotation)
@@ -18,7 +19,12 @@ from variantgrid.settings.components.secret_settings import get_secret
 
 
 # Default is guest:guest default account see: https://www.rabbitmq.com/access-control.html
-CELERY_BROKER_URL = get_secret("CELERY.broker_url")
+if UNIT_TEST:
+    # In-process broker, so tasks fired during tests don't hit the dev worker (which then fails
+    # looking up objects from the rolled back test DB)
+    CELERY_BROKER_URL = "memory://"
+else:
+    CELERY_BROKER_URL = get_secret("CELERY.broker_url")
 
 CELERY_TASK_DEFAULT_QUEUE = 'db_workers'
 CELERY_TASK_QUEUES = (
@@ -115,6 +121,9 @@ CELERY_TASK_ROUTES = {
     'annotation.tasks.annotation_scheduler_task.dispatch_annotation_runs': SCHEDULING_SINGLE_WORKER,
     'upload.tasks.vcf.import_vcf_step_task.schedule_pipeline_stage_steps': SCHEDULING_SINGLE_WORKER,
     'snpdb.tasks.soft_delete_tasks.remove_soft_deleted_vcfs_task': SCHEDULING_SINGLE_WORKER,
+    'snpdb.tasks.user_award_tasks.update_user_awards': SCHEDULING_SINGLE_WORKER,
+    # Nightly all-vs-all relate rewrites every SomalierRelatePairs row - two runs must never overlap
+    'snpdb.tasks.somalier_tasks.somalier_all_samples': SCHEDULING_SINGLE_WORKER,
 
     # Partition archive
     'patients.tasks.extraction_matching_tasks.reconcile_pending_extractions': DB_WORKERS,
@@ -147,11 +156,14 @@ CELERY_IMPORTS = (
     'snpdb.tasks.graph_generation_task',
     'snpdb.tasks.partition_archive_tasks',
     'snpdb.tasks.soft_delete_tasks',
+    'snpdb.tasks.somalier_tasks',
     'snpdb.tasks.vcf_bed_file_task',
     'snpdb.tasks.vcf_zygosity_count_tasks',
     'sync.tasks.sync_tasks',
     'upload.tasks.import_bedfile_task',
+    'upload.tasks.import_dragen_tso500_all_fusions_task',
     'upload.tasks.import_gene_coverage_task',
+    'upload.tasks.import_gene_level_cnv_task',
     'upload.tasks.import_gene_list_task',
     'upload.tasks.import_patient_records_task',
     'upload.tasks.import_ped_task',
@@ -179,9 +191,12 @@ CELERY_WORKER_ADDRESS_SPACE_LIMIT_GB = {
     "analysis_workers": 8,
 }
 
-# Crash safety brake: after a host reboot (low /proc/uptime) the worker auto-pauses the analysis +
-# annotation job dispatchers once per boot, so jobs that may have crashed the box don't immediately
-# re-launch and crash it again. An admin resumes with 'manage.py jobs_control resume'. Turn this OFF
-# on ephemeral / autoscaled hosts, where a fresh boot is routine rather than a crash signal.
+# Crash safety brake: the worker records each host boot, and when two land close together (a box
+# that came up then went down again - a likely crash loop) it auto-pauses the analysis + annotation
+# job dispatchers, so the jobs that may have crashed the box don't immediately re-launch and crash
+# it again. A single reboot the box survives starts up as normal. An admin resumes a paused
+# deployment with 'manage.py jobs_control resume'. Turn this OFF on ephemeral / autoscaled hosts,
+# where a fresh boot is routine rather than a crash signal.
 JOBS_AUTOPAUSE_ON_REBOOT = True
 JOBS_AUTOPAUSE_ON_REBOOT_UPTIME_SECS = 600  # uptime under this on worker start => treat as a reboot
+JOBS_AUTOPAUSE_ON_REBOOT_WINDOW_SECS = 3600  # 2nd boot this soon after the previous => crash loop

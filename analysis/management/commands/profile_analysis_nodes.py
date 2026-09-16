@@ -4,10 +4,18 @@ See https://github.com/SACGF/variantgrid/issues/1494
 
 Usage:
     python3 manage.py profile_analysis_nodes \\
-        --analysis 12345 67890 \\
+        --analysis 12345,67890 \\
         --sample 555 \\
         --rerun --explain \\
         --out /tmp/prof_$(date +%Y%m%d_%H%M%S)
+
+    # A/B Postgres join_collapse_limit - node queries that join more relations than the
+    # limit are never reordered, so a selective filter can end up applied last:
+    python3 manage.py profile_analysis_nodes \\
+        --analysis 12345 --rerun --explain --join-collapse-limit both \\
+        --out /tmp/prof_jcl_$(date +%Y%m%d_%H%M%S)
+    # then compare explain_execution_ms / explain_planning_ms between the
+    # join_collapse_limit rows.
 
     # A/B the issue #546 explicit-PK substitution on a real analysis:
     python3 manage.py profile_analysis_nodes \\
@@ -38,7 +46,7 @@ from django.db.models import Q
 from django.db.models.functions import Substr as DjSubstr
 
 from analysis.models import Analysis
-from analysis.models.nodes.analysis_node import AnalysisNode
+from analysis.models.nodes.analysis_node import AnalysisNode, NodeVersion
 from annotation.models import VariantAnnotationVersion, VariantGeneOverlap
 from genes.models import GeneList
 from snpdb.models import Cohort, Sample, Trio, Variant, VariantCollection
@@ -54,12 +62,14 @@ CSV_FIELDS = [
     "parent_input_count",
     "count",
     "cached_load_seconds",
+    "cached_load_timings",  # {phase: seconds} the cached load recorded @see NodeVersion.load_data
     "rerun_count_seconds",
     "explain_planning_ms",
     "explain_execution_ms",
     "explain_plan_file",
     "sql_truncated",
     "pk_substitution",     # #546 explicit-PK substitution mode this row was profiled under (on/off)
+    "join_collapse_limit",  # session join_collapse_limit this row was profiled under ("" = server default)
     "build_seconds",       # only set by cohort_exclude_vc_join — one-time pre-compute cost
     "vc_record_count",     # only set by cohort_exclude_vc_join — size of the cached set
     "analyze_seconds",     # only set by cohort_exclude_vc_join_postanalyze — ANALYZE cost
@@ -69,18 +79,40 @@ CSV_FIELDS = [
 SQL_TRUNCATE = 1000
 
 
+def _parse_ids(values):
+    """ IDs can be space and/or comma separated, and the switch can be repeated,
+        ie "--analysis 1 2,3 --analysis 4" """
+    ids = []
+    for value in values or []:
+        for part in value.split(","):
+            part = part.strip()
+            if not part:
+                continue
+            try:
+                ids.append(int(part))
+            except ValueError:
+                raise CommandError(f"Expected an integer ID, got '{part}'")
+    return ids
+
+
 class Command(BaseCommand):
+    category = "dev"
     help = "Profile AnalysisNode querysets per-node and emit a CSV + EXPLAIN plans"
 
     def add_arguments(self, parser):
-        parser.add_argument("--analysis", type=int, nargs="*", default=[],
-                            help="Analysis ID(s) — every node in each analysis is profiled")
-        parser.add_argument("--sample", type=int, nargs="*", default=[],
-                            help="Sample ID(s) — synthetic canonical single-node patterns are run per sample")
-        parser.add_argument("--trio", type=int, nargs="*", default=[],
-                            help="Trio ID(s) — multi-sample regex vs substr-AND comparison (de novo pattern)")
-        parser.add_argument("--cohort", type=int, nargs="*", default=[],
-                            help="Cohort ID(s) — multi-sample regex vs substr-AND comparison (random ~half carriers, plus exclude lookahead vs substr-OR)")
+        parser.add_argument("--analysis", nargs="*", action="extend", default=None,
+                            help="Analysis ID(s), space and/or comma separated — every node in "
+                                 "each analysis is profiled")
+        parser.add_argument("--sample", nargs="*", action="extend", default=None,
+                            help="Sample ID(s), space and/or comma separated — synthetic canonical "
+                                 "single-node patterns are run per sample")
+        parser.add_argument("--trio", nargs="*", action="extend", default=None,
+                            help="Trio ID(s), space and/or comma separated — multi-sample regex vs "
+                                 "substr-AND comparison (de novo pattern)")
+        parser.add_argument("--cohort", nargs="*", action="extend", default=None,
+                            help="Cohort ID(s), space and/or comma separated — multi-sample regex vs "
+                                 "substr-AND comparison (random ~half carriers, plus exclude lookahead "
+                                 "vs substr-OR)")
         parser.add_argument("--cohort-seed", type=int, default=42,
                             help="Seed for deterministic cohort sample-half selection (default 42)")
         parser.add_argument("--rerun", action="store_true",
@@ -101,6 +133,14 @@ class Command(BaseCommand):
                                  "for A/B comparison). Only affects --analysis real nodes; the synthetic "
                                  "patterns build querysets directly and never use the substitution.")
 
+        parser.add_argument("--join-collapse-limit", type=str, default=None,
+                            help="Profile under a session join_collapse_limit. Postgres stops "
+                                 "reordering joins once a query has more relations than this "
+                                 "(default 8), so it runs them in the order Django emitted - a "
+                                 "selective filter can end up applied after everything else. Pass "
+                                 "an integer to set it, or 'both' to run each profile twice (server "
+                                 "default, then 16) for A/B comparison.")
+
         parser.add_argument("--planner-diagnostic", action="store_true",
                             help="For --cohort runs only: also re-run cohort_exclude_lookahead "
                                  "and cohort_exclude_vc_join under work_mem/random_page_cost "
@@ -116,6 +156,9 @@ class Command(BaseCommand):
                                  "under the bump (#546). Default 10000. Survey is read-only — no SQL re-execution.")
 
     def handle(self, *args, **options):
+        for id_option in ["analysis", "sample", "trio", "cohort"]:
+            options[id_option] = _parse_ids(options[id_option])
+
         if not (options["analysis"] or options["sample"] or options["trio"] or options["cohort"]):
             raise CommandError("Provide at least one of --analysis / --sample / --trio / --cohort")
 
@@ -134,65 +177,35 @@ class Command(BaseCommand):
 
         subst_modes = {"on": ["on"], "off": ["off"], "both": ["on", "off"]}[options["pk_substitution"]]
 
-        # Issue #546 explicit-PK substitution is gated on ANALYSIS_NODE_STORE_ID_SIZE_MAX
-        # (read live by AnalysisNode.get_small_parent_arg_q_dict). "on" uses the configured
-        # threshold (falling back to 1000 if it's unset/0 so "on" is genuinely enabled); "off"
-        # forces it to 0 so every parent runs as a full subquery.
+        # None means "leave the server default alone" - it is still reported per row, resolved below
+        jcl_arg = options["join_collapse_limit"]
+        if jcl_arg is None:
+            jcl_modes = [None]
+        elif jcl_arg == "both":
+            jcl_modes = [None, 16]
+        else:
+            try:
+                jcl_modes = [int(jcl_arg)]
+            except ValueError:
+                raise CommandError(f"--join-collapse-limit must be an integer or 'both', got '{jcl_arg}'")
+
+        # Issue #546 explicit-PK substitution is gated on ANALYSIS_NODE_STORE_ID_SIZE_MAX, which a node
+        # reads when it loads and stores its PKs with its count - so use --rerun for the mode to take
+        # effect. "on" uses the configured threshold (falling back to 1000 if it's unset/0 so "on" is
+        # genuinely enabled); "off" forces it to 0 so every parent runs as a full subquery.
         original_threshold = getattr(settings, "ANALYSIS_NODE_STORE_ID_SIZE_MAX", 1000)
         subst_threshold = {"on": original_threshold or 1000, "off": 0}
 
         try:
-            for subst_mode in subst_modes:
-                settings.ANALYSIS_NODE_STORE_ID_SIZE_MAX = subst_threshold[subst_mode]
-                self._pk_substitution_mode = subst_mode
-                if len(subst_modes) > 1:
-                    self.stdout.write(
-                        f"##### pk_substitution={subst_mode} "
-                        f"(ANALYSIS_NODE_STORE_ID_SIZE_MAX={subst_threshold[subst_mode]}) #####")
-
-                def tag(profiled_rows, subst_mode=subst_mode):
-                    return self._tag_subst(profiled_rows, subst_mode)
-
-                for analysis_id in options["analysis"]:
-                    self.stdout.write(f"== Analysis {analysis_id} ==")
-                    rows.extend(tag(self._profile_analysis(
-                        analysis_id,
-                        rerun=options["rerun"],
-                        explain=options["explain"],
-                        node_type_filter=node_type_filter,
-                        limit=options["limit_per_analysis"],
-                        plans_dir=plans_dir,
-                        merge_threshold_bumped=options["merge_threshold_bumped"],
-                    )))
-
-                for sample_id in options["sample"]:
-                    self.stdout.write(f"== Sample {sample_id} (synthetic) ==")
-                    rows.extend(tag(self._profile_sample_synthetic(
-                        sample_id,
-                        rerun=options["rerun"],
-                        explain=options["explain"],
-                        plans_dir=plans_dir,
-                    )))
-
-                for trio_id in options["trio"]:
-                    self.stdout.write(f"== Trio {trio_id} (synthetic) ==")
-                    rows.extend(tag(self._profile_trio_synthetic(
-                        trio_id,
-                        rerun=options["rerun"],
-                        explain=options["explain"],
-                        plans_dir=plans_dir,
-                    )))
-
-                for cohort_id in options["cohort"]:
-                    self.stdout.write(f"== Cohort {cohort_id} (synthetic) ==")
-                    rows.extend(tag(self._profile_cohort_synthetic(
-                        cohort_id,
-                        rerun=options["rerun"],
-                        explain=options["explain"],
-                        plans_dir=plans_dir,
-                        seed=options["cohort_seed"],
-                        planner_diagnostic=options["planner_diagnostic"],
-                    )))
+            for jcl in jcl_modes:
+                pg_settings = {"join_collapse_limit": jcl} if jcl else {}
+                with _PgSessionSettings(**pg_settings):
+                    self._join_collapse_limit = _current_join_collapse_limit()
+                    if len(jcl_modes) > 1:
+                        self.stdout.write(
+                            f"########## join_collapse_limit={self._join_collapse_limit} ##########")
+                    self._profile_all(options, rows, node_type_filter, subst_modes,
+                                      subst_threshold, plans_dir)
         finally:
             settings.ANALYSIS_NODE_STORE_ID_SIZE_MAX = original_threshold
 
@@ -205,6 +218,60 @@ class Command(BaseCommand):
         self._write_meta(meta_path, options)
         self.stdout.write(self.style.SUCCESS(f"Wrote {len(rows)} rows -> {csv_path}"))
         self.stdout.write(f"Bundle: {out_dir}")
+
+    def _profile_all(self, options, rows, node_type_filter, subst_modes, subst_threshold, plans_dir):
+        """ Run every requested profile once, under whatever session settings are in force """
+        for subst_mode in subst_modes:
+            settings.ANALYSIS_NODE_STORE_ID_SIZE_MAX = subst_threshold[subst_mode]
+            self._pk_substitution_mode = subst_mode
+            if len(subst_modes) > 1:
+                self.stdout.write(
+                    f"##### pk_substitution={subst_mode} "
+                    f"(ANALYSIS_NODE_STORE_ID_SIZE_MAX={subst_threshold[subst_mode]}) #####")
+
+            def tag(profiled_rows, subst_mode=subst_mode):
+                return self._tag_jcl(self._tag_subst(profiled_rows, subst_mode))
+
+            for analysis_id in options["analysis"]:
+                self.stdout.write(f"== Analysis {analysis_id} ==")
+                rows.extend(tag(self._profile_analysis(
+                    analysis_id,
+                    rerun=options["rerun"],
+                    explain=options["explain"],
+                    node_type_filter=node_type_filter,
+                    limit=options["limit_per_analysis"],
+                    plans_dir=plans_dir,
+                    merge_threshold_bumped=options["merge_threshold_bumped"],
+                )))
+
+            for sample_id in options["sample"]:
+                self.stdout.write(f"== Sample {sample_id} (synthetic) ==")
+                rows.extend(tag(self._profile_sample_synthetic(
+                    sample_id,
+                    rerun=options["rerun"],
+                    explain=options["explain"],
+                    plans_dir=plans_dir,
+                )))
+
+            for trio_id in options["trio"]:
+                self.stdout.write(f"== Trio {trio_id} (synthetic) ==")
+                rows.extend(tag(self._profile_trio_synthetic(
+                    trio_id,
+                    rerun=options["rerun"],
+                    explain=options["explain"],
+                    plans_dir=plans_dir,
+                )))
+
+            for cohort_id in options["cohort"]:
+                self.stdout.write(f"== Cohort {cohort_id} (synthetic) ==")
+                rows.extend(tag(self._profile_cohort_synthetic(
+                    cohort_id,
+                    rerun=options["rerun"],
+                    explain=options["explain"],
+                    plans_dir=plans_dir,
+                    seed=options["cohort_seed"],
+                    planner_diagnostic=options["planner_diagnostic"],
+                )))
 
     # ---- Analysis-mode profiling ----------------------------------------
 
@@ -258,9 +325,8 @@ class Command(BaseCommand):
         Path A (literal IN) is taken when count <= threshold; otherwise path C (subquery form).
         Parents in (threshold_current, threshold_bumped] are the experiment candidates.
 
-        Backwards-compat: only touches stable APIs (parent.count, get_non_empty_parents).
-        Doesn't reference get_cached_node_pks / cache_memoize / the substitution helper, which
-        only exist on post-#546 code.
+        Backwards-compat: only touches stable APIs (parent.count, get_non_empty_parents), so it
+        also runs against pre-#546 code.
         """
         rows = []
         try:
@@ -313,7 +379,9 @@ class Command(BaseCommand):
             "config_summary": _config_summary(node),
             "count": node.count,
             "cached_load_seconds": node.load_seconds,
+            "cached_load_timings": _cached_load_timings(node),
             "pk_substitution": getattr(self, "_pk_substitution_mode", ""),
+            "join_collapse_limit": getattr(self, "_join_collapse_limit", ""),
         }
 
         try:
@@ -352,8 +420,9 @@ class Command(BaseCommand):
 
         if explain and sql is not None:
             subst_mode = getattr(self, "_pk_substitution_mode", "on")
+            jcl = getattr(self, "_join_collapse_limit", "")
             plan_file = os.path.join(
-                plans_dir, f"{source}_a{analysis_id}_n{node.pk}_subst{subst_mode}.json")
+                plans_dir, f"{source}_a{analysis_id}_n{node.pk}_subst{subst_mode}_jcl{jcl}.json")
             try:
                 planning, execution = _run_explain(sql, params, plan_file)
                 row["explain_planning_ms"] = planning
@@ -503,6 +572,7 @@ class Command(BaseCommand):
             "node_name": "",
             "config_summary": config,
             "pk_substitution": getattr(self, "_pk_substitution_mode", ""),
+            "join_collapse_limit": getattr(self, "_join_collapse_limit", ""),
         }
         try:
             sql, params = _qs_sql_with_params(qs)
@@ -929,6 +999,11 @@ class Command(BaseCommand):
             row["pk_substitution"] = subst_mode
         return rows
 
+    def _tag_jcl(self, rows):
+        for row in rows:
+            row.setdefault("join_collapse_limit", getattr(self, "_join_collapse_limit", ""))
+        return rows
+
     @staticmethod
     def _row_summary(row):
         bits = [
@@ -939,10 +1014,14 @@ class Command(BaseCommand):
         ]
         if row.get("pk_substitution"):
             bits.append(f"subst={row['pk_substitution']}")
+        if row.get("join_collapse_limit"):
+            bits.append(f"jcl={row['join_collapse_limit']}")
         if row.get("count") not in (None, ""):
             bits.append(f"count={row['count']}")
         if row.get("cached_load_seconds") not in (None, ""):
             bits.append(f"cached={row['cached_load_seconds']}s")
+        if row.get("cached_load_timings"):
+            bits.append(f"timings={row['cached_load_timings']}")
         if row.get("rerun_count_seconds") not in (None, ""):
             bits.append(f"rerun={row['rerun_count_seconds']}s")
         if row.get("explain_execution_ms") not in (None, ""):
@@ -966,6 +1045,16 @@ class Command(BaseCommand):
             fh.write("options:\n")
             for k, v in sorted(options.items()):
                 fh.write(f"  {k}: {v}\n")
+
+
+def _cached_load_timings(node):
+    """ The phase breakdown the node's last load recorded - what cached_load_seconds was spent on """
+    node_version = NodeVersion.objects.filter(node=node, version=node.version).first()
+    if not node_version:
+        return ""
+    if timings := node_version.load_data.get("timings"):
+        return json.dumps(timings, sort_keys=True)
+    return ""
 
 
 def _sum_parent_counts(node):
@@ -1025,6 +1114,12 @@ class _PgSessionSettings:
             with connection.cursor() as cur:
                 for k in self.settings:
                     cur.execute(f"RESET {k}")
+
+
+def _current_join_collapse_limit() -> str:
+    with connection.cursor() as cursor:
+        cursor.execute("SHOW join_collapse_limit")
+        return cursor.fetchone()[0]
 
 
 def _qs_sql_with_params(qs):

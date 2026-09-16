@@ -16,6 +16,7 @@ from django.utils import timezone
 from analysis.analysis_templates import get_cohort_analysis, get_sample_analysis
 from analysis.grid_export import get_node_export_basename, node_grid_get_export_iterator
 from analysis.models import AnalysisTemplate, CohortNode, NodeStatus, SampleNode, VariantTag
+from analysis.models.nodes.analysis_node import node_query_planner_settings
 from analysis.views.analysis_permissions import get_node_subclass_or_non_fatal_exception
 from genes.models import CanonicalTranscriptCollection
 from library.constants import MINUTE_SECS
@@ -34,18 +35,24 @@ NODE_WAIT_TIME_BETWEEN_CHECKS = [5, 5, 10, 10, 30, 30, 60, MINUTE_SECS * 2]
 NODE_EXPORT_GENERATOR = "export_node_to_downloadable_file"
 
 
+def _get_usable_cgf(generator, pk, export_type) -> Optional[CachedGeneratedFile]:
+    """ A cached file whose output is gone is no better than never having generated it - return None so
+        the page offers the generate link, and get_or_create_and_launch drops the row when they click """
+    params_hash = get_grid_downloadable_file_params_hash(pk, export_type)
+    cgf = CachedGeneratedFile.objects.filter(generator=generator, params_hash=params_hash).first()
+    if cgf and cgf.file_missing:
+        cgf = None
+    return cgf
+
+
 def get_annotated_download_files_cgf(generator, pk) -> dict[str, Optional[CachedGeneratedFile]]:
     annotated_download_files = {}
     try:
         AnalysisTemplate.get_template_from_setting("ANALYSIS_TEMPLATES_AUTO_COHORT_EXPORT")
-        params_hash_vcf = get_grid_downloadable_file_params_hash(pk, "vcf")
-        cgf_vcf = CachedGeneratedFile.objects.filter(generator=generator,
-                                                     params_hash=params_hash_vcf).first()
-        params_hash_csv = get_grid_downloadable_file_params_hash(pk, "csv")
-        cgf_csv = CachedGeneratedFile.objects.filter(generator=generator,
-                                                     params_hash=params_hash_csv).first()
-
-        annotated_download_files = {"vcf": cgf_vcf, "csv": cgf_csv}
+        annotated_download_files = {
+            "vcf": _get_usable_cgf(generator, pk, "vcf"),
+            "csv": _get_usable_cgf(generator, pk, "csv"),
+        }
     except ValueError:
         pass
 
@@ -85,7 +92,9 @@ def _get_annotated_basename(analysis, name: str) -> str:
                      str(analysis.genome_build)])
 
 
-def _write_node_to_cached_generated_file(cgf, request, node, basename, export_type, **export_kwargs):
+def _write_node_to_cached_generated_file(cgf, request, node, basename, export_type, zip_csv=True, **export_kwargs):
+    """ zip_csv: whole cohort/sample exports run to millions of rows so are zipped; a node export is what the
+        user filtered the grid down to, and they open it straight away, so it stays a plain .csv """
     total_records = node.count
     update_size = max(1000, total_records / 100)  # 1% or every 1k records
 
@@ -107,7 +116,7 @@ def _write_node_to_cached_generated_file(cgf, request, node, basename, export_ty
             for chunk in file_iterator:
                 f.write(chunk)  # Already has newline
 
-        if export_type == 'csv':
+        if export_type == 'csv' and zip_csv:
             original_filename = media_root_filename
             zip_file_path = media_root_filename + ".zip"
             with zipfile.ZipFile(zip_file_path, 'w', compression=zipfile.ZIP_DEFLATED) as zipf:
@@ -119,7 +128,6 @@ def _write_node_to_cached_generated_file(cgf, request, node, basename, export_ty
         cgf.progress = 1  # row_wrapper updated the DB directly, so our copy is still at its starting value
         cgf.generate_end = timezone.now()
         logging.info("Wrote %s", media_root_filename)
-        # Write CSVs to Zip (requires the file to be there already)
     except Exception as e:
         logging.error("Failed to write %s: %s", media_root_filename, e)
         cgf.exception = str(e)
@@ -214,6 +222,7 @@ def export_node_to_downloadable_file(self, node_id, node_version, user_id, expor
                 pk=canonical_transcript_collection_id)
 
         sort_order_by_tag = get_tag_sort_order_by_tag(user)
+        # A variant carries a tag once per sample (@see VariantTag.Meta) - the export lists it once
         variant_tag_ids = defaultdict(set)
         for variant_id, tag_id in VariantTag.objects.filter(analysis=node.analysis).values_list("variant_id", "tag_id"):
             variant_tag_ids[variant_id].add(tag_id)
@@ -224,9 +233,11 @@ def export_node_to_downloadable_file(self, node_id, node_version, user_id, expor
 
         request = FakeRequest(user=user)
         request.GET = grid_params
-        _write_node_to_cached_generated_file(cgf, request, node, get_node_export_basename(node), export_type,
-                                             canonical_transcript_collection=canonical_transcript_collection,
-                                             variant_tags_dict=variant_tags_dict)
+        with node_query_planner_settings():
+            _write_node_to_cached_generated_file(cgf, request, node, get_node_export_basename(node), export_type,
+                                                 zip_csv=False,
+                                                 canonical_transcript_collection=canonical_transcript_collection,
+                                                 variant_tags_dict=variant_tags_dict)
     except Retry:
         raise  # Output node not ready yet - export task re-queued, not an error
     except Exception:

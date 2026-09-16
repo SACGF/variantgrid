@@ -2,7 +2,6 @@
 {% load static %}
 {% load js_tags %}
 {% block style %}
-{% load jqgrid_tags %}
 
 #gene-lists-container {
     width: 100%;
@@ -15,7 +14,7 @@
     accordionForm(moiNodeForm);
     ajaxForm(moiNodeForm);
 
-    $("#id_sample", moiNodeForm).change(changeSample);
+    $("#id_sample_source", moiNodeForm).change(changeSampleSource);
 
     function setupCollapse(selector) {
         let allMessage = $(selector + "-all-message");
@@ -41,7 +40,7 @@
         $("input", this).val("");
     });
 
-    let hasDates = $('#moi-dates input[type="text"]').filter(function () {
+    let hasDates = $('#moi-dates input').filter(function () {
         return this.value.length > 0
     }).length;
     if (hasDates) {
@@ -49,7 +48,7 @@
     }
 
     // Initial setup from loading config
-    populateMOIPatient({{ node.sample_id|jsonify }}, {{ sample_patient_gene_disease|jsonify }});
+    populateMOIPatient($("#id_sample_source", moiNodeForm).val());
 
 {% endblock docreadyjs %}
 
@@ -70,18 +69,23 @@
     }
 
     function disableAccordion(accordion) {
-        accordion.accordion({active: 0});
-        $("h3#moi-accordion-patient-control", accordion).addClass("ui-state-disabled");
+        showAccordionPanel(accordion, 0);
+        $("#moi-accordion-patient-control", accordion).addClass("disabled");
     }
 
-    function populateMOIPatient(sampleId, data, changed) {
+    // Gene/disease terms for every choice the picker offers, keyed on its "<kind>:<pk>" value -
+    // the set is the ancestors', so it is small enough to send with the editor
+    const SAMPLE_SOURCE_GENE_DISEASE = {{ sample_source_gene_disease|jsonify }};
+
+    function populateMOIPatient(sampleSource, changed) {
         let accordion = $("#moi-terms-accordion");
         let patientInfo = $("#moi-patient-info");
         let patientTerms = $("#moi-patient-terms");
         patientInfo.empty();
         patientTerms.empty();
 
-        if (sampleId) {
+        if (sampleSource) {
+            let data = SAMPLE_SOURCE_GENE_DISEASE[sampleSource] || {};
             if (!data["patient_id"]) {
                 disableAccordion(accordion);
                 patientInfo.text("Sample is not assigned to a patient.");
@@ -96,9 +100,9 @@
                     patientText += " of which " + terms.length + " are MONDO gene/disease classification terms usable by this node.";
                     patientTerms.append(termsUl(terms));
                     if (changed) {
-                        accordion.accordion({active: 1});
+                        showAccordionPanel(accordion, 1);
                     }
-                    $("h3#moi-accordion-patient-control", accordion).removeClass("ui-state-disabled");
+                    $("#moi-accordion-patient-control", accordion).removeClass("disabled");
                 } else {
                     disableAccordion(accordion);
                     patientText += ". No MONDO terms with gene/disease classification terms";
@@ -110,127 +114,123 @@
             patientInfo.append(patientText);
         } else {
             disableAccordion(accordion);
-            patientInfo.text("No sample selected");
+            patientInfo.text("No sample or patient selected");
         }
     }
 
-    function changeSample() {
-        let sampleId = $("#id_sample", "form#moi-node").val();
-        let ontologyVersionId = {{ node.analysis.annotation_version.ontology_version_id }};
-        if (sampleId) {
-            $.ajax({
-                type: "GET",
-                url: Urls.sample_patient_gene_disease(sampleId, ontologyVersionId),
-                success: function(data) {
-                    populateMOIPatient(sampleId, data, true);
-                }
-            });
-        } else {
-            populateMOIPatient(null, {});
-        }
+    function changeSampleSource() {
+        populateMOIPatient($("#id_sample_source", "form#moi-node").val(), true);
     }
 
 {% endblock inlinejs%}
 
 {% block gene_list_grid %}
 
-{% jqgrid 'node_gene_disease_classification_genes_grid' 'node-ontology-genes' search=False download_grid_json_as_csv=True analysis_id=node.analysis_id node_id=node.pk version=node.version %}
+<table id="node-gene-disease-genes-grid" class="sticky-header" data-datatable-url="{% url 'node_gene_disease_classification_genes_datatable' analysis_id=node.analysis_id node_id=node.pk version=node.version %}"></table>
 
 {% endblock gene_list_grid %}
 
 
 {% block content %}
 <style>
-	#id_percent {
-		width: 100px;
-	}
+    .moi-toggle-block {
+        margin: 5px 0;
+    }
+
+    .moi-toggle-block .editor-choices {
+        margin-top: 4px;
+    }
 </style>
-<div>
-	<form id="moi-node" method="post" action="{{ request.path }}">
-        {% csrf_token %}
-        {% for hidden in form.hidden_fields %}
-            {{ hidden }}
-        {% endfor %}
+<form id="moi-node" method="post" action="{{ request.path }}">
+    {% csrf_token %}
+    {% for hidden in form.hidden_fields %}
+        {{ hidden }}
+    {% endfor %}
 
-        <div>
-            Sample is optional, and used to also apply a zygosity filter.
-        </div>
-		<div>
-            <b>Sample:</b> {{ form.sample }}
-            <b>Require Exact Zygosity Calls:</b> {{ form.require_zygosity }}{{ form.require_zygosity.errors }}
-        </div>
+    <div class="editor-row">
+        <label class="editor-label" for="{{ form.sample_source.id_for_label }}">Applies to</label>
+        {{ form.sample_source }}
+        <label title="Sample or patient is optional, and used to also apply a zygosity filter">{{ form.require_zygosity }} Require exact zygosity calls</label>{{ form.require_zygosity.errors }}
+    </div>
+    <div class="editor-row">
+        <span class="editor-label">Patient</span>
+        <span id="moi-patient-info">
+            <!-- Populated via populateMOIPatient -->
+        </span>
+    </div>
 
-        <div>
-            <b>Patient:</b>
-            <span id="moi-patient-info">
+    <div id="moi-terms-accordion" class="accordion node-editor-accordion">
+        <div class="card">
+            <div class="card-header" data-toggle="collapse" data-target="#moi-panel-custom">Custom Disease</div>
+            <div id="moi-panel-custom" class="collapse" data-parent="#moi-terms-accordion">
+            <div class="card-body">
+                {{ form.mondo }}
+            </div>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-header" id="moi-accordion-patient-control" data-toggle="collapse" data-target="#moi-panel-patient">From Patient</div>
+            <div id="moi-panel-patient" class="collapse" data-parent="#moi-terms-accordion">
+            <div class="card-body" id="moi-patient-terms">
                 <!-- Populated via populateMOIPatient -->
-            </span>
+            </div>
+            </div>
         </div>
+    </div>
 
-		<ul id="moi-terms-accordion" class="accordion">
-            <li>
-                <h3>Custom Disease</h3>
-                <div>
-                    {{ form.mondo }}
-                </div>
-            </li>
-			<li>
-                <h3 id="moi-accordion-patient-control">From Patient</h3>
-                <div id="moi-patient-terms">
-                    <!-- Populated via populateMOIPatient -->
-                </div>
-	        </li>
-		</ul>
-
-        <div>
-            <div>
-                {{ form.min_classification.label }}{{ form.min_classification }}
-            </div>
-            <div>
-                <span id="moi-inheritance-all-message">
-                    Any mode of inheritance
-                </span>
-                <a class="hover-link" data-toggle="collapse" href="#moi-inheritance">Toggle Mode of Inheritance...</a>
-                <div id="moi-inheritance" class="collapse hide">
-                    <h3>Inheritance</h3>
-                    <ul>
-                        {% for field in form.get_moi_fields %}
-                            <li>{{ field }} {{ field.label }}</li>
-                        {% endfor %}
-                    </ul>
-                </div>
-            </div>
-            <div>
-                <span id="moi-submitters-all-message">
-                    Any submitter
-                </span>
-                <a class="hover-link" data-toggle="collapse" href="#moi-submitters">Toggle Submitters...</a>
-                <div id="moi-submitters" class="collapse hide">
-                    <h3>Submitters</h3>
-                    <ul>
-                    {% for field in form.get_submitter_fields %}
-                        <li>{{ field }} {{ field.label }}</li>
+    <div class="editor-row">
+        <label class="editor-label" for="{{ form.min_classification.id_for_label }}">{{ form.min_classification.label }}</label>
+        {{ form.min_classification }}
+    </div>
+    <div class="moi-toggle-block">
+        <span id="moi-inheritance-all-message">Any mode of inheritance</span>
+        <a class="hover-link" data-toggle="collapse" href="#moi-inheritance">Toggle mode of inheritance...</a>
+        <div id="moi-inheritance" class="collapse hide">
+            <div class="editor-section">
+                <div class="editor-section-title">Inheritance</div>
+                <div class="editor-checks">
+                    {% for field in form.get_moi_fields %}
+                        <label for="{{ field.id_for_label }}">{{ field }} {{ field.label }}</label>
                     {% endfor %}
-                    </ul>
-                </div>
-            </div>
-            <div>
-                <span id="moi-dates-all-message">
-                    Any Evaluated Date
-                </span>
-                <a class="hover-link" data-toggle="collapse" href="#moi-dates">Toggle Evaluated Date...</a>
-                <div id="moi-dates" class="collapse hide">
-                    {{ form.min_date.label }}{{ form.min_date }}
-                    {{ form.max_date.label }}{{ form.max_date }}
                 </div>
             </div>
         </div>
+    </div>
+    <div class="moi-toggle-block">
+        <span id="moi-submitters-all-message">Any submitter</span>
+        <a class="hover-link" data-toggle="collapse" href="#moi-submitters">Toggle submitters...</a>
+        <div id="moi-submitters" class="collapse hide">
+            <div class="editor-section">
+                <div class="editor-section-title">Submitters</div>
+                <div class="editor-checks">
+                {% for field in form.get_submitter_fields %}
+                    <label for="{{ field.id_for_label }}">{{ field }} {{ field.label }}</label>
+                {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="moi-toggle-block">
+        <span id="moi-dates-all-message">Any evaluated date</span>
+        <a class="hover-link" data-toggle="collapse" href="#moi-dates">Toggle evaluated date...</a>
+        <div id="moi-dates" class="collapse hide">
+            <div class="editor-section">
+                <div class="editor-section-title">Evaluated date</div>
+                <div class="editor-row">
+                    <label class="editor-label" for="{{ form.min_date.id_for_label }}">{{ form.min_date.label }}</label>
+                    {{ form.min_date }}
+                    <label for="{{ form.max_date.id_for_label }}">{{ form.max_date.label }}</label>
+                    {{ form.max_date }}
+                </div>
+            </div>
+        </div>
+    </div>
 
+    <div class="editor-actions">
         {% if has_write_permission %}
-	    	<button id='moi-node-save' class="btn btn-primary">save</button>
+            <button id='moi-node-save' class="btn btn-primary">Save</button>
         {% endif %}
+    </div>
     {{ form.media }}
-	</form>
-</div>
-
+</form>
 {% endblock content %}

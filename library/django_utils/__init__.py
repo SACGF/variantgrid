@@ -1,8 +1,17 @@
+"""
+Small Django helpers with no model of their own: `require_superuser` / RequireSuperUserView, field
+and choice display formatting (get_expanded_field, get_choices_formatter), Q helpers for name
+searches, timezone and form read-only utilities, `thread_safe_unique_together_get_or_create`,
+related-object introspection (related_objects, object_relations) and the SortMetaOrderingMixin /
+SortByPKMixin that let model instances sort like their querysets. Permission checks live in
+guardian_permissions_mixin.py, partitioning in django_partition.py, test bases in unittest_utils.py.
+"""
 import datetime
 import operator
 import os
 from functools import reduce
 from functools import wraps, partial
+from typing import Any
 
 import nameparser
 from dateutil import parser
@@ -10,10 +19,11 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
 from django.core.exceptions import PermissionDenied, ValidationError, ObjectDoesNotExist
-from django.db.models import F
+from django.db.models import F, JSONField
 from django.db.models.aggregates import Count, Max
 from django.db.models.base import ModelBase
 from django.db.models.fields.reverse_related import OneToOneRel
+from django.db.models.options import Options
 from django.db.models.query_utils import Q
 from django.http import HttpRequest
 from django.urls.base import reverse_lazy
@@ -84,6 +94,19 @@ class RequireSuperUserView(View):
 def get_model_fields(model, ignore_fields=None) -> list[str]:
     ignore_fields = set(ignore_fields or [])
     return [f.name for f in model._meta.fields if f.name not in ignore_fields]
+
+
+def resolve_field_path(options, field_name: str):
+    """ Resolve a '__' separated field path (through FK / one-to-one) to the Django field at its end.
+        Stops at a JSONField rather than descending into its keys. """
+    if '__' in field_name:
+        fk_name, field_name = field_name.split('__', 1)
+        field = options.get_field(fk_name)
+        if field:
+            if isinstance(field, JSONField):
+                return field
+            return resolve_field_path(field.related_model._meta, field_name)
+    return options.get_field(field_name)
 
 
 def get_expanded_field(obj, field):
@@ -276,6 +299,8 @@ def discrimine(pred, sequence):
 
 class SortMetaOrderingMixin:
     """ Declares a '<' operator on Model - so you can sort lists same as querysets (driven by Meta.ordering) """
+    _meta: Options
+
     def __lt__(self, other):
         for f in self._meta.ordering:
             v = getattr(self, f)
@@ -286,6 +311,8 @@ class SortMetaOrderingMixin:
 
 
 class SortByPKMixin:
+    pk: Any
+
     def __lt__(self, other):
         return self.pk < other.pk
 
@@ -366,7 +393,7 @@ class UserMatcher:
 
 
 class FakeRequest(HttpRequest):
-    """ Used as a hack for things that require it, eg JqGrid in a celery task """
+    """ Used as a hack for things that require it, eg building a grid config in a celery task """
     def __init__(self, user):
         super().__init__()
         self.user = user

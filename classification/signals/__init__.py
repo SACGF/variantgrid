@@ -15,6 +15,9 @@ from classification.signals.classification_liftover import *  # so we load the r
 from classification.signals.classification_hooks_grouping import *  # so we load the receivers
 from classification.signals.classification_hooks_grouping_search_terms import *  # so we load the receivers
 from classification.signals.classification_hooks_pending_flags import *  # so we load the receivers
+from classification.signals.classification_import_integration_status import *  # so we load the receivers
+from classification.signals.clinvar_export_integration_status import *  # so we load the receivers
+from classification.signals.classification_hooks_allele_merge import *  # so we load the receivers
 from classification.signals.classification_hooks_overlaps import *
 from classification.signals.clinvar_record_to_contribution import *
 from classification.signals.overlap_review_formatting import *

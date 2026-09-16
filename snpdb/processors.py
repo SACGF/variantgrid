@@ -25,6 +25,11 @@ class LazyUserProperties:
     def avatar_details(self):
         return UserSettingsManager.get_avatar_details()
 
+    @cached_property
+    def show_titles(self) -> bool:
+        """ The navbar decorates the logged in user with their own title (if they hold one and want to see them) """
+        return self.avatar_details.shows_titles_for(UserSettingsManager.get_user_settings())
+
 
 def settings_context_processor(request):
     context = {
@@ -44,7 +49,9 @@ def settings_context_processor(request):
         'site': Site.objects.get_current(),
         'site_messages': SiteMessage.get_site_messages(),
         'site_name': settings.SITE_NAME,
+        'site_short_name': settings.SITE_SHORT_NAME,
         'site_description': settings.SITE_DESCRIPTION,
+        'tips_enabled': settings.TIPS_ENABLED,
         'timezone': settings.TIME_ZONE,
         'top_right_search_form': SearchForm(search_allow_blank=True),
         'url_name_visible': get_visible_url_names(),

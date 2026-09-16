@@ -8,6 +8,8 @@ from snpdb.models import (
     Cohort,
     CohortGenotypeCollection,
     CohortSample,
+    Duo,
+    DuoRelationship,
     GenomeBuild,
     ImportStatus,
     Quad,
@@ -18,7 +20,7 @@ from snpdb.models import (
 
 
 def create_fake_cohort(user: User, genome_build: GenomeBuild) -> Cohort:
-    vcf = VCF.objects.create(name="test_urls_vcf", genotype_samples=1, genome_build=genome_build,
+    vcf = VCF.objects.create(name="test_urls_vcf", genotype_samples=1, genotype_field="GT", allele_depth_field="AD", genome_build=genome_build,
                              import_status=ImportStatus.SUCCESS,
                              user=user, date=timezone.now())
     VCFFilter.objects.create(vcf=vcf, filter_code="X", filter_id='YOUSHALLNOTPASS', description="fdas")
@@ -68,7 +70,7 @@ def create_fake_trio(user: User, genome_build: GenomeBuild) -> Trio:
 def create_fake_quad(user: User, genome_build: GenomeBuild, sibling_affected: bool = False) -> Quad:
     """4-sample Cohort (proband, mother, father, sibling) + a Quad."""
     vcf = VCF.objects.create(
-        name="test_quad_vcf", genotype_samples=1, genome_build=genome_build,
+        name="test_quad_vcf", genotype_samples=1, genotype_field="GT", allele_depth_field="AD", genome_build=genome_build,
         import_status=ImportStatus.SUCCESS, user=user, date=timezone.now()
     )
     proband_sample = Sample.objects.create(name="proband", vcf=vcf, import_status=ImportStatus.SUCCESS)
@@ -108,6 +110,48 @@ def create_fake_quad(user: User, genome_build: GenomeBuild, sibling_affected: bo
         father=father_cs, father_affected=False,
         proband=proband_cs,
         sibling=sibling_cs, sibling_affected=sibling_affected,
+    )
+
+
+def create_fake_duo(user: User, genome_build: GenomeBuild,
+                    relationship: str = DuoRelationship.MOTHER,
+                    relative_affected: bool = False) -> Duo:
+    """2-sample Cohort (proband, relative) + a Duo - the relative is named after the relationship."""
+    vcf = VCF.objects.create(
+        name="test_duo_vcf", genotype_samples=1, genotype_field="GT", allele_depth_field="AD", genome_build=genome_build,
+        import_status=ImportStatus.SUCCESS, user=user, date=timezone.now()
+    )
+    relative_name = DuoRelationship(relationship).label.lower()
+    proband_sample = Sample.objects.create(name="proband", vcf=vcf, import_status=ImportStatus.SUCCESS)
+    relative_sample = Sample.objects.create(name=relative_name, vcf=vcf)
+
+    assign_permission_to_user_and_groups(user, vcf)
+    assign_permission_to_user_and_groups(user, proband_sample)
+
+    cohort = Cohort.objects.create(
+        name="test_duo_cohort", user=user, vcf=vcf,
+        genome_build=genome_build, import_status=ImportStatus.SUCCESS
+    )
+    for i, sample in enumerate([proband_sample, relative_sample]):
+        CohortSample.objects.create(
+            cohort=cohort, sample=sample,
+            cohort_genotype_packed_field_index=i, sort_order=i
+        )
+    assign_permission_to_user_and_groups(user, cohort)
+
+    CohortGenotypeCollection.objects.create(
+        cohort=cohort, cohort_version=cohort.version,
+        num_samples=cohort.cohortsample_set.count()
+    )
+
+    return Duo.objects.create(
+        name="test_duo",
+        user=user,
+        cohort=cohort,
+        proband=cohort.cohortsample_set.get(sample__name='proband'),
+        relative=cohort.cohortsample_set.get(sample__name=relative_name),
+        relationship=relationship,
+        relative_affected=relative_affected,
     )
 
 

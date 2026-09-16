@@ -1,0 +1,22 @@
+{% load tz %}
+{# Every somalier stage for a VCF and how it went - expects 'somalier_stages' from SomalierVCFExtract.get_stages #}
+<table class="table w-auto">
+    <tr>
+        <th>Stage</th>
+        <th>Date</th>
+        <th>Status</th>
+        <th>Details</th>
+    </tr>
+    {% for stage_name, stage in somalier_stages %}
+        <tr>
+            <td>{{ stage_name }}</td>
+            <td>{{ stage.modified | localtime }}</td>
+            <td>{{ stage.get_status_display }}</td>
+            <td>
+                {% if stage.error_exception %}
+                    <pre class="mb-0">{{ stage.error_exception }}</pre>
+                {% endif %}
+            </td>
+        </tr>
+    {% endfor %}
+</table>
