@@ -39,6 +39,7 @@ from upload.tasks.import_dragen_tso500_all_fusions_task import (
 )
 from upload.tasks.import_dragen_tso500_combined_variant_output_task import (
     DragenTSO500CombinedVariantOutputCreateVCFTask,
+    DragenTSO500CombinedVariantOutputInsertTask,
 )
 from upload.tasks import import_gene_level_cnv_task
 from upload.tasks.import_gene_level_cnv_task import (
@@ -239,8 +240,9 @@ class DragenTSO500CombinedVariantOutputImportTaskFactory(AbstractVCFImportTaskFa
         return ProcessGenotypeVCFDataTask
 
     def get_post_data_insertion_classes(self):
-        # A splice event has no record of its own - the alt and INFO carry everything
-        return [VCFCheckAnnotationTask]
+        # A splice event has no record of its own - the alt and INFO carry everything. The insert
+        # task is for the rest of the file: the pair's patient chain, seqauto links and measures
+        return [DragenTSO500CombinedVariantOutputInsertTask, VCFCheckAnnotationTask]
 
     def get_finish_task_classes(self):
         return [ImportGenotypeVCFSuccessTask]

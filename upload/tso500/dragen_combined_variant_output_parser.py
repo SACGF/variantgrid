@@ -1,9 +1,11 @@
 """
 Reader for Illumina DRAGEN TSO 500's CombinedVariantOutput.tsv - the file only, no database work.
 
-What becomes of it is upload.tasks.import_dragen_tso500_combined_variant_output_task: the
-'[Splice Variants]' section, and nothing else - small variants and copy number stay on their VCFs
-and fusions on AllFusions.csv, which carries the caller, score and filters this file drops.
+What becomes of it is upload.tasks.import_dragen_tso500_combined_variant_output_task. The
+'[Splice Variants]' rows are the only variants read from here - small variants and copy number stay on
+their VCFs and fusions on AllFusions.csv, which carries the caller, score and filters this file drops -
+and '[Analysis Details]', '[TMB]', '[MSI]' and '[GIS]' name the pair and its measures
+(@see upload.tso500.dragen_combined_variant_output_records).
 
 The file is the pair-level summary written beside the two arm directories: a banner, then one
 '[Section]' per call type. A section is either key/value ('[Analysis Details]', '[TMB]') or a table
@@ -23,12 +25,25 @@ FIRST_LINE = "DRAGEN TruSight Oncology 500 Analysis Software - Combined Variant 
 
 ANALYSIS_DETAILS = "Analysis Details"
 SPLICE_VARIANTS = "Splice Variants"
+TMB = "TMB"
+MSI = "MSI"
+GIS = "GIS"
 
 # [Analysis Details] keys
 PAIR_ID = "Pair ID"
 DNA_SAMPLE_ID = "DNA Sample ID"
 RNA_SAMPLE_ID = "RNA Sample ID"
+OUTPUT_DATE = "Output Date"
+OUTPUT_TIME = "Output Time"
 MODULE_VERSION = "Module Version"
+
+# The key/value sections holding the pair's measures - what each is written as is
+# upload.tso500.dragen_combined_variant_output_records
+TOTAL_TMB = "Total TMB"
+PERCENT_UNSTABLE_MSI_SITES = "Percent Unstable MSI Sites"
+GENOMIC_INSTABILITY_SCORE = "Genomic Instability Score"
+TUMOR_FRACTION = "Tumor Fraction"
+PLOIDY = "Ploidy"
 
 # [Splice Variants] columns
 GENE = "Gene"
@@ -127,6 +142,13 @@ def get_analysis_details(sections: dict[str, CombinedVariantOutputSection]) -> d
     """ The pair, its two arms and the software that wrote the file """
     if section := sections.get(ANALYSIS_DETAILS):
         return {k: _clean(v) for k, v in section.values.items()}
+    return {}
+
+
+def get_section_values(sections: dict[str, CombinedVariantOutputSection], name: str) -> dict:
+    """ A key/value section, eg '[TMB]' - empty for one this file does not write """
+    if section := sections.get(name):
+        return {k: _clean(v) for k, v in section.values.items() if k}
     return {}
 
 

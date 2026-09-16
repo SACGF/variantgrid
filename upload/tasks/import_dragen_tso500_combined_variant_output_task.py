@@ -3,7 +3,7 @@ Loader for Illumina DRAGEN TSO 500's CombinedVariantOutput.tsv - one vendor's fo
 Anything here that reads a named section or column belongs to that format; the splice identity it
 resolves to does not (@see genes.gene_splice).
 
-Only the '[Splice Variants]' section is a source. It is what a scientist reports a splice call from -
+Only the '[Splice Variants]' section is a variant source. It is what a scientist reports a splice call from -
 Illumina writes only passing calls on AR, EGFR and MET into it - and it names the gene and the two
 breakpoints rather than pretending to be a deletion. The other sections are carried better elsewhere:
 small variants and copy number on their own VCFs, and fusions on AllFusions.csv, which keeps the
@@ -15,9 +15,13 @@ rows are written by the same SQL COPY path. Only the bcftools stages are skipped
 a reference base a gene-level locus does not have. @see snpdb.gene_level_variants for why these are
 Variants at all, and upload.vcf.gene_level_vcf_preprocess for exactly what is skipped and why.
 
-One step, DragenTSO500CombinedVariantOutputCreateVCFTask: a splice event has no record of its own the
-way a fusion has a GeneFusion, so there is nothing to create once the Variants exist - the alt carries
-the gene and the label, and the caller's row rides along in INFO.
+Two steps. DragenTSO500CombinedVariantOutputCreateVCFTask writes the VCF; a splice event has no
+record of its own the way a fusion has a GeneFusion, so the alt carries the gene and the label and the
+caller's row rides along in INFO. DragenTSO500CombinedVariantOutputInsertTask then takes the rest of
+the file - the pair's patient chain, the seqauto links and the specimen's measures
+(@see upload.tso500.dragen_combined_variant_output_records) - which needs the Sample, so it runs once
+the data is in. A chain that cannot be made is a message on the import page rather than a failure:
+the splice calls are worth having whether or not the pair has been accessioned yet.
 
 The file names no genome build, and the create-VCF step needs one to place the breakpoints, so it is
 declared at upload (@see upload.upload_metadata) or comes off the VCFSourceSettings row for
@@ -39,6 +43,7 @@ from library.genomics.vcf_writer import (
 )
 from snpdb.gene_level_variants import GENE_LEVEL_CONTIG_LENGTH, GENE_LEVEL_CONTIG_NAME
 from snpdb.models import GenomeBuild
+from upload.models import SimpleVCFImportInfo, UploadStep
 from upload.tasks.vcf.import_vcf_step_task import ImportVCFStepTask
 from upload.tso500.dragen_combined_variant_output_parser import (
     BREAKPOINT_1,
@@ -53,6 +58,15 @@ from upload.tso500.dragen_combined_variant_output_parser import (
     get_analysis_details,
     get_splice_rows,
     read_combined_variant_output,
+)
+from upload.tso500.dragen_combined_variant_output_records import (
+    CombinedVariantOutputIdentityError,
+    link_samples_to_extractions,
+    link_to_sequencing_run,
+    measured_date,
+    parse_pair_identifiers,
+    resolve_pair,
+    write_specimen_measures,
 )
 from upload.vcf.vcf_import import resolve_genome_build_from_source
 from variantgrid.celery import app
@@ -170,5 +184,48 @@ class DragenTSO500CombinedVariantOutputCreateVCFTask(ImportVCFStepTask):
         return len(rows)
 
 
+class DragenTSO500CombinedVariantOutputInsertTask(ImportVCFStepTask):
+    """ Runs after data insertion, so the VCF and its Sample exist - everything in the file that is
+        not a variant: the pair's patient chain, the seqauto links and the specimen's measures """
+
+    def process_items(self, upload_step: UploadStep):
+        upload_pipeline = upload_step.upload_pipeline
+        vcf = upload_pipeline.uploadedvcf.vcf
+        file_upload = upload_pipeline.file_upload
+        user = file_upload.user
+
+        sections = read_combined_variant_output(file_upload.get_filename())
+        analysis_details = get_analysis_details(sections)
+        try:
+            identifiers = parse_pair_identifiers(analysis_details)
+            if identifiers is None:
+                logging.info("%s names no pair to accession", file_upload)
+                return 0
+            resolved = resolve_pair(identifiers, user)
+        except CombinedVariantOutputIdentityError as e:
+            SimpleVCFImportInfo.add_message_count(1, str(e), upload_step)
+            logging.warning("%s: %s", file_upload, e)
+            return 0
+
+        linked = link_samples_to_extractions(resolved, user)
+        logging.info("%s: linked %d sample(s) to %s", file_upload, linked, resolved.specimen)
+
+        # The splice caller runs on the RNA arm, so that is the sample this VCF's calls came off
+        if identifiers.rna and (sample := vcf.sample_set.first()):
+            if sequencing_run := link_to_sequencing_run(vcf, sample, identifiers.rna.sample_id):
+                logging.info("%s: linked %s to %s", file_upload, sample, sequencing_run)
+            else:
+                message = f"No sequencing sample named '{identifiers.rna.sample_id}' - " \
+                          f"VCF not linked to a sequencing run"
+                SimpleVCFImportInfo.add_message_count(1, message, upload_step)
+
+        measures = write_specimen_measures(sections, resolved, identifiers, user,
+                                           method=source_from_analysis_details(analysis_details),
+                                           date=measured_date(analysis_details))
+        return len(measures)
+
+
 DragenTSO500CombinedVariantOutputCreateVCFTask = app.register_task(
     DragenTSO500CombinedVariantOutputCreateVCFTask())
+DragenTSO500CombinedVariantOutputInsertTask = app.register_task(
+    DragenTSO500CombinedVariantOutputInsertTask())

@@ -61,12 +61,20 @@ Gotchas:
   rewritten onto the gene-level contig - the caller's segment is the panel's target window, not the event, so it is
   never stored as a Variant (tasks/import_gene_level_cnv_task.py, @see snpdb.gene_level_variants). A file naming a gene
   on partial calls (DragenExonCNV's `GENE=`) is not a segment field and keeps importing as coordinate SVs.
-- A TSO 500 pair's CombinedVariantOutput tsv is loaded for its `[Splice Variants]` section only
+- A TSO 500 pair's CombinedVariantOutput tsv is the only variant source for its `[Splice Variants]` section
   (import_task_factories/import_task_factories.py:DragenTSO500CombinedVariantOutputImportTaskFactory,
   tasks/import_dragen_tso500_combined_variant_output_task.py). Each row becomes a gene-level Variant whose alt carries
   the junction's label (@see genes.gene_splice); the file's fusions, small variants and copy number calls are the
   lossy copies of what the arm files carry, so they are not sources. The file declares no genome build, so one is
   declared at upload or comes off the `^DRAGEN TSO500 CombinedVariantOutput` VCFSourceSettings row.
+- The rest of that file is the pair's identity, written after data insertion by
+  tasks/import_dragen_tso500_combined_variant_output_task.py:DragenTSO500CombinedVariantOutputInsertTask
+  (tso500/dragen_combined_variant_output_records.py). `[Analysis Details]` names the Patient (`Pair ID`), the Specimen
+  (the ten-digit accession inside each sample ID) and the two Extractions (its container suffix), created when absent;
+  the DNA/RNA sample IDs are exact `Sample.vcf_sample_name` and `SequencingSample.sample_name`, which links both arms'
+  samples to their extraction and the splice VCF to its sequencing run without seqauto's filename matching. `[TMB]`,
+  `[MSI]` and `[GIS]` become the five patients/models.py:SpecimenMeasure rows. None of it fails the import - a chain
+  that cannot be made is a SimpleVCFImportInfo message, since a splice call is worth having unaccessioned.
 - Failure is one-way: UploadStep.error_exception → upload/models/models.py:UploadPipeline.error sets ERROR, marks the
   VCF/samples ImportStatus.ERROR, logs an Event and reports to Rollbar. Later steps see status != PROCESSING and mark
   themselves SKIPPED; BulkGenotypeVCFProcessor.check_pipeline_for_failures bails mid-file. Running steps are not killed.
