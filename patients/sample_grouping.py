@@ -34,8 +34,8 @@ class SourceLevel:
     """ What one level of the hierarchy is, so the levels differ in a table rather than in branches """
     model: type
     # Sample lookups reaching this object's samples, OR'd together. Patient takes two because the
-    # links are set independently - the VCF import carries extraction down without setting
-    # sample.patient, while the patient CSV sets patient and may leave extraction null
+    # patient CSV sets patient and may leave extraction null, and a sample whose patient was set by
+    # hand can disagree with its extraction's (Sample.save only fills an empty patient)
     sample_paths: tuple[str, ...]
     # Attribute paths from the object to its patient, first one that resolves wins.
     # Empty means the object is already the patient

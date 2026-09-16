@@ -307,9 +307,9 @@ class Patient(GuardianPermissionsMixin, HasPhenotypeDescriptionMixin, Externally
         HasPhenotypeDescriptionMixin.save_phenotype(self, pheno_kwargs)
 
     def get_samples(self):
-        """ Every sample that reaches this patient, either way round - the VCF import carries
-            extraction down without setting sample.patient, while the patient CSV sets patient and
-            may leave extraction null. Same union as SOURCE_LEVELS[PATIENT] in patients.sample_grouping;
+        """ Every sample that reaches this patient, either way round - the patient CSV sets patient
+            and may leave extraction null, and a hand-set patient can disagree with the extraction's.
+            Same union as SOURCE_LEVELS[PATIENT] in patients.sample_grouping;
             Sample is taken off the relation because snpdb imports this module. """
         sample_model = self.sample_set.model
         reaches_patient = Q(patient=self) | Q(extraction__specimen__patient=self)

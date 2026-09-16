@@ -572,6 +572,14 @@ class Sample(GuardianPermissionsMixin, SortByPKMixin, SvgSymbolPreviewIconMixin,
     def __str__(self):
         return f"{self.name} ({self.vcf})"
 
+    def save(self, *args, **kwargs):
+        """ An extraction names its patient, so every route that links one (import, seqauto, CVO,
+            reconcile) fills an empty patient here. A different patient already set is left for
+            SampleForm.clean to report rather than silently replaced """
+        if self.extraction_id and not self.patient_id:
+            self.patient_id = self.extraction.specimen.patient_id
+        super().save(*args, **kwargs)
+
     def get_absolute_url(self):
         return reverse('view_sample', kwargs={"sample_id": self.pk})
 
