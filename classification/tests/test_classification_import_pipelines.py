@@ -10,11 +10,15 @@ from classification.classification_import import (
     GENE_LEVEL_API_UPLOAD_NAME,
     _classification_upload_pipeline,
 )
+from classification.models import ImportedAlleleInfo, ImportedAlleleInfoStatus
 from classification.models.classification import ClassificationImport
+from classification.tasks.classification_import_process_variants_task import (
+    ClassificationImportProcessVariantsTask,
+)
 from snpdb.gene_level_variants import GENE_LEVEL_CONTIG_NAME, GENE_LEVEL_REF, GENE_LEVEL_SVLEN
-from snpdb.models import GenomeBuild, ImportSource, VariantCoordinate
-from upload.models import UploadedClassificationImport, UploadPipeline
-from upload.models.models_enums import UploadedFileTypes
+from snpdb.models import GenomeBuild, GenomeBuildPatchVersion, ImportSource, VariantCoordinate
+from upload.models import FileUpload, UploadedClassificationImport, UploadPipeline, UploadStep
+from upload.models.models_enums import UploadedFileTypes, UploadStepOrigin, UploadStepTaskType
 
 
 class TestClassificationImportPipelines(TestCase):
@@ -64,3 +68,44 @@ class TestClassificationImportPipelines(TestCase):
         pipelines = self._run([ordinary, self._gene_level_coordinate()])
         input_dirs = {os.path.dirname(p.file_upload.path) for p in pipelines}
         self.assertEqual(len(input_dirs), 2, input_dirs)
+
+
+class TestLinkInsertedVariants(TestCase):
+    """ link_inserted_variants hashes what came back unmatched, and a hash needs a Sequence row (#1835) """
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.user = User.objects.get_or_create(username='testuser')[0]
+
+    def test_uninserted_gene_level_coordinate_does_not_kill_the_whole_import(self):
+        """ A gene-level alt is unique to the event, so one that never got inserted has no Sequence
+            row and hashing it raised - taking every other record in the import down with it """
+        genome_build = GenomeBuild.grch37()
+        classification_import = ClassificationImport.objects.create(user=self.user, genome_build=genome_build)
+        gbpv = GenomeBuildPatchVersion.get_unspecified_patch_version_for(genome_build)
+        allele_info = ImportedAlleleInfo.objects.create(
+            imported_genome_build_patch_version=gbpv,
+            imported_c_hgvs="METex14skip",
+            variant_coordinate=f"{GENE_LEVEL_CONTIG_NAME}:7029-7029 <SPLICE:HGNC:7029:ex14skip>",
+            classification_import=classification_import)
+
+        file_upload = UploadedClassificationImport.objects.create(
+            classification_import=classification_import,
+            file_upload=self._file_upload()).file_upload
+        pipeline = UploadPipeline.objects.create(file_upload=file_upload)
+        upload_step = UploadStep.objects.create(upload_pipeline=pipeline, name="link", sort_order=0,
+                                                task_type=UploadStepTaskType.CELERY,
+                                                origin=UploadStepOrigin.IMPORT_TASK_FACTORY)
+
+        ClassificationImportProcessVariantsTask.link_inserted_variants(
+            genome_build, classification_import, upload_step)
+
+        allele_info.refresh_from_db()
+        self.assertEqual(allele_info.status, ImportedAlleleInfoStatus.FAILED)
+        self.assertIn("not inserted", allele_info.message)
+
+    def _file_upload(self) -> FileUpload:
+        return FileUpload.objects.create(path="/tmp/gene_level.vcf", name=GENE_LEVEL_API_UPLOAD_NAME,
+                                         file_type=UploadedFileTypes.GENE_LEVEL_INSERT_VARIANTS_ONLY,
+                                         import_source=ImportSource.API, user=self.user)

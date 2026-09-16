@@ -45,6 +45,7 @@ class ClassificationImportProcessVariantsTask(ImportVCFStepTask):
         variant_pk_lookup = VariantPKLookup(genome_build)
         variant_coordinates_by_hash: dict[Any, VariantCoordinate] = {}
         allele_info_by_hash: dict[Any, ImportedAlleleInfo] = {}
+        allele_info_by_coordinate: dict[VariantCoordinate, ImportedAlleleInfo] = {}
 
         # An import with gene-level coordinates in it runs 2 pipelines (@see snpdb.gene_level_variants)
         # so each one can only link the records its own insert stage put in the database - the other
@@ -59,8 +60,13 @@ class ClassificationImportProcessVariantsTask(ImportVCFStepTask):
                     if variant_coordinate.is_gene_level != gene_level_pipeline:
                         continue
                     variant_hash = variant_pk_lookup.add(variant_coordinate)
-                    variant_coordinates_by_hash[variant_hash] = variant_coordinate
-                    allele_info_by_hash[variant_hash] = allele_info
+                    if variant_hash is not None:
+                        variant_coordinates_by_hash[variant_hash] = variant_coordinate
+                        allele_info_by_hash[variant_hash] = allele_info
+                    # add() returns None for a coordinate whose sequences it has never seen, and
+                    # canonicalises before deciding - those come back below by coordinate, not by hash
+                    canonical = variant_coordinate.as_internal_canonical_form(genome_build)
+                    allele_info_by_coordinate[canonical] = allele_info
                 else:
                     pass
             except:
@@ -90,8 +96,12 @@ class ClassificationImportProcessVariantsTask(ImportVCFStepTask):
             allele_info_variant_and_message[allele_info] = (variant, None)
 
         for variant_coordinate in variant_pk_lookup.unknown_variant_coordinates:
-            variant_hash = variant_pk_lookup.get_variant_coordinate_hash(variant_coordinate)
-            allele_info = allele_info_by_hash[variant_hash]
+            # Keyed by coordinate rather than by hash: a coordinate that was never inserted has no
+            # Sequence row for its alt, so get_variant_coordinate_hash raises KeyError on it. Every
+            # unresolved gene-level event is that case (its alt is unique to the event), and the raise
+            # took the whole import's linking down with it, leaving the rest stuck in Processing.
+            if not (allele_info := allele_info_by_coordinate.get(variant_coordinate)):
+                continue
             try:
                 miv = ModifiedImportedVariant.get_upload_pipeline_unnormalized_variant(upload_step.upload_pipeline,
                                                                                        variant_coordinate)
