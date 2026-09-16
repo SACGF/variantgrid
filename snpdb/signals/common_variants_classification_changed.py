@@ -20,6 +20,8 @@ Classifying a common variant means it can no longer be stored in the common part
 to the uncommon one - see snpdb.tasks.cohort_genotype_tasks.common_variant_classified_task
 """
 
+_last_delayed_import = None  # so a bulk import logs "delayed" once, not once per classification
+
 
 def _launch_common_variant_classified_tasks(cgcfv: CohortGenotypeCommonFilterVersion, variant_qs: QuerySet[Variant]):
     """ common_variant_classified_task creates the CommonVariantClassified, so only call it for variants that
@@ -36,11 +38,17 @@ def variants_classification_changed(sender, **kwargs):  # pylint: disable=unused
     variants = kwargs['variants']
     genome_build = kwargs['genome_build']
 
+    global _last_delayed_import
+
     if ongoing_import := ClassificationImportRun.ongoing_imports():
         # Each check scans every classified high frequency variant in the build, which is far too expensive to
         # do per-classification during a bulk import - classification_imports_complete does one sweep instead
-        logging.info("variants_classification_changed_signal delayed due to %s", ongoing_import)
+        if ongoing_import != _last_delayed_import:
+            _last_delayed_import = ongoing_import
+            logging.info("variants_classification_changed_signal delayed due to %s", ongoing_import)
         return
+
+    _last_delayed_import = None
 
     logging.info("variants_classification_changed_signal!! %s, %s", genome_build, variants)
 
