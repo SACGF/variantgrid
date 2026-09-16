@@ -1,25 +1,18 @@
 import operator
-<<<<<<< HEAD
 from collections import Counter
-=======
 from collections import defaultdict
->>>>>>> refs/heads/master
 from dataclasses import dataclass, field
 from functools import cached_property, reduce
 from typing import Optional, Self
-
 import django
 from django.contrib.auth.models import User
 from django.contrib.postgres.fields import ArrayField
 from django.core.exceptions import PermissionDenied
-<<<<<<< HEAD
 from django.db.models import CASCADE, SET_NULL, IntegerChoices, Q, QuerySet, TextChoices, F, OuterRef, Count
 from django.db.models.signals import pre_delete
 from django.dispatch import receiver
-=======
 from django.db import models, transaction
 from django.db.models import CASCADE, SET_NULL, Count, IntegerChoices, Q, QuerySet, TextChoices
->>>>>>> refs/heads/master
 from django.urls import reverse
 from django_extensions.db.models import TimeStampedModel
 from frozendict import frozendict
@@ -38,12 +31,7 @@ from classification.models.evidence_mixin_summary_cache import (
     ClassificationSummaryCacheObj
 )
 from genes.models import GeneSymbol
-<<<<<<< HEAD
-from library.utils import strip_json
-=======
 from library.utils import JsonDataType, strip_json
-from ontology.models import OntologyTerm
->>>>>>> refs/heads/master
 from snpdb.models import Allele, Lab
 
 classification_grouping_search_term_signal = django.dispatch.Signal()  # args: "grouping", expects iterable of ClassificationGroupingSearchTermStub

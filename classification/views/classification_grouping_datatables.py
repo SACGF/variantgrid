@@ -198,8 +198,8 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
 
         return response
 
-    def pre_render(self, qs: QuerySet[DC]):
-        super().pre_render(qs)
+    def pre_render(self, qs: QuerySet[DC], rows):
+        super().pre_render(qs, rows)
 
         overlap_pending: dict[Tuple[ClassificationResultValue, int], TriageState] = {}
         for overlap_cont in OverlapContribution.objects.filter(

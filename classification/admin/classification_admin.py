@@ -1551,11 +1551,6 @@ class AlleleOriginGroupingTabularAdmin(TabularInline):
         return False
 
 
-@admin.register(AlleleGrouping)
-class AlleleGroupingAdmin(ModelAdminBasics):
-    inlines = (AlleleOriginGroupingTabularAdmin,)
-
-
 @admin.register(ReclassificationEventBuildState)
 class ReclassificationEventBuildStateAdmin(ModelAdminBasics):
     list_display = ("built_to", "last_run")

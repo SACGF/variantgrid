@@ -48,7 +48,7 @@ from classification.enums import (
     SpecialEKeys,
     SubmissionSource,
     ValidationCode,
-    WithdrawReason, TestingContextBucket,
+    WithdrawReason, TestingContextBucket, CopyScope,
 )
 from classification.models.classification_import_run import ClassificationImportRun
 from classification.models.classification_patcher import patch_fuzzy_age
@@ -443,9 +443,6 @@ class ConditionResolved:
         if self.is_multi_condition or other.is_multi_condition:
             # when looking at multiple conditions, do not attempt merging unless we're the exact same
             return self.terms == other.terms and self.join == other.join
-                return 0
-            else:
-                return None
         elif self.single_term == other.single_term:
             return True
         else:
@@ -2794,6 +2791,36 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
                     if not is_prop_equal(a=source_blob.get(attribute), b=other_blob.get(attribute)):
                         return False
         return True
+
+
+COPY_SCOPES_ALL = frozenset({CopyScope.ALLELE, CopyScope.GENE})
+COPY_SCOPES_GENE = frozenset({CopyScope.GENE})
+GENE_CONSENSUS_GROUP_LIMIT = 10
+EXTERNAL_CANDIDATE_LIMIT = 10
+
+BUCKET_ALLELE_ORIGIN = {  # what the allele_origin evidence key is seeded with per bucket
+    AlleleOriginBucket.GERMLINE: "germline",
+    AlleleOriginBucket.SOMATIC: "somatic",
+}
+
+
+@dataclass(frozen=True)
+class GeneConsensusGroup:
+    """
+    Classifications in a gene whose gene level content is identical - they were copied from each other, so
+    they are one choice rather than many. The others are kept so the curator can see the spread of tumour
+    types the content has been used for, which is usually what decides whether it applies here.
+    """
+    representative: ClassificationModification
+    others: list[ClassificationModification]
+
+    @property
+    def other_count(self) -> int:
+        return len(self.others)
+
+    @property
+    def record_count(self) -> int:
+        return len(self.others) + 1
 
 
 @dataclass
