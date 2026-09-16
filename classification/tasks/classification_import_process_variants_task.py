@@ -9,6 +9,7 @@ from snpdb.liftover import create_liftover_pipelines
 from snpdb.models import Allele, GenomeBuild, ImportSource, Variant, VariantCoordinate
 from snpdb.variant_pk_lookup import VariantPKLookup
 from upload.models import ModifiedImportedVariant, UploadStep
+from upload.models.models_enums import UploadedFileTypes
 from upload.tasks.vcf.import_vcf_step_task import ImportVCFStepTask
 from variantgrid.celery import app
 
@@ -45,11 +46,18 @@ class ClassificationImportProcessVariantsTask(ImportVCFStepTask):
         variant_coordinates_by_hash: dict[Any, VariantCoordinate] = {}
         allele_info_by_hash: dict[Any, ImportedAlleleInfo] = {}
 
+        # An import with gene-level coordinates in it runs 2 pipelines (@see snpdb.gene_level_variants)
+        # so each one can only link the records its own insert stage put in the database - the other
+        # kind may not have run yet, and their Sequence rows would not exist.
+        gene_level_pipeline = upload_step.file_upload.file_type == UploadedFileTypes.GENE_LEVEL_INSERT_VARIANTS_ONLY
+
         # TODO, should we filter on matched_variant__isnull=True, or on status, or not filter at all so we can rematch
         no_variant_qs = classification_import.importedalleleinfo_set.all()  # .filter(matched_variant__isnull=True)
         for allele_info in no_variant_qs:
             try:
                 if variant_coordinate := allele_info.variant_coordinate_obj:
+                    if variant_coordinate.is_gene_level != gene_level_pipeline:
+                        continue
                     variant_hash = variant_pk_lookup.add(variant_coordinate)
                     variant_coordinates_by_hash[variant_hash] = variant_coordinate
                     allele_info_by_hash[variant_hash] = allele_info

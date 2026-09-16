@@ -132,6 +132,12 @@ class SpliceEventVariant:
     label: str
 
     @property
+    def variant_id(self) -> int:
+        """ Named as the FK a GeneFusion or GeneCopyNumberEvent has, so anything walking gene-level
+            events reads all three the same way """
+        return self.variant.pk
+
+    @property
     def gene_level_ids(self) -> list[GeneLevelId]:
         """ The genes this event is about, so gene lists and annotation read it the way they read a
             fusion's partners """
