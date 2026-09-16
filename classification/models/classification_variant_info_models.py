@@ -764,8 +764,12 @@ class ImportedAlleleInfo(TimeStampedModel):
     @property
     def is_gene_level(self) -> bool:
         """ The submitted value named genes ('BCR::ABL1', 'EGFR amplification', 'AR V7') rather than an HGVS
-            (@see resolve_gene_level). Read off the resolved coordinate so it holds before a variant is matched """
-        return bool((vc := self.variant_coordinate_obj) and vc.is_gene_level)
+            (@see resolve_gene_level). Read off the resolved coordinate so it holds before a variant is
+            matched - and off the imported value itself for a record that failed before it resolved one,
+            which is the state an import that died leaves behind """
+        if vc := self.variant_coordinate_obj:
+            return vc.is_gene_level
+        return self.resolved_gene_level() is not None
 
     @property
     def imported_as_c_hgvs(self) -> bool:
@@ -899,6 +903,19 @@ class ImportedAlleleInfo(TimeStampedModel):
                                            message=message, hgvs_converter_version=hgvs_converter_version,
                                            hgvs_converter_data_version=data_version)
 
+    def resolved_gene_level(self):
+        """ The gene-level identity the imported value names, or None. Writes nothing, so the callers that
+            have to know whether a record is gene-level before it has a coordinate can ask as well.
+            The HGVS pattern check short circuits anything shaped like an HGVS before any resolver runs. """
+        imported = self.imported_hgvs
+        if not imported or HGVS_UNCLEANED_PATTERN.search(imported):
+            return None
+
+        for resolve in (resolve_fusion_string, resolve_gene_copy_number_string, resolve_splice_string):
+            if resolved := resolve(imported):
+                return resolved
+        return None
+
     def resolve_gene_level(self) -> bool:
         """ A lab submitting 'BCR::ABL1', 'EGFR amplification' or 'AR V7' names genes, not a coordinate - so
             there is no HGVS to resolve. The identity it resolves to has a variant coordinate of its
@@ -908,15 +925,10 @@ class ImportedAlleleInfo(TimeStampedModel):
 
             Returns whether this was a gene-level event, so the caller can skip HGVS resolution. """
 
-        imported = self.imported_hgvs
-        if not imported or HGVS_UNCLEANED_PATTERN.search(imported):
-            return False
-
-        for resolve in (resolve_fusion_string, resolve_gene_copy_number_string, resolve_splice_string):
-            if resolved := resolve(imported):
-                self.variant_coordinate = str(resolved.variant_coordinate)
-                self.message = f"Matched {resolved.canonical_str}"
-                return True
+        if resolved := self.resolved_gene_level():
+            self.variant_coordinate = str(resolved.variant_coordinate)
+            self.message = f"Matched {resolved.canonical_str}"
+            return True
         return False
 
     def update_variant_coordinate(self):

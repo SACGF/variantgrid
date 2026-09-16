@@ -20,9 +20,12 @@ class Command(BaseCommand):
     category = "maintenance"
 
     def add_arguments(self, parser):
-        parser.add_argument('--status', default=ImportedAlleleInfoStatus.PROCESSING,
-                            help="Comma separated ImportedAlleleInfoStatus codes (default 'P' - Processing, "
-                                 "'F' is Failed)")
+        # Both are ways an import dies: it never got to the linking step (Processing), or it got there
+        # without the variants it expected (Failed) - a command named "stuck" means both by default
+        parser.add_argument('--status',
+                            default=f"{ImportedAlleleInfoStatus.PROCESSING},{ImportedAlleleInfoStatus.FAILED}",
+                            help="Comma separated ImportedAlleleInfoStatus codes (default 'P,F' - Processing "
+                                 "and Failed)")
         parser.add_argument('--older-than-hours', type=int, default=24,
                             help="Only records untouched for this long (default 24)")
         parser.add_argument('--gene-level', action='store_true',

@@ -118,6 +118,14 @@ class ImportedAlleleInfoValidationTest(TestCase):
         self.assertTrue(allele_info.is_gene_level)
         self.assertFalse(allele_info.imported_as_c_hgvs)
 
+    def test_gene_level_without_a_coordinate_still_reads_as_gene_level(self):
+        """ an import that died leaves records with no coordinate to read, so the imported value has to answer """
+        allele_info = self._allele_info(imported_c_hgvs="BRCA2::PICALM")
+        allele_info.variant_coordinate = None
+        with patch.object(ImportedAlleleInfo, "resolved_gene_level", return_value=object()):
+            self.assertTrue(allele_info.is_gene_level)
+            self.assertFalse(allele_info.imported_as_c_hgvs)
+
     def test_gene_level_resolved_in_both_builds_is_included(self):
         """ a gene-level variant sits on no transcript, so its ResolvedVariantInfo has no c.HGVS - the build
             check has to track the variant the way a g.HGVS submission does, or it can never be included """
