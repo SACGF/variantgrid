@@ -40,7 +40,7 @@ class Command(BaseCommand):
         qs = ImportedAlleleInfo.objects.filter(status__in=statuses,
                                                modified__lte=timezone.now() - timedelta(hours=older_than_hours))
         if gene_level_only:
-            pks = [ai.pk for ai in qs if (vc := ai.variant_coordinate_obj) and vc.is_gene_level]
+            pks = [ai.pk for ai in qs if ai.is_gene_level]
         else:
             pks = list(qs.values_list("pk", flat=True))
         # By pk from here on - the loop below moves records out of the status the filter selected on
@@ -55,7 +55,10 @@ class Command(BaseCommand):
 
         print(f"Re-matching {qs.count()} records")
         for allele_info in qs:
-            allele_info.update_variant_coordinate()
+            # gene-level values name genes, not a coordinate - re-deriving them as HGVS would fail and
+            # wipe the coordinate resolve_gene_level found (@see ImportedAlleleInfo.get_or_create)
+            if not allele_info.resolve_gene_level():
+                allele_info.update_variant_coordinate()
             allele_info.refresh_and_save(force_update=True)
             allele_info.classification_import = None
             allele_info.status = ImportedAlleleInfoStatus.PROCESSING

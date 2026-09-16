@@ -20,6 +20,12 @@ from snpdb.models import (
 )
 
 
+class ImportedAlleleInfoValidationTagsTest(TestCase):
+    def test_no_tags_renders_as_no_issues(self):
+        """ the grid reads the column raw, so a record validated before it had anything to validate hits None """
+        self.assertEqual(ImportedAlleleInfoValidation.validation_tags_list_from_dict(None), [])
+
+
 class ImportedAlleleInfoStatusTest(TestCase):
     """ update_status is the only place ImportedAlleleInfo.status is derived - these are in memory only """
 
@@ -99,6 +105,28 @@ class ImportedAlleleInfoValidationTest(TestCase):
         liftover = validation_tags["liftover"]
         self.assertTrue(liftover)
         self.assertEqual(set(liftover.values()), {"W"})
+        self.assertTrue(ImportedAlleleInfoValidation.should_include(validation_tags))
+
+    def _gene_level_allele_info(self, imported_c_hgvs: str, coordinate: str, **kwargs) -> ImportedAlleleInfo:
+        allele_info = self._allele_info(imported_c_hgvs=imported_c_hgvs, **kwargs)
+        allele_info.variant_coordinate = coordinate
+        return allele_info
+
+    def test_gene_level_is_not_a_c_hgvs_submission(self):
+        """ the value arrives in imported_c_hgvs but names genes, so nothing may expect a transcript of it """
+        allele_info = self._gene_level_allele_info("BRCA2::PICALM", "GENE_LEVEL:1101-1101 <FUSION:HGNC:15514>")
+        self.assertTrue(allele_info.is_gene_level)
+        self.assertFalse(allele_info.imported_as_c_hgvs)
+
+    def test_gene_level_resolved_in_both_builds_is_included(self):
+        """ a gene-level variant sits on no transcript, so its ResolvedVariantInfo has no c.HGVS - the build
+            check has to track the variant the way a g.HGVS submission does, or it can never be included """
+        allele_info = self._gene_level_allele_info(
+            "ARV7", "GENE_LEVEL:644-644 <SPLICE:HGNC:644:V7>",
+            grch37=self._resolved(GenomeBuild.grch37()),
+            grch38=self._resolved(GenomeBuild.grch38()))
+        validation_tags = allele_info._calculate_validation()
+        self.assertEqual(validation_tags, {})
         self.assertTrue(ImportedAlleleInfoValidation.should_include(validation_tags))
 
     def test_unsupported_transcript_still_errors(self):

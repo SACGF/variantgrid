@@ -141,6 +141,11 @@ Gotchas:
   anchor first), which already holds the approved symbol the caller's MYCL1 resolved to
   (`autopopulate_evidence_keys/evidence_from_variant.py:get_evidence_fields_from_gene_level_event`) - the transcript path
   fills that key for everything else.
+- A gene-level record's validation must not be read as a c.HGVS submission: `imported_as_c_hgvs` returns False when
+  `ImportedAlleleInfo.is_gene_level`, because the named value ('ARV7') lands in `imported_c_hgvs` but sits on no
+  transcript. Otherwise `_calculate_validation` tags `transcript_type_not_supported` as "E" and `should_include` keeps
+  every gene-level record out of exports forever, and the per-build check demands a c.HGVS `ResolvedVariantInfo`
+  deliberately never writes for one.
 - A `case_field` can carry `prefill_key`: the build form starts that field from the named evidence key on the case's
   first classification that has one (SA Path's clinical indication), and its `default` otherwise.
 - report/__init__.py stays empty on purpose: models/classification_report_models.py imports report/template_validation.py

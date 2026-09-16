@@ -426,9 +426,10 @@ class ImportedAlleleInfoValidation(TimeStampedModel):
         return self.validation_tags or {}
 
     @staticmethod
-    def validation_tags_list_from_dict(validation_dict: ImportedAlleleInfoValidationTags):
+    def validation_tags_list_from_dict(validation_dict: Optional[ImportedAlleleInfoValidationTags]):
         items: list[ImportedAlleleInfoValidationTagEntry] = []
-        for category, sub_issues_dict in validation_dict.items():
+        # a record validated before it had anything to validate has no tags - the grid reads the column raw
+        for category, sub_issues_dict in (validation_dict or {}).items():
             for field, severity in sub_issues_dict.items():
                 items.append(ImportedAlleleInfoValidationTagEntry(category=category, field=field, severity=severity))
         return sorted(items)
@@ -761,9 +762,19 @@ class ImportedAlleleInfo(TimeStampedModel):
             return HGVSComponents(self.imported_c_hgvs).transcript
 
     @property
+    def is_gene_level(self) -> bool:
+        """ The submitted value named genes ('BCR::ABL1', 'EGFR amplification', 'AR V7') rather than an HGVS
+            (@see resolve_gene_level). Read off the resolved coordinate so it holds before a variant is matched """
+        return bool((vc := self.variant_coordinate_obj) and vc.is_gene_level)
+
+    @property
     def imported_as_c_hgvs(self) -> bool:
         """ True when the submission supplied a transcript-based HGVS, so a resolved c.HGVS is expected.
-            Reads the fields directly so a malformed imported_c_hgvs that parses to no transcript still counts """
+            Reads the fields directly so a malformed imported_c_hgvs that parses to no transcript still counts.
+            A gene-level value arrives in imported_c_hgvs too, but it names genes and sits on no transcript,
+            so there is no c.HGVS to expect of it in any build """
+        if self.is_gene_level:
+            return False
         return bool(self.imported_c_hgvs or self.imported_transcript)
 
     @property
