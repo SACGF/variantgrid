@@ -22,6 +22,7 @@ from genes.gene_copy_number import (
     find_gene_copy_number_events_for_string,
 )
 from genes.gene_fusions import find_gene_fusions_for_string
+from genes.gene_splice import SPLICE_STRING_PATTERN, find_splice_events_for_string
 from genes.models import MANE, BadTranscript, MissingTranscript, TranscriptVersion
 from genes.models_enums import AnnotationConsortium, MANEStatus
 from library.enums.log_level import LogLevel
@@ -891,6 +892,22 @@ def search_variant_gene_copy_number(search_input: SearchInputInstance):
         and 'del' all find what is written out as 'amplification' / 'loss' """
     events = find_gene_copy_number_events_for_string(search_input.search_string)
     yield from _yield_gene_level_results(search_input, events, "Gene copy number")
+
+
+@search_receiver(
+    search_type=Variant,
+    pattern=SPLICE_STRING_PATTERN,
+    sub_name="Splice Event",
+    example=SearchExample(
+        note="A splice event, named by its gene and the junction's label",
+        examples=["AR V7", "MET exon 14 skipping"]
+    )
+)
+def search_variant_splice_event(search_input: SearchInputInstance):
+    """ Lookup only - searching must never mint a splice identity. A label shape not in
+        SPLICE_STRING_PATTERN never reaches this, so widen the pattern when one is seeded """
+    events = find_splice_events_for_string(search_input.search_string)
+    yield from _yield_gene_level_results(search_input, events, "Splice event")
 
 
 def _yield_gene_level_results(search_input: SearchInputInstance, events, label: str):

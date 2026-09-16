@@ -131,6 +131,12 @@ Gotchas:
   CombinedVariantOutput loaded. The printed name of the event ("MET exon 14 skipping") is the `splice_label` evidence
   key, autopopulated from the junction's `genes/models/models_splice_event.py:SpliceEvent` and left for the scientist
   to type where we have no name for it.
+- A gene-level classification target is named rather than given as HGVS: `models/classification_variant_info_models.py:ImportedAlleleInfo.resolve_gene_level`
+  tries the fusion, whole-gene copy number and splice string resolvers in turn before any HGVS conversion, and the value
+  reaches them with its spaces already removed (`ImportedAlleleInfo._tidy_input_value`), so `AR V7` arrives as `ARV7`.
+  A new splice label shape needs `genes/gene_splice.py:SPLICE_STRING_PATTERN` widened before search will offer it;
+  resolution itself matches on the name, so a `genes/models/models_splice_event.py:SpliceEvent` row is enough for that
+  half. claude/research/classifications.md has the table of written forms.
 - A gene-level variant sits on no transcript, so `gene_symbol` is autopopulated from the event's GeneLevelId (a fusion's
   anchor first), which already holds the approved symbol the caller's MYCL1 resolved to
   (`autopopulate_evidence_keys/evidence_from_variant.py:get_evidence_fields_from_gene_level_event`) - the transcript path

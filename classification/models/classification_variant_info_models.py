@@ -33,6 +33,7 @@ from model_utils.models import TimeStampedModel
 
 from genes.gene_copy_number import resolve_gene_copy_number_string
 from genes.gene_fusions import resolve_fusion_string
+from genes.gene_splice import SpliceEventVariant, get_splice_event_variant, resolve_splice_string
 from genes.hgvs import (HGVSComponents, HGVSDiff, HGVSConverterType, HGVSDisplay, HGVSMatcher,
                        HGVSNoRepresentationException, hgvs_diff_description)
 from genes.models import (
@@ -552,10 +553,18 @@ class ImportedAlleleInfo(TimeStampedModel):
         return None
 
     @property
+    def splice_event_variant(self) -> Optional[SpliceEventVariant]:
+        """ Set where the imported value named a splice event ('AR V7'). A splice event has no
+        record of its own, so this is the matched Variant read back off its alt """
+        if variant := self.matched_variant:
+            return get_splice_event_variant(variant)
+        return None
+
+    @property
     def gene_level_event(self):
         """ Whichever kind of gene-level event the matched Variant is, for the places that want the
         genes it names rather than what sort of event it is """
-        return self.gene_fusion or self.gene_copy_number_event
+        return self.gene_fusion or self.gene_copy_number_event or self.splice_event_variant
 
     allele = ForeignKey(Allele, null=True, blank=True, on_delete=SET_NULL)
     """ set this once it's matched, but record can exist prior to variant matching """
@@ -880,7 +889,7 @@ class ImportedAlleleInfo(TimeStampedModel):
                                            hgvs_converter_data_version=data_version)
 
     def resolve_gene_level(self) -> bool:
-        """ A lab submitting 'BCR::ABL1' or 'EGFR amplification' names genes, not a coordinate - so
+        """ A lab submitting 'BCR::ABL1', 'EGFR amplification' or 'AR V7' names genes, not a coordinate - so
             there is no HGVS to resolve. The identity it resolves to has a variant coordinate of its
             own, which goes through the VCF insert pipeline like every other coordinate, so a
             gene-level event enters the database exactly the way a small variant submitted the same
@@ -892,7 +901,7 @@ class ImportedAlleleInfo(TimeStampedModel):
         if not imported or HGVS_UNCLEANED_PATTERN.search(imported):
             return False
 
-        for resolve in (resolve_fusion_string, resolve_gene_copy_number_string):
+        for resolve in (resolve_fusion_string, resolve_gene_copy_number_string, resolve_splice_string):
             if resolved := resolve(imported):
                 self.variant_coordinate = str(resolved.variant_coordinate)
                 self.message = f"Matched {resolved.canonical_str}"

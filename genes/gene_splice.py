@@ -13,6 +13,7 @@ A splice event has no record of its own the way a fusion has a GeneFusion - the 
 and the label, and the caller's breakpoints ride along in the VCF's INFO - so the objects here are
 resolved identities and a read-only view of a Variant, not models.
 """
+import re
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from typing import Optional
@@ -27,6 +28,26 @@ from snpdb.gene_level_variants import (
     GENE_LEVEL_SVLEN,
 )
 from snpdb.models import Contig, GenomeBuild, Variant, VariantCoordinate
+
+# 'X_66905968_66914514' - the label a junction we have no SpliceEvent for is stored under. The
+# contig is spelled out rather than left as \w+, so 'ARX_66905968_66914514' splits after the gene
+COORDINATE_LABEL_PATTERN = r"(?:chr)?(?:[0-9]{1,2}|MT|X|Y|M)_[0-9]+_[0-9]+"
+# The label shapes a junction is named with, after the gene: 'V7', 'vIII', 'ex14skip',
+# 'exon 14 skipping', or the coordinate label. Widen this when a new label shape is seeded, or
+# search will not offer it - resolution itself matches on the name, not on this.
+SPLICE_LABEL_PATTERN = rf"v[0-9]+|v[IVX]+|ex(?:on)?\s*[0-9]+\s*skip(?:ping)?|{COORDINATE_LABEL_PATTERN}"
+# 'AR V7', 'AR-V7 splice variant', 'MET exon 14 skipping'. The space between gene and label is
+# optional because a classification's imported c.HGVS reaches us with its spaces removed
+# (@see ImportedAlleleInfo._tidy_input_value); a gene that has to resolve is what keeps this from
+# claiming ordinary words.
+SPLICE_STRING_PATTERN = re.compile(
+    rf"^\s*[A-Za-z0-9.]+?\s*[-_]?\s*(?:{SPLICE_LABEL_PATTERN})(?:\s*splice(?:\s*variant)?)?\s*$",
+    re.IGNORECASE)
+# The coordinate form is the one written form we split, since no row names its junction
+SPLICE_COORDINATE_PATTERN = re.compile(
+    rf"^\s*(?P<gene>[A-Za-z0-9.]+?)\s*[-_]?\s*(?P<label>{COORDINATE_LABEL_PATTERN})\s*$", re.IGNORECASE)
+# Everything a written form may put between its words, so one string is one key
+SPLICE_KEY_SEPARATORS = re.compile(r"[\s\-_]")
 
 
 def splice_canonical_str(gene: GeneLevelId, label: str) -> str:
@@ -171,3 +192,109 @@ def splice_event_variants(variant_qs) -> Iterator[SpliceEventVariant]:
                 continue
             gene_ids[gene_id] = gene
         yield SpliceEventVariant(variant=variant, gene=gene, label=label)
+
+
+def splice_key(written: str) -> str:
+    """ The key a written splice event is matched on - lower-cased, with spaces, hyphens and
+        underscores dropped, so 'AR-V7', 'AR V7' and the 'ARV7' an imported c.HGVS arrives as
+        (@see ImportedAlleleInfo._tidy_input_value) are one key. Splitting the string into a gene
+        and a label instead isn't decidable once the space is gone. """
+    return SPLICE_KEY_SEPARATORS.sub("", written or "").lower()
+
+
+def splice_events_by_key() -> dict[str, SpliceEvent]:
+    """ Every written form of a named junction - the canonical 'AR V7' and the 'AR-V7 splice
+        variant' a report writes - against the row it names. A naming table of panel junctions, so
+        it is small enough to build per call. A label means the same event in every build, so the
+        builds' rows collapse onto one key. """
+
+    events: dict[str, SpliceEvent] = {}
+    for splice_event in SpliceEvent.objects.all():
+        for written in (f"{splice_event.gene_symbol_id} {splice_event.label}", splice_event.display):
+            events.setdefault(splice_key(written), splice_event)
+    return events
+
+
+def parse_splice_string(splice_string: str) -> Optional[tuple[str, str, Optional[SpliceEvent]]]:
+    """ (gene name, label, the SpliceEvent naming the junction or None) - the gene is returned for a
+        resolver to place. A named form is matched whole; the coordinate form names a junction no
+        row names, so it is the one form split into its parts. """
+
+    if splice_event := splice_events_by_key().get(splice_key(splice_string)):
+        return splice_event.gene_symbol_id, splice_event.label, splice_event
+    if m := SPLICE_COORDINATE_PATTERN.match(splice_string or ""):
+        return m.group("gene"), _written_coordinate_label(m.group("label")), None
+    return None
+
+
+def _written_coordinate_label(label: str) -> str:
+    """ 'chrx_66905968_66914514' as coordinate_label would have written it """
+    contig, donor, acceptor = label.split("_")
+    return f"{contig[3:] if contig.lower().startswith('chr') else contig}_{donor}_{acceptor}".upper()
+
+
+def resolve_splice_string(splice_string: str, resolver: GeneLevelNameResolver = None) \
+        -> Optional[ResolvedSpliceEvent]:
+    """ 'AR V7' -> the identity it is stored under, whose variant_coordinate goes through the VCF
+        insert pipeline like any other coordinate.
+
+        A named form resolves against a row we hold. The coordinate form names a junction nothing
+        has named, so it resolves only to a Variant that already exists - a lab quoting coordinates
+        is pointing at something we loaded, not minting an unnamed junction from free text.
+        @see ImportedAlleleInfo for where a classification target comes in this way. """
+
+    parsed = parse_splice_string(splice_string)
+    if parsed is None:
+        return None
+
+    gene_name, label, splice_event = parsed
+    if resolver is None:
+        resolver = GeneLevelNameResolver()
+    if splice_event is None:
+        for splice_event_variant in _find_splice_event_variants(gene_name, label, resolver):
+            return ResolvedSpliceEvent(gene=splice_event_variant.gene, label=label)
+        return None
+
+    if resolved_gene := resolver.resolve_gene(gene_name, allow_unknown=False):
+        return ResolvedSpliceEvent(gene=resolved_gene.gene_level_id, label=label,
+                                   splice_event=splice_event)
+    return None
+
+
+def find_splice_events_for_string(splice_string: str, resolver: GeneLevelNameResolver = None) \
+        -> list[SpliceEventVariant]:
+    """ Lookup only - 'AR V7' finds the event if we have it, and mints nothing if we don't. Search
+        runs on whatever a user types, so it must not create identities.
+
+        A splice event has no record of its own, so the Variants are read back through their alt. """
+
+    parsed = parse_splice_string(splice_string)
+    if parsed is None:
+        return []
+
+    gene_name, label, _splice_event = parsed
+    if resolver is None:
+        resolver = GeneLevelNameResolver()
+    return _find_splice_event_variants(gene_name, label, resolver)
+
+
+def _find_splice_event_variants(gene_name: str, label: str,
+                                resolver: GeneLevelNameResolver) -> list[SpliceEventVariant]:
+    """ The splice Variants for a gene name and label, creating nothing - so the GeneLevelIds are
+        looked up rather than minted """
+
+    symbols = {resolver.canonical_symbol(n) for n in resolver.split_gene_names(gene_name)}
+    genes_by_alt = {}
+    for gene in GeneLevelId.objects.filter(symbol_str__in=symbols):
+        alt = GeneLevelSymbolicAlt.format(GeneLevelSymbolicAlt.SPLICE, gene.alt_namespace,
+                                          gene.pk, label)
+        genes_by_alt[alt] = gene
+    if not genes_by_alt:
+        return []
+
+    variant_qs = Variant.objects.filter(Variant.get_gene_level_q(),
+                                        locus__position__in=[g.pk for g in genes_by_alt.values()],
+                                        alt__seq__in=list(genes_by_alt)) \
+                                .select_related("locus", "alt")
+    return [SpliceEventVariant(variant=variant, gene=genes_by_alt[variant.alt.seq], label=label)
+            for variant in variant_qs]

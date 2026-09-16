@@ -36,6 +36,11 @@ Gotchas:
   comes from models/models_splice_event.py:SpliceEvent, a naming table seeded with the junctions the TSO 500 panel
   reports (genes/migrations/0093_seed_splice_events.py); a junction with no row still imports, labelled with its own
   coordinates (`X_66905968_66914514`), which reads as raw coordinates on a report and is the prompt to add a row.
+  The two halves of a splice identity meet on that table from different directions: the importer resolves by coordinates
+  (gene_splice.py:SpliceEventResolver), while a classification or a search box arrives by name and resolves on
+  (gene_symbol, label) - gene_splice.py:resolve_splice_string for the string-in path, gene_splice.py:find_splice_events_for_string
+  for the lookup-only one search uses. Names are matched on a normalised key (gene_splice.py:splice_key), since an
+  imported c.HGVS has had its spaces stripped by the time it gets here.
 - models/models_gene_list.py:GeneList.get_q imports from annotation inside the method — the genes/annotation import cycle is real; keep new cross-imports out of module level.
 - Creating a second SampleGeneList for a sample deletes the ActiveSampleGeneList instead of switching it (models/models_gene_list.py:sample_gene_list_created); set the active one explicitly.
 - `PanelAppPanel.cache_valid` expires after `settings.PANEL_APP_CACHE_DAYS` (models/models_panel_app.py:PanelAppPanel.cache_valid); panel_app.py:get_panel_app_local_cache re-fetches from the live API when stale, so tests must not depend on it.
