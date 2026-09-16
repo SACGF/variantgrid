@@ -135,7 +135,7 @@ def create_gene_copy_number_events_for_variants(variant_qs) -> int:
     events = []
     for variant in variant_qs.filter(Variant.get_gene_level_q(), genecopynumberevent__isnull=True) \
                              .select_related("locus", "alt"):
-        alt_kind, _namespace, _gene_id = GeneLevelSymbolicAlt.parse(variant.alt.seq)
+        alt_kind, _namespace, _gene_id, _label = GeneLevelSymbolicAlt.parse(variant.alt.seq)
         kind = GeneCopyNumberEventKind.from_alt_kind(alt_kind)
         if kind is None:
             continue

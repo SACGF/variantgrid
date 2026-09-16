@@ -241,7 +241,7 @@ def create_gene_fusions_for_variants(variant_qs) -> int:
     gene_fusions = []
     for variant in variant_qs.filter(Variant.get_gene_level_q(), genefusion__isnull=True) \
                              .select_related("locus", "alt"):
-        kind, _namespace, partner_id = GeneLevelSymbolicAlt.parse(variant.alt.seq)
+        kind, _namespace, partner_id, _label = GeneLevelSymbolicAlt.parse(variant.alt.seq)
         if kind not in FUSION_ALTS:
             continue
         gene_fusions.append(GeneFusion(variant=variant,

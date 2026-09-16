@@ -209,7 +209,7 @@ class TestFusionVariant(GeneFusionTestCase):
 
     def test_alt_carries_the_partner(self):
         gene_fusion = self._fusion("BCR", "ABL1")
-        kind, namespace, partner_id = GeneLevelSymbolicAlt.parse(gene_fusion.variant.alt.seq)
+        kind, namespace, partner_id, _label = GeneLevelSymbolicAlt.parse(gene_fusion.variant.alt.seq)
         self.assertEqual(GeneLevelSymbolicAlt.FUSION, kind)
         self.assertEqual(GeneIdNamespace.HGNC, namespace)
         self.assertEqual(self.hgnc_ids["ABL1"], partner_id)

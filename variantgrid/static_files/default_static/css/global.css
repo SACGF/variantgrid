@@ -1019,6 +1019,10 @@ table.variantgrid-datatable .fusion-calls {
   background: #ede7f6;
   color: #5e35b1;
 }
+.rv-kind-splice {
+  background: #e0f2f1;
+  color: #00695c;
+}
 table.variantgrid-datatable .cs-chips {
   display: grid;
   grid-template-columns: 74fr 52fr 66fr 60fr;

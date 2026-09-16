@@ -27,6 +27,7 @@ from annotation.models import (
 )
 from annotation.transcripts_annotation_selections import VariantTranscriptSelections
 from eventlog.models import create_event
+from genes.gene_splice import SpliceEventVariant, get_splice_event_variant
 from genes.models import (
     CanonicalTranscriptCollection,
     GeneCopyNumberEvent,
@@ -172,6 +173,7 @@ def variant_grid_row_detail(request, variant_id: int, annotation_version_id: int
         "overlapping_symbols": overlapping_symbols,
         "gene_fusion": _get_gene_fusion(variant),
         "gene_copy_number_event": _get_gene_copy_number_event(variant),
+        "splice_event_variant": _get_splice_event_variant(variant),
     }
     return render(request, "variantopedia/variant_grid_row_detail.html", context)
 
@@ -189,6 +191,12 @@ def _get_gene_copy_number_event(variant: Variant) -> Optional[GeneCopyNumberEven
     if not variant.is_gene_level:
         return None
     return GeneCopyNumberEvent.objects.filter(variant=variant).select_related("gene").first()
+
+
+def _get_splice_event_variant(variant: Variant) -> Optional[SpliceEventVariant]:
+    """ The third kind - the gene and the junction's label, which the alt carries rather than a row
+        of its own (@see genes.gene_splice) """
+    return get_splice_event_variant(variant)
 
 
 def view_variant(request, variant_id, genome_build_name=None):
@@ -416,6 +424,7 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
         annotation_description["spliceai"] = "Deep Learning splicing predictor - see <a href='https://www.sciencedirect.com/science/article/pii/S0092867418316295?via%3Dihub'>SpliceAI</a>"
 
     has_tags = VariantTag.get_for_build(genome_build, variant_qs=variant.equivalent_variants).exists()
+    splice_event_variant = _get_splice_event_variant(variant)
 
     if variant_annotation and variant_annotation.hgvs_g:
         hgvs_g = variant_annotation.hgvs_g
@@ -441,8 +450,11 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
         "variant_annotation": variant_annotation,
         "gene_fusion": _get_gene_fusion(variant),
         "gene_copy_number_event": _get_gene_copy_number_event(variant),
-        # Names the page and the analysis' variant details tab, which have no room for a transcript
-        "variant_short_label": variant_annotation.get_short_label() if variant_annotation else hgvs_g or str(variant),
+        "splice_event_variant": splice_event_variant,
+        # Names the page and the analysis' variant details tab, which have no room for a transcript.
+        # A splice event is called by its name ("AR-V7 splice variant"), not by a c.HGVS it has none of
+        "variant_short_label": splice_event_variant.display if splice_event_variant else
+            (variant_annotation.get_short_label() if variant_annotation else hgvs_g or str(variant)),
         "variant_tag_stale_days": user_settings.variant_tag_stale_days,
         "visible_fields": variant_annotation.visible_columns if variant_annotation else frozenset(),
         "vts": vts,

@@ -1,5 +1,6 @@
 """
-Annotation for gene-level variants (gene fusions, whole-gene copy number events), computed locally.
+Annotation for gene-level variants (gene fusions, whole-gene copy number events, splice calls),
+computed locally.
 
 @see snpdb.gene_level_variants for why one of these is stored as a Variant.
 
@@ -46,6 +47,7 @@ from annotation.models.damage_enums import PathogenicityImpact
 from annotation.signals.manual_signals import annotation_run_complete_signal
 from genes.gene_copy_number import create_gene_copy_number_events_for_variants
 from genes.gene_fusions import create_gene_fusions_for_variants
+from genes.gene_splice import splice_event_variants
 from genes.models import (
     Gene,
     GeneAnnotationRelease,
@@ -76,6 +78,11 @@ GENE_FUSION_TERMS = GeneLevelTerms(consequence="gene_fusion",
                                    impact=PathogenicityImpact.HIGH,
                                    variant_class=VariantClass.GENE_FUSION)
 # The SO terms VEP itself uses for a transcript wholly duplicated or wholly lost
+# SO:0001568 - a splice call is a junction rather than a variant in a splice site, and the impact
+# matches what VEP gives a splice donor/acceptor variant. @see genes.gene_splice
+SPLICE_TERMS = GeneLevelTerms(consequence="splicing_variant",
+                              impact=PathogenicityImpact.HIGH,
+                              variant_class=VariantClass.SPLICING_VARIANT)
 GENE_COPY_NUMBER_TERMS = {
     GeneCopyNumberEventKind.GAIN: GeneLevelTerms(consequence="transcript_amplification",
                                                  impact=PathogenicityImpact.HIGH,
@@ -271,12 +278,17 @@ def _gene_level_events_for_run(annotation_run):
     for event in copy_number_qs.iterator():
         yield event, GENE_COPY_NUMBER_TERMS[GeneCopyNumberEventKind(event.kind)]
 
+    # A splice event has no row of its own - its alt carries the gene and the junction's label, so
+    # the Variant is read straight into the same shape the other two events present
+    for splice_event_variant in splice_event_variants(variant_qs):
+        yield splice_event_variant, SPLICE_TERMS
+
 
 def _build_gene_level_annotation(annotation_run, resolver: GeneLevelIdResolver, event,
                                  terms: GeneLevelTerms):
     """ (representative annotation, per-transcript annotations, gene overlaps) for one gene-level
-        event - a GeneFusion or a GeneCopyNumberEvent, which differ only in how many genes they name
-        and what VEP would have called them """
+        event - a GeneFusion, a GeneCopyNumberEvent or a splice call, which differ only in how many
+        genes they name and what VEP would have called them """
 
     variant_annotation_version = annotation_run.variant_annotation_version
     # The first gene's release annotation is the representative one (a fusion's anchor), matching

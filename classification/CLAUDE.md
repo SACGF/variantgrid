@@ -121,14 +121,16 @@ Gotchas:
 - `kind_groups` always carries all five kinds, empty variants and all (the way the tiers are always printed), so a
   template can say "Gene Fusions - None detected". A Results Summary that skips a kind reads as though it wasn't looked for.
   The legacy TSO 500 report is the one exception, omitting Splicing Variants entirely when empty - the template decides.
-- What makes a classification a splicing variant is the VCF its sample came off, not anything on the record: a
-  SpliceGirl call imports as an ordinary `<DEL>` variant with coordinates and a c.HGVS
-  (report/case_report_context.py:SPLICE_CALLER_SOURCE_PATTERN). The printed name of the event ("MET exon 14
-  skipping") is the `splice_label` evidence key, which the scientist types - nothing in the call carries it.
 - An amplification carries two magnitudes and they are different quantities: `copy_number` is the caller's
   absolute count (VCF `CN`) and `fold_change` its ratio against the normal (VCF `SM` / `FC`). Both are
   autopopulated from the sample genotype, routed on `VCF.copy_number_field` by
   library/genomics/vcf_enums.py:VCFConstant.COPY_NUMBER_FIELD_IS_RATIO, so a record may hold either or both.
+- What kind of event the case report prints a record as comes off its gene-level alt
+  (`classification/report/case_report_context.py:_kind_and_alteration`) - a fusion, a copy number call or a splice
+  junction. A SpliceGirl VCF's own `<DEL>` records still read as small variants; a splice call is what the TSO 500
+  CombinedVariantOutput loaded. The printed name of the event ("MET exon 14 skipping") is the `splice_label` evidence
+  key, autopopulated from the junction's `genes/models/models_splice_event.py:SpliceEvent` and left for the scientist
+  to type where we have no name for it.
 - A gene-level variant sits on no transcript, so `gene_symbol` is autopopulated from the event's GeneLevelId (a fusion's
   anchor first), which already holds the approved symbol the caller's MYCL1 resolved to
   (`autopopulate_evidence_keys/evidence_from_variant.py:get_evidence_fields_from_gene_level_event`) - the transcript path

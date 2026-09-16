@@ -13,6 +13,7 @@ from genes.gene_copy_number import (
     create_gene_copy_number_events_for_variants,
 )
 from genes.gene_level_resolver import GeneLevelNameResolver
+from genes.gene_splice import ResolvedSpliceEvent, SpliceEventVariant
 from genes.models import GeneCopyNumberEvent, GeneCopyNumberEventKind
 from library.utils import sha256sum_str
 from snpdb.gene_level_variants import GENE_LEVEL_SVLEN
@@ -47,3 +48,17 @@ def create_gene_copy_number_event(gene_name: str, kind: GeneCopyNumberEventKind,
     variant = create_gene_level_variant(event.variant_coordinate)
     create_gene_copy_number_events_for_variants(Variant.objects.filter(pk=variant.pk))
     return GeneCopyNumberEvent.objects.get(variant=variant)
+
+
+@transaction.atomic
+def create_splice_event_variant(gene_name: str, label: str,
+                                resolver: GeneLevelNameResolver = None) -> SpliceEventVariant:
+    """ ('AR', 'V7') -> the splice Variant, as the insert pipeline would have created it. A splice
+        event has no row of its own, so this hands back the view of the Variant """
+
+    if resolver is None:
+        resolver = GeneLevelNameResolver()
+    resolved_gene = resolver.resolve_gene(gene_name)
+    event = ResolvedSpliceEvent(gene=resolved_gene.gene_level_id, label=label)
+    variant = create_gene_level_variant(event.variant_coordinate)
+    return SpliceEventVariant(variant=variant, gene=event.gene, label=label)

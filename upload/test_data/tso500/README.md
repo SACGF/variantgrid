@@ -5,6 +5,7 @@ sequenced as a DNA arm and an RNA arm.
 
 ```
 ExampleSample_2600000001/
+├── ..._CombinedVariantOutput.tsv     the pair's reportable calls + TMB/MSI/GIS
 ├── ExampleSample_DNA_2600000001C/
 │   ├── ....hard-filtered.vcf         small variants     93 records
 │   ├── ....cnv.vcf                   gene-level CNV     25
@@ -24,8 +25,13 @@ and the `GL000*` decoys, with `chrM` at 16569 (rCRS, not hg19's 16571).
 
 The names are synthetic but keep the shape a loader has to parse. `2600000001` is a ten-digit lab
 accession identifying the specimen, and the trailing `C` and `B` are container suffixes naming the
-two nucleic-acid extractions taken from it — so the pair directory is the specimen and the two arm
-directories beneath it are its DNA and RNA extractions.
+two nucleic-acid extractions taken from it — so the two arm directories are the specimen's DNA and
+RNA extractions. The pair is **the patient**, not the specimen: in a real run the pair ID is the
+Omico C-number (`Patient.patient_code`), and the sample IDs are `SA-<C-number>-<accession><container>-<D|R>`,
+eg `SA-C23755-2535115161C-D`. A patient re-analysed later comes back under the same C-number with a
+new accession, so one pair ID spans specimens. The test files keep the older synthetic sample names
+because a CVO's DNA/RNA Sample IDs have to equal the VCF sample names they link to; the pair ID
+(`C0000001`) has the real shape.
 
 ## Properties to know before using this
 
@@ -37,6 +43,35 @@ intact. Positions are valid and self-consistent; they are not where the caller f
 
 Positions in the other files are real. `cnv.vcf` segments are the panel's fixed segmentation
 intervals — identical for every sample — and splice and fusion calls are somatic events.
+
+**`CombinedVariantOutput.tsv` is assembled, not a caller's.** It is the pair-level summary DRAGEN writes
+next to the two arm directories: `[Analysis Details]` names the patient (`Pair ID`) and the two
+extractions (`DNA Sample ID`, `RNA Sample ID`), then one `[Section]` per call type, each a header row then one row per
+call, every line padded with tabs to the widest section (11 columns). The layout is a real 2.1.1 RUO
+file's; the rows are this sample's. The real file's identifiers, dates and per-sample metrics were
+replaced, so:
+
+- `[Splice Variants]` has three rows. The `AR` row is real and is what the other two are shaped on:
+  `chrX:66905968` is the last base of AR exon 3 in GRCh37 (NM_000044.6) and `chrX:66914514` is in
+  intron 3 at cryptic exon 3 — exon 3 spliced to CE3 is AR-V7, and `Affected Exon` is blank because
+  CE3 is not an annotated exon. The `EGFR` and `MET` rows are the two `PASS` calls of
+  `SpliceVariants.vcf` written the way the CVO writes them (`Splice Supporting Reads` = `ALTDEDUP`,
+  `Reference Reads Transcript` = `REFDEDUP`, `Affected Exon` = the exons skipped).
+- `[Fusions]` is every `KeepFusion = True` row of `AllFusions.csv`: gene pair joined with `-` where
+  the caller knew the direction, supporting reads as `upload/tso500/dragen_all_fusions_parser.py`
+  sums them, and `Ref A Dedup` / `Ref B Dedup` as the two reference counts.
+- `[Gene Amplifications]` is the `cnv.vcf` `<DUP>` segments with `SM` ≥ 1.5, to three decimals. The
+  cutoff is a guess at the caller's; Illumina does not publish it.
+- `[Small Variants]` is one row, the first `PASS` record of the fuzzed `hard-filtered.vcf` with its
+  HGVS recomputed at the shifted position. The section is the reportable subset of that VCF and is
+  **not** what small variants are loaded from - see the upload table below.
+- `[Exon-Level CNVs]` is `BRCA1 NA` / `BRCA2 NA` as every published file has it, so it disagrees
+  with the constructed `_DragenExonCNV.vcf` records on purpose.
+- TMB, MSI and GIS values are plausible and made up. `Coding Region Size in Megabases` is the
+  panel constant.
+- Module 2.1.1 writes `[Exon-Level CNVs]`; 2.6 documents that section as `Large Rearrangements` and
+  adds `Gene-level Loss of Heterozygosity`. A loader keys on section names, and tolerates a section
+  it does not know.
 
 **Some rows are reconstructions, not caller output:**
 
@@ -74,6 +109,7 @@ Two facts these files don't reliably carry are supplied at upload instead, as `g
 | `_DragenExonCNV.vcf` | **`GRCh37` — required**, the header has no contigs and an unresolvable `##reference` | from header (`LrCalculator 1.0.0.11`) |
 | `SpliceVariants.vcf` | from header contigs | from header (`SpliceGirl 1.0.0.614`) |
 | `AllFusions.csv` | **`GRCh37` — required** on a multi-build deployment, the file carries no build at all | from its own `# Source =` line (`FusionProcessor 1.0.0.614`) |
+| `CombinedVariantOutput.tsv` | **`GRCh37` — required**, no build in the file | from `Module Version` (`DRAGEN TSO500 CombinedVariantOutput 2.1.1`) |
 
 Send a build's **own name** (`GRCh37`), not an alias (`hg19`). These files are GRCh37 with a `chr`
 prefix and `chrM` at 16569, and their `##reference` says `hg19_decoy` — which is exactly the confusion
@@ -96,6 +132,10 @@ field mapping comes off the header and the copy-neutral skip is a general rule.
   symbol than the rest of the pipeline (`MYCL`).
 - `SpliceVariants.vcf` — no `GT`; `AD`/`DP` carry splice-specific meanings (see the header) and
   the sample column is literally `SAMPLE`. `chr2:47637511` appears twice with different `END`.
+- `CombinedVariantOutput.tsv` — a splice call with no `Affected Exon` (AR-V7, a cryptic exon), two
+  with one (`14`) and a range (`2-7`); a gene pair whose 5' side is written with a slash
+  (`PPARG/AC016683.6-PAX8`) and one whose 3' side is a semicolon list (`CD74-ROS1;GOPC`); `NA`
+  sections (`[Sequencing Run Details]`, both exon-level CNV genes); tab padding on every line.
 - `AllFusions.csv` — multi-gene partners (`RP11-458D21.5;NOTCH2NL`, `ROS1;GOPC`), a gene pair
   written with a slash (`PPARG/AC016683.6`), `SEPT14` (renamed `SEPTIN14` by HGNC, and
   date-mangled by spreadsheets), two callers, long semicolon-joined filter strings.

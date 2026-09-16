@@ -51,36 +51,57 @@ class GeneLevelSymbolicAlt(models.TextChoices):
         FUSION_UNORDERED anchors on the smaller id, because an unordered report asserts no direction.
         GAIN/LOSS are a whole-gene copy number call with no coordinates at all: they repeat the
         position's own gene, so the alt alone says what the variant is. GAIN rather than AMP because
-        the threshold that makes a gain an amplification is the lab's, not ours. """
+        the threshold that makes a gain an amplification is the lab's, not ours.
+
+        SPLICE repeats the gene too, and carries the name of the junction as a third segment
+        (<SPLICE:HGNC:644:V7>), so two events in one gene are two variants. @see genes.gene_splice
+        for what the labels are and where the coordinates go. """
 
     FUSION = "FUSION", "Gene fusion"
     FUSION_UNORDERED = "FUSION_UNORDERED", "Gene fusion (direction not asserted)"
     GAIN = "GAIN", "Gene copy number gain"
     LOSS = "LOSS", "Gene copy number loss"
+    SPLICE = "SPLICE", "Splice event"
 
     # A partner the caller left unspecified, in place of the namespace:id
     UNKNOWN_PARTNER = Constant("UNKNOWN")
 
     @staticmethod
-    def format(kind: str, namespace: Optional[str], gene_id: Optional[int]) -> str:
+    def format(kind: str, namespace: Optional[str], gene_id: Optional[int],
+               label: Optional[str] = None) -> str:
         if gene_id is None:
             return f"<{kind}:{GeneLevelSymbolicAlt.UNKNOWN_PARTNER}>"
+        if label is not None:
+            return f"<{kind}:{namespace}:{gene_id}:{label}>"
         return f"<{kind}:{namespace}:{gene_id}>"
 
     @staticmethod
-    def parse(alt) -> Optional[tuple[str, Optional[str], Optional[int]]]:
-        """ Returns (kind, namespace, gene id) - namespace/id are None for an unknown partner.
-            None if this isn't a gene-level alt at all """
+    def parse(alt) -> Optional[tuple[str, Optional[str], Optional[int], Optional[str]]]:
+        """ Returns (kind, namespace, gene id, label) - namespace/id are None for an unknown partner
+            and the label is None for every kind but SPLICE. None if this isn't a gene-level alt """
         if m := GENE_LEVEL_ALT_PATTERN.fullmatch(str(alt)):
-            kind, namespace, gene_id = m.groups()
-            return kind, namespace, int(gene_id) if gene_id else None
+            kind = m.group("splice_kind") or m.group("kind")
+            namespace = m.group("splice_namespace") or m.group("namespace")
+            gene_id = m.group("splice_gene_id") or m.group("gene_id")
+            return kind, namespace, int(gene_id) if gene_id else None, m.group("label")
         return None
 
 
-# Longest kind first, so FUSION_UNORDERED isn't shadowed by FUSION
+# What a splice junction is named by - a seeded label (V7, vIII, ex14skip) or, for a junction we have
+# no name for, its own coordinates (X_66905968_66914514). @see genes.gene_splice
+GENE_LEVEL_LABEL = r"[A-Za-z0-9._-]+"
+# The kinds whose alt is <KIND:NAMESPACE:id>, longest first so FUSION_UNORDERED isn't shadowed by
+# FUSION. SPLICE is its own branch, as it alone carries the label segment
+_UNLABELLED_KINDS = sorted((v for v in GeneLevelSymbolicAlt.values if v != GeneLevelSymbolicAlt.SPLICE),
+                           key=len, reverse=True)
+_NAMESPACES = "|".join(GeneIdNamespace.values)
 GENE_LEVEL_ALT_PATTERN = re.compile(
-    rf"<({'|'.join(sorted(GeneLevelSymbolicAlt.values, key=len, reverse=True))}):"
-    rf"(?:({'|'.join(GeneIdNamespace.values)}):(\d+)|{GeneLevelSymbolicAlt.UNKNOWN_PARTNER})>"
+    rf"<(?:"
+    rf"(?P<splice_kind>{GeneLevelSymbolicAlt.SPLICE}):(?P<splice_namespace>{_NAMESPACES}):"
+    rf"(?P<splice_gene_id>\d+):(?P<label>{GENE_LEVEL_LABEL})"
+    rf"|(?P<kind>{'|'.join(_UNLABELLED_KINDS)}):"
+    rf"(?:(?P<namespace>{_NAMESPACES}):(?P<gene_id>\d+)|{GeneLevelSymbolicAlt.UNKNOWN_PARTNER})"
+    rf")>"
 )
 
 
@@ -161,6 +182,9 @@ class VariantClass(models.TextChoices):
     # Not an Ensembl class - VEP has none for a fusion, and a gene-level variant never reaches it anyway.
     # SO:0001565, the term SnpEff emits. @see snpdb.gene_level_variants
     GENE_FUSION = 'GF', "gene_fusion"
+    # Nor for a splice event reported as a junction rather than a variant in a splice site -
+    # SO:0001568. @see genes.gene_splice
+    SPLICING_VARIANT = 'SP', "splicing_variant"
 
 
 # Presentation grouping for variant type filters - every VariantClass belongs to exactly one group.
@@ -197,6 +221,9 @@ VARIANT_CLASS_GROUPS = {
     ],
     "Fusion": [
         VariantClass.GENE_FUSION,
+    ],
+    "Splicing": [
+        VariantClass.SPLICING_VARIANT,
     ],
     "Other": [
         VariantClass.ALU_INSERTION,

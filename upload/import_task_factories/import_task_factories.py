@@ -29,13 +29,16 @@ from upload.models import (
     UploadStepTaskType,
     VCFPipelineStage,
 )
-from upload.tso500 import dragen_all_fusions_parser
+from upload.tso500 import dragen_all_fusions_parser, dragen_combined_variant_output_parser
 from upload.tasks.import_analysis_task import ImportAnalysisTask
 from upload.tasks.import_bedfile_task import ImportBedFileTask
 from upload.tasks.import_gene_coverage_task import ImportGeneCoverageTask
 from upload.tasks.import_dragen_tso500_all_fusions_task import (
     DragenTSO500AllFusionsCreateVCFTask,
     DragenTSO500AllFusionsInsertTask,
+)
+from upload.tasks.import_dragen_tso500_combined_variant_output_task import (
+    DragenTSO500CombinedVariantOutputCreateVCFTask,
 )
 from upload.tasks import import_gene_level_cnv_task
 from upload.tasks.import_gene_level_cnv_task import (
@@ -173,6 +176,73 @@ class DragenTSO500AllFusionsImportTaskFactory(AbstractVCFImportTaskFactory):
     def get_finish_task_classes(self):
         # pipeline_success_task closes the pipeline off the end of the FINISH chain, so nothing here
         # takes it out of PROCESSING before ImportGenotypeVCFSuccessTask releases the VCF
+        return [ImportGenotypeVCFSuccessTask]
+
+
+class DragenTSO500CombinedVariantOutputImportTaskFactory(AbstractVCFImportTaskFactory):
+    """ Illumina DRAGEN TSO 500's CombinedVariantOutput.tsv - one vendor's format, not a standard.
+
+        Its '[Splice Variants]' rows become gene-level variants, written as a VCF so they go through
+        the normal insert pipeline. Only the bcftools stages are skipped - they all need a reference
+        base a gene-level locus does not have.
+        @see upload.tasks.import_dragen_tso500_combined_variant_output_task
+
+        A tsv full of gene symbols, so GeneListImportTaskFactory would otherwise claim it on its
+        default ability of 1 """
+
+    def get_uploaded_file_type(self):
+        return UploadedFileTypes.DRAGEN_TSO500_COMBINED_VARIANT_OUTPUT
+
+    def get_possible_extensions(self):
+        return ['tsv']
+
+    def get_data_classes(self):
+        return [UploadedVCF]
+
+    def get_metadata_keys(self):
+        # Becomes a VCF with a sample, so it takes the same keys a VCF does - including genome_build,
+        # which the file itself declares nowhere
+        return VCF_METADATA_KEYS
+
+    def get_processing_ability(self, user, filename, file_extension):
+        if dragen_combined_variant_output_parser.can_process_file(filename):
+            return 1000
+        return 0
+
+    def _get_vcf_filename(self, upload_pipeline) -> str:
+        return get_import_processing_filename(upload_pipeline.pk,
+                                              "dragen_tso500_combined_variant_output.vcf")
+
+    def get_pre_vcf_task(self, upload_pipeline):
+        """ Write the splice variants as a VCF for the pipeline to insert """
+        upload_step = UploadStep.objects.create(upload_pipeline=upload_pipeline,
+                                                name="Create DRAGEN TSO500 CombinedVariantOutput Variant VCF",
+                                                sort_order=self.get_sort_order(),
+                                                task_type=UploadStepTaskType.CELERY,
+                                                pipeline_stage=VCFPipelineStage.PRE_DATA_INSERTION,
+                                                script=full_class_name(DragenTSO500CombinedVariantOutputCreateVCFTask),
+                                                input_filename=upload_pipeline.file_upload.get_filename(),
+                                                output_filename=self._get_vcf_filename(upload_pipeline))
+        return DragenTSO500CombinedVariantOutputCreateVCFTask.si(upload_step.pk, 0)
+
+    def get_create_data_from_vcf_header_task_class(self):
+        # The VCF we wrote declares its sample and source, so the standard header path makes the
+        # VCF/Sample/Cohort/CohortGenotypeCollection the way it does for a lab's VCF
+        return ImportCreateVCFModelForGenotypeVCFTask
+
+    def _get_preprocess_class(self) -> type:
+        return GeneLevelPreprocessVCFTask
+
+    def get_known_variants_parallel_vcf_processing_task_class(self):
+        # Each row carries its read support and the caller's row in INFO, so the standard bulk
+        # importer writes the CohortGenotypes by SQL COPY
+        return ProcessGenotypeVCFDataTask
+
+    def get_post_data_insertion_classes(self):
+        # A splice event has no record of its own - the alt and INFO carry everything
+        return [VCFCheckAnnotationTask]
+
+    def get_finish_task_classes(self):
         return [ImportGenotypeVCFSuccessTask]
 
 

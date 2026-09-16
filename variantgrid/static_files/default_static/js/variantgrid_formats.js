@@ -854,6 +854,7 @@ const GENE_LEVEL_KINDS = {
                          title: 'Gene fusion - direction not asserted by the caller'},
     'GAIN': {code: 'GAIN', css: 'gain', title: 'Gene-level copy number gain'},
     'LOSS': {code: 'LOSS', css: 'loss', title: 'Gene-level copy number loss'},
+    'SPLICE': {code: 'SPLICE', css: 'splice', title: 'Splice event'},
 };
 const SV_KIND_CSS = {'DEL': 'del', 'DUP': 'dup', 'INV': 'inv', 'CNV': 'cnv', 'INS': 'ins'};
 
@@ -862,10 +863,18 @@ VariantGridFormat.variantKind = (alt, svlen, chrom, position) => {
     if (alt == null || !String(alt).startsWith("<")) {
         return null;
     }
-    const kind = String(alt).slice(1, -1).split(":")[0];
+    const altParts = String(alt).slice(1, -1).split(":");
+    const kind = altParts[0];
     const geneLevel = GENE_LEVEL_KINDS[kind];
     if (geneLevel) {
-        return {code: geneLevel.code, cssClass: `rv-kind-${geneLevel.css}`, title: geneLevel.title};
+        // A splice alt carries the junction's label as a fourth segment (<SPLICE:HGNC:644:V7>) -
+        // which event it is, so the badge says it beside the kind
+        const label = (kind === 'SPLICE') ? altParts[3] : null;
+        return {
+            code: label ? `${geneLevel.code} ${label}` : geneLevel.code,
+            cssClass: `rv-kind-${geneLevel.css}`,
+            title: label ? `${geneLevel.title} - ${label}` : geneLevel.title,
+        };
     }
     // An SV says how big it is - that, not the coordinate, is what a reader wants off the row
     const size = Math.abs(svlen || 0);

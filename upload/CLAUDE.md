@@ -61,6 +61,12 @@ Gotchas:
   rewritten onto the gene-level contig - the caller's segment is the panel's target window, not the event, so it is
   never stored as a Variant (tasks/import_gene_level_cnv_task.py, @see snpdb.gene_level_variants). A file naming a gene
   on partial calls (DragenExonCNV's `GENE=`) is not a segment field and keeps importing as coordinate SVs.
+- A TSO 500 pair's CombinedVariantOutput tsv is loaded for its `[Splice Variants]` section only
+  (import_task_factories/import_task_factories.py:DragenTSO500CombinedVariantOutputImportTaskFactory,
+  tasks/import_dragen_tso500_combined_variant_output_task.py). Each row becomes a gene-level Variant whose alt carries
+  the junction's label (@see genes.gene_splice); the file's fusions, small variants and copy number calls are the
+  lossy copies of what the arm files carry, so they are not sources. The file declares no genome build, so one is
+  declared at upload or comes off the `^DRAGEN TSO500 CombinedVariantOutput` VCFSourceSettings row.
 - Failure is one-way: UploadStep.error_exception → upload/models/models.py:UploadPipeline.error sets ERROR, marks the
   VCF/samples ImportStatus.ERROR, logs an Event and reports to Rollbar. Later steps see status != PROCESSING and mark
   themselves SKIPPED; BulkGenotypeVCFProcessor.check_pipeline_for_failures bails mid-file. Running steps are not killed.

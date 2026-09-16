@@ -16,10 +16,13 @@ from classification.autopopulate_evidence_keys.evidence_from_variant import (
 )
 from classification.enums import SpecialEKeys
 from classification.models import EvidenceKey
-from genes.models import HGNC, GeneCopyNumberEventKind, GeneSymbol, HGNCImport
+from genes.models import HGNC, GeneCopyNumberEventKind, GeneSymbol, HGNCImport, SpliceEvent
 from genes.models_enums import HGNCStatus
 from genes.tests.gene_fusion_test_utils import create_gene_fusion
-from genes.tests.gene_level_test_utils import create_gene_copy_number_event
+from genes.tests.gene_level_test_utils import (
+    create_gene_copy_number_event,
+    create_splice_event_variant,
+)
 from snpdb.models import GenomeBuild
 
 
@@ -80,27 +83,38 @@ class GeneLevelGeneSymbolTest(TestCase):
                             status=HGNCStatus.APPROVED, approved_name="MYCL proto-oncogene",
                             previous_symbols="MYCL1")
 
+        # AR is seeded with the junctions the TSO 500 panel reports (genes/migrations/0093)
+        GeneSymbol.objects.get_or_create(symbol="AR")
+        HGNC.objects.create(pk=644, gene_symbol_id="AR", hgnc_import=hgnc_import,
+                            status=HGNCStatus.APPROVED, approved_name="androgen receptor")
+
         cls.copy_number_variant = create_gene_copy_number_event(
             "MYCL1", GeneCopyNumberEventKind.GAIN).variant
         cls.fusion_variant = create_gene_fusion("BCR", "ABL1").variant
+        cls.splice_variant = create_splice_event_variant("AR", "V7").variant
+        cls.unnamed_splice_variant = create_splice_event_variant("AR", "X_1_2").variant
         cls._annotate_gene_level()
 
     @classmethod
     def _annotate_gene_level(cls):
         """ Run the GENE_LEVEL pipeline over them, so autopopulate sees what it sees in production """
         vav = cls.annotation_version.variant_annotation_version
-        variants = sorted([cls.copy_number_variant, cls.fusion_variant], key=lambda v: v.pk)
+        variants = sorted([cls.copy_number_variant, cls.fusion_variant, cls.splice_variant,
+                           cls.unnamed_splice_variant], key=lambda v: v.pk)
         range_lock = AnnotationRangeLock.objects.create(version=vav, min_variant=variants[0],
                                                        max_variant=variants[-1], count=len(variants))
         annotate_gene_level_run(AnnotationRun.objects.create(
             annotation_range_lock=range_lock,
             pipeline_type=VariantAnnotationPipelineType.GENE_LEVEL))
 
-    def _autopopulated_gene_symbol(self, variant) -> str:
+    def _autopopulated(self, variant, key: str):
         evidence_keys_list = list(EvidenceKey.objects.all().select_related("variantgrid_column"))
         data = get_evidence_fields_for_variant(self.genome_build, variant, None, None,
                                                evidence_keys_list, self.annotation_version)
-        return EvidenceKey.get_value(data.data.get(SpecialEKeys.GENE_SYMBOL))
+        return EvidenceKey.get_value(data.data.get(key))
+
+    def _autopopulated_gene_symbol(self, variant) -> str:
+        return self._autopopulated(variant, SpecialEKeys.GENE_SYMBOL)
 
     def test_gain_autopopulates_the_approved_symbol(self):
         self.assertEqual("MYCL", self._autopopulated_gene_symbol(self.copy_number_variant))
@@ -108,3 +122,13 @@ class GeneLevelGeneSymbolTest(TestCase):
     def test_fusion_autopopulates_the_anchor(self):
         """ The 5' partner - what the Variant is filed under and what the report sorts on """
         self.assertEqual("BCR", self._autopopulated_gene_symbol(self.fusion_variant))
+
+    def test_splice_autopopulates_the_gene_and_the_junctions_name(self):
+        """ The seeded SpliceEvent is what the report calls the junction """
+        self.assertEqual("AR", self._autopopulated_gene_symbol(self.splice_variant))
+        self.assertEqual("AR-V7 splice variant",
+                         self._autopopulated(self.splice_variant, SpecialEKeys.SPLICE_LABEL))
+
+    def test_a_junction_we_have_no_name_for_is_left_for_the_scientist(self):
+        self.assertIsNone(self._autopopulated(self.unnamed_splice_variant, SpecialEKeys.SPLICE_LABEL))
+        self.assertTrue(SpliceEvent.objects.exists(), "the seeded junctions are still there")
