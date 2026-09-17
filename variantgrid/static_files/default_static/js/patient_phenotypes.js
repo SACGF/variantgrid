@@ -14,8 +14,23 @@ function patientPhenotypeHtml(phenotype) {
     }
     const chips = [];
     for (const [service, cssClass] of Object.entries(PHENOTYPE_ONTOLOGY_CSS_CLASSES)) {
+        // One chip per phrase - "osteogenesis imperfecta" matches 24 OMIM terms, listed in the tooltip
+        const termsByMatchText = new Map();
         for (const term of (phenotype.terms[service] || [])) {
-            chips.push(`<span class="${cssClass} phenotype-chip" title="${escapeHtml(term.id)}">${escapeHtml(term.name)}</span>`);
+            const key = (term.match_text || term.id).toLowerCase();
+            if (!termsByMatchText.has(key)) {
+                termsByMatchText.set(key, []);
+            }
+            termsByMatchText.get(key).push(term);
+        }
+        for (const terms of termsByMatchText.values()) {
+            let label = terms[0].name;
+            let title = terms[0].id;
+            if (terms.length > 1) {
+                label = `${terms[0].match_text} (${terms.length})`;
+                title = [`${terms.length} ${service} terms:`, ...terms.map((term) => `${term.id} ${term.name}`)].join("\n");
+            }
+            chips.push(`<span class="${cssClass} phenotype-chip" title="${escapeHtml(title)}">${escapeHtml(label)}</span>`);
         }
     }
     if (!chips.length) {

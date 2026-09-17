@@ -1,18 +1,32 @@
-function displayPhenotypeMatches(descriptionBox, phenotypeText, phenotypeMatches, excludeString) {
-    function compareByStart(a,b) {
-      if (a.offset_start < b.offset_start)
-        return -1;
-      if (a.offset_start > b.offset_start)
-        return 1;
-      return 0;
+/*
+ * One span per ontology per matched stretch of text - "osteogenesis imperfecta" matches 24 OMIM terms, which
+ * were 24 nested spans. The tooltip lists every term the span stands for.
+ */
+function groupPhenotypeMatchesByOntology(phenotypeMatches) {
+    const groups = new Map();
+    for (const pm of phenotypeMatches) {
+        const key = `${pm.ontology_service}:${pm.offset_start}:${pm.offset_end}`;
+        if (!groups.has(key)) {
+            groups.set(key, {ontology_service: pm.ontology_service, offset_start: pm.offset_start,
+                             offset_end: pm.offset_end, matches: []});
+        }
+        groups.get(key).matches.push(pm.match);
     }
-    
-    phenotypeMatches = phenotypeMatches.sort(compareByStart);
-    let overlapping_matches = [];
+    return Array.from(groups.values());
+}
+
+function phenotypeMatchGroupTitle(group) {
+    if (group.matches.length === 1) {
+        return group.matches[0];
+    }
+    return [`${group.matches.length} ${group.ontology_service} terms:`, ...group.matches].join("\n");
+}
+
+function displayPhenotypeMatches(descriptionBox, phenotypeText, phenotypeMatches, excludeString) {
     const ambiguousAcronymCandidates = {};  // acronym -> [{accession, name}, ...]
+    const ambiguous = {};
     const realMatches = [];
-    for (let k = 0; k < phenotypeMatches.length; ++k) {
-        const pm = phenotypeMatches[k];
+    for (const pm of phenotypeMatches) {
         const acronym = pm.ambiguous_alias;
         if (acronym) {
             if (!(acronym in ambiguousAcronymCandidates)) {
@@ -20,60 +34,49 @@ function displayPhenotypeMatches(descriptionBox, phenotypeText, phenotypeMatches
             }
             continue;  // warning-only; not a real match - skip highlighting/grid
         }
+        if (pm.ambiguous) {
+            if (!(pm.ambiguous in ambiguous)) {
+                ambiguous[pm.ambiguous] = new Set();
+            }
+            ambiguous[pm.ambiguous].add(pm.accession);
+        }
         realMatches.push(pm);
     }
-    phenotypeMatches = realMatches;
 
-    const phenoLen = phenotypeText.length;
+    // Longest first at the same start, so a match inside another opens inside it
+    const matchGroups = groupPhenotypeMatchesByOntology(realMatches).sort(
+        (a, b) => (a.offset_start - b.offset_start) || (b.offset_end - a.offset_end));
+    const openGroups = [];
+    let nextGroup = 0;
     let phenotypeHTML = '';
-    let phenoOffsetStart = 0;
 
-    const ambiguous = {};
-    function addToAmbiguous(key, value) {
-        if (!(key in ambiguous)) {
-            ambiguous[key] = new Set();
+    function closeGroupsEndingBy(offset) {
+        for (let j = openGroups.length - 1; j >= 0; --j) {
+            if (openGroups[j].offset_end <= offset) {
+                phenotypeHTML += "</span>";
+                openGroups.splice(j, 1);
+            }
         }
-        ambiguous[key].add(value);
     }
 
+    for (let i = 0; i < phenotypeText.length; i++) {
+        closeGroupsEndingBy(i);
+        while (nextGroup < matchGroups.length && matchGroups[nextGroup].offset_start <= i) {
+            const group = matchGroups[nextGroup++];
+            const serviceClass = group.ontology_service.toLowerCase();
+            phenotypeHTML += `<span title="${escapeHtml(phenotypeMatchGroupTitle(group))}" class="ontology-service ${serviceClass}">`;
+            openGroups.push(group);
+        }
 
-    for(let i=0; i<phenoLen ; i++) {
         const char = phenotypeText.charAt(i);
-
-        let sliceEnd = 0;
-        for (let j=phenoOffsetStart ; j<phenotypeMatches.length ; ++j) {
-            const pm = phenotypeMatches[j];
-            if (pm.ambiguous) {
-                addToAmbiguous(pm.ambiguous, pm.accession);
-            }
-            if (pm.offset_start <= i) {
-                sliceEnd = j + 1;
-                phenotypeHTML += `<span title='${pm.match}' class='ontology-service ${pm.ontology_service}'>`;
-            } else {
-                break;
-            }
-        }
-        if (sliceEnd) {
-            const sliced = phenotypeMatches.slice(phenoOffsetStart, sliceEnd);
-            overlapping_matches = overlapping_matches.concat(sliced);
-            phenoOffsetStart = sliceEnd;
-        }
-        
         if (char === '\n') {
             phenotypeHTML += "<br />";
         } else {
             phenotypeHTML += char;
         }
-        
-        for (let j=overlapping_matches.length - 1 ; j>= 0 ; --j) {
-            const pm = overlapping_matches[j];
-            if (pm.offset_end <= i) {
-                phenotypeHTML += "</span>";
-                overlapping_matches.splice(j, 1);
-            }
-        }
     }
-    
+    closeGroupsEndingBy(Infinity);
+
     if (excludeString) {
         const escapedRegex = excludeString.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         const escapedText = excludeString.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');

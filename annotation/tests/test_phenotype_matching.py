@@ -175,7 +175,8 @@ class TestPhenotypeMatching(TestCase):
         self.assertEqual(terms.text, "Raised TSH")
         term_ids = [term.pk for terms_for_service in terms.terms.values() for term in terms_for_service]
         self.assertEqual(sorted(term_ids), patient.get_ontology_term_ids())
-        self.assertEqual([t["id"] for t in terms.to_json()["terms"]["HPO"]], ["HP:0002925"])
+        self.assertEqual([(t["id"], t["match_text"]) for t in terms.to_json()["terms"]["HPO"]],
+                         [("HP:0002925", "Raised TSH")])
 
     def test_patient_phenotype_terms_excludes_ambiguous_acronyms(self):
         """ Rows matched before a term joined the denylist stay in the DB - both paths drop them """

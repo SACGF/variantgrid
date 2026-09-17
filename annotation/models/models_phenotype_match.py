@@ -1,7 +1,7 @@
 import re
 from collections import defaultdict
 from collections.abc import Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from cache_memoize import cache_memoize
 from django.contrib.auth.models import User
@@ -226,14 +226,16 @@ class CohortTextPhenotype(models.Model):
 
 @dataclass(frozen=True)
 class PatientPhenotypeTerms:
-    """ A patient's phenotype text and the ontology terms matched in it """
+    """ A patient's phenotype text and the ontology terms matched in it. match_texts is the text each term
+        matched (term pk -> text), so a page can collapse the terms one phrase matched into one chip """
     text: str
     terms: dict[str, list[OntologyTerm]]
+    match_texts: dict[str, str] = field(default_factory=dict)
 
     def to_json(self) -> dict:
         terms = {}
         for service_label in PHENOTYPE_ONTOLOGY_SERVICE_LABELS.values():
-            terms[service_label] = [{"id": term.pk, "name": term.name}
+            terms[service_label] = [{"id": term.pk, "name": term.name, "match_text": self.match_texts.get(term.pk)}
                                     for term in self.terms.get(service_label, [])]
         return {"text": self.text, "terms": terms}
 
@@ -245,15 +247,18 @@ def patient_phenotype_terms(patients: Iterable[Patient]) -> dict[int, PatientPhe
     tpm_qs = (TextPhenotypeMatch.objects
               .filter(**{TPM_PATIENT_PATH + "__in": patients})
               .select_related("text_phenotype", "ontology_term")
-              .annotate(patient_id=F(TPM_PATIENT_PATH), phenotype_text=F(TPM_DESCRIPTION_TEXT_PATH)))
+              .annotate(patient_id=F(TPM_PATIENT_PATH), phenotype_text=F(TPM_DESCRIPTION_TEXT_PATH))
+              .order_by("pk"))
 
     text_by_patient_id = {}
     terms_by_patient_id = defaultdict(set)
+    match_texts_by_patient_id = defaultdict(dict)
     for tpm in tpm_qs:
         text_by_patient_id[tpm.patient_id] = tpm.phenotype_text
         if tpm.match_text.lower() in denylist:
             continue  # Ambiguous acronym - @see PhenotypeDescription.get_ontology_term_ids
         terms_by_patient_id[tpm.patient_id].add(tpm.ontology_term)
+        match_texts_by_patient_id[tpm.patient_id].setdefault(tpm.ontology_term_id, tpm.match_text)
 
     phenotype_terms = {}
     for patient_id, text in text_by_patient_id.items():
@@ -261,7 +266,8 @@ def patient_phenotype_terms(patients: Iterable[Patient]) -> dict[int, PatientPhe
         for term in sorted(terms_by_patient_id[patient_id]):
             if service_label := PHENOTYPE_ONTOLOGY_SERVICE_LABELS.get(term.ontology_service):
                 terms_by_service[service_label].append(term)
-        phenotype_terms[patient_id] = PatientPhenotypeTerms(text=text, terms=dict(terms_by_service))
+        phenotype_terms[patient_id] = PatientPhenotypeTerms(text=text, terms=dict(terms_by_service),
+                                                            match_texts=match_texts_by_patient_id[patient_id])
     return phenotype_terms
 
 
