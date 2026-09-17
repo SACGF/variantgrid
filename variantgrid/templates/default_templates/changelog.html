@@ -17,7 +17,7 @@
 
     {% if sapath_enabled %}
         <!-- Do all as 1 big change -->
-        <!-- Last audited/updated: 14 September 2026 (includes features up to the 14 September 2026 deploy) -->
+        <!-- Last audited/updated: 17 September 2026 (includes features up to the 17 September 2026 deploy) -->
 
         <div class="card mt-4">
             <div class="card-header">VariantGrid 4.0 - FAQ</div>
@@ -31,10 +31,10 @@
 
                 <h4>Key new features - Somatic</h4>
                 <ul>
-                    <li>All TSO VCFs are loaded (an API to link them by patient is coming)</li>
+                    <li>All TSO VCFs are loaded, and CombinedVariantOutput links them to the patient / specimen / extraction</li>
                     <li>SampleNode works off patients / extractions, not just samples</li>
                     <li>Tag "SomaticReportable", then use the "Classify and report" tab on the sample or patient page
-                        (multi-variant reports under construction)</li>
+                        to build a multi-variant case report (PDF / Word)</li>
                 </ul>
 
                 <h4>How does support for new variant types (eg Structural Variants) work?</h4>
@@ -100,6 +100,7 @@
                         FILTER, zygosity and allele frequency get per sample overrides</li>
                     <li>A node count badge per tag - click it to filter the grid or make a TagNode</li>
                     <li>Analysis templates - reveal a node hidden by ignorable errors (eg a trio where part stopped due to detected sex)</li>
+                    <li>Phenotype node can take its terms from a cohort as well as a patient</li>
                 </ul>
 
                 <h4>Annotation</h4>
@@ -169,6 +170,9 @@
                     <li>Classify &amp; Report tab on the sample and patient pages, with outstanding counts</li>
                     <li>Reuse prior curation at gene level, grouped by distinct gene-scope content</li>
                     <li>Gene page - clinical significance summary counts above the groupings grid, click one to filter</li>
+                    <li>Multi-variant case reports - DRAFT preview then finalise, with copy number losses, splice calls and CNV fold change</li>
+                    <li>Classifications for gene-level events and splice events (eg "AR-V7") can be imported</li>
+                    <li>Classification report warns when it was generated from an older submitted version</li>
                 </ul>
 
                 <h4>Data</h4>
@@ -180,6 +184,7 @@
                     <li>Upload / Download API</li>
                     <li>File upload widget replaced with Filepond (the old jQuery File Upload had been abandoned upstream)</li>
                     <li>Cohort page - tick samples to launch a Duo/Trio/Quad, or to spawn a sub cohort</li>
+                    <li>TSO 500 CombinedVariantOutput import - splice calls, patient / specimen / extraction links and TMB / MSI measures</li>
                 </ul>
 
                 <h4>Data Sharing</h4>
@@ -233,6 +238,8 @@
                     <li>Patient imports - improved grids showing more info, and the original CSV can be downloaded</li>
                     <li>Patient graphs only count patients you have permission to see</li>
                     <li>New Specimen and Extraction records - pages, grids and an API</li>
+                    <li>Cohorts have a phenotype (can be copied from their patients), and patient phenotype terms are shown beside samples</li>
+                    <li>Patients show their de-identified code only, never the name</li>
                 </ul>
 
                 <h4>Search</h4>
@@ -277,6 +284,7 @@
                     <li>Lab heads can add and remove members on their lab page</li>
                     <li>Faster page loads - related data, ontology versions and contigs no longer run a query per row</li>
                     <li>Page titles prefixed with the site name, variant / allele pages named by short label</li>
+                    <li>Dashboard - germline vs somatic sequencing graph</li>
                 </ul>
 
                 <h4>Variant Details</h4>
@@ -303,6 +311,8 @@
                     <li>#733 - Variant pages (gene symbol, all variants, tags etc) now styled/links the same as on Anaylsis grid</li>
                     <li>Composite columns (eg Pop Freq Other, UniProt), sample glyphs, 2 line rows and sort menus</li>
                     <li>Conservation drawn as a dot per score</li>
+                    <li>Custom columns - tags and Sample columns are always included (reorder but not remove)</li>
+                    <li>Grid search matches a user's full name, tagged variants grids show Sample and Patient</li>
                 </ul>
 
                 <h4>VCF upload</h4>
@@ -321,6 +331,27 @@
 
 
     {% else %}
+       <div class="card mt-4">
+            <div class="card-header">17 September 2026</div>
+            <div class="card-body">
+                <h4>Patients / Phenotype</h4>
+                <ul>
+                    <li>#1426 - Cohorts have a phenotype, which can be copied from their samples' patients</li>
+                    <li>#1426 - VCF, cohort and sample pages show each patient's phenotype terms beside the sample</li>
+                    <li>Ontology autocompletes match on term id (eg "1061" or "HPO:1061")</li>
+                </ul>
+                <h4>Tags</h4>
+                <ul>
+                    <li>Tagged variants grids show Sample and Patient columns</li>
+                    <li>Variant page - expanding a tag from another genome build no longer errors</li>
+                </ul>
+                <h4>Settings</h4>
+                <ul>
+                    <li>#1859 #1199 - Custom columns - tags and Sample columns are always included (reorder but not remove), can now drag anywhere in left box</li>
+                </ul>
+            </div>
+       </div>
+
        <div class="card mt-4">
             <div class="card-header">14 September 2026</div>
             <div class="card-body">
