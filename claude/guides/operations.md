@@ -58,6 +58,11 @@ surface the deploy-time steps migrations registered with `manual/operations/manu
 printed for a human. Completion is a `ManualMigrationAttempt`. `scripts/deployed.sh` records the deploy in Rollbar and runs
 `manage.py deployed`. `scripts/restart_services.sh` finishes it.
 
+Releases are git tags `vg<major>.<minor>` (`vg3.0`, and `vg4.0` once cut). `VARIANTGRID_VERSION` is `git describe` against the
+latest tag for `VARIANTGRID_MAJOR_VERSION` (`vg4.0-12-gc174556`, or `vg4-gc174556` before that major has a tag), read
+once per process from the checkout and reported by the API docs and `seqauto/views_rest.py:CapabilitiesView`. Cutting a
+new major means bumping that setting in the same commit as the tag.
+
 Pushed migrations are frozen (`CLAUDE.md`); a data fix that must run on every deployment is a `ManualOperation` in a
 migration, not a note in a PR. Annotation upgrades (new VEP, new columns) are their own procedure: a new
 `VariantAnnotationVersion` per build via `create_new_variant_annotation_version`, then re-annotation of every variant in

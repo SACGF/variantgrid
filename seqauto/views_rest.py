@@ -215,7 +215,7 @@ class CapabilitiesView(APIView):
         upload_file_types = {UploadedFileTypes(factory.get_uploaded_file_type()).name.lower()
                              for factory in get_import_task_factories()}
         return Response({
-            "version": settings.SPECTACULAR_SETTINGS["VERSION"],
+            "version": settings.VARIANTGRID_VERSION,
             "git_hash": Git(settings.BASE_DIR).hash,
             "features": list(API_FEATURES),
             "upload_file_types": sorted(upload_file_types - INTERNAL_UPLOAD_FILE_TYPES),
