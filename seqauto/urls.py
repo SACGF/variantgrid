@@ -145,6 +145,7 @@ rest_urlpatterns = [
     perm_path('api/v1/qc_exec_summary/bulk_create', QCExecSummaryBulkCreateView.as_view(), name='api_qc_exec_summary_bulk_create'),
     perm_path('api/v1/qc_gene_coverage/bulk_create', QCGeneCoverageBulkCreateView.as_view(), name='api_qc_gene_coverage_bulk_create'),
     perm_path('api/v1/sequencing_files/bulk_create', SequencingFilesBulkCreateView.as_view(), name='api_sequencing_files_bulk_create'),
+    perm_path('api/v1/capabilities', views_rest.CapabilitiesView.as_view(), name='api_capabilities'),
 ]
 
 urlpatterns += format_suffix_patterns(rest_urlpatterns)

@@ -1,4 +1,5 @@
 from collections import defaultdict
+from django.conf import settings
 from django.db.models.query_utils import Q
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
@@ -14,6 +15,7 @@ from rest_framework.viewsets import ModelViewSet
 from genes.models import GeneVersion
 from genes.views import get_coverage_stats
 from library.constants import WEEK_SECS
+from library.git import Git
 from library.utils import defaultdict_to_dict
 import numpy as np
 from seqauto.models import GoldCoverageSummary, EnrichmentKit, SequencerModel, Sequencer, Experiment, VariantCaller, \
@@ -28,6 +30,23 @@ from seqauto.serializers.seqauto_qc_serializers import FastQCSerializer, QCExecS
 from seqauto.serializers.sequencing_serializers import SequencerModelSerializer, SequencerSerializer, \
     ExperimentSerializer, VariantCallerSerializer, SequencingRunSerializer, SampleSheetSerializer, VCFFileSerializer, \
     SampleSheetCombinedVCFFileSerializer, SequencingFilesBulkCreateSerializer
+from upload.import_task_factories.import_task_factory import get_import_task_factories
+from upload.models import UploadedFileTypes
+
+# The client contract: each name is a fact about this codebase a client may rely on. Append one in the same
+# change as a client-visible feature, and keep it while this endpoint exists.
+API_FEATURES = ()
+
+# Import factories the server drives itself, rather than files a client uploads (UploadedFileTypes names, lower case)
+INTERNAL_UPLOAD_FILE_TYPES = frozenset({
+    "analysis",
+    "clinvar",
+    "liftover",
+    "manual_variant_entry",
+    "variant_tags",
+    "wiki_gene",
+    "wiki_variant",
+})
 
 
 class EnrichmentKitSummaryView(RetrieveAPIView):
@@ -104,6 +123,21 @@ class SequencingFilesBulkCreateView(APIView):
             serializer.save()
             return Response({"message": "Records created successfully"}, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class CapabilitiesView(APIView):
+    """ What this deployment accepts, so one API client can work against servers of different ages """
+
+    def get(self, request, *args, **kwargs):
+        upload_file_types = {UploadedFileTypes(factory.get_uploaded_file_type()).name.lower()
+                             for factory in get_import_task_factories()}
+        git = Git(settings.BASE_DIR)
+        return Response({
+            "version": git.git_cmd(["describe", "--tags", "--match", "vg3.*"]),
+            "git_hash": git.hash,
+            "features": list(API_FEATURES),
+            "upload_file_types": sorted(upload_file_types - INTERNAL_UPLOAD_FILE_TYPES),
+        })
 
 
 class QCViewSet(ModelViewSet):
