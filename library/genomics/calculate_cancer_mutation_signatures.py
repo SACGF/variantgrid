@@ -100,8 +100,8 @@ from collections import defaultdict, namedtuple
 from functools import partial
 
 import configargparse
+import cyvcf2
 import numpy as np
-import vcf
 from scipy.optimize import minimize
 
 from library.genomics.fasta_wrapper import FastaFileWrapper
@@ -263,7 +263,7 @@ class MutationSignatures:
             but this is no longer useful, as it won't allow random subsampling, so need to keep it as counts """
 
         reference = FastaFileWrapper(reference_fasta)
-        invcf = vcf.Reader(filename=vcf_filename)
+        invcf = cyvcf2.VCF(vcf_filename)
 
         raw_mut_index_list = []
         for var in invcf:

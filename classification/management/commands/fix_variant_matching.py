@@ -20,6 +20,7 @@ from snpdb.models.models_enums import ImportStatus
 
 
 class Command(BaseCommand):
+    category = "one-off"
 
     def add_arguments(self, parser):
         # parser.add_argument('--all', action='store_true', default=False, help='Attempt to rematch every single classification')

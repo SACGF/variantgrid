@@ -1,18 +1,26 @@
+"""
+The analysis grids: VariantGrid (the node variant grid - AbstractVariantGrid with the node's
+queryset, count and sample columns) and ExportVariantGrid for unpaged CSV/VCF export, plus the
+DatatableConfig tables for analyses, templates, node issues, node column summaries, gene lists
+and ontology genes inside a node, karyomapping, the audit log and candidate search runs. Grid
+plumbing is snpdb/views/datatable_view.py; columns come from the user's CustomColumnsCollection.
+"""
 import operator
 from collections import defaultdict
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from functools import reduce
 from typing import Any, Optional
 
 import pandas as pd
 from auditlog.models import LogEntry
 from django.conf import settings
+from django.contrib.humanize.templatetags.humanize import intcomma
 from django.core.exceptions import PermissionDenied
-from django.db.models import F, Max, Q, QuerySet, StringAgg, Value
-from django.db.models.functions import Substr
+from django.db.models import F, FloatField, Max, Q, QuerySet, StringAgg, Value
+from django.db.models.functions import Cast, Substr
+from django.http import HttpRequest
 from django.shortcuts import get_object_or_404
 from django.urls.base import reverse
-from django.utils.functional import SimpleLazyObject
 
 from analysis.models import (
     Analysis,
@@ -24,13 +32,15 @@ from analysis.models import (
     CandidateSearchType,
     CandidateStatus,
     GroupOperation,
-    NodeCount,
     NodeStatus,
+    VariantTag,
 )
 from analysis.models.models_karyomapping import KaryomappingAnalysis
-from analysis.models.nodes.analysis_node import (
-    NodeColumnSummaryCacheCollection,
-    get_extra_filters_q,
+from analysis.models.nodes.analysis_node import NodeColumnSummaryCacheCollection
+from analysis.models.nodes.node_counts import (
+    get_extra_filters_count,
+    get_node_extra_filters_q,
+    is_extra_filter,
 )
 from analysis.variant_tag_operations import VARIANT_TAG_CLASSIFIED
 from analysis.views.analysis_permissions import get_node_subclass_or_404
@@ -38,25 +48,24 @@ from annotation.models import HumanProteinAtlasAnnotation
 from classification.models import Classification
 from genes.grids import GeneListGenesColumns
 from genes.models import HGNC, GeneList
-from library.jqgrid.jqgrid_sql import get_overrides
-from library.jqgrid.jqgrid_user_row_config import JqGridUserRowConfig
-from library.pandas_jqgrid import DataFrameJqGrid
+from library.django_utils.datatable_dataframe import DataFrameDatatableConfig
 from library.unit_percent import get_allele_frequency_formatter
 from library.utils import (
     JsonDataType,
+    JsonObjType,
     iter_fixed_chunks,
     sha256sum_str,
-    update_dict_of_dict_values,
 )
-from ontology.grids import AbstractOntologyGenesGrid
+from ontology.grids import AbstractOntologyGenesConfig
 from ontology.models import GeneDiseaseClassification, OntologyTermRelation, OntologyVersion
 from patients.models_enums import Zygosity
-from snpdb.grid_columns.custom_columns import (
-    get_custom_column_fields_override_and_sample_position,
-    get_variantgrid_extra_annotate,
-)
+from snpdb.grid_columns.custom_columns import get_variantgrid_extra_annotate
 from snpdb.grid_columns.grid_sample_columns import (
+    COPY_NUMBER_COLUMN,
+    SAMPLE_COMPOSITE_COLUMNS,
+    SAMPLE_SORT_KEY_LABELS,
     get_available_format_columns,
+    get_copy_number_alias,
     get_variantgrid_zygosity_annotation_kwargs,
 )
 from snpdb.grids import AbstractVariantGrid
@@ -68,49 +77,48 @@ from snpdb.models import (
     VariantGridColumn,
     VCFFilter,
 )
+from snpdb.models.models_enums import SequenceRole
 from snpdb.models.models_genome import GenomeBuild
-from snpdb.views.datatable_view import CellData, DatatableConfig, RichColumn, SortOrder
+from snpdb.views.datatable_view import CellData, DatatableConfig, NullOrder, RichColumn, SortOrder
 
 
 class VariantGrid(AbstractVariantGrid):
-    caption = 'VariantGrid'
+    grid_name = 'VariantGrid'
     GENOTYPE_COLUMNS_MISSING_VALUE = "."
     SOURCE_COLUMN = "vcf_source"
-    colmodel_overrides = {
-        'tags': {'classes': 'no-word-wrap', 'formatter': 'tagsFormatter', 'sortable': False},
-    }
+    # Sorting a packed genotype column orders on an alias annotated for that column alone
+    GENOTYPE_SORT_ALIAS_PREFIX = "cohort_genotype_sort_"
+    analysis_tags = True
+    # Always deferred: whether to fetch rows at all is the page's call (the row count placeholder,
+    # and the grid tab being hidden) - node_data_grid.html triggers the first load
+    defer_loading = True
+    # The fields/operations go down for the FilterNode editor's builder, but the grid itself gets no
+    # "Filter grid..." button - FilterNode is how you filter an analysis
+    filter_builder_toolbar = False
 
-    def __init__(self, user, node, extra_filters=None, af_show_in_percent=None):
-        if af_show_in_percent is None:
-            af_show_in_percent = settings.VARIANT_ALLELE_FREQUENCY_CLIENT_SIDE_PERCENT
-
-        self.genome_build = node.analysis.genome_build
-        self.cohorts, self.visibility = node.get_cohorts_and_sample_visibility()
-        self.fields, override = self._get_fields_and_overrides(node, af_show_in_percent)
-        super().__init__(user)  # Need to call init after setting fields
-
-        self.url = SimpleLazyObject(lambda: reverse("node_grid_handler", kwargs={"analysis_id": node.analysis_id}))
-        self.extra_config.update(node.get_extra_grid_config())
-
-        update_dict_of_dict_values(self._overrides, override)
-
+    def __init__(self, request: HttpRequest, node, extra_filters=None, af_show_in_percent=None):
         self.node = node
-        self.name = node.name
+        self.genome_build = node.analysis.genome_build
+        self.annotation_version = node.analysis.annotation_version
+        self.cohorts, self.visibility = node.get_cohorts_and_sample_visibility()
+        self.extra_filters = extra_filters
+        # column name -> the expression its sort alias is annotated with (@see ordering)
+        self._genotype_sort_funcs: dict[str, Any] = {}
 
-        try:
-            node_count = NodeCount.load_for_node(self.node, extra_filters)
-        except NodeCount.DoesNotExist:
-            node_count = None
-        self.node_count = node_count
+        # The rows this view shows - an extra filter (eg clinvar, a tag selection) narrows the node
+        self.extra_filters_count = get_extra_filters_count(node, extra_filters)
 
-        # Only set an initial sort column when sorting is allowed (below the row limit) - otherwise the
-        # first grid load would request a sort on default_sort_by_column and blow the statement_timeout.
-        if not self.sorting_disabled():
-            default_sort_by_column = node.analysis.default_sort_by_column
-            if default_sort_by_column:
-                self.extra_config['sortname'] = default_sort_by_column.variant_column
+        super().__init__(request, af_show_in_percent=af_show_in_percent)
 
-        self._set_post_data(node, extra_filters)
+    def _get_standard_overrides(self, af_show_in_percent: bool) -> dict[str, dict]:
+        overrides = super()._get_standard_overrides(af_show_in_percent)
+        # This analysis' own tags - drawn from format_items_iterator/the row, not a queryset field
+        overrides['tags'] = {
+            'model_field': False, 'queryset_field': False,
+            'css_class': 'no-word-wrap', 'orderable': False,
+            'client_renderer': 'VariantGridFormat.tags',
+        }
+        return overrides
 
     def _get_permission_user(self):
         """ We use the analysis user so it's consistent between users """
@@ -119,25 +127,30 @@ class VariantGrid(AbstractVariantGrid):
     def _get_base_queryset(self) -> QuerySet:
         return self.node.get_queryset()
 
-    def _set_post_data(self, node, extra_filters):
-        post_data = self.extra_config.get('postData', {})
-        post_data["node_id"] = node.pk
-        post_data["version_id"] = node.version
-        custom_columns_collection = node.analysis.custom_columns_collection
+    def _get_custom_columns_collection(self):
+        """ The analysis' columns, so every user sees the same grid """
+        return self.node.analysis.custom_columns_collection
+
+    def post_data(self) -> JsonObjType:
+        """ The per-request state the page sends as its ajax params on every row request """
+        post_data = dict(self.node.get_grid_post_data())
+        post_data["node_id"] = self.node.pk
+        post_data["version_id"] = self.node.version
+        custom_columns_collection = self.node.analysis.custom_columns_collection
         post_data['ccc_id'] = custom_columns_collection.pk
         post_data['ccc_version_id'] = custom_columns_collection.version_id
-        post_data["extra_filters"] = extra_filters
+        post_data["extra_filters"] = self.extra_filters
 
-        sample_ids = node.get_sample_ids()
+        sample_ids = self.node.get_sample_ids_with_genotype()
         if sample_ids:
             samples_str = ''.join([str(s) for s in sample_ids])
             post_data['zygosity_samples_hash'] = sha256sum_str(samples_str)
-        self.extra_config['postData'] = post_data
+        return post_data
 
     def _grid_row_count(self) -> Optional[int]:
         """ Current view's row count, or None if unknown """
-        if self.node_count:
-            return self.node_count.count
+        if is_extra_filter(self.extra_filters):
+            return self.extra_filters_count  # None where we'd have to count the filtered rows
         return self.node.count
 
     def sorting_disabled(self) -> bool:
@@ -146,23 +159,21 @@ class VariantGrid(AbstractVariantGrid):
         count = self._grid_row_count()
         return count is None or count >= settings.ANALYSIS_GRID_SORT_MAX_ROWS
 
-    def get_colmodels(self, remove_server_side_only=False):
-        """ Put 'analysisNode' into every colmodel """
-        colmodels = super().get_colmodels(remove_server_side_only=remove_server_side_only)
-        global_colmodel = {"analysisNode": {"visible": self.node.visible}}
-        sorting_disabled = self.sorting_disabled()
-        for cm in colmodels:
-            cm.update(global_colmodel)
-            if sorting_disabled:
-                cm["sortable"] = False
-        return colmodels
+    def sorting_disabled_title(self) -> str:
+        count = self._grid_row_count()
+        count_display = intcomma(count) if count is not None else "?"
+        return (f"Sorting disabled ({count_display} variants) - sorting is off above "
+                f"{intcomma(settings.ANALYSIS_GRID_SORT_MAX_ROWS)} variants, add more filters to re-enable it")
+
+    def get_extra(self) -> JsonObjType:
+        extra = super().get_extra()
+        # Node state the renderers need, once per grid rather than repeated in every column
+        extra["analysisNode"] = {"visible": self.node.visible}
+        extra["sortingDisabled"] = self.sorting_disabled()
+        return extra
 
     def _get_q(self) -> Optional[Q]:
-        q = None
-        if self.node_count:
-            analysis = self.node.analysis
-            q = get_extra_filters_q(analysis.user, analysis.annotation_version, self.node_count.label)
-        return q
+        return get_node_extra_filters_q(self.node, self.extra_filters)
 
     def _get_grid_only_annotation_kwargs(self):
         """ Things not used in counts etc - only to display grid """
@@ -177,145 +188,172 @@ class VariantGrid(AbstractVariantGrid):
                                                                             annotation_gnomad_version=annotation_gnomad_version))
         return annotation_kwargs
 
-    def get_known_count(self, request, items) -> Optional[int]:
-        """ The node load pipeline has already counted this node version, so the paginator doesn't
-            have to count the annotated grid queryset again """
-        if self.get_filters(request):
-            return None  # jqGrid column filters narrow the rows the stored count was taken over
-        return self._grid_row_count()
+    def known_count(self, qs) -> Optional[int]:
+        """ The node load pipeline has already counted this node version, so nothing has to count the
+            annotated grid queryset again """
+        if self.filter_rules_supplied:
+            return None  # column filters narrow the rows the stored count was taken over
+        count = self._grid_row_count()
+        if self.node.count_is_deterministic:
+            return count
+        # A live-source node's data moves under the stored count. Small nodes are where people curate,
+        # and an exact recount at that size is cheap - above it the count stays advisory and the last
+        # page may come up short, which beats re-counting millions of rows on every page request
+        if count is not None and count <= settings.ANALYSIS_NODE_STORE_ID_SIZE_MAX:
+            return None
+        return count
 
-    def get_column_colmodel(self, column_name):
-        for cm in self.get_colmodels():
-            if column_name == cm['name']:
-                return cm
-
-        msg = f"{column_name} not found in grid column model"
+    def column(self, name: str) -> RichColumn:
+        for rc in self.enabled_columns:
+            if rc.name == name:
+                return rc
+        msg = f"{name} not found in grid columns"
         raise PermissionDenied(msg)
 
-    def _get_fields_and_overrides(self, node: AnalysisNode, af_show_in_percent: bool) -> tuple[list, dict]:
-        ccc = node.analysis.custom_columns_collection
-        annotation_version = node.analysis.annotation_version
-        fields, overrides, sample_cols_pos = get_custom_column_fields_override_and_sample_position(ccc,
-                                                                                                   annotation_version,
-                                                                                                   analysis_tags=True)
-        # Put extra columns after sample (they are all usually to do with sample/vcf etc info)
-        if extra_columns := node.get_extra_columns():
-            if sample_cols_pos:
-                fields = fields[:sample_cols_pos] + extra_columns + fields[sample_cols_pos:]
-            else:
-                fields.extend(extra_columns)
+    def ordering(self, qs: QuerySet) -> QuerySet:
+        if self.sorting_disabled():
+            # Ignore any requested sort - order by -pk only (indexed scan + LIMIT). See issue #1651
+            return qs.order_by("-pk")
+        for rich_column, _desc in self.requested_ordering():
+            # A packed genotype column has no field to sort on - unpack this sample's value into one
+            if sort_func := self._genotype_sort_funcs.get(rich_column.name):
+                qs = qs.annotate(**{rich_column.sort_keys[0]: sort_func})
+        return super().ordering(qs)
 
-        update_dict_of_dict_values(overrides, self._get_standard_overrides(af_show_in_percent))
-        update_dict_of_dict_values(overrides, node.get_extra_colmodel_overrides())
+    def _get_rich_columns(self) -> list[RichColumn]:
+        rich_columns, sample_cols_pos = self._build_variant_grid_columns()
+
+        def insert_columns(columns: list[RichColumn], new_columns: list[RichColumn]) -> list[RichColumn]:
+            # Put extra columns after sample (they are all usually to do with sample/vcf etc info)
+            new_columns = [rc for rc in new_columns if rc not in columns]
+            if sample_cols_pos is not None:
+                return columns[:sample_cols_pos] + new_columns + columns[sample_cols_pos:]
+            return columns + new_columns
+
+        if extra_columns := self.node.get_extra_columns():
+            rich_columns = insert_columns(rich_columns, extra_columns)
+
         if self.cohorts:
             sample_formatter = None
-            if grid_sample_label_template := node.analysis.grid_sample_label_template:
+            if grid_sample_label_template := self.node.analysis.grid_sample_label_template:
                 sample_formatter = Sample._get_sample_formatter_func(grid_sample_label_template)
 
-            sample_columns, sample_overrides = VariantGrid.get_grid_genotype_columns_and_overrides(self.cohorts, self.visibility,
-                                                                                                   af_show_in_percent, sample_formatter)
+            sample_columns = self._get_grid_genotype_columns(sample_formatter)
             if len(self.cohorts) > 1:
                 # Worth a column only where rows can come from more than one VCF
-                source_columns, source_overrides = VariantGrid.get_source_columns_and_overrides(self.cohorts,
-                                                                                                self.visibility)
-                sample_columns = source_columns + sample_columns
-                sample_overrides.update(source_overrides)
+                sample_columns = [self._get_source_column()] + sample_columns
+            rich_columns = insert_columns(rich_columns, sample_columns)
 
-            if sample_cols_pos:
-                fields = fields[:sample_cols_pos] + sample_columns + fields[sample_cols_pos:]
-            else:
-                fields.extend(sample_columns)
-
-            update_dict_of_dict_values(overrides, sample_overrides)
-        return fields, overrides
+        if self.sorting_disabled():
+            # The note under the grid is easy to miss - say why on the header the user just clicked
+            sorting_disabled_title = self.sorting_disabled_title()
+            for rc in rich_columns:
+                rc.orderable = False
+                rc.header_title = f"{sorting_disabled_title}\n{rc.header_title}" if rc.header_title else sorting_disabled_title
+        elif default_sort_by_column := self.node.analysis.default_sort_by_column:
+            # Only set an initial sort column when sorting is allowed (below the row limit) - otherwise
+            # the first grid load would request that sort and blow the statement_timeout
+            for rc in rich_columns:
+                if rc.name == default_sort_by_column.variant_column and rc.orderable:
+                    rc.default_sort = SortOrder.ASC
+                    break
+        return rich_columns
 
     @staticmethod
-    def _get_sample_columns_server_side_formatter(cohort, sample: Sample, packed_data_replace: dict,
-                                                  column, i: int, af_show_in_percent: bool):
+    def _get_sample_column_renderer(cohort, sample: Sample, packed_data_replace: dict,
+                                    column, i: int, af_show_in_percent: bool):
         """ A function to capture loop variable """
+        packed_column = cohort.cohort_genotype_collection.get_packed_column_alias(column)
 
-        def packed_data_formatter(row, _field):
-            cgc = cohort.cohort_genotype_collection
-            packed_column = cgc.get_packed_column_alias(column)
-            packed_data = row[packed_column]
-            val = packed_data[i]
+        def unpack(cell: CellData):
+            val = cell[packed_column][i]
             return packed_data_replace.get(val, val)
 
-        server_side_formatter = packed_data_formatter
+        if column == COPY_NUMBER_COLUMN:
+            # Annotated per sample out of the JSON, so there is nothing to unpack
+            copy_number_column = get_copy_number_alias(cohort.cohort_genotype_collection, sample.pk)
+
+            def copy_number_renderer(cell: CellData):
+                """ A copy ratio comes out of the JSON at full float precision - round here rather
+                    than in the cell, so the CSV says what the grid says """
+                value = cell[copy_number_column]
+                if value is None:
+                    return None
+                try:
+                    number = float(value)
+                except ValueError:
+                    return value
+                return int(number) if number.is_integer() else round(number, 3)
+
+            return copy_number_renderer
+
+        renderer = unpack
         if column == "samples_filters" and cohort.vcf:
             filter_formatter = VCFFilter.get_formatter(sample.vcf)  # Per VCF - look up once, not per row
 
-            def sample_filters_formatter(row, field):
+            def sample_filters_renderer(cell: CellData):
                 """ Need to unpack then switch filters """
                 # Sample Filters can be "."
-                val = packed_data_formatter(row, field)
+                val = unpack(cell)
                 if val is None:
                     return '.'
                 # empty string ('') is PASS
-                row[field] = val
-                return filter_formatter(row, field)
+                return filter_formatter(CellData(all_data={packed_column: val}, key=packed_column))
 
-            server_side_formatter = sample_filters_formatter
+            renderer = sample_filters_renderer
         elif column == "samples_allele_frequency":
-            server_side_formatter = get_allele_frequency_formatter(source_in_percent=sample.vcf.allele_frequency_percent,
-                                                                   dest_in_percent=af_show_in_percent,
-                                                                   get_data_func=packed_data_formatter,
-                                                                   missing_value=VariantGrid.GENOTYPE_COLUMNS_MISSING_VALUE)
-        return server_side_formatter
+            renderer = get_allele_frequency_formatter(source_in_percent=sample.vcf.allele_frequency_percent,
+                                                      dest_in_percent=af_show_in_percent,
+                                                      get_data_func=unpack,
+                                                      missing_value=VariantGrid.GENOTYPE_COLUMNS_MISSING_VALUE)
+        return renderer
 
-    @staticmethod
-    def _get_sample_cohort_index(cohorts, visibility) -> dict:
+    def _get_sample_cohort_index(self) -> dict:
         """ sample -> (cohort, index into that cohort's packed genotype columns) """
         sample_cohort_index = {}
-        for cohort in cohorts:
+        for cohort in self.cohorts:
             for cohort_sample in cohort.get_cohort_samples():  # orders by sort_order
                 sample = cohort_sample.sample
-                if visibility.get(sample) and sample not in sample_cohort_index:
+                if self.visibility.get(sample) and sample not in sample_cohort_index:
                     cohort_index = cohort_sample.cohort_genotype_packed_field_index
                     sample_cohort_index[sample] = (cohort, cohort_index)
         return sample_cohort_index
 
-    @staticmethod
-    def get_source_columns_and_overrides(cohorts, visibility):
+    def _get_source_column(self) -> RichColumn:
         """ Which VCF a row came from. The pk driven filter of a grouping node carries no provenance,
             but the grid doesn't display from the filter - each row already arrives carrying, per VCF,
             either real packed genotype data or the missing value placeholder. """
         vcf_packed_columns = []
-        for sample, (cohort, cohort_index) in VariantGrid._get_sample_cohort_index(cohorts, visibility).items():
+        for sample, (cohort, cohort_index) in self._get_sample_cohort_index().items():
             packed_column = cohort.cohort_genotype_collection.get_packed_column_alias("samples_zygosity")
             vcf_packed_columns.append((str(sample.vcf), packed_column, cohort_index))
 
-        def source_formatter(row, _field):
+        def source_renderer(cell: CellData) -> JsonDataType:
             vcf_names = []
             for vcf_name, packed_column, cohort_index in vcf_packed_columns:
-                packed_data = row.get(packed_column)
+                packed_data = cell.get(packed_column)
                 if packed_data and packed_data[cohort_index] != VariantGrid.GENOTYPE_COLUMNS_MISSING_VALUE:
                     if vcf_name not in vcf_names:
                         vcf_names.append(vcf_name)
             return ", ".join(vcf_names)
 
-        col_data_dict = {
-            "label": "Source",
-            "width": 120,
-            "sortable": False,  # Derived from packed data, there's nothing to sort on
-            "server_side_formatter": source_formatter,
-        }
-        column_names = [VariantGrid.SOURCE_COLUMN]
-        overrides = get_overrides(column_names, [col_data_dict], model_field=False, queryset_field=False)
-        return column_names, overrides
+        return RichColumn(key=None, name=VariantGrid.SOURCE_COLUMN, label="Source", width=120,
+                          orderable=False,  # Derived from packed data, there's nothing to sort on
+                          renderer=source_renderer, csv_rendered=True, include_in_csv=True,
+                          extra_columns=sorted({pc for _vcf, pc, _i in vcf_packed_columns}))
 
-    @staticmethod
-    def get_grid_genotype_columns_and_overrides(cohorts, visibility,
-                                                af_show_in_percent: bool, sample_formatter: Optional[Callable] = None):
-        available_format_columns = get_available_format_columns(cohorts)
+    def _get_grid_genotype_columns(self, sample_formatter: Optional[Callable] = None) -> list[RichColumn]:
+        available_format_columns = get_available_format_columns(self.cohorts)
         sample_columns = {
-            'samples_zygosity': ('Zygosity', '%(sample)s %(label)s', 55),
+            'samples_zygosity': ('Zygosity', '%(sample)s %(label)s', 140),
             'samples_allele_depth': ('AD', '%(label)s %(sample)s', 25),
             'samples_allele_frequency': ('AF', '%(label)s %(sample)s', 30),
             'samples_read_depth': ('DP', '%(label)s %(sample)s', 25),
             'samples_genotype_quality': ('GQ', '%(label)s %(sample)s', 25),
             'samples_phred_likelihood': ('PL', '%(label)s %(sample)s', 25),
             'samples_filters': ('FT', '%(label)s %(sample)s', 100),
+            # Labelled with the VCF's own key (CN / SM / FC) - what the number means differs per caller
+            COPY_NUMBER_COLUMN: ('CN', '%(label)s %(sample)s', 40),
         }
         packed_data_replace = dict(Zygosity.CHOICES)
         # Some legacy data (Missing data in FreeBayes before PythonKnownVariantsImporter v12) has -2147483647 for
@@ -324,15 +362,12 @@ class VariantGrid(AbstractVariantGrid):
         packed_data_replace.update(dict.fromkeys(MISSING_VALUES, VariantGrid.GENOTYPE_COLUMNS_MISSING_VALUE))
 
         # We now have separate aliases for packed data, so each cohort handled separately
-        sample_cohort_index = VariantGrid._get_sample_cohort_index(cohorts, visibility)
-
-        column_names = []
-        column_data = []
-        for sample, (cohort, cohort_index) in sample_cohort_index.items():
+        rich_columns = []
+        for sample, (cohort, cohort_index) in self._get_sample_cohort_index().items():
             for column, (column_label, label_format, width) in sample_columns.items():
                 if not available_format_columns[column]:
                     continue
-                column_names.append(f"sample_{sample.pk}_{column}")
+                name = f"sample_{sample.pk}_{column}"
                 sample_formatted_str = None
                 if sample_formatter:
                     try:
@@ -342,53 +377,69 @@ class VariantGrid(AbstractVariantGrid):
                 if sample_formatted_str is None or len(sample_formatted_str) == 0:
                     sample_formatted_str = str(sample.name)
 
-                label = label_format % {"sample": sample_formatted_str, "label": column_label}
-                server_side_formatter = VariantGrid._get_sample_columns_server_side_formatter(cohort, sample,
-                                                                                              packed_data_replace,
-                                                                                              column, cohort_index,
-                                                                                              af_show_in_percent)
                 cgc = cohort.cohort_genotype_collection
-                sql_index = cgc.get_sql_index_for_sample_id(sample.pk)
+                if column == COPY_NUMBER_COLUMN:
+                    if not sample.vcf.copy_number_field:
+                        continue  # Another VCF in this node has one, this sample's doesn't
+                    column_label = sample.vcf.copy_number_field
+                    extra_columns = [get_copy_number_alias(cgc, sample.pk)]
+                else:
+                    extra_columns = [cgc.get_packed_column_alias(column)]
 
-                col_data_dict = {
+                label = label_format % {"sample": sample_formatted_str, "label": column_label}
+                renderer = self._get_sample_column_renderer(cohort, sample, packed_data_replace, column,
+                                                            cohort_index, self.af_show_in_percent)
+                self._genotype_sort_funcs[name] = self._genotype_sort_func(cgc, column, sample.pk)
+                kwargs = {
+                    "key": None,
+                    "name": name,
                     "label": label,
                     "width": width,
-                    "server_side_formatter": server_side_formatter,
-                    # Index is what is passed back to server side for sorting - we'll pack the info here
-                    "index": ":".join([cgc.cohortgenotype_alias, str(sql_index), column]),
+                    "renderer": renderer,
+                    "csv_rendered": True,
+                    "include_in_csv": True,
+                    "extra_columns": extra_columns,
+                    "sort_keys": [self.GENOTYPE_SORT_ALIAS_PREFIX + name],
+                    "orderable": True,
+                    "null_order": NullOrder.FIRST_ON_ASC,
                 }
-                column_data.append(col_data_dict)
+                if column == 'samples_zygosity':
+                    client_renderer_kwargs = {"samplePrefix": f"sample_{sample.pk}_"}
+                    if copy_number_field := sample.vcf.copy_number_field:
+                        # The cell draws the value as a chip - it needs the key's name and what the
+                        # VCF header said it means, neither of which is on the row
+                        client_renderer_kwargs["copyNumber"] = {
+                            "label": copy_number_field,
+                            "title": sample.vcf.copy_number_description or copy_number_field,
+                        }
+                    kwargs.update({
+                        "client_renderer": 'VariantGridFormat.sampleZygosity',
+                        "client_renderer_kwargs": client_renderer_kwargs,
+                        "sort_menu": [
+                            {"label": label, "column": f"sample_{sample.pk}_{c}"}
+                            for c, label in SAMPLE_SORT_KEY_LABELS.items()
+                            if available_format_columns[c]
+                        ],
+                    })
+                elif column in SAMPLE_COMPOSITE_COLUMNS:
+                    kwargs["visible"] = False
+                rich_columns.append(RichColumn(**kwargs))
+        return rich_columns
 
-        overrides = get_overrides(column_names, column_data, model_field=False, queryset_field=False)
-        return column_names, overrides
-
-    def _sort_items(self, items, sidx, sord):
-        """ Special case to handle sort by CohortGenotype packed fields """
-        if self.sorting_disabled():
-            # Ignore any requested sort - order by -pk only (indexed scan + LIMIT). See issue #1651
-            return super()._sort_items(items, None, sord)
-
-        if sidx is not None:
-            # For special fields, we pack sorting info into the 'index' which doesn't map to a field
-            # looks like 'cohortgenotype_134:1:samples_zygosity'
-            if ":" in sidx:
-                sort_alias = "cohort_genotype_sample_sort_alias"
-                cohortgenotype_alias, sql_index, column = sidx.split(":")
-                sql_index = int(sql_index)
-                is_array, _ = CohortGenotype.COLUMN_IS_ARRAY_EMPTY_VALUE[column]
-                if is_array:
-                    # Django index transforms are 0-based
-                    # https://docs.djangoproject.com/en/5.0/ref/contrib/postgres/fields/#index-transforms
-                    django_index = sql_index-1
-                    sort_func = F(f"{cohortgenotype_alias}__{column}__{django_index}")
-                else:
-                    # Is string...
-                    sort_func = Substr(f"{cohortgenotype_alias}__{column}", sql_index, length=1)
-
-                items = items.annotate(**{sort_alias: sort_func})
-                sidx = sort_alias
-
-        return super()._sort_items(items, sidx, sord)
+    @staticmethod
+    def _genotype_sort_func(cgc, column: str, sample_id: int):
+        """ This sample's value out of the cohort's packed genotype column, as something sortable """
+        if column == COPY_NUMBER_COLUMN:
+            # Already this sample's own annotation, but text out of the JSON - sort it as a number
+            return Cast(get_copy_number_alias(cgc, sample_id), FloatField())
+        sql_index = cgc.get_sql_index_for_sample_id(sample_id)
+        is_array, _ = CohortGenotype.COLUMN_IS_ARRAY_EMPTY_VALUE[column]
+        if is_array:
+            # Django index transforms are 0-based
+            # https://docs.djangoproject.com/en/5.0/ref/contrib/postgres/fields/#index-transforms
+            return F(f"{cgc.cohortgenotype_alias}__{column}__{sql_index - 1}")
+        # Is string...
+        return Substr(f"{cgc.cohortgenotype_alias}__{column}", sql_index, length=1)
 
 
 class ExportVariantGrid(VariantGrid):
@@ -396,157 +447,219 @@ class ExportVariantGrid(VariantGrid):
 
     EXPORT_PK_BATCH_SIZE = 10000
 
-    def sort_items(self, request, items):
-        """ Export order is set by paginate_items (genome build contig, then position), so the grid's
-            requested sidx/sord is ignored - applying it here would be both wrong and expensive """
-        return items
-
-    def _iter_by_pk_batches(self, items):
+    def iter_export_rows(self, qs: QuerySet) -> Iterator[dict]:
         """ Take the PKs a contig at a time off the node queryset - that has no annotation joins or
             get_variantgrid_extra_annotate subqueries, so it stays inside the contig/position index -
             then run the full annotated grid queryset against batches of those PKs.
 
             Every query is bounded by the variant PK index and the annotation joins run once per row at
             any node size. A contig with no variants costs one cheap index probe and no annotated query. """
+        value_columns = self.value_columns()
         node_qs = self.node.get_queryset()
-        for contig in self.node.analysis.genome_build.standard_contigs:
+        for contig in self.export_contigs(self.node.analysis.genome_build):
             contig_pks_qs = node_qs.filter(locus__contig=contig).order_by("locus__position", "pk")
             # A node queryset can fan out over a multi-valued join, so de-dupe (keeping order) to stop
             # a repeated PK straddling a batch boundary and being exported twice
             contig_pks = list(dict.fromkeys(contig_pks_qs.values_list("pk", flat=True)))
             for batch in iter_fixed_chunks(contig_pks, self.EXPORT_PK_BATCH_SIZE):
-                batch_items = items.filter(pk__in=batch).order_by("locus__position", "pk")
-                yield from batch_items.iterator()
+                batch_qs = qs.filter(pk__in=batch).order_by("locus__position", "pk")
+                yield from self.render_export_rows(batch_qs.values(*value_columns).iterator())
 
-    def paginate_items(self, request, items):
-        # This is the step after queryset is sorted - we want everything, with no paging
-        return None, None, self._iter_by_pk_batches(items)
+    @staticmethod
+    def export_contigs(genome_build: GenomeBuild) -> QuerySet:
+        """ The build's own contigs, then the shared gene-level one - a fusion has no coordinate, so it
+            exports after everything that does. Leaving it out is how fusions used to fall out of every
+            node export (#1558). @see snpdb.gene_level_variants """
+        roles = [SequenceRole.ASSEMBLED_MOLECULE, SequenceRole.VG_GENE_LEVEL_FAKE_CONTIG]
+        return genome_build.contigs.filter(role__in=roles)
+
+    def ordering(self, qs: QuerySet) -> QuerySet:
+        """ Export order is set by iter_export_rows (genome build contig, then position), so any
+            requested sort is ignored - applying it here would be both wrong and expensive """
+        return qs
 
 
-class AnalysesGrid(JqGridUserRowConfig):
-    model = Analysis
-    caption = 'Analyses'
-    fields = ["id", "name", "created", "modified", "genome_build__name", "analysis_type", "description",
-              "user__username", "tags", "analysislock__locked"]
-    colmodel_overrides = {
-        'id': {'formatter': 'analysisLink',
-               'formatter_kwargs': {"icon_css_class": "analysis-icon",
-                                    "url_name": "analysis"}},
-        "name": {"width": 500},
-        "genome_build__name": {"label": "Genome Build"},
-        "analysis_type": {"label": "Type"},
-        "user__username": {'label': 'Created by'},
-        "tags": {"label": "Tags", "model_field": False,
-                 "name": "tags", "formatter": "tagsFormatter"},  # This formatter counts multiple tags
-        "analysislock__locked": {"hidden": True},
-    }
+class AnalysesListColumns(DatatableConfig[Analysis]):
+    server_csv_download = True
+    search_box_enabled = True
+    search_pk_enabled = True
+    # The unfiltered count is over the tag aggregate and the lock join, and only feeds the
+    # "(filtered from N total)" text
+    count_unfiltered = False
 
-    def __init__(self, **kwargs):
-        user = kwargs.get("user")
-        super().__init__(user)
-        fields = self.get_field_names()
+    def __init__(self, request: HttpRequest):
+        super().__init__(request)
+        self.scroll_x = True
 
         self.genome_builds = list(GenomeBuild.builds_with_annotation())
-        if len(self.genome_builds) == 1:  # No need to show
-            genome_build_colmodel = self._overrides.get('genome_build__name', {})
-            genome_build_colmodel['hidden'] = True
-            self._overrides['genome_build__name'] = genome_build_colmodel
-        user_grid_config = UserGridConfig.get(user, self.caption)
-        qs = Analysis.filter_for_user(user)
-        if not user_grid_config.show_group_data:
-            qs = qs.filter(user=user)
+        self.rich_columns = [
+            RichColumn(key="id", label="ID", orderable=True, search=False,
+                       extra_columns=["analysislock__locked"],
+                       renderer=self._render_analysis, client_renderer='renderAnalysisLink'),
+            RichColumn(key="name", label="Name", orderable=True),
+            RichColumn(key="created", label="Created", orderable=True, search=False,
+                       client_renderer='TableFormat.timestamp'),
+            RichColumn(key="modified", label="Modified", orderable=True, default_sort=SortOrder.DESC,
+                       search=False, client_renderer='TableFormat.timestamp'),
+            RichColumn(key="genome_build__name", label="Genome Build", orderable=True,
+                       enabled=len(self.genome_builds) > 1),
+            RichColumn(key="analysis_type", label="Type", orderable=True, search=False,
+                       client_renderer=RichColumn.choices_client_renderer(AnalysisType.choices)),
+            RichColumn(key="description", label="Description", orderable=True),
+            self.user_column(label="Created by"),
+            RichColumn(key="tags", label="Tags", search=False, client_renderer='renderAnalysisTags'),
+            RichColumn(key="id", name="actions", label="", orderable=False, search=False,
+                       renderer=self._render_actions, client_renderer='renderRowActions'),
+        ]
+
+    def _render_analysis(self, cell: CellData) -> JsonDataType:
+        analysis_id = cell.value
+        return {
+            "text": analysis_id,
+            "url": reverse("analysis", kwargs={"analysis_id": analysis_id}),
+            "locked": bool(cell["analysislock__locked"]),
+        }
+
+    def _render_actions(self, cell: CellData) -> JsonDataType:
+        analysis_id = cell.value
+        actions = [
+            {"label": "Settings", "icon": "fas fa-cog", "css_class": "dt-analysis-settings",
+             "url": reverse("analysis_settings", kwargs={"analysis_id": analysis_id})},
+            {"label": "Clone", "icon": "fas fa-copy", "css_class": "dt-clone-row",
+             "url": reverse("clone_analysis", kwargs={"analysis_id": analysis_id})},
+        ]
+        if delete_url := self.render_delete(cell):
+            actions.append({"label": "Delete", "icon": "fas fa-trash", "css_class": "dt-delete-row text-danger",
+                            "url": delete_url})
+        return actions
+
+    def get_initial_queryset(self) -> QuerySet[Analysis]:
+        qs = Analysis.filter_for_user(self.user)
         qs = qs.filter(genome_build__in=self.genome_builds)
         qs = qs.filter(visible=True, template_type__isnull=True)  # Hide templates
         q_last_lock = Q(analysislock=F("last_lock")) | Q(analysislock__isnull=True)
         qs = qs.annotate(last_lock=Max("analysislock__pk")).filter(q_last_lock)
-        qs = qs.annotate(tags=StringAgg("varianttag__tag", delimiter=Value('|')))
-        self.queryset = qs.values(*fields)
-        self.extra_config.update({'sortname': 'modified',
-                                  'sortorder': 'desc'})
+        return qs.annotate(tags=StringAgg("varianttag__tag", delimiter=Value('|')))
 
+    def filter_queryset(self, qs: QuerySet[Analysis]) -> QuerySet[Analysis]:
+        qs = self.filter_analyses(qs)
+        if tags := self.get_query_json("tags"):
+            # VariantTag is large (400k+ on some deployments) so keep it a subquery rather than a join
+            qs = qs.filter(pk__in=VariantTag.objects.filter(tag__in=tags).values("analysis"))
+        return qs
 
-class AnalysisTemplatesGrid(JqGridUserRowConfig):
-    model = AnalysisTemplate
-    caption = 'Analysis Templates'
-    fields = ["id", "analysis__id", "name", "created", "modified",
-              "analysis__genome_build__name", "analysis__description", "user__username"]
-
-    colmodel_overrides = {
-        "id": {"hidden": True},  # Need an ID row so we can delete
-        'analysis__id': {'formatter': 'analysisLink',
-                         'formatter_kwargs': {"icon_css_class": "analysis-icon",
-                                              "url_name": "analysis"}},
-        "name": {"width": 500},
-        "analysis": {"hidden": True},
-        "modified": {'label': 'Modified'},
-        "user__username": {'label': 'Created by'},
-    }
-
-    def __init__(self, **kwargs):
-        user = kwargs.get("user")
-        super().__init__(user)
-
-        user_grid_config = UserGridConfig.get(user, self.caption)
-        queryset = AnalysisTemplate.filter_for_user(user)
+    def filter_analyses(self, qs: QuerySet[Analysis]) -> QuerySet[Analysis]:
+        """ Everything the page filters on bar the tag selection - the tag count pills count over
+            this, so their counts stay put as tags are selected """
+        user_grid_config = UserGridConfig.get(self.user, 'Analyses')
         if not user_grid_config.show_group_data:
-            queryset = queryset.filter(user=user)
-        queryset = queryset.annotate(latest_version=Max("analysistemplateversion__version")).values("latest_version")
-        fields = self.get_field_names() + ["latest_version"]
-        self.queryset = queryset.values(*fields)
-        self.extra_config.update({'sortname': 'modified',
-                                  'sortorder': 'desc'})
-
-    def get_colmodels(self, remove_server_side_only=False):
-        colmodels = super().get_colmodels(remove_server_side_only=remove_server_side_only)
-        extra = {'index': 'latest_version', 'name': 'latest_version', 'label': 'Latest version', 'sorttype': 'int'}
-        colmodels.append(extra)
-        return colmodels
-
-    def delete_row(self, pk):
-        analysis_template = AnalysisTemplate.get_for_user(self.user, pk)
-        analysis_template.check_can_write(self.user)
-        analysis_template.delete_or_soft_delete()
+            qs = qs.filter(user=self.user)
+        if genome_build_name := self.get_query_param("genome_build_name"):
+            qs = qs.filter(genome_build=GenomeBuild.get_name_or_alias(genome_build_name))
+        if analysis_type := self.get_query_param("analysis_type"):
+            qs = qs.filter(analysis_type=analysis_type)
+        return qs
 
 
-class NodeColumnSummaryGrid(DataFrameJqGrid):
-    colmodel_overrides = {
-        "ID": {"hidden": True},
-        "labels": {'formatter': 'createFilterChildLink'},
-        "Percent": {"formatter": "number"},
-    }
+class AnalysisTemplatesColumns(DatatableConfig[AnalysisTemplate]):
+    server_csv_download = True
 
-    def __init__(self, user, analysis_id, node_id, node_version, extra_filters, variant_column, significant_figures):
-        super().__init__()
+    def __init__(self, request: HttpRequest):
+        super().__init__(request)
 
-        self.node = get_node_subclass_or_404(user, node_id, version=node_version)
-        grid = VariantGrid(user, self.node, extra_filters)
-        cm = grid.get_column_colmodel(variant_column)
-        grid_column_name = cm["label"]
-        field_formatters = grid.get_field_formatters()
-        self.formatter = field_formatters.get(variant_column)
-        self.extra_filters = extra_filters
-        self.variant_column = variant_column
-        self.significant_figures = significant_figures
-        self.grid_column_name = grid_column_name
-        self._overrides["labels"]["label"] = grid_column_name
-        self.extra_config.update({'sortname': 'Counts',
-                                  'sortorder': 'desc'})
+        self.rich_columns = [
+            RichColumn(key="id", visible=False),
+            RichColumn(key="name", label="Name", orderable=True, extra_columns=["analysis__id"],
+                       renderer=self._render_analysis, client_renderer='renderOptionalLink'),
+            RichColumn(key="created", label="Created", orderable=True,
+                       client_renderer='TableFormat.timestamp'),
+            RichColumn(key="modified", label="Modified", orderable=True, default_sort=SortOrder.DESC,
+                       client_renderer='TableFormat.timestamp'),
+            RichColumn(key="analysis__genome_build__name", label="Genome Build", orderable=True),
+            RichColumn(key="analysis__description", label="Description", orderable=True),
+            self.user_column(label="Created by"),
+            RichColumn(key="latest_version", label="Latest version", orderable=True),
+            RichColumn(key="active_version", label="Active version", orderable=True),
+            RichColumn(key="id", name="clone", label="", orderable=False,
+                       renderer=self._render_clone, client_renderer='renderCloneRow'),
+            RichColumn(key="id", name="delete", label="", orderable=False,
+                       renderer=self.render_delete, client_renderer='TableFormat.deleteRow'),
+        ]
 
-        if VariantGridColumn.objects.filter(variant_column=variant_column).exists():
-            self.extra_config["create_filter_child_links"] = True
+    @staticmethod
+    def _render_analysis(cell: CellData) -> JsonDataType:
+        return {
+            "text": cell.value,
+            "url": reverse("analysis", kwargs={"analysis_id": cell["analysis__id"]}),
+        }
 
-    def get_dataframe(self):
-        counts = NodeColumnSummaryCacheCollection.get_counts_for_node(self.node, self.variant_column, self.extra_filters)
-        if self.formatter:
-            labels = {}
-            for field in counts:
-                fake_row = {"field": field}
-                labels[field] = self.formatter(fake_row, "field")
+    @staticmethod
+    def _render_clone(cell: CellData) -> JsonDataType:
+        return reverse("analysis_template_clone", kwargs={"pk": cell.value})
+
+    def get_initial_queryset(self) -> QuerySet[AnalysisTemplate]:
+        qs = AnalysisTemplate.filter_for_user(self.user)
+        q_active = Q(analysistemplateversion__active=True)
+        return qs.annotate(latest_version=Max("analysistemplateversion__version"),
+                           active_version=Max("analysistemplateversion__version", filter=q_active))
+
+    def filter_queryset(self, qs: QuerySet[AnalysisTemplate]) -> QuerySet[AnalysisTemplate]:
+        user_grid_config = UserGridConfig.get(self.user, 'Analysis Templates')
+        if not user_grid_config.show_group_data:
+            qs = qs.filter(user=self.user)
+        return qs
+
+
+class NodeColumnSummaryConfig(DataFrameDatatableConfig):
+    """ Value counts for one variant grid column across a node's variants """
+    index_visible = False
+    default_sort_column = "Counts"
+    default_sort_order = SortOrder.DESC
+    csv_name = "node_column_summary"
+
+    LABELS_COLUMN = "labels"
+
+    def __init__(self, request: HttpRequest):
+        super().__init__(request)
+        self.node = get_node_subclass_or_404(self.user, self.get_query_param("node_id"),
+                                             version=self.get_query_param("node_version"))
+        self.extra_filters = self.get_query_param("extra_filters")
+        self.variant_column = self.get_query_param("variant_column")
+        grid = VariantGrid(request, self.node, self.extra_filters)
+        rich_column = grid.column(self.variant_column)
+        self.grid_column_name = rich_column.label
+        self.renderer = rich_column.renderer
+
+    def get_column_label(self, column_name: Any) -> str:
+        if column_name == self.LABELS_COLUMN:
+            return self.grid_column_name
+        return str(column_name)
+
+    def get_column_client_renderer(self, column_name: Any) -> Optional[str]:
+        if column_name == self.LABELS_COLUMN:
+            return "renderColumnSummaryFilterChildLink"
+        return "TableFormat.number"
+
+    def get_extra(self) -> JsonObjType:
+        """ The labels renderer only links where the column can become a FilterNode """
+        return {
+            "variantColumn": self.variant_column,
+            "createFilterChildLinks": VariantGridColumn.objects.filter(variant_column=self.variant_column).exists(),
+        }
+
+    def get_dataframe(self) -> pd.DataFrame:
+        counts = NodeColumnSummaryCacheCollection.get_counts_for_node(self.node, self.variant_column,
+                                                                     self.extra_filters)
+        if self.renderer:
+            # The same server side rendering the grid cell got (choices expanded, AF as percent)
+            labels = {field: self.renderer(CellData(all_data={self.variant_column: field},
+                                                    key=self.variant_column))
+                      for field in counts}
         else:
             labels = {field: field for field in counts}
 
         counts_series = pd.Series(counts)
-        df = pd.DataFrame({"labels": labels, "Counts": counts_series})
+        df = pd.DataFrame({self.LABELS_COLUMN: labels, "Counts": counts_series})
         total = counts_series.sum()
         if total != 0:
             df['Percent'] = 100.0 * df['Counts'] / total
@@ -555,16 +668,11 @@ class NodeColumnSummaryGrid(DataFrameJqGrid):
         return df.sort_values("Counts", ascending=False)
 
 
-class NodeOntologyGenesGrid(AbstractOntologyGenesGrid):
-    colmodel_overrides = {
-        "ID": {"width": 200},
-        "hpo": {"width": 400},
-        "omim": {"width": 400},
-    }
-
-    def __init__(self, user, analysis_id, node_id, version):
-        self.node = get_node_subclass_or_404(user, node_id, version=version)
-        super().__init__()
+class NodeOntologyGenesConfig(AbstractOntologyGenesConfig):
+    def __init__(self, request: HttpRequest):
+        super().__init__(request)
+        self.node = get_node_subclass_or_404(self.user, self.get_query_param("node_id"),
+                                             version=self.get_query_param("version"))
 
     def _get_ontology_version(self) -> OntologyVersion:
         return self.node.analysis.annotation_version.ontology_version
@@ -573,27 +681,27 @@ class NodeOntologyGenesGrid(AbstractOntologyGenesGrid):
         return self.node.get_ontology_term_ids()
 
 
-class NodeGeneDiseaseClassificationGenesGrid(DataFrameJqGrid):
-    def __init__(self, user, analysis_id, node_id, version):
-        super().__init__()
-        self.node = get_node_subclass_or_404(user, node_id, version=version)
+class NodeGeneDiseaseClassificationGenesConfig(DataFrameDatatableConfig):
+    """ Gene symbols in a MOI node, with each source term's mode of inheritance summary """
+    index_label = "Gene Symbol"
+    csv_name = "gene_disease_classification_genes"
+
+    def __init__(self, request: HttpRequest):
+        super().__init__(request)
+        self.node = get_node_subclass_or_404(self.user, self.get_query_param("node_id"),
+                                             version=self.get_query_param("version"))
 
     def _get_ontology_term_relations(self) -> list[OntologyTermRelation]:
         return self.node.get_gene_disease_relations()
 
-    def get_dataframe(self):
+    def get_dataframe(self) -> pd.DataFrame:
         gene_data = defaultdict(dict)
         valid_classifications = list(reversed(GeneDiseaseClassification.labels))
-        columns = {}
         for otr in self._get_ontology_term_relations():
             moi_classifications = otr.get_gene_disease_moi_classifications()
             gene_symbol = otr.dest_term.name
             summary = ", ".join(otr.get_moi_summary(moi_classifications, valid_classifications))
-            column = str(otr.source_term)
-            columns[column] = True
-            gene_data[gene_symbol][column] = summary
-
-        self._overrides.update({column: {"width": 500} for column in columns})
+            gene_data[gene_symbol][str(otr.source_term)] = summary
 
         df = pd.DataFrame.from_dict(gene_data, orient='index')
         return df.sort_index()
@@ -636,7 +744,7 @@ class KaryomappingAnalysesColumns(DatatableConfig[KaryomappingAnalysis]):
             RichColumn(key='modified', client_renderer='TableFormat.timestamp', orderable=True,
                        default_sort=SortOrder.DESC),
             RichColumn(key='trio__cohort__genome_build__name', label='Genome Build', orderable=True),
-            RichColumn(key='user__username', label='Created by', orderable=True),
+            self.user_column(label='Created by'),
             RichColumn(key='trio__name', label='Trio', orderable=True),
             RichColumn(key='trio__proband__sample__name', label='Proband', orderable=True),
             RichColumn(key='id', name='delete', label='', orderable=False,
@@ -748,7 +856,7 @@ def get_analysis_log_entry_summary(action, content_type_model, changes, addition
         if additional_data.get("operation") == VARIANT_TAG_CLASSIFIED:
             classification_id = additional_data["classification_id"]
             url = Classification.get_url_for_pk(classification_id)
-            return f"Retired - classified as <a href='{url}'>{classification_id}</a>"
+            return f"Cleared - classified as <a href='{url}'>{classification_id}</a>"
 
     if action == LogEntry.Action.CREATE:
         return "Created"
@@ -787,7 +895,7 @@ class AnalysisLogEntryColumns(DatatableConfig[LogEntry]):
         self.expand_client_renderer = "renderExpandAnalysisAuditLogEntry"
         self.rich_columns = [
             RichColumn(key="timestamp", orderable=True, client_renderer='TableFormat.timestamp'),
-            RichColumn(key="actor__username", orderable=True),
+            self.user_column("actor"),
             RichColumn(key="content_type__model", orderable=True),
             RichColumn(key=None, name="node_id", label="Node ID", renderer=self.render_node_id),
             RichColumn(key="object_repr", label="Object"),
@@ -847,7 +955,7 @@ class CandidateSearchRunColumns(DatatableConfig[LogEntry]):
             RichColumn(key="search_version__search_type", orderable=True, renderer=self.render_search_type),
             RichColumn(key="search_version__code_version", orderable=True),
             RichColumn(key="created", label="Created", orderable=True, client_renderer='TableFormat.timestamp'),
-            RichColumn(key="user__username", label="User", orderable=True),
+            self.user_column(label="User"),
             RichColumn(key="status", label="Status", orderable=True, renderer=self.render_status),
         ]
 
@@ -1011,7 +1119,7 @@ class AnalysesColumns(DatatableConfig[Analysis]):
                        renderer=self.view_primary_key,
                        client_renderer='TableFormat.linkUrl'),
             RichColumn(key="name", orderable=True),
-            RichColumn(key="user__username", label='User', orderable=True),
+            self.user_column(label='User'),
             RichColumn(key="analysis_type", label="Type", orderable=True, renderer=self.render_analysis_type),
             RichColumn(key="created", label='Created', orderable=True, client_renderer='TableFormat.timestamp'),
             RichColumn(key="modified", label='Modified', orderable=True, client_renderer='TableFormat.timestamp'),

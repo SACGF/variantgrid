@@ -9,6 +9,8 @@ from library.guardian_utils import assign_permission_to_user_and_groups
 
 
 class Command(BaseCommand):
+    category = "one-off"
+
     def handle(self, *args, **options):
         for analysis in Analysis.objects.filter(analysistemplaterun__isnull=False):
             assign_permission_to_user_and_groups(analysis.user, analysis)

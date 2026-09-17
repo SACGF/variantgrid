@@ -23,6 +23,7 @@ class Command(BaseCommand):
         So 21-24 we can just re-read the header and make these models. Prior to 21 we'll have to reload the VCF
         completely
     """
+    category = "one-off"
     importer_name = "PythonKnownVariantsImporter"
     v_info_format_min = 21
     v_info_format_max = 24

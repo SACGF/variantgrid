@@ -47,16 +47,36 @@ const DataTableDefinition = (function() {
     const DataTableDefinition = function(params) {
         this.dom = params.dom;
         this.url = params.url;
+        // The node grid's definition and data come from different URLs - the definition is per
+        // node version (so its columns cache with the node), the data endpoint is one URL for the
+        // whole analysis. Everything else builds both off the one url.
+        this.definitionUrl = params.definitionUrl || params.url;
         this.data = params.data;
         this.filterCount = params.filterCount;
+        /* Optional hooks, used by the analysis node grid:
+             onDefinition(definition)  return false to stop setup - the node grid's config endpoint
+                                       answers with node errors instead of a table
+             onData(json)              every data response, before its rows are handed to DataTables
+                                       (the grid engine reports a deleted/out of date node in here)
+             onBeforeSend(jqXHR)       every request as it goes out (the node grid keeps a handle on
+                                       it, so moving to another node can abort a query still running)
+             onLoadError(jqXHR, textStatus, errorThrown)  ajax failure */
+        this.onDefinition = params.onDefinition;
+        this.onData = params.onData;
+        this.onBeforeSend = params.onBeforeSend;
+        this.onLoadError = params.onLoadError;
         this.waitOn = Promise.resolve();
-        this.adjustColumns = params.adjustColumns !== false;
 
         this.tableId = null;
+        this.tableWidth = null;
+        this.filterBuilder = null;
+        this.filterRules = null;
         this.lengthKey = null;
+        this.lastDraw = null;
         this.serverParams = null;
         this.dtParams = null;
         this.dataTable = null;
+        this.setupPromise = null;
         this.expandData = {
             expandedTr: null,
             expandedRow: null,
@@ -65,6 +85,9 @@ const DataTableDefinition = (function() {
     };
 
     DataTableDefinition.definitions = {};
+
+    // DataTables' own request params - anything else in the data object is page/grid state
+    DataTableDefinition.DATATABLES_PARAMS = ['draw', 'columns', 'order', 'start', 'length', 'search'];
 
     DataTableDefinition.prototype = {
 
@@ -79,7 +102,7 @@ const DataTableDefinition = (function() {
 
             let tableId = this.dom.attr('id');
             if (!tableId) {
-                tableId = "tid" + _.random(0,100000);
+                tableId = "tid" + Math.floor(Math.random() * 100001);
                 this.dom.attr('id', tableId);
             }
             // this.dom.style('width', '100%');
@@ -93,19 +116,66 @@ const DataTableDefinition = (function() {
         },
 
         loadDefinition: function() {
-            let definitionData = DataTableDefinition.definitions[this.url];
+            let definitionData = DataTableDefinition.definitions[this.definitionUrl];
             if (!definitionData) {
                 let sep = '?';
-                if (this.url.indexOf('?') !== -1) {
+                if (this.definitionUrl.indexOf('?') !== -1) {
                     sep = '&';
                 }
-                definitionData = $.getJSON(this.url + sep + 'dataTableDefinition=1');
-                DataTableDefinition.definitions[this.url] = definitionData;
+                definitionData = $.getJSON(this.definitionUrl + sep + 'dataTableDefinition=1');
+                DataTableDefinition.definitions[this.definitionUrl] = definitionData;
             }
             return definitionData.then(data => {this.serverParams = data;});
         },
 
+        /* The ajax `data` hook. Normally the page's own function; where the definition asks for
+           cache stable params it also sends a minimal, stably ordered param set, so identical grid
+           state produces an identical querystring and a response cached data endpoint keeps its key
+           (@see NodeGridHandler). `draw` varies per request, so it is stripped here and put back on
+           the response by dataSrc. */
+        buildAjaxData: function() {
+            const userDataFn = this.data ? eval(this.data) : null;
+            if (!this.serverParams.cacheStableParams) {
+                return userDataFn;
+            }
+            const self = this;
+            return function(data, settings) {
+                self.lastDraw = data.draw;
+                const params = {};
+                if (userDataFn) {
+                    const returned = userDataFn(data, settings);
+                    if (returned) {
+                        Object.assign(params, returned);
+                    }
+                }
+                for (const key of Object.keys(data)) {
+                    if (DataTableDefinition.DATATABLES_PARAMS.indexOf(key) === -1) {
+                        params[key] = data[key];  // added by the page's data function
+                    }
+                }
+                params.start = data.start;
+                params.length = data.length;
+                if (self.filterRules && self.filterRules.rules.length) {
+                    // Column filter rules - @see library/django_utils/filter_rules.py
+                    params.filters = JSON.stringify(self.filterRules);
+                }
+                if (data.order && data.order.length) {
+                    params['order[0][column]'] = data.order[0].column;
+                    params['order[0][dir]'] = data.order[0].dir;
+                }
+                if (data.search && data.search.value) {
+                    params['search[value]'] = data.search.value;
+                }
+                const stableParams = {};
+                for (const key of Object.keys(params).sort()) {
+                    stableParams[key] = params[key];
+                }
+                return stableParams;
+            };
+        },
+
         convertDefinition: function() {
+            const self = this;
             const defn = this.serverParams;
             const tableId = this.tableId;
             const lengthKey = this.lengthKey;
@@ -114,15 +184,19 @@ const DataTableDefinition = (function() {
             if (tableId) {
                 lengthValue = parseInt(localStorage.getItem(lengthKey)) || 10;
             }
+            if (defn.pageLength) {
+                lengthValue = defn.pageLength;  // this user's UserGridConfig rows beats the local default
+            }
 
-            const domString = `<"top"><"toolbar"<"custom">${ defn.searchBoxEnabled ? 'f' : ''}>rt${ defn.downloadCsvButtonEnabled ? 'B' : ''}<"bottom"<"showing"il>p><"clear">`;
+            // 'r' (processing) sits inside dt-table-container so it's positioned against the table, not the wrapper
+            const domString = `<"top"><"toolbar"<"custom">${ defn.searchBoxEnabled ? 'f' : ''}><"dt-table-container"rt>${ defn.downloadCsvButtonEnabled ? 'B' : ''}<"bottom"<"showing"il><"bottom-toolbar">p><"clear">`;
 
             const dtParams = {
                 processing: true,
                 serverSide: true,
                 pageLength: lengthValue,
                 dom: domString,
-                order: defn.order,
+                order: defn.order || [],
                 fixedOrder: defn.order,
                 pagingType: "input",
                 classes: {
@@ -131,8 +205,15 @@ const DataTableDefinition = (function() {
                 },
                 ajax: {
                     url: this.url,
-                    type: 'POST',
-                    data: this.data ? eval(this.data) : null
+                    type: defn.ajaxType || 'POST',
+                    // DataTables defaults to cache: false, which appends _=timestamp to a GET and
+                    // gives a @cache_page endpoint a fresh key every request
+                    cache: Boolean(defn.cacheStableParams),
+                    error: function(jqXHR, textStatus, errorThrown) {
+                        if (self.onLoadError) {
+                            self.onLoadError(jqXHR, textStatus, errorThrown);
+                        }
+                    }
                 },
                 bFilter: defn.searchBoxEnabled,
                 bAutoWidth: false,
@@ -141,8 +222,52 @@ const DataTableDefinition = (function() {
                     $('th.toggle-link').removeClass('toggle-link');
                 }
             };
+            const ajaxData = this.buildAjaxData();
+            if (ajaxData) {
+                // Only when we have one - DataTables shallow extends ajax over its own request
+                // options, so a null here replaces the draw/start/length params with nothing
+                dtParams.ajax.data = ajaxData;
+            }
             if (defn.order) {
                 dtParams.orderSequence = defn.orderSequence;
+            }
+            if (defn.lengthMenu) {
+                dtParams.lengthMenu = defn.lengthMenu;
+            }
+            if (defn.deferLoading) {
+                // Build the table now, fetch rows when the page asks for them (table.ajax.reload())
+                dtParams.deferLoading = 0;
+            }
+            if (this.onBeforeSend) {
+                dtParams.ajax.beforeSend = function(jqXHR, settings) {
+                    // A per request beforeSend replaces the global one, which is what adds the
+                    // CSRF header (@see tweakAjax) - so run that first
+                    if ($.ajaxSettings.beforeSend) {
+                        $.ajaxSettings.beforeSend.call(this, jqXHR, settings);
+                    }
+                    self.onBeforeSend(jqXHR);
+                };
+            }
+            if (defn.cacheStableParams || this.onData) {
+                dtParams.ajax.dataSrc = function(json) {
+                    if (json.draw === undefined) {
+                        json.draw = self.lastDraw;  // stripped from the request to keep the URL cacheable
+                    }
+                    if (self.onData) {
+                        self.onData(json);
+                    }
+                    return json.data || [];
+                };
+            }
+            if (defn.approximateCount) {
+                // A planner estimate rather than a COUNT(*) - say so rather than claiming an exact total
+                dtParams.infoCallback = function(settings, start, end, max, total, pre) {
+                    const json = this.api().ajax.json();
+                    if (json && json.approximateRecords) {
+                        return `Showing ${start} to ${end} of ${json.approximateRecords} entries`;
+                    }
+                    return pre;
+                };
             }
 
             if (defn.downloadCsvButtonEnabled) {
@@ -191,8 +316,11 @@ const DataTableDefinition = (function() {
                 columnDefs.push(columnDef);
                 if (col.render) {
                     const rawRenderer = eval(col.render);
+                    // Grid wide metadata + this column's own renderer settings, closed over at
+                    // table build time (@see RichColumn client_renderer_kwargs)
+                    const renderContext = {extra: defn.extra || {}, kwargs: col.renderKwargs || null};
                     const renderer = (data, type, row) => {
-                        const output = rawRenderer(data, type, row);
+                        const output = rawRenderer(data, type, row, renderContext);
                         if (output instanceof jQuery) {
                             return output.prop("outerHTML");
                         }
@@ -216,6 +344,17 @@ const DataTableDefinition = (function() {
                 this.waitOn = EKeys.load();
             }
 
+            // table-layout: fixed only kicks in when the table has a real width, so add up what the
+            // columns asked for. Anything left over is shared out proportionally, so this wants to be
+            // the exact sum of the columns DataTables will actually render
+            let tableWidth = 0;
+            for (const col of defn.columns) {
+                if (col.visible !== false && col.width) {
+                    tableWidth += parseFloat(col.width) || 0;
+                }
+            }
+            this.tableWidth = tableWidth || null;
+
             this.dtParams = dtParams;
             return dtParams;
         },
@@ -224,13 +363,29 @@ const DataTableDefinition = (function() {
             const dom = this.dom;
             dom.empty();
             const dtParams = this.dtParams;
+            if (this.serverParams.tableClass) {
+                dom.addClass(this.serverParams.tableClass);
+            }
+            if (this.tableWidth) {
+                dom.css('width', this.tableWidth + 'px');
+            }
 
             const tHead = $('<thead/>').appendTo(dom);
             const tHeadTr = $('<tr/>').appendTo(tHead);
 
             // GENERATE COLUMNS
             for (const columnDef of dtParams.columnDefs) {
-                $('<th/>', {class: columnDef.classNames, html: columnDef.label}).appendTo(tHeadTr);
+                const th = $('<th/>', {class: columnDef.classNames, html: columnDef.label});
+                if (columnDef.headerTitle) {
+                    th.attr('title', columnDef.headerTitle);
+                }
+                if (columnDef.width) {
+                    // DataTables only reads columns.width when autoWidth is on, and autoWidth sizes to
+                    // content - which a cell holding 40 PubMed links blows out. Set it here instead and
+                    // let table-layout: fixed make it the actual width
+                    th.css('width', columnDef.width);
+                }
+                th.appendTo(tHeadTr);
             }
 
             dtParams.createdRow = (row, data, dataIndex) => {
@@ -254,12 +409,93 @@ const DataTableDefinition = (function() {
 
             const tableId = this.tableId;
             const lengthKey = this.lengthKey;
+            const gridName = this.serverParams.gridName;
 
             $(`select[name=${tableId}_length]`).change(function() {
-                localStorage.setItem(lengthKey, $(this).val());
+                const gridRows = $(this).val();
+                localStorage.setItem(lengthKey, gridRows);
+                if (gridName) {
+                    // Opted in via DatatableConfig.grid_name - remember it for this user, not this browser
+                    $.ajax({
+                        type: 'POST',
+                        url: Urls.set_user_row_config(),
+                        data: {grid_name: gridName, grid_rows: gridRows},
+                        headers: {'X-CSRFToken': Cookies.get('csrftoken')}
+                    });
+                }
             });
+            const wrapper = dom.closest('.dataTables_wrapper');
+            if (this.serverParams.compactControls) {
+                wrapper.addClass('dt-compact');
+            }
+            const toolbar = wrapper.find('.toolbar .custom');
             // move any externally defined toolbar elements onto it
-            $(`[data-toolbar="#${tableId}"]`).detach().appendTo(dom.closest('.dataTables_wrapper').find('.toolbar .custom'));
+            $(`[data-toolbar="#${tableId}"]`).detach().appendTo(toolbar);
+            // ...and anything that belongs under the grid onto the pager's row
+            $(`[data-toolbar-bottom="#${tableId}"]`).detach().appendTo(wrapper.find('.bottom-toolbar'));
+
+            this.setupFilterBuilder(toolbar);
+
+            const downloadUrl = this.serverParams.downloadUrl;
+            if (downloadUrl) {
+                // Server side streaming CSV - raw values and every row, unlike the client side button
+                // which pulls rows back through the ajax endpoint
+                const link = $('<a>', {class: 'btn btn-outline-secondary',
+                                       html: '<i class="fas fa-download"></i> CSV'}).appendTo(toolbar);
+                const joiner = downloadUrl.indexOf('?') === -1 ? '?' : '&';
+                dataTable.on('draw', function() {
+                    link.attr('href', downloadUrl + joiner + $.param(dataTable.ajax.params() || {}));
+                });
+            }
+        },
+
+        /* The column filter dialog, as a panel above the table. Rules go up as 'filters', which the
+           server turns into a Q object. Page level filters (extra_filters) stack on top of it. */
+        setupFilterBuilder: function(toolbar) {
+            const defn = this.serverParams;
+            if (!defn.filterBuilder || !(defn.filterBuilder.fields || []).length) {
+                return;
+            }
+            if (defn.filterBuilderToolbar === false) {
+                return;  // the page mounts its own builder off the definition (@see the FilterNode editor)
+            }
+            const self = this;
+            const dataTable = this.dataTable;
+
+            const panel = $('<div>', {class: 'variantgrid-filter-panel card card-body p-2 mb-2',
+                                      style: 'display: none'});
+            panel.insertBefore(this.dom.closest('.dataTables_wrapper'));
+
+            const button = $('<a>', {class: 'btn btn-outline-secondary', href: 'javascript:void(0)',
+                                     html: '<i class="fas fa-filter"></i> Filter grid...'}).appendTo(toolbar);
+            const summary = $('<span>', {class: 'ml-2 text-muted variantgrid-filter-summary'}).appendTo(toolbar);
+
+            const describe = function(filters) {
+                const count = filters.rules.length;
+                if (!count) {
+                    return '';
+                }
+                return count === 1 ? 'filtered on 1 column' : `filtered on ${count} columns`;
+            };
+
+            this.filterBuilder = new VariantGridFilterBuilder({
+                container: panel,
+                filterBuilder: defn.filterBuilder,
+                onApply: function(filters) {
+                    self.filterRules = filters.rules.length ? filters : null;
+                    summary.text(describe(filters));
+                    dataTable.page(0).draw(false);  // a narrower result set invalidates the page number
+                },
+                onReset: function(filters) {
+                    self.filterRules = null;
+                    summary.text('');
+                    dataTable.page(0).draw(false);
+                }
+            }).render();
+
+            button.click(function() {
+                panel.toggle();
+            });
         },
 
         setupClientExpend: function() {
@@ -274,7 +510,12 @@ const DataTableDefinition = (function() {
             const expandFn = eval(this.serverParams.expandClientRenderer);
             const expandData = this.expandData;
 
-            dom.on('click', 'tr', function() {
+            dom.on('click', 'tr', function(event) {
+                // A click on a link or control belongs to it (the variant grids have a details link, a
+                // checkbox, and tag chips that expand to a delete button) - only bare row space toggles
+                if ($(event.target).closest('a, input, button, select, label, .grid-tag-deletable').length) {
+                    return;
+                }
                 const tr = $(this); //.closest('tr');
                 if (!tr.hasClass('odd') && !tr.hasClass('even')) {
                     // not a regular row
@@ -312,6 +553,9 @@ const DataTableDefinition = (function() {
                     tr.addClass('shown');
                 }
             });
+            if (this.serverParams.expandPrefetch === false) {
+                return;
+            }
             // PRE-FETCH data
             // if hovering over a single row for 500ms, pre-fetch the client data ready to display
             dom.on('mouseenter', 'tr', function() {
@@ -355,24 +599,140 @@ const DataTableDefinition = (function() {
             });
         },
 
-        setup: function() {
-            if (this.dom.hasClass('dataTable')) {
+        /* A composite cell draws several values, so its header offers a sort key per value. Each
+           entry names another column - hidden or not - whose own definition carries that key's
+           sort index, so picking one is just an order() on that column. */
+        setupSortMenus: function() {
+            const columns = this.serverParams.columns || [];
+            const columnIndexByData = {};
+            columns.forEach((col, i) => {
+                columnIndexByData[col.data] = i;
+            });
+            const dataTable = this.dataTable;
+
+            columns.forEach((col, columnIndex) => {
+                if (!col.sortMenu || col.visible === false || col.orderable === false) {
+                    return;  // nothing to offer if this grid (or column) can't be sorted at all
+                }
+                const header = $(dataTable.column(columnIndex).header());
+                const menu = $('<span>', {class: 'dt-sort-menu'});
+                const toggle = $('<a>', {class: 'dt-sort-menu-toggle', href: 'javascript:void(0)',
+                                         title: 'Sort this column by', text: '▾'});
+                const items = $('<div>', {class: 'dropdown-menu dt-sort-menu-items'});
+                for (const entry of col.sortMenu) {
+                    const target = columnIndexByData[entry.column];
+                    if (target === undefined) {
+                        continue;
+                    }
+                    $('<a>', {class: 'dropdown-item', href: 'javascript:void(0)', text: entry.label})
+                        .on('click', function(event) {
+                            event.stopPropagation();
+                            FloatingPanel.hide();
+                            dataTable.order([target, 'asc']).draw();
+                        }).appendTo(items);
+                }
+                if (!items.children().length) {
+                    return;
+                }
+                // The header cell is itself the sort toggle, so the menu has to swallow the click -
+                // which is also why it opens as a floating panel rather than a Bootstrap dropdown
+                toggle.on('click', function(event) {
+                    event.stopPropagation();
+                    if (FloatingPanel.isShowing(items)) {
+                        FloatingPanel.hide();
+                    } else {
+                        FloatingPanel.show(items, this, {alignRight: true});
+                    }
+                });
+                menu.append(toggle);
+                header.append(menu);
+            });
+        },
+
+        /* Drag a header's right edge to widen a column for a closer look. Nothing is saved - the next
+           load is back to the catalogue widths. Only the fixed-layout grids take part (the ones that
+           summed a tableWidth): their column widths are whatever the header cells say, and the table
+           grows by the same amount so the other columns keep theirs. With scrollX the header is a
+           separate table above the body, and the body's own (cloned) header is what table-layout
+           sizes from, so a drag moves both */
+        setupColumnResize: function() {
+            if (!this.tableWidth) {
                 return;
             }
+            const defn = this;
+            this.dataTable.columns().every(function() {
+                const column = this;
+                const handle = $('<span>', {class: 'dt-col-resize', title: 'Drag to resize'});
+                handle.on('mousedown', function(event) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    defn.dragColumnWidth(column, event.pageX);
+                });
+                $(column.header()).append(handle);
+            });
+        },
+
+        dragColumnWidth: function(column, startX) {
+            const defn = this;
+            const header = $(column.header());
+            const headerTable = header.closest('table');
+            const bodyTable = $(this.dataTable.table().node());
+            const tables = headerTable.add(bodyTable);
+            const bodyHeader = bodyTable.find('thead th').eq(column.index('visible'));
+            const startWidth = header.outerWidth();
+            const startTableWidth = bodyTable.outerWidth();
+            $('body').addClass('dt-col-resizing');
+
+            $(document).on('mousemove.dtColResize', function(event) {
+                const width = Math.max(30, startWidth + event.pageX - startX);
+                header.css('width', width);
+                bodyHeader.css('width', width);
+                tables.css('width', startTableWidth + width - startWidth);
+            }).on('mouseup.dtColResize', function() {
+                $(document).off('.dtColResize');
+                $('body').removeClass('dt-col-resizing');
+                // Every draw (paging, sorting) re-applies each column's sWidth to the body table's
+                // cloned header and sizes the real header from it, so the new width has to go there
+                defn.dataTable.settings()[0].aoColumns[column.index()].sWidth = header[0].style.width;
+                // The header cell is the sort toggle, and the click that ends a drag lands on it -
+                // swallow just that one
+                const swallow = (event) => event.stopPropagation();
+                header[0].addEventListener('click', swallow, true);
+                window.setTimeout(() => header[0].removeEventListener('click', swallow, true), 0);
+            });
+        },
+
+        /* Resolves with this definition once the table is built, so a caller can wire up row
+           interactions or announce itself (the analysis editor waits on its grid) */
+        setup: function() {
+            // Two definitions can land on the one table - the analysis node grid loads its markup
+            // afresh each time and a node can be asked to load twice at once - so hand back the
+            // definition that owns it rather than this one, whose dataTable would still be null
+            const owner = this.dom.data('dtDefinition');
+            if (owner) {
+                return owner.setupPromise;
+            }
+            if ($.fn.DataTable.isDataTable(this.dom)) {
+                this.dataTable = this.dom.DataTable();
+                return Promise.resolve(this);
+            }
             this.ensureState();
-            this.loadDefinition().then(() => {
+            this.dom.data('dtDefinition', this);
+            this.setupPromise = this.loadDefinition().then(() => {
+                if (this.onDefinition && this.onDefinition(this.serverParams) === false) {
+                    return null;
+                }
                 this.convertDefinition();
-                this.waitOn.then(() => {
+                return this.waitOn.then(() => {
                     this.setupDom();
                     this.setupClientExpend();
                     this.setupResponsiveExpand();
-                    // note the below causes the dataTable to re-download data from the server redundantly
-                    // not sure under what circumstances it's actually required
-                    if (this.adjustColumns) {
-                        this.dataTable.columns.adjust().draw(false);
-                    }
+                    this.setupSortMenus();
+                    this.setupColumnResize();
+                    return this;
                 });
             });
+            return this.setupPromise;
         }
     };
 

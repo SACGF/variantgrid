@@ -4,7 +4,7 @@
           <a href="#" onclick="downloadNodeCSV(this, {{ node.analysis_id }}, {{ node.pk }}, {{ node.version }}); return false;">
         {% endif %}
                 <span class="icon-stack" title="{{ node.get_name_or_identifier }}">
-                  <i class="icon ui-icon icon-bottom {{ node.get_class_name }}"></i>
+                  <i class="icon icon-bottom {{ node.get_class_name }}"></i>
                   <i class="icon icon-top">
                       {% if node.is_ready %}
                         {% if node.is_valid %}

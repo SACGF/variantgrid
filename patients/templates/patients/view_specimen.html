@@ -1,15 +1,8 @@
 {% extends menu_patients_base %}
+{% load ui_tabs_builder %}
 {% load ui_utils %}
 {% load crispy_forms_tags %}
 {% block title %}Specimen {{ specimen.reference_id }}{% endblock title %}
-{% block head %}
-<script>
-    $(document).ready(() => {
-        $(".date-picker").datepicker({changeYear: true, yearRange: "-120:+0"});
-    });
-</script>
-{% endblock head %}
-
 {% block submenu_page_content %}
     <div class="container">
         <h3>Specimen: {{ specimen.reference_id }} {% admin_link specimen %}</h3>
@@ -23,6 +16,7 @@
         {% endif %}
         {% labelled label="Age at collection" %}{{ specimen.age_at_collection_date|default_if_none:"-" }}{% endlabelled %}
 
+        {% ui_register_tab_embedded label="Details" tab_set="specimen" %}
         <form method="post" id="specimen-form">
             {% csrf_token %}
             {% crispy form form_helper.horizontal %}
@@ -99,6 +93,20 @@
             </table>
         {% else %}
             <p>No measures recorded for this specimen.</p>
+        {% endif %}
+
+        <hr/>
+        <h4>Create analysis</h4>
+        {% load related_analyses_tags %}
+        {% analysis_templates_for_sample_source "P" specimen %}
+        {% end_ui_register_tab_embedded %}
+        {# A TSO 500 case's DNA and RNA arms are one case, reported from the specimen its measures hang off #}
+        {% ui_register_tab label="Classify &amp; Report" url="specimen_classify_report_tab" param=specimen.pk url_check=True tab_set="specimen" %}
+        {% ui_render_tabs tab_set="specimen" %}
+        {% if url_name_visible.specimen_classify_report_tab %}
+            {% url 'specimen_classify_report_tab' specimen.pk as classify_report_tab_url %}
+            {% url 'classify_report_summary' 'specimen' specimen.pk as classify_report_summary_url %}
+            {% include "analysis/classify_report_tab_counts.html" %}
         {% endif %}
     </div>
 {% endblock submenu_page_content %}

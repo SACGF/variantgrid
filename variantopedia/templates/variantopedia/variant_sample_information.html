@@ -1,6 +1,7 @@
 {% load static %}
 {% load js_tags %}
 {% load ui_help %}
+{% load genome_build_tags %}
 
 {% if has_samples_in_other_builds %}
 <div id="sv-annotation-help-info" class="container">
@@ -13,7 +14,7 @@
 </div>
 {% endif %}
 
-<script type="text/javascript" src="{% static 'js/lib/plotly-latest.min.js' %}"></script>
+<script type="text/javascript" src="{% static 'js/lib/plotly-custom-3.7.0.min.js' %}"></script>
 <script type="text/javascript" src="{% static 'js/plotly_helper.js' %}"></script>
 <script type="text/javascript" src="{% static 'js/phenotype.js' %}"></script>
 <script type="text/javascript" src="{% static 'js/variant_sample_information.js' %}"></script>
@@ -43,6 +44,10 @@
 
     .separator {
         padding: 0 5px 0 5px;
+    }
+
+    #genome-build-filter {
+        margin-bottom: 6px;
     }
 
     td.details-control {
@@ -80,9 +85,11 @@
 
     <div id="genotype-grid-container" style="display: none">
         <form id="genotype-grid-form">
-            <div id="genome-build-filter" style="display: none">
-                <b>Genome Build </b><span id="genome-build-filters"></span>
+            {% if genome_builds|length > 1 %}
+            <div id="genome-build-filter">
+                <b>Genome Build </b>{% genome_build_grid_filter genome_builds %}
             </div>
+            {% endif %}
             <b>Zygosity </b><span id="zygosity-filters"></span>
         </form>
 

@@ -1,0 +1,41 @@
+{% load ui_utils %}
+{# The gene content dialog on the classification form - the same deduplicated candidates the create page #}
+{# offers, each with its values beside this record's own. Applying fills the empty fields only.          #}
+{% if comparisons %}
+    <p class="text-muted small">
+        Gene content is the same for every variant in <strong>{{ gene_symbol }}</strong>. Whether the tumour
+        type it was curated for matches this case is your call - applying fills the fields this record has
+        left empty.
+    </p>
+    {% for comparison in comparisons %}
+        <div class="border-top py-3">
+            <div class="d-flex align-items-start">
+                <div class="flex-grow-1">
+                    {% include "classification/tags/gene_consensus_group.html" with group=comparison.group %}
+                </div>
+                <button type="button" class="btn btn-outline-primary btn-sm ml-2 apply-gene-consensus"
+                        data-vcm-id="{{ comparison.group.representative.pk }}">Apply</button>
+            </div>
+            <table class="table table-sm mt-2 mb-0">
+                <thead>
+                    <tr>
+                        <th>Field</th>
+                        <th>This record</th>
+                        <th>{{ comparison.group.representative.classification.lab }}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for value in comparison.values %}
+                    <tr>
+                        <td>{{ value.label }}</td>
+                        <td>{% if value.current %}{{ value.current|truncatewords:60 }}{% else %}<span class="no-value">-</span>{% endif %}</td>
+                        <td>{{ value.candidate|truncatewords:60 }}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% endfor %}
+{% else %}
+    <div class="no-value">No gene content available for {{ gene_symbol }}</div>
+{% endif %}

@@ -198,7 +198,7 @@ class OverlapColumns(DatatableConfig[ClassificationGrouping]):
         qs = qs.prefetch_related("overlapcontributionnextstep_set")
         return qs
 
-    def pre_render(self, qs: QuerySet[DC]):
+    def pre_render(self, qs: QuerySet[DC], rows):
         # stores cross context overlaps
         allele_ids = qs.values_list('allele_id', flat=True)
         cross_context_qs = Overlap.objects.filter(valid=True, overlap_type=OverlapType.CROSS_CONTEXT,

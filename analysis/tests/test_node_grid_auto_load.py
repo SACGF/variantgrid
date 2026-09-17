@@ -3,7 +3,6 @@ from django.test import TestCase
 from django.urls import reverse
 
 from analysis.models import AllVariantsNode, Analysis
-from analysis.models.nodes.analysis_node import NodeCount
 from annotation.fake_annotation import get_fake_annotation_version
 from snpdb.models import GenomeBuild
 from snpdb.models.models_enums import BuiltInFilters
@@ -66,7 +65,9 @@ class NodeGridAutoLoadViewTest(TestCase):
         """ A large node deferred on its total count auto-loads when viewing an extra filter
             (eg ClinVar) whose filtered count is below the threshold. """
         node = AllVariantsNode.objects.create(analysis=self.analysis, count=500)
-        NodeCount.objects.create(node_version=node.node_version, label=BuiltInFilters.CLINVAR, count=10)
+        node_version = node.node_version
+        node_version.load_data = {"counts": {BuiltInFilters.CLINVAR: 10}}
+        node_version.save()
 
         # Default (unfiltered) view still defers - 500 >= 100
         default_response = self._get_grid(node)

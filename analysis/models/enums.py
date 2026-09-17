@@ -1,3 +1,9 @@
+"""
+Enums for analyses and nodes: NodeStatus (the load lifecycle, with LOADING / CLAIMABLE / ERROR
+sets the scheduler reads), the inheritance modes for Trio, Quad and Duo nodes, set and group
+operations, tag-node modes, node error sources and colours. Stored codes: add values, never
+renumber.
+"""
 import operator
 from functools import reduce
 
@@ -12,22 +18,13 @@ class AnalysisType(models.TextChoices):
     COHORT = 'C', 'Cohort'
     TRIO = 'T', 'Trio'
     QUAD = 'Q', 'Quad'
+    DUO = 'U', 'Duo'
     PEDIGREE = 'P', 'Pedigree'
 
 
 class AnalysisTemplateType(models.TextChoices):
     TEMPLATE = 'T', 'Template'
     SNAPSHOT = 'S', 'Snapshot'
-
-
-class SampleNodeSourceLevel(models.TextChoices):
-    """ What a SampleNode gathers its samples from. Set explicitly rather than inferred from which FK
-        is set - node_create stamps it from the menu entry, and the editor has to choose a widget
-        before there is any value """
-    SAMPLE = 'S', 'Sample'
-    EXTRACTION = 'E', 'Extraction'
-    SPECIMEN = 'P', 'Specimen'
-    PATIENT = 'T', 'Patient'
 
 
 class SetOperations(models.TextChoices):
@@ -52,6 +49,7 @@ class TrioInheritance(models.TextChoices):
     ALL_RECESSIVE = 'A', 'All Recessive (AR + XLR)'
     COMPOUND_HET = 'C', 'C. Het'
     DOMINANT = 'D', 'Dominant'
+    MOSAIC_PARENT = 'M', 'Dominant (mosaic parent)'
     DENOVO = 'N', "Denovo"
     XLINKED_RECESSIVE = 'X', "X-Linked Recessive"
     ANY_AFFECTED = 'Y', 'Any Affected (variant in ≥1 affected)'
@@ -62,7 +60,21 @@ class QuadInheritance(models.TextChoices):
     ALL_RECESSIVE = 'A', 'All Recessive (AR + XLR)'
     COMPOUND_HET = 'C', 'C. Het'
     DOMINANT = 'D', 'Dominant'
+    MOSAIC_PARENT = 'M', 'Dominant (mosaic parent)'
     DENOVO = 'N', 'Denovo'
+    XLINKED_RECESSIVE = 'X', 'X-Linked Recessive'
+    ANY_AFFECTED = 'Y', 'Any Affected (variant in ≥1 affected)'
+
+
+class DuoInheritance(models.TextChoices):
+    """ Trio's modes with the missing parent's constraint dropped - same letters where they mean the
+        same thing, so 'N' (Trio's Denovo) is the one-parent "absent in parent" """
+    RECESSIVE = 'R', 'Recessive'
+    ALL_RECESSIVE = 'A', 'All Recessive (AR + XLR)'
+    COMPOUND_HET = 'C', 'C. Het (half phased)'
+    DOMINANT = 'D', 'Dominant'
+    MOSAIC_PARENT = 'M', 'Dominant (mosaic parent)'
+    ABSENT_IN_PARENT = 'N', 'Absent in parent'
     XLINKED_RECESSIVE = 'X', 'X-Linked Recessive'
     ANY_AFFECTED = 'Y', 'Any Affected (variant in ≥1 affected)'
 
@@ -171,6 +183,14 @@ class QuadSample(models.TextChoices):
     SIBLING = 'S', 'Sibling'
 
 
+class DuoSample(models.TextChoices):
+    """ Values match DuoRelationship, so the relative's role is the Duo's relationship """
+    MOTHER = 'M', 'Mother'
+    FATHER = 'F', 'Father'
+    SIBLING = 'S', 'Sibling'
+    PROBAND = 'P', 'Proband'
+
+
 class TagNodeMode(models.TextChoices):
     THIS_ANALYSIS = 'T', 'This analysis'
     ALL_TAGS = 'L', 'All analyses'
@@ -181,6 +201,13 @@ class TagNodeInput(models.TextChoices):
     TAGGED_VARIANTS = 'T', 'Tagged variants (no parent)'
     PARENT_TAGGED = 'I', 'Parent variants that ARE tagged'
     PARENT_NOT_TAGGED = 'E', 'Parent variants that are NOT tagged'
+
+
+class NodeMatchInput(models.TextChoices):
+    """ Whether the node is a source (matching variants) or filters its parent """
+    MATCHING_VARIANTS = 'C', 'Matching variants (no parent)'
+    PARENT_MATCHING = 'I', 'Parent variants that MATCH'
+    PARENT_NOT_MATCHING = 'E', 'Parent variants that DO NOT match'
 
 
 class TagLocation(models.TextChoices):

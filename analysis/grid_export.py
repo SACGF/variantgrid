@@ -9,7 +9,7 @@ from analysis.models import AnalysisNode
 from annotation.models import VariantTranscriptAnnotation
 from genes.models import CanonicalTranscriptCollection
 from library.django_utils import get_model_fields
-from library.django_utils.jqgrid_view import EXPORT_ROWS_PER_CHUNK, grid_export_csv
+from library.django_utils.grid_export import EXPORT_ROWS_PER_CHUNK, grid_export_csv
 from library.genomics.vcf_writer import VCFWriter
 from library.utils import StashFile, iter_fixed_chunks
 from patients.models_enums import Zygosity
@@ -36,12 +36,12 @@ def node_grid_get_export_iterator(request, node, export_type, canonical_transcri
         grid_kwargs["af_show_in_percent"] = False
 
     extra_filters = request.GET.get("extra_filters")
-    grid = ExportVariantGrid(request.user, node, extra_filters, **grid_kwargs)
+    grid = ExportVariantGrid(request, node, extra_filters, **grid_kwargs)
 
     if basename is None:
         basename = get_node_export_basename(node)
-    sample_ids = node.get_sample_ids()
-    _, _, items = grid.get_items(request)
+    sample_ids = node.get_sample_ids_with_genotype()
+    items = grid.iter_export_rows(grid.apply_filters(grid.get_initial_queryset()))
 
     if canonical_transcript_collection:
         basename += f"_{canonical_transcript_collection}"
@@ -52,15 +52,15 @@ def node_grid_get_export_iterator(request, node, export_type, canonical_transcri
     if row_wrapper:
         items = row_wrapper(items)
 
-    colmodels = grid.get_colmodels()
+    csv_columns = grid.csv_columns()
 
     if export_type == 'csv':
-        file_iterator = grid_export_csv(colmodels, items)
+        file_iterator = grid_export_csv(csv_columns, items)
     elif export_type == 'vcf':
         genome_build = node.analysis.genome_build
         values_qs = Sample.objects.filter(id__in=sample_ids).values_list("id", "name")
         sample_names_by_id = dict(values_qs)
-        file_iterator = _grid_export_vcf(genome_build, colmodels, items, sample_ids, sample_names_by_id)
+        file_iterator = _grid_export_vcf(genome_build, csv_columns, items, sample_ids, sample_names_by_id)
     else:
         raise ValueError(f"unknown export type: '{export_type}'")
 
@@ -68,41 +68,52 @@ def node_grid_get_export_iterator(request, node, export_type, canonical_transcri
     return filename, file_iterator
 
 def get_node_export_basename(node: AnalysisNode) -> str:
-    """ For CSV/VCF etc """
-    name_parts = []
+    """ Short enough to survive Windows path limits once it lands in a downloads folder - the analysis pk,
+        node pk and version keep it unique; the node name (or class when unnamed) says what it is """
+    if node.name:
+        label = re.sub(r"\W+", "_", node.name).strip("_")
+    else:
+        label = node.get_node_class_label()
+    name_parts = [label]
     if samples := node.get_samples():
         if len(samples) == 1:
             name_parts.append(samples[0].name)
-
-    name_parts.append(f"analysis_{node.analysis.pk}")
-
-    node_label = node.get_node_class_label()
-    if not node_label.endswith("Node"):
-        node_label += "Node"
-    name_parts.append(node_label)
-    name_parts.append(str(node.pk))
-
-    if node.name:
-        name_underscores = re.sub(r"\s", "_", node.name)
-        name_parts.append(name_underscores)
-    name_parts.append(f"v{node.version}")
+    name_parts += [f"a{node.analysis.pk}", f"n{node.pk}", f"v{node.version}"]
     return "_".join(name_parts)
 
 
-def _grid_export_vcf(genome_build, colmodels, items, sample_ids, sample_names_by_id) -> Iterator[str]:
+def _get_copy_number_formats(sample_ids) -> list[tuple[int, str]]:
+    """ (sample id, the VCF key its copy number came from) for the exported samples that have one.
+        The samples in one export can come from VCFs that disagree on the key, so every key present
+        goes in FORMAT and a sample writes '.' under the ones that aren't its own """
+    values_qs = Sample.objects.filter(id__in=sample_ids, vcf__copy_number_field__isnull=False) \
+                              .values_list("id", "vcf__copy_number_field")
+    return sorted(values_qs)
+
+
+def _grid_export_vcf(genome_build, csv_columns, items, sample_ids, sample_names_by_id) -> Iterator[str]:
     samples = [sample_names_by_id[s_id] for s_id in sample_ids]
 
     use_accession = False
-    info_dict = _get_colmodel_info_dict(colmodels)
-    header_lines = get_vcf_header_from_contigs(genome_build, info_dict, samples, use_accession=use_accession)
+    info_dict = _get_vcf_info_dict(csv_columns)
+    copy_number_formats = _get_copy_number_formats(sample_ids)
+    copy_number_keys = sorted({field for _sample_id, field in copy_number_formats})
+    # The export carries fusions (@see ExportVariantGrid.export_contigs), so declare the contig they
+    # are written on or the file won't re-import
+    header_lines = get_vcf_header_from_contigs(genome_build, info_dict, samples, use_accession=use_accession,
+                                               include_gene_level=True,
+                                               extra_formats=_copy_number_format_lines(copy_number_keys))
 
     pseudo_buffer = StashFile()
     writer = VCFWriter(pseudo_buffer, header_lines)
     yield pseudo_buffer.value  # header
 
+    copy_number_by_sample = dict(copy_number_formats)
     for i, obj in enumerate(items, start=1):
         chrom, pos, vcf_id, ref, alt, info, fmt, sample_calls = \
-            _grid_item_to_vcf_row(info_dict, obj, sample_ids, samples, use_accession=use_accession)
+            _grid_item_to_vcf_row(info_dict, obj, sample_ids, samples, use_accession=use_accession,
+                                  copy_number_by_sample=copy_number_by_sample,
+                                  copy_number_keys=copy_number_keys)
         writer.write_record(chrom, pos, ref, alt, vcf_id=vcf_id, info=info, fmt=fmt, sample_calls=sample_calls)
         if i % EXPORT_ROWS_PER_CHUNK == 0:
             yield pseudo_buffer.value
@@ -128,11 +139,11 @@ def _get_column_vcf_info():
     return column_vcf_info
 
 
-def _get_colmodel_info_dict(colmodels):
+def _get_vcf_info_dict(csv_columns):
     column_vcf_info = _get_column_vcf_info()
 
     info_dict = {}
-    for c in colmodels:
+    for c in csv_columns:
         name = c['name']
         col_info = column_vcf_info.get(name)
         if col_info:
@@ -149,6 +160,17 @@ VCF_INFO_REPLACE = {
 }
 
 VCF_SAMPLE_FORMAT = ['GT', 'AD', 'AF', 'PL', 'DP', 'GQ']
+COPY_NUMBER_FORMAT_DESCRIPTIONS = {
+    "CN": "Copy number",
+    "SM": "Linear copy ratio over the segment",
+    "FC": "Fold change over the segment",
+}
+
+
+def _copy_number_format_lines(copy_number_keys: list[str]) -> list[str]:
+    return [f'##FORMAT=<ID={key},Number=1,Type=Float,'
+            f'Description="{COPY_NUMBER_FORMAT_DESCRIPTIONS.get(key, key)}">'
+            for key in copy_number_keys]
 
 
 def _vcf_info_encode(val):
@@ -165,14 +187,17 @@ def _format_sample_value(value):
     return str(value)
 
 
-def _format_sample_call(gt, ad, af, pl, dp, gq) -> str:
-    # GT leads whenever present; the remaining fields follow VCF_SAMPLE_FORMAT order
+def _format_sample_call(gt, ad, af, pl, dp, gq, copy_numbers=()) -> str:
+    # GT leads whenever present; the remaining fields follow VCF_SAMPLE_FORMAT order, then one value
+    # per copy number key any exported sample uses
     parts = [gt] if gt else []
     parts.extend(_format_sample_value(v) for v in (ad, af, pl, dp, gq))
+    parts.extend(_format_sample_value(v) for v in copy_numbers)
     return ":".join(parts)
 
 
-def _grid_item_to_vcf_row(info_dict, obj, sample_ids, sample_names, use_accession=True):
+def _grid_item_to_vcf_row(info_dict, obj, sample_ids, sample_names, use_accession=True,
+                          copy_number_by_sample=None, copy_number_keys=()):
     if use_accession:
         chrom = obj.get("locus__contig__refseq_accession", ".")
     else:
@@ -194,7 +219,8 @@ def _grid_item_to_vcf_row(info_dict, obj, sample_ids, sample_names, use_accessio
     fmt = None
     sample_calls = None
     if sample_ids:
-        fmt = ':'.join(VCF_SAMPLE_FORMAT)
+        fmt = ':'.join(list(VCF_SAMPLE_FORMAT) + list(copy_number_keys))
+        copy_number_by_sample = copy_number_by_sample or {}
         sample_calls = []
         for sample_id in sample_ids:
             sample_prefix = f"sample_{sample_id}_samples"
@@ -206,21 +232,32 @@ def _grid_item_to_vcf_row(info_dict, obj, sample_ids, sample_names, use_accessio
             # GQ/PL/FT are optional now
             pl = obj.get(f"{sample_prefix}_phred_likelihood", ".")
             gq = obj.get(f"{sample_prefix}_genotype_quality", ".")
-            sample_calls.append(_format_sample_call(gt, ad, af, pl, dp, gq))
+            # A value only under this sample's own key, so a CNV VCF round-trips its copy number
+            sample_key = copy_number_by_sample.get(sample_id)
+            copy_numbers = [obj.get(f"{sample_prefix}_copy_number") if key == sample_key else None
+                            for key in copy_number_keys]
+            sample_calls.append(_format_sample_call(gt, ad, af, pl, dp, gq, copy_numbers))
 
     return chrom, pos, vcf_id, ref, alt, info or None, fmt, sample_calls
 
 
 def _summarise_tags_global(tags_global: str, stale_cutoff: Optional[str]) -> str:
-    """ tags_global entries are 'tag:date' - see get_variantgrid_extra_annotate.
+    """ tags_global entries are 'tag:date:resolved' - see get_variantgrid_extra_annotate. A tag id can
+        itself contain a colon, so the two trailing fields come off the end.
         stale_cutoff: ISO date - events on/after it count as fresh (None = no fresh counts) """
     totals = Counter()
     fresh = Counter()
+    resolved = Counter()
     for entry in tags_global.split("|"):
-        tag, sep, entry_date = entry.rpartition(":")
+        entry, sep, resolved_marker = entry.rpartition(":")
         if not sep:  # rpartition puts a separator-less entry in the tail
+            entry, resolved_marker = resolved_marker, ""
+        tag, sep, entry_date = entry.rpartition(":")
+        if not sep:
             tag, entry_date = entry_date, ""
         totals[tag] += 1
+        if resolved_marker:
+            resolved[tag] += 1
         if entry_date and (stale_cutoff is None or entry_date >= stale_cutoff):
             fresh[tag] += 1
 
@@ -229,6 +266,8 @@ def _summarise_tags_global(tags_global: str, stale_cutoff: Optional[str]) -> str
         summary = f"{tag} x {count}" if count > 1 else tag
         if stale_cutoff is not None and (count > 1 or fresh[tag] < count):
             summary += f" ({fresh[tag]} fresh)"
+        if resolved[tag]:
+            summary += f" ({resolved[tag]} resolved)"
         summarised_tags.append(summary)
     return ", ".join(summarised_tags)
 
@@ -247,11 +286,11 @@ def format_items_iterator(items, variant_tags_dict: Optional[dict] = None, tag_s
 
     stale_cutoff = tag_stale_date.date().isoformat() if tag_stale_date else None
     for item in items:
-        if tags_global := item["tags_global"]:
+        # Either column is only here when the collection being exported shows it
+        if tags_global := item.get("tags_global"):
             item["tags_global"] = _summarise_tags_global(tags_global, stale_cutoff)
 
-        variant_id = item["id"]
-        if tags := variant_tags_dict.get(variant_id):
+        if tags := variant_tags_dict.get(item.get("id")):
             item["tags"] = tags
         yield item
 
@@ -271,12 +310,15 @@ def _replace_transcripts_iterator(grid, ctc: CanonicalTranscriptCollection, item
     transcript_fields = set(get_model_fields(VariantTranscriptAnnotation, ignore_fields=["id", "version", "variant"]))
     annotation_prefix = "variantannotation__"
     annotation_prefix_len = len(annotation_prefix)
-    for f in grid.get_field_names():
+    for rc in grid.export_columns():
+        f = rc.name
         if f.startswith(annotation_prefix):
             suffix = f[annotation_prefix_len:]
             tf = suffix.split("__", 1)[0]
             if tf in transcript_fields:
                 transcript_replace_fields[suffix] = f
+    # The replaced values go through the same renderers the export rows they overwrite did
+    replaced_columns = [rc for rc in grid.export_columns() if rc.name in set(transcript_replace_fields.values())]
 
     # We only need things from VariantTranscriptAnnotation - so join there directly
     version = grid.node.analysis.annotation_version.variant_annotation_version
@@ -294,7 +336,8 @@ def _replace_transcripts_iterator(grid, ctc: CanonicalTranscriptCollection, item
                     transcript_item[after] = transcript_data[before]
                 yield transcript_item
 
-        return {item["id"]: item for item in grid.iter_format_items(transcript_items())}
+        return {item["id"]: item
+                for item in grid.render_export_rows(transcript_items(), columns=replaced_columns)}
 
     # Loop through items and changeroo
     for batch in iter_fixed_chunks(items, TRANSCRIPT_REPLACE_BATCH_SIZE):

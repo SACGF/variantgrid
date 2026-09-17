@@ -48,6 +48,11 @@
             checkAndMarkDirtyNodes();
         {% endif %}
 
+        {% if reload_page %}
+        if (IN_ANALYSIS) {
+            window.location.reload();  // horizontal mode changed - the page renders a different layout
+        }
+        {% endif %}
     });
 </script>
 

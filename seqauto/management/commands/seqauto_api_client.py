@@ -18,6 +18,7 @@ class Command(BaseCommand):
         Version 5 - Start replacing hardcoded files with examining files
         Version 6 - Extract into library / example script
     """
+    category = "dev"
     TEST_DATA_DIR = os.path.join(settings.BASE_DIR, 'seqauto', 'test_data')
     API_DATA = os.path.join(TEST_DATA_DIR, 'api_client')
     URLS = {

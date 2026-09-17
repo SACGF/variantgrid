@@ -41,16 +41,42 @@
 {% endblock docreadyjs %}
 
 {% block content %}
-<div>
-	<div id="vennnode-{{ node.pk }}"></div>
-	<form id='venn-form' method="post" action="{{ request.path }}">
-        {% csrf_token %}
+<style>
+    .venn-editor {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+
+    .venn-set-name {
+        font-weight: 600;
+        color: #3d4550;
+    }
+</style>
+<form id='venn-form' method="post" action="{{ request.path }}">
+    {% csrf_token %}
+    <div class="venn-editor">
+        <div id="vennnode-{{ node.pk }}"></div>
         <div>
-          <b>A:</b>{{a_name}} {{ form.set_operation }} <b>B:</b>{{b_name}}
+            <div class="editor-row">
+                <span class="editor-label">A</span>
+                <span class="venn-set-name">{{ a_name }}</span>
+            </div>
+            <div class="editor-row">
+                <label class="editor-label" for="{{ form.set_operation.id_for_label }}">Operation</label>
+                {{ form.set_operation }}
+            </div>
+            <div class="editor-row">
+                <span class="editor-label">B</span>
+                <span class="venn-set-name">{{ b_name }}</span>
+            </div>
         </div>
+    </div>
+    <div class="editor-actions">
         {% if has_write_permission %}
-            <button id='venn-save' class="btn btn-primary">save</button>
+            <button id='venn-save' class="btn btn-primary">Save</button>
         {% endif %}
-	</form>
-</div>
+    </div>
+</form>
 {% endblock content %}

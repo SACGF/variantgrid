@@ -88,6 +88,21 @@ class TestVCFProcessors(TestCase):
         vcf_filename = os.path.join(self.TEST_DATA_DIR, "no_genotype.GRCh37.vcf")
         self._test_genotype_processor(vcf_filename, BulkNoGenotypeVCFProcessor)
 
+    def test_no_genotype_processor_finish(self):
+        """ The pipeline always passes ModifiedImportedVariants, and finishing the last locus
+            must cope with a processor that never had allele depths #1865 """
+        vcf_filename = os.path.join(self.TEST_DATA_DIR, "no_genotype.GRCh37.vcf")
+        vcf_reader = cyvcf2.VCF(vcf_filename)
+        upload_step, uploaded_vcf = self._create_fake_upload_step_and_vcf(vcf_filename, vcf_reader)
+        cohort_genotype_collection = uploaded_vcf.vcf.cohort.cohort_genotype_collection
+        modified_imported_variants = ModifiedImportedVariants.objects.create(upload_step=upload_step)
+        processor = BulkNoGenotypeVCFProcessor(upload_step, cohort_genotype_collection, uploaded_vcf,
+                                               modified_imported_variants)
+        for v in vcf_reader:
+            processor.process_entry(v)
+        processor.finished_locus()
+        self.assertEqual(processor.modified_imported_variants, [])
+
     def test_genotype_processor(self):
         vcf_filename = os.path.join(self.TEST_DATA_DIR, "sample1_hg19.vcf")
         self._test_genotype_processor(vcf_filename, BulkGenotypeVCFProcessor)

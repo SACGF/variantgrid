@@ -3,13 +3,16 @@ from collections import defaultdict
 
 from django import template
 from django.utils.safestring import mark_safe
+from django.utils.timezone import localtime
 
 from analysis.models import VariantTag
-from analysis.models.nodes.node_counts import get_node_count_colors
+from analysis.models.nodes.node_counts import get_node_count_colors, get_tag_node_count_colors
 from annotation.models import AnnotationVersion
 from library import tag_utils
 from library.django_utils import get_field_counts
+from patients.models import Patient
 from snpdb.models import GenomeBuild
+from snpdb.models.models_enums import TagFilter
 from snpdb.models.models_user_settings import UserSettings
 from snpdb.utils import get_tag_sort_order_by_tag, get_tag_styles_and_colors
 from snpdb.variant_queries import get_variant_queryset_for_gene_symbol
@@ -17,28 +20,32 @@ from snpdb.variant_queries import get_variant_queryset_for_gene_symbol
 register = template.Library()
 
 
-class AbstractCSSRGBNode(template.Node):
-    """ Renders CSS rule for UserTagColor """
-
-    def render_user_tag_styles(self, prefix, user_tag_style):
-        css_string = ''
-        for tag, data in user_tag_style:
-            if data:
-                data_css_lines = []
-                for k, v in data.items():
-                    data_css_lines.append(f"{k}: {v} !important;")
-
-                data_string = '\n'.join(data_css_lines)
-                string = """
-        .%s%s>.user-tag-colored {
-            %s
-        }
-                """
-                css_string += string % (prefix, tag, data_string)
-        return css_string
+def _json_for_script(value) -> str:
+    """ Inline in a <script> block - tag and sample names are user data, so '</script>' must not end it """
+    return json.dumps(value).replace("</", "<\\/")
 
 
-class VariableCSSRGBNode(AbstractCSSRGBNode, template.Node):
+def render_user_tag_styles(prefix, user_tag_style):
+    """ CSS rules for UserTagColor - .<prefix><tag> > .user-tag-colored """
+    css_string = ''
+    for tag, data in user_tag_style:
+        if data:
+            data_css_lines = []
+            for k, v in data.items():
+                data_css_lines.append(f"{k}: {v} !important;")
+
+            data_string = '\n'.join(data_css_lines)
+            string = """
+    .%s%s>.user-tag-colored {
+        %s
+    }
+            """
+            css_string += string % (prefix, tag, data_string)
+    return css_string
+
+
+class VariableCSSRGBNode(template.Node):
+    """ Renders CSS rules for UserTagColor """
 
     def __init__(self, prefix, user_tag_style):
         self.prefix = template.Variable(prefix)
@@ -47,20 +54,14 @@ class VariableCSSRGBNode(AbstractCSSRGBNode, template.Node):
     def render(self, context):
         prefix = self.prefix.resolve(context)
         user_tag_style = self.user_tag_style.resolve(context)
-        return self.render_user_tag_styles(prefix, user_tag_style)
-
-
-class ArgsCSSRGBNode(AbstractCSSRGBNode, template.Node):
-
-    def __init__(self, prefix, user_tag_style):
-        self.prefix = prefix
-        self.user_tag_style = user_tag_style
-
-    def render(self, context):
-        return self.render_user_tag_styles(self.prefix, self.user_tag_style)
+        return render_user_tag_styles(prefix, user_tag_style)
 
 
 class VariantTagsJSNode(template.Node):
+    """ {variant_id: [{id, tag, sample, patient, patient_name, resolved}, ...]} - one entry per tagging, which
+        is one pill in the analysis grid's tags column (@see VariantGridFormat.tags). Pushed/spliced on tag
+        and untag. A tagging above sample level names the patient instead, so the pill carries that name
+        rather than there being a second dictionary beside render_analysis_samples_dict """
 
     def __init__(self, nodes):
         self.variable = template.Variable(nodes)
@@ -69,10 +70,23 @@ class VariantTagsJSNode(template.Node):
         analysis = self.variable.resolve(context)
 
         variant_tags = defaultdict(list)
-        variant_tags_qs = VariantTag.objects.filter(analysis=analysis).values_list('variant__id', 'tag__id')
-        for variant_id, tag_id in variant_tags_qs:
-            variant_tags[variant_id].append(tag_id)
-        return json.dumps(variant_tags)
+        variant_tags_qs = VariantTag.objects.filter(analysis=analysis).values_list(
+            'id', 'variant_id', 'tag_id', 'sample_id', 'patient_id', 'resolved',
+            'resolved_classification__withdrawn')
+        variant_tags_qs = list(variant_tags_qs)
+        # str(Patient) falls back to the code for a de-identified record, so the objects are needed
+        patient_names = {p.pk: str(p) for p in
+                         Patient.objects.filter(pk__in={vt[4] for vt in variant_tags_qs if vt[4]})}
+        for pk, variant_id, tag_id, sample_id, patient_id, resolved, withdrawn in variant_tags_qs:
+            resolved_date = None
+            # A withdrawn resolving classification puts the to-do back @see VariantTag.unresolved_q
+            if resolved and not withdrawn:
+                resolved_date = localtime(resolved).date().isoformat()
+            variant_tags[variant_id].append({"id": pk, "tag": tag_id, "sample": sample_id,
+                                             "patient": patient_id,
+                                             "patient_name": patient_names.get(patient_id),
+                                             "resolved": resolved_date})
+        return _json_for_script(variant_tags)
 
 
 @register.tag
@@ -80,11 +94,14 @@ def render_rgb_css(_parser, token):
     return VariableCSSRGBNode(*tag_utils.get_passed_objects(token))
 
 
-@register.tag
-def render_node_count_colors_css(_parser, _token):
+@register.simple_tag(takes_context=True)
+def render_node_count_colors_css(context):
+    """ Legend swatch colours - the built in filters, plus one per tag in the user's tag colours """
     prefix = 'node-count-legend-'
-    tag_rgb = get_node_count_colors("background-color")
-    return ArgsCSSRGBNode(prefix, tag_rgb)
+    user = context["user"]
+    css = render_user_tag_styles(prefix, get_node_count_colors("background-color"))
+    css += render_user_tag_styles(prefix, get_tag_node_count_colors(user, "background-color"))
+    return mark_safe(css)
 
 
 @register.tag
@@ -92,10 +109,16 @@ def render_variant_tags_dict(_parser, token):
     return VariantTagsJSNode(tag_utils.get_passed_object(token))
 
 
+@register.simple_tag
+def render_analysis_samples_dict(analysis):
+    """ {sample_id: name} - what a tagging's sample is called on its pill's tooltip """
+    return mark_safe(_json_for_script({s.pk: str(s) for s in analysis.get_samples()}))
+
+
 @register.simple_tag(takes_context=True)
 def render_variant_tag_order(context):
     """ {tag_id: sort_order} for JS tag sorting - see sortVariantTags in grid.js """
-    return mark_safe(json.dumps(get_tag_sort_order_by_tag(context["user"])))
+    return mark_safe(_json_for_script(get_tag_sort_order_by_tag(context["user"])))
 
 
 @register.inclusion_tag("analysis/tags/render_tag_styles_and_formatter.html", takes_context=True)
@@ -115,22 +138,28 @@ def tag_colors_collection_link(context):
     return {"tag_colors_collection": user_settings.tag_colors}
 
 
-@register.inclusion_tag("analysis/tags/tag_counts_filter.html", takes_context=True)
-def tag_counts_filter(context, genome_build: GenomeBuild,
-                      click_func=None, show_all_func=None, gene_symbol=None, any_tag_button=True):
-    tag_kwargs = {}
-    if gene_symbol:
-        annotation_version = AnnotationVersion.latest(genome_build)
-        gene_variant_qs = get_variant_queryset_for_gene_symbol(gene_symbol, annotation_version,
-                                                               traverse_aliases=True)
-        tag_kwargs["variant_qs"] = gene_variant_qs
-    variant_tags_qs = VariantTag.get_for_build(genome_build=genome_build, **tag_kwargs)
-    tag_counts = sorted(get_field_counts(variant_tags_qs, "tag").items())
+@register.inclusion_tag("analysis/tags/tag_counts_summary.html", takes_context=True)
+def tag_counts_summary(context, genome_build: GenomeBuild = None, gene_symbol=None,
+                       tag_counts=None, selected=None):
+    """ Pill + count toggles that filter the grid below them - the page wires them up with
+        setupTagCountsSummary(). tag_counts is a (tag, count) list - pass it in if the page has
+        already counted them, it's an expensive count """
+    if tag_counts is None:
+        tag_kwargs = {}
+        if gene_symbol:
+            annotation_version = AnnotationVersion.latest(genome_build)
+            gene_variant_qs = get_variant_queryset_for_gene_symbol(gene_symbol, annotation_version,
+                                                                   traverse_aliases=True)
+            tag_kwargs["variant_qs"] = gene_variant_qs
+        variant_tags_qs = VariantTag.get_for_build(genome_build=genome_build, **tag_kwargs)
+        tag_counts = get_field_counts(variant_tags_qs, "tag").items()
+
+    sort_order_by_tag = get_tag_sort_order_by_tag(context["user"])
+    tag_counts = sorted(tag_counts, key=lambda tc: (sort_order_by_tag.get(tc[0], 0), tc[0]))
     return {
-        "any_tag_button": any_tag_button,
-        "tag_counts": tag_counts,
-        "click_func": click_func,
-        "show_all_func": show_all_func,
+        # The label is what the analysis grid takes as its extra_filters @see TagFilter
+        "tag_counts": [(tag, TagFilter.label(tag), count) for tag, count in tag_counts],
+        "selected": selected or [],
     }
 
 

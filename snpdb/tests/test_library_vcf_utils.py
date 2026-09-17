@@ -7,7 +7,6 @@ from django.test import TestCase
 
 from library.genomics.vcf_utils import (
     vcf_get_ref_alt_svlen_and_modification,
-    vcf_to_variant_coordinates,
     vcf_to_variant_coordinates_and_records,
     write_vcf_from_variant_coordinates,
 )
@@ -41,7 +40,7 @@ class TestVCFUtils(TestCase):
 
         with tempfile.NamedTemporaryFile(delete=True) as temp_file:
             write_vcf_from_variant_coordinates(temp_file.name, variant_coordinates)
-            out_vc = list(vcf_to_variant_coordinates(temp_file.name))
+            out_vc = [vc for vc, _ in vcf_to_variant_coordinates_and_records(temp_file.name)]
             self.assertEqual(variant_coordinates, out_vc)
 
     def test_write_vcf_with_ids(self):

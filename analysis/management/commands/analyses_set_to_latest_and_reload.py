@@ -7,6 +7,8 @@ from annotation.models.models import AnnotationVersion
 
 
 class Command(BaseCommand):
+    category = "maintenance"
+
     def add_arguments(self, parser):
         parser.add_argument('--all', action='store_true', help='Reload *everything*')
 

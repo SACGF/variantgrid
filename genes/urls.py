@@ -3,20 +3,19 @@ from genes.grids import (
     CanonicalTranscriptColumns,
     GeneListColumns,
     GeneListGenesColumns,
-    GenesGrid,
+    GenesColumns,
     GeneSymbolVariantsGrid,
     GeneSymbolWikiColumns,
-    QCGeneCoverageGrid,
-    UncoveredGenesGrid,
+    QCGeneCoverageColumns,
+    UncoveredGenesColumns,
 )
-from genes.views import views, views_autocomplete, views_rest
+from genes.views import views, views_autocomplete, views_coverage, views_rest
 from genes.views.views_hotspot_graphs import (
     ClassificationsHotspotGraphView,
     CohortHotspotGraphView,
     HotspotGraphView,
     PublicRUNX1HotspotGraphView,
 )
-from library.django_utils.jqgrid_view import JQGridView
 from snpdb.views.datatable_view import DatabaseTableView
 from variantgrid.perm_path import path
 
@@ -38,10 +37,10 @@ urlpatterns = [
     path('gene_list_graphs_tab/<int:gene_list_id>', views.gene_list_graphs_tab, name='gene_list_graphs_tab'),
     path('gene_list_chromosome_graph/<int:gene_list_id>', views.gene_list_chromosome_graph, name='gene_list_chromosome_graph'),
     path('view_canonical_transcript_collection/<pk>', views.view_canonical_transcript_collection, name='view_canonical_transcript_collection'),
-    path('qc_coverage', views.qc_coverage, name='qc_coverage'),
-    path('qc_coverage/<genome_build_name>', views.qc_coverage, name='genome_build_qc_coverage'),
-    path('gene_coverage_collection_graphs/<genome_build_name>/<slug:gene_symbol>', views.gene_coverage_collection_graphs, name='gene_symbol_coverage_collection_graphs'),
-    path('qc_gene_list_coverage_graphs/<genome_build_name>/<int:gene_list_id>', views.qc_gene_list_coverage_graphs, name='qc_gene_list_coverage_graphs'),
+    path('qc_coverage', views_coverage.qc_coverage, name='qc_coverage'),
+    path('qc_coverage/<genome_build_name>', views_coverage.qc_coverage, name='genome_build_qc_coverage'),
+    path('gene_coverage_collection_graphs/<genome_build_name>/<slug:gene_symbol>', views_coverage.gene_coverage_collection_graphs, name='gene_symbol_coverage_collection_graphs'),
+    path('qc_gene_list_coverage_graphs/<genome_build_name>/<int:gene_list_id>', views_coverage.qc_gene_list_coverage_graphs, name='qc_gene_list_coverage_graphs'),
     path('gene_grid/<path:columns_from_url>', views.gene_grid, name='passed_gene_grid'),
     path('gene_grid', views.gene_grid, name='gene_grid'),
     path('canonical_transcripts', views.canonical_transcripts, name='canonical_transcripts'),
@@ -73,7 +72,9 @@ urlpatterns = [
     # Grids
     path('wiki/datatable', DatabaseTableView.as_view(column_class=GeneSymbolWikiColumns),
          name='gene_wiki_datatable'),
-    path('gene/grid/<gene_symbol>/<genome_build_name>/<slug:op>/', JQGridView.as_view(grid=GeneSymbolVariantsGrid), name='gene_symbol_variants_grid'),
+    path('gene/grid/<gene_symbol>/<genome_build_name>/',
+         DatabaseTableView.as_view(column_class=GeneSymbolVariantsGrid),
+         name='gene_symbol_variants_grid'),
 
     path('gene_lists/datatable/', DatabaseTableView.as_view(column_class=GeneListColumns),
          name='gene_lists_datatable'),
@@ -85,11 +86,15 @@ urlpatterns = [
     path('canonical_transcript_collection/datatable/',
          DatabaseTableView.as_view(column_class=CanonicalTranscriptColumns),
          name='canonical_transcript_datatable'),
-    path('genes/grid/<genome_build_name>/<slug:op>/', JQGridView.as_view(grid=GenesGrid, csv_download=True), name='genes_grid'),
-    path('gene_coverage/grid/<int:gene_coverage_collection_id>/<slug:op>/', JQGridView.as_view(grid=QCGeneCoverageGrid), name='gene_coverage_collection_grid'),
-    path('gene_coverage/grid/<int:gene_coverage_collection_id>/<slug:op>/<path:gene_list_id_list>/',
-         JQGridView.as_view(grid=QCGeneCoverageGrid), name='gene_coverage_collection_gene_list_grid'),
-    path('uncovered_genes/grid/<int:gene_coverage_collection_id>/<slug:op>/<path:gene_list_id_list>/min_depth/<int:min_depth>/', JQGridView.as_view(grid=UncoveredGenesGrid), name='uncovered_genes_grid'),
+    path('genes/datatable/<genome_build_name>/', DatabaseTableView.as_view(column_class=GenesColumns),
+         name='genes_datatable'),
+    path('gene_coverage/datatable/<int:gene_coverage_collection_id>/',
+         DatabaseTableView.as_view(column_class=QCGeneCoverageColumns), name='gene_coverage_collection_datatable'),
+    path('gene_coverage/datatable/<int:gene_coverage_collection_id>/<path:gene_list_id_list>/',
+         DatabaseTableView.as_view(column_class=QCGeneCoverageColumns),
+         name='gene_coverage_collection_gene_list_datatable'),
+    path('uncovered_genes/datatable/<int:gene_coverage_collection_id>/min_depth/<int:min_depth>/<path:gene_list_id_list>/',
+         DatabaseTableView.as_view(column_class=UncoveredGenesColumns), name='uncovered_genes_datatable'),
 
     path('autocomplete/PanelAppPanel/aus', views_autocomplete.PanelAppPanelAusAutocompleteView.as_view(),
          name='panel_app_panel_aus_autocomplete'),

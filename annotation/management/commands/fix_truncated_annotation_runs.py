@@ -22,6 +22,8 @@ ERROR_EXCEPTION_FORMAT = (
 
 
 class Command(BaseCommand):
+    category = "one-off"
+
     def add_arguments(self, parser):
         parser.add_argument('--mark-error', action='store_true',
                             help="Write a descriptive error_exception on each affected run, moving it to "

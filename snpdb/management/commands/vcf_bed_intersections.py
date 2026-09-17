@@ -9,6 +9,8 @@ from upload.models import BackendVCF
 
 
 class Command(BaseCommand):
+    category = "maintenance"
+
     def add_arguments(self, parser):
         parser.add_argument('--clear-errors', action='store_true')
         parser.add_argument('--clear-non-success', action='store_true')

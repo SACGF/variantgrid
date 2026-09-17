@@ -13,6 +13,7 @@ from snpdb.models import VariantCollection
 
 
 class Command(BaseCommand):
+    category = "dev"
 
     def add_arguments(self, parser):
         parser.add_argument('variant_collection_id', type=int)

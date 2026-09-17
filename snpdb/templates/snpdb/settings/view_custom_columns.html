@@ -1,4 +1,5 @@
 {% extends menu_settings_base %}
+{% load static %}
 
 {% block title %}VariantGrid Custom Columns{% endblock %}
 
@@ -13,16 +14,26 @@
 	}
 
 	.sort_placeholder {height: 15px; border: red 3px solid;}
-	.list_placeholder { font-weight: bolder; }
 	.columns-list {
 		margin: 5px; float: left;
 		width: 40%;
 		height: 100%;
 		border: 1px solid black;
+		display: flex;
+		flex-direction: column;
 	}
+	.columns-list h2 {
+		margin: 10px;
+	}
+	/* The list is the drop zone: it fills whatever the pane's items leave empty, and has no padding
+	   of its own so that hovering the list itself (not an item) always means "below the last item" */
 	.columns-list ul {
-		height: 100%;
+		flex: 1 1 auto;
+		margin: 0;
+		padding: 0 10px;
+		min-height: 100px;
 		list-style: none;
+		user-select: none;
 	}
 
 	div#columns-widget {
@@ -34,7 +45,6 @@
 	{
 		margin: 0;
 		padding: 5px;
-		margin-right: 10px;
 		border: 1px solid #eee;
 	}
 
@@ -54,10 +64,10 @@
 	    content: ': ';
 	}
 
-    /* Don't allow people to move magic column! */
-    li#variant {
-        display: none;
-    }
+	li.mandatory .mandatory-lock {
+		float: right;
+		color: #888;
+	}
 
 {% if not has_write_permission %}
 	.cursor-move {
@@ -65,6 +75,7 @@
 	}
 {% endif %}
 </style>
+<script type="text/javascript" src="{% static 'js/lib/html5sortable/html5sortable.min.js' %}"></script>
 <script>
 	function cloneCustomColumns() {
 		$(this).prop("disabled", true);
@@ -79,29 +90,40 @@
 		});
 	}
 
-	// .sortable('serialize') doesn't work with multiple underscores
+	// html5sortable positions its placeholder when the pointer is over an item, or anywhere in a list
+	// with no items. Hovering the empty part of a list that has items does nothing, so a reader
+	// scrolled down beside a short "My Columns" had nowhere to drop - treat that as "after the last item"
+	function dropAnywhereInList(list, placeholder) {
+	    list.addEventListener("dragover", function(e) {
+	        const dragging = document.querySelector("li.user-column[aria-grabbed='true']");
+	        if (e.target !== list || !dragging) {
+	            return;
+	        }
+	        if (list.lastElementChild !== placeholder) {
+	            $(".sort_placeholder").remove();
+	            list.appendChild(placeholder);
+	        }
+	        e.preventDefault();
+	    });
+	}
+
+	// Library serializers split ids on underscore - ours contain them, so build the list by hand
 	function serialize_columns(select) {
         const ids = [];
         $(select + ' .user-column').each(function() { ids.push($(this).attr("id")) });
 		return ids.toString();
 	}
 
-	function clear_custom_columns() {
-        const my_columns = $("#my_columns_sortable");
-        my_columns.find("li.user-column").appendTo("#available_columns_sortable");
-
-        const widget = my_columns.sortable("widget");
-        if (widget) {
-	    	widget.trigger("sortupdate");
-	    }
-	}
-
 	$(document).ready(function() {
 		$("#clone-button").click(cloneCustomColumns);
 
-	{% if has_write_permission %}
-		$("#custom-column-tabs").tabs({cache: true});
+		// Members are in the catalogue for filter nodes and evidence keys, but are drawn inside their
+		// composite - only a lab that wants one standalone needs to see them in the available list
+		$("#show-members-checkbox").change(function() {
+			$("#columns-widget").toggleClass("show-members", this.checked);
+		});
 
+	{% if has_write_permission %}
         $("button#change-name-button").click(function() {
             let nameInput = $("#custom-columns-name");
             let name = nameInput.val();
@@ -123,11 +145,38 @@
             });
         });
 
-		$("#my_columns_sortable").sortable({
-		    items: "li.user-column",
-		    placeholder: "sort_placeholder",
-		    connectWith: '#available_columns_sortable',
-		}).bind("sortupdate", function(event, ui) {
+		// acceptFrom is the whole answer to "can this list take that item", so both lists need
+		// to be named - listing only the other one stops a list accepting its own items
+		const listSelectors = ["#my_columns_sortable", "#available_columns_sortable"];
+		for (const listSelector of listSelectors) {
+		    // Our own placeholder element, so dropAnywhereInList can position it
+		    const placeholder = document.createElement("li");
+		    sortable(listSelector, {
+		        items: "li.user-column",
+		        placeholder: placeholder,
+		        placeholderClass: "sort_placeholder",
+		        acceptFrom: listSelectors.join(", "),
+		    });
+		    dropAnywhereInList(document.querySelector(listSelector), placeholder);
+		}
+
+		// A mandatory column can be reordered but not removed. acceptFrom can't refuse a single item,
+		// so a mandatory item dropped into "Available Columns" is put back where it came from
+		function putBackIfMandatory(detail) {
+		    const item = detail.item;
+		    if (!$(item).hasClass("mandatory") || detail.destination.container.id !== "available_columns_sortable") {
+		        return false;
+		    }
+		    const origin = detail.origin.container;
+		    origin.insertBefore(item, origin.children[detail.origin.elementIndex] || null);
+		    return true;
+		}
+
+		// html5sortable fires sortupdate on the list the item was dropped into
+		$("#my_columns_sortable, #available_columns_sortable").on("sortupdate", function(event) {
+		    if (putBackIfMandatory(event.originalEvent.detail)) {
+		        return;
+		    }
             const result_my_columns = serialize_columns("#my_columns_sortable");
 
             $.ajax({
@@ -135,14 +184,7 @@
 		        data: 'columns=' + result_my_columns + '&my_columns=true',
 		        url: "{{ request.path }}",
             });
-		}).disableSelection();
-
-
-		$("#available_columns_sortable").sortable({
-		    items: "li.user-column",
-		    placeholder: "sort_placeholder",
-		    connectWith: '#my_columns_sortable',
-		}).disableSelection();
+		});
 
 		// Set the height of both columns-list to be that of largest
         const tallest = Math.max($("#my_columns")[0].scrollHeight, $("#available_columns")[0].scrollHeight);
@@ -156,11 +198,12 @@
 
 {% if has_write_permission %}
     <div id="custom-column-tabs">
-        <ul>
-            <li><a href="#name">Name</a></li>
-	        <li><a href="{% url 'group_permissions' 'snpdb.models.CustomColumnsCollection' custom_columns.pk %}">Sharing / Permissions</a></li>
+        <ul class="nav nav-tabs mb-4" role="tablist">
+            <li class="nav-item"><a class="nav-link show active" data-toggle="tab" role="tab" href="#name">Name</a></li>
+	        <li class="nav-item"><a class="nav-link" data-toggle="tab" role="tab" href="#custom-columns-permissions" data-href="{% url 'group_permissions' 'snpdb.models.CustomColumnsCollection' custom_columns.pk %}">Sharing / Permissions</a></li>
 		</ul>
-        <div id="name">
+        <div class="tab-content">
+        <div class="tab-pane show active" role="tabpanel" id="name">
 			<form id="custom-columns-form" method="post">
 				{% csrf_token %}
 				<label for="custom-columns-name">Name:</label>
@@ -170,6 +213,8 @@
 				<ul id="save-name-message" class="messages">
 				</ul>
 			</form>
+		</div>
+        <div class="tab-pane" role="tabpanel" id="custom-columns-permissions"></div>
 		</div>
 	</div>
 
@@ -209,12 +254,21 @@
 
 <div id="columns-widget">
 	<div id="my_columns" class="columns-list">
+		<h2>My Columns</h2>
 		<ul id="my_columns_sortable">
-			<li id="active_placeholder" class="ui-state-disabled"><h2>My Columns</h2></li>
 			{% for column in my_columns_list %}
 			<li class="{{ column.get_css_classes }} cursor-move" id="{{ column.pk }}" column_id="{{ column.pk }}">
+				{% if column.is_mandatory %}
+				<i class="fas fa-lock mandatory-lock" title="Mandatory: analyses need this column, so it can be reordered but not removed"></i>
+				{% endif %}
 				<div class="column-name">{{ column.pk }}</div>
 				<div class="column-description">{{ column.description | safe }}</div>
+				{% if column.is_composite %}
+				<div class="composite-shows">shows: {% for member in column.member_columns %}{{ member.label }}{% if not forloop.last %} &middot; {% endif %}{% endfor %}</div>
+				{% endif %}
+				{% if column.composite_of %}
+				<div class="composite-inside">shown inside <b>{{ column.composite_of.label }}</b></div>
+				{% endif %}
 				{% if column.columns_version_description %}
 				<div>Note: <b>{{ column.columns_version_description }}</b> only</div>
 				{% endif %}
@@ -223,12 +277,19 @@
 		</ul>
 	</div>
 	<div id="available_columns" class="columns-list">
+		<label id="show-members-label"><input type="checkbox" id="show-members-checkbox" /> Show columns already inside a composite</label>
+		<h2>Available Columns</h2>
 		<ul id="available_columns_sortable">
-			<li id="inactive_placeholder" class="ui-state-disabled"><h2>Available Columns</h2></li>
 			{% for column in available_columns_list %}
 			<li class="{{ column.get_css_classes }} cursor-move" id="{{ column.pk }}" column_id="{{ column.pk }}">
 				<div class="column-name">{{ column.pk }}</div>
 				<div class="column-description">{{ column.description | safe }}</div>
+				{% if column.is_composite %}
+				<div class="composite-shows">shows: {% for member in column.member_columns %}{{ member.label }}{% if not forloop.last %} &middot; {% endif %}{% endfor %}</div>
+				{% endif %}
+				{% if column.composite_of %}
+				<div class="composite-inside">shown inside <b>{{ column.composite_of.label }}</b></div>
+				{% endif %}
 				{% if column.columns_version_description %}
 				<div>Note: <b>{{ column.columns_version_description }}</b> only</div>
 				{% endif %}

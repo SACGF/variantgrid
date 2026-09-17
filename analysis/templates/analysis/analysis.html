@@ -6,16 +6,14 @@
 {% load user_tag_color_tags %}
 {% load settings_tags %}
 
+{% block title %}Analysis: {{ analysis.name }}{% endblock title %}
+
 {% block head %}
-<script src="{% static 'js/lib/jquery.jsPlumb-1.4.1-all-min.js' %}"></script>
-<script type="text/javascript" src="{% static 'js/lib/d3.v2.js' %}"></script>
-<script type="text/javascript" src="{% static 'js/lib/multidraggable.js' %}"></script>
+<script src="{% static 'js/lib/jsplumb.browser-ui-6.2.10.umd.min.js' %}"></script>
 <script type="text/javascript" src="{% static 'js/lib/split-1.6.0/split.min.js' %}"></script>
 
 {% include "analysis/analysis_includes.html" %}
 
-<script type="text/javascript" src="{% static 'js/samplenode.js' %}"></script>
-<script type="text/javascript" src="{% static 'js/pedigree_node.js' %}"></script>
 <script type="text/javascript" src="{% static 'js/analysis_updates.js' %}"></script>
 <script type="text/javascript" src="{% static 'js/analysis_nodes.js' %}"></script>
 <script type="text/javascript" src="{% static 'js/cached_generated_files.js' %}"></script>
@@ -44,7 +42,10 @@
         padding: 50px 0px 0px 0px; /* Height of navbar */
         margin: 0px;
 
-        height: 100%;
+        /* base.html wraps .main-content in a plain div, so a percentage height here collapses to the
+           content height - the panels then grow past the window (which is overflow-y: hidden) instead
+           of scrolling their own overflow. @see global.scss, which sizes it the same way */
+        height: 100vh;
         width: 100%;
     }
 
@@ -59,7 +60,9 @@
 
     #analysis-toolbar {
         width: 100%;
-        z-index: 9999;
+        /* Over the canvas (nodes are 24) but under Bootstrap's tooltips, so a hover from the
+           toolbar or the editor drawer isn't drawn behind the bar */
+        z-index: 100;
         position: absolute;
         top: 0px;
         left: 0px;
@@ -132,6 +135,12 @@
         overflow: scroll;
     }
 
+    #right-panel {
+        /* The grid scrolls its own rows (see resizeGrid), so only show the panel's bars when
+           something actually overflows it */
+        overflow: auto;
+    }
+
 	{% render_rgb_css 'node-count-' node_count_colors %}
     {% render_node_count_colors_css %}
 </style>
@@ -140,14 +149,25 @@
     // noinspection JSAnnotator
     const ANALYSIS_ID = {{ analysis.pk }};
 
+    // Nodes flow left->right with the grid along the bottom - see analysis.js/analysis_nodes.js
+    // noinspection JSAnnotator
+    const ANALYSIS_HORIZONTAL_MODE = {{ analysis.analysis_horizontal_mode|jsonify }};
+
     // User-selected grid loading animations (menu ids; see showGridLoadingOverlay)
     // noinspection JSAnnotator
     const ANALYSIS_LOADING_ANIMATIONS = {{ loading_animations | jsonify }};
+
+    // Feature tips shown in the grid loading overlay / empty grid area - see tips.js
+    // noinspection JSAnnotator
+    const ANALYSIS_TIPS = {{ tips | jsonify }};
 
     // noinspection JSAnnotator
     const ANALYSIS_TAGS_NODE_ID = {{ analysis_tags_node.pk }};
     // noinspection JSAnnotator
 	const NODE_HELP = {{ node_help | jsonify }};
+	// Icons/labels for the add-node dropdown - see node_display.py
+	// noinspection JSAnnotator
+	const NODE_TYPES = {{ node_types_display | jsonify }};
 	ANALYSIS_SETTINGS = {{ analysis_settings | jsonify }};
 
 	// Panel resize timeouts function added in analysis.js
@@ -163,6 +183,7 @@
 	var saveSettingsOnResize = true;
 
     variantTags = {% render_variant_tags_dict analysis %};
+    analysisSamples = {% render_analysis_samples_dict analysis %};
     variantTagOrder = {% render_variant_tag_order %};
     variantTagsReadOnly = !{{ has_write_permission|jsonify }};
     variantTagStaleDays = ANALYSIS_SETTINGS.variant_tag_stale_days;
@@ -251,21 +272,28 @@
                         {% if analysis.template_type == 'S' %}
                         <label>Version:</label> <span>{{ analysis.analysistemplateversion.version }}</span>
                         {% else %}
-                            {% with latest=analysis.template.latest_version_obj %}
+                            {% with latest=analysis.template.latest_version_obj active=analysis.template.active %}
                                 {% if latest %}
                                     <label>Latest Version:</label>
-                                    <span id="latest-template-version">v.{{ latest.version }} saved {{ latest.created|localtime|date:"Y-m-d H:i" }}</span>
+                                    <span id="latest-template-version">v.{{ latest.version }} ({% if latest.active %}active{% else %}draft{% endif %}) saved {{ latest.created|localtime|date:"Y-m-d H:i" }}</span>
+                                    {% if not latest.active and has_write_permission %}
+                                        <a href="{% url 'analysis_template_settings' analysis.template.pk %}" target="_blank">make active in Template settings</a>
+                                    {% endif %}
+                                    {% if active and active.pk != latest.pk %}
+                                        <div><label>Active:</label> <span>v.{{ active.version }}</span></div>
+                                    {% endif %}
                                 {% else %}
-                                    <span id="latest-template-version"><em>No saved versions - click "save version" to create an official version</em></span>
+                                    <span id="latest-template-version"><em>No saved versions - click "save draft" to create an official version</em></span>
                                 {% endif %}
                             {% endwith %}
                         {% endif %}
                         <div class="display-flex">
                             {% if analysis.template_type != 'S' and has_write_permission %}
-                            <button id="analysis-template-save-version" class="btn btn-outline-primary btn-sm">save version</button>
+                            <button id="analysis-template-save-version" class="btn btn-outline-primary btn-sm">save draft</button>
+                            <button id="analysis-template-save-active" class="btn btn-primary btn-sm">save &amp; make active</button>
                             {% endif %}
                             <a href="{%  url 'analysis_template_settings' analysis.template.pk %}" target="_blank">
-                                <span class="toolbar-button settings-icon"></span>
+                                <span class="toolbar-button"><i class="fa-solid fa-gear"></i></span>
                                 Template settings
                             </a>
                         </div>
@@ -276,14 +304,14 @@
             <div id='analysis-variables-help' class="left">
                 <b>Analysis Variables</b> - these fields are set from external data when creating an analysis
                 {% if analysis.template_type == 'T' %}
-                <div><b>Add:</b>Click <span id="av-example-add-button"></span> inside a node.</div>
-                <div><b>Remove:</b>Click the <span class="analysis-variable" id="av-example-button">variable</span> in this window.</div>
+                <div><b>Add:</b>Click <button type="button" id="av-example-add-button" class="add-analysis-variable-button btn btn-primary"><i class="fas fa-caret-square-up"></i>+</button> inside a node.</div>
+                <div><b>Remove:</b>Click the <button type="button" class="btn btn-primary-outline analysis-variable" id="av-example-button">variable</button> in this window.</div>
                 {% endif %}
             </div>
             <div class="clear"></div>
         </div>
     {% endif %}
-        <div id="analysis-and-toolbar-container" class="d-flex flex-row split-element">
+        <div id="analysis-and-toolbar-container" class="d-flex split-element {% if analysis.analysis_horizontal_mode %}flex-column analysis-horizontal{% else %}flex-row{% endif %}">
             <div id="left-panel" class="split-element noselect">
                 <div id="analysis-toolbar">
                 {% if has_write_permission %}
@@ -291,32 +319,33 @@
                 {% endif %}
                     <div id="toolbar-buttons">
                     {% if analysis.is_locked %}
-                        <i title='Locked by: {{ analysis.last_lock.user }} on {{ analysis.last_lock.date|localtime }} ({{ analysis.last_lock.date|timesince }} ago)' class="left fa fa-lock fa-lg toolbar-button"></i>
+                        <span class="toolbar-status" title='Locked by: {{ analysis.last_lock.user }} on {{ analysis.last_lock.date|localtime }} ({{ analysis.last_lock.date|timesince }} ago)'><i class="fa-solid fa-lock"></i></span>
                     {% endif %}
 
                     {% if warnings %}
-                        <i id='lock-input-sources-warning-icon' class="fas fa-exclamation-triangle text-warning toolbar-button"
+                        <span id='lock-input-sources-warning-icon' class="toolbar-status text-warning"
                              title="<ul style='background-color: #FEBC00;'>{% for w in warnings %}<li>{{ w }}{% endfor %}}</ul>"
                              data-toggle="tooltip"
                              data-placement="bottom"
                              data-html="true"
-                        ></i>
+                        ><i class="fa-solid fa-triangle-exclamation"></i></span>
                     {% endif %}
 
                     {% if has_write_permission %}
-                        <a id="add-node-button" class="toolbar-button" href="javascript:addNode()" title="Add node"></a>
-                        <a id="copy-node-button" class="toolbar-button" href="javascript:copyNode()" title="Copy node"></a>
-                        <a id="del-node-button" class="toolbar-button" href="javascript:deleteActiveNodes()" title="Delete Node"></a>
+                        <a id="add-node-button" class="toolbar-button" href="javascript:addNode()" title="Add node"><i class="fa-solid fa-circle-plus"></i></a>
+                        <a id="copy-node-button" class="toolbar-button" href="javascript:copyNode()" title="Copy node"><i class="fa-regular fa-clone"></i></a>
+                        <a id="del-node-button" class="toolbar-button" href="javascript:deleteActiveNodes()" title="Delete Node"><i class="fa-regular fa-trash-can"></i></a>
+                        <span class="toolbar-separator"></span>
                     {% endif %}
-                        <a class="toolbar-button settings-icon" href="javascript:analysisSettings()" title="Analysis Settings"></a>
-                        <a href="javascript:viewTags()" class='left no-link-style' title="Tags">
-                            <span id="view-tags-button" class="toolbar-button"></span>
+                        <a class="toolbar-button" href="javascript:analysisSettings()" title="Analysis Settings"><i class="fa-solid fa-gear"></i></a>
+                        <a id="view-tags-button" class="toolbar-button" href="javascript:viewTags()" title="Tags">
+                            <i class="fa-solid fa-tags"></i>
                             <span id="number-of-tags"></span>
                         </a>
-                        <a id="input-samples-button" class="toolbar-button" href="javascript:inputSamples()" title="Show Input Samples"></a>
+                        <a id="input-samples-button" class="toolbar-button" href="javascript:inputSamples()" title="Show Input Samples"><svg class="toolbar-icon"><use href="#node-icon-samples"></use></svg></a>
                         {% settings_value 'ANALYSIS_DUAL_SCREEN_MODE_FEATURE_ENABLED' as analysis_dual_screen_mode_feature_enabled %}
                         {% if analysis_dual_screen_mode_feature_enabled %}
-                        <a id="dual-screen-button" class="toolbar-button" href="javascript:startDualScreenMode()" title="Dual Screen Mode"></a>
+                        <a id="dual-screen-button" class="toolbar-button" href="javascript:startDualScreenMode()" title="Dual Screen Mode"><i class="fa-solid fa-table-columns"></i></a>
                         {% endif %}
                         </div>
                         <span id="analysis-info">
@@ -332,21 +361,32 @@
                     </div>
 
                 <div id="analysis-container">
-                    <div>
-                        {% include "analysis/svg_dropshadow.html" %}
-                    </div>
                     <div id="overscroll" class='overlay'>
                         <div id="analysis"></div>
                     </div>
                 </div>
                 <div id='node-count-legend' title='Modify node counts in analysis settings (cog icon)'></div>
+            {% if analysis.analysis_horizontal_mode %}
+                {# The editor's other home - #node-editor-container is moved in here, see applyEditorHome() #}
+                <div id="node-editor-drawer" style="display: none">
+                    <div class="drawer-resize-handle" title="Drag to resize"></div>
+                    <div class="drawer-header">
+                        <span class="drawer-title">Node editor</span>
+                        {# The node editor's own tabs are mirrored in here - see syncNodeEditorTabs() #}
+                        <span id="drawer-node-tabs" class="drawer-node-tabs"></span>
+                        <span id="drawer-variant-tabs" class="drawer-node-tabs"></span>
+                        <a id="dock-editor-as-tab-button" class="toolbar-button" href="javascript:void(0)"
+                           title="Dock the editor as a tab in the bottom panel"><i class="fa-solid fa-window-maximize"></i></a>
+                        <a id="close-editor-drawer-button" class="toolbar-button" href="javascript:void(0)"
+                           title="Close (Esc)"><i class="fa-solid fa-xmark"></i></a>
+                    </div>
+                    <div id="node-editor-drawer-body"></div>
+                </div>
+            {% endif %}
             </div>
             <div id="right-panel" class="split-element">
                 <div>&nbsp;</div>
             </div>
         </div>
-    </div>
-
-    <div id="error-dialog" class="no-close" title="Javascript Error">
     </div>
 {% endblock content %}

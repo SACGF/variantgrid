@@ -1,24 +1,9 @@
-<style>
-    .af-slider {
-        width: 50%;
-        margin: 0px 10px 0px 10px;
-    }
-    
-    .slider-label {
-        width: 35px;
-    }
-
-    #af-tool-container {
-        margin-bottom: 5px;
-    }
-</style>
 <script type="text/ignored_template" data-template="slider">
-    <div class='slider-container'>
-        <div class='slider-min slider-label label left'></div>
-        <div class='af-slider left'></div>
-        <div class='slider-max slider-label label left'></div>
-        <input value="-" title="Delete AF range" class="delete-slider" type="button">
-        <div class='clear'></div>
+    <div class='af-slider-row'>
+        <div class='slider-min slider-label'></div>
+        <div class='af-slider'></div>
+        <div class='slider-max slider-label'></div>
+        <button type="button" title="Delete AF range" class="delete-slider btn btn-sm btn-outline-secondary btn-icon">&minus;</button>
     </div>
 </script>
 <script>
@@ -57,7 +42,7 @@
         $(".slider-max", container).text(maxVal);
     }
 
-    function createSlider(value1, value2) {
+    function addSlider(value1, value2) {
         value1 = getValue(value1, 0);
         value2 = getValue(value2, 1);
 
@@ -65,47 +50,41 @@
         const sliderContainer = $(sliderTemplate);
         const slider = $(".af-slider", sliderContainer);
 
-        slider.slider({
-            range: true,
-            min: 0,
-            max: 1,
-            step: 0.01,
-            values: [ value1, value2 ],
-            slide: function(event, ui) {
-                afSetSliderMinMaxLabels(this, ui.values[0], ui.values[1]);
-            }
-        });
-        // initial labels
-        afSetSliderMinMaxLabels(slider, slider.slider('values', 0), slider.slider('values', 1));
-
         $(".delete-slider", sliderContainer).click(function() {
+            slider[0].noUiSlider.destroy();
             sliderContainer.remove();
         });
 
-        return sliderContainer;
-    }
-
-
-    function addSlider(value1, value2) {
-        const sliderContainer = createSlider(value1, value2);
+        // noUiSlider needs the element in the DOM before create()
         $("#allele-frequency-filter").append(sliderContainer);
-        return $(".af-slider", sliderContainer);
+
+        noUiSlider.create(slider[0], {
+            start: [value1, value2],
+            connect: true,
+            range: {min: 0, max: 1},
+            step: 0.01,
+        });
+        // update fires on create as well as on drag, so it sets the initial labels too
+        slider[0].noUiSlider.on("update", function(values, handle, unencoded) {
+            afSetSliderMinMaxLabels(slider, unencoded[0], unencoded[1]);
+        });
+
+        return slider;
     }
 
 
-    function getAlleleFrequencyValues() {
+    nodeEditorHooks.getAlleleFrequencyValues = function() {
         const sliderList = [];
         $(".af-slider").each(function() {
-            const sMin = $(this).slider('values', 0);
-            const sMax = $(this).slider('values', 1);
-            sliderList.push([sMin, sMax]);
+            const values = this.noUiSlider.get(true);
+            sliderList.push([values[0], values[1]]);
         });
         
         return {
             "group_operation" : $("#slider-group-operation").val(),
             "sliders" : sliderList,
         };
-    }
+    };
 
     $(document).ready(function() {
         $("#add-slider").click(function(event) {
@@ -118,14 +97,14 @@
         {% endif %}
     });
 </script>
-<div id='allele-frequency-filter' class='hidden'>
+<div id='allele-frequency-filter' class='hidden editor-section'>
     <div id='af-tool-container'>
-        <b>Allele Frequency</b>
-        <select id='slider-group-operation'>
+        <span class="editor-section-title">Allele frequency</span>
+        <select id='slider-group-operation' title="Match all ranges, or any of them">
             <option value="L">all</option>
             <option value="Y" selected="selected">any</option>
         </select>
-        <input id='add-slider' value="+" title="Add AF range" class="ui-add" type="button">
+        <button type="button" id='add-slider' title="Add AF range" class="btn btn-sm btn-outline-secondary btn-icon">+</button>
     </div>
 </div>
 

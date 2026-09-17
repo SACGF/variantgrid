@@ -242,11 +242,17 @@ class VariantTranscriptSelections:
             Whichever one is used will have molecular consequences etc.
 
             We may have transcripts from consortium not used, so can add those. """
+        if variant.is_gene_level:
+            # No coordinate, so nothing to convert into the other consortium's transcripts
+            # @see snpdb.gene_level_variants
+            return
+
         ac_key = self._ac_key(self.annotation_consortium)
         other_ac_key = self._ac_key(self.other_annotation_consortium)
 
+        # Symbolic DEL/DUP/INV resolve from coordinates alone, so length doesn't cost anything (#1571)
         svlen = variant.svlen or 0
-        if abs(svlen) > settings.HGVS_MAX_SEQUENCE_LENGTH:
+        if variant.coordinate.symbolic_hgvs_interval is None and abs(svlen) > settings.HGVS_MAX_SEQUENCE_LENGTH:
             other_ac = AnnotationConsortium(self.other_annotation_consortium)
             self.warning_messages.append(f"Not adding {other_ac.label} transcripts due to length")
             return
@@ -272,8 +278,11 @@ class VariantTranscriptSelections:
             "gene_version__gene_symbol_id__in": gene_symbols,
         }
 
-        # Convert once to explicit, then pass this around
-        variant_coordinate = variant.coordinate.as_external_explicit(self.genome_build)
+        # Symbolic DEL/DUP/INV go to the converter as coordinates (#1571) and <CNV>/<INS> have no
+        # HGVS at all (#1574) - everything else converts once here rather than once per transcript
+        variant_coordinate = variant.coordinate
+        if variant_coordinate.symbolic_hgvs_interval is None and variant_coordinate.can_be_made_explicit:
+            variant_coordinate = variant_coordinate.as_external_explicit(self.genome_build)
         has_other_annotation_consortium_transcripts = False
         transcript_version_qs = TranscriptVersion.objects.filter(**kwargs).select_related("gene_version")
         for transcript_version in transcript_version_qs.order_by("-version"):

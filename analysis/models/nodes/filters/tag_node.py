@@ -5,6 +5,7 @@ from typing import Optional
 
 from auditlog.registry import auditlog
 from django.db import models
+from django.db.models import Count
 from django.db.models.deletion import CASCADE, SET_NULL
 from django.db.models.query_utils import Q
 from django.utils import timezone
@@ -13,6 +14,7 @@ from django.utils.timezone import localtime
 from analysis.models.enums import TagNodeInput, TagNodeMode
 from analysis.models.models_variant_tag import VariantTag
 from analysis.models.nodes.analysis_node import AnalysisNode, NodeAuditLogMixin, NodeVersion
+from analysis.models.nodes.node_display import NodeIcon
 from snpdb.models import Tag
 
 
@@ -21,6 +23,8 @@ class TagNode(AnalysisNode):
     node_input = models.CharField(max_length=1, choices=TagNodeInput.choices, default=TagNodeInput.PARENT_TAGGED)
     mode = models.CharField(max_length=1, choices=TagNodeMode.choices, default=TagNodeMode.THIS_ANALYSIS)
     tagged_within_days = models.IntegerField(null=True, blank=True)
+    # A resolved to-do tagging (VariantTag.resolved) is done, so it is left out unless asked for
+    include_resolved = models.BooleanField(default=False)
 
     def modifies_parents(self):
         return True
@@ -55,14 +59,17 @@ class TagNode(AnalysisNode):
         anchor = node_version.created if node_version else timezone.now()
         return anchor - timedelta(days=self.tagged_within_days)
 
-    def _get_node_q(self) -> Q:
-        cutoff = self.tagged_within_cutoff
+    def tagged_variants_q(self, tag_ids: list[str], cutoff: Optional[datetime] = None) -> Q:
+        """ Variants carrying any of tag_ids (any tag at all if empty), within this node's tag scope.
+            The one place local vs global tags, and resolved to-dos, is decided """
         # Pull in tags from this analysis - use variant query
         # VariantTags are same build as analysis, so use this not Allele as it avoids a race condition where
         # tagging a variant w/o an Allele takes a few seconds to create one via liftover pipelines
         variants_with_tags = VariantTag.objects.filter(analysis=self.analysis)
-        if self.tag_ids:
-            variants_with_tags = variants_with_tags.filter(tag__in=self.tag_ids)
+        if not self.include_resolved:
+            variants_with_tags = variants_with_tags.filter(VariantTag.unresolved_q())
+        if tag_ids:
+            variants_with_tags = variants_with_tags.filter(tag__in=tag_ids)
         if cutoff:
             variants_with_tags = variants_with_tags.filter(created__gte=cutoff)
         # Tagging is done manually so this will only ever be small - much faster to convert to list
@@ -73,12 +80,46 @@ class TagNode(AnalysisNode):
             tags_qs = VariantTag.filter_for_user(self.analysis.user)
             # We already have tags from this analysis, no need to retrieve again
             tags_qs = tags_qs.exclude(analysis=self.analysis)
+            if not self.include_resolved:
+                tags_qs = tags_qs.filter(VariantTag.unresolved_q())
             if cutoff:
                 tags_qs = tags_qs.filter(created__gte=cutoff)
             # Builds from different analyses (maybe diff builds) - so do query using Allele
-            q_list.append(VariantTag.variants_for_build_q(self.analysis.genome_build, tags_qs, self.tag_ids))
+            q_list.append(VariantTag.variants_for_build_q(self.analysis.genome_build, tags_qs, tag_ids))
 
-        q = reduce(operator.or_, q_list)
+        return reduce(operator.or_, q_list)
+
+    def get_extra_filters_tag_q(self, tag_ids: list[str]) -> Optional[Q]:
+        """ A global node's tags reach outside the analysis, so the analysis-scoped default is wrong """
+        if self.mode == TagNodeMode.ALL_TAGS:
+            return self.tagged_variants_q(tag_ids)
+        return None
+
+    def get_tag_counts(self) -> dict[str, int]:
+        """ {tag: taggings} for the editor's tag picker - a hint beside each pill, not the node's count.
+            Local mode counts this analysis's taggings; global mode counts every tagging the user can see,
+            whatever the analysis or build - the node's own filter decides what gets through.
+            The tagged_within_days cutoff decides which variants enter the node, not which tags to
+            count, so it's left out """
+        if self.mode == TagNodeMode.ALL_TAGS:
+            tags_qs = VariantTag.filter_for_user(self.analysis.user)
+        else:
+            tags_qs = VariantTag.objects.filter(analysis=self.analysis)
+        if not self.include_resolved:
+            tags_qs = tags_qs.filter(VariantTag.unresolved_q())
+        tag_counts = dict(tags_qs.values_list("tag_id").annotate(n=Count("id")).values_list("tag_id", "n"))
+        # A tag already configured on the node always keeps its pill - dropping it would silently
+        # drop the tag on the next save
+        for tag_id in self.tag_ids:
+            tag_counts.setdefault(tag_id, 0)
+        if self.mode == TagNodeMode.ALL_TAGS:
+            # Every live tag is pickable in global mode
+            for tag_id in Tag.objects.filter(retired__isnull=True).values_list("pk", flat=True):
+                tag_counts.setdefault(tag_id, 0)
+        return tag_counts
+
+    def _get_node_q(self) -> Q:
+        q = self.tagged_variants_q(self.tag_ids, self.tagged_within_cutoff)
         if self.node_input == TagNodeInput.PARENT_NOT_TAGGED:
             q = ~q
         return q
@@ -102,6 +143,9 @@ class TagNode(AnalysisNode):
             if self.tagged_within_days is not None:
                 description_list.append(f"≤ {self.tagged_within_days}d")
 
+            if self.include_resolved:
+                description_list.append("incl. resolved")
+
             description = " ".join(description_list)
         else:
             description = self.ANALYSIS_TAGS_NAME  # Has to be set to this
@@ -123,11 +167,17 @@ class TagNode(AnalysisNode):
     def get_node_class_label():
         return "Tags"
 
+    @classmethod
+    def get_node_class_icon(cls) -> NodeIcon:
+        return NodeIcon(fa="fa-solid fa-tags")
+
     def _get_method_summary(self):
         summary = f"Tagged {', '.join(self.tag_ids)} ({self.get_mode_display()})"
         if self.tagged_within_days is not None:
             summary += f", tagged within {self.tagged_within_days} days" \
                        f" (since {localtime(self.tagged_within_cutoff):%d %b %Y})"
+        if self.include_resolved:
+            summary += ", incl. resolved"
         return summary
 
     def get_css_classes(self):

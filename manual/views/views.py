@@ -27,6 +27,7 @@ class MigrationAttemptColumns(DatatableConfig[ManualMigrationAttempt]):
         "manage*deployment_check",
         "manage*migrate",
         "manage*collectstatic",
+        "manage*collectstatic_clean_compressor",
         "manage*collectstatic_js_reverse",
     ]
 

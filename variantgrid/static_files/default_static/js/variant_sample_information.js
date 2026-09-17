@@ -8,7 +8,8 @@
  * The allele may be created (and linked to the other builds' variants) by the variant details page while
  * this is loading, so we also listen for ALLELE_VARIANTS_EVENT and pick up any variants that turned up.
  */
-const VariantSampleInformation = (function () {
+// var not const - the analysis' variant details tabs load this script again for each variant
+var VariantSampleInformation = (function () {
     // Ordered as the zygosity filter checkboxes are drawn
     const ZYGOSITIES = [
         {code: 'R', label: 'REF'},
@@ -42,6 +43,8 @@ const VariantSampleInformation = (function () {
     ];
     const GRAPH_HEIGHT = 384;
     const ALLELE_VARIANTS_EVENT = "allele-variants-loaded";
+    // Namespaced so re-loading the section (another variant details tab) replaces its document handlers
+    const EVENT_NAMESPACE = ".variantSampleInformation";
 
     let config = null;
     let dataTable = null;
@@ -50,7 +53,7 @@ const VariantSampleInformation = (function () {
     let pendingRequests = 0;
     let allRows = [];
     let checkedZygosities = null;  // null until we've seen a response and know what to default to
-    let genomeBuildChecked = {};  // build -> bool, a build starts checked when its first rows arrive
+    let genomeBuildFilter = "";  // Build name from the radio filter, empty for all builds
     let graphedFilter = null;  // Redrawing 10k plotly points on every page change is a waste
 
     function genotypesUrl(variantId, limit) {
@@ -163,7 +166,7 @@ const VariantSampleInformation = (function () {
         if (type !== 'display' || !hasDetails(row)) {
             return '';
         }
-        return $('<i>', {class: 'fas fa-plus-circle', title: 'Patient / specimen details'}).prop('outerHTML');
+        return $('<i>', {class: 'fas fa-chevron-right', title: 'Patient / specimen details'}).prop('outerHTML');
     }
 
     function detailsList(row) {
@@ -192,7 +195,7 @@ const VariantSampleInformation = (function () {
         } else {
             row.child(detailsList(row.data())).show();
         }
-        $(this).find('i').toggleClass('fa-plus-circle fa-minus-circle');
+        $(this).find('i').toggleClass('fa-chevron-right fa-chevron-down');
     }
 
     function columns() {
@@ -276,7 +279,7 @@ const VariantSampleInformation = (function () {
             if (settings.nTable.id !== 'genotype-grid') {
                 return true;
             }
-            if (genomeBuildChecked[rowData.genome_build] === false) {
+            if (genomeBuildFilter && rowData.genome_build !== genomeBuildFilter) {
                 return false;
             }
             return checkedZygosities === null || checkedZygosities.has(rowData.zygosity);
@@ -309,26 +312,7 @@ const VariantSampleInformation = (function () {
         return counts;
     }
 
-    /** Draws "label (count): [x] |" checkboxes, handing the checked values to onChange */
-    function drawFilterCheckboxes(container, entries, isChecked, onChange) {
-        container.empty();
-        for (const entry of entries) {
-            const checkbox = $('<input>', {
-                type: 'checkbox',
-                class: 'genotype-filter',
-                value: entry.value,
-            }).prop('checked', isChecked(entry.value));
-            container.append($('<label>', {text: `${entry.label} (${entry.count}):`}), checkbox,
-                $('<span>', {class: 'separator', text: '|'}));
-        }
-
-        container.find(".genotype-filter").change(function () {
-            onChange(container.find(".genotype-filter:checked")
-                .map(function () { return $(this).val(); }).get());
-            dataTable.draw();
-        });
-    }
-
+    /** Draws "ZYGOSITY (count): [x] |" checkboxes for every zygosity that has rows */
     function drawZygosityFilters() {
         const counts = zygosityCounts();
         if (checkedZygosities === null) {
@@ -338,30 +322,22 @@ const VariantSampleInformation = (function () {
             checkedZygosities = new Set(visible);
         }
 
-        const entries = ZYGOSITIES.filter(z => counts[z.code])
-            .map(z => ({value: z.code, label: z.label, count: counts[z.code]}));
-        drawFilterCheckboxes($("#zygosity-filters"), entries,
-            code => checkedZygosities.has(code),
-            values => checkedZygosities = new Set(values));
-    }
-
-    function drawGenomeBuildFilters() {
-        const counts = genomeBuildCounts();
-        const builds = Object.keys(counts).sort();
-        for (const build of builds) {
-            if (!(build in genomeBuildChecked)) {
-                genomeBuildChecked[build] = true;  // Builds load one at a time, so this can be after a filter change
-            }
+        const container = $("#zygosity-filters").empty();
+        for (const zygosity of ZYGOSITIES.filter(z => counts[z.code])) {
+            const checkbox = $('<input>', {
+                type: 'checkbox',
+                class: 'genotype-filter',
+                value: zygosity.code,
+            }).prop('checked', checkedZygosities.has(zygosity.code));
+            container.append($('<label>', {text: `${zygosity.label} (${counts[zygosity.code]}):`}), checkbox,
+                $('<span>', {class: 'separator', text: '|'}));
         }
 
-        // A single build is the whole grid, so there'd be nothing to filter
-        $("#genome-build-filter").toggle(builds.length > 1);
-        const entries = builds.map(build => ({value: build, label: build, count: counts[build]}));
-        drawFilterCheckboxes($("#genome-build-filters"), entries,
-            build => genomeBuildChecked[build],
-            function (values) {
-                builds.forEach(build => genomeBuildChecked[build] = values.includes(build));
-            });
+        container.find(".genotype-filter").change(function () {
+            checkedZygosities = new Set(container.find(".genotype-filter:checked")
+                .map(function () { return $(this).val(); }).get());
+            dataTable.draw();
+        });
     }
 
     function locusCountsTable(locusCounts) {
@@ -380,9 +356,17 @@ const VariantSampleInformation = (function () {
 
         const tbody = $('<tbody>');
         for (const row of locusCounts) {
-            const link = $('<a>', {class: 'hover-link', href: row.url, text: row.variant});
+            // Named the way the grid's Variant cell names it - the row carries the same members
+            const label = VariantGridFormat.representativeVariantLabel(row.variant_id, row);
+            const link = $('<a>', {class: 'hover-link', href: row.url, title: label.title, html: label.html});
             const description = row.description ? ` (${row.description})` : '';
-            const tr = $('<tr>').append($('<td>').append(link).append(document.createTextNode(description)));
+            const cell = $('<td>').append(link);
+            const badge = VariantGridFormat.variantKindBadge(row["alt__seq"], row["svlen"],
+                                                             row["locus__contig__name"], row["locus__position"]);
+            if (badge) {
+                cell.append(' ').append(badge);
+            }
+            const tr = $('<tr>').append(cell.append(document.createTextNode(description)));
             fields.forEach(f => tr.append($('<td>', {text: row[f]})));
             tbody.append(tr);
         }
@@ -543,7 +527,7 @@ const VariantSampleInformation = (function () {
             y: alleleFrequencies,
             text: labels,
         };
-        const layout = defaultLayout(config.variantLabel + " Allele Frequency", null, GRAPH_HEIGHT);
+        const layout = defaultLayout("Allele Frequency", null, GRAPH_HEIGHT);
         layout.xaxis = Object.assign(layout.xaxis || {}, {zeroline: false, showgrid: false, showticklabels: false});
         layout.yaxis = Object.assign(layout.yaxis || {}, {range: [0, 1.05], showgrid: false, zeroline: false});
         Plotly.newPlot('sample-allele-frequency-scatter', [scatterData], layout, RESPONSIVE);
@@ -553,15 +537,18 @@ const VariantSampleInformation = (function () {
         const histogramData = {
             name: "Allele Frequency",
             type: 'histogram',
+            orientation: 'h',
             marker: {color: AF_COLOR},
-            x: clampedAf,
-            autobinx: false,
+            y: clampedAf,
+            autobiny: false,
             histnorm: "count",
-            xbins: {start: 0, size: .05, end: 1},
+            ybins: {start: 0, size: .05, end: 1},
         };
-        const histogramLayout = defaultLayout(config.variantLabel + " Allele Frequency Histogram", null, GRAPH_HEIGHT);
-        histogramLayout.xaxis = {autotick: true, range: [0, 1]};
-        histogramLayout.yaxis = {showline: false, zeroline: false, showticklabels: false};
+        const histogramLayout = defaultLayout("Allele Frequency Histogram", null, GRAPH_HEIGHT);
+        // Bins run up the same scale as the scatter beside it, so it reads as that plot's summary
+        histogramLayout.xaxis = {tickmode: 'auto', showgrid: false, zeroline: false};
+        histogramLayout.yaxis = {range: [0, 1.05], showgrid: false, zeroline: false, showticklabels: false};
+        histogramLayout.margin = {l: 20};
         Plotly.newPlot('sample-allele-frequency-histogram', [histogramData], histogramLayout, RESPONSIVE);
     }
 
@@ -602,8 +589,7 @@ const VariantSampleInformation = (function () {
 
     function drawGraphs() {
         const zygosities = checkedZygosities === null ? '' : [...checkedZygosities].sort().join(',');
-        const builds = Object.keys(genomeBuildChecked).filter(b => genomeBuildChecked[b]).sort().join(',');
-        const filter = [allRows.length, dataTable.search(), zygosities, builds].join('|');
+        const filter = [allRows.length, dataTable.search(), zygosities, genomeBuildFilter].join('|');
         if (filter === graphedFilter) {
             return;  // Paging/sorting doesn't change what the graphs summarise
         }
@@ -629,7 +615,6 @@ const VariantSampleInformation = (function () {
         if (allRows.length) {
             $("#genotype-grid-container").show();
             drawZygosityFilters();
-            drawGenomeBuildFilters();
             dataTable.column('genome_build:name').visible(Object.keys(genomeBuildCounts()).length > 1, false);
             const hasClassifications = allRows.some(row => row.classifications && row.classifications.length);
             dataTable.column('classifications:name').visible(hasClassifications, false);
@@ -666,11 +651,19 @@ const VariantSampleInformation = (function () {
         config = cfg;
         createDataTable();
 
+        $("#genome-build-filter input[name=genome_build_filter]").change(function () {
+            genomeBuildFilter = $(this).val();
+            dataTable.draw();
+        });
+
+        $(document).off(EVENT_NAMESPACE);
+
         // getOntologyTermLinks makes these as the grid renders, so delegate from the document
-        $(document).on('click', '.ontology-terms-container .collapsed-term', expandCollapsedOntologyTerm);
+        $(document).on('click' + EVENT_NAMESPACE, '.ontology-terms-container .collapsed-term',
+                       expandCollapsedOntologyTerm);
 
         // The allele can be created (linking the other builds' variants) while this section is loading
-        $(document).on(ALLELE_VARIANTS_EVENT, (event, variantIds) => requestVariants(variantIds));
+        $(document).on(ALLELE_VARIANTS_EVENT + EVENT_NAMESPACE, (event, variantIds) => requestVariants(variantIds));
 
         requestVariants(config.variantIds);
         requestVariants(window.alleleVariantIds);  // Allele resolved before we got here, so we missed the event

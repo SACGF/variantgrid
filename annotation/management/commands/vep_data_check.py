@@ -8,6 +8,8 @@ from snpdb.models import GenomeBuild
 
 
 class Command(BaseCommand):
+    category = "ops"
+
     def handle(self, *args, **options):
 
         for genome_build in GenomeBuild.builds_with_annotation():

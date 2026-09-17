@@ -1,0 +1,88 @@
+<html>
+<head>
+<style>
+    @page { size: A4 portrait; margin: 1.5cm }
+    body { font-family: Helvetica, sans-serif; font-size: 10pt }
+    h1 { font-size: 15pt; margin-bottom: 2pt }
+    h2 { font-size: 12pt; border-bottom: 1px solid #999; margin-top: 14pt }
+    h3 { font-size: 11pt; margin-bottom: 2pt }
+    table { width: 100% }
+    th, td { border: 1px solid #999; padding: 3pt; text-align: left; font-size: 9pt }
+    .field-label { color: #555 }
+    .draft-watermark { text-align: center; color: #e0a0a0; font-size: 30pt; font-weight: bold }
+    /* xhtml2pdf implements neither transform nor position, so the PDF's DRAFT sits in the flow */
+    @media screen { .draft-watermark { transform: rotate(-20deg) } }
+</style>
+</head>
+<body>
+{% if draft %}<div class="draft-watermark">DRAFT</div>{% endif %}
+<h1>Case report</h1>
+<table>
+    <tr><td class="field-label">Patient</td><td>{{ patient.str|default_if_none:"" }}</td>
+        <td class="field-label">Patient code</td><td>{{ patient.patient_code|default_if_none:"" }}</td></tr>
+    <tr><td class="field-label">Specimen</td><td>{{ specimen.str|default_if_none:"" }}</td>
+        <td class="field-label">Sequencing run</td><td>{{ sequencing_runs|join:", " }}</td></tr>
+    <tr><td class="field-label">Report ID</td><td>{{ case_report.external_report_id|default_if_none:"" }}</td>
+        <td class="field-label">Report date</td><td>{{ case_report.report_date|default_if_none:"" }}</td></tr>
+</table>
+
+{% if measures %}
+<h2>Measures</h2>
+<table>
+    <tr><th>Measure</th><th>Value</th><th>Call</th></tr>
+    {% for key, measure in measures.items %}
+    <tr><td>{{ key }}</td><td>{{ measure.value|default_if_none:"" }}{{ measure.unit|default_if_none:"" }}</td>
+        <td>{{ measure.call|default_if_none:"" }}</td></tr>
+    {% endfor %}
+</table>
+{% endif %}
+
+<h2>Results summary</h2>
+{% for kind_group in kind_groups %}
+<h3>{{ kind_group.label }}</h3>
+{% if not kind_group.variants %}<p>None detected.</p>{% endif %}
+<table>
+    <tr><th>Tier</th><th>Gene</th><th>Change</th><th>VAF</th><th>Copies</th></tr>
+    {% for v in kind_group.variants %}
+    <tr><td>{{ v.amp_tier }}</td><td>{{ v.gene_label }}</td>
+        <td>{{ v.evidence.p_hgvs.value|default_if_none:"" }}</td>
+        <td>{% if v.vaf_percent_whole is not None %}{{ v.vaf_percent_whole }}%{% endif %}</td>
+        <td>{% if v.copy_number is not None %}{{ v.copy_number }}{% elif v.fold_change is not None %}{{ v.fold_change }}x{% endif %}</td></tr>
+    {% endfor %}
+</table>
+{% endfor %}
+
+{% if summary %}
+<h2>Summary interpretation</h2>
+<p>{{ summary }}</p>
+{% endif %}
+
+<h2>Variant interpretation</h2>
+{% if splice_note %}<p>{{ splice_note }}</p>{% endif %}
+{% for tier in tier_groups %}
+<h3>{{ tier.label }}</h3>
+{% if not tier.genes %}
+<p>{% if tier.unreported_count %}No reportable variants detected.{% else %}No variants detected.{% endif %}</p>
+{% endif %}
+{% for gene in tier.genes %}
+<p>
+    {% for v in gene.variants %}
+    <b>{{ v.gene_label }}.</b> {{ v.evidence.refseq_transcript_id.value|default_if_none:"" }}:{{ v.evidence.c_hgvs.value|default_if_none:"" }};
+    {{ v.evidence.p_hgvs.value|default_if_none:"" }}. Tier {{ v.amp_tier }}.{% if v.vaf_percent is not None %} VAF: {{ v.vaf_percent }}%{% endif %}
+    {% if not forloop.last %}<br/>and<br/>{% endif %}
+    {% endfor %}
+</p>
+{% for v in gene.variants %}
+{% if v.evidence.somatic_summary_interpretation.value %}<p>{{ v.evidence.somatic_summary_interpretation.value }}</p>{% endif %}
+{% endfor %}
+{% if gene.gene_summary %}<p>{{ gene.gene_summary }}</p>{% endif %}
+{% endfor %}
+{% endfor %}
+
+<h2>Method</h2>
+<p>VariantGrid {{ versions.variantgrid }}.
+{% for build, version in versions.annotation.items %}Annotation ({{ build }}): {{ version }}. {% endfor %}
+{% for caller in versions.callers %}{{ caller }} {% endfor %}</p>
+<p class="field-label">Generated {{ generated }} by {{ user.str }}{% if lab %}, {{ lab.str }}{% endif %}.</p>
+</body>
+</html>

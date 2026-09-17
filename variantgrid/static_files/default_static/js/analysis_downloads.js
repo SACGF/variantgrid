@@ -70,12 +70,9 @@ class AnalysisDownloadTracker {
             this._renderButton(existing);
             return;
         }
-        const inner = el.find(".ui-pg-div");  // jqGrid nav buttons keep their padding on an inner div
-        const target = inner.length ? inner : el;
         const button = {
             infoFunc: infoFunc,
-            target: target,
-            defaultHtml: target.html(),
+            defaultHtml: el.html(),
             defaultTitle: el.attr("title") || "",
             container: el,
         };
@@ -229,7 +226,7 @@ class AnalysisDownloadTracker {
     _renderButton(button) {
         const info = button.infoFunc();
         const entry = this.entries[AnalysisDownloadTracker.keyFor(info)];
-        const target = button.target;
+        const target = button.container;
         if (!entry) {
             target.html(button.defaultHtml);
             button.container.attr("title", button.defaultTitle).css("opacity", "");

@@ -5,6 +5,7 @@ Covers what the split buys: a supplementary run waits for the VEP run whose rows
 hold up a VCF import, sees SVs too large for VEP, and appears for every existing range lock the moment
 the pipeline is enabled - which is the backfill the issue asked for.
 """
+from datetime import timedelta
 from unittest import mock
 
 from django.contrib.auth.models import User
@@ -14,15 +15,19 @@ from django.urls import reverse
 from django.utils import timezone
 
 from annotation.annotation_versions import _reset_run_counts_after_extend
-from annotation.fake_annotation import get_fake_vep_version
+from annotation.fake_annotation import (
+    get_fake_vep_version,
+    retire_seeded_annotation_version,
+)
 from annotation.models import AnnotationVersion, VariantAnnotationVersion
 from annotation.models.models import AnnotationPipelineVersion, AnnotationRangeLock, AnnotationRun
 from annotation.models.models_enums import AnnotationStatus, VariantAnnotationPipelineType
 from annotation.pipelines import blocking_pipeline_types, enabled_pipeline_types, get_runner
 from annotation.tasks.annotation_scheduler_task import (
+    COUNT_LEASE_PREFIX,
     _dispatchable_runs_qs,
     _handle_variant_annotation_version,
-    count_annotation_run,
+    count_annotation_runs,
 )
 from genes.models_enums import AnnotationConsortium
 from library.utils import execute_cmd
@@ -41,6 +46,7 @@ class AnnotSVPipelineTestCase(TestCase):
         cls.grch37 = GenomeBuild.get_name_or_alias("GRCh37")
         cls.variants = [slowly_create_test_variant("1", 100000 + i * 10, 'A', 'T', cls.grch37)
                         for i in range(2)]
+        retire_seeded_annotation_version(cls.grch37)
         kwargs = get_fake_vep_version(cls.grch37, AnnotationConsortium.ENSEMBL, 2)
         kwargs["status"] = VariantAnnotationVersion.Status.ACTIVE
         cls.vav = VariantAnnotationVersion.objects.create(**kwargs)
@@ -83,7 +89,10 @@ class AnnotSVPipelineTestCase(TestCase):
         lock = self._make_lock()  # only the two SNVs from setUpTestData
         _sv_run, annotsv_run = self._make_runs(lock)
 
-        count_annotation_run(annotsv_run.pk)
+        token = f"{COUNT_LEASE_PREFIX}test"  # lease it to the count lane, as _dispatch_counts would
+        AnnotationRun.objects.filter(pk=annotsv_run.pk).update(
+            leased_by=token, lease_expires=timezone.now() + timedelta(seconds=60))
+        count_annotation_runs([annotsv_run.pk], token)
 
         annotsv_run.refresh_from_db()
         self.assertEqual(annotsv_run.count, 0)
@@ -224,7 +233,7 @@ class PromotePipelineVersionViewTest(TestCase):
         self.assertContains(response, f"promote-pipeline-version-{self.new.pk}")
 
     def test_promoting_activates_and_queues_the_scheduler(self):
-        with mock.patch("annotation.views.annotation_scheduler") as scheduler:
+        with mock.patch("annotation.views_annotation_runs.annotation_scheduler") as scheduler:
             response = self.client.post(reverse("variant_annotation_runs"),
                                         {f"promote-pipeline-version-{self.new.pk}": "1"})
         self.assertEqual(response.status_code, 200)
@@ -257,7 +266,7 @@ class RegisterPipelineVersionViewTest(TestCase):
     def test_registering_creates_active_version_and_queues_the_scheduler(self):
         with mock.patch("annotation.pipelines.annotsv.get_annotsv_command_line_version",
                         return_value="3.5.10"), \
-                mock.patch("annotation.views.annotation_scheduler") as scheduler:
+                mock.patch("annotation.views_annotation_runs.annotation_scheduler") as scheduler:
             response = self.client.post(reverse("variant_annotation_runs"), {self.post_name: "1"})
         self.assertEqual(response.status_code, 200)
         pipeline_version = AnnotationPipelineVersion.get_active(ANNOTSV, self.genome_build)

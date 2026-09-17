@@ -2,9 +2,12 @@
 {% load classification_tags %}
 {% load js_tags %}
 {% load fieldset_tags %}
+{% load gene_copy_number_tags %}
+{% load gene_fusion_tags %}
 {% load ui_utils %}
 {% load ui_help %}
 {% load settings_tags %}
+{% load datatable_tags %}
 {% load user_tag_color_tags %}
 {% load settings_tags %}
 {% load clinvar_tags %}
@@ -35,7 +38,13 @@ function analysisLinkRenderer(data, type, row) {
 }
 
 // User's variant_tag_stale_days setting (null = staleness off)
-const VARIANT_TAG_STALE_DAYS = {{ variant_tag_stale_days|jsonify }};
+// var not const - the analysis editor loads this page's scripts into the same document each time
+var VARIANT_TAG_STALE_DAYS = {{ variant_tag_stale_days|jsonify }};
+
+// Opened from an analysis grid - name the tab now we know what the variant is called
+if (typeof setVariantDetailsTabLabel === "function") {
+    setVariantDetailsTabLabel({{ variant.pk }}, {{ variant_short_label|jsonify }});
+}
 
 function tagRenderer(data, type, row) {
     let tagLabel = row.tag;
@@ -75,41 +84,10 @@ function gnomadGeneConstraintRetrieval(content) {
     return retrievalSummary;
 }
 
-var pathogenicity_rankscore_threshold = [
-    {% settings_value 'ANNOTATION_MAX_BENIGN_RANKSCORE' %},
-    {% settings_value 'ANNOTATION_MIN_PATHOGENIC_RANKSCORE' %}
-]
+// {field: {benign, pathogenic, magnitude}} from the TOOLS / COLOUR_BANDS registries - see the
+// Pathogenicity Thresholds page for the cutoffs and their sources
+var CODE_THRESHOLDS = {% pathogenicity_thresholds %};
 
-var PATHOGENICITY_THRESHOLDS = {% pathogenicity_thresholds %};
-
-var CODE_THRESHOLDS = {
-    ...PATHOGENICITY_THRESHOLDS,
-    "grantham": [57, 105],
-    "gerp_pp_rs": [0, 3],
-    //
-    "alphamissense_rankscore": pathogenicity_rankscore_threshold,
-    "cadd_raw_rankscore": pathogenicity_rankscore_threshold,
-    "revel_rankscore": pathogenicity_rankscore_threshold,
-    "bayesdel_noaf_rankscore": pathogenicity_rankscore_threshold,
-    "clinpred_rankscore": pathogenicity_rankscore_threshold,
-    "vest4_rankscore": pathogenicity_rankscore_threshold,
-    "metalr_rankscore": pathogenicity_rankscore_threshold,
-    "maxentscan_percent_diff_ref": [-150, -70, 70, 150],
-    "phastcons_100_way_vertebrate": [0.85],
-    "phastcons_46_way_mammalian": [0.85],
-    "phastcons_30_way_mammalian": [0.85],
-    "phylop_100_way_vertebrate": [1.4],
-    // TODO: can't find what the ranges are...
-    // "phylop_46_way_mammalian": [1],
-    "phylop_30_way_mammalian": [1],
-    "spliceai_pred_ds_ag": [0.2, 0.6],
-    "spliceai_pred_ds_al": [0.2, 0.6],
-    "spliceai_pred_ds_dg": [0.2, 0.6],
-    "spliceai_pred_ds_dl": [0.2, 0.6],
-    "dbscsnv_ada_score": [0.2, 0.6],
-    "dbscsnv_rf_score": [0.2, 0.6],
-    "cosmic_count": [2, 10]
-};
 // These are looked up in lower case
 var CODE_WORDS = {
     "tolerated": "low",
@@ -171,57 +149,46 @@ function formatNumberSigDigits(value) {
     }
 }
 
+/** Green / amber / red band for a score, or null where the field has no band (or the value sits
+    below the only cutoff it has). Matches the Pathogenicity Thresholds page: at or above the
+    pathogenic cutoff supports pathogenic, at or below the benign one supports benign. */
+function thresholdBand(name, value) {
+    const band = CODE_THRESHOLDS[name];
+    if (!band) {
+        return null;
+    }
+    const score = band.magnitude ? Math.abs(value) : value;
+    if (score >= band.pathogenic) {
+        return "threshold-high";
+    }
+    if (band.benign === undefined) {
+        return null;
+    }
+    return score <= band.benign ? "threshold-low" : "threshold-med";
+}
+
 function applyValue(name, value) {
     let transcriptInfoTable = $('#transcript-info');
     let hasValue = true;
     if (value === null) {
         hasValue = false;
         value = $('<span>', {class: 'no-value', text:'-'});
-    } else if (_.isNumber(value)) {
-        let threshold = CODE_THRESHOLDS[name];
+    } else if (typeof value === "number") {
         let cssClasses = ["text-monospace"];
-        if (threshold) {
-            if (threshold.length == 1) {
-                if (value >= threshold[0]) {
-                    cssClasses.push("threshold");
-                    cssClasses.push("threshold-high");
-                }
-            } else if (threshold.length == 2) {
-                cssClasses.push("threshold");
-                if (value < threshold[0]) {
-                    cssClasses.push("threshold-low");
-                } else if (value <= threshold[1]) {
-                    cssClasses.push("threshold-med");
-                } else {
-                    cssClasses.push("threshold-high");
-                }
-            } else if (threshold.length == 4) {
-                cssClasses.push("threshold");
-                if (value < threshold[0]) {
-                    cssClasses.push("threshold-high");
-                } else if (value <= threshold[1]) {
-                    cssClasses.push("threshold-med");
-                } else if (value <= threshold[2]) {
-                     cssClasses.push("threshold-low");
-                } else if (value <= threshold[3]) {
-                    cssClasses.push("threshold-med");
-                } else {
-                    cssClasses.push("threshold-med");
-                }
-            }
-        }
-        if (value === 0) {
+        let band = thresholdBand(name, value);
+        if (band) {
+            cssClasses.push("threshold", band);
+        } else if (value === 0) {
             cssClasses.push("text-secondary");
         }
         value = $('<span>', {"class": cssClasses.join(" "), text: formatNumberSigDigits(value)});
-    } else if (_.isString(value)) {
+    } else if (typeof value === "string") {
         let threshold = CODE_WORDS[value.toLowerCase()];
         if (threshold) {
             value = $('<span>', {"class": `threshold threshold-${threshold}`, text: value});
         }
-    } else if (_.isBoolean(value)) {
-        let threshold = value? "high" : "low";
-        value = $('<span>', {"class": `threshold threshold-${threshold}`, text: value});
+    } else if (typeof value === "boolean") {
+        value = $('<span>', {"class": "text-monospace", text: value});
     }
     let htmlDom = $("#" + name, transcriptInfoTable);
 
@@ -242,8 +209,8 @@ function transcriptFunc(transcriptId, data) {
         applyValue(name, value);
     });
 
-    formatField($("#cosmic_id"), cosmicLink);
-    formatField($("#cosmic_legacy_id"), cosmicLink);
+    formatField($("#cosmic_id"), VariantGridFormat.cosmicLink);
+    formatField($("#cosmic_legacy_id"), VariantGridFormat.cosmicLink);
     formatField($("#gnomad_gene_constraint_retrieval"), gnomadGeneConstraintRetrieval);
 }
 
@@ -440,7 +407,7 @@ $(document).ready(function() {
     handlePubMedLinks("{{ variant_annotation.pubmed|default_if_none:''|escapejs }}");
     let dbSNP = $("#dbsnp_rs_id").text();
     if (dbSNP && dbSNP !== '-') {
-        formatField($("#dbsnp_rs_id"), formatDBSNP);
+        formatField($("#dbsnp_rs_id"), VariantGridFormat.dbsnp);
     }
 
     $('.search-terms-toggle').click(function() {
@@ -496,6 +463,8 @@ function applyVariantValues() {
         applyValue("spliceai_pred_ds_al", {{ variant_annotation.spliceai_pred_ds_al | jsonify }});
         applyValue("spliceai_pred_ds_dg", {{ variant_annotation.spliceai_pred_ds_dg | jsonify }});
         applyValue("spliceai_pred_ds_dl", {{ variant_annotation.spliceai_pred_ds_dl | jsonify }});
+    {% endif %}
+    {% if variant_annotation.has_cosmic %}
         applyValue("cosmic_count", {{ variant_annotation.cosmic_count | jsonify }});
     {% endif %}
 }
@@ -544,7 +513,13 @@ function applyVariantValues() {
             <div class="card-body">
                 {% if variant_annotation %}{% labelled label="Variant Annotation" admin_only=True %}{{ variant_annotation.version }} {% admin_link variant_annotation %}{% endlabelled %}{% endif %}
                 {% labelled id="g-hgvs" label="g.HGVS" value_css="variant-coordinate variant_coordinate" %}{% c_hgvs hgvs_g %}{% endlabelled %}
-                {% labelled id="variant_coordinate" label="Variant Coordinate" value_css="variant-coordinate variant_coordinate" %}Loading...{% endlabelled %}
+                {% if gene_fusion %}
+                    {% labelled label="Fusion" %}{% gene_fusion gene_fusion %}{% endlabelled %}
+                {% elif gene_copy_number_event %}
+                    {% labelled label="Copy number" %}{% gene_copy_number gene_copy_number_event %}{% endlabelled %}
+                {% else %}
+                    {% labelled id="variant_coordinate" label="Variant Coordinate" value_css="variant-coordinate variant_coordinate" %}Loading...{% endlabelled %}
+                {% endif %}
                 {% if variant.svlen %}
                     <!-- You can't see ref base in variant coordinate for symbolics - so explicitly show to help admins debug stuff -->
                     {% labelled label="Reference" admin_only=True %}{{ variant.locus.ref }}{% endlabelled %}
@@ -613,6 +588,7 @@ function applyVariantValues() {
 
         <div id="variant-tags-datatable-wrapper" class="{% if not has_tags %}hidden{% endif %}">
             {% tag_colors_collection_link %}
+            {% datatable_user_data_filter 'variant-tags-datatable' 'Variant Tags' group_data=False hidden_data=True hidden_label="Show resolved" %}
             <table id="variant-tags-datatable" class="sticky-header" data-datatable-responsive="true" data-datatable-url="{% url 'variant_tag_counts_datatable' variant.pk %}"></table>
         </div>
 
@@ -624,6 +600,7 @@ function applyVariantValues() {
             </div>
             <form id="variant-tag-form" class="hidden flex-row flex-grow">
                 {% csrf_token %}
+                <label class="sr-only" for="{{ tag_form.tag.id_for_label }}">{{ tag_form.tag.label }}</label>
                 {{ tag_form.tag }}
                 {{ tag_form.media }}
             </form>
@@ -1169,18 +1146,89 @@ function applyVariantValues() {
                 <div class="card">
                     <div class="card-header">Open Targets</div>
                     <div class="card-body">
-                        {% labelled id='open_targets_gwas_l2g_score' visible_fields=visible_fields label='GWAS L2G score' help=annotation_description.open_targets_gwas_l2g_score hint="tiny" value_css="text-monospace" %}{{ variant_annotation.open_targets_gwas_l2g_score }}{% endlabelled %}
-                        {% labelled id='open_targets_gwas_gene_id' visible_fields=visible_fields label='GWAS gene' help=annotation_description.open_targets_gwas_gene_id hint="tiny" value_css="text-monospace" %}{{ variant_annotation.open_targets_gwas_gene_id }}{% endlabelled %}
-                        {% labelled id='open_targets_gwas_diseases' visible_fields=visible_fields label='GWAS diseases' help=annotation_description.open_targets_gwas_diseases hint="tiny" %}{{ variant_annotation.open_targets_gwas_diseases }}{% endlabelled %}
-                        {% labelled id='open_targets_study_type' visible_fields=visible_fields label='Study type' help=annotation_description.open_targets_study_type hint="tiny" %}{{ variant_annotation.open_targets_study_type }}{% endlabelled %}
-                        {% labelled id='open_targets_qtl_gene_id' visible_fields=visible_fields label='QTL gene' help=annotation_description.open_targets_qtl_gene_id hint="tiny" value_css="text-monospace" %}{{ variant_annotation.open_targets_qtl_gene_id }}{% endlabelled %}
-                        {% labelled id='open_targets_qtl_biosample' visible_fields=visible_fields label='QTL biosample' help=annotation_description.open_targets_qtl_biosample hint="tiny" %}{{ variant_annotation.open_targets_qtl_biosample }}{% endlabelled %}
-                        {% if variant_annotation.open_targets_variant_id %}
-                            {% labelled id='open_targets_variant_id' visible_fields=visible_fields label='Variant' help=annotation_description.open_targets_variant_id hint="tiny" %}<a target="_blank" class='hover-link' href="https://platform.opentargets.org/variant/{{ variant_annotation.open_targets_variant_id }}">{{ variant_annotation.open_targets_variant_id }}</a>{% endlabelled %}
-                        {% endif %}
-                        {% if variant_annotation.open_targets_study_id %}
-                            {% labelled id='open_targets_study_id' visible_fields=visible_fields label='Study' help=annotation_description.open_targets_study_id hint="tiny" %}<a target="_blank" class='hover-link' href="https://platform.opentargets.org/study/{{ variant_annotation.open_targets_study_id }}">{{ variant_annotation.open_targets_study_id }}</a>{% endlabelled %}
-                        {% endif %}
+                        {% labelled id='open_targets_gwas_l2g_score' visible_fields=visible_fields label='Max GWAS L2G score' help=annotation_description.open_targets_gwas_l2g_score hint="tiny" value_css="text-monospace" %}{{ variant_annotation.open_targets_gwas_l2g_score|default_if_none:"" }}{% endlabelled %}
+                        {% with open_targets_variant=variant_annotation.open_targets_variant %}
+                            {% if open_targets_variant %}
+                                {% labelled id='open_targets_variant_id' visible_fields=visible_fields label='Variant' help=annotation_description.open_targets_variant_id hint="tiny" %}<a target="_blank" class='hover-link' href="{{ open_targets_variant.url }}">{{ open_targets_variant.id }}</a>{% endlabelled %}
+                            {% endif %}
+                        {% endwith %}
+
+                        {% with gwas_genes=variant_annotation.open_targets_gwas_genes %}
+                            {% if gwas_genes %}
+                                <table class="table table-sm mt-2">
+                                    <thead>
+                                        <tr>
+                                            <th title="{{ annotation_description.open_targets_gwas_gene_id }}">GWAS gene</th>
+                                            <th class="text-right" title="{{ annotation_description.open_targets_gwas_l2g_score }}">L2G</th>
+                                            <th title="{{ annotation_description.open_targets_gwas_diseases }}">Diseases</th>
+                                            <th class="text-right" title="{{ annotation_description.open_targets_study_id }}">Studies</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                    {% for gene in gwas_genes %}
+                                        <tr>
+                                            <td>
+                                                <a class="hover-link" href="{{ gene.gene_url }}">{{ gene.gene_symbol }}</a>
+                                                {% if gene.gene_symbol != gene.gene_id %}<div class="text-monospace text-muted">{{ gene.gene_id }}</div>{% endif %}
+                                            </td>
+                                            <td class="text-right text-monospace">{{ gene.l2g_score|floatformat:3|default_if_none:"" }}</td>
+                                            <td>
+                                                {% for disease in gene.diseases|slice:":8" %}
+                                                    <a target="_blank" class='hover-link badge badge-secondary' href="{{ disease.url }}">{{ disease.name }}</a>
+                                                {% endfor %}
+                                                {% if gene.diseases|length > 8 %}
+                                                    <a data-toggle="collapse" class="hover-link" href="#open-targets-diseases-{{ gene.gene_id }}">
+                                                        <i class="fas fa-caret-right"></i> and {{ gene.diseases|length|add:"-8" }} more
+                                                    </a>
+                                                    <div id="open-targets-diseases-{{ gene.gene_id }}" class="collapse">
+                                                        {% for disease in gene.diseases|slice:"8:" %}
+                                                            <a target="_blank" class='hover-link badge badge-secondary' href="{{ disease.url }}">{{ disease.name }}</a>
+                                                        {% endfor %}
+                                                    </div>
+                                                {% endif %}
+                                            </td>
+                                            <td class="text-right">
+                                                {{ gene.study_count }}
+                                                {% if gene.lead_study_count %}<div class="text-muted" title="{{ annotation_description.open_targets_is_lead }}">{{ gene.lead_study_count }} lead</div>{% endif %}
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                    </tbody>
+                                </table>
+                            {% endif %}
+                        {% endwith %}
+
+                        {% with qtl_genes=variant_annotation.open_targets_qtl_genes %}
+                            {% if qtl_genes %}
+                                <table class="table table-sm mt-2">
+                                    <thead>
+                                        <tr>
+                                            <th title="{{ annotation_description.open_targets_qtl_gene_id }}">QTL gene</th>
+                                            <th title="{{ annotation_description.open_targets_study_type }}">Study type</th>
+                                            <th title="{{ annotation_description.open_targets_qtl_biosample }}">Biosamples</th>
+                                            <th class="text-right" title="{{ annotation_description.open_targets_study_id }}">Studies</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                    {% for gene in qtl_genes %}
+                                        <tr>
+                                            <td>
+                                                <a class="hover-link" href="{{ gene.gene_url }}">{{ gene.gene_symbol }}</a>
+                                                {% if gene.gene_symbol != gene.gene_id %}<div class="text-monospace text-muted">{{ gene.gene_id }}</div>{% endif %}
+                                            </td>
+                                            <td>{{ gene.study_type_label }}</td>
+                                            <td>{{ gene.biosamples|join:", " }}</td>
+                                            <td class="text-right">
+                                                {{ gene.study_count }}
+                                                {% if gene.lead_study_count %}<div class="text-muted" title="{{ annotation_description.open_targets_is_lead }}">{{ gene.lead_study_count }} lead</div>{% endif %}
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                    </tbody>
+                                </table>
+                            {% endif %}
+                        {% endwith %}
+
                         <div class="text-right mt-2"><i class="text-secondary">Source: <a target="_blank" class='hover-link' href="https://platform.opentargets.org/">Open Targets</a></i></div>
                     </div>
                 </div>

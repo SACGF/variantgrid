@@ -10,9 +10,9 @@ function plotSamplesByMonthGraph(x, y) {
       },
     ];
 
-    var layout = {  title: "Cumulative samples",
-                    xaxis: {title: "Month"},
-                    yaxis: {title: "Samples"},
+    var layout = {  title: {text: "Cumulative samples"},
+                    xaxis: {title: {text: "Month"}},
+                    yaxis: {title: {text: "Samples"}},
     };
 
     Plotly.newPlot('samples-per-month', data, layout);

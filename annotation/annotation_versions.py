@@ -1,3 +1,9 @@
+"""
+Which variants still need annotation: get_annotation_range_lock_and_unannotated_count and
+get_lowest_unannotated_variant_id decide where the next AnnotationRangeLock starts, and
+merge_pending_range_locks combines small pending locks into batch-sized ones (#2667). The scheduler
+in annotation/tasks/annotation_scheduler_task.py calls these.
+"""
 import logging
 import sys
 
@@ -61,11 +67,15 @@ def _get_unannotated_count_min_max(annotation_version, search_min: int,
     unannotated_count = 0
     min_variant_id = None
     max_variant_id = None
+    if variant_max is None:  # No variants on system yet
+        return unannotated_count, min_variant_id, max_variant_id
+
     while True:
-        remaining_max = annotation_batch_max - unannotated_count
-        search_max = min(variant_max, search_min + remaining_max)
         if search_min > variant_max:
             break
+
+        remaining_max = annotation_batch_max - unannotated_count
+        search_max = min(variant_max, search_min + remaining_max)
 
         logging.debug("Searching for unannotated variants in range: %d-%d", search_min, search_max)
         qs = get_variants_qs_for_annotation(annotation_version, min_variant_id=search_min, max_variant_id=search_max)
@@ -157,7 +167,7 @@ def _absorb_range_lock(survivor: AnnotationRangeLock, absorbed: AnnotationRangeL
 def _reset_run_counts_after_extend(range_lock: AnnotationRangeLock):
     """ #1646: the range grew, so each run's pre-computed `count` is stale. Reopen empty-finished runs
         to CREATED (the larger range may now hold variants of their pipeline type) and null every run's
-        count. The scheduler's next count sweep (_trigger_counts_for_uncounted_runs) re-counts them; an
+        count. The dispatcher's next count lane batch (_dispatch_counts) re-counts them; an
         un-recounted reopened run is still correct - it just dumps over the new range like any CREATED
         run.
 

@@ -8,6 +8,7 @@ from snpdb.models import GenomeBuild, VariantCoordinate
 
 
 class Command(BaseCommand):
+    category = "maintenance"
 
     def add_arguments(self, parser):
         parser.add_argument('--vcf', help='VCF file, default: - (stdin)', default="-")

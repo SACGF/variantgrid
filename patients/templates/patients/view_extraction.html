@@ -1,15 +1,8 @@
 {% extends menu_patients_base %}
+{% load ui_tabs_builder %}
 {% load ui_utils %}
 {% load crispy_forms_tags %}
 {% block title %}Extraction {{ extraction }}{% endblock title %}
-{% block head %}
-<script>
-    $(document).ready(() => {
-        $(".date-picker").datepicker({changeYear: true, yearRange: "-120:+0"});
-    });
-</script>
-{% endblock head %}
-
 {% block submenu_page_content %}
     <div class="container">
         <h3>Extraction: {{ extraction }} {% admin_link extraction %}</h3>
@@ -25,6 +18,7 @@
             {% labelled label="Externally managed" %}{{ extraction.external_manager.explaination }}{% endlabelled %}
         {% endif %}
 
+        {% ui_register_tab_embedded label="Details" tab_set="extraction" %}
         <form method="post" id="extraction-form">
             {% csrf_token %}
             {% crispy form form_helper.horizontal %}
@@ -57,6 +51,12 @@
             <p>This extraction has no samples.</p>
         {% endif %}
 
+
+        <hr/>
+        <h4>Create analysis</h4>
+        {% load related_analyses_tags %}
+        {% analysis_templates_for_sample_source "E" extraction %}
+
         {% if sequencing_samples %}
             <h4>Sequencing Samples</h4>
             <table class="table">
@@ -73,6 +73,14 @@
                 {% endfor %}
                 </tbody>
             </table>
+        {% endif %}
+        {% end_ui_register_tab_embedded %}
+        {% ui_register_tab label="Classify &amp; Report" url="extraction_classify_report_tab" param=extraction.pk url_check=True tab_set="extraction" %}
+        {% ui_render_tabs tab_set="extraction" %}
+        {% if url_name_visible.extraction_classify_report_tab %}
+            {% url 'extraction_classify_report_tab' extraction.pk as classify_report_tab_url %}
+            {% url 'classify_report_summary' 'extraction' extraction.pk as classify_report_summary_url %}
+            {% include "analysis/classify_report_tab_counts.html" %}
         {% endif %}
     </div>
 {% endblock submenu_page_content %}

@@ -1,3 +1,11 @@
+"""
+Patients and the material taken from them: Patient (phenotype text matched to ontology terms),
+Specimen (one tissue at one timepoint), Extraction (nucleic acid off a specimen) and
+SpecimenMeasure, all Guardian-permissioned and optionally externally managed (ExternalPK /
+ExternallyManagedModel). ExtractionMatchMixin is how a Sample claims its extraction before the
+records exist. Patient modifications and imports are audited rows; clinicians and patient records
+complete the set.
+"""
 import os
 from typing import Optional
 
@@ -6,8 +14,9 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
 from django.db import models
-from django.db.models import Q
+from django.db.models import Case, F, Q, TextField, Value, When
 from django.db.models.deletion import CASCADE, SET_NULL
+from django.db.models.functions import Concat
 from django.dispatch.dispatcher import receiver
 from django.urls.base import reverse
 from django.utils import timezone
@@ -95,6 +104,13 @@ class ExternallyManagedModel(TimeStampedModel):
         abstract = True
 
     @property
+    def short_identifier(self):
+        """ What this record is known by - its local reference, else whatever external system
+            manages it, else the pk. One identity rule for previews, search and node chips """
+        local_reference = getattr(self, self.LOCAL_REFERENCE_FIELD, None)
+        return local_reference or self.external_pk or f"({self.pk})"
+
+    @property
     def external_manager(self):
         em = None
         if self.external_pk:
@@ -180,13 +196,19 @@ class Patient(GuardianPermissionsMixin, HasPhenotypeDescriptionMixin, Externally
             parts.append(PreviewKeyValue(value="deceased"))
 
         return self.preview_with(
-            identifier=self.patient_code or self.external_pk or f"({self.pk})",
-            title=self.name_last_name_first,
+            identifier=self.short_identifier,
+            title=self.display_identity,
             summary_extra=parts
         )
 
     def can_write(self, user) -> bool:
         return ExternallyManagedModel.can_write(self, user) and GuardianPermissionsMixin.can_write(self, user)
+
+    @classmethod
+    def filter_writable_for_user(cls, user):
+        """ Batch can_write - a record an external manager owns is read only here """
+        qs = super().filter_writable_for_user(user)
+        return qs.exclude(external_pk__external_manager__can_modify=False)
 
     @classmethod
     def allow_group_permission_delete(cls) -> bool:
@@ -285,14 +307,55 @@ class Patient(GuardianPermissionsMixin, HasPhenotypeDescriptionMixin, Externally
         HasPhenotypeDescriptionMixin.save_phenotype(self, pheno_kwargs)
 
     def get_samples(self):
-        return self.sample_set.all().select_related("vcf", "extraction__specimen").order_by("vcf__date")
+        """ Every sample that reaches this patient, either way round - the VCF import carries
+            extraction down without setting sample.patient, while the patient CSV sets patient and
+            may leave extraction null. Same union as SOURCE_LEVELS[PATIENT] in patients.sample_grouping;
+            Sample is taken off the relation because snpdb imports this module. """
+        sample_model = self.sample_set.model
+        reaches_patient = Q(patient=self) | Q(extraction__specimen__patient=self)
+        return sample_model.objects.filter(reaches_patient).distinct() \
+            .select_related("vcf__genome_build", "extraction__specimen").order_by("vcf__date")
+
+    @property
+    def display_identity(self) -> str:
+        """ The code alone when there is one - showing the name beside a de-identified code would
+            re-identify the patient. Only a patient with no code is known by name """
+        if code := self.patient_code or self.external_pk:
+            return str(code)
+        if self.first_name or self.last_name:
+            return self.name_last_name_first
+        return str(self.code)
+
+    @staticmethod
+    def display_identity_expression(prefix: str = "") -> Case:
+        """ display_identity as SQL, so a grid can sort, filter and export on the identity its cells show.
+            Change it alongside the property above - the two rules have to give the same answer.
+            prefix: the lookup path to the patient, eg "patient__" from a model that has one """
+        def field(name: str) -> str:
+            return f"{prefix}{name}"
+
+        def present(name: str) -> Q:
+            """ Python treats a blank TextField as absent, so a NOT NULL test isn't enough """
+            return Q(**{f"{field(name)}__isnull": False}) & ~Q(**{field(name): ""})
+
+        has_first = present("first_name")
+        has_last = present("last_name")
+        return Case(
+            # A prefixed path can arrive at no patient at all - that is a blank cell, not "Patient:"
+            When(Q(**{f"{field('pk')}__isnull": True}), then=Value(None)),
+            When(present("patient_code"), then=F(field("patient_code"))),
+            When(Q(**{f"{field('external_pk')}__isnull": False}),
+                 then=Concat(field("external_pk__code"), Value(" ("), field("external_pk__external_type"),
+                             Value(")"), output_field=TextField())),
+            When(has_first & has_last, then=Concat(field("last_name"), Value(", "), field("first_name"),
+                                                   output_field=TextField())),
+            When(has_first, then=F(field("first_name"))),
+            When(has_last, then=F(field("last_name"))),
+            default=Concat(Value("Patient:"), field("pk"), output_field=TextField()),
+            output_field=TextField())
 
     def __str__(self):
-        # De-identified patients have no name, so fall back to the code they're known by
-        if self.first_name or self.last_name:
-            description = self.name
-        else:
-            description = str(self.code)
+        description = self.display_identity
         if self.sex != Sex.UNKNOWN:
             description += f" ({self.sex})"
         return description
@@ -355,7 +418,8 @@ class Specimen(GuardianPermissionsMixin, ExternallyManagedModel, PreviewModelMix
 
     @classmethod
     def preview_icon(cls) -> str:
-        return "fa-solid fa-vial"
+        # A blob against the extraction's stick - biological material vs the lab glassware taken off it
+        return "fa-solid fa-droplet"
 
     @classmethod
     def preview_if_url_visible(cls) -> Optional[str]:
@@ -368,7 +432,7 @@ class Specimen(GuardianPermissionsMixin, ExternallyManagedModel, PreviewModelMix
             parts.append(PreviewKeyValue(key="Collected", value=self.collection_date))
 
         return self.preview_with(
-            identifier=self.reference_id or self.external_pk or f"({self.pk})",
+            identifier=self.short_identifier,
             title=str(self.patient),
             summary_extra=parts
         )
@@ -476,7 +540,7 @@ class Extraction(GuardianPermissionsMixin, ExternallyManagedModel, PreviewModelM
             parts.append(PreviewKeyValue(key="Extracted", value=self.extraction_date))
 
         return self.preview_with(
-            identifier=self.reference_id or self.external_pk or f"({self.pk})",
+            identifier=self.short_identifier,
             title=str(self.specimen.patient),
             summary_extra=parts
         )

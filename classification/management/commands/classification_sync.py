@@ -7,6 +7,7 @@ class Command(BaseCommand):
     """
     Performs a sync to other VariantGrid instances
     """
+    category = "ops"
 
     def add_arguments(self, parser):
         parser.add_argument('--destination', required=True)

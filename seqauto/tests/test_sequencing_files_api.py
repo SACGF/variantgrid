@@ -1,9 +1,10 @@
 """Tests for sequencing data sent up without FastQs (SACGF/variantgrid_sapath#357)."""
 from django.contrib.auth.models import User
-from django.test import TestCase
+from django.test import RequestFactory, TestCase
+from django.urls.base import resolve, reverse
 from rest_framework.exceptions import ValidationError
 
-from seqauto.grids.sequencing_data_grids import BamFileListGrid
+from seqauto.grids.sequencing_data_grids import BamFileColumns
 from seqauto.models import (
     QC,
     BamFile,
@@ -92,6 +93,14 @@ class SequencingFilesBulkCreateTests(TestCase):
         }
         return QCSerializer.get_object(qc_data)
 
+    def _bam_file_grid_rows(self):
+        url = reverse('bam_file_datatable')
+        request = RequestFactory().get(url)
+        request.resolver_match = resolve(url)
+        request.user = self.user
+        config = BamFileColumns(request)
+        return config.get_initial_queryset().values(*config.value_columns())
+
     def test_bam_without_fastqs(self):
         sample_name = SAMPLE_NAMES[0]
         self._bulk_create(self._record(sample_name, fastqs=False))
@@ -114,7 +123,7 @@ class SequencingFilesBulkCreateTests(TestCase):
         coverage_qs = QCGeneCoverage.objects.filter(qc__bam_file__sequencing_sample=sequencing_sample)
         self.assertEqual(coverage_qs.count(), 1)
 
-        grid_rows = list(BamFileListGrid(self.user).queryset)
+        grid_rows = list(self._bam_file_grid_rows())
         self.assertEqual(len(grid_rows), 1)
         self.assertEqual(grid_rows[0]["sequencing_sample__sample_sheet__sequencing_run__name"],
                          self.sequencing_run.name)

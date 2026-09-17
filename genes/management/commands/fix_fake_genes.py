@@ -14,6 +14,7 @@ from genes.models import Gene, TranscriptVersion
 
 
 class Command(BaseCommand):
+    category = "one-off"
 
     def handle(self, *args, **options):
         fake_genes = Gene.objects.filter(pk__startswith=Gene.FAKE_GENE_ID_PREFIX)

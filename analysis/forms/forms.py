@@ -8,6 +8,7 @@ from crispy_forms.layout import Field, Layout
 from dal import forward
 from django import forms
 from django.core.exceptions import ValidationError
+from django.db import transaction
 from django.forms import inlineformset_factory
 from django.forms.widgets import TextInput
 
@@ -24,6 +25,7 @@ from analysis.models import (
 from analysis.models.enums import (
     AnalysisTemplateType,
     AnalysisType,
+    DuoSample,
     QuadSample,
     SNPMatrix,
     TrioSample,
@@ -35,6 +37,7 @@ from library.django_utils import get_models_dict_by_column
 from library.django_utils.autocomplete_utils import ModelSelect2
 from library.forms import NumberInput, ROFormMixin
 from library.guardian_utils import assign_permission_to_user_and_groups
+from patients.models_enums import SampleSourceLevel, Sex
 from seqauto.models import EnrichmentKit
 from snpdb.forms import GenomeBuildAutocompleteForwardMixin, UserSettingsGenomeBuildMixin
 from snpdb.models import CustomColumnsCollection, Trio, UserSettings, VariantGridColumn
@@ -69,7 +72,8 @@ def get_analysis_template_form_for_variables_only_of_class(class_name, autocompl
         widget = forms.HiddenInput()
 
     class _AnalysisTemplateForm(forms.Form):
-        analysis_template = forms.ModelChoiceField(queryset=AnalysisTemplate.objects.all(), widget=widget)
+        analysis_template_version = forms.ModelChoiceField(queryset=AnalysisTemplateVersion.objects.all(),
+                                                           widget=widget)
 
     return _AnalysisTemplateForm
 
@@ -81,7 +85,9 @@ class AnalysisNodeClassesForm(forms.Form):
         super().__init__()
         choices = self._get_node_types_choices(source_nodes=source_nodes, filter_nodes=filter_nodes)
         self.fields['node_types'].choices = choices
-        self.fields['node_types'].initial = "SampleNode"
+        all_keys = [key for _, group in choices for key, _ in group]
+        preferred = f"SampleNode:{SampleSourceLevel.SAMPLE}"
+        self.fields['node_types'].initial = preferred if preferred in all_keys else all_keys[0]
 
     @staticmethod
     def _get_node_types_choices(source_nodes=True, filter_nodes=True):
@@ -97,7 +103,7 @@ class AnalysisNodeClassesForm(forms.Form):
         for classification in node_classifications:
             nodes = nodes_by_classification[classification]
             node_classes = [(data["class_name"], data["class_label"]) for data in nodes]
-            nc = sorted(node_classes, key=operator.itemgetter(0))
+            nc = sorted(node_classes, key=operator.itemgetter(1))
             choices.append((classification.title(), tuple(nc)))
 
         return choices
@@ -227,8 +233,10 @@ class AnalysisForm(forms.ModelForm, ROFormMixin):
                   "name", "description", "analysis_type",
                   "custom_columns_collection", "default_sort_by_column", "canonical_transcript_collection",
                   "grid_sample_label_template", "variant_tag_stale_days",
-                  "show_igv_links", "annotation_version", "lock_input_sources", "node_queryset_filter_contigs")
-        read_only = ('user', 'genome_build')
+                  "show_igv_links", "analysis_horizontal_mode", "annotation_version", "lock_input_sources",
+                  "node_queryset_filter_contigs")
+        read_only = ('genome_build', )
+        read_only_display = ('user', )
         model = Analysis
         widgets = {'name': TextInput(),
                    'grid_sample_label_template': TextInput(),
@@ -283,36 +291,26 @@ class AnalysisForm(forms.ModelForm, ROFormMixin):
             instance.version += 1
 
         if commit:
-            instance.save()
+            with transaction.atomic():
+                instance.save()
+                if "analysis_horizontal_mode" in self.changed_data:
+                    instance.rotate_node_positions()
         return instance
 
 
 class ColumnSummaryForm(forms.Form):
     column = forms.ChoiceField()
 
-    def __init__(self, colmodels, *args, **kwargs):
+    def __init__(self, rich_columns, *args, **kwargs):
         super().__init__(*args, **kwargs)
-
-        labels = []
-        name = []
-        for cm in ColumnSummaryForm.get_summarisable_colmodels(colmodels):
-            labels.append(cm['label'])
-            name.append(cm['name'])
-        choices = zip(name, labels)
-        self.fields['column'].choices = choices
+        summarisable = ColumnSummaryForm.get_summarisable_columns(rich_columns)
+        self.fields['column'].choices = [(rc.name, rc.label) for rc in summarisable]
 
     @staticmethod
-    def get_summarisable_colmodels(colmodels):
+    def get_summarisable_columns(rich_columns):
+        """ Columns from the catalogue whose value is selected out - the summary groups on the field """
         variantgrid_columns_dict = get_models_dict_by_column(VariantGridColumn, column="variant_column")
-        summarisable_colmodels = []
-        for cm in colmodels:
-            variant_column = cm.get("index") or cm.get("name")
-            has_variantgrid_column = variant_column in variantgrid_columns_dict
-            queryset_field = cm.get("queryset_field")
-
-            if has_variantgrid_column and queryset_field:
-                summarisable_colmodels.append(cm)
-        return summarisable_colmodels
+        return [rc for rc in rich_columns if rc.key and rc.name in variantgrid_columns_dict]
 
 
 class SNPMatrixForm(forms.Form):
@@ -340,7 +338,7 @@ class GraphTypeChoiceForm(forms.Form):
 
         # We don't join to observed variant anymore, but to keep compatibility
         # We can still get it if we have exactly 1 sample
-        if len(node.get_sample_ids()) == 1:
+        if len(node.get_sample_ids_with_genotype()) == 1:
             columns.append("observedvariant__zygosity")
             columns.append("observedvariant__allele_frequency")
 
@@ -359,50 +357,120 @@ class UserTrioForm(GenomeBuildAutocompleteForwardMixin, forms.Form):
                                                       attrs={'data-placeholder': 'Trio...'}))
 
 
-class UserTrioWizardForm(forms.Form):
-    mother_affected = forms.BooleanField(required=False)
-    father_affected = forms.BooleanField(required=False)
-    sample_1 = forms.ChoiceField(choices=TrioSample.choices)
-    sample_2 = forms.ChoiceField(choices=TrioSample.choices)
-    sample_3 = forms.ChoiceField(choices=TrioSample.choices)
+def _affected_widget() -> forms.CheckboxInput:
+    """ Bootstrap custom switch - the wizard templates supply the custom-control wrapper and label """
+    return forms.CheckboxInput(attrs={"class": "custom-control-input"})
+
+
+BLANK_ROLE = ("", "---")
+
+
+def _family_role_widget() -> forms.Select:
+    return forms.Select(attrs={"class": "custom-select custom-select-sm"})
+
+
+def _roles_for_sex(choices, sex: Sex, parent_role_by_sex: dict) -> list:
+    """ A sample's sex rules out the other parent's role - proband and sibling are open to anyone.
+        Roles start blank so no two samples hold the same one until they're picked """
+    if sex in parent_role_by_sex:
+        excluded = {role for other_sex, role in parent_role_by_sex.items() if other_sex != sex}
+        choices = [(value, label) for value, label in choices if value not in excluded]
+    return [BLANK_ROLE, *choices]
+
+
+class FamilyWizardForm(forms.Form):
+    """ Give each of a cohort's samples a role in the family, and say which of them are affected.
+        Pass sample_sexes (one Sex per sample, in field order) to keep a female off Father """
+    ROLE_ENUM = None
+    SAMPLE_FIELDS: list[str] = []
+    PARENT_ROLE_BY_SEX: dict = {}
+
+    # Only asked for when the patient record and the sample's detected sex disagree
+    proband_sex = forms.ChoiceField(choices=[("", "---")] + [(s, Sex(s).label) for s in Sex.FILLED_IN_CHOICES],
+                                    required=False, widget=_family_role_widget())
+
+    def __init__(self, *args, sample_sexes=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        sexes = sample_sexes or [Sex.UNKNOWN] * len(self.SAMPLE_FIELDS)
+        for field_name, sex in zip(self.SAMPLE_FIELDS, sexes):
+            field = self.fields[field_name]
+            field.choices = _roles_for_sex(field.choices, sex, self.PARENT_ROLE_BY_SEX)
 
     def clean(self):
         cleaned_data = super().clean()
 
-        SAMPLES = ["sample_1", "sample_2", "sample_3"]
-        for a, b in itertools.combinations(SAMPLES, 2):
+        for a, b in itertools.combinations(self.SAMPLE_FIELDS, 2):
             a_v = cleaned_data.get(a)
-            b_v = cleaned_data.get(b)
-            if a_v == b_v:
-                trio_sample = TrioSample(a_v)
-                msg = f"Samples {a}/{b} are both assigned to: {trio_sample.label}"
+            if a_v and a_v == cleaned_data.get(b):
+                role = self.ROLE_ENUM(a_v)
+                msg = f"Samples {a}/{b} are both assigned to: {role.label}"
                 raise forms.ValidationError(msg)
+
+        roles = [cleaned_data.get(field_name) for field_name in self.SAMPLE_FIELDS]
+        if all(roles) and self.ROLE_ENUM.PROBAND not in roles:
+            raise forms.ValidationError("One of the samples must be the proband")
 
         return cleaned_data
 
+    @property
+    def roles(self) -> list[str]:
+        """ The role picked for each sample, in the order the samples were passed in """
+        return [self.cleaned_data[field_name] for field_name in self.SAMPLE_FIELDS]
 
-class UserQuadWizardForm(forms.Form):
-    mother_affected  = forms.BooleanField(required=False)
-    father_affected  = forms.BooleanField(required=False)
-    sibling_affected = forms.BooleanField(required=False)
-    sample_1 = forms.ChoiceField(choices=QuadSample.choices)
-    sample_2 = forms.ChoiceField(choices=QuadSample.choices)
-    sample_3 = forms.ChoiceField(choices=QuadSample.choices)
-    sample_4 = forms.ChoiceField(choices=QuadSample.choices)
+    @property
+    def affected_by_role(self) -> dict:
+        """ The proband is affected by definition - everyone else carries their own tick """
+        affected = {}
+        for i, field_name in enumerate(self.SAMPLE_FIELDS, start=1):
+            role = self.cleaned_data[field_name]
+            affected[role] = role == self.ROLE_ENUM.PROBAND or self.cleaned_data[f"sample_{i}_affected"]
+        return affected
 
-    def clean(self):
-        cleaned_data = super().clean()
 
-        SAMPLES = ["sample_1", "sample_2", "sample_3", "sample_4"]
-        for a, b in itertools.combinations(SAMPLES, 2):
-            a_v = cleaned_data.get(a)
-            b_v = cleaned_data.get(b)
-            if a_v == b_v:
-                quad_sample = QuadSample(a_v)
-                msg = f"Samples {a}/{b} are both assigned to: {quad_sample.label}"
-                raise forms.ValidationError(msg)
+class UserTrioWizardForm(FamilyWizardForm):
+    ROLE_ENUM = TrioSample
+    SAMPLE_FIELDS = ["sample_1", "sample_2", "sample_3"]
+    PARENT_ROLE_BY_SEX = {Sex.MALE: TrioSample.FATHER, Sex.FEMALE: TrioSample.MOTHER}
 
-        return cleaned_data
+    sample_1 = forms.ChoiceField(choices=TrioSample.choices, widget=_family_role_widget())
+    sample_1_affected = forms.BooleanField(required=False, widget=_affected_widget())
+    sample_2 = forms.ChoiceField(choices=TrioSample.choices, widget=_family_role_widget())
+    sample_2_affected = forms.BooleanField(required=False, widget=_affected_widget())
+    sample_3 = forms.ChoiceField(choices=TrioSample.choices, widget=_family_role_widget())
+    sample_3_affected = forms.BooleanField(required=False, widget=_affected_widget())
+
+
+class UserQuadWizardForm(FamilyWizardForm):
+    ROLE_ENUM = QuadSample
+    SAMPLE_FIELDS = ["sample_1", "sample_2", "sample_3", "sample_4"]
+    PARENT_ROLE_BY_SEX = {Sex.MALE: QuadSample.FATHER, Sex.FEMALE: QuadSample.MOTHER}
+
+    sample_1 = forms.ChoiceField(choices=QuadSample.choices, widget=_family_role_widget())
+    sample_1_affected = forms.BooleanField(required=False, widget=_affected_widget())
+    sample_2 = forms.ChoiceField(choices=QuadSample.choices, widget=_family_role_widget())
+    sample_2_affected = forms.BooleanField(required=False, widget=_affected_widget())
+    sample_3 = forms.ChoiceField(choices=QuadSample.choices, widget=_family_role_widget())
+    sample_3_affected = forms.BooleanField(required=False, widget=_affected_widget())
+    sample_4 = forms.ChoiceField(choices=QuadSample.choices, widget=_family_role_widget())
+    sample_4_affected = forms.BooleanField(required=False, widget=_affected_widget())
+
+
+class UserDuoWizardForm(FamilyWizardForm):
+    """ Mother/Father/Sibling/Proband, with only two samples to place - the relative's role is what
+        the Duo stores as its relationship """
+    ROLE_ENUM = DuoSample
+    SAMPLE_FIELDS = ["sample_1", "sample_2"]
+    PARENT_ROLE_BY_SEX = {Sex.MALE: DuoSample.FATHER, Sex.FEMALE: DuoSample.MOTHER}
+
+    sample_1 = forms.ChoiceField(choices=DuoSample.choices, widget=_family_role_widget())
+    sample_1_affected = forms.BooleanField(required=False, widget=_affected_widget())
+    sample_2 = forms.ChoiceField(choices=DuoSample.choices, widget=_family_role_widget())
+    sample_2_affected = forms.BooleanField(required=False, widget=_affected_widget())
+
+    @property
+    def relative_role(self) -> str:
+        """ Mother, Father or Sibling - whichever of the two samples isn't the proband """
+        return next(role for role in self.roles if role != DuoSample.PROBAND)
 
 
 class KaryomappingGeneForm(forms.ModelForm):

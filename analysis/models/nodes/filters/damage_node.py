@@ -5,21 +5,31 @@ from typing import Optional
 
 from auditlog.registry import auditlog
 from django.conf import settings
+from django.contrib.postgres.fields import ArrayField
 from django.db import models
 from django.db.models.query_utils import Q
 
 from analysis.models.nodes.analysis_node import AnalysisNode
+from analysis.models.nodes.node_display import NodeChip, NodeIcon
 from annotation.models.damage_enums import (
     ALoFTPrediction,
     AlphaMissensePrediction,
     ClinPredPrediction,
+    EVEClass,
     MetaRNNPrediction,
     PathogenicityImpact,
     PrimateAIPrediction,
 )
 from annotation.models.models import VariantAnnotation
 from annotation.models.models_enums import NMDEscapeStatus
-from annotation.pathogenicity_predictions import TOOLS, TOOLS_BY_PRED_FIELD
+from annotation.pathogenicity_predictions import (
+    TOOLS,
+    TOOLS_BY_PRED_FIELD,
+    PathogenicityTool,
+    RawScoreDirection,
+)
+from library.genomics.vcf_enums import VariantClass
+from snpdb.models.models_variant import Variant
 
 
 class ALoFTPredictionOptions(models.TextChoices):
@@ -29,8 +39,26 @@ class ALoFTPredictionOptions(models.TextChoices):
     DOMINANT = ALoFTPrediction.DOMINANT, "Dominant"
 
 
+class StructuralFilter(models.TextChoices):
+    """ Whether to keep only, or drop, the rows stored as a symbolic alt with an SVLEN - SVs, CNVs
+        and the gene-level events. @see Variant.get_symbolic_q """
+    ANY = 'A', "Any"
+    ONLY = 'O', "Structural only"
+    EXCLUDE = 'E', "Exclude structural"
+
+
 class DamageNode(AnalysisNode):
     """ This is called 'EffectNode' in analysis """
+    # A type restriction restricts - it goes in and_filters rather than the scoring OR pool,
+    # so it has no _required flag. Empty means every type.
+    variant_class = ArrayField(models.CharField(max_length=2, choices=VariantClass.choices),
+                               default=list, blank=True)
+    variant_class_exclude = models.BooleanField(default=False)
+    # Orthogonal to variant_class, which is VEP's: VEP calls a 1 Mb <DEL> and a 1 bp deletion the
+    # same class, so "just the SVs/CNVs" is a question the class filter cannot answer
+    structural = models.CharField(max_length=1, choices=StructuralFilter.choices,
+                                  default=StructuralFilter.ANY)
+
     impact_min = models.CharField(max_length=1, choices=PathogenicityImpact.CHOICES, null=True, blank=True)
     impact_required = models.BooleanField(default=False)
 
@@ -107,6 +135,28 @@ class DamageNode(AnalysisNode):
     clinpred_score_required = models.BooleanField(default=False)
     clinpred_score_allow_null = models.BooleanField(default=True)
 
+    # The VEP 116 plugin scores below are GRCh38 + columns_version >= 5, so unlike the dbNSFP scores
+    # their sliders only show on annotation versions that populate them (#1808)
+    eve_score_min = models.FloatField(null=True, blank=True)
+    eve_score_required = models.BooleanField(default=False)
+    eve_score_allow_null = models.BooleanField(default=True)
+
+    # popEVE is a log-likelihood ratio - more negative is more damaging, hence _max not _min
+    popeve_score_max = models.FloatField(null=True, blank=True)
+    popeve_score_required = models.BooleanField(default=False)
+    popeve_score_allow_null = models.BooleanField(default=True)
+
+    # ProtVar ddG (kcal/mol) and PromoterAI aren't missense pathogenicity predictions - they filter
+    # only, and stay out of predictions_num_pathogenic. PromoterAI's score is signed, so it matches
+    # on |score|.
+    protvar_stability_min = models.FloatField(null=True, blank=True)
+    protvar_stability_required = models.BooleanField(default=False)
+    protvar_stability_allow_null = models.BooleanField(default=True)
+
+    promoter_ai_score_min = models.FloatField(null=True, blank=True)
+    promoter_ai_score_required = models.BooleanField(default=False)
+    promoter_ai_score_allow_null = models.BooleanField(default=True)
+
     metarnn_score_min = models.FloatField(null=True, blank=True)
     metarnn_score_required = models.BooleanField(default=False)
     metarnn_score_allow_null = models.BooleanField(default=True)
@@ -151,6 +201,11 @@ class DamageNode(AnalysisNode):
     primateai_pred_required = models.BooleanField(default=False)
     primateai_pred_allow_null = models.BooleanField(default=True)
 
+    # EVE's class is stored as a word, not the dbNSFP single-char code
+    eve_class = models.CharField(max_length=10, choices=EVEClass.choices, null=True, blank=True)
+    eve_class_required = models.BooleanField(default=False)
+    eve_class_allow_null = models.BooleanField(default=True)
+
     nmd_escaping_variant = models.BooleanField(default=False)
     nmd_escaping_variant_required = models.BooleanField(default=False)
 
@@ -162,23 +217,33 @@ class DamageNode(AnalysisNode):
     aloft_required = models.BooleanField(default=False)
     aloft_allow_null = models.BooleanField(default=True)
 
+    def get_raw_score_tools(self) -> list[PathogenicityTool]:
+        """ Tools whose raw-score slider this analysis's annotation version actually populates -
+            gated off visible_columns so the editor can't offer a filter over an empty column. """
+        visible_columns = self.analysis.annotation_version.variant_annotation_version.visible_columns
+        return [t for t in TOOLS if t.raw_field in visible_columns]
+
+    def get_pred_tools(self) -> list[PathogenicityTool]:
+        """ Tools offering a categorical prediction dropdown on this annotation version """
+        visible_columns = self.analysis.annotation_version.variant_annotation_version.visible_columns
+        return [t for t in TOOLS if t.pred_field in visible_columns]
+
     def _v4_score_min_fields(self) -> list:
-        # REVEL is in TOOLS but uses revel_rankscore_min (v2/v3 field), not revel_score_min;
-        # safe getattr keeps the helper robust to TOOLS-vs-model field divergence.
-        return [getattr(self, f"{t.raw_field}_min", None) for t in TOOLS if t.raw_field]
+        return [getattr(self, t.node_threshold_field) for t in TOOLS if t.raw_field]
 
     def _v4_pred_fields(self) -> list:
         return [getattr(self, t.pred_field) for t in TOOLS if t.pred_field]
 
     def _v4_score_required_fields(self) -> list:
-        return [getattr(self, f"{t.raw_field}_required", False) for t in TOOLS if t.raw_field]
+        return [getattr(self, f"{t.raw_field}_required") for t in TOOLS if t.raw_field]
 
     def _v4_pred_required_fields(self) -> list:
         return [getattr(self, f"{t.pred_field}_required") for t in TOOLS if t.pred_field]
 
     def modifies_parents(self):
         all_versions = [self.impact_min, self.splice_min, self.cosmic_count_min, self.damage_predictions_min,
-                        self.protein_domain, self.published]
+                        self.protein_domain, self.published, self.variant_class,
+                        self.structural != StructuralFilter.ANY]
         v2_fields = [self.bayesdel_noaf_rankscore_min, self.cadd_raw_rankscore_min, self.clinpred_rankscore_min,
                 self.metalr_rankscore_min, self.revel_rankscore_min, self.vest4_rankscore_min,
                 self.nmd_escaping_variant, self.aloft]
@@ -285,6 +350,15 @@ class DamageNode(AnalysisNode):
                 "nmd_escape_status has not been backfilled. "
                 "Run `manage.py backfill_ptc_annotation` to enable the filter."
             )
+        for tool in TOOLS:
+            if tool.raw_field and getattr(self, tool.node_threshold_field) is not None:
+                if tool.raw_field not in vav.visible_columns:
+                    warnings.append(
+                        f"{tool.name} filter has no data on this VariantAnnotationVersion: "
+                        f"{tool.raw_field} is not populated on {vav.genome_build} / VEP {vav.vep} / "
+                        f"columns_version {vav.columns_version}."
+                    )
+
         if self.splice_min is not None and vav.uses_raw_spliceai:
             warnings.append(
                 "SpliceAI scores on this VariantAnnotationVersion are from the raw precomputed file "
@@ -295,12 +369,37 @@ class DamageNode(AnalysisNode):
             )
         return warnings
 
+    @staticmethod
+    def _raw_score_q(tool: PathogenicityTool, threshold: float) -> Q:
+        """ Keeps the damaging side of the score - which side that is depends on the tool """
+        field = f"variantannotation__{tool.raw_field}"
+        match tool.raw_direction:
+            case RawScoreDirection.LOWER:
+                return Q(**{f"{field}__lte": threshold})
+            case RawScoreDirection.MAGNITUDE:
+                return Q(**{f"{field}__gte": abs(threshold)}) | Q(**{f"{field}__lte": -abs(threshold)})
+            case _:
+                return Q(**{f"{field}__gte": threshold})
+
     def _get_node_q_hash(self) -> str:
         return str(self._get_node_q())
 
     def _get_node_q(self) -> Optional[Q]:
         or_filters = []
         and_filters = []
+
+        if self.variant_class:
+            q_variant_class = Q(variantannotation__variant_class__in=self.variant_class)
+            if self.variant_class_exclude:
+                # Negated subquery so variants without annotation aren't silently dropped
+                q_variant_class = ~q_variant_class
+            and_filters.append(q_variant_class)
+
+        if self.structural != StructuralFilter.ANY:
+            q_structural = Variant.get_symbolic_q()
+            if self.structural == StructuralFilter.EXCLUDE:
+                q_structural = ~q_structural
+            and_filters.append(q_structural)
 
         if self.impact_min is not None:
             q_impact = PathogenicityImpact.get_q(self.impact_min)
@@ -376,18 +475,18 @@ class DamageNode(AnalysisNode):
                     else:
                         or_filters.append(q_path)
 
-            # Raw-score filters (v4 onward) — driven by TOOLS so VARITY_ER (no
-            # ClinGen calibration, slider-only) is included alongside calibrated tools.
+            # Raw-score filters (v4 onward) — driven by TOOLS so the uncalibrated tools
+            # (VARITY_ER, EVE, popEVE, ProtVar ddG, PromoterAI) are offered alongside the
+            # calibrated ones.
             if self.columns_version >= 4:
                 for tool in TOOLS:
                     raw_field = tool.raw_field
                     if not raw_field:
                         continue
-                    raw_field_min = f"{raw_field}_min"
-                    if score_min := getattr(self, raw_field_min, None):
-                        q_raw = Q(**{f"variantannotation__{raw_field}__gte": score_min})
-                        if getattr(self, f"{raw_field}_required", False):
-                            if getattr(self, f"{raw_field}_allow_null", False):
+                    if threshold := getattr(self, tool.node_threshold_field):
+                        q_raw = self._raw_score_q(tool, threshold)
+                        if getattr(self, f"{raw_field}_required"):
+                            if getattr(self, f"{raw_field}_allow_null"):
                                 q_raw |= Q(**{f"variantannotation__{raw_field}__isnull": True})
                             and_filters.append(q_raw)
                         else:
@@ -520,17 +619,36 @@ class DamageNode(AnalysisNode):
 
     @staticmethod
     def get_help_text() -> str:
-        return "Impact, damage predictions, conservation and splicing filter"
+        return "Variant type, impact, damage predictions, conservation and splicing filter"
 
-    def get_css_classes(self):
-        css_classes = super().get_css_classes()
+    def get_variant_class_summary(self) -> str:
+        labels = [VariantClass(vc).label for vc in self.variant_class]
+        summary = ", ".join(labels)
+        if self.variant_class_exclude:
+            summary = f"not {summary}"
+        return summary
+
+    def get_node_chips(self) -> list[NodeChip]:
+        chips = super().get_node_chips()
+        if self.variant_class:
+            chips.append(NodeChip(text="type", icon="fa-solid fa-shapes",
+                                  title=f"Variant type: {self.get_variant_class_summary()}"))
         if self.splice_min is not None:
-            css_classes.append("EffectNodeSplicing")
-        return css_classes
+            chips.append(NodeChip(text="splice", icon="fa-solid fa-scissors",
+                                  title=f"Splicing prediction score >= {self.splice_min}"))
+        return chips
 
     @staticmethod
     def get_node_class_label():
         return "EffectNode"
+
+    @classmethod
+    def get_node_class_icon(cls) -> NodeIcon:
+        return NodeIcon(symbol="node-icon-effect")
+
+    @classmethod
+    def get_node_class_label_short(cls) -> str:
+        return "Effect"
 
 
 auditlog.register(DamageNode)

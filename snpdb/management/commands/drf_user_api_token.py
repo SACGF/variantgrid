@@ -4,6 +4,7 @@ from rest_framework.authtoken.models import Token
 
 
 class Command(BaseCommand):
+    category = "ops"
     help = 'Copy data from a one VCF to another (with the same samples)'
 
     def add_arguments(self, parser):

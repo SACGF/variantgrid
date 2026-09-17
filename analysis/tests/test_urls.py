@@ -10,6 +10,8 @@ from django.utils import timezone
 
 from analysis.models import (
     Analysis,
+    AnalysisTemplate,
+    AnalysisTemplateType,
     GeneListNode,
     GeneListNodeGeneList,
     KaryomappingAnalysis,
@@ -30,9 +32,9 @@ from snpdb.models.models_cohort import (
     CohortGenotype,
     CohortGenotypeCollection,
     CohortSample,
-    Trio,
 )
 from snpdb.models.models_enums import ImportStatus
+from snpdb.models.models_family import Trio
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_vcf import VCF, Sample
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_loci_and_variants_for_vcf
@@ -51,7 +53,7 @@ class Test(URLTestCase):
         non_owner_username = f"test_user_{__file__}_non_owner"
         cls.user_owner = User.objects.get_or_create(username=owner_username)[0]
         cls.user_non_owner = User.objects.get_or_create(username=non_owner_username)[0]
-        cls.vcf = VCF.objects.create(name="test_urls_vcf", genotype_samples=1, genome_build=grch37,
+        cls.vcf = VCF.objects.create(name="test_urls_vcf", genotype_samples=1, genotype_field="GT", allele_depth_field="AD", genome_build=grch37,
                                      import_status=ImportStatus.SUCCESS,
                                      user=cls.user_owner, date=timezone.now())
         cls.sample = Sample.objects.create(name="sample1", vcf=cls.vcf, import_status=ImportStatus.SUCCESS)
@@ -60,6 +62,9 @@ class Test(URLTestCase):
 
         mother_sample = Sample.objects.create(name="mother", vcf=cls.vcf)
         father_sample = Sample.objects.create(name="father", vcf=cls.vcf)
+        sibling_sample = Sample.objects.create(name="sibling", vcf=cls.vcf)
+        for family_sample in (mother_sample, father_sample, sibling_sample):
+            assign_permission_to_user_and_groups(cls.user_owner, family_sample)
         cls.cohort = Cohort.objects.create(name="test_urls_cohort", user=cls.user_owner,
                                            vcf=cls.vcf, genome_build=grch37,
                                            import_status=ImportStatus.SUCCESS)
@@ -70,6 +75,8 @@ class Test(URLTestCase):
                                                 cohort_genotype_packed_field_index=1, sort_order=2)
         father_cs = CohortSample.objects.create(cohort=cls.cohort, sample=father_sample,
                                                 cohort_genotype_packed_field_index=2, sort_order=3)
+        cls.sibling_cs = CohortSample.objects.create(cohort=cls.cohort, sample=sibling_sample,
+                                                     cohort_genotype_packed_field_index=3, sort_order=4)
 
         assign_permission_to_user_and_groups(cls.user_owner, cls.cohort)
 
@@ -95,12 +102,12 @@ class Test(URLTestCase):
                                       het_count=1,
                                       hom_count=1,
                                       filters="&",
-                                      samples_zygosity="ERO",
-                                      samples_allele_depth=[42, 22, 32],
-                                      samples_allele_frequency=[100, 100, 100],
-                                      samples_read_depth=[42, 22, 32],
-                                      samples_genotype_quality=[20, 20, 20],
-                                      samples_phred_likelihood=[0, 0, 0])
+                                      samples_zygosity="EROR",
+                                      samples_allele_depth=[42, 22, 32, 28],
+                                      samples_allele_frequency=[100, 100, 100, 100],
+                                      samples_read_depth=[42, 22, 32, 28],
+                                      samples_genotype_quality=[20, 20, 20, 20],
+                                      samples_phred_likelihood=[0, 0, 0, 0])
 
         # Auto cohorts don't show on list
         cls.cohort2 = Cohort.objects.create(name="blah cohort", user=cls.user_owner,
@@ -118,6 +125,12 @@ class Test(URLTestCase):
         cls.gene_list_node = GeneListNode.objects.create(analysis=cls.analysis)
         GeneListNodeGeneList.objects.create(gene_list_node=cls.gene_list_node, gene_list=gene_list)
 
+        template_analysis = Analysis(genome_build=grch37, template_type=AnalysisTemplateType.TEMPLATE)
+        template_analysis.set_defaults_and_save(cls.user_owner)
+        cls.analysis_template = AnalysisTemplate.objects.create(name="test_urls template",
+                                                                user=cls.user_owner,
+                                                                analysis=template_analysis)
+
         cls.karyomapping_analysis = KaryomappingAnalysis.objects.create(user=cls.user_owner,
                                                                         name="test karyomapping",
                                                                         trio=cls.trio)
@@ -133,8 +146,7 @@ class Test(URLTestCase):
         cls.PRIVATE_OBJECT_URL_NAMES_AND_KWARGS = [
             ('analysis', {"analysis_id": cls.analysis.pk}, 200),
 
-            # analysis templates - TODO: Need to make Template and verify it is kept private
-            # ('analysis_template_settings', {"analysis_template_id": cls.analysis.pk}, 200),
+            ('analysis_template_settings', {"pk": cls.analysis_template.pk}, 200),
 
             # Node editor
             ('node_view', analysis_version_and_node_version_params, 200),
@@ -153,6 +165,10 @@ class Test(URLTestCase):
                                      "extra_filters": "default",
                                      "grid_column_name": grid_column_name,
                                      "significant_figures": 2}, 200),
+            ('node_column_summary_datatable', {**node_version_params,
+                                               "extra_filters": "default",
+                                               "variant_column": grid_column_name,
+                                               "significant_figures": 2}, 200),
             ('node_snp_matrix', {**node_version_params,
                                  "conversion": SNPMatrix.TOTAL_PERCENT,
                                  "significant_figures": 2}, 200),
@@ -161,9 +177,12 @@ class Test(URLTestCase):
             ('analysis_node_versions', analysis_params, 200),
             ('analysis_editor_and_grid', analysis_params, 200),
             ('analysis_settings', analysis_params, 200),
+            ('analysis_export', analysis_params, 200),
             ('analysis_settings_details_tab', analysis_params, 200),
             ('analysis_settings_node_counts_tab', analysis_params, 200),
             ('analysis_input_samples', analysis_params, 200),
+
+            ('sample_classify_report_tab', {"sample_id": cls.sample.pk}, 200),
 
             # Node data
             ('node_data_grid', analysis_version_and_node_version_params, 200),
@@ -172,15 +191,25 @@ class Test(URLTestCase):
             ('node_method_description', node_version_params, 200),
 
             ('view_karyomapping_analysis', {"pk": cls.karyomapping_analysis.pk}, 200),
-        ]
 
-        cls.PRIVATE_GRID_LIST_URLS = [
-            #("vcfs_grid", {}, cls.vcf),
+            ('trio_wizard', {"cohort_id": cls.cohort.pk,
+                             "sample1_id": cls.trio.proband.sample_id,
+                             "sample2_id": cls.trio.mother.sample_id,
+                             "sample3_id": cls.trio.father.sample_id}, 200),
+            ('quad_wizard', {"cohort_id": cls.cohort.pk,
+                             "sample1_id": cls.trio.proband.sample_id,
+                             "sample2_id": cls.trio.mother.sample_id,
+                             "sample3_id": cls.trio.father.sample_id,
+                             "sample4_id": cls.sibling_cs.sample_id}, 200),
+            ('duo_wizard', {"cohort_id": cls.cohort.pk,
+                            "sample1_id": cls.trio.proband.sample_id,
+                            "sample2_id": cls.trio.mother.sample_id}, 200),
         ]
 
     def testUrls(self):
         URL_NAMES_AND_KWARGS = [
             ("analyses", {}, 200),
+            ("analysis_list_tag_counts", {}, 200),
             ("analysis_templates", {}, 200),
             ("karyomapping_analyses", {}, 200),
         ]
@@ -189,6 +218,8 @@ class Test(URLTestCase):
 
     def testDatatableUrls(self):
         DATATABLE_URLS = [
+            ("analyses_list_datatable", {}, 200),
+            ("analysis_templates_datatable", {}, 200),
             ("analysis_node_issues_datatable", {}, 200),
             ("karyomapping_analyses_datatable", {}, 200),
         ]
@@ -196,6 +227,7 @@ class Test(URLTestCase):
 
     def testDatatableListPermission(self):
         PRIVATE_DATATABLE_LIST_URLS = [
+            ("analyses_list_datatable", {}, ("text", self.analysis)),
             ("karyomapping_analyses_datatable", {}, self.karyomapping_analysis),
         ]
         self._test_datatables_grid_urls_contains_objs(PRIVATE_DATATABLE_LIST_URLS, self.user_owner, True)
@@ -203,6 +235,7 @@ class Test(URLTestCase):
     @prevent_request_warnings
     def testDatatableListNoPermission(self):
         PRIVATE_DATATABLE_LIST_URLS = [
+            ("analyses_list_datatable", {}, ("text", self.analysis)),
             ("karyomapping_analyses_datatable", {}, self.karyomapping_analysis),
         ]
         self._test_datatables_grid_urls_contains_objs(PRIVATE_DATATABLE_LIST_URLS, self.user_non_owner, False)
@@ -213,13 +246,6 @@ class Test(URLTestCase):
     @prevent_request_warnings
     def testNoPermission(self):
         self._test_urls(self.PRIVATE_OBJECT_URL_NAMES_AND_KWARGS, self.user_non_owner, expected_code_override=403)
-
-    def testJqGridListPermission(self):
-        self._test_jqgrid_urls_contains_objs(self.PRIVATE_GRID_LIST_URLS, self.user_owner, True)
-
-    @prevent_request_warnings
-    def testJqGridListNoPermission(self):
-        self._test_jqgrid_urls_contains_objs(self.PRIVATE_GRID_LIST_URLS, self.user_non_owner, False)
 
     def _testVariantGridExport(self, export_type: str):
         """ The export runs under Celery now (#1257) - the view launches it and redirects to the

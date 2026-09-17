@@ -4,8 +4,9 @@ from auditlog.registry import auditlog
 from django.db import models
 from django.db.models import Q
 
-from analysis.models.nodes.analysis_node import AnalysisNode, NodeCount
+from analysis.models.nodes.analysis_node import AnalysisNode
 from analysis.models.nodes.node_counts import get_extra_filters_q
+from analysis.models.nodes.node_display import NodeIcon
 from annotation.models import ClinVarReviewStatus
 from snpdb.models.models_enums import BuiltInFilters
 
@@ -26,7 +27,7 @@ class BuiltInFilterNode(AnalysisNode):
         return Q(clinvar__review_status__in=review_statuses)
 
     def _get_node_q(self) -> Optional[Q]:
-        q = get_extra_filters_q(self.analysis.user, self.analysis.annotation_version, self.built_in_filter)
+        q = get_extra_filters_q(self.analysis, self.built_in_filter)
         if self.built_in_filter == BuiltInFilters.CLINVAR and self.clinvar_stars_min:
             q &= self.get_clinvar_stars_q()
         elif self.built_in_filter == BuiltInFilters.COSMIC and self.cosmic_count_min:
@@ -78,8 +79,7 @@ class BuiltInFilterNode(AnalysisNode):
             if label in [BuiltInFilters.TOTAL, self.built_in_filter]:
                 try:
                     parent = self.get_single_parent()
-                    parent_node_count = NodeCount.load_for_node(parent, self.built_in_filter)
-                    count = parent_node_count.count
+                    count = parent.node_version.counts.get(self.built_in_filter)
                 except Exception:
                     pass
         return count
@@ -87,6 +87,14 @@ class BuiltInFilterNode(AnalysisNode):
     @staticmethod
     def get_node_class_label():
         return "Built In Filter"
+
+    @classmethod
+    def get_node_class_icon(cls) -> NodeIcon:
+        return NodeIcon(fa="fa-solid fa-sliders")
+
+    @classmethod
+    def get_node_class_label_short(cls) -> str:
+        return "Built-in"
 
 
 auditlog.register(BuiltInFilterNode)

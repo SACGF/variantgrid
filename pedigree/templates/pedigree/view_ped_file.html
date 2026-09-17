@@ -27,8 +27,6 @@
 {% endblock css %}
 
 {% block jsdocumentready %}
-    $("#ped-file-tabs").tabs();
-
     {% if draw_pedigree_chart %}
         var graph_selector = $('#pedigree-chart');
         {% if ped_file.import_status == 'S' %}
@@ -58,16 +56,21 @@
 	<div id="ped_file">
 		<h3>PED file: {{ ped_file.name }}</h3>
         <div id="ped-file-tabs">
-            <ul>
-                <li><a href="#details">Details</a></li>
+            <ul class="nav nav-tabs mb-4" role="tablist">
+                <li class="nav-item"><a class="nav-link show active" data-toggle="tab" role="tab" href="#details">Details</a></li>
                 {% if has_write_permission %}
-                <li><a href="{% url 'group_permissions' 'pedigree.models.PedFile' ped_file.pk %}">Sharing / Permissions</a></li>
+                <li class="nav-item"><a class="nav-link" data-toggle="tab" role="tab" href="#ped-file-permissions" data-href="{% url 'group_permissions' 'pedigree.models.PedFile' ped_file.pk %}">Sharing / Permissions</a></li>
                 {% endif %}
             </ul>
-            <div id="details">
-            <form>
-                {% crispy ped_file_form form_helper.horizontal %}
-            </form>
+            <div class="tab-content">
+                <div class="tab-pane show active" role="tabpanel" id="details">
+                <form>
+                    {% crispy ped_file_form form_helper.horizontal %}
+                </form>
+                </div>
+                {% if has_write_permission %}
+                <div class="tab-pane" role="tabpanel" id="ped-file-permissions"></div>
+                {% endif %}
             </div>
         </div>
 	</div>

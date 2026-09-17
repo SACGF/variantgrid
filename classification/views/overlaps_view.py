@@ -65,17 +65,24 @@ class ClassificationGroupingValueTriageForm(forms.Form):
         widget=forms.Textarea({"rows": 5})
     )
 
+def _onc_path_choices():
+    return [("undecided", "Undecided")] + \
+            [(m.get("key"), m.get("label")) for m in EvidenceKeyMap.cached_key(SpecialEKeys.ONC_PATH).virtual_options]
+
 
 class ClassificationGroupingValueTriageOncPathForm(ClassificationGroupingValueTriageForm):
 
     new_value = forms.ChoiceField(
         label="New Classification",
         widget=forms.Select(),
-        choices=
-            [("undecided", "Undecided")] +
-            [(m.get("key"), m.get("label")) for m in EvidenceKeyMap.cached_key(SpecialEKeys.ONC_PATH).virtual_options],
+        choices=_onc_path_choices,
         help_text="New Onc/Path value if you have agreed to change"
     )
+
+
+def _clin_sig_choices():
+    return [("undecided", "Undecided")] + \
+        [(m.get("key"), m.get("label")) for m in EvidenceKeyMap.cached_key(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE).virtual_options]
 
 
 class ClassificationGroupingValueTriageClinSigForm(ClassificationGroupingValueTriageForm):
@@ -83,9 +90,7 @@ class ClassificationGroupingValueTriageClinSigForm(ClassificationGroupingValueTr
     new_value = forms.ChoiceField(
         label="New Clinical Significance",
         widget=forms.Select(),
-        choices=
-            [("undecided", "Undecided")] +
-            [(m.get("key"), m.get("label")) for m in EvidenceKeyMap.cached_key(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE).virtual_options],
+        choices=_clin_sig_choices,
         help_text="New Clinical Significance value if you have agreed to change"
     )
 

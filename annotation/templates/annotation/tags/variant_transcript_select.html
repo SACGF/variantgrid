@@ -34,6 +34,7 @@ fieldset.form-fields {
     {% for transcript_data in vts.transcript_data %}
         <tr class="radio-row{% if transcript_data.collapse_class %} {{ transcript_data.collapse_class }} collapse{% endif %}">
             <td>    <input type='radio' name='transcript_choice' value='{{ transcript_data.transcript_id }}'
+                    aria-label='Show annotation for transcript {{ transcript_data.transcript_id }}'
                     {% if transcript_data.selected  %}
                         checked='1'
                     {% endif %}
@@ -69,6 +70,7 @@ fieldset.form-fields {
     {% if empty_transcript_option %}
         <tr class="radio-row">
             <td>    <input type='radio' name='transcript_choice' value=''
+                    aria-label='{{ empty_transcript_option }}'
                     {% if not vts.transcript_data  %}
                            checked='1'
                     {% endif %}

@@ -10,6 +10,8 @@ from snpdb.models import SiteMessage
 
 
 class Command(BaseCommand):
+    category = "ops"
+
     def add_arguments(self, parser):
         parser.add_argument('--shutdown', type=int, required=False)
         parser.add_argument('--message', required=False)

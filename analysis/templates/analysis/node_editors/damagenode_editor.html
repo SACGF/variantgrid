@@ -2,48 +2,61 @@
 {% load js_tags %}
 {% block content %}
 <style>
-	.slider-container {
-		margin-left: 10px;
-		display: inline-block;
-	}
-
-	.slider {
-		display: inline-block;
-		width: 200px;
-	}
-	
-	.slider label {
-	    position: absolute;
-	    width: 20px;
-	    margin-left: -10px;
-	    text-align: center;
-	    margin-top: 20px;
-	}
-
-	.slider-labels {
-		width: 200px;
-	}
-
-	.label {
-		font-weight: bold;
-	}
-
-	.slider-value {
-        min-width: 50px;
-        height: 25px;
-		margin-left: 15px;
-	}
-
 	.individual-pathogenic-prediction {
 	    display: none;
 	}
 
-	/* Calibrated ClinGen PP3/BP4 cutoff bands drawn behind the raw-score slider track */
+	#variant-class-individual {
+	    display: none;
+	    margin-top: 4px;
+	}
+
+	.variant-class-group-classes {
+	    display: flex;
+	    flex-wrap: wrap;
+	    align-items: center;
+	    gap: 2px 10px;
+	    margin-top: 3px;
+	}
+
+	.variant-class-group-classes .label {
+	    min-width: 70px;
+	    color: #6b7280;
+	    font-size: 12px;
+	}
+
+	.variant-class-group-label, .variant-class-label, .variant-class-exclude-label {
+	    margin-right: 10px;
+	    font-weight: normal;
+	    white-space: nowrap;
+	}
+
+	#structural-filter ul {
+	    display: flex;
+	    gap: 12px;
+	    margin: 0;
+	    padding: 0;
+	    list-style: none;
+	}
+
+	#structural-filter label {
+	    margin: 0;
+	    font-weight: normal;
+	    white-space: nowrap;
+	}
+
+	#damage-table th.filter-required,
+	#damage-table td.filter-required {
+	    text-align: center;
+	}
+
+	/* Calibrated ClinGen PP3/BP4 cutoff bands drawn over the raw-score slider track */
 	.cutoff-band {
 	    position: absolute;
-	    top: 0;
-	    height: 100%;
-	    z-index: 0;
+	    top: 50%;
+	    height: 8px;
+	    transform: translateY(-50%);
+	    z-index: 1;
 	    opacity: 0.35;
 	    pointer-events: none;
 	}
@@ -83,6 +96,36 @@
         }
     }
 
+    function setupVariantClassGroups() {
+        // Group checkboxes are unnamed - they drive the individual (named) checkboxes that get submitted
+        $(".variant-class-group").each(function() {
+            let groupCheckbox = $(this);
+            updateVariantClassGroup(groupCheckbox);
+            groupCheckbox.change(function() {
+                variantClassGroupCheckboxes(groupCheckbox).prop("checked", groupCheckbox.prop("checked"));
+            });
+            variantClassGroupCheckboxes(groupCheckbox).change(function() {
+                updateVariantClassGroup(groupCheckbox);
+            });
+        });
+    }
+
+    function variantClassGroupCheckboxes(groupCheckbox) {
+        return $("#variant-class-individual").find(".variant-class-group-classes[data-group='" +
+                 groupCheckbox.data("group") + "'] input[type=checkbox]");
+    }
+
+    function updateVariantClassGroup(groupCheckbox) {
+        let boxes = variantClassGroupCheckboxes(groupCheckbox);
+        let numChecked = boxes.filter(":checked").length;
+        groupCheckbox.prop("checked", numChecked > 0 && numChecked === boxes.length);
+        groupCheckbox.prop("indeterminate", numChecked > 0 && numChecked < boxes.length);
+    }
+
+    function toggleVariantClasses() {
+        $("#variant-class-individual").toggle();
+    }
+
     function showIndividualPathogenicPredictions() {
         // From v4 the rankscores share this class but are split into their own legacy group, so the
         // main toggle reveals only the non-rankscore (raw-score) rows; rankscores use showRankscores().
@@ -99,7 +142,7 @@
         $("#show-rankscore-prediction").hide();
     }
 
-    // Draw the calibrated PP3/BP4 cutoff bands behind a raw-score slider track. The thresholds come
+    // Draw the calibrated PP3/BP4 cutoff bands over a raw-score slider track. The thresholds come
     // from data-pathogenic-min / data-benign-max (set in DamageNodeForm from the per-tool TOOLS table);
     // sliders without them (rankscores, splice, cosmic) get no bands.
     function addCutoffBands(inputSelector, sliderSelector) {
@@ -115,7 +158,7 @@
             $('<div class="cutoff-band cutoff-band-benign"></div>')
                 .css({left: 0, width: pct + "%"})
                 .attr("title", "BP4-supporting (benign) ≤ " + benignMax)
-                .prependTo(sliderSelector);
+                .prependTo(sliderSelector.parent(".slider-track"));
         }
         let pathMin = inputSelector.attr("data-pathogenic-min");
         if (typeof pathMin !== 'undefined') {
@@ -123,7 +166,7 @@
             $('<div class="cutoff-band cutoff-band-pathogenic"></div>')
                 .css({left: pct + "%", width: (100 - pct) + "%"})
                 .attr("title", "PP3-supporting (pathogenic) ≥ " + pathMin)
-                .prependTo(sliderSelector);
+                .prependTo(sliderSelector.parent(".slider-track"));
         }
     }
 
@@ -157,8 +200,8 @@
         setupSlider(inputSelector, sliderSelector);
         addCutoffBands(inputSelector, sliderSelector);
         colourSliderValue(inputSelector, sliderSelector);
-        // setupSlider's own slide handler updates inputSelector.val() first, so recolour from it here
-        sliderSelector.on("slide", function () {
+        // setupSlider's own input handler updates inputSelector.val() first, so recolour from it here
+        sliderSelector.on("input", function () {
             colourSliderValue(inputSelector, sliderSelector);
         });
         let sliderVal = inputSelector.val();
@@ -170,13 +213,13 @@
 
             enableInput.change(function () {
                 if ($(this).is(":checked")) {
-                    sliderSelector.slider("enable");
+                    sliderSelector.prop("disabled", false);
                     frInputs.prop("disabled", false);
                     colourSliderValue(inputSelector, sliderSelector);
                 } else {
                     setVisibleSliderValue(inputSelector, sliderSelector, "");
-                    sliderSelector.slider({value: 0})
-                    sliderSelector.slider("disable");
+                    sliderSelector.val(sliderSelector.attr("min"));
+                    sliderSelector.prop("disabled", true);
                     inputSelector.val("");
                     colourSliderValue(inputSelector, sliderSelector);
                     frInputs.prop("disabled", true);
@@ -191,18 +234,15 @@
             }
         }
 
-        if (sliderVal === '') {
-            sliderSelector.slider("disable");
-        } else {
-            sliderSelector.slider("enable");
-        }
+        sliderSelector.prop("disabled", sliderVal === '');
     }
 
 
     $(document).ready(function() {
         let damageForm = $("form#damage-filter");
         ajaxForm(damageForm);
-        accordionForm(damageForm);
+
+        setupVariantClassGroups();
 
         setupDamageNodeSlider($("#id_splice_min"), $("#splice-slider"), $("input#enable-splice"));
         setupDamageNodeSlider($("#id_cosmic_count_min"), $("#cosmic-count-slider"), $("input#enable-cosmic-count"));
@@ -223,18 +263,9 @@
             setupDamageNodeSlider($("#id_revel_rankscore_min"), $("#revel_rankscore-slider"), $("input#enable-revel_rankscore"));
             setupDamageNodeSlider($("#id_vest4_rankscore_min"), $("#vest4_rankscore-slider"), $("input#enable-vest4_rankscore"));
             {% if node.columns_version >= 4 %}
-                setupDamageNodeSlider($("#id_alphamissense_score_min"), $("#alphamissense_score-slider"), $("input#enable-alphamissense_score"));
-                setupDamageNodeSlider($("#id_bayesdel_noaf_score_min"), $("#bayesdel_noaf_score-slider"), $("input#enable-bayesdel_noaf_score"));
-                setupDamageNodeSlider($("#id_cadd_phred_min"), $("#cadd_phred-slider"), $("input#enable-cadd_phred"));
-                setupDamageNodeSlider($("#id_clinpred_score_min"), $("#clinpred_score-slider"), $("input#enable-clinpred_score"));
-                setupDamageNodeSlider($("#id_metarnn_score_min"), $("#metarnn_score-slider"), $("input#enable-metarnn_score"));
-                setupDamageNodeSlider($("#id_mpc_score_min"), $("#mpc_score-slider"), $("input#enable-mpc_score"));
-                setupDamageNodeSlider($("#id_mutpred2_score_min"), $("#mutpred2_score-slider"), $("input#enable-mutpred2_score"));
-                setupDamageNodeSlider($("#id_primateai_score_min"), $("#primateai_score-slider"), $("input#enable-primateai_score"));
-                setupDamageNodeSlider($("#id_revel_score_min"), $("#revel_score-slider"), $("input#enable-revel_score"));
-                setupDamageNodeSlider($("#id_varity_er_score_min"), $("#varity_er_score-slider"), $("input#enable-varity_er_score"));
-                setupDamageNodeSlider($("#id_varity_r_score_min"), $("#varity_r_score-slider"), $("input#enable-varity_r_score"));
-                setupDamageNodeSlider($("#id_vest4_score_min"), $("#vest4_score-slider"), $("input#enable-vest4_score"));
+                {% for row in form.get_raw_score_rows %}
+                    setupDamageNodeSlider($("#id_{{ row.threshold_field }}"), $("#{{ row.field }}-slider"), $("input#enable-{{ row.field }}"));
+                {% endfor %}
             {% endif %}
         {% endif %}
 
@@ -250,13 +281,9 @@
     });
 </script>
 <div>
-    <div>
-        <p>
-            Shows variants meeting meeting <b>ANY</b> of the below filters, unless some are made mandatory via 'required'.
-        </p>
-        <p>
-            Check the left box to enable sliders (to distinguish between not selected and a minimum of 0)
-        </p>
+    <div class="editor-help">
+        Shows variants meeting <b>any</b> of the filters below, unless some are made mandatory via 'Required'.
+        Tick the box beside a slider to enable it - that tells "not set" apart from a minimum of 0.
     </div>
 
 	<form id="damage-filter" method="post" action="{{ request.path }}">
@@ -266,12 +293,49 @@
         {% endfor %}
 
 		{{ form.non_field_errors }}
-        <table>
-            <tr>
-                <td></td>
-                <td></td>
+        <table class="editor-table" id="damage-table">
+            <tr class="editor-table-head">
+                <th></th>
+                <th></th>
                 <th><a class="hover-link" href="javascript:toggleRequiredFilter()">Required</a></th>
                 <th class="collapse filter-required">Allow Null</th>
+            </tr>
+            <tr>
+                <th>{{ form.variant_class.label }}</th>
+                <td>{{ form.variant_class.errors }}
+                    <div id="variant-class-groups">
+                        {% for group_name, subwidgets in form.get_variant_class_groups %}
+                            <label class="variant-class-group-label">
+                                <input type="checkbox" class="variant-class-group" data-group="{{ forloop.counter }}" />
+                                {{ group_name }}
+                            </label>
+                        {% endfor %}
+                        <label class="variant-class-exclude-label" title="Show everything except the selected types">
+                            {{ form.variant_class_exclude }} exclude
+                        </label>
+                        <a class="hover-link" href="javascript:toggleVariantClasses()">Individual variant classes...</a>
+                    </div>
+                    <div id="variant-class-individual">
+                        {% for group_name, subwidgets in form.get_variant_class_groups %}
+                            <div class="variant-class-group-classes" data-group="{{ forloop.counter }}">
+                                <span class="label">{{ group_name }}</span>
+                                {% for subwidget in subwidgets %}
+                                    <label class="variant-class-label">{{ subwidget.tag }} {{ subwidget.choice_label }}</label>
+                                {% endfor %}
+                            </div>
+                        {% endfor %}
+                    </div>
+                </td>
+                <td class="collapse filter-required"> <!-- variant type always restricts --> </td>
+                <td class="collapse filter-required"> <!-- variant_class is non-nullable --> </td>
+            </tr>
+            <tr>
+                <th title="Stored as a symbolic alt with an SVLEN - SVs, CNVs and gene-level events. VEP calls a 1Mb deletion and a 1bp one the same class, so this is a separate question">{{ form.structural.label }}</th>
+                <td>{{ form.structural.errors }}
+                    <div id="structural-filter">{{ form.structural }}</div>
+                </td>
+                <td class="collapse filter-required"> <!-- structural always restricts --> </td>
+                <td class="collapse filter-required"> <!-- structural is non-nullable --> </td>
             </tr>
             <tr>
                 <th>{{ form.impact_min.label }}</th>
@@ -285,7 +349,7 @@
                     <input id="enable-splice"  title="Enable Splicing slider" class="enable-slider" type="checkbox" />
                     <span class='slider-container'>
                         <div class="display-flex">
-                            <div id="splice-slider" class='slider'></div>
+                            <span class="slider-track"><input type="range" id="splice-slider" class='slider' /></span>
                             <div class='label slider-value'></div>
                         </div>
                         <div class='slider-labels'>
@@ -308,7 +372,7 @@
                     <input id="enable-damage-predictions" title="Enable Damage Predictions slider" class="enable-slider" type="checkbox" />
                     <span class='slider-container'>
                         <div class="display-flex">
-                            <div id="damage-predictions-min-slider" class='slider'></div>
+                            <span class="slider-track"><input type="range" id="damage-predictions-min-slider" class='slider' /></span>
                             <div class='label slider-value'></div>
                         </div>
                         <div class='slider-labels'>
@@ -322,7 +386,7 @@
             </tr>
             <tr id="show-individual-pathogenic-prediction">
                 <td colspan="2">
-                    <a class="hover-link" href="javascript:showIndividualPathogenicPredictions()">Show Individual Pathogenic Predictions</a>
+                    <a class="hover-link" href="javascript:showIndividualPathogenicPredictions()">Show individual pathogenicity predictions</a>
                 </td>
                 <td></td>
                 <td></td>
@@ -343,7 +407,7 @@
                         <input id="enable-cadd" title="Enable CADD slider" class="enable-slider" type="checkbox" />
                         <span class='slider-container'>
                             <div class="display-flex">
-                                <div id="cadd-slider" class='slider'></div>
+                                <span class="slider-track"><input type="range" id="cadd-slider" class='slider' /></span>
                                 <div class='label slider-value'></div>
                             </div>
                             <div class='slider-labels'>
@@ -361,7 +425,7 @@
                         <input id="enable-revel"  title="Enable Revel slider" class="enable-slider" type="checkbox" />
                         <span class='slider-container'>
                             <div class="display-flex">
-                                <div id="revel-slider" class='slider'></div>
+                                <span class="slider-track"><input type="range" id="revel-slider" class='slider' /></span>
                                 <div class='label slider-value'></div>
                             </div>
                             <div class='slider-labels'>
@@ -382,7 +446,7 @@
                             <input id="enable-alphamissense_rankscore"  title="Enable AlphaMissense slider" class="enable-slider" type="checkbox" />
                             <span class='slider-container'>
                                 <div class="display-flex">
-                                    <div id="alphamissense_rankscore-slider" class='slider'></div>
+                                    <span class="slider-track"><input type="range" id="alphamissense_rankscore-slider" class='slider' /></span>
                                     <div class='label slider-value'></div>
                                 </div>
                                 <div class='slider-labels'>
@@ -401,7 +465,7 @@
                         <input id="enable-bayesdel_noaf_rankscore"  title="Enable BayesDel slider" class="enable-slider" type="checkbox" />
                         <span class='slider-container'>
                             <div class="display-flex">
-                                <div id="bayesdel_noaf_rankscore-slider" class='slider'></div>
+                                <span class="slider-track"><input type="range" id="bayesdel_noaf_rankscore-slider" class='slider' /></span>
                                 <div class='label slider-value'></div>
                             </div>
                             <div class='slider-labels'>
@@ -419,7 +483,7 @@
                         <input id="enable-cadd_raw_rankscore"  title="Enable CADD slider" class="enable-slider" type="checkbox" />
                         <span class='slider-container'>
                             <div class="display-flex">
-                                <div id="cadd_raw_rankscore-slider" class='slider'></div>
+                                <span class="slider-track"><input type="range" id="cadd_raw_rankscore-slider" class='slider' /></span>
                                 <div class='label slider-value'></div>
                             </div>
                             <div class='slider-labels'>
@@ -437,7 +501,7 @@
                         <input id="enable-clinpred_rankscore"  title="Enable ClinPRed slider" class="enable-slider" type="checkbox" />
                         <span class='slider-container'>
                             <div class="display-flex">
-                                <div id="clinpred_rankscore-slider" class='slider'></div>
+                                <span class="slider-track"><input type="range" id="clinpred_rankscore-slider" class='slider' /></span>
                                 <div class='label slider-value'></div>
                             </div>
                             <div class='slider-labels'>
@@ -455,7 +519,7 @@
                         <input id="enable-metalr_rankscore"  title="Enable MetaLR slider" class="enable-slider" type="checkbox" />
                         <span class='slider-container'>
                             <div class="display-flex">
-                                <div id="metalr_rankscore-slider" class='slider'></div>
+                                <span class="slider-track"><input type="range" id="metalr_rankscore-slider" class='slider' /></span>
                                 <div class='label slider-value'></div>
                             </div>
                             <div class='slider-labels'>
@@ -473,7 +537,7 @@
                         <input id="enable-revel_rankscore"  title="Enable Revel Rankscore slider" class="enable-slider" type="checkbox" />
                         <span class='slider-container'>
                             <div class="display-flex">
-                                <div id="revel_rankscore-slider" class='slider'></div>
+                                <span class="slider-track"><input type="range" id="revel_rankscore-slider" class='slider' /></span>
                                 <div class='label slider-value'></div>
                             </div>
                             <div class='slider-labels'>
@@ -491,7 +555,7 @@
                         <input id="enable-vest4_rankscore"  title="Enable VEST4 Rankscore slider" class="enable-slider" type="checkbox" />
                         <span class='slider-container'>
                             <div class="display-flex">
-                                <div id="vest4_rankscore-slider" class='slider'></div>
+                                <span class="slider-track"><input type="range" id="vest4_rankscore-slider" class='slider' /></span>
                                 <div class='label slider-value'></div>
                             </div>
                             <div class='slider-labels'>
@@ -505,246 +569,34 @@
                 </tr>
                 {% endif %}{# show_rankscore_sliders #}
                 {% if node.columns_version >= 4 %}
-                    <tr class="individual-pathogenic-prediction">
-                        <th>{{ form.alphamissense_score_min.label }}</th>
-                        <td>{{ form.alphamissense_score_min.errors }}
-                            <input id="enable-alphamissense_score" title="Enable AlphaMissense raw slider" class="enable-slider" type="checkbox" />
-                            <span class='slider-container'>
-                                <div class="display-flex">
-                                    <div id="alphamissense_score-slider" class='slider'></div>
-                                    <div class='label slider-value'></div>
-                                </div>
-                                <div class='slider-labels'>
-                                    <span class='label min-value left'></span>
-                                    <span class='label max-value right'></span>
-                                </div>
-                            </span>
-                        </td>
-                        <td class="collapse filter-required">{{ form.alphamissense_score_required }}</td>
-                        <td class="collapse filter-required">{{ form.alphamissense_score_allow_null }}</td>
-                    </tr>
-                    <tr class="individual-pathogenic-prediction">
-                        <th>{{ form.bayesdel_noaf_score_min.label }}</th>
-                        <td>{{ form.bayesdel_noaf_score_min.errors }}
-                            <input id="enable-bayesdel_noaf_score" title="Enable BayesDel raw slider" class="enable-slider" type="checkbox" />
-                            <span class='slider-container'>
-                                <div class="display-flex">
-                                    <div id="bayesdel_noaf_score-slider" class='slider'></div>
-                                    <div class='label slider-value'></div>
-                                </div>
-                                <div class='slider-labels'>
-                                    <span class='label min-value left'></span>
-                                    <span class='label max-value right'></span>
-                                </div>
-                            </span>
-                        </td>
-                        <td class="collapse filter-required">{{ form.bayesdel_noaf_score_required }}</td>
-                        <td class="collapse filter-required">{{ form.bayesdel_noaf_score_allow_null }}</td>
-                    </tr>
-                    <tr class="individual-pathogenic-prediction">
-                        <th>{{ form.cadd_phred_min.label }}</th>
-                        <td>{{ form.cadd_phred_min.errors }}
-                            <input id="enable-cadd_phred" title="Enable CADD phred slider" class="enable-slider" type="checkbox" />
-                            <span class='slider-container'>
-                                <div class="display-flex">
-                                    <div id="cadd_phred-slider" class='slider'></div>
-                                    <div class='label slider-value'></div>
-                                </div>
-                                <div class='slider-labels'>
-                                    <span class='label min-value left'></span>
-                                    <span class='label max-value right'></span>
-                                </div>
-                            </span>
-                        </td>
-                        <td class="collapse filter-required">{{ form.cadd_phred_required }}</td>
-                        <td class="collapse filter-required">{{ form.cadd_phred_allow_null }}</td>
-                    </tr>
-                    <tr class="individual-pathogenic-prediction">
-                        <th>{{ form.clinpred_score_min.label }}</th>
-                        <td>{{ form.clinpred_score_min.errors }}
-                            <input id="enable-clinpred_score" title="Enable ClinPred raw slider" class="enable-slider" type="checkbox" />
-                            <span class='slider-container'>
-                                <div class="display-flex">
-                                    <div id="clinpred_score-slider" class='slider'></div>
-                                    <div class='label slider-value'></div>
-                                </div>
-                                <div class='slider-labels'>
-                                    <span class='label min-value left'></span>
-                                    <span class='label max-value right'></span>
-                                </div>
-                            </span>
-                        </td>
-                        <td class="collapse filter-required">{{ form.clinpred_score_required }}</td>
-                        <td class="collapse filter-required">{{ form.clinpred_score_allow_null }}</td>
-                    </tr>
-                    <tr class="individual-pathogenic-prediction">
-                        <th>{{ form.metarnn_score_min.label }}</th>
-                        <td>{{ form.metarnn_score_min.errors }}
-                            <input id="enable-metarnn_score" title="Enable MetaRNN raw slider" class="enable-slider" type="checkbox" />
-                            <span class='slider-container'>
-                                <div class="display-flex">
-                                    <div id="metarnn_score-slider" class='slider'></div>
-                                    <div class='label slider-value'></div>
-                                </div>
-                                <div class='slider-labels'>
-                                    <span class='label min-value left'></span>
-                                    <span class='label max-value right'></span>
-                                </div>
-                            </span>
-                        </td>
-                        <td class="collapse filter-required">{{ form.metarnn_score_required }}</td>
-                        <td class="collapse filter-required">{{ form.metarnn_score_allow_null }}</td>
-                    </tr>
-                    <tr class="individual-pathogenic-prediction">
-                        <th>{{ form.mpc_score_min.label }}</th>
-                        <td>{{ form.mpc_score_min.errors }}
-                            <input id="enable-mpc_score" title="Enable MPC raw slider" class="enable-slider" type="checkbox" />
-                            <span class='slider-container'>
-                                <div class="display-flex">
-                                    <div id="mpc_score-slider" class='slider'></div>
-                                    <div class='label slider-value'></div>
-                                </div>
-                                <div class='slider-labels'>
-                                    <span class='label min-value left'></span>
-                                    <span class='label max-value right'></span>
-                                </div>
-                            </span>
-                        </td>
-                        <td class="collapse filter-required">{{ form.mpc_score_required }}</td>
-                        <td class="collapse filter-required">{{ form.mpc_score_allow_null }}</td>
-                    </tr>
-                    <tr class="individual-pathogenic-prediction">
-                        <th>{{ form.mutpred2_score_min.label }}</th>
-                        <td>{{ form.mutpred2_score_min.errors }}
-                            <input id="enable-mutpred2_score" title="Enable MutPred2 raw slider" class="enable-slider" type="checkbox" />
-                            <span class='slider-container'>
-                                <div class="display-flex">
-                                    <div id="mutpred2_score-slider" class='slider'></div>
-                                    <div class='label slider-value'></div>
-                                </div>
-                                <div class='slider-labels'>
-                                    <span class='label min-value left'></span>
-                                    <span class='label max-value right'></span>
-                                </div>
-                            </span>
-                        </td>
-                        <td class="collapse filter-required">{{ form.mutpred2_score_required }}</td>
-                        <td class="collapse filter-required">{{ form.mutpred2_score_allow_null }}</td>
-                    </tr>
-                    <tr class="individual-pathogenic-prediction">
-                        <th>{{ form.primateai_score_min.label }}</th>
-                        <td>{{ form.primateai_score_min.errors }}
-                            <input id="enable-primateai_score" title="Enable PrimateAI raw slider" class="enable-slider" type="checkbox" />
-                            <span class='slider-container'>
-                                <div class="display-flex">
-                                    <div id="primateai_score-slider" class='slider'></div>
-                                    <div class='label slider-value'></div>
-                                </div>
-                                <div class='slider-labels'>
-                                    <span class='label min-value left'></span>
-                                    <span class='label max-value right'></span>
-                                </div>
-                            </span>
-                        </td>
-                        <td class="collapse filter-required">{{ form.primateai_score_required }}</td>
-                        <td class="collapse filter-required">{{ form.primateai_score_allow_null }}</td>
-                    </tr>
-                    <tr class="individual-pathogenic-prediction">
-                        <th>{{ form.revel_score_min.label }}</th>
-                        <td>{{ form.revel_score_min.errors }}
-                            <input id="enable-revel_score" title="Enable REVEL raw slider" class="enable-slider" type="checkbox" />
-                            <span class='slider-container'>
-                                <div class="display-flex">
-                                    <div id="revel_score-slider" class='slider'></div>
-                                    <div class='label slider-value'></div>
-                                </div>
-                                <div class='slider-labels'>
-                                    <span class='label min-value left'></span>
-                                    <span class='label max-value right'></span>
-                                </div>
-                            </span>
-                        </td>
-                        <td class="collapse filter-required">{{ form.revel_score_required }}</td>
-                        <td class="collapse filter-required">{{ form.revel_score_allow_null }}</td>
-                    </tr>
-                    <tr class="individual-pathogenic-prediction">
-                        <th>{{ form.varity_er_score_min.label }}</th>
-                        <td>{{ form.varity_er_score_min.errors }}
-                            <input id="enable-varity_er_score" title="Enable VARITY_ER raw slider" class="enable-slider" type="checkbox" />
-                            <span class='slider-container'>
-                                <div class="display-flex">
-                                    <div id="varity_er_score-slider" class='slider'></div>
-                                    <div class='label slider-value'></div>
-                                </div>
-                                <div class='slider-labels'>
-                                    <span class='label min-value left'></span>
-                                    <span class='label max-value right'></span>
-                                </div>
-                            </span>
-                        </td>
-                        <td class="collapse filter-required">{{ form.varity_er_score_required }}</td>
-                        <td class="collapse filter-required">{{ form.varity_er_score_allow_null }}</td>
-                    </tr>
-                    <tr class="individual-pathogenic-prediction">
-                        <th>{{ form.varity_r_score_min.label }}</th>
-                        <td>{{ form.varity_r_score_min.errors }}
-                            <input id="enable-varity_r_score" title="Enable VARITY_R raw slider" class="enable-slider" type="checkbox" />
-                            <span class='slider-container'>
-                                <div class="display-flex">
-                                    <div id="varity_r_score-slider" class='slider'></div>
-                                    <div class='label slider-value'></div>
-                                </div>
-                                <div class='slider-labels'>
-                                    <span class='label min-value left'></span>
-                                    <span class='label max-value right'></span>
-                                </div>
-                            </span>
-                        </td>
-                        <td class="collapse filter-required">{{ form.varity_r_score_required }}</td>
-                        <td class="collapse filter-required">{{ form.varity_r_score_allow_null }}</td>
-                    </tr>
-                    <tr class="individual-pathogenic-prediction">
-                        <th>{{ form.vest4_score_min.label }}</th>
-                        <td>{{ form.vest4_score_min.errors }}
-                            <input id="enable-vest4_score" title="Enable VEST4 raw slider" class="enable-slider" type="checkbox" />
-                            <span class='slider-container'>
-                                <div class="display-flex">
-                                    <div id="vest4_score-slider" class='slider'></div>
-                                    <div class='label slider-value'></div>
-                                </div>
-                                <div class='slider-labels'>
-                                    <span class='label min-value left'></span>
-                                    <span class='label max-value right'></span>
-                                </div>
-                            </span>
-                        </td>
-                        <td class="collapse filter-required">{{ form.vest4_score_required }}</td>
-                        <td class="collapse filter-required">{{ form.vest4_score_allow_null }}</td>
-                    </tr>
-                    <tr>
-                        <th>{{ form.alphamissense_pred.label }}</th>
-                        <td>{{ form.alphamissense_pred.errors }} {{ form.alphamissense_pred }}</td>
-                        <td class="collapse filter-required">{{ form.alphamissense_pred_required }}</td>
-                        <td class="collapse filter-required">{{ form.alphamissense_pred_allow_null }}</td>
-                    </tr>
-                    <tr>
-                        <th>{{ form.clinpred_pred.label }}</th>
-                        <td>{{ form.clinpred_pred.errors }} {{ form.clinpred_pred }}</td>
-                        <td class="collapse filter-required">{{ form.clinpred_pred_required }}</td>
-                        <td class="collapse filter-required">{{ form.clinpred_pred_allow_null }}</td>
-                    </tr>
-                    <tr>
-                        <th>{{ form.metarnn_pred.label }}</th>
-                        <td>{{ form.metarnn_pred.errors }} {{ form.metarnn_pred }}</td>
-                        <td class="collapse filter-required">{{ form.metarnn_pred_required }}</td>
-                        <td class="collapse filter-required">{{ form.metarnn_pred_allow_null }}</td>
-                    </tr>
-                    <tr>
-                        <th>{{ form.primateai_pred.label }}</th>
-                        <td>{{ form.primateai_pred.errors }} {{ form.primateai_pred }}</td>
-                        <td class="collapse filter-required">{{ form.primateai_pred_required }}</td>
-                        <td class="collapse filter-required">{{ form.primateai_pred_allow_null }}</td>
-                    </tr>
+                    {% for row in form.get_raw_score_rows %}
+                        <tr class="individual-pathogenic-prediction">
+                            <th>{{ row.min_field.label }}</th>
+                            <td>{{ row.min_field.errors }}
+                                <input id="enable-{{ row.field }}" title="Enable {{ row.tool.name }} raw slider" class="enable-slider" type="checkbox" />
+                                <span class='slider-container'>
+                                    <div class="display-flex">
+                                        <span class="slider-track"><input type="range" id="{{ row.field }}-slider" class='slider' /></span>
+                                        <div class='label slider-value'></div>
+                                    </div>
+                                    <div class='slider-labels'>
+                                        <span class='label min-value left'></span>
+                                        <span class='label max-value right'></span>
+                                    </div>
+                                </span>
+                            </td>
+                            <td class="collapse filter-required">{{ row.required_field }}</td>
+                            <td class="collapse filter-required">{{ row.allow_null_field }}</td>
+                        </tr>
+                    {% endfor %}
+                    {% for row in form.get_pred_rows %}
+                        <tr>
+                            <th>{{ row.pred_field.label }}</th>
+                            <td>{{ row.pred_field.errors }} {{ row.pred_field }}</td>
+                            <td class="collapse filter-required">{{ row.required_field }}</td>
+                            <td class="collapse filter-required">{{ row.allow_null_field }}</td>
+                        </tr>
+                    {% endfor %}
                 {% endif %}
             {% endif %}
             <tr>
@@ -753,7 +605,7 @@
                     <input id="enable-cosmic-count"  title="Enable COSMIC count slider" class="enable-slider" type="checkbox" />
                     <span class='slider-container'>
                         <div class="display-flex">
-                            <div id="cosmic-count-slider" class='slider'></div>
+                            <span class="slider-track"><input type="range" id="cosmic-count-slider" class='slider' /></span>
                             <div class='label slider-value'></div>
                         </div>
                         <div class='slider-labels'>
@@ -804,26 +656,23 @@
             </tr>
         </table>
 
-        {% if has_write_permission %}
-    		<button id='damage-save' class="btn btn-primary">save</button>
-        {% endif %}
+        <div class="editor-note">
+            {% if node.columns_version == 1%}
+                Damage, CADD and REVEL only apply to non-synonymous SNVs (ie not indels or intergenic).
+            {% else %}
+                Pathogenicity predictions only apply to non-synonymous SNVs (ie not indels or intergenic).
+            {% endif %}
+            MODERATE* does not include missense variants, so use MODERATE* together with one or more
+            of the pathogenicity predictors to include damaging missense variants.
+            <a target="_blank" href="{{ help_url }}analysis/nodes.html#{{ node.get_node_class_label|slugify }}">See help for details.</a>
+            <a target="_blank" href="{% url 'pathogenicity_thresholds' %}">Pathogenicity thresholds &amp; sources.</a>
+        </div>
+        <div class="editor-actions">
+            {% if has_write_permission %}
+                <button id='damage-save' class="btn btn-primary">Save</button>
+            {% endif %}
+        </div>
 	    {{ form.media }}
 	</form>
-
-    <div>
-        Note:
-        {% if node.columns_version == 1%}
-            Damage, CADD and REVEL only apply to non-synonymous SNVs (ie not indels or intergenic)
-        {% else %}
-            Pathogenicity predictions only apply to non-synonymous SNVs (ie not indels or intergenic)
-        {% endif %}
-        MODERATE* does not include missense variants, so we suggest you use MODERATE* in combination with one or more
-        of the Pathogenicity Predictors to include damaging missense variants.
-        <a target="_blank" href="{{ help_url }}analysis/nodes.html#{{ node.get_node_class_label|slugify }}">
-            See help for details.
-        </a>
-        <a target="_blank" href="{% url 'pathogenicity_thresholds' %}">See pathogenicity thresholds &amp; sources.</a>
-    </div>
-
 </div>
 {% endblock content %}

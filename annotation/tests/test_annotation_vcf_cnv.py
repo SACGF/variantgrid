@@ -1,4 +1,6 @@
 import os
+import shutil
+import tempfile
 from unittest.mock import patch
 
 from django.conf import settings
@@ -74,6 +76,8 @@ class TestAnnotationVCFCNV(TestCase):
         va = VariantAnnotation.objects.get(variant_id=202)
         self.assertEqual(va.variant_class, VariantClass.INVERSION)
         self.assertEqual(va.impact, PathogenicityImpact.MODIFIER)
+        # #1571 - a ranged inv is HGVS from coordinates alone, so 1.1Mb is no obstacle
+        self.assertEqual("NC_000003.11:g.127535894_128720376inv", va.hgvs_g)
 
         # 17	41236500	.	G	<DEL>	.	.	SVTYPE=DEL;SVLEN=14500;variant_id=203
         va = VariantAnnotation.objects.get(variant_id=203)
@@ -106,6 +110,8 @@ class TestAnnotationVCFCNV(TestCase):
         va = VariantAnnotation.objects.get(variant_id=102)
         self.assertEqual(va.variant_class, VariantClass.DELETION)
         self.assertEqual(va.impact, PathogenicityImpact.HIGH)
+        # #1571 - the padding base at POS is excluded, so the interval opens at POS + 1
+        self.assertEqual("NC_000021.9:g.35041809_35051808del", va.hgvs_g)
 
 
 @override_settings(**get_fake_annotation_settings_dict(columns_version=4))
@@ -136,20 +142,17 @@ class TestAnnotationVCFCNV4(TestAnnotationVCFCNV):
 
     def setUp(self):
         super().setUp()
-        self._sidecars = []
-
-    def tearDown(self):
-        for sidecar in self._sidecars:
-            if os.path.exists(sidecar):
-                os.remove(sidecar)
-        super().tearDown()
+        # The sidecar lives next to the annotated VCF, so each test imports from its own copy of the
+        # fixture in a temp dir - nothing is written into test_data, whatever the test does
+        temp_dir = tempfile.mkdtemp(prefix="vg_sv_conservation_")
+        self.addCleanup(shutil.rmtree, temp_dir, ignore_errors=True)
+        self.TEST_ANNOTATION_VCF_GRCH37 = shutil.copy(type(self).TEST_ANNOTATION_VCF_GRCH37, temp_dir)
+        self.TEST_ANNOTATION_VCF_GRCH38 = shutil.copy(type(self).TEST_ANNOTATION_VCF_GRCH38, temp_dir)
 
     def _write_conservation_sidecar(self, vcf_filename, conservation):
         columns = sorted({c for values in conservation.values() for c in values})
         tracks = [ConservationTrack(name=c, path="", db_column=c) for c in columns]
-        sidecar = conservation_sidecar_filename(vcf_filename)
-        write_conservation_sidecar(sidecar, conservation, tracks)
-        self._sidecars.append(sidecar)
+        write_conservation_sidecar(conservation_sidecar_filename(vcf_filename), conservation, tracks)
 
     def test_import_variant_annotations_grch37(self):
         # Write the pyBigWig sidecar next to the annotated VCF so the import path picks it up.
@@ -239,3 +242,28 @@ class TestAnnotationVCFCNV4(TestAnnotationVCFCNV):
                    return_value=scored) as mock_score:
             call_command("backfill_sv_conservation", "--genome-build", "GRCh37")
         mock_score.assert_not_called()
+
+    def test_recalculate_symbolic_hgvs(self):
+        """ #1571: rows imported before symbolic DEL/DUP/INV resolved from coordinates hold a
+            placeholder message - the backfill turns those into real HGVS """
+        self._write_conservation_sidecar(self.TEST_ANNOTATION_VCF_GRCH37, self.CONSERVATION_GRCH37)
+        self._import_grch37_run()
+
+        va = VariantAnnotation.objects.get(variant_id=202)
+        expected_hgvs_g = va.hgvs_g
+        va.hgvs_g = VariantAnnotation.SV_HGVS_TOO_LONG_MESSAGE
+        va.hgvs_c = VariantAnnotation.SV_HGVS_TOO_LONG_MESSAGE
+        va.save()
+
+        untouched = VariantAnnotation.objects.get(variant_id=203)
+        untouched_hgvs_g = untouched.hgvs_g
+
+        call_command("one_off_recalculate_symbolic_hgvs", "--genome-build", "GRCh37")
+
+        va.refresh_from_db()
+        self.assertEqual(expected_hgvs_g, va.hgvs_g)
+        # No local transcript sequences in the fixture, so c.HGVS resolves to blank rather than the message
+        self.assertIsNone(va.hgvs_c)
+
+        untouched.refresh_from_db()
+        self.assertEqual(untouched_hgvs_g, untouched.hgvs_g)

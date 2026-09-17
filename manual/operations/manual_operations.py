@@ -1,3 +1,10 @@
+"""
+ManualOperation: a migration operation that registers a deploy-time task (a management command to
+run, or a step for a human) as a ManualMigrationTask instead of doing work itself. Build one with
+ManualOperation.operation_manage / operation_other or task_id_manage, and pass `test=` (receives
+`apps`) so the task only registers when the deployment has data that needs it. The migrator and
+`manage.py manual_outstanding` surface what is registered; manual/__manual_readme.md has the procedure.
+"""
 from collections.abc import Callable
 from typing import Optional, Union
 
@@ -109,3 +116,7 @@ class ManualOperation(Operation):
     @staticmethod
     def task_id_manage(args: Union[str, list[str]]) -> str:
         return ManualOperation._task_id_generate(category="manage", args=args)
+
+    @staticmethod
+    def task_id_other(args: Union[str, list[str]]) -> str:
+        return ManualOperation._task_id_generate(category="other", args=args)

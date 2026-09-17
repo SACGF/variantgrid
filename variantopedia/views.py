@@ -1,80 +1,50 @@
+import csv
 import json
-import logging
-import operator
-import re
 from collections import defaultdict
-from dataclasses import dataclass
-from datetime import datetime, timedelta
-from functools import reduce
-from typing import Any
+from datetime import timedelta
+from typing import Optional
+
 from django.conf import settings
 from django.contrib import messages
+from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
-from django.db import connection
 from django.forms import model_to_dict
+from django.http import StreamingHttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
-from django.utils.timesince import timesince
+from django.utils.text import slugify
 from django.utils.timezone import localtime
-from django.views.decorators.http import require_POST
 
 from analysis.models import VariantTag
-from annotation.manual_variant_entry import check_can_create_variants
 from annotation.models import (
-    AnnotationRun,
-    AnnotationStatus,
     AnnotationVersion,
     Classification,
+    ClassificationModification,
+    ClinVar,
     ClinVarRecordCollection,
     VariantAnnotation,
-    VariantAnnotationVersion,
+    VariantTranscriptAnnotation,
 )
 from annotation.transcripts_annotation_selections import VariantTranscriptSelections
-from classification.enums import OverlapType
-from classification.models import (
-    OverlapStatus, Overlap, ClassificationModification,
-)
-from classification.models.classification_import_run import ClassificationImportRun
-from classification.templatetags.classification_tags import imported_allele_info
-from classification.variant_card import AlleleCard
-from classification.views.exports import ClassificationExportFormatterCSV
-from classification.views.exports.classification_export_filter import ClassificationFilter
-from classification.views.exports.classification_export_formatter_csv import FormatDetailsCSV
 from eventlog.models import create_event
-from genes.hgvs import HGVSMatcher
-from genes.models import CanonicalTranscriptCollection, GeneSymbol
-from library.django_utils import get_field_counts, highest_pk, require_superuser
-from library.django_utils.jqgrid_view import JQGridView
-from library.git import Git
-from library.guardian_utils import admin_bot
-from library.health_check import HealthCheckRequest, health_check_overall_stats_signal
-from library.log_utils import (
-    AdminNotificationBuilder,
-    log_traceback,
-    report_message,
-    slack_bot_username,
+from genes.models import (
+    CanonicalTranscriptCollection,
+    GeneCopyNumberEvent,
+    GeneFusion,
+    GeneSymbol,
 )
-from library.utils import flatten_nested_lists
+from library.django_utils import get_field_counts
+from library.django_utils.grid_export import EXPORT_ROWS_PER_CHUNK
+from library.git import Git
+from library.log_utils import log_traceback
+from library.utils import StashFile
+from library.utils.date_utils import local_date_string
 from pathtests.models import cases_for_user
 from seqauto.models import VCFFromSequencingRun, get_20x_gene_coverage
 from seqauto.seqauto_stats import get_sample_enrichment_kits_df
-from snpdb.clingen_allele import link_allele_to_existing_variants
 from snpdb.forms import TagForm, UserSelectForm, get_settings_form_features
 from snpdb.genome_build_manager import GenomeBuildManager
-from snpdb.liftover import create_liftover_pipelines
-from snpdb.models import (
-    VCF,
-    Allele,
-    AlleleConversionTool,
-    AlleleOrigin,
-    ImportSource,
-    Sample,
-    Tag,
-    Variant,
-    VariantGridColumn,
-    get_igv_data,
-)
-from snpdb.models.models_genome import GenomeBuild
+from snpdb.models import Sample, Tag, Variant, VariantGridColumn, get_igv_data
 from snpdb.models.models_user_settings import UserSettings
 from snpdb.search import search_data
 from snpdb.serializers import VariantAlleleSerializer
@@ -86,18 +56,17 @@ from snpdb.variant_filters import (
     get_variant_type_label,
     resolve_gene_symbols,
 )
-from upload.upload_stats import get_vcf_variant_upload_stats
-from variantgrid.celery import app
-from variantgrid.tasks.server_monitoring_tasks import get_disk_messages
 from variantopedia import forms
-from variantopedia.grids import TaggedVariantGrid, VariantTagsGrid
+from variantopedia.grids import (
+    VariantTagsColumns,
+    filter_unresolved_variant_tags,
+    variant_tags_for_user,
+)
 from variantopedia.interesting_nearby import (
     get_method_summaries,
     get_nearby_qs,
     get_nearby_summaries,
 )
-from variantopedia.server_status import get_dashboard_notices
-from variantopedia.tasks.server_status_tasks import notify_server_status_now
 
 
 def variants(request, genome_build_name=None):
@@ -125,17 +94,6 @@ def variants(request, genome_build_name=None):
     return render(request, "variantopedia/variants.html", context)
 
 
-def strip_celery_from_keys(celery_state):
-    worker_status = {}
-    if celery_state:
-        for worker_string, data in celery_state.items():
-            m = re.match(r".*@(.*?)$", worker_string)
-            if m:
-                worker = m.group(1)
-                worker_status[worker] = data
-    return worker_status
-
-
 def dashboard(request):
     sample_enrichment_kits_df = None
     latest_sequencing_vcfs = []
@@ -154,269 +112,83 @@ def dashboard(request):
     return render(request, "variantopedia/dashboard.html", context)
 
 
-@require_superuser
-def server_status(request):
-    if request.method == "POST":
-        action = request.POST.get('action')
-        if action == 'Test Slack':
-            nb = AdminNotificationBuilder(message="Slack Check")
-            nb.add_markdown("This is a Slack Test :ladybug:")
-            nb.send()
-            messages.add_message(request, level=messages.INFO, message="Slack should have been sent a test message.")
-        elif action == 'Health Check':
-            notify_server_status_now()
-            messages.add_message(request, level=messages.INFO, message="Slack should have been sent the health check.")
-        elif action == 'Test Rollbar':
-            report_message("Testing Rollbar", level='error')
-            messages.add_message(request, level=messages.INFO, message="Rollbar should have been sent an error.")
-        elif action == 'Test Message Branding':
-            messages.success(request, "Success message")
-            messages.info(request, "Info message")
-            messages.warning(request, "Warning message")
-            messages.error(request, "Error message")
-
-        elif action == 'kill-pid':
-            pid = int(request.POST.get('pid'))
-            with connection.cursor() as cursor:
-                cursor.execute("SELECT pg_terminate_backend(%s)", [pid])
-                terminated = cursor.fetchone()[0]
-                messages.add_message(request, level=messages.INFO, message=f"Query {pid} Terminated = {terminated}")
-        else:
-            logging.warning("Unrecognised action %s", action)
-
-        # return redirect(reverse('server_status'))
-
-        # TODO should redirect to read-only version of the page
-
-    celery_workers = {}
-    if settings.CELERY_ENABLED:
-        # This relies on the services being started with the "-n worker_name" with a separate one for each service
-        worker_names = settings.CELERY_WORKER_NAMES.copy()
-        if settings.URLS_APP_REGISTER["analysis"]:
-            worker_names.extend(settings.CELERY_ANALYSIS_WORKER_NAMES)
-
-        i = app.control.inspect()
-        ping = strip_celery_from_keys(i.ping())
-        stats = strip_celery_from_keys(i.stats())
-        active = strip_celery_from_keys(i.active())
-        scheduled = strip_celery_from_keys(i.scheduled())
-
-        for worker in worker_names:
-            num_workers = "?"
-            status = 'ERROR - no workers found'
-            ok = False
-
-            # Sometimes stats fails - just use ping
-            pong = ping.get(worker, {})
-            if pong.get("ok") == "pong":
-                status = "OK"
-                ok = True
-
-            if data := stats.get(worker):
-                processes = data.get("pool", {}).get("processes")
-                if processes:
-                    num_workers = len(processes)
-                    status = "OK"
-                    ok = True
-
-            num_active = 0
-            active_jobs = []
-            if worker_active := active.get(worker):
-                num_active = len(worker_active)
-                logging.debug("worker %s active: %s", worker, worker_active)
-                name_time_stamps = defaultdict(list)
-                for worker_data in worker_active:
-                    name = worker_data.get("name")
-                    time_start = worker_data.get("time_start")
-                    if name and time_start:
-                        name = name.split(".")[-1]  # remove prefix
-                        name_time_stamps[name].append(time_start)
-
-                for name, time_stamps in sorted(name_time_stamps.items(), key=lambda x: len(x[1]), reverse=True):
-                    earliest_ts = min(time_stamps)
-                    dt = datetime.fromtimestamp(earliest_ts)
-                    earliest = f"{timesince(dt)} ago"
-                    active_jobs.append(f"{name}: {len(time_stamps)} (earliest={earliest})")
-
-            celery_workers[worker] = {
-                "status": status,
-                "ok": ok,
-                "active": num_active,
-                "scheduled": len(scheduled.get(worker, [])),
-                "num_workers": num_workers,
-                "active_jobs": ", ".join(active_jobs),
-            }
-
-    can_access_reference = True
-    try:
-        for genome_build in GenomeBuild.builds_with_annotation():
-            _ = genome_build.reference_fasta  # Throws exception on error
-    except (KeyError, FileNotFoundError):
-        can_access_reference = False
-
-    # Variant Annotation - incredibly quick check
-    highest_variant_annotated = {}
-    try:
-        q = reduce(operator.and_, VariantAnnotation.VARIANT_ANNOTATION_Q)
-        highest_variant = Variant.objects.filter(q).order_by("pk").last()
-        genome_build = next(iter(highest_variant.genome_builds))  # Just pick one if spans multiple
-        vav = VariantAnnotationVersion.latest(genome_build)
-        annotated = highest_variant.variantannotation_set.filter(version=vav).exists()
-        if annotated:
-            highest_variant_annotated["status"] = "info"
-            highest_variant_annotated["message"] = "OK"
-        else:
-            try:
-                ar_qs = AnnotationRun.objects.filter(annotation_range_lock__version=vav,
-                                                     annotation_range_lock__min_variant__lte=highest_variant.pk,
-                                                     annotation_range_lock__max_variant__gte=highest_variant.pk)
-                ar_qs = ar_qs.exclude(status=AnnotationStatus.ERROR)
-                annotation_run_message = f"AnnotationRuns: {', '.join([str(ar) for ar in ar_qs])}"
-
-                highest_variant_annotated["status"] = "warning"
-                highest_variant_annotated["message"] = annotation_run_message
-            except AnnotationRun.DoesNotExist:
-                highest_variant_annotated["status"] = "danger"
-                highest_variant_annotated["message"] = "Not annotated, no AnnotationRun!"
-    except Exception as e:
-        highest_variant_annotated["status"] = "danger"
-        highest_variant_annotated["message"] = str(e)
-
-    sample_enrichment_kits_df = None
-    if settings.SEQAUTO_ENABLED:
-        sample_enrichment_kits_df = get_sample_enrichment_kits_df()
-    disk_messages = get_disk_messages(info_messages=True)
-    disk_free = {"status": "info", "messages": []}
-    for status, message in disk_messages:
-        if status == "warning":
-            disk_free["status"] = "warning"
-        disk_free["messages"].append(message)
-
-    context = {
-        "celery_workers": celery_workers,
-        "queries": long_running_sql(0),
-        "can_access_reference": can_access_reference,
-        "highest_variant_annotated": highest_variant_annotated,
-        "sample_enrichment_kits_df": sample_enrichment_kits_df
-    }
-    return render(request, "variantopedia/server_status.html", context)
-
-
-@require_superuser
-def server_status_activity(request, days_ago: int):
-    dashboard_notices = get_dashboard_notices(request.user, days_ago)
-    return render(request, "variantopedia/server_status_activity_detail.html", {"dashboard_notices": dashboard_notices})
-
-
-@require_superuser
-def server_status_settings(request):
-    slack_emoji = (settings.SLACK or {}).get('emoji') or ':dna:'
-    slack_username = f"{slack_emoji} {slack_bot_username()}"
-
-    hgvs_matcher = HGVSMatcher(GenomeBuild.grch38())
-
-    return render(request, "variantopedia/server_status_settings_detail.html", {
-        "settings": settings,
-        "slack_bot_username": slack_username,
-        "ongoing_imports": ClassificationImportRun.ongoing_imports(),
-        "hgvs_matcher": hgvs_matcher
-    })
-
-
-@require_superuser
-def health_check_details(request):
-    now = localtime()
-    since = now - timedelta(days=1)
-    health_request = HealthCheckRequest(since=since, now=now)
-
-    results = []
-    for _, result in health_check_overall_stats_signal.send_robust(sender=None, health_request=health_request):
-        if not isinstance(result, Exception):
-            results.append(result)
-
-    checks = flatten_nested_lists(results)
-    checks = sorted(checks, key=lambda hc: (hc.sort_order(), hc.name if hasattr(hc, "name") else "z"))
-    overall_lines = []
-    for check in checks:
-        line_content = check.as_html()
-        overall_lines.append(line_content)
-
-    context = {
-        'overall_lines': overall_lines,
-    }
-    return render(request, "variantopedia/health_check_details.html", context)
-
-
-@dataclass
-class RunningQuery:
-    pid: int
-    duration: Any  # is actually a Duration
-    query: str
-    state: str
-
-
-def long_running_sql(min_age_in_seconds: int = 30):
-    with connection.cursor() as cursor:
-        db_name = connection.settings_dict['NAME']
-        # We exclude "idle" state - as they are from connection pool and not actually running
-        cursor.execute(
-            """
-            SELECT
-              pid,
-              now() - pg_stat_activity.query_start AS duration,
-              query,
-              state
-            FROM pg_stat_activity
-            WHERE (now() - pg_stat_activity.query_start) > interval %s
-            AND datname = %s
-            AND state <> 'idle'                
-            ORDER BY now() - pg_stat_activity.query_start desc;
-            """,
-            [f"{min_age_in_seconds} seconds", db_name]
-        )
-
-        def to_obj(row) -> RunningQuery:
-            return RunningQuery(
-                pid=row[0],
-                duration=row[1],
-                query=row[2],
-                state=row[3]
-            )
-
-        return [to_obj(result) for result in cursor.fetchall()]
-
-
-@require_superuser
-def database_statistics(request):
-    max_variant_id = highest_pk(Variant)
-    num_vcfs = VCF.objects.count()
-    num_samples = Sample.objects.count()
-
-    variant_stats_per_build = defaultdict(dict)
-    for genome_build in GenomeBuild.builds_with_annotation():
-        vcf_variant_stats_df = get_vcf_variant_upload_stats(genome_build)
-        for col in ["cumulative_samples", "cumulative_variants", "cumulative_genotypes", "percent_known"]:
-            variant_stats_per_build[genome_build.name][col] = vcf_variant_stats_df[col].tolist()
-
-    context = {"max_variant_id": max_variant_id,
-               "num_vcfs": num_vcfs,
-               "num_samples": num_samples,
-               "variant_stats_per_build": dict(variant_stats_per_build)}
-    return render(request, "variantopedia/database_statistics_detail.html", context)
-
-
 def variant_tag_detail(request, variant_id, tag):
     """ Loaded via tags grid on variant page """
 
     variant = get_object_or_404(Variant, pk=variant_id)
     tag = get_object_or_404(Tag, pk=tag)
-    if not VariantTag.filter_for_user(request.user).filter(variant=variant, tag=tag).exists():
+    # Same taggings as the counts grid this expands from - the tag may sit on another build of the allele
+    if not variant_tags_for_user(variant, request.user).filter(tag=tag).exists():
         raise PermissionDenied
     context = {
         "variant": variant,
         "tag": tag,
     }
     return render(request, "variantopedia/variant_tag_detail.html", context)
+
+
+VARIANT_GRID_ROW_DETAIL_MAX_TRANSCRIPTS = 20
+VARIANT_GRID_ROW_DETAIL_MAX_CLASSIFICATIONS = 10
+
+
+def variant_grid_row_detail(request, variant_id: int, annotation_version_id: int):
+    """ The expanded row under a variant grid row - identifiers for the grid's annotation version.
+        @see variantGridRowDetail in grid.js """
+    variant = get_object_or_404(Variant, pk=variant_id)
+    annotation_version = get_object_or_404(AnnotationVersion, pk=annotation_version_id)
+    vav = annotation_version.variant_annotation_version
+    variant_annotation = VariantAnnotation.objects.filter(variant=variant, version=vav).first()
+    transcript_annotations = VariantTranscriptAnnotation.objects.filter(variant=variant, version=vav) \
+        .exclude(hgvs_c__isnull=True).order_by("hgvs_c").select_related("transcript_version")
+    # The representative transcript first, then the rest by accession
+    representative_transcript_version_id = variant_annotation.transcript_version_id if variant_annotation else None
+    transcript_annotations = sorted(transcript_annotations[:VARIANT_GRID_ROW_DETAIL_MAX_TRANSCRIPTS],
+                                    key=lambda ta: (ta.transcript_version_id != representative_transcript_version_id,
+                                                    ta.hgvs_c))
+    # The records behind the Classifications column's internal chips
+    classifications = []
+    if allele := variant.allele:
+        cm_qs = ClassificationModification.latest_for_user(request.user) \
+            .filter(classification__allele=allele) \
+            .select_related("classification", "classification__lab").order_by("classification__pk")
+        classifications = list(cm_qs[:VARIANT_GRID_ROW_DETAIL_MAX_CLASSIFICATIONS])
+
+    # Symbolic variants span genes rather than sitting in one, so name what they hit
+    overlapping_symbols = None
+    if variant.is_symbolic and variant_annotation:
+        overlapping_symbols = variant_annotation.overlapping_symbols
+
+    # What the Classifications column's ClinVar chips summarise
+    clinvar = ClinVar.objects.filter(variant=variant, version=annotation_version.clinvar_version).first()
+
+    context = {
+        "variant": variant,
+        "variant_annotation": variant_annotation,
+        "transcript_annotations": transcript_annotations,
+        "build_variants": variant.all_build_variants,
+        "clingen_allele": variant.allele.clingen_allele if variant.allele else None,
+        "classifications": classifications,
+        "clinvar": clinvar,
+        "overlapping_symbols": overlapping_symbols,
+        "gene_fusion": _get_gene_fusion(variant),
+        "gene_copy_number_event": _get_gene_copy_number_event(variant),
+    }
+    return render(request, "variantopedia/variant_grid_row_detail.html", context)
+
+
+def _get_gene_fusion(variant: Variant) -> Optional[GeneFusion]:
+    """ A fusion's partners and direction - what a gene-level variant shows in place of the coordinate
+        it formats as, so the one place every page shares. @see snpdb.gene_level_variants """
+    if not variant.is_gene_level:
+        return None
+    return GeneFusion.objects.filter(variant=variant).select_related("anchor", "partner").first()
+
+
+def _get_gene_copy_number_event(variant: Variant) -> Optional[GeneCopyNumberEvent]:
+    """ The other kind of gene-level variant - the gene and which way it went """
+    if not variant.is_gene_level:
+        return None
+    return GeneCopyNumberEvent.objects.filter(variant=variant).select_related("gene").first()
 
 
 def view_variant(request, variant_id, genome_build_name=None):
@@ -471,7 +243,9 @@ def view_variant_annotation_history(request, variant_id):
 
 def variant_tags(request, genome_build_name=None):
     genome_build = UserSettings.get_genome_build_or_default(request.user, genome_build_name)
-    variant_tags_qs = VariantTag.get_for_build(genome_build)
+    # The counts and the grids below are one work list, so they hide resolved to-dos together
+    tags_qs = filter_unresolved_variant_tags(VariantTag.objects.all(), request.user)
+    variant_tags_qs = VariantTag.get_for_build(genome_build, tags_qs=tags_qs)
     tag_counts = sorted(get_field_counts(variant_tags_qs, "tag").items())
     month_ago = localtime() - timedelta(days=30)
 
@@ -479,8 +253,11 @@ def variant_tags(request, genome_build_name=None):
     if (user_id := request.GET.get("user")) and user_id.isdigit():
         filter_user = User.objects.filter(pk=user_id).first()
 
-    # The grids below show coordinates, so a tag needs a variant in this build to appear in them
-    without_coordinate_qs = VariantTag.objects.exclude(allele__variantallele__genome_build=genome_build)
+    # The grids below show coordinates, so a tag needs a variant in this build to appear in them.
+    # get_for_build is what they both start from, so ask it rather than re-deriving the rule - a tag
+    # made in this build has its own variant and shows up before liftover assigns it an allele
+    without_coordinate_qs = tags_qs.exclude(
+        pk__in=variant_tags_qs.values_list("pk", flat=True))
     if filter_user:
         without_coordinate_qs = without_coordinate_qs.filter(user=filter_user)
 
@@ -565,79 +342,6 @@ def view_allele_from_variant(request, variant_id):
     if allele and settings.PREFER_ALLELE_LINKS:
         return redirect(reverse('view_allele', kwargs={"allele_id": allele.id}))
     return redirect(reverse('view_variant', kwargs={"variant_id": variant_id}))
-
-
-@dataclass
-class ShareLevelRecordCounts:
-    lab_count: int
-    # record_count: int
-
-
-def view_allele(request, allele_id: int):
-    allele: Allele = get_object_or_404(Allele, pk=allele_id)
-    link_allele_to_existing_variants(allele, AlleleConversionTool.CLINGEN_ALLELE_REGISTRY)
-    ClinVarRecordCollection.set_allele_for_variants(allele)
-
-    # Filter on classification grouping first, so we can find all unique AlleleGroupings
-    # that the user has access to
-    # aog_qs = AlleleOriginGrouping.objects.filter(pk__in=\
-    #     ClassificationGrouping.filter_for_user(
-    #         request.user,
-    #         ClassificationGrouping.objects.filter(allele_origin_grouping__allele_grouping__allele=allele_id)
-    #     ).values_list("allele_origin_grouping")
-    # )
-    # aogs = [AlleleOriginGroupingDescription.describe(aog, request.user) for aog in sorted(aog_qs.all())]
-    #
-    # show_overall_diff = len(aogs) > 1
-
-    overlaps = Overlap.objects.filter(allele=allele, overlap_type=OverlapType.SINGLE_CONTEXT, valid=True, overlap_status__gte=OverlapStatus.SINGLE_SUBMITTER)
-    overlaps = list(sorted(overlaps, key=lambda overlap: (overlap.testing_contexts_objs[0], overlap.value_type)))
-
-    cross_overlaps = Overlap.objects.filter(allele=allele, overlap_type=OverlapType.CROSS_CONTEXT, valid=True, overlap_status__gte=OverlapStatus.SINGLE_SUBMITTER)
-    cross_overlaps = list(sorted(cross_overlaps, key=lambda overlap: (overlap.testing_contexts_objs[0], overlap.value_type)))
-
-    context = {
-        # "allele_origin_groupings_desc": aogs,
-        "overlaps": overlaps,
-        "cross_overlaps": cross_overlaps,
-        # "show_overall_diff": show_overall_diff,
-        "allele_card": AlleleCard(user=request.user, allele=allele),
-        "allele": allele,
-        "edit_clinical_groupings": request.GET.get('edit_clinical_groupings') == 'True'
-    }
-    if request.user.is_superuser:
-        withdrawn_count = Classification.objects.filter(allele_info__allele=allele, withdrawn=True).count()
-        context["withdrawn_count"] = withdrawn_count
-
-    return render(request, "variantopedia/view_allele.html", context)
-
-
-def export_classifications_allele(request, allele_id: int):
-    """
-    CSV export of what is currently filtered into the classification grid
-    """
-    allele = get_object_or_404(Allele, pk=allele_id)
-    return ClassificationExportFormatterCSV(
-        ClassificationFilter(
-            user=request.user,
-            genome_build=GenomeBuildManager.get_current_genome_build(),
-            allele=allele_id,
-            file_prefix=f"classifications_allele_{allele:CA}"
-        ),
-        FormatDetailsCSV()
-    ).serve()
-
-
-@require_POST
-def create_variant_for_allele(request, allele_id, genome_build_name):
-    """ Shortcut to create manual variant, but as a POST """
-    check_can_create_variants(request.user)
-    allele = get_object_or_404(Allele, pk=allele_id)
-    genome_build = get_genome_build_or_404(genome_build_name)
-    non_liftover_origin = [AlleleOrigin.IMPORTED_TO_DATABASE, AlleleOrigin.IMPORTED_NORMALIZED]
-    if variant_allele := allele.variantallele_set.filter(origin__in=non_liftover_origin).first():
-        create_liftover_pipelines(admin_bot(), [allele], ImportSource.WEB, variant_allele.genome_build, [genome_build])
-    return redirect(allele)
 
 
 def get_genes_canonical_transcripts(variant, annotation_version):
@@ -735,6 +439,10 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
         "variant": variant,
         "variant_allele": variant_allele_data,
         "variant_annotation": variant_annotation,
+        "gene_fusion": _get_gene_fusion(variant),
+        "gene_copy_number_event": _get_gene_copy_number_event(variant),
+        # Names the page and the analysis' variant details tab, which have no room for a transcript
+        "variant_short_label": variant_annotation.get_short_label() if variant_annotation else hgvs_g or str(variant),
         "variant_tag_stale_days": user_settings.variant_tag_stale_days,
         "visible_fields": variant_annotation.visible_columns if variant_annotation else frozenset(),
         "vts": vts,
@@ -753,6 +461,7 @@ def variant_sample_information(request, variant_id, genome_build_name):
     context = {
         "variant": variant,
         "variant_ids": [v.pk for v in variant.all_build_variants],
+        "genome_builds": sorted(variant.all_genome_builds, key=lambda gb: gb.name),
         "has_samples_in_other_builds":
             Sample.objects.exclude(vcf__genome_build__in=variant.all_genome_builds).exists(),
     }
@@ -808,28 +517,50 @@ def nearby_variants(request, variant_id, annotation_version_id):
 
 def _get_grid_name(request, name) -> str:
     name_parts = [name]
+    tag_id = request.GET.get("tag")
     if extra_filters := request.GET.get("extra_filters"):
-        extra_filters = json.loads(extra_filters)
-        if tag_id := extra_filters.get("tag"):
-            name_parts.extend(["tag", tag_id])
+        tag_id = json.loads(extra_filters).get("tag")
+    if tag_id:
+        name_parts.extend(["tag", tag_id])
     return "_".join(name_parts)
 
 
+# The DataTable pages at 100 rows, so the variant tags CSV comes from the queryset directly
+VARIANT_TAGS_EXPORT_COLUMNS = {
+    "variant_string": "Variant",
+    "gene_symbol": "Gene",
+    "tag__id": "Tag",
+    "analysis__id": "Analysis ID",
+    "analysis__name": "Analysis",
+    "sample__name": "Sample",
+    "patient_identity": "Patient",
+    "user__username": "Username",
+    "created": "Created",
+    "variant__id": "Variant ID",
+    "id": "Tag ID",
+}
+
+
 def variant_tags_export(request, genome_build_name):
-    class SortVariantTagsGrid(VariantTagsGrid):
-        def _get_sidx_and_sord(self, request) -> tuple:
-            return "variant_string", "asc"
+    config = VariantTagsColumns(request)
+    qs = config.filter_queryset(config.get_initial_queryset()).order_by("variant_string")
+    basename = f"{_get_grid_name(request, 'variant_tags_export')}_{local_date_string()}"
 
-    basename = _get_grid_name(request, "variant_tags_export")
-    return JQGridView.export_grid_as_csv(request, grid_klass=SortVariantTagsGrid,
-                                         basename=basename, genome_build_name=genome_build_name)
+    pseudo_buffer = StashFile()
+    writer = csv.writer(pseudo_buffer, dialect='excel', quoting=csv.QUOTE_MINIMAL)
+
+    def iter_rows():
+        writer.writerow(["Genome Build"] + list(VARIANT_TAGS_EXPORT_COLUMNS.values()))
+        yield pseudo_buffer.value
+        for i, row in enumerate(qs.values(*VARIANT_TAGS_EXPORT_COLUMNS), start=1):
+            writer.writerow([genome_build_name] + [row[k] for k in VARIANT_TAGS_EXPORT_COLUMNS])
+            if i % EXPORT_ROWS_PER_CHUNK == 0:
+                yield pseudo_buffer.value
+        if remaining := pseudo_buffer.value:
+            yield remaining
+
+    response = StreamingHttpResponse(iter_rows(), content_type="text/csv")
+    response['Content-Disposition'] = f'attachment; filename="{slugify(basename)}.csv"'
+    return response
 
 
-def tagged_variant_export(request, genome_build_name):
-    class SortTaggedVariantGrid(TaggedVariantGrid):
-        def _get_sidx_and_sord(self, request) -> tuple:
-            return "locus__position", "asc"
-
-    basename = _get_grid_name(request, "tagged_variant_export")
-    return JQGridView.export_grid_as_csv(request, grid_klass=SortTaggedVariantGrid,
-                                         basename=basename, genome_build_name=genome_build_name)

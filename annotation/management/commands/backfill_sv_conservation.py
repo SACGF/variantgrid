@@ -40,6 +40,7 @@ MIN_CHANGE = 1e-4
 
 
 class Command(BaseCommand):
+    category = "one-off"
     help = "Recompute SV conservation (phastCons/phyloP max) columns with pyBigWig (#1657)"
 
     def add_arguments(self, parser):

@@ -11,6 +11,7 @@ from variantgrid.settings.env.shariantcommon import *  # pylint: disable=wildcar
 # import all the base settings #
 SITE_ID = 5  # shariant.org.au
 SITE_NAME = "Shariant"
+SITE_SHORT_NAME = "Shariant"
 
 # HEARTBEAT_URL = 'https://heartbeat.uptimerobot.com/m788641874-4c58c98a716180f36670e551a0bd03fff47abfea'
 SEND_EMAILS = True

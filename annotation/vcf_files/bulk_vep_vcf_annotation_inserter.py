@@ -1,18 +1,25 @@
+"""
+Loading a VEP-annotated VCF into the annotation tables. BulkVEPVCFAnnotationInserter reads the CSQ
+field through the VEPColumnDef registry (vep_columns.py) into CSVs for COPY, choosing the
+representative transcript row for VariantAnnotation and every transcript for
+VariantTranscriptAnnotation, adding the PTC / NMD columns (add_calculated_ptc) and gene overlaps;
+SVOverlapProcessor and genes.gene_overlaps.SVGeneOverlapResolver handle the structural variants VEP
+skipped or annotated via --custom. Runs inside an AnnotationRun's upload step.
+"""
 import logging
 import operator
 import os
-import shutil
-import time
 from collections import Counter, defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass
 from functools import cached_property
 from typing import Optional, TypeAlias
 
-import intervaltree
 from django.conf import settings
 
+from annotation import annotsv_columns as annotsv_columns_registry
 from annotation import vep_columns as vep_columns_registry
+from annotation.annotation_run_files import ANNOTATION_RUN_IMPORT_PROCESSING_PREFIX
 from annotation.models.models import (
     AnnotationRun,
     VariantAnnotation,
@@ -32,13 +39,14 @@ from annotation.vcf_files.vcf_types import VCFVariant
 from annotation.vep_annotation import VEPConfig
 from annotation.vep_columns import VEPColumnDef
 from annotation.vep_field_formatters import EMPTY_VALUES, VEP_SEPARATOR
+from genes.gene_overlaps import SVGeneOverlapResolver
 from genes.hgvs import HGVSMatcher
 from genes.models import GeneVersion, TranscriptVersion
 from genes.models_enums import AnnotationConsortium
 from library.django_utils import get_model_fields
 from library.django_utils.django_file_utils import (
-    get_import_processing_dir,
     get_import_processing_filename,
+    remove_import_processing_dir,
 )
 from library.genomics import Range, overlap_fraction, parse_gnomad_coord
 from library.log_utils import log_traceback
@@ -164,7 +172,7 @@ class BulkVEPVCFAnnotationInserter:
 
         VEP Fields are where they are copied are defined in ColumnVEPField """
 
-    PREFIX = "annotation_run"
+    PREFIX = ANNOTATION_RUN_IMPORT_PROCESSING_PREFIX
     DB_FIXED_COLUMNS = [
         "version_id",
         "annotation_run_id",
@@ -188,6 +196,8 @@ class BulkVEPVCFAnnotationInserter:
         "spliceai_max_ds",
     ]
     DB_IGNORED_COLUMNS = ["id", "transcript", "MaveDB_nt", "MaveDB_pro"]
+    # Written by import_vcf_annotations for variants VEP skipped, so never sourced from CSQ
+    DB_NOT_FROM_VEP_COLUMNS = ["vep_skipped_reason"]
     VEP_NOT_COPIED_FIELDS = [
         "Allele",
         "BIOTYPE",
@@ -273,7 +283,8 @@ class BulkVEPVCFAnnotationInserter:
         sv_gene_overlap_resolver = None
         if self.annotation_run.pipeline_type == VariantAnnotationPipelineType.STRUCTURAL_VARIANT:
             sv_overlap_processor = SVOverlapProcessor(cvf_list)
-            sv_gene_overlap_resolver = SVGeneOverlapResolver(self.annotation_run.variant_annotation_version)
+            sv_gene_overlap_resolver = SVGeneOverlapResolver.for_variant_annotation_version(
+                self.annotation_run.variant_annotation_version)
         self.sv_overlap_processor = sv_overlap_processor
         self.sv_gene_overlap_resolver = sv_gene_overlap_resolver
         self._generated_hgvs_c = Counter()
@@ -330,6 +341,8 @@ class BulkVEPVCFAnnotationInserter:
 
         self.source_field_to_columns = defaultdict(set)
         self.ignored_vep_fields = self.VEP_NOT_COPIED_FIELDS.copy()
+        if self.annotation_run.annotation_consortium == AnnotationConsortium.REFSEQ:
+            self.ignored_vep_fields.extend(self.VEP_NOT_COPIED_REFSEQ_ONLY)
 
         # cvf_list is already filtered through vep_config so unconfigured customs are dropped.
         # Sort to have consistent VCF headers (case-insensitive to match postgres `ORDER BY source_field`)
@@ -352,9 +365,11 @@ class BulkVEPVCFAnnotationInserter:
 
         ignore_columns = set(self.DB_FIXED_COLUMNS +
                              self.DB_MANUALLY_POPULATED_COLUMNS +
-                             self.DB_IGNORED_COLUMNS)
-        if self.annotation_run.annotation_consortium == AnnotationConsortium.REFSEQ:
-            ignore_columns.update(self.VEP_NOT_COPIED_REFSEQ_ONLY)
+                             self.DB_MANUALLY_POPULATED_VARIANT_ONLY_COLUMNS +
+                             self.DB_IGNORED_COLUMNS +
+                             self.DB_NOT_FROM_VEP_COLUMNS)
+        # AnnotSV columns are filled by its own pipeline type, never from CSQ
+        ignore_columns.update(annotsv_columns_registry.all_variant_grid_column_ids())
 
         # Find the ones that don't apply to this version, and exclude them
         in_scope = {vgc for c in cvf_list for vgc in c.variant_grid_columns}
@@ -752,16 +767,19 @@ class BulkVEPVCFAnnotationInserter:
         if transcript_data.get('hgvs_c'):
             return
 
-        if transcript_data.get(VEPColumns.PICK):
-            max_length = settings.HGVS_MAX_SEQUENCE_LENGTH_REPRESENTATIVE_TRANSCRIPT
-        else:
-            max_length = settings.HGVS_MAX_SEQUENCE_LENGTH
+        # The limit caps reading sequence out of the reference - symbolic DEL/DUP/INV are HGVS from
+        # coordinates alone (#1571), so it only applies to coordinates carrying explicit sequence
+        if variant_coordinate.symbolic_hgvs_interval is None:
+            if transcript_data.get(VEPColumns.PICK):
+                max_length = settings.HGVS_MAX_SEQUENCE_LENGTH_REPRESENTATIVE_TRANSCRIPT
+            else:
+                max_length = settings.HGVS_MAX_SEQUENCE_LENGTH
 
-        # Only calculate very long HGVS for representative transcripts
-        if variant_coordinate.max_sequence_length > max_length:
-            transcript_data['hgvs_c'] = VariantAnnotation.SV_HGVS_TOO_LONG_MESSAGE
-            self._generated_hgvs_c["too_long"] += 1
-            return
+            # Only calculate very long HGVS for representative transcripts
+            if variant_coordinate.max_sequence_length > max_length:
+                transcript_data['hgvs_c'] = VariantAnnotation.SV_HGVS_TOO_LONG_MESSAGE
+                self._generated_hgvs_c["too_long"] += 1
+                return
 
         if transcript_accession:
 
@@ -783,7 +801,7 @@ class BulkVEPVCFAnnotationInserter:
             return
 
         max_length = settings.HGVS_MAX_SEQUENCE_LENGTH_REPRESENTATIVE_TRANSCRIPT  # VariantAnnotation
-        if variant_coordinate.max_sequence_length > max_length:
+        if variant_coordinate.symbolic_hgvs_interval is None and variant_coordinate.max_sequence_length > max_length:
             hgvs_g = VariantAnnotation.SV_HGVS_TOO_LONG_MESSAGE
         else:
             try:
@@ -805,9 +823,11 @@ class BulkVEPVCFAnnotationInserter:
 
         svlen = v.INFO.get("SVLEN")
         variant_coordinate = VariantCoordinate(chrom=v.CHROM, position=v.POS, ref=v.REF, alt=v.ALT[0], svlen=svlen)
-        # Do now so we only retrieve sequences once. <CNV>/<INS> can't be expanded to explicit
-        # ref/alt - leave them symbolic (downstream HGVS/SV-overlap handle the symbolic form)
-        if variant_coordinate.can_be_made_explicit:
+        # The standard pipeline's consumers need explicit sequence - _add_calculated_ptc measures
+        # len(ref)/len(alt) and the internal alt='=' has to resolve. Do it once here.
+        # The SV pipeline's consumers (HGVS #1571, gnomAD SV overlap) work off the symbolic form
+        if self.annotation_run.pipeline_type == VariantAnnotationPipelineType.STANDARD \
+                and variant_coordinate.can_be_made_explicit:
             variant_coordinate = variant_coordinate.as_external_explicit(self.annotation_run.genome_build)
 
         try:
@@ -945,10 +965,7 @@ class BulkVEPVCFAnnotationInserter:
         pass
 
     def remove_processing_files(self):
-        import_processing_dir = get_import_processing_dir(self.annotation_run.pk, prefix=self.PREFIX)
-        logging.info("********* Deleting '%s' *******", import_processing_dir)
-        # ignore_errors so a missing dir (eg cleaned-up retry) doesn't blow up - we just want it gone
-        shutil.rmtree(import_processing_dir, ignore_errors=True)
+        remove_import_processing_dir(self.annotation_run.pk, prefix=self.PREFIX)
 
     @cached_property
     def gene_identifiers(self):
@@ -1040,79 +1057,11 @@ class SVOverlapProcessor:
         if settings.ANNOTATION_VEP_SV_OVERLAP_SINGLE_VALUE_METHOD == "greatest_overlap":
             raise NotImplementedError("greatest_overlap")
         elif settings.ANNOTATION_VEP_SV_OVERLAP_SINGLE_VALUE_METHOD == "lowest_af":
-            for record in filtered_sv_records:
-                if chosen_record:
-                    if record["gnomad_sv_overlap_af"] > chosen_record["gnomad_sv_overlap_af"]:
-                        continue
-                chosen_record = record
+            # VEP values are still strings here - compare as floats, as gnomAD-SV mixes '4.6e-05' and '0.006085'
+            chosen_record = min(filtered_sv_records, key=lambda r: float(r["gnomad_sv_overlap_af"]))
         elif settings.ANNOTATION_VEP_SV_OVERLAP_SINGLE_VALUE_METHOD == "exact_or_lowest_af":
             raise NotImplementedError("exact_or_lowest_af")
         else:
             raise ValueError(f"Unknown value for {settings.ANNOTATION_VEP_SV_OVERLAP_SINGLE_VALUE_METHOD=}")
 
         return chosen_record
-
-
-class SVGeneOverlapResolver:
-    """ Resolves gene overlaps for long SVs that VEP skipped due to TOO_LONG.
-
-        Builds an in-memory per-contig IntervalTree of TranscriptVersions in the
-        VariantAnnotationVersion's gene_annotation_release. For each variant, returns
-        the set of overlapping (symbol, gene_id) pairs.
-    """
-
-    def __init__(self, variant_annotation_version: VariantAnnotationVersion):
-        self.variant_annotation_version = variant_annotation_version
-        gene_annotation_release = variant_annotation_version.gene_annotation_release
-        self._trees: dict[str, intervaltree.IntervalTree] = defaultdict(intervaltree.IntervalTree)
-
-        if gene_annotation_release is None:
-            logging.warning("SVGeneOverlapResolver: no gene_annotation_release on %s", variant_annotation_version)
-            return
-
-        start_time = time.monotonic()
-        tv_qs = TranscriptVersion.objects.filter(
-            releasetranscriptversion__release=gene_annotation_release,
-        ).select_related("gene_version__gene_symbol", "contig")
-
-        count = 0
-        for tv in tv_qs:
-            try:
-                start = tv.start
-                end = tv.end
-            except (KeyError, IndexError):
-                continue
-            if end <= start:
-                # intervaltree treats zero-length intervals as empty
-                end = start + 1
-            symbol = tv.gene_version.gene_symbol_id
-            gene_id = tv.gene_version.gene_id
-            self._trees[tv.contig.name].addi(start, end, (gene_id, symbol))
-            count += 1
-
-        elapsed = time.monotonic() - start_time
-        logging.info(
-            "SVGeneOverlapResolver: built %d intervals across %d contigs for %s in %.2fs",
-            count, len(self._trees), variant_annotation_version, elapsed,
-        )
-
-    def get_overlaps(self, variant_coordinate: VariantCoordinate) -> tuple[set[str], set[str]]:
-        """ Returns (overlapping_symbols, overlapping_gene_ids) for the given variant. """
-        symbols: set[str] = set()
-        gene_ids: set[str] = set()
-        tree = self._trees.get(variant_coordinate.chrom)
-        if tree is None:
-            return symbols, gene_ids
-
-        start = variant_coordinate.position
-        end = variant_coordinate.end
-        if end <= start:
-            end = start + 1
-
-        for interval in tree.overlap(start, end):
-            gene_id, symbol = interval.data
-            if gene_id is not None:
-                gene_ids.add(gene_id)
-            if symbol is not None:
-                symbols.add(symbol)
-        return symbols, gene_ids

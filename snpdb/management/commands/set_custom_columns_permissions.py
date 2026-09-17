@@ -9,6 +9,8 @@ from snpdb.models import CustomColumnsCollection
 
 class Command(BaseCommand):
     """ This needs to be run on all VG systems to set initial permissions  """
+    category = "maintenance"
+
     def handle(self, *args, **options):
         # User as NULL = public
         for ccc in CustomColumnsCollection.objects.filter(user__isnull=True):

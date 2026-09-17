@@ -1,5 +1,9 @@
 import copy
+import logging
 import socket
+import time
+
+import requests
 from collections.abc import Iterable
 from typing import Any, Optional, TypeVar, Union
 from urllib.parse import quote, urljoin
@@ -13,7 +17,7 @@ from classification.models.classification_utils import ClassificationJsonParams
 from classification.models.evidence_key import EvidenceKey, EvidenceKeyMap
 from library.constants import MINUTE_SECS
 from library.guardian_utils import admin_bot
-from snpdb.models import Lab
+from snpdb.models import Lab, Variant
 from sync.models.models import SyncDestination
 from sync.models.models_classification_sync import ClassificationModificationSyncRecord
 from sync.shariant.historical_ekey_converter import HistoricalEKeyConverter
@@ -24,6 +28,13 @@ from sync.sync_runner import ClassificationUploadSyncRunner, SyncRunInstance, re
 SHARIANT_PRIVATE_FIELDS = [
     'age_units', 'dob', 'family_id', 'internal_use', 'patient_id', 'patient_summary', 'sample_id', 'variant_type'
 ]
+
+# server-side processing of a 50 record batch can exceed the default minute
+UPLOAD_TIMEOUT_SECS = 5 * MINUTE_SECS
+UPLOAD_ATTEMPTS = 3
+UPLOAD_RETRY_DELAY_SECS = 30
+
+GENE_LEVEL_EXCLUSION_REASON = "Gene fusions and copy number events are not shared with {destination} until it is upgraded to accept them"
 
 
 def insert_nones(data: dict) -> dict:
@@ -71,6 +82,7 @@ class VariantGridUploadSyncer(ClassificationUploadSyncRunner):
         self.filters = {}
         self.filter_labels = {}
         self.remote_lab_record_url = False
+        self.remote_gene_level = False
         self.lab_mappings = {}
         self.share_level_mappings = {}
         self.user_mappings = {}
@@ -84,6 +96,9 @@ class VariantGridUploadSyncer(ClassificationUploadSyncRunner):
         self.filter_labels = config.get('filter_labels', {})
         # only true once the remote has been upgraded to a version serving view_classification_lab_record
         self.remote_lab_record_url = config.get('remote_lab_record_url', False)
+        # only true once the remote resolves 'BCR::ABL1' / 'EGFR amplification' as a gene-level Variant (#1506, #1836) -
+        # an older remote accepts the record but leaves it as Matching Failed
+        self.remote_gene_level = config.get('remote_gene_level', False)
         mapping = config.get('mapping', {})
 
         self.lab_mappings = mapping.get('labs', {})
@@ -105,6 +120,8 @@ class VariantGridUploadSyncer(ClassificationUploadSyncRunner):
         if apply_filters and self.filters:
             q = QueryJsonFilter.classification_value_filter().convert_to_q(self.filters)
             qs = qs.filter(q)
+        if apply_filters and not self.remote_gene_level:
+            qs = qs.exclude(Variant.get_gene_level_q(path_to_variant="classification__allele_info__matched_variant__"))
 
         if not full_sync:
             qs = ClassificationModificationSyncRecord.filter_out_synced(
@@ -133,7 +150,17 @@ class VariantGridUploadSyncer(ClassificationUploadSyncRunner):
                 if not single_record_qs.filter(q).exists():
                     reasons.append(self.describe_filter_clause(key, value, cm))
 
+        if not self.remote_gene_level and self._is_gene_level(cm):
+            reasons.append(GENE_LEVEL_EXCLUSION_REASON.format(destination=self.sync_destination))
+
         return reasons
+
+    @staticmethod
+    def _is_gene_level(cm: ClassificationModification) -> bool:
+        if allele_info := cm.classification.allele_info:
+            if variant := allele_info.matched_variant:
+                return variant.is_gene_level
+        return False
 
     def describe_filter_clause(self, key: str, value: Any, cm: ClassificationModification) -> str:
         if label := self.filter_labels.get(key):
@@ -225,32 +252,49 @@ class VariantGridUploadSyncer(ClassificationUploadSyncRunner):
         qs = self.records_to_sync(full_sync=sync_run_instance.full_sync)
 
         rows_uploaded = 0
+        record_count = qs.count()
+        logging.info("%s: %d record(s) to upload", sync_run_instance.sync_destination, record_count)
 
-        if not qs.exists():
+        if not record_count:
             sync_run_instance.run_completed(had_records=False)
         else:
             if max_rows := sync_run_instance.max_rows:
                 qs = qs[:max_rows]
+                record_count = min(record_count, max_rows)
 
             site_name = socket.gethostname().lower().split('.')[0].replace('-', '')
             for batch, finished in batch_iterator_end(qs, batch_size=50):
                 # providing import_id and status:complete when we're done lets Shariant know
                 # when the upload has been completed
+                json_start = time.time()
                 json_to_send = {
                     "records": [self.classification_to_json(vcm) for vcm in batch],
                     "import_id": site_name
                 }
                 if finished:
                     json_to_send["status"] = "complete"
-                # print(json.dumps(json_to_send))
+                json_duration = time.time() - json_start
                 other_variant_grid = sync_run_instance.server_auth()
 
-                response = other_variant_grid.post(
-                    url_suffix='classification/api/classifications/v2/record/',
-                    json=json_to_send,
-                    timeout=MINUTE_SECS,
-                )
-                response.raise_for_status()
+                post_start = time.time()
+                # records are upserts keyed by lab/lab_record_id, so re-sending a batch after a
+                # timeout/connection drop is safe even if the server processed the first attempt
+                for attempt in range(UPLOAD_ATTEMPTS):
+                    try:
+                        response = other_variant_grid.post(
+                            url_suffix='classification/api/classifications/v2/record/',
+                            json=json_to_send,
+                            timeout=UPLOAD_TIMEOUT_SECS,
+                        )
+                        response.raise_for_status()
+                        break
+                    except (requests.ConnectionError, requests.Timeout) as e:
+                        retries_left = UPLOAD_ATTEMPTS - attempt - 1
+                        if not retries_left:
+                            raise
+                        logging.warning("%s: %r - %d retries left", sync_run_instance.sync_destination, e, retries_left)
+                        time.sleep(UPLOAD_RETRY_DELAY_SECS)
+                post_duration = time.time() - post_start
                 # results are sent back in an array in the same order they were sent up
                 results = response.json().get('results')
 
@@ -261,4 +305,7 @@ class VariantGridUploadSyncer(ClassificationUploadSyncRunner):
                         classification_modification=record,
                         meta=result
                     )
+                logging.info("%s: uploaded %d/%d records (batch of %d: JSON build %.1fs, POST %.1fs)",
+                             sync_run_instance.sync_destination, rows_uploaded, record_count,
+                             len(batch), json_duration, post_duration)
             sync_run_instance.run_completed(had_records=True)

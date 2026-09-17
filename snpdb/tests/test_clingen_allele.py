@@ -1,19 +1,30 @@
-from django.test import TestCase
+from unittest.mock import patch
+
+from django.db import IntegrityError
+from django.test import TestCase, override_settings
 
 from annotation.fake_annotation import get_fake_annotation_version
+from library.genomics.vcf_enums import VCFSymbolicAllele
 from snpdb.clingen_allele import (
     ClinGenAlleleAPIException,
     ClinGenAlleleServerException,
+    _create_variant_allele_with_new_allele,
     get_clingen_allele,
     get_clingen_allele_for_variant,
+    get_variant_allele_for_variant,
+    populate_clingen_alleles_for_variants,
     variant_allele_clingen,
 )
-from snpdb.models import GenomeBuild
+from snpdb.models import Allele, ClinGenAllele, GenomeBuild, VariantAllele, VariantCoordinate
 from snpdb.tests.utils.mock_clingen_api import (
     MockClinGenAlleleRegistryAPI,
     MockServerErrorClinGenAlleleRegistryAPI,
 )
-from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
+from snpdb.tests.utils.vcf_testing_utils import (
+    create_mock_allele,
+    slowly_create_test_variant,
+    slowly_create_test_variant_from_coordinate,
+)
 
 
 class ClinGenAlleleTestCase(TestCase):
@@ -68,3 +79,62 @@ class ClinGenAlleleTestCase(TestCase):
                                                 existing_variant_allele=variant_allele,
                                                 clingen_api=clingen_api_success)
         self.assertEqual(clingen_allele.allele, variant_allele.allele, "Alleles merged")
+
+
+class ClinGenAlleleNeverRegisteredTestCase(TestCase):
+    """ Variants that can never get a ClinGenAllele used to collect a new Allele per call - #1361 / #1844 """
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.grch37 = GenomeBuild.get_name_or_alias("GRCh37")
+        get_fake_annotation_version(cls.grch37)
+        # 1bp over the ClinGen limit, so clingen_allele_skip_reason() will always refuse it
+        variant_coordinate = VariantCoordinate(chrom="3", position=128198980, ref="A",
+                                               alt=VCFSymbolicAllele.DEL,
+                                               svlen=-(ClinGenAllele.CLINGEN_ALLELE_MAX_ALLELE_SIZE + 1))
+        cls.variant = slowly_create_test_variant_from_coordinate(variant_coordinate, cls.grch37)
+
+    def _populate(self):
+        populate_clingen_alleles_for_variants(self.grch37, [self.variant],
+                                              clingen_api=MockClinGenAlleleRegistryAPI())
+
+    def test_populate_creates_one_allele_for_new_never_clingen_variant(self):
+        self.assertIsNotNone(self.variant.clingen_allele_skip_reason())
+        self._populate()
+        variant_allele = VariantAllele.objects.get(variant=self.variant, genome_build=self.grch37)
+        self.assertIsNone(variant_allele.clingen_error)
+        self.assertIsNone(variant_allele.allele.clingen_allele)
+
+    def test_populate_never_clingen_variant_is_idempotent(self):
+        for _ in range(3):
+            self._populate()
+
+        va_qs = VariantAllele.objects.filter(variant=self.variant, genome_build=self.grch37)
+        self.assertEqual(va_qs.count(), 1)
+        self.assertEqual(Allele.objects.filter(variantallele__variant=self.variant).distinct().count(), 1)
+
+    def test_populate_repeated_variant_in_one_call(self):
+        populate_clingen_alleles_for_variants(self.grch37, [self.variant, self.variant],
+                                              clingen_api=MockClinGenAlleleRegistryAPI())
+        self.assertEqual(VariantAllele.objects.filter(variant=self.variant).count(), 1)
+        self.assertEqual(Allele.objects.count(), 1)
+
+    @override_settings(CLINGEN_ALLELE_REGISTRY_LOGIN=None)
+    def test_get_variant_allele_for_variant_creates_then_reuses(self):
+        variant_allele = get_variant_allele_for_variant(self.grch37, self.variant)
+        self.assertEqual(Allele.objects.count(), 1)
+
+        again = get_variant_allele_for_variant(self.grch37, self.variant)
+        self.assertEqual(again.pk, variant_allele.pk)
+        self.assertEqual(Allele.objects.count(), 1)
+
+    @override_settings(CLINGEN_ALLELE_REGISTRY_LOGIN=None)
+    def test_create_variant_allele_uses_the_race_winners_link(self):
+        winning_allele = create_mock_allele(self.variant, self.grch37)
+        with patch.object(VariantAllele.objects, "create", side_effect=IntegrityError):
+            variant_allele = _create_variant_allele_with_new_allele(self.variant, self.grch37)
+
+        self.assertEqual(variant_allele.allele, winning_allele)
+        # The Allele we made before losing the race is gone, rather than left with nothing pointing at it
+        self.assertEqual(Allele.objects.count(), 1)

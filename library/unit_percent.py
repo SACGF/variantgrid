@@ -1,5 +1,7 @@
 from functools import partial
 
+from library.utils.text_utils import format_significant_digits
+
 
 def convert_from_percent_to_unit(percent, missing_value=None):
     if percent != missing_value:
@@ -18,10 +20,11 @@ def convert_from_unit_to_percent(unit, missing_value=None):
 
 
 def server_side_format_percent(val, missing_value=None):
-    """ Shows falsey values (eg 0.0) or '.' as blank """
+    """ Shows falsey values (eg 0.0) or '.' as blank. Significant digits rather than '%g' - rare
+        allele frequencies are small enough that '%g' switches to scientific notation """
     display_value = ""
     if val and val != missing_value:
-        display_value = f"{val:.3g}%"
+        display_value = f"{format_significant_digits(val)}%"
     return display_value
 
 
@@ -48,15 +51,14 @@ def format_af(value, source_in_percent, dest_in_percent, missing_value=None):
 
 
 def get_allele_frequency_formatter(source_in_percent, dest_in_percent, get_data_func=None, missing_value=None):
+    """ A grid column renderer (@see snpdb.views.datatable_view.RichColumn) - get_data_func pulls the
+        raw value out of the row where it isn't the column's own key (packed genotype columns) """
     formatters = _get_formatters(source_in_percent, dest_in_percent, missing_value=missing_value)
 
-    def format_field(row, field):
-        if get_data_func:
-            val = get_data_func(row, field)
-        else:
-            val = row[field]
+    def format_cell(cell):
+        val = get_data_func(cell) if get_data_func else cell.value
         for f in formatters:
             val = f(val)
         return val
 
-    return format_field
+    return format_cell

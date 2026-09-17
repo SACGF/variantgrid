@@ -1,3 +1,8 @@
+"""
+Enums for genes and transcripts: AnnotationConsortium (RefSeq / Ensembl - the axis every Gene and
+Transcript id carries), HGNC status, HGVS kinds, alias sources, MANE status and PanelApp confidence.
+Stored codes: add values, never renumber.
+"""
 from django.db import models
 
 

@@ -2,10 +2,23 @@ import unittest
 
 from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
+from django.test.client import Client
+from django.urls.base import reverse
 from django.utils import timezone
 
-from analysis.models import Analysis, AnalysisLock, GeneListNode, SampleNode, ZygosityNode
+from analysis.forms.forms import AnalysisForm
+from analysis.models import (
+    AllVariantsNode,
+    Analysis,
+    AnalysisLock,
+    AnalysisTemplate,
+    GeneListNode,
+    SampleNode,
+    ZygosityNode,
+)
+from analysis.tests.test_node_editors_render import form_submit_data
 from annotation.fake_annotation import get_fake_annotation_version
+from genes.models import GeneList, SampleGeneList
 from library.guardian_utils import assign_permission_to_user_and_groups
 from snpdb.models import (
     VCF,
@@ -54,6 +67,74 @@ class AnalysisModelTestCase(TestCase):
         analysis = Analysis(genome_build=self.grch37)
         analysis.set_defaults_and_save(self.owner_user)
         self.assertEqual(analysis.variant_tag_stale_days, 730)
+
+    def test_horizontal_mode_from_user_settings(self):
+        """ New analyses take the user's preferred orientation """
+        user_settings_override = UserSettingsOverride.objects.get_or_create(user=self.owner_user)[0]
+        user_settings_override.analysis_horizontal_mode = True
+        user_settings_override.save()
+
+        analysis = Analysis(genome_build=self.grch37)
+        analysis.set_defaults_and_save(self.owner_user)
+        self.assertTrue(analysis.analysis_horizontal_mode)
+
+    def test_rotate_node_positions(self):
+        """ Node positions are orientation specific - the turn has to be self-inverse so toggling
+            the mode back restores the original layout exactly """
+        analysis = Analysis(genome_build=self.grch37)
+        analysis.set_defaults_and_save(self.owner_user)
+        # A left hand parent above its child, which is what a Venn's left side looks like
+        left = AllVariantsNode.objects.create(analysis=analysis, x=10, y=10)
+        right = AllVariantsNode.objects.create(analysis=analysis, x=110, y=10)
+        child = AllVariantsNode.objects.create(analysis=analysis, x=60, y=110)
+
+        analysis.analysis_horizontal_mode = True
+        analysis.rotate_node_positions()
+        for node in (left, right, child):
+            node.refresh_from_db()
+        # Anti-clockwise: what flowed down now flows right, and the left parent swings to the bottom
+        self.assertGreater(child.x, left.x, "Child is downstream (to the right) of its parents")
+        self.assertGreater(left.y, right.y, "Left parent is below the right one")
+
+        analysis.analysis_horizontal_mode = False
+        analysis.rotate_node_positions()
+        for node in (left, right, child):
+            node.refresh_from_db()
+        self.assertEqual((left.x, left.y), (10, 10))
+        self.assertEqual((right.x, right.y), (110, 10))
+        self.assertEqual((child.x, child.y), (60, 110))
+
+    def test_changing_horizontal_mode_rotates_nodes(self):
+        analysis = Analysis(genome_build=self.grch37, name="horizontal mode test")
+        analysis.set_defaults_and_save(self.owner_user)
+        assign_permission_to_user_and_groups(self.owner_user, analysis.custom_columns_collection)
+        parent = AllVariantsNode.objects.create(analysis=analysis, x=10, y=10)
+        child = AllVariantsNode.objects.create(analysis=analysis, x=10, y=210)
+
+        data = {k: v for k, v in AnalysisForm(instance=analysis, user=self.owner_user).initial.items()
+                if v is not None}
+        data["analysis_horizontal_mode"] = True
+        form = AnalysisForm(data, instance=analysis, user=self.owner_user)
+        self.assertTrue(form.is_valid(), form.errors)
+        form.save()
+
+        parent.refresh_from_db()
+        child.refresh_from_db()
+        self.assertEqual((parent.x, parent.y), (10, 10))
+        self.assertEqual((child.x, child.y), (210, 10))  # downstream is now to the right
+
+    def test_invisible_analysis_hides_template_from_lists(self):
+        """ Internal auto-analysis templates (eg cohort VCF export) are hidden from template lists
+            by marking their analysis invisible - permissions delegate to the analysis """
+        analysis = Analysis(genome_build=self.grch37)
+        analysis.set_defaults_and_save(self.owner_user)
+        template = AnalysisTemplate.objects.create(name="test template visibility",
+                                                   user=self.owner_user, analysis=analysis)
+        self.assertIn(template, AnalysisTemplate.filter_for_user(self.owner_user))
+
+        analysis.visible = False
+        analysis.save()
+        self.assertNotIn(template, AnalysisTemplate.filter_for_user(self.owner_user))
 
     def test_locking(self):
         analysis = Analysis(genome_build=self.grch37)
@@ -121,9 +202,9 @@ class AncestorSampleNoGenotypeTestCase(TestCase):
         self.assertFalse(self.sample.has_genotype)
 
     def test_ancestor_samples_includes_no_genotype_sample(self):
-        """ _get_ancestor_samples should find samples from no-genotype VCFs """
+        """ get_ancestor_samples should find samples from no-genotype VCFs """
         gene_list_node = self._create_child_node(GeneListNode)
-        ancestor_samples = gene_list_node._get_ancestor_samples()
+        ancestor_samples = gene_list_node.get_ancestor_samples()
         self.assertIn(self.sample, ancestor_samples)
 
     def test_gene_list_node_no_config_error_for_no_genotype_sample(self):
@@ -150,6 +231,46 @@ class AncestorSampleNoGenotypeTestCase(TestCase):
 
         gene_list_node.handle_ancestor_input_samples_changed()
         self.assertEqual(gene_list_node.sample, self.sample)
+
+    def test_get_samples_includes_no_genotype_sample(self):
+        """ Sample level data uses get_samples(), only the genotype ones can be shown/filtered """
+        gene_list_node = self._create_child_node(GeneListNode)
+        self.assertEqual([self.sample], gene_list_node.get_samples())
+        self.assertEqual([], gene_list_node.get_samples_with_genotype())
+
+    def _get_node_editor_url(self, node) -> str:
+        return reverse("node_view", kwargs={"analysis_id": self.analysis.pk,
+                                            "analysis_version": self.analysis.version,
+                                            "node_id": node.pk,
+                                            "node_version": node.version,
+                                            "extra_filters": "default"})
+
+    def test_gene_list_node_editor_round_trip(self):
+        """ The ancestor sample has to be in the editor's picker choices, or the node can't be saved """
+        gene_list_node = self._create_child_node(GeneListNode)
+        client = Client()
+        client.force_login(self.user)
+        url = self._get_node_editor_url(gene_list_node)
+        response = client.get(url)
+        self.assertEqual(200, response.status_code)
+        data = form_submit_data(response.content.decode(), "node-gene-list-form")
+        self.assertEqual(f"sample:{self.sample.pk}", data.get("sample_source"), "Sample selected in editor")
+
+        # JSON back means saved - an invalid form comes back as the re-rendered editor HTML
+        self.assertEqual({}, client.post(url, data).json())
+        gene_list_node.refresh_from_db()
+        self.assertEqual(self.sample, gene_list_node.sample)
+
+    def test_gene_list_node_editor_sample_gene_lists(self):
+        gene_list_node = self._create_child_node(GeneListNode)
+        gene_list = GeneList.objects.create(name="sample gene list", user=self.user)
+        SampleGeneList.objects.create(sample=self.sample, gene_list=gene_list)
+
+        client = Client()
+        client.force_login(self.user)
+        response = client.get(self._get_node_editor_url(gene_list_node))
+        self.assertEqual(200, response.status_code)
+        self.assertTrue(response.context["has_sample_gene_lists"])
 
 
 if __name__ == '__main__':

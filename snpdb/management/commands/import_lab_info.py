@@ -20,6 +20,8 @@ URL = 'URL'
 
 
 class Command(BaseCommand):
+    category = "import"
+
     def add_arguments(self, parser):
         parser.add_argument('LabNameLocations', help='csv file for Lab Details')
 

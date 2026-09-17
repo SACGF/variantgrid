@@ -1,31 +1,72 @@
+"""
+The DataTables engine every list page uses. A DatatableConfig subclass declares RichColumn objects
+(key, renderer, sorting, search, column_filter) and the config both defines the client table and
+answers its ajax requests; DatabaseTableView serves one config as JSON or a streamed CSV. Filtering
+funnels through DatatableConfig.apply_filters (config filter, search box, client column rules),
+ordering always ends in a pk tie-breaker, and known_count / approximate_count let expensive tables
+skip an exact count. uicore/CLAUDE.md#grids has the recipe; the variant grids build on it in
+snpdb/grids.py.
+"""
 import enum
 import itertools
 import logging
+import math
 import operator
-from collections.abc import Callable
-from dataclasses import dataclass
+from collections.abc import Callable, Iterable, Iterator
+from dataclasses import dataclass, field
 from datetime import datetime
 from enum import auto
 from functools import cached_property, reduce
 from typing import Any, Generic, Optional, TypeVar, Union
 
 from django.contrib.auth.models import User
+from django.core.exceptions import PermissionDenied
 from django.db import models
-from django.db.models import F, OrderBy, Q, QuerySet
-from django.http import HttpRequest, QueryDict
+from django.db.models import CharField, Expression, F, OrderBy, Q, QuerySet, Value
+from django.db.models.functions import Concat
+from django.http import HttpRequest, QueryDict, StreamingHttpResponse
 from django.urls import reverse
 from kombu.utils import json
 
+from library.django_utils.filter_rules import filter_operations_json, parse_filters, rules_to_q
+from library.django_utils.grid_export import csv_streaming_response, grid_export_csv
+from library.django_utils.major_operation import MajorOperationViewMixin
 from library.log_utils import report_exc_info
 from library.utils import JsonDataType, JsonObjType, full_class_name, nice_class_name, pretty_label
+from snpdb.models import AvatarDetails, UserGridConfig, UserSettings
 from snpdb.views.datatable_mixins import JSONResponseView
 
 logger = logging.getLogger(__name__)
+
+# Client asks for the server side CSV by adding this to the table's own ajax params
+DATATABLE_CSV_PARAM = "dataTableCsv"
+# The column filter rules the client sends up (@see library.django_utils.filter_rules)
+DATATABLE_FILTERS_PARAM = "filters"
 
 
 class SortOrder(enum.Enum):
     ASC = 'asc'
     DESC = 'desc'
+
+
+class NullOrder(enum.Enum):
+    """ Where NULLs go when sorting on a column """
+    LAST = 'last'  # last whichever direction - the default
+    FIRST_ON_ASC = 'first_on_asc'  # first ascending, last descending (what the variant grids do)
+
+
+@dataclass(frozen=True)
+class FilterField:
+    """ How the client filter builder should offer a column, and what a rule on it means server side.
+        'field' in an emitted rule is the column's key, which goes straight into a Django lookup """
+    type: str = 'text'  # 'text' / 'int' / 'float' / 'date' / 'select'
+    choices: Optional[dict] = field(default=None)
+
+    def as_json(self, name: str, label: str) -> JsonObjType:
+        data: JsonObjType = {"field": name, "label": label, "type": self.type}
+        if self.choices:
+            data["choices"] = self.choices
+        return data
 
 
 RDC = TypeVar('RDC', bound=models.Model)  # Row Data Class (should match the DatatableConfig but only required if using Objects mode)
@@ -37,7 +78,7 @@ class CellData(Generic[RDC]):
     Parameter to be passed to server side renders,
     call .value to get the single column, otherwise can inspect columns
     """
-    all_data: Optional[dict[str, Any]]
+    all_data: dict[str, Any]
     key: Optional[str]
     obj: Optional[RDC] = None
 
@@ -66,9 +107,37 @@ class CellData(Generic[RDC]):
     def get_nested_json(self, key, sub_key):
         if data := self.all_data.get(key):
             return data.get(sub_key)
+        return None
 
     def get(self, key: Any, default: Optional[RDC] = None) -> Any:
         return self.all_data.get(key, default)
+
+
+def sanitize_value(value: Any) -> Any:
+    if isinstance(value, datetime):
+        value = value.timestamp()
+    elif isinstance(value, float) and math.isnan(value):
+        # JSON goes out strict - a NaN in a float annotation column renders blank rather than
+        # breaking JSON.parse in the browser
+        value = None
+    return value
+
+
+def limit_value_size(value: Any) -> Any:
+    """
+    Limits the amount of data that can be returned in one cell
+    Will duplicate dicts into dicts with limited text
+    """
+    LIMIT = 100000
+    if isinstance(value, str):
+        if (value_len := len(value)) and value_len > LIMIT:
+            return value[:LIMIT] + f"... (data is too large to display, full data is {value_len} characters long)"
+    elif isinstance(value, dict):
+        cloned = value.copy()
+        for key, sub_value in value.items():
+            cloned[key] = limit_value_size(sub_value)
+        value = cloned
+    return value
 
 
 class RichColumn:
@@ -110,7 +179,15 @@ class RichColumn:
                  detail: bool = False,
                  css_class: str = None,
                  extra_columns: Optional[list[str]] = None,
-                 template: Optional[str] = None):
+                 include_in_csv: Optional[bool] = None,
+                 csv_rendered: bool = False,
+                 width: Optional[int] = None,
+                 header_title: Optional[str] = None,
+                 client_renderer_kwargs: Optional[dict] = None,
+                 sort_menu: Optional[list[dict]] = None,
+                 column_filter: Optional[FilterField] = None,
+                 null_order: NullOrder = NullOrder.LAST,
+                 search_annotations: Optional[dict[str, Expression]] = None):
         """
         #TODO consolidate, orderable, default_sort, sort_order_sequence
         :param key: A column name to be retrieved and returned and sorted on
@@ -129,6 +206,18 @@ class RichColumn:
         :param detail: If True, the column will be shown in the expand section of the table only (requires responsive)
         :param css_class: css class to apply to the column
         :param extra_columns: other columns that need to be selected out for the server renderer
+        :param include_in_csv: whether the column goes in the server side CSV (defaults to having a key)
+        :param csv_rendered: write render_cell() output to the CSV rather than the raw value - set it
+                             wherever the server renderer converts the value (AF as percent, choices
+                             expanded, packed genotype unpacked) so the CSV matches the grid
+        :param width: column width in pixels (the variant grids lay out table-layout: fixed)
+        :param header_title: tooltip on the column header
+        :param client_renderer_kwargs: per column settings handed to the client renderer
+        :param sort_menu: [{label, column}] alternative sort keys offered on a composite cell's header
+        :param column_filter: offer this column in the client's filter builder, and accept rules on it
+        :param null_order: where NULLs sort
+        :param search_annotations: {alias: expression} the search box also matches against - annotated onto
+                                   the queryset only while searching, so they never reach .values()
         """
         self.key = key
         self.sort_keys = sort_keys
@@ -171,10 +260,15 @@ class RichColumn:
         self.visible = visible
         self.css_class = css_class
         self.extra_columns = extra_columns
-        self.template = template
-
-    def __str__(self):
-        return f"RichColumn({self.key or self.name})"
+        self.include_in_csv = bool(key) if include_in_csv is None else include_in_csv
+        self.csv_rendered = csv_rendered
+        self.width = width
+        self.header_title = header_title
+        self.client_renderer_kwargs = client_renderer_kwargs
+        self.sort_menu = sort_menu
+        self.column_filter = column_filter
+        self.null_order = null_order
+        self.search_annotations = search_annotations or {}
 
     @property
     def css_classes(self) -> str:
@@ -194,6 +288,8 @@ class RichColumn:
 
     # the below seems to break special sort keys
     def sort_string(self, desc: bool) -> list[OrderBy]:
+        nulls_first_on_asc = self.null_order == NullOrder.FIRST_ON_ASC
+
         def as_order_by(key: str):
             use_desc = desc
             if key.startswith('-'):
@@ -202,11 +298,10 @@ class RichColumn:
 
             if use_desc:
                 return F(key).desc(nulls_last=True)
-            else:
-                return F(key).asc(nulls_last=True)
+            if nulls_first_on_asc:
+                return F(key).asc(nulls_first=True)
+            return F(key).asc(nulls_last=True)
         use_keys = self.sort_keys or [self.key]
-        if not use_keys or None in use_keys:
-            raise ValueError(f"Cannot sort by column without key or sort_keys {self}")
         return [as_order_by(key) for key in use_keys]
 
     # def sort_string(self, desc: bool) -> list[str]:
@@ -244,12 +339,46 @@ class DatatableConfig(Generic[DC]):
     and how the server will send data to it via ajax (via BaseDatatableView)
     """
     search_box_enabled = False
+    # Also match a row by its exact pk when the search box is handed a number - people write record
+    # IDs down, and an integer column can't take the icontains the text columns are searched with
+    search_pk_enabled = False
     download_csv_button_enabled = False
+    # Streams every row's raw values from the server, rather than the client side button which pulls
+    # the rendered rows back through the ajax endpoint - use it on anything that can grow large
+    server_csv_download = False
     csv_name: Optional[str] = None  # filename for CSV download (date suffix added automatically)
     rich_columns: list[RichColumn]  # columns for display
     expand_client_renderer: Optional[str] = None  # if provided, will expand rows and render content with this JavaScript method
     scroll_x = False
     server_calculate_mode = DatatableConfigQuerySetMode.COLUMNS
+    # Set to opt in to rows per page persisting per user (in UserGridConfig, keyed on this name)
+    # rather than in the browser's localStorage
+    grid_name: Optional[str] = None
+    # recordsTotal only feeds DataTables' "(filtered from N total)" text. Turn this off where the
+    # unfiltered queryset is expensive to count - the filtered count is then reported for both.
+    count_unfiltered = True
+    # Extra css classes on the <table> - the variant grids lay out table-layout: fixed
+    table_class: Optional[str] = None
+    # Fills in for any column that doesn't set its own width (px). table-layout: fixed needs one per column
+    default_column_width: Optional[int] = None
+    # Trim the chrome around the table - every pixel of it is a row the user can't see
+    compact_controls = False
+    # Build the table but hold the first row request back until the page asks for it
+    defer_loading = False
+    # Send a minimal, stably ordered param set so identical grid state keeps a cached response's key
+    cache_stable_params = False
+    ajax_type = 'POST'  # 'GET' keeps @cache_page on a data endpoint working
+    # Offer the column filter builder (columns carrying a column_filter), and accept its rules
+    filter_builder = False
+    # The page can mount its own builder off the definition without the grid's "Filter grid..." button
+    filter_builder_toolbar = True
+    # Whether the pager may show a "~N" estimate instead of a count (@see approximate_count)
+    approximate_count_enabled = False
+    # Hovering a row for 500ms fetches its expanded content early
+    expand_prefetch = True
+    max_page_length = 100
+    # CSV header labels that differ from the column's own (@see csv_columns)
+    csv_label_overrides: Optional[dict[str, str]] = None
 
     def row_css(self, row: CellData) -> Optional[str]:
         """
@@ -257,6 +386,24 @@ class DatatableConfig(Generic[DC]):
         :param row: The row data to be styled
         :return: A css class or None
         """
+        return None
+
+    def csv_columns(self) -> list[dict[str, str]]:
+        """ Columns for the server side CSV, as {name, label} - one per export column """
+        label_overrides = self.csv_label_overrides or {}
+        return [{"name": rc.name, "label": label_overrides.get(rc.name, rc.label)}
+                for rc in self.export_columns()]
+
+    def get_extra(self) -> JsonObjType:
+        """ Grid wide metadata for the client renderers - things that belong to the grid rather than
+            to any one column """
+        return {}
+
+    def get_table_classes(self) -> list[str]:
+        return [self.table_class] if self.table_class else []
+
+    def post_data(self) -> Optional[JsonObjType]:
+        """ Per request state the page sends back as the ajax params of every row request """
         return None
 
     def row_columns(self) -> list[str]:
@@ -286,6 +433,40 @@ class DatatableConfig(Generic[DC]):
         self.request: HttpRequest = request
         self.user: User = request.user
         self.hardcoded_params = hardcoded_params
+        self._page_rows: list[dict] = []
+        self._page_writable_pks: Optional[set] = None
+        self._user_labels: dict[int, str] = {}
+
+    @cached_property
+    def viewer_settings(self) -> UserSettings:
+        return UserSettings.get_for_user(self.user)
+
+    def user_column(self, fk: str = "user", **kwargs) -> RichColumn:
+        """ The column for a User FK: sorts and exports on the username, renders through render_user,
+            and the search box matches the username or the "First Last" the cell shows (#1200) """
+        full_name_alias = f"{fk}__full_name"
+        kwargs.setdefault("orderable", True)
+        return RichColumn(key=f"{fk}__username",
+                          extra_columns=[f"{fk}__id"],
+                          renderer=self.render_user,
+                          search=[f"{fk}__username"],
+                          search_annotations={full_name_alias: Concat(f"{fk}__first_name", Value(" "),
+                                                                      f"{fk}__last_name",
+                                                                      output_field=CharField())},
+                          **kwargs)
+
+    def render_user(self, cell: CellData) -> JsonDataType:
+        """ For a "<fk>__username" column with extra_columns=["<fk>__id"] (see user_column): renders the
+            name through AvatarDetails so a title holder gets their crown (#1819). Sort/CSV stay on
+            the username """
+        user_id = cell.get(cell.key.removesuffix("__username") + "__id")
+        if user_id is None:
+            return ""
+        if (label := self._user_labels.get(user_id)) is None:
+            user = User.objects.filter(pk=user_id).first()
+            label = str(AvatarDetails.avatar_for(user).grid_label_html(self.viewer_settings)) if user else ""
+            self._user_labels[user_id] = label
+        return label
 
     @cached_property
     def default_sort_order_column(self) -> RichColumn:
@@ -304,13 +485,25 @@ class DatatableConfig(Generic[DC]):
 
     def power_search(self, qs: QuerySet[DC], search_string: str) -> QuerySet[DC]:
         search_cols = set()
+        search_annotations: dict[str, Expression] = {}
         rich_col: RichColumn
         for rich_col in self.enabled_columns:  # TODO do we want to check not enabled columns too?
             search_cols = search_cols.union(rich_col.search)
+            search_annotations.update(rich_col.search_annotations)
+        if search_annotations:
+            qs = qs.annotate(**search_annotations)
 
         filters: list[Q] = []
-        for search_col in search_cols:
+        for search_col in itertools.chain(search_cols, search_annotations):
             filters.append(Q(**{f'{search_col}__icontains': search_string}))
+
+        if self.search_pk_enabled and search_string.isdigit():
+            pk = int(search_string)
+            if pk < 2 ** 63:  # anything wider than a bigint is an error rather than a miss
+                filters.append(Q(pk=pk))
+
+        if not filters:
+            return qs
         or_filter = reduce(operator.or_, filters)
         qs = qs.filter(or_filter)
         return qs
@@ -322,6 +515,130 @@ class DatatableConfig(Generic[DC]):
         :return: A filtered QuerySet
         """
         return qs
+
+    @cached_property
+    def filter_rules(self) -> Optional[dict]:
+        """ The column filter rules this request carries (@see library.django_utils.filter_rules) """
+        if not self.filter_builder:
+            return None
+        return parse_filters(self.get_query_param(DATATABLE_FILTERS_PARAM))
+
+    @property
+    def filter_rules_supplied(self) -> bool:
+        """ known_count/approximate_count implementations decline when column filters narrow the rows """
+        return self.filter_rules is not None
+
+    def filter_fields(self) -> list[JsonObjType]:
+        """ The fields the filter builder offers. 'field' goes straight into a Django lookup, so only
+            columns that named a column_filter are here """
+        fields = []
+        for rc in self.enabled_columns:
+            if column_filter := rc.column_filter:
+                fields.append(column_filter.as_json(rc.name, rc.label))
+        return fields
+
+    def apply_filter_rules(self, qs: QuerySet[DC]) -> QuerySet[DC]:
+        if rules := self.filter_rules:
+            if q := rules_to_q(rules):
+                qs = qs.filter(q)
+        return qs
+
+    def known_count(self, qs: QuerySet[DC]) -> Optional[int]:
+        """ Row count for this request when it's already known (a stored node count, a planner
+            estimate), so nothing has to run a COUNT(*). None means count the queryset """
+        return None
+
+    def approximate_count(self, qs: QuerySet[DC]) -> Optional[str]:
+        """ Called after known_count - the "~N" the pager shows in place of an exact count """
+        return None
+
+    def render_cell(self, row: CellData, column: RichColumn) -> JsonDataType:
+        """ Renders a column on a row """
+        data: Any
+        if row.obj and not column.renderer:
+            if key := row.key:
+                try:
+                    return getattr(row.obj, key)
+                except AttributeError:
+                    pass
+            raise ValueError("RichColumns must have a sever renderer, or a key that matches an attribute if in object mode")
+
+        if column.renderer:
+            return limit_value_size(column.renderer(row))
+        if column.extra_columns:
+            return {col: limit_value_size(sanitize_value(row.get(col))) for col in column.value_columns}
+        if column.key:
+            return limit_value_size(sanitize_value(row.get(column.key)))
+        return None
+
+    # def render_rows(self, rows: Iterable[CellData]) -> Iterator[dict]:
+    #     """ Raw .values() rows -> {column name: rendered value} """
+    #     for row in rows:
+    #         row_json = {rc.name: self.render_cell(row, rc) for rc in self.enabled_columns}
+    #         if row_css := self.row_css(row):
+    #             row_json["row_css"] = row_css
+    #         yield row_json
+
+    def export_columns(self) -> list[RichColumn]:
+        """ The columns the CSV/VCF export writes. Two columns writing the same raw value collapse to
+            one - an action column (delete etc) shares its key with the column it acts on """
+        columns = []
+        raw_keys = set()
+        for rc in self.enabled_columns:
+            if not rc.include_in_csv:
+                continue
+            if not rc.csv_rendered and rc.key is not None:
+                if rc.key in raw_keys:
+                    continue
+                raw_keys.add(rc.key)
+            columns.append(rc)
+        return columns
+
+    def render_export_rows(self, rows: Iterable[dict],
+                           columns: Optional[list[RichColumn]] = None) -> Iterator[dict]:
+        """ Rows for the CSV/VCF export - the server renderer's output where the column asked for it
+            (csv_rendered), the raw value everywhere else """
+        if columns is None:
+            columns = self.export_columns()
+        for row in rows:
+            yield {rc.name: self.render_cell(row, rc) if rc.csv_rendered else sanitize_value(row.get(rc.key))
+                   for rc in columns}
+
+    def iter_export_rows(self, qs: QuerySet[DC]) -> Iterator[dict]:
+        return self.render_export_rows(qs.values(*self.value_columns()).iterator())
+
+    def apply_filters(self, qs: QuerySet[DC]) -> QuerySet[DC]:
+        """ Everything that narrows the rows: the config's own params, the search box, then the
+            client's column filter rules """
+        filtered_qs = self.filter_queryset(qs)
+        if filtered_qs is None:
+            raise NotImplementedError("filter_queryset returned None")
+        if (search_text := self.get_query_param('search[value]')) and (search_text := search_text.strip()):
+            filtered_qs = self.power_search(filtered_qs, search_text)
+        return self.apply_filter_rules(filtered_qs)
+
+    def paging(self, qs: QuerySet[DC]) -> QuerySet[DC]:
+        limit = min(int(self.get_query_param('length') or 10), self.max_page_length)
+        start = int(self.get_query_param('start') or 0)
+        if limit == -1:  # if pagination is disabled ("paging": false)
+            return qs
+        return qs[start:start + limit]
+
+    def get_csv_name(self) -> str:
+        if csv_name := self.csv_name:
+            return csv_name
+        try:
+            return nice_class_name(self._model)
+        except Exception:
+            # The definition names the download before any request filtering, and a config whose
+            # queryset needs those params raises here - a generic filename is fine
+            return "export"
+
+    def initial_order(self) -> Optional[list]:
+        """ The client's initial sort - None leaves the table unsorted """
+        if rc := self.default_sort_order_column:
+            return [[self.column_index(rc), "desc" if rc.default_sort == SortOrder.DESC else "asc"]]
+        return None
 
     @staticmethod
     def _row_expand_ajax(expand_view: str, id_field: str = 'id', expected_height: Optional[int] = None) -> str:
@@ -342,7 +659,7 @@ class DatatableConfig(Generic[DC]):
 
     def get_query_param(self, param: str) -> Optional[str]:
         """
-        Returns a param value from the GET or POST or URL or hardcoded param values
+        Returns a param value from the GET or POST
         :param param: the key of the param
         :return: the value of the param
         """
@@ -350,8 +667,8 @@ class DatatableConfig(Generic[DC]):
             if param in hardcoded_params:
                 return hardcoded_params.get(param)
 
-        if param in self.request.resolver_match.kwargs:
-            return self.request.resolver_match.kwargs[param]
+        if (resolver_match := self.request.resolver_match) and param in resolver_match.kwargs:
+            return resolver_match.kwargs[param]
 
         return self._querydict.get(param)
 
@@ -371,24 +688,30 @@ class DatatableConfig(Generic[DC]):
             May need to overwrite if you use a group by/count in queryset thus no PK """
         return F("pk").desc()
 
+    def requested_ordering(self) -> list[tuple[RichColumn, bool]]:
+        """ (column, descending) for each order[i] the request carries """
+        #  'order[0][column]': ['0'], 'order[0][dir]': ['asc']
+        ordering = []
+        for index in range(len(self.enabled_columns)):
+            column_index_str = self.get_query_param(f'order[{index}][column]')
+            if not column_index_str:
+                break
+            try:
+                rich_column = self.enabled_columns[int(column_index_str)]
+            except (ValueError, IndexError):
+                logger.warning("%s: order column '%s' is not one of its columns",
+                               nice_class_name(self), column_index_str)
+                break
+            ordering.append((rich_column, self.get_query_param(f'order[{index}][dir]') == 'desc'))
+        return ordering
+
     def ordering(self, qs: QuerySet) -> QuerySet[DC]:
         """ Get parameters from the request and prepare order by clause """
-        #  'order[0][column]': ['0'], 'order[0][dir]': ['asc']
-
         sort_by_list: list[OrderBy] = []
         sorted_set = set()
-        for index in range(len(self.enabled_columns)):
-            order_key = f'order[{index}][column]'
-            column_index_str = self.get_query_param(order_key)
-            if column_index_str:
-                column_index = int(column_index_str)
-                sort_order = self.get_query_param(f'order[{index}][dir]')
-                rich_column = self.enabled_columns[column_index]
-
-                sorted_set.add(rich_column.name)
-                sort_by_list += rich_column.sort_string(sort_order == 'desc')
-            else:
-                break
+        for rich_column, desc in self.requested_ordering():
+            sorted_set.add(rich_column.name)
+            sort_by_list += rich_column.sort_string(desc)
 
         for col in self.rich_columns:
             if col.default_sort:
@@ -398,12 +721,15 @@ class DatatableConfig(Generic[DC]):
         sort_by_list.append(self._get_sort_tiebreaker())
         return qs.order_by(*sort_by_list)
 
-    def pre_render(self, qs: QuerySet[DC]):
+    def pre_render(self, qs: QuerySet[DC], rows: list[dict]):
         """
         Last method called before we start rendering
         qs: The QuerySet with all filtering, ordering applied
+        rows: The page's raw values - use it to resolve in one query what would otherwise be per-row
+        Overrides call super() - render_delete resolves the page's write permissions off these rows
         """
-        pass
+        self._page_rows = rows
+        self._page_writable_pks = None
 
     @cached_property
     def _model(self) -> type[DC]:
@@ -426,31 +752,199 @@ class DatatableConfig(Generic[DC]):
         }
 
     def render_delete(self, cell: CellData) -> Optional[str]:
-        try:
-            obj = self._model.get_instance_for_permission_check(cell.value)
-        except self._model.DoesNotExist:
-            return None
-        if not obj.can_write(self.user):
+        """ The delete link, or None where the user can't write the row """
+        if cell.value not in self._writable_pks_for_page(cell.key):
             return None
         return reverse('group_permissions_object_delete',
                        kwargs={'class_name': full_class_name(self._model), 'primary_key': cell.value})
 
+    def _writable_pks_for_page(self, pk_column: str) -> set:
+        """ Which of the page's rows the user can write, resolved on the first row that asks -
+            a pair of Guardian lookups per row is the single most expensive thing a grid can do """
+        if self._page_writable_pks is None:
+            pks = {pk for row in self._page_rows if (pk := row.get(pk_column)) is not None}
+            writable_qs = self._model.filter_writable_for_user(self.user).filter(pk__in=pks)
+            self._page_writable_pks = set(writable_qs.values_list("pk", flat=True))
+        return self._page_writable_pks
 
-class DatabaseTableView(Generic[DC], JSONResponseView):
+    def prepare_results(self, qs: QuerySet[DC]) -> list[JsonDataType]:
+        rows = list(qs.values(*self.value_columns()))
+        self.pre_render(qs, rows)
+        data = []
+
+        if self.server_calculate_mode == DatatableConfigQuerySetMode.COLUMNS:
+            # select out all columns but only send down data for enabled columns
+            all_columns = self.value_columns()
+            for row in qs.values(*all_columns):
+                row_json = {}
+                for rc in self.enabled_columns:
+                    value = self.render_cell(row=CellData(all_data=row, key=rc.key), column=rc)
+                    row_json[rc.name] = value
+                if row_css := self.row_css(row):
+                    row_json["row_css"] = row_css
+                data.append(row_json)
+        elif self.server_calculate_mode == DatatableConfigQuerySetMode.OBJECTS:
+            for row_obj in qs:
+                mapped_obj = self.map_object(row_obj)
+                row_json = {}
+                for rc in self.enabled_columns:
+                    value = self.render_cell(row=CellData(all_data=None, obj=mapped_obj, key=rc.key), column=rc)
+                    row_json[rc.name] = value
+                data.append(row_json)
+        else:
+            raise ValueError(f"Unexpected QuerySet mode {self.server_calculate_mode}")
+
+        return data
+
+
+def datatable_response(config: DatatableConfig, draw: Optional[str] = None) -> JsonObjType:
+    """ One page of a config's rows in the DataTables envelope. Shared by DatabaseTableView and the
+        analysis node grid handler, which sits on its own view mixin for error/lock handling """
+    qs = config.get_initial_queryset()
+    filtered_qs = config.apply_filters(qs)
+
+    if (known_count := config.known_count(filtered_qs)) is not None:
+        total_display_records = known_count
+    else:
+        total_display_records = filtered_qs.count()
+
+    # The total before filtering - apply_filters hands back the same queryset when nothing was
+    # supplied, and counting the unfiltered queryset can be expensive enough to skip
+    if config.count_unfiltered and filtered_qs is not qs and known_count is None:
+        total_records = qs.count()
+    else:
+        total_records = total_display_records
+
+    page_qs = config.paging(config.ordering(filtered_qs))
+    # rows = list(page_qs.values(*config.value_columns()))
+    # config.pre_render(page_qs, rows)
+
+    rows = config.prepare_results(page_qs)
+
+    data: JsonObjType = {
+        'recordsTotal': total_records,
+        'recordsFiltered': total_display_records,
+        'data': rows,
+    }
+    if approximate_records := config.approximate_count(filtered_qs):
+        # An estimate rather than a COUNT(*) - the pager shows it as "~N"
+        data["approximateRecords"] = approximate_records
+    # The client can strip 'draw' so the request URL stays cacheable, and restore it on the response.
+    # Echoing a 0 here would look stale to DataTables and the draw would be discarded
+    if draw is not None:
+        data['draw'] = int(draw)
+    return data
+
+
+def rich_column_json(rc: RichColumn, default_column_width: Optional[int] = None) -> JsonObjType:
+    """ One column of the table definition - what DataTableDefinition builds a column (and its cell
+        renderer) from. @see the annotation descriptions page, which draws example cells from these """
+    column: JsonObjType = {
+        "data": rc.name,
+        "label": rc.label,
+        "render": rc.client_renderer,
+        "createdCell": rc.client_renderer_td,
+        "orderable": rc.orderable,
+        "orderSequence": [x.value for x in rc.order_sequence],
+        "className": rc.css_classes,
+        "visible": rc.visible,
+    }
+    if width := (rc.width or default_column_width):
+        column["width"] = f"{width}px"
+    if rc.header_title:
+        column["headerTitle"] = rc.header_title
+    if rc.client_renderer_kwargs:
+        column["renderKwargs"] = rc.client_renderer_kwargs
+    if rc.sort_menu:
+        # Alternative sort keys for a composite cell - each names another column whose own
+        # definition already carries the sort key. @see DataTableDefinition.setupSortMenus
+        column["sortMenu"] = rc.sort_menu
+    return column
+
+
+def datatable_definition(config: DatatableConfig, download_url: Optional[str] = None) -> JsonObjType:
+    """ The table definition DataTableDefinition builds the table from. Computed per request -
+        column visibility and UserGridConfig rows are both per user """
+    data: JsonObjType = {
+        "responsive": any(col.detail for col in config.enabled_columns),
+        "searchBoxEnabled": config.search_box_enabled,
+        "downloadCsvButtonEnabled": config.download_csv_button_enabled,
+        "csvName": config.get_csv_name(),
+        "expandClientRenderer": config.expand_client_renderer,
+        "scrollX": config.scroll_x,
+    }
+    if download_url:
+        data["downloadUrl"] = download_url
+    if table_classes := config.get_table_classes():
+        data["tableClass"] = " ".join(table_classes)
+    if config.compact_controls:
+        data["compactControls"] = True
+    if config.defer_loading:
+        data["deferLoading"] = True
+    if config.cache_stable_params:
+        data["cacheStableParams"] = True
+    if config.ajax_type != 'POST':
+        data["ajaxType"] = config.ajax_type
+    if config.approximate_count_enabled:
+        data["approximateCount"] = True
+    if config.expand_client_renderer and not config.expand_prefetch:
+        data["expandPrefetch"] = False
+    if extra := config.get_extra():
+        data["extra"] = extra
+    if post_data := config.post_data():
+        data["postData"] = post_data
+    if grid_name := config.grid_name:
+        rows, row_selections = UserGridConfig.get_rows_and_selections(config.user, grid_name)
+        data["gridName"] = grid_name
+        data["pageLength"] = rows
+        data["lengthMenu"] = row_selections
+    if config.filter_builder:
+        data["filterBuilder"] = {
+            "fields": config.filter_fields(),
+            "operations": filter_operations_json(),
+        }
+        data["filterBuilderToolbar"] = config.filter_builder_toolbar
+
+    if (order := config.initial_order()) is not None:
+        data["order"] = order
+
+    data["columns"] = [rich_column_json(rc, config.default_column_width) for rc in config.enabled_columns]
+    return data
+
+
+class DatabaseTableView(Generic[DC], MajorOperationViewMixin, JSONResponseView):
     """
     Wraps a column_class to give it functionality for a view to provide data to a DataTables view
     """
+    # Strict JSON so a NaN in a float annotation column renders blank rather than going down as a
+    # bare NaN token and breaking JSON.parse in the browser
+    json_allow_nan = False
     config: DatatableConfig
-    max_display_length = 100
-
     column_class: type[DC] = None
 
-    def config_for_request(self, request: HttpRequest) -> DatatableConfig[DC]:
+    def config_for_request(self, request: HttpRequest, **kwargs) -> DatatableConfig[DC]:
+        """ kwargs are the URL kwargs, for a config that needs them to build (node, genome build).
+            DatatableConfig.get_query_param already falls back to resolver_match.kwargs """
         return self.column_class(request)
 
     def get(self, request: HttpRequest, *args, **kwargs):
-        self.config = self.config_for_request(request)
+        self.request = request
+        self.config = self.config_for_request(request, **kwargs)
+        if self._querydict.get(DATATABLE_CSV_PARAM):
+            return self.download_csv()
         return super().get(request, *args, **kwargs)
+
+    def download_csv(self) -> StreamingHttpResponse:
+        config = self.config
+        if not config.server_csv_download:
+            raise PermissionDenied(f"CSV download requested but 'server_csv_download' not set on "
+                                   f"{nice_class_name(config)}")
+        qs = config.ordering(config.apply_filters(config.get_initial_queryset()))
+        return csv_streaming_response(self._csv_name(),
+                                      grid_export_csv(config.csv_columns(), config.iter_export_rows(qs)))
+
+    def _csv_name(self) -> str:
+        return self.config.get_csv_name()
 
     @property
     def _querydict(self) -> QueryDict:
@@ -461,72 +955,23 @@ class DatabaseTableView(Generic[DC], JSONResponseView):
 
     def initialize(self, *args, **kwargs):
         pass
-        # can we set config here? how do we get request back out?
-        # if not self.config:
-        #    raise ValueError('DatatableMixin must set self.config in initialize')
 
     @staticmethod
     def sanitize_value(value: Any) -> Any:
-        if isinstance(value, datetime):
-            value = value.timestamp()
-        return value
+        return sanitize_value(value)
 
     @staticmethod
     def limit_value_size(value: Any) -> Any:
-        """
-        Limits the amount of data that can be returned in one cell
-        Will duplicate dicts into dicts with limited text
-        """
-        LIMIT = 100000
-        if isinstance(value, str):
-            if (value_len := len(value)) and value_len > LIMIT:
-                return value[:LIMIT] + f"... (data is too large to display, full data is {value_len} characters long)"
-        elif isinstance(value, dict):
-            cloned = value.copy()
-            for key, sub_value in value.items():
-                cloned[key] = DatabaseTableView.limit_value_size(sub_value)
-            value = cloned
-        return value
+        return limit_value_size(value)
 
     def render_cell(self, row: CellData, column: RichColumn) -> JsonDataType:
-        """ Renders a column on a row. column can be given in a module notation e.g. document.invoice.type """
-        data: Any
-        if row.obj and not column.renderer:
-            if key := row.key:
-                try:
-                    return getattr(row.obj, key)
-                except AttributeError:
-                    pass
-
-            raise ValueError("RichColumns must have a sever renderer, or a key that matches an attribute if in object mode")
-
-        if column.renderer:
-            return DatabaseTableView.limit_value_size(column.renderer(row))
-        elif column.extra_columns:
-            data_dict = {}
-            for col in column.value_columns:
-                data_dict[col] = DatabaseTableView.limit_value_size(DatabaseTableView.sanitize_value(row.get(col)))
-            return data_dict
-
-        elif column.key:
-            return DatabaseTableView.limit_value_size(DatabaseTableView.sanitize_value(row.get(column.key)))
-        else:
-            return None
+        return self.config.render_cell(row, column)
 
     def ordering(self, qs: QuerySet[DC]):
         return self.config.ordering(qs)
 
     def paging(self, qs: QuerySet[DC]) -> QuerySet[DC]:
-        limit = min(int(self._querydict.get('length', 10)), self.max_display_length)
-        start = int(self._querydict.get('start', 0))
-
-        # if pagination is disabled ("paging": false)
-        if limit == -1:
-            return qs
-
-        offset = start + limit
-
-        return qs[start:offset]
+        return self.config.paging(qs)
 
     def get_initial_queryset(self) -> QuerySet[DC]:
         return self.config.get_initial_queryset()
@@ -541,122 +986,33 @@ class DatabaseTableView(Generic[DC], JSONResponseView):
         return None
 
     def filter_queryset(self, qs: QuerySet[DC]) -> QuerySet[DC]:
-        qs = self.config.filter_queryset(qs)
-        if qs is not None:
-            if (search_text := self.get_query_param('search[value]')) and (search_text := search_text.strip()):
-                qs = self.config.power_search(qs, search_text)
-            return qs
+        return self.config.apply_filters(qs)
 
-        raise NotImplementedError("filter_queryset returned None")
-
-    def prepare_results(self, qs: QuerySet[DC]):
-        self.config.pre_render(qs)
-        data = []
-
-        if self.config.server_calculate_mode == DatatableConfigQuerySetMode.COLUMNS:
-            # select out all columns but only send down data for enabled columns
-            all_columns = self.config.value_columns()
-            for row in qs.values(*all_columns):
-                row_json = {}
-                for rc in self.config.enabled_columns:
-                    value = self.render_cell(row=CellData(all_data=row, key=rc.key), column=rc)
-                    row_json[rc.name] = value
-                if row_css := self.config.row_css(row):
-                    row_json["row_css"] = row_css;
-                data.append(row_json)
-        elif self.config.server_calculate_mode == DatatableConfigQuerySetMode.OBJECTS:
-            for row_obj in qs:
-                mapped_obj = self.config.map_object(row_obj)
-                row_json = {}
-                for rc in self.config.enabled_columns:
-                    value = self.render_cell(row=CellData(all_data=None, obj=mapped_obj, key=rc.key), column=rc)
-                    row_json[rc.name] = value
-                data.append(row_json)
-        else:
-            raise ValueError(f"Unexpected QuerySet mode {self.config.server_calculate_mode}")
-
-        return data
+    # def prepare_results(self, qs: QuerySet[DC]):
+    #     # select out all columns but only send down data for enabled columns
+    #     rows = list(qs.values(*self.config.value_columns()))
+    #     self.config.pre_render(qs, rows)
+    #     return list(self.config.render_rows(rows))
 
     def handle_exception(self, e: BaseException):
         report_exc_info()
         logger.exception(str(e))
         raise e
 
+    def _download_url(self) -> Optional[str]:
+        if not self.config.server_csv_download:
+            return None
+        return f"{self.request.path}?{DATATABLE_CSV_PARAM}=1"
+
     def json_definition(self) -> JsonObjType:
-        config = self.config
-
-        csv_name = config.csv_name
-        if not csv_name:
-            try:
-                csv_name = nice_class_name(config.get_initial_queryset().model)
-            except Exception:
-                csv_name = "export"
-
-        data: JsonObjType = {
-            "responsive": any(col.detail for col in config.enabled_columns),
-            "searchBoxEnabled": config.search_box_enabled,
-            "downloadCsvButtonEnabled": config.download_csv_button_enabled,
-            "csvName": csv_name,
-            "expandClientRenderer": config.expand_client_renderer,
-            "scrollX": config.scroll_x,
-        }
-        if config.default_sort_order_column:
-            data["order"] = [[config.column_index(config.default_sort_order_column), "asc" if config.default_sort_order_column.default_sort != SortOrder.DESC else "desc"]]
-
-        columns: list[JsonObjType] = []
-        for rc in config.enabled_columns:
-            columns.append({
-                "data": rc.name,
-                "label": rc.label,
-                "render": rc.client_renderer,
-                "createdCell": rc.client_renderer_td,
-                "orderable": rc.orderable,
-                "orderSequence": [x.value for x in rc.order_sequence],
-                "className": rc.css_classes,
-                "visible": rc.visible,
-            })
-        data["columns"] = columns
-
-        return data
+        return datatable_definition(self.config, download_url=self._download_url())
 
     def get_context_data(self, *args, **kwargs):
-        if definition_request := self.get_query_param("dataTableDefinition"):
+        if self.get_query_param("dataTableDefinition"):
             return self.json_definition()
 
         try:
             self.initialize(*args, **kwargs)
-
-            # prepare initial queryset
-            qs = self.get_initial_queryset()
-
-            # store the total number of records (before filtering)
-            total_records = qs.count()
-
-            # apply filters
-            filtered_qs = self.filter_queryset(qs)
-
-            # number of records after filtering - filter_queryset hands back the same queryset when no
-            # filters were supplied, and the count is often expensive enough to be worth not repeating
-            if filtered_qs is qs:
-                total_display_records = total_records
-            else:
-                total_display_records = filtered_qs.count()
-            qs = filtered_qs
-
-            # apply ordering
-            qs = self.ordering(qs)
-
-            # apply pagintion
-            qs = self.paging(qs)
-
-            # prepare output data
-            data = self.prepare_results(qs)
-
-            ret = {'draw': int(self._querydict.get('draw', 0)),
-                   'recordsTotal': total_records,
-                   'recordsFiltered': total_display_records,
-                   'data': data
-                   }
-            return ret
+            return datatable_response(self.config, draw=self._querydict.get('draw'))
         except Exception as e:
             return self.handle_exception(e)

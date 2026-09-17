@@ -15,7 +15,7 @@ from django.db.models import CharField, F, Func, Value
 from django.db.models.aggregates import Max
 from django.db.models.deletion import CASCADE, SET_NULL
 from django.db.models.query import QuerySet
-from django.db.models.signals import post_save, pre_delete
+from django.db.models.signals import post_delete, post_save, pre_delete
 from django.dispatch.dispatcher import receiver
 from django.urls import reverse
 from django.utils import timezone
@@ -26,7 +26,11 @@ from annotation.annotation_versions import get_lowest_unannotated_variant_id
 from annotation.models.models_enums import VariantAnnotationPipelineType
 from eventlog.models import create_event
 from library.django_utils.django_file_system_storage import PrivateUploadStorage
-from library.django_utils.django_file_utils import get_import_processing_dir
+from library.django_utils.django_file_utils import (
+    get_import_processing_dir,
+    import_processing_dir_path,
+    remove_import_processing_dir,
+)
 from library.enums.log_level import LogLevel
 from library.log_utils import report_exc_info, report_message
 from library.utils import file_sha256sum
@@ -80,6 +84,18 @@ class FileUpload(TimeStampedModel):
         if self.import_source == ImportSource.WEB_UPLOAD:
             return self.file_field.size
         return os.stat(self.get_filename()).st_size
+
+    @property
+    def is_import_processing_scratch(self) -> bool:
+        """ True for a VCF we generated into IMPORT_PROCESSING_DIR to feed a pipeline (liftover, manual
+            variant entry, classification import) rather than a file a user handed us - so it can be
+            thrown away with the pipeline that consumed it. WEB_UPLOAD files live under UPLOAD_DIR and
+            are named via file_field, so they can never match. """
+        if not self.path or self.import_source == ImportSource.WEB_UPLOAD:
+            return False
+        import_processing_root = os.path.realpath(settings.IMPORT_PROCESSING_DIR)
+        resolved = os.path.realpath(self.path)
+        return resolved.startswith(import_processing_root + os.sep)
 
     def can_view(self, user_or_group: Union[User, Group]) -> bool:
         if isinstance(user_or_group, User):
@@ -208,9 +224,21 @@ class UploadPipeline(models.Model):
         return sd
 
     def remove_processing_files(self):
-        pipeline_processing_dir = self.get_pipeline_processing_dir()
-        logging.info("*** Deleting files for pipeline %d - '%s'", self.pk, pipeline_processing_dir)
-        shutil.rmtree(pipeline_processing_dir)
+        remove_import_processing_dir(self.pk)
+
+    def remove_generated_input_file(self):
+        """ Some pipelines are fed a VCF we wrote for them (liftover, manual variant entry,
+            classification import) into a scratch dir of its own - once the pipeline is done with it,
+            nothing else can use it. Files written *inside* pipeline_<pk> (variant tags, TSO500) belong
+            to remove_processing_files. """
+        file_upload = self.file_upload
+        if not file_upload.is_import_processing_scratch:
+            return
+        input_dir = os.path.dirname(os.path.realpath(file_upload.path))
+        if os.path.realpath(import_processing_dir_path(self.pk)) == input_dir:
+            return
+        logging.info("*** Deleting generated input dir for pipeline %d - '%s'", self.pk, input_dir)
+        shutil.rmtree(input_dir, ignore_errors=True)
 
     def start(self):
         logging.debug("upload_pipeline.start()")
@@ -236,6 +264,7 @@ class UploadPipeline(models.Model):
         create_event(self.file_upload.user, f"import_{self.get_file_type_display()}_success")
         if settings.IMPORT_PROCESSING_DELETE_TEMP_FILES_ON_SUCCESS:
             self.remove_processing_files()
+            self.remove_generated_input_file()
 
     def error(self, error_message):
         # FIXME remove this, cause of error might not be the most recent exception
@@ -269,12 +298,13 @@ class UploadPipeline(models.Model):
 
     @property
     def vcf(self):
-        if self.file_upload.file_type == UploadedFileTypes.VCF:
-            try:
-                return self.file_upload.uploadedvcf.vcf
-            except (UploadedVCF.DoesNotExist, VCF.DoesNotExist) as _:
-                pass
-        return None
+        """ The VCF this pipeline loads, for every file type that loads one - which is more than the
+            '.vcf' ones (@see upload.uploaded_file_type.reloads_vcf_in_place). None for the
+            insert-variants-only types, whose UploadedVCF has no VCF. """
+        try:
+            return self.file_upload.uploadedvcf.vcf
+        except (UploadedVCF.DoesNotExist, VCF.DoesNotExist) as _:
+            return None
 
     def get_errors(self, hide_accepted=True) -> list:
         errors = []
@@ -524,6 +554,23 @@ class UploadedVCF(UploadData):
         return description
 
 
+@receiver(post_delete, sender=UploadPipeline)
+def upload_pipeline_post_delete_handler(sender, instance, **kwargs):  # pylint: disable=unused-argument
+    """ The row is gone, so nothing can name these directories any more - there is no sweep of
+        IMPORT_PROCESSING_DIR to catch them later (that is what the import_processing_cleanup command
+        is for, and only for what leaked before #928).
+
+        Unconditional: the setting is about keeping a *successful* pipeline's scratch around to look at,
+        which needs the pipeline to still be there to look at it from. Using the signal rather than
+        overriding delete() also covers queryset deletes and FileUpload/VCF cascades - registering a
+        receiver disables Django's fast-delete path. """
+    try:
+        instance.remove_processing_files()
+        instance.remove_generated_input_file()
+    except Exception:  # Deleting the row is what matters - a file we can't remove must not block it
+        logging.exception("Failed removing files for deleted UploadPipeline %s", instance.pk)
+
+
 @receiver(pre_delete, sender=UploadedVCF)
 def pre_delete_uploaded_vcf(sender, instance, *args, **kwargs):
     if vcf := instance.vcf:
@@ -710,6 +757,9 @@ class ModifiedImportedVariants(VCFImportInfo):
         if num_shared_locus := miv_qs.filter(operation=ModifiedImportedVariantOperation.SHARED_LOCUS).count():
             messages.append(f"{num_shared_locus} allele frequencies summed across a shared locus")
 
+        if num_merged := miv_qs.filter(operation=ModifiedImportedVariantOperation.MERGED_RECORDS).count():
+            messages.append(f"{num_merged} variants from multiple merged records")
+
         return ", ".join(messages)
 
 
@@ -733,7 +783,8 @@ class ModifiedImportedVariant(models.Model):
     old_variant = models.TextField(null=True)
     old_variant_formatted = models.TextField(null=True)  # consistently format for retrieval
     # What the operation did, where the old_* fields (which are bcftools-shaped) can't say it. Used by
-    # SHARED_LOCUS to record the depths that were summed, so the per-record VAF stays reconstructable
+    # SHARED_LOCUS to record the depths that were summed (so the per-record VAF stays reconstructable)
+    # and by MERGED_RECORDS to list the records that were merged
     operation_detail = models.TextField(null=True)
 
     @property
@@ -867,7 +918,8 @@ class UploadSettings(models.Model):
     time_filter_method = models.CharField(max_length=1, choices=TimeFilterMethod.choices, default=TimeFilterMethod.RECORDS)
     time_filter_value = models.IntegerField(default=5)
 
-    INTERNAL_TYPES = {UploadedFileTypes.LIFTOVER, UploadedFileTypes.VCF_INSERT_VARIANTS_ONLY}
+    INTERNAL_TYPES = {UploadedFileTypes.LIFTOVER, UploadedFileTypes.VCF_INSERT_VARIANTS_ONLY,
+                      UploadedFileTypes.GENE_LEVEL_INSERT_VARIANTS_ONLY}
 
     @cached_property
     def file_types(self) -> set:

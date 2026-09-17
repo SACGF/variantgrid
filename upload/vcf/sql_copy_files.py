@@ -1,3 +1,8 @@
+"""
+Postgres COPY of the CSVs the VCF importer writes: loci_sql_copy_csv, variants_sql_copy_csv, the
+cohort genotype and modified-imported-variant loaders, all through write_sql_copy_csv. Columns are
+positional and must match the writer in upload/vcf/.
+"""
 import csv
 import logging
 import os

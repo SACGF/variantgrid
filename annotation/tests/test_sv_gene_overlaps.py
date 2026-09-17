@@ -7,10 +7,8 @@ from django.test import TestCase
 
 from annotation.fake_annotation import get_fake_annotation_version
 from annotation.tests.test_data_fake_genes import _create_fake_gene_version, _insert_transcript_data
-from annotation.vcf_files.bulk_vep_vcf_annotation_inserter import (
-    BulkVEPVCFAnnotationInserter,
-    SVGeneOverlapResolver,
-)
+from annotation.vcf_files.bulk_vep_vcf_annotation_inserter import BulkVEPVCFAnnotationInserter
+from genes.gene_overlaps import SVGeneOverlapResolver
 from genes.models import ReleaseTranscriptVersion, TranscriptVersion
 from genes.models_enums import AnnotationConsortium
 from snpdb.models import GenomeBuild, VariantCoordinate
@@ -67,7 +65,7 @@ class SVGeneOverlapResolverTest(TestCase):
         cls.contig_name = cls.tv_a.contig.name
 
     def test_resolver_overlap_spans_two_transcripts(self):
-        resolver = SVGeneOverlapResolver(self.vav)
+        resolver = SVGeneOverlapResolver.for_variant_annotation_version(self.vav)
         # 10 MB deletion spanning both transcripts
         vc = VariantCoordinate(chrom=self.contig_name, position=500_000,
                                ref="N", alt="<DEL>", svlen=-10_000_000)
@@ -76,7 +74,7 @@ class SVGeneOverlapResolverTest(TestCase):
         self.assertEqual(gene_ids, {"ENSG00000000001", "ENSG00000000002"})
 
     def test_resolver_no_overlap(self):
-        resolver = SVGeneOverlapResolver(self.vav)
+        resolver = SVGeneOverlapResolver.for_variant_annotation_version(self.vav)
         # SV outside both transcripts
         vc = VariantCoordinate(chrom=self.contig_name, position=20_000_000,
                                ref="N", alt="<DEL>", svlen=-100_000)
@@ -85,7 +83,7 @@ class SVGeneOverlapResolverTest(TestCase):
         self.assertEqual(gene_ids, set())
 
     def test_resolver_unknown_contig_returns_empty(self):
-        resolver = SVGeneOverlapResolver(self.vav)
+        resolver = SVGeneOverlapResolver.for_variant_annotation_version(self.vav)
         vc = VariantCoordinate(chrom="22", position=1, ref="N", alt="<DEL>", svlen=-1_000)
         symbols, gene_ids = resolver.get_overlaps(vc)
         self.assertEqual(symbols, set())
@@ -99,7 +97,7 @@ class SVGeneOverlapResolverTest(TestCase):
             pass
 
         stub = _Stub()
-        stub.sv_gene_overlap_resolver = SVGeneOverlapResolver(self.vav)
+        stub.sv_gene_overlap_resolver = SVGeneOverlapResolver.for_variant_annotation_version(self.vav)
         stub.constant_data = {"version_id": self.vav.pk, "annotation_run_id": 999}
         stub.variant_gene_overlap_list = []
         return stub

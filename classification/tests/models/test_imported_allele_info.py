@@ -1,12 +1,23 @@
+from unittest.mock import patch
+
 from django.test import TestCase
 
+from annotation.fake_annotation import get_fake_annotation_version
 from classification.models import ImportedAlleleInfo
 from classification.models.classification_variant_info_models import (
     ImportedAlleleInfoStatus,
     ImportedAlleleInfoValidation,
     ResolvedVariantInfo,
 )
-from snpdb.models import GenomeBuild, GenomeBuildPatchVersion
+from library.genomics.vcf_enums import VCFSymbolicAllele
+from library.utils import sha256sum_str
+from snpdb.models import (
+    GenomeBuild,
+    GenomeBuildPatchVersion,
+    Locus,
+    Sequence,
+    Variant,
+)
 
 
 class ImportedAlleleInfoStatusTest(TestCase):
@@ -118,3 +129,37 @@ class ImportedAlleleInfoValidationTest(TestCase):
             grch37=self._resolved(GenomeBuild.grch37()),
             grch38=self._resolved(GenomeBuild.grch38(), c_hgvs=self.C_HGVS_38, transcript_version_id=2))
         self.assertEqual(allele_info._calculate_validation()["builds"], {"missing_37": "W"})
+
+
+class ResolvedVariantInfoCNVTest(TestCase):
+    """ #1574 - a <CNV> is a valid variant that HGVS simply cannot write, so it is recorded as an
+        error on the ResolvedVariantInfo rather than reported as a bug """
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.genome_build = GenomeBuild.grch37()
+        get_fake_annotation_version(cls.genome_build)
+
+        contig = cls.genome_build.contigs.get(name="3")
+        ref, _ = Sequence.objects.get_or_create(seq="N", seq_sha256_hash=sha256sum_str("N"))
+        alt, _ = Sequence.objects.get_or_create(seq=VCFSymbolicAllele.CNV,
+                                                seq_sha256_hash=sha256sum_str(VCFSymbolicAllele.CNV))
+        locus, _ = Locus.objects.get_or_create(contig=contig, position=128200000, ref=ref)
+        cls.variant, _ = Variant.objects.get_or_create(locus=locus, alt=alt, svlen=1000,
+                                                       defaults={"end": 128201000})
+
+        cls.allele_info = ImportedAlleleInfo.objects.create(
+            imported_genome_build_patch_version=GenomeBuildPatchVersion.get_unspecified_patch_version_for(
+                cls.genome_build),
+            imported_c_hgvs="NM_001145661.2(GATA2):c.1018-213_1304del")
+
+    @patch("classification.models.classification_variant_info_models.report_exc_info")
+    def test_cnv_records_error_without_reporting(self, mock_report_exc_info):
+        variant_info = ResolvedVariantInfo(genome_build=self.genome_build, allele_info=self.allele_info,
+                                           variant=self.variant)
+        variant_info.set_variant_and_save(self.variant)
+
+        self.assertIsNone(variant_info.c_hgvs)
+        self.assertIn("has no HGVS representation", variant_info.error)
+        mock_report_exc_info.assert_not_called()

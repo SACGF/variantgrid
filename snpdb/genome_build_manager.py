@@ -1,3 +1,9 @@
+"""
+GenomeBuildManager.get_current_genome_build: the build a request is about, resolved in order from
+the ?genome_build= parameter, a GRCh37/GRCh38 segment in the URL path, the user's default and
+finally the first annotated build, then cached on the request threadlocal.
+set_current_genome_build overrides it for the rest of the request.
+"""
 import re
 from typing import Optional
 

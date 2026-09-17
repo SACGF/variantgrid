@@ -1,3 +1,10 @@
+"""
+Test bases and query accounting: URLTestCase (Celery eager, plain static storage, annotation web
+resources off) with _test_urls / _test_datatable_urls / _test_autocomplete_urls for batch status
+checks, production_query_count (drops savepoints and the tables production caches), and
+QueryProfilingClient which appends per-GET query stats when VG_QUERY_PROFILE is set (stacks for
+matching SQL under VG_QUERY_TRACE). `vg page --queries` reuses the same counting.
+"""
 import json
 import logging
 import os
@@ -135,7 +142,7 @@ def prevent_request_warnings(original_function):
                    GENES_DEFAULT_CANONICAL_TRANSCRIPT_COLLECTION_ID=None,
                    LIFTOVER_CLASSIFICATIONS=False,
                    ANNOTATION_CACHED_WEB_RESOURCES=[],  # So we don't auto load resources in test
-                   CELERY_ALWAYS_EAGER=True)  # Don't launch async tasks
+                   CELERY_TASK_ALWAYS_EAGER=True)  # Run async tasks inline
 class URLTestCase(TestCase):
     """ Need to override settings as ManifestStaticFilesStorage expects staticfiles.json to exist
         and contain the file asked. @see https://stackoverflow.com/a/51580328/295724 """
@@ -232,48 +239,5 @@ class URLTestCase(TestCase):
                         break
 
                 # print(f"{data=}")
-                # print(f"Url '{url} obj pk={obj.pk} in results={in_results}'")
-                self.assertEqual(in_results, found, msg=f"Url '{url} obj {key}={obj.pk} in results={in_results}'")
-
-    def _test_jqgrid_urls_contains_objs(self, names_obj, user, in_results):
-        """ Also allow 403 if not expecting results
-            TODO: Load grid properly call URL with sidx params etc, currently get UnorderedObjectListWarning """
-        client = _make_test_client()
-        client.force_login(user)
-
-        for name, kwargs, obj in names_obj:
-            kwargs = kwargs.copy()  # In case client shared them
-            kwargs["op"] = "config"
-            config_url = reverse(name, kwargs=kwargs)
-            response = client.get(config_url)
-            if in_results:
-                self.assertEqual(200, response.status_code)
-            try:
-                config_data = response.json()
-            except ValueError:  # Not JSON
-                config_data = {}
-            kwargs["op"] = "handler"  # To show grid
-            url = reverse(name, kwargs=kwargs)
-            # Add sidx so we don't get pager order warning
-            if sortname := config_data.get("sortname"):
-                url += f"?sidx={sortname}"
-            response = client.get(url)
-            if in_results:
-                self.assertEqual(200, response.status_code)
-            elif response.status_code == 403:
-                continue  # No need to check
-
-            data = json.loads(response.content)
-            if obj is not None:
-                found = False
-                key = "id"
-                if isinstance(obj, tuple):
-                    key, obj = obj
-
-                for row in data["rows"]:
-                    if row.get(key) == obj.pk:
-                        found = True
-                        break
-
                 # print(f"Url '{url} obj pk={obj.pk} in results={in_results}'")
                 self.assertEqual(in_results, found, msg=f"Url '{url} obj {key}={obj.pk} in results={in_results}'")

@@ -1,5 +1,6 @@
 import json
 
+from django.conf import settings
 from django.test import TestCase
 
 from annotation.fake_annotation import get_fake_annotation_version
@@ -80,8 +81,39 @@ class TestVariantAnnotationVersionRawScoreFuncs(TestCase):
 
 
 class TestPathogenicityThresholdsTag(TestCase):
+    """ The tag is variant_details.html CODE_THRESHOLDS - every coloured number on the page """
+
     def test_excludes_uncalibrated_tools(self):
-        # variant_details.html spreads these into CODE_THRESHOLDS - a tool with no
-        # calibrated band must not get one
+        # A tool with no calibrated band must not get one
         bands = json.loads(pathogenicity_thresholds())
         self.assertNotIn("varity_er_score", bands)
+        self.assertNotIn("phylop_46_way_mammalian", bands)  # COLOUR_BANDS entry, no cutoff chosen
+
+    def test_rankscores_banded_off_settings(self):
+        bands = json.loads(pathogenicity_thresholds())
+        for rankscore_field in (t.rankscore_field for t in TOOLS if t.rankscore_field):
+            self.assertEqual(bands[rankscore_field],
+                             {"pathogenic": settings.ANNOTATION_MIN_PATHOGENIC_RANKSCORE,
+                              "benign": settings.ANNOTATION_MAX_BENIGN_RANKSCORE})
+
+    def test_rankscore_bands_cover_damage_count_columns(self):
+        # The banded rankscores and the ones counted into predictions_num_pathogenic are the same set
+        vav = VariantAnnotationVersion(columns_version=3)
+        counted = set(vav.get_rankscore_pathogenic_prediction_funcs())
+        self.assertEqual({t.rankscore_field for t in TOOLS if t.rankscore_field}, counted)
+
+    def test_damaging_end_only_where_no_benign_cutoff(self):
+        # Conservation and dbscSNV colour the damaging end - a low score isn't benign evidence
+        bands = json.loads(pathogenicity_thresholds())
+        for field in ("gerp_pp_rs", "phastcons_100_way_vertebrate", "dbscsnv_ada_score"):
+            self.assertNotIn("benign", bands[field])
+
+    def test_maxentscan_bands_on_magnitude(self):
+        # Signed % change against the reference site - a big shift either way is worth flagging
+        bands = json.loads(pathogenicity_thresholds())
+        self.assertTrue(bands["maxentscan_percent_diff_ref"]["magnitude"])
+
+    def test_cosmic_count_not_banded(self):
+        # A somatic sample count isn't a pathogenicity axis (#1673)
+        bands = json.loads(pathogenicity_thresholds())
+        self.assertNotIn("cosmic_count", bands)

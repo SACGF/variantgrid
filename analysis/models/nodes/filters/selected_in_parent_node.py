@@ -6,6 +6,7 @@ from django.db.models.deletion import CASCADE
 from django.db.models.query_utils import Q
 
 from analysis.models.nodes.analysis_node import AnalysisNode
+from analysis.models.nodes.node_display import NodeIcon
 from snpdb.models import Variant
 
 
@@ -32,6 +33,14 @@ class SelectedInParentNode(AnalysisNode):
     @staticmethod
     def get_node_class_label():
         return "Selected In Parent Filter"
+
+    @classmethod
+    def get_node_class_icon(cls) -> NodeIcon:
+        return NodeIcon(fa="fa-solid fa-square-check")
+
+    @classmethod
+    def get_node_class_label_short(cls) -> str:
+        return "Selected"
 
     def _get_method_summary(self):
         return "Manually Selected"

@@ -1,4 +1,6 @@
+import operator
 from abc import ABC
+from functools import reduce
 
 from django.contrib.auth.models import User
 from django.db.models.functions import Length
@@ -15,6 +17,7 @@ from snpdb.models import (
     Cohort,
     CustomColumn,
     CustomColumnsCollection,
+    Duo,
     GenomeBuild,
     GenomicIntervalsCollection,
     ImportStatus,
@@ -43,6 +46,21 @@ class GenomeBuildAutocompleteView(AutocompleteView, ABC):
         if self.forwarded.get('exclude_archived'):
             qs = qs.filter(**{f"{path_to_archived_date}__isnull": True})
         return qs
+
+    def filter_to_readable_samples(self, qs, sample_paths: list[str]):
+        """ Keep rows reaching a Sample the consumer can actually read - one genome build, and not
+            archived. The paths are OR'd against a single sample queryset, so both conditions have
+            to be met by the same sample rather than by two different ones. """
+        sample_kwargs = {}
+        if genome_build_id := self.forwarded.get('genome_build_id'):
+            sample_kwargs["vcf__genome_build_id"] = genome_build_id
+        if self.forwarded.get('exclude_archived'):
+            sample_kwargs["vcf__data_archived_date__isnull"] = True
+        if not sample_kwargs:
+            return qs
+        sample_qs = Sample.objects.filter(**sample_kwargs)
+        q = reduce(operator.or_, [Q(**{f"{path}__in": sample_qs}) for path in sample_paths])
+        return qs.filter(q).distinct()
 
 
 @method_decorator(cache_page(MINUTE_SECS), name='dispatch')
@@ -120,6 +138,10 @@ class SampleAutocompleteView(GenomeBuildAutocompleteView):
         # Completes the Patient -> Specimen -> Extraction -> Sample chain the patients autocompletes start
         if extraction := self.forwarded.get('extraction'):
             sample_qs = sample_qs.filter(extraction=extraction)
+        if patient := self.forwarded.get('patient'):
+            # Both ways a sample reaches a patient - the same union as Patient.get_samples(), which the VCF
+            # import and the patient CSV each populate only one side of
+            sample_qs = sample_qs.filter(Q(patient=patient) | Q(extraction__specimen__patient=patient))
         return self.filter_to_genome_build(sample_qs, "vcf__genome_build")
 
 
@@ -188,6 +210,16 @@ class TrioAutocompleteView(GenomeBuildAutocompleteView):
 
     def get_user_queryset(self, user):
         qs = Trio.filter_for_user(user, success_status_only=True)
+        qs = self.exclude_archived_if_forwarded(qs, "cohort__vcf__data_archived_date")
+        return self.filter_to_genome_build(qs, "cohort__genome_build")
+
+
+@method_decorator([cache_page(MINUTE_SECS), vary_on_cookie], name='dispatch')
+class DuoAutocompleteView(GenomeBuildAutocompleteView):
+    fields = ['name']
+
+    def get_user_queryset(self, user):
+        qs = Duo.filter_for_user(user).filter(cohort__import_status=ImportStatus.SUCCESS)
         qs = self.exclude_archived_if_forwarded(qs, "cohort__vcf__data_archived_date")
         return self.filter_to_genome_build(qs, "cohort__genome_build")
 

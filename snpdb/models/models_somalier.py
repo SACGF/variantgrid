@@ -7,7 +7,7 @@ from subprocess import CalledProcessError
 
 from django.conf import settings
 from django.db import models
-from django.db.models import CASCADE, Q
+from django.db.models import CASCADE, Count, Q
 from django.db.models.signals import pre_delete
 from django.dispatch import receiver
 from django.utils.text import slugify
@@ -18,7 +18,7 @@ from library.django_utils import get_url_from_media_root_filename
 from library.utils import execute_cmd
 from patients.models_enums import Sex
 from pedigree.ped.export_ped import write_trio_ped, write_unrelated_ped
-from snpdb.models import VCF, Cohort, ImportStatus, Sample, SuperPopulationCode, Trio
+from snpdb.models import VCF, Cohort, GenomeBuild, ImportStatus, Sample, SuperPopulationCode, Trio
 from snpdb.models.models_enums import ProcessingStatus
 
 
@@ -85,6 +85,16 @@ class SomalierVCFExtract(AbstractSomalierModel):
 
     def get_samples(self) -> Iterable[Sample]:
         return self.vcf.sample_set.filter(no_dna_control=False).order_by("pk")
+
+    def get_stages(self) -> list[tuple[str, AbstractSomalierModel]]:
+        """ (name, stage) for each somalier stage of this VCF, so a page can show a failed or skipped
+            one rather than just leaving the tab out """
+        stages = [
+            ("Extract", self),
+            ("Ancestry", SomalierAncestryRun.objects.filter(vcf_extract=self).first()),
+            ("Relate (VCF)", SomalierCohortRelate.objects.filter(cohort=self.vcf.cohort).first()),
+        ]
+        return [(name, stage) for name, stage in stages if stage]
 
 
 @receiver(pre_delete, sender=SomalierVCFExtract)
@@ -156,10 +166,20 @@ class SomalierRelate(AbstractSomalierModel):
         return []
 
     @property
-    def is_joint_called_vcf(self) -> bool:
-        samples_qs = self.get_samples()
-        num_vcfs = samples_qs.order_by("vcf").distinct("vcf").count()
-        return num_vcfs == 1
+    def genome_build(self) -> GenomeBuild:
+        """ Which build's sites VCF relate is given (@see SomalierConfig.get_relate_sites_args) """
+        raise NotImplementedError()
+
+    @property
+    def has_hom_ref_calls(self) -> bool:
+        """ A VCF that records 0/0 calls means an absent site is unknown. Without them (merged
+            single-sample calls, benchmark VCFs, anything gVCF-derived) absent means hom-ref, which
+            is what somalier's --unknown says. """
+        sample_ids = [s.pk for s in self.get_samples()]
+        if not sample_ids:
+            return False
+        with_ref = SomalierSampleExtract.objects.filter(sample__in=sample_ids, ref_count__gt=0).count()
+        return with_ref == len(sample_ids)
 
     def has_ped_file(self) -> bool:
         return False
@@ -184,12 +204,20 @@ class SomalierCohortRelate(SomalierRelate):
     def get_samples(self) -> Iterable[Sample]:
         return self.cohort.get_samples_qs().filter(no_dna_control=False)
 
+    @property
+    def genome_build(self) -> GenomeBuild:
+        return self.cohort.genome_build
+
 
 class SomalierTrioRelate(SomalierRelate):
     trio = models.OneToOneField(Trio, on_delete=CASCADE)
 
     def get_samples(self) -> Iterable[Sample]:
         return self.trio.get_samples()
+
+    @property
+    def genome_build(self) -> GenomeBuild:
+        return self.trio.genome_build
 
     def has_ped_file(self) -> bool:
         return True
@@ -205,15 +233,6 @@ class SomalierTrioRelate(SomalierRelate):
                        father, self.trio.father_affected, mother, self.trio.mother_affected)
 
 
-@receiver(pre_delete, sender=SomalierCohortRelate)
-@receiver(pre_delete, sender=SomalierTrioRelate)
-def somalier_relate_pre_delete_handler(sender, instance, **kwargs):  # pylint: disable=unused-argument
-    related_dir = instance.get_related_dir()
-    if os.path.exists(related_dir):
-        logging.info("Deleting %s - removing dir: %s", instance, related_dir)
-        shutil.rmtree(related_dir)
-
-
 class SomalierAllSamplesRelate(SomalierRelate):
     def get_sample_somalier_filenames(self) -> list[str]:
         cfg = SomalierConfig()
@@ -221,6 +240,31 @@ class SomalierAllSamplesRelate(SomalierRelate):
 
     def get_samples(self) -> Iterable[Sample]:
         return Sample.objects.filter(import_status=ImportStatus.SUCCESS)
+
+    @property
+    def genome_build(self) -> GenomeBuild:
+        """ These samples span builds and relate takes one sites VCF. The builds' sites files are the
+            same variants at different coordinates, differing in alleles at well under 1% of sites, so
+            the build most samples are in is the closest fit """
+        build_counts = self.get_samples().values("vcf__genome_build") \
+            .annotate(num_samples=Count("pk")).order_by("-num_samples")
+        if row := build_counts.first():
+            return GenomeBuild.get_name_or_alias(row["vcf__genome_build"])
+        return GenomeBuild.builds_with_annotation().first()
+
+    @property
+    def has_hom_ref_calls(self) -> bool:
+        return False  # Samples from different VCFs are never jointly called
+
+
+@receiver(pre_delete, sender=SomalierAllSamplesRelate)
+@receiver(pre_delete, sender=SomalierCohortRelate)
+@receiver(pre_delete, sender=SomalierTrioRelate)
+def somalier_relate_pre_delete_handler(sender, instance, **kwargs):  # pylint: disable=unused-argument
+    related_dir = instance.get_related_dir()
+    if os.path.exists(related_dir):
+        logging.info("Deleting %s - removing dir: %s", instance, related_dir)
+        shutil.rmtree(related_dir)
 
 
 class SomalierRelatePairs(models.Model):
@@ -273,6 +317,19 @@ class SomalierConfig:
     def get_sites(self, genome_build: 'GenomeBuild'):
         sites = self.settings["annotation"]["sites"][genome_build.name]
         return self._annotation_dir(sites)
+
+    def get_relate_sites_args(self, genome_build: 'GenomeBuild') -> list[str]:
+        """ somalier only counts hom-ref/hom-alt the right way round if relate is given the sites VCF
+            (v0.3.5, brentp/somalier#163). Older ones have no --sites at all, and we compensate in the
+            exported AD order instead - @see snpdb.variants_to_vcf.somalier_alleles_flipped """
+        if self.settings["compensate_allele_order"]:
+            return []
+        sites = self.get_sites(genome_build)
+        if not os.path.exists(sites):
+            raise ValueError(f"somalier relate needs the {genome_build} sites VCF '{sites}', which "
+                             "doesn't exist - it is what makes the counts right with "
+                             "SOMALIER['compensate_allele_order'] off")
+        return ["--sites", sites]
 
     def get_sites_vcf_name(self, genome_build: 'GenomeBuild') -> str:
         return os.path.basename(self.get_sites(genome_build))

@@ -1,5 +1,7 @@
 # Plan: Consolidate on `model_utils.TimeStampedModel`, remove `django_extensions`
 
+Status: draft
+
 Issue: sacgf/variantgrid_private#3437 — VariantGrid uses two `TimeStampedModel` implementations.
 
 ## Decision

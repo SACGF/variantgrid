@@ -10,6 +10,7 @@ from django.db.models.query_utils import Q
 
 from analysis.models.enums import GroupOperation
 from analysis.models.nodes.analysis_node import AnalysisNode, NodeAuditLogMixin
+from analysis.models.nodes.node_display import NodeIcon
 from annotation.models.models import VariantAnnotation
 from classification.enums import ClinicalSignificance
 from classification.models.classification import Classification
@@ -69,6 +70,20 @@ class PopulationNode(AnalysisNode):
         if not (common_variants or self._has_common_variants()):
             node_kwargs["common_variants"] = False
         return node_kwargs
+
+    def _get_live_data_sources(self) -> dict[str, int]:
+        """ The internal counts are the global zygosity collection, which every VCF import/delete rewrites.
+            The gnomAD/annotation filters are pinned to the annotation version so contribute nothing """
+        if self.use_internal_counts:
+            vzcc = VariantZygosityCountCollection.get_global_germline_counts()
+            return {vzcc.live_source_key: vzcc.data_version}
+        return {}
+
+    def get_live_data_notes(self) -> list[str]:
+        notes = super().get_live_data_notes()
+        if self.use_internal_counts:
+            notes.append("Uses live internal frequency counts (updated with each VCF import)")
+        return notes
 
     def _get_annotation_kwargs_for_node(self, **kwargs) -> dict:
         annotation_kwargs = super()._get_annotation_kwargs_for_node(**kwargs)
@@ -267,6 +282,10 @@ class PopulationNode(AnalysisNode):
     @staticmethod
     def get_node_class_label():
         return "Population"
+
+    @classmethod
+    def get_node_class_icon(cls) -> NodeIcon:
+        return NodeIcon(symbol="node-icon-population")
 
 
 class PopulationNodeGnomADPopulation(NodeAuditLogMixin, models.Model):

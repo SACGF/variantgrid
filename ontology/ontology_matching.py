@@ -262,9 +262,7 @@ class OntologyMatching:
         Given a gene symbol, provide all terms that have a relationship to that gene symbol
         """
         if gene_symbol := self.gene_symbol:
-            try:
-                OntologyTerm.get_gene_symbol(gene_symbol)
-            except ValueError:
+            if OntologyTerm.get_gene_symbol_or_none(gene_symbol) is None:
                 report_message(message=f"Could not resolve {gene_symbol} to HGNC OntologyTerm - can't do gene specific resolutions", level='warning')
                 return
 

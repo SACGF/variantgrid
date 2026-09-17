@@ -130,6 +130,7 @@ class Command(BaseCommand):
 
         @see https://github.com/SACGF/cdot
     """
+    category = "import"
 
     def add_arguments(self, parser):
         parser.add_argument('--genome-build', choices=self.genome_builds, required=False,

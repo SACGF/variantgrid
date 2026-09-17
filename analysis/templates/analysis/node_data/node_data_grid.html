@@ -4,11 +4,17 @@
 {% block css %}
 .node-grid-placeholder { padding: 12px; }
 .node-grid-placeholder .placeholder-buttons { display: flex; flex-direction: row; align-items: center; gap: 24px; }
-.node-grid-placeholder .placeholder-buttons a { display: flex; flex-direction: row; align-items: center; gap: 6px; text-decoration: none; }
+.node-grid-sorting-disabled { color: #8a6d3b; font-size: 11px; white-space: nowrap; }
+.node-grid-sorting-disabled i { margin-right: 3px; }
 {% endblock css %}
 {% block content %}
 <script>
 var nodeId = {{ node_id }};
+// Tag pills are read against the node the grid is showing - a tagging for someone else, or for
+// nobody yet, is marked rather than looking like this proband's. @see VariantGridFormat.tags
+var nodeProbandSampleId = {{ node_proband_sample_id|jsonify }};
+// A node above sample level is about a person without being about one of their VCFs
+var nodeProbandPatientId = {{ node_proband_patient_id|jsonify }};
 
 function selectVariant() {
     const variantId = $(this).attr("variant_id");
@@ -62,17 +68,20 @@ function gridComplete() {
     registerNodeGridDownloadButton("#placeholder-export-vcf-{{ node_id }}", {{ analysis_id }}, {{ node_id }},
                                    unique_code, 'vcf', false, "VCF");
 
-    // The deferred placeholder fires gridComplete for its empty datatype:'local' init (needed so
-    // the editor's everythingLoaded can proceed). Only a genuine row fetch (server datatype) counts
-    // as "loaded this session" - otherwise revisiting would auto-fire the query the user never asked for.
-    const grid = getGrid(nodeId, unique_code);
-    if (grid.jqGrid('getGridParam', 'datatype') !== 'local') {
+    // A deferred grid draws once with no rows (so the editor's everythingLoaded can proceed). Only a
+    // genuine row fetch counts as "loaded this session" - otherwise revisiting would auto-fire the
+    // query the user never asked for.
+    if (nodeGridHasData({{ node_id }}, unique_code)) {
         // Record this node-version as loaded so a later revisit re-shows it automatically (page-cache hit).
         aWin.loadedGridVersions = aWin.loadedGridVersions || {};
         aWin.loadedGridVersions[{{ node_id }}] = {{ node_version }};
 
         // Clear the grid-only overlay we put up when the user clicked "Show grid" (no-op otherwise).
         hideGridLoadingOverlay();
+
+        if (typeof isHorizontalMode === "function" && isHorizontalMode()) {
+            resizeGrid();  // fill the full width bottom panel the grid landed in
+        }
     }
 }
 
@@ -87,6 +96,35 @@ function getBams() {
     return bams;
 }
 
+
+/* CSV/VCF run as Celery jobs and hand back a file - the buttons show their progress, see
+   analysis_downloads.js. They're built once the table is, so they can read its live ajax params. */
+function addNodeGridExportButtons(unique_code) {
+    const toolbar = $("#node-grid-toolbar-{{ node_id }}");
+    const addButton = function(id, caption, title, exportType, useCanonicalTranscripts) {
+        const link = $("<a>", {id: id, class: "btn btn-outline-secondary btn-sm", title: title,
+                               href: "javascript:void(0)",
+                               html: '<i class="fas fa-download"></i> ' + caption}).appendTo(toolbar);
+        link.click(function() {
+            export_grid({{ analysis_id }}, {{ node_id }}, unique_code, exportType, useCanonicalTranscripts);
+        });
+        registerNodeGridDownloadButton("#" + id, {{ analysis_id }}, {{ node_id }}, unique_code,
+                                       exportType, useCanonicalTranscripts, caption);
+    };
+
+    addButton("node-grid-export-csv-{{ node_id }}", "CSV", "Download as CSV", 'csv', false);
+
+    const aWin = getAnalysisWindow();
+    if (aWin.ANALYSIS_SETTINGS && aWin.ANALYSIS_SETTINGS.canonical_transcript_collection) {
+        const ctc = aWin.ANALYSIS_SETTINGS.canonical_transcript_collection;
+        addButton("node-grid-export-canonical-csv-{{ node_id }}", "Canonical transcript CSV",
+                  "Download CSV using transcripts from " + ctc, 'csv', true);
+    }
+
+    addButton("node-grid-export-vcf-{{ node_id }}", "VCF", "Download as VCF", 'vcf', false);
+}
+
+
 $(document).ready(function() {
     // Need to capture unique code and pass to functions as pages may be redefined by further DOM manipulation before load()s etc come back
     const unique_code = "{{ node_id }}_{{ node_version }}";
@@ -94,27 +132,49 @@ $(document).ready(function() {
     const node_view_url = "{% url 'node_view' analysis_id analysis_version node_id node_version extra_filters %}";
     load_node_editor(node_view_url, unique_code);
 
-    const grid_url = "{% url 'node_grid_config' analysis_id analysis_version node_id node_version extra_filters %}";
+    const config_url = "{% url 'node_grid_config' analysis_id analysis_version node_id node_version extra_filters %}";
+    const handler_url = "{% url 'node_grid_handler' analysis_id %}";
     // Re-show instantly if this exact node-version was already loaded this session (page cache hit).
     const aWin = getAnalysisWindow();
     aWin.loadedGridVersions = aWin.loadedGridVersions || {};
     const alreadyLoaded = aWin.loadedGridVersions[{{ node_id }}] === {{ node_version }};
-    const autoLoad = {{ grid_auto_load|yesno:"true,false" }} || alreadyLoaded;
-    if (autoLoad) {
-        // We have retrieved it (or are about to) - show the grid, never the placeholder.
+    const wantsGrid = {{ grid_auto_load|yesno:"true,false" }} || alreadyLoaded;
+    // Nothing to show while the Editor tab is up, so don't pay for the rows - the tab-show handler
+    // in analysis.js fires the load we register below.
+    const gridTabHidden = typeof bottomPaneGridHidden === "function" && bottomPaneGridHidden();
+    const autoLoad = wantsGrid && !gridTabHidden;
+
+    const showGrid = function() {
         $("#grid-placeholder-{{ node_id }}").hide();
         $("#node-data-grid", "#" + unique_code).show();
+    };
+
+    if (autoLoad) {
+        // We have retrieved it (or are about to) - show the grid, never the placeholder.
+        showGrid();
     }
-    setupGrid(grid_url, {{ analysis_id }}, {{ node_id }}, {{ node_version }}, unique_code,
-              gridComplete, gridLoadError, on_error_function, autoLoad);
+    setupNodeGrid(config_url, handler_url, {{ analysis_id }}, {{ node_id }}, {{ node_version }}, unique_code,
+                  gridComplete, gridLoadError, on_error_function, autoLoad).then(function(built) {
+        if (built) {
+            addNodeGridExportButtons(unique_code);
+        }
+    });
+
+    const loadDeferredGrid = function() {
+        showGrid();
+        // Double-helix over just the grid section (editor stays usable) while phase 2 runs.
+        showGridLoadingOverlay("#node-grid-container");
+        loadNodeGridData({{ node_id }}, unique_code);  // fires deferred phase 2
+    };
+
+    if (gridTabHidden) {
+        // Picking the Grid tab is itself the user asking for the rows, so it stands in for the
+        // placeholder's "Show grid" click on a node over the row-count threshold
+        registerDeferredGridLoad(loadDeferredGrid, !wantsGrid);
+    }
     if (!autoLoad) {
-        $("#load-variants-{{ node_id }}").click(function() {
-            $("#grid-placeholder-{{ node_id }}").hide();
-            $("#node-data-grid", "#" + unique_code).show();
-            // Double-helix over just the grid section (editor stays usable) while phase 2 runs.
-            showGridLoadingOverlay("#node-grid-container");
-            loadNodeGridData({{ node_id }}, unique_code);  // fires deferred phase 2
-        });
+        // Over the row-count threshold - the placeholder gives the user the choice
+        $("#load-variants-{{ node_id }}").click(loadDeferredGrid);
     }
 });
 </script>
@@ -138,14 +198,17 @@ $(document).ready(function() {
 	</div>
 	{% endif %}
 	<div id='node-data-grid' class='node-data'{% if not grid_auto_load %} style='display: none'{% endif %}>
+	{# The tag widget takes the node from the grid it was raised in - @see showTagAutocomplete #}
+	<table id='grid-{{ node_id }}' class='grid' node_id='{{ node_id }}'>
+	</table>
+	{# Downloads and the sorting note sit under the grid on the pager's row (moved there by DataTableDefinition.setupDom) - space above the grid is rows the user can't see #}
 	{% if grid_sorting_disabled %}
-	<div class="alert alert-info" role="alert">
-        <b>Sorting is disabled</b> above {{ grid_sort_max_variants|intcomma }} variants (grid={{ grid_row_count|default_if_none:"?"|intcomma }}) Please add more filters to re-enable sorting.
+	<div class="node-grid-sorting-disabled" data-toolbar-bottom="#grid-{{ node_id }}"
+		 title="Sorting is disabled above {{ grid_sort_max_variants|intcomma }} variants - add more filters to re-enable it">
+		<i class="fas fa-sort"></i> Sorting disabled ({{ grid_row_count|default_if_none:"?"|intcomma }} variants)
 	</div>
 	{% endif %}
-	<table id='grid-{{ node_id }}' class='grid'>
-	</table>
-	<div id='pager-{{ node_id }}'></div>
+	<div id="node-grid-toolbar-{{ node_id }}" data-toolbar-bottom="#grid-{{ node_id }}"></div>
 	</div>
 	<div id='node-data-summary' class='node-data' style='display: none'>
 		Please select a column above and click "view"
@@ -158,4 +221,3 @@ $(document).ready(function() {
 </div>
 
 {% endblock content %}
-

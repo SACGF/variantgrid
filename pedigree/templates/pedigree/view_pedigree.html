@@ -2,15 +2,8 @@
 {% load related_data_tags %}
 {% load related_analyses_tags %}
 {% load crispy_forms_tags %}
-{% load static %}
 
 {% block title %}Pedigree: {{ pedigree.name }}{% endblock title %}
-{% block head %}
-{{ block.super }}
-<link rel="stylesheet" type="text/css" media="screen" href="{% static 'js/lib/free-jqgrid/css/ui.jqgrid.min.css' %}" />
-<script src="{% static 'js/lib/free-jqgrid/jquery.jqgrid.min.js' %}"></script>
-<script type="text/javascript" src="{% static 'js/grid.js' %}"></script>
-{% endblock %}
 {% block css %}
 	table {
 		border-collapse: collapse;
@@ -69,7 +62,6 @@
 {% endblock jshead %}
 
 {% block jsdocumentready %}
-    $("#pedigree-tabs").tabs();
     let crossLink = $("<a/>", {class: "cross-link", id: "cohort-link"}).html("View Cohort");
     $("#id_cohort").after(crossLink).change(cohortChange);
     cohortChange();
@@ -78,13 +70,14 @@
 
 {% block submenu_page_content %}
 <div id="pedigree-tabs">
-    <ul>
-        <li><a href="#details">Details</a></li>
+    <ul class="nav nav-tabs mb-4" role="tablist">
+        <li class="nav-item"><a class="nav-link show active" data-toggle="tab" role="tab" href="#details">Details</a></li>
         {% if has_write_permission %}
-        <li><a href="{% url 'group_permissions' 'pedigree.models.Pedigree' pedigree.pk %}">Sharing / Permissions</a></li>
+        <li class="nav-item"><a class="nav-link" data-toggle="tab" role="tab" href="#pedigree-permissions" data-href="{% url 'group_permissions' 'pedigree.models.Pedigree' pedigree.pk %}">Sharing / Permissions</a></li>
         {% endif %}
     </ul>
-    <div id="details">
+    <div class="tab-content">
+    <div class="tab-pane show active" role="tabpanel" id="details">
 	<form method="post">
 		{% csrf_token %}
 		<div id="pedigree">
@@ -107,6 +100,10 @@
         <button id='save-pedigree' class="btn btn-primary">save</button
 		</p>
 	</form>
+    </div>
+    {% if has_write_permission %}
+    <div class="tab-pane" role="tabpanel" id="pedigree-permissions"></div>
+    {% endif %}
     </div>
 </div>
 

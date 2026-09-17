@@ -1,3 +1,13 @@
+"""
+Variant identity. Sequence (unique by sha256 - save through the model), Locus (contig, position,
+ref: one per VCF line), Variant (locus, alt, svlen - build-specific, no build FK; builds come from
+the locus contig) and the build-independent Allele linked per build by VariantAllele. VariantCoordinate
+is the value object between HGVS, VCF and the database - canonicalise with as_internal_canonical_form
+before lookup or insert. Also the liftover records (LiftoverRun, AlleleLiftover, the AlleleSource
+family) and VariantCollection (a partitioned set of variants used as a cache). Gene-level variants
+are a declared hack: read snpdb/gene_level_variants.py before touching get_gene_level_q. Bulk
+insert goes through snpdb/variant_pk_lookup.py, not this module. snpdb/CLAUDE.md has the rules.
+"""
 import logging
 import re
 from collections import defaultdict
@@ -11,7 +21,7 @@ import pydantic
 from bioutils.sequences import reverse_complement
 from django.conf import settings
 from django.contrib.auth.models import User
-from django.db import IntegrityError, models
+from django.db import IntegrityError, models, transaction
 from django.db.models import F, QuerySet, Value
 from django.db.models.deletion import CASCADE, DO_NOTHING
 from django.db.models.fields import TextField
@@ -55,6 +65,10 @@ VARIANT_GENE_LEVEL_PATTERN = re.compile(
     rf"^{GENE_LEVEL_CONTIG_NAME}\s*:\s*(\d+)\s*-\s*\d+\s*({GENE_LEVEL_ALT_PATTERN.pattern})$")
 # matches anything hgvs-like before any fixes
 HGVS_UNCLEANED_PATTERN = re.compile(r"(^(N[MC]_|ENST)\d+.*:|[cnmg]\.|[^:]:[cnmg]).*\d+", re.IGNORECASE)
+
+
+# kwargs: old_allele, new_allele - sent after Allele.merge() moves everything across
+allele_merged_signal = django.dispatch.Signal()
 
 
 class Allele(FlagsMixin, PreviewModelMixin, models.Model):
@@ -179,16 +193,30 @@ class Allele(FlagsMixin, PreviewModelMixin, models.Model):
                 other_fc.classification_set.update(flag_collection=self.flag_collection)
             existing_allele_cc_names = self.clinicalcontext_set.values_list("name", flat=True)
             other_allele.clinicalcontext_set.exclude(name__in=existing_allele_cc_names).update(allele=self)
+            # Everything else pointing at the allele we're merging away - left behind these become records
+            # against an Allele with no variants (eg a tag that then can't be seen in either build - #1361)
+            other_allele.varianttag_set.update(allele=self)
+            other_allele.classification_set.update(allele=self)
+            other_allele.importedalleleinfo_set.update(allele=self)
+            other_allele.clinvarrecordcollection_set.update(allele=self)
+            # AlleleLiftover is unique on (liftover, allele) - if both were in a run, ours is the record of it
+            existing_liftover_ids = self.alleleliftover_set.values_list("liftover_id", flat=True)
+            other_allele.alleleliftover_set.exclude(liftover_id__in=existing_liftover_ids).update(allele=self)
             for va in other_allele.variantallele_set.all():
                 try:
-                    va.allele = self
-                    va.clingen_error = None  # clear any errors
-                    va.allele_linking_tool = allele_linking_tool
-                    va.save()
+                    # Savepoint - both alleles linking the same variant/build is normal, and an IntegrityError
+                    # that isn't rolled back aborts any transaction we're running inside
+                    with transaction.atomic():
+                        va.allele = self
+                        va.clingen_error = None  # clear any errors
+                        va.allele_linking_tool = allele_linking_tool
+                        va.save()
                 except IntegrityError:
                     logging.warning("VariantAllele exists with allele/build/variant of %s/%s/%s - deleting this one",
                                     va.allele, va.genome_build, va.variant)
                     va.delete()
+
+            allele_merged_signal.send_robust(sender=Allele, old_allele=other_allele, new_allele=self)
 
         return can_merge
 
@@ -214,6 +242,15 @@ class Allele(FlagsMixin, PreviewModelMixin, models.Model):
         alleles_with_variants_qs = Allele.objects.filter(variantallele__isnull=False)
         # distinct as the variantallele join returns an allele once per build it's already in
         return alleles_with_variants_qs.filter(~Q(variantallele__genome_build=genome_build)).distinct()
+
+    @staticmethod
+    def failed_liftover_for_build(genome_build, conversion_tool) -> QuerySet['Allele']:
+        """ Alleles still missing a variant in genome_build, where conversion_tool has already failed on them.
+            Mirrors AlleleLiftover.get_failed_conversion_tools - ie exactly the alleles a retry re-attempts """
+        return Allele.missing_variants_for_build(genome_build).filter(
+            alleleliftover__status=ProcessingStatus.ERROR,
+            alleleliftover__liftover__genome_build=genome_build,
+            alleleliftover__liftover__conversion_tool=conversion_tool).distinct()
 
     def __str__(self):
         name = f"Allele {self.pk}"
@@ -318,7 +355,8 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
 
     def format(self):
         if Sequence.allele_is_symbolic(self.alt):
-            range_end = self.position + abs(self.svlen)
+            # Formatting is used in error messages, so tolerate a missing svlen
+            range_end = self.position + abs(self.svlen or 0)
             return f"{self.chrom}:{self.position}-{range_end} {self.alt}"
         else:
             return f"{self.chrom}:{self.position} {self.ref}>{self.alt}"
@@ -417,6 +455,20 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
         if not self.is_symbolic:
             return True
         return self.alt in {VCFSymbolicAllele.DEL, VCFSymbolicAllele.DUP, VCFSymbolicAllele.INV}
+
+    @property
+    def symbolic_hgvs_interval(self) -> Optional[tuple[int, int]]:
+        """ 1-based inclusive interval the symbolic alt spans, ready to hand to HGVS.
+            <DEL>/<DUP> carry the VCF padding base at position; <INV> starts on it.
+            None for anything with no ranged HGVS form - <CNV>, <INS>, gene-level and
+            every explicit coordinate - which have to go through as_external_explicit() """
+        if not self.is_symbolic or self.svlen is None:
+            return None
+        if self.alt in {VCFSymbolicAllele.DEL, VCFSymbolicAllele.DUP}:
+            return self.position + 1, self.end
+        if self.alt == VCFSymbolicAllele.INV:
+            return self.position, self.end
+        return None
 
     def calculated_reference(self, genome_build) -> str:
         contig_sequence = genome_build.genome_fasta.fasta[self.chrom]
@@ -678,11 +730,12 @@ class Variant(PreviewModelMixin, models.Model):
         return Q(svlen__isnull=False)
 
     @staticmethod
-    def get_gene_level_q() -> Q:
+    def get_gene_level_q(path_to_variant: str = "") -> Q:
         """ Events with no coordinate (gene fusions) - @see snpdb.gene_level_variants.
             The single predicate for "keep this away from anything that reads a reference
-            sequence"; is_gene_level is the instance-level twin """
-        return Q(locus__contig__role=SequenceRole.VG_GENE_LEVEL_FAKE_CONTIG)
+            sequence"; is_gene_level is the instance-level twin.
+            path_to_variant walks from another model, e.g. "classification__allele_info__matched_variant__" """
+        return Q(**{f"{path_to_variant}locus__contig__role": SequenceRole.VG_GENE_LEVEL_FAKE_CONTIG})
 
     @cached_property
     def is_gene_level(self) -> bool:
@@ -823,9 +876,7 @@ class Variant(PreviewModelMixin, models.Model):
     @property
     def can_make_g_hgvs(self) -> bool:
         """ Can't form ones with some symbolic variants (eg <INS>) """
-        if self.is_symbolic:
-            return self.alt.seq in {VCFSymbolicAllele.DEL, VCFSymbolicAllele.DUP, VCFSymbolicAllele.INV}
-        return True
+        return self.coordinate.can_be_made_explicit
 
     @property
     def _clingen_allele_size(self) -> int:
@@ -861,7 +912,12 @@ class Variant(PreviewModelMixin, models.Model):
 
     @property
     def can_have_c_hgvs(self) -> bool:
-        return self.can_have_annotation and (self.svlen is None or abs(self.svlen) <= settings.HGVS_MAX_SEQUENCE_LENGTH)
+        if not self.can_have_annotation:
+            return False
+        if self.is_symbolic and self.can_make_g_hgvs:
+            # DEL/DUP/INV are HGVS from coordinates alone, at any size (#1571)
+            return True
+        return self.svlen is None or abs(self.svlen) <= settings.HGVS_MAX_SEQUENCE_LENGTH
 
     def as_tuple(self) -> tuple[str, int, str, str, int]:
         return self.locus.contig.name, self.locus.position, self.locus.ref.seq, self.alt.seq, self.svlen
@@ -953,11 +1009,10 @@ class VariantWiki(Wiki):
 
 
 class VariantAllele(TimeStampedModel):
-    """ It's possible for multiple variants from the same genome build to
-        resolve to the same allele (due to our normalization not being the same as ClinGen
-        or 2 loci in a genome build being represented by 1 loci in the build being used
-        by ClinGen) - but it's not likely. It's a bug to have the same 3 variant/build/allele
-        so we can add that unique_together constraint
+    """ One Allele per variant per build - that's the unique_together, and code relies on it (#1361)
+
+        Several variants in a build may share an Allele (our normalization isn't the same as ClinGen's,
+        or 2 loci in a genome build are 1 locus in the build ClinGen used) - but it's not likely.
 
         We only expect to store Alleles for a small fraction of Variants
         So don't want them on the Variant object - instead do 1-to-1 """
@@ -974,7 +1029,7 @@ class VariantAllele(TimeStampedModel):
     clingen_error = models.JSONField(null=True)  # null on success
 
     class Meta:
-        unique_together = ("variant", "genome_build", "allele")
+        unique_together = ("variant", "genome_build")
 
     @property
     def canonical_c_hgvs(self):
@@ -982,6 +1037,8 @@ class VariantAllele(TimeStampedModel):
 
     def needs_clingen_call(self):
         if settings.CLINGEN_ALLELE_REGISTRY_LOGIN and self.allele.clingen_allele is None:
+            if not self.variant.can_have_clingen_allele:
+                return False  # eg gene-level - @see clingen_allele_skip_reason
             if self.clingen_error:
                 # Retry if server was down
                 return self.clingen_error.get("errorType") == ClinGenAllele.CLINGEN_ALLELE_SERVER_ERROR_TYPE

@@ -7,6 +7,8 @@ from snpdb.models import Lab
 
 
 class Command(BaseCommand):
+    category = "ops"
+
     def add_arguments(self, parser):
         parser.add_argument('-lab_id', type=str, help="The lab_id with classifications that we want to change")
         parser.add_argument('-old_user_id', type=str, help="The user_id we don't want anymore")

@@ -11,6 +11,8 @@ class Command(BaseCommand):
     """
         At the moment this is only used for liftover but I'm using subcommands so we can have multiple fixes
     """
+    category = "one-off"
+
     def add_arguments(self, parser):
         subparsers = parser.add_subparsers(dest="command", help="Subcommands for different fixes")
         _liftover_parser = subparsers.add_parser('liftover', help='Re-link to any missing variants in other builds')

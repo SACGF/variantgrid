@@ -1,3 +1,6 @@
+"""
+Durations in seconds (MINUTE_SECS, HOUR_SECS, DAY_SECS, WEEK_SECS) for cache TTLs and schedules.
+"""
 MINUTE_SECS = 60
 HOUR_SECS = MINUTE_SECS * 60
 DAY_SECS = HOUR_SECS * 24

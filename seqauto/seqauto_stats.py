@@ -2,7 +2,7 @@ import logging
 import operator
 import re
 from functools import reduce
-from typing import Optional
+from typing import NamedTuple, Optional
 
 import numpy as np
 import pandas as pd
@@ -10,8 +10,22 @@ from django.conf import settings
 
 from library.utils.date_utils import get_months_since, month_range, parse_yymm
 from seqauto.models import SequencingRun, SequencingSample
+from snpdb.models import VariantsType
 
 SEQUENCING_RUN_DATE_PATTERN = re.compile(r"^(\d{4})\d{2}[_-]")
+
+ENRICHMENT_KIT_COL = "enrichment_kit__name"
+VARIANTS_TYPE_COL = "enrichment_kit__sample_variants_type"
+VARIANTS_TYPE_SERIES_COL = "variants_type_series"
+# Series per EnrichmentKit.sample_variants_type, somatic types combined as Sample.is_somatic does
+VARIANTS_TYPE_SERIES = {
+    VariantsType.GERMLINE: "Germline",
+    VariantsType.MIXED: "Somatic",
+    VariantsType.SOMATIC_ONLY: "Somatic",
+    VariantsType.UNKNOWN: "Unknown",
+}
+# The .allele-origin-box germline / somatic colours from global.scss
+VARIANTS_TYPE_SERIES_COLORS = {"Germline": "#88cc88", "Somatic": "#cc99cc", "Unknown": "#999999"}
 
 
 def get_sequencing_run_yymm(sequencing_run_name) -> Optional[str]:
@@ -24,27 +38,41 @@ def get_sequencing_run_yymm(sequencing_run_name) -> Optional[str]:
     return None
 
 
+def add_variants_type_series(df: pd.DataFrame) -> pd.DataFrame:
+    """ Adds the germline / somatic series column - a sample with no kit, or a kit left as Unknown, is "Unknown" """
+    variants_type = df[VARIANTS_TYPE_COL] if VARIANTS_TYPE_COL in df.columns else pd.Series(index=df.index, dtype=object)
+    df[VARIANTS_TYPE_SERIES_COL] = variants_type.map(VARIANTS_TYPE_SERIES).fillna(VARIANTS_TYPE_SERIES[VariantsType.UNKNOWN])
+    return df
+
+
 def get_sample_enrichment_kits_df():
     if settings.SEQAUTO_FAKE_SAMPLE_ENRICHMENT_KITS_DF:
         logging.info("Loading FAKE sample enrichment kits DF: %s", settings.SEQAUTO_FAKE_SAMPLE_ENRICHMENT_KITS_DF)
         df = pd.read_csv(settings.SEQAUTO_FAKE_SAMPLE_ENRICHMENT_KITS_DF)
-        return df
+        return add_variants_type_series(df)
 
     SEQUENCING_RUN_COL = "sample_sheet__sequencing_run"
-    values_qs = SequencingSample.get_current().values(SEQUENCING_RUN_COL, "enrichment_kit__name")
+    values_qs = SequencingSample.get_current().values(SEQUENCING_RUN_COL, ENRICHMENT_KIT_COL, VARIANTS_TYPE_COL)
     df = pd.DataFrame.from_records(values_qs)
     # May be no sequencing runs - in which case skip
     if SEQUENCING_RUN_COL not in df.columns:
         return df
+    df = add_variants_type_series(df)
 
     years = {}
     year_months = {}
     for i, sequencing_run_name in df[SEQUENCING_RUN_COL].items():
-        if yymm := get_sequencing_run_yymm(sequencing_run_name):
-            years[i] = int(yymm[:2])
-            year_months[i] = int(yymm)
-        else:
+        yymm = get_sequencing_run_yymm(sequencing_run_name)
+        if yymm is None:
             logging.warning("Skipping sequencing run %s - no YYMMDD date at start of name", sequencing_run_name)
+            continue
+        try:
+            parse_yymm(yymm)
+        except ValueError as ve:
+            logging.warning("Skipping sequencing run %s - %s", sequencing_run_name, ve)
+            continue
+        years[i] = int(yymm[:2])
+        year_months[i] = int(yymm)
 
     # Only keep rows we could date, so callers always see year/year_month/month_offset columns
     df = df.loc[list(year_months)].copy()
@@ -74,14 +102,31 @@ def year_month_formatter_start_to_end(start, end, year_month_start):
     return month_range(start_month, start_year, start, end)
 
 
-def group_enrichment_kits_df(df, by_column, max_groups=None, max_years=None):
-    """ returns (array of (enrichment_kit_name, data), labels)
-        max_groups=10 gives 9 groups with everything else as "other" """
+class EnrichmentKitGroups(NamedTuple):
+    """ Stacked bar series per enrichment kit, with the smallest kits summed into an "other" series """
+    data: list[tuple[str, list[int]]]
+    labels: list[str]
+    collapsed_count: int = 0
+
+    @property
+    def collapsed_help(self) -> Optional[str]:
+        if not self.collapsed_count:
+            return None
+        named_count = len(self.data) - 1
+        return (f"Showing the top {named_count} enrichment kits by sample count - "
+                f"the remaining {self.collapsed_count} are summed into 'other'")
+
+
+def group_enrichment_kits_df(df, by_column, max_groups=None, max_years=None,
+                             group_column=ENRICHMENT_KIT_COL) -> EnrichmentKitGroups:
+    """ One series per value of group_column (a kit name, or a VARIANTS_TYPE_SERIES_COL label).
+        max_groups=10 gives 9 named series with everything else as "other" """
     LABELS_FOR_COLUMNS = {"year": year_formatter_start_to_end,
                           "month_offset": year_month_formatter_start_to_end}
 
     enrichment_kit_data = []
     labels = []
+    collapsed_count = 0
 
     if not df.empty:
         if max_years is not None:
@@ -101,7 +146,7 @@ def group_enrichment_kits_df(df, by_column, max_groups=None, max_years=None):
             raise ValueError(f"by_column must be one of {label_options}")
         labels = get_labels_from_start_to_end(start, end, year_month_start)
 
-        for enrichment_kit_name, enrichment_kit_df in df.groupby("enrichment_kit__name"):
+        for enrichment_kit_name, enrichment_kit_df in df.groupby(group_column):
             array = [0] * array_size
 
             for value in enrichment_kit_df[by_column]:
@@ -112,6 +157,7 @@ def group_enrichment_kits_df(df, by_column, max_groups=None, max_years=None):
 
     if max_groups is not None and len(enrichment_kit_data) > max_groups:
         named_groups = max_groups - 1
+        collapsed_count = len(enrichment_kit_data) - named_groups
         enrichment_kit_data_sum = [(name, array, sum(array)) for name, array in enrichment_kit_data]
         enrichment_kit_data_sum = sorted(enrichment_kit_data_sum, key=operator.itemgetter(2), reverse=True)
         enrichment_kit_data = []
@@ -121,4 +167,4 @@ def group_enrichment_kits_df(df, by_column, max_groups=None, max_years=None):
         other_sum = reduce(operator.add, [np.array(array) for _, array, _ in enrichment_kit_data_sum[named_groups:]])
         enrichment_kit_data.append(("other", other_sum.tolist()))
 
-    return enrichment_kit_data, labels
+    return EnrichmentKitGroups(enrichment_kit_data, labels, collapsed_count)

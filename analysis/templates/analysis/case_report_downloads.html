@@ -1,0 +1,10 @@
+{% comment %}
+    One report's four documents. The HTML preview and the JSON come out of the CaseReport row, the
+    PDF and the Word file out of its media directory - all four through a permission checked view,
+    since MEDIA_ROOT has none of its own.
+{% endcomment %}
+<a class="mr-2" href="{% url 'view_case_report' case_report.pk %}" target="_blank"
+   title="The report as the scientist reads it"><i class="fas fa-eye mr-1"></i>Preview</a>
+<a class="mr-2" href="{% url 'case_report_download' case_report.pk 'pdf' %}"><i class="fas fa-file-pdf mr-1"></i>PDF</a>
+<a class="mr-2" href="{% url 'case_report_download' case_report.pk 'docx' %}"><i class="fas fa-file-word mr-1"></i>Word</a>
+<a class="mr-2" href="{% url 'case_report_download' case_report.pk 'json' %}"><i class="fas fa-file-code mr-1"></i>JSON</a>

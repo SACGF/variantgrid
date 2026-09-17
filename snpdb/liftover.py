@@ -43,16 +43,21 @@ LIFTOVER_TUPLE = tuple[Optional[AlleleConversionTool], Optional['VariantCoordina
 def create_liftover_pipelines(user: User, alleles: Iterable[Allele],
                               import_source: ImportSource,
                               inserted_genome_build: GenomeBuild,
-                              destination_genome_builds: list[GenomeBuild] = None):
+                              destination_genome_builds: list[GenomeBuild] = None,
+                              retry_conversion_tools: Iterable[AlleleConversionTool] = ()):
     """ Creates and runs a liftover pipeline for each destination GenomeBuild (default = all other builds)
 
         Alleles are handled in batches of settings.LIFTOVER_BATCH_SIZE - a batch's alleles, coordinates and
         AlleleLiftover records are all held in memory while its VCF is written, and anything that goes wrong
-        only takes out the batch rather than the whole run """
+        only takes out the batch rather than the whole run
+
+        retry_conversion_tools are attempted even for alleles they have already failed on (@see
+        _get_build_liftover_dicts) - use after fixing a bug or config problem that caused the failures """
 
     for allele_batch in _batch_alleles(alleles):
         _create_liftover_pipelines_for_batch(user, allele_batch, import_source,
-                                             inserted_genome_build, destination_genome_builds)
+                                             inserted_genome_build, destination_genome_builds,
+                                             retry_conversion_tools=retry_conversion_tools)
 
 
 def _batch_alleles(alleles: Iterable[Allele]) -> Iterable[list[Allele]]:
@@ -74,8 +79,9 @@ def _batch_alleles(alleles: Iterable[Allele]) -> Iterable[list[Allele]]:
 def _create_liftover_pipelines_for_batch(user: User, alleles: list[Allele],
                                          import_source: ImportSource,
                                          inserted_genome_build: GenomeBuild,
-                                         destination_genome_builds: list[GenomeBuild] = None):
-    build_liftover_existing_allele_and_variants, build_liftover_allele_variant_coordinate_error = _get_build_liftover_dicts(alleles, inserted_genome_build, destination_genome_builds)
+                                         destination_genome_builds: list[GenomeBuild] = None,
+                                         retry_conversion_tools: Iterable[AlleleConversionTool] = ()):
+    build_liftover_existing_allele_and_variants, build_liftover_allele_variant_coordinate_error = _get_build_liftover_dicts(alleles, inserted_genome_build, destination_genome_builds, retry_conversion_tools=retry_conversion_tools)
     for genome_build, liftover_tuples in build_liftover_existing_allele_and_variants.items():
         for conversion_tool, av_tuples in liftover_tuples.items():
             liftover = LiftoverRun.objects.create(user=user,
@@ -190,8 +196,12 @@ def _variant_allele_for_build(allele, genome_build: GenomeBuild) -> Optional['Va
 
 
 def _get_build_liftover_dicts(alleles: Iterable[Allele], inserted_genome_build: GenomeBuild,
-                              destination_genome_builds: list[GenomeBuild] = None) -> tuple[dict, dict]:
-    """ ID column set to allele_id """
+                              destination_genome_builds: list[GenomeBuild] = None,
+                              retry_conversion_tools: Iterable[AlleleConversionTool] = ()) -> tuple[dict, dict]:
+    """ ID column set to allele_id
+
+        Tools in retry_conversion_tools are dropped from each allele's already-failed set, so they are
+        attempted again - the earlier AlleleLiftover records are kept as history """
     if destination_genome_builds is None:
         destination_genome_builds = GenomeBuild.builds_with_annotation()
 
@@ -208,6 +218,7 @@ def _get_build_liftover_dicts(alleles: Iterable[Allele], inserted_genome_build: 
     allele_ids = [allele.pk for allele in alleles]
     alleles = _liftover_allele_qs(allele_ids)
     build_failed_tools = {gb: AlleleLiftover.get_failed_conversion_tools(allele_ids, gb) for gb in other_builds}
+    retry_tools = set(retry_conversion_tools)
 
     build_liftover_existing_allele_and_variants = defaultdict(lambda: defaultdict(list))  # Already lifted over
     build_liftover_allele_variant_coordinate_error = defaultdict(lambda: defaultdict(list))  # Need to run pipelines
@@ -230,7 +241,7 @@ def _get_build_liftover_dicts(alleles: Iterable[Allele], inserted_genome_build: 
                 continue
 
             hgvs_matcher = HGVSMatcher.instance(genome_build)
-            failed_tools = build_failed_tools[genome_build].get(allele.pk, set())
+            failed_tools = build_failed_tools[genome_build].get(allele.pk, set()) - retry_tools
 
             for tool_coordinate_error in itertools.chain(
                     _liftover_using_dest_variant_coordinate(allele, genome_build,
@@ -249,7 +260,8 @@ def _get_build_liftover_dicts(alleles: Iterable[Allele], inserted_genome_build: 
     return build_liftover_existing_allele_and_variants, build_liftover_allele_variant_coordinate_error
 
 
-def liftover_alleles(allele_qs, user: User = None):
+def liftover_alleles(allele_qs, user: User = None,
+                     retry_conversion_tools: Iterable[AlleleConversionTool] = ()):
     """ Creates then runs (async) liftover pipelines for a queryset of alleles """
     if user is None:
         user = admin_bot()
@@ -257,27 +269,42 @@ def liftover_alleles(allele_qs, user: User = None):
     for genome_build in GenomeBuild.builds_with_annotation():
         variants_qs = Variant.objects.filter(variantallele__allele__in=allele_qs)
         populate_clingen_alleles_for_variants(genome_build, variants_qs)
-        create_liftover_pipelines(user, allele_qs, ImportSource.WEB, inserted_genome_build=genome_build)
+        create_liftover_pipelines(user, allele_qs, ImportSource.WEB, inserted_genome_build=genome_build,
+                                  retry_conversion_tools=retry_conversion_tools)
 
 
 def _run_liftover_using_same_contig(liftover, av_tuples: list[tuple[Allele, Variant]]):
     """ Special case of e.g. Mitochondria that has the same contig across multiple builds
         we just need to create a VariantAllele object - will already have annotation for both builds """
 
+    # The destination variant may already have an Allele of its own (eg an MT variant imported straight into
+    # GRCh38 before the GRCh37 copy was lifted over) - a variant only ever has 1 Allele per build, so merge
+    existing_allele_id_by_variant_id = dict(
+        VariantAllele.objects.filter(genome_build=liftover.genome_build,
+                                     variant__in=[v for _, v in av_tuples]).values_list("variant_id", "allele_id"))
+
     variant_alleles = []
     allele_liftovers = []
     for allele, variant in av_tuples:
-        va = VariantAllele(variant=variant,
-                           genome_build=liftover.genome_build,
-                           allele=allele,
-                           origin=AlleleOrigin.LIFTOVER,
-                           allele_linking_tool=AlleleConversionTool.SAME_CONTIG)
-        variant_alleles.append(va)
+        if existing_allele_id := existing_allele_id_by_variant_id.get(variant.pk):
+            if existing_allele_id != allele.pk:
+                keep_id, other_id = sorted([existing_allele_id, allele.pk])
+                keep_allele = Allele.objects.get(pk=keep_id)
+                if not keep_allele.merge(AlleleConversionTool.SAME_CONTIG, Allele.objects.get(pk=other_id)):
+                    logging.warning("Couldn't merge 2xAlleles (same contig liftover) - Allele IDs: %s and %s",
+                                    keep_id, other_id)
+            status = ProcessingStatus.SKIPPED
+        else:
+            variant_alleles.append(VariantAllele(variant=variant,
+                                                 genome_build=liftover.genome_build,
+                                                 allele=allele,
+                                                 origin=AlleleOrigin.LIFTOVER,
+                                                 allele_linking_tool=AlleleConversionTool.SAME_CONTIG))
+            status = ProcessingStatus.SUCCESS
 
-        al = AlleleLiftover(allele=allele,
-                            liftover=liftover,
-                            status=ProcessingStatus.SUCCESS)
-        allele_liftovers.append(al)
+        allele_liftovers.append(AlleleLiftover(allele=allele,
+                                               liftover=liftover,
+                                               status=status))
 
     if variant_alleles:
         VariantAllele.objects.bulk_create(variant_alleles, ignore_conflicts=True, batch_size=2000)
@@ -414,19 +441,26 @@ def _liftover_using_source_variant_coordinate(allele, source_genome_build: Genom
             break  # Just want 1st one
 
 
-def allele_can_attempt_liftover(allele, genome_build) -> bool:
+def allele_can_attempt_liftover(allele, genome_build,
+                                retry_conversion_tools: Iterable[AlleleConversionTool] = ()) -> bool:
+    """ retry_conversion_tools are considered available even if they have already failed on this allele """
     conversion_tool, variant = _liftover_using_existing_contig(allele, genome_build)
     if conversion_tool and variant:
         return True
 
-    for conversion_tool, variant_coordinate, _error_message in _liftover_using_dest_variant_coordinate(allele, genome_build):
+    failed_tools = AlleleLiftover.get_failed_conversion_tools([allele.pk], genome_build).get(allele.pk, set())
+    failed_tools -= set(retry_conversion_tools)
+
+    for conversion_tool, variant_coordinate, _error_message in _liftover_using_dest_variant_coordinate(
+            allele, genome_build, failed_tools=failed_tools):
         if conversion_tool and variant_coordinate:
             return True
 
     for va in allele.variantallele_set.all():
         if va.genome_build_id == genome_build.pk:
             continue
-        for conversion_tool, variant_coordinate, _error_message in _liftover_using_source_variant_coordinate(allele, va.genome_build, genome_build):
+        for conversion_tool, variant_coordinate, _error_message in _liftover_using_source_variant_coordinate(
+                allele, va.genome_build, genome_build, failed_tools=failed_tools):
             if conversion_tool and variant_coordinate:
                 return True
 

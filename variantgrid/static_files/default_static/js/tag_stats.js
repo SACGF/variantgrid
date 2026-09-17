@@ -22,7 +22,7 @@ function tagStatsTimeAgo(isoString) {
 
 function tagStatsLayout(title, extra) {
     return Object.assign({
-        title: title,
+        title: {text: title},
         height: 400,
         margin: {t: 50, b: 100},
         legend: {orientation: "h"},

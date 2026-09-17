@@ -1,5 +1,6 @@
 {% load static %}
 {% load js_tags %}
+{% load analysis_node_tags %}
 {% if errors %}
 	<script type="text/javascript">
 		$(document).ready(function() {
@@ -13,6 +14,11 @@
 	<script type="text/javascript">
 	NODE_ID = "#analysis-node-{{ node.pk }}";
 
+	// Hooks the loaded editor fills in for the hidden fields it owns - a registry rather than
+	// global function names, so two editors can supply the same hook without one shadowing the
+	// other by load order. @see the vcf_locus_filter / allele_frequency tags and samplenode_editor
+	nodeEditorHooks = {};
+
 	function ajaxForm(selector, beforeSerializeFunc, successFunc) {
 		const options = {
 			target: "#node-editor-wrapper",
@@ -23,15 +29,11 @@
 			    submitButton.LoadingOverlay('show');
 
 				// Common hidden fields
-				if (typeof getAlleleFrequencyValues !== 'undefined') {
-					const afData = getAlleleFrequencyValues();
-					const afVal = JSON.stringify(afData);
-					$("input#id_allele_frequency").val(afVal);
+				if (nodeEditorHooks.getAlleleFrequencyValues) {
+					$("input#id_allele_frequency").val(JSON.stringify(nodeEditorHooks.getAlleleFrequencyValues()));
 				}
-				if (typeof getVCFLocusFilters !== 'undefined') {
-					const vcfFiltersData = getVCFLocusFilters();
-					const vcfFiltersVal = JSON.stringify(vcfFiltersData);
-					$("input#id_vcf_locus_filters").val(vcfFiltersVal);
+				if (nodeEditorHooks.getVCFLocusFilters) {
+					$("input#id_vcf_locus_filters").val(JSON.stringify(nodeEditorHooks.getVCFLocusFilters()));
 				}
 
 				if (beforeSerializeFunc) {
@@ -45,6 +47,10 @@
 						successFunc();
 					}
 					reloadNodeAndData({{ node.pk }});
+				} else {
+					// base_editor renders form.errors above the editor - say so in the console too
+					console.warn("Node {{ node.pk }} not saved - the form came back with errors",
+					             $(".node-editor-form-errors", "#node-editor-wrapper").text().trim());
 				}
 			},
 		};
@@ -52,22 +58,39 @@
 	}
 
 
+	function accordionPanels(accordion) {
+		// accordion_panel indexes the cards in document order
+		return $("> .card > .collapse", accordion);
+	}
+
+	function showAccordionPanel(accordion, index) {
+		accordionPanels(accordion).eq(index).collapse("show");
+	}
+
 	function accordionForm(formSelector) {
-		// Expects: ul.accordion and hidden input #id_accordion_panel that maps to accordion settings
+		// Expects: div.accordion of Bootstrap cards and hidden input #id_accordion_panel holding the open card's index
 
 		const accordion = $(".accordion", formSelector);
 		const accordionStateInput = $("#id_accordion_panel", formSelector);
+		const panels = accordionPanels(accordion);
 
-		accordion.accordion({
-			heightStyle: "content",
-			widthStyle: "fill",
-			active: parseInt(accordionStateInput.val()),
-			activate: function() {
-				const accordionId = $(this).accordion("option", "active");
-				accordionStateInput.val(accordionId);
+		accordion.on("shown.bs.collapse", "> .card > .collapse", function() {
+			accordionStateInput.val(panels.index(this));
+		});
+
+		// The open panel is what the node filters on, so keep one open - clicking the open header does nothing
+		accordion.on("click", "> .card > .card-header", function(event) {
+			if (!$(this).hasClass("collapsed")) {
+				event.stopPropagation();
 			}
 		});
 
+		// Open the stored panel by class so the editor doesn't animate as it loads
+		const activePanel = panels.eq(parseInt(accordionStateInput.val()) || 0);
+		panels.removeClass("show");
+		$("> .card > .card-header", accordion).addClass("collapsed");
+		activePanel.addClass("show");
+		activePanel.prev(".card-header").removeClass("collapsed");
 	}
 
 
@@ -100,6 +123,14 @@
 		$('.node-data', dataContainer).fadeOut().promise().done(fadeInFunc);
 	}
 
+	/* The summary/graph views render into the data container, which shares the bottom panel with the
+	   editor in horizontal mode - show the pane they land in */
+	function showNodeDataPane() {
+		if (typeof showBottomPaneTab === 'function') {
+			showBottomPaneTab(BOTTOM_PANE_GRID);
+		}
+	}
+
 	function load_column_summary() {
 		const column = $("select#id_column", "form#column-summary-form").val();
 		const base_url = "{% url 'node_column_summary' node.analysis_id node.analysis.version node.pk node.version extra_filters 'COLUMN' 3 %}";
@@ -107,18 +138,7 @@
 		const nodeDataSummary = $("#node-data-summary");
 
 		nodeDataSummary.load(url);
-	}
-
-
-	function createFilterChild(columnName, columnFilter) {
-		const CREATE_FILTER_CHILD_URL = "{% url 'create_filter_child' node.analysis_id node.id %}";
-		const data = 'column_name=' + columnName + '&column_filter=' + encodeURIComponent(columnFilter);
-		$.ajax({
-			type: "POST",
-			data: data,
-			url: CREATE_FILTER_CHILD_URL,
-			success: getAnalysisWindow().addConnectedNode,
-		});
+		showNodeDataPane();
 	}
 
 
@@ -142,6 +162,7 @@
 		const nodeDataSummary = $("#node-data-summary");
 		nodeDataSummary.html("Loading...");
 		nodeDataSummary.load(url);
+		showNodeDataPane();
 	}
 
 	function load_node_graph() {
@@ -154,25 +175,20 @@
 		const nodeDataGraph = $("#node-data-graphs");
 		nodeDataGraph.html("Loading...");
 		nodeDataGraph.load(url);
+		showNodeDataPane();
 	}
 
 	$(document).ready(function() {
-		const tab = $("#node-editor-tabs");
-		let params = {
-			activate: function (event, ui) {
-				const active = tab.tabs('option', 'active');
-				const activeTabLinkId = $("ul>li a", tab).eq(active).attr("id");
-				switch_node_data(activeTabLinkId);
-			}
-		};
-		tab.tabs(params);
+		$("#node-editor-tabs > ul.nav-tabs > li > a").on('shown.bs.tab', function () {
+			switch_node_data($(this).attr("id"));
+		});
+		if (typeof syncNodeEditorTabs === 'function') {
+			syncNodeEditorTabs();  // horizontal mode shows these tabs in the bottom pane or drawer bar
+		}
 
-		params = {
-			activate: function (event, ui) {
-				$("#node-data-summary").html("Please select configuration above and select view.");
-			}
-		};
-		$("#node-summary-tabs").tabs(params).addClass('ui-tabs-vertical ui-helper-clearfix');
+		$("#node-summary-tabs > ul.nav-tabs > li > a").on('shown.bs.tab', function () {
+			$("#node-data-summary").html("Please select configuration above and select view.");
+		});
 
 		$("#column-summary-button").click(load_column_summary);
 		$("#snp-matrix-button").click(load_snp_matrix_summary);
@@ -191,57 +207,80 @@
 
 	</script>
 	<style>
-	#locked-warning-icon {
-		font-size: 18px;
-	}
-
 	{% block style %}
 	{% endblock style %}
 	</style>
 	<div id="node-editor-wrapper" node_id="{{ node.pk }}">
 		<div id="node-editor-tabs">
-			<ul>
-				<li><a id='tab-link-grid' href="#node-grid">Grid</a></li>
+			<ul class="nav nav-tabs" role="tablist">
+				{# Horizontal mode mirrors these into the bottom pane strip, where this tab is the editor half #}
+				<li class="nav-item"><a id='tab-link-grid' class="nav-link show active" data-toggle="tab" role="tab" href="#node-grid">{% if node.analysis.analysis_horizontal_mode %}Editor{% else %}Grid{% endif %}</a></li>
 				{% block node_editor_tab_links_second %}{% endblock node_editor_tab_links_second %}
 
 				{% if node.visible %}
-					<li><a id='tab-link-summary' href="#node-summary">Summary</a></li>
-					<li><a id='tab-link-doc' href="{% url 'node_doc' node.analysis_id node.pk %}">Doc</a></li>
+					<li class="nav-item"><a id='tab-link-summary' class="nav-link" data-toggle="tab" role="tab" href="#node-summary">Summary</a></li>
+					<li class="nav-item"><a id='tab-link-doc' class="nav-link" data-toggle="tab" role="tab" href="#node-doc" data-href="{% url 'node_doc' node.analysis_id node.pk %}">Doc</a></li>
 					{% if graph_form %}
-					<li><a id='tab-link-graphs' href="#node-graphs">Graphs</a></li>
+					<li class="nav-item"><a id='tab-link-graphs' class="nav-link" data-toggle="tab" role="tab" href="#node-graphs">Graphs</a></li>
 					{% endif %}
 				{% else %}
 					{% block node_editor_not_visible_tab_links %}{% endblock node_editor_not_visible_tab_links %}
 				{% endif %}
 				{% if node.has_audit_log %}
-					<li><a id='tab-link-node-audit-log' href="{% url 'node_audit_log' node.analysis_id node.analysis.version node.pk node.version extra_filters %}">Audit Log</a></li>
+					<li class="nav-item"><a id='tab-link-node-audit-log' class="nav-link" data-toggle="tab" role="tab" href="#node-audit-log" data-href="{% url 'node_audit_log' node.analysis_id node.analysis.version node.pk node.version extra_filters %}">Audit Log</a></li>
 				{% endif %}
 				{% if node_debug_tab %}
-					<li><a id='tab-link-debug' href="{% url 'node_debug' node.analysis_id node.analysis.version node.pk node.version extra_filters %}">Debug</a></li>
+					<li class="nav-item"><a id='tab-link-debug' class="nav-link" data-toggle="tab" role="tab" href="#node-debug" data-href="{% url 'node_debug' node.analysis_id node.analysis.version node.pk node.version extra_filters %}">Debug</a></li>
 				{% endif %}
 				{% block node_editor_tab_links_end %}{% endblock node_editor_tab_links_end %}
 			</ul>
-			<div id="node-grid">
+			<div class="tab-content">
+			<div class="tab-pane show active" role="tabpanel" id="node-grid">
 				{% block node_filter_info %}
 					{% if extra_filters_label %}
-						<b>Filtering to:</b> <span class="node-count-{{ extra_filters }}"><span class='user-tag-colored'>{{ extra_filters_label }}</span> - <a href="javascript:createExtraFilterChild()">create child node.</a></span>
+						<div class="node-editor-filter-info">
+						<b>Filtering to:</b>
+						{% if extra_filters_tags %}
+							{# A selection can be several tags, each in its own colour #}
+							{% for tag_id, tag_label in extra_filters_tags %}<span class="node-count-{{ tag_label }}"><span class='user-tag-colored'>{{ tag_id }}</span></span>{% if not forloop.last %}, {% endif %}{% endfor %}
+							- <a href="javascript:createExtraFilterChild()">create child node.</a>
+						{% else %}
+							<span class="node-count-{{ extra_filters }}"><span class='user-tag-colored'>{{ extra_filters_label }}</span> - <a href="javascript:createExtraFilterChild()">create child node.</a></span>
+						{% endif %}
+						</div>
 					{% endif %}
 
 					{% if node.analysis.lock_input_sources and not node.has_input %}
-						<div>
+						<div class="editor-warning">
 						<i id='locked-warning-icon' class="fas fa-exclamation-triangle text-warning"></i>
 						<b>Analysis locked</b> - you cannot change samples.</div>
 					{% endif %}
 
-					<h4>
-						{{ node.get_node_class_label }}
+					<h4 class="node-editor-title">
+						{% render_node_icon_badge node %}
+						{# What the node is, matching the card's class strip - see get_node_strip_label() #}
+						{{ node.get_node_strip_label }}
 						<a target="_blank" href="{{ help_url }}analysis/nodes.html#{{ node.get_node_class_label|slugify }}">
 							<i title="Help docs on this node" class="fas fa-book"></i>
 						</a>
 					</h4>
 
 				{% endblock node_filter_info %}
+				{% if form.errors %}
+					{# The editor comes back re-rendered instead of saving - show why, wherever the editor
+					   template didn't render the field's own errors #}
+					<div class="alert alert-danger node-editor-form-errors">
+						<b>Not saved</b> {{ form.errors }}
+					</div>
+				{% endif %}
 				{% block content %}{% endblock content %}
+                {% if node_live_data_notes %}
+                    <div>
+                    {% for note in node_live_data_notes %}
+                        <div class='live-data-note'>&#9889; {{ note }}</div>
+                    {% endfor %}
+                    </div>
+                {% endif %}
                 {% if node_warnings %}
                     <div>
                     {% for w in node_warnings %}
@@ -253,52 +292,64 @@
 			</div>
 			{% if node.visible %}
 			{% block node_editor_tabs_second %}{% endblock node_editor_tabs_second %}
-			<div id="node-summary">
-				<div id='node-summary-tabs'>
-					<ul>
+			<div class="tab-pane" role="tabpanel" id="node-summary">
+				<div id='node-summary-tabs' class="vertical-tabs">
+					<ul class="nav nav-tabs flex-column" role="tablist">
 					{% block node_summary_tab_links %}{% endblock node_summary_tab_links %}
-					<li><a href='#column-summary-editor'>Column Summary</a></li>
-					<li><a href='#snp-matrix-editor'>SNP Matrix</a></li>
+					<li class="nav-item"><a class="nav-link show active" data-toggle="tab" role="tab" href='#column-summary-editor'>Column Summary</a></li>
+					<li class="nav-item"><a class="nav-link" data-toggle="tab" role="tab" href='#snp-matrix-editor'>SNP Matrix</a></li>
 					</ul>
-					<div id='column-summary-editor'>
+					<div class="tab-content">
+					<div class="tab-pane show active" role="tabpanel" id='column-summary-editor'>
 						<form id='column-summary-form'>
 							{% csrf_token %}
-							<div>
-							<div>
-							<span>{{ column_summary_form.column }}</span>
-							<span><button id='column-summary-button'  class="btn btn-outline-primary" type='button'>view</button></span>
-							</div>
+							<div class="editor-row">
+								<label class="editor-label" for="{{ column_summary_form.column.id_for_label }}">Column</label>
+								{{ column_summary_form.column }}
+								<button id='column-summary-button' class="btn btn-sm btn-outline-primary" type='button'>View</button>
 							</div>
 						</form>
 					</div>
-					<div id='snp-matrix-editor'>
+					<div class="tab-pane" role="tabpanel" id='snp-matrix-editor'>
 						<form id='snp-matrix-form'>
 							{% csrf_token %}
-							<table>
-							<tr>
-							<td>{{ snp_matrix_form.conversion }}</td>
-							<td><div id='significant-figures-container'>Sig figs: {{ snp_matrix_form.significant_figures }}</div></td>
-							<td><button id='snp-matrix-button' type='button' class="btn btn-outline-primary">view</button></td>
-							</tr>
-							</table>
+							<div class="editor-row">
+								<label class="editor-label" for="{{ snp_matrix_form.conversion.id_for_label }}">Conversion</label>
+								{{ snp_matrix_form.conversion }}
+								<span id='significant-figures-container'>Sig figs {{ snp_matrix_form.significant_figures }}</span>
+								<button id='snp-matrix-button' type='button' class="btn btn-sm btn-outline-primary">View</button>
+							</div>
 						</form>
+					</div>
 					</div>
 				</div>
 			</div>
+				<div class="tab-pane" role="tabpanel" id="node-doc"></div>
 				{% if graph_form %}
-				<div id="node-graphs">
+				<div class="tab-pane" role="tabpanel" id="node-graphs">
 					<form id="graph-node-form">
 						{% csrf_token %}
-						Graph: {{ graph_form.graph_type }}
-						Colormap: {{ graph_form.cmap }}
-						<button id='node-graph-editor-button' type='button' class="btn btn-outline-primary">view</button>
+						<div class="editor-row">
+							<label class="editor-label" for="{{ graph_form.graph_type.id_for_label }}">Graph</label>
+							{{ graph_form.graph_type }}
+							<label for="{{ graph_form.cmap.id_for_label }}">Colormap</label>
+							{{ graph_form.cmap }}
+							<button id='node-graph-editor-button' type='button' class="btn btn-sm btn-outline-primary">View</button>
+						</div>
 					</form>
 				</div>
 				{% endif %}
 			{% else %}
 			  {% block node_editor_not_visible_tab %}{% endblock node_editor_not_visible_tab %}
 			{% endif %}
+			{% if node.has_audit_log %}
+			<div class="tab-pane" role="tabpanel" id="node-audit-log"></div>
+			{% endif %}
+			{% if node_debug_tab %}
+			<div class="tab-pane" role="tabpanel" id="node-debug"></div>
+			{% endif %}
 			{% block node_editor_tabs_end %}{% endblock node_editor_tabs_end %}
+			</div>
 		</div>
 
 	</div>

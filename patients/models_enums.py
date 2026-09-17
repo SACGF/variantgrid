@@ -1,3 +1,10 @@
+"""
+Enums for patients, specimens and samples that other apps also read: Zygosity (the one-character
+codes packed into CohortGenotype.samples_zygosity, with the regex helpers), Sex, the specimen /
+extraction hierarchy levels and tissue status, population groups extending gnomAD, and matching
+statuses for externally managed records. Codes are stored in the database - add values, never
+renumber.
+"""
 from django.db import models
 from django.db.models import Q
 
@@ -7,6 +14,16 @@ from library.utils import Constant, get_single_element, invert_dict
 class NucleicAcid(models.TextChoices):
     DNA = 'D', 'DNA'
     RNA = 'R', 'RNA'
+
+
+class SampleSourceLevel(models.TextChoices):
+    """ A level of the Patient -> Specimen -> Extraction -> Sample hierarchy. Analysis source nodes
+        store one explicitly rather than inferring it from which FK is set - the editor has to draw
+        its tree before there is any value """
+    SAMPLE = 'S', 'Sample'
+    EXTRACTION = 'E', 'Extraction'
+    SPECIMEN = 'P', 'Specimen'
+    PATIENT = 'T', 'Patient'
 
 
 class TissueStatus(models.TextChoices):

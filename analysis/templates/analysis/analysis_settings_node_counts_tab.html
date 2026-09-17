@@ -1,4 +1,5 @@
 {% load js_tags %}
+{% load static %}
 <div id='analysis-settings-node-counts-tab'>
 {% include "uicore/messages/messages.html" %}
 <style>
@@ -37,6 +38,17 @@
         width: 100%;
     }
 
+    /* The list is as wide as the tab, so let a long tag name have all of it rather than the
+       width a grid cell can spare (@see .grid-tag in global.scss) */
+    .node-count-filter .grid-tag .user-tag-colored {
+        max-width: 100%;
+    }
+
+    .node-count-filter .grid-tag .tag-icon {
+        font-size: 8px;
+        margin-right: 3px;
+    }
+
     .legend-row {
         margin: 5px;
     }
@@ -52,9 +64,16 @@
        float: left;
     }
 
-    ul.ui-sortable {
+    #my_filters_sortable, #available_filters_sortable, #available_tags_sortable {
         /* Need somewhere to drag to if empty */
         min-height: 100px;
+        user-select: none;
+    }
+
+    #available_tags_sortable {
+        /* There can be a lot of tags - keep the columns beside each other a sane length */
+        max-height: 400px;
+        overflow-y: auto;
     }
 
 
@@ -62,26 +81,27 @@
     {% render_node_count_colors_css %}
 
 </style>
+{% render_tag_styles_and_formatter %}
+<script type="text/javascript" src="{% static 'js/lib/html5sortable/html5sortable.min.js' %}"></script>
 <script>
 	DIV_TO_RELOAD = '#analysis-settings-node-counts-tab';
 	var IN_ANALYSIS = $("#analysis-and-toolbar-container").length > 0;
     var nodeCountsChanged = false;
+    var NODE_COUNT_LISTS = "#my_filters_sortable, #available_filters_sortable, #available_tags_sortable";
 
 	function setupNodeCountsWidget() {
-        $("#my_filters_sortable").sortable({
+        // acceptFrom is the whole answer to "can this list take that item", so every list needs
+        // to be named - leaving one out stops it accepting its own items back
+        sortable(NODE_COUNT_LISTS, {
             items: "li.node-count-filter",
-            placeholder: "sort_placeholder",
-            connectWith: '#available_filters_sortable',
-        }).bind("sortupdate", function(event, ui) {
+            placeholderClass: "sort_placeholder",
+            acceptFrom: NODE_COUNT_LISTS,
+        });
+
+        // html5sortable fires sortupdate on the list the item was dropped into
+        $(NODE_COUNT_LISTS).on("sortupdate", function() {
             nodeCountsChanged = true;
-        }).disableSelection();
-        
-        
-        $("#available_filters_sortable").sortable({
-            items: "li.node-count-filter",
-            placeholder: "sort_placeholder",
-            connectWith: '#my_filters_sortable',
-        }).disableSelection();
+        });
 	}
 
     function serialize_columns() {
@@ -129,20 +149,42 @@
     {% csrf_token %}
 
     <div class="container no-gutters">
+    {% if is_analysis %}
         <div class="row">
-            <div class="col col-md-5">
+            <div class="col">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="id_node_count_auto_add_tags"
+                           name="node_count_auto_add_tags" {% if node_count_auto_add_tags %}checked{% endif %}
+                           {% if not has_write_permission %}disabled{% endif %} />
+                    <label class="form-check-label" for="id_node_count_auto_add_tags">
+                        Tagging a variant adds a node count for that tag
+                    </label>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+        <div class="row">
+            <div class="col col-md-4">
                 <h5>My Node Counts</h5>
                 <ul class="list-group" id="my_filters_sortable">
                     {% for nc in my_node_counts_list %}
-                        <li class="list-group-item node-count-filter cursor-move {{ nc.css_classes }}" id="{{ nc.pk }}" node_count_id="{{ nc.pk }}"><div class='user-tag-colored legend-color-box'></div><div class='legend-label'>{{ nc.description | safe  }}</div><div class='clear'></div></li>
+                        {% include "analysis/node_count_filter.html" %}
                     {% endfor %}
                 </ul>
             </div>
-            <div class="col col-md-5">
+            <div class="col col-md-4">
                 <h5>Available Node Counts</h5>
                 <ul class="list-group" id="available_filters_sortable">
                     {% for nc in available_node_counts_list %}
-                        <li class="list-group-item node-count-filter cursor-move {{ nc.css_classes }}" id="{{ nc.pk }}" node_count_id="{{ nc.pk }}"><div class='user-tag-colored legend-color-box'></div><div class='legend-label'>{{ nc.description | safe  }}</div><div class='clear'></div></li>
+                        {% include "analysis/node_count_filter.html" %}
+                    {% endfor %}
+                </ul>
+            </div>
+            <div class="col col-md-4">
+                <h5>Available Tags</h5>
+                <ul class="list-group" id="available_tags_sortable">
+                    {% for nc in available_tag_node_counts_list %}
+                        {% include "analysis/node_count_filter.html" %}
                     {% endfor %}
                 </ul>
             </div>

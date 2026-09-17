@@ -166,8 +166,7 @@ def format_alphamissense_pred(raw_value):
 
 
 # --- Shared factory instances -------------------------------------------------
-# Pre-built once so VEPColumnDefs can reference them directly. These mirror the
-# locals previously built inside BulkVEPVCFAnnotationInserter._add_vep_field_handlers.
+# Pre-built once so VEPColumnDefs can reference them directly.
 
 # TOPMED and 1k genomes can return multiple values - take highest
 format_pick_highest_float = get_clean_and_pick_single_value_func(max, float)

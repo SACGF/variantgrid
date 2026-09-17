@@ -1,4 +1,3 @@
-{% load jqgrid_tags %}
 <style>
 .qc-column-name {
 	text-align: right;
@@ -6,6 +5,6 @@
 </style>
 {% if gene_coverage %}
 <div id="gene-coverage">
-{% jqgrid 'gene_coverage_collection_grid' 'GeneCoverage' False None 'jqgrid/jqgrid.html' None False download_grid_json_as_csv=True gene_coverage_collection_id=gene_coverage.pk %}
+<table id="gene-coverage-grid" class="sticky-header" data-datatable-url="{% url 'gene_coverage_collection_datatable' gene_coverage_collection_id=gene_coverage.pk %}"></table>
 </div>
 {% endif %}

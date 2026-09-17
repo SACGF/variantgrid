@@ -3,16 +3,23 @@
 """
 from unittest import skip
 
+from django.conf import settings
 from django.test import TestCase, override_settings
 from hgvs.parser import Parser
-from hgvs_shim.hgvs_converter_biocommons import BioCommonsHGVSVariant
 
 from annotation.fake_annotation import get_fake_annotation_version
 from annotation.tests.test_data_fake_genes import (
     create_fake_transcript_version,
     create_gata2_transcript_version,
+    create_pten_transcript_version,
 )
-from genes.hgvs import HGVSConverterType, HGVSException, HGVSMatcher
+from genes.hgvs import (
+    HGVSConverterType,
+    HGVSException,
+    HGVSMatcher,
+    HGVSNoRepresentationException,
+    HGVSVariant,
+)
 from genes.hgvs.hgvs_matcher import FakeTranscriptVersion
 from snpdb.models import GenomeBuild, VariantCoordinate
 
@@ -86,7 +93,7 @@ class TestHGVS(TestCase):
 
         parser = Parser()
         for hgvs_string, hgvs_expected_trimmed in LONG_AND_TRIMMED_HGVS.items():
-            hgvs_variant = BioCommonsHGVSVariant(parser.parse(hgvs_string))
+            hgvs_variant = HGVSVariant(parser.parse(hgvs_string))
             hgvs_actual_trimmed = hgvs_variant.format(max_ref_length=10)
             self.assertEqual(hgvs_actual_trimmed, hgvs_expected_trimmed)
 
@@ -284,3 +291,82 @@ class TestHGVS(TestCase):
             def get_vc():
                 return matcher.get_variant_coordinate(hgvs_string)
             self.assertRaises(HGVSException, get_vc)
+
+
+@override_settings(HGVS_VALIDATE_REFSEQ_TRANSCRIPT_LENGTH=False)
+class TestSymbolicHGVS(TestCase):
+    """ #1571 - a ranged del/dup/inv is HGVS from coordinates alone, so symbolic CNVs resolve
+        without reading the reference, at any size. Coordinates here use ref='N': nothing in
+        this path looks at the reference or the transcript sequence. """
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.genome_build = GenomeBuild.grch37()
+        get_fake_annotation_version(cls.genome_build)
+        create_gata2_transcript_version(cls.genome_build)  # minus strand
+        create_pten_transcript_version(cls.genome_build)  # plus strand
+
+    @staticmethod
+    def _symbolic_coordinate(chrom: str, position: int, alt: str, svlen: int) -> VariantCoordinate:
+        return VariantCoordinate(chrom=chrom, position=position, ref='N', alt=alt, svlen=svlen)
+
+    def test_symbolic_hgvs_interval(self):
+        """ DEL/DUP carry the VCF padding base at position, so their interval opens 1 later.
+            <INV> is stored with the first inverted base at position """
+        DEL = self._symbolic_coordinate('3', 10070339, '<DEL>', -72609)
+        self.assertEqual((10070340, 10142948), DEL.symbolic_hgvs_interval)
+
+        DUP = self._symbolic_coordinate('1', 9770511, '<DUP>', 16595)
+        self.assertEqual((9770512, 9787106), DUP.symbolic_hgvs_interval)
+
+        INV = self._symbolic_coordinate('3', 127535894, '<INV>', 1184482)
+        self.assertEqual((127535894, 128720376), INV.symbolic_hgvs_interval)
+
+    def test_symbolic_hgvs_interval_none_without_ranged_form(self):
+        """ <CNV>/<INS> don't say what happened over the range, and explicit coordinates
+            have to go through as_external_explicit() """
+        for alt in ('<CNV>', '<INS>'):
+            vc = self._symbolic_coordinate('3', 10070339, alt, 72609)
+            self.assertIsNone(vc.symbolic_hgvs_interval, alt)
+
+        explicit = VariantCoordinate.from_explicit_no_svlen('3', 10070339, 'AT', 'A')
+        self.assertIsNone(explicit.symbolic_hgvs_interval)
+
+    def test_g_hgvs_beyond_max_sequence_length(self):
+        """ The 463kb DUP and 72kb DEL from the TSO500 CNV VCF in #1571 - the DUP is past even
+            HGVS_MAX_SEQUENCE_LENGTH_REPRESENTATIVE_TRANSCRIPT, and neither string carries sequence """
+        matcher = HGVSMatcher(self.genome_build, clingen_resolution=False)
+        EXPECTED = {
+            ('3', 134514471, '<DUP>', 463493): "NC_000003.11:g.134514472_134977964dup",
+            ('3', 10070339, '<DEL>', -72609): "NC_000003.11:g.10070340_10142948del",
+        }
+        for (chrom, position, alt, svlen), expected in EXPECTED.items():
+            vc = self._symbolic_coordinate(chrom, position, alt, svlen)
+            self.assertGreater(vc.max_sequence_length, settings.HGVS_MAX_SEQUENCE_LENGTH)
+            self.assertEqual(expected, matcher.variant_coordinate_to_g_hgvs(vc))
+
+        biggest = self._symbolic_coordinate('3', 134514471, '<DUP>', 463493)
+        self.assertGreater(biggest.max_sequence_length,
+                           settings.HGVS_MAX_SEQUENCE_LENGTH_REPRESENTATIVE_TRANSCRIPT)
+
+    def test_c_hgvs_symbolic_del_both_strands(self):
+        """ A 1kb DEL inside the transcript, projected onto a minus and a plus strand transcript """
+        matcher = HGVSMatcher(self.genome_build, clingen_resolution=False)
+        EXPECTED = {
+            ('3', 128200000, "NM_001145661.2"): "NM_001145661.2(GATA2):c.1018-213_1304del",  # minus
+            ('10', 89690000, "NM_000314.8"): "NM_000314.8(PTEN):c.210-802_253+154del",  # plus
+        }
+        for (chrom, position, transcript_accession), expected in EXPECTED.items():
+            vc = self._symbolic_coordinate(chrom, position, '<DEL>', -1000)
+            hgvs_variant = matcher.variant_coordinate_to_hgvs_variant(vc, transcript_accession)
+            self.assertEqual(expected, str(hgvs_variant))
+
+    def test_cnv_has_no_hgvs_representation(self):
+        """ #1574 - "copy number changed somewhere in here" has no HGVS, on either the g. or the c. path """
+        matcher = HGVSMatcher(self.genome_build, clingen_resolution=False)
+        vc = self._symbolic_coordinate('3', 128200000, '<CNV>', 1000)
+        with self.assertRaises(HGVSNoRepresentationException):
+            matcher.variant_coordinate_to_g_hgvs(vc)
+        with self.assertRaises(HGVSNoRepresentationException):
+            matcher.variant_coordinate_to_hgvs_variant(vc, "NM_001145661.2")

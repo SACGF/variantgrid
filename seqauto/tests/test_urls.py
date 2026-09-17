@@ -41,6 +41,11 @@ class Test(URLTestCase):
 
         GRID_LIST_URLS = [
             ("experiments_datatable", {}, 200),
+            ("sequencing_run_datatable", {}, 200),
+            ("unaligned_reads_datatable", {}, 200),
+            ("bam_file_datatable", {}, 200),
+            ("vcf_file_datatable", {}, 200),
+            ("qc_datatable", {}, 200),
             ("enrichment_kit_datatable", {}, 200),
             ("library_datatable", {}, 200),
             ("sequencer_datatable", {}, 200),
@@ -48,6 +53,12 @@ class Test(URLTestCase):
             ("aligner_datatable", {}, 200),
             ("variant_caller_datatable", {}, 200),
             ("variant_calling_pipeline_datatable", {}, 200),
+            ("illumina_flowcell_qc_datatable", {}, 200),
+            ("fastqc_datatable", {}, 200),
+            ("flagstats_datatable", {}, 200),
+            ("qc_exec_summary_datatable", {}, 200),
+            ("sequencing_samples_datatable", {}, 200),
+            ("sequencing_samples_historical_datatable", {"time_frame": "year"}, 200),
         ]
         self._test_datatable_urls(GRID_LIST_URLS, self.user_non_owner)
 

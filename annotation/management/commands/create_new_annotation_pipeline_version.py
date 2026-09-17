@@ -18,6 +18,8 @@ from annotation.pipelines import PIPELINES, get_runner, versioned_pipeline_types
 from snpdb.models.models_genome import GenomeBuild
 
 class Command(BaseCommand):
+    category = "ops"
+
     def add_arguments(self, parser):
         parser.add_argument("--pipeline-type", required=True,
                             choices=[pt.value for pt in versioned_pipeline_types()],

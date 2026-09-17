@@ -42,8 +42,8 @@ class Test(URLTestCase):
         ]
 
         # (url_name, url_kwargs, object to check appears in grid pk column or (grid column, object)
-        cls.PRIVATE_GRID_LIST_URLS = [
-            ("upload_pipeline_modified_variants_grid", upload_pipeline_kwargs, None),
+        cls.PRIVATE_DATATABLES_GRID_LIST_URLS = [
+            ("upload_pipeline_modified_variants_datatable", upload_pipeline_kwargs, None),
         ]
 
     def testUrls(self):
@@ -61,12 +61,12 @@ class Test(URLTestCase):
     def testNoPermission(self):
         self._test_urls(self.PRIVATE_OBJECT_URL_NAMES_AND_KWARGS, self.user_non_owner, expected_code_override=403)
 
-    def testJqGridListPermission(self):
-        self._test_jqgrid_urls_contains_objs(self.PRIVATE_GRID_LIST_URLS, self.user_owner, True)
+    def testDatatableGridListPermission(self):
+        self._test_datatables_grid_urls_contains_objs(self.PRIVATE_DATATABLES_GRID_LIST_URLS, self.user_owner, True)
 
     @prevent_request_warnings
-    def testJqGridListNoPermission(self):
-        self._test_jqgrid_urls_contains_objs(self.PRIVATE_GRID_LIST_URLS, self.user_non_owner, False)
+    def testDatatableGridListNoPermission(self):
+        self._test_datatables_grid_urls_contains_objs(self.PRIVATE_DATATABLES_GRID_LIST_URLS, self.user_non_owner, False)
 
 
 if __name__ == "__main__":

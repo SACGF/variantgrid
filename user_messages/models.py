@@ -1,3 +1,7 @@
+"""
+Private user-to-user messages: Message (Markdown body, read state) with MessageManager for the
+inbox queries the navigation badge uses.
+"""
 from django.conf import settings
 from django.db import models
 from django.urls import reverse

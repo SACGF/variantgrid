@@ -3,9 +3,10 @@ import re
 import uuid
 from collections.abc import Iterable
 from html import escape
-from typing import Any, Optional
+from typing import Any, Optional, Union
 
 from django import template
+from django.apps import apps
 from django.contrib.auth.models import User
 from django.db.models import Model
 from django.forms.utils import ErrorList
@@ -15,7 +16,7 @@ from django.utils.safestring import SafeString
 
 from library.enums.log_level import LogLevel
 from library.log_utils import log_level_to_bootstrap
-from library.preview_request import PreviewModelMixin
+from library.preview_request import PreviewData, PreviewModelMixin, preview_coordinator_icon_html
 from library.utils import diff_text, emoji_to_unicode, format_diff_text, html_id_safe, pretty_label
 from snpdb.admin_utils import get_admin_url
 from uicore.views.ajax_form_view import LazyRender
@@ -211,6 +212,7 @@ class LabelledValueTag(template.Node):
         self.show_if = show_if
 
     id_regex = re.compile(r"id=[\"|'](.*?)[\"|']")
+    form_control_id_regex = re.compile(r"<(?:input|select|textarea)\b[^>]*\bid=[\"'](.*?)[\"']", re.IGNORECASE)
     big_zero = re.compile(r"^0([.]0+)?$")
 
     def render(self, context):
@@ -278,11 +280,15 @@ class LabelledValueTag(template.Node):
                 give_div_id = False
 
         div_id = ""
+        if complete_id and give_div_id:
+            div_id = f"id=\"{complete_id}\""
+
+        # Nearly all rows are read-only values - a <label for> pointing at the value div is invalid
+        # and gets announced as a form field, so only use a label when we're wrapping a real control
         for_id = ""
-        if complete_id:
-            if give_div_id:
-                div_id = f"id=\"{complete_id}\""
-            for_id = f"for=\"{complete_id}\""
+        if '<label' not in output:
+            if form_control := LabelledValueTag.form_control_id_regex.search(output):
+                for_id = form_control.group(1)
 
         if output in ("", "None"):
             output = "<span class=\"no-value\">-</span>"
@@ -300,7 +306,10 @@ class LabelledValueTag(template.Node):
             help_attr = f'title=\"{label}\" data-help=\"{help_html}\"'
             # help_tag = f' <i class="fas fa-duotone fa-info-circle hover-detail popover-hover-stay text-info" data-toggle="popover" popover-header="{label}" data-html="true" data-placement="left" data-content="{help_html}"></i>'
 
-        label_tag = f'<label {for_id} class="{label_css}" { help_attr }>{label}</label>'
+        if for_id:
+            label_tag = f'<label for="{for_id}" class="{label_css}" { help_attr }>{label}</label>'
+        else:
+            label_tag = f'<div class="field-label {label_css}" { help_attr }>{label}</div>'
         content = f"""{label_tag}<div {div_id} class="{value_css}">{output}</div>"""
 
         if hint == "inline":
@@ -478,7 +487,8 @@ def danger_badge(count: Optional[int]) -> str:
 
 
 @register.filter()
-def badge(count: Optional[int], status: Optional[str] = None) -> str:
+def badge(count: Union[int, str, None], status: Optional[str] = None) -> str:
+    """ count is usually a number, but can be a short label such as "hidden: 1" """
     if count is None:
         return ""
     if status is None:
@@ -720,6 +730,23 @@ def enrich(text: str):
 @register.inclusion_tag("uicore/tags/preview_tag.html")
 def preview(obj: PreviewModelMixin):
     return {"preview": obj.preview}
+
+
+@register.simple_tag
+def preview_icon(preview_coordinator, css_class: str = "") -> SafeString:
+    """ The icon for a model, model class or PreviewData - FontAwesome, or an SVG symbol where the model
+        has one, see PreviewModelMixin.preview_icon_html """
+    if preview_coordinator is None:
+        return SafeString("")
+    if isinstance(preview_coordinator, PreviewData):
+        return preview_coordinator.icon_html(css_class)
+    return preview_coordinator_icon_html(preview_coordinator, css_class)
+
+
+@register.simple_tag
+def preview_icon_for_model(model_label: str, css_class: str = "") -> SafeString:
+    """ The icon for a model named "app_label.ModelName" - for labelling a control rather than a record """
+    return preview_coordinator_icon_html(apps.get_model(model_label), css_class)
 
 
 @register.filter(name="field_errors")

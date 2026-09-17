@@ -67,7 +67,7 @@
             {% ui_register_tab tab_set="analysis_tab" url='view_annotation_version_details' param=analysis.annotation_version.pk label="Annotation Version" %}
         {% endif %}
         {% if analysis.analysistemplaterun or analysis.template_type != 'T' %}
-            {% ui_register_tab tab_set="analysis_tab" url='analysis_settings_template_tab' param=analysis.pk label="Template" %}
+            {% ui_register_tab tab_set="analysis_tab" url='analysis_settings_template_tab' param=analysis.pk label="Template" badge=hidden_badge badge_status="light" %}
         {% endif %}
         {% if analysis.has_audit_log %}
             {% ui_register_tab tab_set="analysis_tab" url='analysis_settings_audit_log_tab' param=analysis.pk label="Audit Log" %}
@@ -99,6 +99,7 @@
 	<hr>
 	<div>
         <button class="btn btn-outline-primary fas fas-fw fa-window-close" id='close-analysis-settings' type='button'>Close</button>
+        <a class="btn btn-outline-primary fas fa-download" href="{% url 'analysis_export' analysis.pk %}">Export</a>
         {% if has_write_permission %}
 		    <button class="btn btn-outline-danger fas fa-redo" id='force-reload-nodes-button' type='button'>Force Reload All Nodes</button>
 		    <button class="btn btn-outline-danger fas fa-redo" id='force-reload-error-nodes-button' type='button'>Force Reload Error Nodes</button>

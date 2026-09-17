@@ -1,0 +1,247 @@
+{% comment %}
+Icons that FontAwesome doesn't have - referenced by id from NodeIcon(symbol=...) - see node_display.py -
+and from SvgSymbolPreviewIconMixin, so the Trio/Pedigree pages wear the same icons as their analysis nodes.
+
+Strokes and fills are currentColor so the same symbol picks up the node's accent colour on the white
+badge and in the add-node dropdown - see --node-accent-color in analysis_nodes.css. Symbols carry
+their own viewBox, so <use> scales them to whatever width/height the <svg class="node-icon"> is given.
+{% endcomment %}
+<svg xmlns="http://www.w3.org/2000/svg" style="display: none" aria-hidden="true" id="node-icon-sprite">
+    {# Sample - pedigree notation: square male, circle female, struck through if deceased #}
+    <symbol id="node-icon-sample" viewBox="0 0 24 24">
+        <rect x="4" y="4" width="16" height="16" fill="none" stroke="currentColor" stroke-width="3"/>
+    </symbol>
+    <symbol id="node-icon-sample-male" viewBox="0 0 24 24">
+        <rect x="4" y="4" width="16" height="16" fill="none" stroke="currentColor" stroke-width="3"/>
+    </symbol>
+    <symbol id="node-icon-sample-female" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="3"/>
+    </symbol>
+    <symbol id="node-icon-sample-male-deceased" viewBox="0 0 24 24">
+        <g fill="none" stroke="currentColor" stroke-width="3">
+            <rect x="4" y="4" width="16" height="16"/>
+            <path d="M21 3 L3 21"/>
+        </g>
+    </symbol>
+    <symbol id="node-icon-sample-female-deceased" viewBox="0 0 24 24">
+        <g fill="none" stroke="currentColor" stroke-width="3">
+            <circle cx="12" cy="12" r="8.5"/>
+            <path d="M21 3 L3 21"/>
+        </g>
+    </symbol>
+
+    {# Input samples - the pedigree square and circle, overlapped to say "more than one" #}
+    <symbol id="node-icon-samples" viewBox="0 0 27 27">
+        <g fill="none" stroke="currentColor" stroke-width="2.4">
+            <rect x="1.5" y="1.5" width="15.5" height="15.5"/>
+            <circle cx="18.3" cy="18.3" r="7.5"/>
+        </g>
+    </symbol>
+
+    {% comment %}
+    Trio - two parents and an affected proband. The parents fill in when the page marks them affected:
+    set --pedigree-father-fill / --pedigree-mother-fill on the svg that uses this symbol. The stroke is
+    weighted for badge size, so a page drawing it large wants --pedigree-stroke-width around 1.5.
+    {% endcomment %}
+    <symbol id="node-icon-trio" viewBox="0 0 32 26">
+        <g fill="none" stroke="currentColor" style="stroke-width: var(--pedigree-stroke-width, 2.6)">
+            <rect x="2" y="2" width="8" height="8" style="fill: var(--pedigree-father-fill, none)"/>
+            <circle cx="26" cy="6" r="4.5" style="fill: var(--pedigree-mother-fill, none)"/>
+            <path d="M10 6 H21.5 M16 6 V15"/>
+            <circle cx="16" cy="20" r="4.5" fill="currentColor"/>
+        </g>
+    </symbol>
+
+    {# Quad - trio plus a sibling, same affected fills as Trio plus --pedigree-sibling-fill #}
+    <symbol id="node-icon-quad" viewBox="0 0 36 26">
+        <g fill="none" stroke="currentColor" style="stroke-width: var(--pedigree-stroke-width, 2.6)">
+            <rect x="2" y="2" width="8" height="8" style="fill: var(--pedigree-father-fill, none)"/>
+            <circle cx="30" cy="6" r="4.5" style="fill: var(--pedigree-mother-fill, none)"/>
+            <path d="M10 6 H25.5 M18 6 V13 M10 13 H26 M10 13 V16 M26 13 V16"/>
+            <circle cx="10" cy="20" r="4.5" fill="currentColor"/>
+            <rect x="21.5" y="15.5" width="9" height="9" style="fill: var(--pedigree-sibling-fill, none)"/>
+        </g>
+    </symbol>
+
+    {% comment %}
+    Duo - the affected proband with one relative, drawn as a parent above them or a sibling beside
+    them under a sibship bar. Both halves are in the symbol and duo-sibling swaps which one shows
+    (see --pedigree-duo-* in global.scss); within the parent half both shapes are drawn and
+    duo-mother/duo-father blanks out the one the relationship rules out. relative-affected fills
+    whichever relative shape is left. With none of those classes the overlapped square and circle
+    read as "a relative", which is what the empty DuoNode icon wants.
+    {% endcomment %}
+    <symbol id="node-icon-duo" viewBox="0 0 20 26">
+        <g fill="none" stroke="currentColor" style="stroke-width: var(--pedigree-stroke-width, 2.6)">
+            <g style="display: var(--pedigree-duo-parent-display, inline)">
+                <rect x="6" y="2" width="8" height="8"
+                      style="fill: var(--pedigree-duo-square-fill, var(--pedigree-relative-fill, none));
+                             stroke: var(--pedigree-duo-square-stroke, currentColor)"/>
+                <circle cx="10" cy="6" r="4.5"
+                        style="fill: var(--pedigree-duo-circle-fill, var(--pedigree-relative-fill, none));
+                               stroke: var(--pedigree-duo-circle-stroke, currentColor)"/>
+                <path d="M10 10.5 V15.5"/>
+                <circle cx="10" cy="20" r="4.5" fill="currentColor"/>
+            </g>
+            <g style="display: var(--pedigree-duo-sibling-display, none)">
+                <path d="M5 12 H15 M5 12 V15.5 M15 12 V15.5"/>
+                <circle cx="5" cy="20" r="4.5" fill="currentColor"/>
+                <rect x="11" y="16" width="8" height="8" style="fill: var(--pedigree-relative-fill, none)"/>
+                <circle cx="15" cy="20" r="4.5" style="fill: var(--pedigree-relative-fill, none)"/>
+            </g>
+        </g>
+    </symbol>
+
+    {# Pedigree - three generations, which is what tells it apart from Trio/Quad #}
+    <symbol id="node-icon-pedigree" viewBox="0 0 50 36">
+        <g fill="none" stroke="currentColor" stroke-width="2.4">
+            <rect x="8" y="2" width="6.5" height="6.5"/>
+            <circle cx="24" cy="5.2" r="3.5"/>
+            <path d="M14.5 5.2 H20.5 M17.5 5.2 V12 M8 12 H36 M8 12 V15.5 M22 12 V15.5 M36 12 V15.5"/>
+            <circle cx="8" cy="19" r="3.5"/>
+            <rect x="18.8" y="15.5" width="6.5" height="6.5"/>
+            <circle cx="36" cy="19" r="3.5"/>
+            <path d="M25.3 19 H32.5 M29 19 V25 M18 25 H40 M18 25 V28.5 M29 25 V28.5 M40 25 V28.5"/>
+            <rect x="14.8" y="28.5" width="6.5" height="6.5" fill="currentColor"/>
+            <circle cx="29" cy="32" r="3.5"/>
+            <rect x="36.8" y="28.5" width="6.5" height="6.5"/>
+        </g>
+    </symbol>
+
+    {# Venn - two overlapping sets #}
+    <symbol id="node-icon-venn" viewBox="0 0 34 24">
+        <g fill="none" stroke="currentColor" stroke-width="2.4">
+            <circle cx="13" cy="12" r="9"/>
+            <circle cx="21" cy="12" r="9"/>
+        </g>
+    </symbol>
+
+    {# Gene list - one big letterform, which reads at badge size where a stack of small ones doesn't #}
+    <symbol id="node-icon-gene-list" viewBox="0 0 18 20">
+        <text x="9" y="16.8" text-anchor="middle" fill="currentColor"
+              font-family="ui-monospace, monospace" font-size="20" font-weight="800">G</text>
+    </symbol>
+
+    {# Effect - the bolt, drawn rather than FontAwesome so the gold keeps a darker keyline on white #}
+    <symbol id="node-icon-effect" viewBox="0 0 24 24">
+        <path d="M14 1.5 L4.5 14 H10.5 L9 22.5 L19.5 9.5 H13 Z" fill="currentColor"
+              stroke="#8a6400" stroke-width="1.4" stroke-linejoin="round"/>
+    </symbol>
+
+    {# Population - wireframe globe, which survives the size cut where continents don't #}
+    <symbol id="node-icon-population" viewBox="0 0 24 24">
+        <g fill="none" stroke="currentColor" stroke-width="2.1">
+            <circle cx="12" cy="12" r="9.5"/>
+            <ellipse cx="12" cy="12" rx="4" ry="9.5"/>
+            <path d="M2.5 12 H21.5"/>
+        </g>
+    </symbol>
+
+    {# Zygosity - Punnett square #}
+    <symbol id="node-icon-zygosity" viewBox="0 0 28 28">
+        <g fill="none" stroke="currentColor" stroke-width="2.6">
+            <rect x="3" y="3" width="22" height="22" rx="2"/>
+            <path d="M14 3 V25 M3 14 H25"/>
+        </g>
+    </symbol>
+
+    {# Mode of inheritance - allele transmission, deliberately no people shapes (Trio owns those) #}
+    <symbol id="node-icon-moi" viewBox="0 0 24 26">
+        <g fill="currentColor" font-family="ui-monospace, monospace" font-size="11" font-weight="800"
+           text-anchor="middle">
+            <text x="12" y="9">Aa</text>
+            <text x="12" y="25">aa</text>
+        </g>
+        <path d="M12 11.5 V18 M9 15 L12 19 L15 15" fill="none" stroke="currentColor" stroke-width="2.2"
+              stroke-linecap="round" stroke-linejoin="round"/>
+    </symbol>
+
+    {# Intervals intersection - a chromosome ideogram with a banded region #}
+    <symbol id="node-icon-intervals" viewBox="0 0 44 24">
+        <rect x="2" y="8" width="15" height="8" rx="4" fill="none" stroke="currentColor" stroke-width="2.4"/>
+        <rect x="19" y="8" width="23" height="8" rx="4" fill="none" stroke="currentColor" stroke-width="2.4"/>
+        <rect x="25" y="9.5" width="6" height="5" fill="currentColor"/>
+    </symbol>
+
+    {# Conservation - an alignment stepping through conserved blocks #}
+    <symbol id="node-icon-conservation" viewBox="0 0 30 26">
+        <path d="M3 22 H10 M10 22 V8 M10 8 H16 M10 15 H20 M20 15 V11 M20 11 H26 M20 19 H26 M16 8 V5 M16 5 H26"
+              fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/>
+    </symbol>
+
+    {# Merge - three lanes joining into one, turned downward to match the DAG's flow #}
+    <symbol id="node-icon-merge" viewBox="0 0 32 30">
+        <g fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M5 3 C5 11, 9 14.5, 14.5 17.5"/>
+            <path d="M27 3 C27 11, 23 14.5, 17.5 17.5"/>
+            <path d="M16 3 V17"/>
+            <path d="M16 17.5 V26 M11.8 22 L16 26.5 L20.2 22"/>
+        </g>
+    </symbol>
+    {% comment %}
+    Uploaded file types - drawn for upload/file_type_icons.py where FontAwesome and the node badges had nothing
+    that said it. Sized by .file-type-icon in global.scss; the fixed colours are the ones the drawing needs
+    (the extra copy's red, the fusion partner's orange, the old build's grey), everything else is currentColor.
+    {% endcomment %}
+    {# VCF - a file with the format on a band #}
+    <symbol id="file-icon-vcf" viewBox="0 0 40 40">
+        <path d="M8 3 H24 L33 12 V37 H8 Z M24 3 V12 H33" fill="none" stroke="currentColor" stroke-width="2.6"
+              stroke-linejoin="round"/>
+        <rect x="3" y="18" width="34" height="13" rx="2.5" fill="currentColor"/>
+        <text x="20" y="28.4" text-anchor="middle" font-family="-apple-system, Helvetica, Arial, sans-serif"
+              font-size="10.5" font-weight="800" fill="#fff">VCF</text>
+    </symbol>
+
+    {# Gene-level copy number - two copies becoming three #}
+    <symbol id="file-icon-copy-number" viewBox="0 0 40 40">
+        <g fill="currentColor">
+            <rect x="2" y="15.5" width="13" height="4" rx="2"/>
+            <rect x="2" y="21.5" width="13" height="4" rx="2"/>
+            <rect x="26" y="12.5" width="13" height="4" rx="2" fill="#c0392b"/>
+            <rect x="26" y="18.5" width="13" height="4" rx="2"/>
+            <rect x="26" y="24.5" width="13" height="4" rx="2"/>
+        </g>
+        <path d="M17.5 20.5 H23 M20.5 17.5 L23.5 20.5 L20.5 23.5" fill="none" stroke="#6c757d" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round"/>
+    </symbol>
+
+    {# Fusion - two partner genes joined at the breakpoint #}
+    <symbol id="file-icon-fusion" viewBox="0 0 40 40">
+        <clipPath id="file-icon-fusion-clip"><rect x="3" y="14" width="34" height="12" rx="6"/></clipPath>
+        <g clip-path="url(#file-icon-fusion-clip)">
+            <rect x="3" y="14" width="17" height="12" fill="currentColor"/>
+            <rect x="20" y="14" width="17" height="12" fill="#e07a2f"/>
+        </g>
+    </symbol>
+
+    {# Gene coverage - read depth over the gene #}
+    <symbol id="file-icon-gene-coverage" viewBox="0 0 40 40">
+        <g fill="currentColor" opacity=".55">
+            <rect x="4" y="19" width="4" height="8"/><rect x="9" y="11" width="4" height="16"/>
+            <rect x="14" y="14" width="4" height="13"/><rect x="19" y="6" width="4" height="21"/>
+            <rect x="24" y="12" width="4" height="15"/><rect x="29" y="20" width="4" height="7"/>
+            <rect x="34" y="23" width="2" height="4"/>
+        </g>
+        <rect x="3" y="30" width="34" height="6" rx="3" fill="currentColor"/>
+    </symbol>
+
+    {# Liftover - the same variant re-plotted from the old build (grey) onto the new one #}
+    <symbol id="file-icon-liftover" viewBox="0 0 40 40">
+        <rect x="3" y="7" width="34" height="6" rx="3" fill="#b9bec7"/>
+        <rect x="3" y="27" width="34" height="6" rx="3" fill="currentColor"/>
+        <circle cx="12" cy="10" r="3" fill="#fff" stroke="#6c757d" stroke-width="1.5"/>
+        <circle cx="27" cy="30" r="3" fill="#fff" stroke="currentColor" stroke-width="1.5"/>
+        <path d="M14 14 L25 25 M18.5 24 L25.5 25.5 L24 18.5" fill="none" stroke="#6c757d" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round"/>
+    </symbol>
+
+    {# Bulleted list - sits behind the gene list's G #}
+    <symbol id="file-icon-list" viewBox="0 0 40 40">
+        <g fill="currentColor">
+            <circle cx="6" cy="8" r="2.6"/><circle cx="6" cy="17" r="2.6"/>
+            <circle cx="6" cy="26" r="2.6"/><circle cx="6" cy="35" r="2.6"/>
+        </g>
+        <path d="M13 8 H35 M13 17 H35 M13 26 H35 M13 35 H35" stroke="currentColor" stroke-width="3.2"
+              stroke-linecap="round"/>
+    </symbol>
+</svg>

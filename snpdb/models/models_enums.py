@@ -1,4 +1,13 @@
+"""
+Enums shared across snpdb and the apps built on it: import and processing lifecycles (ImportStatus,
+ProcessingStatus, DataState), where uploads came from (ImportSource), allele linking
+(AlleleOrigin, AlleleConversionTool, AlleleOriginFilterDefault), contig roles (SequenceRole - including the
+gene-level fake contig), sample and file kinds, the grid's built-in and per-tag filter keys
+(BuiltInFilters, TagFilter) and the user award scale. Codes are stored in the database: add values,
+never renumber. Zygosity lives in patients/models_enums.py.
+"""
 from enum import Enum
+from typing import Optional
 
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import models
@@ -23,6 +32,31 @@ class UserAwardLevel(models.TextChoices):
 
     def __lt__(self, other):
         return self.int_value < other.int_value
+
+
+class UserAwardKind(models.TextChoices):
+    TITLE = "T", "Title"  # Held until someone takes it - crown/medal/trophy
+    BADGE = "B", "Badge"  # Permanent once earned, tiered bronze/silver/gold
+    KUDOS = "K", "Kudos"  # Hand-given by an admin
+
+
+class AwardPeriod(models.TextChoices):
+    ALL_TIME = "A", "all time"
+    MONTH = "M", "this month"
+    DAY = "D", "today"
+
+    @property
+    def icon(self) -> str:
+        return {
+            AwardPeriod.ALL_TIME: "fa-crown",
+            AwardPeriod.MONTH: "fa-medal",
+            AwardPeriod.DAY: "fa-trophy",
+        }[self]
+
+    @property
+    def rank(self) -> int:
+        """ ALL_TIME outranks MONTH outranks DAY """
+        return {AwardPeriod.ALL_TIME: 3, AwardPeriod.MONTH: 2, AwardPeriod.DAY: 1}[self]
 
 
 class ImportSource(models.TextChoices):
@@ -82,16 +116,18 @@ class BuiltInFilters:
     OMIM = "O"
     IMPACT_HIGH_OR_MODERATE = 'I'
     CLASSIFIED = 'G'  # G = for Genomic Variant Classification
-    CLASSIFIED_PATHOGENIC = 'P'
+    CLASSIFIED_PATHOGENIC = 'P'  # Germline LP/P
+    CLASSIFIED_TIER_1_2 = 'S'  # Somatic Tier I/II
     COSMIC = 'M'  # cosMic
 
     FILTER_CHOICES = [
         # Don't include total (as that's no filter at all!
-        (CLINVAR, 'ClinVar LP/P'),
+        (CLINVAR, 'ClinVar significant'),
         (OMIM, 'OMIM Phenotype'),
         (IMPACT_HIGH_OR_MODERATE, 'High or Mod impact'),
         (CLASSIFIED, 'Classified'),
         (CLASSIFIED_PATHOGENIC, 'Classified Pathogenic'),
+        (CLASSIFIED_TIER_1_2, 'Classified Tier I/II'),
         (COSMIC, 'COSMIC')]
     CHOICES = [(TOTAL, 'Total')] + FILTER_CHOICES
     COLORS = [(TOTAL, "#000000"),
@@ -100,8 +136,45 @@ class BuiltInFilters:
               (IMPACT_HIGH_OR_MODERATE, "#aaaaff"),
               (CLASSIFIED, "#7c26cb"),
               (CLASSIFIED_PATHOGENIC, "#Ff008b"),
+              (CLASSIFIED_TIER_1_2, "#cc99cc"),
               (COSMIC, "#14559f")]
     DEFAULT_NODE_COUNT_FILTERS = [TOTAL, IMPACT_HIGH_OR_MODERATE, CLINVAR]
+
+
+class TagFilter:
+    """ Per-tag node counts / grid filters, eg 'tag_Artifact'. These sit alongside BuiltInFilters
+        wherever a node count label or 'extra_filters' is used - tag names are alphanumeric so the
+        prefix and separator can never collide with a tag, and the label stays a valid URL slug and
+        CSS class. A node count is always a single tag, an 'extra_filters' selection can be several
+        (comma joined, meaning a variant carrying any of them) """
+    PREFIX = "tag_"
+    SEPARATOR = ","
+
+    @staticmethod
+    def label(tag_id: str) -> str:
+        return TagFilter.PREFIX + tag_id
+
+    @staticmethod
+    def label_for_tags(tag_ids: list[str]) -> str:
+        return TagFilter.SEPARATOR.join(TagFilter.label(tag_id) for tag_id in tag_ids)
+
+    @staticmethod
+    def get_tag_id(label: str) -> Optional[str]:
+        """ Tag id for a tag node count label, or None if it's not one """
+        if label and label.startswith(TagFilter.PREFIX):
+            return label[len(TagFilter.PREFIX):]
+        return None
+
+    @staticmethod
+    def get_tag_ids(label: str) -> list[str]:
+        """ Tag ids for a (possibly multi-tag) label, or [] if it's not one """
+        tag_ids = []
+        for part in (label or "").split(TagFilter.SEPARATOR):
+            tag_id = TagFilter.get_tag_id(part)
+            if not tag_id:
+                return []
+            tag_ids.append(tag_id)
+        return tag_ids
 
 
 class VariantsType(models.TextChoices):
@@ -186,7 +259,7 @@ class AlleleOriginFilterDefault(models.TextChoices):
     @property
     def buckets(self) -> set[AlleleOriginBucket]:
         if self == AlleleOriginFilterDefault.SHOW_ALL:
-            return {AlleleOriginBucket.values}
+            return set(AlleleOriginBucket)
         elif self == AlleleOriginFilterDefault.GERMLINE:
             return {AlleleOriginBucket.GERMLINE, AlleleOriginBucket.UNKNOWN}
         elif self == AlleleOriginFilterDefault.SOMATIC:
@@ -234,3 +307,10 @@ class DataState(models.TextChoices):
 class CohortGenotypeCollectionType(models.TextChoices):
     COMMON = "C", "Common"
     UNCOMMON = "U", "Uncommon"
+
+
+class DuoRelationship(models.TextChoices):
+    """ How a Duo's second member is related to the proband - a parent, or a sibling (#1861) """
+    MOTHER = 'M', 'Mother'
+    FATHER = 'F', 'Father'
+    SIBLING = 'S', 'Sibling'

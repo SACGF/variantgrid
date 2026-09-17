@@ -1,3 +1,12 @@
+"""
+The classification vocabulary: SpecialEKeys (the evidence keys code refers to by name - use these,
+never string literals), ShareLevel (lab -> institution -> logged-in users -> public, with which levels
+count toward discordance), AlleleOriginBucket, CopyScope / CopyAlleleOrigin (how far a value travels
+when copied from a previous classification), ClinicalSignificance / SomaticClinicalSignificance value
+helpers, EvidenceCategory and EvidenceKeyValueType (the EvidenceKey schema), CriteriaEvaluation
+(ACMG strengths), SubmissionSource, ValidationCode and WithdrawReason. Buckets and option metadata
+come from EvidenceKey rows, not from these enums.
+"""
 import typing
 from dataclasses import dataclass
 from enum import Enum
@@ -135,6 +144,35 @@ class AlleleOriginBucket(TextChoices):
             return AlleleOriginBucket.UNKNOWN
 
 
+class CopyScope(TextChoices):
+    """
+    How far an EvidenceKey's value legitimately travels when copying from a previously curated
+    classification - gene level content is the same for every variant in the gene, allele level content
+    only for the same allele
+    """
+    NONE = "N", "None"
+    ALLELE = "A", "Allele"
+    GENE = "G", "Gene"
+
+
+class CopyAlleleOrigin(TextChoices):
+    """
+    Which allele origin an EvidenceKey is meaningful for - segregation, de novo and allelic data are
+    germline concepts with no namespace to filter on
+    """
+    ANY = "A", "Any"
+    GERMLINE = "G", "Germline"
+    SOMATIC = "S", "Somatic"
+
+    def can_copy_to(self, allele_origin_bucket: Optional[AlleleOriginBucket]) -> bool:
+        """ Only the opposite bucket stops the copy, an unknown bucket keeps the value """
+        if self == CopyAlleleOrigin.GERMLINE:
+            return allele_origin_bucket != AlleleOriginBucket.SOMATIC
+        if self == CopyAlleleOrigin.SOMATIC:
+            return allele_origin_bucket != AlleleOriginBucket.GERMLINE
+        return True
+
+
 class ReclassificationEventType(TextChoices):
     """ What one row of a classification's significance timeline records @see ReclassificationEvent """
     INITIAL = "I", "Initial Classification"
@@ -189,6 +227,14 @@ class SpecialEKeys:
     CURATION_VERIFIED_BY = 'curation_verified_by'
     SAMPLE_DATE = 'sample_date'
     VARIANT_TAGS = 'variant_tags'
+    VARIANT_CLASS = 'variant_class'
+    VARIANT_REPORTED = 'variant_reported'
+    REPORT_ID = 'report_id'  # stamped by a case report from the LIS's report ID
+    REPORT_DATE = 'report_date'  # stamped by a case report when it is finalised
+    COPY_NUMBER = 'copy_number'
+    FOLD_CHANGE = 'fold_change'
+    H_SUMMARY = 'h_summary'  # the gene level paragraph a case report prints after a gene's variants
+    SPLICE_LABEL = 'splice_label'  # what the report calls a splice event, eg "MET exon 14 skipping"
 
     # POPULATED
     # Note: Some fields not here are populated - those with variantgrid_column
@@ -595,6 +641,44 @@ class ClinicalSignificance:
         except ValueError:
             pass
         return d
+
+
+class SomaticClinicalSignificance:
+    """ Values of the 'somatic:clinical_significance' EvidenceKey (AMP tiers) that code needs to reference
+        directly - the authoritative option list lives on the EvidenceKey record """
+    TIER_1 = "tier_1"
+    TIER_1_OR_2 = "tier_1_or_2"
+    TIER_2 = "tier_2"
+    TIER_3 = "tier_3"
+    TIER_4 = "tier_4"
+
+    CHOICES = [
+        (TIER_1, "Tier I"),
+        (TIER_1_OR_2, "Tier I/II"),
+        (TIER_2, "Tier II"),
+        (TIER_3, "Tier III"),
+        (TIER_4, "Tier IV"),
+    ]
+    LABELS = dict(CHOICES)
+
+    SHORT_CHOICES = [
+        (TIER_1, "I"),
+        (TIER_1_OR_2, "I/II"),
+        (TIER_2, "II"),
+        (TIER_3, "III"),
+        (TIER_4, "IV"),
+    ]
+    SHORT_LABELS = dict(SHORT_CHOICES)
+
+    TIER_1_AND_2_VALUES = [TIER_1, TIER_1_OR_2, TIER_2]
+    """ Tiers of strong/potential clinical significance - the somatic analogue of germline LP/P """
+
+    @staticmethod
+    def css_class(somatic_clinical_significance: Optional[str]) -> str:
+        """ Class for the .c-pill.scs-* rules in global.scss """
+        if somatic_clinical_significance in SomaticClinicalSignificance.LABELS:
+            return f"scs-{somatic_clinical_significance}"
+        return "scs-none"
 
 
 class CriteriaEvaluation:

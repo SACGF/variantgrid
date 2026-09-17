@@ -41,6 +41,10 @@ SORT_VCF_SUB_STEP = "sort_vcf"
 VCF_CLEAN_ALTS_SUB_STEP = "vcf_clean_alts"
 REMOVE_HEADER_SUB_STEP = "remove_header"
 SPLIT_VCF_SUB_STEP = "split_vcf"
+# Each split chunk gets the header prepended and is bgzipped so the data-insertion tasks read .vcf.gz.
+# split runs the filter via sh -c and expands $VG_HEADER_FILE / $VG_SPLIT_VCF_DIR / $FILE there, so the
+# paths ride in the environment rather than in the shell string (see run_pipe's split_env).
+SPLIT_VCF_FILTER = "--filter='bash -c \"set -eo pipefail; { cat $VG_HEADER_FILE; cat; } | bgzip -c > $VG_SPLIT_VCF_DIR/$FILE\"'"
 
 UNSORTED_VCF_MESSAGE = "VCF was not sorted - records have been sorted for import"
 
@@ -140,6 +144,13 @@ def _get_preprocess_files(upload_pipeline, vcf_filename: str, cleaned_vcf_header
                            swap_skipped=swap_skipped_file)
 
 
+def get_split_vcf_command(vcf_name: str, split_file_rows: int) -> list[str]:
+    """ GNU split (--filter / --additional-suffix are not POSIX) writing bgzipped chunks named
+        <vcf_name>NN.vcf.gz into $VG_SPLIT_VCF_DIR. Also run by deployment_check to prove the tools are there. """
+    return ["split", "-", vcf_name, "--additional-suffix=.vcf.gz", "--numeric-suffixes",
+            "--lines", str(split_file_rows), SPLIT_VCF_FILTER]
+
+
 def _build_pipe_commands(upload_step, files: PreprocessFiles, disable_swap=False, sort_vcf=False) -> tuple[dict, dict]:
     """ Returns (pipe_commands, sub_steps) - pipe_commands dict order is the pipeline order.
         sort_vcf: splice 'bcftools sort' in after the clean/filter stage, which then skips its sorted check """
@@ -201,9 +212,7 @@ def _build_pipe_commands(upload_step, files: PreprocessFiles, disable_swap=False
 
     # Split up the VCF
     split_file_rows = upload_step.split_file_rows or settings.VCF_IMPORT_FILE_SPLIT_ROWS
-    pipe_commands[SPLIT_VCF_SUB_STEP] = ["split", "-", vcf_name, "--additional-suffix=.vcf.gz", "--numeric-suffixes",
-                                         "--lines", str(split_file_rows),
-                                         "--filter='bash -c \"set -eo pipefail; { cat $VG_HEADER_FILE; cat; } | bgzip -c > $VG_SPLIT_VCF_DIR/$FILE\"'"]
+    pipe_commands[SPLIT_VCF_SUB_STEP] = get_split_vcf_command(vcf_name, split_file_rows)
 
     sub_steps = {}
     bcftools_version = get_bcftools_tool_version(settings.BCFTOOLS_COMMAND)

@@ -7,6 +7,7 @@ from classification.models import ImportedAlleleInfo
 class Command(BaseCommand):
     """ g.HGVS only submissions used to be validated as though a c.HGVS was expected, which left them with
         errors that excluded them from exports - see https://github.com/SACGF/variantgrid/issues/1063 """
+    category = "one-off"
 
     def handle(self, *args, **options):
         g_hgvs_only_qs = ImportedAlleleInfo.objects.filter(

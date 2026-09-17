@@ -5,6 +5,7 @@ from classification.models import ImportedAlleleInfo
 
 
 class Command(BaseCommand):
+    category = "maintenance"
 
     def add_arguments(self, parser):
         parser.add_argument("--dirty", action="store_true", help="Only validate Allele Infos already marked as dirty")

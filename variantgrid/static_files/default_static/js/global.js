@@ -47,12 +47,29 @@ function tweakAjax() {
         console.log(jqxhr);
 
         // messagePoller.stop_polling();
-        // $.blockUI({ message: $('#ajax-error') });
     });
 }
 
 const globalPreviewCache = {};
 const globalPreviewableDbs = new Set(["OMIM", "MONDO", "HPO", "PMID", "PMC", "PUBMED", "NCBIBOOKSHELF"]);
+
+// Keep a popover up while the mouse is over it, so its content can be read (and clicked)
+function popoverHoverStay($node) {
+    $node.on("mouseenter", function () {
+        const _this = this;
+        $(this).popover("show");
+        $(".popover").on("mouseleave", function () {
+            $(_this).popover('hide');
+        });
+    }).on("mouseleave", function () {
+        const _this = this;
+        setTimeout(function () {
+            if (!$(".popover:hover").length) {
+                $(_this).popover("hide");
+            }
+        }, 300);
+    });
+}
 
 function enhanceAndMonitor() {
     const popoverOpts = {
@@ -182,20 +199,7 @@ function enhanceAndMonitor() {
             $target.attr('data-content', $node.attr('data-help'));
             $target.attr('data-html', true);
             $target.attr('data-placement', 'left'); // top & left are preferred as most help are labels with data to the right
-            $target.on("mouseenter", function () {
-                const _this = this;
-                $(this).popover("show");
-                $(".popover").on("mouseleave", function () {
-                    $(_this).popover('hide');
-                });
-            }).on("mouseleave", function () {
-                const _this = this;
-                setTimeout(function () {
-                    if (!$(".popover:hover").length) {
-                        $(_this).popover("hide");
-                    }
-                }, 300);
-            });
+            popoverHoverStay($target);
 
             // remove attributes from parent element as to not get overlapping help
             $node.removeAttr('title');
@@ -207,20 +211,7 @@ function enhanceAndMonitor() {
                 node.addClass('hover-detail');
                 const poOpts = Object.assign({}, popoverOpts);  // clone
                 if (node.hasClass("popover-hover-stay")) {
-                    node.on("mouseenter", function () {
-                        const _this = this;
-                        $(this).popover("show");
-                        $(".popover").on("mouseleave", function () {
-                            $(_this).popover('hide');
-                        });
-                    }).on("mouseleave", function () {
-                        const _this = this;
-                        setTimeout(function () {
-                            if (!$(".popover:hover").length) {
-                                $(_this).popover("hide");
-                            }
-                        }, 300);
-                    });
+                    popoverHoverStay(node);
                     poOpts["trigger"] = "manual";
                 }
                 node.popover(poOpts);
@@ -228,7 +219,7 @@ function enhanceAndMonitor() {
         },
 
         // everything with a title (that isn't data-content aka popover) give a tooltip
-        {test: '[title]:not([data-content]):not(.ui-datepicker-prev):not(.ui-datepicker-next)',
+        {test: '[title]:not([data-content])',
             func: (node) => {
                 node.tooltip({html:true, trigger : 'hover'});
                 node.click(function(e) {$(this).tooltip('hide');});
@@ -297,9 +288,6 @@ function enhanceAndMonitor() {
         }},
         // similar but for radio buttons (only change if not already checked)
         {test: '.radio-row', func: (node) => {node.click(event => {$(event.currentTarget).find(':radio:not(:checked)').prop('checked', 'checked').change();});}},
-        // we don't generally allow future dates
-        {test: '.date-picker', func: (node) => {node.datepicker({changeYear: true, yearRange: "-120:+0", dateFormat: "yy-mm-dd"});}},
-
         // is this still used?? Would like to get rid of
         {test: '#id_import_status',
             func: (node) => {
@@ -349,10 +337,10 @@ function enhanceAndMonitor() {
                 const data = node.attr('data-datatable-data');
                 new DataTableDefinition({
                     url: dataTableUrl,
+                    definitionUrl: node.attr('data-datatable-definition-url'),
                     data: data, // as in a function that filters the data displayed
                     filterCount: node.attr('data-datatable-filter-count'),
                     dom: node,
-                    adjustColumns: node.attr('data-adjust-columns') != 'false',
                 }).setup();
             }
         },
@@ -801,6 +789,63 @@ function dictFromLabelsAndValues(labels, values) {
     return dict;
 }
 
+// A panel raised from inside a DataTable can't live inside it - with scrollX both the scroll head
+// and the scroll body clip their overflow, so anything positioned in a header or a cell is cut off
+// at the edge. These float the panel over the page, anchored to the element it was raised from.
+const FloatingPanel = {
+    panel: null,
+    onHide: null,
+
+    isShowing: function(panel) {
+        return FloatingPanel.panel !== null && FloatingPanel.panel[0] === $(panel)[0];
+    },
+
+    show: function(panel, anchorElement, options) {
+        FloatingPanel.hide();
+        options = options || {};
+        panel = $(panel);
+        const rect = anchorElement.getBoundingClientRect();
+        // Fixed, so the viewport rect is the position - no offset parent to fight over
+        panel.css({position: "fixed", top: rect.bottom + 2, left: 0, zIndex: 2000, display: "block"});
+        panel.appendTo(document.body);
+        const width = panel.outerWidth();
+        const wanted = options.alignRight ? rect.right - width : rect.left;
+        panel.css("left", Math.max(4, Math.min(wanted, $(window).width() - width - 4)));
+
+        FloatingPanel.panel = panel;
+        FloatingPanel.onHide = options.onHide;
+        $(document).on("mousedown.floatingPanel", function(event) {
+            const target = $(event.target);
+            // select2 draws its dropdown on the body, so a click in it is still inside the panel
+            if (!target.closest(panel).length && !target.closest(".select2-container").length) {
+                FloatingPanel.hide();
+            }
+        });
+        $(document).on("keydown.floatingPanel", function(event) {
+            if (event.key === "Escape") {
+                FloatingPanel.hide();
+            }
+        });
+        return panel;
+    },
+
+    hide: function() {
+        const panel = FloatingPanel.panel;
+        if (!panel) {
+            return;
+        }
+        const onHide = FloatingPanel.onHide;
+        FloatingPanel.panel = null;
+        FloatingPanel.onHide = null;
+        $(document).off(".floatingPanel");
+        panel.detach();  // not remove() - callers reuse their panel
+        if (onHide) {
+            onHide();
+        }
+    },
+};
+
+
 function deleteItemClickHandler(outerElement, innerSpan, deleteClickHandler) {
     const isExpanded = innerSpan.attr("original_width");
     let completeFunc;
@@ -896,7 +941,6 @@ function dynamicSort(property, caseSensitive) {
 }
 
 function zero_pad(num, size) {
-    // deprecated use _.pad(num + "", size, '0');
     let s = num + "";
     while (s.length < size) s = "0" + s;
     return s;
@@ -1136,15 +1180,88 @@ function limitLength(text, limit) {
     }
 }
 
-function debounce( func , timeout ) {
-    var timeoutID , timeout = timeout || 200;
-    return function () {
-        const scope = this , args = arguments;
-        clearTimeout( timeoutID );
-        timeoutID = setTimeout( function () {
-            func.apply( scope , Array.prototype.slice.call( args ) );
-        }, timeout );
-   };
+// Trailing-edge debounce with lodash-compatible maxWait and flush()
+function debounce(func, wait, {maxWait} = {}) {
+    const delay = wait || 200;
+    let timer = null;
+    let maxTimer = null;
+    let pendingArgs = null;
+    let pendingThis = null;
+
+    function invoke() {
+        clearTimeout(timer);
+        clearTimeout(maxTimer);
+        timer = maxTimer = null;
+        if (pendingArgs) {
+            const [args, self] = [pendingArgs, pendingThis];
+            pendingArgs = pendingThis = null;
+            func.apply(self, args);
+        }
+    }
+
+    function debounced(...args) {
+        pendingArgs = args;
+        pendingThis = this;
+        clearTimeout(timer);
+        timer = setTimeout(invoke, delay);
+        if (maxWait && !maxTimer) {
+            maxTimer = setTimeout(invoke, maxWait);
+        }
+    }
+    debounced.flush = invoke;
+    debounced.cancel = function() {
+        clearTimeout(timer);
+        clearTimeout(maxTimer);
+        timer = maxTimer = pendingArgs = pendingThis = null;
+    };
+    return debounced;
+}
+
+// Escapes &, <, >, " and ' for interpolation into an HTML string
+function escapeHtml(text) {
+    return String(text).replace(/[&<>"']/g, (c) => {
+        return {"&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;"}[c];
+    });
+}
+
+// Minimal chainable SVG element builder - replaces the d3 v2 subset we used.
+// jQuery can't do this: SVG elements need createElementNS to render.
+const SVG_NS = "http://www.w3.org/2000/svg";
+
+class SvgSelection {
+    constructor(node) {
+        this.node = node;
+    }
+
+    // Accepts "svg:rect" or "rect" - the d3 v2 namespace prefix is kept so call sites read the same
+    append(tagName) {
+        const child = document.createElementNS(SVG_NS, tagName.replace(/^svg:/, ""));
+        this.node.appendChild(child);
+        return new SvgSelection(child);
+    }
+
+    attr(name, value) {
+        if (value === undefined) {
+            return this.node.getAttribute(name);
+        }
+        this.node.setAttribute(name, value);
+        return this;
+    }
+
+    style(name, value) {
+        this.node.style.setProperty(name, value);
+        return this;
+    }
+
+    on(eventName, handler) {
+        this.node.addEventListener(eventName, handler.bind(this.node));
+        return this;
+    }
+}
+
+function svgSelect(target) {
+    const node = typeof target === "string" ? document.querySelector(target) : (target.jquery ? target[0] : target);
+    return new SvgSelection(node);
 }
 
 function highlightTextAsDom(value, full_text) {
@@ -1273,33 +1390,25 @@ function suggestionDialogSaved() {
     });
 }
 
-// FIXME turn into Bootstrap modal
-function showReloadPageErrorDialog(selector, message, allowClose) {
-    const buttons = [
-        {   text: "Reload Page",
-            class: "btn",
-            click: function() {
-                $(this).dialog("close");
-                location.reload();
-            },
-        },
-    ];
-    if (allowClose) {
-        const closeButton = {
-            text: "Close and continue (not recommended)",
-            class: "btn btn-outline-danger",
-            click: function () {
-                $(this).dialog("close");
-            },
-        };
-        buttons.push(closeButton);
+function showReloadPageErrorDialog(message, allowClose) {
+    // Reused across repeated errors so a polling loop doesn't stack modals
+    let modalContent = $('#error-dialog');
+    if (!modalContent.length) {
+        modalContent = createModalShell('error-dialog', 'Error', 'lg');
+        // The page is broken - only the footer buttons get you out of here
+        modalContent.attr({'data-backdrop': 'static', 'data-keyboard': 'false'});
+        modalContent.find('.modal-header .close').remove();
     }
-
-    $(selector).html(message).dialog({
-        dialogClass: "no-close",
-        minWidth: 500,
-        buttons: buttons,
-    });
+    modalContent.find('.modal-body').html(message);
+    const footer = modalContent.find('.modal-footer').empty();
+    $('<button>', {type: 'button', 'class': 'btn btn-primary', text: "Reload Page"})
+        .click(function() { location.reload(); })
+        .appendTo(footer);
+    if (allowClose) {
+        $('<button>', {type: 'button', 'class': 'btn btn-outline-danger', 'data-dismiss': 'modal',
+                       text: "Close and continue (not recommended)"}).appendTo(footer);
+    }
+    modalContent.modal({focus: true, backdrop: 'static', keyboard: false, show: true});
 }
 
 function severityIcon(severity) {
@@ -1321,11 +1430,11 @@ function formatJson(jsonObj) {
 }
 
 function _formatJson(jsonObj) {
-    if (_.isNumber(jsonObj)) {
+    if (typeof jsonObj === "number") {
         return $('<span>', {class: 'js-num', text: jsonObj});
-    } else if (_.isBoolean(jsonObj)) {
+    } else if (typeof jsonObj === "boolean") {
         return $('<span>', {class: 'js-bool', text: jsonObj});
-    } else if (_.isString(jsonObj)) {
+    } else if (typeof jsonObj === "string") {
         let text = JSON.stringify(jsonObj);
         text = text.substring(1, text.length-1);
         const html = [];
@@ -1337,7 +1446,7 @@ function _formatJson(jsonObj) {
         // return $('<span>', {class: 'js-str', text: JSON.stringify(jsonObj)});
     } else if (jsonObj === null) {
         return $('<span>', {class: 'js-null', text: 'null'});
-    } else if (_.isArray(jsonObj)) {
+    } else if (Array.isArray(jsonObj)) {
         const html = [];
         html.push($('<span>', {class: 'js-br', text: '['}));
         let first = true;

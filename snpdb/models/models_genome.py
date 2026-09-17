@@ -1,3 +1,12 @@
+"""
+The genome: GenomeBuild (GRCh37, GRCh38, T2T-CHM13v2.0 - enabled flag plus settings.ANNOTATION
+decide which are usable), Contig (shared between builds, so MT is one row), GenomeBuildContig
+(the ordered join), GenomeBuildPatchVersion (future-proofing; one patch per build today) and
+GenomeFasta (chrom-to-fasta-name mapping for bcftools). GenomeBuild caches lookups
+(ObjectManagerCachingImmutable, a 60 s timed_cache on get_name_or_alias); use
+`GenomeBuild.builds_with_annotation()` for the annotated set and `Variant.get_contigs_q` to
+restrict variants to a build.
+"""
 import itertools
 import operator
 import os

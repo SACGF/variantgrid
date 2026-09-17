@@ -14,6 +14,7 @@ from patients.models import (
     Specimen,
 )
 from patients.models_enums import PopulationGroup
+from uicore.widgets.date_widget import NativeDateInput
 
 
 class PatientForm(forms.ModelForm):
@@ -33,8 +34,8 @@ class PatientForm(forms.ModelForm):
                    'last_name': TextInput(attrs={'placeholder': 'Last Name'}),
                    'family_code': TextInput(attrs={'placeholder': 'Family Code'}),
                    'patient_code': TextInput(attrs={'placeholder': 'Patient Code (de-identified)'}),
-                   'date_of_birth': TextInput(attrs={'class': 'date-picker', 'placeholder': 'Date of Birth'}),
-                   'date_of_death': TextInput(attrs={'class': 'date-picker', 'placeholder': 'Date of Death'})}
+                   'date_of_birth': NativeDateInput(),
+                   'date_of_death': NativeDateInput()}
 
     def __init__(self, *args, **kwargs):
         self.user = kwargs.pop("user")
@@ -115,8 +116,6 @@ class PatientSearchForm(forms.Form):
     patient = forms.ModelChoiceField(queryset=Patient.objects.all(),
                                      widget=ModelSelect2(url='patient_autocomplete',
                                                          attrs={'data-placeholder': 'Patient...'}))
-    family_code = forms.CharField(widget=TextInput(attrs={'placeholder': 'Family Code'}))
-    phenotype = forms.CharField(widget=TextInput(attrs={'placeholder': 'Phenotype text'}))
 
 
 # Tissue has no way to be created yet (#1747), so both editors here leave out a dropdown that
@@ -129,8 +128,8 @@ PatientSpecimenFormSet = inlineformset_factory(Patient,
                                                         'description': TextInput(),
                                                         'reference_id': TextInput(),
                                                         'collected_by': TextInput(),
-                                                        'collection_date': TextInput(attrs={'class': 'date-picker'}),
-                                                        'received_date': TextInput(attrs={'class': 'date-picker'})},
+                                                        'collection_date': NativeDateInput(),
+                                                        'received_date': NativeDateInput()},
                                                extra=1)
 
 
@@ -141,8 +140,8 @@ SpecimenForm = modelform_factory(Specimen,
                                  widgets={'description': TextInput(),
                                           'reference_id': TextInput(),
                                           'collected_by': TextInput(),
-                                          'collection_date': TextInput(attrs={'class': 'date-picker'}),
-                                          'received_date': TextInput(attrs={'class': 'date-picker'})})
+                                          'collection_date': NativeDateInput(),
+                                          'received_date': NativeDateInput()})
 
 
 class ExtractionForm(forms.ModelForm):
@@ -153,7 +152,7 @@ class ExtractionForm(forms.ModelForm):
         model = Extraction
         fields = ['reference_id', 'nucleic_acid_source', 'extraction_date']
         widgets = {'reference_id': TextInput(),
-                   'extraction_date': TextInput(attrs={'class': 'date-picker'})}
+                   'extraction_date': NativeDateInput()}
 
     def clean_reference_id(self):
         # Unnamed extractions are all distinct under Postgres (@see Extraction.Meta), so an empty box
@@ -165,8 +164,10 @@ class ExtractionForm(forms.ModelForm):
         # Django skips a unique_together whose fields the form leaves out, so a clash would otherwise
         # only surface as an IntegrityError
         reference_id = cleaned_data.get('reference_id')
-        if reference_id and self.instance.specimen_id:
-            clash = Extraction.objects.filter(specimen_id=self.instance.specimen_id,
+        # The patient tab's formset has specimen as a field, the specimen page has it on the instance
+        specimen = cleaned_data.get('specimen') or self.instance.specimen_id
+        if reference_id and specimen:
+            clash = Extraction.objects.filter(specimen=specimen,
                                               reference_id=reference_id).exclude(pk=self.instance.pk)
             if clash.exists():
                 self.add_error('reference_id', "This specimen already has an extraction with this reference.")
@@ -186,7 +187,7 @@ def patient_extraction_formset_factory(patient):
                                 fields=['specimen', 'reference_id', 'nucleic_acid_source', 'extraction_date'],
                                 widgets={'specimen': specimen_widget,
                                          'reference_id': TextInput(),
-                                         'extraction_date': TextInput(attrs={'class': 'date-picker'})},
+                                         'extraction_date': NativeDateInput()},
                                 extra=1)
 
 

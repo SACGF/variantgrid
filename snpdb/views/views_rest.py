@@ -13,9 +13,10 @@ from rest_framework.views import APIView
 from library.constants import MINUTE_SECS
 from patients.models_enums import Zygosity
 from snpdb.clingen_allele import get_variant_allele_for_variant
-from snpdb.models import GenomeBuild, Quad, Sample, Trio, Variant
+from snpdb.models import Duo, GenomeBuild, Quad, Sample, Trio, Variant
 from snpdb.models.models_vcf import Project
 from snpdb.serializers import (
+    DuoSerializer,
     ProjectSerializer,
     QuadSerializer,
     TrioSerializer,
@@ -55,6 +56,16 @@ class TrioView(RetrieveAPIView):
 
     def get_queryset(self):
         return Trio.filter_for_user(self.request.user)
+
+
+@method_decorator([cache_page(MINUTE_SECS), vary_on_cookie], name='dispatch')
+class DuoView(RetrieveAPIView):
+    serializer_class = DuoSerializer
+    permission_classes = (permissions.IsAuthenticatedOrReadOnly,)
+    lookup_fields = ('pk',)
+
+    def get_queryset(self):
+        return Duo.filter_for_user(self.request.user)
 
 
 @method_decorator([cache_page(MINUTE_SECS), vary_on_cookie], name='dispatch')

@@ -1,3 +1,11 @@
+"""
+The search engine: SearchInput sends search_signal, every function decorated with
+`@search_receiver(...)` answers with a SearchResponse, and SearchResponsesCombined ranks and merges
+them (single_preferred_result is the auto-jump). The decorator owns the shared behaviour - admin
+gating, preview_enabled, the regex pattern, result caps, error capture and the variant-to-allele
+conversion under settings.PREFER_ALLELE_LINKS. Receivers live in each app's signals/ package
+(snpdb/signals/variant_search.py is the largest) and register on import.
+"""
 import itertools
 import logging
 import operator
@@ -14,6 +22,7 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.db.models import Q, QuerySet
 from django.dispatch import Signal
+from django.utils.safestring import SafeString
 from more_itertools import take
 
 from library.enums.log_level import LogLevel
@@ -23,7 +32,13 @@ from library.log_utils import (
     report_exc_info,
     report_message,
 )
-from library.preview_request import PreviewCoordinator, PreviewData
+from library.preview_request import (
+    PreviewCoordinator,
+    PreviewData,
+    SvgSymbolPreviewIconMixin,
+    fa_icon_html,
+    preview_coordinator_icon_html,
+)
 from library.utils import clean_string, first, remove_duplicates_from_list
 from snpdb.models import Allele, GenomeBuild, UserSettings, Variant
 
@@ -435,14 +450,13 @@ class SearchResult:
             return f"{icon} text-{severity}"
 
     @property
-    def preview_icon_with_severity(self):
+    def preview_icon_html_with_severity(self) -> SafeString:
         # coloring the icon became too busy, we're already showing info/warning/error icons against the record
         # no need to re-color the icon
-        return self._preview_icon_severity('success')
-        # if self.messages:
-        #     return self._preview_icon_severity('warning')
-        # else:
-        #     return self._preview_icon_severity('success')
+        severity = 'success'
+        if isinstance(self.preview.obj, SvgSymbolPreviewIconMixin):
+            return self.preview.icon_html(f"mr-2 text-{severity}")
+        return fa_icon_html(self._preview_icon_severity(severity), "mr-2")
 
     @property
     def search_type(self) -> str:
@@ -665,6 +679,10 @@ class SearchResponse:
     @property
     def preview_icon(self) -> str:
         return self.search_type.preview_icon()
+
+    @property
+    def preview_icon_html(self) -> SafeString:
+        return preview_coordinator_icon_html(self.search_type)
 
     def __lt__(self, other):
         return (self.preview_category, self.sub_name or "") < (other.preview_category, other.sub_name or "")

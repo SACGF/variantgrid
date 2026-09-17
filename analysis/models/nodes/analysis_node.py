@@ -4,10 +4,12 @@ import logging
 import operator
 from collections import defaultdict
 from collections.abc import Sequence
+from contextlib import contextmanager
+from dataclasses import dataclass
 from datetime import timedelta
 from functools import cached_property, reduce
 from random import random
-from time import time
+from time import perf_counter, time
 from typing import Optional
 
 from auditlog.context import disable_auditlog
@@ -16,6 +18,7 @@ from auditlog.registry import auditlog
 from cache_memoize import cache_memoize
 from celery.canvas import Signature
 from django.conf import settings
+from django.contrib.postgres.fields import ArrayField
 from django.core.cache import cache
 from django.core.exceptions import FieldError
 from django.db import connection, models, transaction
@@ -47,16 +50,21 @@ from analysis.models.enums import (
     NodeStatus,
 )
 from analysis.models.models_analysis import Analysis
-from analysis.models.nodes.node_counts import get_extra_filters_q, get_node_counts_and_labels_dict
+from analysis.models.nodes.node_counts import get_node_counts_and_labels_dict, get_node_extra_filters_q
+from analysis.models.nodes.node_display import NodeChip, NodeIcon
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
 from classification.models import Classification
 from library.constants import DAY_SECS, MINUTE_SECS
 from library.django_utils import thread_safe_unique_together_get_or_create
 from library.django_utils.django_postgres import get_backend_pid
+from library.django_utils.major_operation import planner_join_collapse_limit
 from library.log_utils import log_traceback
 from library.utils import add_exception_note, format_percent
 from library.utils.database_utils import queryset_to_sql
 from library.utils.django_utils import get_model_content_type_dict
+from patients.models import Patient
+from patients.models_enums import SampleSourceLevel
+from patients.sample_grouping import get_patient_for_source
 from snpdb.models import (
     AlleleSource,
     BuiltInFilters,
@@ -72,16 +80,33 @@ from snpdb.models import (
     Wiki,
 )
 from snpdb.variant_collection import write_sql_to_variant_collection
+from snpdb.views.datatable_view import RichColumn
 
 # How long a node's lease is good for. The window is (re)started when a worker claims the node for
 # loading, so it measures actual load time rather than how long the task sat in the queue.
 LEASE_SECONDS = MINUTE_SECS * 10
 
 
+def _phase_seconds(phase_start: float) -> float:
+    """ How long a load phase took @see NodeVersion.load_data["timings"] """
+    return round(perf_counter() - phase_start, 3)
+
+
+@contextmanager
+def node_query_planner_settings():
+    """ Wrap anything that evaluates a node's Variant queryset - grid pages, exports, loads, tag recounts.
+        With the grid's columns selected a node query joins 50+ relations, past the planner's default
+        join_collapse_limit, and the SQL's join order starts from the whole variant table with the node's
+        selective filter applied last (a 421 variant gene search grid took over two minutes).
+        @see settings.ANALYSIS_NODE_QUERY_JOIN_COLLAPSE_LIMIT """
+    with planner_join_collapse_limit(settings.ANALYSIS_NODE_QUERY_JOIN_COLLAPSE_LIMIT):
+        yield
+
+
 def queryset_to_pk_in_q(qs: QuerySet) -> Q:
     """ Embed a queryset as pk IN (subquery), NOT list(qs.values_list("pk")).
-        Callers reach this with querysets that are large by construction - small ones are substituted
-        to a literal PK list upstream by get_small_parent_arg_q_dict - so list() here could pull an
+        Callers reach this with querysets that are large by construction - a small node answers
+        get_arg_q_dict with the literal PK list it stored at load - so list() here could pull an
         unbounded number of PKs into Python (e.g. a 7.4M-row cohort).
         We render to RawSQL, capturing the compiled SQL + params (incl. the partition table rewrite the
         TransformerQuerySet applies in as_sql), so it runs as a single DB-side semi-join. RawSQL also keeps
@@ -123,6 +148,15 @@ def _default_position():
     return 10 + random() * 50
 
 
+@dataclass(frozen=True)
+class NodeProband:
+    """ Who a node is about - the object of the study, resolved once per node up the DAG.
+        Either half can be known without the other: an extraction level node whose DNA arm has two callers
+        has no single sample but does have a patient (@see AnalysisNode.get_proband) """
+    sample: Optional[Sample]
+    patient: Optional[Patient]
+
+
 class NodeInheritanceManager(InheritanceManager):
     def get_queryset(self):
         queryset = super()._queryset_class(self.model)
@@ -161,6 +195,8 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
     auto_node_name = models.BooleanField(default=True)
     output_node = models.BooleanField(default=False)
     hide_node_and_descendants_upon_template_configuration_error = models.BooleanField(default=False)
+    # Waives the errors on get_ignorable_error_fields() - they're reported as warnings instead
+    ignore_field_errors = models.BooleanField(default=False)
     ready = models.BooleanField(default=True)
     valid = models.BooleanField(default=False)
     visible = models.BooleanField(default=True)
@@ -264,38 +300,78 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
         return cohorts, visibility
 
     @cache_memoize(DAY_SECS, args_rewrite=lambda s: (s.pk, s.version))
-    def get_sample_ids(self) -> list[Sample]:
-        return [s.pk for s in self.get_samples()]
+    def get_sample_ids_with_genotype(self) -> list[int]:
+        return [s.pk for s in self.get_samples_with_genotype()]
 
     def get_samples_from_node_only_not_ancestors(self):
-        cohorts, visibility = self._get_cohorts_and_sample_visibility_for_node()
-        return self._get_visible_samples_from_cohort(cohorts, visibility)
+        _, visibility = self._get_cohorts_and_sample_visibility_for_node()
+        return sorted(visibility)
 
     def _get_proband_sample_for_node(self) -> Optional[Sample]:
         """ Sample of the object of a study, if known """
         return None
 
-    def get_proband_sample(self) -> Optional[Sample]:
-        """ Sample of the object of a study if known """
+    def _get_proband_patient_for_node(self) -> Optional[Patient]:
+        """ Patient of the object of a study, if known - the proband sample's patient, either way the
+            sample is linked (@see patients/sample_grouping.py:get_patient_for_source) """
+        return get_patient_for_source(SampleSourceLevel.SAMPLE, self._get_proband_sample_for_node())
+
+    def get_proband(self, proband_by_node_id: Optional[dict[int, NodeProband]] = None) -> NodeProband:
+        """ Who the node is about - sample and patient resolved independently by the same rule, so a node
+            that cannot name a sample (two callers on the one extraction) can still name the patient.
+            proband_by_node_id: answers already worked out, shared across a whole graph rather than kept on the
+            node - a descendant asks each of its ancestors, so a diamond in the DAG asks the same node once per
+            path to it (@see analysis/variant_tag_operations.py:get_proband_by_node_id) """
+        if proband_by_node_id is not None and self.pk in proband_by_node_id:
+            return proband_by_node_id[self.pk]
+
         proband_samples = set()
+        proband_patients = set()
         if proband_sample := self._get_proband_sample_for_node():
             proband_samples.add(proband_sample)
+        if proband_patient := self._get_proband_patient_for_node():
+            proband_patients.add(proband_patient)
 
         if self.has_input():
             parents, _ = self.get_parent_subclasses_and_errors()
             for parent in parents:
-                if parent_proband_sample := parent.get_proband_sample():
-                    proband_samples.add(parent_proband_sample)
+                parent_proband = parent.get_proband(proband_by_node_id)
+                if parent_proband.sample:
+                    proband_samples.add(parent_proband.sample)
+                if parent_proband.patient:
+                    proband_patients.add(parent_proband.patient)
 
-        proband_sample = None
-        if len(proband_samples) == 1:  # If ambiguous, then just give up
-            proband_sample = proband_samples.pop()
-        return proband_sample
+        # If ambiguous, then just give up
+        proband = NodeProband(sample=proband_samples.pop() if len(proband_samples) == 1 else None,
+                              patient=proband_patients.pop() if len(proband_patients) == 1 else None)
+        if proband_by_node_id is not None:
+            proband_by_node_id[self.pk] = proband
+        return proband
 
-    def get_samples(self) -> list[Sample]:
-        """ Return all ancestor samples for a node"""
+    def get_proband_sample(self, proband_by_node_id: Optional[dict[int, NodeProband]] = None) -> Optional[Sample]:
+        """ Sample of the object of a study if known """
+        return self.get_proband(proband_by_node_id).sample
+
+    def get_proband_patient(self, proband_by_node_id: Optional[dict[int, NodeProband]] = None) -> Optional[Patient]:
+        """ Patient of the object of a study if known - a node above sample level has one where it has no
+            single sample """
+        return self.get_proband(proband_by_node_id).patient
+
+    def get_samples_with_genotype(self) -> list[Sample]:
+        """ Node + ancestor samples whose genotype we can show/filter on - ie variant-only VCFs
+            (has_sample_columns=False) are left out. Use get_samples() for sample level data """
         cohorts, visibility = self.get_cohorts_and_sample_visibility(sort=False)
         return self._get_visible_samples_from_cohort(cohorts, visibility)
+
+    def get_samples(self) -> list[Sample]:
+        """ Every node + ancestor sample, including those from variant-only VCFs. Sample level data
+            that doesn't come from the genotype - gene lists, coverage, BAMs, patients - and
+            restricting sample fields to ancestors @see AncestorSampleMixin """
+        _, visibility = self.get_cohorts_and_sample_visibility(sort=False)
+        return sorted(visibility)  # Every sample the node knows about is a key, genotype or not
+
+    def get_sample_ids(self) -> list[int]:
+        return [s.pk for s in self.get_samples()]
 
     def get_bams_dict(self):
         bams_dict = defaultdict(set)
@@ -383,6 +459,40 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
             non_empty_parents.append(p)
         return non_empty_parents
 
+    def _get_live_data_sources(self) -> dict[str, int]:
+        """ Mutable tables this node's own query reads, keyed by a stable source key, with the source's
+            version at the time of the call. Empty means the node's query is a pure function of versioned
+            inputs (annotation version, node settings, parents) """
+        return {}
+
+    def get_live_data_sources(self) -> dict[str, int]:
+        sources = dict(self._get_live_data_sources())
+        for parent in self.get_non_empty_parents():
+            sources.update(parent.get_live_data_sources())
+        return sources
+
+    @property
+    def live_data_sources(self) -> dict[str, int]:
+        """ The live sources recorded when this node version was loaded """
+        return self.node_version.live_data_sources
+
+    @property
+    def count_is_deterministic(self) -> bool:
+        """ False means the count is advisory - the node reads tables that change under it """
+        return not self.live_data_sources
+
+    def get_live_data_notes(self) -> list[str]:
+        """ Editor notes explaining a node's live data sources - unlike get_warnings() these aren't faults """
+        return []
+
+    def _raise_or_warn_count_mismatch(self, detail: str):
+        """ A deterministic node re-running the same query must give the same answer, so a mismatch is a
+            query bug. A live-source node's data moves under it, so it's expected drift """
+        msg = f"Node {self}(pk={self.pk}) count mismatch: {detail}"
+        if self.count_is_deterministic:
+            raise ValueError(msg)
+        logging.warning("%s (live sources: %s)", msg, self.live_data_sources)
+
     def get_single_parent(self):
         if self.min_inputs != 1:
             msg = "get_single_parent() should only be called for single parent nodes"
@@ -406,8 +516,6 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
             if parent.count == 0:
                 q_none = self.q_none()
                 arg_q_dict[None] = {str(q_none): q_none}
-            elif (small_arg_q_dict := AnalysisNode.get_small_parent_arg_q_dict(parent)) is not None:
-                arg_q_dict = small_arg_q_dict
             else:
                 arg_q_dict = parent.get_arg_q_dict()
         else:
@@ -512,6 +620,15 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
 
             @see https://github.com/SACGF/variantgrid/wiki/Analysis-Nodes#node-q-objects
         """
+        # Issue #546 explicit-PK substitution, in the one place every consumer passes through: a node
+        # whose load stored its exact pk list answers with a literal Q(pk__in=[...]) - for its own grid,
+        # export and recounts, and for every child composing it - so Postgres plans a bitmap-or over the
+        # pk index instead of re-running the filter chain. Checked ahead of the Redis Q cache, which
+        # holds the real filter the load itself ran (the pks only exist once that load has finished)
+        if (variant_ids := AnalysisNode.get_cached_node_pks(self)) is not None:
+            q = Q(pk__in=variant_ids)
+            return {None: {q: q}}
+
         # We need this for node counts, and doing a grid query (each page) - and it can take a few secs to generate
         # for some nodes (Comp HET / pheno) so cache it
         cache_key = self._get_cache_key() + f"q_cache={disable_cache}"
@@ -603,42 +720,25 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
         return arg_q_dict
 
     @staticmethod
-    @cache_memoize(15 * MINUTE_SECS, args_rewrite=lambda n: (n.pk, n.version))
-    def get_cached_node_pks(node) -> list:
-        """ Materialised variant PKs for a node small enough to hold them - the source for explicit-PK
-            substitution (@see get_small_parent_arg_q_dict) and the grid export """
-        max_size = settings.ANALYSIS_NODE_STORE_ID_SIZE_MAX
-        if node.count is None or node.count > max_size:
-            raise ValueError(
-                f"get_cached_node_pks: refusing to cache {node} PKs "
-                f"(count={node.count}, max={max_size})"
-            )
-        # count can come from a stats cache that doesn't match the live query, so take one more than it
-        # claims - that bounds what a bad count can pull into RAM and tells us the list can't be trusted
-        pks = list(node.get_queryset().values_list("pk", flat=True)[:node.count + 1])
-        if len(pks) > node.count:
-            raise ValueError(
-                f"get_cached_node_pks: {node}(pk={node.pk}) query returned more than count={node.count}"
-            )
-        return pks
-
-    @staticmethod
-    def get_small_parent_arg_q_dict(parent) -> Optional[dict[Optional[str], dict[str, Q]]]:
-        """ Issue #546 explicit-PK substitution. When the parent holds only a small number of
-            variants, materialise its PKs once (cached) and substitute its contribution with a
-            literal Q(pk__in=[...]) so Postgres plans a tight bitmap-or over the variant PK index
-            instead of re-running the parent's full filter chain wrapped in pk IN (subquery).
-
-            Returns None when the parent is not eligible (count unknown or above the ceiling), in
-            which case callers fall back to parent.get_arg_q_dict(). """
-        max_size = settings.ANALYSIS_NODE_STORE_ID_SIZE_MAX
-        if max_size and parent.count is not None and parent.count <= max_size:
-            variant_ids = AnalysisNode.get_cached_node_pks(parent)
-            q = Q(pk__in=variant_ids)
-            return {None: {q: q}}
-        return None
+    def get_cached_node_pks(node) -> Optional[list[int]]:
+        """ The exact PK set stored at load for nodes <= ANALYSIS_NODE_STORE_ID_SIZE_MAX (@see node_counts),
+            or None for a large node - or one loaded before the PKs were stored with the count.
+            A list over the current setting is treated as absent, so lowering it (or the profiler's
+            --pk-substitution off) takes effect without a reload """
+        try:
+            variant_ids = node.node_version.variant_ids
+        except NodeVersion.DoesNotExist:
+            return None
+        if variant_ids is not None and len(variant_ids) > settings.ANALYSIS_NODE_STORE_ID_SIZE_MAX:
+            return None
+        return variant_ids
 
     def _get_node_q(self) -> Optional[Q]:
+        return None
+
+    def get_extra_filters_tag_q(self, tag_ids: list[str]) -> Optional[Q]:
+        """ Tag scope for a tag 'extra_filters' selection, or None to use the analysis-scoped
+            default @see get_node_extra_filters_q """
         return None
 
     @staticmethod
@@ -712,7 +812,8 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
         # https://docs.djangoproject.com/en/3.0/topics/db/aggregation/#interaction-with-default-ordering-or-order-by
         return qs.order_by()
 
-    def get_extra_grid_config(self):
+    def get_grid_post_data(self) -> dict:
+        """ Per-request state the node grid page sends back as its ajax params """
         return {}
 
     def get_class_name(self):
@@ -772,6 +873,30 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
         """ Used in create node dropdown """
         raise NotImplementedError("get_node_class_label not implemented - this is probably due to a new class, or a reverse migration wiping out the subclass leaving just the AnalysisNode")
 
+    @classmethod
+    def get_node_class_label_short(cls) -> str:
+        """ Class strip on the node card - override where the long label doesn't fit 128px """
+        return cls.get_node_class_label()
+
+    def get_node_strip_label(self) -> str:
+        """ Class strip text for this node - override where a node's configuration changes what it
+            is rather than just what it reads (eg SampleNode at extraction level) """
+        return self.get_node_class_label_short()
+
+    @classmethod
+    def get_node_class_icon(cls) -> NodeIcon:
+        """ Badge icon for a node of this class - also what the create node dropdown shows """
+        return NodeIcon(fa="fa-solid fa-circle-nodes")
+
+    def get_node_icon(self) -> NodeIcon:
+        """ Badge icon for this node - the class default unless config changes it (eg SampleNode
+            draws the patient's pedigree shape) """
+        return self.get_node_class_icon()
+
+    def get_node_chips(self) -> list[NodeChip]:
+        """ Pills under the node name - what this node is reading, from its saved config """
+        return []
+
     def _get_genome_build_errors(self, field_name, field_genome_build: GenomeBuild) -> list:
         """ Used to quickly add errors about genome build mismatches
             This only happens in templates (ran template on sample with different build than hardcoded data)
@@ -803,11 +928,38 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
             errors = AnalysisNode.flatten_errors(errors)
         return errors
 
-    def get_warnings(self) -> list[str]:
+    def get_ignorable_error_fields(self) -> list[str]:
+        """ Fields whose _get_field_errors() the user may waive with ignore_field_errors """
         return []
 
-    def get_errors(self, include_parent_errors=True, flat=False):
-        """ returns a tuple of (NodeError, str) unless flat=True where it's only string """
+    def _get_field_errors(self) -> dict[str, list[str]]:
+        """ Configuration errors keyed by the node field at fault, so the editor shows them against
+            that field. Templates are exempt - they're configured however the author likes """
+        return {}
+
+    def _get_ignored_error_fields(self) -> set[str]:
+        if self.ignore_field_errors:
+            return set(self.get_ignorable_error_fields())
+        return set()
+
+    def get_field_errors(self) -> dict[str, list[str]]:
+        """ The field errors that stop the node running """
+        if self.analysis.template_type == AnalysisTemplateType.TEMPLATE:
+            return {}
+        ignored = self._get_ignored_error_fields()
+        return {field: errors for field, errors in self._get_field_errors().items()
+                if errors and field not in ignored}
+
+    def get_ignored_field_errors(self) -> list[str]:
+        if self.analysis.template_type == AnalysisTemplateType.TEMPLATE:
+            return []
+        ignored = self._get_ignored_error_fields()
+        return [e for field, errors in self._get_field_errors().items() if field in ignored for e in errors]
+
+    def get_warnings(self) -> list[str]:
+        return list(self.get_ignored_field_errors())
+
+    def _get_non_field_errors(self, include_parent_errors=True) -> list[tuple[NodeErrorSource, str]]:
         errors = self.get_analysis_errors()
         _, parent_errors = self.get_parents_and_errors()
         if include_parent_errors:
@@ -815,9 +967,24 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
         if self.errors:
             errors.append((NodeErrorSource.INTERNAL_ERROR, self.errors))
         errors.extend((NodeErrorSource.CONFIGURATION, ce) for ce in self._get_configuration_errors())
+        return errors
+
+    def get_errors(self, include_parent_errors=True, flat=False):
+        """ returns a tuple of (NodeError, str) unless flat=True where it's only string """
+        errors = self._get_non_field_errors(include_parent_errors=include_parent_errors)
+        errors.extend((NodeErrorSource.CONFIGURATION, e) for field_errors in self.get_field_errors().values()
+                      for e in field_errors)
         if flat:
             errors = AnalysisNode.flatten_errors(errors)
         return errors
+
+    def can_ignore_errors(self) -> bool:
+        """ Everything wrong with the node is a field error ignore_field_errors would waive - what the
+            Template tab offers when it reveals a branch the template run hid """
+        field_errors = self.get_field_errors()
+        if not field_errors or self._get_non_field_errors():
+            return False
+        return set(field_errors) <= set(self.get_ignorable_error_fields())
 
     @staticmethod
     def flatten_errors(errors):
@@ -859,50 +1026,26 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
     def inherits_parent_columns(self):
         return self.min_inputs == 1 and self.max_inputs == 1
 
-    def _get_node_extra_columns(self):
+    def _get_node_extra_columns(self) -> list[RichColumn]:
+        """ Subclasses override to add their own columns to the node grid """
         return []
 
-    def _get_inherited_columns(self):
+    def _get_inherited_columns(self) -> list[RichColumn]:
         extra_columns = []
         if self.inherits_parent_columns():
             parent = self.get_single_parent()
             extra_columns.extend(parent.get_extra_columns())
         return extra_columns
 
-    def get_extra_columns(self):
-        cache_key = self._get_cache_key() + "_extra_columns"
-        extra_columns = cache.get(cache_key)
-        if extra_columns is None:
-            extra_columns = []
-            if self.is_valid:
-                extra_columns.extend(self._get_inherited_columns())
-            # Only add columns that are unique, as otherwise filters get added twice.
-            node_extra_columns = self._get_node_extra_columns()
-            for col in node_extra_columns:
-                if col not in extra_columns:
-                    extra_columns.append(col)
-            cache.set(cache_key, extra_columns)
+    def get_extra_columns(self) -> list[RichColumn]:
+        extra_columns = []
+        if self.is_valid:
+            extra_columns.extend(self._get_inherited_columns())
+        # Only add columns that are unique, as otherwise filters get added twice.
+        for col in self._get_node_extra_columns():
+            if col not in extra_columns:
+                extra_columns.append(col)
         return extra_columns
-
-    def _get_node_extra_colmodel_overrides(self):
-        """ Subclasses should override to add colmodel overrides for JQGrid """
-        return {}
-
-    def _get_inherited_colmodel_overrides(self):
-        extra_overrides = {}
-        if self.inherits_parent_columns():
-            parent = self.get_single_parent()
-            extra_overrides.update(parent.get_extra_colmodel_overrides())
-        return extra_overrides
-
-    def get_extra_colmodel_overrides(self):
-        """ For JQGrid - subclasses should override _get_node_extra_colmodel_overrides """
-
-        extra_overrides = {}
-        if self.is_valid and self.uses_parent_queryset:
-            extra_overrides.update(self._get_inherited_colmodel_overrides())
-        extra_overrides.update(self._get_node_extra_colmodel_overrides())
-        return extra_overrides
 
     def get_node_classification(self):
         if self.is_source:
@@ -957,21 +1100,20 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
         try:
             if self.cloned_from:
                 # If cloned (and we or original haven't changed) - use those counts
-                try:
-                    node_count = NodeCount.load_for_node_version(self.cloned_from, label)
-                    return node_count.count
-                except NodeCount.DoesNotExist:
-                    # Should only ever happen if original bumped version since we were loaded
-                    # otherwise should have cascade set cloned_from to NULL
-                    pass
+                # A missing count should only ever happen if original bumped version since we were
+                # loaded, otherwise the cascade should have set cloned_from to NULL
+                if (cloned_count := self.cloned_from.counts.get(label)) is not None:
+                    return cloned_count
 
             if self.has_input():
                 parent_non_zero_label_counts = []
                 for parent in self.get_non_empty_parents():
                     if parent.count != 0:  # count=0 has 0 for all labels
-                        parent_node_count = NodeCount.load_for_node(parent, label)
-                        if parent_node_count.count != 0:
-                            parent_non_zero_label_counts.append(parent_node_count.count)
+                        parent_count = parent.node_version.counts.get(label)
+                        if parent_count is None:
+                            return None  # Parent loaded before this label was configured - run the SQL
+                        if parent_count != 0:
+                            parent_non_zero_label_counts.append(parent_count)
 
                 if not parent_non_zero_label_counts:
                     # logging.info("all parents had 0 %s counts", label)
@@ -981,8 +1123,6 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
                     if len(parent_non_zero_label_counts) == 1:
                         # logging.info("Single parent, no modification, using that")
                         return parent_non_zero_label_counts[0]
-        except NodeCount.DoesNotExist:
-            pass
         except Exception as e:
             logging.warning("Trouble getting cached %s count: %s", label, e)
 
@@ -1000,10 +1140,22 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
             node_id, version = parent.get_grid_node_id_and_version()
         return node_id, version
 
-    def node_counts(self):
-        """ This is inside Celery task """
+    def node_counts(self, timings: Optional[dict] = None):
+        """ This is inside Celery task.
+            timings - {phase: seconds} the load fills in as it goes, stored on the NodeVersion """
+
+        if timings is None:
+            timings = {}
 
         self.count = None
+        # Record provenance first, so the checks below know whether this node's data can move under it
+        phase_start = perf_counter()
+        live_data_sources = self.get_live_data_sources()
+        NodeVersion.objects.filter(pk=self.node_version.pk).update(live_data_sources=live_data_sources)
+        self.node_version.live_data_sources = live_data_sources
+        timings["live_data_sources"] = _phase_seconds(phase_start)
+
+        phase_start = perf_counter()
         counts_to_get = {BuiltInFilters.TOTAL}
         counts_to_get.update([i[0] for i in self.analysis.get_node_count_types()])
         label_counts = {}
@@ -1021,22 +1173,36 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
             retrieved_label_counts = get_node_counts_and_labels_dict(self, counts_to_get)
             label_counts.update(retrieved_label_counts)
 
-        node_counts = []
-        for label, count in label_counts.items():
-            node_counts.append(NodeCount(node_version=self.node_version, label=label, count=count))
-        if node_counts:
-            # Counts are a cache of a deterministic query against an immutable node_version, so a
-            # re-load (eg after a backoff retry that failed once these were already written) can
-            # safely overwrite them
-            NodeCount.objects.bulk_create(node_counts, update_conflicts=True, update_fields=["count"],
-                                          unique_fields=["node_version", "label"])
+        timings["counts"] = _phase_seconds(phase_start)
 
         total_count = label_counts[BuiltInFilters.TOTAL]
+        phase_start = perf_counter()
+        variant_ids = self._get_variant_ids_to_store(total_count)
+        timings["variant_ids"] = _phase_seconds(phase_start)
+        if variant_ids is not None:
+            # For a small node the PK list is the truth - it and the count came from the same load
+            total_count = len(variant_ids)
 
         # Every label count is a subset of the total - a bigger one means the query fanned out over a
         # multi-valued join, or a cached count is out of sync with the live query
-        if bigger_than_total := {l: c for l, c in label_counts.items() if c > total_count}:
-            raise ValueError(f"Node {self}(pk={self.pk}) label counts {bigger_than_total} > total count={total_count}")
+        bigger_than_total = {l: c for l, c in label_counts.items() if c > total_count}
+
+        label_counts[BuiltInFilters.TOTAL] = total_count
+        load_data = {"counts": label_counts}
+        phase_start = perf_counter()
+        load_data.update(self._get_load_data())
+        timings["load_data"] = _phase_seconds(phase_start)
+        load_data["timings"] = timings
+        # Counts are a cache of a query against an immutable node_version, so a re-load (eg after a
+        # backoff retry that failed once these were already written) can safely overwrite them.
+        # "modified" is the client's signal that counts landed @see nodes_status
+        NodeVersion.objects.filter(pk=self.node_version.pk).update(load_data=load_data, variant_ids=variant_ids,
+                                                                   modified=timezone.now())
+        self.node_version.load_data = load_data
+        self.node_version.variant_ids = variant_ids
+
+        if bigger_than_total:
+            self._raise_or_warn_count_mismatch(f"label counts {bigger_than_total} > total count={total_count}")
 
         # Single parent nodes should always reduce the number of variants - run a check to make sure the
         # query wasn't bad and returned more results than it should have
@@ -1044,9 +1210,27 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
         if len(parents) == 1:
             parent = parents[0]
             if parent.count < total_count:
-                raise ValueError(f"Single parent node {self}(pk={self.pk}) had count={total_count} > {parent=}(pk={parent.pk}) count={parent.count=}")
+                self._raise_or_warn_count_mismatch(f"count={total_count} > {parent=}(pk={parent.pk}) count={parent.count}")
 
         return NodeStatus.READY, total_count
+
+    def _get_variant_ids_to_store(self, total_count: int) -> Optional[list[int]]:
+        """ The node's exact PK set, for nodes small enough to hold it - taken after the count so a node
+            whose data moved between the two is caught here rather than storing a silently short list """
+        max_size = settings.ANALYSIS_NODE_STORE_ID_SIZE_MAX
+        if not (max_size and total_count <= max_size):
+            return None
+
+        variant_ids = list(self.get_queryset().values_list("pk", flat=True)[:max_size + 1])
+        if len(variant_ids) > max_size:
+            self._raise_or_warn_count_mismatch(f"{len(variant_ids)} pks > max_size={max_size}")
+            return None
+        return variant_ids
+
+    def _get_load_data(self) -> dict:
+        """ Override to snapshot anything else the node worked out at load - merged into
+            NodeVersion.load_data alongside "counts" @see node_counts """
+        return {}
 
     def _load(self):
         """ Override to do anything interesting.
@@ -1057,9 +1241,16 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
         """ load is called after parents are run """
         # logging.debug("node %d (%d) load()", self.id, self.version)
         start = time()
+        timings = {}
+        phase_start = perf_counter()
         load_update_kwargs = self._load() or {}  # Do before counts in case it affects anything
-        status, count = self.node_counts()
+        timings["load"] = _phase_seconds(phase_start)
+        status, count = self.node_counts(timings=timings)
         load_seconds = time() - start
+        # load_seconds is one number - the phase breakdown is what says where a slow load went
+        if slow_seconds := settings.ANALYSIS_NODE_SLOW_LOAD_SECONDS:
+            if load_seconds > slow_seconds:
+                logging.warning("Node %d.%d slow load %.1fs: %s", self.pk, self.version, load_seconds, timings)
         self.update(status=status, count=count, load_seconds=load_seconds, **load_update_kwargs)
 
     def add_parent(self, parent, *args, **kwargs):
@@ -1196,7 +1387,7 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
             copy.id = None
             copy.pk = None
             copy.version = 1  # 0 is for those being constructed in analysis templates
-            # Store cloned_from so we can use original's NodeCounts
+            # Store cloned_from so we can use original's counts
             copy.cloned_from = original_node_version
             copy.save()
 
@@ -1312,6 +1503,16 @@ class NodeVersion(TimeStampedModel):
     """ This will be deleted once a node updates, so make all version specific caches cascade delete from this """
     node = models.ForeignKey(AnalysisNode, on_delete=CASCADE)
     version = models.IntegerField(null=False)
+    # {source_key: data_version} of the mutable tables this node read at load. Empty = deterministic
+    live_data_sources = models.JSONField(default=dict)
+    # The exact PK set stored at load, only for nodes <= ANALYSIS_NODE_STORE_ID_SIZE_MAX.
+    # When present, load_data["counts"][TOTAL] == len(variant_ids)
+    variant_ids = ArrayField(models.IntegerField(), null=True)
+    # Products of the node's load:
+    #   "counts":  {node count label: count} - the DAG badge counts, eg {"T": 1234, "C": 4, "tag_artefact": 3}.
+    #              Labels only ever live under this key, so they can never collide with the keys beside it
+    #   "timings": {phase: seconds} of the load - where load_seconds went @see AnalysisNode.load
+    load_data = models.JSONField(default=dict)
 
     class Meta:
         unique_together = ("node", "version")
@@ -1323,6 +1524,10 @@ class NodeVersion(TimeStampedModel):
         except NodeVersion.DoesNotExist:
             node.check_still_valid()
             raise
+
+    @property
+    def counts(self) -> dict[str, int]:
+        return self.load_data.get("counts", {})
 
     def __str__(self):
         return f"{self.node.pk} (v{self.version})"
@@ -1359,26 +1564,6 @@ def post_delete_node_cache(sender, instance, **kwargs):  # pylint: disable=unuse
         pass
 
 
-class NodeCount(TimeStampedModel):
-    node_version = models.ForeignKey(NodeVersion, on_delete=CASCADE)
-    label = models.CharField(max_length=100)
-    count = models.IntegerField(null=False)
-
-    class Meta:
-        unique_together = ("node_version", "label")
-
-    @staticmethod
-    def load_for_node_version(node_version: NodeVersion, label: str) -> 'NodeCount':
-        return NodeCount.objects.get(node_version=node_version, label=label)
-
-    @staticmethod
-    def load_for_node(node: AnalysisNode, label: str) -> 'NodeCount':
-        return NodeCount.load_for_node_version(node.node_version, label=label)
-
-    def __str__(self):
-        return f"NodeCount({self.node_version}, {self.label}) = {self.count}"
-
-
 class NodeColumnSummaryCacheCollection(models.Model):
     node_version = models.ForeignKey(NodeVersion, on_delete=CASCADE)
     variant_column = models.TextField(null=False)
@@ -1390,7 +1575,7 @@ class NodeColumnSummaryCacheCollection(models.Model):
                                                                                 variant_column=variant_column,
                                                                                 extra_filters=extra_filters)
         if created:
-            extra_filters_q = get_extra_filters_q(node.analysis.user, node.analysis.annotation_version, extra_filters)
+            extra_filters_q = get_node_extra_filters_q(node, extra_filters)
             queryset = node.get_queryset(extra_filters_q)
             count_qs = queryset.values_list(variant_column).distinct().annotate(Count('id'))
             data_list = []
@@ -1433,13 +1618,32 @@ class NodeVCFFilter(NodeAuditLogMixin, models.Model):
         return set(all_nvf_qs.values_list("vcf_filter__filter_id", flat=True))
 
     @staticmethod
-    def get_filter_codes(node, vcf):
-        filter_ids = NodeVCFFilter.get_filter_ids(node)
+    def has_pass(node) -> bool:
+        """ PASS is stored as the node level row with no vcf_filter - it's the one FILTER value
+            that means the same thing in every VCF """
+        return NodeVCFFilter.objects.filter(node_id=node.pk, vcf_filter__isnull=True).exists()
 
-        # Translate them into codes from our VCF
-        vf_qs = VCFFilter.objects.filter(vcf=vcf, filter_id__in=filter_ids).values("filter_code")
-        filter_codes = set(vf_qs.values_list("filter_code", flat=True).distinct())
-        if None in filter_ids:  # PASS
+    @staticmethod
+    def get_vcf_filter_ids(node, vcf=None) -> list[tuple]:
+        """ (vcf_id, filter_id) for the node's non-PASS rows, optionally for one VCF """
+        nvf_qs = NodeVCFFilter.objects.filter(node_id=node.pk, vcf_filter__isnull=False)
+        if vcf is not None:
+            nvf_qs = nvf_qs.filter(vcf_filter__vcf=vcf)
+        return list(nvf_qs.values_list("vcf_filter__vcf_id", "vcf_filter__filter_id"))
+
+    @staticmethod
+    def get_filter_codes(node, vcf, pass_only: Optional[bool] = None):
+        """ What this VCF lets through: its own ticked codes, plus PASS if the node's PASS row is set.
+
+            PASS is the one FILTER value that means the same thing in every VCF, so a code is never
+            translated across them - 'LowDepth' in a DRAGEN small variant VCF is not 'LowDepth' in
+            its CNV VCF. pass_only stands in for the node's PASS row, which is how SampleNode lets
+            one of its samples decide for itself. """
+        nvf_qs = NodeVCFFilter.objects.filter(node_id=node.pk, vcf_filter__vcf=vcf)
+        filter_codes = set(nvf_qs.values_list("vcf_filter__filter_code", flat=True))
+        if pass_only is None:
+            pass_only = NodeVCFFilter.has_pass(node)
+        if pass_only:
             filter_codes.add(None)
         return filter_codes
 

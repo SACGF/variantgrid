@@ -2,6 +2,7 @@ from django.db import models
 
 
 class UploadedFileTypes(models.TextChoices):
+    ANALYSIS = 'N', 'Analysis'
     BED = 'B', 'BED'
     CLINVAR = 'L', 'Clinvar'
     DRAGEN_TSO500_ALL_FUSIONS = 'F', 'DRAGEN TSO500 AllFusions'
@@ -18,6 +19,8 @@ class UploadedFileTypes(models.TextChoices):
     # Gene-level variants skip the bcftools stages, which all need a reference base they have no
     # coordinate for - @see snpdb.gene_level_variants
     GENE_LEVEL_INSERT_VARIANTS_ONLY = 'y', 'VCF - Insert gene-level variants only'
+    # A CNV caller's VCF of whole-gene calls - the records name a gene, not a coordinate
+    GENE_LEVEL_CNV_VCF = 'c', 'VCF - Gene-level copy number'
     # Need to separate these as Variant needs to be imported using VCF (for normalization etc)
     WIKI_GENE = "w", "Gene Wiki records"
     WIKI_VARIANT = "W", "Variant Wiki records"
@@ -58,3 +61,4 @@ class ModifiedImportedVariantOperation(models.TextChoices):
     NORMALIZATION = 'N', "Normalisation"
     RMDUP = 'R', "Removed Duplicate"
     SHARED_LOCUS = 'L', "Shared Locus - allele depths summed"
+    MERGED_RECORDS = 'M', "Merged Records - multiple VCF records became one variant"

@@ -1,3 +1,9 @@
+"""
+Pedigrees over PED files: PedFile / PedFileFamily / PedFileRecord hold the parsed file, Pedigree links
+a family to a Cohort through CohortSamplePedFileRecord (one per record, or the pedigree is invalid -
+see validate), and create_automatch_pedigree builds one by matching sample names. Trio / Duo / Quad in
+snpdb are the fixed-shape alternatives.
+"""
 from collections.abc import Iterable
 
 from django.contrib.auth.models import User
@@ -11,9 +17,9 @@ from library.django_utils.guardian_permissions_mixin import (
     GuardianPermissionsAutoInitialSaveMixin,
     GuardianPermissionsMixin,
 )
-from library.preview_request import PreviewModelMixin
+from library.preview_request import PreviewModelMixin, SvgSymbolPreviewIconMixin
 from patients.models_enums import Sex
-from snpdb.models import Cohort, CohortSample, ImportStatus, Sample, SomalierRelate
+from snpdb.models import Cohort, CohortSample, GenomeBuild, ImportStatus, Sample, SomalierRelate
 
 
 class PedFile(GuardianPermissionsMixin, models.Model):
@@ -119,11 +125,14 @@ def validate(records):
     return errors_list
 
 
-class Pedigree(GuardianPermissionsAutoInitialSaveMixin, PreviewModelMixin, SortByPKMixin, TimeStampedModel):
+class Pedigree(GuardianPermissionsAutoInitialSaveMixin, SvgSymbolPreviewIconMixin, PreviewModelMixin,
+               SortByPKMixin, TimeStampedModel):
     user = models.ForeignKey(User, on_delete=CASCADE)
     name = models.TextField(blank=False)
     cohort = models.ForeignKey(Cohort, on_delete=CASCADE)
     ped_file_family = models.ForeignKey(PedFileFamily, on_delete=CASCADE)
+
+    preview_icon_symbol = "node-icon-pedigree"  # PedigreeNode wears this too - see get_node_class_icon
 
     def get_samples(self, affected=None):
         """ returns a Sample queryset """
@@ -174,6 +183,10 @@ class SomalierPedigreeRelate(SomalierRelate):
 
     def get_samples(self) -> Iterable[Sample]:
         return self.pedigree.get_samples()
+
+    @property
+    def genome_build(self) -> GenomeBuild:
+        return self.pedigree.genome_build
 
     def write_ped_file(self, filename):
         pass

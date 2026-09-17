@@ -1,6 +1,6 @@
 {% load static %}
 {% load i18n %}
-<script type="text/javascript" src="{% static 'js/lib/plotly-latest.min.js' %}"></script>
+<script type="text/javascript" src="{% static 'js/lib/plotly-custom-3.7.0.min.js' %}"></script>
 <script type="text/javascript">
 $(document).ready(function() {
 
@@ -35,10 +35,10 @@ $(document).ready(function() {
     });
 
     function showPopup(sampleId, geneSymbol, sample) {
-        // create template url
-        const SVGD_URL = Urls.sample_variants_gene_detail(sampleId, geneSymbol);
-        const str_title = "Showing " + geneSymbol + " variant(s) for sample " + sample;
-        $("#sample-variants").dialog({ title: str_title, width: "80%", height: 400, modal: true}).dialog('open').load(SVGD_URL);
+        loadAjaxModal($("<a>", {
+            "data-href": Urls.sample_variants_gene_detail(sampleId, geneSymbol),
+            "data-title": "Showing " + geneSymbol + " variant(s) for sample " + sample,
+        }));
     }
 {% endif %}
 
@@ -102,24 +102,6 @@ $(document).ready(function() {
     height: 300px;
 }
 
-#sample-variants{
-    display: none;
-    border: 1px solid black;
-    width: 100%;
-    height: 100%;
-}
-
-.ui-dialog {
-    z-index: 100000 !important ;
-}
-
-.ui-dialog.position{
-    my: "center",
-    at: "center",
-    of: $("body"),
-    within: $("body")
-}
-
 .front-page-only {
     display: none;
 }
@@ -136,7 +118,6 @@ $(document).ready(function() {
 }
 
 </style>
-<script type="text/javascript" src="{% static 'js/grid.js' %}"></script>
 <div class='content-wrapper'>
     <div>
         <div id='runx1-logo-description-container' class='left'>
@@ -186,8 +167,6 @@ $(document).ready(function() {
     </div>
 
   <div id='classifications-hotspot-graph-container'></div>
-  <div id="sample-variants" class="dialog">
-  </div>
   <div id='runx1-gene-sample-matrix'>
   </div>
 </div>

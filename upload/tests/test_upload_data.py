@@ -9,6 +9,7 @@ from snpdb.models import VCF, ImportedWikiCollection, ImportSource
 from snpdb.models.models_enums import AlleleConversionTool
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_variant import LiftoverRun
+from upload.uploaded_file_type import get_upload_data_for_uploaded_file, reloads_vcf_in_place
 from upload.models import (
     FileUpload,
     UploadedClassificationImport,
@@ -23,8 +24,7 @@ from upload.models import (
 )
 
 
-class UploadPipelineGenomeBuildTest(TestCase):
-    """ UploadPipeline.genome_build resolves via UploadData - one case per UploadedFileTypes value """
+class UploadDataTestCase(TestCase):
 
     @classmethod
     def setUpTestData(cls):
@@ -42,11 +42,18 @@ class UploadPipelineGenomeBuildTest(TestCase):
         """ The VCF-ish pipelines create an UploadedVCF with a null vcf alongside their own satellite """
         UploadedVCF.objects.create(file_upload=pipeline.file_upload, upload_pipeline=pipeline)
 
+    def _vcf(self, name: str) -> VCF:
+        return VCF.objects.create(name=name, date=localdate(), user=self.user,
+                                  genotype_samples=0, genome_build=self.grch37)
+
+
+class UploadPipelineGenomeBuildTest(UploadDataTestCase):
+    """ UploadPipeline.genome_build resolves via UploadData - one case per UploadedFileTypes value """
+
     def test_vcf(self):
         pipeline = self._pipeline(UploadedFileTypes.VCF)
-        vcf = VCF.objects.create(name="build.vcf", date=localdate(), user=self.user,
-                                 genotype_samples=0, genome_build=self.grch37)
-        UploadedVCF.objects.create(file_upload=pipeline.file_upload, upload_pipeline=pipeline, vcf=vcf)
+        UploadedVCF.objects.create(file_upload=pipeline.file_upload, upload_pipeline=pipeline,
+                                   vcf=self._vcf("build.vcf"))
         self.assertEqual(pipeline.genome_build, self.grch37)
 
     def test_vcf_before_vcf_created(self):
@@ -119,3 +126,35 @@ class UploadPipelineGenomeBuildTest(TestCase):
                           UploadedFileTypes.VARIANT_CLASSIFICATIONS):
             with self.subTest(file_type=file_type):
                 self.assertIsNone(self._pipeline(file_type).genome_build)
+
+
+class RetryUploadPipelineTest(UploadDataTestCase):
+    """ Which pipelines retry by reloading their VCF in place, vs deleting their UploadData and
+        starting over. Every file type an AbstractVCFImportTaskFactory loads a VCF for takes the
+        first path, whatever its extension - @see reloads_vcf_in_place """
+
+    def _fusions_pipeline(self) -> UploadPipeline:
+        pipeline = self._pipeline(UploadedFileTypes.DRAGEN_TSO500_ALL_FUSIONS)
+        UploadedVCF.objects.create(file_upload=pipeline.file_upload, upload_pipeline=pipeline,
+                                   vcf=self._vcf("fusions.csv"))
+        return pipeline
+
+    def _reloads_in_place(self, pipeline: UploadPipeline) -> bool:
+        return reloads_vcf_in_place(get_upload_data_for_uploaded_file(pipeline.file_upload))
+
+    def test_dragen_all_fusions_reloads_in_place(self):
+        self.assertTrue(self._reloads_in_place(self._fusions_pipeline()))
+
+    def test_dragen_all_fusions_pipeline_finds_its_vcf(self):
+        """ So a failed import marks the VCF and its samples as errored """
+        pipeline = self._fusions_pipeline()
+        self.assertEqual("fusions.csv", pipeline.vcf.name)
+
+    def test_manual_variant_entry_is_rebuilt(self):
+        """ Its UploadedVCF has no VCF - the collection is what gets deleted and made again """
+        pipeline = self._pipeline(UploadedFileTypes.VCF_INSERT_VARIANTS_ONLY)
+        mvec = ManualVariantEntryCollection.objects.create(user=self.user, genome_build=self.grch37)
+        UploadedManualVariantEntryCollection.objects.create(file_upload=pipeline.file_upload, collection=mvec)
+        self._uploaded_vcf_without_vcf(pipeline)
+        self.assertFalse(self._reloads_in_place(pipeline))
+        self.assertIsNone(pipeline.vcf)

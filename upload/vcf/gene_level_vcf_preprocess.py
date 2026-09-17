@@ -23,6 +23,7 @@ from upload.vcf.vcf_preprocess import (
     REMOVE_HEADER_SUB_STEP,
     SPLIT_VCF_SUB_STEP,
     create_sub_step,
+    get_split_vcf_command,
     run_pipe,
     schedule_split_file_steps,
 )
@@ -48,9 +49,7 @@ def preprocess_gene_level_vcf(upload_step):
         "cat": ["cat", vcf_filename],
         # sed rather than 'bcftools view --no-header' so no stage in this pipe needs a reference
         REMOVE_HEADER_SUB_STEP: ["sed", "/^#/d"],
-        SPLIT_VCF_SUB_STEP: ["split", "-", vcf_name, "--additional-suffix=.vcf.gz", "--numeric-suffixes",
-                             "--lines", str(split_file_rows),
-                             "--filter='bash -c \"set -eo pipefail; { cat $VG_HEADER_FILE; cat; } | bgzip -c > $VG_SPLIT_VCF_DIR/$FILE\"'"],
+        SPLIT_VCF_SUB_STEP: get_split_vcf_command(vcf_name, split_file_rows),
     }
     # A sub step so a failed split reports on the pipeline the way the bcftools stages do. No tool
     # version - coreutils split is the only tool in this pipe

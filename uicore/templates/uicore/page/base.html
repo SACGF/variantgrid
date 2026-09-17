@@ -10,7 +10,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
     <link href="{% static 'js/lib/bootstrap/4.5.2/css/bootstrap.min.css' %}" rel="stylesheet">
 
-    <title>{% block title %}{{ site_name }}{% endblock %}</title>
+    <title>{{ site_short_name }} {% block title %}{% endblock %}</title>
     <meta name="description" content="{% block meta_description %}{{ site_description }}{% endblock %}">
     <link rel="canonical" href="{% block canonical_url %}{{ request.scheme }}://{{ request.get_host }}{{ request.path }}{% endblock %}">
 
@@ -23,9 +23,7 @@
     <meta name="twitter:card" content="summary">
     <meta name="twitter:title" content="{% block twitter_title %}{{ site_name }}{% endblock %}">
     <meta name="twitter:description" content="{% block twitter_description %}{{ site_description }}{% endblock %}">
-    <style>
-        @import url("https://fonts.googleapis.com/css?family=Raleway:400,500");
-    </style>
+    <link href="{% static 'css/fonts.css' %}" rel="stylesheet">
 
     {% compress css %}
     <!-- standard values -->
@@ -51,11 +49,12 @@
     <script>
         var $buoop = {
             required:{e:16,f:60,o:53,s:11,c:66},insecure:false,api:2021.03,reminder:0,no_permanent_hide: true, style:'bottom',
+            jsshowurl:"{% static 'js/lib/browser-update/3.3.67/update.show.min.js' %}",
             text:'Your browser {brow_name} <b>will not work on this site</b>.<br/>Please <a{up_but}>click here</a> for details on getting an up to date browser.'
         };
         function $buo_f(){
          var e = document.createElement("script");
-         e.src = "//browser-update.org/update.min.js";
+         e.src = "{% static 'js/lib/browser-update/3.3.67/update.min.js' %}";
          document.body.appendChild(e);
         }
         try {document.addEventListener("DOMContentLoaded", $buo_f,false)}
@@ -63,6 +62,7 @@
 
         var _rollbarConfig = {
             accessToken: "{{ rollbar_access_token | safe }}",
+            rollbarJsUrl: "{% static 'js/lib/rollbar/v3.1.0/rollbar.min.js' %}",
             {% if not rollbar_enabled %}
             enabled: false,
             {% endif %}
@@ -94,9 +94,6 @@
     <!-- used to set custom cookies, for functionality not worth setting in the database -->
     <script src="{% static 'js/lib/js.cookie.min.js' %}"></script>
 
-    <!-- lodash for our own usage -->
-    <script src="{% static 'js/lib/lodash/4.18.1/lodash.min.js' %}"></script>
-
     <!-- Needed by code that calls ajaxForm -->
     <script src="{% static 'js/lib/jquery.form.min.js' %}"></script>
 
@@ -110,12 +107,6 @@
     <!-- Datatables -->
     <link rel="stylesheet" type="text/css" href="{% static 'js/lib/datatables/datatables.min.css' %}"/>
     <script type="text/javascript" src="{% static 'js/lib/datatables/datatables.min.js' %}"></script>
-
-    <!-- Needed for drag & drop
-    TODO reduce scope of jquery UI to only elements we need -->
-    <link href="{% static 'js/lib/jquery-ui-1.13.2.custom/jquery-ui.min.css' %}" rel="stylesheet">
-    <link href="{% static 'js/lib/jquery-ui-1.13.2.custom/jquery-ui.theme.css' %}" rel="stylesheet">
-    <script src="{% static 'js/lib/jquery-ui-1.13.2.custom/jquery-ui.min.js' %}"></script>
 
     <script>
         {% block jshead %}{% endblock %}
@@ -152,16 +143,22 @@
         <script src="{% static 'js/citations.js' %}"></script>
         <script src="{% static 'js/vc_keys.js' %}"></script>
         <script src="{% static 'js/datatable_definition.js' %}"></script>
+        <script src="{% static 'js/datatables_client_renderers.js' %}"></script>
+        <script src="{% static 'js/grid.js' %}"></script>
+        <script src="{% static 'js/variantgrid_formats.js' %}"></script>
+        <script src="{% static 'js/variantgrid_filter_builder.js' %}"></script>
         <script src="{% static 'js/vc_links.js' %}"></script>
         <script src="{% static 'js/vc_form.js' %}"></script>
         <script src="{% static 'js/flags.js' %}"></script>
         <script src="{% static 'js/vc_diff.js' %}"></script>
         <script src="{% static 'js/age_widget.js' %}"></script>
         <script src="{% static 'js/scientific_number_widget.js' %}"></script>
+        <script src="{% static 'js/tips.js' %}"></script>
     {% endcompress %}
     {% block head %}{% endblock %}
 </head>
 <body>
+    {% include "uicore/tags/svg_icon_sprite.html" %}
     <nav class="navbar navbar-expand-lg navbar-light bg-theme fixed-top">
         <div id="navbar-brand-background">
             <a class="navbar-brand" href="{% url 'LOGO_VIEW_NAME'|settings_value %}"></a>
@@ -201,7 +198,7 @@
                 <a id="navbar-user-profile" href="{% url 'view_user_settings' %}" class="nav-link text-nowrap">
                     <i class="fas fa-user-circle"></i>
                     {{ user.username }}
-                    {{ user_properties.avatar_details.awards.html }}
+                    {% if user_properties.show_titles %}{{ user_properties.avatar_details.title_icon_html }}{% endif %}
                 </a>
             </div>
         </div>

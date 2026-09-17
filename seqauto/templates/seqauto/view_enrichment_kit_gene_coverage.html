@@ -7,45 +7,18 @@
 {% endblock %}
 
 {% block jshead %}
-    gridExtraFilters = {};
-    function showAll() {
-        $("#gold").prop("checked", false);
-        gridExtraFilters = {};
-        filterGrid();
-    }
+    let goldOnly = false;
 
-    function initFunc(grid, pagerId) {
-        $("#variant-classification-grid-filter-container").hide();
-        grid[0].p.postData["extra_filters"] = getExtraFilters;
+    function geneCoverageFilter(data) {
+        data.gold_only = goldOnly;
     }
-    
-    function filterGrid() {
-        $("#EnrichmentKitGeneCoverage-grid").trigger("reloadGrid");
-    }
-
-    function getExtraFilters() {
-        var extraFilters = '';
-        if (gridExtraFilters) {
-            extraFilters = JSON.stringify(gridExtraFilters);
-        }
-        return extraFilters;
-    }
-        
 {% endblock %}
 
 {% block jsdocumentready %}
-    jQuery.extend($.fn.fmatter , {
-        viewSequencingRunLink : function(sequencingRun) {
-            var url = Urls.view_sequencing_run(sequencingRun);
-            return "<a class='grid-link' target='_blank' href='" + url + "'>" + geneSymbol + "</div></a>";
-        }
-    });
-
     $("input#gold-only").change(function() {
-        gridExtraFilters['gold_only'] = $(this).is(":checked");
-        filterGrid();
+        goldOnly = $(this).is(":checked");
+        $("#enrichment-kit-gene-coverage-grid").DataTable().ajax.reload();
     });
-
 {% endblock %}
 
 {% block submenu_page_content %}
@@ -64,8 +37,9 @@
     </p>
     
     <div>
-    {% load jqgrid_tags %}
-    {% jqgrid 'enrichment_kit_gene_coverage_grid' 'EnrichmentKitGeneCoverage' search=False enrichment_kit_id=enrichment_kit.pk genome_build=genome_build gene_symbol=gene_symbol download_grid_json_as_csv=True init_func='initFunc' %}
+    <table id="enrichment-kit-gene-coverage-grid" class="sticky-header"
+           data-datatable-url="{% url 'enrichment_kit_gene_coverage_datatable' enrichment_kit_id=enrichment_kit.pk genome_build=genome_build gene_symbol=gene_symbol %}"
+           data-datatable-data="geneCoverageFilter"></table>
     </div>
 
 {% endblock %}

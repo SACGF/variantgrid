@@ -18,6 +18,7 @@ from snpdb.models.models_genome import GenomeBuild
 class Command(BaseCommand):
     """ This should only need to be run on legacy data, with variant annotations that were run before the transcript
         versions it used were inserted. Now we ensure the gene_annotation_release is set so this shouldn't happen """
+    category = "one-off"
 
     def handle(self, *args, **options):
         for genome_build in GenomeBuild.builds_with_annotation():

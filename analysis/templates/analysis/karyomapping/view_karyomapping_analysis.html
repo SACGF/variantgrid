@@ -33,8 +33,6 @@
     }
 
     $(document).ready(() => {
-        $("#karyomapping-tabs").tabs();
-
         {% if created_karyomapping_gene %}
         openKaryomapGene("{{ created_karyomapping_gene.pk }}");
         {% endif %}
@@ -45,14 +43,19 @@
 {% block submenu_page_content %}
 <script type="text/javascript" src="{% static 'js/lib/double-helix.jquery.js' %}"></script>
 <div id='karyomapping-tabs'>
-    <ul>
-        <li><a href="#details">Karyomapping</a></li>
+    <ul class="nav nav-tabs mb-4" role="tablist">
+        <li class="nav-item"><a class="nav-link show active" data-toggle="tab" role="tab" href="#details">Karyomapping</a></li>
         {% if has_write_permission %}
-        <li><a href="{% url 'group_permissions' 'analysis.models.KaryomappingAnalysis' karyomapping_analysis.pk %}">Sharing / Permissions</a></li>
+        <li class="nav-item"><a class="nav-link" data-toggle="tab" role="tab" href="#karyomapping-permissions" data-href="{% url 'group_permissions' 'analysis.models.KaryomappingAnalysis' karyomapping_analysis.pk %}">Sharing / Permissions</a></li>
         {% endif %}
     </ul>
-    <div id="details">
-        {% trio_table karyomapping_analysis.trio %}
+    <div class="tab-content">
+        <div class="tab-pane show active" role="tabpanel" id="details">
+            {% trio_table karyomapping_analysis.trio %}
+        </div>
+        {% if has_write_permission %}
+        <div class="tab-pane" role="tabpanel" id="karyomapping-permissions"></div>
+        {% endif %}
     </div>
 </div>
 

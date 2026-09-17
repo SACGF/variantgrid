@@ -1,5 +1,5 @@
 from functools import cached_property
-from typing import Optional
+from typing import Iterable, Optional
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -24,23 +24,60 @@ class VariantGridColumn(models.Model):
     width = models.IntegerField(null=True)
     label = models.TextField()
     description = models.TextField()
-    model_field = models.BooleanField(default=True)  # Standard field, can use Meta inspection to determine colmodel
+    model_field = models.BooleanField(default=True)  # Standard field - resolve it for the column's label/filter
     queryset_field = models.BooleanField(default=True)  # In queryset.values() (field or alias)
 
-    # These are required to be in custom columns
-    _MANDATORY_COLUMNS = {
-        "tags",
-        "tags_global",
-    }
+    # The composite this column is drawn inside, where something has worked that out for a whole
+    # page of columns at once - @see annotate_composite_membership
+    composite_of: Optional["VariantGridColumn"] = None
+
+    @property
+    def is_composite(self) -> bool:
+        """ Draws several other columns in the one cell - @see CompositeColumnMember """
+        return bool(self.composite_members.all())
+
+    @property
+    def member_columns(self) -> list["VariantGridColumn"]:
+        return [m.column for m in self.composite_members.all()]
+
+    @property
+    def headline_column(self) -> Optional["VariantGridColumn"]:
+        """ The member the cell reads as, and what it sorts on by default """
+        members = self.member_columns
+        return members[0] if members else None
+
+    @property
+    def composite_sort_menu(self) -> list[dict]:
+        """ The alternative sort keys the cell's header offers, in member order """
+        return [{"label": m.column.label, "column": m.column.variant_column}
+                for m in self.composite_members.all() if m.in_sort_menu]
+
+    @staticmethod
+    def annotate_composite_membership(columns: Iterable["VariantGridColumn"]) -> None:
+        """ Sets composite_of across a catalogue read with prefetch_related("composite_members__column"),
+            so a page listing every column does no per-row queries """
+        by_pk = {c.pk: c for c in columns}
+        for column in by_pk.values():
+            for member in column.composite_members.all():
+                if member_column := by_pk.get(member.column_id):
+                    member_column.composite_of = column
+
+    @property
+    def is_mandatory(self) -> bool:
+        return self.grid_column_name in CustomColumnsCollection.MANDATORY_COLUMNS
 
     def get_css_classes(self):
         css_classes = ["user-column"]
-        if self.grid_column_name in self._MANDATORY_COLUMNS:
+        if self.is_mandatory:
             css_classes.append("mandatory")
 
         if self.annotation_level:
             annotation_level_class = ColumnAnnotationLevel(self.annotation_level).label.lower()
             css_classes.append(f"{annotation_level_class}-column")
+        if self.is_composite:
+            css_classes.append("composite-column")
+        if self.composite_of:
+            css_classes.append("composite-member")
         return " ".join(css_classes)
 
     @cached_property
@@ -72,8 +109,29 @@ class VariantGridColumn(models.Model):
         return self.grid_column_name
 
 
+class CompositeColumnMember(models.Model):
+    """ A column drawn inside another column's cell. The first member (sort_order 0) is the headline -
+        the value the cell reads as and its default sort key - the rest are detail on hover.
+        A member stays in the catalogue (filter nodes, evidence keys and the VEP column map all key on
+        it) but rides along hidden wherever its composite is shown """
+    composite = models.ForeignKey(VariantGridColumn, on_delete=CASCADE, related_name="composite_members")
+    column = models.OneToOneField(VariantGridColumn, on_delete=CASCADE, related_name="composite_membership")
+    sort_order = models.IntegerField()
+    in_sort_menu = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ("composite", "sort_order")
+
+    def __str__(self):
+        return f"{self.composite_id}: {self.column_id}"
+
+
 class CustomColumnsCollection(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
-    MANDATORY_COLUMNS = ["variant"]
+    # Every collection has these: the analysis grid needs the row id, the tag columns to tag variants
+    # and the Sample marker to place the per-sample genotype columns. The custom columns page draws
+    # them locked in "My Columns" (reorder but not remove), except the row id which it never draws
+    MANDATORY_COLUMNS = ["variant", "tags", "tags_global", "Sample"]
+    ROW_ID_COLUMN = "variant"
     name = models.TextField()
     user = models.ForeignKey(User, null=True, on_delete=CASCADE)  # null = Public
     version_id = models.IntegerField(null=False, default=0)
@@ -105,11 +163,10 @@ class CustomColumnsCollection(GuardianPermissionsAutoInitialSaveMixin, TimeStamp
         clone_cc = CustomColumnsCollection(name=name, user=user)
         clone_cc.save()
 
-        # Mandatory columns are already inserted
-        for cc in self.customcolumn_set.exclude(column__grid_column_name__in=CustomColumnsCollection.MANDATORY_COLUMNS):
-            cc.pk = None
-            cc.custom_columns_collection = clone_cc
-            cc.save()
+        # save() has already inserted the mandatory columns - this puts them where the original had them
+        for cc in self.customcolumn_set.all():
+            CustomColumn.objects.update_or_create(custom_columns_collection=clone_cc, column=cc.column,
+                                                  defaults={"sort_order": cc.sort_order})
 
         return clone_cc
 

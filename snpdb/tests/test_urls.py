@@ -6,16 +6,22 @@ from annotation.fake_annotation import get_fake_annotation_version
 from annotation.tests.test_data_fake_genes import create_fake_transcript_version
 from library.django_utils.unittest_utils import URLTestCase, prevent_request_warnings
 from library.guardian_utils import assign_permission_to_user_and_groups
-from snpdb.models import TagColorsCollection
+from snpdb.models import Duo, TagColorsCollection, UserAward
 from snpdb.models.models_cohort import Cohort
 from snpdb.models.models_columns import CustomColumnsCollection
-from snpdb.models.models_enums import ImportStatus
+from snpdb.models.models_enums import (
+    AwardPeriod,
+    DuoRelationship,
+    ImportStatus,
+    UserAwardKind,
+    UserAwardLevel,
+)
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_genomic_interval import (
     GenomicIntervalsCategory,
     GenomicIntervalsCollection,
 )
-from snpdb.tests.utils.fake_cohort_data import create_fake_quad, create_fake_trio
+from snpdb.tests.utils.fake_cohort_data import create_fake_duo, create_fake_quad, create_fake_trio
 
 
 class Test(URLTestCase):
@@ -38,6 +44,12 @@ class Test(URLTestCase):
         cls.trio = create_fake_trio(cls.user_owner, grch37)
         cls.cohort = cls.trio.cohort
         cls.quad = create_fake_quad(cls.user_owner, grch37)
+        cls.duo = create_fake_duo(cls.user_owner, grch37)
+        # Same samples read as a sibling pair - the view page words itself off the relationship
+        cls.duo_sibling = Duo.objects.create(name="test_duo_sibling", user=cls.user_owner,
+                                             cohort=cls.duo.cohort, proband=cls.duo.proband,
+                                             relative=cls.duo.relative, relative_affected=True,
+                                             relationship=DuoRelationship.SIBLING)
         cls.vcf = cls.cohort.vcf
         cls.sample = cls.vcf.sample_set.first()
 
@@ -55,6 +67,12 @@ class Test(URLTestCase):
 
         cls.test_tag = TagColorsCollection.objects.create(user=cls.user_owner, name="TagA", version_id=1)
         cls.custom_columns_collection = CustomColumnsCollection.objects.create(name="Test Column Collections", user=cls.user_owner, version_id=1)
+        # Award cabinet on the user pages (#1819)
+        UserAward.objects.create(user=cls.user_owner, kind=UserAwardKind.TITLE, definition_key="top_tagger",
+                                 period=AwardPeriod.ALL_TIME, award_text="Top tagger (all time)", count=3)
+        UserAward.objects.create(user=cls.user_owner, kind=UserAwardKind.BADGE, definition_key="tagger",
+                                 award_text="Tagger", count=150, award_level=UserAwardLevel.BRONZE)
+        UserAward.objects.create(user=cls.user_owner, award_text="Thanks for the help")
 
         cls.PRIVATE_OBJECT_URL_NAMES_AND_KWARGS = [
             ('view_vcf', {"vcf_id": cls.vcf.pk}, 200),
@@ -67,25 +85,21 @@ class Test(URLTestCase):
             ('sample_graphs_tab', {"sample_id": cls.sample.pk}, 200),
             ('sample_permissions_tab', {"sample_id": cls.sample.pk}, 200),
             # Cohort
-            ('view_cohort_details_tab', {"cohort_id": cls.cohort.pk}, 200),
             ('view_cohort', {"cohort_id": cls.cohort.pk}, 302),
             ('cohort_hotspot', {"cohort_id": cls.cohort.pk}, 200),
             ('cohort_gene_counts', {"cohort_id": cls.cohort.pk}, 200),
-            ('cohort_sort', {"cohort_id": cls.cohort.pk}, 200),
             ('cohort_sample_count', {"cohort_id": cls.cohort.pk}, 200),
-            ('cohort_sample_edit', {"cohort_id": cls.cohort.pk}, 200),
+            ('cohort_sample_rows', {"cohort_id": cls.cohort.pk}, 200),
 
-            # Trio / Quad
+            # Duo / Trio / Quad
             ('view_trio', {"pk": cls.trio.pk}, 200),
             ('view_quad', {"pk": cls.quad.pk}, 200),
+            ('view_duo', {"pk": cls.duo.pk}, 200),
+            ('view_duo', {"pk": cls.duo_sibling.pk}, 200),
 
             # Data objects
             ('view_genomic_intervals', {"genomic_intervals_collection_id": cls.genomic_intervals_collection.pk}, 200),
             ('genomic_intervals_graphs_tab', {"genomic_intervals_collection_id": cls.genomic_intervals_collection.pk}, 200),
-
-            # Grids for objects
-            ("cohort_sample_grid", {"cohort_id": cls.cohort.pk, "op": "config"}, 200),
-            ("cohort_sample_grid", {"cohort_id": cls.cohort.pk, "op": "handler"}, 200),
         ]
 
         cls.PRIVATE_AUTOCOMPLETE_URLS = [
@@ -93,20 +107,20 @@ class Test(URLTestCase):
             ('sample_autocomplete', cls.sample, {"q": cls.sample.name}),
             ('cohort_autocomplete', cls.cohort, {"q": cls.cohort.name}),
             ('trio_autocomplete', cls.trio, {"q": cls.trio.name}),
-        ]
-
-        cls.PRIVATE_GRID_LIST_URLS = [
-            ("vcfs_grid", {}, cls.vcf),
-            ("samples_grid", {}, cls.sample),
+            ('duo_autocomplete', cls.duo, {"q": cls.duo.name}),
         ]
 
         cls.PRIVATE_DATATABLES_GRID_LIST_URLS = [
+            ("vcfs_datatable", {}, cls.vcf),
+            ("samples_list_datatable", {}, cls.sample),
             ("tag_color_collections_datatable", {}, cls.test_tag),
             ("custom_columns_collections_datatable", {}, cls.custom_columns_collection),
             ("cohort_datatable", {}, cls.cohort2),
             ("trio_datatable", {}, cls.trio),
             ("quad_datatable", {}, cls.quad),
+            ("duo_datatable", {}, cls.duo),
             ("genomic_intervals_datatable", {}, cls.genomic_intervals_collection),
+            ("cohort_sample_datatable", {"cohort_id": cls.cohort.pk}, None),
         ]
 
     def testUrls(self):
@@ -119,6 +133,7 @@ class Test(URLTestCase):
             ("cohorts", {}, 200),
             ("trios", {}, 200),
             ("quads", {}, 200),
+            ("duos", {}, 200),
             ("manual_variant_entry", {}, 200),
             ("custom_columns", {}, 200),
             ("tag_settings", {}, 200),
@@ -154,13 +169,6 @@ class Test(URLTestCase):
     @prevent_request_warnings
     def testAutocompleteNoPermission(self):
         self._test_autocomplete_urls(self.PRIVATE_AUTOCOMPLETE_URLS, self.user_non_owner, False)
-
-    def testJqGridListPermission(self):
-        self._test_jqgrid_urls_contains_objs(self.PRIVATE_GRID_LIST_URLS, self.user_owner, True)
-
-    @prevent_request_warnings
-    def testJqGridListNoPermission(self):
-        self._test_jqgrid_urls_contains_objs(self.PRIVATE_GRID_LIST_URLS, self.user_non_owner, False)
 
     def testDataTablesGridListPermission(self):
         self._test_datatables_grid_urls_contains_objs(self.PRIVATE_DATATABLES_GRID_LIST_URLS, self.user_owner, True)

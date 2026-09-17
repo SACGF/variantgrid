@@ -7,7 +7,6 @@
 {% load static %}
 {% load tz %}
 {% load js_tags %}
-{% load jqgrid_tags %}
 {% load user_tag_color_tags %}
 {% load wiki_tags %}
 {% load datatable_tags %}
@@ -23,8 +22,7 @@
 {% block head %}
     {% render_tag_styles_and_formatter %}
     <link rel="stylesheet" href="{% static 'css/graphs.css' %}" />
-    <script type="text/javascript" src="{% static 'js/lib/plotly-latest.min.js' %}"></script>
-    <script type="text/javascript" src="{% static 'js/grid.js' %}"></script>
+    <script type="text/javascript" src="{% static 'js/lib/plotly-custom-3.7.0.min.js' %}"></script>
     <script src="{% static 'js/cached_generated_files.js' %}"></script>
     <style>
         #hotspot-graph, #hotspot-graph img {
@@ -52,7 +50,6 @@
             open_variant_details_in_new_window: true,
         };
 
-        let gridFilterVisible = false;
         let geneClassificationsGridParams = {};
         let geneVariantsGridParams = {};
 
@@ -70,23 +67,6 @@
             });
         }
 
-        function showFilter() {
-            gridFilterVisible = true; // so it won't hide on reload.
-            $("#show-filter-link").hide();
-            let filterBox = $("#searchmodfbox_gene-variants-grid");
-            filterBox.slideDown();
-        }
-
-        $(window).bind('resize', function() {
-            let maxWidth = 1450;
-            let space = $(window).width() - 160;
-            let desiredWidth = Math.min(maxWidth, space);
-            let grid = $("#gene-classifications-grid");
-            if (grid && grid.length) {
-                grid.setGridWidth(desiredWidth);
-            }
-        });
-
         function showTranscripts() {
             $("#show-transcripts-link").hide();
             $("#transcripts").slideDown();
@@ -96,7 +76,7 @@
             $("#gene-variants-grid-filtering-message").empty().html("Filtering to " + text).parent().show();
             geneVariantsGridParams["protein_position"] = protein_position;
             geneVariantsGridParams["protein_position_transcript_version_id"] = transcript_version_id;
-            $("#gene-variants-grid").trigger("reloadGrid");
+            reloadGeneVariantsTable();
         }
 
         function viewGeneClassificationsHotspotGraphClickFunc(transcript_version_id, text, protein_position) {
@@ -464,7 +444,7 @@
             {% endmodal %}
         {% endif %}
 
-        {% classification_groupings %}
+        {% classification_groupings show_summary_counts=True %}
     </div>
     <div class="container">
         {% if show_annotation %}
@@ -485,44 +465,45 @@
                     <p>The 2nd column: 'Sample Count' shows the number of samples which have this variant. A hotspot graph shows variants from this gene if any appear in samples.
                 {% end_page_help_embedded %}
 
-                <a class='hover-link' id='show-filter-link' href="javascript:showFilter()">Filter grid...</a>
                 <span class="hidden">
                     <span class="filter-message" id="gene-variants-grid-filtering-message"></span>
                     <a class='hover-link' href="javascript:clearGeneVariantsGrid()">Show all...</a>
                 </span>
-        		<table id="grid"></table>
-        		<div id="pager"></div>
                 <script>
-                    function geneVariantsGridComplete() {
-                        const searchToolBox = $("#searchmodfbox_gene-variants-grid");
-                        searchToolBox.width(650); // make space for data entry
-                        if (!gridFilterVisible) {
-                            searchToolBox.hide();
-                        }
+                    // Called by DataTables before each ajax call - the grid class reads them as extra_filters
+                    function geneVariantsDatatableFilter(data) {
+                        data["extra_filters"] = JSON.stringify(geneVariantsGridParams);
                     }
 
-                    function getGeneVariantsGridExtraFilters() {
-                        return JSON.stringify(geneVariantsGridParams);
+                    function reloadGeneVariantsTable() {
+                        const table = $("#gene-variants-datatable");
+                        if ($.fn.DataTable.isDataTable(table)) {
+                            table.DataTable().ajax.reload();
+                        }
                     }
 
                     function clearGeneVariantsGrid() {
                         geneVariantsGridParams = {};
-                        $("#gene-variants-grid").trigger("reloadGrid");
+                        clearTagCountsSummary(GENE_VARIANTS_TAG_COUNTS);
+                        reloadGeneVariantsTable();
                         $("#gene-variants-grid-filtering-message").empty().parent().hide();
                     }
 
-                    function geneVariantsGridInitFunc(grid, pagerId) {
-                        grid[0].p.postData["extra_filters"] = getGeneVariantsGridExtraFilters;
+                    function geneVariantsTagsChanged(tagIds) {
+                        geneVariantsGridParams = tagIds.length ? {"tags": tagIds} : {};
+                        reloadGeneVariantsTable();
                     }
 
-                    function tagClick(tagId) {
-                        geneVariantsGridParams = {"tag" : tagId};
-                        let grid = $("#gene-variants-grid");
-                        grid.jqGrid('setGridParam', {page: 1, sortname: 'id', sortorder: "desc"}).trigger('reloadGrid');
-                    }
+                    const GENE_VARIANTS_TAG_COUNTS = "[data-tag-counts-summary]";
+
+                    $(document).ready(() => {
+                        setupTagCountsSummary(GENE_VARIANTS_TAG_COUNTS, geneVariantsTagsChanged);
+                    });
                 </script>
-                {% tag_counts_filter genome_build=genome_build gene_symbol=gene_symbol click_func='tagClick' show_all_func='clearGeneVariantsGrid' %}
-                {% jqgrid 'gene_symbol_variants_grid' 'gene-variants' template_name='jqgrid/variant_details_link_grid.html' delete=False download_grid_json_as_csv=True gene_symbol=gene_symbol.pk genome_build_name=genome_build.name init_func='geneVariantsGridInitFunc' grid_complete='geneVariantsGridComplete' %}
+                {% tag_counts_summary genome_build=genome_build gene_symbol=gene_symbol %}
+                <table id="gene-variants-datatable" class="sticky-header"
+                       data-datatable-url="{% url 'gene_symbol_variants_grid' gene_symbol=gene_symbol.pk genome_build_name=genome_build.name %}"
+                       data-datatable-data="geneVariantsDatatableFilter"></table>
             {% else %}
                 There are no variants for this gene.
             {% endif %}

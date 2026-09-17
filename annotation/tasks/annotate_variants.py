@@ -8,6 +8,7 @@ from celery import chain
 from celery.canvas import Signature
 from django.conf import settings
 from django.db import connection, transaction
+from django.db.models import F
 from django.utils import timezone
 
 from annotation.models import AnnotationStatus
@@ -220,9 +221,10 @@ def annotate_variants(annotation_run_id):
         logging.info("Skipping external AnnotationRun %s (awaiting external annotation)", annotation_run.pk)
         return
 
-    # task_id used as Celery lock
-    num_modified = AnnotationRun.objects.filter(pk=annotation_run.pk,
-                                                task_id__isnull=True).update(task_id=my_task_id)
+    # task_id used as Celery lock. attempt_count is bumped here - at execution, not dispatch - so a run
+    # whose task merely sat in an overloaded queue past its lease never burns its retry budget.
+    num_modified = AnnotationRun.objects.filter(pk=annotation_run.pk, task_id__isnull=True).update(
+        task_id=my_task_id, attempt_count=F("attempt_count") + 1)
     if num_modified != 1:
         msg = f"Celery couldn't get task_id lock on AnnotationRun: {annotation_run.pk}"
         _record_lock_failure(annotation_run.pk, my_task_id, msg)
@@ -304,9 +306,10 @@ def import_annotation_run(annotation_run_id):
     annotation_run = AnnotationRun.objects.get(pk=annotation_run_id)
     my_task_id = import_annotation_run.request.id
 
-    # task_id used as Celery lock (as annotate_variants) so a double-dispatch can't double-import
-    num_modified = AnnotationRun.objects.filter(
-        pk=annotation_run.pk, task_id__isnull=True).update(task_id=my_task_id)
+    # task_id used as Celery lock (as annotate_variants) so a double-dispatch can't double-import.
+    # attempt_count bumped at execution, not dispatch (as annotate_variants).
+    num_modified = AnnotationRun.objects.filter(pk=annotation_run.pk, task_id__isnull=True).update(
+        task_id=my_task_id, attempt_count=F("attempt_count") + 1)
     if num_modified != 1:
         msg = f"Celery couldn't get task_id lock on AnnotationRun: {annotation_run.pk}"
         _record_lock_failure(annotation_run.pk, my_task_id, msg)
@@ -315,13 +318,25 @@ def import_annotation_run(annotation_run_id):
     try:
         # Reload to get updated task_id
         annotation_run = AnnotationRun.objects.get(pk=annotation_run_id)
-        annotation_run.task_id = my_task_id
+        # Re-check state at execution time (the is_upload_resumable predicate): a queued import task can
+        # be stale - the run already imported via an earlier dispatch (and the cleanup receiver removed
+        # its annotated file), or was reclaimed. A stale duplicate is a silent no-op, never an ERROR;
+        # the finally below releases the lock.
+        if annotation_run.status != AnnotationStatus.ANNOTATION_COMPLETED \
+                or not (annotation_run.vcf_annotated_filename
+                        and os.path.exists(annotation_run.vcf_annotated_filename)):
+            logging.info("AnnotationRun %s no longer needs importing (status=%s) - stale queued task %s",
+                         annotation_run.pk, annotation_run.status, my_task_id)
+            return
         annotation_run.set_task_log("import_start", timezone.now())
         annotation_run.save()
 
         # Renew the lease while the bulk DB insert runs, so a live worker is never reclaimed under us.
         with AnnotationRunLeaseHeartbeat(annotation_run, my_task_id):
             get_runner(annotation_run.pipeline_type).import_results(annotation_run)
+        # A completed upload outranks any stale error - reclaim may have failed the run out while this
+        # task sat queued, and get_status() tests error_exception first.
+        annotation_run.error_exception = None
         # The run is only truly complete once imported (moved here from annotate_variants). #1649
         # #1670: annotation_run is carried so the cleanup receiver can reclaim this run's output now that
         # its rows are committed. Existing receivers take **kwargs, so the extra key is transparent.

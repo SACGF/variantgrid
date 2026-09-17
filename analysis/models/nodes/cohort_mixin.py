@@ -1,20 +1,75 @@
 import operator
 import re
-from functools import reduce
+from collections.abc import Callable
+from functools import cached_property, reduce
 from typing import Optional
 
+import simplejson
 from django.db.models import Q
 
 from analysis.models.enums import GroupOperation
-from analysis.models.nodes.analysis_node import NodeAlleleFrequencyFilter, NodeVCFFilter
-from patients.models_enums import Zygosity
+from analysis.models.models_analysis import Analysis
+from analysis.models.nodes.analysis_node import (
+    NodeAlleleFrequencyFilter,
+    NodeVCFFilter,
+    annotate_and_filter_queryset,
+    queryset_to_pk_in_q,
+)
+from library.genomics.vcf_writer import percent_decode_info_value
+from patients.models import Patient
+from patients.models_enums import SampleSourceLevel, Zygosity
+from patients.sample_grouping import get_patient_for_source
 from snpdb.archive import DataArchivedError
-from snpdb.models import Cohort, CohortGenotypeCollection, Sample, VCFFilter
+from snpdb.models import Cohort, CohortGenotypeCollection, ImportStatus, Sample, VCFFilter, VCFInfo
+from snpdb.views.datatable_view import CellData, NullOrder, RichColumn
 from upload.models import UploadedVCF
+from upload.tso500.dragen_all_fusions_parser import (
+    FUSION_OBSERVATIONS_INFO,
+    format_fusion_observations,
+)
+
+
+def _render_fusion_calls(cell: CellData) -> str:
+    """ The caller rows this fusion was merged from. INFO values are stored as the VCF wrote them -
+        htslib doesn't decode, so we do. @see upload.tso500.dragen_all_fusions_parser """
+    if not (encoded := cell.value):
+        return ""
+    return format_fusion_observations(simplejson.loads(percent_decode_info_value(encoded)))
+
+
+def get_sample_annotation_kwargs(sample: Sample, **kwargs) -> dict:
+    """ The genotype join for one sample's VCF, plus its zygosity alias """
+    annotation_kwargs = dict(sample.cohort_genotype_collection.get_annotation_kwargs(**kwargs))
+    annotation_kwargs.update(sample.get_annotation_kwargs(**kwargs))
+    return annotation_kwargs
+
+
+def get_sample_pk_in_q(node, sample: Sample, arg_q_dict: dict[Optional[str], dict[str, Q]]) -> Q:
+    """ One sample's variants as pk IN (subquery). Annotated with only its own VCF's genotype join,
+        so the subquery doesn't drag the other samples' outer joins through with it """
+    qs = node._get_model_queryset()  # pylint: disable=protected-access
+    a_kwargs = get_sample_annotation_kwargs(sample)
+    qs, q_list = annotate_and_filter_queryset(qs, a_kwargs, arg_q_dict)
+    if q_list:
+        qs = qs.filter(reduce(operator.and_, q_list))
+    return queryset_to_pk_in_q(qs)
+
+
+def get_sample_any_zygosity_arg_q_dict(sample: Sample) -> dict[Optional[str], dict[str, Q]]:
+    """ A sample's rows, unfiltered - the zygosity IN is what restricts the outer join to them, so a
+        VCF with nothing to filter on passes through rather than being left out
+        (@see analysis/models/nodes/sources/sample_node.py:SampleNode._get_sample_arg_q_dict) """
+    alias, field = sample.get_cohort_genotype_alias_and_field("zygosity")
+    q = Q(**{f"{field}__in": [code for code, _ in Zygosity.CHOICES]})
+    return {alias: {str(q): q}}
 
 
 class CohortMixin:
     """ Since a Cohort is based off a VCF we also  """
+    analysis: Analysis
+    nodeallelefrequencyfilter: NodeAlleleFrequencyFilter
+    q_none: Callable[[], Q]
+    get_samples_with_genotype: Callable[[], list[Sample]]
 
     def _get_cohort(self):
         """ Each subclass needs to implement the way to get their Cohort """
@@ -75,7 +130,7 @@ class CohortMixin:
         visibility = {}
         if cohort := self._get_cohort():
             cohorts = [cohort]
-            visibility = dict.fromkeys(cohort.get_samples(), cohort.has_genotype)
+            visibility = dict.fromkeys(cohort.get_samples(), cohort.has_sample_columns)
         return cohorts, visibility
 
     @property
@@ -177,7 +232,8 @@ class CohortMixin:
 
     def get_allele_frequency_q_list(self):
         """ Anything that subclasses this (eg TrioNode/PedigreeNode) must also implement
-            self.get_samples() and reduce to what is used there so filter is only applied on those samples """
+            self.get_samples_with_genotype() and reduce to what is used there so filter is only
+            applied on those samples """
         try:
             naff = self.nodeallelefrequencyfilter
             if not naff.nodeallelefrequencyrange_set.exists():
@@ -189,8 +245,8 @@ class CohortMixin:
         cgc = self.cohort_genotype_collection
         packed_index_by_sample_id = cgc.get_packed_index_by_sample_id
 
-        for sample in self.get_samples():
-            # get_samples() includes ancestor samples (eg a compound het Trio/Quad's parent node)
+        for sample in self.get_samples_with_genotype():
+            # get_samples_with_genotype() includes ancestor samples (eg a compound het Trio/Quad's parent node)
             # that may not be in this cohort's genotype array - skip those.
             if sample.pk not in packed_index_by_sample_id:
                 continue
@@ -208,10 +264,12 @@ class CohortMixin:
             q_and.append(GroupOperation.reduce(filters, naff.group_operation))
         return q_and
 
-    def _get_vcf_locus_filters_arg_q_dict(self, vcf, alias: str) -> dict[Optional[str], dict[str, Q]]:
-        """ Filter ids are stored on the node - they resolve into each VCF's own codes here """
+    def _get_vcf_locus_filters_arg_q_dict(self, vcf, alias: str,
+                                          pass_only: Optional[bool] = None) -> dict[Optional[str], dict[str, Q]]:
+        """ Filter ids are stored on the node - they resolve into each VCF's own codes here.
+            pass_only lets a caller decide PASS for itself (see SampleNode's per sample overrides) """
         arg_q_dict = {}
-        filter_codes = NodeVCFFilter.get_filter_codes(self, vcf)
+        filter_codes = NodeVCFFilter.get_filter_codes(self, vcf, pass_only=pass_only)
         if filter_codes:
             q_or = []
             if None in filter_codes:  # Pass
@@ -249,13 +307,14 @@ class CohortMixin:
             1 - Pass Only
             2 - Other (will calculate as not cached) """
 
-        vcf = self._get_vcf()
-        if vcf:
-            if filter_codes := NodeVCFFilter.get_filter_codes(self, vcf):
-                if filter_codes == [None]:  # PASS only
-                    return 1
-                return 2
-        return 0
+        filter_codes = set()
+        for vcf in self.get_vcf_locus_filter_vcfs():
+            filter_codes |= NodeVCFFilter.get_filter_codes(self, vcf)
+        if not filter_codes:
+            return 0
+        if filter_codes == {None}:  # PASS only, which means the same thing in every VCF
+            return 1
+        return 2
 
     def get_filter_description(self):
         FILTER_DESCRIPTIONS = {1: "Pass Filters",
@@ -263,10 +322,12 @@ class CohortMixin:
         filter_code = self.get_filter_code()
         return FILTER_DESCRIPTIONS.get(filter_code)
 
-    @property
-    def has_filters(self):
-        vcf = self._get_vcf()
-        return vcf and vcf.vcffilter_set.exists()
+    @cached_property
+    def has_filters(self) -> bool:
+        """ Cached: the query build asks this once per sample, and a VCF's filters can't change
+            mid request """
+        vcfs = self.get_vcf_locus_filter_vcfs()
+        return bool(vcfs) and VCFFilter.objects.filter(vcf__in=vcfs).exists()
 
     def _get_filters_cohort_genotype_collections(self) -> list:
         """ The genotype collections whose record level FILTER to show. Nodes spanning VCFs override """
@@ -275,27 +336,44 @@ class CohortMixin:
                 return [cgc]
         return []
 
-    def _get_node_extra_columns(self):
+    def _get_node_extra_columns(self) -> list[RichColumn]:
         """ show filters if we have them and they're not filtered away (no point then) """
-        return [f"{cgc.cohortgenotype_alias}__filters" for cgc in self._get_filters_cohort_genotype_collections()]
-
-    def _get_node_extra_colmodel_overrides(self):
-        extra_colmodel_overrides = super()._get_node_extra_colmodel_overrides()
+        extra_columns = super()._get_node_extra_columns()
         cgcs = self._get_filters_cohort_genotype_collections()
         for cgc in cgcs:
             vcf = cgc.cohort.get_vcf()
             filters_column = f"{cgc.cohortgenotype_alias}__filters"
-            overrides = {
-                'name': filters_column,
-                'model_field': False,  # It's an alias
-                'queryset_field': True,
-                'server_side_formatter': VCFFilter.get_formatter(vcf),
-            }
-            if len(cgcs) > 1:  # Which VCF's FILTER this is only needs saying when there are several
-                overrides['label'] = f"{vcf} Filters"
-            extra_colmodel_overrides[filters_column] = overrides
+            # Which VCF's FILTER this is only needs saying when there are several
+            label = f"{vcf} Filters" if len(cgcs) > 1 else "Filters"
+            extra_columns.append(RichColumn(
+                key=filters_column, label=label, width=80, orderable=True, search=False,
+                include_in_csv=True,
+                # Expanded to the VCF's own filter descriptions server side, so the CSV matches
+                renderer=VCFFilter.get_formatter(vcf), csv_rendered=True,
+                # Nearly every record passed - the cell fades a pass right down so only a
+                # failure reads. @see VariantGridFormat.vcfFilters
+                client_renderer='VariantGridFormat.vcfFilters',
+                null_order=NullOrder.FIRST_ON_ASC))
 
-        return extra_colmodel_overrides
+        # One gene pair can be several caller rows, all merged onto the one Variant - blank on
+        # everything that isn't a fusion, which is why the column only appears for a fusion VCF
+        fusion_cgcs = self._get_fusion_calls_cohort_genotype_collections()
+        for cgc in fusion_cgcs:
+            label = f"{cgc.cohort.get_vcf()} Fusion calls" if len(fusion_cgcs) > 1 else "Fusion calls"
+            extra_columns.append(RichColumn(
+                key=f"{cgc.cohortgenotype_alias}__info__{FUSION_OBSERVATIONS_INFO}",
+                label=label, width=90,
+                orderable=False, search=False, include_in_csv=True,
+                renderer=_render_fusion_calls, csv_rendered=True,
+                client_renderer='VariantGridFormat.fusionCalls'))
+        return extra_columns
+
+    def _get_fusion_calls_cohort_genotype_collections(self) -> list:
+        """ The genotype collections whose VCF carries fusion observations. Nodes spanning VCFs override """
+        if cgc := self.cohort_genotype_collection:
+            if VCFInfo.objects.filter(vcf=cgc.cohort.get_vcf(), identifier=FUSION_OBSERVATIONS_INFO).exists():
+                return [cgc]
+        return []
 
     def _get_configuration_check_cohorts(self) -> list:
         """ Cohorts to check for missing/archived genotype data. Nodes spanning VCFs override """
@@ -306,6 +384,10 @@ class CohortMixin:
     def _get_configuration_errors(self) -> list:
         errors = super()._get_configuration_errors()
         for cohort in self._get_configuration_check_cohorts():
+            if cohort.import_status != ImportStatus.SUCCESS:
+                errors.append(f"'{cohort}' has import status: {cohort.get_import_status_display()}")
+                continue
+
             try:
                 _ = cohort.cohort_genotype_collection
             except CohortGenotypeCollection.DoesNotExist:
@@ -328,6 +410,7 @@ class CohortMixin:
 
 class SampleMixin(CohortMixin):
     """ Adds sample to query via annotation kwargs, must have a "sample" field """
+    sample: Optional[Sample]
 
     def _get_sample(self) -> Optional[Sample]:
         """ The sample this node's genotype joins hang off - overridden by nodes that group samples """
@@ -352,40 +435,111 @@ class SampleMixin(CohortMixin):
 
         if sample := self._get_sample():
             cohorts = [self._get_cohort()]
-            visibility[sample] = sample.has_genotype
+            visibility[sample] = sample.has_sample_columns
         return cohorts, visibility
 
 
 class AncestorSampleMixin(SampleMixin):
-    """ Must have a "sample" field that is set from ancestor """
+    """ A filter node that applies to either one sample or one patient, set from its ancestors.
+
+        The model needs a "sample" and a "patient" field, at most one of which is set - both null
+        means unset. In patient mode the filter applies to every ancestor sample of that patient and
+        the node's query is the OR of the per-sample filters, the shape a group level SampleNode
+        produces (@see analysis/models/nodes/sources/sample_node.py:SampleNode). "Every ancestor
+        sample" is the scope rather than every sample of the patient, so the source node decides the
+        reach and the filter follows it. """
+    patient: Optional[Patient]
+    version: int
+    _get_node_q_hash: Callable[[], str]
+    get_parent_subclasses_and_errors: Callable[[], tuple[list, list]]
+    get_proband_sample: Callable[..., Optional[Sample]]
+    get_proband_patient: Callable[..., Optional[Patient]]
 
     def _set_sample(self, sample):
         self.sample = sample
+        self.patient = None
+
+    def _set_patient(self, patient):
+        self.patient = patient
+        self.sample = None
+
+    def get_filter_patient(self) -> Optional[Patient]:
+        """ Who the node is about - the patient it was set to, or the one its sample belongs to """
+        if self.patient:
+            return self.patient
+        return get_patient_for_source(SampleSourceLevel.SAMPLE, self.sample)
+
+    def get_filter_samples(self) -> list[Sample]:
+        """ The samples this node's genotype filters apply to - every path that used self.sample
+            for a genotype join goes through here """
+        if self.sample:
+            return [self.sample]
+        if self.patient:
+            samples = [s for s in self.get_ancestor_samples()
+                       if get_patient_for_source(SampleSourceLevel.SAMPLE, s) == self.patient]
+            return sorted(samples, key=lambda s: s.pk)
+        return []
+
+    def _get_filter_samples_arg_q_dict(self, per_sample) -> dict[Optional[str], dict[str, Q]]:
+        """ The one place the per-sample OR is built. per_sample(sample) returns that sample's
+            arg_q_dict, keyed on its own alias.
+
+            Sample mode returns it as is. Patient mode wraps each sample's filters in a pk__in
+            subquery annotated with only that sample's genotype join - a Q keyed on an alias runs as
+            soon as that alias is annotated (@see analysis_node.annotate_and_filter_queryset), so an
+            OR across two aliases has nowhere to hang until both are """
+        samples = self.get_filter_samples()
+        if not samples:
+            return {}
+        if self.sample:
+            return per_sample(samples[0])
+        q = reduce(operator.or_, [get_sample_pk_in_q(self, sample, per_sample(sample)) for sample in samples])
+        return {None: {self._get_node_q_hash(): q}}
+
+    def _get_cohorts_and_sample_visibility_for_node(self):
+        if not self.patient:
+            return super()._get_cohorts_and_sample_visibility_for_node()
+
+        cohorts = []
+        visibility = {}
+        for sample in self.get_filter_samples():
+            cohort = sample.vcf.cohort
+            if cohort not in cohorts:
+                cohorts.append(cohort)
+            visibility[sample] = sample.has_sample_columns
+        return cohorts, visibility
+
+    def _get_annotation_kwargs_for_node(self, **kwargs) -> dict:
+        annotation_kwargs = super()._get_annotation_kwargs_for_node(**kwargs)
+        if self.patient:
+            kwargs["override"] = False
+            for sample in self.get_filter_samples():
+                annotation_kwargs.update(get_sample_annotation_kwargs(sample, **kwargs))
+        return annotation_kwargs
 
     def _get_configuration_errors(self) -> list:
         errors = super()._get_configuration_errors()
         if self.sample:
-            parent_sample_set = self._get_ancestor_samples()
-            if self.sample not in parent_sample_set:
+            if self.sample not in self.get_ancestor_samples():
                 errors.append(f"Sample: {self.sample} is not set as a sample in any ancestors of this node")
+        elif self.patient:
+            if not self.get_filter_samples():
+                errors.append(f"Patient: {self.patient} has no samples in any ancestors of this node")
         return errors
 
-    def _get_ancestor_samples(self) -> set[Sample]:
-        """ Get all samples from ancestor nodes, including those from VCFs without genotypes.
-            Uses cohort samples directly rather than visibility-filtered get_samples(),
-            so that variant-only VCFs (has_genotype=False) are still recognized as valid ancestors. """
+    def get_ancestor_samples(self) -> set[Sample]:
+        """ Get all samples from ancestor nodes, including those from VCFs without genotypes,
+            so that variant-only VCFs (has_sample_columns=False) are still valid ancestors """
         parent_sample_set = set()
         parents, _errors = self.get_parent_subclasses_and_errors()
         for parent in parents:  # Use parent samples not own as own inserts self.sample
-            cohorts, _ = parent.get_cohorts_and_sample_visibility(sort=False)
-            for c in cohorts:
-                parent_sample_set.update(c.get_samples())
+            parent_sample_set.update(parent.get_samples())
         return parent_sample_set
 
     def handle_ancestor_input_samples_changed(self):
-        """ Auto-set to single sample ancestor (or remove if no longer ancestor) """
+        """ Auto-set to the ancestors' proband (or remove if no longer reachable from them) """
 
-        parent_sample_set = self._get_ancestor_samples()
+        parent_sample_set = self.get_ancestor_samples()
 
         modified = False
         # Don't do anything if new as the get_samples won't work
@@ -394,10 +548,17 @@ class AncestorSampleMixin(SampleMixin):
             if self.sample and self.sample not in parent_sample_set:
                 self._set_sample(None)
                 modified = True
+            if self.patient and not self.get_filter_samples():
+                self._set_patient(None)
+                modified = True
 
-        if self.sample is None:
+        if self.sample is None and self.patient is None:
             if proband_sample := self.get_proband_sample():
                 self._set_sample(proband_sample)
+                modified = True
+            elif proband_patient := self.get_proband_patient():
+                # Several callers on the one extraction have no single sample, but are one person
+                self._set_patient(proband_patient)
                 modified = True
             elif len(parent_sample_set) == 1:
                 self._set_sample(parent_sample_set.pop())

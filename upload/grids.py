@@ -1,15 +1,15 @@
 from functools import partial
+from typing import Any
 
 from django.db.models import QuerySet
 from django.http import HttpRequest
 from django.shortcuts import get_object_or_404
 
 from annotation.annotation_version_querysets import get_queryset_for_latest_annotation_version
-from library.jqgrid.jqgrid_user_row_config import JqGridUserRowConfig
-from snpdb.grids import AbstractSkippedAnnotationGrid
-from snpdb.models import ProcessingStatus
+from snpdb.grids import AbstractSkippedAnnotationColumns
+from snpdb.models import GenomeBuild, ProcessingStatus
 from snpdb.models.models_variant import Variant
-from snpdb.views.datatable_view import CellData, DatatableConfig, RichColumn
+from snpdb.views.datatable_view import CellData, DatatableConfig, RichColumn, SortOrder
 from upload.models import ModifiedImportedVariant, UploadPipeline, UploadStep, VCFPipelineStage
 
 
@@ -65,37 +65,34 @@ class UploadStepColumns(DatatableConfig[UploadStep]):
         ]
 
 
-class UploadPipelineSkippedAnnotationGrid(AbstractSkippedAnnotationGrid):
-    def __init__(self, user, upload_pipeline_id):
-        super().__init__(user)
-        upload_pipeline = get_object_or_404(UploadPipeline, pk=upload_pipeline_id)
-        vcf = upload_pipeline.uploadedvcf.vcf
-        self.set_skipped_annotation_queryset(vcf, upload_pipeline.genome_build)
+class UploadPipelineSkippedAnnotationColumns(AbstractSkippedAnnotationColumns):
+    def _get_variant_source(self) -> tuple[Any, GenomeBuild]:
+        upload_pipeline = self._get_upload_pipeline()
+        return upload_pipeline.uploadedvcf.vcf, upload_pipeline.genome_build
+
+    def _get_upload_pipeline(self) -> UploadPipeline:
+        return get_object_or_404(UploadPipeline, pk=self.get_query_param("upload_pipeline_id"))
 
 
-class UploadPipelineModifiedVariantsGrid(JqGridUserRowConfig):
-    model = ModifiedImportedVariant
-    caption = 'Modified Imported Variant'
-    fields = ["operation", "variant__variantannotation__transcript_version__gene_version__gene__identifier", "variant__variantannotation__transcript_version__gene_version__gene_symbol__symbol",
-              'old_multiallelic', 'old_variant', 'operation_detail']
+class UploadPipelineModifiedVariantsColumns(DatatableConfig[ModifiedImportedVariant]):
+    """ Variants changed by decompose/normalise during import """
+    grid_name = "Modified Imported Variant"
+    GENE_SYMBOL_PATH = "variant__variantannotation__transcript_version__gene_version__gene_symbol__symbol"
 
-    colmodel_overrides = {"variant__variantannotation__transcript_version__gene_version__gene__identifier": {"hidden": True},
-                          "variant__variantannotation__transcript_version__gene_version__gene_symbol__symbol": {'label': 'Gene', 'formatter': 'geneLinkFormatter'}}
+    def __init__(self, request: HttpRequest):
+        super().__init__(request)
+        self.rich_columns = [
+            RichColumn(key="variant_string", label="Variant", orderable=True, default_sort=SortOrder.ASC),
+            RichColumn(key="operation", label="Operation", orderable=True),
+            RichColumn(key=self.GENE_SYMBOL_PATH, name="gene_symbol", label="Gene", orderable=True,
+                       client_renderer='renderGeneSymbol'),
+            RichColumn(key="old_multiallelic", label="Old Multiallelic", orderable=True),
+            RichColumn(key="old_variant", label="Old Variant", orderable=True),
+            RichColumn(key="operation_detail", label="Operation Detail", orderable=True),
+        ]
 
-    def __init__(self, user, upload_pipeline_id):
-        super().__init__(user)
-        upload_pipeline = get_object_or_404(UploadPipeline, pk=upload_pipeline_id)
-
-        queryset = get_queryset_for_latest_annotation_version(self.model, upload_pipeline.genome_build)
-        queryset = queryset.filter(import_info__upload_step__upload_pipeline=upload_pipeline)
-        queryset = Variant.annotate_variant_string(queryset, path_to_variant="variant__")
-
-        field_names = self.get_field_names() + ["variant_string"]
-        self.queryset = queryset.values(*field_names)
-        self.extra_config.update({'sortname': 'variant_string',
-                                  'sortorder': 'asc'})
-
-    def get_colmodels(self, remove_server_side_only=False):
-        before_colmodels = [{'index': 'variant_string', 'name': 'variant_string', 'label': 'Variant'}]
-        colmodels = super().get_colmodels(remove_server_side_only=remove_server_side_only)
-        return before_colmodels + colmodels
+    def get_initial_queryset(self) -> QuerySet[ModifiedImportedVariant]:
+        upload_pipeline = get_object_or_404(UploadPipeline, pk=self.get_query_param("upload_pipeline_id"))
+        qs = get_queryset_for_latest_annotation_version(ModifiedImportedVariant, upload_pipeline.genome_build)
+        qs = qs.filter(import_info__upload_step__upload_pipeline=upload_pipeline)
+        return Variant.annotate_variant_string(qs, path_to_variant="variant__")

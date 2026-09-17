@@ -72,10 +72,16 @@ class CreatePathologyTestForm(forms.Form):
 class PathologyTestOrderForm(forms.ModelForm):
     class Meta:
         model = PathologyTestOrder
-        fields = '__all__'
+        fields = ('external_pk', 'case', 'pathology_test_version', 'custom_gene_list', 'user',
+                  'started_library', 'finished_library', 'started_sequencing', 'finished_sequencing',
+                  'order_completed', 'sequencing_run')
         widgets = {'name': TextInput(),
                    'external_pk': ModelSelect2(url='external_pk_autocomplete',
                                                attrs={'data-placeholder': 'External ID...'}),
+                   'case': ModelSelect2(url='case_autocomplete',
+                                        attrs={'data-placeholder': 'Case...'}),
+                   'sequencing_run': ModelSelect2(url='sequencing_run_autocomplete',
+                                                  attrs={'data-placeholder': 'Sequencing Run...'}),
                    'custom_gene_list': ModelSelect2(url='gene_autocomplete',
                                                     attrs={'data-placeholder': 'Gene List...'}),
                    'pathology_test_version': ModelSelect2(url='pathology_test_version_autocomplete',
@@ -91,7 +97,7 @@ class CaseForm(forms.ModelForm):
         widgets = {'name': TextInput(),
                    'lead_scientist': ModelSelect2(url='user_autocomplete',
                                                   attrs={'data-placeholder': 'User...'}),
-                   'patient': ModelSelect2(url='user_autocomplete',
+                   'patient': ModelSelect2(url='patient_autocomplete',
                                            attrs={'data-placeholder': 'Patient...'})}
 
     def __init__(self, *args, **kwargs):

@@ -81,6 +81,12 @@ ANNOTATION_MAX_RUN_ATTEMPTS = 3
 # (~7 beats/window) so a transient DB/process stall doesn't falsely reclaim a live run.
 ANNOTATION_RUN_LEASE_SECONDS = 900
 ANNOTATION_RUN_LEASE_HEARTBEAT_SECONDS = 120
+# Lease window for the count lane (#1646): the dispatcher leases a batch of uncounted runs to one
+# count_annotation_runs task (~15s of work for a full batch, no heartbeat). Kept well under
+# ANNOTATION_RUN_LEASE_SECONDS because a live count lease briefly holds its runs out of the VEP lane -
+# a dead count worker should release them quickly. Expiry is harmless: reclaim just clears the lease
+# (a count lease is never a run attempt).
+ANNOTATION_COUNT_LEASE_SECONDS = 300
 ANNOTATION_VEP_ARGS = []
 ANNOTATION_VEP_VERSION = "116"
 ANNOTATION_VEP_BASE_DIR = os.path.join(ANNOTATION_BASE_DIR, "VEP")
@@ -402,7 +408,7 @@ ANNOTATION_ANNOTSV_GENOME_BUILD = {
 # Annotations bundle has no version stamp file; admin sets this to the bundle release string they
 # installed (eg "3.5.8"). Becomes AnnotationPipelineVersion.data_version, so a new bundle is registered
 # and promoted the same way a new binary is - @see AnnotationPipelineVersion.
-ANNOTATION_ANNOTSV_BUNDLE_VERSION = None
+ANNOTATION_ANNOTSV_BUNDLE_VERSION = "3.5"  # Annotations_Human_3.5.tar.gz
 ANNOTATION_ANNOTSV_EXTRA_ARGS: list[str] = []
 ANNOTATION_ANNOTSV_TIMEOUT_SECONDS = 60 * 60
 # Admin email used in PubMed queries to contact before throttling/banning
@@ -429,9 +435,7 @@ CACHED_WEB_RESOURCE_REFSEQ_SEQUENCE_INFO = "RefSeq Sequence Info"
 CACHED_WEB_RESOURCE_REFSEQ_GENE_PUBMED_COUNTS = "RefSeq Gene PubMed Counts"
 CACHED_WEB_RESOURCE_UNIPROT = "UniProt"
 
-DISABLED_CACHED_WEB_RESOURCES = {
-    CACHED_WEB_RESOURCE_PFAM: "https://github.com/SACGF/variantgrid/issues/1554",
-}
+DISABLED_CACHED_WEB_RESOURCES = {}
 
 ANNOTATION_CACHED_WEB_RESOURCES = [
     CACHED_WEB_RESOURCE_GNOMAD_GENE_CONSTRAINT,

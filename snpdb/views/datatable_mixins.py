@@ -23,6 +23,9 @@ class LazyEncoder(DjangoJSONEncoder):
 
 class JSONResponseMixin:
     is_clean = False
+    # Strict JSON (allow_nan=False) refuses to emit bare NaN/Infinity tokens, which JSON.parse
+    # can't read - set it on views whose data can carry them
+    json_allow_nan = True
 
     def render_to_response(self, context):
         """ Returns a JSON response containing 'context' as payload
@@ -56,7 +59,7 @@ class JSONResponseMixin:
         else:
             response = func_val
 
-        dump = json.dumps(response, cls=LazyEncoder)
+        dump = json.dumps(response, cls=LazyEncoder, allow_nan=self.json_allow_nan)
         return self.render_to_response(dump)
 
 

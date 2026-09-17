@@ -23,7 +23,7 @@ from snpdb.models.models_enums import ImportStatus
 from upload.models import FileUpload
 from upload.upload_metadata import UploadMetadataError
 from upload.uploaded_file_type import get_upload_data_for_uploaded_file
-from upload.views.views import get_upload_status_dict, handle_file_upload
+from upload.views.views_json import get_upload_status_dict, handle_file_upload
 
 
 def _get_file_upload_for_user(user, *, file_upload_id=None, sha256_hash=None) -> FileUpload:

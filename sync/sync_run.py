@@ -1,3 +1,5 @@
+import logging
+import time
 from typing import Optional
 
 from sync.alissa import *  # to get decorators to register
@@ -39,9 +41,13 @@ def run_sync(sync_destination: SyncDestination, full_sync: bool = False, max_row
     """
 
     sync_run_instance = SyncRunInstance(sync_destination=sync_destination, full_sync=full_sync, max_rows=max_rows)
+    logging.info("Sync '%s' starting (full_sync=%s, max_rows=%s)", sync_destination, full_sync, max_rows)
+    start = time.time()
     try:
         sync_runner_for_destination(sync_destination).sync(sync_run_instance)
     finally:
         if sync_run_instance.sync_run.status == SyncStatus.IN_PROGRESS:
             sync_run_instance.run_failed()
+        logging.info("Sync '%s' finished with status '%s' in %.1fs",
+                     sync_destination, sync_run_instance.sync_run.get_status_display(), time.time() - start)
     return sync_run_instance.sync_run

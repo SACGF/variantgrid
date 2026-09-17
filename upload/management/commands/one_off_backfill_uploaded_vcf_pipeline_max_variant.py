@@ -17,6 +17,7 @@ class Command(BaseCommand):
 
         A VCF with no rows is treated as "fully annotated" (nothing to wait for), so existing VCFs must
         get their rows before that check matters. Only VCFs that don't already have rows are processed. """
+    category = "one-off"
 
     def handle(self, *args, **options):
         # Only VCFs still lacking rows - newly imported VCFs already create them via the import path

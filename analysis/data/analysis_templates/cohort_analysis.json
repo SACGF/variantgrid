@@ -155,15 +155,16 @@
         "analysis_update_uuid": null,
         "status": "R",
         "genomic_intervals_collection": null,
-        "genomic_interval": null,
-        "hgvs_string": null,
-        "hgvs_variant": null,
         "left": 0,
         "right": 0,
         "accordion_panel": 0,
         "analysisvariable_set": [],
         "nodeallelefrequencyfilter": null,
-        "nodewiki": null
+        "nodewiki": null,
+        "variant_text": null,
+        "variant_ids": [],
+        "variant_regions": [],
+        "variant_text_unresolved": []
       }
     },
     {

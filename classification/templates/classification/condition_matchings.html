@@ -31,7 +31,7 @@
             $('#condition-text-datatable').DataTable().ajax.reload();
         }
 
-        let debouncedApplyFilters = _.debounce(applyFilters, 250, {maxWait: 1000});
+        let debouncedApplyFilters = debounce(applyFilters, 250, {maxWait: 1000});
 
     </script>
     <style>

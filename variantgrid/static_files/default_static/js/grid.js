@@ -1,5 +1,22 @@
+/* The node grid's <table>. One per node-version pane, so it's looked up inside the pane rather
+   than by id alone - a stale pane may still be in the DOM while the next one loads. */
 function getGrid(nodeId, unique_code) {
 	return $("#grid-" + nodeId, "#" + unique_code);
+}
+
+// The DataTableDefinition driving a node's grid, by node id - set by setupNodeGrid
+const nodeGridDefinitions = {};
+
+function getNodeGridDefinition(nodeId) {
+	return nodeGridDefinitions[nodeId];
+}
+
+function getNodeDataTable(nodeId, unique_code) {
+	const table = getGrid(nodeId, unique_code);
+	if (table.length && $.fn.DataTable.isDataTable(table)) {
+		return table.DataTable();
+	}
+	return null;
 }
 
 function getAnalysisDownloadTracker() {
@@ -7,17 +24,30 @@ function getAnalysisDownloadTracker() {
 }
 
 /* Everything a node export is identified by, plus the URL that launches it. Built off the grid's live
-   postData so the export sees whatever the user has filtered the grid down to. */
+   ajax params so the export sees whatever the user has filtered the grid down to.
+
+   Works before the rows have ever been fetched: the placeholder on a big node offers CSV/VCF without
+   the user loading the grid, so the params come from the definition's postData when the table has
+   yet to make a request. Paging and sorting are dropped - the export orders by genome position. */
 function nodeGridExportInfo(analysisId, nodeId, unique_code, export_type, use_canonical_transcripts, caption) {
-	const grid = getGrid(nodeId, unique_code);
-	const gridParams = $.extend({}, grid.jqGrid('getGridParam', 'postData'));
-	gridParams['rows'] = 0; // no pagination
+	const definition = getNodeGridDefinition(nodeId);
+	const dataTable = getNodeDataTable(nodeId, unique_code);
+	let gridParams = {};
+	if (dataTable) {
+		gridParams = $.extend({}, dataTable.ajax.params());
+	} else if (definition) {
+		gridParams = $.extend({}, definition.serverParams.postData);
+	}
+	delete gridParams['start'];
+	delete gridParams['order[0][column]'];
+	delete gridParams['order[0][dir]'];
+	delete gridParams['length'];  // the export is unpaged
 	gridParams['export_type'] = export_type;
 	if (use_canonical_transcripts) {
 		gridParams['use_canonical_transcripts'] = true;
 	}
 
-	const gridCaption = grid.jqGrid('getGridParam', 'caption') || ("Node " + nodeId);
+	const gridCaption = (definition && definition.serverParams.gridName) || ("Node " + nodeId);
 	return {
 		nodeId: nodeId,
 		nodeVersion: gridParams['version_id'],
@@ -69,9 +99,37 @@ function load_variant_details(variant_id) {
             }
         }
     }
+    // Horizontal mode gives each variant its own closable tab, leaving the node editor where it was
+    if (typeof openVariantDetailsTab === "function" && openVariantDetailsTab(variant_id, variant_details_url)) {
+        return;
+    }
     const editorContainer = $("#node-editor-container");
     editorContainer.html('<div class="editor-loading"><i class="fa fa-spinner"></i> Loading variant details...</div>');
     editorContainer.load(variant_details_url);
+}
+
+// Expand renderer for the variant grids (@see AbstractVariantGrid.get_expand_client_renderer). The
+// identifiers come from the server for the grid's annotation version; the actions are built here so
+// IGV follows ANALYSIS_SETTINGS.show_igv_links like the rest of the page
+function variantGridRowDetail(annotationVersionId, rowData) {
+    const variantId = rowData["id"];
+    const detail = $('<div>', {class: 'variant-row-detail'});
+    const fragment = $('<div>', {class: 'variant-row-detail-fragment', text: 'Loading...'});
+    loadAjaxBlock(fragment, Urls.variant_grid_row_detail(variantId, annotationVersionId));
+
+    const actions = $('<div>', {class: 'variant-row-detail-actions'});
+    actions.append($('<a>', {href: `javascript:load_variant_details(${variantId});`, text: 'Details'}));
+    actions.append($('<a>', {href: Urls.view_variant(variantId), target: '_blank', text: 'Open in new tab'}));
+    const chrom = rowData["locus__contig__name"];
+    const position = rowData["locus__position"];
+    if (chrom != null && position != null) {
+        const igvUrl = createIgvUrl(`${chrom}:${position}`, 'getBams');  // null unless the analysis shows IGV links
+        if (igvUrl) {
+            actions.append($('<a>', {href: igvUrl, text: 'IGV'}));
+        }
+    }
+    detail.append(fragment, actions);
+    return detail;
 }
 
 function getAnalysisWindow() {
@@ -175,16 +233,7 @@ function open_igv_link(locus, getBamsFunc) {
                 let message = "<p>Could not connect to IGV - is it running and accepting connections on " + base_url + "?";
                 message += "<p>See also <a target='_blank' href='" + igvIntegrationUrl + "'>IGV Integration</a>";
                 
-                $("#error-dialog").html(message).dialog({
-                    minWidth: 500,
-                    buttons: [
-                        {   text: "OK",
-                            click: function() {
-                                $(this).dialog("close");
-                            },
-                        },
-                    ],                
-                });
+                createModal("igv-error-dialog", "IGV", message);
                 seen_igv_error = true;
             }
         },
@@ -254,11 +303,20 @@ function create_igv_link(locus, getBamsFuncString) {
     return '';
 }
 
-function showGridCell(gridColumn) {
-    const selector = $("td[aria-describedby*='" + gridColumn + "']");
-    if (selector.length) {
-        selector[0].scrollIntoView();
+/* Filter child nodes are raised from cells in the grid (gene symbols) and from the column summary
+   table, so the node comes from whichever node the data container is showing rather than from the
+   editor that happens to be loaded */
+function createFilterChild(columnName, columnFilter) {
+    const nodeId = $("#node-data-container").attr("node_id");
+    if (!nodeId) {
+        return;
     }
+    $.ajax({
+        type: "POST",
+        data: {column_name: columnName, column_filter: columnFilter},
+        url: Urls.create_filter_child(ANALYSIS_ID, nodeId),
+        success: getAnalysisWindow().addConnectedNode,
+    });
 }
 
 function inAnalysis() {
@@ -267,526 +325,228 @@ function inAnalysis() {
     return typeof ANALYSIS_ID !== "undefined";
 }
 
-function isNodeVisible(options) {
-    if (!inAnalysis()) {
-        return false;
-    }
-    // Default to True so that any cached grid data won't be missing new field
-    let nodeVisible = true;
-    const analysisNode = options.colModel.analysisNode;
-    if (analysisNode) {
-        nodeVisible = analysisNode.visible;
-    }
-    return nodeVisible;
-}
 
-
-function detailsLink(variantId, options, rowData) {
-    let nodeVisible = isNodeVisible(options);
-    const kwargs = options.colModel.formatter_kwargs;
-    if (kwargs) {
-        nodeVisible = kwargs.node_visible;
-    }
-
-    const variantBoxes = [];
-    if (nodeVisible) {
-        const variant_selector = "<input type='checkbox' class='variant-select' variant_id=" + variantId + ">";
-        variantBoxes.push(variant_selector);
-    }
-
-    const detailsUrl = "javascript:load_variant_details(" + variantId + ");";
-    const detailsLink = createGridLink('View details', detailsUrl, '', ['variant-link'], ['view-details-link']);
-    variantBoxes.push(detailsLink);
-
-    // ClinVar
-    let cvHighestPath = rowData["clinvar__highest_pathogenicity"];
-    const cvClinSig = rowData["clinvar__clinical_significance"];
-
-    let linkUrl = null;
-    let extraLinkClasses = ['node-count-legend-C'];
-    let extraIconClasses = [];
-    let cvTitle = "ClinVar: ";
-    if (cvHighestPath !== null) {
-        cvTitle += cvClinSig;
-        linkUrl = 'javascript:showGridCell("clinvar__clinical_significance")';
-    } else {
-        cvTitle += "not classified";
-        extraIconClasses.push("no-entry");
-        cvHighestPath = '';
-    }
-    const cvLink = createGridLink(cvTitle, linkUrl, cvHighestPath, extraLinkClasses, extraIconClasses);
-    variantBoxes.push(cvLink);
-
-    // Internally Classified
-    let intMaxClass = rowData["max_internal_classification"];
-    const intClassified = rowData["internally_classified"];
-
-    linkUrl = null;
-    let icTitle = "Internally Classified: ";
-    extraLinkClasses = ['node-count-legend-G'];
-    extraIconClasses = [];
-
-    if (intMaxClass !== null) {
-        icTitle += intClassified;
-        linkUrl = 'javascript:showGridCell("max_internal_classification")';
-    } else {
-        icTitle += "not classified";
-        extraIconClasses.push("no-entry");
-        intMaxClass = '';
-    }
-    const icLink = createGridLink(icTitle, linkUrl, intMaxClass, extraLinkClasses, extraIconClasses);
-    variantBoxes.push(icLink);
-
-    const locus = rowData["locus__contig__name"] + ":" + rowData["locus__position"];
-    const igvLink = create_igv_link(locus, 'getBams');
-    variantBoxes.push(igvLink);
-    return "<span class='variant_id-container' variant_id=" + variantId + ">" + variantBoxes.join('') + "</span>";
-}
-
-function clinvarLink(clinvar_variation_id) {
-    let clinvar_string = '';
-    if (clinvar_variation_id) {
-        clinvar_string = "<a title='View ClinVar entry in new window' target='_blank' href='http://www.ncbi.nlm.nih.gov/clinvar/variation/" + clinvar_variation_id + "'>" + clinvar_variation_id + "</a>";
-    }
-    return clinvar_string;
-}
-
-function cosmicLink(cosmic_ids) {
-    const COSMIC_PREFIX = "COSV";
-    const COSMIC_LEGACY_PREFIX = "COSM";
-
-    let cosmic_string = '';
-    if (cosmic_ids) {
-        const cosmic_ids_list = cosmic_ids.split("&");
-        const cosmic_links = [];
-        for(let i=0 ; i<cosmic_ids_list.length ; ++i) {
-            let cosmic_id = cosmic_ids_list[i];
-            if (cosmic_id.startsWith(COSMIC_PREFIX)) {
-                // #2637 - COSMIC switched to using COSV in 2019, I can't find a direct link but search works then you select transcript
-                cosmic_id = "<a title='View COSMIC entry in new window' target='_blank' href=' https://cancer.sanger.ac.uk/cosmic/search?q=" + cosmic_id + "'>" + cosmic_id + "</a>";
-            } else if (cosmic_id.startsWith(COSMIC_LEGACY_PREFIX)) {
-                const cosmic_id_int = cosmic_id.replace("COSM", "");
-                cosmic_id = "<a title='View COSMIC entry in new window' target='_blank' href='http://cancer.sanger.ac.uk/cosmic/mutation/overview?id=" + cosmic_id_int + "'>" + cosmic_id + "</a>";
-            }
-            cosmic_links.push(cosmic_id);
-        }
-        
-        cosmic_string = cosmic_links.join();
-    }
-    return cosmic_string;
-}
-
-
-function omimLink(omim_id) {
-    let omim_string = '';
-    if (omim_id) {
-        omim_string = "<a title='View OMIM entry in new window' target='_blank' href='https://www.omim.org/entry/" + omim_id + "'>" + omim_id + "</a>";
-    }
-    return omim_string;
-}
-
-
-function _geneSymbolLink(geneSymbolColumn, filterChildLink) {
-    let columnString = '';
-    if (geneSymbolColumn) {
-        const geneSymbolList = geneSymbolColumn.split(",");
-        const geneSymbolLinks = [];
-        for(let i=0 ; i<geneSymbolList.length ; ++i) {
-            const geneSymbol = geneSymbolList[i];
-            let geneLinkString = '';
-            if (filterChildLink) {
-                const filterGeneLink = "javascript:createFilterChild(\"gene_symbol\", \"" + geneSymbol + "\");";
-                geneLinkString = "<a class='grid-link' title='Filter to " + geneSymbol + "' href='" + filterGeneLink + "'><div class='grid-link-icon GeneListNode'></div></a>";
-                geneLinkString += " <a class='left' target='_blank' title='View gene in new window' href='" + Urls.view_gene_symbol(geneSymbol) + "'>" + geneSymbol + "</a> ";
-            } else {
-                // not left
-                geneLinkString += " <a target='_blank' title='View gene in new window' href='" + Urls.view_gene_symbol(geneSymbol) + "'>" + geneSymbol + "</a> ";
-            }
-            geneSymbolLinks.push(geneLinkString);
-        }
-        columnString = geneSymbolLinks.join();
-    }
-    return columnString;
-}
-
-function geneSymbolLink(geneSymbol, options) {
-    const filterChildLink = isNodeVisible(options); // don't create kids for analysis wide tag nodes
-    return _geneSymbolLink(geneSymbol, filterChildLink);
-}
-
-function geneSymbolNewWindowLink(geneSymbol) {
-    return _geneSymbolLink(geneSymbol, false);
-}
-
-function formatMavedbUrnLinks(mavedbUrn) {
-    const urls = mavedbUrnToUrls(mavedbUrn);
-    return Object.entries(urls).map(([key, value]) => `<a target="_blank" href="${value}">${key}</a>`).join(" ");
-}
-
-function mavedbUrnToUrls(mavedbUrn) {
-  const experimentSets = new Set();
-  const EXPERIMENT_URL_PREFIX = "https://www.mavedb.org/#/experiment-sets/";
-  if (mavedbUrn) {
-    mavedbUrn.split("&").forEach(urn => {
-      const es = urn.rsplit("-", 2)[0];
-      experimentSets.add(es);
-    });
-  }
-  const urls = {};
-  [...experimentSets].sort().forEach(urn => {
-    urls[urn] = EXPERIMENT_URL_PREFIX + urn;
-  });
-  return urls;
-}
-
-// JavaScript does not have a built-in rsplit function, so we need to implement it.
-String.prototype.rsplit = function(sep, maxsplit) {
-  const split = this.split(sep);
-  return maxsplit ? [split.slice(0, -maxsplit).join(sep), ...split.slice(-maxsplit)] : split;
-};
-
-
+// The tag entry widget is a full sized select2 - loaded into the cell it opened the row (and so
+// every row height below it) right up, so it floats over the grid anchored to the + it came from
 function showTagAutocomplete(variantId) {
-    const container = $("#tag-entry-container-" + variantId);
-    const addTagButton = $(".show-tag-autocomplete", container.parent());
-    const nodeId = container.parents("#node-data-container").attr("node_id");
-    
+    const addTagButton = $(".show-tag-autocomplete[variant_id=" + variantId + "]");
+    const cell = addTagButton.parent();
+    // The grid the + was clicked in is the node the tagging is about - the data container's node_id
+    // is cleared whenever the editor is replaced, and a tagging without a node never learns its sample
+    const nodeId = addTagButton.closest("table.grid").attr("node_id");
+
+    const panel = $("<div/>", {"class": "variant-tag-entry"});
+    // The panel is anchored off the button's rect, so it can only be hidden once that has been taken
+    FloatingPanel.show(panel, addTagButton[0], {onHide: function() {
+        addTagButton.show();
+    }});
     addTagButton.hide();
-    container.load(Urls.tag_autocomplete_form(), function() {
-        const tagSelect = $("select#id_tag", container);
+
+    panel.load(Urls.tag_autocomplete_form(), function() {
+        const tagSelect = $("select#id_tag", panel);
+        colorTagAutocompleteResults(tagSelect);
         tagSelect.change(function() {
             const tag = $(this).val();
             if (tag) {
-                const successFunc = function () {
-                    const vtHtml = getVariantTagHtml(variantId, tag);
-                    const newTag = $(vtHtml);
-                    newTag.click(tagClickHandler);
-                    container.parent().append(newTag);
-                    container.empty();
-                    addTagButton.show();
+                const successFunc = function (response) {
+                    // The click lands on this node's proband's tagging - a new pill only where a row was made
+                    if (response && response.created) {
+                        const tagging = response.variant_tag;
+                        // setVariantTag has already recorded the sample's name by the time this runs
+                        const options = variantTaggingPillOptions(tagging, getAnalysisWindow().analysisSamples || {},
+                                                                  false);
+                        options.variantTagId = tagging.id;
+                        const newTag = $(getVariantTagHtml(variantId, tag, false, options));
+                        newTag.click(tagClickHandler);
+                        cell.append(newTag);
+                    }
+                    FloatingPanel.hide();
                 };
                 addVariantTag(variantId, nodeId, tag, successFunc);
             }
         });
 
         // Can't call open() until element is fully initialised
-        $(document).on("dal-element-initialized", function (e) {
+        $(document).off("dal-element-initialized.tagEntry").on("dal-element-initialized.tagEntry", function (e) {
             if (e.detail.element == tagSelect[0]) {
                 tagSelect.select2("open").trigger("focus");
             }
         });
     });
-
 }
 
 
-function getVariantTagHtml(variantId, tag, readOnly, tagLabel, extraClasses, title) {
-    if (typeof(tagLabel) === 'undefined') {
-        tagLabel = tag;
+/* Tag colours are CSS (.tagged-<tag> > .user-tag-colored - @see render_tag_styles_and_formatter), so a
+   dropdown entry draws in its tag's colour once it carries the same markup a grid tag does. select2
+   redraws its list on every keystroke, so watch it rather than decorating once */
+function colorTagAutocompleteResults(tagSelect) {
+    function decorate(resultsList) {
+        // select2 keeps a result's data in its own cache keyed off data-select2-id, not jQuery's store
+        const select2Utils = $.fn.select2.amd.require("select2/utils");
+        $("li.select2-results__option", resultsList).each(function() {
+            const option = $(this);
+            const tag = (select2Utils.GetData(this, "data") || {}).id;
+            if (!tag || option.children(".grid-tag").length) {
+                return;  // a message row ("Searching...", "No results"), or already drawn
+            }
+            option.empty().append($("<span/>", {class: "grid-tag tagged-" + tag})
+                                      .append($("<span/>", {class: "user-tag-colored", text: tag})));
+        });
     }
-    if (typeof(title) === 'undefined') {
-        title = `Tagged as ${tag}`;
-    }
+
+    tagSelect.on("select2:open", function() {
+        const resultsList = $("#select2-" + tagSelect.attr("id") + "-results");
+        if (!resultsList.length) {
+            return;
+        }
+        decorate(resultsList);
+        const observer = new MutationObserver(function() {
+            decorate(resultsList);
+        });
+        observer.observe(resultsList[0], {childList: true});
+        tagSelect.one("select2:close", function() {
+            observer.disconnect();
+        });
+    });
+}
+
+
+/* options: tagLabel (HTML, defaults to the tag), extraClasses, title, variantTagId (the tagging the
+   pill is - what the X deletes) and marker (icon classes drawn after the label, saying whose tagging
+   it is - @see VariantGridFormat.tags) */
+function getVariantTagHtml(variantId, tag, readOnly, options) {
+    options = options || {};
+    const tagLabel = typeof(options.tagLabel) === 'undefined' ? tag : options.tagLabel;
+    const title = typeof(options.title) === 'undefined' ? `Tagged as ${tag}` : options.title;
     const outerClasses = ["grid-tag", "tagged-" + tag];
     if (!readOnly) {
         outerClasses.push("grid-tag-deletable");
     }
-    if (extraClasses) {
-        outerClasses.push(...extraClasses);
+    if (options.extraClasses) {
+        outerClasses.push(...options.extraClasses);
     }
-    return `<span class='${outerClasses.join(' ')}' title='${title}' variant_id='${variantId}' tag_id='${tag}'><span class='user-tag-colored'>${tagLabel}</span></span>`;
+    // A tagging's own pk - the analysis grid's X removes that one tagging, not every tagging of the tag
+    const pkAttr = options.variantTagId ? ` variant_tag_id='${options.variantTagId}'` : "";
+    const marker = options.marker ? `<i class='grid-tag-sample-marker ${options.marker}'></i>` : "";
+    return `<span class='${outerClasses.join(' ')}' title='${escapeHtml(title)}' variant_id='${variantId}' tag_id='${tag}'${pkAttr}><span class='user-tag-colored'>${tagLabel}${marker}</span></span>`;
+}
+
+
+// The sample the grid's pills are read against - the node the grid is showing is about one study.
+// @see node_data_grid.html / sample_variants_tab.html
+function getNodeProbandSampleId() {
+    return typeof(nodeProbandSampleId) === 'undefined' ? null : nodeProbandSampleId;
+}
+
+
+// The patient the grid's pills are read against - a node above sample level is about a person without
+// being about one of their VCFs. @see node_data_grid.html
+function getNodeProbandPatientId() {
+    return typeof(nodeProbandPatientId) === 'undefined' ? null : nodeProbandPatientId;
+}
+
+
+/* How a tagging reads on its pill: a tagging that names someone - a sample, or just the patient - always
+   says who, and one made for someone other than who the grid is about is boxed as well: it isn't this
+   proband's to-do. Returns the marker/title getVariantTagHtml takes - @see VariantGridFormat.tags */
+function variantTaggingPillOptions(tagging, sampleNames, readOnly) {
+    const probandSampleId = getNodeProbandSampleId();
+    const tag = tagging.tag;
+    if (tagging.sample) {
+        const options = {marker: "fas fa-user",
+                         title: `Tagged as ${tag} for ${sampleNames[tagging.sample] || "another sample"}`};
+        if (probandSampleId && tagging.sample !== probandSampleId) {
+            options.marker += " grid-tag-sample-other";
+            options.title += ` - not ${sampleNames[probandSampleId] || "this node's sample"}`;
+        }
+        return options;
+    }
+    if (tagging.patient) {
+        const probandPatientId = getNodeProbandPatientId();
+        const options = {marker: "fas fa-user",
+                         title: `Tagged as ${tag} for ${tagging.patient_name || "another patient"}`};
+        if (probandPatientId && tagging.patient !== probandPatientId) {
+            options.marker += " grid-tag-sample-other";
+            options.title += " - not this node's patient";
+        }
+        return options;
+    }
+    if (probandSampleId) {
+        let title = `Tagged as ${tag}, no sample`;
+        if (!readOnly) {
+            title += ` - tag here to make one for ${sampleNames[probandSampleId] || "this sample"}`;
+        }
+        return {marker: "far fa-user", title: title};
+    }
+    return {title: `Tagged as ${tag}`};
 }
 
 
 // Tags with no entry in variantTagOrder sort as 0, ties broken alphabetically.
 // Customised per-collection on the tag colors page - see issue #343
-function sortVariantTags(aWin, tagList) {
+// getTag pulls the tag out of an entry - the analysis grid sorts taggings, not tag names
+function sortVariantTags(aWin, tagList, getTag) {
     const tagOrder = aWin.variantTagOrder || {};
+    const tagOf = getTag || function(entry) { return entry; };
     return tagList.slice().sort(function(a, b) {
-        const diff = (tagOrder[a] || 0) - (tagOrder[b] || 0);
+        const tagA = tagOf(a);
+        const tagB = tagOf(b);
+        const diff = (tagOrder[tagA] || 0) - (tagOrder[tagB] || 0);
         if (diff) {
             return diff;
         }
-        return a.localeCompare(b);
+        return tagA.localeCompare(tagB);
     });
 }
 
 
-// This is driven entirely off variantTags (not passed through SQL->JQGrid)
-// This is so we can add/remove tags without wrecking cache
-function tagsFormatter(tagsCellValue, a, rowData) {
-    const variantId = rowData['id'];
-    let tagHtml = "";
-    const aWin = getAnalysisWindow();
-    const readOnly = aWin.variantTagsReadOnly || !inAnalysis();
-
-    if (!readOnly) {
-        tagHtml += "<a class='show-tag-autocomplete' href='javascript:showTagAutocomplete(" + variantId + ")'><span class='add-variant-tag' title='Tag variant..'></span></a>";
-        tagHtml += "<span id='tag-entry-container-" + variantId + "'></span>";
+function disarmVariantTags(except) {
+    let armed = $(".grid-tag-armed");
+    if (except) {
+        armed = armed.not(except);
     }
-
-    const tagList = (aWin.variantTags || {})[variantId];
-    if (tagList) {
-        const sortedTags = sortVariantTags(aWin, tagList);
-        for (let i=0 ; i<sortedTags.length ; ++i) {
-            const tag = sortedTags[i];
-            tagHtml += getVariantTagHtml(variantId, tag, readOnly);
-        }
-    }
-    return tagHtml;
+    armed.removeClass("grid-tag-armed").children(".grid-tag-delete").remove();
 }
 
 
-function tagsGlobalFormatter(value, a, rowData) {
-    if (!value) {
-        return "";
-    }
-    const variantId = rowData['id'];
-    const aWin = getAnalysisWindow();
-    // In an analysis this is the analysis variant_tag_stale_days setting (null/undefined = staleness off)
-    const staleDays = aWin.variantTagStaleDays;
-    let staleCutoff = null;  // ISO date - payload dates compare lexically
-    if (staleDays) {
-        staleCutoff = new Date(Date.now() - staleDays * 86400 * 1000).toISOString().slice(0, 10);
-    }
-
-    // Entries are "tag:date" - see get_variantgrid_extra_annotate
-    const tagStats = {};
-    const entries = value.split("|");
-    for (let i=0 ; i<entries.length ; ++i) {
-        const entry = entries[i];
-        const sep = entry.lastIndexOf(":");
-        const tag = sep >= 0 ? entry.slice(0, sep) : entry;
-        const date = sep >= 0 ? entry.slice(sep + 1) : null;
-        let stats = tagStats[tag];
-        if (!stats) {
-            stats = {total: 0, fresh: 0, mostRecent: null};
-            tagStats[tag] = stats;
-        }
-        stats.total += 1;
-        if (date && (!staleCutoff || date >= staleCutoff)) {
-            stats.fresh += 1;
-        }
-        if (date && (!stats.mostRecent || date > stats.mostRecent)) {
-            stats.mostRecent = date;
-        }
-    }
-
-    let tagGlobalHtml = "";
-    const sortedKeys = sortVariantTags(aWin, Object.keys(tagStats));
-    for (let i=0 ; i<sortedKeys.length ; ++i) {
-        const tag = sortedKeys[i];
-        const stats = tagStats[tag];
-        let tagLabel = tag;
-        if (stats.total > 1) {
-            tagLabel = `${tag} x ${stats.total}`;
-        }
-        let title;
-        const extraClasses = [];
-        if (staleCutoff) {
-            if (stats.fresh === 0) {  // Most recent event is older than the cutoff
-                extraClasses.push("grid-tag-stale");
-                tagLabel += " <i class='fas fa-clock'></i>";
-                title = `Tagged as ${tag} - no events within the last ${staleDays} days, most recent ${stats.mostRecent}`;
-            } else if (stats.total > 1) {
-                tagLabel = `${tag} x ${stats.total} (${stats.fresh} fresh)`;
-                title = `${stats.fresh} of ${stats.total} tag events within the last ${staleDays} days, most recent ${stats.mostRecent}`;
-            }
-        }
-        tagGlobalHtml += getVariantTagHtml(variantId, tag, true, tagLabel, extraClasses, title);
-    }
-    return tagGlobalHtml;
-}
-
-
-function classifyAndCloseButton(tagId) {
-    const classifyUrl = Urls.create_classification_for_variant_tag(tagId);
-    window.open(classifyUrl, "_blank");
-    $(`#tag-button-${tagId}`).remove();
-}
-
-function formatVariantTagFirstColumn(variantString, options, rowObject) {
-    const REQUIRES_CLASSIFICATION = "RequiresClassification";
-    const variantURL = Urls.view_variant(rowObject["variant__id"]);
-    let cellValue = "<a href='" + variantURL + "' target='_blank'>" + variantString + "</a>";
-    if (rowObject.tag__id == REQUIRES_CLASSIFICATION) {
-        const tagId = rowObject.id;
-        cellValue += `<a id="tag-button-${tagId}" class="btn btn-primary new-classification-button" href="javascript:classifyAndCloseButton(${tagId})"><i class="fas fa-plus-circle"></i> New Classification</a>`;
-    }
-    return cellValue;
-}
-
-
-function gnomADVariant(rowData) {
-    let chrom = rowData["locus__contig__name"];
-    if (chrom.startsWith("chr")) {
-        chrom = chrom.substr(3);
-    }
-    return [chrom, rowData["locus__position"], rowData["locus__ref__seq"], rowData["alt__seq"]].join("-");
-}
-
-
-function gnomadFilteredFormatter(gnomadFilteredCellValue, a, rowData) {
-    let gnomadFilteredString = '';
-    if (gnomadFilteredCellValue !== null) {
-        const filterDiv = $("<div/>").addClass("gnomad-flag-label");
-        if (gnomadFilteredCellValue) {
-            filterDiv.addClass("gnomad-flagged");
-            filterDiv.text("Fail");
-        } else {
-            filterDiv.text("Pass");
-        }
-        const gv = gnomADVariant(rowData);
-        const dataset = ANALYSIS_SETTINGS["genome_build"] === 'GRCh38'? 'gnomad_r3' : 'gnomad_r2_1';
-        const url = `http://gnomad.broadinstitute.org/variant/${gv}?dataset=${dataset}`;
-        const gnomADLink = $("<a />").addClass("gnomad-link").attr({
-            "href": url,
-            "target": "_blank",
-            "title": "View in gnomAD"
-        });
-        gnomADLink.append(filterDiv);
-        gnomadFilteredString = gnomADLink.get(0).outerHTML;
-    }
-    return gnomadFilteredString;
-}
-
-
-function formatClinGenAlleleId(cellValue) {
-    // warning: doesn't use settings.CLINGEN_ALLELE_REGISTRY_DOMAIN as static JS
-    if (cellValue) {
-        const ca_id = cellValue;
-        const url = `http://reg.clinicalgenome.org/redmine/projects/registry/genboree_registry/by_caid?caid=${ca_id}`;
-        cellValue = `<a href="${url}" target="_blank">${ca_id}</a>`;
-    } else {
-        cellValue = "";
-    }
-    return cellValue;
-}
-
-
-function splitAndLink(rawValue, split, buildLinkFunc) {
-    let formattedValue = '';
-    if (rawValue) {
-        const raw_value_list = rawValue.split(split);
-        const links = [];
-        for(let i=0 ; i<raw_value_list.length ; ++i) {
-            const value = raw_value_list[i];
-            links.push(buildLinkFunc(value));
-        }
-        formattedValue = links.join();
-    }
-    return formattedValue;
-}
-
-function formatDBSNP(dbsnp_rs_ids) {
-    function buildDBSNPLink(dbsnp_id) {
-        return "<a title='View dbSNP in new window' target='_blank' href='https://www.ncbi.nlm.nih.gov/snp/" + dbsnp_id + "'>" + dbsnp_id + "</a>";
-    }
-    return splitAndLink(dbsnp_rs_ids, "&", buildDBSNPLink);
-}
-
-
-function formatPubMed(pubmed) {
-    function buildPubMedLink(pubmed_id) {
-        return "<a title='View PubMed article in new window' target='_blank' href='https://pubmed.ncbi.nlm.nih.gov/" + pubmed_id + "'>" + pubmed_id + "</a>";
-    }
-    return splitAndLink(pubmed, "&", buildPubMedLink);
-}
-
-
-function formatOntologyTerms(ontology_terms) {
-    function buildOntologyTermLink(ontology_term) {
-        const termSlug = ontology_term.split(" ")[0].replace(":", "_");
-        const url = Urls.ontology_term(termSlug);
-        return "<a title='View Ontology Term in new window' target='_blank' href='" + url + "'>" + ontology_term + "</a>";
-    }
-    return splitAndLink(ontology_terms, " | ", buildOntologyTermLink);
-}
-
-
-function unitAsPercentFormatter(unitValue) {
-    let percentValue = "";
-    // Allele Frequency missing data passed as "." to match VCF
-    // Shows falsey values (eg 0.0) or '.' as blank
-    if (unitValue && unitValue !== ".") {
-        const percent = (100.0 * unitValue).toPrecision(3);
-        percentValue = percent + "%";
-    }
-    return percentValue;
-}
-
-
-function formatMasterMindMMID3(value) {
-    function buildMasterMindLink(mmid3) {
-        return "<a title='View MasterMind in new window' target='_blank' href='https://mastermind.genomenon.com/detail?mutation=" + mmid3 + "'>" + mmid3 + "</a>";
-    }
-    return splitAndLink(value, "&", buildMasterMindLink);
-}
-
-
-jQuery.extend($.fn.fmatter , {
-    'detailsLink' : detailsLink,
-    'tagsFormatter' : tagsFormatter,
-    'tagsGlobalFormatter' : tagsGlobalFormatter,
-    'clinvarLink' : clinvarLink,
-    'cosmicLink' : cosmicLink,
-    'omimLink' : omimLink,
-    'formatClinGenAlleleId': formatClinGenAlleleId,
-    'formatDBSNP': formatDBSNP,
-    'formatOntologyTerms': formatOntologyTerms,
-    'formatPubMed': formatPubMed,
-    'geneSymbolLink' : geneSymbolLink,
-    'geneSymbolNewWindowLink' : geneSymbolNewWindowLink,
-    'gnomadFilteredFormatter' : gnomadFilteredFormatter,
-    'unitAsPercentFormatter' : unitAsPercentFormatter,
-    'formatMasterMindMMID3': formatMasterMindMMID3,
-    'formatMavedbUrnLinks': formatMavedbUrnLinks,
-});
-
-
-// We need to do this, so that we don't send up a changing timestamp and thus never get cached
-function deleteNdParam(postData) {
-    const myPostData = $.extend({}, postData); // make a copy of the input parameter
-    myPostData._filters = myPostData.filters;
-    delete myPostData.nd;
-    return myPostData;
-}
-
-// FIXME: Duplicated in jqgrid.html
-function setRowChangeCallbacks(grid, gridName) {
-	$(".ui-pg-selbox").change(function() {
-        const gridRows = $(this).val();
-        const data = 'grid_name=' + gridName + '&grid_rows=' + gridRows;
-        $.ajax({
-		    type: "POST",
-		    data: data,
-		    url: Urls.set_user_row_config(),
-		});
-	});
-}
-
-
+// Click a tag to arm it, then click the X to delete. The X is drawn over the tag's right end rather
+// than given room inside it - arming resizes nothing, so the grid doesn't reflow, and the X stays
+// inside the clipped cell no matter how long the tag name is
 function tagClickHandler() {
     const gridTag = $(this);
-    const innerSpan = $(".user-tag-colored", gridTag);
+    if (gridTag.hasClass("grid-tag-armed")) {
+        disarmVariantTags();
+        return;
+    }
+    disarmVariantTags(gridTag);
+    gridTag.addClass("grid-tag-armed");
 
-    function removeClickHandler() {
-        const tagId = gridTag.attr('tag_id');
-        const variantId = gridTag.attr('variant_id');
+    const deleteButton = $("<i/>", {"class": "grid-tag-delete fa-solid fa-circle-xmark",
+                                    "title": "Remove tag"});
+    deleteButton.click(function(event) {
+        event.stopPropagation();
         const removeTagCallback = function () {
             gridTag.remove();
         };
-        removeVariantTag(variantId, tagId, removeTagCallback);
-    }
-    deleteItemClickHandler(gridTag, innerSpan, removeClickHandler);
+        removeVariantTag(gridTag.attr('variant_id'), gridTag.attr('tag_id'),
+                         gridTag.attr('variant_tag_id'), removeTagCallback);
+    });
+    gridTag.append(deleteButton);
 }
 
 
-// This is always kicked off after grid is loaded (after passed in function gridComplete)
+// Kicked off after every grid draw, alongside the page's own gridComplete
 function gridCompleteExtra() {
+    FloatingPanel.hide();  // A tag entry or sort menu raised off the last draw's cells is stale now
     const aWin = getAnalysisWindow();
     if (!aWin.variantTagsReadOnly) {
         $(".grid-tag-deletable").click(tagClickHandler);
+        // Namespaced + off first as this runs after every draw
+        $(document).off("click.gridTagDisarm").on("click.gridTagDisarm", function(event) {
+            if (!$(event.target).closest(".grid-tag").length) {
+                disarmVariantTags();
+            }
+        });
     }
 
     // We want to be able to right click to open full screen link new tab
@@ -800,136 +560,98 @@ function gridCompleteExtra() {
 }
 
 
+/* The analysis node grid. Two endpoints: config_url answers the table definition (columns, widths,
+   renderers - it varies by node version, so it caches with the node) and the handler serves the rows
+   for the whole analysis. The node's own state - node_id, version_id, ccc_id, ccc_version_id,
+   extra_filters, zygosity_samples_hash and a FilterNode's filters - comes back on the definition as
+   'postData' and goes up as the ajax params of every row request.
 
-function setupGrid(config_url, analysisId, nodeId, versionId, unique_code, gridComplete, gridLoadError, on_error_function, autoLoad) {
+   autoLoad false builds the table but holds the row query back until loadNodeGridData() asks for it,
+   which is how a node over the auto-load row count waits behind its placeholder.
+
+   Resolves once the table is built (or the definition reported node errors), so the caller can wire
+   up its row interactions. */
+function setupNodeGrid(config_url, handler_url, analysisId, nodeId, versionId, unique_code,
+                       gridComplete, gridLoadError, on_error_function, autoLoad) {
     if (typeof autoLoad === "undefined") { autoLoad = true; }
-	$(function () {
-    	$.getJSON(config_url, function(data) {
-            const errors = data["errors"];
-            if (errors) {
-				on_error_function(errors);
-    		} else {
-                const postData = data["postData"] || {};
-                // TODO: From issue #1041 6/6/2018 - remove this when nodes config cache expires in 1 week.
-                if (typeof postData["node_id"] == "undefined") {
-                    postData["node_id"] = nodeId;
+
+    const definition = new DataTableDefinition({
+        dom: getGrid(nodeId, unique_code),
+        definitionUrl: config_url,
+        url: handler_url,
+        data: function(data) {
+            // FilterNode rules are saved against the node, so they ride along with its other state
+            return $.extend({}, definition.serverParams.postData);
+        },
+        onDefinition: function(defn) {
+            if (defn.errors) {
+                on_error_function(defn.errors);
+                return false;
+            }
+            return true;
+        },
+        onData: function(json) {
+            if (json.non_fatal && json.deleted_nodes) {
+                deleteNodesFromDOM(json.deleted_nodes, []);
+                if (json.message) {
+                    $("#node-editor-container").text(json.message);
                 }
-				// end obsolete code... 
-				
-				data["postData"] = postData;
-				data["serializeGridData"] = deleteNdParam;
-				data["shrinkToFit"] = false;
+            }
+        },
+        onBeforeSend: function(jqXHR) {
+            window.activeGridRequestXHR = jqXHR;
+        },
+        onLoadError: gridLoadError,
+    });
+    nodeGridDefinitions[nodeId] = definition;
 
-                const pagerId = '#pager-' + nodeId;
-                data["pager"] = pagerId;
-				data["gridComplete"] = function() {
-				    gridComplete();
-				    gridCompleteExtra();
-				};
-				data["loadError"] = gridLoadError;
-                data["loadComplete"] = function(data) {
-                    if (data.non_fatal) {
-                        // console.log("jQGrid: Non fatal node error...");
-                        // console.log(data);
-                        if (data.deleted_nodes) {
-                            deleteNodesFromDOM(data.deleted_nodes, []);
-                            if (data.message) {
-                                $("#node-editor-container").text(data.message);
-                            }
-                        }
-                    }
-                };
-                // height: auto screws up on firefox
-                if (typeof(data["height"]) === "undefined" || data["height"] === "auto") {
-                    data["height"] = null;
-                }
+    // Only one node grid query at a time - a user clicking through nodes would otherwise leave
+    // several multi-minute queries running against each other
+    if (window.activeGridRequestXHR) {
+        window.activeGridRequestXHR.abort();
+        window.activeGridRequestXHR = null;
+    }
 
-                // You can only have 1 active grid request
-                data["loadBeforeSend"] = function(xhr) {
-                    window.activeGridRequestXHR = xhr;
-                };
-                if (window.activeGridRequestXHR) {
-                    window.activeGridRequestXHR.abort();
-                    window.activeGridRequestXHR = null;
-                }
-
-                // Remember the server datatype so a deferred load can flip back to it.
-                window.nodeGridServerDatatype = window.nodeGridServerDatatype || {};
-                window.nodeGridServerDatatype[nodeId] = data["datatype"] || "json";
-                if (!autoLoad) {
-                    data["datatype"] = "local";  // build colModel/pager/nav, fetch no rows
-                }
-
-                const grid = getGrid(nodeId, unique_code);
-                grid.jqGrid(data).navGrid(pagerId,
-	                	{add: false, edit: false, del: false, view: false, search:false},
-			       		{}, // edit options
-			        	{}, // add options
-			       	 	{}, // del options 
-			        	{ multipleSearch:true, closeOnEscape:true }, // search options 
-			        	{} // view options 
-		        	);
-
-				setRowChangeCallbacks(grid, data["caption"]);
-
-                const csvButtonId = `node-grid-export-csv-${nodeId}`;
-                grid.jqGrid(
-		            'navButtonAdd', pagerId, {
-		            id : csvButtonId,
-		            caption : "CSV",
-		            buttonicon : "ui-icon-arrowthickstop-1-s",
-		            onClickButton : function() {
-		            	export_grid(analysisId, nodeId, unique_code, 'csv');
-		            },
-		            title : "Download as CSV",
-		            cursor : "pointer"
-		        });
-                registerNodeGridDownloadButton(`#${csvButtonId}`, analysisId, nodeId, unique_code, 'csv',
-                                               false, "CSV");
-
-                const aWin = getAnalysisWindow();
-                if (aWin.ANALYSIS_SETTINGS && aWin.ANALYSIS_SETTINGS.canonical_transcript_collection) {
-                    const ctc = aWin.ANALYSIS_SETTINGS.canonical_transcript_collection;
-                    const ctcButtonId = `node-grid-export-canonical-csv-${nodeId}`;
-                    grid.jqGrid(
-                        'navButtonAdd', pagerId, {
-                        id : ctcButtonId,
-                        caption : "Canonical transcript CSV",
-                        buttonicon : "ui-icon-arrowthickstop-1-s",
-                        onClickButton : function() {
-                            export_grid(analysisId, nodeId, unique_code, 'csv', true);
-                        },
-                        title : "Download CSV using transcripts from " + ctc,
-                        cursor : "pointer"
-                    });
-                    registerNodeGridDownloadButton(`#${ctcButtonId}`, analysisId, nodeId, unique_code, 'csv',
-                                                   true, "Canonical transcript CSV");
-                }
-
-                const vcfButtonId = `node-grid-export-vcf-${nodeId}`;
-		        grid.jqGrid(
-		            'navButtonAdd', pagerId, {
-		            id : vcfButtonId,
-		            caption : "VCF",
-		            buttonicon : "ui-icon-arrowthickstop-1-s",
-		            onClickButton : function() {
-		            	export_grid(analysisId, nodeId, unique_code, 'vcf');
-		            },
-		            title : "Download as VCF",
-		            cursor : "pointer"
-	        	});
-                registerNodeGridDownloadButton(`#${vcfButtonId}`, analysisId, nodeId, unique_code, 'vcf',
-                                               false, "VCF");
-			}
-	    });
-	});
+    return definition.setup().then(function(built) {
+        if (!built) {
+            return null;  // node errors - on_error_function has already put them on the page
+        }
+        if (built !== definition) {
+            // Another load of this node is already driving the table - leave its definition and row
+            // handlers alone rather than doubling them up
+            nodeGridDefinitions[nodeId] = built;
+            return null;
+        }
+        const dataTable = built.dataTable;
+        dataTable.on('draw.dt', function() {
+            gridComplete();
+            gridCompleteExtra();
+        });
+        if (autoLoad) {
+            loadNodeGridData(nodeId, unique_code);
+        } else {
+            // The rows are being held back, but the table itself is up - say so, or the editor's
+            // everythingLoaded (which waits on both halves) sits behind its overlay until the user
+            // clicks "Show grid". gridComplete tells the two apart with nodeGridHasData()
+            gridComplete();
+            gridCompleteExtra();
+        }
+        return built;
+    });
 }
 
-// Fire the deferred row query (phase 2) for a node whose grid was config-loaded only.
+// Fire the row query for a node whose table was built but held back (@see setupNodeGrid autoLoad)
 function loadNodeGridData(nodeId, unique_code) {
-    const grid = getGrid(nodeId, unique_code);
-    const datatype = (window.nodeGridServerDatatype || {})[nodeId] || "json";
-    grid.jqGrid('setGridParam', {datatype: datatype}).trigger('reloadGrid');
+    const dataTable = getNodeDataTable(nodeId, unique_code);
+    if (dataTable) {
+        dataTable.ajax.reload();
+    }
+}
+
+// True once the grid has actually fetched rows - a built-but-deferred table has made no request
+function nodeGridHasData(nodeId, unique_code) {
+    const dataTable = getNodeDataTable(nodeId, unique_code);
+    return Boolean(dataTable && dataTable.ajax.json());
 }
 
 function gridLoadError(jqXHR, textStatus, errorThrown) {

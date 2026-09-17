@@ -1,4 +1,10 @@
 # From https://nitratine.net/blog/post/python-size-and-time-cache-decorator/
+"""
+In-process caching: `timed_cache(ttl=, size_limit=)` memoises a function per process (keyed on
+args and kwargs, so each web and celery worker has its own copy - restart to clear) and
+clear_cached_property drops a cached_property so it recomputes. Redis is the cross-process cache;
+this is for hot lookups such as GenomeBuild.get_name_or_alias.
+"""
 
 import time
 
@@ -75,6 +81,13 @@ def timed_cache(size_limit=0, ttl=0, quick_key_access=False):
                         break
 
             return result
+
+        def cache_clear():
+            storage.clear()
+            ttls.clear()
+            keys.clear()
+
+        wrapper.cache_clear = cache_clear
         return wrapper
     return decorator
 

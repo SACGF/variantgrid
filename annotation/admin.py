@@ -3,7 +3,7 @@ from typing import Optional
 
 from django.contrib import admin, messages
 from django.contrib.admin import TabularInline
-from django.db.models import QuerySet
+from django.db.models import QuerySet, TextField
 from django.utils.safestring import SafeString
 from django.utils.timezone import now
 
@@ -74,6 +74,14 @@ class VariantAnnotationVersionAdmin(ArchivePartitionDataAdminMixin, ModelAdminBa
         if f.name == "gene_annotation_release":
             return False
         return super().is_readonly_field(f)
+
+    def formfield_for_dbfield(self, db_field, request, **kwargs):
+        # Django only sets this for CharField, so a blanked out nullable TextField would save as '',
+        # which doesn't match the None the VEP pins are derived as - get_or_create() would then miss
+        # this version and make a new one, and the version checks would fail the annotation run
+        if isinstance(db_field, TextField) and db_field.null:
+            kwargs["empty_value"] = None
+        return super().formfield_for_dbfield(db_field, request, **kwargs)
 
     @admin_list_column("Status", order_field="status")
     def status_badge(self, obj: VariantAnnotationVersion) -> SafeString:

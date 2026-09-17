@@ -1,3 +1,12 @@
+"""
+Creating the VCF and Sample rows from an uploaded file's header: create_vcf_from_uploaded_vcf and
+create_vcf_from_vcf read the header only, resolve_genome_build (header, then what was declared at
+upload, then the source's fallback), configure_vcf_from_header binds the sample FORMAT fields
+(overridable per source through VCFSourceSettings in handle_vcf_source), create_cohort_genotype_collection_from_vcf
+makes the automatic cohort, and create_backend_vcf_links attaches SeqAuto records. import_vcf_file
+is the per-split-file genotype import that runs in parallel. Steps are wired in
+upload/import_task_factories/.
+"""
 import logging
 import os
 import re
@@ -83,6 +92,30 @@ def get_format_field(vcf_formats, wanted_format_id):
     return format_id
 
 
+def get_copy_number_field(vcf_formats, vcf_infos, single_sample: bool):
+    """ Which key this caller wrote copy number under, in preference order. A single-sample VCF is
+        allowed to put it in INFO (the Pisces TSO 500 shape) - with more than one sample an INFO
+        value says nothing about which of them it belongs to """
+    for field in VCFConstant.COPY_NUMBER_FIELDS:
+        if field in vcf_formats:
+            return field
+    if single_sample:
+        for field in VCFConstant.COPY_NUMBER_FIELDS:
+            if field in vcf_infos:
+                return field
+    return None
+
+
+def get_gene_level_segment_field(vcf_infos) -> Optional[str]:
+    """ The INFO key naming the gene each record is about, for a VCF of whole-gene copy number
+        events. Declared in the header by the caller, and by the VCF we rewrite it into, so a
+        reload binds it again - @see snpdb.gene_level_variants """
+    for field in settings.VCF_GENE_LEVEL_SEGMENT_FIELDS:
+        if field in vcf_infos:
+            return field
+    return None
+
+
 def set_allele_depth_format_fields(vcf: VCF, vcf_formats, vcf_source, default_allele_field):
     # Use FreeBayes AO/RO fields due to AD field not being decomposed properly on multi-alts
     # @see https://github.com/SACGF/variantgrid/issues/2126
@@ -148,7 +181,7 @@ def create_vcf_filters(vcf, filters: dict):
             logging.warning("Warning: Run out of characters to store filters! Only storing 1st %d.", num_filters)
             break
 
-        if filter_id == "PASS":  # Special - don't store this as vcf.Reader will not return it
+        if filter_id == "PASS":  # Special - don't store this as cyvcf2 returns FILTER=None for it
             continue
         filter_description = filter_dict["Description"]
 
@@ -278,12 +311,20 @@ def _get_file_upload(vcf) -> Optional[FileUpload]:
         return None
 
 
-def resolve_genome_build(vcf_reader, file_upload) -> Optional[GenomeBuild]:
-    """ Header detection first, then whatever the submitter declared at upload.
+def get_vcf_source(vcf_reader, file_upload) -> str:
+    """ A client-declared source wins over '##source' - it's the only way to reach a file that declares
+        none. The header text stays in vcf.header either way """
+    return get_metadata_source(file_upload) or cyvcf2_header_get(vcf_reader, "source", "")
 
-        Where both are present and disagree we fail rather than pick a winner - differing contigs mean
-        the coordinates aren't what the submitter thinks they are. Returns None if nothing resolves,
-        which the caller turns into REQUIRES_USER_INPUT. """
+
+def resolve_genome_build(vcf_reader, file_upload) -> Optional[GenomeBuild]:
+    """ Header detection first, then whatever the submitter declared at upload, then the build the
+        VCF's source is called against (@see VCFSourceSettings) - which is how a file whose header has
+        no contigs to detect from gets one, eg gene-level variants written from a fusion caller's csv.
+
+        Where detected and declared are both present and disagree we fail rather than pick a winner -
+        differing contigs mean the coordinates aren't what the submitter thinks they are. Returns None
+        if nothing resolves, which the caller turns into REQUIRES_USER_INPUT. """
 
     detected_genome_build = None
     try:
@@ -299,6 +340,22 @@ def resolve_genome_build(vcf_reader, file_upload) -> Optional[GenomeBuild]:
 
     if genome_build := detected_genome_build or declared_genome_build:
         return genome_build
+
+    return resolve_genome_build_from_source(get_vcf_source(vcf_reader, file_upload), file_upload)
+
+
+def resolve_genome_build_from_source(source: str, file_upload) -> Optional[GenomeBuild]:
+    """ The build for a file with nothing in it to detect from: what the submitter declared at
+        upload, then the build the source is called against (@see VCFSourceSettings). Split out for
+        the loaders that need the build before there is a VCF to read a header from - a fusion
+        caller's csv knows its '# Source =' line and nothing else. """
+
+    if declared_genome_build := get_metadata_genome_build(file_upload):
+        return declared_genome_build
+
+    for vss in VCFSourceSettings.get_for_source(source):
+        if vss.genome_build:
+            return vss.genome_build
 
     # Nothing to disambiguate on a single-build server - same fallback ImportBedFileTask already applies
     genome_builds = list(GenomeBuild.builds_with_annotation())
@@ -324,10 +381,10 @@ def configure_vcf_from_header(vcf, vcf_reader):
     create_vcf_filters(vcf, header_types.get("FILTER", {}))
     create_vcf_format(vcf, header_types.get("FORMAT", {}))
     vcf_formats = set(header_types["FORMAT"])
-    # A client-declared source wins over '##source' - it's the only way to reach a file that declares
-    # none. The header text stays in vcf.header either way
-    source = get_metadata_source(_get_file_upload(vcf)) or cyvcf2_header_get(vcf_reader, "source", "")
+    vcf_infos = set(header_types.get("INFO", {}))
+    source = get_vcf_source(vcf_reader, _get_file_upload(vcf))
     vcf.source = source
+    vcf.gene_level_segment_field = get_gene_level_segment_field(vcf_infos)
     if vcf.genotype_samples:  # Has sample format fields
         set_allele_depth_format_fields(vcf, vcf_formats, source, VCFConstant.DEFAULT_ALLELE_FIELD)
         vcf.genotype_field = get_format_field(vcf_formats, VCFConstant.DEFAULT_GENOTYPE_FIELD)
@@ -337,6 +394,8 @@ def configure_vcf_from_header(vcf, vcf_reader):
                                                                 VCFConstant.DEFAULT_PHRED_LIKILIHOOD_FIELD)
         vcf.allele_frequency_field = get_format_field(vcf_formats, VCFConstant.DEFAULT_ALLELE_FREQUENCY_FIELD)
         vcf.sample_filters_field = get_format_field(vcf_formats, VCFConstant.DEFAULT_SAMPLE_FILTERS_FIELD)
+        vcf.copy_number_field = get_copy_number_field(vcf_formats, vcf_infos,
+                                                      single_sample=vcf.genotype_samples == 1)
 
     vcf.allele_frequency_percent = False  # Explicitly set for when reloading old VCFs
     vcf.save()
@@ -363,18 +422,16 @@ def configure_vcf_from_header(vcf, vcf_reader):
 
 
 def handle_vcf_source(vcf):
-    if vcf.source:
-        for vss in VCFSourceSettings.objects.all():
-            if re.match(vss.source_regex, vcf.source):
-                vcf.sample_set.all().update(variants_type=vss.sample_variants_type)
-                vcf.variant_zygosity_count = vss.variant_zygosity_count
-                # Runs last in configure_vcf_from_header, so this lands on top of the by-name defaults
-                vss.apply_sample_field_overrides(vcf)
-                vcf.save()
+    for vss in VCFSourceSettings.get_for_source(vcf.source):
+        vcf.sample_set.all().update(variants_type=vss.sample_variants_type)
+        vcf.variant_zygosity_count = vss.variant_zygosity_count
+        # Runs last in configure_vcf_from_header, so this lands on top of the by-name defaults
+        vss.apply_sample_field_overrides(vcf)
+        vcf.save()
 
 
 def genotype_vcf_processor_factory(upload_step, cohort_genotype_collection, uploaded_vcf, preprocess_vcf_import_info):
-    if uploaded_vcf.vcf.has_genotype:
+    if uploaded_vcf.vcf.has_sample_columns:
         klass = BulkGenotypeVCFProcessor
     else:
         klass = BulkNoGenotypeVCFProcessor

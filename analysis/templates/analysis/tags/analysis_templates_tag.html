@@ -15,23 +15,24 @@
 {% endif %}
 {% if analysis_template_links.exists %}
 <script>
-    function createAnalysis_{{ flattened_uuid }}(analysis_template_id) {
+    function createAnalysis_{{ flattened_uuid }}(analysis_template_version_id) {
         let atForm = $("form#analysis-template-form-{{ flattened_uuid }}");
-        let templateField = $("#id_{{ flattened_uuid }}-analysis_template", atForm);
+        let templateField = $("#id_{{ flattened_uuid }}-analysis_template_version", atForm);
         {% if autocomplete_field %}
-        setAutocompleteValue(templateField, analysis_template_id, "");
+        setAutocompleteValue(templateField, analysis_template_version_id, "");
         {% else %}
-            templateField.val(analysis_template_id);
+            templateField.val(analysis_template_version_id);
         {% endif %}
         atForm.submit();
     }
 </script>
 <ul>
-    {% for analysis_template in analysis_template_links %}
-    <li><a class='hover-link' href="javascript:createAnalysis_{{ flattened_uuid }}({{ analysis_template.pk }})">
-            Perform {{ analysis_template.name }}
+    {% for atv in analysis_template_links %}
+    <li><a class='hover-link' href="javascript:createAnalysis_{{ flattened_uuid }}({{ atv.pk }})">
+            Perform {{ atv.template.name }}
         </a>
-        {{ analysis_template.description|safe }}
+        {% if atv.is_draft %}<span class="badge badge-warning">draft v{{ atv.version }}</span>{% endif %}
+        {{ atv.template.description|safe }}
     </li>
     {% endfor %}
 </ul>
