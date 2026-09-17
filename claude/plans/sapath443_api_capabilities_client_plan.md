@@ -5,7 +5,7 @@ Status: draft
 
 Client half of [sapath#443](https://github.com/SACGF/variantgrid_sapath/issues/443), for the
 *SACGF/variantgrid_api* repo (checked out at `../variantgrid_api`). It consumes the endpoint in
-`claude/plans/sapath443_api_capabilities_server_plan.md` and is consumed by
+`seqauto/views_rest.py:CapabilitiesView` (`seqauto/CLAUDE.md`) and is consumed by
 `claude/plans/sapath443_ngs_pipelines_plan.md`. It also carries the patient / specimen / extraction
 methods asked for in [variantgrid_api#20](https://github.com/SACGF/variantgrid_api/issues/20),
 since those are exactly the calls that need gating.
