@@ -64,6 +64,7 @@ class Test(URLTestCase):
             ('view_extraction', {"extraction_id": cls.extraction.pk}, 200),
             ('extraction_classify_report_tab', {"extraction_id": cls.extraction.pk}, 200),
             ('view_patient_genes', patient_kwargs, 200),
+            ('patient_phenotype_terms', patient_kwargs, 200),
             ('patient_classify_report_tab', patient_kwargs, 200),
             ('patient_ontology_genes_datatable', patient_kwargs, 200),
             ('view_patient_modifications', patient_kwargs, 200),

@@ -2,7 +2,7 @@ import hashlib
 import logging
 import operator
 from functools import cached_property, reduce
-from typing import Optional
+from typing import Optional, Union
 
 from auditlog.registry import auditlog
 from cache_memoize import cache_memoize
@@ -11,74 +11,120 @@ from django.db.models.deletion import CASCADE, SET_NULL
 from django.db.models.query_utils import Q
 
 from analysis.models.nodes.analysis_node import AnalysisNode, NodeAuditLogMixin
+from analysis.models.nodes.cohort_mixin import CohortMixin
 from analysis.models.nodes.node_display import NodeIcon
 from annotation.models import OntologyTerm, VariantTranscriptAnnotation
 from genes.models import GeneSymbol
 from library.constants import DAY_SECS
 from patients.models import Patient
-from snpdb.models import Contig
+from snpdb.models import Cohort, Contig
 
 
 class PhenotypeNode(AnalysisNode):
     PANEL_CUSTOM = 0
-    PANEL_PATIENT = 1
+    PANEL_SOURCE = 1
     text_phenotype = models.TextField(null=True, blank=True)  # Split on whitespace, any words match
+    # At most one of patient / cohort is set - both null means the node has no phenotype source
     patient = models.ForeignKey(Patient, null=True, blank=True, on_delete=SET_NULL)
+    cohort = models.ForeignKey(Cohort, null=True, blank=True, on_delete=SET_NULL)
     accordion_panel = models.IntegerField(default=0)
 
-    @property
-    def use_patient(self):
-        # To support legacy template code after refactor to using accordian_panel
-        return self.accordion_panel == self.PANEL_PATIENT
+    def _set_patient(self, patient):
+        self.patient = patient
+        self.cohort = None
 
-    def get_patients_qs(self):
+    def _set_cohort(self, cohort):
+        self.cohort = cohort
+        self.patient = None
+
+    def get_phenotype_source(self) -> Optional[Union[Patient, Cohort]]:
+        """ Whose phenotype terms the node reads - the one place the patient-or-cohort choice is made.
+            Both carry HasPhenotypeDescriptionMixin, so the term/gene calls are identical """
+        return self.cohort or self.patient
+
+    def get_ancestor_patients_qs(self):
         samples = set()
 
-        node_ids = [n.pk for n in self.analysisnode_ptr.get_roots()]
-        roots = AnalysisNode.objects.filter(pk__in=node_ids).select_subclasses()
-        for node in roots:
+        for node in self._get_root_nodes():
             samples.update(node.get_samples())
 
         return Patient.filter_for_user(self.analysis.user).filter(sample__in=samples).distinct()
 
+    def get_ancestor_cohorts(self) -> list[Cohort]:
+        """ The cohorts the ancestor source nodes are built on - a sub cohort offers its base cohort too """
+        cohorts_by_pk = {}
+        for node in self._get_root_nodes():
+            if isinstance(node, CohortMixin):
+                if cohort := node._get_cohort():
+                    for c in (cohort, cohort.get_base_cohort()):
+                        cohorts_by_pk[c.pk] = c
+
+        user = self.analysis.user
+        return [cohort for _, cohort in sorted(cohorts_by_pk.items()) if cohort.can_view(user)]
+
+    def _get_root_nodes(self) -> list[AnalysisNode]:
+        node_ids = [n.pk for n in self.analysisnode_ptr.get_roots()]
+        return list(AnalysisNode.objects.filter(pk__in=node_ids).select_subclasses())
+
     @property
-    def has_sample_inputs_with_patient(self) -> bool:
-        return self.get_patients_qs().exists()
+    def has_phenotype_sources(self) -> bool:
+        return self.get_ancestor_patients_qs().exists() or bool(self.get_ancestor_cohorts())
 
     def handle_ancestor_input_samples_changed(self):
-        """ Auto-set to single patient ancestor (or remove if no longer ancestor) """
+        """ Auto-set to a single patient or cohort ancestor (or remove if no longer ancestor) """
 
-        patients = set(self.get_patients_qs())
+        patients = set(self.get_ancestor_patients_qs())
+        cohorts = self.get_ancestor_cohorts()
 
         modified = False
         is_new = self.version == 0
         if not is_new:  # Being set in analysis template
-            # may have been moved/copied into a different DAG without current patient as ancestor
+            # may have been moved/copied into a different DAG without current source as ancestor
             if self.patient and self.patient not in patients:
                 self.patient = None
                 modified = True
+            if self.cohort and self.cohort not in cohorts:
+                self.cohort = None
+                modified = True
 
-        if self.patient is None:
+        if self.get_phenotype_source() is None:
             if proband_sample := self.get_proband_sample():
                 if proband_patient := proband_sample.patient:
                     patients = [proband_patient]  # Set below
 
             if len(patients) == 1:
-                self.patient = patients.pop()
-                if is_new:
-                    self.accordion_panel = self.PANEL_PATIENT
+                self._set_patient(patients.pop())
                 modified = True
+            else:
+                # A cohort with no phenotype text is offered in the picker but never auto-selected
+                described_cohorts = [c for c in cohorts if c.phenotype]
+                if len(described_cohorts) == 1:
+                    self._set_cohort(described_cohorts[0])
+                    modified = True
+
+            if modified and is_new:
+                self.accordion_panel = self.PANEL_SOURCE
 
         if modified:
             self.appearance_dirty = True
+
+    def _get_configuration_errors(self) -> list:
+        errors = super()._get_configuration_errors()
+        if self.patient:
+            if self.patient not in set(self.get_ancestor_patients_qs()):
+                errors.append(f"Patient: {self.patient} is not set as a patient in any ancestors of this node")
+        elif self.cohort:
+            if self.cohort not in self.get_ancestor_cohorts():
+                errors.append(f"Cohort: {self.cohort} is not a cohort in any ancestors of this node")
+        return errors
 
     def modifies_parents(self):
         return self.text_phenotype or self.get_gene_symbols_qs().exists()
 
     def get_gene_symbols_qs(self):
         ontology_version = self.analysis.annotation_version.ontology_version
-        if self.accordion_panel == self.PANEL_PATIENT and self.patient:
-            gene_symbols_qs = self.patient.get_gene_symbols(ontology_version)
+        if self.accordion_panel == self.PANEL_SOURCE and (source := self.get_phenotype_source()):
+            gene_symbols_qs = source.get_gene_symbols(ontology_version)
         else:
             gene_symbols_qs = ontology_version.cached_gene_symbols_for_terms_tuple(tuple(self.get_ontology_term_ids()))
         return gene_symbols_qs
@@ -86,9 +132,9 @@ class PhenotypeNode(AnalysisNode):
     def get_ontology_term_ids(self):
         """ For NodeOntologyGenesGrid """
         ontology_term_ids = []
-        if self.accordion_panel == self.PANEL_PATIENT:
-            if self.patient:
-                ontology_term_ids = self.patient.get_ontology_term_ids()
+        if self.accordion_panel == self.PANEL_SOURCE:
+            if source := self.get_phenotype_source():
+                ontology_term_ids = source.get_ontology_term_ids()
         else:
             ontology_term_ids = self.phenotypenodeontologyterm_set.values_list("ontology_term", flat=True)
         return ontology_term_ids
@@ -158,8 +204,7 @@ class PhenotypeNode(AnalysisNode):
         long_descriptions = []
         short_descriptions = []
 
-        ontology_terms = self.phenotypenodeontologyterm_set.values_list("ontology_term", flat=True)
-        terms_dict = OntologyTerm.split_hpo_omim_mondo_as_dict(ontology_terms)
+        terms_dict = OntologyTerm.split_hpo_omim_mondo_as_dict(self.get_ontology_term_ids())
         for ontology_name, ontology_list in terms_dict.items():
             ontology_strings = []
             for ot in ontology_list:
@@ -179,7 +224,9 @@ class PhenotypeNode(AnalysisNode):
         MAX_NAME_LENGTH = 50
         name = ''
         if self.pk and self.modifies_parents():
-            if self.accordion_panel == self.PANEL_PATIENT and self.patient:
+            if self.accordion_panel == self.PANEL_SOURCE and self.cohort:
+                name = f"{self.cohort.name} cohort phenotypes"
+            elif self.accordion_panel == self.PANEL_SOURCE and self.patient:
                 name = f"{self.patient} patient phenotypes"
             else:
                 short_descriptions, long_descriptions = self._short_and_long_descriptions

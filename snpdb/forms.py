@@ -17,7 +17,7 @@ from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.forms import ALL_FIELDS, EmailInput, URLInput, inlineformset_factory
 from django.forms.forms import DeclarativeFieldsMetaclass
-from django.forms.widgets import HiddenInput, NullBooleanSelect, TextInput
+from django.forms.widgets import HiddenInput, NullBooleanSelect, Textarea, TextInput
 from guardian import shortcuts
 from guardian.shortcuts import assign_perm, remove_perm
 
@@ -691,12 +691,32 @@ class CreateCohortForm(BaseModelForm):
         self.fields['genome_build'].choices = GenomeBuild.get_choices()
 
 
-class CohortForm(forms.ModelForm):
+class CohortPhenotypeForm(forms.ModelForm):
+    """ The cohort's shared condition - matched to ontology terms on save, as a Patient's is """
 
     class Meta:
         model = models.Cohort
-        fields = ['name']
-        widgets = {'name': TextInput()}
+        fields = ['phenotype']
+
+    def __init__(self, *args, **kwargs):
+        self.user = kwargs.pop("user")
+        super().__init__(*args, **kwargs)
+
+    def save(self, commit=True):
+        cohort = super().save(commit=False)
+        if commit:
+            cohort.save(phenotype_approval_user=self.user)
+        return cohort
+
+
+class CohortForm(CohortPhenotypeForm):
+
+    class Meta(CohortPhenotypeForm.Meta):
+        model = models.Cohort
+        fields = ['name', 'phenotype']
+        # The phenotype editor is drawn in the page's Details tab, outside the cohort-form element
+        widgets = {'name': TextInput(),
+                   'phenotype': Textarea(attrs={"form": "cohort-form"})}
 
 
 class CustomColumnsCollectionForm(forms.ModelForm):

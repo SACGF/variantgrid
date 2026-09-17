@@ -2461,6 +2461,14 @@ label[for="id_mondo"],
   border-color: #99CD83;
 }
 
+/* Matched patient phenotype terms shown beside a sample */
+.patient-phenotype .phenotype-chip {
+  display: inline-block;
+  font-size: small;
+  white-space: nowrap;
+  margin-bottom: 2px;
+}
+
 /* We use this as click to expand grouped OntologyTerms */
 .collapsed-term {
   cursor: pointer;

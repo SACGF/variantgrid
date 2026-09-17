@@ -290,18 +290,10 @@ class PhenotypeNodeView(NodeView):
         context = super().get_context_data(**kwargs)
 
         node = self.object
-        patient = node.patient
-        if patient:
-            ontology_term_ids = patient.get_ontology_term_ids()
-            terms_dict = OntologyTerm.split_hpo_omim_mondo_as_dict(ontology_term_ids)
-            context.update({f"patient_{k.lower()}": v for k, v in terms_dict.items()})
-
-        patient_queryset = node.get_patients_qs()
-        has_patients = patient_queryset.exists()
-
-        context.update({
-            'has_patients': has_patients,
-        })
+        if source := node.get_phenotype_source():
+            terms_dict = OntologyTerm.split_hpo_omim_mondo_as_dict(source.get_ontology_term_ids())
+            context.update({f"source_{k.lower()}": v for k, v in terms_dict.items()})
+            context["phenotype_source"] = source
         return context
 
 

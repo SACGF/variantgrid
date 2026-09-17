@@ -12,6 +12,7 @@ from django.db.models.expressions import F
 from django.urls.base import reverse
 
 from annotation.models import AnnotationVersion
+from annotation.models.models_phenotype_match import patient_phenotypes_for_samples
 from annotation.tasks.calculate_sample_stats import enqueue_cohort_stats_recompute
 from patients.models_enums import Sex
 from snpdb.archive import DataArchivedError
@@ -54,6 +55,7 @@ def sample_membership_rows(samples: list[Sample]) -> list[dict]:
             "vcf_name": sample.vcf.name,
             "het_hom": f"{stats.het_count:,} / {stats.hom_count:,}" if stats else None,
             "sex": (stats.chrx_sex_guess if stats else Sex.UNKNOWN).label,
+            "patient_id": sample.patient_id,
         })
     return rows
 
@@ -113,9 +115,11 @@ def _family_groups_by_sample_id(cohort: Cohort) -> dict[int, list[str]]:
 
 
 def _membership_editor_context(cohort: Cohort, cohort_samples: list[Sample],
-                               cohort_genotype_collection, has_write_permission: bool) -> dict:
-    """ Config + rows the membership editor is built from. A sub cohort picks from its parent VCF's
-        samples so every edit stays on the instant path; a custom cohort searches all samples. """
+                               cohort_genotype_collection, has_write_permission: bool) -> tuple[dict, list[Sample]]:
+    """ Config + rows the membership editor is built from, and the candidate samples it offers (they
+        are drawn in the same table, so the page's phenotype lookup covers them too). A sub cohort picks
+        from its parent VCF's samples so every edit stays on the instant path; a custom cohort searches
+        all samples. """
     config = {
         "cohort_id": cohort.pk,
         "version": cohort.version,
@@ -130,20 +134,23 @@ def _membership_editor_context(cohort: Cohort, cohort_samples: list[Sample],
         "family_groups": _family_groups_by_sample_id(cohort),
     }
 
+    candidate_samples = []
     if parent_vcf := (cohort.parent_cohort.vcf if cohort.parent_cohort else None):
         member_ids = [sample.pk for sample in cohort_samples]
-        candidates = parent_vcf.sample_set.exclude(pk__in=member_ids).select_related("vcf").order_by("pk")
-        config["candidate_samples"] = sample_membership_rows(list(candidates))
+        candidate_samples = list(parent_vcf.sample_set.exclude(pk__in=member_ids)
+                                 .select_related("vcf").order_by("pk"))
+        config["candidate_samples"] = sample_membership_rows(candidate_samples)
 
-    return {
+    context = {
         "membership_config": config,
         "cohort_sample_rows": sample_membership_rows(cohort_samples),
         "sample_form": SampleChoiceForm(genome_build=cohort.genome_build),
         "vcf_form": VCFChoiceForm(genome_build=cohort.genome_build),
     }
+    return context, candidate_samples
 
 
-def vcf_cohort_page_context(cohort: Cohort, has_write_permission: bool, vcf: VCF = None) -> dict:
+def vcf_cohort_page_context(user, cohort: Cohort, has_write_permission: bool, vcf: VCF = None) -> dict:
     """ Context shared by view_vcf and view_cohort. Pass vcf for the VCF-backed page - its samples are
         fixed by the file, so it gets the sample formset rather than the membership editor. """
     cohort_genotype_collection = None
@@ -167,6 +174,7 @@ def vcf_cohort_page_context(cohort: Cohort, has_write_permission: bool, vcf: VCF
         "show_stats_tab": bool(vcf) or cohort_genotype_collection is not None,
     }
 
+    samples_in_table = list(cohort_samples)
     if vcf:
         context["page_title"] = vcf.name
         if settings.SOMALIER.get("enabled"):
@@ -174,12 +182,24 @@ def vcf_cohort_page_context(cohort: Cohort, has_write_permission: bool, vcf: VCF
                 context["somalier_stages"] = vcf_extract.get_stages()
     else:
         context["page_title"] = "Cohort"
-        context.update(_membership_editor_context(cohort, cohort_samples, cohort_genotype_collection,
-                                                  has_write_permission))
+        membership_context, candidate_samples = _membership_editor_context(cohort, cohort_samples,
+                                                                          cohort_genotype_collection,
+                                                                          has_write_permission)
+        context.update(membership_context)
+        samples_in_table += candidate_samples
         sample_names, sample_zygosities, stats_pending = cohort_zygosity_stats(cohort, cohort_samples)
         context.update({
             "sample_names": sample_names,
             "sample_zygosities": sample_zygosities,
             "stats_pending": stats_pending,
         })
+
+    patient_phenotypes = patient_phenotypes_for_samples(user, samples_in_table)
+    context.update({
+        "patient_phenotypes": patient_phenotypes,
+        # The cohort phenotype editor: archived data is read only, and there's nothing to seed it from
+        # unless one of the patients on show has written phenotype text
+        "can_edit_phenotype": has_write_permission and not (cohort and cohort.data_archived),
+        "any_patient_phenotype_text": any(p.get("text") for p in patient_phenotypes.values()),
+    })
     return context

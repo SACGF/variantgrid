@@ -31,6 +31,7 @@ from annotation.models import (
     VCFAnnotationStats,
 )
 from annotation.models.models import ManualVariantEntryCollection
+from annotation.models.models_phenotype_match import patient_phenotypes_for_samples
 from annotation.serializers import ManualVariantEntryCollectionSerializer
 from annotation.tasks.calculate_sample_stats import enqueue_cohort_stats_recompute
 from classification.views.classification_datatables import ClassificationColumns
@@ -184,23 +185,6 @@ def view_vcf(request, vcf_id):
                                              fields=["vcf_sample_name", "name", "patient", "extraction"],
                                              widgets=SampleForm.Meta.widgets)
 
-    post = request.POST or None
-    vcf_form = forms.VCFForm(post, instance=vcf)
-    samples_form = VCFSampleFormSet(post, instance=vcf)
-    for form in samples_form.forms:
-        form.fields["vcf_sample_name"].disabled = True
-
-    requires_user_input = vcf.import_status == ImportStatus.REQUIRES_USER_INPUT
-    reload_vcf = False
-    if request.method == 'POST':
-        valid = all(f.is_valid() for f in [vcf_form, samples_form])
-        if valid:
-            vcf = vcf_form.save()
-            reload_vcf = requires_user_input and vcf.genome_build
-            samples_form.save()
-
-        add_save_message(request, valid, "VCF")
-
     cohort = None
     cohort_id = None
     try:
@@ -213,6 +197,33 @@ def view_vcf(request, vcf_id):
     except DataArchivedError:
         # Banner from _data_archived_banner.html shows the message; cohort stays set if available.
         pass
+
+    post = request.POST or None
+    vcf_form = forms.VCFForm(post, instance=vcf)
+    samples_form = VCFSampleFormSet(post, instance=vcf)
+    for form in samples_form.forms:
+        form.fields["vcf_sample_name"].disabled = True
+    # The VCF's automatic cohort carries the phenotype - it saves with the rest of the vcf-form POST
+    cohort_phenotype_form = None
+    if cohort:
+        # Prefixed: the create patient dialog on this page has a 'phenotype' field of its own
+        cohort_phenotype_form = forms.CohortPhenotypeForm(post, instance=cohort, user=request.user, prefix="cohort")
+
+    requires_user_input = vcf.import_status == ImportStatus.REQUIRES_USER_INPUT
+    reload_vcf = False
+    if request.method == 'POST':
+        page_forms = [vcf_form, samples_form]
+        if cohort_phenotype_form:
+            page_forms.append(cohort_phenotype_form)
+        valid = all(f.is_valid() for f in page_forms)
+        if valid:
+            vcf = vcf_form.save()
+            reload_vcf = requires_user_input and vcf.genome_build
+            samples_form.save()
+            if cohort_phenotype_form:
+                cohort_phenotype_form.save()
+
+        add_save_message(request, valid, "VCF")
 
     if reload_vcf:
         set_vcf_and_samples_import_status(vcf, ImportStatus.IMPORTING)
@@ -232,6 +243,8 @@ def view_vcf(request, vcf_id):
         set_form_read_only(vcf_form)
         for form in samples_form.forms:
             set_form_read_only(form)
+        if cohort_phenotype_form:
+            set_form_read_only(cohort_phenotype_form)
         messages.add_message(request, messages.WARNING, "You can view but not modify this data.")
 
     variant_zygosity_count_collections = {}
@@ -265,7 +278,7 @@ def view_vcf(request, vcf_id):
     if vcf.data_restorable_from and vcf.data_restorable_from.startswith(settings.PARTITION_ARCHIVE_DIR):
         restore_source_kind = "backend"
 
-    context = vcf_cohort_page_context(cohort, has_write_permission, vcf=vcf)
+    context = vcf_cohort_page_context(request.user, cohort, has_write_permission, vcf=vcf)
     context.update({
         'sample_stats_het_hom_count': sample_stats_het_hom_count,
         'sample_stats_pass_het_hom_count': sample_stats_pass_het_hom_count,
@@ -274,6 +287,7 @@ def view_vcf(request, vcf_id):
         'sample_zygosities': sample_zygosities,
         'vcf_form': vcf_form,
         'samples_form': samples_form,
+        'cohort_phenotype_form': cohort_phenotype_form,
         'patient_form': PatientForm(user=request.user),  # blank
         'can_view_upload_pipeline': can_view_upload_pipeline,
         'annotated_download_files': annotated_download_files,
@@ -544,6 +558,7 @@ def view_sample(request, sample_id):
         "sample_stats": sample_stats,
         "sample_genotype_stats": sample_genotype_stats,
         "skipped_annotation_count": skipped_annotation_count,
+        "patient_phenotypes": patient_phenotypes_for_samples(request.user, [sample]),
         **somalier_context,
     }
     return render(request, 'snpdb/data/view_sample.html', context)

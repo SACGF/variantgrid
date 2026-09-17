@@ -9,8 +9,9 @@
 const COHORT_TASK_POLL_FREQUENCY = 1000;
 
 class CohortMembershipEditor {
-    constructor(config, sampleRows) {
+    constructor(config, sampleRows, patientPhenotypes) {
         this.config = config;
+        this.patientPhenotypes = patientPhenotypes || {};
         this.samplesById = {};
         for (const row of sampleRows) {
             this.samplesById[row.id] = row;
@@ -133,7 +134,25 @@ class CohortMembershipEditor {
             }
             that.status = null;
             that.render();
+            that.loadStagedPhenotypes(data.samples);
         });
+    }
+
+    /* A staged sample can bring a patient the page data didn't cover - fetch its terms, then redraw */
+    loadStagedPhenotypes(rows) {
+        const that = this;
+        for (const row of rows) {
+            if (row.patient_id && !(row.patient_id in this.patientPhenotypes)) {
+                loadPatientPhenotype(this.patientPhenotypes, row.patient_id, function () {
+                    that.render();
+                });
+            }
+        }
+    }
+
+    /* The member samples' patients, in display order - what the phenotype seed button walks */
+    get memberPatientIds() {
+        return this.order.map((sampleId) => this.samplesById[sampleId].patient_id).filter(Boolean);
     }
 
     /* Only saved members are analysis material - a pending add has no CohortSample behind it yet */
@@ -145,7 +164,7 @@ class CohortMembershipEditor {
         const baselineSet = new Set(this.baseline);
         const table = $(`<table class="table membership-table">
             <thead><tr><th><input type="checkbox" class="sample-select-all" title="Select all samples"></th>
-            <th></th><th>Sample</th><th>Source VCF</th><th>Het / Hom</th><th>Sex</th><th></th></tr></thead>
+            <th></th><th>Sample</th><th>Source VCF</th><th>Het / Hom</th><th>Sex</th><th>Phenotype</th><th></th></tr></thead>
             <tbody></tbody></table>`);
         const tbody = $("tbody", table);
 
@@ -168,18 +187,19 @@ class CohortMembershipEditor {
                 <td class="vcf-name">${escapeHtml(sample.vcf_name)}</td>
                 <td class="num">${sample.het_hom || "N/A"}</td>
                 <td>${escapeHtml(sample.sex)}</td>
+                <td class="sample-phenotype">${patientPhenotypeHtml(this.patientPhenotypes[sample.patient_id])}</td>
                 <td class="text-right">${this.config.has_write_permission ? button : ""}</td>
             </tr>`);
         }
         if (!this.order.length) {
-            tbody.append('<tr><td colspan="7" class="text-muted">No samples - add some below.</td></tr>');
+            tbody.append('<tr><td colspan="8" class="text-muted">No samples - add some below.</td></tr>');
         }
 
         // Sub cohort: the rest of the parent VCF's samples, ready to tick back in
         const memberSet = new Set(this.order);
         const available = this.candidateIds.filter((id) => !memberSet.has(id));
         if (available.length) {
-            tbody.append(`<tr class="candidate-heading"><td colspan="7">Other samples in this VCF</td></tr>`);
+            tbody.append(`<tr class="candidate-heading"><td colspan="8">Other samples in this VCF</td></tr>`);
             for (const sampleId of available) {
                 const sample = this.samplesById[sampleId];
                 const button = `<button type="button" class="btn btn-sm btn-outline-primary add-sample" data-sample-id="${sampleId}">Add</button>`;
@@ -190,6 +210,7 @@ class CohortMembershipEditor {
                     <td class="vcf-name">${escapeHtml(sample.vcf_name)}</td>
                     <td class="num">${sample.het_hom || "N/A"}</td>
                     <td>${escapeHtml(sample.sex)}</td>
+                    <td class="sample-phenotype">${patientPhenotypeHtml(this.patientPhenotypes[sample.patient_id])}</td>
                     <td class="text-right">${this.config.has_write_permission ? button : ""}</td>
                 </tr>`);
             }

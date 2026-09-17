@@ -69,7 +69,7 @@ def view_cohort(request, cohort_id):
         return redirect('view_vcf', vcf_id=cohort.vcf.pk)
 
     has_write_permission = cohort.can_write(request.user) and not cohort.data_archived
-    cohort_form = forms.CohortForm(request.POST or None, instance=cohort)
+    cohort_form = forms.CohortForm(request.POST or None, instance=cohort, user=request.user)
     if request.method == "POST":
         if not has_write_permission:
             raise PermissionDenied()
@@ -77,7 +77,7 @@ def view_cohort(request, cohort_id):
             cohort = cohort_form.save()
         add_save_message(request, valid, "Cohort")
 
-    context = vcf_cohort_page_context(cohort, has_write_permission)
+    context = vcf_cohort_page_context(request.user, cohort, has_write_permission)
     context["cohort_form"] = cohort_form
     return render(request, 'snpdb/data/view_vcf_cohort.html', context)
 
