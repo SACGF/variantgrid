@@ -2,7 +2,7 @@
 {% load ui_utils %}
 <h5>Grouping</h5>
 {% labelled label="Lab" %}{% lab classification_grouping.lab %}{% endlabelled %}
-{% with allele=classification_grouping.allele_origin_grouping.allele_grouping.allele %}
+{% with allele=classification_grouping.allele_origin_grouping.allele %}
     {% labelled label="Internal Allele ID" %}{{ allele.pk }}{% endlabelled %}
     {% labelled label="ClinGen Canonical Allele ID" %}
         {% if allele.clingen_allele %}
