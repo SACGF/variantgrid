@@ -588,10 +588,18 @@ def search_hgvs(search_input: SearchInputInstance) -> Iterable[SearchResult]:
 
         if error_message:
             results = [SearchResult.error_result(error_message, genome_build)]
+            if search_input.classify:
+                results.extend(_classify_unresolved_hgvs(search_input.user, genome_build,
+                                                         search_input.search_string, error_message))
         if results:
             for_all_genome_builds.append(results)
 
     return itertools.chain(*for_all_genome_builds)
+
+
+def _classify_unresolved_hgvs(user: User, genome_build: GenomeBuild, hgvs_string: str, error_message: str) -> Iterable[SearchResult]:
+    if classify_no_variant := VariantExtra.classify_no_variant_hgvs(for_user=user, genome_build=genome_build, hgvs_string=hgvs_string):
+        yield SearchResult(classify_no_variant, messages=[SearchMessage(f"Error reading HGVS \"{error_message}\"")])
 
 
 def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visible_variants: QuerySet, classify: bool = False) -> Iterable[Union[SearchResult, SearchMessageOverall]]:
@@ -730,17 +738,13 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
             else:  # Valid - just no results
                 hgvs_error = None
 
-        if variant_coordinate is None:
-            if classify:
-                search_message = SearchMessage(f"Error reading HGVS \"{hgvs_error}\"")
-                if classify_no_variant := VariantExtra.classify_no_variant_hgvs(for_user=user, genome_build=genome_build, hgvs_string=original_hgvs_string):
-                    yield SearchResult(classify_no_variant, messages=[search_message])
-
         # yield SearchMessageOverall(str(hgvs_error))
         if hgvs_error:  # May have been cleared if matched gene symbol HGVS
             raise hgvs_error
     except HGVSNomenclatureException as hgvs_ex:
         raw_message = str(hgvs_ex)
+        if classify:
+            yield from _classify_unresolved_hgvs(user, genome_build, original_hgvs_string, raw_message)
         if "char" not in raw_message and "EOF" not in raw_message:
             # this is likely not a technical message, send it directly to the user
             yield SearchMessageOverall(raw_message)
