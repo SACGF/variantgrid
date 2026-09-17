@@ -374,19 +374,21 @@ function enhanceAndMonitor() {
         // checked is the opposite of that, the checkbox will be toggled to the other state (firing any change listeners)
         {test: 'input[type=checkbox][data-cookie]',
             func: (node) => {
-                const $node = $(node);
-                const cookieName = $node.attr('data-cookie') || $node.attr('id') || $node.attr('name');
+                if (typeof Cookies !== 'undefined') {
+                    const $node = $(node);
+                    const cookieName = $node.attr('data-cookie') || $node.attr('id') || $node.attr('name');
 
-                $node.change(() => {
-                   const checked = !!$node.prop('checked');
-                   Cookies.set(cookieName, checked ? 'true' : 'false', {sameSite: 'strict'});
-                });
+                    $node.change(() => {
+                       const checked = !!$node.prop('checked');
+                       Cookies.set(cookieName, checked ? 'true' : 'false', {sameSite: 'strict'});
+                    });
 
-                const checked = !!$node.prop('checked') ? 'true' : 'false';
-                const existingCookie = Cookies.get(cookieName);
+                    const checked = !!$node.prop('checked') ? 'true' : 'false';
+                    const existingCookie = Cookies.get(cookieName);
 
-                if (existingCookie && existingCookie != checked) {
-                    $node.click();
+                    if (existingCookie && existingCookie != checked) {
+                        $node.click();
+                    }
                 }
             }
         },
@@ -725,7 +727,9 @@ function globalSetup() {
     tweakAjax();
     configureTimestamps();
     // stops there being a popup to the user
-    $.fn.DataTable.ext.errMode = 'none';
+    if ($.fn.DataTable) {
+        $.fn.DataTable.ext.errMode = 'none';
+    }
 
     // applies many tweaks and functionality (such as ajax blocks)
     // as well as applying them to dynamically added elements
@@ -1030,26 +1034,28 @@ const JS_DATE_FORMAT_SCIENTIFIC = 'YYYY-MM-DD HH:mm';
 const JS_DATE_FORMAT = 'YYYY-MM-DD HH:mm'; //'lll';
 const JS_DATE_ONLY_FORMAT = 'YYYY-MM-DD';
 function configureTimestamps() {
-    $.timeago.settings.allowFuture = true;
-    $.timeago.settings.strings = {
-        prefixAgo: null,
-        prefixFromNow: null,
-        suffixAgo: "ago",
-        suffixFromNow: "from now",
-        seconds: "<1 min",
-        minute: "1 min",
-        minutes: "%d mins",
-        hour: "1 hour",
-        hours: "%d hours",
-        day: "1 day",
-        days: "%d days",
-        month: "1 month",
-        months: "%d months",
-        year: "1 year",
-        years: "%d years",
-        wordSeparator: " ",
-        numbers: []
-    };
+    if ($.timeago) {
+        $.timeago.settings.allowFuture = true;
+        $.timeago.settings.strings = {
+            prefixAgo: null,
+            prefixFromNow: null,
+            suffixAgo: "ago",
+            suffixFromNow: "from now",
+            seconds: "<1 min",
+            minute: "1 min",
+            minutes: "%d mins",
+            hour: "1 hour",
+            hours: "%d hours",
+            day: "1 day",
+            days: "%d days",
+            month: "1 month",
+            months: "%d months",
+            year: "1 year",
+            years: "%d years",
+            wordSeparator: " ",
+            numbers: []
+        };
+    }
 }
 
 function convertTimestampDom(elem) {
