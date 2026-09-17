@@ -1,13 +1,52 @@
 # NGS-pipelines: one vg_api_full.py for VG3 and VG4, runnable off the TAU box
 
-Written by Claude Fable 5.1 (claude-fable-5-1), 2026-09-17
+Written by Claude Fable 5.1 (claude-fable-5-1), 2026-09-17; revised by Claude Opus 5 (claude-opus-5), 2026-09-17
 Status: draft
 
 Pipeline half of [sapath#443](https://github.com/SACGF/variantgrid_sapath/issues/443), for the
 *GMP-TAU/NGS-pipelines* repo (checked out at `../NGS-pipelines`, script *scripts/vg_api_full.py*,
-config *misc/vg_api_config.yaml*, tests *tests/test_vg_api_full.py*). It depends on the client in
-`claude/plans/sapath443_api_capabilities_client_plan.md` being released as variantgrid_api 1.5. It
-goes to TAU as two pull requests, because the first is useful now and independent of the release.
+config *misc/vg_api_config.yaml*, tests *tests/test_vg_api_full.py*). It goes to TAU as two pull
+requests: the first is independent of any server or client change, the second uses the capability probe.
+
+## What it builds on (done)
+
+**Server.** `variantgrid/views_rest.py:CapabilitiesView` at `GET /api/v1/capabilities` returns
+`version`, `git_hash`, `features` (`variantgrid/views_rest.py:API_FEATURES`) and `upload_file_types`
+(derived from the import task factories). The contract and how a VG3 server answers are in
+`claude/guides/operations.md` (authentication surface).
+
+**Client.** variantgrid_api 1.5.0 is on PyPI (repo `../variantgrid_api`, CHANGELOG `[1.5.0]`,
+SACGF/variantgrid_api#20 and #21). The parts this script relies on:
+
+```python
+@dataclass(frozen=True)
+class ServerCapabilities:          # variantgrid_api.data_models
+    version: str                   # "vg4.0-12-gc174556", or "legacy"
+    git_hash: Optional[str] = None
+    features: FrozenSet[str] = frozenset()
+    upload_file_types: FrozenSet[str] = frozenset()
+
+class UnsupportedFeaturePolicy(Enum):   # variantgrid_api.api_client
+    SKIP = "skip"     # log a warning, return None
+    ERROR = "error"   # raise UnsupportedFeatureError (the default)
+```
+
+- `VariantGridAPI(server, token, unsupported_feature_policy=...)`. `vg_api.capabilities` is fetched
+  once on first use; a 404 or a redirect (VG3 sending `/api/` to its login page) gives
+  `ServerCapabilities.LEGACY`. Ungated calls make no probe.
+- `supports(feature)`, `accepts_upload(file_type)` for branches a skip can't express.
+- Gated: `create_patient` / `create_specimen` / `create_extraction` (`patients`),
+  `create_specimen_measure(s)` (`specimen_measures`), `link_sequencing_sample_extraction`
+  (`link_extraction`), `poll_upload_status` / `wait_for_annotation` / `download_annotated` /
+  `annotate_vcf` (`upload_status`).
+- `upload_file(filename, metadata=None, file_type=None)`: `file_type` isn't sent, it gates the upload
+  on `accepts_upload(file_type)` (SKIP returns `None`). Non-empty `metadata` needs `upload_metadata`;
+  under SKIP the file is still uploaded, without the metadata.
+- `MockVariantGridAPI(capabilities=None, unsupported_feature_policy=ERROR)`: default capabilities are
+  a current server with every gated feature and the TSO 500 upload types;
+  `capabilities=ServerCapabilities.LEGACY` behaves as VG3. A call skipped under SKIP is not recorded
+  in `mock.calls`.
+- *examples/example_tso500.py* in the client repo is the reference flow for a TSO 500 pair.
 
 ## PR 1: run the script anywhere
 
@@ -37,7 +76,7 @@ scripts/vg_api_full.py --server http://localhost:8000 --api-token ... --batchid 
 
 ## PR 2: capability-gated TSO 500 upload
 
-Requires variantgrid_api 1.5 (`requirements` / the shared environment pin moves up).
+The shared TAU environment's variantgrid_api pin moves to `>=1.5.0`.
 
 Construct the client with `unsupported_feature_policy=UnsupportedFeaturePolicy.SKIP` in `__main__`
 so every new call below is a logged no-op on a server that lacks it.
@@ -60,7 +99,7 @@ does the CVO upload for every pair in `samp_to_pairIDs`, after `upload_single_sa
 **Patient chain.** For each pair, one `link_sequencing_sample_extraction(SequencingSampleLookup(...), extraction_reference)`
 per arm, with the extraction reference being the container suffix the CVO names (the DNA and RNA
 sample IDs' trailing `C` / `B` containers). On VG4 the server parks the claim until the extraction
-exists (202), on VG3 the call is skipped. Name, DOB, sex, tissue and dates keep arriving from Mocha
+exists (202 with `match_status` `Pending`), on VG3 the call is skipped and returns `None`. Name, DOB, sex, tissue and dates keep arriving from Mocha
 through the patient / specimen / extraction API, so this script posts none of them; TMB, MSI and
 the other specimen measures come out of the CVO on the server, so it posts no `specimen_measure`
 either.
@@ -84,8 +123,8 @@ splice VCF, `Logs_Intermediates/...` BAM and FASTQ paths), then:
 ## Rollout
 
 1. PR 1 merges and the TAU environment installs nothing new.
-2. variantgrid_api 1.5 is released; the VG4 test server (`VG_test` in their config) gets the
-   capabilities endpoint.
-3. PR 2 merges. Against VG3 prod the runs are byte-for-byte what they are today plus one 404 on the
-   capabilities probe per run. When prod moves to VG4 the same script starts sending the CVO and
+2. The VG4 test server (`VG_test` in their config) is deployed from a master that has
+   `/api/v1/capabilities`, and TAU's environment installs variantgrid_api 1.5.0.
+3. PR 2 merges. Against VG3 prod the runs are byte-for-byte what they are today plus one capabilities
+   probe per run (a 404 or login redirect). When prod moves to VG4 the same script starts sending the CVO and
    stops sending the splice VCF with no further change on TAU's side.
