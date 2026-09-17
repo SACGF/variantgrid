@@ -24,28 +24,54 @@ function patientPhenotypeHtml(phenotype) {
     return `<span class="patient-phenotype" title="${escapeHtml(phenotype.text || "")}">${chips.join("")}</span>`;
 }
 
-/*
- * Seed a phenotype textarea from the patients on the page - each patient's text once, on its own line,
- * skipping anything the textarea already holds. Nothing is saved: the keyup runs the editor's live
- * matching so the user reviews and trims before submitting the form.
- */
-function addPatientPhenotypesToText(textarea, patientIds, patientPhenotypes) {
-    let text = textarea.val() || "";
-    const seen = new Set();
-    for (const patientId of patientIds) {
-        if (!patientId || seen.has(String(patientId))) {
-            continue;
-        }
-        seen.add(String(patientId));
+/* Each patient's text once, skipping anything the existing text already holds */
+function patientPhenotypeTextsToAdd(existingText, patientIds, patientPhenotypes) {
+    const texts = [];
+    for (const patientId of new Set(patientIds.filter(Boolean).map(String))) {
         const phenotype = patientPhenotypes[patientId];
         const patientText = phenotype && phenotype.text ? phenotype.text.trim() : "";
-        if (!patientText || text.indexOf(patientText) !== -1) {
-            continue;
+        if (patientText && ![existingText, ...texts].join("\n").includes(patientText)) {
+            texts.push(patientText);
         }
-        text = text ? text + "\n" + patientText : patientText;
     }
-    textarea.val(text);
-    textarea.trigger("keyup");
+    return texts;
+}
+
+/*
+ * The "Add all sample patient phenotypes" button seeds a phenotype textarea from the page's patients, one
+ * text per line. Nothing is saved: the keyup runs the editor's live matching so the user reviews and trims
+ * before submitting the form. getPatientIds is read on every refresh, as membership and patient selects
+ * change before saving - returns the refresh for callers to run when they do.
+ */
+function setupPatientPhenotypeSeedButton(textarea, getPatientIds, patientPhenotypes) {
+    const button = $("#add-sample-patient-phenotypes");
+    const summary = $("#sample-patient-phenotypes-summary");
+
+    function refresh() {
+        const patientIds = getPatientIds();
+        const toAdd = patientPhenotypeTextsToAdd(textarea.val() || "", patientIds, patientPhenotypes);
+        let message;
+        if (toAdd.length) {
+            message = `${toAdd.length} phenotype${toAdd.length === 1 ? "" : "s"} will be copied in.`;
+        } else if (patientPhenotypeTextsToAdd("", patientIds, patientPhenotypes).length) {
+            message = "Every sample patient phenotype is already in the text.";
+        } else {
+            message = "No sample patients have phenotype text.";
+        }
+        button.prop("disabled", !toAdd.length);
+        summary.text(message);
+    }
+
+    button.click(function () {
+        const existingText = textarea.val() || "";
+        const toAdd = patientPhenotypeTextsToAdd(existingText, getPatientIds(), patientPhenotypes);
+        textarea.val([existingText, ...toAdd].filter(Boolean).join("\n"));
+        textarea.trigger("keyup");
+        refresh();
+    });
+    textarea.on("input change keyup", refresh);
+    refresh();
+    return refresh;
 }
 
 /* Terms for one patient, from the cache if we already have them */

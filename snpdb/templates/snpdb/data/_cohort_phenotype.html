@@ -1,7 +1,16 @@
 {# The cohort's shared condition - same editor a Patient's phenotype uses. 'phenotype_field' is the bound field #}
+{# The seed button starts disabled; setupPatientPhenotypeSeedButton counts what it would copy and enables it #}
 {% load phenotype_tags %}
-{% if can_edit_phenotype and any_patient_phenotype_text %}
-    <button type="button" id="add-sample-patient-phenotypes" class="btn btn-secondary mb-2"
+{% if can_edit_phenotype %}
+    <p class="text-muted mb-1">
+        {% if vcf %}
+            Copies in phenotype text from the patients of this VCF's samples.
+        {% else %}
+            Only copies in phenotype text from the patients of samples in this cohort{% if membership_config.candidate_samples %}, not the other samples in its VCF{% endif %}.
+        {% endif %}
+        <span id="sample-patient-phenotypes-summary"></span>
+    </p>
+    <button type="button" id="add-sample-patient-phenotypes" class="btn btn-secondary mb-2" disabled
             title="Copy each sample patient's phenotype text in here to review before saving">
         Add all sample patient phenotypes
     </button>

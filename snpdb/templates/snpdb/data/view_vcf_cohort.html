@@ -194,6 +194,16 @@ $(document).ready(function() {
         $(".sample-phenotype", row).html(patientPhenotypeHtml(patientPhenotypes[row.attr("data-patient-id")]));
     });
 
+{% if cohort_phenotype_form %}
+    const refreshPhenotypeSeedButton = setupPatientPhenotypeSeedButton($("#{{ cohort_phenotype_form.phenotype.auto_id }}"), function () {
+        return $("tr.sample-row", "#sample-formset").map(function () {
+            return $(".sample-patient select", this).val() || $(this).attr("data-patient-id");
+        }).get();
+    }, patientPhenotypes);
+{% else %}
+    const refreshPhenotypeSeedButton = () => {};
+{% endif %}
+
     $(".sample-patient select", "form#vcf-form").each(function () {
         const patientSelector = $(this);
         const patientLink = patientSelector.parents(".sample-patient").find("a.patient-link");
@@ -212,6 +222,7 @@ $(document).ready(function() {
             // The column follows the select rather than waiting for Save
             loadPatientPhenotype(patientPhenotypes, patientSelector.val(), function (phenotype) {
                 phenotypeCell.html(patientPhenotypeHtml(phenotype));
+                refreshPhenotypeSeedButton();
             });
         });
     });
@@ -226,13 +237,6 @@ $(document).ready(function() {
         addCreatePatientButton(dialog, $(this), sampleName, $(this).parents(".sample-patient"));
     });
 {% endif %}
-
-    $("#add-sample-patient-phenotypes").click(function () {
-        const patientIds = $("tr.sample-row", "#sample-formset").map(function () {
-            return $(".sample-patient select", this).val() || $(this).attr("data-patient-id");
-        }).get();
-        addPatientPhenotypesToText($("#{{ cohort_phenotype_form.phenotype.auto_id }}"), patientIds, patientPhenotypes);
-    });
 
     drawLengthHistograms();
 
@@ -310,10 +314,10 @@ $(document).ready(function() {
 {% endif %}
 {% if not vcf %}
     const membershipEditor = new CohortMembershipEditor({{ membership_config|jsonify }}, {{ cohort_sample_rows|jsonify }}, patientPhenotypes);
+    const refreshPhenotypeSeedButton = setupPatientPhenotypeSeedButton($("#{{ cohort_form.phenotype.auto_id }}"),
+                                                                       () => membershipEditor.memberPatientIds, patientPhenotypes);
+    membershipEditor.onRender = refreshPhenotypeSeedButton;
     membershipEditor.init();
-    $("#add-sample-patient-phenotypes").click(function () {
-        addPatientPhenotypesToText($("#{{ cohort_form.phenotype.auto_id }}"), membershipEditor.memberPatientIds, patientPhenotypes);
-    });
 {% endif %}
 {% endblock %}
 

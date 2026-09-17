@@ -27,6 +27,7 @@ class CohortMembershipEditor {
         this.selected = new Set();  // Ticked for the selected samples actions - read back off the table before a redraw
         this.version = config.version;
         this.status = null;
+        this.onRender = null;  // Called after each redraw - the page's own widgets that follow membership
 
         this.tableContainer = $("#cohort-membership-table");
         this.saveBar = $("#cohort-membership-save-bar");
@@ -150,9 +151,9 @@ class CohortMembershipEditor {
         }
     }
 
-    /* The member samples' patients, in display order - what the phenotype seed button walks */
+    /* The member samples' patients (pending changes applied), in display order - what the phenotype seed button walks */
     get memberPatientIds() {
-        return this.order.map((sampleId) => this.samplesById[sampleId].patient_id).filter(Boolean);
+        return this.effectiveMembers().map((sampleId) => this.samplesById[sampleId].patient_id).filter(Boolean);
     }
 
     /* Only saved members are analysis material - a pending add has no CohortSample behind it yet */
@@ -373,6 +374,9 @@ class CohortMembershipEditor {
         this.renderSaveBar();
         if (typeof SampleSelectionActions !== "undefined") {
             SampleSelectionActions.update();  // Which samples are ticked can change with the table
+        }
+        if (this.onRender) {
+            this.onRender();
         }
     }
 

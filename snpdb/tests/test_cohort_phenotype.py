@@ -1,7 +1,7 @@
 """  The cohort's own phenotype text (issue #1426).
 
      Owns: that saving a Cohort matches its phenotype text to ontology terms through CohortTextPhenotype,
-     and that the cohort and VCF pages carry the editor and the seed-from-patients button.
+     and that the cohort and VCF pages carry the editor.
 """
 from django.contrib.auth.models import User
 from django.test import TestCase
@@ -14,7 +14,6 @@ from ontology.tests.test_data_ontology import (
     create_ontology_test_data,
     create_test_ontology_version,
 )
-from patients.models import Patient
 from snpdb.models import Cohort, GenomeBuild, ImportStatus
 from snpdb.tests.utils.fake_cohort_data import create_fake_cohort
 
@@ -65,17 +64,3 @@ class CohortPhenotypeTest(TestCase):
         # Prefixed so it doesn't collide with the create patient dialog's own phenotype field
         self.assertEqual(response.context["cohort_phenotype_form"].instance, self.vcf_cohort)
         self.assertContains(response, 'id="id_cohort-phenotype"')
-
-    def test_seed_button_needs_a_visible_patient_with_phenotype_text(self):
-        self.client.force_login(self.user)
-        url = reverse("view_vcf", kwargs={"vcf_id": self.vcf.pk})
-        self.assertNotContains(self.client.get(url), 'id="add-sample-patient-phenotypes"')
-
-        patient = Patient(phenotype=RAISED_TSH)
-        patient.save(phenotype_matcher=PhenotypeMatcher())
-        assign_permission_to_user_and_groups(self.user, patient)
-        sample = self.vcf_cohort.get_samples()[0]
-        sample.patient = patient
-        sample.save()
-
-        self.assertContains(self.client.get(url), 'id="add-sample-patient-phenotypes"')

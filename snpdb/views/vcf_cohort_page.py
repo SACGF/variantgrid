@@ -197,9 +197,7 @@ def vcf_cohort_page_context(user, cohort: Cohort, has_write_permission: bool, vc
     patient_phenotypes = patient_phenotypes_for_samples(user, samples_in_table)
     context.update({
         "patient_phenotypes": patient_phenotypes,
-        # The cohort phenotype editor: archived data is read only, and there's nothing to seed it from
-        # unless one of the patients on show has written phenotype text
+        # The cohort phenotype editor - archived data is read only
         "can_edit_phenotype": has_write_permission and not (cohort and cohort.data_archived),
-        "any_patient_phenotype_text": any(p.get("text") for p in patient_phenotypes.values()),
     })
     return context
