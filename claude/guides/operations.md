@@ -131,3 +131,6 @@ loop. GitHub issues are closed by a human after that pipeline, never by a commit
 `/seqauto/api/`, `/upload/api/`, `/mme/api/`, `/beacon/`) so DRF's `IsAuthenticated` can answer 401 instead. A plain Django
 `View` mounted under an exempt prefix is reachable anonymously (it usually 500s on `AnonymousUser`); new endpoints there must
 be `rest_framework.views.APIView` subclasses. Verify with an unauthenticated request - a 500 means the view is unprotected.
+`seqauto/views_rest.py:CapabilitiesView` stays at `/seqauto/api/v1/capabilities` rather than `/api/v1/`: VG3 (`vg3_sapath_prod`) only
+exempts the app prefixes, so there `/api/v1/capabilities` redirects to the login page (a 200 of HTML to a client that follows
+redirects) while the seqauto path is a clean 404 a client can read as "legacy server".

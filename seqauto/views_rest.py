@@ -74,7 +74,14 @@ from upload.models import UploadedFileTypes
 
 # The client contract: each name is a fact about this codebase a client may rely on. Append one in the same
 # change as a client-visible feature, and keep it while this endpoint exists.
-API_FEATURES = ()
+API_FEATURES = (
+    "patients",
+    "specimen_measures",
+    "link_extraction",
+    "upload_status",
+    "joint_called_vcf_cross_run",
+    "upload_metadata",
+)
 
 # Import factories the server drives itself, rather than files a client uploads (UploadedFileTypes names, lower case)
 INTERNAL_UPLOAD_FILE_TYPES = frozenset({
