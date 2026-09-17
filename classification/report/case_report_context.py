@@ -182,26 +182,10 @@ def amp_tier(record: ClassificationModification) -> tuple[str, list[str]]:
     return short, []
 
 
-# The RNA splice caller of the TSO 500 pipeline (snpdb/migrations/0204_vcf_source_settings_splicegirl.py).
-# Its calls import as ordinary <DEL> variants with coordinates and a c.HGVS, so the file they came off
-# is what says the event is a splicing one
-SPLICE_CALLER_SOURCE_PATTERN = re.compile(r"^SpliceGirl")
-
-
-def _is_splice_call(record: ClassificationModification) -> bool:
-    """ Everything in a SpliceGirl VCF is a splice event - the pipeline runs it for nothing else. A
-        classification with no sample link has nothing to go on, and reads as a small variant """
-    if sample := record.classification.sample:
-        return bool(SPLICE_CALLER_SOURCE_PATTERN.match(sample.vcf.source or ""))
-    return False
-
-
 def _kind_and_alteration(record: ClassificationModification) -> tuple[str, str]:
-    """ The caller the classification came off says a splice call outright, as a gene-level alt does
-        for a fusion or a copy number call; otherwise the variant_class evidence key is what a
-        classification with no resolved variant has to go on """
-    if _is_splice_call(record):
-        return ReportVariantKind.SPLICE, Alteration.SPLICE
+    """ A gene-level alt says outright what the event is - a fusion, a copy number call or a splice
+        junction; otherwise the variant_class evidence key is what a classification with no resolved
+        variant has to go on """
 
     variant = record.classification.variant
     if variant is not None and variant.is_gene_level:
@@ -213,6 +197,8 @@ def _kind_and_alteration(record: ClassificationModification) -> tuple[str, str]:
                 return ReportVariantKind.COPY_NUMBER, Alteration.AMPLIFICATION
             if kind_alt == GeneLevelSymbolicAlt.LOSS:
                 return ReportVariantKind.COPY_NUMBER_LOSS, Alteration.AMPLIFICATION
+            if kind_alt == GeneLevelSymbolicAlt.SPLICE:
+                return ReportVariantKind.SPLICE, Alteration.SPLICE
 
     variant_class = record.get(SpecialEKeys.VARIANT_CLASS)
     if variant_class == VariantClass.COPY_NUMBER_GAIN.label:

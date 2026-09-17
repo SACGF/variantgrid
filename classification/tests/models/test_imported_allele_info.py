@@ -1,6 +1,6 @@
 from unittest.mock import patch
 
-from django.test import TestCase
+from django.test import TestCase, override_settings
 
 from annotation.fake_annotation import get_fake_annotation_version
 from classification.models import ImportedAlleleInfo
@@ -18,6 +18,12 @@ from snpdb.models import (
     Sequence,
     Variant,
 )
+
+
+class ImportedAlleleInfoValidationTagsTest(TestCase):
+    def test_no_tags_renders_as_no_issues(self):
+        """ the grid reads the column raw, so a record validated before it had anything to validate hits None """
+        self.assertEqual(ImportedAlleleInfoValidation.validation_tags_list_from_dict(None), [])
 
 
 class ImportedAlleleInfoStatusTest(TestCase):
@@ -101,6 +107,59 @@ class ImportedAlleleInfoValidationTest(TestCase):
         self.assertEqual(set(liftover.values()), {"W"})
         self.assertTrue(ImportedAlleleInfoValidation.should_include(validation_tags))
 
+    def _gene_level_allele_info(self, imported_c_hgvs: str, coordinate: str, **kwargs) -> ImportedAlleleInfo:
+        allele_info = self._allele_info(imported_c_hgvs=imported_c_hgvs, **kwargs)
+        allele_info.variant_coordinate = coordinate
+        return allele_info
+
+    def test_gene_level_is_not_a_c_hgvs_submission(self):
+        """ the value arrives in imported_c_hgvs but names genes, so nothing may expect a transcript of it """
+        allele_info = self._gene_level_allele_info("BRCA2::PICALM", "GENE_LEVEL:1101-1101 <FUSION:HGNC:15514>")
+        self.assertTrue(allele_info.is_gene_level)
+        self.assertFalse(allele_info.imported_as_c_hgvs)
+
+    def test_gene_level_without_a_coordinate_still_reads_as_gene_level(self):
+        """ a record whose gene turned out to be a typo has no coordinate to read, so the shape of the
+            imported value has to answer - or it would be reported as a broken HGVS """
+        allele_info = self._allele_info(imported_c_hgvs="ARHGEF::TP53")
+        allele_info.variant_coordinate = None
+        self.assertTrue(allele_info.is_gene_level)
+        self.assertFalse(allele_info.imported_as_c_hgvs)
+
+    def test_gene_level_that_did_not_resolve_says_so(self):
+        """ the value names genes, so the error is about the genes rather than about a transcript """
+        allele_info = self._allele_info(imported_c_hgvs="ARHGEF::TP53")
+        allele_info.variant_coordinate = None
+        general = allele_info._calculate_validation()["general"]
+        self.assertEqual({"gene_level_unresolved": "E"}, general)
+
+    def test_gene_level_resolved_in_both_builds_is_included(self):
+        """ a gene-level variant sits on no transcript, so its ResolvedVariantInfo has no c.HGVS - the build
+            check has to track the variant the way a g.HGVS submission does, or it can never be included """
+        allele_info = self._gene_level_allele_info(
+            "ARV7", "GENE_LEVEL:644-644 <SPLICE:HGNC:644:V7>",
+            grch37=self._resolved(GenomeBuild.grch37()),
+            grch38=self._resolved(GenomeBuild.grch38()))
+        validation_tags = allele_info._calculate_validation()
+        self.assertEqual(validation_tags, {})
+        self.assertTrue(ImportedAlleleInfoValidation.should_include(validation_tags))
+
+    def test_gene_level_matched_displays_as_resolved(self):
+        """ a grid finding no c.HGVS on either build must not call a matched gene-level variant unresolved """
+        grch37, grch38 = GenomeBuild.grch37(), GenomeBuild.grch38()
+        allele_info = self._gene_level_allele_info(
+            "ARV7", "GENE_LEVEL:644-644 <SPLICE:HGNC:644:V7>", grch37=self._resolved(grch37))
+        display = allele_info.matched_without_c_hgvs_display(grch38)
+        self.assertEqual("ARV7", display.full_hgvs)
+        self.assertEqual(grch37, display.genome_build)
+        self.assertTrue(display.is_normalised)
+        self.assertFalse(display.is_desired_build)
+
+        self.assertIsNone(self._allele_info(imported_c_hgvs=self.C_HGVS_38).matched_without_c_hgvs_display(grch38))
+        with_c_hgvs = self._allele_info(imported_c_hgvs=self.C_HGVS_38,
+                                        grch38=self._resolved(grch38, c_hgvs=self.C_HGVS_38))
+        self.assertIsNone(with_c_hgvs.matched_without_c_hgvs_display(grch38))
+
     def test_unsupported_transcript_still_errors(self):
         allele_info = self._allele_info(
             imported_c_hgvs="NX_000059.4(BRCA2):c.1234A>G",
@@ -129,6 +188,23 @@ class ImportedAlleleInfoValidationTest(TestCase):
             grch37=self._resolved(GenomeBuild.grch37()),
             grch38=self._resolved(GenomeBuild.grch38(), c_hgvs=self.C_HGVS_38, transcript_version_id=2))
         self.assertEqual(allele_info._calculate_validation()["builds"], {"missing_37": "W"})
+
+
+class ImportedAlleleInfoGeneLevelDisabledTest(TestCase):
+    """ With gene-level variants off, a value naming genes is just a c.HGVS that fails to parse """
+
+    @override_settings(VARIANT_GENE_LEVEL_ENABLED=False)
+    def test_fusion_string_fails_as_an_hgvs(self):
+        allele_info = ImportedAlleleInfo.get_or_create(
+            imported_c_hgvs="BCR::ABL1",
+            imported_genome_build_patch_version=GenomeBuildPatchVersion.get_unspecified_patch_version_for(
+                GenomeBuild.grch38()))
+        self.assertIsNone(allele_info.variant_coordinate)
+        self.assertEqual(ImportedAlleleInfoStatus.FAILED, allele_info.status)
+        self.assertFalse(allele_info.is_gene_level)
+        general = allele_info.latest_validation.validation_tags["general"]
+        self.assertIn("cant_resolve_to_variant_coordinate", general)
+        self.assertNotIn("gene_level_unresolved", general)
 
 
 class ResolvedVariantInfoCNVTest(TestCase):

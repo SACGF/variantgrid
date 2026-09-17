@@ -93,6 +93,7 @@ class ExtractionArrivalOrderTest(ExtractionMatchingTestBase):
         sample.refresh_from_db()
         self.assertEqual(sample.extraction, extraction)
         self.assertEqual(sample.extraction_match_status, MatchStatus.MATCHED)
+        self.assertEqual(sample.patient, self.patient)
 
     def test_order_c_link_call_after_the_vcf(self):
         """ link_samples_and_vcfs_to_sequencing runs once, at import - a later link call has no path
@@ -115,6 +116,19 @@ class ExtractionArrivalOrderTest(ExtractionMatchingTestBase):
         sample.refresh_from_db()
         self.assertEqual(sample.extraction, extraction)
         self.assertEqual(sample.extraction_match_status, MatchStatus.MATCHED)
+        self.assertEqual(sample.patient, self.patient)
+
+    def test_a_patient_already_set_is_not_replaced_by_the_extraction(self):
+        other_patient = Patient.objects.create(first_name="OTHER", last_name="PATIENT")
+        vcf = self._import_vcf({"extraction": "2600000001C"})
+        sample = self._sample(vcf)
+        sample.patient = other_patient
+        sample.save()
+
+        self._create_extraction()
+        reconcile_pending_extractions()
+        sample.refresh_from_db()
+        self.assertEqual(sample.patient, other_patient)
 
     def test_a_matched_row_is_left_alone(self):
         extraction = self._create_extraction()

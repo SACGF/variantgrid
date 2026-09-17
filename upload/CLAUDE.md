@@ -61,6 +61,24 @@ Gotchas:
   rewritten onto the gene-level contig - the caller's segment is the panel's target window, not the event, so it is
   never stored as a Variant (tasks/import_gene_level_cnv_task.py, @see snpdb.gene_level_variants). A file naming a gene
   on partial calls (DragenExonCNV's `GENE=`) is not a segment field and keeps importing as coordinate SVs.
+- A file type gated by a setting overrides `import_task_factories/import_task_factory.py:ImportTaskFactory.enabled`;
+  a disabled factory is left out of `get_import_task_factories`, so it is neither picked for an upload nor listed by the
+  capabilities endpoint. The four gene-level factories return `settings.VARIANT_GENE_LEVEL_ENABLED`, and with it off a
+  `SEGID` CNV VCF imports as an ordinary VCF on its written coordinates.
+- A TSO 500 pair's CombinedVariantOutput tsv is the only variant source for its `[Splice Variants]` section
+  (import_task_factories/import_task_factories.py:DragenTSO500CombinedVariantOutputImportTaskFactory,
+  tasks/import_dragen_tso500_combined_variant_output_task.py). Each row becomes a gene-level Variant whose alt carries
+  the junction's label (@see genes.gene_splice); the file's fusions, small variants and copy number calls are the
+  lossy copies of what the arm files carry, so they are not sources. The file declares no genome build, so one is
+  declared at upload or comes off the `^DRAGEN TSO500 CombinedVariantOutput` VCFSourceSettings row.
+- The rest of that file is the pair's identity, written after data insertion by
+  tasks/import_dragen_tso500_combined_variant_output_task.py:DragenTSO500CombinedVariantOutputInsertTask
+  (tso500/dragen_combined_variant_output_records.py). `[Analysis Details]` names the Patient (`Pair ID`), the Specimen
+  (the ten-digit accession inside each sample ID) and the two Extractions (its container suffix), created when absent;
+  the DNA/RNA sample IDs are exact `Sample.vcf_sample_name` and `SequencingSample.sample_name`, which links both arms'
+  samples to their extraction and the splice VCF to its sequencing run without seqauto's filename matching. `[TMB]`,
+  `[MSI]` and `[GIS]` become the five patients/models.py:SpecimenMeasure rows. None of it fails the import - a chain
+  that cannot be made is a SimpleVCFImportInfo message, since a splice call is worth having unaccessioned.
 - Failure is one-way: UploadStep.error_exception → upload/models/models.py:UploadPipeline.error sets ERROR, marks the
   VCF/samples ImportStatus.ERROR, logs an Event and reports to Rollbar. Later steps see status != PROCESSING and mark
   themselves SKIPPED; BulkGenotypeVCFProcessor.check_pipeline_for_failures bails mid-file. Running steps are not killed.
@@ -76,6 +94,12 @@ Gotchas:
 - Queues (celery_settings.py:CELERY_TASK_ROUTES, keyed by dotted class path): web_workers reads uploaded files,
   variant_id_single_worker inserts variants and zygosity counts, scheduling_single_worker runs
   schedule_pipeline_stage_steps; everything else lands on db_workers.
+- The retry button (upload/views/views.py:upload_retry_import) only shows for the file's owner or a superuser, with the
+  input file still on disk, UPLOAD_ENABLED, and the URL visible (Shariant hides it). `manage.py reload_imports` is the
+  way in without it - `--uploaded_file_type`, `--status`, `--upload_pipeline_id`, `--dry-run`. An import whose failure
+  was before UploadPipeline.objects.create has only an orphan FileUpload to show for itself and nothing to reload;
+  classification imports get back in through `manage.py classification_rematch_stuck`, which re-derives the coordinates
+  and runs new pipelines.
 - settings.UPLOAD_ENABLED=False makes InsertUnknownVariantsTask raise; IMPORT_PROCESSING_DELETE_TEMP_FILES_ON_SUCCESS
   wipes the processing dir on success, so inspect a failed pipeline's files before retrying it.
 - upload/tasks/vcf/import_vcf_step_task.py:pipeline_success_task is the only thing that closes a VCF pipeline, and it is

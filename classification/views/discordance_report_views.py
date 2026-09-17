@@ -25,7 +25,8 @@ from classification.models import (
     ClinicalContextChangeData,
     ClinicalContextRecalcTrigger,
     DiscordanceReportClassification,
-    ClassificationFlagTypes, ClinicalContextChangeData, ClinicalContextRecalcTrigger, Overlap, OverlapType, \
+    Overlap,
+    OverlapType,
     classification_flag_types,
     discordance_change_signal, EvidenceKeyMap,
 )

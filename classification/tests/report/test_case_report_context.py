@@ -150,28 +150,25 @@ class ReportVariantKindTest(TestCase):
 
 
 class SpliceCallTest(TestCase):
-    """ A SpliceGirl call imports as an ordinary <DEL> variant with coordinates and a c.HGVS, so the
-        VCF it came off is the only thing that says the event is a splicing one """
+    """ A splice call is a gene-level variant whose alt names the junction, so the record says what
+        it is without consulting the caller it came off """
 
-    def test_a_call_off_the_splice_caller_is_a_splicing_variant(self):
-        splice = fake_report_variant("MET", sample=fake_sample("SpliceGirl 1.0.0.614"),
-                                     splice_label="MET exon 14 skipping")
+    def test_a_splice_alt_is_a_splicing_variant(self):
+        splice = fake_report_variant("MET", splice_label="MET exon 14 skipping",
+                                     variant=fake_gene_level_variant("<SPLICE:HGNC:7029:ex14skip>"))
         self.assertEqual(splice.kind, ReportVariantKind.SPLICE)
         self.assertEqual(splice.alteration, Alteration.SPLICE)
 
-    def test_another_caller_is_a_small_variant(self):
-        dna = fake_report_variant("MET", sample=fake_sample("DRAGEN 4.2.4"))
+    def test_a_call_off_the_splice_caller_vcf_is_a_small_variant(self):
+        """ A SpliceGirl VCF imports as coordinate <DEL> variants, which print as small variants """
+        dna = fake_report_variant("MET", sample=fake_sample("SpliceGirl 1.0.0.614"))
         self.assertEqual(dna.kind, ReportVariantKind.SMALL_VARIANT)
         self.assertEqual(dna.alteration, Alteration.VARIANT)
 
-    def test_a_classification_with_no_sample_is_a_small_variant(self):
-        """ Nothing says what the record is, so it prints as it did before the splice kind existed """
-        self.assertEqual(fake_report_variant("MET").kind, ReportVariantKind.SMALL_VARIANT)
-
     def test_the_label_the_scientist_typed_reaches_the_json(self):
         """ "MET exon 14 skipping" is the lab's name for the event - it is the JSON's description """
-        splice = fake_report_variant("MET", sample=fake_sample("SpliceGirl 1.0.0.614"),
-                                     splice_label="MET exon 14 skipping")
+        splice = fake_report_variant("MET", splice_label="MET exon 14 skipping",
+                                     variant=fake_gene_level_variant("<SPLICE:HGNC:7029:ex14skip>"))
 
         as_dict = context_as_dict(ReportContext(
             source_level="S", variants=[splice], kind_groups=[], tier_groups=[],

@@ -35,6 +35,7 @@ from upload.views.views_json import _get_basic_uploaded_file_context, get_file_d
 
 UPLOADED_FILE_CONTEXT = {UploadedFileTypes.VCF: "uploaded_vcf",
                          UploadedFileTypes.DRAGEN_TSO500_ALL_FUSIONS: "uploaded_vcf",
+                         UploadedFileTypes.DRAGEN_TSO500_COMBINED_VARIANT_OUTPUT: "uploaded_vcf",
                          UploadedFileTypes.GENE_LIST: "uploaded_gene_list"}
 
 

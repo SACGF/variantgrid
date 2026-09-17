@@ -31,29 +31,32 @@ class TestCopyNumberString(GeneFusionTestCase):
         """ 'deletion' is input only - as output it reads as a coordinate event """
         for imported, canonical in [("EGFR gain", "EGFR amplification"),
                                     ("EGFR deletion", "EGFR loss")]:
-            self.assertEqual(canonical, resolve_gene_copy_number_string(imported).canonical_str)
+            self.assertEqual(canonical, resolve_gene_copy_number_string(imported).resolved.canonical_str)
 
     def test_an_old_symbol_resolves_to_the_approved_one(self):
         self.assertEqual("SEPTIN14 amplification",
-                         resolve_gene_copy_number_string("SEPT14 amp").canonical_str)
+                         resolve_gene_copy_number_string("SEPT14 amp").resolved.canonical_str)
 
     def test_a_gene_we_do_not_know_mints_nothing(self):
-        """ Otherwise any two words would become a copy number event """
-        self.assertIsNone(resolve_gene_copy_number_string("NOTAGENE amplification"))
-        self.assertIsNone(resolve_gene_copy_number_string("not a copy number event"))
+        """ Otherwise any two words would become a copy number event - the unknown gene is the
+            reason the record ends up carrying """
+        resolution = resolve_gene_copy_number_string("NOTAGENE amplification")
+        self.assertFalse(resolution)
+        self.assertEqual("gene 'NOTAGENE' is not a symbol we know", resolution.reason)
+        self.assertFalse(resolve_gene_copy_number_string("not a copy number event").recognised)
 
     def test_resolves_to_the_coordinate_the_loader_writes(self):
         """ A classification target and the loader put the same coordinate through the pipeline, so
             both arrive at one Variant """
         from_loader = create_gene_copy_number_event("EGFR", GeneCopyNumberEventKind.GAIN,
                                                     resolver=self.resolver)
-        resolved = resolve_gene_copy_number_string("EGFR amplification")
+        resolved = resolve_gene_copy_number_string("EGFR amplification").resolved
         self.assertEqual(from_loader.variant.coordinate, resolved.variant_coordinate)
 
     def test_resolving_a_string_creates_no_variant(self):
         """ The Variant is the insert pipeline's to make - @see snpdb.gene_level_variants """
         before = GeneCopyNumberEvent.objects.count()
-        self.assertIsNotNone(resolve_gene_copy_number_string("EGFR amplification"))
+        self.assertTrue(resolve_gene_copy_number_string("EGFR amplification"))
         self.assertEqual(before, GeneCopyNumberEvent.objects.count())
 
 

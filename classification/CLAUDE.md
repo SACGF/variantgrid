@@ -121,18 +121,36 @@ Gotchas:
 - `kind_groups` always carries all five kinds, empty variants and all (the way the tiers are always printed), so a
   template can say "Gene Fusions - None detected". A Results Summary that skips a kind reads as though it wasn't looked for.
   The legacy TSO 500 report is the one exception, omitting Splicing Variants entirely when empty - the template decides.
-- What makes a classification a splicing variant is the VCF its sample came off, not anything on the record: a
-  SpliceGirl call imports as an ordinary `<DEL>` variant with coordinates and a c.HGVS
-  (report/case_report_context.py:SPLICE_CALLER_SOURCE_PATTERN). The printed name of the event ("MET exon 14
-  skipping") is the `splice_label` evidence key, which the scientist types - nothing in the call carries it.
 - An amplification carries two magnitudes and they are different quantities: `copy_number` is the caller's
   absolute count (VCF `CN`) and `fold_change` its ratio against the normal (VCF `SM` / `FC`). Both are
   autopopulated from the sample genotype, routed on `VCF.copy_number_field` by
   library/genomics/vcf_enums.py:VCFConstant.COPY_NUMBER_FIELD_IS_RATIO, so a record may hold either or both.
+- What kind of event the case report prints a record as comes off its gene-level alt
+  (`classification/report/case_report_context.py:_kind_and_alteration`) - a fusion, a copy number call or a splice
+  junction. A SpliceGirl VCF's own `<DEL>` records still read as small variants; a splice call is what the TSO 500
+  CombinedVariantOutput loaded. The printed name of the event ("MET exon 14 skipping") is the `splice_label` evidence
+  key, autopopulated from the junction's label through `genes/gene_splice.py:display_splice_label` - the panel's own
+  wording where a `genes/models/models_splice_event.py:SpliceEvent` names it, and the breakpoints written out
+  ("AR GRCh37 X:66905968-66914514") where nothing does, which is the prompt for the scientist to name it.
+- A gene-level classification target is named rather than given as HGVS: `models/classification_variant_info_models.py:ImportedAlleleInfo.resolve_gene_level`
+  runs the fusion, whole-gene copy number and splice string resolvers through `genes/gene_level_strings.py:resolve_gene_level_string`
+  before any HGVS conversion, and the value reaches them with its spaces already removed
+  (`ImportedAlleleInfo._tidy_input_value`), so `AR V7` arrives as `ARV7`. What takes that path is the *shape* of the
+  value (`genes/gene_level_strings.py:looks_gene_level`), so one whose gene turned out to be a typo fails as a
+  gene-level record - `gene_level_unresolved`, with the resolver's reason as its message - rather than as a broken
+  HGVS. A splice label shape has to be in `genes/gene_splice.py:SPLICE_STRING_PATTERN` to be recognised at all;
+  nothing has to be pre-registered beyond that. claude/research/classifications.md has the table of written forms.
+- With `VARIANT_GENE_LEVEL_ENABLED` off (Shariant), `genes/gene_level_strings.py:looks_gene_level` is always False, so
+  'BCR::ABL1' takes the HGVS path and fails as an HGVS - `cant_resolve_to_variant_coordinate`, never `gene_level_unresolved`.
 - A gene-level variant sits on no transcript, so `gene_symbol` is autopopulated from the event's GeneLevelId (a fusion's
   anchor first), which already holds the approved symbol the caller's MYCL1 resolved to
   (`autopopulate_evidence_keys/evidence_from_variant.py:get_evidence_fields_from_gene_level_event`) - the transcript path
   fills that key for everything else.
+- A gene-level record's validation must not be read as a c.HGVS submission: `imported_as_c_hgvs` returns False when
+  `ImportedAlleleInfo.is_gene_level`, because the named value ('ARV7') lands in `imported_c_hgvs` but sits on no
+  transcript. Otherwise `_calculate_validation` tags `transcript_type_not_supported` as "E" and `should_include` keeps
+  every gene-level record out of exports forever, and the per-build check demands a c.HGVS `ResolvedVariantInfo`
+  deliberately never writes for one.
 - A `case_field` can carry `prefill_key`: the build form starts that field from the named evidence key on the case's
   first classification that has one (SA Path's clinical indication), and its `default` otherwise.
 - report/__init__.py stays empty on purpose: models/classification_report_models.py imports report/template_validation.py

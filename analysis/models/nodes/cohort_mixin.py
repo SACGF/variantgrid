@@ -27,6 +27,10 @@ from upload.tso500.dragen_all_fusions_parser import (
     FUSION_OBSERVATIONS_INFO,
     format_fusion_observations,
 )
+from upload.tso500.dragen_combined_variant_output_parser import (
+    SPLICE_OBSERVATION_INFO,
+    format_splice_observation,
+)
 
 
 def _render_fusion_calls(cell: CellData) -> str:
@@ -35,6 +39,14 @@ def _render_fusion_calls(cell: CellData) -> str:
     if not (encoded := cell.value):
         return ""
     return format_fusion_observations(simplejson.loads(percent_decode_info_value(encoded)))
+
+
+def _render_splice_calls(cell: CellData) -> str:
+    """ The caller row this splice event was called from - the junction, the affected exon and the
+        reads that crossed it. @see upload.tso500.dragen_combined_variant_output_parser """
+    if not (encoded := cell.value):
+        return ""
+    return format_splice_observation(simplejson.loads(percent_decode_info_value(encoded)))
 
 
 def get_sample_annotation_kwargs(sample: Sample, **kwargs) -> dict:
@@ -366,12 +378,30 @@ class CohortMixin:
                 orderable=False, search=False, include_in_csv=True,
                 renderer=_render_fusion_calls, csv_rendered=True,
                 client_renderer='VariantGridFormat.fusionCalls'))
+
+        # The caller's own row for a splice junction - blank on everything that isn't a splice call,
+        # which is why the column only appears for a VCF carrying them
+        splice_cgcs = self._get_splice_calls_cohort_genotype_collections()
+        for cgc in splice_cgcs:
+            label = f"{cgc.cohort.get_vcf()} Splice calls" if len(splice_cgcs) > 1 else "Splice calls"
+            extra_columns.append(RichColumn(
+                key=f"{cgc.cohortgenotype_alias}__info__{SPLICE_OBSERVATION_INFO}",
+                label=label, width=90,
+                orderable=False, search=False, include_in_csv=True,
+                renderer=_render_splice_calls, csv_rendered=True))
         return extra_columns
 
     def _get_fusion_calls_cohort_genotype_collections(self) -> list:
         """ The genotype collections whose VCF carries fusion observations. Nodes spanning VCFs override """
+        return self._cohort_genotype_collections_with_info(FUSION_OBSERVATIONS_INFO)
+
+    def _get_splice_calls_cohort_genotype_collections(self) -> list:
+        """ The genotype collections whose VCF carries splice observations. Nodes spanning VCFs override """
+        return self._cohort_genotype_collections_with_info(SPLICE_OBSERVATION_INFO)
+
+    def _cohort_genotype_collections_with_info(self, identifier: str) -> list:
         if cgc := self.cohort_genotype_collection:
-            if VCFInfo.objects.filter(vcf=cgc.cohort.get_vcf(), identifier=FUSION_OBSERVATIONS_INFO).exists():
+            if VCFInfo.objects.filter(vcf=cgc.cohort.get_vcf(), identifier=identifier).exists():
                 return [cgc]
         return []
 

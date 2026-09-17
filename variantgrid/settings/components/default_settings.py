@@ -693,6 +693,9 @@ USER_SETTINGS_SHOW_GROUPS = True
 SQL_BATCH_INSERT_SIZE = 50000
 SQL_SCRIPTS_DIR = os.path.join(BASE_DIR, "dbscripts")
 SITE_NAME = "VariantGrid"
+# Bump when cutting the vg<major>.0 release tag; VARIANTGRID_VERSION counts commits on from the latest vg<major>.* tag
+VARIANTGRID_MAJOR_VERSION = 4
+VARIANTGRID_VERSION = Git(BASE_DIR).version(VARIANTGRID_MAJOR_VERSION)
 SITE_SHORT_NAME = "VG"  # Prefixes page titles, where there's no room for the full name
 SITE_DESCRIPTION = "VariantGrid - genomic variant curation and classification platform"
 
@@ -892,7 +895,7 @@ SPECTACULAR_SETTINGS = {
     'TITLE': 'VariantGrid API',
     'DESCRIPTION': 'REST API for VariantGrid - variant database, annotation and classification platform. '
                    'Authenticate with a session, HTTP basic auth, or a token from your user profile page.',
-    'VERSION': '4.0.0',
+    'VERSION': VARIANTGRID_VERSION,
     'SERVE_INCLUDE_SCHEMA': False,
     'SERVE_PUBLIC': True,  # list all endpoints in the schema regardless of viewer permissions
     'SERVE_PERMISSIONS': ['rest_framework.permissions.AllowAny'],
@@ -1276,6 +1279,12 @@ VARIANT_SYMBOLIC_ALT_VALID_TYPES = {VCFSymbolicAllele.CNV, VCFSymbolicAllele.DEL
 # This is for our internal storage in Variant records
 # See https://github.com/SACGF/variantgrid/issues/1344
 VARIANT_SYMBOLIC_ALT_SVLEN_ALWAYS_POSITIVE = False
+
+# Gene-level variants - fusions, whole-gene copy number and splice events stored as Variants on the
+# fake contig (@see snpdb.gene_level_variants). Off, a value naming one is refused at the coordinate,
+# the search shortcuts and TSO 500 upload types are withheld and the gene-level annotation pipeline
+# is never scheduled.
+VARIANT_GENE_LEVEL_ENABLED = True
 
 VIEW_GENE_HOTSPOT_GRAPH_CLASSIFICATIONS = False
 VIEW_GENE_HOTSPOT_GRAPH_CLASSIFICATIONS_PREFER_CANONICAL_WITH_DIFF_VERSION = True

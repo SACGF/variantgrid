@@ -168,7 +168,7 @@ class GeneCopyNumberEvent(models.Model):
         if parsed is None:
             raise ValidationError(f"Variant alt '{self.variant.alt.seq}' is not a gene-level alt")
 
-        alt_kind, _namespace, gene_id = parsed
+        alt_kind, _namespace, gene_id, _label = parsed
         if alt_kind != GeneCopyNumberEventKind(self.kind).alt_kind:
             raise ValidationError(f"Variant alt '{self.variant.alt.seq}' does not match {self.kind=}")
         if gene_id != self.gene_id:

@@ -49,6 +49,9 @@ Patterns here:
   and comp het collapses to one unphased branch. The node editor's zygosity table is keyed on the plainest name that
   still tells its rows apart - `relative`, plus a `_<relationship>` and/or `_affected`/`_unaffected` suffix only where
   the mode reads differently - and `duonode_editor.html`'s `lookup()` tries those in the same order.
+- `analysis/models/nodes/filters/phenotype_node.py:PhenotypeNode.get_phenotype_source` is the one place the node's
+  patient-or-cohort choice is resolved - every term and gene lookup goes through it, and both models carry
+  `annotation/models/has_phenotype_description_mixin.py:HasPhenotypeDescriptionMixin` so the calls are identical.
 - Node editor = ModelForm subclass of `analysis/forms/forms_nodes.py:BaseNodeForm` + a `NodeView` subclass in views/nodes/
   with `model` set + template `analysis/node_editors/<classname>_editor.html`.
   `analysis/views/views_node.py:get_node_views_by_class` finds the view by `model`, so defining the class registers it;

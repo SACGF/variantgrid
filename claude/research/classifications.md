@@ -57,10 +57,29 @@ A classification never links to a Variant directly. `classification/models/class
 calls `classification/models/classification_variant_info_models.py:ImportedAlleleInfo.get_or_create` with exactly what
 the lab sent (c.HGVS or g.HGVS, transcript, genome build patch version), unique on an md5 of that text because Postgres
 cannot index a 3 kb HGVS (#753). The first time an ImportedAlleleInfo is created it derives a `VariantCoordinate` from the
-HGVS (or, since #1506, recognises a `BCR::ABL1` gene pair as a gene-level fusion) and records validation; then
+HGVS (or resolves it as a gene-level event, which a lab names rather than gives a coordinate for) and records
+validation; then
 `classification/models/variant_resolver.py:VariantResolver.queue_resolve` attaches it to a per-build
 `classification/models/classification.py:ClassificationImport` and, when the inserter finishes or 100 are queued, fires
 `classification/tasks/classification_import_task.py:process_classification_import_task`.
+
+The gene-level forms, tried in turn by `genes/gene_level_strings.py:resolve_gene_level_string` (reached from
+`classification/models/classification_variant_info_models.py:ImportedAlleleInfo.resolve_gene_level`) before any HGVS
+conversion is attempted, are:
+
+| Written | Resolves via | Since |
+|---|---|---|
+| `BCR::ABL1`, `CD74-ROS1` | `genes/gene_fusions.py:resolve_fusion_string` - both sides have to be genes we know | #1506 |
+| `EGFR amplification`, `PTEN loss` (`amp`, `gain`, `deletion`, `del` also accepted) | `genes/gene_copy_number.py:resolve_gene_copy_number_string` | #1836 |
+| `AR V7`, `AR-V7 splice variant`, `EGFRvIVa`, `MET exon 14 skipping`, `AR X_66905968_66914514` | `genes/gene_splice.py:resolve_splice_string` - every form canonicalised to one label (`genes/gene_splice.py:canonical_splice_label`), the gene has to be one we know, and the breakpoint form is read under the imported build | #1875, #1835 |
+
+Each answers with a `genes/gene_level_resolver.py:GeneLevelResolution`: an identity with a `variant_coordinate` of its
+own, so a gene-level event enters the database through the same insert pipeline a small variant does, or the reason the
+kind that recognised the string refused it, which becomes the record's message and its `gene_level_unresolved`
+validation tag. Which values take this path at all is the shape of the string
+(`genes/gene_level_strings.py:looks_gene_level`), so one naming a gene we don't know never reaches the HGVS converter.
+The imported value arrives with its spaces already removed (`ImportedAlleleInfo._tidy_input_value`), which is why the
+splice forms accept no space between gene and label.
 
 That task runs `classification/classification_import.py:process_classification_import`: known coordinates are matched in
 bulk through `VariantPKLookup`; unknown ones are written to a synthetic VCF and pushed through the ordinary upload

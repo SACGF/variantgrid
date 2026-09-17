@@ -121,7 +121,7 @@ class FakeClassification:
     @property
     def condition_resolution_obj(self) -> Optional[ConditionResolved]:
         if self.terms:
-            return ConditionResolved(terms=list(self.terms))
+            return ConditionResolved.from_uncounted_terms(terms=list(self.terms))
         return None
 
     def get(self, key):

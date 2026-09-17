@@ -2,7 +2,6 @@ from django.test import TestCase
 
 from classification.enums import AlleleOriginBucket, ShareLevel, SubmissionSource
 from classification.models import (
-    AlleleGrouping,
     AlleleOriginGrouping,
     Classification,
     ClassificationGrouping,
@@ -45,13 +44,12 @@ class AlleleMergeRehomingTestCase(TestCase):
         classification.save()
 
         allele_origin_grouping = AlleleOriginGrouping.objects.create(
-            allele_grouping=AlleleGrouping.objects.create(allele=allele),
+            allele=allele,
             allele_origin_bucket=AlleleOriginBucket.GERMLINE
         )
         grouping = ClassificationGrouping.objects.create(
             allele_origin_grouping=allele_origin_grouping,
             lab=self.lab,
-            allele_origin_bucket=AlleleOriginBucket.GERMLINE,
             share_level=ShareLevel.ALL_USERS,
             latest_classification_modification=modification
         )
@@ -69,4 +67,4 @@ class AlleleMergeRehomingTestCase(TestCase):
         entry = ClassificationGroupingEntry.objects.get(classification=classification)
         self.assertEqual(classification.allele, allele_a)
         self.assertEqual(classification.clinical_context.allele, allele_a)
-        self.assertEqual(entry.grouping.allele_origin_grouping.allele_grouping.allele, allele_a)
+        self.assertEqual(entry.grouping.allele_origin_grouping.allele, allele_a)

@@ -9,10 +9,15 @@
 {% load vcf_import_info_tags %}
 {% load vcf_history_trail_tags %}
 {% load cohort_sample_actions_tag %}
+{% load phenotype_tags %}
 
 {% block title %}{{ page_title }}{% endblock %}
 {% block head %}
 {{ block.super }}
+<script type="text/javascript" src="{% static 'js/patient_phenotypes.js' %}"></script>
+<script>
+    const patientPhenotypes = {{ patient_phenotypes|jsonify }};
+</script>
 {% if show_stats_tab %}
 <script type="text/javascript" src="{% static 'js/lib/plotly-custom-3.7.0.min.js' %}"></script>
 <script type="text/javascript" src="{% static 'js/plotly_helper.js' %}"></script>
@@ -184,9 +189,15 @@ $(document).ready(function() {
 
     addCreateProjectButtonAndForm();
 
+    $("tr.sample-row", "#sample-formset").each(function () {
+        const row = $(this);
+        $(".sample-phenotype", row).html(patientPhenotypeHtml(patientPhenotypes[row.attr("data-patient-id")]));
+    });
+
     $(".sample-patient select", "form#vcf-form").each(function () {
         const patientSelector = $(this);
         const patientLink = patientSelector.parents(".sample-patient").find("a.patient-link");
+        const phenotypeCell = patientSelector.parents("tr.sample-row").find(".sample-phenotype");
         function setPatientLink() {
             const pk = patientSelector.val();
             if (pk) {
@@ -196,7 +207,13 @@ $(document).ready(function() {
             }
         }
         setPatientLink();
-        patientSelector.change(setPatientLink);
+        patientSelector.change(function () {
+            setPatientLink();
+            // The column follows the select rather than waiting for Save
+            loadPatientPhenotype(patientPhenotypes, patientSelector.val(), function (phenotype) {
+                phenotypeCell.html(patientPhenotypeHtml(phenotype));
+            });
+        });
     });
 
 {% if has_write_permission %}
@@ -209,6 +226,13 @@ $(document).ready(function() {
         addCreatePatientButton(dialog, $(this), sampleName, $(this).parents(".sample-patient"));
     });
 {% endif %}
+
+    $("#add-sample-patient-phenotypes").click(function () {
+        const patientIds = $("tr.sample-row", "#sample-formset").map(function () {
+            return $(".sample-patient select", this).val() || $(this).attr("data-patient-id");
+        }).get();
+        addPatientPhenotypesToText($("#{{ cohort_phenotype_form.phenotype.auto_id }}"), patientIds, patientPhenotypes);
+    });
 
     drawLengthHistograms();
 
@@ -285,7 +309,11 @@ $(document).ready(function() {
                    {{ sample_zygosities|jsonify }}, {{ sample_names|jsonify }});
 {% endif %}
 {% if not vcf %}
-    new CohortMembershipEditor({{ membership_config|jsonify }}, {{ cohort_sample_rows|jsonify }}).init();
+    const membershipEditor = new CohortMembershipEditor({{ membership_config|jsonify }}, {{ cohort_sample_rows|jsonify }}, patientPhenotypes);
+    membershipEditor.init();
+    $("#add-sample-patient-phenotypes").click(function () {
+        addPatientPhenotypesToText($("#{{ cohort_form.phenotype.auto_id }}"), membershipEditor.memberPatientIds, patientPhenotypes);
+    });
 {% endif %}
 {% endblock %}
 
@@ -303,10 +331,11 @@ $(document).ready(function() {
         Underlying VCF data has been archived. Restore the parent VCF to enable editing.
     </div>
     {% endif %}
+    {# The phenotype editor lives in the Details tab and joins this POST through its form attribute #}
     <form id="cohort-form" method="post">
         {% csrf_token %}
         {% if has_write_permission %}
-            {{ cohort_form.name }}<button id='change-name' class="btn btn-primary">Change Name</button>
+            {{ cohort_form.name }}<button id='change-name' class="btn btn-primary">Save</button>
         {% else %}
             <b>Cohort:</b> {{ cohort.name }}
         {% endif %}
@@ -362,6 +391,11 @@ $(document).ready(function() {
                 </div>
             {% endif %}
 
+            {% if cohort_phenotype_form %}
+                <h3>Phenotype</h3>
+                {% include "snpdb/data/_cohort_phenotype.html" with phenotype_field=cohort_phenotype_form.phenotype %}
+            {% endif %}
+
             <h3>Samples</h3>
             {% include "snpdb/data/_cohort_samples_table.html" %}
 
@@ -409,6 +443,9 @@ $(document).ready(function() {
             </p>
             {% endif %}
         </fieldset>
+
+        <h3>Phenotype</h3>
+        {% include "snpdb/data/_cohort_phenotype.html" with phenotype_field=cohort_form.phenotype %}
 
         <h3>Samples</h3>
         {% include "snpdb/data/_cohort_samples_table.html" %}

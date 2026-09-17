@@ -25,6 +25,7 @@ from annotation.transcripts_annotation_selections import VariantTranscriptSelect
 from annotation.vcf_files.bulk_vep_vcf_annotation_inserter import VEP_SEPARATOR
 from classification.enums import SpecialEKeys, SubmissionSource
 from classification.models.evidence_key import EvidenceKey, EvidenceKeyMap
+from genes.gene_splice import SpliceEventVariant, get_splice_event_variant
 from genes.hgvs import HGVSMatcher
 from genes.models import GeneCopyNumberEvent, GeneFusion, GnomADGeneConstraint, TranscriptVersion
 from genes.models_enums import AnnotationConsortium
@@ -299,12 +300,17 @@ def get_evidence_fields_from_gene_level_event(variant: Variant) -> Optional[Auto
         return None
 
     event = GeneFusion.objects.filter(variant=variant).first() or \
-        GeneCopyNumberEvent.objects.filter(variant=variant).first()
+        GeneCopyNumberEvent.objects.filter(variant=variant).first() or \
+        get_splice_event_variant(variant)
     if event is None:
         return None
 
     data = AutopopulateData("gene-level event")
     data[SpecialEKeys.GENE_SYMBOL] = event.gene_level_ids[0].symbol_str
+    if isinstance(event, SpliceEventVariant):
+        # What the report calls the junction - the panel's own wording where a SpliceEvent names it,
+        # else the label written out (@see genes.gene_splice.display_splice_label)
+        data[SpecialEKeys.SPLICE_LABEL] = event.display
     return data
 
 

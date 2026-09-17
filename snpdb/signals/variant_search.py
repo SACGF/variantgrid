@@ -22,6 +22,7 @@ from genes.gene_copy_number import (
     find_gene_copy_number_events_for_string,
 )
 from genes.gene_fusions import find_gene_fusions_for_string
+from genes.gene_splice import SPLICE_STRING_PATTERN, find_splice_events_for_string
 from genes.models import MANE, BadTranscript, MissingTranscript, TranscriptVersion
 from genes.models_enums import AnnotationConsortium, MANEStatus
 from library.enums.log_level import LogLevel
@@ -866,7 +867,8 @@ GENE_FUSION_PATTERN = re.compile(r"^([A-Za-z0-9.]+)\s*(?:::|--|-)\s*([A-Za-z0-9.
     example=SearchExample(
         note="A gene fusion, named by its gene pair",
         examples=["BCR::ABL1", "CD74-ROS1"]
-    )
+    ),
+    enabled=settings.VARIANT_GENE_LEVEL_ENABLED,
 )
 def search_variant_gene_fusion(search_input: SearchInputInstance):
     """ Lookup only - searching must never mint a fusion identity.
@@ -884,13 +886,35 @@ def search_variant_gene_fusion(search_input: SearchInputInstance):
     example=SearchExample(
         note="A whole-gene copy number event, named by its gene",
         examples=["EGFR amplification", "PTEN loss"]
-    )
+    ),
+    enabled=settings.VARIANT_GENE_LEVEL_ENABLED,
 )
 def search_variant_gene_copy_number(search_input: SearchInputInstance):
     """ Lookup only - searching must never mint a copy number identity. 'amp', 'gain', 'deletion'
         and 'del' all find what is written out as 'amplification' / 'loss' """
     events = find_gene_copy_number_events_for_string(search_input.search_string)
     yield from _yield_gene_level_results(search_input, events, "Gene copy number")
+
+
+@search_receiver(
+    search_type=Variant,
+    pattern=SPLICE_STRING_PATTERN,
+    sub_name="Splice Event",
+    example=SearchExample(
+        note="A splice event, named by its gene and the junction's label",
+        examples=["AR V7", "MET exon 14 skipping"]
+    ),
+    enabled=settings.VARIANT_GENE_LEVEL_ENABLED,
+)
+def search_variant_splice_event(search_input: SearchInputInstance):
+    """ Lookup only - searching must never mint a splice identity. A label shape not in
+        SPLICE_STRING_PATTERN never reaches this, so widen the pattern when a new one is accepted.
+        A junction named by its breakpoints is a different junction in each build, so each build the
+        search covers is asked for its own label """
+    events = []
+    for genome_build in search_input.genome_builds:
+        events.extend(find_splice_events_for_string(search_input.search_string, genome_build=genome_build))
+    yield from _yield_gene_level_results(search_input, events, "Splice event")
 
 
 def _yield_gene_level_results(search_input: SearchInputInstance, events, label: str):

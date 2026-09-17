@@ -71,7 +71,9 @@ are separate facts - a depth-only caller has sample columns without a genotype. 
 
 **Cohort / CohortSample** - `snpdb/models/models_cohort.py:Cohort`, `CohortSample`. An ordered set of Samples. Every VCF has
 an automatic cohort of all its samples; custom cohorts pick across VCFs. Membership changes go through
-`Cohort.set_samples` (one version bump, one genotype rebuild), never a bulk update.
+`Cohort.set_samples` (one version bump, one genotype rebuild), never a bulk update. A Cohort also carries its own
+phenotype text matched to OntologyTerms the way a Patient's is (`annotation/models/has_phenotype_description_mixin.py:HasPhenotypeDescriptionMixin`),
+so the analysis Phenotype node can read terms from either.
 
 **CohortGenotypeCollection / CohortGenotype** - `snpdb/models/models_cohort.py:CohortGenotypeCollection`, `CohortGenotype`.
 Genotypes are packed one row per variant per cohort, in arrays indexed by `CohortSample.cohort_genotype_packed_field_index`;
@@ -201,6 +203,9 @@ User, later wins) read through `UserSettings.get_for_user`; holds the default bu
 user's chosen set; every variant grid builds its columns from them (`snpdb/grid_columns/custom_columns.py`).
 
 **Patient** - `patients/models.py:Patient` with phenotype text matched to OntologyTerms; a Sample may link to one.
+One patient's terms are `Patient.get_ontology_term_ids()`; many patients' at once (a samples table) is
+`annotation/models/models_phenotype_match.py:patient_phenotype_terms`, one query for the lot - the page-shaped,
+permission-filtered wrapper is `annotation/models/models_phenotype_match.py:patient_phenotypes_for_samples`.
 
 ## Pipelines and operations (upload, manual, flags)
 

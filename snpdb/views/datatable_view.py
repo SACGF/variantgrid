@@ -571,14 +571,6 @@ class DatatableConfig(Generic[DC]):
             return limit_value_size(sanitize_value(row.get(column.key)))
         return None
 
-    # def render_rows(self, rows: Iterable[CellData]) -> Iterator[dict]:
-    #     """ Raw .values() rows -> {column name: rendered value} """
-    #     for row in rows:
-    #         row_json = {rc.name: self.render_cell(row, rc) for rc in self.enabled_columns}
-    #         if row_css := self.row_css(row):
-    #             row_json["row_css"] = row_css
-    #         yield row_json
-
     def export_columns(self) -> list[RichColumn]:
         """ The columns the CSV/VCF export writes. Two columns writing the same raw value collapse to
             one - an action column (delete etc) shares its key with the column it acts on """
@@ -601,7 +593,8 @@ class DatatableConfig(Generic[DC]):
         if columns is None:
             columns = self.export_columns()
         for row in rows:
-            yield {rc.name: self.render_cell(row, rc) if rc.csv_rendered else sanitize_value(row.get(rc.key))
+            yield {rc.name: self.render_cell(CellData(all_data=row, key=rc.key), rc) if rc.csv_rendered
+                   else sanitize_value(row.get(rc.key))
                    for rc in columns}
 
     def iter_export_rows(self, qs: QuerySet[DC]) -> Iterator[dict]:
@@ -773,9 +766,7 @@ class DatatableConfig(Generic[DC]):
         data = []
 
         if self.server_calculate_mode == DatatableConfigQuerySetMode.COLUMNS:
-            # select out all columns but only send down data for enabled columns
-            all_columns = self.value_columns()
-            for row in qs.values(*all_columns):
+            for row in rows:
                 row_json = {}
                 for rc in self.enabled_columns:
                     value = self.render_cell(row=CellData(all_data=row, key=rc.key), column=rc)
@@ -816,9 +807,6 @@ def datatable_response(config: DatatableConfig, draw: Optional[str] = None) -> J
         total_records = total_display_records
 
     page_qs = config.paging(config.ordering(filtered_qs))
-    # rows = list(page_qs.values(*config.value_columns()))
-    # config.pre_render(page_qs, rows)
-
     rows = config.prepare_results(page_qs)
 
     data: JsonObjType = {
@@ -988,11 +976,8 @@ class DatabaseTableView(Generic[DC], MajorOperationViewMixin, JSONResponseView):
     def filter_queryset(self, qs: QuerySet[DC]) -> QuerySet[DC]:
         return self.config.apply_filters(qs)
 
-    # def prepare_results(self, qs: QuerySet[DC]):
-    #     # select out all columns but only send down data for enabled columns
-    #     rows = list(qs.values(*self.config.value_columns()))
-    #     self.config.pre_render(qs, rows)
-    #     return list(self.config.render_rows(rows))
+    def prepare_results(self, qs: QuerySet[DC]) -> list[JsonDataType]:
+        return self.config.prepare_results(qs)
 
     def handle_exception(self, e: BaseException):
         report_exc_info()

@@ -325,6 +325,13 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
             raise ValueError('Symbolic variants disabled via settings.')
         return value
 
+    @field_validator('chrom')
+    @classmethod
+    def validate_gene_level(cls, value):
+        if value == GENE_LEVEL_CONTIG_NAME and settings.VARIANT_GENE_LEVEL_ENABLED is False:
+            raise ValueError('Gene-level variants disabled via settings.')
+        return value
+
     @property
     def as_tuple(self) -> tuple:
         return self.chrom, self.position, self.ref, self.alt, self.svlen
@@ -408,10 +415,11 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
     @staticmethod
     def from_gene_level_match(match) -> 'VariantCoordinate':
         """ No genome build involved - a gene-level coordinate is the same on every build, and there
-            is no reference to read. @see snpdb.gene_level_variants """
+            is no reference to read. The alt is upper-cased like every other Sequence, so a splice
+            label written in its display case is the same coordinate. @see snpdb.gene_level_variants """
         # Explicit group numbers - the alt sub-pattern brings its own groups along
         return VariantCoordinate(chrom=GENE_LEVEL_CONTIG_NAME, position=int(match.group(1)),
-                                 ref=GENE_LEVEL_REF, alt=match.group(2), svlen=GENE_LEVEL_SVLEN)
+                                 ref=GENE_LEVEL_REF, alt=match.group(2).upper(), svlen=GENE_LEVEL_SVLEN)
 
     @staticmethod
     def from_string(variant_string: str, genome_build):
@@ -768,7 +776,8 @@ class Variant(PreviewModelMixin, models.Model):
         if abbreviate and not Sequence.allele_is_symbolic(alt):
             ref = Sequence.abbreviate(ref)
             alt = Sequence.abbreviate(alt)
-        vc = VariantCoordinate(chrom=chrom, position=position, ref=ref, alt=alt, svlen=svlen)
+        # Formatting only - a stored row still displays after a setting turns its kind of variant off
+        vc = VariantCoordinate.model_construct(chrom=chrom, position=position, ref=ref, alt=alt, svlen=svlen)
         return vc.format()
 
     @staticmethod
@@ -829,8 +838,9 @@ class Variant(PreviewModelMixin, models.Model):
     def coordinate(self) -> VariantCoordinate:
         locus = self.locus
         contig = locus.contig
-        return VariantCoordinate(chrom=contig.name, position=locus.position,
-                                 ref=locus.ref.seq, alt=self.alt.seq, svlen=self.svlen)
+        # A stored row was validated on the way in - @see format_tuple
+        return VariantCoordinate.model_construct(chrom=contig.name, position=locus.position,
+                                                 ref=locus.ref.seq, alt=self.alt.seq, svlen=self.svlen)
 
     @staticmethod
     def is_ref_alt_reference(ref, alt):

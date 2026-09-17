@@ -4,6 +4,7 @@
 {% load fieldset_tags %}
 {% load gene_copy_number_tags %}
 {% load gene_fusion_tags %}
+{% load gene_splice_tags %}
 {% load ui_utils %}
 {% load ui_help %}
 {% load settings_tags %}
@@ -517,6 +518,8 @@ function applyVariantValues() {
                     {% labelled label="Fusion" %}{% gene_fusion gene_fusion %}{% endlabelled %}
                 {% elif gene_copy_number_event %}
                     {% labelled label="Copy number" %}{% gene_copy_number gene_copy_number_event %}{% endlabelled %}
+                {% elif splice_event_variant %}
+                    {% labelled label="Splice" %}{% splice_event splice_event_variant %}{% endlabelled %}
                 {% else %}
                     {% labelled id="variant_coordinate" label="Variant Coordinate" value_css="variant-coordinate variant_coordinate" %}Loading...{% endlabelled %}
                 {% endif %}

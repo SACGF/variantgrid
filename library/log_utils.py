@@ -16,7 +16,6 @@ from logging import StreamHandler
 from re import Match
 from typing import Any, Optional, Union
 
-import markdown
 import requests
 import rollbar
 from django.conf import settings

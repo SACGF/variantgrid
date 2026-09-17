@@ -52,7 +52,7 @@ from patients.models import Patient
 from patients.models_enums import GnomADPopulation, SampleSourceLevel
 from patients.sample_grouping import SOURCE_LEVELS, get_patient_for_source
 from snpdb.forms import GenomeBuildAutocompleteForwardMixin
-from snpdb.models import Lab, Sample, Tag, VCFFilter
+from snpdb.models import Cohort, Lab, Sample, Tag, VCFFilter
 from snpdb.models.models_enums import AlleleOriginFilterDefault
 from snpdb.models.models_genome import Contig
 from uicore.widgets.date_widget import NativeDateInput
@@ -894,6 +894,12 @@ class PedigreeNodeForm(GenomeBuildAutocompleteForwardMixin, VCFSourceNodeForm):
 
 
 class PhenotypeNodeForm(BaseNodeForm):
+    """ `phenotype_source` carries "<patient|cohort>:<pk>" - one control rather than a patient select
+        and a cohort select, since the node reads exactly one of them
+        (@see analysis/models/nodes/filters/phenotype_node.py:PhenotypeNode.get_phenotype_source).
+        The choices are the ancestors the node validates against, so they are already permission
+        checked and small enough for a plain grouped Select. """
+    phenotype_source = forms.ChoiceField(required=False, label="Phenotype from")
     omim = forms.ModelMultipleChoiceField(required=False,
                                           queryset=OntologyTerm.objects.all(),
                                           widget=ModelSelect2Multiple(url='omim_autocomplete',
@@ -910,7 +916,7 @@ class PhenotypeNodeForm(BaseNodeForm):
 
     class Meta:
         model = PhenotypeNode
-        exclude = ANALYSIS_NODE_FIELDS
+        exclude = list(ANALYSIS_NODE_FIELDS) + ["patient", "cohort"]
         widgets = {
             "text_phenotype": TextInput(attrs={'placeholder': 'Phenotype text'}),
             'accordion_panel': HiddenInput(),
@@ -918,10 +924,49 @@ class PhenotypeNodeForm(BaseNodeForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['patient'].queryset = self.instance.get_patients_qs()
+        self.fields["phenotype_source"].choices = self._get_phenotype_source_choices()
+        self.fields["phenotype_source"].initial = self._get_phenotype_source_initial()
+
+    def _get_phenotype_source_choices(self) -> list:
+        choices = [("", "---------")]
+        if patients := list(self.instance.get_ancestor_patients_qs().order_by("pk")):
+            choices.append(("Patients", [(f"patient:{p.pk}", str(p)) for p in patients]))
+        if cohorts := self.instance.get_ancestor_cohorts():
+            cohort_choices = []
+            for cohort in cohorts:
+                label = cohort.name if cohort.phenotype else f"{cohort.name} (no phenotype)"
+                cohort_choices.append((f"cohort:{cohort.pk}", label))
+            choices.append(("Cohorts", cohort_choices))
+        return choices
+
+    def _get_phenotype_source_initial(self) -> str:
+        if self.instance.cohort:
+            return f"cohort:{self.instance.cohort_id}"
+        if self.instance.patient:
+            return f"patient:{self.instance.patient_id}"
+        return ""
+
+    def get_analysis_variable_field(self, field_name: str) -> str:
+        """ The picker stands in for whichever FK is set - that FK is what a template's
+            AnalysisVariable is keyed on, since populate_arguments sets node fields by name """
+        if field_name == "phenotype_source":
+            return "cohort" if self.instance.cohort else "patient"
+        return super().get_analysis_variable_field(field_name)
+
+    def _set_phenotype_source(self, node):
+        """ Unpack the picker into the node's patient / cohort - at most one of them is set """
+        value = self.cleaned_data.get("phenotype_source")
+        kind, _, pk = (value or "").partition(":")
+        if kind == "patient":
+            node._set_patient(Patient.objects.get(pk=pk))
+        elif kind == "cohort":
+            node._set_cohort(Cohort.objects.get(pk=pk))
+        else:
+            node._set_patient(None)
 
     def save(self, commit=True):
         node = super().save(commit=False)
+        self._set_phenotype_source(node)
 
         # TODO: I'm sure there's a way to get Django to handle this via save_m2m()
         ontology_term_set = self.instance.phenotypenodeontologyterm_set

@@ -13,6 +13,11 @@ from genes.gene_copy_number import (
     create_gene_copy_number_events_for_variants,
 )
 from genes.gene_level_resolver import GeneLevelNameResolver
+from genes.gene_splice import (
+    ResolvedSpliceEvent,
+    SpliceEventVariant,
+    canonical_splice_label,
+)
 from genes.models import GeneCopyNumberEvent, GeneCopyNumberEventKind
 from library.utils import sha256sum_str
 from snpdb.gene_level_variants import GENE_LEVEL_SVLEN
@@ -20,6 +25,8 @@ from snpdb.models import Contig, Locus, Sequence, Variant, VariantCoordinate
 
 
 def get_sequence(seq: str) -> Sequence:
+    """ Upper-cased, as every path that inserts a Sequence in production does """
+    seq = seq.upper()
     sequence, _ = Sequence.objects.get_or_create(seq=seq, defaults={"seq_sha256_hash": sha256sum_str(seq)})
     return sequence
 
@@ -47,3 +54,21 @@ def create_gene_copy_number_event(gene_name: str, kind: GeneCopyNumberEventKind,
     variant = create_gene_level_variant(event.variant_coordinate)
     create_gene_copy_number_events_for_variants(Variant.objects.filter(pk=variant.pk))
     return GeneCopyNumberEvent.objects.get(variant=variant)
+
+
+@transaction.atomic
+def create_splice_event_variant(gene_name: str, label: str,
+                                resolver: GeneLevelNameResolver = None) -> SpliceEventVariant:
+    """ ('AR', 'V7') -> the splice Variant, as the insert pipeline would have created it. The label
+        is canonicalised on the way in, as an import's is, so a fixture holds what a real one does.
+        A splice event has no row of its own, so this hands back the view of the Variant """
+
+    canonical = canonical_splice_label(label)
+    if canonical is None:
+        raise ValueError(f"'{label}' is not a splice label shape we accept")
+    if resolver is None:
+        resolver = GeneLevelNameResolver()
+    resolved_gene = resolver.resolve_gene(gene_name)
+    event = ResolvedSpliceEvent(gene=resolved_gene.gene_level_id, label=canonical)
+    variant = create_gene_level_variant(event.variant_coordinate)
+    return SpliceEventVariant(variant=variant, gene=event.gene, label=canonical)

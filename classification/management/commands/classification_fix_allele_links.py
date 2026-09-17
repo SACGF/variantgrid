@@ -33,5 +33,5 @@ class Command(BaseCommand):
             self.stdout.write(f"{num_mismatched} classifications would be re-homed")
             return
 
-        num_rehomed = rehome_classifications(classification_qs, force_recalc_text="allele merged (#1361)")
+        num_rehomed = rehome_classifications(classification_qs)
         self.stdout.write(f"Re-homed {num_rehomed} classifications")

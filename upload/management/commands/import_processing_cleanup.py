@@ -88,7 +88,10 @@ def _manual_variants_finished(pk: int) -> bool:
 
 
 def _classification_import_finished(pk: int) -> bool:
-    return _generated_input_finished(UploadedClassificationImport.objects.filter(classification_import_id=pk).first())
+    """ An import with gene-level records has a pipeline (and a scratch dir) per kind, so the dir is only
+        done with once every pipeline of that import is """
+    qs = UploadedClassificationImport.objects.filter(classification_import_id=pk)
+    return all(_generated_input_finished(uci) for uci in qs)
 
 
 def _somalier_vcf_extract_finished(pk: int) -> bool:
@@ -119,6 +122,7 @@ PK_OWNERS = {
     "liftover": _liftover_finished,
     "manual_variants": _manual_variants_finished,
     "classification_import": _classification_import_finished,
+    "classification_import_gene_level": _classification_import_finished,
     "somalier_vcf_extract": _somalier_vcf_extract_finished,
     "somalier_relate": _somalier_relate_finished,
     "gene_annotation": _gene_annotation_finished,

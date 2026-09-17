@@ -17,7 +17,11 @@ import re
 from dataclasses import dataclass
 from typing import Optional
 
-from genes.gene_level_resolver import GeneLevelNameResolver
+from genes.gene_level_resolver import (
+    GeneLevelNameResolver,
+    GeneLevelResolution,
+    unknown_gene_reason,
+)
 from genes.models import (
     GeneCopyNumberEvent,
     GeneCopyNumberEventKind,
@@ -85,24 +89,26 @@ def parse_gene_copy_number_string(copy_number_string: str) -> Optional[tuple[str
 
 
 def resolve_gene_copy_number_string(copy_number_string: str,
-                                    resolver: GeneLevelNameResolver = None) \
-        -> Optional[ResolvedGeneCopyNumberEvent]:
+                                    resolver: GeneLevelNameResolver = None) -> GeneLevelResolution:
     """ 'EGFR amplification' -> the identity it will be stored under, whose variant_coordinate goes
         through the VCF insert pipeline like any other coordinate.
 
-        The gene has to be one we already know, so an arbitrary word pair doesn't mint an identity.
+        The gene has to be one we already know, so an arbitrary word pair doesn't mint an identity -
+        and a gene we don't know is the reason the record carries.
         @see ImportedAlleleInfo for where a classification target comes in this way. """
 
     parsed = parse_gene_copy_number_string(copy_number_string)
     if parsed is None:
-        return None
+        return GeneLevelResolution.not_applicable()
 
     gene_name, kind = parsed
     if resolver is None:
         resolver = GeneLevelNameResolver()
-    if resolved_gene := resolver.resolve_gene(gene_name, allow_unknown=False):
-        return ResolvedGeneCopyNumberEvent(gene=resolved_gene.gene_level_id, kind=kind)
-    return None
+    resolved_gene = resolver.resolve_gene(gene_name, allow_unknown=False)
+    if resolved_gene is None:
+        return GeneLevelResolution.refused(unknown_gene_reason(gene_name))
+    return GeneLevelResolution.identity(
+        ResolvedGeneCopyNumberEvent(gene=resolved_gene.gene_level_id, kind=kind))
 
 
 def find_gene_copy_number_events_for_string(copy_number_string: str,
@@ -135,7 +141,7 @@ def create_gene_copy_number_events_for_variants(variant_qs) -> int:
     events = []
     for variant in variant_qs.filter(Variant.get_gene_level_q(), genecopynumberevent__isnull=True) \
                              .select_related("locus", "alt"):
-        alt_kind, _namespace, _gene_id = GeneLevelSymbolicAlt.parse(variant.alt.seq)
+        alt_kind, _namespace, _gene_id, _label = GeneLevelSymbolicAlt.parse(variant.alt.seq)
         kind = GeneCopyNumberEventKind.from_alt_kind(alt_kind)
         if kind is None:
             continue

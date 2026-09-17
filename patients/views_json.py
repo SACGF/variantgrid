@@ -3,6 +3,10 @@ from django.http import Http404
 from django.http.response import HttpResponse, JsonResponse
 from django.views.decorators.http import require_POST
 
+from annotation.models.models_phenotype_match import PatientPhenotypeTerms
+from annotation.models.models_phenotype_match import (
+    patient_phenotype_terms as bulk_patient_phenotype_terms,
+)
 from annotation.phenotype_matching import create_phenotype_description
 from library.utils import invert_dict
 from patients import forms
@@ -102,6 +106,15 @@ def create_patient(request):
         data["error"] = form.errors
 
     return JsonResponse(data)
+
+
+def patient_phenotype_terms(request, patient_id):
+    """ One patient's matched HPO / OMIM / MONDO terms - what a page asks for when a patient select changes """
+    patient = Patient.get_for_user(request.user, patient_id)
+    phenotype_terms = bulk_patient_phenotype_terms([patient]).get(patient.pk)
+    if phenotype_terms is None:
+        phenotype_terms = PatientPhenotypeTerms(text=patient.phenotype or "", terms={})
+    return JsonResponse(phenotype_terms.to_json())
 
 
 @require_POST

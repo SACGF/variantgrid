@@ -1,0 +1,74 @@
+DRAGEN TruSight Oncology 500 Analysis Software - Combined Variant Output										
+For Research Use Only. Not for use in diagnostic procedures.										
+										
+[Analysis Details]										
+Pair ID	C0000001									
+DNA Sample ID	ExampleSample_DNA_2600000001C									
+RNA Sample ID	ExampleSample_RNA_2600000001B									
+Output Date	2026-01-01									
+Output Time	00:00:00									
+Module Version	2.1.1									
+Pipeline Version	ruo-2.1.1.4									
+										
+[Sequencing Run Details]										
+NA										
+										
+[TMB]										
+Total TMB	7.1									
+Coding Region Size in Megabases	1.27									
+Number of Passing Eligible Variants	9									
+										
+[MSI]										
+Usable MSI Sites	121									
+Total MSI Sites Unstable	3									
+Percent Unstable MSI Sites	2.48									
+										
+[GIS]										
+Genomic Instability Score	31									
+Tumor Fraction	0.62									
+Ploidy	2.10									
+										
+[Gene Amplifications]										
+Gene	Fold Change									
+EPHB1	2.028									
+GSK3B	1.909									
+ATR	1.863									
+PIK3CB	1.842									
+GATA2	1.832									
+STAG1	1.744									
+										
+[Splice Variants]										
+Gene	Affected Exon	Breakpoint 1	Breakpoint 2	Splice Supporting Reads	Reference Reads Transcript					
+AR		chrX:66905968	chrX:66914514	27	573					
+EGFR	2-7	chr7:55087058	chr7:55223522	64	1					
+MET	14	chr7:116411708	chr7:116414934	91	1					
+										
+[Fusions]										
+Gene Pair	Breakpoint 1	Breakpoint 2	Fusion Supporting Reads	Gene 1 Reference Reads	Gene 2 Reference Reads					
+PVT1-MYC	chr8:128806980	chr8:128750494	7	2	4416					
+TPM3-NTRK1	chr1:154142876	chr1:156844361	159	0	2					
+LMNA-NTRK1	chr1:156100562	chr1:156844696	247	0	517					
+SLC45A3-BRAF	chr1:205649521	chr7:140494266	518	0	1070					
+EML4-ALK	chr2:42522654	chr2:29446394	75	749	9					
+PPARG/AC016683.6-PAX8	chr3:12421199	chr2:113992971	182	11	0					
+TFG-NTRK1	chr3:100451513	chr1:156844360	124	0	2					
+FGFR3-TACC3	chr4:1808661	chr4:1741429	98	9	0					
+FGFR3-BAIAP2L1	chr4:1808661	chr7:97991744	231	10	0					
+SLC34A2-ROS1;GOPC	chr4:25665950	chr6:117645578	59	0	0					
+CD74-ROS1;GOPC	chr5:149784243	chr6:117645578	96	2	0					
+EGFR-SEPT14	chr7:55268103	chr7:55863785	75	7	0					
+KIF5B-RET	chr10:32306071	chr10:43609927	339	2452	3					
+NCOA4-RET	chr10:51582937	chr10:43612030	61	0	81					
+CCDC6-RET	chr10:61665879	chr10:43612032	83	0	81					
+ETV6-NTRK3	chr12:12022900	chr15:88483984	142	0	0					
+TMPRSS2-ERG	chr21:42880006	chr21:39956867	620	1	1					
+										
+[Exon-Level CNVs]										
+Gene	Chromosome	Start	Stop	Affected Exon(s)	Fold Change	CNV Type				
+BRCA1	NA									
+BRCA2	NA									
+										
+[Small Variants]										
+Gene	Chromosome	Genomic Position	Reference Call	Alternative Call	Allele Frequency	Depth	P-Dot Notation	C-Dot Notation	Consequence(s)	Affected Exon(s)
+TNFRSF14	chr1	2488137	T	A	1.0	486	NP_003811.2:p.(Trp12Arg)	NM_003820.4:c.34T>A	missense_variant	1/8
+										

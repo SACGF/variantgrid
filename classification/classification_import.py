@@ -29,6 +29,18 @@ from upload.upload_processing import process_upload_pipeline
 # MAX_VCF_FIELD_LENGTH = 131072
 MAX_VCF_FIELD_LENGTH = 1000  # while maximum is much larger than this, it indicated a problem
 
+# FileUpload.name - what the upload listing shows for a classification import. The two pipelines an
+# import can run need different names or the listing shows the same row twice
+# (upload/migrations/0045_rename_gene_level_api_uploads.py renamed historical records)
+API_UPLOAD_NAME = 'Variants from API'
+GENE_LEVEL_API_UPLOAD_NAME = 'Gene-level Variants from API'
+
+# Each pipeline writes its VCF into a scratch dir of its own - UploadPipeline.remove_generated_input_file
+# deletes the whole dir when a pipeline finishes, taking a sibling's input with it if they share one.
+# Both are registered in upload/management/commands/import_processing_cleanup.py:PK_OWNERS
+SCRATCH_PREFIX = 'classification_import'
+GENE_LEVEL_SCRATCH_PREFIX = 'classification_import_gene_level'
+
 
 def _is_safe_for_vcf(variant_coordinate: VariantCoordinate) -> bool:
     if not all([variant_coordinate.chrom, variant_coordinate.position, variant_coordinate.ref, variant_coordinate.alt]):
@@ -105,11 +117,13 @@ def _classification_upload_pipeline(
     # * perform liftover to other builds
     # * set c_hgvs cache
     _run_insert_variants_pipeline(classification_import, ordinary, import_source,
-                                  UploadedFileTypes.VCF_INSERT_VARIANTS_ONLY, "classification_import.vcf")
+                                  UploadedFileTypes.VCF_INSERT_VARIANTS_ONLY, SCRATCH_PREFIX,
+                                  "classification_import.vcf", API_UPLOAD_NAME)
     if gene_level:
         _run_insert_variants_pipeline(classification_import, gene_level, import_source,
                                       UploadedFileTypes.GENE_LEVEL_INSERT_VARIANTS_ONLY,
-                                      "classification_import_gene_level.vcf")
+                                      GENE_LEVEL_SCRATCH_PREFIX, "classification_import_gene_level.vcf",
+                                      GENE_LEVEL_API_UPLOAD_NAME)
 
 
 def _run_insert_variants_pipeline(
@@ -117,9 +131,11 @@ def _run_insert_variants_pipeline(
         variant_coordinates: list[VariantCoordinate],
         import_source: ImportSource,
         file_type: UploadedFileTypes,
-        vcf_name: str):
+        scratch_prefix: str,
+        vcf_name: str,
+        upload_name: str):
     if variant_coordinates:
-        working_dir = get_import_processing_dir(classification_import.pk, "classification_import")
+        working_dir = get_import_processing_dir(classification_import.pk, scratch_prefix)
         vcf_filename = os.path.join(working_dir, vcf_name)
         used_chroms = set(vc.chrom for vc in variant_coordinates)
         # standard_only excludes the gene-level contig by role, so the allow list decides instead
@@ -131,7 +147,7 @@ def _run_insert_variants_pipeline(
 
     file_upload = FileUpload.objects.create(path=vcf_filename,
                                             import_source=import_source,
-                                            name='Variants from API',
+                                            name=upload_name,
                                             user=classification_import.user,
                                             file_type=file_type)
 
@@ -164,7 +180,7 @@ def variant_matching_dry_run(queryset: QuerySet[ImportedAlleleInfo]):
 
 
 def reattempt_variant_matching(user: User, queryset: QuerySet[ImportedAlleleInfo], clear_existing: bool = False):
-    """ @:returns (valid_record_count, invalid_record_count) """
+    """ @:returns the number of records queued for matching """
     from classification.models.variant_resolver import VariantResolver
     qs: QuerySet[ImportedAlleleInfo] = queryset.order_by('imported_genome_build_patch_version')
     variant_matcher = VariantResolver(user=user)

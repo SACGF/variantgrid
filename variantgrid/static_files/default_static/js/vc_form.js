@@ -198,6 +198,14 @@ const VCForm = (function() {
                 
         generateExportButtons() {
             let wrapper = $('<div>', {html: $('<h5>', {text:'Export as', class: 'mt-4'})});
+            if (this.reportEnabled && this.record.has_changes) {
+                // the report is rendered from the submitted version, not what the form is showing
+                const submitted = this.record.published_version ?
+                    ` (${moment(this.record.published_version * 1000).format('DD/MMM/YYYY HH:mm')})` : '';
+                $('<div>', {class: 'font-weight-bold text-danger mb-2', style: 'font-size:14px',
+                    html: `<i class="fas fa-exclamation-triangle text-warning"></i> The report is generated from the last submitted version${submitted}, so the unsubmitted changes above won't appear in it.`
+                }).appendTo(wrapper);
+            }
             let buttons = $('<div>', {class: 'btn-toolbar'}).appendTo(wrapper);
             let csvButton = $('<button>', {class:'btn btn-outline-primary btn-lg', id: 'export-csv', html: '<i class="fas fa-file-csv"></i> CSV', click: () => {this.csv()}});
             csvButton.appendTo(buttons);
@@ -1151,6 +1159,11 @@ const VCForm = (function() {
                             // to finish (if the auto-update kicked in).
                         } else {
                             elem.val(val);
+                            if (val && elem.attr('type') === 'date' && elem.val() === '') {
+                                // a date the browser's picker can't hold (the server warns on anything
+                                // but yyyy-mm-dd) - show it as free text so it stays visible and editable
+                                elem.attr('type', 'text').val(val);
+                            }
                             if (elem.refresh) {
                                 elem.refesh();
                             }
@@ -2324,15 +2337,10 @@ VCForm.format_condition = function(condition_json) {
     if (!condition_json) {
         return $('<span>', {text: "-", class:'no-value'});
     }
-    let dom = $('<div>');
-    let domUsed = false;
+    const termDoms = [];
     if (condition_json.resolved_terms) {
-
-        let first = true;
         for (let term of condition_json.resolved_terms) {
-            domUsed = true;
-            first = false;
-            $('<div>', {
+            termDoms.push($('<div>', {
                 class: 'ontology-term semicolon-sep',
                 html: [
                     $('<a>', {
@@ -2343,24 +2351,44 @@ VCForm.format_condition = function(condition_json) {
                     " ",
                     $('<span>', {text: term.name, class: 'term-name'})
                 ]
-            }).appendTo(dom);
+            }));
         }
     }
     if (condition_json.plain_text_terms) {
         for (let term of condition_json.plain_text_terms) {
-            domUsed = true;
-            $('<div>', {text: term, class:'ontology-term free-text semicolon-sep'}).appendTo(dom);
+            termDoms.push($('<div>', {text: term, class:'ontology-term free-text semicolon-sep'}));
         }
     }
 
-    if (!domUsed) {
+    if (!termDoms.length) {
         return $('<div>', {class: 'ontology-term free-text', text: condition_json.display_text});
+    }
+
+    const dom = $('<div>');
+    const MAX_VISIBLE_CONDITIONS = 5;
+    if (termDoms.length > MAX_VISIBLE_CONDITIONS) {
+        dom.append(termDoms.slice(0, MAX_VISIBLE_CONDITIONS));
+        $('<a>', {
+            class: 'show-more-conditions hover-link',
+            href: '#',
+            text: `+ ${termDoms.length - MAX_VISIBLE_CONDITIONS} more conditions`,
+            title: 'click to show all conditions'
+        }).appendTo(dom);
+        $('<div>', {class: 'hidden-conditions', style: 'display:none'}).append(termDoms.slice(MAX_VISIBLE_CONDITIONS)).appendTo(dom);
+    } else {
+        dom.append(termDoms);
     }
     if (condition_json.resolved_terms && condition_json.resolved_terms.length > 1 && condition_json.resolved_join) {
         $('<div>', {class: 'font-italic', text:condition_json.resolved_join === 'C' ? ' Co-occurring' : ' Uncertain'}).appendTo(dom);
     }
     return dom;
 };
+
+// grid cells are rendered as static HTML, so the show-more toggle needs a delegated handler
+$(document).on('click', '.show-more-conditions', function() {
+    $(this).hide().siblings('.hidden-conditions').show();
+    return false;
+});
 
 let VCTable = (function() {
     let VCTable = function() {};
