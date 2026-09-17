@@ -8,6 +8,7 @@ from django.urls import path
 import debug_toolbar
 
 from variantgrid import views
+from variantgrid.views_rest import CapabilitiesView
 
 
 admin.autodiscover()
@@ -30,6 +31,7 @@ urlpatterns = [
     path('terms/', include('termsandconditions.urls')),
     path('__debug__/', include(debug_toolbar.urls)),
     url('avatar/', include('avatar.urls')),
+    path('api/v1/capabilities', CapabilitiesView.as_view(), name='api_capabilities'),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
 if settings.USE_OIDC:

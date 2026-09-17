@@ -744,6 +744,7 @@ PUBLIC_PATHS = [
     r'^/classification/api/.*',  # REST framework used by command line tools
     r'^/seqauto/api/.*',
     r'^/upload/api/.*',
+    r'^/api/v1/capabilities$',  # API client probe - DRF answers 401 to anonymous
 ]
 
 
