@@ -787,6 +787,17 @@ STATICFILES_FINDERS = (
     'compressor.finders.CompressorFinder'
 )
 
+# Content-hashed static filenames (collectstatic writes staticfiles.json), so a changed file gets a new URL
+# rather than Cloudflare serving the old copy for hours. {% static %} raises for a file missing from the
+# manifest, so tests - which run without collectstatic - use the plain backend
+STORAGES = {
+    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "staticfiles": {
+        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage" if UNIT_TEST
+        else "django.contrib.staticfiles.storage.ManifestStaticFilesStorage",
+    },
+}
+
 # Needs to be unique and not checked into source control, so make
 # django_secret_key.txt in this dir (which is hidden via .gitignore)
 SECRET_KEY = get_or_create_django_secret_key(SETTINGS_DIR)

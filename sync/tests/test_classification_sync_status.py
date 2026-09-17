@@ -7,7 +7,6 @@ from classification.models.classification import Classification
 from classification.models.classification_variant_info_models import ImportedAlleleInfo
 from classification.tests.models.test_utils import ClassificationTestUtils
 from genes.tests.gene_level_test_utils import create_gene_level_variant
-from library.django_utils.unittest_utils import PLAIN_STATICFILES_STORAGES
 from snpdb.gene_level_variants import GENE_LEVEL_CONTIG_NAME, GENE_LEVEL_REF, GENE_LEVEL_SVLEN
 from snpdb.models import Lab, VariantCoordinate
 from sync.classification_sync_status import ClassificationSyncState, classification_sync_status
@@ -21,8 +20,7 @@ SYNC_DETAILS = {"test_shariant": {"host": REMOTE_HOST}}
 
 
 @override_settings(CLASSIFICATION_MATCH_VARIANTS=False,
-                   SYNC_DETAILS=SYNC_DETAILS,
-                   STORAGES=PLAIN_STATICFILES_STORAGES)
+                   SYNC_DETAILS=SYNC_DETAILS)
 class ClassificationSyncStatusTestCase(TestCase):
 
     def setUp(self):

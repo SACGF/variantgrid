@@ -25,9 +25,6 @@ from snpdb.tests.utils.fake_cohort_data import create_fake_duo, create_fake_quad
 
 
 class Test(URLTestCase):
-    """ Need to override settings as ManifestStaticFilesStorage expects staticfiles.json to exist
-        and contain the file asked. @see https://stackoverflow.com/a/51580328/295724
-    """
 
     @classmethod
     def setUpTestData(cls):

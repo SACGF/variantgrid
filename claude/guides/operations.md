@@ -71,9 +71,12 @@ migration, not a note in a PR. Annotation upgrades (new VEP, new columns) are th
 Caches: `CACHE_VERSION` in `default_settings.py` is the Redis key version - bump it after a change that makes cached values
 wrong. Process-level caches (`library/cache.py:timed_cache`, the caching model managers) only clear on restart.
 
-Static files: `manage.py collectstatic` writes `variantgrid/sitestatic/`; storage is Django's plain `StaticFilesStorage`
-(no manifest hashing), which is why CI runs tests without collectstatic and `library/django_utils/unittest_utils.py`
-overrides `STORAGES` to the plain backend. django-compressor bundles the `{% compress %}` blocks into `sitestatic/static/CACHE/`
+Static files: `manage.py collectstatic` writes `variantgrid/sitestatic/`. Storage is `ManifestStaticFilesStorage`, so
+`{% static %}` links the content-hashed names collectstatic records in its manifest, and a changed file gets a new URL - Cloudflare caches
+`/static/` for 4 hours, and a shift+reload doesn't get past it. With `DEBUG=False` a deployment that hasn't run collectstatic
+since a file was added 500s on any page linking it (`Missing staticfiles manifest entry`); `DEBUG=True` links the
+unhashed name. Under `manage.py test` (`UNIT_TEST`) the settings pick plain `StaticFilesStorage`, so tests need no
+collectstatic. (The manifest setting was lost in the Django 6 upgrade, when `STATICFILES_STORAGE` stopped being read.) django-compressor bundles the `{% compress %}` blocks into `sitestatic/static/CACHE/`
 and caches the rendered tag in Redis for 30 days under a key hashed from the source files' mtimes. With `DEBUG=True` those
 are the finders' source files, so `collectstatic --clear` leaves every page linking a deleted bundle (symptom: unstyled
 pages, an SVG icon filling its cell); deployments read the freshly collected copies and rebuild on their own. The migrator
