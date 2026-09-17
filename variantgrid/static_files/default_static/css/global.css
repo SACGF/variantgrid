@@ -2423,7 +2423,8 @@ nav ol.breadcrumb .breadcrumb-item a:hover,
 .hp,
 .hpo,
 .omim,
-.mondo .hgnc {
+.mondo,
+.hgnc {
   border: 3px solid white;
   margin: 0 4px 0 4px;
   border-radius: 3px;
