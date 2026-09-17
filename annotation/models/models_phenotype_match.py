@@ -1,18 +1,33 @@
 import re
+from collections import defaultdict
+from collections.abc import Iterable
+from dataclasses import dataclass
 
 from cache_memoize import cache_memoize
 from django.contrib.auth.models import User
 from django.db import models
-from django.db.models import Count, OuterRef, QuerySet, Subquery
+from django.db.models import Count, F, OuterRef, QuerySet, Subquery
 from django.db.models.deletion import CASCADE, SET_NULL
 
 from annotation.phenotype_matcher import get_ambiguous_acronym_denylist
 from library.constants import DAY_SECS
-from ontology.models import OntologyTerm, OntologyVersion
+from ontology.models import OntologyService, OntologyTerm, OntologyVersion
 from patients.models import Patient
+from snpdb.models import Cohort
 
 PATIENT_TPM_PATH = "patient_text_phenotype__phenotype_description__textphenotypesentence__text_phenotype__textphenotypematch"
 PATIENT_ONTOLOGY_TERM_PATH = PATIENT_TPM_PATH + "__ontology_term"
+
+# The same relation from the other end - TextPhenotypeMatch back to the patient it was matched for
+TPM_PATIENT_PATH = "text_phenotype__textphenotypesentence__phenotype_description__patienttextphenotype__patient"
+TPM_DESCRIPTION_TEXT_PATH = "text_phenotype__textphenotypesentence__phenotype_description__original_text"
+
+# The 3 ontologies a phenotype description matches to, labelled as OntologyTerm.split_hpo_omim_mondo_as_dict has them
+PHENOTYPE_ONTOLOGY_SERVICE_LABELS = {
+    OntologyService.HPO: "HPO",
+    OntologyService.OMIM: "OMIM",
+    OntologyService.MONDO: "MONDO",
+}
 
 
 def filter_ambiguous_acronym_matches(matches: list["TextPhenotypeMatch"]) -> list["TextPhenotypeMatch"]:
@@ -197,6 +212,68 @@ class PatientTextPhenotype(models.Model):
 
     def __str__(self):
         return f"{self.patient}: {self.phenotype_description}"
+
+
+class CohortTextPhenotype(models.Model):
+    """ Used to link cohort & phenotype - the shared condition a cohort was assembled around """
+    cohort = models.OneToOneField(Cohort, related_name='cohort_text_phenotype', on_delete=CASCADE)
+    phenotype_description = models.OneToOneField(PhenotypeDescription, on_delete=CASCADE)
+    approved_by = models.ForeignKey(User, null=True, on_delete=SET_NULL)
+
+    def __str__(self):
+        return f"{self.cohort}: {self.phenotype_description}"
+
+
+@dataclass(frozen=True)
+class PatientPhenotypeTerms:
+    """ A patient's phenotype text and the ontology terms matched in it """
+    text: str
+    terms: dict[str, list[OntologyTerm]]
+
+    def to_json(self) -> dict:
+        terms = {}
+        for service_label in PHENOTYPE_ONTOLOGY_SERVICE_LABELS.values():
+            terms[service_label] = [{"id": term.pk, "name": term.name}
+                                    for term in self.terms.get(service_label, [])]
+        return {"text": self.text, "terms": terms}
+
+
+def patient_phenotype_terms(patients: Iterable[Patient]) -> dict[int, PatientPhenotypeTerms]:
+    """ Patient pk -> matched terms, for every patient that has phenotype text, in one query.
+        The single object path is Patient.get_ontology_term_ids() - the two must agree. """
+    denylist = get_ambiguous_acronym_denylist()
+    tpm_qs = (TextPhenotypeMatch.objects
+              .filter(**{TPM_PATIENT_PATH + "__in": patients})
+              .select_related("text_phenotype", "ontology_term")
+              .annotate(patient_id=F(TPM_PATIENT_PATH), phenotype_text=F(TPM_DESCRIPTION_TEXT_PATH)))
+
+    text_by_patient_id = {}
+    terms_by_patient_id = defaultdict(set)
+    for tpm in tpm_qs:
+        text_by_patient_id[tpm.patient_id] = tpm.phenotype_text
+        if tpm.match_text.lower() in denylist:
+            continue  # Ambiguous acronym - @see PhenotypeDescription.get_ontology_term_ids
+        terms_by_patient_id[tpm.patient_id].add(tpm.ontology_term)
+
+    phenotype_terms = {}
+    for patient_id, text in text_by_patient_id.items():
+        terms_by_service = defaultdict(list)
+        for term in sorted(terms_by_patient_id[patient_id]):
+            if service_label := PHENOTYPE_ONTOLOGY_SERVICE_LABELS.get(term.ontology_service):
+                terms_by_service[service_label].append(term)
+        phenotype_terms[patient_id] = PatientPhenotypeTerms(text=text, terms=dict(terms_by_service))
+    return phenotype_terms
+
+
+def patient_phenotypes_for_samples(user, samples: Iterable) -> dict[int, dict]:
+    """ Patient pk -> the JSON a page draws phenotype chips from, for the patients of these samples
+        the user can view - one query for the whole page. A patient the user cannot view is absent. """
+    patient_ids = {sample.patient_id for sample in samples if sample.patient_id}
+    if not patient_ids:
+        return {}
+    patients = Patient.filter_for_user(user).filter(pk__in=patient_ids)
+    return {patient_id: phenotype_terms.to_json()
+            for patient_id, phenotype_terms in patient_phenotype_terms(patients).items()}
 
 
 def patients_qs_for_ontology_term(user, ontology_term):

@@ -138,7 +138,9 @@ class UploadedClassificationImport(UploadData):
     created_by_pipeline = False  # @see classification.classification_import.process_classification_import
 
     file_upload = models.OneToOneField(FileUpload, on_delete=CASCADE)
-    classification_import = models.OneToOneField(ClassificationImport, null=True, on_delete=CASCADE)
+    # An import whose records include gene-level coordinates runs a pipeline for each kind, so there is
+    # a row per pipeline - not per ClassificationImport (@see snpdb.gene_level_variants)
+    classification_import = models.ForeignKey(ClassificationImport, null=True, on_delete=CASCADE)
 
     def get_data(self):
         return self.classification_import

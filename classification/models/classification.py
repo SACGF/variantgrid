@@ -2343,6 +2343,9 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             if c_hgvs_str := self.get_c_hgvs(alt_genome_build):
                 return HGVSDisplay.parse(c_hgvs_str, genome_build=alt_genome_build,
                                          is_normalised=True, is_desired_build=False)
+        if (allele_info := self.allele_info) and \
+                (matched := allele_info.matched_without_c_hgvs_display(preferred_genome_build)):
+            return matched
         # nothing resolved, fall back to whichever HGVS the submitter gave us
         imported_genome_build = None
         try:

@@ -69,7 +69,18 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
                 except ValueError:
                     pass
 
-            c_hgvs = HGVSDisplay.parse(row.get('published_evidence__c_hgvs__value'), is_normalised=False)
+            imported_hgvs = row.get('published_evidence__c_hgvs__value') or row.get('published_evidence__g_hgvs__value')
+            # A variant HGVS can't write (a gene-level event, a symbolic CNV) matches without getting a c.HGVS
+            for index, genome_build in enumerate(self.genome_build_prefs):
+                try:
+                    if row.get(ClassificationModification.column_name_for_build(genome_build, 'variant_id')):
+                        c_hgvs = HGVSDisplay.parse(imported_hgvs, genome_build=genome_build,
+                                                   is_normalised=True, is_desired_build=index == 0)
+                        return c_hgvs.to_json()
+                except ValueError:
+                    pass
+
+            c_hgvs = HGVSDisplay.parse(imported_hgvs, is_normalised=False)
             json_data = c_hgvs.to_json()
             # use this rather than genome build object so we can get a patch version
             json_data['genome_build'] = row.get('published_evidence__genome_build__value')
@@ -192,7 +203,10 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
                 extra_columns=[
                     "classification__allele_info__grch37__c_hgvs",
                     "classification__allele_info__grch38__c_hgvs",
+                    "classification__allele_info__grch37__variant_id",
+                    "classification__allele_info__grch38__variant_id",
                     'published_evidence__c_hgvs__value',
+                    'published_evidence__g_hgvs__value',
                     'published_evidence__p_hgvs__value',
                     'published_evidence__genome_build__value',
                     'classification__allele_info__id',

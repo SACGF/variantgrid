@@ -143,7 +143,7 @@ def get_fake_annotation_settings_dict(columns_version: int) -> dict:
         "ANNOTATION_ANNOTSV_ENABLED": False,
         # Gene level is on in the shipped defaults - pin it so a developer on settings that turn it
         # off still exercises the pipeline.
-        "ANNOTATION_GENE_LEVEL_ENABLED": True,
+        "VARIANT_GENE_LEVEL_ENABLED": True,
         "ANNOTATION": ANNOTATION_COLUMNS,
     }
 

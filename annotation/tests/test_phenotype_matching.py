@@ -2,7 +2,11 @@ from unittest import mock
 
 from django.test import TestCase, override_settings
 
-from annotation.models.models_phenotype_match import PatientTextPhenotype, TextPhenotypeMatch
+from annotation.models.models_phenotype_match import (
+    PatientTextPhenotype,
+    TextPhenotypeMatch,
+    patient_phenotype_terms,
+)
 from annotation.phenotype_matcher import (
     PhenotypeMatcher,
     _build_ambiguous_acronym_denylist,
@@ -153,6 +157,43 @@ class TestPhenotypeMatching(TestCase):
                 term_ids, [],
                 "Ambiguous-acronym matches must be excluded from get_ontology_term_ids",
             )
+
+    def _create_matched_patient(self, phenotype: str) -> Patient:
+        patient = Patient(phenotype=phenotype)
+        patient.save(phenotype_matcher=self.phenotype_matcher)
+        patient.process_phenotype_if_changed(phenotype_matcher=self.phenotype_matcher)
+        return patient
+
+    def test_patient_phenotype_terms_agrees_with_single_patient_path(self):
+        patient = self._create_matched_patient("Raised TSH")
+        no_phenotype = Patient(patient_code="no phenotype")
+        no_phenotype.save()
+
+        phenotype_terms = patient_phenotype_terms([patient, no_phenotype])
+        self.assertNotIn(no_phenotype.pk, phenotype_terms, "Patient without phenotype text is absent")
+        terms = phenotype_terms[patient.pk]
+        self.assertEqual(terms.text, "Raised TSH")
+        term_ids = [term.pk for terms_for_service in terms.terms.values() for term in terms_for_service]
+        self.assertEqual(sorted(term_ids), patient.get_ontology_term_ids())
+        self.assertEqual([t["id"] for t in terms.to_json()["terms"]["HPO"]], ["HP:0002925"])
+
+    def test_patient_phenotype_terms_excludes_ambiguous_acronyms(self):
+        """ Rows matched before a term joined the denylist stay in the DB - both paths drop them """
+        patient = self._create_matched_patient("Raised TSH")
+        denylist = {
+            "raised tsh": (("HP:0002925", "Raised TSH"), ("OMIM:000000", "Something else")),
+        }
+        with mock.patch(
+            "annotation.models.models_phenotype_match.get_ambiguous_acronym_denylist",
+            return_value=denylist,
+        ):
+            phenotype_terms = patient_phenotype_terms([patient])
+            phenotype_description = patient.patient_text_phenotype.phenotype_description
+            phenotype_description.get_ontology_term_ids.invalidate(phenotype_description)
+            self.assertEqual(phenotype_description.get_ontology_term_ids(), [])
+
+        self.assertEqual(phenotype_terms[patient.pk].terms, {},
+                         "Ambiguous acronym matches must not become terms")
 
     def test_hardcoded_override_wins_over_denylist(self):
         """If a key has a hardcoded lookup (e.g. FTT), the public denylist

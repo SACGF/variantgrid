@@ -70,6 +70,21 @@ deliberate exception (#1558) - dropping fusions out of every CSV/VCF was worse t
 `ExportVariantGrid.export_contigs` adds the contig and `get_contigs_header_lines(include_gene_level=True)`
 declares it, which is what makes the file re-import. A writer that wants the plain genome keeps
 `standard_contigs` and gets it.
+
+
+## Turning it off
+
+`settings.VARIANT_GENE_LEVEL_ENABLED = False` (Shariant) stops new ones arriving:
+
+  * `VariantCoordinate` refuses a coordinate on the gene-level contig, so every write path is covered.
+  * `genes.gene_level_strings.looks_gene_level` is always False, so a classification naming 'BCR::ABL1'
+    takes the HGVS path and fails there.
+  * The fusion, copy number and splice search receivers are never connected.
+  * `ImportTaskFactory.enabled` withdraws the TSO 500 and gene-level CNV upload types.
+  * The GENE_LEVEL annotation pipeline is never scheduled, and the All Variants page offers no Fusion type.
+
+Gene-level Variants already stored are still read, displayed and exported - `Variant.coordinate` and
+`Variant.format_tuple` build the coordinate without validating it.
 """
 
 # The contig every build shares. Deliberately non-genomic names so nothing mistakes it for a sequence,

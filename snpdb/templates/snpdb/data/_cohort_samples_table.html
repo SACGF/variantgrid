@@ -27,11 +27,12 @@
                 <th>Name
                 <th data-help="{% detected_sex_help %}">Detected Sex</th>
                 <th>Patient
+                <th>Phenotype
                 <th>Extraction
             </tr>
         </thead>
         {% for form in samples_form %}
-            <tr class="sample-row">
+            <tr class="sample-row" data-patient-id="{{ form.instance.patient_id|default_if_none:'' }}">
                 {{ form.id }}
                 <td>
                     <div class="display-flex flex-row">
@@ -69,6 +70,7 @@
                         </div>
                     </div>
                 </td>
+                <td class="sample-phenotype"></td>
                 <td>{{ form.extraction }}{{ form.extraction.errors }}</td>
             </tr>
         {% endfor %}

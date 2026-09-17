@@ -59,7 +59,7 @@ class GeneFusion(models.Model):
         if parsed is None:
             raise ValidationError(f"Variant alt '{self.variant.alt.seq}' is not a gene-level alt")
 
-        kind, _namespace, partner_id = parsed
+        kind, _namespace, partner_id, _label = parsed
         expected_kind = GeneLevelSymbolicAlt.FUSION if self.is_ordered else GeneLevelSymbolicAlt.FUSION_UNORDERED
         if kind != expected_kind:
             raise ValidationError(f"Variant alt '{self.variant.alt.seq}' does not match {self.is_ordered=}")

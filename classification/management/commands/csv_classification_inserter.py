@@ -15,6 +15,9 @@ from library.utils import batch_iterator
 from snpdb.models import Lab
 
 
+PROGRESS_EVERY = 500
+
+
 @contextmanager
 def _classification_import_run(identifier: str):
     """ While a ClassificationImportRun is ongoing, the expensive classification_post_publish_signal receivers
@@ -62,9 +65,12 @@ class Command(BaseCommand):
         user = admin_bot()  # Or make it --user param?
         lab = Lab.objects.get(name=lab_name)
 
-        records = self.iter_records(lab, static_dict, variants_ekeys_csv)
+        df = self.read_variants_df(variants_ekeys_csv)
+        total_records = min(len(df), max_records)
+        records = self.iter_records(lab, static_dict, df)
 
         count = 0
+        last_progress = 0
         first_batch = False
         with _classification_import_run(f"csv_classification_inserter_{lab.group_name}") as import_run:
             for batch in batch_iterator(records, batch_size=50):
@@ -93,10 +99,13 @@ class Command(BaseCommand):
                     log_traceback()
                     raise
                 finally:
-                    logging.info("Finish")
                     inserter.finish()
                     # bumps modified so the run isn't cleaned up as stale mid-import
                     import_run.save()
+                    if count - last_progress >= PROGRESS_EVERY or count >= total_records:
+                        last_progress = count
+                        logging.info("Inserted %d/%d (%.1f%%)", count, total_records,
+                                     100 * count / total_records)
 
                 if count >= max_records:
                     break
@@ -117,16 +126,18 @@ class Command(BaseCommand):
             return ekey.key
         raise ValueError("No Ekey found")
 
-    def iter_records(self, lab: Lab, static_dict: dict[str,str], variants_ekeys_csv: str):
+    @staticmethod
+    def read_variants_df(variants_ekeys_csv: str) -> pd.DataFrame:
+        df = pd.read_csv(variants_ekeys_csv)
+        return df_nan_to_none(df)
+
+    def iter_records(self, lab: Lab, static_dict: dict[str, str], df: pd.DataFrame):
         # Are we going to do any validation? Code around the place uses:
         # known_keys = EvidenceKeyMap.instance()
         # known_keys.get(key).is_dummy
         # valid_evidence_keys = set(k.key for k in EvidenceKeyMap.cached().all_keys)
 
         internal_notes_ekey = self.get_internal_notes_ekey_name()
-        df = pd.read_csv(variants_ekeys_csv)
-        df = df_nan_to_none(df)
-
         for _, row in df.iterrows():
             data = static_dict.copy()
             data.update(row.to_dict())

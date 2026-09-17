@@ -1135,6 +1135,11 @@ table.as_table {
 	color: #5e35b1;
 }
 
+.rv-kind-splice {
+	background: #e0f2f1;
+	color: #00695c;
+}
+
 table.variantgrid-datatable {
 	table-layout: fixed;
 	width: auto;
@@ -2959,6 +2964,14 @@ label[for="id_mondo"],
 .hgnc {
 	background-color: #99CD83;
 	border-color: #99CD83;
+}
+
+/* Matched patient phenotype terms shown beside a sample */
+.patient-phenotype .phenotype-chip {
+	display: inline-block;
+	font-size: small;
+	white-space: nowrap;
+	margin-bottom: 2px;
 }
 
 /* We use this as click to expand grouped OntologyTerms */

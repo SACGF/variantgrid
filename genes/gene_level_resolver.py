@@ -17,7 +17,7 @@ identity, via GeneLevelId's local id space, so every call the caller made become
 import re
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Optional
+from typing import Any, Optional
 
 from genes.gene_matching import GeneSymbolMatcher
 from genes.models import HGNC, GeneLevelId
@@ -25,6 +25,44 @@ from genes.models_enums import HGNCStatus
 
 # Within one cell - a hyphen can't separate, as clone-based identifiers contain them (RP11-458D21.5)
 GENE_LIST_SEPARATOR = re.compile(r"[;/]")
+
+
+@dataclass(frozen=True)
+class GeneLevelResolution:
+    """ What a resolve_*_string call answers: the identity the string names, or the reason the kind
+        of event it was recognised as refused it.
+
+        Neither set means the string is not that kind of event at all, so the next resolver gets a
+        turn; a reason means it was that kind and did not validate, which is what a record's message
+        says (@see classification.models.ImportedAlleleInfo). """
+    resolved: Optional[Any] = None
+    reason: Optional[str] = None
+
+    def __bool__(self) -> bool:
+        return self.resolved is not None
+
+    @property
+    def recognised(self) -> bool:
+        """ The string is this kind of gene-level event, resolved or refused """
+        return self.resolved is not None or self.reason is not None
+
+    @staticmethod
+    def not_applicable() -> 'GeneLevelResolution':
+        return GeneLevelResolution()
+
+    @staticmethod
+    def identity(resolved: Any) -> 'GeneLevelResolution':
+        return GeneLevelResolution(resolved=resolved)
+
+    @staticmethod
+    def refused(reason: str) -> 'GeneLevelResolution':
+        return GeneLevelResolution(reason=reason)
+
+
+def unknown_gene_reason(name: str) -> str:
+    """ The reason every gene-level resolver gives for a name that is no symbol we hold - a lab
+        typo'd partner, so the message names the half that failed """
+    return f"gene '{name}' is not a symbol we know"
 
 
 @dataclass(frozen=True)

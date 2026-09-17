@@ -1,0 +1,9 @@
+{# The cohort's shared condition - same editor a Patient's phenotype uses. 'phenotype_field' is the bound field #}
+{% load phenotype_tags %}
+{% if can_edit_phenotype and any_patient_phenotype_text %}
+    <button type="button" id="add-sample-patient-phenotypes" class="btn btn-secondary mb-2"
+            title="Copy each sample patient's phenotype text in here to review before saving">
+        Add all sample patient phenotypes
+    </button>
+{% endif %}
+{% phenotype_entry phenotype_field cohort.phenotype_description edit=can_edit_phenotype show_page_help=False %}

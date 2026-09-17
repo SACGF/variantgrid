@@ -12,3 +12,4 @@ from .models_gene_coverage import *
 from .models_gnomad_gene_constraint import *
 from .models_gene_level import *
 from .models_gene_fusion import *
+from .models_splice_event import *

@@ -59,6 +59,8 @@ urlpatterns = [
     path('patient_term_approvals', views.patient_term_approvals, name='patient_term_approvals'),
     path('approve_patient_term', views_json.approve_patient_term, name='approve_patient_term'),
     path('phenotypes_matches', views_json.phenotypes_matches, name='phenotypes_matches'),
+    path('patient_phenotype_terms/<int:patient_id>', views_json.patient_phenotype_terms,
+         name='patient_phenotype_terms'),
 
     # Grids
     path('patient/datatables/', DatabaseTableView.as_view(column_class=PatientListColumns),

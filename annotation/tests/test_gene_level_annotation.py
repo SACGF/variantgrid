@@ -19,7 +19,10 @@ from annotation.models import (
 )
 from annotation.tests.test_data_fake_genes import _create_fake_gene_version, _insert_transcript_data
 from genes.tests.gene_fusion_test_utils import create_gene_fusion, create_gene_fusion_for_ids
-from genes.tests.gene_level_test_utils import create_gene_copy_number_event
+from genes.tests.gene_level_test_utils import (
+    create_gene_copy_number_event,
+    create_splice_event_variant,
+)
 from genes.models import (
     HGNC,
     GeneCopyNumberEventKind,
@@ -35,7 +38,10 @@ from genes.models import (
 )
 from genes.models_enums import AnnotationConsortium, HGNCStatus
 from library.genomics.vcf_enums import VariantClass
-from classification.models.classification_variant_info_models import ImportedAlleleInfo
+from classification.models.classification_variant_info_models import (
+    ImportedAlleleInfo,
+    ImportedAlleleInfoStatus,
+)
 from snpdb.models import GenomeBuild, GenomeBuildPatchVersion, Variant
 from snpdb.variant_queries import get_variant_queryset_for_gene_symbol
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
@@ -550,6 +556,49 @@ class GeneCopyNumberClassificationTest(TestCase):
         self.assertIsNone(resolved.c_hgvs, "a copy number event sits on no transcript")
         self.assertEqual("EGFR", resolved.gene_symbol_id)
 
-    def test_a_gene_we_do_not_know_mints_nothing(self):
-        allele_info = ImportedAlleleInfo(imported_c_hgvs="NOTAGENE amplification")
-        self.assertFalse(allele_info.resolve_gene_level())
+    def test_a_gene_we_do_not_know_fails_with_the_reason(self):
+        """ A value that names genes stays on the gene-level path even when it doesn't validate, so
+            it is never reported as a broken HGVS (#1835) """
+        allele_info = self._allele_info("NOTAGENE amplification")
+        self.assertEqual(ImportedAlleleInfoStatus.FAILED, allele_info.status)
+        self.assertEqual("gene 'NOTAGENE' is not a symbol we know", allele_info.message)
+        self.assertIsNone(allele_info.variant_coordinate)
+        general = allele_info.latest_validation.validation_tags.get("general", {})
+        self.assertIn("gene_level_unresolved", general)
+        self.assertNotIn("transcript_type_not_supported", general)
+
+
+class SpliceEventClassificationTest(TestCase):
+    """ A lab submitting 'AR V7' as a classification target - @see ImportedAlleleInfo """
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.genome_build = GenomeBuild.get_name_or_alias("GRCh37")
+        GeneSymbol.objects.get_or_create(symbol="AR")
+        HGNC.objects.create(pk=644, gene_symbol_id="AR", hgnc_import=HGNCImport.objects.create(),
+                            status=HGNCStatus.APPROVED, approved_name="androgen receptor")
+
+    def _allele_info(self, imported_c_hgvs: str) -> ImportedAlleleInfo:
+        return ImportedAlleleInfo.get_or_create(
+            imported_c_hgvs=imported_c_hgvs,
+            imported_genome_build_patch_version=GenomeBuildPatchVersion.get_unspecified_patch_version_for(
+                self.genome_build))
+
+    def test_splice_string_resolves_to_a_gene_level_coordinate(self):
+        """ get_or_create strips the space, so this is the 'ARV7' the resolver really sees """
+        allele_info = self._allele_info("AR V7")
+        self.assertTrue(allele_info.variant_coordinate_obj.is_gene_level)
+        self.assertIn("AR-V7", allele_info.message)
+
+    def test_event_is_read_off_the_matched_variant(self):
+        allele_info = self._allele_info("AR V7")
+        self.assertIsNone(allele_info.gene_level_event,
+                          "nothing is matched until the pipeline inserts it")
+
+        splice_event_variant = create_splice_event_variant("AR", "V7")
+        allele_info.set_variant_and_save(matched_variant=splice_event_variant.variant)
+        self.assertEqual("AR-V7", allele_info.gene_level_event.canonical_str)
+        resolved = allele_info[self.genome_build]
+        self.assertIsNone(resolved.c_hgvs, "a splice event sits on no transcript")
+        self.assertEqual("AR", resolved.gene_symbol_id)

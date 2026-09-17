@@ -48,10 +48,14 @@ class ManualOperation(Operation):
         pass
 
     def database_forwards(self, app_label, schema_editor, from_state, to_state):
-        self.run(to_state.apps)
+        # As RunPython does: earlier operations in the same migrate run may have delay-reloaded only
+        # some models, leaving FKs pointing at stale classes ("Must be 'X' instance") until re-rendered
+        from_state.clear_delayed_apps_cache()
+        self.run(from_state.apps)
 
     def database_backwards(self, app_label, schema_editor, from_state, to_state):
-        self.run(to_state.apps, reverse=True)
+        from_state.clear_delayed_apps_cache()
+        self.run(from_state.apps, reverse=True)
 
     def run(self, apps, reverse=False):
         """

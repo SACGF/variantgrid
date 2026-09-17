@@ -72,7 +72,22 @@
 </style>
 <script type="text/javascript" src="{% static 'js/cached_generated_files.js' %}"></script>
 <script type="text/javascript" src="{% static 'js/annotated_file_download.js' %}"></script>
+<script type="text/javascript" src="{% static 'js/patient_phenotypes.js' %}"></script>
 <script>
+const patientPhenotypes = {{ patient_phenotypes|jsonify }};
+
+function setPatientPhenotype() {
+    const patientSelector = $("#id_patient");
+    const patientId = patientSelector.val();
+    loadPatientPhenotype(patientPhenotypes, patientId, function (phenotype) {
+        const chips = patientPhenotypeHtml(phenotype);
+        $("#patient-phenotype-terms").html(chips);
+        $("#patient-phenotype-text").text(phenotype ? phenotype.text : "");
+        setCrossLink($("#patient-phenotype-link"), Urls.view_patient, patientId);
+        $("#patient-phenotype-row").toggleClass("d-none", !chips);
+    });
+}
+
 function getBams() {
     const bams = {{ bam_list | jsonify }};
     return bams;
@@ -119,9 +134,11 @@ $(document).ready(function() {
 
     const sampleForm = $("#sample-form");
     const patientSelect = $("#id_patient", sampleForm);
+    setPatientPhenotype();
     patientSelect.change(function() {
         let extractionSelect = $("#id_extraction", sampleForm);
         clearAutocompleteChoice(extractionSelect);
+        setPatientPhenotype();
     });
 {% if has_write_permission %}
     setupUnsavedChangesMessage(sampleForm);
@@ -205,6 +222,11 @@ $(document).ready(function() {
             <form method="post" id='sample-form'>
                 {% csrf_token %}
                 {% crispy form form_helper.horizontal %}
+                {% labelled row_id="patient-phenotype-row" row_css="d-none" label="Patient Phenotype" %}
+                    <div id="patient-phenotype-terms"></div>
+                    <div id="patient-phenotype-text" class="text-muted"></div>
+                    <a class="cross-link" id="patient-phenotype-link">View Patient</a>
+                {% endlabelled %}
                 {% detected_sex_help sample_genotype_stats as detected_sex_help_text %}
                 {% labelled id="detected-sex" label="Detected Sex" help=detected_sex_help_text %}{{ sample.detected_sex.label }}{% endlabelled %}
                 {% if annotated_download_files and not sample.vcf.data_archived %}

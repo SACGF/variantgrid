@@ -78,6 +78,7 @@
                 <div class="card-header"><i class="fa-solid fa-magnifying-glass-location"></i> Variant Matching</div>
                 <div class="card-body">
                     {% labelled hint="tiny" label="Symbolic Variant Resolution Enabled" %}{{ settings.VARIANT_SYMBOLIC_ALT_ENABLED | boolean }}{% endlabelled %}
+                    {% labelled hint="tiny" label="Gene-level Variants Enabled" %}{{ settings.VARIANT_GENE_LEVEL_ENABLED | boolean }}{% endlabelled %}
                     {% labelled hint="tiny" label="Attempt ClinGen" %}{{ hgvs_matcher.attempt_clingen | boolean }}{% endlabelled %}
                     {% labelled hint="chunky" label="Matcher Version" value_css="text-secondary" %}{{ hgvs_matcher.hgvs_converter.description }}{% endlabelled %}
                 </div>

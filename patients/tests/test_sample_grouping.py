@@ -184,8 +184,8 @@ class TestPatientGetSamples(ExtractionSampleTestCase):
     """ Related data has to show everything related - a sample reaches its patient either way round """
 
     def test_samples_linked_only_through_the_extraction_are_related_data(self):
-        # What the VCF import produces: extraction carried down, sample.patient left null
-        self.assertIsNone(self.sample.patient)
+        # A row written around Sample.save, which would have filled patient from the extraction
+        Sample.objects.filter(pk=self.sample.pk).update(patient=None)
         self.assertIn(self.sample, self.patient.get_samples())
 
     def test_samples_linked_straight_to_the_patient_are_related_data(self):
@@ -242,7 +242,7 @@ class TestSampleGroupTree(ExtractionSampleTestCase):
         """ A deployment that hasn't set up specimens and extractions has no tree to draw - the
             editor says so rather than inventing containers around the one sample """
         loose, _ = self._create_vcf_sample("loose_sample", self.grch37)
-        Sample.objects.filter(pk=loose.pk).update(extraction=None)
+        Sample.objects.filter(pk=loose.pk).update(extraction=None, patient=None)
         loose.refresh_from_db()
 
         tree = get_patient_sample_tree(self.user, SampleSourceLevel.SAMPLE, loose, self.grch37)

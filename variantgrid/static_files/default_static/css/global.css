@@ -1053,6 +1053,10 @@ table.variantgrid-datatable .fusion-calls {
   background: #ede7f6;
   color: #5e35b1;
 }
+.rv-kind-splice {
+  background: #e0f2f1;
+  color: #00695c;
+}
 table.variantgrid-datatable .cs-chips {
   display: grid;
   grid-template-columns: 74fr 52fr 66fr 60fr;
@@ -2503,6 +2507,14 @@ label[for="id_mondo"],
 .hgnc {
   background-color: #99CD83;
   border-color: #99CD83;
+}
+
+/* Matched patient phenotype terms shown beside a sample */
+.patient-phenotype .phenotype-chip {
+  display: inline-block;
+  font-size: small;
+  white-space: nowrap;
+  margin-bottom: 2px;
 }
 
 /* We use this as click to expand grouped OntologyTerms */

@@ -10,7 +10,7 @@ what the command cannot know. Verified against vg-test2 on 2026-09-06.
 |---|---|---|
 | vg-test2 (test.variantgrid.com) | `variantgrid/settings/env/vgtest2.py` | The lab box this repo is usually driven from; see "This box" in `CLAUDE.md` |
 | variantgrid.com | `variantgrid/settings/env/vgaws.py` | Public instance on AWS |
-| Shariant (test / demo / prod) | `variantgrid/settings/env/shariantcommon.py` + `sharianttest.py` / `shariantdemo.py` / `shariant.py` / `shariantsecurity.py` alongside it | Australian classification sharing; patients and analysis URLs unregistered |
+| Shariant (test / demo / prod) | `variantgrid/settings/env/shariantcommon.py` + `sharianttest.py` / `shariantdemo.py` / `shariant.py` / `shariantsecurity.py` alongside it | Australian classification sharing; patients and analysis URLs unregistered; `VARIANT_GENE_LEVEL_ENABLED = False` (germline small variants only) |
 | SA Pathology | private repo `variantgrid_sapath` (settings and site-specific apps live there) | Largest production data; clinical use |
 | runx1db | `variantgrid/settings/env/runx1db2.py` | Gene-specific public database |
 | CI | `variantgrid/settings/env/github_actions.py` with `config/ci/settings_config.json` | Also the canonical module for `vg map` |
@@ -57,6 +57,11 @@ surface the deploy-time steps migrations registered with `manual/operations/manu
 `manage` steps auto-run once their `requires` gates (`manual/gates.py`) clear and the command still exists; `other` steps are
 printed for a human. Completion is a `ManualMigrationAttempt`. `scripts/deployed.sh` records the deploy in Rollbar and runs
 `manage.py deployed`. `scripts/restart_services.sh` finishes it.
+
+Releases are git tags `vg<major>.<minor>` (`vg3.0`, and `vg4.0` once cut). `VARIANTGRID_VERSION` is `git describe` against the
+latest tag for `VARIANTGRID_MAJOR_VERSION` (`vg4.0-12-gc174556`, or `vg4-gc174556` before that major has a tag), read
+once per process from the checkout and reported by the API docs and `seqauto/views_rest.py:CapabilitiesView`. Cutting a
+new major means bumping that setting in the same commit as the tag.
 
 Pushed migrations are frozen (`CLAUDE.md`); a data fix that must run on every deployment is a `ManualOperation` in a
 migration, not a note in a PR. Annotation upgrades (new VEP, new columns) are their own procedure: a new
@@ -131,3 +136,6 @@ loop. GitHub issues are closed by a human after that pipeline, never by a commit
 `/seqauto/api/`, `/upload/api/`, `/mme/api/`, `/beacon/`) so DRF's `IsAuthenticated` can answer 401 instead. A plain Django
 `View` mounted under an exempt prefix is reachable anonymously (it usually 500s on `AnonymousUser`); new endpoints there must
 be `rest_framework.views.APIView` subclasses. Verify with an unauthenticated request - a 500 means the view is unprotected.
+`seqauto/views_rest.py:CapabilitiesView` stays at `/seqauto/api/v1/capabilities` rather than `/api/v1/`: VG3 (`vg3_sapath_prod`) only
+exempts the app prefixes, so there `/api/v1/capabilities` redirects to the login page (a 200 of HTML to a client that follows
+redirects) while the seqauto path is a clean 404 a client can read as "legacy server".

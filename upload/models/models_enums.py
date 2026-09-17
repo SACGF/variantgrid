@@ -6,6 +6,9 @@ class UploadedFileTypes(models.TextChoices):
     BED = 'B', 'BED'
     CLINVAR = 'L', 'Clinvar'
     DRAGEN_TSO500_ALL_FUSIONS = 'F', 'DRAGEN TSO500 AllFusions'
+    # The pair-level summary written beside the two arm directories - the splice calls
+    # become gene-level variants, @see upload.tasks.import_dragen_tso500_combined_variant_output_task
+    DRAGEN_TSO500_COMBINED_VARIANT_OUTPUT = 'C', 'DRAGEN TSO500 Combined Variant Output'
     GENE_LIST = 'G', 'Gene List'
     GENE_COVERAGE = 'O', 'Gene Coverage'
     LIFTOVER = 'I', 'Liftover'

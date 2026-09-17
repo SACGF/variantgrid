@@ -1,11 +1,12 @@
 from bioutils.sequences import reverse_complement
 from django.conf import settings
-from django.test import TestCase
+from django.test import SimpleTestCase, TestCase, override_settings
 
 from annotation.fake_annotation import get_fake_annotation_version
 from library.genomics.vcf_enums import VCFSymbolicAllele
 from snpdb.models import AlleleOrigin, GenomeBuild, Variant, VariantAllele, VariantCoordinate
 from snpdb.tests.utils.vcf_testing_utils import create_mock_allele, slowly_create_test_variant
+from snpdb.variant_filters import VariantType, get_all_variant_types
 
 
 class VariantTestCase(TestCase):
@@ -277,3 +278,25 @@ class VariantAcrossGenomeBuildsTestCase(TestCase):
     def test_allele_all_genome_builds(self):
         variant_37, _ = self._linked_variants("3", 5200)
         self.assertEqual({self.grch37, self.grch38}, variant_37.allele.all_genome_builds)
+
+
+class GeneLevelDisabledTest(SimpleTestCase):
+    GENE_LEVEL_STRING = "GENE_LEVEL:3236-3236 <SPLICE:HGNC:3236:V_III>"
+
+    def test_gene_level_coordinate_refused_when_disabled(self):
+        with override_settings(VARIANT_GENE_LEVEL_ENABLED=False):
+            with self.assertRaises(ValueError):
+                VariantCoordinate.from_string(self.GENE_LEVEL_STRING, None)
+
+        variant_coordinate = VariantCoordinate.from_string(self.GENE_LEVEL_STRING, None)
+        self.assertEqual("GENE_LEVEL", variant_coordinate.chrom)
+
+    @override_settings(VARIANT_GENE_LEVEL_ENABLED=False)
+    def test_stored_gene_level_variant_still_formats_when_disabled(self):
+        variant_string = Variant.format_tuple("GENE_LEVEL", 3236, "N", "<SPLICE:HGNC:3236:V_III>", 0)
+        self.assertEqual(self.GENE_LEVEL_STRING, variant_string)
+
+    def test_all_variant_types_offer_fusion_only_when_enabled(self):
+        self.assertIn(VariantType.FUSION, get_all_variant_types())
+        with override_settings(VARIANT_GENE_LEVEL_ENABLED=False):
+            self.assertNotIn(VariantType.FUSION, get_all_variant_types())
