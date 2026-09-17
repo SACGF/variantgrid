@@ -18,6 +18,7 @@ class AnnotationConfig(AppConfig):
         # Registers receivers on import - noqa: F401 keeps the unused-import autofix from
         # silently unregistering them
         from annotation.signals import (  # noqa: F401
+            ambiguous_acronym_denylist,
             citation_preview,
             citation_search,
             clinvar_annotation_health_check,

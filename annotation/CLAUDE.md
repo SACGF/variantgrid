@@ -46,6 +46,9 @@ Patterns here:
   GeneAnnotationRelease (annotation/models/models.py:VariantAnnotationVersion.link_gene_annotation_release) →
   `gene_annotation --new-releases` → promote. Non-VEP tools: `create_new_annotation_pipeline_version`.
 Gotchas:
+- annotation/phenotype_matcher.py:get_ambiguous_acronym_denylist reads every ontology term and relation (~230MB) on a cache
+  miss - 100s on a cold disk inside a page render. It is cached with no expiry and prebuilt on a new
+  OntologyVersion (annotation/tasks/ambiguous_acronym_denylist_task.py); a Redis flush means one slow rebuild.
 - A VAV must match the VEP that will run: annotation/vep_annotation.py:vep_check_command_line_version_match raises
   VEPVersionMismatchError when any data file or plugin version differs, and the annotated VCF header is checked the
   same way on import — changing a settings.ANNOTATION data path without a new VAV halts annotation.

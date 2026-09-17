@@ -8,7 +8,6 @@ from typing import Any, Optional
 import Levenshtein
 from cache_memoize import cache_memoize
 
-from library.constants import DAY_SECS
 from library.log_utils import log_traceback
 from library.utils import is_not_none
 from ontology.models import OntologyService, OntologyTerm, OntologyTermRelation, OntologyVersion
@@ -56,7 +55,7 @@ class SkipAllPhenotypeMatchException(Exception):
     pass
 
 
-@cache_memoize(timeout=DAY_SECS)
+@cache_memoize(timeout=None)
 def _build_ambiguous_acronym_denylist(ontology_version_pk: int) -> dict[str, tuple[tuple[str, str], ...]]:
     """Lowercased short ontology lookup keys that match multiple distinct concept
     clusters - building these matches would silently mean the wrong thing.
@@ -144,7 +143,9 @@ def get_ambiguous_acronym_denylist() -> Mapping[str, tuple[tuple[str, str], ...]
     OntologyVersion, minus keys that have explicit hardcoded overrides
     (those have a known correct meaning). Values are tuples of (term_id, name)
     pairs so callers can display the conflicting candidates. Cached in Redis
-    via cache_memoize and rebuilt only when a new OntologyVersion is imported."""
+    with no expiry, keyed on OntologyVersion - the build reads every ontology term
+    and relation, so annotation.tasks.ambiguous_acronym_denylist_task prebuilds it when a
+    new OntologyVersion is created rather than leaving it for a page render."""
     ov = OntologyVersion.latest(validate=False)
     raw = _build_ambiguous_acronym_denylist(ov.pk if ov else 0)
     overrides = _get_explicit_override_keys()
