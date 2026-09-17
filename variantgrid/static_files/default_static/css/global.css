@@ -251,6 +251,23 @@ i.fas, i.fa-solid {
   transform: scale(0.7);
 }
 
+.user-title.user-award {
+  position: static;
+  font-size: inherit;
+  animation: none;
+  transform: none;
+}
+
+.award-cabinet .award-badge {
+  min-width: 12rem;
+}
+.award-cabinet .award-badge.award-locked {
+  opacity: 0.55;
+}
+.award-cabinet .award-badge .progress {
+  height: 6px;
+}
+
 strong {
   font-weight: 500;
 }
@@ -590,7 +607,8 @@ input[type='checkbox'], input[type='radio'] {
   display: flex;
   align-items: center;
 }
-.horizontal-fields label {
+.horizontal-fields label,
+.horizontal-fields .field-label {
   font-weight: bold;
   width: inherit;
   padding-right: 6px;
@@ -617,6 +635,7 @@ input[type='checkbox'], input[type='radio'] {
 .horizontal-fields > p,
 .horizontal-fields > input,
 .horizontal-fields > label:not(:first-child),
+.horizontal-fields > .field-label:not(:first-child),
 .horizontal-fields > button,
 .horizontal-fields > a {
   margin-left: 12px;
@@ -795,11 +814,6 @@ li.error::before {
   margin-right: 4px;
 }
 
-.jqgrid-container .ui-corner-top {
-  border-top-right-radius: 0;
-  border-top-left-radius: 0;
-}
-
 .grid-link {
   float: left;
   border: 0px !important;
@@ -821,6 +835,19 @@ li.error::before {
   background-size: 16px 16px;
 }
 
+.grid-link-icon.allele-origin-G {
+  background-color: #88cc88;
+}
+
+.grid-link-icon.allele-origin-S {
+  background-color: #cc99cc;
+}
+
+.grid-link-icon.grid-link-small-text {
+  font-size: 10px;
+  letter-spacing: -0.5px;
+}
+
 .icon24 {
   width: 24px;
   height: 24px;
@@ -839,18 +866,30 @@ li.error::before {
   background-size: 48px 48px;
 }
 
-.click-to-delete-button {
-  background-image: url("/static/icons/delete-icon.png");
+.click-to-delete-button,
+.click-to-add-button {
   cursor: pointer;
   height: 16px;
   width: 16px;
+  line-height: 16px;
+  text-align: center;
+  font-family: 'Font Awesome 6 Free', 'FontAwesome';
+  font-weight: 900;
+  font-size: 14px;
+}
+
+.click-to-delete-button {
+  color: #c02b2b;
+}
+.click-to-delete-button::before {
+  content: "\f057";
 }
 
 .click-to-add-button {
-  background-image: url("/static/icons/add-icon.png");
-  cursor: pointer;
-  height: 16px;
-  width: 16px;
+  color: #3f9a5e;
+}
+.click-to-add-button::before {
+  content: "\f055";
 }
 
 table.table {
@@ -866,6 +905,600 @@ table.as_table td {
   width: 50%;
   text-align: left !important;
   border: none;
+}
+
+.grid-tag {
+  position: relative;
+  display: inline-block;
+  vertical-align: top;
+}
+.grid-tag .user-tag-colored {
+  display: inline-block;
+  max-width: 130px;
+  height: 16px;
+  line-height: 16px;
+  margin: 0 3px 0 0;
+  padding: 0 6px;
+  border-radius: 8px;
+  font-size: 10px;
+  background: #eceff3;
+  color: #333;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+table.variantgrid-datatable {
+  table-layout: fixed;
+  width: auto;
+}
+table.variantgrid-datatable th,
+table.variantgrid-datatable td {
+  box-sizing: border-box;
+  padding: 2px 4px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+table.variantgrid-datatable tbody td {
+  line-height: 16px;
+}
+table.variantgrid-datatable .ic-line2 {
+  display: none;
+}
+table.variantgrid-datatable.two-line-rows tbody td {
+  line-height: 16px;
+  vertical-align: top;
+  white-space: normal;
+}
+table.variantgrid-datatable.two-line-rows .rv-line2,
+table.variantgrid-datatable.two-line-rows .ic-line2 {
+  display: block;
+  color: #888;
+  font-size: 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+table.variantgrid-datatable.two-line-rows .variant_id-container {
+  align-items: flex-start;
+}
+table.variantgrid-datatable.two-line-rows .variant_id-container a.rv-label {
+  white-space: normal;
+}
+table.variantgrid-datatable.two-line-rows .impact-consequence {
+  display: inline-block;
+}
+table.variantgrid-datatable th {
+  position: relative;
+}
+table.variantgrid-datatable th .dt-col-resize {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 1;
+  width: 6px;
+  height: 100%;
+  cursor: col-resize;
+}
+table.variantgrid-datatable th .dt-col-resize:hover {
+  background: #ccc;
+}
+table.variantgrid-datatable th .dt-sort-menu .dt-sort-menu-toggle {
+  margin-left: 4px;
+  color: #888;
+  text-decoration: none;
+  font-size: 10px;
+}
+table.variantgrid-datatable .variant_id-container {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  max-width: calc(100% - 16px);
+}
+table.variantgrid-datatable .variant_id-container a.rv-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-decoration: none;
+}
+.rv-gene {
+  font-weight: 600;
+}
+.rv-hgvs {
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 11px;
+}
+.rv-hgvs-p,
+.rv-sub {
+  color: #777;
+  font-size: 11px;
+}
+table.variantgrid-datatable .fusion-calls {
+  padding: 0 4px;
+  border-radius: 3px;
+  background: #ede7f6;
+  color: #5e35b1;
+  font-size: 11px;
+}
+.rv-line2 {
+  display: none;
+}
+.rv-kind {
+  flex: none;
+  padding: 0 4px;
+  border-radius: 3px;
+  background: #eceff1;
+  color: #546e7a;
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 10px;
+}
+.rv-kind-del,
+.rv-kind-loss {
+  background: #fdecea;
+  color: #b3261e;
+}
+.rv-kind-dup,
+.rv-kind-cnv,
+.rv-kind-gain {
+  background: #e8f0fe;
+  color: #1a56b8;
+}
+.rv-kind-ins,
+.rv-kind-inv {
+  background: #fff4e5;
+  color: #a15c00;
+}
+.rv-kind-fusion {
+  background: #ede7f6;
+  color: #5e35b1;
+}
+table.variantgrid-datatable .cs-chips {
+  display: grid;
+  grid-template-columns: 74fr 52fr 66fr 60fr;
+  gap: 3px;
+  align-items: center;
+}
+table.variantgrid-datatable .cs-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-width: 0;
+  height: 16px;
+  line-height: 16px;
+  padding: 0 5px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #333;
+  vertical-align: middle;
+  text-decoration: none;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+table.variantgrid-datatable .cs-chip.cs-chip-empty {
+  background: transparent;
+  border: 1px dashed #ccc;
+  color: #bbb;
+  font-weight: 500;
+}
+table.variantgrid-datatable .cs-chip.allele-origin-G {
+  box-shadow: inset 3px 0 0 #88cc88;
+  padding-left: 7px;
+}
+table.variantgrid-datatable .cs-chip.allele-origin-S {
+  box-shadow: inset 3px 0 0 #cc99cc;
+  padding-left: 7px;
+}
+table.variantgrid-datatable .cs-chip .cs-chip-src {
+  font-size: 9px;
+  opacity: 0.6;
+  margin-right: 2px;
+}
+table.variantgrid-datatable .cs-chip .cs-chip-stars {
+  color: #d9a400;
+  font-size: 9px;
+  letter-spacing: -1px;
+}
+table.variantgrid-datatable .cs-chip .cs-chip-stars .off {
+  color: #ccc;
+}
+table.variantgrid-datatable .cs-chip .cs-chip-count {
+  font-size: 9px;
+  background: rgba(0, 0, 0, 0.08);
+  border-radius: 99px;
+  padding: 0 4px;
+}
+table.variantgrid-datatable .impact-consequence {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+table.variantgrid-datatable .impact-consequence .impact-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+}
+table.variantgrid-datatable .impact-consequence .impact-high {
+  background: #cf3f3a;
+}
+table.variantgrid-datatable .impact-consequence .impact-moderate {
+  background: #dd8a1c;
+}
+table.variantgrid-datatable .impact-consequence .impact-low {
+  background: #3f9a5e;
+}
+table.variantgrid-datatable .impact-consequence .impact-modifier {
+  background: #a0a8b3;
+}
+table.variantgrid-datatable .impact-consequence .impact-unknown {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px #ccc;
+}
+table.variantgrid-datatable .gnomad-popmax-pop {
+  color: #777;
+  font-size: 10px;
+}
+table.variantgrid-datatable .gnomad-af-common {
+  color: #999;
+}
+table.variantgrid-datatable .gnomad-af-cell {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+table.variantgrid-datatable .gnomad-af-cell .gnomad-af {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+table.variantgrid-datatable .gnomad-af-cell .gnomad-popmax-af {
+  color: #777;
+  font-size: 11px;
+  flex: none;
+}
+table.variantgrid-datatable .gnomad-af-cell .gnomad-link {
+  margin-left: auto;
+  flex: none;
+}
+table.variantgrid-datatable .composite-cell {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+table.variantgrid-datatable .composite-empty-headline {
+  color: #bbb;
+}
+table.variantgrid-datatable .spliceai {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+table.variantgrid-datatable .spliceai .spliceai-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+}
+table.variantgrid-datatable .spliceai .spliceai-high {
+  background: #cf3f3a;
+}
+table.variantgrid-datatable .spliceai .spliceai-moderate {
+  background: #dd8a1c;
+}
+table.variantgrid-datatable .spliceai .spliceai-low {
+  background: #d8c53a;
+}
+table.variantgrid-datatable .spliceai .spliceai-none {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px #ccc;
+}
+table.variantgrid-datatable .maxentscan-weakened {
+  color: #cf3f3a;
+}
+table.variantgrid-datatable .mastermind-link {
+  text-decoration: none;
+}
+table.variantgrid-datatable .aloft {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+table.variantgrid-datatable .aloft .aloft-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+}
+table.variantgrid-datatable .aloft .aloft-dominant {
+  background: #cf3f3a;
+}
+table.variantgrid-datatable .aloft .aloft-recessive {
+  background: #dd8a1c;
+}
+table.variantgrid-datatable .aloft .aloft-tolerant {
+  background: #3f9a5e;
+}
+table.variantgrid-datatable .aloft .aloft-unknown {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px #ccc;
+}
+table.variantgrid-datatable .aloft .aloft-prob {
+  color: #777;
+  font-size: 10px;
+}
+table.variantgrid-datatable .aloft-low-confidence {
+  color: #999;
+}
+table.variantgrid-datatable .aloft-low-confidence .aloft-dot {
+  opacity: .45;
+}
+
+table.variantgrid-datatable .predictions {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  min-width: 0;
+}
+table.variantgrid-datatable .predictions i {
+  width: 4px;
+  height: 10px;
+  border-radius: 1px;
+  flex: none;
+}
+table.variantgrid-datatable .predictions .pred-damaging {
+  background: #cf3f3a;
+}
+table.variantgrid-datatable .predictions .pred-benign {
+  background: #a0a8b3;
+}
+table.variantgrid-datatable .predictions .predictions-count {
+  margin-left: 5px;
+  color: #777;
+  font-size: 10px;
+}
+table.variantgrid-datatable .pop-freq-source {
+  margin-left: 4px;
+  color: #777;
+  font-size: 10px;
+}
+table.variantgrid-datatable .uniprot {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  min-width: 0;
+}
+table.variantgrid-datatable .uniprot .uniprot-link {
+  flex: none;
+}
+table.variantgrid-datatable .uniprot .uniprot-function {
+  color: #777;
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+table.variantgrid-datatable .conservation {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+}
+table.variantgrid-datatable .conservation .conservation-detail {
+  display: none;
+}
+table.variantgrid-datatable .db-count-zero {
+  color: #bbb;
+}
+table.variantgrid-datatable .vcf-filter-pass {
+  color: #dde1e6;
+  font-size: 10px;
+}
+table.variantgrid-datatable .vcf-filter-failed {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+table.variantgrid-datatable .sample-zygosity {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  height: 16px;
+  vertical-align: top;
+}
+table.variantgrid-datatable .sample-zygosity .zyg-glyph {
+  width: 12px;
+  height: 12px;
+  flex: none;
+}
+table.variantgrid-datatable .sample-zygosity .zyg-het,
+table.variantgrid-datatable .sample-zygosity .zyg-hom-alt {
+  color: #3a6ea5;
+}
+table.variantgrid-datatable .sample-zygosity .zyg-ref,
+table.variantgrid-datatable .sample-zygosity .zyg-unknown {
+  color: #b0b6bd;
+}
+table.variantgrid-datatable .sample-zygosity .zyg-values {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  color: #555;
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+table.variantgrid-datatable .sample-zygosity .zyg-depth {
+  color: #888;
+  font-size: 10px;
+}
+table.variantgrid-datatable .sample-zygosity .zyg-cn {
+  flex: none;
+  padding: 0 3px;
+  border-radius: 3px;
+  background: #eef3f8;
+  color: #3a6ea5;
+  font-size: 10px;
+}
+table.variantgrid-datatable .sample-zygosity .zyg-qual {
+  width: 3px;
+  height: 10px;
+  border-radius: 1px;
+  flex: none;
+}
+table.variantgrid-datatable .sample-zygosity .zyg-qual-good {
+  background: #d5dae0;
+}
+table.variantgrid-datatable .sample-zygosity .zyg-qual-marginal {
+  background: #dd8a1c;
+}
+table.variantgrid-datatable .sample-zygosity .zyg-qual-bad {
+  background: #cf3f3a;
+}
+table.variantgrid-datatable .sample-zygosity .zyg-filtered {
+  color: #cf3f3a;
+  font-size: 10px;
+  flex: none;
+}
+table.variantgrid-datatable .grid-tags {
+  display: inline-block;
+  vertical-align: top;
+}
+table.variantgrid-datatable td.dt-tags:hover,
+table.variantgrid-datatable td.dt-tags_global:hover {
+  overflow: visible;
+}
+table.variantgrid-datatable td.dt-tags:hover > .grid-tags,
+table.variantgrid-datatable td.dt-tags_global:hover > .grid-tags {
+  position: relative;
+  z-index: 3;
+  background: #f8f8f8;
+}
+table.variantgrid-datatable .grid-tag-deletable .user-tag-colored {
+  cursor: pointer;
+}
+table.variantgrid-datatable .grid-tag-resolved .user-tag-colored {
+  opacity: 0.55;
+}
+table.variantgrid-datatable .grid-tag-sample-marker {
+  margin-left: 3px;
+  font-size: 8px;
+  vertical-align: 1px;
+  opacity: 0.75;
+}
+table.variantgrid-datatable .grid-tag-sample-marker.grid-tag-sample-other {
+  opacity: 1;
+  padding: 0 1px;
+  border: 1px solid;
+  border-radius: 2px;
+}
+table.variantgrid-datatable .grid-tag-delete {
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  z-index: 2;
+  width: 12px;
+  height: 12px;
+  font-size: 12px;
+  line-height: 12px;
+  color: #c02b2b;
+  background: white;
+  border-radius: 50%;
+  cursor: pointer;
+}
+table.variantgrid-datatable .grid-tag-armed .user-tag-colored {
+  outline: 1px solid #c02b2b;
+}
+table.variantgrid-datatable .add-variant-tag {
+  display: inline-block;
+  height: 16px;
+  line-height: 16px;
+  margin-right: 3px;
+  font-size: 12px;
+  color: #a0a8b3;
+  vertical-align: top;
+  cursor: pointer;
+}
+table.variantgrid-datatable .add-variant-tag::before {
+  content: "\f055";
+  font-family: 'Font Awesome 6 Free', 'FontAwesome';
+  font-weight: 900;
+}
+table.variantgrid-datatable .show-tag-autocomplete:hover .add-variant-tag {
+  color: #3a6ea5;
+}
+table.variantgrid-datatable.expandable td.toggle-link {
+  cursor: pointer;
+}
+table.variantgrid-datatable .variant-row-detail {
+  position: sticky;
+  left: 0;
+  width: max-content;
+  max-width: 90vw;
+  padding: 6px 10px;
+  font-size: 12px;
+  white-space: normal;
+}
+table.variantgrid-datatable .variant-row-detail .variant-row-detail-columns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 32px;
+  align-items: flex-start;
+}
+table.variantgrid-datatable .variant-row-detail .variant-row-detail-table {
+  max-width: 420px;
+}
+table.variantgrid-datatable .variant-row-detail .variant-row-detail-table th,
+table.variantgrid-datatable .variant-row-detail .variant-row-detail-table td {
+  overflow: visible;
+  text-overflow: clip;
+}
+table.variantgrid-datatable .variant-row-detail .variant-row-detail-table td {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+table.variantgrid-datatable .variant-row-detail .variant-row-detail-table th {
+  color: #777;
+  font-weight: 500;
+  padding-right: 10px;
+  white-space: nowrap;
+  text-align: left;
+}
+table.variantgrid-datatable .variant-row-detail .variant-row-detail-table .mono {
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 11px;
+}
+table.variantgrid-datatable .variant-row-detail .variant-row-detail-actions {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid #e1e5ea;
+  display: flex;
+  gap: 12px;
+}
+table.variantgrid-datatable td .external-link::after {
+  content: none;
+}
+table.variantgrid-datatable.dataTable tbody tr:first-child td {
+  border-top: 1px solid transparent;
+}
+table.variantgrid-datatable.dataTable thead > tr > th {
+  padding-right: 16px !important;
+}
+table.variantgrid-datatable.dataTable thead > tr > th.sorting_disabled {
+  padding-right: 4px !important;
+}
+table.variantgrid-datatable.dataTable thead > tr > th::before,
+table.variantgrid-datatable.dataTable thead > tr > th::after {
+  right: 2px !important;
 }
 
 table.sticky-header thead th {
@@ -956,7 +1589,8 @@ table.dataTable tr.child td.child {
 table.dataTable tr.child td.child fieldset.form-fields {
   padding-top: 0;
 }
-table.dataTable tr.child td.child fieldset.form-fields > * > label {
+table.dataTable tr.child td.child fieldset.form-fields > * > label,
+table.dataTable tr.child td.child fieldset.form-fields > * > .field-label {
   width: 100px;
 }
 table.dataTable tr.child td.child fieldset.form-fields > * > *:nth-child(2) {
@@ -1010,6 +1644,44 @@ table.datatable.expandable tr.even, table.datatable.expandable tr.odd {
 }
 .dataTables_wrapper .bottom .showing {
   flex-grow: 1;
+}
+.dataTables_wrapper .bottom .bottom-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-right: 12px;
+}
+.dataTables_wrapper.dt-compact .bottom .showing {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.dataTables_wrapper.dt-compact .bottom .dataTables_info,
+.dataTables_wrapper.dt-compact .bottom .dataTables_length,
+.dataTables_wrapper.dt-compact .bottom .dataTables_paginate {
+  padding: 0;
+  margin: 0;
+  line-height: 22px;
+  white-space: nowrap;
+}
+.dataTables_wrapper.dt-compact .bottom select,
+.dataTables_wrapper.dt-compact .bottom input {
+  height: 22px;
+  padding-top: 0;
+  padding-bottom: 0;
+  line-height: 22px;
+}
+.dataTables_wrapper.dt-compact .bottom .btn {
+  padding: 0 6px;
+  line-height: 20px;
+}
+.dataTables_wrapper.dt-compact .bottom .btn-rnd-rect {
+  width: auto;
+  min-width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  margin-left: 2px;
+  margin-right: 2px;
 }
 
 /* be able to show alerts in tables without them making the row giant */
@@ -1179,10 +1851,6 @@ div.readonly {
   font-style: italic;
 }
 
-.ui-tabs .ui-tabs-nav li.ui-tabs-active {
-  padding-bottom: 0 !important;
-}
-
 .debug {
   padding: 4px;
   margin-left: auto;
@@ -1320,6 +1988,34 @@ select[disabled] {
     transform: rotate(360deg);
   }
 }
+#columns-widget .composite-shows,
+#columns-widget .composite-inside {
+  color: #777;
+  font-size: 11px;
+}
+#columns-widget li.composite-column .column-name:before {
+  content: "composite";
+  margin-right: 5px;
+  padding: 0 4px;
+  border-radius: 2px;
+  background: #e4e8ee;
+  color: #555;
+  font-size: 10px;
+  font-weight: normal;
+}
+#columns-widget #available_columns li.composite-member {
+  display: none;
+}
+#columns-widget.show-members #available_columns li.composite-member {
+  display: block;
+}
+
+#show-members-label {
+  display: block;
+  margin: 5px;
+  font-size: 12px;
+}
+
 .list-group-item .user-award {
   text-shadow: #fff 0px 0 4px;
 }
@@ -1353,7 +2049,8 @@ h4:not(:first-child):not(.popover-header) {
 }
 
 label,
-form label {
+form label,
+.field-label {
   color: #555;
   font-weight: 500;
 }
@@ -1444,10 +2141,6 @@ span.select2-container {
 }
 .card-body-list .list-group .list-group-item:last-child {
   border-bottom: none !important;
-}
-
-.ui-jqgrid > .ui-jqgrid-pager {
-  height: 38px !important;
 }
 
 hr {
@@ -2137,11 +2830,32 @@ a.nav-link.not-important.active {
 	animation: highlight-select 1s infinite alternate;
 }
  */
+/* DataTables positions the processing box against the wrapper, which lands it halfway down the
+   grid - the table gets its own container, and the box sticks to the top of it so it stays over
+   the header row (which does its own sticking) however far the grid is scrolled */
+.dt-table-container {
+  position: relative;
+}
+
 div.dataTables_processing {
-  border-radius: 4px;
+  position: sticky;
+  top: 0;
+  left: auto;
+  height: 0;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  background: none;
+  border: none;
+  z-index: 2;
 }
 div.dataTables_processing div {
-  margin: 4px !important;
+  display: inline-block;
+  margin: 0 !important;
+  padding: 2px 8px;
+  background-color: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(0, 0, 0, 0.125);
+  border-radius: 4px;
 }
 div.dataTables_processing div::before {
   content: 'Processing...';
@@ -2152,6 +2866,7 @@ div.dataTables_processing div * {
 }
 div.dataTables_processing > div:last-child {
   width: auto !important;
+  height: auto !important;
 }
 
 /**
@@ -2203,6 +2918,107 @@ li.help-item :last-child {
   margin-right: 2px;
 }
 
+/* Icons drawn from the sprite rather than FontAwesome - see SvgSymbolPreviewIconMixin. Sized to sit on
+   the text baseline like a glyph; the symbols are currentColor so they pick up the surrounding colour */
+.svg-symbol-icon {
+  width: 1.25em;
+  height: 1em;
+  vertical-align: -0.125em;
+}
+
+/* Uploaded file type icons on the upload pages - see upload/file_type_icons.py. FontAwesome or a sprite symbol at
+   40px, with a round badge in front for the VCF sub-types (V for variants only, a pen for manual entry, the gene
+   for gene-level) and the gene list's G */
+.file-type-icon {
+  position: relative;
+  float: left;
+  width: 40px;
+  height: 40px;
+  font-size: 30px;
+  line-height: 40px;
+  text-align: center;
+  color: #3455a4;
+}
+.file-type-icon > .svg-symbol-icon {
+  width: 40px;
+  height: 40px;
+  vertical-align: top;
+}
+
+.file-type-icon-bed {
+  color: #8a6d3b; /* .IntersectionNode's --node-accent-color, which is scoped to the node card */
+}
+
+.file-type-icon-muted {
+  color: #9aa3b2;
+}
+
+.file-type-badge {
+  position: absolute;
+  left: -7px;
+  bottom: -3px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  box-sizing: border-box;
+  color: #fff;
+  font-size: 12px;
+  line-height: 22px;
+  text-align: center;
+}
+.file-type-badge > .svg-symbol-icon {
+  width: 16px;
+  height: 16px;
+  vertical-align: -3px;
+}
+
+.file-type-badge-variant {
+  background-color: #343a40;
+}
+
+.file-type-badge-manual {
+  background-color: #0e7a4a;
+}
+
+.file-type-badge-gene, .file-type-badge-gene-list {
+  background-color: #6b3fa0; /* .GeneListNode's --node-accent-color */
+}
+
+/* Blackens a member of the Trio/Quad pedigree symbols - see --pedigree-*-fill in
+   uicore/tags/svg_icon_sprite.html. Set on the <svg> by the page, or by Trio/Quad's
+   get_preview_icon_css_class() so a listed trio wears its affected status */
+.mother-affected {
+  --pedigree-mother-fill: currentColor;
+}
+
+.father-affected {
+  --pedigree-father-fill: currentColor;
+}
+
+.sibling-affected {
+  --pedigree-sibling-fill: currentColor;
+}
+
+.relative-affected {
+  --pedigree-relative-fill: currentColor;
+}
+
+.duo-mother {
+  --pedigree-duo-square-fill: none;
+  --pedigree-duo-square-stroke: none;
+}
+
+.duo-father {
+  --pedigree-duo-circle-fill: none;
+  --pedigree-duo-circle-stroke: none;
+}
+
+.duo-sibling {
+  --pedigree-duo-parent-display: none;
+  --pedigree-duo-sibling-display: inline;
+}
+
 .preview-data .preview-category,
 .preview-data .preview-title {
   font-weight: 500;
@@ -2233,6 +3049,166 @@ li.help-item :last-child {
   font-size: 8pt;
 }
 
+.variant-tag-entry {
+  width: 260px;
+  padding: 6px;
+  background: white;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .2);
+}
+
+.dt-sort-menu-items {
+  font-size: 12px;
+  min-width: 0;
+}
+.dt-sort-menu-items .dropdown-item {
+  padding: 2px 12px;
+}
+
+body.dt-col-resizing {
+  cursor: col-resize;
+  user-select: none;
+}
+
+.cons-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+  vertical-align: middle;
+}
+
+.cons-conserved {
+  background: #cf3f3a;
+}
+
+.cons-not-conserved {
+  background: #a0a8b3;
+}
+
+.cons-none {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px #ccc;
+}
+
+.conservation-detail {
+  padding: 4px 8px;
+  font-size: 12px;
+  white-space: nowrap;
+  background: white;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .2);
+}
+.conservation-detail th {
+  padding: 1px 10px 1px 0;
+  font-weight: normal;
+  text-align: left;
+  color: #444;
+}
+.conservation-detail td {
+  padding: 1px 4px;
+  text-align: right;
+}
+.conservation-detail .cons-range {
+  color: #bbb;
+  font-size: 10px;
+}
+.conservation-detail .cons-value {
+  font-weight: bold;
+}
+.conservation-detail .cons-value .cons-dot {
+  margin-right: 5px;
+}
+.conservation-detail .cons-blank {
+  color: #bbb;
+  font-weight: normal;
+}
+
+.annotation-descriptions .composite-section {
+  padding: 12px 0;
+  border-top: 1px solid #e5e5e5;
+}
+.annotation-descriptions .composite-section:first-of-type {
+  border-top: none;
+}
+.annotation-descriptions .composite-section-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+.annotation-descriptions .composite-section-title {
+  flex: 1;
+  min-width: 0;
+}
+.annotation-descriptions .composite-section-title .color-box {
+  width: 14px;
+  height: 14px;
+  float: none;
+  margin-right: 0;
+}
+.annotation-descriptions table.composite-example {
+  flex: none;
+  margin-top: 0 !important;
+}
+.annotation-descriptions table.composite-example th {
+  font-size: 12px;
+  border-bottom: 1px solid #ccc;
+  cursor: default;
+}
+.annotation-descriptions table.composite-example td {
+  height: 22px;
+  border: none;
+}
+.annotation-descriptions table.composite-example a {
+  cursor: default;
+}
+.annotation-descriptions .annotation-grid-column-name {
+  font-size: 11px;
+  font-weight: normal;
+}
+.annotation-descriptions .annotation-member-level {
+  font-size: 11px;
+  padding-top: 4px;
+  white-space: nowrap;
+}
+.annotation-descriptions .annotation-member-level .color-box {
+  width: 12px;
+  height: 12px;
+  float: none;
+  display: inline-block;
+  margin-right: 4px;
+  vertical-align: text-bottom;
+}
+.annotation-descriptions .annotation-role {
+  border-radius: 5px;
+  white-space: nowrap;
+  text-align: center;
+  padding: 2px;
+  font-size: 11px;
+}
+.annotation-descriptions .annotation-role-headline {
+  background-color: #333333;
+  color: #fff;
+}
+.annotation-descriptions .annotation-role-sort {
+  background-color: #cccccc;
+  color: #333333;
+}
+.annotation-descriptions .annotation-role-hover {
+  background-color: #eeeeee;
+  color: #666666;
+}
+.annotation-descriptions .annotation-source-composite {
+  background-color: #6A5ACD;
+}
+.annotation-descriptions .annotation-source-vcf {
+  background-color: #B8860B;
+}
+
+
 .gnomad-link {
   text-decoration: none;
 }
@@ -2251,7 +3227,8 @@ li.help-item :last-child {
   background-color: #5cb85c;
 }
 
-.gnomad-filtered {
+.gnomad-filtered,
+.gnomad-flagged {
   background-color: #f0ad4e;
 }
 
@@ -2314,16 +3291,13 @@ a.clinical-context {
   background-image: url(/static/icons/vcf_64.png);
 }
 
-.sample-icon {
-  background-image: url(/static/icons/samples_icon.png);
-}
-
-.bed-icon {
-  background-image: url(/static/images/node_icons/intersection.png);
-}
-
-.analysis-icon {
-  background-image: url(/static/images/node_icons/analysis_node.png);
+.sequencing-run-vcfs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  line-height: 1;
+  min-width: 106px;
 }
 
 .clingen-icon {
@@ -2360,22 +3334,6 @@ a.clinical-context {
   background-image: url(/static/icons/sequencers/iseq_icon.png);
 }
 
-.patient-icon {
-  background-image: url(/static/icons/patient-icon-png-3.png);
-}
-
-.cohort-icon {
-  background-image: url(/static/images/node_icons/cohort.png);
-}
-
-.pedigree-icon {
-  background-image: url(/static/images/node_icons/pedigree.png);
-}
-
-.trio-icon {
-  background-image: url(/static/images/node_icons/trio.png);
-}
-
 .gold-standard-icon {
   background-image: url(/static/icons/gold-medal.png);
 }
@@ -2394,10 +3352,6 @@ a.clinical-context {
 
 .gene-list-icon {
   background-image: url("/static/images/node_icons/filter_list.png");
-}
-
-.expression-icon {
-  background-image: url("/static/images/node_icons/expression.png");
 }
 
 .show-grid-icon {
@@ -2805,28 +3759,28 @@ a .c-hgvs-body .c-hgvs-nomen {
   font-weight: 600;
 }
 
-.cs-none {
+.scs-none, .cs-none {
   border: none !important;
   background-color: #eeeeee;
 }
 
-.cs-tier_1 {
+.scs-tier_1, .cs-tier_1 {
   background-color: #ffcccc;
 }
 
-.cs-tier_1_or_2 {
+.scs-tier_1_or_2, .cs-tier_1_or_2 {
   background-color: #ffd5d5;
 }
 
-.cs-tier_2 {
+.scs-tier_2, .cs-tier_2 {
   background-color: #ffdddd;
 }
 
-.cs-tier_3 {
+.scs-tier_3, .cs-tier_3 {
   background-color: #dddddd;
 }
 
-.cs-tier_4 {
+.scs-tier_4, .cs-tier_4 {
   background-color: #ccccff;
 }
 
@@ -2863,6 +3817,57 @@ a .c-hgvs-body .c-hgvs-nomen {
 
 .cs-withdrawn {
   opacity: 0.5;
+}
+
+.summary-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.summary-counts .summary-count {
+  display: flex;
+  align-items: stretch;
+  white-space: nowrap;
+  cursor: pointer;
+  border-radius: 6px;
+  text-decoration: none;
+}
+.summary-counts .summary-count .c-pill {
+  width: auto;
+  min-width: 90px;
+  border-radius: 6px 0 0 6px;
+}
+.summary-counts .summary-count .count {
+  padding: 4px 10px;
+  border: 1px solid #ddd;
+  border-left: none;
+  border-radius: 0 6px 6px 0;
+  background-color: #fafafa;
+  color: #555;
+  font-weight: 600;
+}
+.summary-counts .summary-count:hover .count {
+  background-color: #eee;
+}
+.summary-counts .summary-count.selected {
+  outline: 2px solid #555;
+  outline-offset: 1px;
+}
+.summary-counts.filtered .summary-count:not(.selected) {
+  opacity: 0.5;
+}
+.summary-counts.tag-counts-summary {
+  align-items: center;
+}
+.summary-counts.tag-counts-summary .summary-count .c-pill {
+  min-width: 60px;
+  padding: 2px 8px;
+  font-size: 11px;
+}
+.summary-counts.tag-counts-summary .summary-count .count {
+  padding: 2px 8px;
+  font-size: 11px;
 }
 
 .cs-in-review {
@@ -2912,6 +3917,46 @@ a .c-hgvs-body .c-hgvs-nomen {
 .screenshot-mode time.ago {
   color: black;
   background: black;
+}
+
+/* Feature tips (see variantgrid/tips.py) - sits over a grid loading overlay or under a page
+   heading, so it reads as a friendly aside rather than a warning */
+.tip-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 640px;
+  margin: 12px auto;
+  padding: 8px 14px;
+  border-radius: 18px;
+  background-color: #f2f7fd;
+  border: 1px solid #d8e6f5;
+  color: #40546a;
+  font-size: 0.9em;
+  line-height: 1.35;
+}
+.tip-box .tip-icon {
+  color: #e0a900;
+}
+.tip-box .tip-label {
+  font-weight: 600;
+  color: #2f4a68;
+}
+.tip-box .tip-text {
+  flex: 1;
+}
+.tip-box .tip-next, .tip-box .tip-dismiss {
+  color: #8ba3bc;
+  opacity: 0.7;
+}
+.tip-box .tip-next:hover, .tip-box .tip-dismiss:hover {
+  color: #2f4a68;
+  opacity: 1;
+  text-decoration: none;
+}
+.tip-box.tips-off {
+  justify-content: center;
+  font-style: italic;
 }
 
 .comment {
