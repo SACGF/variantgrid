@@ -59,10 +59,12 @@
                     <input type="checkbox" class="form-check-input" id="transcript_type_not_supported" onclick="applyFilters()"/>
                     <label for="transcript_type_not_supported" title="Only show records where the imported transcript type is not supported">Transcript Type Not Supported</label>
                 </div>
+                {% if gene_level_enabled %}
                 <div class="form-check-inline">
                     <input type="checkbox" class="form-check-input" id="gene_level_unresolved" onclick="applyFilters()"/>
                     <label for="gene_level_unresolved" title="Only show records whose gene-level value (a fusion, copy number call or splice event) could not be resolved">Gene Level Unresolved</label>
                 </div>
+                {% endif %}
                 <div class="form-check-inline">
                     <input type="checkbox" class="form-check-input" id="transcript_version_change" onclick="applyFilters()"/>
                     <label for="transcript_version_change" title="Only show records where imported/normal/liftover differ by transcript version">Transcript Ver Change</label>

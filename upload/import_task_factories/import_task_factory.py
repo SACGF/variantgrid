@@ -14,6 +14,11 @@ from upload.models import UploadPipeline
 class ImportTaskFactory(ABC):
     """ Subclass this to dispatch uploaded files to tasks """
 
+    @property
+    def enabled(self) -> bool:
+        """ False withdraws this file type from upload and from the API capabilities endpoint """
+        return True
+
     @abstractmethod
     def get_uploaded_file_type(self) -> str:
         pass
@@ -52,7 +57,9 @@ def get_import_task_factories() -> list[ImportTaskFactory]:
     factories = []
     for itf_class in get_all_subclasses(ImportTaskFactory):
         if not inspect.isabstract(itf_class):
-            factories.append(itf_class())
+            itf = itf_class()
+            if itf.enabled:
+                factories.append(itf)
 #        else:
 #            logging.debug("Warning: not looking at %s", itf_class)
 

@@ -124,6 +124,10 @@ class DragenTSO500AllFusionsImportTaskFactory(AbstractVCFImportTaskFactory):
         A csv full of gene symbols, so GeneListImportTaskFactory would otherwise claim it on its
         default ability of 1 """
 
+    @property
+    def enabled(self) -> bool:
+        return settings.VARIANT_GENE_LEVEL_ENABLED
+
     def get_uploaded_file_type(self):
         return UploadedFileTypes.DRAGEN_TSO500_ALL_FUSIONS
 
@@ -190,6 +194,10 @@ class DragenTSO500CombinedVariantOutputImportTaskFactory(AbstractVCFImportTaskFa
 
         A tsv full of gene symbols, so GeneListImportTaskFactory would otherwise claim it on its
         default ability of 1 """
+
+    @property
+    def enabled(self) -> bool:
+        return settings.VARIANT_GENE_LEVEL_ENABLED
 
     def get_uploaded_file_type(self):
         return UploadedFileTypes.DRAGEN_TSO500_COMBINED_VARIANT_OUTPUT
@@ -258,6 +266,10 @@ class GeneLevelCNVImportTaskFactory(AbstractVCFImportTaskFactory):
 
         An ordinary VCF, so GenotypeVCFImportFactory would otherwise claim it and store the caller's
         target windows as structural variants. """
+
+    @property
+    def enabled(self) -> bool:
+        return settings.VARIANT_GENE_LEVEL_ENABLED
 
     def get_uploaded_file_type(self):
         return UploadedFileTypes.GENE_LEVEL_CNV_VCF
@@ -462,6 +474,10 @@ class GeneLevelInsertVariantsOnlyImportFactory(VCFInsertVariantsOnlyImportFactor
     """ As VCFInsertVariantsOnlyImportFactory, for gene-level variants - a classification naming
         'BCR::ABL1' comes in this way, so that a fusion enters the database by the same pipeline as
         every other variant. @see snpdb.gene_level_variants """
+
+    @property
+    def enabled(self) -> bool:
+        return settings.VARIANT_GENE_LEVEL_ENABLED
 
     def get_uploaded_file_type(self):
         return UploadedFileTypes.GENE_LEVEL_INSERT_VARIANTS_ONLY

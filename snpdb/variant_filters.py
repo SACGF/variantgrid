@@ -65,7 +65,10 @@ def get_symbolic_variant_types() -> list[str]:
 
 
 def get_all_variant_types() -> list[str]:
-    return STANDARD_VARIANT_TYPES + get_symbolic_variant_types() + [VariantType.FUSION]
+    variant_types = STANDARD_VARIANT_TYPES + get_symbolic_variant_types()
+    if settings.VARIANT_GENE_LEVEL_ENABLED:
+        variant_types.append(VariantType.FUSION)
+    return variant_types
 
 
 def get_variant_type_label(variant_type: str) -> str:

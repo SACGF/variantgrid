@@ -1,6 +1,6 @@
 from unittest.mock import patch
 
-from django.test import TestCase
+from django.test import TestCase, override_settings
 
 from annotation.fake_annotation import get_fake_annotation_version
 from classification.models import ImportedAlleleInfo
@@ -188,6 +188,23 @@ class ImportedAlleleInfoValidationTest(TestCase):
             grch37=self._resolved(GenomeBuild.grch37()),
             grch38=self._resolved(GenomeBuild.grch38(), c_hgvs=self.C_HGVS_38, transcript_version_id=2))
         self.assertEqual(allele_info._calculate_validation()["builds"], {"missing_37": "W"})
+
+
+class ImportedAlleleInfoGeneLevelDisabledTest(TestCase):
+    """ With gene-level variants off, a value naming genes is just a c.HGVS that fails to parse """
+
+    @override_settings(VARIANT_GENE_LEVEL_ENABLED=False)
+    def test_fusion_string_fails_as_an_hgvs(self):
+        allele_info = ImportedAlleleInfo.get_or_create(
+            imported_c_hgvs="BCR::ABL1",
+            imported_genome_build_patch_version=GenomeBuildPatchVersion.get_unspecified_patch_version_for(
+                GenomeBuild.grch38()))
+        self.assertIsNone(allele_info.variant_coordinate)
+        self.assertEqual(ImportedAlleleInfoStatus.FAILED, allele_info.status)
+        self.assertFalse(allele_info.is_gene_level)
+        general = allele_info.latest_validation.validation_tags["general"]
+        self.assertIn("cant_resolve_to_variant_coordinate", general)
+        self.assertNotIn("gene_level_unresolved", general)
 
 
 class ResolvedVariantInfoCNVTest(TestCase):

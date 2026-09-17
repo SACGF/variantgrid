@@ -3,6 +3,7 @@ import re
 from functools import reduce
 from typing import Optional
 
+from django.conf import settings
 from django.db.models import Count, Q, QuerySet
 from django.http import HttpRequest
 from django.shortcuts import get_object_or_404, render
@@ -201,7 +202,10 @@ class ImportedAlleleInfoColumns(DatatableConfig[ImportedAlleleInfo]):
 @require_superuser
 def view_imported_allele_info(request: HttpRequest) -> Response:
     status = request.GET.get("status")
-    return render(request, "classification/imported_allele_info.html", {"status": status})
+    return render(request, "classification/imported_allele_info.html", {
+        "status": status,
+        "gene_level_enabled": settings.VARIANT_GENE_LEVEL_ENABLED,
+    })
 
 
 def view_imported_allele_info_detail(request: HttpRequest, allele_info_id: int):

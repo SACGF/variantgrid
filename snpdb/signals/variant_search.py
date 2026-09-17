@@ -867,7 +867,8 @@ GENE_FUSION_PATTERN = re.compile(r"^([A-Za-z0-9.]+)\s*(?:::|--|-)\s*([A-Za-z0-9.
     example=SearchExample(
         note="A gene fusion, named by its gene pair",
         examples=["BCR::ABL1", "CD74-ROS1"]
-    )
+    ),
+    enabled=settings.VARIANT_GENE_LEVEL_ENABLED,
 )
 def search_variant_gene_fusion(search_input: SearchInputInstance):
     """ Lookup only - searching must never mint a fusion identity.
@@ -885,7 +886,8 @@ def search_variant_gene_fusion(search_input: SearchInputInstance):
     example=SearchExample(
         note="A whole-gene copy number event, named by its gene",
         examples=["EGFR amplification", "PTEN loss"]
-    )
+    ),
+    enabled=settings.VARIANT_GENE_LEVEL_ENABLED,
 )
 def search_variant_gene_copy_number(search_input: SearchInputInstance):
     """ Lookup only - searching must never mint a copy number identity. 'amp', 'gain', 'deletion'
@@ -901,7 +903,8 @@ def search_variant_gene_copy_number(search_input: SearchInputInstance):
     example=SearchExample(
         note="A splice event, named by its gene and the junction's label",
         examples=["AR V7", "MET exon 14 skipping"]
-    )
+    ),
+    enabled=settings.VARIANT_GENE_LEVEL_ENABLED,
 )
 def search_variant_splice_event(search_input: SearchInputInstance):
     """ Lookup only - searching must never mint a splice identity. A label shape not in

@@ -13,6 +13,8 @@ This is the only module that knows all three kinds; the resolvers themselves sta
 from functools import partial
 from typing import Optional
 
+from django.conf import settings
+
 from genes.gene_copy_number import (
     COPY_NUMBER_STRING_PATTERN,
     resolve_gene_copy_number_string,
@@ -26,8 +28,11 @@ from snpdb.models import HGVS_UNCLEANED_PATTERN, GenomeBuild
 def looks_gene_level(value: str) -> bool:
     """ Whether the value names genes ('BCR::ABL1', 'EGFR amplification', 'ARV7') rather than giving
         a coordinate. Shape only - it holds for a value nothing has resolved yet, and for one whose
-        gene turned out to be a typo, which is what stops either being read as a broken HGVS """
+        gene turned out to be a typo, which is what stops either being read as a broken HGVS.
+        Always False with VARIANT_GENE_LEVEL_ENABLED off, so every value takes the HGVS path """
 
+    if not settings.VARIANT_GENE_LEVEL_ENABLED:
+        return False
     if not value or HGVS_UNCLEANED_PATTERN.search(value):
         return False
     return bool(FUSION_STRING_SEPARATOR.search(value)

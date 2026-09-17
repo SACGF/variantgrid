@@ -140,6 +140,8 @@ Gotchas:
   gene-level record - `gene_level_unresolved`, with the resolver's reason as its message - rather than as a broken
   HGVS. A splice label shape has to be in `genes/gene_splice.py:SPLICE_STRING_PATTERN` to be recognised at all;
   nothing has to be pre-registered beyond that. claude/research/classifications.md has the table of written forms.
+- With `VARIANT_GENE_LEVEL_ENABLED` off (Shariant), `genes/gene_level_strings.py:looks_gene_level` is always False, so
+  'BCR::ABL1' takes the HGVS path and fails as an HGVS - `cant_resolve_to_variant_coordinate`, never `gene_level_unresolved`.
 - A gene-level variant sits on no transcript, so `gene_symbol` is autopopulated from the event's GeneLevelId (a fusion's
   anchor first), which already holds the approved symbol the caller's MYCL1 resolved to
   (`autopopulate_evidence_keys/evidence_from_variant.py:get_evidence_fields_from_gene_level_event`) - the transcript path

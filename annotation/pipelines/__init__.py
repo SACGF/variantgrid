@@ -15,7 +15,7 @@ from annotation.pipelines.vep import VEPRunner
 PIPELINES: dict[VariantAnnotationPipelineType, PipelineDef] = {p.pipeline_type: p for p in [
     PipelineDef(VEPRunner(VariantAnnotationPipelineType.STANDARD)),
     PipelineDef(VEPRunner(VariantAnnotationPipelineType.STRUCTURAL_VARIANT)),
-    PipelineDef(GeneLevelRunner(), enabled_setting="ANNOTATION_GENE_LEVEL_ENABLED"),
+    PipelineDef(GeneLevelRunner(), enabled_setting="VARIANT_GENE_LEVEL_ENABLED"),
     PipelineDef(AnnotSVRunner(),
                 depends_on=VariantAnnotationPipelineType.STRUCTURAL_VARIANT,
                 blocks_vcf_import=False,

@@ -10,7 +10,7 @@ what the command cannot know. Verified against vg-test2 on 2026-09-06.
 |---|---|---|
 | vg-test2 (test.variantgrid.com) | `variantgrid/settings/env/vgtest2.py` | The lab box this repo is usually driven from; see "This box" in `CLAUDE.md` |
 | variantgrid.com | `variantgrid/settings/env/vgaws.py` | Public instance on AWS |
-| Shariant (test / demo / prod) | `variantgrid/settings/env/shariantcommon.py` + `sharianttest.py` / `shariantdemo.py` / `shariant.py` / `shariantsecurity.py` alongside it | Australian classification sharing; patients and analysis URLs unregistered |
+| Shariant (test / demo / prod) | `variantgrid/settings/env/shariantcommon.py` + `sharianttest.py` / `shariantdemo.py` / `shariant.py` / `shariantsecurity.py` alongside it | Australian classification sharing; patients and analysis URLs unregistered; `VARIANT_GENE_LEVEL_ENABLED = False` (germline small variants only) |
 | SA Pathology | private repo `variantgrid_sapath` (settings and site-specific apps live there) | Largest production data; clinical use |
 | runx1db | `variantgrid/settings/env/runx1db2.py` | Gene-specific public database |
 | CI | `variantgrid/settings/env/github_actions.py` with `config/ci/settings_config.json` | Also the canonical module for `vg map` |

@@ -61,6 +61,10 @@ Gotchas:
   rewritten onto the gene-level contig - the caller's segment is the panel's target window, not the event, so it is
   never stored as a Variant (tasks/import_gene_level_cnv_task.py, @see snpdb.gene_level_variants). A file naming a gene
   on partial calls (DragenExonCNV's `GENE=`) is not a segment field and keeps importing as coordinate SVs.
+- A file type gated by a setting overrides `import_task_factories/import_task_factory.py:ImportTaskFactory.enabled`;
+  a disabled factory is left out of `get_import_task_factories`, so it is neither picked for an upload nor listed by the
+  capabilities endpoint. The four gene-level factories return `settings.VARIANT_GENE_LEVEL_ENABLED`, and with it off a
+  `SEGID` CNV VCF imports as an ordinary VCF on its written coordinates.
 - A TSO 500 pair's CombinedVariantOutput tsv is the only variant source for its `[Splice Variants]` section
   (import_task_factories/import_task_factories.py:DragenTSO500CombinedVariantOutputImportTaskFactory,
   tasks/import_dragen_tso500_combined_variant_output_task.py). Each row becomes a gene-level Variant whose alt carries

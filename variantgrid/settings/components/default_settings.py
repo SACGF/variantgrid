@@ -1280,6 +1280,12 @@ VARIANT_SYMBOLIC_ALT_VALID_TYPES = {VCFSymbolicAllele.CNV, VCFSymbolicAllele.DEL
 # See https://github.com/SACGF/variantgrid/issues/1344
 VARIANT_SYMBOLIC_ALT_SVLEN_ALWAYS_POSITIVE = False
 
+# Gene-level variants - fusions, whole-gene copy number and splice events stored as Variants on the
+# fake contig (@see snpdb.gene_level_variants). Off, a value naming one is refused at the coordinate,
+# the search shortcuts and TSO 500 upload types are withheld and the gene-level annotation pipeline
+# is never scheduled.
+VARIANT_GENE_LEVEL_ENABLED = True
+
 VIEW_GENE_HOTSPOT_GRAPH_CLASSIFICATIONS = False
 VIEW_GENE_HOTSPOT_GRAPH_CLASSIFICATIONS_PREFER_CANONICAL_WITH_DIFF_VERSION = True
 VIEW_GENE_HOTSPOT_GRAPH = True
