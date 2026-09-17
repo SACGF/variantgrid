@@ -60,7 +60,7 @@ printed for a human. Completion is a `ManualMigrationAttempt`. `scripts/deployed
 
 Releases are git tags `vg<major>.<minor>` (`vg3.0`, and `vg4.0` once cut). `VARIANTGRID_VERSION` is `git describe` against the
 latest tag for `VARIANTGRID_MAJOR_VERSION` (`vg4.0-12-gc174556`, or `vg4-gc174556` before that major has a tag), read
-once per process from the checkout and reported by the API docs and `seqauto/views_rest.py:CapabilitiesView`. Cutting a
+once per process from the checkout and reported by the API docs and `variantgrid/views_rest.py:CapabilitiesView`. Cutting a
 new major means bumping that setting in the same commit as the tag.
 
 Pushed migrations are frozen (`CLAUDE.md`); a data fix that must run on every deployment is a `ManualOperation` in a
@@ -139,6 +139,8 @@ loop. GitHub issues are closed by a human after that pipeline, never by a commit
 `/seqauto/api/`, `/upload/api/`, `/mme/api/`, `/beacon/`) so DRF's `IsAuthenticated` can answer 401 instead. A plain Django
 `View` mounted under an exempt prefix is reachable anonymously (it usually 500s on `AnonymousUser`); new endpoints there must
 be `rest_framework.views.APIView` subclasses. Verify with an unauthenticated request - a 500 means the view is unprotected.
-`seqauto/views_rest.py:CapabilitiesView` stays at `/seqauto/api/v1/capabilities` rather than `/api/v1/`: VG3 (`vg3_sapath_prod`) only
-exempts the app prefixes, so there `/api/v1/capabilities` redirects to the login page (a 200 of HTML to a client that follows
-redirects) while the seqauto path is a clean 404 a client can read as "legacy server".
+`variantgrid/views_rest.py:CapabilitiesView` (`/api/v1/capabilities`) tells a client which calls this server accepts, as VG3 and
+VG4 run side by side. `API_FEATURES` is the client contract: add a name in the same change as a client-visible feature, and keep
+names once added. `upload_file_types` is derived from the import task factories, so it needs no upkeep. A server too old to have
+the endpoint answers 404, or on VG3 (which only exempts `^/api/v1/capabilities$`, not `^/api/.*`) a redirect to login. The
+client (variantgrid_api) doesn't follow redirects and reads either as "legacy server".

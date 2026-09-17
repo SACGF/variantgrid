@@ -10,6 +10,7 @@ from drf_spectacular.views import SpectacularAPIView, SpectacularRedocView, Spec
 
 from variantgrid import views
 from variantgrid.views import ContactFormView, OneStepRegistrationView
+from variantgrid.views_rest import CapabilitiesView
 
 admin.autodiscover()
 
@@ -51,6 +52,7 @@ urlpatterns = [
     path('api/schema', SpectacularAPIView.as_view(), name='openapi-schema'),
     path('api/docs', SpectacularSwaggerView.as_view(url_name='openapi-schema'), name='api-docs'),
     path('api/redoc', SpectacularRedocView.as_view(url_name='openapi-schema'), name='api-redoc'),
+    path('api/v1/capabilities', CapabilitiesView.as_view(), name='api_capabilities'),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
 if settings.INBOX_ENABLED:

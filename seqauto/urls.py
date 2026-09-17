@@ -40,7 +40,6 @@ from seqauto.views_admin import (
     VariantCallingPipelineUpdate,
 )
 from seqauto.views_rest import (
-    CapabilitiesView,
     EnrichmentKitViewSet,
     ExperimentViewSet,
     FastQCViewSet,
@@ -201,7 +200,6 @@ urlpatterns += [
     path('api/v1/sequencing_files/bulk_create', SequencingFilesBulkCreateView.as_view(), name='api_sequencing_files_bulk_create'),
     path('api/v1/sequencing_sample/link_extraction', SequencingSampleExtractionLinkView.as_view(),
          name='api_sequencing_sample_link_extraction'),
-    path('api/v1/capabilities', CapabilitiesView.as_view(), name='api_capabilities'),
 
 
 ]

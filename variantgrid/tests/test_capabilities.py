@@ -1,5 +1,5 @@
 """
-sapath#443 - the capabilities endpoint a client asks before choosing which calls to make
+sapath#443 - the capabilities endpoint (/api/v1/capabilities) a client asks before choosing which calls to make
 """
 from django.contrib.auth.models import User
 from django.urls import reverse
