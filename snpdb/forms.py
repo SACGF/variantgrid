@@ -17,7 +17,7 @@ from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.forms import ALL_FIELDS, EmailInput, URLInput, inlineformset_factory
 from django.forms.forms import DeclarativeFieldsMetaclass
-from django.forms.widgets import HiddenInput, NullBooleanSelect, Textarea, TextInput
+from django.forms.widgets import HiddenInput, NullBooleanSelect, TextInput
 from guardian import shortcuts
 from guardian.shortcuts import assign_perm, remove_perm
 
@@ -714,9 +714,7 @@ class CohortForm(CohortPhenotypeForm):
     class Meta(CohortPhenotypeForm.Meta):
         model = models.Cohort
         fields = ['name', 'phenotype']
-        # The phenotype editor is drawn in the page's Details tab, outside the cohort-form element
-        widgets = {'name': TextInput(),
-                   'phenotype': Textarea(attrs={"form": "cohort-form"})}
+        widgets = {'name': TextInput()}
 
 
 class CustomColumnsCollectionForm(forms.ModelForm):

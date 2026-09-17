@@ -318,6 +318,17 @@ $(document).ready(function() {
                                                                        () => membershipEditor.memberPatientIds, patientPhenotypes);
     membershipEditor.onRender = refreshPhenotypeSeedButton;
     membershipEditor.init();
+    {% if has_write_permission %}
+    // Compared against the rendered values, so typing a change back out hides the message again.
+    // The phenotype editor's term pickers also live in this form - only name and text are saved
+    const cohortForm = $("form#cohort-form");
+    const cohortDetailFields = $("#{{ cohort_form.name.auto_id }}, #{{ cohort_form.phenotype.auto_id }}");
+    const cohortDetailValues = () => JSON.stringify(cohortDetailFields.map(function () { return $(this).val(); }).get());
+    const savedCohortDetails = cohortDetailValues();
+    cohortForm.on("input change keyup", function () {
+        $(".unsaved-changes-message", cohortForm).toggle(cohortDetailValues() !== savedCohortDetails);
+    });
+    {% endif %}
 {% endif %}
 {% endblock %}
 
@@ -329,22 +340,13 @@ $(document).ready(function() {
     <h1>VCF: {{ vcf.name }}</h1>
     {% include "snpdb/data/_data_archived_banner.html" with obj=vcf restore_url_name='restore_vcf' %}
 {% else %}
+    <h1>Cohort: {{ cohort.name }}</h1>
     {% if cohort.data_archived %}
     <div class="alert alert-warning" role="alert">
         <strong>Cohort is read-only.</strong>
         Underlying VCF data has been archived. Restore the parent VCF to enable editing.
     </div>
     {% endif %}
-    {# The phenotype editor lives in the Details tab and joins this POST through its form attribute #}
-    <form id="cohort-form" method="post">
-        {% csrf_token %}
-        {% if has_write_permission %}
-            {{ cohort_form.name }}<button id='change-name' class="btn btn-primary">Save</button>
-        {% else %}
-            <b>Cohort:</b> {{ cohort.name }}
-        {% endif %}
-        <b>Genome Build:</b> {{ cohort.genome_build }}
-    </form>
 {% endif %}
 
 {% include "snpdb/data/_cohort_provenance.html" %}
@@ -423,7 +425,18 @@ $(document).ready(function() {
             {% vcf_import_info vcf 'Please see "View upload processing" in VCF info tab.' %}
         </form>
     {% else %}
+        {# Membership saves separately, through the samples table's save bar #}
+        <form id="cohort-form" method="post">
+        {% csrf_token %}
         <fieldset class="form-fields">
+            <p>
+                <label for="{{ cohort_form.name.id_for_label }}">Name</label>
+                {% if has_write_permission %}
+                    {{ cohort_form.name }}
+                {% else %}
+                    <span>{{ cohort.name }}</span>
+                {% endif %}
+            </p>
             <p>
                 <label>Status</label>
                 <span>{{ cohort.get_import_status_display }}</span>
@@ -451,11 +464,18 @@ $(document).ready(function() {
         <h3>Phenotype</h3>
         {% include "snpdb/data/_cohort_phenotype.html" with phenotype_field=cohort_form.phenotype %}
 
+        {% if has_write_permission %}
+            <p>
+                <button id="save-cohort-details" class="btn btn-primary">Save name and phenotype</button>
+                <span class="unsaved-changes-message text-info ml-2" style="display: none;">
+                    Unsaved changes - click 'Save name and phenotype' to keep them.
+                </span>
+            </p>
+        {% endif %}
+        </form>
+
         <h3>Samples</h3>
         {% include "snpdb/data/_cohort_samples_table.html" %}
-        {% if not cohort.data_archived %}
-            {% cohort_sample_actions cohort %}
-        {% endif %}
     {% endif %}
     </div>
 

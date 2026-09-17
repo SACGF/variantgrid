@@ -45,16 +45,11 @@
     opacity: 0.4;
 }
 
-#cohort-membership tr.candidate-heading td {
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: #64737f;
-    background-color: #f1f4f7;
+#cohort-membership .candidates-toggle {
+    padding-left: 0;
 }
 
 #cohort-membership tr.candidate-row .sample-name,
-#cohort-membership tr.candidate-row .vcf-name,
 #cohort-membership tr.candidate-row .num {
     opacity: 0.65;
 }

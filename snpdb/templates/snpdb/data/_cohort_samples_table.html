@@ -3,6 +3,7 @@
 {% load js_tags %}
 {% load model_tags %}
 {% load ui_utils %}
+{% load cohort_sample_actions_tag %}
 {% if vcf %}
     {# VCF mode - the file fixes which samples exist, so the table edits their details #}
     <div id="samples">
@@ -96,5 +97,10 @@
         </div>
         {% endif %}
         <div id="cohort-membership-save-bar"></div>
+        {% if not cohort.data_archived %}
+            {% cohort_sample_actions cohort %}
+        {% endif %}
+        {# Below the save bar and actions, which act on the members above - a VCF can offer thousands #}
+        <div id="cohort-membership-candidates"></div>
     </div>
 {% endif %}

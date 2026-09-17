@@ -28,8 +28,10 @@ class CohortMembershipEditor {
         this.version = config.version;
         this.status = null;
         this.onRender = null;  // Called after each redraw - the page's own widgets that follow membership
+        this.showCandidates = false;
 
         this.tableContainer = $("#cohort-membership-table");
+        this.candidatesContainer = $("#cohort-membership-candidates");
         this.saveBar = $("#cohort-membership-save-bar");
         this.sampleSelect = $("#id_sample", "#cohort-membership");
         this.vcfSelect = $("#id_vcf", "#cohort-membership");
@@ -196,31 +198,59 @@ class CohortMembershipEditor {
             tbody.append('<tr><td colspan="8" class="text-muted">No samples - add some below.</td></tr>');
         }
 
-        // Sub cohort: the rest of the parent VCF's samples, ready to tick back in
-        const memberSet = new Set(this.order);
-        const available = this.candidateIds.filter((id) => !memberSet.has(id));
-        if (available.length) {
-            tbody.append(`<tr class="candidate-heading"><td colspan="8">Other samples in this VCF</td></tr>`);
-            for (const sampleId of available) {
-                const sample = this.samplesById[sampleId];
-                const button = `<button type="button" class="btn btn-sm btn-outline-primary add-sample" data-sample-id="${sampleId}">Add</button>`;
-                tbody.append(`<tr class="candidate-row" data-candidate-id="${sampleId}">
-                    <td></td>
-                    <td></td>
-                    <td class="sample-name"><a href="${sample.url}">${escapeHtml(sample.name)}</a></td>
-                    <td class="vcf-name">${escapeHtml(sample.vcf_name)}</td>
-                    <td class="num">${sample.het_hom || "N/A"}</td>
-                    <td>${escapeHtml(sample.sex)}</td>
-                    <td class="sample-phenotype">${patientPhenotypeHtml(this.patientPhenotypes[sample.patient_id])}</td>
-                    <td class="text-right">${this.config.has_write_permission ? button : ""}</td>
-                </tr>`);
-            }
-        }
-
         this.tableContainer.empty().append(table);
         if (this.config.has_write_permission) {
             this.bindRowHandlers(tbody);
         }
+    }
+
+    /* Sub cohort: the rest of the parent VCF's samples, ready to add back in. Starts collapsed, and the rows
+     * are only built while shown - a VCF can have thousands and every membership change redraws */
+    renderCandidates() {
+        const memberSet = new Set(this.order);
+        const available = this.candidateIds.filter((id) => !memberSet.has(id));
+        this.candidatesContainer.empty();
+        if (!available.length) {
+            return;
+        }
+
+        const plural = available.length === 1 ? "sample" : "samples";
+        const caret = this.showCandidates ? "fa-caret-down" : "fa-caret-right";
+        const toggle = $(`<button type="button" class="btn btn-link candidates-toggle">
+            <i class="fas ${caret}"></i> ${this.showCandidates ? "Hide" : "Show"} ${available.length.toLocaleString()} other ${plural} in VCF
+        </button>`);
+        toggle.click(() => {
+            this.showCandidates = !this.showCandidates;
+            this.renderCandidates();
+        });
+        this.candidatesContainer.append(toggle);
+        if (!this.showCandidates) {
+            return;
+        }
+
+        const table = $(`<table class="table membership-table candidates-table">
+            <thead><tr><th>Sample</th><th>Het / Hom</th><th>Sex</th><th>Phenotype</th><th></th></tr></thead>
+            <tbody></tbody></table>`);
+        const tbody = $("tbody", table);
+        for (const sampleId of available) {
+            const sample = this.samplesById[sampleId];
+            const button = `<button type="button" class="btn btn-sm btn-outline-primary add-sample" data-sample-id="${sampleId}">Add</button>`;
+            tbody.append(`<tr class="candidate-row" data-candidate-id="${sampleId}">
+                <td class="sample-name"><a href="${sample.url}">${escapeHtml(sample.name)}</a></td>
+                <td class="num">${sample.het_hom || "N/A"}</td>
+                <td>${escapeHtml(sample.sex)}</td>
+                <td class="sample-phenotype">${patientPhenotypeHtml(this.patientPhenotypes[sample.patient_id])}</td>
+                <td class="text-right">${this.config.has_write_permission ? button : ""}</td>
+            </tr>`);
+        }
+        this.candidatesContainer.append(table);
+
+        const that = this;
+        $(".add-sample", tbody).click(function () {
+            that.order.push(Number($(this).data("sample-id")));
+            that.status = null;
+            that.render();
+        });
     }
 
     /* The table is redrawn from scratch, so the ticks have to be read off it first */
@@ -254,12 +284,6 @@ class CohortMembershipEditor {
             that.status = null;
             that.render();
         });
-        $(".add-sample", tbody).click(function () {
-            that.order.push(Number($(this).data("sample-id")));
-            that.status = null;
-            that.render();
-        });
-
         let dragRow = null;
         $("tr[draggable]", tbody).each(function () {
             const row = this;
@@ -372,6 +396,7 @@ class CohortMembershipEditor {
         this.captureSelection();
         this.renderTable();
         this.renderSaveBar();
+        this.renderCandidates();
         if (typeof SampleSelectionActions !== "undefined") {
             SampleSelectionActions.update();  // Which samples are ticked can change with the table
         }
