@@ -42,6 +42,12 @@ print_light_gray = partial(print_color, "\033[97m")
 print_black = partial(print_color, "\033[98m")
 
 
+def print_restart_reminder():
+    print_yellow("If this upgrade pulled new code, restart the services so they pick it up:")
+    print_yellow("    ctrl-d (back to an admin user)")
+    print_yellow("    sudo ./scripts/restart_services.sh")
+
+
 def substitute_aliases(args: list[str]):
     return [COMMAND_ALIASES.get(arg, arg) for arg in args]
 
@@ -488,6 +494,7 @@ class Migrator:
                 return
 
             if selection == "q":
+                print_restart_reminder()
                 sys.exit(0)
 
             selected_options = [migration for migration in self.migrations if migration.key == selection]
@@ -502,6 +509,7 @@ class Migrator:
             if success:
                 if not self.has_custom_migrations:
                     print_light_purple("Quick migration was successful")
+                    print_restart_reminder()
                     sys.exit(0)
             if self.has_custom_migrations:
                 print_red("Outstanding custom migrations, remember you can mark them all as skipped using VGs version page")
@@ -574,5 +582,6 @@ if __name__ == '__main__':
         migrator.run_and_quit_if_success()
     elif arg == '--auto-manage':
         migrator.run_auto_manage()
+        print_restart_reminder()
     else:
         migrator.prompt()
