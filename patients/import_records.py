@@ -3,7 +3,8 @@ Imports work by:
 
     import_patient_records:
         - Read the CSV with pandas, and create PatientRecord entries
-        - Set whether a record is valid or needs manual intervention
+        - Set whether a record is valid or needs manual intervention - a value that won't parse is a
+          validation message, and a row that can't be imported at all is rolled back to an invalid record
         - Display what's going to happen with the records (ie good, bad etc)
         - Then, click SUBMIT button after review
 
@@ -17,10 +18,12 @@ from collections import Counter
 
 import pandas as pd
 from dateutil import parser
+from django.db import transaction
 from django.utils import timezone
 
 from annotation.phenotype_matching import bulk_patient_phenotype_matching
 from library.guardian_utils import assign_permission_to_user_and_groups
+from library.log_utils import report_exc_info
 from library.pandas_utils import df_nan_to_none
 from patients.models import (
     Patient,
@@ -34,6 +37,10 @@ from patients.models_enums import NucleicAcid, PatientRecordMatchType, Sex, Tiss
 from snpdb.models import Sample
 
 UNKNOWN_STRING = 'UNKNOWN'  # Upper
+
+
+class InvalidPatientRecord(ValueError):
+    """ A row that can't be imported - the message becomes its PatientRecord's validation message """
 
 
 def assign_patient_to_sample(patient_import, user, sample, patient, origin):
@@ -95,6 +102,18 @@ def parse_date(row, column, validation_messages):
                     validation_messages.append(message)
 
     return d
+
+
+def parse_int(row, column, validation_messages):
+    value = row[column]
+    if not value:
+        return None
+
+    try:
+        return int(value)
+    except ValueError:
+        validation_messages.append(f"{column}: Could not parse whole number from '{value}'")
+        return None
 
 
 def parse_boolean(row, column, validation_messages, nullable=True):
@@ -227,19 +246,19 @@ def process_record(patient_records, record_id, row):
     patient_code = row[PatientColumns.PATIENT_CODE]
     first_name = row[PatientColumns.PATIENT_FIRST_NAME]
     last_name = row[PatientColumns.PATIENT_LAST_NAME]
+    if not last_name:
+        raise InvalidPatientRecord(f"{PatientColumns.PATIENT_LAST_NAME}: is blank, it is needed to match or create a patient")
     date_of_birth = parse_date(row, PatientColumns.DATE_OF_BIRTH, validation_messages)
     date_of_death = parse_date(row, PatientColumns.DATE_OF_DEATH, validation_messages)
     sex = parse_choice(Sex.choices, row, PatientColumns.SEX, validation_messages)
     affected = parse_boolean(row, PatientColumns.AFFECTED, validation_messages)
     consanguineous = parse_boolean(row, PatientColumns.CONSANGUINEOUS, validation_messages)
     patient_phenotype = row[PatientColumns.PATIENT_PHENOTYPE]
-    deceased = row[PatientColumns.DECEASED]
+    deceased = parse_boolean(row, PatientColumns.DECEASED, validation_messages)
 
     # only set patient_deceased if deceased flag set but date_of_death not set
-    if deceased == 'Y' and date_of_death is None:
-        patient_deceased = True
-    elif deceased == 'N' and date_of_death is None:
-        patient_deceased = False
+    if isinstance(deceased, bool) and date_of_death is None:
+        patient_deceased = deceased
     else:
         patient_deceased = None
 
@@ -250,9 +269,9 @@ def process_record(patient_records, record_id, row):
     specimen_received_date = parse_date(row, PatientColumns.SPECIMEN_RECEIVED_DATE, validation_messages)
     specimen_tissue_status = parse_choice(TissueStatus.choices, row, PatientColumns.SPECIMEN_TISSUE_STATUS, validation_messages)
     specimen_nucleic_acid_source = parse_choice(NucleicAcid.choices, row, PatientColumns.SPECIMEN_NUCLEIC_ACID_SOURCE, validation_messages)
-    specimen_age_at_collection = row[PatientColumns.SPECIMEN_AGE_AT_COLLECTION_DATE]
+    specimen_age_at_collection = parse_int(row, PatientColumns.SPECIMEN_AGE_AT_COLLECTION_DATE, validation_messages)
 
-    sample_id = row[PatientColumns.SAMPLE_ID] or None
+    sample_id = parse_int(row, PatientColumns.SAMPLE_ID, validation_messages)
     sample_name = row[PatientColumns.SAMPLE_NAME]
 
     sample = match_sample(user, sample_id, sample_name, validation_messages)
@@ -357,7 +376,7 @@ def process_record(patient_records, record_id, row):
             if other_patients_specimen:
                 msg = f"{other_patients_specimen} has patient {other_patients_specimen.patient}, " \
                       f"tried to assign to patient {patient}"
-                raise ValueError(msg)
+                raise InvalidPatientRecord(msg)
             specimen = Specimen.objects.create(reference_id=specimen_reference_id,
                                                patient=patient)
             specimen_match_type = PatientRecordMatchType.CREATED
@@ -435,6 +454,23 @@ def process_record(patient_records, record_id, row):
     return patient_to_check_for_phenotype_match
 
 
+def create_failed_patient_record(patient_records, record_id, row, exception):
+    """ The row as text only, as any typed column may be what failed """
+    PatientRecord.objects.create(patient_records=patient_records,
+                                 record_id=record_id,
+                                 valid=False,
+                                 validation_message=str(exception),
+                                 sample_name=row[PatientColumns.SAMPLE_NAME],
+                                 patient_family_code=row[PatientColumns.PATIENT_FAMILY_CODE],
+                                 patient_code=row[PatientColumns.PATIENT_CODE],
+                                 patient_first_name=row[PatientColumns.PATIENT_FIRST_NAME],
+                                 patient_last_name=row[PatientColumns.PATIENT_LAST_NAME] or "",
+                                 patient_phenotype=row[PatientColumns.PATIENT_PHENOTYPE],
+                                 specimen_reference_id=row[PatientColumns.SPECIMEN_REFERENCE_ID],
+                                 specimen_description=row[PatientColumns.SPECIMEN_DESCRIPTION],
+                                 specimen_collected_by=row[PatientColumns.SPECIMEN_COLLECTED_BY])
+
+
 def pandas_read_encoded_csv(*args, **kwargs):
     """ Try opening as UTF8, then Windows code page 1252 (Western Excel) if that fails """
     try:
@@ -477,7 +513,15 @@ def import_patient_records(patient_records):
     # iterrows() would build each row as a str Series, turning df_nan_to_none's None back into NaN
     for i, row in enumerate(df.to_dict("records")):
         logging.info("import_patient_records, process_record: %s", i)
-        patient_with_phenotype = process_record(patient_records, i, row)
+        # A row that fails leaves nothing behind but its invalid PatientRecord, and the other rows still import
+        try:
+            with transaction.atomic():
+                patient_with_phenotype = process_record(patient_records, i, row)
+        except Exception as e:
+            if not isinstance(e, InvalidPatientRecord):
+                report_exc_info(extra_data={"patient_records": patient_records.pk, "record_id": i})
+            create_failed_patient_record(patient_records, i, row, e)
+            patient_with_phenotype = None
         if patient_with_phenotype:
             patients_to_check_for_phenotype_matches.append(patient_with_phenotype)
         items_processed += 1

@@ -2,8 +2,11 @@
 Edge case tests for the patients app - falsy-vs-missing values, import
 reconciliation and the de-identified patient display rules.
 """
+import csv
 import os
+import tempfile
 from datetime import UTC, date, datetime
+from unittest import mock
 
 from django.contrib.auth.models import User
 from django.core.exceptions import MultipleObjectsReturned
@@ -11,7 +14,13 @@ from django.test import TestCase
 
 from library.guardian_utils import assign_permission_to_user_and_groups
 from patients.forms import PatientForm
-from patients.import_records import parse_boolean, parse_choice, parse_date, process_record
+from patients.import_records import (
+    import_patient_records,
+    parse_boolean,
+    parse_choice,
+    parse_date,
+    process_record,
+)
 from patients.models import (
     Clinician,
     ExternalModelManager,
@@ -20,6 +29,7 @@ from patients.models import (
     PatientColumns,
     PatientImport,
     PatientModification,
+    PatientRecord,
     PatientRecords,
     Specimen,
 )
@@ -39,14 +49,14 @@ def _make_row(**overrides):
     return row
 
 
-def _make_patient_records(user):
+def _make_patient_records(user, path=_FAKE_CSV):
     """Build the full PatientRecords FK chain required by process_record."""
     pi = PatientImport.objects.create(name=f"test_import_{user.pk}")
     pr = PatientRecords.objects.create(patient_import=pi)
     uf = FileUpload.objects.create(
         user=user,
         name="test_import_file",
-        path=_FAKE_CSV,
+        path=path,
         file_type=UploadedFileTypes.PATIENT_RECORDS,
         import_source=ImportSource.COMMAND_LINE,
     )
@@ -276,6 +286,112 @@ class TestProcessRecordSpecimenAge(TestCase):
         specimen = Specimen.objects.get(reference_id="EXISTSPECAGE001")
         self.assertEqual(specimen._age_at_collection_date, 35,
                          "Age not updated on reimport")
+
+
+# ---------------------------------------------------------------------------
+# process_record values that won't parse become validation messages
+# ---------------------------------------------------------------------------
+
+class TestProcessRecordUnparseableValues(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.user = User.objects.create_user("unparseable_user", password="x")
+
+    def setUp(self):
+        self.pr = _make_patient_records(self.user)
+
+    def test_non_numeric_age(self):
+        """ #2810 - 'D' reached Specimen's IntegerField and failed the whole upload """
+        process_record(self.pr, record_id=1, row=_make_row(**{
+            PatientColumns.SPECIMEN_REFERENCE_ID: "BADAGESPEC001",
+            PatientColumns.SPECIMEN_AGE_AT_COLLECTION_DATE: "D",
+        }))
+        record = PatientRecord.objects.get(patient_records=self.pr)
+        self.assertFalse(record.valid)
+        self.assertIn(PatientColumns.SPECIMEN_AGE_AT_COLLECTION_DATE, record.validation_message)
+        self.assertIsNone(record.specimen._age_at_collection_date)
+
+    def test_non_numeric_sample_id(self):
+        process_record(self.pr, record_id=1, row=_make_row(**{PatientColumns.SAMPLE_ID: "S12"}))
+        record = PatientRecord.objects.get(patient_records=self.pr)
+        self.assertFalse(record.valid)
+        self.assertIn(PatientColumns.SAMPLE_ID, record.validation_message)
+
+    def test_blank_integer_columns_are_valid(self):
+        process_record(self.pr, record_id=1, row=_make_row(**{
+            PatientColumns.SAMPLE_ID: "",
+            PatientColumns.SPECIMEN_AGE_AT_COLLECTION_DATE: "",
+        }))
+        self.assertTrue(PatientRecord.objects.get(patient_records=self.pr).valid)
+
+    def test_deceased_any_case(self):
+        process_record(self.pr, record_id=1, row=_make_row(**{PatientColumns.DECEASED: "y"}))
+        self.assertTrue(PatientRecord.objects.get(patient_records=self.pr).patient.deceased)
+
+    def test_deceased_unrecognised(self):
+        process_record(self.pr, record_id=1, row=_make_row(**{PatientColumns.DECEASED: "maybe"}))
+        record = PatientRecord.objects.get(patient_records=self.pr)
+        self.assertFalse(record.valid)
+        self.assertIn(PatientColumns.DECEASED, record.validation_message)
+
+
+# ---------------------------------------------------------------------------
+# import_patient_records - a row that can't be imported doesn't take the file with it
+# ---------------------------------------------------------------------------
+
+class TestImportPatientRecordsFailedRows(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.user = User.objects.create_user("failed_rows_user", password="x")
+        owner = Patient.objects.create(first_name="ORIGINAL", last_name="OWNER")
+        Specimen.objects.create(reference_id="FAILEDROWSPEC001", patient=owner)
+
+        rows = [
+            _make_row(**{PatientColumns.PATIENT_LAST_NAME: None}),
+            _make_row(**{PatientColumns.PATIENT_LAST_NAME: "SPECIMENTHIEF",
+                         PatientColumns.SPECIMEN_REFERENCE_ID: "FAILEDROWSPEC001"}),
+            _make_row(**{PatientColumns.PATIENT_LAST_NAME: "GOODROW"}),
+        ]
+        with tempfile.NamedTemporaryFile("w", suffix=".csv", newline="", delete=False) as f:
+            writer = csv.DictWriter(f, fieldnames=PatientColumns.COLUMNS)
+            writer.writeheader()
+            writer.writerows(rows)
+        cls.addClassCleanup(os.unlink, f.name)
+
+        cls.pr = _make_patient_records(cls.user, path=f.name)
+        cls.items_processed = import_patient_records(cls.pr)
+
+    def _record(self, record_id):
+        return PatientRecord.objects.get(patient_records=self.pr, record_id=record_id)
+
+    def test_every_row_has_a_record(self):
+        self.assertEqual(3, self.items_processed)
+        self.assertEqual([False, False, True],
+                         [self._record(i).valid for i in range(3)])
+
+    def test_blank_last_name(self):
+        self.assertIn(PatientColumns.PATIENT_LAST_NAME, self._record(0).validation_message)
+
+    def test_failed_row_is_rolled_back(self):
+        """ The patient is created before the specimen turns out to be someone else's """
+        self.assertIn("FAILEDROWSPEC001", self._record(1).validation_message)
+        self.assertFalse(Patient.objects.filter(last_name="SPECIMENTHIEF").exists())
+
+    def test_later_rows_still_import(self):
+        self.assertEqual("GOODROW", self._record(2).patient.last_name)
+
+    @mock.patch("patients.import_records.report_exc_info")
+    @mock.patch("patients.import_records.process_record", side_effect=RuntimeError("a bug of ours"))
+    def test_unexpected_exception_is_reported(self, _process_record, report_exc_info):
+        """ Bad data is the user's to fix in the grid, anything else we need to hear about """
+        patient_records = _make_patient_records(self.user, path=self.pr.file_upload.path)
+        import_patient_records(patient_records)
+        self.assertEqual(3, report_exc_info.call_count)
+        messages = set(PatientRecord.objects.filter(patient_records=patient_records, valid=False)
+                       .values_list("validation_message", flat=True))
+        self.assertEqual({"a bug of ours"}, messages)
 
 
 # ---------------------------------------------------------------------------
