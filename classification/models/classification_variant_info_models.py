@@ -750,6 +750,16 @@ class ImportedAlleleInfo(TimeStampedModel):
             return g_hgvs
         return None
 
+    def matched_without_c_hgvs_display(self, preferred_genome_build: GenomeBuild) -> Optional[HGVSDisplay]:
+        """ A variant HGVS has no way to write (a gene-level event, a symbolic CNV) matches but gets no c.HGVS,
+            so show it as imported without calling it unresolved """
+        builds = sorted(ImportedAlleleInfo.supported_genome_builds(), key=lambda gb: gb != preferred_genome_build)
+        for genome_build in builds:
+            if (variant_info := self[genome_build]) and variant_info.variant_id and not variant_info.c_hgvs:
+                return HGVSDisplay(self.imported_hgvs_obj() or HGVSComponents(""), genome_build=genome_build,
+                                   is_normalised=True, is_desired_build=genome_build == preferred_genome_build)
+        return None
+
     @staticmethod
     def all_chgvs(allele: Allele) -> list[HGVSDisplay]:
         all_chgvs = set()

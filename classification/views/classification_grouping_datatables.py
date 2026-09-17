@@ -137,11 +137,17 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
                                                is_desired_build=index == 0)
                     return c_hgvs.to_json()
 
-            # May still have linked to an allele without having the c_hgvs on either build
-            # TODO check imported g_hgvs or other importable columns
+            imported_hgvs = row["latest_allele_info__imported_c_hgvs"] or row["latest_allele_info__imported_g_hgvs"]
+            # A variant HGVS can't write (a gene-level event, a symbolic CNV) matches without getting a c.HGVS
+            for index, genome_build in enumerate(self.genome_build_prefs):
+                if row.get(ImportedAlleleInfo.column_name_for_build(genome_build, "latest_allele_info", "variant_id")):
+                    c_hgvs = HGVSDisplay.parse(imported_hgvs, genome_build=genome_build,
+                                               is_normalised=True, is_desired_build=index == 0)
+                    return c_hgvs.to_json()
+
             # could be dirty and not have a latest_allele_info
             if raw_genome_build := row["latest_allele_info__imported_genome_build_patch_version__genome_build"]:
-                c_hgvs = HGVSDisplay.parse(row["latest_allele_info__imported_c_hgvs"],
+                c_hgvs = HGVSDisplay.parse(imported_hgvs,
                                            genome_build=GenomeBuild.get_name_or_alias(raw_genome_build),
                                            is_normalised=False)
                 return c_hgvs.to_json()
@@ -399,11 +405,14 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
                     "latest_allele_info__pk",
                     "latest_allele_info__grch37__c_hgvs",
                     "latest_allele_info__grch38__c_hgvs",
+                    "latest_allele_info__grch37__variant_id",
+                    "latest_allele_info__grch38__variant_id",
                     'latest_allele_info__id',
                     'latest_allele_info__allele_id',
                     'latest_allele_info__latest_validation__include',
                     'latest_allele_info__status',
                     'latest_allele_info__imported_c_hgvs',
+                    'latest_allele_info__imported_g_hgvs',
                     'latest_allele_info__imported_genome_build_patch_version__genome_build',
                     'latest_classification_modification__published_evidence__p_hgvs__value'  # TODO move this to allele info
                 ]

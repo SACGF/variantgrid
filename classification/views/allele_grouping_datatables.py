@@ -79,7 +79,9 @@ class AlleleGroupingColumns(DatatableConfig[AlleleGrouping]):
                                        is_desired_build=is_preferred_genome_build)
             is_preferred_genome_build = False
 
-        return HGVSDisplay(allele_info.imported_c_hgvs_obj or HGVSComponents(""), is_normalised=False)
+        if matched := allele_info.matched_without_c_hgvs_display(self.genome_build_prefs[0]):
+            return matched
+        return HGVSDisplay(allele_info.imported_hgvs_obj() or HGVSComponents(""), is_normalised=False)
 
     def render_allele(self, row: CellData) -> JsonDataType:
         allele_group = _allele_group(row.get("allele"))

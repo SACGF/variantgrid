@@ -144,6 +144,22 @@ class ImportedAlleleInfoValidationTest(TestCase):
         self.assertEqual(validation_tags, {})
         self.assertTrue(ImportedAlleleInfoValidation.should_include(validation_tags))
 
+    def test_gene_level_matched_displays_as_resolved(self):
+        """ a grid finding no c.HGVS on either build must not call a matched gene-level variant unresolved """
+        grch37, grch38 = GenomeBuild.grch37(), GenomeBuild.grch38()
+        allele_info = self._gene_level_allele_info(
+            "ARV7", "GENE_LEVEL:644-644 <SPLICE:HGNC:644:V7>", grch37=self._resolved(grch37))
+        display = allele_info.matched_without_c_hgvs_display(grch38)
+        self.assertEqual("ARV7", display.full_hgvs)
+        self.assertEqual(grch37, display.genome_build)
+        self.assertTrue(display.is_normalised)
+        self.assertFalse(display.is_desired_build)
+
+        self.assertIsNone(self._allele_info(imported_c_hgvs=self.C_HGVS_38).matched_without_c_hgvs_display(grch38))
+        with_c_hgvs = self._allele_info(imported_c_hgvs=self.C_HGVS_38,
+                                        grch38=self._resolved(grch38, c_hgvs=self.C_HGVS_38))
+        self.assertIsNone(with_c_hgvs.matched_without_c_hgvs_display(grch38))
+
     def test_unsupported_transcript_still_errors(self):
         allele_info = self._allele_info(
             imported_c_hgvs="NX_000059.4(BRCA2):c.1234A>G",

@@ -315,6 +315,9 @@ class ClassificationGroup:
     def c_hgvs_for(cm: ClassificationModification, genome_build: GenomeBuild) -> HGVSDisplay:
         if c_str := cm.classification.get_c_hgvs(genome_build):
             return HGVSDisplay.parse(c_str, genome_build=genome_build, is_normalised=True)
+        if (allele_info := cm.classification.allele_info) and \
+                (matched := allele_info.matched_without_c_hgvs_display(genome_build)):
+            return matched
 
         imported_genome_build = None
         is_desired_build = None
@@ -323,8 +326,9 @@ class ClassificationGroup:
             is_desired_build = genome_build.name == imported_genome_build.name
         except ValueError:
             pass
-        return HGVSDisplay(cm.classification.c_parts, genome_build=imported_genome_build,
-                           is_normalised=False, is_desired_build=is_desired_build)
+        imported_hgvs = cm.classification.get(SpecialEKeys.C_HGVS) or cm.classification.get(SpecialEKeys.G_HGVS)
+        return HGVSDisplay.parse(imported_hgvs or "", genome_build=imported_genome_build,
+                                 is_normalised=False, is_desired_build=is_desired_build)
 
     @cached_property
     def c_hgvses(self) -> list[HGVSDisplay]:
