@@ -1,3 +1,13 @@
+"""
+Classification and ClassificationModification: a lab's record for an allele + condition, whose
+evidence is JSON validated against EvidenceKey, with every edit kept as a modification. Change
+evidence through Classification.patch_value, publish through ClassificationModification.publish,
+and read what a user may see through ClassificationModification.latest_for_user; allele resolution
+is delegated to ImportedAlleleInfo (classification_variant_info_models.py). Also here:
+ClassificationImport and the allele sources that drive matching and liftover, ConditionResolved,
+ClassificationConsensus and CuratedDate. classification/CLAUDE.md has the rules. Large: use
+`scripts/vg outline`.
+"""
 import copy
 import json
 import logging
@@ -1090,13 +1100,16 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
     def filter_for_user(cls, user: User, queryset: Optional[QuerySet] = None, **kwargs) -> QuerySet:
         """ Classification only has write permission, View is based on a version in a point at time
             see ClassificationModification's read permission """
-        klass = queryset if queryset is not None else cls
+        if not (user and user.is_authenticated):
+            return cls.objects.none()
 
-        if user and user.is_authenticated:
-            queryset = get_objects_for_user(user, cls.get_write_perm(), klass=klass, accept_global_perms=True)
-        else:
-            queryset = cls.objects.none()
-
+        # Off the bare model - Guardian embeds a queryset it is handed into both permission lookups
+        # (@see GuardianPermissionsMixin._permitted_for_user_qs)
+        permitted_qs = get_objects_for_user(user, cls.get_write_perm(), klass=cls, accept_global_perms=True)
+        if queryset is None:
+            return permitted_qs
+        if permitted_qs.query.has_filters():
+            return queryset.filter(pk__in=permitted_qs.values("pk"))
         return queryset
 
     @staticmethod
@@ -2222,10 +2235,20 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
 
     @staticmethod
     def get_classifications_qs(user: User, clinical_significance_list: Iterable[str] = None,
-                               lab_list: Iterable[Lab] = None) -> QuerySet:
-        cm_qs = ClassificationModification.latest_for_user(user, published=True)
+                               lab_list: Iterable[Lab] = None,
+                               somatic_clinical_significance_list: Iterable[str] = None,
+                               allele_origin_buckets: Optional[set[AlleleOriginBucket]] = None) -> QuerySet:
+        """ clinical_significance_list / somatic_clinical_significance_list are ORed together - a
+            record matches if either its germline or somatic clinical significance is in its list """
+        cm_qs = ClassificationModification.latest_for_user(user, published=True,
+                                                           allele_origin_buckets=allele_origin_buckets)
+        cs_q = Q()
         if clinical_significance_list:
-            cm_qs = cm_qs.filter(clinical_significance__in=clinical_significance_list)
+            cs_q |= Q(clinical_significance__in=clinical_significance_list)
+        if somatic_clinical_significance_list:
+            cs_q |= Q(classification__summary__somatic__clinical_significance__in=list(somatic_clinical_significance_list))
+        if cs_q:
+            cm_qs = cm_qs.filter(cs_q)
         qs = Classification.objects.filter(pk__in=cm_qs.values('classification'))
         if lab_list:
             qs = qs.filter(lab__in=lab_list)
@@ -2234,10 +2257,14 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
     @staticmethod
     def get_variant_q(user: User, genome_build: GenomeBuild,
                       clinical_significance_list: Iterable[str] = None,
-                      lab_list: Iterable[Lab] = None) -> Q:
+                      lab_list: Iterable[Lab] = None,
+                      somatic_clinical_significance_list: Iterable[str] = None,
+                      allele_origin_buckets: Optional[set[AlleleOriginBucket]] = None) -> Q:
         """ returns a Q object filtering variants to those with a PUBLISHED classification
             (optionally classification in clinical_significance_list """
-        vc_qs = Classification.get_classifications_qs(user, clinical_significance_list, lab_list)
+        vc_qs = Classification.get_classifications_qs(user, clinical_significance_list, lab_list,
+                                                      somatic_clinical_significance_list=somatic_clinical_significance_list,
+                                                      allele_origin_buckets=allele_origin_buckets)
         return Classification.get_variant_q_from_classification_qs(vc_qs, genome_build)
 
     @staticmethod
