@@ -108,7 +108,6 @@ from snpdb.models import (
     VCF,
     Allele,
     GenomeBuild,
-    Q,
     Variant,
 )
 from snpdb.models.models_enums import ImportStatus

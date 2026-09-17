@@ -735,12 +735,6 @@ class ImportedAlleleInfo(TimeStampedModel):
         return self.imported_c_hgvs or self.imported_g_hgvs
 
     @property
-    def imported_c_hgvs_obj(self) -> Optional[HGVSComponents]:
-        if self.imported_c_hgvs:
-            return HGVSComponents(self.imported_c_hgvs)
-        return None
-
-    @property
     def imported_g_hgvs_obj(self) -> Optional[HGVSComponents]:
         if self.imported_g_hgvs:
             return HGVSComponents(self.imported_g_hgvs)

@@ -50,10 +50,6 @@ class ClassificationPublicSummaryData:
         return 100 * float(self.discordant_alleles) / float(self.overlapped_alleles)
 
     @cached_property
-    def classification_count(self) -> int:
-        return Classification.objects.filter(withdrawn=False).count()
-
-    @cached_property
     def unique_allele_count(self) -> int:
         return Classification.objects.filter(allele__isnull=False, withdrawn=False, share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS).order_by('allele').distinct('allele').count()
 

@@ -6,7 +6,6 @@ from auditlog.context import set_extra_data
 from django.contrib.auth.models import User
 from django.dispatch import receiver
 from django.urls import reverse
-from django.contrib.auth.models import User
 
 from classification.enums import ClinicalSignificance, ShareLevel, SpecialEKeys, ClassificationResultValue, TriageState
 from classification.models import (
