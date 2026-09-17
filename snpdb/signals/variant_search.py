@@ -482,8 +482,6 @@ def _search_hgvs_using_gene_symbol(
                 if m:
                     unique_messages[m] = True
 
-        search_messages.extend(unique_messages.keys())
-
         unique_annotation_consortia = set()
         for r in results_for_record:
             unique_annotation_consortia.update(r.annotation_consortia)
@@ -493,7 +491,7 @@ def _search_hgvs_using_gene_symbol(
         preview = results_for_record[0].preview  # These will all be the same
         if unique_annotation_consortia:
             preview.annotation_consortia = unique_annotation_consortia
-        yield SearchResult(preview=preview, messages=search_messages)
+        yield SearchResult(preview=preview, messages=search_messages + list(unique_messages))
 
     if transcript_accessions_by_exception:
         resolution_errors = []
@@ -688,13 +686,13 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
                         genes_with_non_mane_transcripts.add(str(mane.symbol))
 
                 # Combine messages into 1
-                msg_hgvs_gene_search = msg_hgvs_given_symbol
+                gene_search_sentences = [msg_hgvs_given_symbol]
                 if gene_aliases_to_mane_symbols:
                     if len(gene_aliases_to_mane_symbols) == 1:
                         alias_word = "alias"
                     else:
                         alias_word = "aliases"
-                    msg_hgvs_gene_search += f" Matched to MANE symbols via {alias_word}: {', '.join(gene_aliases_to_mane_symbols)}. "
+                    gene_search_sentences.append(f"Matched to MANE symbols via {alias_word}: {', '.join(gene_aliases_to_mane_symbols)}.")
                 if genes_with_non_mane_transcripts:
                     if len(genes_with_non_mane_transcripts) == 1:
                         gene_word = "Gene symbol"
@@ -703,11 +701,12 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
                         gene_word = "Gene symbols"
                         has_word = "have"
 
-                    msg_hgvs_gene_search += f"{gene_word} {', '.join(genes_with_non_mane_transcripts)} {has_word} "
-                    msg_hgvs_gene_search += "non-MANE transcripts that may resolve to different coordinates. " + \
-                        "You may wish to add a transcript or search for the gene symbol to view all results"
+                    gene_search_sentences.append(
+                        f"{gene_word} {', '.join(genes_with_non_mane_transcripts)} {has_word} "
+                        "non-MANE transcripts that may resolve to different coordinates. "
+                        "You may wish to add a transcript or search for the gene symbol to view all results")
 
-                yield SearchMessageOverall(msg_hgvs_gene_search, severity=LogLevel.INFO)
+                yield SearchMessageOverall(" ".join(gene_search_sentences), severity=LogLevel.INFO)
 
                 try:
                     # gene-only HGVS is "SYMBOL:allele" - swap each cdot transcript in for the symbol
