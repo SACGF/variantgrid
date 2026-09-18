@@ -1,10 +1,11 @@
+{% load analysis_node_tags %}
 <div class="output-node-icons">
     {% for node in output_nodes %}
         {% if node.is_ready and node.is_valid %}
           <a href="#" onclick="downloadNodeCSV(this, {{ node.analysis_id }}, {{ node.pk }}, {{ node.version }}); return false;">
         {% endif %}
                 <span class="icon-stack" title="{{ node.get_name_or_identifier }}">
-                  <i class="icon icon-bottom {{ node.get_class_name }}"></i>
+                  <span class="icon-bottom">{% render_node_icon_badge node %}</span>
                   <i class="icon icon-top">
                       {% if node.is_ready %}
                         {% if node.is_valid %}
