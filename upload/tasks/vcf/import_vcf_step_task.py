@@ -5,6 +5,8 @@ from typing import Optional
 import celery
 from celery.app.task import Task
 from celery.canvas import chain
+from celery.exceptions import WorkerLostError
+from celery.signals import task_failure, task_revoked
 from django.db.models.aggregates import Max, Min
 from django.db.models.expressions import F
 from django.utils import timezone
@@ -174,6 +176,40 @@ class ImportVCFStepTask(Task):
         skip_steps.update(end_date=timezone.now(),
                           status=ProcessingStatus.SKIPPED,
                           output_text=message + " - skipped")
+
+
+def _fail_unfinished_upload_step(upload_step_id, error_message: str):
+    """ The worker child running the step died, so run()'s own error handling never ran - without this the
+        step and its pipeline stay PROCESSING forever. Runs in the worker's master process. """
+    try:
+        upload_step = UploadStep.objects.get(pk=upload_step_id)
+    except UploadStep.DoesNotExist:
+        return
+    if upload_step.end_date is not None:
+        return  # Finished before the child died
+
+    upload_step.status = ProcessingStatus.ERROR
+    upload_step.error_message = error_message
+    upload_step.end_date = timezone.now()
+    upload_step.save()
+    upload_step.close_sub_steps()
+
+    upload_pipeline = upload_step.upload_pipeline
+    if upload_pipeline.status == ProcessingStatus.PROCESSING:
+        upload_pipeline.error(f"{upload_step}: {error_message}")
+
+
+@task_failure.connect
+def fail_upload_step_on_worker_lost(sender=None, exception=None, args=None, **kwargs):
+    if isinstance(sender, ImportVCFStepTask) and isinstance(exception, WorkerLostError) and args:
+        _fail_unfinished_upload_step(args[0], f"Worker lost: {exception}")
+
+
+@task_revoked.connect
+def fail_upload_step_on_revoked(sender=None, request=None, terminated=False, signum=None, **kwargs):
+    if isinstance(sender, ImportVCFStepTask) and request is not None and request.args:
+        reason = f"terminated (signal {signum})" if terminated else "revoked"
+        _fail_unfinished_upload_step(request.args[0], f"Celery task {reason}")
 
 
 @celery.shared_task
