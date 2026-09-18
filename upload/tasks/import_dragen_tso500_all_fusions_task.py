@@ -60,10 +60,20 @@ from upload.tso500.dragen_all_fusions_parser import (
 from upload.vcf.vcf_import import resolve_genome_build_from_source
 from variantgrid.celery import app
 
+# Illumina names the file after the RNA arm - '<sample ID>_AllFusions.csv'
+ALL_FUSIONS_FILENAME_SUFFIX = "_AllFusions.csv"
+
 # The sample's FORMAT fields - read support rather than a genotype
 ALT_READS_FORMAT = "ALT_READS"
 REF_READS_FORMAT = "REF_READS"
 VCF_MISSING_VALUE = "."
+
+
+def arm_sample_name(filename: str) -> str:
+    """ The VCF sample is the arm the fusions were called on - the name its sequencing sample has, so
+        SeqAuto links it (@see seqauto.models.get_samples_by_sequencing_sample). The file carries no
+        sample ID of its own, only its name does """
+    return filename.removesuffix(ALL_FUSIONS_FILENAME_SUFFIX) or filename
 
 
 def _source_from_comments(comments) -> str:
@@ -158,7 +168,7 @@ class DragenTSO500AllFusionsCreateVCFTask(ImportVCFStepTask):
         genome_build = resolve_genome_build_from_source(source, file_upload)
         observations = _observations_by_variant_coordinate(rows, genome_build)
         _write_gene_level_vcf(upload_step.output_filename, observations,
-                              sample_name=file_upload.name, source=source)
+                              sample_name=arm_sample_name(file_upload.name), source=source)
         return len(rows)
 
 

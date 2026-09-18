@@ -565,10 +565,12 @@ def link_samples_and_vcfs_to_sequencing(backend_vcf, replace_existing=False, upl
                           "variant_caller": backend_vcf.variant_caller},
             )
         elif backend_vcf.single_sample_vcf:
+            # A re-analysis replaces the arm's earlier VCF from the same caller. A BAM can have a VCF per
+            # caller (eg DRAGEN TSO 500's small variants, gene-level CNV and fusions), and those stay
             sequencing_sample = get_single_element(samples_by_sequencing_sample)
             existing = VCFFromSequencingRun.objects.filter(
                 vcf__sample__in=sequencing_sample.samplefromsequencingsample_set.values_list("sample"),
-                vcf__uploadedvcf__backendvcf__single_sample_vcf__isnull=False,
+                vcf__uploadedvcf__backendvcf__single_sample_vcf__variant_caller=backend_vcf.variant_caller,
             )
             if existing.exists():
                 existing_vcfs = ", ".join([str(vfsr.vcf) for vfsr in existing])

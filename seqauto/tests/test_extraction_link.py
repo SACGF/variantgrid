@@ -25,6 +25,7 @@ from seqauto.models import (
     SequencingSample,
     SingleSampleVCF,
     VariantCaller,
+    VCFFromSequencingRun,
 )
 from seqauto.models.models_enums import DataGeneration
 from seqauto.serializers.sequencing_serializers import SampleSheetSerializer
@@ -144,7 +145,7 @@ class ExtractionCarriedDownToSamplesTest(TestCase):
                                                aligner=aligner)
         self.variant_caller = VariantCaller.objects.create(name="dragen", version="4.2")
 
-    def _link_one_vcf(self, suffix):
+    def _link_one_vcf(self, suffix, variant_caller=None):
         path = f"/data/tso500/{DNA_SAMPLE_NAME}.{suffix}.vcf"
         vcf = VCF.objects.create(name=f"{DNA_SAMPLE_NAME}.{suffix}", date=timezone.now(),
                                  user=self.user, genotype_samples=1)
@@ -155,7 +156,7 @@ class ExtractionCarriedDownToSamplesTest(TestCase):
         single_sample_vcf = SingleSampleVCF.objects.create(path=path,
                                                            sequencing_run=self.sequencing_run,
                                                            bam_file=self.bam_file,
-                                                           variant_caller=self.variant_caller)
+                                                           variant_caller=variant_caller or self.variant_caller)
         backend_vcf = BackendVCF.objects.create(uploaded_vcf=uploaded_vcf,
                                                 single_sample_vcf=single_sample_vcf)
         link_samples_and_vcfs_to_sequencing(backend_vcf)
@@ -185,6 +186,20 @@ class ExtractionCarriedDownToSamplesTest(TestCase):
         self.assertIsNone(sample.extraction)
         self.assertEqual(sample.extraction_reference, parked)
         self.assertEqual(sample.extraction_match_status, MatchStatus.PENDING)
+
+    def test_each_callers_vcf_stays_linked_to_the_run(self):
+        """ Small variants, gene-level CNV and fusions off one BAM are different callers - none replaces another """
+        callers = [VariantCaller.objects.create(name=f"dragen_{suffix}", version="4.2") for suffix in DNA_VCF_SUFFIXES]
+        samples = [self._link_one_vcf(suffix, caller) for suffix, caller in zip(DNA_VCF_SUFFIXES, callers)]
+        linked = VCFFromSequencingRun.objects.filter(sequencing_run=self.sequencing_run)
+        self.assertEqual({s.vcf for s in samples}, {vfsr.vcf for vfsr in linked})
+
+    def test_a_reanalysis_replaces_the_same_callers_vcf(self):
+        first = self._link_one_vcf("hard-filtered")
+        second = self._link_one_vcf("hard-filtered_reanalysis")
+        linked = VCFFromSequencingRun.objects.filter(sequencing_run=self.sequencing_run)
+        self.assertEqual([second.vcf], [vfsr.vcf for vfsr in linked])
+        self.assertNotEqual(first.vcf, second.vcf)
 
     def test_sample_is_linked_to_its_sequencing_sample(self):
         sample = self._link_one_vcf("hard-filtered")

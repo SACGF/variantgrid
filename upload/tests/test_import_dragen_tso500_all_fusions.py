@@ -10,7 +10,7 @@ from django.test import TestCase
 
 from annotation.fake_annotation import get_fake_annotation_version
 from genes.gene_fusions import GeneFusionResolver, create_gene_fusions_for_variants
-from genes.models import GeneLevelId, GeneFusion
+from genes.models import GeneFusion, GeneLevelId
 from genes.tests.gene_fusion_test_utils import create_gene_fusion
 from genes.tests.test_gene_fusions import GeneFusionTestCase
 from library.genomics.vcf_enums import GeneLevelSymbolicAlt
@@ -105,7 +105,7 @@ class TestGeneFusionVCF(GeneFusionTestCase):
 
     def test_header_declares_the_sample_and_source(self):
         """ What ImportCreateVCFModelForGenotypeVCFTask makes the VCF and Sample from """
-        self.assertEqual([self.file_upload.name], self.reader.samples)
+        self.assertEqual(["ExampleSample_RNA_2600000001B"], self.reader.samples)
         self.assertIn("FusionProcessor 1.0.0.614", self.reader.raw_header)
 
     def test_genome_build_comes_from_the_source(self):
