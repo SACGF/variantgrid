@@ -16,12 +16,13 @@ Section names move between module versions - 2.1.1's '[Exon-Level CNVs]' is docu
 'Large Rearrangements' in 2.6, which also adds 'Gene-level Loss of Heterozygosity' - so a section
 this has no name for is read and kept rather than being an error.
 """
+import re
 from dataclasses import dataclass, field
 from typing import Optional
 
 # The banner line, which is what recognises the file - a tsv of gene symbols would otherwise be
-# claimed as a gene list
-FIRST_LINE = "DRAGEN TruSight Oncology 500 Analysis Software - Combined Variant Output"
+# claimed as a gene list. 2.6 puts its version in it, eg 'DRAGEN TruSight Oncology 500 v2.6.2 Analysis...'
+FIRST_LINE_PATTERN = re.compile(r"DRAGEN TruSight Oncology 500 (?:v[\d.]+ )?Analysis Software - Combined Variant Output")
 
 ANALYSIS_DETAILS = "Analysis Details"
 SPLICE_VARIANTS = "Splice Variants"
@@ -133,7 +134,8 @@ def can_process_file(filename: str) -> bool:
         gene list """
     try:
         with open(filename, encoding="utf-8-sig") as f:
-            return _split_line(f.readline())[:1] == [FIRST_LINE]
+            first_cells = _split_line(f.readline())
+            return bool(first_cells) and bool(FIRST_LINE_PATTERN.fullmatch(first_cells[0]))
     except (OSError, UnicodeDecodeError, IndexError):
         return False
 

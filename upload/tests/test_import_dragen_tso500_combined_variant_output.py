@@ -1,5 +1,6 @@
 """Import of CombinedVariantOutput.tsv - the splice VCF the loader writes from it."""
 import os
+import tempfile
 
 import cyvcf2
 import simplejson
@@ -106,6 +107,14 @@ class TestCombinedVariantOutputParser(TestCase):
         user = User.objects.get_or_create(username='testuser')[0]
         self.assertGreater(combined.get_processing_ability(user, COMBINED_VARIANT_OUTPUT, "tsv"),
                            gene_list.get_processing_ability(user, COMBINED_VARIANT_OUTPUT, "tsv"))
+
+    def test_claims_a_versioned_banner(self):
+        """ 2.6 writes its version into the banner line """
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            path = os.path.join(tmp_dir, "versioned_CombinedVariantOutput.tsv")
+            with open(path, "w") as f:
+                f.write("DRAGEN TruSight Oncology 500 v2.6.2 Analysis Software - Combined Variant Output\t\t\n")
+            self.assertTrue(can_process_file(path))
 
     def test_does_not_claim_other_tsvs(self):
         """ A gene table is a tsv of gene symbols - only the banner line says this is a CVO """
