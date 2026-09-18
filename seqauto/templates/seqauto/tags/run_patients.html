@@ -5,8 +5,9 @@
         {% preview_icon run_patient.patient %}
         <a href="{% url 'view_patient' run_patient.patient.pk %}">{{ run_patient.patient }}</a>
     </h5>
-    <table class="table table-sm">
-        <tr><th>Specimen <th>Tissue <th>Extraction <th>Sequencing Sample <th>Sample <th>VCF</tr>
+    <table class="table table-sm table-bordered">
+        <thead><tr><th>Specimen</th><th>Tissue</th><th>Extraction</th><th>Sequencing Sample</th><th>Sample</th><th>VCF</th></tr></thead>
+        <tbody>
         {% for extraction, rows in run_patient.extractions %}
             {% for row in rows %}
                 <tr>
@@ -14,12 +15,16 @@
                     <td rowspan="{{ rows|length }}">
                         {% if extraction %}
                             <a href="{% url 'view_specimen' extraction.specimen.pk %}">{{ extraction.specimen }}</a>
+                        {% else %}
+                            -
                         {% endif %}
                     </td>
                     <td rowspan="{{ rows|length }}">
                         {% if extraction %}
-                            {{ extraction.specimen.tissue|default_if_none:"" }}
+                            {{ extraction.specimen.tissue|default_if_none:"-" }}
                             {% if extraction.specimen.tissue_status != 'U' %}({{ extraction.specimen.get_tissue_status_display }}){% endif %}
+                        {% else %}
+                            -
                         {% endif %}
                     </td>
                     <td rowspan="{{ rows|length }}">
@@ -34,18 +39,20 @@
                 </tr>
             {% endfor %}
         {% endfor %}
+        </tbody>
     </table>
 {% endfor %}
 
 {% if unmatched_run_samples %}
     <h5>No patient</h5>
-    <table class="table table-sm">
-        <tr><th>Match Status <th>Sequencing Sample <th>Sample <th>VCF</tr>
+    <table class="table table-sm table-bordered">
+        <thead><tr><th>Match Status</th><th>Sequencing Sample</th><th>Sample</th><th>VCF</th></tr></thead>
+        <tbody>
         {% for row in unmatched_run_samples %}
             <tr>
             <td>
                 {% with match_record=row.match_record %}
-                    {{ match_record.get_extraction_match_status_display|default_if_none:"" }}
+                    {{ match_record.get_extraction_match_status_display|default_if_none:"-" }}
                     {% if match_record.extraction_match_error %}
                         <div class="text-danger">{{ match_record.extraction_match_error }}</div>
                     {% endif %}
@@ -54,5 +61,6 @@
             {% include "seqauto/tags/run_sample_row.html" %}
             </tr>
         {% endfor %}
+        </tbody>
     </table>
 {% endif %}

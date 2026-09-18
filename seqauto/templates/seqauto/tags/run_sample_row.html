@@ -3,6 +3,8 @@
 <td>
     {% if row.sample %}
         <a href="{% url 'view_sample' row.sample.pk %}">{{ row.sample }}</a>
+    {% else %}
+        -
     {% endif %}
 </td>
 <td>
@@ -12,5 +14,7 @@
         {% else %}
             <div title="You don't have permission to view this VCF" class='vcf-icon icon24 run-vcf-icon'></div>
         {% endif %}
+    {% else %}
+        -
     {% endif %}
 </td>

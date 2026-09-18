@@ -1,5 +1,7 @@
 {% load static %}
 {% load model_helpers %}
+{% load humanize %}
+{% load ui_utils %}
 <link rel="stylesheet" href="{% static 'css/graphs.css' %}" />
 <link rel="stylesheet" href="{% static 'css/seqauto.css' %}" />
 <script>
@@ -40,21 +42,18 @@ $(document).ready(function() {
 <div id="run-stats">
 {% if show_stats %}
 	{{ graph_form.as_p }}
-	<div id='generated-graph-qc' class='generated-graph'></div>
-	<table class='model-table'>
-		<tr><th>Mean Cluster Density:		<td>{{ illumina_qc.mean_cluster_density }}
-		<tr><th>Mean PF Cluster Density:	<td>{{ illumina_qc.mean_pf_cluster_density }}
-		<tr><th>Total Clusters:				<td>{{ illumina_qc.total_clusters }}
-		<tr><th>Total PF Clusters:			<td>{{ illumina_qc.total_pf_clusters }}
-		<tr><th>Percentage of Clusters PF:	<td>{{ illumina_qc.percentage_of_clusters_pf }}
-		<tr><th>Aligned To PhiX:			<td>{{ illumina_qc.aligned_to_phix }}
-		{% if read_q30s %}
-		<tr><th>R1 Q30:			<td>{{ read_q30s.R1 | floatformat }}
-		<tr><th>R2 Q30:			<td>{{ read_q30s.R2 | floatformat }}
-		{% endif %}
-		</tr>
-	</table>
+	<div id='generated-graph-qc' class='generated-graph mb-4'></div>
+	{% labelled label="Mean Cluster Density" %}{{ illumina_qc.mean_cluster_density|intcomma }}{% endlabelled %}
+	{% labelled label="Mean PF Cluster Density" %}{{ illumina_qc.mean_pf_cluster_density|intcomma }}{% endlabelled %}
+	{% labelled label="Total Clusters" %}{{ illumina_qc.total_clusters|intcomma }}{% endlabelled %}
+	{% labelled label="Total PF Clusters" %}{{ illumina_qc.total_pf_clusters|intcomma }}{% endlabelled %}
+	{% labelled label="Percentage of Clusters PF" %}{{ illumina_qc.percentage_of_clusters_pf|floatformat }}{% endlabelled %}
+	{% labelled label="Aligned To PhiX" %}{{ illumina_qc.aligned_to_phix|floatformat }}{% endlabelled %}
+	{% if read_q30s %}
+		{% labelled label="R1 Q30" %}{{ read_q30s.R1|floatformat }}{% endlabelled %}
+		{% labelled label="R2 Q30" %}{{ read_q30s.R2|floatformat }}{% endlabelled %}
+	{% endif %}
 {% else %}
-	No stats available.
+	<p class="text-muted">No stats available.</p>
 {% endif %}
 </div>

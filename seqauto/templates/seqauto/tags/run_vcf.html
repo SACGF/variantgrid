@@ -11,23 +11,24 @@
         <a href="{{ run_vcf.record_url }}">{{ run_vcf.record }}</a>
         {% if run_vcf.is_joint_called %}
             {% with joint_called_vcf=run_vcf.record %}
+                <span class="ml-2 font-weight-normal">
                 <div class='sample-sheet-icon'></div>
-                SampleSheet.csv —
                 {% with sample_count=joint_called_vcf.sample_count %}
                     {% if sample_count is None %}
                         loading…
                     {% else %}
                         {{ sample_count }} / {{ joint_called_vcf.sequencing_sample_count }} samples
                         {% if joint_called_vcf.is_full_sheet %}
-                            [full sheet]
+                            <span class="badge badge-primary">full sheet</span>
                         {% else %}
-                            [subset]
+                            <span class="badge badge-secondary">subset</span>
                         {% endif %}
                     {% endif %}
                 {% endwith %}
                 {% if joint_called_vcf.is_cross_run %}
-                    [cross-run]
+                    <span class="badge badge-info">cross-run</span>
                 {% endif %}
+                </span>
             {% endwith %}
         {% endif %}
     {% else %}
