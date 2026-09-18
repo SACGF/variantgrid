@@ -4,15 +4,16 @@ from analysis.models import AllVariantsNode
 from analysis.models.enums import NodeStatus
 from analysis.models.nodes.filters.merge_node import MergeNode
 from analysis.tests.utils import AnalysisSetupMixin
+from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
 
 
 @override_settings(ANALYSIS_NODE_CACHE_Q=False)
 class TestMergeNode(AnalysisSetupMixin, TestCase):
     """ Merging parents that ask the same question is a no-op """
 
-    def _ready_all_variants_node(self, **kwargs) -> AllVariantsNode:
+    def _ready_all_variants_node(self, count=1, **kwargs) -> AllVariantsNode:
         node = AllVariantsNode.objects.create(analysis=self.analysis, **kwargs)
-        AllVariantsNode.objects.filter(pk=node.pk).update(status=NodeStatus.READY, count=1)
+        AllVariantsNode.objects.filter(pk=node.pk).update(status=NodeStatus.READY, count=count)
         node.refresh_from_db()
         return node
 
@@ -39,3 +40,9 @@ class TestMergeNode(AnalysisSetupMixin, TestCase):
         b = self._ready_all_variants_node()
         merge = self._merge_of(a, b)
         self.assertIn(merge.get_single_parent().pk, {a.pk, b.pk})
+
+    def test_all_empty_parents_matches_nothing(self):
+        """ With no non-empty parents there's nothing to OR together - must not fall through to every variant """
+        slowly_create_test_variant("3", 128198980, 'A', 'T', self.grch37)
+        merge = self._merge_of(self._ready_all_variants_node(count=0), self._ready_all_variants_node(count=0))
+        self.assertFalse(merge.get_queryset().exists())

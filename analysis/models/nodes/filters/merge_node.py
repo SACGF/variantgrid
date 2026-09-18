@@ -132,6 +132,10 @@ class MergeNode(AnalysisNode):
         for parent in self.get_non_empty_parents():
             # disable_cache=True: see comment in _split_common_filters above (#240, ad35a7fb1).
             parent_arg_q_dict[parent] = parent.get_arg_q_dict(disable_cache=True)
+        if not parent_arg_q_dict:
+            # All parents empty - an empty merge would otherwise apply no filter at all
+            q_none = self.q_none()
+            return {None: {str(q_none): q_none}}
         return self._get_merged_q_dict(parent_arg_q_dict)
 
     def _get_node_q(self) -> Optional[Q]:
