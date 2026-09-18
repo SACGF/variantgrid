@@ -1,4 +1,5 @@
 import json
+from typing import Optional
 from unittest import mock
 
 from django.contrib.auth.models import User
@@ -12,14 +13,17 @@ from annotation.models import AnnotationRangeLock, AnnotationRun, VariantAnnotat
 from annotation.tests.test_data_fake_genes import create_fake_transcript_version
 from genes.models import GeneSymbol, GeneSymbolAlias, GeneSymbolAliasSource
 from genes.tests.gene_fusion_test_utils import create_gene_fusion
+from genes.tests.gene_level_test_utils import create_gene_level_variant, get_sequence
 from library.django_utils import FakeRequest
-from library.genomics.vcf_enums import VCFSymbolicAllele
+from library.genomics.vcf_enums import GeneLevelSymbolicAlt, VCFSymbolicAllele
+from snpdb.gene_level_variants import GENE_LEVEL_CONTIG_NAME, GENE_LEVEL_REF, GENE_LEVEL_SVLEN
 from snpdb.models import (
     AllVariantsFilter,
     GenomeBuild,
     Locus,
     Sequence,
     Variant,
+    VariantCoordinate,
     VariantZygosityCountCollection,
 )
 from snpdb.views.datatable_view import datatable_response
@@ -74,6 +78,19 @@ class AllVariantsGridFilterTest(TestCase):
         for symbol in ["CD74", "ROS1"]:
             GeneSymbol.objects.get_or_create(symbol=symbol)
         cls.fusion_variant = create_gene_fusion("CD74", "ROS1").variant
+        cls.copy_number_variant = cls._create_gene_level_variant(GeneLevelSymbolicAlt.GAIN)
+        cls.splice_variant = cls._create_gene_level_variant(GeneLevelSymbolicAlt.SPLICE, label="V_7")
+        cls.gene_level_variant_ids = {cls.fusion_variant.pk, cls.copy_number_variant.pk, cls.splice_variant.pk}
+
+        cls.deletion_variant = Variant.objects.create(locus=cls.variant.locus, alt=get_sequence(VCFSymbolicAllele.DEL),
+                                                      svlen=-1000, end=cls.variant.locus.position + 1000)
+
+    @staticmethod
+    def _create_gene_level_variant(kind: str, label: Optional[str] = None) -> Variant:
+        gene_level_id = 1
+        alt = GeneLevelSymbolicAlt.format(kind, "HGNC", gene_level_id, label=label)
+        return create_gene_level_variant(VariantCoordinate(chrom=GENE_LEVEL_CONTIG_NAME, position=gene_level_id,
+                                                           ref=GENE_LEVEL_REF, alt=alt, svlen=GENE_LEVEL_SVLEN))
 
     @classmethod
     def _create_variant_gene_overlap(cls, variant, gene):
@@ -195,10 +212,20 @@ class AllVariantsGridFilterTest(TestCase):
         variant_ids = self._grid_variant_ids({"contig_ids": [self.contig.pk], "min_count": 1})
         self.assertEqual(set(), variant_ids)
 
-    def test_fusion_type_selects_gene_level_rows(self):
+    def test_gene_level_types_select_their_own_kind(self):
+        for variant_type, variant in [(VariantType.FUSION, self.fusion_variant),
+                                      (VariantType.COPY_NUMBER, self.copy_number_variant),
+                                      (VariantType.SPLICE, self.splice_variant)]:
+            with self.subTest(variant_type=variant_type):
+                variant_ids = self._grid_variant_ids({"contig_ids": [self.contig.pk],
+                                                      "variant_types": [variant_type]})
+                self.assertEqual({variant.pk}, variant_ids)
+
+    def test_structural_type_excludes_gene_level(self):
+        """ Gene-level variants have an SVLEN (0) too, so "symbolic" alone would pull them in """
         variant_ids = self._grid_variant_ids({"contig_ids": [self.contig.pk],
-                                              "variant_types": [VariantType.FUSION]})
-        self.assertEqual({self.fusion_variant.pk}, variant_ids)
+                                              "variant_types": [VariantType.SYMBOLIC]})
+        self.assertEqual({self.deletion_variant.pk}, variant_ids)
 
     def test_fusion_contig_passes_the_chromosome_filter(self):
         """ The gene-level contig is not a chromosome anyone can tick, so ticking Fusion is what

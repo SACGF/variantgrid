@@ -80,6 +80,7 @@ class AllVariantsNodeView(NodeView):
             out_of_date_message = "Please press save."
 
         context['num_samples_for_build'] = self.object.num_samples_for_build
+        context["gene_level_enabled"] = settings.VARIANT_GENE_LEVEL_ENABLED
         context["out_of_date_message"] = out_of_date_message
         context["max_variant_id"] = self.object.max_variant_id
         return context

@@ -6,7 +6,7 @@ from annotation.fake_annotation import get_fake_annotation_version
 from library.genomics.vcf_enums import VCFSymbolicAllele
 from snpdb.models import AlleleOrigin, GenomeBuild, Variant, VariantAllele, VariantCoordinate
 from snpdb.tests.utils.vcf_testing_utils import create_mock_allele, slowly_create_test_variant
-from snpdb.variant_filters import VariantType, get_all_variant_types
+from snpdb.variant_filters import GENE_LEVEL_VARIANT_TYPES, get_all_variant_types
 
 
 class VariantTestCase(TestCase):
@@ -296,7 +296,7 @@ class GeneLevelDisabledTest(SimpleTestCase):
         variant_string = Variant.format_tuple("GENE_LEVEL", 3236, "N", "<SPLICE:HGNC:3236:V_III>", 0)
         self.assertEqual(self.GENE_LEVEL_STRING, variant_string)
 
-    def test_all_variant_types_offer_fusion_only_when_enabled(self):
-        self.assertIn(VariantType.FUSION, get_all_variant_types())
+    def test_all_variant_types_offer_gene_level_only_when_enabled(self):
+        self.assertTrue(set(GENE_LEVEL_VARIANT_TYPES) <= set(get_all_variant_types()))
         with override_settings(VARIANT_GENE_LEVEL_ENABLED=False):
-            self.assertNotIn(VariantType.FUSION, get_all_variant_types())
+            self.assertFalse(set(GENE_LEVEL_VARIANT_TYPES) & set(get_all_variant_types()))

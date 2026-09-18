@@ -13,6 +13,7 @@ from snpdb.models import Variant, VariantZygosityCountCollection
 from snpdb.models.models_genome import Contig
 from snpdb.variant_filters import (
     VariantType,
+    get_contig_ids_for_variant_types,
     get_contigs_q,
     get_gene_symbols_q,
     get_variant_types_q,
@@ -28,6 +29,10 @@ class AllVariantsNode(AnalysisNode, AbstractZygosityCountNode):
     indels = models.BooleanField(default=True, blank=True)
     complex_subsitution = models.BooleanField(default=True, blank=True)
     structural_variants = models.BooleanField(default=True, blank=True)
+    # Gene-level events - @see snpdb.gene_level_variants
+    fusions = models.BooleanField(default=True, blank=True)
+    copy_number = models.BooleanField(default=True, blank=True)
+    splicing = models.BooleanField(default=True, blank=True)
     min_inputs = 0
     max_inputs = 0
 
@@ -59,7 +64,8 @@ class AllVariantsNode(AnalysisNode, AbstractZygosityCountNode):
 
     # The types this node offers, ie what "everything selected" means for it
     VARIANT_TYPES = [VariantType.REFERENCE, VariantType.SNV, VariantType.INDEL,
-                     VariantType.COMPLEX, VariantType.SYMBOLIC]
+                     VariantType.COMPLEX, VariantType.SYMBOLIC,
+                     VariantType.FUSION, VariantType.COPY_NUMBER, VariantType.SPLICE]
 
     @property
     def selected_variant_types(self) -> list[str]:
@@ -69,13 +75,18 @@ class AllVariantsNode(AnalysisNode, AbstractZygosityCountNode):
             (self.indels, VariantType.INDEL),
             (self.complex_subsitution, VariantType.COMPLEX),
             (self.structural_variants, VariantType.SYMBOLIC),
+            (self.fusions, VariantType.FUSION),
+            (self.copy_number, VariantType.COPY_NUMBER),
+            (self.splicing, VariantType.SPLICE),
         ]
         return [variant_type for test, variant_type in type_lookup if test]
 
     def _get_node_arg_q_dict(self) -> dict[Optional[str], dict[str, Q]]:
         """ Restrict to analysis genome build """
 
-        q_contigs = get_contigs_q(self.analysis.genome_build, contig_ids=self.contig_ids)
+        genome_build = self.analysis.genome_build
+        contig_ids = get_contig_ids_for_variant_types(genome_build, self.contig_ids, self.selected_variant_types)
+        q_contigs = get_contigs_q(genome_build, contig_ids=contig_ids)
         q_dict = {
             str(q_contigs): q_contigs,
         }
@@ -110,6 +121,9 @@ class AllVariantsNode(AnalysisNode, AbstractZygosityCountNode):
             (self.indels, True, "indels"),
             (self.complex_subsitution, True, "complex sub"),
             (self.structural_variants, True, "SVs"),
+            (self.fusions, True, "fusions"),
+            (self.copy_number, True, "copy number"),
+            (self.splicing, True, "splicing"),
         ]
         name_description = []
         all_default = True

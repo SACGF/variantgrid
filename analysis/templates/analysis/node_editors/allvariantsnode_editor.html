@@ -28,6 +28,11 @@
             {{ form.indels.errors }}<label for="{{ form.indels.id_for_label }}">{{ form.indels }} Indels</label>
             {{ form.complex_subsitution.errors }}<label for="{{ form.complex_subsitution.id_for_label }}">{{ form.complex_subsitution }} Complex substitutions</label>
             {{ form.structural_variants.errors }}<label for="{{ form.structural_variants.id_for_label }}">{{ form.structural_variants }} Structural variants</label>
+            {% if gene_level_enabled %}
+                {{ form.fusions.errors }}<label for="{{ form.fusions.id_for_label }}">{{ form.fusions }} Fusions</label>
+                {{ form.copy_number.errors }}<label for="{{ form.copy_number.id_for_label }}">{{ form.copy_number }} Copy number</label>
+                {{ form.splicing.errors }}<label for="{{ form.splicing.id_for_label }}">{{ form.splicing }} Splicing</label>
+            {% endif %}
         </span>
     </div>
 

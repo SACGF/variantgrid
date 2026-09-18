@@ -14,10 +14,11 @@ from django.db.models import Q
 
 from annotation.models import AnnotationVersion, VariantTranscriptAnnotation
 from genes.models import Gene, GeneSymbol
+from library.genomics.vcf_enums import GeneLevelSymbolicAlt
 from snpdb.models.models_enums import SequenceRole
 from snpdb.models.models_genome import Contig, GenomeBuild
 from snpdb.models.models_user_settings import AllVariantsFilter
-from snpdb.models.models_variant import Variant
+from snpdb.models.models_variant import Sequence, Variant
 
 # The smallest standard autosome - a brand new user's default, so their first page load is cheap
 DEFAULT_CONTIG_NAME = "21"
@@ -30,8 +31,31 @@ class VariantType:
     SNV = "snv"
     INDEL = "indel"
     COMPLEX = "complex"
-    SYMBOLIC = "symbolic"  # Any variant with an SVLEN
-    FUSION = "fusion"  # Gene-level events - @see snpdb.gene_level_variants
+    SYMBOLIC = "symbolic"  # Structural variants - a symbolic alt with coordinates, ie not gene-level
+    # Gene-level events - @see snpdb.gene_level_variants
+    FUSION = "fusion"
+    COPY_NUMBER = "copy_number"
+    SPLICE = "splice"
+
+
+GENE_LEVEL_VARIANT_TYPES = [VariantType.FUSION, VariantType.COPY_NUMBER, VariantType.SPLICE]
+
+
+def _alt_in_q(q_sequence: Q) -> Q:
+    """ An alt_id IN (subquery) rather than a join to Sequence - OR'd with the other types, a join
+        stops Postgres using the per-branch plans and the whole-build scan goes from ~1s to ~14s """
+    return Q(alt__in=Sequence.objects.filter(q_sequence))
+
+
+def _gene_level_kinds_q(*kinds: str) -> Q:
+    """ By alt prefix - '<FUSION' covers FUSION_UNORDERED too """
+    q_sequence = reduce(operator.or_, [Q(seq__startswith=f"<{kind}") for kind in kinds])
+    return Variant.get_gene_level_q() & _alt_in_q(q_sequence)
+
+
+def get_structural_variant_q() -> Q:
+    """ Symbolic alts with coordinates - gene-level events also have an SVLEN (0), so name the alts """
+    return Variant.get_symbolic_q() & _alt_in_q(Q(seq__in=settings.VARIANT_SYMBOLIC_ALT_VALID_TYPES))
 
 
 _VARIANT_TYPE_Q_FUNCS = {
@@ -39,8 +63,10 @@ _VARIANT_TYPE_Q_FUNCS = {
     VariantType.SNV: Variant.get_snp_q,
     VariantType.INDEL: Variant.get_indel_q,
     VariantType.COMPLEX: Variant.get_complex_subsitution_q,
-    VariantType.SYMBOLIC: Variant.get_symbolic_q,
-    VariantType.FUSION: Variant.get_gene_level_q,
+    VariantType.SYMBOLIC: get_structural_variant_q,
+    VariantType.FUSION: lambda: _gene_level_kinds_q(GeneLevelSymbolicAlt.FUSION),
+    VariantType.COPY_NUMBER: lambda: _gene_level_kinds_q(GeneLevelSymbolicAlt.GAIN, GeneLevelSymbolicAlt.LOSS),
+    VariantType.SPLICE: lambda: _gene_level_kinds_q(GeneLevelSymbolicAlt.SPLICE),
 }
 
 VARIANT_TYPE_LABELS = {
@@ -50,6 +76,8 @@ VARIANT_TYPE_LABELS = {
     VariantType.COMPLEX: "Complex sub",
     VariantType.SYMBOLIC: "Structural",
     VariantType.FUSION: "Fusion",
+    VariantType.COPY_NUMBER: "Copy number",
+    VariantType.SPLICE: "Splicing",
 }
 
 # The types offered on the All Variants page - reference variants are always excluded there, and the
@@ -64,11 +92,15 @@ def get_symbolic_variant_types() -> list[str]:
     return []
 
 
-def get_all_variant_types() -> list[str]:
-    variant_types = STANDARD_VARIANT_TYPES + get_symbolic_variant_types()
+def get_gene_level_variant_types() -> list[str]:
+    """ Empty when gene-level variants are disabled """
     if settings.VARIANT_GENE_LEVEL_ENABLED:
-        variant_types.append(VariantType.FUSION)
-    return variant_types
+        return list(GENE_LEVEL_VARIANT_TYPES)
+    return []
+
+
+def get_all_variant_types() -> list[str]:
+    return STANDARD_VARIANT_TYPES + get_symbolic_variant_types() + get_gene_level_variant_types()
 
 
 def get_variant_type_label(variant_type: str) -> str:
@@ -81,7 +113,7 @@ def get_variant_type_q(variant_type: str) -> Q:
         return q_func()
     if variant_type in settings.VARIANT_SYMBOLIC_ALT_VALID_TYPES:
         # Symbolic alts are only meaningful with an SVLEN - @see issue #1663
-        return Q(alt__seq=variant_type) & Variant.get_symbolic_q()
+        return _alt_in_q(Q(seq=variant_type)) & Variant.get_symbolic_q()
     msg = f"Unknown variant type: '{variant_type}'"
     raise ValueError(msg)
 
@@ -109,6 +141,16 @@ def get_non_standard_contig_ids(genome_build: GenomeBuild) -> list[int]:
     """ Alt scaffolds, patches and unplaced/unlocalized contigs """
     qs = genome_build.contigs.exclude(role=SequenceRole.ASSEMBLED_MOLECULE)
     return list(qs.values_list("pk", flat=True))
+
+
+def get_contig_ids_for_variant_types(genome_build: GenomeBuild, contig_ids: Iterable[int],
+                                     variant_types: Optional[Iterable[str]]) -> list[int]:
+    """ The gene-level contig is not a chromosome anyone can tick, so a gene-level type is what lets
+        it through - without it a contig selection hides every fusion whatever else is on """
+    contig_id_list = list(contig_ids)
+    if contig_id_list and (variant_types is None or set(variant_types) & set(GENE_LEVEL_VARIANT_TYPES)):
+        contig_id_list.extend(get_gene_level_contig_ids(genome_build))
+    return contig_id_list
 
 
 def get_contigs_q(genome_build: GenomeBuild, contig_ids: Optional[Iterable[int]] = None,
@@ -186,10 +228,7 @@ def get_variant_filter_q(genome_build: GenomeBuild, annotation_version: Annotati
             # Let the genes' contigs through, so a gene on a chromosome the user hasn't ticked still shows.
             # The page ticks them too, but a stale saved filter set or a direct grid URL wouldn't have.
             contig_id_list.extend(get_contig_ids_for_gene_symbols(genome_build, gene_symbols))
-        if variant_type_list is None or VariantType.FUSION in variant_type_list:
-            # The gene-level contig is not a chromosome anyone can tick, so the Fusion type is what
-            # lets it through - without it the contig filter hides every fusion whatever else is on
-            contig_id_list.extend(get_gene_level_contig_ids(genome_build))
+        contig_id_list = get_contig_ids_for_variant_types(genome_build, contig_id_list, variant_type_list)
 
     filter_list = [get_contigs_q(genome_build, contig_ids=contig_id_list,
                                  non_standard_contigs=non_standard_contigs)]

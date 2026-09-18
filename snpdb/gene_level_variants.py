@@ -81,7 +81,7 @@ declares it, which is what makes the file re-import. A writer that wants the pla
     takes the HGVS path and fails there.
   * The fusion, copy number and splice search receivers are never connected.
   * `ImportTaskFactory.enabled` withdraws the TSO 500 and gene-level CNV upload types.
-  * The GENE_LEVEL annotation pipeline is never scheduled, and the All Variants page offers no Fusion type.
+  * The GENE_LEVEL annotation pipeline is never scheduled, and the All Variants page and node offer no gene-level types.
 
 Gene-level Variants already stored are still read, displayed and exported - `Variant.coordinate` and
 `Variant.format_tuple` build the coordinate without validating it.
