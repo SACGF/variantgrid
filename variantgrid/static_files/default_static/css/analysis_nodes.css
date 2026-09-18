@@ -120,12 +120,12 @@ button.add-analysis-variable-button {
 	margin: 5px;
 }
 
-/* Add node dropdown - Bootstrap dropdown over the node types select, see setupNodeTypeSelect() */
+/* Add node dropdown - Bootstrap dropdown over the node types select, see node_type_select.js */
 #analysis-toolbar .node-type-item {
     float: none;  /* #analysis-toolbar floats its divs - the dropdown rows lay themselves out */
 }
 
-#id_node_types-button {
+.node-type-button {
     display: flex;
     align-items: center;
     width: 180px;
@@ -139,19 +139,19 @@ button.add-analysis-variable-button {
     color: #24292f;
 }
 
-#id_node_types-button:hover,
-.dropdown.show > #id_node_types-button {
+.node-type-button:hover,
+.dropdown.show > .node-type-button {
     border-color: #3455a4;
     background: #f4f6f8;
 }
 
-#id_node_types-button .node-type-button-text {
+.node-type-button .node-type-button-text {
     flex: 1;
     margin-right: 0;
 }
 
 .node-type-menu {
-    min-width: 180px; /* match #id_node_types-button */
+    min-width: 180px; /* match .node-type-button */
     max-height: 60vh;
     overflow-y: auto;
     padding: 3px;

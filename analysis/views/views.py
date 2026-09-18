@@ -366,7 +366,8 @@ def view_analysis_issues(request):
                "field_counts": field_counts,
                "jobs_control": jobs_control,
                "jobs_paused": bool(jobs_control and jobs_control.paused),
-               "filter_form": AnalysisNodeIssuesFilterForm(request.GET or None)}
+               "filter_form": AnalysisNodeIssuesFilterForm(request.GET or None),
+               "node_types_display": get_node_display_data_by_class_name()}
     return render(request, 'analysis/view_analysis_issues.html', context)
 
 

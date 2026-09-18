@@ -53,19 +53,6 @@ function getNode(nodeId) {
 // Everything else on the card - badge icon, class strip, chips - comes from the rendering dict, see
 // analysis/models/nodes/node_display.py
 
-// icon is a NodeIcon dict: FontAwesome classes, or a symbol id in node_icon_sprite.html
-function renderNodeIcon(icon) {
-	if (icon && icon.symbol) {
-		const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-		svg.setAttribute("class", "node-icon");
-		const use = document.createElementNS("http://www.w3.org/2000/svg", "use");
-		use.setAttribute("href", "#" + icon.symbol);
-		svg.appendChild(use);
-		return $(svg);
-	}
-	return $("<i/>", {class: "node-icon " + ((icon && icon.fa) || "")});
-}
-
 // A chip with children is a group - the hierarchy nested the way the relations are, eg a specimen
 // wrapping its extractions wrapping their VCFs
 function renderChip(chip) {
