@@ -10,6 +10,7 @@ from django.conf import settings
 from django.contrib.auth.models import Group, User
 from django.contrib.postgres.fields import DecimalRangeField
 from django.core.cache import cache
+from django.core.exceptions import ObjectDoesNotExist
 from django.db import models
 from django.db.models import Max
 from django.db.models.deletion import CASCADE, PROTECT, SET_NULL
@@ -606,6 +607,13 @@ class SingleSampleVCF(SeqAutoRecord):
     @property
     def sample_sheet(self) -> SampleSheet:
         return self.bam_file.sequencing_sample.sample_sheet
+
+    @property
+    def vcf(self) -> Optional[VCF]:
+        try:
+            return self.backendvcf.uploaded_vcf.vcf
+        except ObjectDoesNotExist:
+            return None
 
     def __str__(self):
         return f"VCF {self.name}"

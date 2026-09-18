@@ -1,11 +1,13 @@
 import os
 from collections import defaultdict
+from dataclasses import dataclass
+from typing import Optional, Union
 
 from django.conf import settings
 from django.core.exceptions import PermissionDenied
-from django.db.models.query_utils import Q
 from django.http.response import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, render
+from django.urls import reverse
 from django.views.decorators.http import require_POST
 
 from eventlog.models import create_event
@@ -35,7 +37,8 @@ from seqauto.qc.sequencing_run_utils import SEQUENCING_RUN_QC_COLUMNS
 from seqauto.sequencing_files.sample_sheet import (
     assign_old_sample_sheet_data_to_current_sample_sheet,
 )
-from snpdb.models import Sample, UserSettings
+from snpdb.models import VCF, Sample, UserSettings
+from upload.models import UploadedFileTypes
 
 
 def sequencing_data(request):
@@ -87,6 +90,71 @@ def get_illumina_qc_and_show_stats_for_sample_sheet(sample_sheet):
     return illumina_qc, show_stats
 
 
+@dataclass
+class RunVCF:
+    """ A VCF made from a run: the seqauto record of the file on disk (None when it was uploaded
+        and linked afterwards, eg DRAGEN TSO500 CombinedVariantOutput) next to the imported snpdb VCF """
+    record: Optional[Union[SingleSampleVCF, JointCalledVCF]]
+    vcf: Optional[VCF]
+    can_view: bool
+    label: Optional[str] = None
+
+    @property
+    def is_joint_called(self) -> bool:
+        return isinstance(self.record, JointCalledVCF)
+
+    @property
+    def record_url(self) -> Optional[str]:
+        if isinstance(self.record, JointCalledVCF):
+            return reverse("view_joint_called_vcf", kwargs={"joint_called_vcf_id": self.record.pk})
+        if isinstance(self.record, SingleSampleVCF):
+            return reverse("view_single_sample_vcf", kwargs={"single_sample_vcf_id": self.record.pk})
+        return None
+
+
+def _get_sequencing_run_vcfs(sequencing_run: SequencingRun, sample_sheet, user) -> dict:
+    """ VCFs with more than one sample belong to the run, the rest to their sequencing sample """
+
+    def run_vcf(record, vcf, label=None) -> RunVCF:
+        return RunVCF(record=record, vcf=vcf, can_view=bool(vcf and vcf.can_view(user)), label=label)
+
+    sheet_sequencing_sample_ids = set(sample_sheet.sequencingsample_set.values_list("pk", flat=True))
+    multi_sample_vcfs = []
+    sequencing_sample_vcfs = defaultdict(list)
+
+    for joint_called_vcf in sample_sheet.get_joint_called_vcfs():
+        sequencing_sample_ids = list(joint_called_vcf.get_sequencing_samples().values_list("pk", flat=True))
+        rv = run_vcf(joint_called_vcf, joint_called_vcf.vcf)
+        if len(sequencing_sample_ids) == 1 and sequencing_sample_ids[0] in sheet_sequencing_sample_ids:
+            sequencing_sample_vcfs[sequencing_sample_ids[0]].append(rv)
+        else:
+            multi_sample_vcfs.append(rv)
+
+    uploaded_qs = sequencing_run.vcffromsequencingrun_set.filter(vcf__uploadedvcf__backendvcf__isnull=True)
+    for vcf_for_run in uploaded_qs.select_related("vcf__uploadedvcf__file_upload"):
+        vcf = vcf_for_run.vcf
+        label = "Uploaded VCF"
+        if hasattr(vcf, "uploadedvcf") and vcf.uploadedvcf.file_upload.file_type != UploadedFileTypes.VCF:
+            label = vcf.uploadedvcf.file_upload.get_file_type_display()
+        rv = run_vcf(None, vcf, label)
+        sequencing_sample_ids = list(vcf.sample_set.values_list("samplefromsequencingsample__sequencing_sample", flat=True))
+        if len(sequencing_sample_ids) == 1 and sequencing_sample_ids[0] in sheet_sequencing_sample_ids:
+            sequencing_sample_vcfs[sequencing_sample_ids[0]].append(rv)
+        else:
+            multi_sample_vcfs.append(rv)
+
+    single_sample_vcfs = {}
+    ss_vcf_qs = SingleSampleVCF.objects.filter(bam_file__sequencing_sample__sample_sheet=sample_sheet)
+    for single_sample_vcf in ss_vcf_qs.select_related("backendvcf__uploaded_vcf__vcf"):
+        single_sample_vcfs[single_sample_vcf.pk] = run_vcf(single_sample_vcf, single_sample_vcf.vcf)
+
+    return {
+        "multi_sample_vcfs": multi_sample_vcfs,
+        "sequencing_sample_vcfs": dict(sequencing_sample_vcfs),
+        "single_sample_vcfs": single_sample_vcfs,
+    }
+
+
 def view_sequencing_run(request, sequencing_run_id, tab_id=0):
     sequencing_run = get_object_or_404(SequencingRun, pk=sequencing_run_id)
 
@@ -106,22 +174,10 @@ def view_sequencing_run(request, sequencing_run_id, tab_id=0):
 
             sequencing_run = sequencing_run_form.save()
 
-    vcf_types = {
-        "Joint Called VCF": Q(vcf__uploadedvcf__backendvcf__joint_called_vcf__isnull=False),
-        "Single Sample VCF": Q(vcf__uploadedvcf__backendvcf__single_sample_vcf__isnull=False),
-    }
-
-    run_vcfs = defaultdict(list)
-    sr_vcf_qs = sequencing_run.vcffromsequencingrun_set.all()
-    for vcf_type, q in vcf_types.items():
-        for vcf_for_run in sr_vcf_qs.filter(q):
-            run_vcfs[vcf_type].append((vcf_for_run.get_variant_caller(), vcf_for_run.vcf, vcf_for_run.vcf.can_view(request.user)))
-
     context = {
         "sequencing_run": sequencing_run,
         "sequencing_run_form": sequencing_run_form,
         'tab_id': tab_id,
-        'run_vcfs': dict(run_vcfs),
     }
 
     try:  # May not have sample sheet and die
@@ -134,9 +190,11 @@ def view_sequencing_run(request, sequencing_run_id, tab_id=0):
         context['has_sequencing_sample_data'] = has_sequencing_sample_data
         context["sequencing_samples"] = sample_sheet.get_sorted_sequencing_samples()
         context['data_out_of_date_from_current_sample_sheet'] = sequencing_run.is_data_out_of_date_from_current_sample_sheet
+        context.update(_get_sequencing_run_vcfs(sequencing_run, sample_sheet, request.user))
     except Exception:
         log_traceback()
 
+    context['default_tab'] = "run-stats" if context.get('show_stats') else "data"
     return render(request, 'seqauto/view_sequencing_run.html', context)
 
 

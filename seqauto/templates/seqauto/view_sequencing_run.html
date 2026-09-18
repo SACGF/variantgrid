@@ -3,6 +3,7 @@
 {% load model_helpers %}
 {% load help_tags %}
 {% load ui_utils %}
+{% load js_tags %}
 {% block title %}{{ sequencing_run.name }}{% endblock %}
 {% block head %}
 	<link rel="stylesheet" href="{% static 'css/graphs.css' %}" />
@@ -57,12 +58,10 @@
             background-image: url({% static 'icons/sequencers/miseq_icon.png' %})
         }
 
-        .vcf-icon {
-            width: 24px;
-            height: 24px;
-            background-size: 24px 24px;
-            background-image: url({% static 'icons/vcf_64.png' %});
-            float: left;
+        .run-vcf-icon {
+            display: inline-block;
+            vertical-align: middle;
+            text-indent: 0;
         }
 
         .sample-sheet-icon {
@@ -187,32 +186,18 @@
         {% endif %}
     {% endwith %}
 
-    {% for vcf_type, vcf_files in run_vcfs.items %}
-        {% for variant_caller, vcf, can_view in vcf_files %}
-        <tr>
-            <th>{{ vcf_type }} / {{ variant_caller.name }} VCF:</th>
-            <td>
-                    {% if can_view %}
-                        <a href="{% url 'view_vcf' vcf.pk %}"><div class='vcf-icon'></div>{{ vcf }}</a>
-                    {% else %}
-                        <div title="You don't have permission to view this VCF" class='vcf-icon'></div>{{ vcf }}
-                    {% endif %}
-            </td>
-        </tr>
-        {% endfor %}
-    {% endfor %}
 	</table>
 
 	<div id="sequencing-run-tabs">
 		<ul class="nav nav-tabs mb-4" role="tablist">
-	    	<li class="nav-item"><a class="nav-link{% if not tab_id %} show active{% endif %}" data-toggle="tab" role="tab" href="#run-stats" data-href="{% url 'view_sequencing_run_stats_tab' sequencing_run.pk %}">Run Stats</a></li>
+	    	<li class="nav-item"><a class="nav-link{% if not tab_id and default_tab == 'run-stats' %} show active{% endif %}" data-toggle="tab" role="tab" href="#run-stats" data-href="{% url 'view_sequencing_run_stats_tab' sequencing_run.pk %}">Run Stats</a></li>
             <li class="nav-item"><a class="nav-link" data-toggle="tab" role="tab" href="#wiki">Wiki{% if sequencing_run.sequencingrunwiki %}*{% endif %}</a></li>
             <li class="nav-item"><a class="nav-link" data-toggle="tab" role="tab" href="#barcodes">Barcodes</a></li>
 	    	<li class="nav-item"><a class="nav-link" data-toggle="tab" role="tab" href="#samples">Samples</a></li>
 		{% if sequencing_run.experiment %}
 	    	<li class="nav-item"><a class="nav-link" data-toggle="tab" role="tab" href="#experiment">{{ sequencing_run.experiment }}</a></li>
 		{% endif %}
-            <li class="nav-item"><a class="nav-link" data-toggle="tab" role="tab" href="#data">Data</a></li>
+            <li class="nav-item"><a class="nav-link{% if not tab_id and default_tab == 'data' %} show active{% endif %}" data-toggle="tab" role="tab" href="#data">Data</a></li>
         {% if sequencing_run.sequencingrunmodification_set.exists %}
             <li class="nav-item"><a class="nav-link" data-toggle="tab" role="tab" href="#modifications">Modifications</a></li>
         {% endif %}
@@ -222,7 +207,7 @@
 
 	  	</ul>
         <div class="tab-content">
-        <div class="tab-pane{% if not tab_id %} show active{% endif %}" role="tabpanel" id="run-stats"></div>
+        <div class="tab-pane{% if not tab_id and default_tab == 'run-stats' %} show active{% endif %}" role="tabpanel" id="run-stats"></div>
         <div class="tab-pane" role="tabpanel" id="wiki">
             {% load wiki_tags %}
             {% wiki_editor sequencing_run.sequencingrunwiki class_name='seqauto.models.SequencingRunWiki' unique_keyword='sequencing_run_id' unique_value=sequencing_run.pk %}
@@ -325,37 +310,17 @@
 		</div>
 		{% endif %}
 
-        <div class="tab-pane" role="tabpanel" id='data'>
+        <div class="tab-pane{% if not tab_id and default_tab == 'data' %} show active{% endif %}" role="tabpanel" id='data'>
             <h3>Made from this data</h3>
-            {% with joint_called_vcfs=sample_sheet.get_joint_called_vcfs %}
-            {% if joint_called_vcfs %}
-                <ul><b>Joint Called VCFs</b>
-                {% for joint_called_vcf in joint_called_vcfs %}
-                    <li class='seqauto-record vcf-file'>
-                        <a href="{% url 'view_joint_called_vcf' joint_called_vcf.pk %}">{{ joint_called_vcf }}</a>
-                        <div class='sample-sheet-icon'></div>
-                        SampleSheet.csv —
-                        {% with sample_count=joint_called_vcf.sample_count %}
-                            {% if sample_count is None %}
-                                loading…
-                            {% else %}
-                                {{ sample_count }} / {{ joint_called_vcf.sequencing_sample_count }} samples
-                                {% if joint_called_vcf.is_full_sheet %}
-                                    [full sheet]
-                                {% else %}
-                                    [subset]
-                                {% endif %}
-                            {% endif %}
-                        {% endwith %}
-                        {% if joint_called_vcf.is_cross_run %}
-                            [cross-run]
-                        {% endif %}
+            {% if multi_sample_vcfs %}
+                <ul><b>Multi-sample VCFs</b>
+                {% for run_vcf in multi_sample_vcfs %}
+                    {% include "seqauto/tags/run_vcf.html" %}
                 {% endfor %}
                 </ul>
             {% endif %}
-            {% endwith %}
-    
-            <ul>        
+
+            <ul>
             {% for ss in sample_sheet.sequencingsample_set.all %}
                 <li><b>Sample:</b> {{ ss }}
                 <ul>
@@ -367,8 +332,9 @@
 
                     <ul>
                     {% for vcf_file in bam_file.singlesamplevcf_set.all %}
-                        <li class='seqauto-record vcf-file'><a href="{% url 'view_single_sample_vcf' vcf_file.pk %}">{{ vcf_file }}</a>
-
+                        {% with run_vcf=single_sample_vcfs|get_item:vcf_file.pk %}
+                            {% include "seqauto/tags/run_vcf.html" %}
+                        {% endwith %}
                         <ul>
                         {% for qc in vcf_file.qc_set.all %}
                             <li class='seqauto-record qc'><a href="{% url 'view_qc' qc.pk %}">{{ qc }}</a>
@@ -377,6 +343,9 @@
                     {% endfor %}
                     </ul>
                     </li>
+                {% endfor %}
+                {% for run_vcf in sequencing_sample_vcfs|get_item:ss.pk %}
+                    {% include "seqauto/tags/run_vcf.html" %}
                 {% endfor %}
                 </ul>
                 </li>

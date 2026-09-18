@@ -1,0 +1,36 @@
+{# A VCF made from a sequencing run: the seqauto record (file on disk) as a link, the imported VCF as an icon #}
+<li class='seqauto-record'>
+    {% if run_vcf.vcf %}
+        {% if run_vcf.can_view %}
+            <a href="{% url 'view_vcf' run_vcf.vcf.pk %}" title="VCF: {{ run_vcf.vcf }}"><div class='vcf-icon icon24 run-vcf-icon'></div></a>
+        {% else %}
+            <div title="You don't have permission to view this VCF" class='vcf-icon icon24 run-vcf-icon'></div>
+        {% endif %}
+    {% endif %}
+    {% if run_vcf.record %}
+        <a href="{{ run_vcf.record_url }}">{{ run_vcf.record }}</a>
+        {% if run_vcf.is_joint_called %}
+            {% with joint_called_vcf=run_vcf.record %}
+                <div class='sample-sheet-icon'></div>
+                SampleSheet.csv —
+                {% with sample_count=joint_called_vcf.sample_count %}
+                    {% if sample_count is None %}
+                        loading…
+                    {% else %}
+                        {{ sample_count }} / {{ joint_called_vcf.sequencing_sample_count }} samples
+                        {% if joint_called_vcf.is_full_sheet %}
+                            [full sheet]
+                        {% else %}
+                            [subset]
+                        {% endif %}
+                    {% endif %}
+                {% endwith %}
+                {% if joint_called_vcf.is_cross_run %}
+                    [cross-run]
+                {% endif %}
+            {% endwith %}
+        {% endif %}
+    {% else %}
+        {{ run_vcf.label }}: {{ run_vcf.vcf }}
+    {% endif %}
+</li>
