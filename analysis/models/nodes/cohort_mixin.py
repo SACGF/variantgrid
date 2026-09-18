@@ -311,6 +311,25 @@ class CohortMixin:
         alias = self.cohort_genotype_collection.cohortgenotype_alias
         return self._get_vcf_locus_filters_arg_q_dict(self._get_vcf(), alias)
 
+    def save(self, *args, **kwargs):
+        ret = super().save(*args, **kwargs)
+        vcfs = self.get_vcf_locus_filter_vcfs()
+        if len(vcfs) == 1:
+            NodeVCFFilter.carry_over_to_vcf(self, vcfs[0])
+        return ret
+
+    def get_warnings(self) -> list[str]:
+        warnings = super().get_warnings()
+        vcfs = self.get_vcf_locus_filter_vcfs()
+        for other_vcf, filter_ids in NodeVCFFilter.get_filter_ids_for_other_vcfs(self, vcfs).items():
+            msg = f"FILTER {', '.join(sorted(filter_ids))} chosen for VCF '{other_vcf}' not applied"
+            if len(vcfs) == 1:
+                vcf_filter_ids = set(vcfs[0].vcffilter_set.values_list("filter_id", flat=True))
+                missing = ', '.join(sorted(filter_ids - vcf_filter_ids))
+                msg += f" - VCF '{vcfs[0]}' has no {missing}"
+            warnings.append(msg + ". Re-select FILTERs and save.")
+        return warnings
+
     def get_filter_code(self):
         """
             Used for cached label counts

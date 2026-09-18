@@ -10,7 +10,8 @@ from django.urls.base import reverse
 from django.utils import timezone
 from guardian.shortcuts import assign_perm
 
-from analysis.analysis_templates import get_sample_analysis
+from analysis.analysis_templates import get_sample_analysis, run_analysis_template
+from analysis.forms.forms_nodes import VCFLocusFiltersMixin
 from analysis.models import (
     Analysis,
     AnalysisTemplate,
@@ -19,11 +20,21 @@ from analysis.models import (
     AnalysisTemplateVersion,
     AnalysisVariable,
 )
+from analysis.models.nodes.analysis_node import NodeVCFFilter
 from analysis.models.nodes.sources.sample_node import SampleNode
 from annotation.fake_annotation import get_fake_annotation_version
 from library.django_utils.unittest_utils import prevent_request_warnings
 from library.guardian_utils import DjangoPermission, assign_permission_to_user_and_groups
-from snpdb.models import VCF, GenomeBuild, ImportStatus, Sample
+from snpdb.models import (
+    VCF,
+    Cohort,
+    CohortGenotypeCollection,
+    CohortSample,
+    GenomeBuild,
+    ImportStatus,
+    Sample,
+    VCFFilter,
+)
 
 ANALYSIS_NAME_TEMPLATE = "%(template)s for %(input)s"
 
@@ -290,3 +301,80 @@ class TestTemplateSaveView(AnalysisTemplateDraftTestCase):
         data = self._save(activate=1)
         self.assertTrue(data["active"])
         self.assertIsNone(data["replaced_version"])
+
+
+
+class TestTemplateRunSampleNodeFilters(AnalysisTemplateDraftTestCase):
+    """ #1886 - a template's sample node FILTERs are ticked on the sample it was built with, and carry
+        over to the VCF it is run against when that declares every one of them by name """
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls._create_cohort(cls.sample)
+        # Codes are assigned per VCF, so the same filter has a different one in each
+        template_filter = VCFFilter.objects.create(vcf=cls.vcf, filter_code="A", filter_id="LowDepth")
+
+        node = SampleNode.objects.get(analysis=cls.template.analysis)
+        node.sample = cls.sample
+        node.save()
+        NodeVCFFilter.objects.create(node=node, vcf_filter=None)  # PASS
+        NodeVCFFilter.objects.create(node=node, vcf_filter=template_filter)
+
+    @classmethod
+    def _create_cohort(cls, sample):
+        cohort = Cohort.objects.create(name=f"{sample.name}_cohort", user=cls.owner, vcf=sample.vcf,
+                                       genome_build=cls.grch37, import_status=ImportStatus.SUCCESS)
+        CohortSample.objects.create(cohort=cohort, sample=sample,
+                                    cohort_genotype_packed_field_index=0, sort_order=0)
+        assign_permission_to_user_and_groups(cls.owner, cohort)
+        CohortGenotypeCollection.objects.create(cohort=cohort, cohort_version=cohort.version, num_samples=1)
+
+    def _create_sample(self, name, filter_ids) -> Sample:
+        vcf = VCF.objects.create(name=f"{name}_vcf", genotype_samples=1, genotype_field="GT",
+                                 genome_build=self.grch37, import_status=ImportStatus.SUCCESS,
+                                 user=self.owner, date=timezone.now())
+        sample = Sample.objects.create(name=name, vcf=vcf, import_status=ImportStatus.SUCCESS)
+        assign_permission_to_user_and_groups(self.owner, vcf)
+        assign_permission_to_user_and_groups(self.owner, sample)
+        self._create_cohort(sample)
+        for code, filter_id in zip("BCD", filter_ids):
+            VCFFilter.objects.create(vcf=vcf, filter_code=code, filter_id=filter_id)
+        return sample
+
+    def _run(self, sample) -> SampleNode:
+        self._new_version().activate()
+        template_run = run_analysis_template(self.template, self.grch37, user=self.owner, sample=sample)
+        return SampleNode.objects.get(analysis=template_run.analysis)
+
+    def test_filters_carry_over_to_a_vcf_declaring_them_all(self):
+        # A newer pipeline version that added a filter
+        sample = self._create_sample("run", ["LowDepth", "LowGQ"])
+        node = self._run(sample)
+        self.assertEqual(NodeVCFFilter.get_filter_codes(node, sample.vcf), {None, "B"})
+        self.assertEqual(node.get_warnings(), [])
+
+    def test_filters_missing_from_the_vcf_warn(self):
+        sample = self._create_sample("run", ["LowQual"])
+        node = self._run(sample)
+        self.assertEqual(NodeVCFFilter.get_filter_codes(node, sample.vcf), {None})
+        self.assertEqual(len(node.get_warnings()), 1)
+        self.assertIn("LowDepth", node.get_warnings()[0])
+
+    def test_editor_swapping_sample_carries_filters_over(self):
+        sample = self._create_sample("swap", ["LowDepth"])
+        node = SampleNode.objects.get(analysis=self.template.analysis)
+        node.sample = sample
+
+        # The editor posts the old VCF's ticks - nothing is ticked on the new one yet
+        form = VCFLocusFiltersMixin()
+        form.cleaned_data = {"vcf_locus_filters": {"pass": True, "by_vcf": {str(self.vcf.pk): ["LowDepth"]}}}
+        form.save_vcf_locus_filters(node)
+        node.save()
+        self.assertEqual(NodeVCFFilter.get_filter_codes(node, sample.vcf), {None, "B"})
+
+        # Saving again on the new VCF with nothing ticked is a choice, not a swap
+        form.cleaned_data = {"vcf_locus_filters": {"pass": True, "by_vcf": {}}}
+        form.save_vcf_locus_filters(node)
+        node.save()
+        self.assertEqual(NodeVCFFilter.get_filter_codes(node, sample.vcf), {None})

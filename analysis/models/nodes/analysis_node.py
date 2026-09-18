@@ -1647,6 +1647,43 @@ class NodeVCFFilter(NodeAuditLogMixin, models.Model):
             filter_codes.add(None)
         return filter_codes
 
+    @staticmethod
+    def get_filter_ids_for_other_vcfs(node, vcfs) -> dict:
+        """ {vcf: filter_ids} for rows on VCFs the node no longer reads - ticked before its sample or
+            cohort changed, and not applied to anything """
+        filter_ids_by_vcf = defaultdict(set)
+        nvf_qs = NodeVCFFilter.objects.filter(node_id=node.pk, vcf_filter__isnull=False)
+        for nvf in nvf_qs.exclude(vcf_filter__vcf__in=vcfs).select_related("vcf_filter__vcf"):
+            filter_ids_by_vcf[nvf.vcf_filter.vcf].add(nvf.vcf_filter.filter_id)
+        return filter_ids_by_vcf
+
+    @staticmethod
+    def carry_over_to_vcf(node, vcf):
+        """ A node moved onto another VCF (sample swap, template run) keeps the selection made on its
+            old one if the new VCF declares every filter by the same name - a newer pipeline version
+            that added filters, or common ones like LowQual. Otherwise the rows stay on the old VCF,
+            unapplied, and the node warns (@see CohortMixin.get_warnings) """
+        other_vcf_filter_ids = NodeVCFFilter.get_filter_ids_for_other_vcfs(node, [vcf])
+        if not other_vcf_filter_ids:
+            return
+
+        other_vcf_qs = NodeVCFFilter.objects.filter(node_id=node.pk, vcf_filter__isnull=False) \
+            .exclude(vcf_filter__vcf=vcf)
+        if NodeVCFFilter.objects.filter(node_id=node.pk, vcf_filter__vcf=vcf).exists():
+            other_vcf_qs.delete()  # Chosen on this VCF, which replaces anything left from the old one
+            return
+
+        if len(other_vcf_filter_ids) != 1:
+            return
+        filter_ids = next(iter(other_vcf_filter_ids.values()))
+        vcf_filters = list(VCFFilter.objects.filter(vcf=vcf, filter_id__in=filter_ids))
+        if len(vcf_filters) != len(filter_ids):
+            return
+
+        other_vcf_qs.delete()
+        for vcf_filter in vcf_filters:
+            NodeVCFFilter.objects.create(node_id=node.pk, vcf_filter=vcf_filter)
+
 
 class NodeAlleleFrequencyFilter(NodeAuditLogMixin, models.Model):
     """ Used for various nodes """

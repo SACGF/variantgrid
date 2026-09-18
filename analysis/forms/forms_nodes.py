@@ -116,13 +116,21 @@ class VCFLocusFiltersMixin(forms.Form):
             return
 
         vcf_locus_filters = self.cleaned_data["vcf_locus_filters"] or {}
-        NodeVCFFilter.objects.filter(node=node).delete()
+        by_vcf = vcf_locus_filters.get("by_vcf") or {}
+        vcfs_by_id = {str(vcf.pk): vcf for vcf in vcfs}
+
+        nvf_qs = NodeVCFFilter.objects.filter(node=node)
+        saved_vcfs = type(node).objects.get(pk=node.pk).get_vcf_locus_filter_vcfs()
+        if set(saved_vcfs) != set(vcfs) and not any(by_vcf.get(vcf_id) for vcf_id in vcfs_by_id):
+            # Moved to another VCF with nothing ticked on it yet - leave the old VCF's rows for
+            # node.save() to carry over by name (@see NodeVCFFilter.carry_over_to_vcf)
+            nvf_qs = nvf_qs.filter(Q(vcf_filter__isnull=True) | Q(vcf_filter__vcf__in=vcfs))
+        nvf_qs.delete()
 
         if vcf_locus_filters.get("pass"):
             NodeVCFFilter.objects.create(node=node, vcf_filter=None)
 
-        vcfs_by_id = {str(vcf.pk): vcf for vcf in vcfs}
-        for vcf_id, filter_ids in (vcf_locus_filters.get("by_vcf") or {}).items():
+        for vcf_id, filter_ids in by_vcf.items():
             vcf = vcfs_by_id.get(str(vcf_id))
             if vcf is None:
                 continue  # A VCF the node no longer reads
