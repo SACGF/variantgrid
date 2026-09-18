@@ -109,7 +109,7 @@
         {% endif %}
 
         <div class="container">
-            <div id="analysis-node-summary-graph"></div>
+            <div id="analysis-node-summary-graph" style="height: 100px"></div>
             {% for field, count in field_counts.items %}
                 {% labelled label=field %}{{ count }}{% endlabelled %}
             {% endfor %}
