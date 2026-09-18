@@ -3820,6 +3820,27 @@ a.clinical-context {
 	line-height: 1;
 	// stop the auto-width column collapsing to a single icon, which forced one icon per line
 	min-width: 106px;
+
+	.sequencing-run-vcfs-toggle {
+		white-space: nowrap;
+
+		.grid-link-icon {
+			display: inline-block;
+			vertical-align: middle;
+		}
+	}
+
+	.sequencing-run-vcfs-list {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 2px;
+		flex-basis: 100%;
+	}
+
+	&.sequencing-run-vcfs-collapsed .sequencing-run-vcfs-list {
+		display: none;
+	}
 }
 
 .clingen-icon {

@@ -174,27 +174,49 @@ function renderExternalLinks(data, type, row) {
 }
 
 
-// Server sends one entry per VCF loaded from the run - {id, url, import_status, variant_caller}
+function _sequencingRunVCFIcon(vcf) {
+    if (vcf.import_status === 'S') {
+        return $('<div>', {class: 'grid-link-icon vcf-icon', title: vcf.variant_caller});
+    } else if (vcf.import_status === 'E') {
+        return $('<i>', {class: 'fas fa-times-circle text-danger', title: vcf.variant_caller});
+    } else if (vcf.import_status === 'C' || vcf.import_status === 'I') {
+        return $('<i>', {class: 'fas fa-spinner fa-spin', title: vcf.variant_caller});
+    }
+    return $('<span>', {text: `VCF ${vcf.id} (${vcf.import_status})`});
+}
+
+/* Server sends one entry per VCF loaded from the run - {id, url, import_status, variant_caller}
+   More than one reads "VCF x N" so the column stays even, and toggles the full set of icons open in place */
 function renderSequencingRunVCFs(data, type, row) {
     if (!data || !data.length) {
         return '';
     }
-    const dom = $('<div>', {class: 'sequencing-run-vcfs'});
+    const dom = $('<div>', {class: 'sequencing-run-vcfs sequencing-run-vcfs-collapsed'});
+    if (data.length === 1) {
+        const vcf = data[0];
+        $('<a>', {href: vcf.url, html: _sequencingRunVCFIcon(vcf)}).appendTo(dom);
+        return dom.prop('outerHTML');
+    }
+    const toggle = $('<a>', {href: '#', class: 'sequencing-run-vcfs-toggle',
+                             title: `${data.length} VCFs - click to show/hide`}).appendTo(dom);
+    $('<div>', {class: 'grid-link-icon vcf-icon'}).appendTo(toggle);
+    toggle.append(` x ${data.length}`);
+    // Problems stay visible while collapsed
+    const numErrors = data.filter(vcf => vcf.import_status === 'E').length;
+    if (numErrors) {
+        toggle.append(' ', $('<i>', {class: 'fas fa-times-circle text-danger', title: `${numErrors} failed to import`}));
+    }
+    const vcfList = $('<div>', {class: 'sequencing-run-vcfs-list'}).appendTo(dom);
     for (const vcf of data) {
-        let icon;
-        if (vcf.import_status === 'S') {
-            icon = $('<div>', {class: 'grid-link-icon vcf-icon', title: vcf.variant_caller});
-        } else if (vcf.import_status === 'E') {
-            icon = $('<i>', {class: 'fas fa-times-circle text-danger', title: vcf.variant_caller});
-        } else if (vcf.import_status === 'C' || vcf.import_status === 'I') {
-            icon = $('<i>', {class: 'fas fa-spinner fa-spin', title: vcf.variant_caller});
-        } else {
-            icon = $('<span>', {text: `VCF ${vcf.id} (${vcf.import_status})`});
-        }
-        $('<a>', {href: vcf.url, html: icon}).appendTo(dom);
+        $('<a>', {href: vcf.url, html: _sequencingRunVCFIcon(vcf)}).appendTo(vcfList);
     }
     return dom.prop('outerHTML');
 }
+
+$(document).on('click', '.sequencing-run-vcfs-toggle', function(e) {
+    e.preventDefault();
+    $(this).closest('.sequencing-run-vcfs').toggleClass('sequencing-run-vcfs-collapsed');
+});
 
 
 // Variant tags grid (@see VariantTagsColumns) - the tag colour CSS comes from render_tag_styles_and_formatter

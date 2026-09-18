@@ -3264,6 +3264,23 @@ a.clinical-context {
   line-height: 1;
   min-width: 106px;
 }
+.sequencing-run-vcfs .sequencing-run-vcfs-toggle {
+  white-space: nowrap;
+}
+.sequencing-run-vcfs .sequencing-run-vcfs-toggle .grid-link-icon {
+  display: inline-block;
+  vertical-align: middle;
+}
+.sequencing-run-vcfs .sequencing-run-vcfs-list {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  flex-basis: 100%;
+}
+.sequencing-run-vcfs.sequencing-run-vcfs-collapsed .sequencing-run-vcfs-list {
+  display: none;
+}
 
 .clingen-icon {
   background-image: url(/static/images/clingen.jpeg);
