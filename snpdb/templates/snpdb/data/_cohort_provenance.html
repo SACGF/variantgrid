@@ -2,7 +2,7 @@
 <p class="cohort-provenance text-muted">
 {% if vcf %}
     Samples come from this VCF file - membership is fixed by the file.
-    {% if has_write_permission and vcf.import_status == 'S' %}
+    {% if has_write_permission and vcf.import_status == 'S' and cohort.sample_count > 1 %}
         Select samples below and use <b>Create cohort from selected samples</b> to work with a subset.
     {% endif %}
 {% elif cohort.parent_cohort %}
