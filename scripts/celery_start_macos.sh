@@ -14,4 +14,5 @@ celery worker -l DEBUG -b ${BROKER_URL} --app variantgrid --concurrency=1 -P gev
 celery worker -l DEBUG -b ${BROKER_URL} --app variantgrid --concurrency=1 -P gevent -n web_workers --queues web_workers &
 celery worker -l DEBUG -b ${BROKER_URL} --app variantgrid --concurrency=1 -P gevent -n variant_id_single_worker --queues variant_id_single_worker &
 celery worker -l DEBUG -b ${BROKER_URL} --app variantgrid --concurrency=1 -P eventlet -n scheduling_single_worker --queues scheduling_single_worker &
+celery worker -l DEBUG -b ${BROKER_URL} --app variantgrid --concurrency=1 -P gevent -n heavy_workers --queues heavy_workers &
 wait

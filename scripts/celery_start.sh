@@ -12,4 +12,5 @@ celery -b ${BROKER_URL} --app variantgrid worker -l DEBUG --max-tasks-per-child=
 celery -b ${BROKER_URL} --app variantgrid worker -l DEBUG --max-tasks-per-child=100 --concurrency=4 -n web_workers --queues web_workers &
 celery -b ${BROKER_URL} --app variantgrid worker -l DEBUG --max-tasks-per-child=100 --concurrency=1 -n variant_id_single_worker --queues variant_id_single_worker &
 celery -b ${BROKER_URL} --app variantgrid worker -l DEBUG --max-tasks-per-child=100 --concurrency=1 -n scheduling_single_worker --queues scheduling_single_worker &
+celery -b ${BROKER_URL} --app variantgrid worker -l DEBUG --max-tasks-per-child=100 --concurrency=2 -n heavy_workers --queues heavy_workers &
 wait

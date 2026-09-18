@@ -35,6 +35,7 @@ CELERY_TASK_QUEUES = (
     Queue('web_workers', Exchange('web_workers'), routing_key='web_workers'),
     Queue('scheduling_single_worker', Exchange('scheduling_single_worker'), routing_key='scheduling_single_worker'),
     Queue('variant_id_single_worker', Exchange('variant_id_single_worker'), routing_key='variant_id_single_worker'),
+    Queue('heavy_workers', Exchange('heavy_workers'), routing_key='heavy_workers'),
 )
 
 ANALYSIS_WORKERS = {'queue': 'analysis_workers', 'routing_key': 'analysis_workers'}
@@ -50,9 +51,13 @@ VARIANT_ID_SINGLE_WORKER = {'queue': 'variant_id_single_worker', 'routing_key': 
 # 1 worker, use this to schedule tasks and avoid race conditions
 SCHEDULING_SINGLE_WORKER = {'queue': 'scheduling_single_worker', 'routing_key': 'scheduling_single_worker'}
 
+# Low concurrency (2) for memory-hungry subprocesses, so a burst of imports can't run enough at once to OOM the box
+HEAVY_WORKERS = {'queue': 'heavy_workers', 'routing_key': 'heavy_workers'}
+
 CELERY_WORKER_NAMES = ['annotation_workers', 'db_workers', 'web_workers',
                        'scheduling_single_worker', 'variant_id_single_worker']
 CELERY_ANALYSIS_WORKER_NAMES = ['analysis_workers']
+CELERY_HEAVY_WORKER_NAMES = ['heavy_workers']  # Only needed when SOMALIER is enabled
 
 CELERY_TASK_ROUTES = {
     # Analysis
@@ -109,6 +114,7 @@ CELERY_TASK_ROUTES = {
     'upload.tasks.vcf.unknown_variants_task.InsertUnknownVariantsTask': VARIANT_ID_SINGLE_WORKER,
     'upload.tasks.vcf.genotype_vcf_tasks.UpdateVariantZygosityCountsTask': VARIANT_ID_SINGLE_WORKER,
     'upload.tasks.vcf.genotype_vcf_tasks.reload_vcf_task': VARIANT_ID_SINGLE_WORKER,
+    'upload.tasks.vcf.genotype_vcf_tasks.SomalierVCFTask': HEAVY_WORKERS,  # somalier ancestry is ~1GB RSS
 
     # Scheduling single worker
     'analysis.tasks.analysis_update_tasks.create_and_launch_analysis_tasks': SCHEDULING_SINGLE_WORKER,

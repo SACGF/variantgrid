@@ -7,6 +7,7 @@ Type=forking
 User=variantgrid
 ExecStartPre=/bin/mkdir -p /var/log/variantgrid
 Restart=always
+OOMPolicy=continue
 EnvironmentFile=/etc/variantgrid/variantgrid.env
 EnvironmentFile=/etc/variantgrid/celery/celeryd_annotation_workers.env
 ExecStart=/bin/sh -c 'cd "${VG_INSTALL_DIR}" && ${CELERY_BIN} multi start ${CELERYD_NODES} \

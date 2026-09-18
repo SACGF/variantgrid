@@ -56,6 +56,8 @@ def _celery_worker_status() -> dict:
     worker_names = settings.CELERY_WORKER_NAMES.copy()
     if settings.URLS_APP_REGISTER["analysis"]:
         worker_names.extend(settings.CELERY_ANALYSIS_WORKER_NAMES)
+    if settings.SOMALIER.get("enabled"):
+        worker_names.extend(settings.CELERY_HEAVY_WORKER_NAMES)
 
     i = app.control.inspect()
     ping = strip_celery_from_keys(i.ping())

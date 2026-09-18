@@ -39,6 +39,7 @@ systemd units, all restarted by `scripts/restart_services.sh` (`stop_services.sh
 | `annotation_workers` | VEP dumps / runs / uploads |
 | `variant_id_single_worker` | one process: inserts new Loci/Variants so there is exactly one row per coordinate |
 | `scheduling_single_worker` | one process: schedulers that must not race (annotation, node tasks) |
+| `heavy_workers` | two processes: memory-hungry subprocesses (somalier), so a burst of imports can't OOM the box |
 
 Route a task with `@celery.shared_task(queue=...)` or an entry in `CELERY_TASK_ROUTES`; `claude/maps/tasks.md` lists every
 task with its queue and enqueuers. The broker is RabbitMQ (`CELERY.broker_url` secret), the result backend and cache Redis.

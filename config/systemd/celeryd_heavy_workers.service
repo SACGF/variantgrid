@@ -1,5 +1,5 @@
 [Unit]
-Description=VG Web worker
+Description=VG heavy worker
 After=network.target
 
 [Service]
@@ -9,7 +9,7 @@ ExecStartPre=/bin/mkdir -p /var/log/variantgrid
 Restart=always
 OOMPolicy=continue
 EnvironmentFile=/etc/variantgrid/variantgrid.env
-EnvironmentFile=/etc/variantgrid/celery/celeryd_web_workers.env
+EnvironmentFile=/etc/variantgrid/celery/celeryd_heavy_workers.env
 ExecStart=/bin/sh -c 'cd "${VG_INSTALL_DIR}" && ${CELERY_BIN} multi start ${CELERYD_NODES} \
   -A ${CELERY_APP} --pidfile=${CELERYD_PID_FILE} \
   --logfile=${CELERYD_LOG_FILE} --loglevel=${CELERYD_LOG_LEVEL} ${CELERYD_OPTS}'
@@ -18,7 +18,7 @@ ExecStop=/bin/sh -c 'cd "${VG_INSTALL_DIR}" && ${CELERY_BIN} multi stopwait ${CE
 ExecReload=/bin/sh -c 'cd "${VG_INSTALL_DIR}" && ${CELERY_BIN} multi restart ${CELERYD_NODES} \
   -A ${CELERY_APP} --pidfile=${CELERYD_PID_FILE} \
   --logfile=${CELERYD_LOG_FILE} --loglevel=${CELERYD_LOG_LEVEL} ${CELERYD_OPTS}'
-RuntimeDirectory=celeryd_web_workers
+RuntimeDirectory=celeryd_heavy_workers
 RuntimeDirectoryMode=0750
 
 [Install]
