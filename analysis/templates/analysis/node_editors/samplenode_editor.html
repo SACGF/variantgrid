@@ -73,6 +73,37 @@
         margin: 0 8px 0 0;
     }
 
+    /* One FILTER per line, so each checkbox sits clearly beside its own id and description */
+    .source-sample-detail .vcf-filter-list {
+        margin: 0 0 2px 1em;
+    }
+
+    .source-sample-detail label.vcf-filter-option {
+        display: flex;
+        align-items: baseline;
+        gap: 4px;
+        margin: 0;
+        line-height: 1.3;
+    }
+
+    .vcf-filter-option input {
+        margin: 0;
+    }
+
+    .vcf-filter-id {
+        font-weight: 600;
+        white-space: nowrap;
+    }
+
+    .vcf-filter-description {
+        color: #6c757d;
+        font-size: 0.85em;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        min-width: 0;
+    }
+
     /* Placeholder = the node's value above the tree, so a blank input is an inherited one */
     input.sample-threshold, input.node-threshold {
         width: 4em;
@@ -224,20 +255,25 @@
         return nodePassOnly();
     }
 
+    function renderFilterOption(filterList, filterId, description, checked) {
+        var label = $("<label/>", {"class": "vcf-filter-option", title: description}).appendTo(filterList);
+        var checkbox = $("<input/>", {type: "checkbox", checked: checked}).appendTo(label);
+        $("<span/>", {"class": "vcf-filter-id", text: filterId}).appendTo(label);
+        $("<span/>", {"class": "vcf-filter-description", text: description}).appendTo(label);
+        return {label: label, checkbox: checkbox};
+    }
+
     // PASS is the one FILTER value that means the same thing in every VCF, so it is the one a
     // sample can set for itself - the rest are this VCF's own codes. It reads as one more of them,
     // since "passed, or only failed this one" is what ticking it alongside a code asks for
-    function renderSamplePass(sample, filterLine) {
+    function renderSamplePass(sample, filterList) {
         var overrides = sampleOverrides(sample.sample_id);
         var overridden = multiSample && overrides["pass_only"] !== undefined;
-        var label = $("<label/>", {title: "Only records that passed every filter"}).appendTo(filterLine);
-        var checkbox = $("<input/>", {type: "checkbox", checked: samplePassOnly(sample)});
-        checkbox.appendTo(label);
-        label.append(document.createTextNode(" PASS"));
+        var option = renderFilterOption(filterList, "PASS", "All filters passed", samplePassOnly(sample));
         if (overridden) {
-            label.addClass("sample-overridden");
+            option.label.addClass("sample-overridden");
         }
-        checkbox.change(function() {
+        option.checkbox.change(function() {
             var passOnly = $(this).is(":checked");
             expandedFilters[sample.vcf_id] = true;  // Unticking it would otherwise fold the list up
             if (multiSample) {
@@ -249,13 +285,10 @@
         });
     }
 
-    function renderVCFFilterCode(sample, vcfFilter, filterLine) {
+    function renderVCFFilterCode(sample, vcfFilter, filterList) {
         var selected = vcfLocusFilters["by_vcf"][sample.vcf_id] || [];
-        var label = $("<label/>", {title: vcfFilter.description}).appendTo(filterLine);
-        var checkbox = $("<input/>", {type: "checkbox",
-                                      checked: selected.indexOf(vcfFilter.filter_id) !== -1});
-        checkbox.appendTo(label);
-        label.append(document.createTextNode(" " + vcfFilter.filter_id));
+        var checkbox = renderFilterOption(filterList, vcfFilter.filter_id, vcfFilter.description,
+                                          selected.indexOf(vcfFilter.filter_id) !== -1).checkbox;
         checkbox.change(function() {
             var codes = vcfLocusFilters["by_vcf"][sample.vcf_id] || [];
             removeItemFromArray(vcfFilter.filter_id, codes);
@@ -294,15 +327,16 @@
             return;
         }
 
-        renderSamplePass(sample, filterLine);
-        $.each(sample.vcf_filters, function(i, vcfFilter) {
-            renderVCFFilterCode(sample, vcfFilter, filterLine);
-        });
         if (nothingSelected) {
             $("<a/>", {href: "javascript:void(0)", text: "hide"}).click(function() {
                 showVCFFilterCodes(sample.vcf_id, false);
             }).appendTo(filterLine);
         }
+        var filterList = $("<div/>", {"class": "vcf-filter-list"}).appendTo(detail);
+        renderSamplePass(sample, filterList);
+        $.each(sample.vcf_filters, function(i, vcfFilter) {
+            renderVCFFilterCode(sample, vcfFilter, filterList);
+        });
     }
 
     function renderSampleThresholds(sample, detail) {
