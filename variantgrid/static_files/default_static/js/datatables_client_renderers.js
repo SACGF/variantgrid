@@ -186,7 +186,8 @@ function _sequencingRunVCFIcon(vcf) {
 }
 
 /* Server sends one entry per VCF loaded from the run - {id, url, import_status, variant_caller}
-   More than one reads "VCF x N" so the column stays even, and toggles the full set of icons open in place */
+   More than one collapses to a count per state (loaded / loading / failed) so the column stays even,
+   and toggles the full set of icons open in place */
 function renderSequencingRunVCFs(data, type, row) {
     if (!data || !data.length) {
         return '';
@@ -199,12 +200,22 @@ function renderSequencingRunVCFs(data, type, row) {
     }
     const toggle = $('<a>', {href: '#', class: 'sequencing-run-vcfs-toggle',
                              title: `${data.length} VCFs - click to show/hide`}).appendTo(dom);
-    $('<div>', {class: 'grid-link-icon vcf-icon'}).appendTo(toggle);
-    toggle.append(` x ${data.length}`);
-    // Problems stay visible while collapsed
-    const numErrors = data.filter(vcf => vcf.import_status === 'E').length;
-    if (numErrors) {
-        toggle.append(' ', $('<i>', {class: 'fas fa-times-circle text-danger', title: `${numErrors} failed to import`}));
+    const countByState = [
+        [['S'], $('<div>', {class: 'grid-link-icon vcf-icon', title: 'Loaded'})],
+        [['C', 'I'], $('<i>', {class: 'fas fa-spinner fa-spin', title: 'Loading'})],
+        [['E'], $('<i>', {class: 'fas fa-times-circle text-danger', title: 'Failed to import'})],
+    ];
+    let numCounted = 0;
+    for (const [importStatuses, icon] of countByState) {
+        const count = data.filter(vcf => importStatuses.includes(vcf.import_status)).length;
+        if (count) {
+            toggle.append(numCounted ? ' ' : '', icon, ` x ${count}`);
+            numCounted += count;
+        }
+    }
+    const numOther = data.length - numCounted;
+    if (numOther) {
+        toggle.append(numCounted ? ' ' : '', `+${numOther} other`);
     }
     const vcfList = $('<div>', {class: 'sequencing-run-vcfs-list'}).appendTo(dom);
     for (const vcf of data) {
