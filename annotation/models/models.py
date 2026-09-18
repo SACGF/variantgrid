@@ -25,7 +25,7 @@ from django.contrib.postgres.fields import ArrayField
 from django.core.exceptions import PermissionDenied
 from django.db import connection, models, transaction
 from django.db.models import F, Max, Min, OuterRef, Q, QuerySet, Subquery
-from django.db.models.deletion import CASCADE, PROTECT, SET_NULL
+from django.db.models.deletion import CASCADE, DO_NOTHING, PROTECT, SET_NULL
 from django.db.models.functions import Coalesce, Greatest
 from django.db.models.signals import pre_delete
 from django.dispatch.dispatcher import receiver
@@ -213,7 +213,8 @@ class ClinVar(models.Model):
                             16: '1kg_failed',
                             1024: 'other'}
 
-    version = models.ForeignKey(ClinVarVersion, on_delete=CASCADE)
+    # DO_NOTHING as records are deleted by dropping the partition (a CASCADE locks every other version's)
+    version = models.ForeignKey(ClinVarVersion, on_delete=DO_NOTHING)
     variant = models.ForeignKey(Variant, on_delete=PROTECT)
     clinvar_variation_id = models.IntegerField()
     clinvar_allele_id = models.IntegerField()
@@ -649,7 +650,8 @@ def gene_annotation_version_pre_delete_handler(sender, instance, **kwargs):  # p
 class GeneAnnotation(models.Model):
     """ This is generated against genes found via GeneAnnotationRelease
         so that data matches up in analyses """
-    version = models.ForeignKey(GeneAnnotationVersion, on_delete=CASCADE)
+    # DO_NOTHING as records are deleted by dropping the partition (a CASCADE locks every other version's)
+    version = models.ForeignKey(GeneAnnotationVersion, on_delete=DO_NOTHING)
     gene = models.ForeignKey(Gene, on_delete=CASCADE)
     dbnsfp_gene = models.ForeignKey(DBNSFPGeneAnnotation, null=True, on_delete=SET_NULL)
     hpo_terms = models.TextField(null=True)
@@ -707,7 +709,8 @@ class HumanProteinAtlasTissueSample(models.Model):
 
 
 class HumanProteinAtlasAnnotation(models.Model):
-    version = models.ForeignKey(HumanProteinAtlasAnnotationVersion, on_delete=CASCADE)
+    # DO_NOTHING as records are deleted by dropping the partition (a CASCADE locks every other version's)
+    version = models.ForeignKey(HumanProteinAtlasAnnotationVersion, on_delete=DO_NOTHING)
     gene_symbol = models.ForeignKey(GeneSymbol, null=True, on_delete=CASCADE)
     gene = models.ForeignKey(Gene, null=True, on_delete=CASCADE)  # Always Ensembl
     tissue_sample = models.ForeignKey(HumanProteinAtlasTissueSample, on_delete=CASCADE)
@@ -1607,7 +1610,8 @@ class AbstractVariantAnnotation(models.Model):
     SV_HGVS_TOO_LONG_MESSAGE = "HGVS not calculated due to length"
     SV_HGVS_ERROR_MESSAGE = "Error creating HGVS"
 
-    version = models.ForeignKey(VariantAnnotationVersion, on_delete=CASCADE)
+    # DO_NOTHING as records are deleted by dropping the partition (a CASCADE locks every other version's)
+    version = models.ForeignKey(VariantAnnotationVersion, on_delete=DO_NOTHING)
     variant = models.ForeignKey(Variant, on_delete=CASCADE)
     annotation_run = models.ForeignKey(AnnotationRun, on_delete=CASCADE)
 
@@ -2688,7 +2692,8 @@ class VariantTranscriptAnnotation(AbstractVariantAnnotation):
 class VariantGeneOverlap(models.Model):
     """ Created for every gene that overlaps a variant (per annotation version)
         Allows efficient gene list queries (10% larger than variant annotation) while handling multiple transcripts """
-    version = models.ForeignKey(VariantAnnotationVersion, on_delete=CASCADE)
+    # DO_NOTHING as records are deleted by dropping the partition (a CASCADE locks every other version's)
+    version = models.ForeignKey(VariantAnnotationVersion, on_delete=DO_NOTHING)
     annotation_run = models.ForeignKey(AnnotationRun, on_delete=CASCADE)
     variant = models.ForeignKey(Variant, on_delete=CASCADE)
     gene = models.ForeignKey(Gene, on_delete=CASCADE)

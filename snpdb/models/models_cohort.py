@@ -848,7 +848,7 @@ class CohortGenotype(models.Model):
         "samples_filters": (True, MISSING_FT_VALUE),
     }
 
-    collection = models.ForeignKey(CohortGenotypeCollection, on_delete=CASCADE)
+    collection = models.ForeignKey(CohortGenotypeCollection, on_delete=DO_NOTHING)  # handled via drop partition
     variant = models.ForeignKey(Variant, on_delete=CASCADE)
     ref_count = models.IntegerField(default=0)
     het_count = models.IntegerField(default=0)

@@ -62,6 +62,13 @@ Gotchas:
   alongside `can_write` or the two drift.
 - `library/django_utils/django_partition.py:temporary_db_table` must bracket any query against a partition table;
   swapping `_meta.db_table` by hand leaves `Field.cached_col` pointing at the partition for the life of the process.
+- A model whose rows live in a partition points at its collection with `on_delete=DO_NOTHING` - dropping the partition
+  in `library/django_utils/django_partition.py:RelatedModelsPartitionModel.delete_related_objects` is the delete. A
+  `CASCADE` there makes Django's collector issue `DELETE FROM <base table>`, and inheritance expansion takes
+  `RowExclusiveLock` on every other collection's partition before constraint exclusion prunes them (measured: 191
+  relations for one no-op delete), so two concurrent VCF re-imports each holding `AccessExclusive` on the partition
+  they just dropped deadlock - SACGF/variantgrid_sapath#450. `VariantZygosityCount` is the exception: nothing drops
+  its partition, so its `CASCADE` is the only cleanup.
 - `library/cache.py:timed_cache` keys on `(*args, kwargs.items())` and holds results in module memory, so each celery
   and web worker process has its own copy. `clear_cached_property` there and
   `library/utils/misc_utils.py:invalidate_cached_property` do the same job — use either, add no third.

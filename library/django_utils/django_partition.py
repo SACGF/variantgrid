@@ -2,8 +2,9 @@
 RelatedModelsPartitionModel: a model whose related records live in their own Postgres child table
 per instance (CREATE TABLE ... INHERITS with a check constraint on the FK), created on save and
 dropped by delete_related_objects - CohortGenotypeCollection, VariantCollection and the zygosity
-counts use it. Bracket any query aimed at a partition with temporary_db_table; _warn_if_no_archive
-logs a drop that has no PartitionArchive but does not block it.
+counts use it. Records point at their collection with on_delete=DO_NOTHING (a CASCADE deletes across
+the inheritance parent, locking every other partition); bracket any query aimed at a partition with
+temporary_db_table; _warn_if_no_archive logs a drop that has no PartitionArchive but does not block it.
 """
 import logging
 from contextlib import contextmanager
@@ -90,7 +91,7 @@ class RelatedModelsPartitionModel(models.Model):
 
     -- If a column in the parent table is an identity column, that property is not inherited
     -- @see https://www.postgresql.org/docs/current/sql-createtable.html
-    
+
     ALTER TABLE "%(table_name)s"
     ALTER COLUMN id SET DEFAULT nextval('%(id_sequence)s');
     """
@@ -139,6 +140,18 @@ class RelatedModelsPartitionModel(models.Model):
 
     def delete_related_objects(self):
         self._partition_table_op("drop")
+        self._delete_base_table_records()
+
+    def _delete_base_table_records(self):
+        """ Records only ever live in a partition, so dropping it is the delete - but an insert that bypassed
+            the partition leaves rows in the base table itself. The related models point here with DO_NOTHING
+            (a CASCADE makes Django's collector issue a base table DELETE, which locks every other collection's
+            partition and deadlocks concurrent imports - SACGF/variantgrid_sapath#450), so nothing else would
+            collect them. ONLY keeps the lock on the base table rather than the whole inheritance tree. """
+
+        for base_table_name in self.RECORDS_BASE_TABLE_NAMES:
+            sql = f'DELETE FROM ONLY "{base_table_name}" WHERE {self.RECORDS_FK_FIELD_TO_THIS_MODEL} = %s'
+            run_sql(sql, [self.pk])
 
     def truncate_related_objects(self):
         self._partition_table_op("truncate")

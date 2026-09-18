@@ -8,7 +8,7 @@ from django.core.exceptions import (
     ObjectDoesNotExist,
 )
 from django.db import models
-from django.db.models.deletion import CASCADE, SET_NULL
+from django.db.models.deletion import CASCADE, DO_NOTHING, SET_NULL
 from django.db.models.signals import pre_delete
 from django.dispatch import receiver
 from django.urls.base import reverse
@@ -231,7 +231,9 @@ def gene_coverage_collection_pre_delete_handler(sender, instance, **kwargs):  # 
 
 
 class AbstractGeneCoverage(models.Model):
-    gene_coverage_collection = models.ForeignKey(GeneCoverageCollection, on_delete=CASCADE)  # rename to "coverage"?
+    # DO_NOTHING as records are deleted by dropping the partition (a CASCADE locks every other collection's)
+    gene_coverage_collection = models.ForeignKey(GeneCoverageCollection,
+                                                 on_delete=DO_NOTHING)  # rename to "coverage"?
     gene_symbol = models.ForeignKey(GeneSymbol, null=True, on_delete=CASCADE)
     transcript = models.ForeignKey(Transcript, null=True, blank=True, on_delete=SET_NULL)
     transcript_version = models.ForeignKey(TranscriptVersion, null=True, blank=True, on_delete=SET_NULL)
