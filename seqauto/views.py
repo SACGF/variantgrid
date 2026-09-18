@@ -13,6 +13,7 @@ from django.views.decorators.http import require_POST
 from eventlog.models import create_event
 from genes.models import CanonicalTranscriptCollection
 from library.log_utils import log_traceback
+from patients.models import Extraction, Patient
 from seqauto import forms
 from seqauto.forms import AllEnrichmentKitForm, AutocompleteSequencingRunForm, SequencingRunForm
 from seqauto.illumina.run_parameters import get_run_parameters
@@ -29,6 +30,7 @@ from seqauto.models import (
     QCGeneCoverage,
     QCType,
     SequencingRun,
+    SequencingSample,
     SingleSampleVCF,
     UnalignedReads,
 )
@@ -155,7 +157,70 @@ def _get_sequencing_run_vcfs(sequencing_run: SequencingRun, sample_sheet, user) 
     }
 
 
-def view_sequencing_run(request, sequencing_run_id, tab_id=0):
+@dataclass
+class RunSampleRow:
+    """ A sample sheet row with the Sample imported for it (None if not imported yet). The Sample's
+        extraction is the join key, falling back on the sequencing sample's claim """
+    sequencing_sample: SequencingSample
+    sample: Optional[Sample]
+    can_view_vcf: bool
+
+    @property
+    def extraction(self) -> Optional[Extraction]:
+        if self.sample and self.sample.extraction:
+            return self.sample.extraction
+        return self.sequencing_sample.extraction
+
+    @property
+    def patient(self) -> Optional[Patient]:
+        if extraction := self.extraction:
+            return extraction.specimen.patient
+        if self.sample:
+            return self.sample.patient
+        return None
+
+    @property
+    def match_record(self) -> Union[Sample, SequencingSample]:
+        """ Whichever of the pair carries the extraction match status """
+        if self.sample and self.sample.extraction_match_status:
+            return self.sample
+        return self.sequencing_sample
+
+
+def _get_sequencing_run_patients(sample_sheet, user) -> dict:
+    """ Sample sheet rows grouped patient -> extraction, the rows without a patient left over as unmatched """
+    sequencing_samples = sample_sheet.sequencingsample_set.select_related(
+        "extraction__specimen__patient", "extraction__specimen__tissue",
+    ).prefetch_related(
+        "samplefromsequencingsample_set__sample__extraction__specimen__patient",
+        "samplefromsequencingsample_set__sample__extraction__specimen__tissue",
+        "samplefromsequencingsample_set__sample__patient",
+        "samplefromsequencingsample_set__sample__vcf",
+    )
+    rows = []
+    for ss in sequencing_samples:
+        samples = [sfss.sample for sfss in ss.samplefromsequencingsample_set.all()] or [None]
+        for sample in samples:
+            can_view_vcf = bool(sample and sample.vcf.can_view(user))
+            rows.append(RunSampleRow(sequencing_sample=ss, sample=sample, can_view_vcf=can_view_vcf))
+    rows.sort(key=lambda r: r.sequencing_sample.sample_number)
+
+    extractions_by_patient = defaultdict(lambda: defaultdict(list))
+    unmatched = []
+    for row in rows:
+        if patient := row.patient:
+            extractions_by_patient[patient][row.extraction].append(row)
+        else:
+            unmatched.append(row)
+
+    run_patients = [
+        {"patient": patient, "extractions": list(rows_by_extraction.items())}
+        for patient, rows_by_extraction in sorted(extractions_by_patient.items(), key=lambda pe: str(pe[0]))
+    ]
+    return {"run_patients": run_patients, "unmatched_run_samples": unmatched}
+
+
+def view_sequencing_run(request, sequencing_run_id, tab=None):
     sequencing_run = get_object_or_404(SequencingRun, pk=sequencing_run_id)
 
     sequencing_run_form = SequencingRunForm(request.POST or None, instance=sequencing_run)
@@ -177,7 +242,7 @@ def view_sequencing_run(request, sequencing_run_id, tab_id=0):
     context = {
         "sequencing_run": sequencing_run,
         "sequencing_run_form": sequencing_run_form,
-        'tab_id': tab_id,
+        'tab': tab,
     }
 
     try:  # May not have sample sheet and die
@@ -188,13 +253,18 @@ def view_sequencing_run(request, sequencing_run_id, tab_id=0):
         context['illumina_qc'] = illumina_qc
         context['show_stats'] = show_stats
         context['has_sequencing_sample_data'] = has_sequencing_sample_data
-        context["sequencing_samples"] = sample_sheet.get_sorted_sequencing_samples()
+        context["sequencing_samples"] = sample_sheet.sequencingsample_set.order_by("sample_number").select_related(
+            "enrichment_kit",
+        ).prefetch_related("samplefromsequencingsample_set__sample__patient", "sequencingsampledata_set")
         context['data_out_of_date_from_current_sample_sheet'] = sequencing_run.is_data_out_of_date_from_current_sample_sheet
         context.update(_get_sequencing_run_vcfs(sequencing_run, sample_sheet, request.user))
+        context.update(_get_sequencing_run_patients(sample_sheet, request.user))
     except Exception:
         log_traceback()
 
-    context['default_tab'] = "run-stats" if context.get('show_stats') else "data"
+    if not tab:
+        tab = "patients" if context.get("run_patients") else "data"
+    context['active_tab'] = tab
     return render(request, 'seqauto/view_sequencing_run.html', context)
 
 

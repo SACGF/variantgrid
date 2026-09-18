@@ -104,7 +104,7 @@
             url: '{% url 'reload_experiment_name' sequencing_run.pk %}',
             success: function(data) {
                 // Reload page (re-opening tab)
-                var sequencing_run_tab_url = '{% url 'view_sequencing_run_tab' sequencing_run.pk 3 %}'
+                var sequencing_run_tab_url = '{% url 'view_sequencing_run_tab' sequencing_run.pk 'experiment' %}'
                 window.location = sequencing_run_tab_url;
             }
         });
@@ -114,11 +114,6 @@
 
 
 {% block jsdocumentready %}
-    var tab_id = {{ tab_id }};
-    if (tab_id) {
-        $("#sequencing-run-tabs .nav-link").eq(tab_id).tab('show');
-    }
-
     {% if show_stats %}
         loadIndexMetricsGraph();
 	{% endif %}
@@ -132,7 +127,7 @@
             url: '{% url 'assign_data_to_current_sample_sheet' sequencing_run.pk %}',
             success: function(data) {
                 // Reload page (re-opening tab)
-                var sequencing_run_tab_url = '{% url 'view_sequencing_run_tab' sequencing_run.pk 4 %}'
+                var sequencing_run_tab_url = '{% url 'view_sequencing_run_tab' sequencing_run.pk 'admin' %}'
                 window.location = sequencing_run_tab_url;
             }
         });
@@ -190,51 +185,72 @@
 
 	<div id="sequencing-run-tabs">
 		<ul class="nav nav-tabs mb-4" role="tablist">
-	    	<li class="nav-item"><a class="nav-link{% if not tab_id and default_tab == 'run-stats' %} show active{% endif %}" data-toggle="tab" role="tab" href="#run-stats" data-href="{% url 'view_sequencing_run_stats_tab' sequencing_run.pk %}">Run Stats</a></li>
-            <li class="nav-item"><a class="nav-link" data-toggle="tab" role="tab" href="#wiki">Wiki{% if sequencing_run.sequencingrunwiki %}*{% endif %}</a></li>
-            <li class="nav-item"><a class="nav-link" data-toggle="tab" role="tab" href="#barcodes">Barcodes</a></li>
-	    	<li class="nav-item"><a class="nav-link" data-toggle="tab" role="tab" href="#samples">Samples</a></li>
+        {% if run_patients %}
+            <li class="nav-item"><a class="nav-link{% if active_tab == 'patients' %} show active{% endif %}" data-toggle="tab" role="tab" href="#patients">Patients</a></li>
+        {% endif %}
+	    	<li class="nav-item"><a class="nav-link{% if active_tab == 'run-stats' %} show active{% endif %}" data-toggle="tab" role="tab" href="#run-stats" data-href="{% url 'view_sequencing_run_stats_tab' sequencing_run.pk %}">Run Stats</a></li>
+            <li class="nav-item"><a class="nav-link{% if active_tab == 'wiki' %} show active{% endif %}" data-toggle="tab" role="tab" href="#wiki">Wiki{% if sequencing_run.sequencingrunwiki %}*{% endif %}</a></li>
+	    	<li class="nav-item"><a class="nav-link{% if active_tab == 'sample-sheet' %} show active{% endif %}" data-toggle="tab" role="tab" href="#sample-sheet">SampleSheet</a></li>
 		{% if sequencing_run.experiment %}
-	    	<li class="nav-item"><a class="nav-link" data-toggle="tab" role="tab" href="#experiment">{{ sequencing_run.experiment }}</a></li>
+	    	<li class="nav-item"><a class="nav-link{% if active_tab == 'experiment' %} show active{% endif %}" data-toggle="tab" role="tab" href="#experiment">{{ sequencing_run.experiment }}</a></li>
 		{% endif %}
-            <li class="nav-item"><a class="nav-link{% if not tab_id and default_tab == 'data' %} show active{% endif %}" data-toggle="tab" role="tab" href="#data">Data</a></li>
+            <li class="nav-item"><a class="nav-link{% if active_tab == 'data' %} show active{% endif %}" data-toggle="tab" role="tab" href="#data">Data</a></li>
         {% if sequencing_run.sequencingrunmodification_set.exists %}
-            <li class="nav-item"><a class="nav-link" data-toggle="tab" role="tab" href="#modifications">Modifications</a></li>
+            <li class="nav-item"><a class="nav-link{% if active_tab == 'modifications' %} show active{% endif %}" data-toggle="tab" role="tab" href="#modifications">Modifications</a></li>
         {% endif %}
         {% if user.is_superuser %}
-            <li class="nav-item"><a class="nav-link" data-toggle="tab" role="tab" href="#admin">Admin</a></li>
+            <li class="nav-item"><a class="nav-link{% if active_tab == 'admin' %} show active{% endif %}" data-toggle="tab" role="tab" href="#admin">Admin</a></li>
         {% endif %}
 
 	  	</ul>
         <div class="tab-content">
-        <div class="tab-pane{% if not tab_id and default_tab == 'run-stats' %} show active{% endif %}" role="tabpanel" id="run-stats"></div>
-        <div class="tab-pane" role="tabpanel" id="wiki">
+        {% if run_patients %}
+        <div class="tab-pane{% if active_tab == 'patients' %} show active{% endif %}" role="tabpanel" id="patients">
+            {% include "seqauto/tags/run_patients.html" %}
+        </div>
+        {% endif %}
+        <div class="tab-pane{% if active_tab == 'run-stats' %} show active{% endif %}" role="tabpanel" id="run-stats"></div>
+        <div class="tab-pane{% if active_tab == 'wiki' %} show active{% endif %}" role="tabpanel" id="wiki">
             {% load wiki_tags %}
             {% wiki_editor sequencing_run.sequencingrunwiki class_name='seqauto.models.SequencingRunWiki' unique_keyword='sequencing_run_id' unique_value=sequencing_run.pk %}
         </div>
-		<div class="tab-pane" role="tabpanel" id="samples">
-
+		<div class="tab-pane{% if active_tab == 'sample-sheet' %} show active{% endif %}" role="tabpanel" id="sample-sheet">
+		{% if sample_sheet %}
             {% page_help user 'seqauto/sequencing_run_samples_help' 'Sequencing Run Samples' %}
-		
+
+			{% if user.is_superuser %}
+			<table class='model-table'>
+			<tr><th>Date:		<td> {{ sample_sheet.date }}
+			<tr><th>Hash:		<td> {{ sample_sheet.hash }}
+			</table>
+			{% endif %}
+
             <table class="table">
-            <tr><th>Name <th>Sample <th>Patient
+            <tr><th>Number <th>Name <th>Project <th>Lane <th>Barcode <th>Enrichment Kit <th>Sample <th>Patient
             {% if has_sequencing_sample_data %}
                 <th>Data
-            {% endif %}  
-            
+            {% endif %}
+            </tr>
             {% for ss in sequencing_samples %}
                 <tr>
+                <td>{{ ss.sample_number }}
                 <td>{{ ss.sample_name }}
+                <td>{{ ss.sample_project|default_if_none:"" }}
+                <td>{{ ss.lane|default_if_none:"" }}
+                <td>{{ ss.barcode }}
+                <td>{{ ss.enrichment_kit|default_if_none:"" }}
                 <td>
                     {% for sfss in ss.samplefromsequencingsample_set.all %}
-                        <a href="{% url 'view_sample' sfss.sample.pk %}">View Sample</a>
+                        <a href="{% url 'view_sample' sfss.sample.pk %}">{{ sfss.sample }}</a>
                     {% endfor %}
                 </td>
                 <td>
-                    {% if ss.patient %}
-                        {% preview_icon ss.patient %}
-                        <a href="{% url 'view_patient' ss.patient.pk %}">{{ ss.patient }}</a>
-                    {% endif %}
+                    {% for sfss in ss.samplefromsequencingsample_set.all %}
+                        {% if sfss.sample.patient %}
+                            {% preview_icon sfss.sample.patient %}
+                            <a href="{% url 'view_patient' sfss.sample.patient.pk %}">{{ sfss.sample.patient }}</a>
+                        {% endif %}
+                    {% endfor %}
                 </td>
                 {% if has_sequencing_sample_data %}
                 <td>
@@ -243,47 +259,16 @@
                     {% endfor %}
                 </td>
                 {% endif %}
-                
                 </tr>
             {% endfor %}
-            </table>		
-		
-        </div>
-        <div class="tab-pane" role="tabpanel" id="barcodes">
+            </table>
 
-		{% if sample_sheet %}
-			{% if user.is_superuser %}
-			<h3>SampleSheet</h3>
-			<table class='model-table'>
-			<tr><th>Date:		<td> {{ sample_sheet.date }}
-			<tr><th>Hash:		<td> {{ sample_sheet.hash }}
-			</table>
-			{% endif %}
-	
-			<h3>Samples</h3>
-			<table>
-			<tr><th>Name <th>VCF <th>Number <th>Lane <th>Barcode <th>Enrichment Kit</tr>
-			
-			{% for ss in sample_sheet.sequencingsample_set.all %}
-				<tr>
-				<td>{{ ss.sample_name }}
-				<td>{{ ss.sample_project }}
-				<td>{{ ss.sample_number }}
-				<td>{{ ss.lane }}
-				<td>{{ ss.barcode }}
-				<td>{{ ss.enrichment_kit }}
-				</tr>
-			{% endfor %}
-			</table>
-	
-			{% if illumina_qc %}
-				{% if show_stats %}
+			{% if illumina_qc and show_stats %}
 				{% load humanize %}
 				<div id='generated-graph-index-qc'></div>
-			
+
 				<table>
 				<tr><th>Name <th>Index <th>Reads</tr>
-				
 				{% for ss in illumina_qc.illuminaindexqc_set.all %}
 					<tr>
 					<td>{{ ss.name }}
@@ -292,16 +277,14 @@
 					</tr>
 				{% endfor %}
 				</table>
-				{% endif %}
 			{% endif %}
-	
 		{% else %}
 			No sample sheet found in sequencing run directory!
 		{% endif %}
 		</div>
 
 		{% if sequencing_run.experiment %}
-		<div class="tab-pane" role="tabpanel" id='experiment'>
+		<div class="tab-pane{% if active_tab == 'experiment' %} show active{% endif %}" role="tabpanel" id='experiment'>
             <div id='experiment-info-text'>
                 <p>ExperimentID (
                 <a href="{% url 'view_experiment' sequencing_run.experiment.pk %}">{{ sequencing_run.experiment }}</a>) was read from RunParameters.xml (or if missing, RunInfo.xml) in the Sequencing Run directory labelled <b>Path</b> above.
@@ -310,7 +293,7 @@
 		</div>
 		{% endif %}
 
-        <div class="tab-pane{% if not tab_id and default_tab == 'data' %} show active{% endif %}" role="tabpanel" id='data'>
+        <div class="tab-pane{% if active_tab == 'data' %} show active{% endif %}" role="tabpanel" id='data'>
             <h3>Made from this data</h3>
             {% if multi_sample_vcfs %}
                 <ul><b>Multi-sample VCFs</b>
@@ -355,7 +338,7 @@
 
 
         {% if sequencing_run.sequencingrunmodification_set.exists %}
-        <div class="tab-pane" role="tabpanel" id='modifications'>
+        <div class="tab-pane{% if active_tab == 'modifications' %} show active{% endif %}" role="tabpanel" id='modifications'>
             <table>
                 <tr><th>User <th>Created <th>Message
             {% for srm in sequencing_run.sequencingrunmodification_set.all %}
@@ -370,7 +353,7 @@
 
 
     {% if user.is_superuser %}
-        <div class="tab-pane" role="tabpanel" id='admin'>
+        <div class="tab-pane{% if active_tab == 'admin' %} show active{% endif %}" role="tabpanel" id='admin'>
             <h3>SequencingRun Admin</h3>
 
             <script>

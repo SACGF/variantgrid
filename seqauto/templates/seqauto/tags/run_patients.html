@@ -1,0 +1,58 @@
+{% load ui_utils %}
+{# Sample sheet rows grouped patient -> specimen/extraction, context from views._get_sequencing_run_patients #}
+{% for run_patient in run_patients %}
+    <h5>
+        {% preview_icon run_patient.patient %}
+        <a href="{% url 'view_patient' run_patient.patient.pk %}">{{ run_patient.patient }}</a>
+    </h5>
+    <table class="table table-sm">
+        <tr><th>Specimen <th>Tissue <th>Extraction <th>Sequencing Sample <th>Sample <th>VCF</tr>
+        {% for extraction, rows in run_patient.extractions %}
+            {% for row in rows %}
+                <tr>
+                {% if forloop.first %}
+                    <td rowspan="{{ rows|length }}">
+                        {% if extraction %}
+                            <a href="{% url 'view_specimen' extraction.specimen.pk %}">{{ extraction.specimen }}</a>
+                        {% endif %}
+                    </td>
+                    <td rowspan="{{ rows|length }}">
+                        {% if extraction %}
+                            {{ extraction.specimen.tissue|default_if_none:"" }}
+                            {% if extraction.specimen.tissue_status != 'U' %}({{ extraction.specimen.get_tissue_status_display }}){% endif %}
+                        {% endif %}
+                    </td>
+                    <td rowspan="{{ rows|length }}">
+                        {% if extraction %}
+                            <a href="{% url 'view_extraction' extraction.pk %}">{{ extraction }}</a>
+                        {% else %}
+                            <span class="text-muted">No extraction</span>
+                        {% endif %}
+                    </td>
+                {% endif %}
+                {% include "seqauto/tags/run_sample_row.html" %}
+                </tr>
+            {% endfor %}
+        {% endfor %}
+    </table>
+{% endfor %}
+
+{% if unmatched_run_samples %}
+    <h5>No patient</h5>
+    <table class="table table-sm">
+        <tr><th>Match Status <th>Sequencing Sample <th>Sample <th>VCF</tr>
+        {% for row in unmatched_run_samples %}
+            <tr>
+            <td>
+                {% with match_record=row.match_record %}
+                    {{ match_record.get_extraction_match_status_display|default_if_none:"" }}
+                    {% if match_record.extraction_match_error %}
+                        <div class="text-danger">{{ match_record.extraction_match_error }}</div>
+                    {% endif %}
+                {% endwith %}
+            </td>
+            {% include "seqauto/tags/run_sample_row.html" %}
+            </tr>
+        {% endfor %}
+    </table>
+{% endif %}

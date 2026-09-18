@@ -1,0 +1,16 @@
+{# Trailing cells of a views.RunSampleRow: sequencing sample, sample, VCF #}
+<td>{{ row.sequencing_sample.sample_name }}</td>
+<td>
+    {% if row.sample %}
+        <a href="{% url 'view_sample' row.sample.pk %}">{{ row.sample }}</a>
+    {% endif %}
+</td>
+<td>
+    {% if row.sample %}
+        {% if row.can_view_vcf %}
+            <a href="{% url 'view_vcf' row.sample.vcf.pk %}" title="VCF: {{ row.sample.vcf }}"><div class='vcf-icon icon24 run-vcf-icon'></div> {{ row.sample.vcf }}</a>
+        {% else %}
+            <div title="You don't have permission to view this VCF" class='vcf-icon icon24 run-vcf-icon'></div>
+        {% endif %}
+    {% endif %}
+</td>

@@ -88,7 +88,7 @@ urlpatterns = [
     path('graphs/qc_exec_summary_graph/<qc_exec_summary_id>/<qc_compare_type>', views_qc_graphs.qc_exec_summary_graph, name='qc_exec_summary_graph'),
     path('graphs/qc_exec_summary_json_graph/<qc_exec_summary_id>/<qc_compare_type>', views_qc_graphs.qc_exec_summary_json_graph, name='qc_exec_summary_json_graph'),
 
-    path('view_sequencing_run/<sequencing_run_id>/tab/<int:tab_id>', views.view_sequencing_run, name='view_sequencing_run_tab'),
+    path('view_sequencing_run/<sequencing_run_id>/tab/<str:tab>', views.view_sequencing_run, name='view_sequencing_run_tab'),
     path('view_sequencing_run_stats_tab/<sequencing_run_id>', views.view_sequencing_run_stats_tab, name='view_sequencing_run_stats_tab'),
     path('view_sequencing_run/<sequencing_run_id>', views.view_sequencing_run, name='view_sequencing_run'),
     path('sequencing_run/reload_experiment_name/<sequencing_run_id>', views.reload_experiment_name, name='reload_experiment_name'),
