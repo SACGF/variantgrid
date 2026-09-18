@@ -1,7 +1,7 @@
 # NGS-pipelines: one vg_api_full.py for VG3 and VG4, runnable off the TAU box
 
 Written by Claude Fable 5.1 (claude-fable-5-1), 2026-09-17; revised by Claude Opus 5 (claude-opus-5), 2026-09-17
-Status: draft
+Status: in progress - both PRs implemented on NGS-pipelines branch `sapath443_vg_capabilities`, awaiting test against VG3/VG4
 
 Pipeline half of [sapath#443](https://github.com/SACGF/variantgrid_sapath/issues/443), for the
 *GMP-TAU/NGS-pipelines* repo (checked out at `../NGS-pipelines`, script *scripts/vg_api_full.py*,
@@ -95,6 +95,9 @@ The splice line is the one real branch: VG4 takes the splice calls from the CVO 
 them if the VCF also arrived, VG3 has no CVO importer and needs the VCF. So the RNA arm's
 `vcfsuffix` choice reads the capability. A new `upload_combined_variant_output` entry in `API_STEPS`
 does the CVO upload for every pair in `samp_to_pairIDs`, after `upload_single_sample_vcf_file`.
+The RNA arm only becomes a `SequencingFile` with `--include_rna`, which *tso500_run_wrapper.py* doesn't
+pass, so a default run sends no splice VCF to either server; the CVO upload and both extraction links
+don't depend on it.
 
 **Patient chain.** For each pair, one `link_sequencing_sample_extraction(SequencingSampleLookup(...), extraction_reference)`
 per arm, with the extraction reference being the container suffix the CVO names (the DNA and RNA
