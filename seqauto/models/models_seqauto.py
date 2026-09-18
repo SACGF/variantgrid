@@ -349,8 +349,9 @@ class SequencingSample(ExtractionMatchMixin, models.Model):
         return None
 
     def get_single_qc(self):
-        bam_file = self.get_single_bam()
-        return bam_file.qc_set.get()
+        if bam_file := self.get_single_bam():
+            return bam_file.qc_set.get()
+        return None
 
     @staticmethod
     def get_current():

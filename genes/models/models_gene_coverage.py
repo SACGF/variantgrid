@@ -98,6 +98,8 @@ class GeneCoverageCollection(DataArchiveMixin, RelatedModelsPartitionModel):
         try:
             sequencing_sample = sample.samplefromsequencingsample.sequencing_sample
             bam_file = sequencing_sample.get_single_bam()
+            if bam_file is None:
+                return None
             try:
                 qc = bam_file.qc_set.get()
                 gene_coverage = qc.qcgenecoverage.gene_coverage_collection
