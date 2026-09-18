@@ -22,6 +22,7 @@ from django.http import HttpRequest
 from django.shortcuts import get_object_or_404
 from django.urls.base import reverse
 
+from analysis.forms.forms import AnalysisNodeIssuesFilterForm
 from analysis.models import (
     Analysis,
     AnalysisNode,
@@ -42,6 +43,7 @@ from analysis.models.nodes.node_counts import (
     get_node_extra_filters_q,
     is_extra_filter,
 )
+from analysis.models.nodes.node_types import get_node_class_choices, get_node_class_name_expression
 from analysis.variant_tag_operations import VARIANT_TAG_CLASSIFIED
 from analysis.views.analysis_permissions import get_node_subclass_or_404
 from annotation.models import HumanProteinAtlasAnnotation
@@ -716,6 +718,8 @@ class AnalysisNodeIssuesColumns(DatatableConfig[AnalysisNode]):
             RichColumn(key='analysis__name', label='Analysis', orderable=True,
                        renderer=self.render_node_link,
                        client_renderer='TableFormat.linkUrl'),
+            RichColumn(key='node_class', label='Node Class', orderable=True,
+                       client_renderer=RichColumn.choices_client_renderer(get_node_class_choices())),
             RichColumn(key='status', orderable=True,
                        client_renderer=RichColumn.choices_client_renderer(NodeStatus.choices)),
             RichColumn(key='modified', client_renderer='TableFormat.timestamp', orderable=True,
@@ -730,7 +734,9 @@ class AnalysisNodeIssuesColumns(DatatableConfig[AnalysisNode]):
         return {"text": row.value, "url": url}
 
     def get_initial_queryset(self) -> QuerySet[AnalysisNode]:
-        return AnalysisNode.objects.filter(status=NodeStatus.ERROR)
+        data = {field: self.get_query_param(field) for field in AnalysisNodeIssuesFilterForm.base_fields}
+        qs = AnalysisNodeIssuesFilterForm(data).get_queryset()
+        return qs.annotate(node_class=get_node_class_name_expression())
 
 
 class KaryomappingAnalysesColumns(DatatableConfig[KaryomappingAnalysis]):

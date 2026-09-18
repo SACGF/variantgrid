@@ -26,12 +26,17 @@ from analysis.models.enums import (
     AnalysisTemplateType,
     AnalysisType,
     DuoSample,
+    NodeStatus,
     QuadSample,
     SNPMatrix,
     TrioSample,
 )
 from analysis.models.models_karyomapping import KaryomappingGene
-from analysis.models.nodes.node_types import get_nodes_by_classification
+from analysis.models.nodes.node_types import (
+    get_node_class_choices,
+    get_node_types_hash_by_class_name,
+    get_nodes_by_classification,
+)
 from annotation.models.models import AnnotationVersion, VariantAnnotationVersion
 from library.django_utils import get_models_dict_by_column
 from library.django_utils.autocomplete_utils import ModelSelect2
@@ -42,6 +47,7 @@ from seqauto.models import EnrichmentKit
 from snpdb.forms import GenomeBuildAutocompleteForwardMixin, UserSettingsGenomeBuildMixin
 from snpdb.models import CustomColumnsCollection, Trio, UserSettings, VariantGridColumn
 from uicore.utils.form_helpers import form_helper_horizontal
+from uicore.widgets.date_widget import NativeDateInput
 
 
 class AnalysisChoiceForm(forms.Form):
@@ -530,6 +536,34 @@ class AnalysisFilterForm(forms.Form):
 
         if dmin and dmax and dmin > dmax:
             raise ValidationError('date_min must be <= date_max')
+
+
+class AnalysisNodeIssuesFilterForm(forms.Form):
+    """ Filters the failed nodes on the analysis issues page - shared by its grid and 'Reload matching' """
+    node_class = forms.ChoiceField(required=False)
+    modified_from = forms.DateField(required=False, widget=NativeDateInput())
+    modified_to = forms.DateField(required=False, widget=NativeDateInput())
+    error_contains = forms.CharField(required=False)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['node_class'].choices = [('', 'All'), *get_node_class_choices()]
+
+    def get_queryset(self):
+        """ Invalid fields are left out of cleaned_data, so they don't filter """
+        self.is_valid()
+        data = self.cleaned_data
+        qs = AnalysisNode.objects.filter(status=NodeStatus.ERROR)
+        if node_class := data.get('node_class'):
+            model_name = get_node_types_hash_by_class_name()[node_class]._meta.model_name
+            qs = qs.filter(**{f"{model_name}__isnull": False})
+        if modified_from := data.get('modified_from'):
+            qs = qs.filter(modified__date__gte=modified_from)
+        if modified_to := data.get('modified_to'):
+            qs = qs.filter(modified__date__lte=modified_to)
+        if error_contains := data.get('error_contains'):
+            qs = qs.filter(errors__icontains=error_contains)
+        return qs
 
 
 class SampleCandidatesSearchForm(forms.Form):

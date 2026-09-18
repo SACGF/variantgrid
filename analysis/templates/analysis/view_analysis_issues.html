@@ -65,7 +65,24 @@
             }
 
             showSummaryGraph("analysis-node-summary-graph", nodesStatusSummary);
+
+            let filterForm = $("#analysis-node-issues-filter");
+            filterForm.find("select, input").on("change", () => {
+                $('#analysis-node-issues-datatable').DataTable().ajax.reload();
+            });
+            filterForm.on("submit", (event) => {
+                let numNodes = $('#analysis-node-issues-datatable').DataTable().page.info().recordsDisplay;
+                if (!confirm(`Reload ${numNodes} failed nodes (and the other failed nodes in their analyses)?`)) {
+                    event.preventDefault();
+                }
+            });
         });
+
+        function analysisNodeIssuesFilter(data, type) {
+            {% for field in filter_form %}
+                data.{{ field.name }} = blankToNull($("#{{ field.id_for_label }}").val());
+            {% endfor %}
+        }
     </script>
 {% endblock head %}
 {% block content %}
@@ -97,7 +114,16 @@
                 {% labelled label=field %}{{ count }}{% endlabelled %}
             {% endfor %}
         </div>
-        <table id="analysis-node-issues-datatable" data-datatable-url="{% url 'analysis_node_issues_datatable' %}" class="sticky-header"></table>
+        <form id="analysis-node-issues-filter" method="post" class="form-inline mb-2">
+            {% csrf_token %}
+            {% for field in filter_form %}
+                <label class="mr-1" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                <span class="mr-3">{{ field }}</span>
+            {% endfor %}
+            <button name="reload-matching" class="btn btn-outline-primary">Reload matching</button>
+        </form>
+        <table id="analysis-node-issues-datatable" data-datatable-url="{% url 'analysis_node_issues_datatable' %}"
+               data-datatable-data="analysisNodeIssuesFilter" class="sticky-header"></table>
     </div>
 
 {% endblock content %}

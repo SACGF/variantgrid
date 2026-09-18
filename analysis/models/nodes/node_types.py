@@ -2,6 +2,7 @@ from collections import defaultdict
 from dataclasses import asdict
 
 from django.db import models
+from django.db.models import Case, TextField, Value, When
 
 from analysis.models.nodes.analysis_node import AnalysisNode
 from library.utils import get_subclasses
@@ -31,6 +32,20 @@ def get_node_types_hash():
 
 def get_node_types_hash_by_class_name():
     return {node_class.__name__: node_class for node_class in get_node_types_hash().values()}
+
+
+def get_node_class_choices() -> list[tuple[str, str]]:
+    """ (class name, label) sorted by label """
+    return sorted(((node_class.__name__, label) for label, node_class in get_node_types_hash().items()),
+                  key=lambda choice: choice[1])
+
+
+def get_node_class_name_expression() -> Case:
+    """ Annotate an AnalysisNode queryset with the concrete subclass name - one LEFT JOIN per subclass
+        table, so use it on small querysets """
+    whens = [When(**{f"{sc._meta.model_name}__isnull": False}, then=Value(sc.__name__))
+             for sc in get_subclasses(AnalysisNode) if not sc._meta.abstract]
+    return Case(*whens, output_field=TextField())
 
 
 def get_nodes_by_classification() -> dict[str, list]:

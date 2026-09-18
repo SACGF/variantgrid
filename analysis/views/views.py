@@ -1,6 +1,7 @@
 from collections import Counter
 from functools import cached_property
 from typing import Optional
+from urllib.parse import urlencode
 
 import numpy as np
 from dal import forward
@@ -24,6 +25,7 @@ from analysis.analysis_templates import (
 )
 from analysis.forms import (
     AnalysisChoiceForm,
+    AnalysisNodeIssuesFilterForm,
     AnalysisTemplateAutoLaunchForm,
     AnalysisTemplateForm,
     AnalysisTemplateTypeChoiceForm,
@@ -42,6 +44,7 @@ from analysis.models import (
 )
 from analysis.models.enums import AnalysisType, MinimisationResultType, NodeStatus
 from analysis.models.mutational_signatures import MutationalSignature
+from analysis.models.nodes import node_utils
 from analysis.models.nodes.analysis_node import AnalysisClassification
 from analysis.models.nodes.node_counts import get_node_count_colors, get_tag_node_count_colors
 from analysis.models.nodes.node_types import get_node_display_data_by_class_name, get_node_types_hash
@@ -337,6 +340,17 @@ def view_analysis_issues(request):
                               by=str(request.user))
             messages.add_message(request, messages.WARNING,
                                  "Paused analysis + annotation job dispatch")
+        if "reload-matching" in request.POST:
+            filter_form = AnalysisNodeIssuesFilterForm(request.POST)
+            nodes_qs = filter_form.get_queryset()
+            num_nodes = nodes_qs.count()
+            analysis_ids = list(nodes_qs.order_by().values_list("analysis_id", flat=True).distinct())
+            for analysis_id in analysis_ids:
+                node_utils.reload_analysis_nodes(analysis_id, only_errors=True)
+            messages.add_message(request, messages.INFO,
+                                 f"Reloading {num_nodes} failed nodes in {len(analysis_ids)} analyses")
+            query_string = urlencode({k: v for k, v in filter_form.cleaned_data.items() if v})
+            return redirect(f"{reverse('analysis_issues')}?{query_string}")
 
     all_nodes = AnalysisNode.objects.all()
     field_counts = get_field_counts(all_nodes, "status")
@@ -351,7 +365,8 @@ def view_analysis_issues(request):
     context = {"nodes_status_summary": summary_data,
                "field_counts": field_counts,
                "jobs_control": jobs_control,
-               "jobs_paused": bool(jobs_control and jobs_control.paused)}
+               "jobs_paused": bool(jobs_control and jobs_control.paused),
+               "filter_form": AnalysisNodeIssuesFilterForm(request.GET or None)}
     return render(request, 'analysis/view_analysis_issues.html', context)
 
 
