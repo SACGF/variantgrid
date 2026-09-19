@@ -133,7 +133,7 @@ with `tool_version=None` so the three-stage pipe reports the same way.
 
 ### Docs
 
-- `upload/CLAUDE.md`, under the "Preprocess is one shell pipe" pattern: `run_pipe` reads `PIPESTATUS` and a stderr
+- `upload/AGENTS.md`, under the "Preprocess is one shell pipe" pattern: `run_pipe` reads `PIPESTATUS` and a stderr
   file per stage; the failing stage is the first non-zero exit that is not SIGPIPE-shaped (141, or a Python
   `BrokenPipeError`) - those are stages killed because the one after them died. Every stage is a sub step and its
   stderr is its `output_text`.
@@ -209,7 +209,7 @@ On this box (bcftools 1.20, GRCh38 reference present):
 
 - `scripts/vg tests --explain` names `upload.tests.vcf.test_vcf_preprocess` and it passes with `--keepdb`; the kept
   tests are the four above.
-- `vcf_preprocess.py` module docstring states the status-file mechanism and the culprit rule; `upload/CLAUDE.md`
+- `vcf_preprocess.py` module docstring states the status-file mechanism and the culprit rule; `upload/AGENTS.md`
   gotcha line added; `claude/research/upload.md` sentence corrected; `scripts/vg docs check` passes.
 - `scripts/vg map` refreshed (setting removed).
 - This plan's `Status:` updated.

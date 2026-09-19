@@ -5,7 +5,7 @@ Verified against 7c4408c62 on 2026-09-06
 The classification app is a lab's record of what a variant means for a condition, and everything Shariant built around
 sharing those records between labs: versioned evidence, share levels, allele resolution, per-allele grouping, discordance
 detection and resolution, condition matching to ontology terms, and outbound ClinVar submission. This is the long story
-behind the rules in `classification/CLAUDE.md`; the vocabulary is in `claude/domain.md#classification-classification`,
+behind the rules in `classification/AGENTS.md`; the vocabulary is in `claude/domain.md#classification-classification`,
 and the model, URL, task, signal and command inventories are the generated maps (`claude/maps/models.md#classification`,
 `claude/maps/urls.md#classification`, `claude/maps/tasks.md#classification`, `claude/maps/signals.md#first-party`,
 `claude/maps/commands.md`). The two readmes, `classification/__classification_readme.md` and

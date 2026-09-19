@@ -57,7 +57,7 @@ two-arm case. The CSV gets the same three fields and the same matching rule.
 - **All 21 columns are required today** (`patients/import_records.py:import_patient_records` raises on any missing
   header). The three extraction columns join that list; a file in the old shape fails the same check.
 - `claude/research/patients.md` has no `Verified against` header; its PatientRecord section is a lead, not a fact.
-  The patients app has no CLAUDE.md of its own.
+  The patients app has no AGENTS.md of its own.
 
 ## Data
 

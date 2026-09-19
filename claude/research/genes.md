@@ -7,7 +7,7 @@ RefSeq/Ensembl gene and transcript ids, the per-build, per-version transcript ge
 `VariantCoordinate` and back, and the release bookkeeping that ties a VEP build to the exact gene and transcript
 versions it reported. On top of that sit the things users make from symbols - gene lists (typed, PanelApp, per-sample),
 canonical transcript collections for coverage, gene fusions - and the reference downloads (HGNC, MANE, LRG, gnomAD
-constraint, Pfam). This document is the story behind `genes/CLAUDE.md`: how the data gets in, why symbol matching is
+constraint, Pfam). This document is the story behind `genes/AGENTS.md`: how the data gets in, why symbol matching is
 per release, how HGVS resolution falls through biocommons to ClinGen, and what has bitten before. Fields, URLs,
 commands, tasks and signals are in the generated maps ([models](../maps/models.md#genes),
 [urls](../maps/urls.md#genes), [commands](../maps/commands.md), [tasks](../maps/tasks.md#genes),

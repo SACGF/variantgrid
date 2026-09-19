@@ -128,7 +128,7 @@ Below the `Outstanding Classification Records` row, inside the `mt-3` block:
 `("search_failed", "Monarch search failed")` filtering `search_failed__isnull=False`. This is the "which
 ones" list from the issue for an operator, without a datatable column.
 
-### `classification/CLAUDE.md`
+### `classification/AGENTS.md`
 
 One gotcha line next to the condition resolution note: `search_suggestion` swallows Monarch failures and
 falls back to local OMIM; the only trace is `ConditionMatchingSuggestion.search_failed`, which
@@ -160,7 +160,7 @@ banner are checked by hand.
 
 On this box, Monarch reachable:
 
-1. `python3 manage.py migrate classification` (ask first, per CLAUDE.md), then
+1. `python3 manage.py migrate classification` (ask first, per AGENTS.md), then
    `python3 manage.py vg page /classification/condition_matching/<pk> --queries` before and after the
    template change - same query count.
 2. In `manage.py shell`, pick a `ConditionText`, set `search_failed=now()` and save; load the page: banner
@@ -193,6 +193,6 @@ On this box, Monarch reachable:
 ## Definition of done
 
 - `scripts/vg tests --explain` names `classification.tests` (migration) and it passes with `--keepdb`.
-- New tasks module has a docstring; `classification/CLAUDE.md` gotcha line added.
+- New tasks module has a docstring; `classification/AGENTS.md` gotcha line added.
 - `scripts/vg map` refreshed; `scripts/vg docs check` passes.
 - This plan's `Status:` updated.

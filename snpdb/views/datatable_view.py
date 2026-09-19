@@ -4,7 +4,7 @@ The DataTables engine every list page uses. A DatatableConfig subclass declares 
 answers its ajax requests; DatabaseTableView serves one config as JSON or a streamed CSV. Filtering
 funnels through DatatableConfig.apply_filters (config filter, search box, client column rules),
 ordering always ends in a pk tie-breaker, and known_count / approximate_count let expensive tables
-skip an exact count. uicore/CLAUDE.md#grids has the recipe; the variant grids build on it in
+skip an exact count. uicore/AGENTS.md#grids has the recipe; the variant grids build on it in
 snpdb/grids.py.
 """
 import enum

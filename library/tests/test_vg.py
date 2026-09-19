@@ -92,7 +92,7 @@ class TestSelectionTest(SimpleTestCase):
         self.assertEqual(selection.reasons["snpdb.tests"], ["snpdb/migrations/0001_initial.py", "snpdb/tests/test_variant.py"])
 
     def test_docs_and_data_select_nothing(self):
-        self.assertEqual(self._labels(["claude/plans/x.md", "snpdb/CLAUDE.md", "requirements.txt"]), [])
+        self.assertEqual(self._labels(["claude/plans/x.md", "snpdb/AGENTS.md", "requirements.txt"]), [])
 
 
 class TasksMapTest(SimpleTestCase):

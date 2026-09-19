@@ -12,7 +12,7 @@ GUARDED = [
     (r"\brestart_services\.sh|\bstop_services\.sh|\bsystemctl\s+(restart|stop|start)\b|\bservice\s+\S+\s+(restart|stop|start)\b",
      "restarts or stops services on this box: anyone using the site or a running import/annotation loses their work"),
     (r"manage\.py\s+migrate\b",
-     "migrates the live database this box's testers share; pushed migrations are frozen (CLAUDE.md), so check this is what is wanted"),
+     "migrates the live database this box's testers share; pushed migrations are frozen (AGENTS.md), so check this is what is wanted"),
     (r"manage\.py\s+(vep_run|create_new_variant_annotation_version|annotate_variants|liftover_alleles|delete_variant_annotation_version)\b",
      "changes annotation state for every variant on the box and runs for hours; annotation runs are shared"),
     (r"\b(DROP|TRUNCATE)\s+(TABLE|DATABASE)\b|\bdropdb\b",

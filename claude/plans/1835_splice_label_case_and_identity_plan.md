@@ -153,8 +153,8 @@ In `classification/models/classification_variant_info_models.py:ImportedAlleleIn
 - `SpliceEventVariant.splice_event`, `display` and `canonical_str` read through `display_splice_label`, with the row's
   `display` preferred. `find_splice_events_for_string` (search) canonicalises the same way and stays lookup-only.
 - The docstrings in `genes/models/models_splice_event.py` and `genes/gene_splice.py`, and the splice paragraph in
-  `genes/CLAUDE.md`, say the new rule: a splice string that validates mints its Variant; `SpliceEvent` names what the
-  caller reports and is not consulted on the classification path. `classification/CLAUDE.md` drops the sentence about
+  `genes/AGENTS.md`, say the new rule: a splice string that validates mints its Variant; `SpliceEvent` names what the
+  caller reports and is not consulted on the classification path. `classification/AGENTS.md` drops the sentence about
   needing a row.
 
 ### Data migration

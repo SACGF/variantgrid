@@ -6,7 +6,7 @@ The annotation app takes the Variants snpdb has stored and attaches what the wor
 consequences and the plugin/custom scores that ride along with it, ClinVar's summary per variant, per-gene annotation
 (ontology terms, GenCC gene-disease strength, dbNSFP gene scores, gnomAD constraint), Human Protein Atlas tissue data,
 and citations. Every one of these is versioned, and `annotation/models/models.py:AnnotationVersion` is the bundle per
-build that an analysis or a variant page pins itself to. This document is the story behind `annotation/CLAUDE.md`:
+build that an analysis or a variant page pins itself to. This document is the story behind `annotation/AGENTS.md`:
 how a version comes to exist, how a variant gets its rows, why the tables are partitioned, and what has gone wrong
 before. Model fields, URLs, commands, tasks and signals are in the generated maps
 ([models](../maps/models.md#annotation), [urls](../maps/urls.md#annotation), [commands](../maps/commands.md),
@@ -142,7 +142,7 @@ empty version live, since an empty GeneAnnotation partition makes every OMIM/HPO
 
 ## Why it is shaped this way
 
-Three "versions" are kept apart on purpose (`annotation/CLAUDE.md` says how to tell them apart). The VAV is what VEP
+Three "versions" are kept apart on purpose (`annotation/AGENTS.md` says how to tell them apart). The VAV is what VEP
 ran with, and its partition is the unit of retention: old analyses keep reading their old partition after an upgrade,
 and dropping a HISTORICAL VAV drops one table rather than deleting millions of rows. `columns_version` exists so that a
 VEP upgrade that changes nothing in the schema is a new VAV without a migration, and a schema change (new plugin

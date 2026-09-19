@@ -3,7 +3,7 @@ PostToolUse hook for Edit/Write: the fastest feedback loop in claude/plans/agent
 
   *.py    -> ruff check on that file; findings go to stderr with exit 2 so the agent sees them
   *.js    -> eslint on that file when node is installed (never on the vendored js/lib/)
-  *.scss  -> remind that the compiled .css needs the same change by hand (CLAUDE.md "SCSS / CSS")
+  *.scss  -> remind that the compiled .css needs the same change by hand (AGENTS.md "SCSS / CSS")
   *.md    -> vg docs check on that file when it is one of the agent docs, so a dead citation is caught
              as it is written rather than by the Agent maps job on push
 """

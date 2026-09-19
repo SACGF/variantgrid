@@ -8,7 +8,7 @@ symbol is a top-level class / function / assignment or a member of one, by AST).
 `check_docs` (returns a list of DeadCitation) and `render_report`. Pure AST and filesystem - no Django,
 so scripts/vg runs it in well under a second and CI runs it without a database.
 
-Paths resolve against the repo root first, then the citing doc's directory (so `snpdb/CLAUDE.md` may say
+Paths resolve against the repo root first, then the citing doc's directory (so `snpdb/AGENTS.md` may say
 `models/models_variant.py:Variant`); a bare filename with no directory resolves to any file of that name under
 the doc's directory tree, then anywhere in the repo. A `module.path:Symbol` spelling is accepted as
 `module/path.py:Symbol`. Fenced code blocks are skipped: what is inside them is a command or a listing, not a
@@ -32,7 +32,7 @@ from pathlib import Path
 
 from library.vg.repo import REPO_ROOT, first_party_packages
 
-DOC_GLOBS = ("claude/**/*.md", "*/CLAUDE.md", "*/__*_readme.md", "CLAUDE.md")
+DOC_GLOBS = ("claude/**/*.md", "*/AGENTS.md", "*/__*_readme.md", "AGENTS.md")
 GENERATED_DIRS = ("claude/maps",)
 # Gitignored build output: present on a box that has run the build, absent from a fresh checkout
 BUILD_OUTPUTS = ("variantgrid/sitestatic", "lint.txt")

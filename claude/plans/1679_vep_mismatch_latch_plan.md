@@ -133,7 +133,7 @@ these fields are ordinary `update()` calls and never create a new `AnnotationVer
 
 ### Docs
 
-- `annotation/CLAUDE.md`, under the existing mismatch gotcha: the mismatch latches
+- `annotation/AGENTS.md`, under the existing mismatch gotcha: the mismatch latches
   `annotation_blocked_reason` on the VAV, the dispatcher's VEP lane and the scheduler skip a blocked VAV,
   `get_vep_version` is memoised per worker process so the re-check clears only its own cache.
 - `claude/research/annotation.md` Traps paragraph: one sentence on the latch and the re-check button.
@@ -201,6 +201,6 @@ On a box with VEP (vg-test2), scheduler and workers running, Rollbar or its log 
 ## Definition of done
 
 - `scripts/vg tests --explain` names `annotation.tests` (migration) and the modules above pass.
-- `annotation/CLAUDE.md` gotcha and `claude/research/annotation.md` trap updated; `scripts/vg docs check`
+- `annotation/AGENTS.md` gotcha and `claude/research/annotation.md` trap updated; `scripts/vg docs check`
   passes; `scripts/vg map` refreshed.
 - This plan's `Status:` records the outcome.

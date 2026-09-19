@@ -149,6 +149,6 @@ VCF pages resolve before and after.
 
 - `scripts/vg tests --explain` names `snpdb.tests.test_somalier` and it passes.
 - `somalier_tasks.py` docstring lists the three entry points and which is the import path.
-- One line in `snpdb/CLAUDE.md` next to the existing somalier note: ancestry is batched, the report a VCF
+- One line in `snpdb/AGENTS.md` next to the existing somalier note: ancestry is batched, the report a VCF
   links to is its batch's.
 - `scripts/vg map` refreshed (new model, task, setting); `scripts/vg docs check` passes.

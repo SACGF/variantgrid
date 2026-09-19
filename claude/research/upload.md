@@ -6,7 +6,7 @@ The upload app turns a file a user or API client sent into database rows, asynch
 taken. For most file types that is one celery task; for a VCF it is a multi-stage pipeline of `UploadStep` rows that
 normalises the file with bcftools, creates whatever Variants do not exist yet through a single serialised worker,
 bulk-loads genotypes with SQL COPY in parallel, waits for VEP annotation to catch up, and only then declares the VCF
-imported. The rules for touching it are in `upload/CLAUDE.md`; this is the longer story of why those rules exist.
+imported. The rules for touching it are in `upload/AGENTS.md`; this is the longer story of why those rules exist.
 Models, URLs, tasks, commands and signals are enumerated in the generated maps ([models](../maps/models.md#upload),
 [urls](../maps/urls.md#upload), [tasks](../maps/tasks.md#upload), [commands](../maps/commands.md),
 [signals](../maps/signals.md#first-party)); this doc does not restate them.

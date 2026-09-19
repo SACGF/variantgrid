@@ -9,7 +9,7 @@ operation" throttle, the grid filter vocabulary, the test base classes, `library
 and `library/vg/`, the introspection tooling behind `manage.py vg`. It is not an installed app - it has no models,
 migrations or URLs of its own, only two abstract mixins that other apps' models inherit - which is why it sits below
 `snpdb` in the dependency order and why its one upward import (`snpdb.models.UserSettings`) is worth a paragraph
-below. `library/CLAUDE.md` holds the rules; this is the story behind them. Setting values are in the generated
+below. `library/AGENTS.md` holds the rules; this is the story behind them. Setting values are in the generated
 [settings map](../maps/settings.md), commands in [commands](../maps/commands.md), and `claude/domain.md` has the
 vocabulary.
 

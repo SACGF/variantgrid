@@ -115,7 +115,7 @@ python3 manage.py classification_normalise_option_values mode_of_inheritance --a
    classification under the MOI node for its normalised value (see Side effects) - expected to be zero at SA
    Path, where the matching UI is off.
 
-One line in `classification/CLAUDE.md` Gotchas: legacy records can hold option labels rather than keys, and
+One line in `classification/AGENTS.md` Gotchas: legacy records can hold option labels rather than keys, and
 this command is the fix.
 
 ### Scale

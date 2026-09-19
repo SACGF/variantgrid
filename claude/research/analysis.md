@@ -8,7 +8,7 @@ where source nodes (sample, cohort, trio, duo, quad, pedigree, all variants) sta
 each contributing a Django Q rather than a stored result set. Around that core sit the version/lease machinery that
 recounts nodes in celery after every edit, the node grid and its exports, templates that are cloned and parameterised per
 sample or cohort (and auto-launched on VCF import), variant tags, and the trio karyomapping side-feature. This document is
-the story behind `analysis/CLAUDE.md`: how an edit becomes a count, why a node is a Q and not a table, and what has gone
+the story behind `analysis/AGENTS.md`: how an edit becomes a count, why a node is a Q and not a table, and what has gone
 wrong before. Model fields, URLs, commands, tasks, signals and settings are in the generated maps
 ([models](../maps/models.md#analysis), [urls](../maps/urls.md#analysis), [commands](../maps/commands.md),
 [tasks](../maps/tasks.md#analysis), [signals](../maps/signals.md), [settings](../maps/settings.md));

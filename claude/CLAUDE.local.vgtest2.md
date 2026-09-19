@@ -1,7 +1,7 @@
 # CLAUDE.local.md for vg-test2
 
 Copy this file to the repo root as CLAUDE.local.md (gitignored) on vg-test2. It is the per-host section that used to
-live in `CLAUDE.md`; the checked-in file is the same on every box, so anything true of one machine only lives here.
+live in `AGENTS.md`; the checked-in file is the same on every box, so anything true of one machine only lives here.
 
 ## This box
 

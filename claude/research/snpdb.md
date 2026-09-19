@@ -5,7 +5,7 @@ Verified against 7c4408c62 on 2026-09-06
 snpdb is the core app: the genome (`GenomeBuild`, `Contig`), the variant identity model (`Sequence`, `Locus`,
 `Variant`, `Allele`), samples and their packed genotypes (`VCF`, `Sample`, `Cohort`, `CohortGenotypeCollection`),
 liftover between builds, ClinGen Allele Registry linking, labs and organisations, user settings, the grid column
-catalogue and the DataTables engine every list page uses. The rules are in `snpdb/CLAUDE.md`; the models are listed
+catalogue and the DataTables engine every list page uses. The rules are in `snpdb/AGENTS.md`; the models are listed
 in `claude/maps/models.md#snpdb`; this is the story behind them. The name is historical ("SNP database" predates
 VariantGrid); nothing here is SNP-specific.
 

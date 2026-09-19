@@ -8,7 +8,7 @@ what the command cannot know. Verified against vg-test2 on 2026-09-06.
 
 | Deployment | Hostname → settings file | Notes |
 |---|---|---|
-| vg-test2 (test.variantgrid.com) | `variantgrid/settings/env/vgtest2.py` | The lab box this repo is usually driven from; see "This box" in `CLAUDE.md` |
+| vg-test2 (test.variantgrid.com) | `variantgrid/settings/env/vgtest2.py` | The lab box this repo is usually driven from; see "This box" in `AGENTS.md` |
 | variantgrid.com | `variantgrid/settings/env/vgaws.py` | Public instance on AWS |
 | Shariant (test / demo / prod) | `variantgrid/settings/env/shariantcommon.py` + `sharianttest.py` / `shariantdemo.py` / `shariant.py` / `shariantsecurity.py` alongside it | Australian classification sharing; patients and analysis URLs unregistered; `VARIANT_GENE_LEVEL_ENABLED = False` (germline small variants only) |
 | SA Pathology | private repo `variantgrid_sapath` (settings and site-specific apps live there) | Largest production data; clinical use |
@@ -64,7 +64,7 @@ latest tag for `VARIANTGRID_MAJOR_VERSION` (`vg4.0-12-gc174556`, or `vg4-gc17455
 once per process from the checkout and reported by the API docs and `variantgrid/views_rest.py:CapabilitiesView`. Cutting a
 new major means bumping that setting in the same commit as the tag.
 
-Pushed migrations are frozen (`CLAUDE.md`); a data fix that must run on every deployment is a `ManualOperation` in a
+Pushed migrations are frozen (`AGENTS.md`); a data fix that must run on every deployment is a `ManualOperation` in a
 migration, not a note in a PR. Annotation upgrades (new VEP, new columns) are their own procedure: a new
 `VariantAnnotationVersion` per build via `create_new_variant_annotation_version`, then re-annotation of every variant in
 `AnnotationRun` batches - hours on the big deployments.

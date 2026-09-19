@@ -61,7 +61,7 @@ extra ones are the genuinely hard, model-level knots:
 **Workaround debt:** 183 function-level first-party imports. Excluding the legitimate ones
 (`apps.py` `ready()` signal registration, ~22), that is roughly 160 imports that exist to dodge a
 cycle. Concentrated in `snpdb` (49), `classification` (37), `analysis` (19), `annotation` (16),
-`ontology` (16), `genes` (13). CLAUDE.md's rule is that inline imports are only for genuine
+`ontology` (16), `genes` (13). AGENTS.md's rule is that inline imports are only for genuine
 circular deps — so this number is a fair proxy for "cycle debt", and it should go down.
 
 ---
@@ -91,7 +91,7 @@ only `snpdb` dependency from `manual`, `mme`, `review`, and `sync`'s admin layer
 `library` looking like a leaf while every app has to reach into `snpdb` for a `ModelAdmin` base
 class.
 
-CLAUDE.md's "Grid/table views" section names `snpdb/views/datatable_view.py` as the home of
+AGENTS.md's "Grid/table views" section names `snpdb/views/datatable_view.py` as the home of
 `DatatableConfig` / `RichColumn` — update that reference as part of the move.
 
 ## Stage 2 — Make `library` a true base layer
