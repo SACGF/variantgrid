@@ -51,7 +51,8 @@ def create_test_ontology_version() -> OntologyVersion:
     now = timezone.now()
     for field, (import_source, filenames) in OntologyVersion.ONTOLOGY_IMPORTS.items():
         filename = filenames[0]
-        oi = OntologyImport.objects.filter(import_source=import_source, filename=filename).first()
+        # latest() takes the highest-pk import per field, so match that or it won't find this version
+        oi = OntologyImport.objects.filter(import_source=import_source, filename=filename).order_by("pk").last()
         if not oi:
             oi, _ = OntologyImport.objects.get_or_create(import_source=import_source, filename=filename,
                                                          defaults={"processed_date": now})
