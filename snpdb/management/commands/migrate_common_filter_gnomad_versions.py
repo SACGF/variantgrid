@@ -19,6 +19,7 @@ from django.core.management import BaseCommand, CommandError
 from django.db import transaction
 
 from annotation.models import VariantAnnotationVersion
+from library.django_utils.django_partition import temporary_db_table
 from library.django_utils.django_postgres import model_to_insert_sql
 from library.utils.database_utils import run_sql
 from snpdb.common_variants import get_common_filter
@@ -109,7 +110,7 @@ class Command(BaseCommand):
             move_qs = CohortGenotype.objects.filter(collection=common_cgc).exclude(
                 variant__variantannotation__version=vav,
                 variant__variantannotation__gnomad_af__gt=af_min)
-            moved += self._move_cohort_genotypes(move_qs, uncommon_cgc, dry_run=dry_run)
+            moved += self._move_cohort_genotypes(move_qs, common_cgc, uncommon_cgc, dry_run=dry_run)
 
         if dry_run:
             logging.info("%s: [dry-run] would move %d records and repoint to %s", common_cgc, moved, target_filter)
@@ -119,12 +120,14 @@ class Command(BaseCommand):
             logging.info("%s: moved %d records, repointed to %s", common_cgc, moved, target_filter)
 
     @staticmethod
-    def _move_cohort_genotypes(move_qs, uncommon_cgc: CohortGenotypeCollection, dry_run: bool) -> int:
+    def _move_cohort_genotypes(move_qs, common_cgc: CohortGenotypeCollection,
+                               uncommon_cgc: CohortGenotypeCollection, dry_run: bool) -> int:
         """ Move CohortGenotype rows into the uncommon partition. They live in different partitions, so we re-insert
             then delete the originals (@see common_variant_classified_task). Returns the number moved. """
         if dry_run:
             return move_qs.count()
 
+        common_table = common_cgc.get_partition_table()
         uncommon_table = uncommon_cgc.get_partition_table()
         total = 0
         batch = []
@@ -135,17 +138,20 @@ class Command(BaseCommand):
             cg.collection = uncommon_cgc
             batch.append(cg)
             if len(batch) >= BATCH_SIZE:
-                total += Command._flush_batch(batch, delete_ids, uncommon_table)
+                total += Command._flush_batch(batch, delete_ids, common_table, uncommon_table)
                 batch, delete_ids = [], []
-        total += Command._flush_batch(batch, delete_ids, uncommon_table)
+        total += Command._flush_batch(batch, delete_ids, common_table, uncommon_table)
         return total
 
     @staticmethod
-    def _flush_batch(batch, delete_ids, uncommon_table) -> int:
+    def _flush_batch(batch, delete_ids, common_table, uncommon_table) -> int:
         if not batch:
             return 0
         with transaction.atomic():
             for insert_sql in model_to_insert_sql(batch, ignore_fields=['id'], db_table=uncommon_table):
                 run_sql(insert_sql)
-            CohortGenotype.objects.filter(pk__in=delete_ids).delete()
+            # Deleting off the base table would lock every other collection's partition (it's an inheritance
+            # parent, @see library.django_utils.django_partition), which deadlocks concurrent VCF imports
+            with temporary_db_table(CohortGenotype, common_table):
+                CohortGenotype.objects.filter(pk__in=delete_ids).delete()
         return len(batch)

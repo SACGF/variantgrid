@@ -7,6 +7,7 @@ import celery
 from celery.result import AsyncResult
 from django.db.models.query_utils import Q
 
+from library.django_utils.django_partition import temporary_db_table
 from library.django_utils.django_postgres import model_to_insert_sql, pg_sql_array
 from library.log_utils import log_traceback
 from library.utils import single_quote
@@ -261,22 +262,30 @@ def common_variant_classified_task(variant_id, common_filter_id):
         # We should only be called if CommonVariantClassified doesn't exist
         logging.info("common_variant_classified_task(%s, %s)", str(variant), str(common_filter))
 
-        cohort_genotype_delete_ids = []
+        delete_ids_by_partition = {}
         for cgc in common_filter.cohortgenotypecollection_set.all():
             uncommon = cgc.uncommon
+            delete_ids = []
             for cg in cgc.cohortgenotype_set.filter(variant=variant):
                 # Because they are in different partitions we can't just update them, need to re-insert and then delete
                 # old ones
-                cohort_genotype_delete_ids.append(cg.pk)
+                delete_ids.append(cg.pk)
                 cg.pk = None
                 cg.collection = uncommon
                 insert_sql = model_to_insert_sql([cg], ignore_fields=['id'],
                                                  db_table=uncommon.get_partition_table())[0]
                 run_sql(insert_sql)
+            if delete_ids:
+                delete_ids_by_partition[cgc.get_partition_table()] = delete_ids
 
         # No errors, insert must have gone through ok
-        logging.info("Deleting %d cohort genotype records", len(cohort_genotype_delete_ids))
-        CohortGenotype.objects.filter(pk__in=cohort_genotype_delete_ids).delete()
+        num_delete_ids = sum(len(delete_ids) for delete_ids in delete_ids_by_partition.values())
+        logging.info("Deleting %d cohort genotype records", num_delete_ids)
+        for partition_table, delete_ids in delete_ids_by_partition.items():
+            # Deleting off the base table would lock every other collection's partition (it's an inheritance
+            # parent, @see library.django_utils.django_partition), which deadlocks concurrent VCF imports
+            with temporary_db_table(CohortGenotype, partition_table):
+                CohortGenotype.objects.filter(pk__in=delete_ids).delete()
 
         # When it's completed - we can create the record
         CommonVariantClassified.objects.create(variant=variant, common_filter=common_filter)

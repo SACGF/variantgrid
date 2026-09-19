@@ -1,12 +1,23 @@
 from typing import Optional
 
 from django.contrib.auth.models import User
+from django.db import connection
 from django.test import TestCase
+from django.test.utils import CaptureQueriesContext
 
 from annotation.fake_annotation import get_fake_annotation_version
-from snpdb.models import CohortGenotype, CohortGenotypeCollection, GenomeBuild
+from library.django_utils.django_partition import temporary_db_table
+from snpdb.models import (
+    CohortGenotype,
+    CohortGenotypeCollection,
+    CohortGenotypeCollectionType,
+    CohortGenotypeCommonFilterVersion,
+    CommonVariantClassified,
+    GenomeBuild,
+)
 from snpdb.tasks.cohort_genotype_tasks import (
     cohort_genotype_task,
+    common_variant_classified_task,
     create_cohort_genotype_collection,
 )
 from snpdb.tests.utils.fake_cohort_data import create_fake_cohort, create_fake_trio
@@ -86,3 +97,56 @@ class SampleGenotypeCopyNumberTest(TestCase):
     def test_is_none_when_the_record_carries_no_value(self):
         sample_genotype = self._sample_genotype("SM", [{"BC": [22]}, {}, {}])
         self.assertIsNone(sample_genotype.copy_number_value)
+
+
+class CommonVariantClassifiedTest(TestCase):
+    """ Classifying a common variant moves its CohortGenotype rows out of the common partition into the
+        uncommon one, so they stop being skipped by the common filter optimisation. """
+
+    def setUp(self):
+        user = User.objects.get_or_create(username='testuser')[0]
+        self.genome_build = GenomeBuild.get_name_or_alias("GRCh37")
+        get_fake_annotation_version(self.genome_build)
+        self.cohort = create_fake_cohort(user, self.genome_build)
+        self.uncommon_cgc = self.cohort.cohort_genotype_collection
+
+        self.common_filter = CohortGenotypeCommonFilterVersion.objects.create(
+            gnomad_version="2.1.1", gnomad_af_min=0.05, genome_build=self.genome_build)
+        self.common_cgc = CohortGenotypeCollection.objects.create(
+            cohort=self.cohort, cohort_version=self.cohort.version,
+            num_samples=self.uncommon_cgc.num_samples,
+            collection_type=CohortGenotypeCollectionType.COMMON,
+            common_filter=self.common_filter)
+        self.uncommon_cgc.common_collection = self.common_cgc
+        self.uncommon_cgc.save()
+
+        self.variant = slowly_create_test_variant("3", 128198980, 'G', 'C', self.genome_build)
+        with temporary_db_table(CohortGenotype, self.common_cgc.get_partition_table()):
+            CohortGenotype.objects.create(collection=self.common_cgc, variant=self.variant,
+                                          samples_zygosity="OOO", het_count=0, hom_count=3)
+
+    def _partition_count(self, cgc) -> int:
+        with temporary_db_table(CohortGenotype, cgc.get_partition_table()):
+            return CohortGenotype.objects.filter(collection=cgc).count()
+
+    def test_moves_genotypes_from_the_common_to_the_uncommon_partition(self):
+        self.assertEqual(self._partition_count(self.common_cgc), 1)
+        self.assertEqual(self._partition_count(self.uncommon_cgc), 0)
+
+        common_variant_classified_task(self.variant.pk, self.common_filter.pk)
+
+        self.assertEqual(self._partition_count(self.common_cgc), 0)
+        self.assertEqual(self._partition_count(self.uncommon_cgc), 1)
+        self.assertTrue(CommonVariantClassified.objects.filter(variant=self.variant,
+                                                               common_filter=self.common_filter).exists())
+
+    def test_delete_does_not_expand_over_the_inheritance_parent(self):
+        """ A delete off snpdb_cohortgenotype locks every other collection's partition, which deadlocks
+            concurrent VCF imports (SACGF/variantgrid_sapath#450) """
+        with CaptureQueriesContext(connection) as queries:
+            common_variant_classified_task(self.variant.pk, self.common_filter.pk)
+
+        base_table = '"snpdb_cohortgenotype"'
+        tree_wide = [q["sql"] for q in queries
+                     if q["sql"].lstrip().upper().startswith("DELETE") and base_table in q["sql"]]
+        self.assertEqual(tree_wide, [], f"Delete expanded over the inheritance tree: {tree_wide}")
