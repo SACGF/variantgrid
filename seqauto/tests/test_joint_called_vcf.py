@@ -419,7 +419,7 @@ class CrossRunLinkSamplesTests(TestCase):
             response = self.client.get(reverse("view_sequencing_run",
                                                kwargs={"sequencing_run_id": sequencing_run.pk}))
             self.assertEqual(response.status_code, 200, sequencing_run)
-            self.assertIn("[cross-run]", response.content.decode(), sequencing_run)
+            self.assertIn(">cross-run<", response.content.decode(), sequencing_run)
 
     def test_new_sample_sheet_on_member_run_remaps_that_member(self):
         backend, joint_called_vcf, members, samples = self._make_trio()
