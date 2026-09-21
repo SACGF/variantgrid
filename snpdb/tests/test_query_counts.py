@@ -30,10 +30,10 @@ class RelatedDataQueryCountTest(TestCase):
         cls.samples = list(cls.trio.get_samples())
 
     def test_related_data_for_samples_query_count(self):
-        # 4 queries: cohort samples, trios, ped file records, classifications exists.
+        # 6 queries: cohort samples, trios, quads, duos, ped file records, classifications exists.
         # Constant regardless of how many samples/cohorts/trios are passed in.
         context = {"user": self.user}
-        with self.assertNumQueries(4):
+        with self.assertNumQueries(6):
             result = related_data_for_samples(context, self.samples)
         self.assertEqual(len(result["trios_and_samples"]), 1)
         self.assertEqual(len(result["cohorts_and_samples"]), 1)

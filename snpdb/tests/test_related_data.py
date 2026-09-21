@@ -3,8 +3,8 @@ from django.test import TestCase
 
 from pedigree.models import PedFile, PedFileFamily, Pedigree
 from snpdb.models import GenomeBuild, Trio
-from snpdb.templatetags.related_data_tags import related_data_for_cohort
-from snpdb.tests.utils.fake_cohort_data import create_fake_cohort
+from snpdb.templatetags.related_data_tags import related_data_for_cohort, related_data_for_samples
+from snpdb.tests.utils.fake_cohort_data import create_fake_cohort, create_fake_duo, create_fake_quad
 
 
 class RelatedDataForCohortTest(TestCase):
@@ -39,3 +39,20 @@ class RelatedDataForCohortTest(TestCase):
 
     def test_shows_sub_cohort_pedigrees(self):
         self.assertEqual(self._related_data()["pedigrees"], [self.pedigree])
+
+
+class RelatedDataForSamplesTest(TestCase):
+    """ A sample's page lists the duos and quads it is a member of, as well as trios (#1889) """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = User.objects.get_or_create(username='related_data_samples_user')[0]
+        genome_build = GenomeBuild.get_name_or_alias("GRCh37")
+        cls.duo = create_fake_duo(cls.user, genome_build)
+        cls.quad = create_fake_quad(cls.user, genome_build)
+
+    def test_shows_duo_and_quad_with_member_sample(self):
+        sibling = self.quad.sibling.sample
+        related_data = related_data_for_samples({"user": self.user}, [self.duo.proband.sample, sibling])
+        self.assertEqual(related_data["duos_and_samples"], [(self.duo, "proband")])
+        self.assertEqual(related_data["quads_and_samples"], [(self.quad, "sibling")])

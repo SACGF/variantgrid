@@ -30,7 +30,7 @@ from analysis.related_analyses import (
 from library.utils import remove_duplicates_from_list
 from patients.sample_grouping import get_sample_group
 from pedigree.models import Pedigree
-from snpdb.models import Cohort, Trio
+from snpdb.models import Cohort, Duo, Quad, Trio
 
 register = Library()
 
@@ -59,7 +59,7 @@ def get_all_analyses_for_user(user, samples, cohorts=None, trios=None, quads=Non
             analysis_details[analysis].append(f'Duo: {details}')
 
     for analysis, details in get_related_analysis_details_for_samples(user, samples):
-        analysis_details[analysis].append(f"Sample: {details}")
+        analysis_details[analysis].append(details)
 
     return [(analysis, ", ".join(details)) for analysis, details in analysis_details.items()]
 
@@ -83,15 +83,23 @@ def update_context_with_related_analysis(context, samples, cohorts=None, trios=N
                     "analysis_ids_list": analyses_list})
 
 
+def _family_groups_for_samples(family_class, cohorts, samples):
+    """ Trios/Quads/Duos with any of the samples as a member """
+    member_q_list = [Q(**{f"{field}__sample__in": samples}) for field in family_class.MEMBER_FIELDS]
+    return family_class.objects.filter(cohort__in=cohorts).filter(reduce(operator.or_, member_q_list)).distinct()
+
+
 @register.inclusion_tag("analysis/tags/related_analyses_for_samples.html", takes_context=True)
 def related_analyses_for_samples(context, samples, show_sample_info, show_create_analyses=True):
     cohorts = Cohort.objects.filter(cohortsample__sample__in=samples).distinct()
-    trio_sample_q_list = [Q(**{f"{trio_field}__sample__in": samples}) for trio_field in ["mother", "father", "proband"]]
-    trios = Trio.objects.filter(cohort__in=cohorts).filter(reduce(operator.or_, trio_sample_q_list)).distinct()
+    trios = _family_groups_for_samples(Trio, cohorts, samples)
+    quads = _family_groups_for_samples(Quad, cohorts, samples)
+    duos = _family_groups_for_samples(Duo, cohorts, samples)
     pedigrees = Pedigree.objects.filter(cohort__in=cohorts).filter(cohortsamplepedfilerecord__cohort_sample__sample__in=samples).distinct()
     sample_mutational_signatures = MutationalSignature.objects.filter(sample__in=samples).distinct().select_related("sample")
 
-    update_context_with_related_analysis(context, samples, cohorts=cohorts, trios=trios, pedigrees=pedigrees,
+    update_context_with_related_analysis(context, samples, cohorts=cohorts, trios=trios, quads=quads, duos=duos,
+                                         pedigrees=pedigrees,
                                          show_sample_info=show_sample_info,
                                          show_create_analyses=show_create_analyses)
     context["samples"] = samples
@@ -104,8 +112,11 @@ def related_analyses_for_cohort(context, cohort):
     cohorts = [cohort] + list(cohort.sub_cohort_set.all())
     pedigrees = Pedigree.objects.filter(cohort__in=cohorts)
     trios = Trio.objects.filter(cohort__in=cohorts)
+    quads = Quad.objects.filter(cohort__in=cohorts)
+    duos = Duo.objects.filter(cohort__in=cohorts)
 
-    update_context_with_related_analysis(context, cohort.get_samples(), cohorts=cohorts, trios=trios, pedigrees=pedigrees)
+    update_context_with_related_analysis(context, cohort.get_samples(), cohorts=cohorts, trios=trios, quads=quads,
+                                         duos=duos, pedigrees=pedigrees)
     context["cohort"] = cohort
     context["has_gene_count_types"] = GeneCountType.objects.filter(enabled=True).exists()
     return context

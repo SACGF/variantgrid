@@ -1,5 +1,6 @@
 from collections import defaultdict
-from operator import itemgetter
+from functools import reduce
+from operator import itemgetter, or_
 
 from django.db.models import Q
 from django.template import Library
@@ -7,7 +8,7 @@ from django.template import Library
 from classification.models import Classification
 from classification.views.classification_datatables import ClassificationColumns
 from pedigree.models import CohortSamplePedFileRecord, Pedigree
-from snpdb.models import CohortSample, Trio
+from snpdb.models import CohortSample, Duo, Quad, Trio
 from snpdb.models.models_enums import ImportStatus
 
 register = Library()
@@ -49,6 +50,8 @@ def summarise_samples(x_and_samples_list, show_sample_info):
 def related_data_for_samples(context, samples, show_sample_info=True):
     cohorts_and_samples_list = defaultdict(list)
     trios_and_samples_list = defaultdict(list)
+    quads_and_samples_list = defaultdict(list)
+    duos_and_samples_list = defaultdict(list)
     pedigrees_and_samples_list = defaultdict(list)
 
     cohort_samples = list(CohortSample.objects.filter(sample__in=samples).select_related("cohort", "sample"))
@@ -59,11 +62,15 @@ def related_data_for_samples(context, samples, show_sample_info=True):
 
     if successful_cohort_samples:
         cs_ids = {cs.pk for cs in successful_cohort_samples}
-        trio_qs = Trio.objects.filter(Q(mother__in=cs_ids) | Q(father__in=cs_ids) | Q(proband__in=cs_ids))
-        for trio in trio_qs.select_related(*TRIO_SAMPLES_SELECT_RELATED):
-            for cs in trio.get_cohort_samples():
-                if cs.pk in cs_ids:
-                    trios_and_samples_list[trio].append(cs.sample.name)
+        for family_class, family_and_samples_list in [(Trio, trios_and_samples_list),
+                                                      (Quad, quads_and_samples_list),
+                                                      (Duo, duos_and_samples_list)]:
+            member_q = reduce(or_, [Q(**{f"{field}__in": cs_ids}) for field in family_class.MEMBER_FIELDS])
+            member_samples = [f"{field}__sample" for field in family_class.MEMBER_FIELDS]
+            for family in family_class.objects.filter(member_q).select_related(*member_samples):
+                for cs in family.get_cohort_samples():
+                    if cs.pk in cs_ids:
+                        family_and_samples_list[family].append(cs.sample.name)
 
     if cohort_samples:
         seen_pedigree_cohort_samples = set()
@@ -76,12 +83,16 @@ def related_data_for_samples(context, samples, show_sample_info=True):
 
     cohorts_and_samples = summarise_samples(cohorts_and_samples_list, show_sample_info)
     trios_and_samples = summarise_samples(trios_and_samples_list, show_sample_info)
+    quads_and_samples = summarise_samples(quads_and_samples_list, show_sample_info)
+    duos_and_samples = summarise_samples(duos_and_samples_list, show_sample_info)
     pedigrees_and_samples = summarise_samples(pedigrees_and_samples_list, show_sample_info)
 
     context = related_data_context(context, samples)
     context.update({"show_sample_info": show_sample_info,
                     "cohorts_and_samples": cohorts_and_samples,
                     "trios_and_samples": trios_and_samples,
+                    "quads_and_samples": quads_and_samples,
+                    "duos_and_samples": duos_and_samples,
                     "pedigrees_and_samples": pedigrees_and_samples})
     return context
 
@@ -95,6 +106,8 @@ def related_data_for_cohort(context, cohort):
     context["cohort"] = cohort
     context["sub_cohorts"] = sub_cohorts
     context["trios"] = list(Trio.objects.filter(cohort__in=cohorts).select_related(*TRIO_SAMPLES_SELECT_RELATED))
+    context["quads"] = list(Quad.objects.filter(cohort__in=cohorts))
+    context["duos"] = list(Duo.objects.filter(cohort__in=cohorts))
     context["pedigrees"] = list(Pedigree.objects.filter(cohort__in=cohorts))
     return context
 
