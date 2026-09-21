@@ -63,8 +63,13 @@
                 <td>
                     {% for delivery in deliveries_by_report_id|get_item:case_report.pk %}
                         <div class="mb-1">
-                            <span class="badge badge-{{ delivery.status }}">{{ delivery.label }}</span>
-                            <span class="small">{{ delivery.text }}</span>
+                            {% if delivery.colour %}
+                                <span class="badge text-white" style="background-color: {{ delivery.colour }}">{{ delivery.label }}</span>
+                                <span class="small text-{{ delivery.status }}">{{ delivery.text }}</span>
+                            {% else %}
+                                <span class="badge badge-{{ delivery.status }}">{{ delivery.label }}</span>
+                                <span class="small">{{ delivery.text }}</span>
+                            {% endif %}
                             {% if delivery.timestamp %}<div class="text-muted small">{{ delivery.timestamp|date:"d M Y H:i" }}</div>{% endif %}
                             {% if delivery.action_url %}
                                 <button type="button" class="btn btn-outline-secondary btn-sm case-report-action"

@@ -19,3 +19,4 @@ class CaseReportDelivery:
     timestamp: Optional[datetime] = None
     action_url: Optional[str] = None  # a POST that retries / resends, run by the card's action handler
     action_label: Optional[str] = None  # "Send to Mocha"
+    colour: Optional[str] = None  # the system's own badge colour - status then colours the text instead

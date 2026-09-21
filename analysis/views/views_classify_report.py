@@ -337,4 +337,4 @@ def preview_case_report(request, case_type: str, case_id: int) -> HttpResponse:
         reported_by_pk=_reported_by_pk(request, modifications),
         summary=request.POST.get("summary", ""),
         case_values=template.case_values_from_form(request.POST))
-    return HttpResponse(content=html, content_type="text/html")
+    return HttpResponse(content=html)

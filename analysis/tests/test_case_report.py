@@ -228,6 +228,8 @@ class CaseReportPermissionTest(ClassifyReportTestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response["X-Frame-Options"], "SAMEORIGIN")
+        # HtmlMinifyMiddleware turns &nbsp; into the character, which reads as "Â " without a charset
+        self.assertIn("charset=utf-8", response["Content-Type"])
 
 
 @override_settings(CELERY_TASK_ALWAYS_EAGER=True, LIFTOVER_CLASSIFICATIONS=False,

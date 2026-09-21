@@ -77,7 +77,7 @@ def view_case_report(request, case_report_id: int) -> HttpResponse:
     """ The stored HTML, as the preview the scientist reads - framed by the built-report modal, which the
         site-wide X-Frame-Options DENY would otherwise blank """
     case_report = _get_case_report(request.user, case_report_id)
-    return HttpResponse(content=case_report.html, content_type="text/html")
+    return HttpResponse(content=case_report.html)
 
 
 def _finalise_response(result: FinaliseResult) -> JsonResponse:
