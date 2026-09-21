@@ -13,6 +13,12 @@ class Test(URLTestCase):
         patient = Patient.objects.create(first_name="Path", last_name="Tests")
         cls.case = Case.objects.create(name="pathtests_case", patient=patient)
 
+    def testUrls(self):
+        URL_NAMES_AND_KWARGS = [
+            ("view_case", {"pk": self.case.pk}, 200),
+        ]
+        self._test_urls(URL_NAMES_AND_KWARGS, self.user)
+
     def testDatatableUrls(self):
         DATATABLE_URLS = [
             ("pathology_test_orders_datatable", {}, 200),

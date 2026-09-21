@@ -10,8 +10,7 @@ function setPatientLink() {
     var patientSelector = $("#id_patient");
     patientSelector.after("<a class='cross-link' id='patient-link'>View Patient</a>");
     function mySetPatientLink() {
-        var pk = patientSelector.find(":selected").val();
-        setCrossLink($("#patient-link"), Urls.view_patient, pk);
+        setCrossLink($("#patient-link"), Urls.view_patient, patientSelector.val());
     }
     mySetPatientLink();
     patientSelector.change(mySetPatientLink);

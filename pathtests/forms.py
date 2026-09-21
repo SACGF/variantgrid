@@ -93,8 +93,11 @@ class PathologyTestOrderForm(forms.ModelForm):
 class CaseForm(forms.ModelForm):
     class Meta:
         model = Case
-        fields = '__all__'
+        fields = ('external_pk', 'name', 'lead_scientist', 'result_required_date', 'patient',
+                  'report_date', 'details', 'status', 'workflow_status', 'investigation_type')
         widgets = {'name': TextInput(),
+                   'external_pk': ModelSelect2(url='external_pk_autocomplete',
+                                               attrs={'data-placeholder': 'External ID...'}),
                    'lead_scientist': ModelSelect2(url='user_autocomplete',
                                                   attrs={'data-placeholder': 'User...'}),
                    'patient': ModelSelect2(url='patient_autocomplete',
