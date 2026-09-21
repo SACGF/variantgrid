@@ -86,17 +86,26 @@ def get_proband_by_node_id(analysis: Analysis) -> dict[int, NodeProband]:
     return proband_by_node_id
 
 
+def classification_is_of_another_person(variant_tag: VariantTag, classification: Classification) -> bool:
+    """ Whether the tagging names a sample or patient that the classification's sample is not """
+    if not classification.sample_id:
+        return False
+    if variant_tag.sample_id:
+        return variant_tag.sample_id != classification.sample_id
+    if variant_tag.patient_id:
+        # Another sample of the same patient is not somebody else's
+        classification_patient = get_patient_for_source(SampleSourceLevel.SAMPLE, classification.sample)
+        return bool(classification_patient) and classification_patient.pk != variant_tag.patient_id
+    return False
+
+
 def classification_resolves_tag(variant_tag: VariantTag, classification: Classification) -> bool:
     """ Whether the classification is of the person the tagging is about. Where either side doesn't say, only a
         one-person analysis is unambiguous - otherwise it is the scientist's call (@see resolve_variant_tag) """
+    if classification_is_of_another_person(variant_tag, classification):
+        return False
     if variant_tag.sample_id and classification.sample_id:
-        return variant_tag.sample_id == classification.sample_id
-    if variant_tag.patient_id and classification.sample_id:
-        # The tagging names a patient rather than one of their samples - a record of somebody else's is not it,
-        # while another sample of the same patient is still the scientist's call below
-        classification_patient = get_patient_for_source(SampleSourceLevel.SAMPLE, classification.sample)
-        if classification_patient and classification_patient.pk != variant_tag.patient_id:
-            return False
+        return True
     if analysis := variant_tag.analysis:
         return len(analysis.get_samples()) <= 1
     return True
@@ -134,9 +143,10 @@ def resolve_variant_tag(variant_tag: VariantTag, classification: Classification,
 
 def resolve_launching_variant_tag(classification: Classification, variant_tag: VariantTag,
                                   user: User) -> Optional[VariantTag]:
-    """ The tagging whose "New classification" opened the create form. Launching from it is the scientist
-        saying this record is what that tagging was asking for, so it resolves without the samples having to
-        agree - which they can't when the tagging never knew whose it was """
+    """ The tagging the scientist classified from - its "New classification" create form, or its row in the
+        Classify & Report queue. Launching from it is the scientist saying this record is what that tagging was
+        asking for, so it resolves without the samples having to agree - which they can't when the tagging
+        never knew whose it was """
     if variant_tag.is_resolved or not variant_tag.can_write(user):
         return None
     variant = classification.variant

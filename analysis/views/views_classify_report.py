@@ -26,7 +26,9 @@ from analysis.classify_report import (
 from analysis.models import VariantTag
 from analysis.models.nodes.analysis_node import AnalysisClassification
 from analysis.variant_tag_operations import (
+    classification_is_of_another_person,
     get_sample_genotype_for_variant_tag,
+    resolve_launching_variant_tag,
     resolve_requires_classification_tags_for_samples,
     resolve_variant_tag,
 )
@@ -175,16 +177,21 @@ def create_classification_for_case(request, case_type: str, case_id: int, varian
     if analysis := variant_tag.analysis:
         if analysis.can_write(request.user):
             AnalysisClassification.objects.create(analysis=analysis, classification=classification)
+    # Classifying from the row resolves it, unless the sample picked in the dialog isn't the one the tagging names
+    launched = None
+    if not classification_is_of_another_person(variant_tag, classification):
+        launched = resolve_launching_variant_tag(classification, variant_tag, request.user)
     resolved = resolve_requires_classification_tags_for_samples(classification, case.samples, request.user)
     # The queue row shows the link either way - unresolved it also offers the button that says this is the person
     return classification_created_response(request, classification,
-                                           {"resolved": variant_tag.pk in {vt.pk for vt in resolved}})
+                                           {"resolved": launched is not None or
+                                                        variant_tag.pk in {vt.pk for vt in resolved}})
 
 
 @require_POST
 def resolve_variant_tag_for_case(request, case_type: str, case_id: int, variant_tag_id: int) -> HttpResponseBase:
     """ The scientist saying the case's classification is what this tagging was asking for - needed when the
-        tagging never knew whose it was, so it couldn't be resolved automatically """
+        record was made elsewhere, or for a sample other than the one the tagging names """
     case = _get_case(request.user, case_type, case_id)
     variant_tag = VariantTag.get_for_user(request.user, variant_tag_id)
     if not variant_tag.can_write(request.user):

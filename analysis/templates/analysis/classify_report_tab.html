@@ -65,7 +65,7 @@
                 action.html($("<span>", {class: "text-success mr-2", text: "✓ Classified"})).append(
                     $("<a>", {href: data.url, target: "_blank", text: data.label}));
                 row.addClass("has-classification");
-                // A tagging that never knew whose it was stays outstanding until someone says this is the person
+                // Made for a sample other than the tagging's own, it stays outstanding until someone says this is the person
                 if (data.resolved) {
                     row.addClass("classified table-success");
                 } else {

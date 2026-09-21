@@ -405,15 +405,26 @@ class CreateClassificationForCaseTest(ClassifyReportTestCase):
         self.variant_tag.refresh_from_db()
         self.assertTrue(self.variant_tag.is_resolved)
 
-    def test_ambiguous_tagging_waits_for_the_button(self):
+    def test_clears_a_tagging_no_sample_could_have_resolved(self):
         analysis = self._create_cohort_analysis()
         variant_tag = self._create_variant_tag(analysis=analysis)
 
         response = self.client.post(self._classify_url(variant_tag), self._post_data())
 
-        self.assertFalse(json.loads(response.content)["resolved"])
+        self.assertTrue(json.loads(response.content)["resolved"])
         variant_tag.refresh_from_db()
-        self.assertFalse(variant_tag.is_resolved)
+        self.assertTrue(variant_tag.is_resolved)
+
+    def test_another_samples_record_leaves_the_tagging_alone(self):
+        response = self.client.post(self.url, self._post_data(sample_id=self.mother.pk))
+
+        self.assertFalse(json.loads(response.content)["resolved"])
+        self.variant_tag.refresh_from_db()
+        self.assertFalse(self.variant_tag.is_resolved)
+
+    def test_the_button_clears_a_tagging_classified_elsewhere(self):
+        variant_tag = self._create_variant_tag(analysis=self._create_cohort_analysis())
+        self._classify(self.proband)
 
         resolve_url = reverse("resolve_variant_tag_for_case",
                               kwargs={"case_type": "sample", "case_id": self.proband.pk,
