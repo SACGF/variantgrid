@@ -25,24 +25,16 @@ class ClassificationReport:
     """
     Formats using report for the corresponding lab.
 
-    One record fills "record" the way it always has. A multi-variant report (the sample/patient page's
-    Classify & Report tab) passes the rest in as well - "classifications" is every record in report order and
-    "gene_groups" the same records grouped by gene symbol - so single-variant templates keep working unchanged.
-    @see classification/report/case_report_context.py, which builds the rows for both this and the case report.
+    One record's report. Several records are a case report (classification/report/case_report_builder.py),
+    and classification/report/case_report_context.py builds the rows for both.
     """
 
-    def __init__(self, classification: ClassificationModification, user: User,
-                 classifications: Optional[list[ClassificationModification]] = None,
-                 report_template: Optional[ClassificationReportTemplate] = None,
-                 extra_context: Optional[dict] = None):
+    def __init__(self, classification: ClassificationModification, user: User):
         self.classification = classification
-        self.classifications = classifications if classifications is not None else [classification]
-        self.report_template = report_template
-        self.extra_context = extra_context or {}  # eg the case header a multi-variant report opens with
         self.user = user
 
     def get_template(self):
-        report = self.report_template or ClassificationReportTemplate.preferred_template_for(self.classification)
+        report = ClassificationReportTemplate.preferred_template_for(self.classification)
         template_str = report.template or 'No report template has been configured'
         django_engine = engines['django']
         return django_engine.from_string(template_str)
@@ -51,13 +43,12 @@ class ClassificationReport:
         """ The single record report and the case report build their rows from the same ReportVariant,
             so "this variant's row" means one thing - `record` / `classifications` / `gene_groups` are
             the shape the existing templates read """
-        variants = build_report_variants(self.classifications, self.user)
+        variants = build_report_variants([self.classification], self.user)
         by_pk = {variant.modification.pk: variant for variant in variants}
 
         record = by_pk[self.classification.pk].evidence if self.classification.pk in by_pk \
             else self.row_data(self.classification)
         return {
-            **self.extra_context,
             'record': record,
             'classifications': [variant.evidence for variant in variants],
             'gene_groups': build_gene_groups(variants),
@@ -65,17 +56,12 @@ class ClassificationReport:
 
     def _unsubmitted_changes_warning(self) -> Optional[str]:
         """ Reports are rendered from submitted versions, so say so when the form is showing newer data """
-        stale = [record for record in self.classifications if not record.is_last_edited]
-        if not stale:
+        if self.classification.is_last_edited:
             return None
 
-        if len(self.classifications) == 1:
-            submitted = timezone.localtime(stale[0].created).strftime("%d %b %Y %H:%M")
-            message = (f"This report was generated from the version submitted on {submitted}. "
-                       "Changes made since then have not been submitted and do not appear below.")
-        else:
-            message = (f"{len(stale)} of {len(self.classifications)} classifications have unsubmitted changes - "
-                       "this report was generated from their submitted versions.")
+        submitted = timezone.localtime(self.classification.created).strftime("%d %b %Y %H:%M")
+        message = (f"This report was generated from the version submitted on {submitted}. "
+                   "Changes made since then have not been submitted and do not appear below.")
         return UNSUBMITTED_CHANGES_WARNING.format(message=message)
 
     @staticmethod

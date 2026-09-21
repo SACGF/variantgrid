@@ -23,7 +23,7 @@ from analysis.variant_tag_operations import (
 )
 from annotation.fake_annotation import create_fake_variants, get_fake_annotation_version
 from classification.enums import AlleleOriginBucket, ShareLevel, SpecialEKeys, SubmissionSource
-from classification.models import Classification, ClassificationReportTemplate
+from classification.models import Classification, ClassificationReportTemplate, ReportNames
 from library.guardian_utils import all_users_group, assign_permission_to_user_and_groups
 from patients.models import Patient
 from snpdb.models import Country, GenomeBuild, Lab, Organization, Sample, Tag, Variant
@@ -485,42 +485,20 @@ class CreateClassificationForCaseTest(ClassifyReportTestCase):
         self.assertEqual(classification.get("h_summary"), "RUNX1 is a transcription factor")
         self.assertIsNone(classification.get(SpecialEKeys.INTERPRETATION_SUMMARY))
 
-    def test_multi_classification_report_groups_by_gene(self):
-        ClassificationReportTemplate.objects.create(
-            name="test template",
-            template="{% for group in gene_groups %}[{{ group.gene_symbol }}"
-                     "={{ group.classifications|length }}]{% endfor %}")
-        classification = self._classify(self.proband, data={SpecialEKeys.GENE_SYMBOL: {"value": "RUNX1"}})
-        classification.publish_latest(self.user)
-
-        url = reverse("multi_classification_report",
-                      kwargs={"case_type": "sample", "case_id": self.proband.pk})
-        response = self.client.post(url, {
-            "report_template": "test template",
-            "classification_modification_id": [classification.last_published_version.pk],
-        })
-
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "[RUNX1=1]")
-
     def test_report_warns_when_the_record_has_unsubmitted_changes(self):
         """ Reports render the submitted version, so the page has to say when the form is showing newer data """
-        ClassificationReportTemplate.objects.create(name="test template", template="<html><body>report</body></html>")
+        ClassificationReportTemplate.objects.update_or_create(
+            name=ReportNames.DEFAULT_REPORT, defaults={"template": "<html><body>report</body></html>"})
         classification = self._classify(self.proband)
         classification.publish_latest(self.user)
-        url = reverse("multi_classification_report",
-                      kwargs={"case_type": "sample", "case_id": self.proband.pk})
-        post_data = {
-            "report_template": "test template",
-            "classification_modification_id": [classification.last_published_version.pk],
-        }
+        url = reverse("view_template_report", kwargs={"classification_id": classification.pk})
 
-        self.assertNotContains(self.client.post(url, post_data), "not been submitted")
+        self.assertNotContains(self.client.get(url), "not been submitted")
 
         classification.patch_value({SpecialEKeys.GENE_SYMBOL: {"value": "RUNX1"}},
                                    user=self.user, source=SubmissionSource.FORM, save=True)
 
-        self.assertContains(self.client.post(url, post_data), "not been submitted")
+        self.assertContains(self.client.get(url), "not been submitted")
 
     def test_a_tag_with_nothing_to_reuse_links_to_the_tag_create_page(self):
         analysis = self._create_analysis()

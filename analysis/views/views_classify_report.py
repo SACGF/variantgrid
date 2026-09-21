@@ -41,9 +41,7 @@ from classification.models import (
 )
 from classification.report.case_report_builder import build_case_report, preview_case_report_html
 from classification.report.case_report_context import build_report_variants
-from classification.views.classification_export_report import ClassificationReport
 from classification.views.views import classification_created_response, create_classification_object
-from library.utils import first
 from patients.models import Extraction, Patient, Specimen
 from patients.models_enums import Zygosity
 from snpdb.forms import UserLabChoiceForm
@@ -80,7 +78,6 @@ def _classify_report_context(case: ClassifyReportCase, case_type: str, case_id: 
         "unclassified": sum(1 for row in rows if row.needs_classification),
         "tag_summary": tag_summary(rows),
         "classification_modifications": modifications,
-        "report_templates": ClassificationReportTemplate.objects.exclude(template="").order_by("name"),
         "case_report_templates": ClassificationReportTemplate.case_templates_for_bucket(
             case_allele_origin_bucket(modifications)),
         "case_reports": case_reports,
@@ -196,28 +193,6 @@ def resolve_variant_tag_for_case(request, case_type: str, case_id: int, variant_
         raise Http404("This case has no classification for the tagged variant")
     resolve_variant_tag(variant_tag, row.classification, request.user)
     return JsonResponse({"resolved": True})
-
-
-@require_POST
-def multi_classification_report(request, case_type: str, case_id: int):
-    """ One report over several of the case's classifications, grouped by gene """
-    case = _get_case(request.user, case_type, case_id)
-    selected_ids = request.POST.getlist("classification_modification_id")
-    modifications = [cm for cm in case.classification_modifications() if str(cm.pk) in selected_ids]
-    if not modifications:
-        raise Http404("No classifications selected for this report")
-
-    report_template = get_object_or_404(ClassificationReportTemplate, pk=request.POST["report_template"])
-    # The header a multi-variant report opens with - who the case is, and what was sequenced.
-    # Every level resolves its patient the same way, so an extraction case has one too
-    extra_context = {
-        "case": case.obj,
-        "case_label": str(case.obj),
-        "samples": case.samples,
-        "patient": first(case.patients),
-    }
-    return ClassificationReport(modifications[0], user=request.user, classifications=modifications,
-                                report_template=report_template, extra_context=extra_context).serve()
 
 
 def _selected_modifications(case: ClassifyReportCase, request) -> list[ClassificationModification]:
