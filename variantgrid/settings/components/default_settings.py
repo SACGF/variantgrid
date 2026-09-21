@@ -451,6 +451,12 @@ PATIENT_EXTRACTION_MATCH_PENDING_DAYS = 3
 # posted, so it can never override a client. The group names only the extraction, and reference_id is
 # unique per specimen rather than globally, so a match under two specimens parks as Needs attention
 PATIENT_EXTRACTION_SAMPLE_NAME_REGEX = None  # eg r"(?P<extraction>\d{10}[A-Z])$"
+# A TSO500 CombinedVariantOutput's 'Pair ID' is the pair's sample name, and the patient's code is a
+# field inside it - this regex's 'patient_code' group. The default reads SA Path's naming
+# ('5_FMC080_FCUP_2619115319' -> 'FMC080'), where the leading sequencing sample ID changes on
+# re-sequencing while the code stays. A lab naming pairs some other way sets its own; None takes the
+# whole Pair ID as the code, and a Pair ID the regex doesn't match accessions no patient
+TSO500_PAIR_ID_PATIENT_CODE_REGEX = r"^\d+_(?P<patient_code>[^_]+)_"
 # An external_manager the API doesn't recognise is a typo on an intranet deployment, where the set of
 # tracking systems is known - so only a superuser creates one via the API. A public server taking
 # records from systems it has never seen would set this False

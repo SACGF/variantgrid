@@ -3,14 +3,17 @@ The database side of a TSO 500 pair's CombinedVariantOutput - everything in the 
 variant. The file itself is read by upload.tso500.dragen_combined_variant_output_parser and its
 splice calls become Variants in upload.tasks.import_dragen_tso500_combined_variant_output_task.
 
-'[Analysis Details]' names the whole chain. 'Pair ID' is the patient (the lab's C-number, which the
-same patient comes back under when they are re-analysed, so one pair ID spans specimens), the
-ten-digit accession inside each sample ID is the specimen, and the container suffix on it names that
-arm's extraction. Each level is resolved against what is already there and created when absent, so a
-CVO arriving before anything has been accessioned leaves a stub Patient holding only its code, a
-Specimen and two named Extractions - the patients API keeps what the file lacks (name, DOB, sex,
-tissue, dates) and fills the stub in. In practice the patient is pushed before sequencing starts, so
-the stub is the exception this tolerates rather than the path it is built for.
+'[Analysis Details]' names the whole chain. 'Pair ID' is the pair's sample name, whose second
+underscore-separated field is the patient's code (the lab's C-number) - the sequencing sample ID
+leading it changes when the patient is re-sequenced, so the code is what one patient comes back
+under and the whole pair ID is not (settings.TSO500_PAIR_ID_PATIENT_CODE_REGEX reads it, so a lab
+naming pairs some other way says so there). The ten-digit accession inside each sample ID is the
+specimen, and the container suffix on it names that arm's extraction. Each level is resolved against what is
+already there and created when absent, so a CVO arriving before anything has been accessioned
+leaves a stub Patient holding only its code, a Specimen and two named Extractions - the patients
+API keeps what the file lacks (name, DOB, sex, tissue, dates) and fills the stub in. In practice
+the patient is pushed before sequencing starts, so the stub is the exception this tolerates rather
+than the path it is built for.
 
 The same two sample IDs are the join to everything else: DRAGEN writes them from the SampleSheet's
 Sample_ID, so each is exactly a Sample.vcf_sample_name and exactly a SequencingSample.sample_name.
@@ -26,6 +29,7 @@ import re
 from dataclasses import dataclass
 from typing import Optional
 
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.db import transaction
 from django.db.models import Model
@@ -74,8 +78,8 @@ SAMPLE_ID_ACCESSION_PATTERN = re.compile(r"(?P<specimen>\d{10})(?P<container>[A-
 
 
 class CombinedVariantOutputIdentityError(ValueError):
-    """ The file names a chain we cannot make - one arm's accession disagreeing with the other's, or
-        a specimen already held by a different patient """
+    """ The file names a chain we cannot make - a pair ID carrying no patient code, one arm's
+        accession disagreeing with the other's, or a specimen already held by a different patient """
 
 
 @dataclass(frozen=True)
@@ -88,6 +92,7 @@ class ArmIdentifiers:
 
 @dataclass(frozen=True)
 class PairIdentifiers:
+    pair_id: str
     patient_code: str
     specimen_reference: str
     dna: Optional[ArmIdentifiers]
@@ -130,10 +135,25 @@ MEASURE_SOURCES = (
 )
 
 
+def parse_patient_code(pair_id: str) -> str:
+    """ The patient's code out of the pair's sample name, as the lab's naming writes it (@see the
+        setting). A pair ID the regex does not read names a patient we cannot identify, and the
+        whole pair ID is not it - one per sequencing of the patient would leave a patient per run """
+    pattern = settings.TSO500_PAIR_ID_PATIENT_CODE_REGEX
+    if not pattern:
+        return pair_id
+    m = re.match(pattern, pair_id)
+    if m is None:
+        raise CombinedVariantOutputIdentityError(
+            f"Pair ID '{pair_id}' does not match settings.TSO500_PAIR_ID_PATIENT_CODE_REGEX "
+            f"('{pattern}') - no patient code to accession the pair against")
+    return m.group("patient_code")
+
+
 def parse_pair_identifiers(analysis_details: dict) -> Optional[PairIdentifiers]:
     """ The chain the file names, or None where it names none - an older module version writing no
         pair ID, or sample IDs carrying no accession """
-    patient_code = analysis_details.get(PAIR_ID)
+    pair_id = analysis_details.get(PAIR_ID)
     arms = {}
     specimen_references = set()
     for key, nucleic_acid in ((DNA_SAMPLE_ID, NucleicAcid.DNA), (RNA_SAMPLE_ID, NucleicAcid.RNA)):
@@ -148,14 +168,14 @@ def parse_pair_identifiers(analysis_details: dict) -> Optional[PairIdentifiers]:
         arms[nucleic_acid] = ArmIdentifiers(sample_id=sample_id, extraction_reference=m.group(0),
                                             nucleic_acid=nucleic_acid)
 
-    if not (patient_code and specimen_references):
+    if not (pair_id and specimen_references):
         return None
     if len(specimen_references) > 1:
         raise CombinedVariantOutputIdentityError(
-            f"'{patient_code}' pairs arms from different specimens: "
+            f"'{pair_id}' pairs arms from different specimens: "
             f"{', '.join(sorted(specimen_references))}")
 
-    return PairIdentifiers(patient_code=patient_code,
+    return PairIdentifiers(pair_id=pair_id, patient_code=parse_patient_code(pair_id),
                            specimen_reference=specimen_references.pop(),
                            dna=arms.get(NucleicAcid.DNA), rna=arms.get(NucleicAcid.RNA))
 
@@ -176,7 +196,8 @@ def resolve_pair(identifiers: PairIdentifiers, user: User) -> ResolvedPair:
     if patient is None:
         patient = Patient.objects.create(patient_code=identifiers.patient_code)
         assign_permission_to_user_and_groups(user, patient)
-        logging.info("Created %s from Pair ID '%s'", patient, identifiers.patient_code)
+        logging.info("Created %s from the patient code in Pair ID '%s'", patient,
+                     identifiers.pair_id)
 
     specimen = _resolve(Specimen, identifiers.specimen_reference, user)
     if specimen is None:

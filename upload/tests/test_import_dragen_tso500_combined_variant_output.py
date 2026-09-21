@@ -6,7 +6,7 @@ import cyvcf2
 import simplejson
 from django.conf import settings
 from django.contrib.auth.models import User
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.utils import timezone
 
 from genes.gene_splice import coordinate_label
@@ -40,6 +40,7 @@ from upload.tso500.dragen_combined_variant_output_parser import (
     AFFECTED_EXON,
     BREAKPOINT_1,
     DNA_SAMPLE_ID,
+    PAIR_ID,
     RNA_SAMPLE_ID,
     SPLICE_INFO,
     SPLICE_OBSERVATION_INFO,
@@ -241,14 +242,52 @@ class TestCombinedVariantOutputRecords(TestCase):
         self.identifiers = parse_pair_identifiers(self.analysis_details)
 
     def test_pair_names_the_patient_specimen_and_both_arms(self):
-        """ Pair ID is the patient; the accession inside each sample ID is the specimen and the
-            container suffix on it that arm's extraction """
+        """ The patient code is the second field of Pair ID; the accession inside each sample ID is
+            the specimen and the container suffix on it that arm's extraction """
+        self.assertEqual("5_C0000001_FCUP_2600000001", self.identifiers.pair_id)
         self.assertEqual("C0000001", self.identifiers.patient_code)
         self.assertEqual("2600000001", self.identifiers.specimen_reference)
         self.assertEqual("2600000001C", self.identifiers.dna.extraction_reference)
         self.assertEqual(NucleicAcid.DNA, self.identifiers.dna.nucleic_acid)
         self.assertEqual("2600000001B", self.identifiers.rna.extraction_reference)
         self.assertEqual(NucleicAcid.RNA, self.identifiers.rna.nucleic_acid)
+
+    def test_pair_id_the_regex_does_not_read_is_not_a_chain(self):
+        """ The whole pair ID is a sample name, so falling back to it would accession a patient per
+            sequencing rather than one per patient """
+        details = dict(self.analysis_details)
+        details[PAIR_ID] = "C0000001"
+        with self.assertRaises(CombinedVariantOutputIdentityError):
+            parse_pair_identifiers(details)
+
+    @override_settings(TSO500_PAIR_ID_PATIENT_CODE_REGEX=None)
+    def test_with_no_regex_the_whole_pair_id_is_the_patient_code(self):
+        """ A lab whose Pair ID is the patient's code, which is how Illumina documents it """
+        identifiers = parse_pair_identifiers(self.analysis_details)
+        self.assertEqual("5_C0000001_FCUP_2600000001", identifiers.patient_code)
+
+    @override_settings(TSO500_PAIR_ID_PATIENT_CODE_REGEX=r"^(?P<patient_code>[^-]+)-")
+    def test_another_labs_naming_is_read_by_its_own_regex(self):
+        details = dict(self.analysis_details)
+        details[PAIR_ID] = "C0000001-5-FCUP"
+        self.assertEqual("C0000001", parse_pair_identifiers(details).patient_code)
+
+    def test_re_sequencing_comes_back_to_the_one_patient(self):
+        """ A re-sequenced patient gets a new sequencing sample ID leading the same patient code,
+            so the second pair resolves to the first's patient """
+        first = resolve_pair(self.identifiers, self.user)
+
+        details = dict(self.analysis_details)
+        details[PAIR_ID] = "17_C0000001_RWYN_2600000002"
+        details[DNA_SAMPLE_ID] = "ExampleSample_DNA_2600000002C"
+        details[RNA_SAMPLE_ID] = "ExampleSample_RNA_2600000002B"
+        re_sequenced = parse_pair_identifiers(details)
+        self.assertEqual("C0000001", re_sequenced.patient_code)
+
+        second = resolve_pair(re_sequenced, self.user)
+        self.assertEqual(first.patient, second.patient)
+        self.assertEqual(1, Patient.objects.filter(patient_code="C0000001").count())
+        self.assertNotEqual(first.specimen, second.specimen)
 
     def test_arms_from_different_specimens_are_not_a_pair(self):
         details = dict(self.analysis_details)
@@ -268,7 +307,7 @@ class TestCombinedVariantOutputRecords(TestCase):
         self.assertEqual(NucleicAcid.RNA, by_reference["2600000001B"].nucleic_acid_source)
 
     def test_re_analysis_reuses_the_chain(self):
-        """ The same patient comes back under the same Pair ID, so a second CVO adds nothing """
+        """ A re-analysis of the pair writes the same Pair ID, so a second CVO adds nothing """
         first = resolve_pair(self.identifiers, self.user)
         second = resolve_pair(self.identifiers, self.user)
         self.assertEqual(first.patient, second.patient)

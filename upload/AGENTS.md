@@ -76,7 +76,9 @@ Gotchas:
   declared at upload or comes off the `^DRAGEN TSO500 CombinedVariantOutput` VCFSourceSettings row.
 - The rest of that file is the pair's identity, written after data insertion by
   tasks/import_dragen_tso500_combined_variant_output_task.py:DragenTSO500CombinedVariantOutputInsertTask
-  (tso500/dragen_combined_variant_output_records.py). `[Analysis Details]` names the Patient (`Pair ID`), the Specimen
+  (tso500/dragen_combined_variant_output_records.py). `[Analysis Details]` names the Patient (the code
+  `settings.TSO500_PAIR_ID_PATIENT_CODE_REGEX` reads out of `Pair ID`, whose leading sequencing sample ID changes when
+  the patient is re-sequenced), the Specimen
   (the ten-digit accession inside each sample ID) and the two Extractions (its container suffix), created when absent;
   the DNA/RNA sample IDs are exact `Sample.vcf_sample_name` and `SequencingSample.sample_name`, which links both arms'
   samples to their extraction and the splice VCF to its sequencing run without seqauto's filename matching. `[TMB]`,

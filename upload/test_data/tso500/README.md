@@ -45,8 +45,8 @@ Positions in the other files are real. `cnv.vcf` segments are the panel's fixed 
 intervals — identical for every sample — and splice and fusion calls are somatic events.
 
 **`CombinedVariantOutput.tsv` is assembled, not a caller's.** It is the pair-level summary DRAGEN writes
-next to the two arm directories: `[Analysis Details]` names the patient (`Pair ID`) and the two
-extractions (`DNA Sample ID`, `RNA Sample ID`), then one `[Section]` per call type, each a header row then one row per
+next to the two arm directories: `[Analysis Details]` names the patient (the code in the second field of
+`Pair ID`) and the two extractions (`DNA Sample ID`, `RNA Sample ID`), then one `[Section]` per call type, each a header row then one row per
 call, every line padded with tabs to the widest section (11 columns). The layout is a real 2.1.1 RUO
 file's; the rows are this sample's. The real file's identifiers, dates and per-sample metrics were
 replaced, so:
