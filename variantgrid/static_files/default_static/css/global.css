@@ -3810,3 +3810,7 @@ a .c-hgvs-body .c-hgvs-nomen {
 }
 
 /*# sourceMappingURL=global.css.map */
+
+.btn.new-classification-button {
+  margin-left: 6px;
+}

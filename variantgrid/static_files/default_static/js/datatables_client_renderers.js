@@ -245,8 +245,8 @@ function renderVariantTagVariant(data, type, row) {
         $('<a>', {
             href: data.classify_url,
             target: '_blank',
-            class: 'btn btn-primary new-classification-button',
-            html: [$('<i>', {class: 'fas fa-plus-circle'}), ' New Classification']
+            class: 'btn btn-primary btn-sm new-classification-button',
+            text: 'New Classification'
         }).appendTo(dom);
     }
     return dom.prop('outerHTML');
