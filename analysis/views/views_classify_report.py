@@ -67,7 +67,8 @@ def _get_case(user, case_type: str, case_id: int) -> ClassifyReportCase:
 
 def _classify_report_context(case: ClassifyReportCase, case_type: str, case_id: int) -> dict:
     rows = case.queue_rows()
-    modifications = list(case.classification_modifications())
+    report_candidates = case.report_candidates()
+    modifications = [candidate.modification for candidate in report_candidates]
     case_reports = list(case.case_reports())
     return {
         "case": case,
@@ -78,6 +79,7 @@ def _classify_report_context(case: ClassifyReportCase, case_type: str, case_id: 
         "unclassified": sum(1 for row in rows if row.needs_classification),
         "tag_summary": tag_summary(rows),
         "classification_modifications": modifications,
+        "report_candidates": report_candidates,
         "case_report_templates": ClassificationReportTemplate.case_templates_for_bucket(
             case_allele_origin_bucket(modifications)),
         "case_reports": case_reports,
@@ -197,9 +199,11 @@ def resolve_variant_tag_for_case(request, case_type: str, case_id: int, variant_
 
 def _selected_modifications(case: ClassifyReportCase, request) -> list[ClassificationModification]:
     """ The ticked rows, resolved against what the case actually has - every classification a report
-        pins has to be one this user can see, and the CaseReportClassification rows are that record """
+        pins has to be one this user can see, and the CaseReportClassification rows are that record.
+        A record that isn't ready has its tick box disabled, and is dropped here if posted anyway """
     selected_ids = set(request.POST.getlist("classification_modification_id"))
-    modifications = [cm for cm in case.classification_modifications() if str(cm.pk) in selected_ids]
+    modifications = [candidate.modification for candidate in case.report_candidates()
+                     if candidate.ready and str(candidate.modification.pk) in selected_ids]
     if not modifications:
         raise Http404("No classifications selected for this report")
     return modifications

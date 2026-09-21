@@ -31,6 +31,16 @@ from snpdb.tests.utils.fake_cohort_data import create_fake_cohort, create_fake_t
 from snpdb.tests.utils.tag_testing_utils import create_classify_queue_tag
 
 
+# The mandatory keys - a record missing any of them has errors, so the form will not submit it
+READY_EVIDENCE = {
+    SpecialEKeys.ALLELE_ORIGIN: {"value": "germline"},
+    SpecialEKeys.CLINICAL_SIGNIFICANCE: {"value": "VUS"},
+    SpecialEKeys.CONDITION: {"value": "Test condition"},
+    SpecialEKeys.GENOME_BUILD: {"value": "GRCh37"},
+    SpecialEKeys.ZYGOSITY: {"value": "heterozygous"},
+}
+
+
 class ClassifyReportTestCase(TestCase):
     """ A 3 sample cohort where only the proband carries cls.variant, and both parents carry cls.shared_variant """
 

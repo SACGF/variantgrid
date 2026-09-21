@@ -118,6 +118,36 @@ class ClassifyQueueRow:
         return tag_allele_origin_bucket(self.variant_tag.tag)
 
 
+@dataclass
+class ReportCandidate:
+    """ One of the case's classifications, and whether it is fit to go in a report. Every record is published
+        to its lab the moment it is created, errors and all, so the share level says who can see it and
+        nothing about whether it is finished - that is its validation errors being resolved (the form
+        refuses to submit until they are) and no edits sitting unsubmitted """
+    modification: ClassificationModification
+
+    @cached_property
+    def _severities(self) -> list[str]:
+        return [message.get("severity") for message in self.modification.classification.validate()]
+
+    @property
+    def error_count(self) -> int:
+        return self._severities.count("error")
+
+    @property
+    def warning_count(self) -> int:
+        return self._severities.count("warning")
+
+    @property
+    def unsubmitted(self) -> bool:
+        """ The report renders the published version, so edits made since are not in it """
+        return not self.modification.is_last_edited
+
+    @property
+    def ready(self) -> bool:
+        return not (self.error_count or self.unsubmitted)
+
+
 def tag_allele_origin_bucket(tag: Tag) -> Optional[AlleleOriginBucket]:
     """ Which bucket a tag's classifications belong in - "Both" leaves the choice to the record being copied """
     bucket = AlleleOriginBucket(tag.allele_origin_bucket)
@@ -260,6 +290,9 @@ class ClassifyReportCase:
         return qs.select_related("classification", "classification__sample", "classification__sample__vcf",
                                  "classification__lab") \
             .order_by("classification__pk")
+
+    def report_candidates(self) -> list[ReportCandidate]:
+        return [ReportCandidate(modification) for modification in self.classification_modifications()]
 
     def _case_classifications(self) -> QuerySet[Classification]:
         """ What the case has classified - the published records the user can see plus their own lab's work in

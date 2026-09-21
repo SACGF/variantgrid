@@ -3,6 +3,15 @@
 {% load user_tag_color_tags %}
 {% render_tag_styles_and_formatter %}
 <div id="classify-report" data-tab-url="{{ request.path }}">
+    <style>
+        /* Where unshared records are faded (CLASSIFICATION_GRID_FADE_NON_SHARED) - here what matters is ready for the report */
+        #classify-report .report-candidate [class*="share-level-"] {
+            opacity: 1;
+        }
+        #classify-report .report-candidate.not-ready td:not(.report-status) {
+            opacity: 0.4;
+        }
+    </style>
     <script>
         $(document).ready(function() {
             const container = $("#classify-report");
@@ -140,6 +149,11 @@
                 }
             });
 
+            // Resolving a record's errors happens on its own page, so the row is picked up on the way back
+            container.on("click", ".report-fix-link", function() {
+                tabPane.data("reloadOnReturn", true);
+            });
+
             container.on("click", ".classify-tag", function() {
                 wizard = null;
                 openClassifyDialog($(this).closest(".classify-queue-row").data("variantTagId"));
@@ -173,7 +187,7 @@
 
             container.on("change", ".report-select", updateReportSelection);
             container.on("change", "#report-select-all", function() {
-                $(".report-select", container).prop("checked", $(this).is(":checked"));
+                $(".report-select:not(:disabled)", container).prop("checked", $(this).is(":checked"));
                 updateReportSelection();
             });
             updateReportSelection();
@@ -352,7 +366,7 @@
         <div class="card">
             <div class="card-header">
                 <span>Classifications</span>
-                <span class="text-muted small ml-2">tick the ones to include in the report</span>
+                <span class="text-muted small ml-2">tick the ones to include in the report - a record is ready once its errors are resolved and it has been submitted</span>
             </div>
             <form id="report-form">
                 {% csrf_token %}
@@ -364,19 +378,36 @@
                             <th>Gene</th>
                             <th>Classification</th>
                             <th>Sample</th>
+                            <th>Shared</th>
+                            <th>Status</th>
                         </tr>
                     </thead>
                     <tbody>
-                    {% for cm in classification_modifications %}
-                        <tr>
-                            <td><input type="checkbox" class="report-select" name="classification_modification_id" value="{{ cm.pk }}" checked /></td>
+                    {% for candidate in report_candidates %}
+                        {% with cm=candidate.modification %}
+                        <tr class="report-candidate{% if not candidate.ready %} not-ready{% endif %}">
+                            <td><input type="checkbox" class="report-select" name="classification_modification_id" value="{{ cm.pk }}"
+                                       {% if candidate.ready %}checked{% else %}disabled title="Not ready for a report"{% endif %} /></td>
                             <td>{{ cm.evidence.c_hgvs.value|default:cm.classification.variant }}</td>
                             <td>{{ cm.evidence.gene_symbol.value|default_if_none:"" }}</td>
                             <td>{% classification_quick cm show_condition=True %}</td>
                             <td>{{ cm.classification.sample.name }}</td>
+                            <td>{{ cm.share_level_enum.label }}</td>
+                            <td class="report-status">
+                                {% if candidate.ready %}
+                                    <span class="text-success">&#10003; Ready</span>
+                                {% else %}
+                                    <a class="text-danger report-fix-link" target="_blank" href="{{ cm.classification.get_absolute_url }}">
+                                        {% if candidate.error_count %}{{ candidate.error_count }} error{{ candidate.error_count|pluralize }} to resolve{% else %}Unsubmitted changes{% endif %}</a>
+                                {% endif %}
+                                {% if candidate.warning_count %}
+                                    <span class="text-muted small ml-1">{{ candidate.warning_count }} warning{{ candidate.warning_count|pluralize }}</span>
+                                {% endif %}
+                            </td>
                         </tr>
+                        {% endwith %}
                     {% empty %}
-                        <tr><td colspan="5" class="text-muted text-center py-3">No classifications yet &ndash; work through the tag queue above</td></tr>
+                        <tr><td colspan="7" class="text-muted text-center py-3">No classifications yet &ndash; work through the tag queue above</td></tr>
                     {% endfor %}
                     </tbody>
                 </table>

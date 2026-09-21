@@ -8,8 +8,8 @@ from django.contrib.auth.models import User
 from django.test import override_settings
 from django.urls import reverse
 
-from analysis.classify_report import ClassifyReportCase
-from analysis.tests.test_classify_report import ClassifyReportTestCase
+from analysis.classify_report import ClassifyReportCase, ReportCandidate
+from analysis.tests.test_classify_report import READY_EVIDENCE, ClassifyReportTestCase
 from classification.enums import SpecialEKeys, SubmissionSource
 from classification.models import (
     CaseReport,
@@ -246,12 +246,12 @@ class CaseReportBuildFormTest(ClassifyReportTestCase):
                          {"key": "msi", "label": "MSI", "type": "bool", "group": "assay_success"}])
         cls.reported = Classification.create(user=cls.user, lab=cls.lab, sample=cls.proband,
                                               source=SubmissionSource.VARIANT_GRID, variant=cls.variant,
-                                              data={SpecialEKeys.GENE_SYMBOL: {"value": "RUNX1"}})
+                                              data={**READY_EVIDENCE, SpecialEKeys.GENE_SYMBOL: {"value": "RUNX1"}})
         cls.reported.publish_latest(cls.user)
         cls.unreported = Classification.create(user=cls.user, lab=cls.lab, sample=cls.proband,
                                                 source=SubmissionSource.VARIANT_GRID,
                                                 variant=cls.shared_variant,
-                                                data={SpecialEKeys.GENE_SYMBOL: {"value": "TP53"}})
+                                                data={**READY_EVIDENCE, SpecialEKeys.GENE_SYMBOL: {"value": "TP53"}})
         cls.unreported.publish_latest(cls.user)
 
     def setUp(self):
@@ -280,6 +280,32 @@ class CaseReportBuildFormTest(ClassifyReportTestCase):
         self.assertContains(response, "TP53")
         self.assertContains(response, "case_field_panel")
         self.assertContains(response, "assay_success")
+
+    def test_a_record_with_errors_cannot_be_put_in_a_report(self):
+        """ Creating a record publishes it to the lab with its mandatory keys still empty, so being
+            published is not being ready - its tick box is disabled, and posting it anyway drops it """
+        incomplete = Classification.create(user=self.user, lab=self.lab, sample=self.mother,
+                                           source=SubmissionSource.VARIANT_GRID, variant=self.variant,
+                                           data={SpecialEKeys.GENE_SYMBOL: {"value": "BRCA2"}})
+        incomplete.publish_latest(self.user)
+        candidate = ReportCandidate(incomplete.last_published_version)
+        self.assertFalse(candidate.ready)
+        self.assertGreater(candidate.error_count, 0)
+
+        url = reverse("case_report_build_dialog", kwargs={"case_type": "sample", "case_id": self.mother.pk})
+        response = self.client.post(url, {"classification_modification_id": [candidate.modification.pk]})
+        self.assertEqual(response.status_code, 404)
+
+    def test_a_record_with_unsubmitted_edits_is_not_ready(self):
+        candidate = ReportCandidate(self.reported.last_published_version)
+        self.assertTrue(candidate.ready)
+
+        self.reported.patch_value({SpecialEKeys.INTERPRETATION_SUMMARY: {"value": "still working"}},
+                                  user=self.user, source=SubmissionSource.FORM, save=True)
+
+        candidate = ReportCandidate(self.reported.last_published_version)
+        self.assertTrue(candidate.unsubmitted)
+        self.assertFalse(candidate.ready)
 
     def test_the_dialog_starts_a_field_from_its_default_and_its_prefill_key(self):
         """ A case level value the records already carry is not worth retyping, and a flag that is

@@ -87,6 +87,11 @@ Patterns here:
   `case_fields`), and `create_case_report` replaces the modal body with the preview and the downloads. Finalise,
   Rebuild documents, New version and the LIS fields act on one CaseReport (`classification/views/views_case_report.py`)
   and then reload the tab, so the Reports card is always redrawn from the database rather than patched in place.
+- A classification can only be ticked for a report once it is ready (`analysis/classify_report.py:ReportCandidate`):
+  no validation errors and no unsubmitted edits. Share level cannot say this - creating a record publishes it to the
+  lab with its mandatory keys still empty - so the tab shows the share level beside an error count that links to the
+  form, and `_selected_modifications` drops a record that isn't ready if it is posted anyway. A test fixture that is
+  meant to reach a report needs `analysis/tests/test_classify_report.py:READY_EVIDENCE`.
 - The Classify & Report tab's label carries the counts (`analysis/views/views_classify_report.py:classify_report_summary`,
   drawn by `analysis/templates/analysis/classify_report_tab_counts.html`), so a page says whether there is anything to do
   before the tab is opened. It is fetched after render - deciding which taggings are the case's walks every analysis its
