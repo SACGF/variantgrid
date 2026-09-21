@@ -16,6 +16,7 @@ from django.core.exceptions import PermissionDenied
 from django.http import FileResponse, Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404
 from django.utils.dateparse import parse_date
+from django.views.decorators.clickjacking import xframe_options_sameorigin
 from django.views.decorators.http import require_POST
 
 from classification.models import CaseReport
@@ -71,8 +72,10 @@ def case_report_download(request, case_report_id: int, document_format: str):
     return FileResponse(file_field.open("rb"), as_attachment=True, filename=f"{stem}.{document_format}")
 
 
+@xframe_options_sameorigin
 def view_case_report(request, case_report_id: int) -> HttpResponse:
-    """ The stored HTML, as the preview the scientist reads """
+    """ The stored HTML, as the preview the scientist reads - framed by the built-report modal, which the
+        site-wide X-Frame-Options DENY would otherwise blank """
     case_report = _get_case_report(request.user, case_report_id)
     return HttpResponse(content=case_report.html, content_type="text/html")
 

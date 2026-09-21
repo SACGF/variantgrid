@@ -221,6 +221,14 @@ class CaseReportPermissionTest(ClassifyReportTestCase):
         self.assertEqual(self.client.get(urls["download"]).status_code, 200)
         self.assertEqual(self.client.post(urls["finalise"]).status_code, 200)
 
+    def test_the_preview_can_be_framed_by_the_built_report_modal(self):
+        """ case_report_built.html shows it in an iframe, which the site-wide DENY blanks """
+        self.client.force_login(self.user)
+        response = self.client.get(reverse("view_case_report", kwargs={"case_report_id": self.case_report.pk}))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["X-Frame-Options"], "SAMEORIGIN")
+
 
 @override_settings(CELERY_TASK_ALWAYS_EAGER=True, LIFTOVER_CLASSIFICATIONS=False,
                    CLINGEN_ALLELE_REGISTRY_LOGIN=None)
