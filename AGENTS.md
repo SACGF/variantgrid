@@ -49,11 +49,23 @@ Deeper still: `<app>/__<app>_readme.md`. Plans live in `claude/plans/`, runbooks
 
 ## This box
 
-What this machine is (shared lab or private dev box, which database, who else is using it) lives in
-CLAUDE.local.md (gitignored); `claude/CLAUDE.local.vgtest2.md` is the copy for vg-test2. On any box: `python3 manage.py vg status`
-first, read-only work and `--keepdb` tests without asking, and ask before restarting services, `manage.py migrate`,
-creating or deleting annotation versions or running VEP, liftover across the database, or any write to `snpdb_variant`,
-`snpdb_allele` or `annotation_variantannotation` (`.claude/hooks/pre_bash.py` prompts for these).
+Behaviour depends on the host. The session hook prints `host:` (otherwise run `hostname`); settings resolve from the
+same name (`claude/guides/operations.md#deployments`). Identify the box before running anything that writes.
+
+| Host (settings stem) | What it is | Rules |
+|---|---|---|
+| `vg-test2` (`vgtest2`) | Shared lab, test.variantgrid.com: gunicorn and celery against a 175 GB database human testers are also using | Read-only work, `vg page` and `--keepdb` tests without asking; ask before the list below |
+| `sharianttest`, `shariantdemo`, `shariantsecurity` | Shared Shariant test / demo | As vg-test2 |
+| `vgaws`, `shariant`, `runx1db2`, SA Pathology hosts | Production, real users and clinical data | Read-only only. Never run tests, `migrate`, management commands that write, service restarts, or edit files; ask before anything else |
+| anything else | Developer box or unknown | Ask the user what the box is before the list below |
+
+Ask first on any shared box: restarting services, `manage.py migrate`, creating or deleting annotation versions or
+running VEP, liftover across the database, or any write to `snpdb_variant`, `snpdb_allele` or
+`annotation_variantannotation` (`.claude/hooks/pre_bash.py` prompts for these). `python3 manage.py vg status` is the first
+thing to run in a session.
+
+Do not create a CLAUDE.local.md: while one exists anywhere from the working directory up, Claude Code skips every
+`AGENTS.md` in the repo. Per-host facts go in the table above.
 
 ## Commands
 

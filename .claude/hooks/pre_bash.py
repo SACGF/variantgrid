@@ -5,6 +5,7 @@ else passes through untouched.
 """
 import json
 import re
+import socket
 import sys
 
 # (pattern, why it needs a human)
@@ -33,7 +34,7 @@ def main() -> int:
             print(json.dumps({"hookSpecificOutput": {
                 "hookEventName": "PreToolUse",
                 "permissionDecision": "ask",
-                "permissionDecisionReason": f"vg-test2 is shared with human testers - this {reason}.",
+                "permissionDecisionReason": f"{socket.gethostname()} - this {reason}.",
             }}))
             return 0
     return 0
