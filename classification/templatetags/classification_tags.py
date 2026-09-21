@@ -312,7 +312,8 @@ def classification_quick(context,
         "show_criteria": show_criteria,
         "show_flags": show_flags,
         "show_imported_c_hgvs": show_imported_c_hgvs,
-        "record_count": record_count
+        "record_count": record_count,
+        "fade_non_shared": settings.CLASSIFICATION_GRID_FADE_NON_SHARED
     }
 
 

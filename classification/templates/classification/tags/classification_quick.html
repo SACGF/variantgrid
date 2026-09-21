@@ -11,7 +11,7 @@
     {% if mode == "compact" %}
         <a class="hover-link" href="{% url 'view_classification' vcm.classification.id %}">{{ vcm.classification.lab }} / {{ vcm.cr_lab_id }}</a>
     {% else %}
-        <span class="share-level-{{ vcm.share_level_enum.name }} sig-level-{{ vcm.evidence.clinical_significance.value}}">
+        <span class="{% if fade_non_shared %}share-level-{{ vcm.share_level_enum.name }} {% endif %}sig-level-{{ vcm.evidence.clinical_significance.value}}">
             {% clinical_significance_values vcm %}
             {% if record_count and record_count != 1 %}
                 x {{ record_count }}
@@ -35,5 +35,5 @@
     {% if show_flags %}<div class="flags d-inline-block" style="margin-left:12px; position: relative; bottom: -4px;" data-flags="{{ vcm.classification.flag_collection_id }}">...</div>{% endif %}
 </span>
 {% else %}
-    <span class="share-level-LAB"><span class="cs">DELETED</span> Unknown</span>
+    <span{% if fade_non_shared %} class="share-level-LAB"{% endif %}><span class="cs">DELETED</span> Unknown</span>
 {% endif %}
