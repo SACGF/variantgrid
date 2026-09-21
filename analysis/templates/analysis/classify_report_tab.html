@@ -2,7 +2,7 @@
 {% load classification_tags %}
 {% load user_tag_color_tags %}
 {% render_tag_styles_and_formatter %}
-<div id="classify-report" data-tab-url="{{ request.path }}">
+<div id="classify-report" data-tab-url="{{ request.path }}" data-populating="{{ populating_classifications|length }}">
     <style>
         /* Where unshared records are faded (CLASSIFICATION_GRID_FADE_NON_SHARED) - here what matters is ready for the report */
         #classify-report .report-candidate [class*="share-level-"] {
@@ -14,14 +14,24 @@
     </style>
     <script>
         $(document).ready(function() {
+            const POPULATING_POLL_MS = 3000;
+            const POPULATING_MAX_POLLS = 20;
             const container = $("#classify-report");
             const tabPane = container.parent();  // Reloaded in place, the way the other sample tabs do it
             // The wizard walks the rows still wanting a classification, one dialog at a time
             let wizard = null;
             let reloadWhenDone = false;
 
+            // The modals live inside the tab, so replacing it under an open one strands Bootstrap's backdrop -
+            // a dialog opened while the reload was in flight holds it off until that dialog closes
             function reloadTab() {
-                tabPane.load(container.data("tab-url"));
+                $.get(container.data("tab-url"), function(html) {
+                    if ($(".modal.show", tabPane).length) {
+                        reloadWhenDone = true;
+                    } else {
+                        tabPane.html(html);
+                    }
+                });
                 $(document).trigger("classifyReportChanged");  // The tab label's counts follow the tab
             }
 
@@ -63,7 +73,7 @@
                 const row = $(`.classify-queue-row[data-variant-tag-id='${variantTagId}']`, container);
                 const action = $(".classify-action", row);
                 action.html($("<span>", {class: "text-success mr-2", text: "✓ Classified"})).append(
-                    $("<a>", {href: data.url, target: "_blank", text: data.label}));
+                    $("<a>", {href: data.url, target: "_blank", class: "classification-link", text: data.label}));
                 row.addClass("has-classification");
                 // Made for a sample other than the tagging's own, it stays outstanding until someone says this is the person
                 if (data.resolved) {
@@ -149,8 +159,8 @@
                 }
             });
 
-            // Resolving a record's errors happens on its own page, so the row is picked up on the way back
-            container.on("click", ".report-fix-link", function() {
+            // Editing, submitting or resolving a record's errors happens on its own page, so the rows are picked up on the way back
+            container.on("click", ".report-fix-link, .classification-link", function() {
                 tabPane.data("reloadOnReturn", true);
             });
 
@@ -170,6 +180,22 @@
             container.on("click", ".wizard-skip", function() {
                 stepWizard($("#classify-modal").data("variantTagId"));
             });
+
+            // A record created from the queue only reaches Classifications once celery has published it. A timer
+            // outliving its tab (replaced by some other reload) lets the newer tab do the polling
+            if (container.data("populating")) {
+                const polls = (tabPane.data("populatingPolls") || 0) + 1;
+                if (polls <= POPULATING_MAX_POLLS) {
+                    tabPane.data("populatingPolls", polls);
+                    setTimeout(function() {
+                        if ($.contains(document, container[0])) {
+                            reloadTab();
+                        }
+                    }, POPULATING_POLL_MS);
+                }
+            } else {
+                tabPane.data("populatingPolls", 0);
+            }
 
             $("#classify-modal").on("hidden.bs.modal", function() {
                 wizard = null;
@@ -340,10 +366,10 @@
                             data-resolve-url="{% url 'resolve_variant_tag_for_case' case_type case_id row.variant_tag.pk %}">
                             {% if row.done %}
                                 <span class="text-success mr-2">&#10003; Classified</span>
-                                <a href="{{ row.variant_tag.resolved_classification.get_absolute_url }}" target="_blank">{{ row.variant_tag.resolved_classification.friendly_label }}</a>
+                                <a class="classification-link" href="{{ row.variant_tag.resolved_classification.get_absolute_url }}" target="_blank">{{ row.variant_tag.resolved_classification.friendly_label }}</a>
                             {% elif row.can_resolve %}
                                 <span class="text-success mr-2">&#10003; Classified</span>
-                                <a href="{{ row.classification.get_absolute_url }}" target="_blank">{{ row.classification.friendly_label }}</a>
+                                <a class="classification-link" href="{{ row.classification.get_absolute_url }}" target="_blank">{{ row.classification.friendly_label }}</a>
                                 <button type="button" class="btn btn-outline-success btn-sm ml-2 resolve-tag"
                                         title="Say this classification is what the tag was asking for">Clear tag</button>
                             {% elif can_create_classifications %}
@@ -406,9 +432,21 @@
                             </td>
                         </tr>
                         {% endwith %}
-                    {% empty %}
-                        <tr><td colspan="7" class="text-muted text-center py-3">No classifications yet &ndash; work through the tag queue above</td></tr>
                     {% endfor %}
+                    {% for classification in populating_classifications %}
+                        <tr class="report-candidate not-ready">
+                            <td><input type="checkbox" disabled title="Not ready for a report" /></td>
+                            <td>{{ classification.variant|default_if_none:"" }}</td>
+                            <td></td>
+                            <td><a class="classification-link" href="{{ classification.get_absolute_url }}" target="_blank">{{ classification.friendly_label }}</a></td>
+                            <td>{{ classification.sample.name }}</td>
+                            <td></td>
+                            <td class="report-status"><i class="fas fa-spinner fa-spin mr-1"></i>Populating&hellip;</td>
+                        </tr>
+                    {% endfor %}
+                    {% if not report_candidates and not populating_classifications %}
+                        <tr><td colspan="7" class="text-muted text-center py-3">No classifications yet &ndash; work through the tag queue above</td></tr>
+                    {% endif %}
                     </tbody>
                 </table>
                 {% if classification_modifications %}

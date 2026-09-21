@@ -291,6 +291,14 @@ class ClassifyReportCase:
                                  "classification__lab") \
             .order_by("classification__pk")
 
+    def populating_classifications(self) -> QuerySet[Classification]:
+        """ The user's own records for the case that have never been published - a record created from the
+            queue is populated and published by a celery task (@see populate_new_classification_task) """
+        return Classification.filter_for_user(self.user) \
+            .filter(sample__in=self.samples, withdrawn=False) \
+            .exclude(classificationmodification__published=True) \
+            .select_related("sample").order_by("pk")
+
     def report_candidates(self) -> list[ReportCandidate]:
         return [ReportCandidate(modification) for modification in self.classification_modifications()]
 

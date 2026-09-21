@@ -251,6 +251,16 @@ class ClassifyQueueTest(ClassifyReportTestCase):
         self.assertTrue(row.can_resolve)
         self.assertEqual(row.classification, classification)
 
+    def test_a_record_is_populating_until_first_published(self):
+        classification = self._classify(self.proband)
+        case = ClassifyReportCase.for_sample(self.user, self.proband)
+        self.assertEqual(list(case.populating_classifications()), [classification])
+
+        classification.publish_latest(self.user)
+        classification.patch_value({SpecialEKeys.GENE_SYMBOL: {"value": "RUNX1"}},
+                                   user=self.user, source=SubmissionSource.FORM, save=True)
+        self.assertEqual(list(case.populating_classifications()), [])
+
     def test_another_samples_classification_does_not_clear_the_tag(self):
         self._create_variant_tag(sample=self.proband)
         classification = self._classify(self.mother)

@@ -82,6 +82,7 @@ def _classify_report_context(case: ClassifyReportCase, case_type: str, case_id: 
         "tag_summary": tag_summary(rows),
         "classification_modifications": modifications,
         "report_candidates": report_candidates,
+        "populating_classifications": list(case.populating_classifications()),
         "case_report_templates": ClassificationReportTemplate.case_templates_for_bucket(
             case_allele_origin_bucket(modifications)),
         "case_reports": case_reports,
