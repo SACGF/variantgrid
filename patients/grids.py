@@ -1,8 +1,10 @@
 from functools import partial
 from typing import Optional
 
+from django.contrib.postgres.aggregates import ArrayAgg
 from django.db.models import QuerySet, StringAgg, TextField, Value
 from django.db.models.aggregates import Count
+from django.db.models.functions import JSONObject
 from django.db.models.query_utils import Q
 from django.http import HttpRequest
 from django.shortcuts import get_object_or_404
@@ -14,7 +16,13 @@ from ontology.grids import AbstractOntologyGenesConfig
 from ontology.models import OntologyService, OntologyTerm
 from patients.external_references import ExternalReference
 from patients.models import Extraction, Patient, PatientRecord, PatientRecords, Specimen
-from patients.models_enums import MatchStatus, NucleicAcid, PatientRecordMatchType, TissueStatus
+from patients.models_enums import (
+    MatchStatus,
+    NucleicAcid,
+    PatientRecordMatchType,
+    SpecimenMeasureType,
+    TissueStatus,
+)
 from seqauto.models import SequencingSample
 from snpdb.models import Sample
 from snpdb.views.datatable_view import CellData, DatatableConfig, RichColumn, SortOrder
@@ -209,13 +217,34 @@ class SpecimenColumns(DatatableConfig[Specimen]):
             RichColumn('external_pk__code', label='External ID', orderable=True),
             RichColumn('extraction_count', label='# Extractions', orderable=True, search=False,
                        css_class='num'),
+            RichColumn('measure_count', label='# Measures', orderable=True, search=False, css_class='num'),
+            RichColumn('measures', label='Measures', search=False, renderer=self.render_measures),
             RichColumn('modified', orderable=True, search=False, default_sort=SortOrder.DESC,
                        client_renderer='TableFormat.timestamp'),
         ]
 
+    @staticmethod
+    def render_measures(row: CellData) -> str:
+        descriptions = []
+        for measure in sorted(row.value or [], key=lambda m: m["measure_type"]):
+            description = SpecimenMeasureType(measure["measure_type"]).label
+            if measure["value"] is not None:
+                unit = measure["unit"] or ""
+                separator = "" if unit in ("", "%") else " "
+                description += f" {measure['value']}{separator}{unit}"
+            if measure["call"]:
+                description += f" ({measure['call']})"
+            descriptions.append(description)
+        return ", ".join(descriptions)
+
     def get_initial_queryset(self) -> QuerySet[Specimen]:
         qs = Specimen.filter_for_user(self.user)
-        return qs.annotate(extraction_count=Count("extraction", distinct=True))
+        measure = JSONObject(measure_type="specimenmeasure__measure_type", value="specimenmeasure__value",
+                             unit="specimenmeasure__unit", call="specimenmeasure__call")
+        return qs.annotate(extraction_count=Count("extraction", distinct=True),
+                           measure_count=Count("specimenmeasure", distinct=True),
+                           measures=ArrayAgg(measure, distinct=True,
+                                             filter=Q(specimenmeasure__isnull=False)))
 
 
 class ExtractionColumns(DatatableConfig[Extraction]):
