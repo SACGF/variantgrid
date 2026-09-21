@@ -86,6 +86,13 @@ class TagColorsCollection(GuardianPermissionsAutoInitialSaveMixin, TimeStampedMo
     def get_sort_order_by_tag(self) -> dict[str, int]:
         return dict(self.tagcolor_set.filter(sort_order__isnull=False).values_list('tag', 'sort_order'))
 
+    def get_quick_tags(self) -> list[str]:
+        """ Tags drawn as their own (+) in the analysis grid, in the order the pills sort in (#1888).
+            A retired tag is dropped rather than unticked, so reinstating brings its button back """
+        quick_tags = self.tagcolor_set.filter(quick_tag=True, tag__in=Tag.live_qs())
+        tag_ids_and_sort_order = quick_tags.values_list('tag', 'sort_order')
+        return [tag_id for tag_id, _ in sorted(tag_ids_and_sort_order, key=lambda t: (t[1] or 0, t[0]))]
+
     def clone_for_user(self, user):
         name = f"{user}'s copy of {self.name}"
         clone_tcc = TagColorsCollection(name=name, user=user)
@@ -109,8 +116,10 @@ class TagColorsCollection(GuardianPermissionsAutoInitialSaveMixin, TimeStampedMo
 class TagColor(TimeStampedModel):
     collection = models.ForeignKey(TagColorsCollection, null=True, on_delete=CASCADE)
     tag = models.ForeignKey(Tag, on_delete=CASCADE)
-    rgb = models.CharField(max_length=7)  # '#rrggbb'
+    rgb = models.CharField(max_length=7)  # '#rrggbb' - '' when the row only holds sort_order / quick_tag
     sort_order = models.IntegerField(null=True, blank=True)  # Tags w/o value sort as 0, ties broken by tag name
+    # Drawn as its own (+) in the analysis grid's tags column, so tagging with it is one click (#1888)
+    quick_tag = models.BooleanField(default=False)
 
     class Meta:
         unique_together = ('collection', 'tag')

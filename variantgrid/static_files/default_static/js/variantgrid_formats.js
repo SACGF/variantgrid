@@ -1001,6 +1001,14 @@ VariantGridFormat.tags = (tagsCellValue, type, rowData) => {
 
     if (!readOnly) {
         tagHtml += "<a class='show-tag-autocomplete' variant_id='" + variantId + "' href='javascript:showTagAutocomplete(" + variantId + ")'><span class='add-variant-tag' title='Tag variant..'></span></a>";
+        // One (+) per quick tag, in the tag's own colour - tagging with it is a single click (#1888)
+        // @see render_variant_quick_tags / quickTagClickHandler
+        const quickTags = aWin.variantQuickTags || [];
+        for (let i=0 ; i<quickTags.length ; ++i) {
+            const tag = quickTags[i];
+            tagHtml += `<a class='quick-tag' href='javascript:void(0)' variant_id='${variantId}' tag_id='${tag}' title='${escapeHtml(`Tag as ${tag}`)}'>`
+                     + `<span class='grid-tag tagged-${tag}'><span class='user-tag-colored quick-tag-button'></span></span></a>`;
+        }
     }
 
     // One pill per tagging, marked with whose it is and read against the proband of the node this grid

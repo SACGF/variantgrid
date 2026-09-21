@@ -186,6 +186,7 @@
     variantTags = {% render_variant_tags_dict analysis %};
     analysisSamples = {% render_analysis_samples_dict analysis %};
     variantTagOrder = {% render_variant_tag_order %};
+    variantQuickTags = {% render_variant_quick_tags %};
     variantTagsReadOnly = !{{ has_write_permission|jsonify }};
     variantTagStaleDays = ANALYSIS_SETTINGS.variant_tag_stale_days;
     selectedVariants = {% render_node_variant_dict analysis %};

@@ -14,7 +14,7 @@ from patients.models import Patient
 from snpdb.models import GenomeBuild
 from snpdb.models.models_enums import TagFilter
 from snpdb.models.models_user_settings import UserSettings
-from snpdb.utils import get_tag_sort_order_by_tag, get_tag_styles_and_colors
+from snpdb.utils import get_tag_quick_tags, get_tag_sort_order_by_tag, get_tag_styles_and_colors
 from snpdb.variant_queries import get_variant_queryset_for_gene_symbol
 
 register = template.Library()
@@ -119,6 +119,12 @@ def render_analysis_samples_dict(analysis):
 def render_variant_tag_order(context):
     """ {tag_id: sort_order} for JS tag sorting - see sortVariantTags in grid.js """
     return mark_safe(_json_for_script(get_tag_sort_order_by_tag(context["user"])))
+
+
+@register.simple_tag(takes_context=True)
+def render_variant_quick_tags(context):
+    """ [tag_id] for the one-click (+) buttons - see VariantGridFormat.tags """
+    return mark_safe(_json_for_script(get_tag_quick_tags(context["user"])))
 
 
 @register.inclusion_tag("analysis/tags/render_tag_styles_and_formatter.html", takes_context=True)

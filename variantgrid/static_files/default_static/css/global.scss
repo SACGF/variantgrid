@@ -1664,6 +1664,33 @@ table.variantgrid-datatable {
 		color: #3a6ea5;
 	}
 
+	// A quick tag's own (+), sized and aligned like the plain one. The inner markup is a pill's, so
+	// the per-tag rules from render_tag_styles_and_formatter colour it - the grey is what a quick tag
+	// with no colour of its own falls back to. @see VariantGridFormat.tags
+	.quick-tag {
+		text-decoration: none;
+	}
+
+	.quick-tag-button {
+		width: 16px;
+		padding: 0;
+		border-radius: 50%;
+		font-size: 12px;
+		text-align: center;
+		background: #a0a8b3;
+		color: white;
+
+		&::before {
+			content: "\f055";
+			font-family: 'Font Awesome 6 Free', 'FontAwesome';
+			font-weight: 900;
+		}
+	}
+
+	.quick-tag:hover .quick-tag-button {
+		outline: 1px solid #3a6ea5;
+	}
+
 	// Only the arrow cell invites a click - the rest of the row is links
 	&.expandable td.toggle-link {
 		cursor: pointer;

@@ -103,6 +103,15 @@ def get_tag_sort_order_by_tag(user, tag_colors_collection=None) -> dict[str, int
     return sort_order_by_tag
 
 
+def get_tag_quick_tags(user, tag_colors_collection=None) -> list[str]:
+    """ Tags the analysis grid draws as their own (+), in the order the pills sort in (issue #1888) """
+    tag_colors_collection = _resolve_tag_colors_collection(user, tag_colors_collection)
+    quick_tags = []
+    if tag_colors_collection:
+        quick_tags = tag_colors_collection.get_quick_tags()
+    return quick_tags
+
+
 def get_all_tags_and_user_colors(user, tag_colors_collection=None):
     """ Returns Hash of { tag_name : color }
         with color being None if not set for user """

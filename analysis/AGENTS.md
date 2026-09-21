@@ -129,6 +129,11 @@ Patterns here:
   resolution included. The patient's name rides on the tagging (a de-identified patient shows as their code), while a
   sample's comes from `render_analysis_samples_dict` (@see `render_variant_tags_dict`, `VariantGridFormat.tags`,
   `variantTaggingPillOptions` in `grid.js`).
+- Beside the tags column's (+) the grid draws one coloured (+) per quick tag - the tags ticked "1-click" on the tag
+  colours collection (`snpdb/models/models_user_settings.py:TagColor`), reaching the page as `variantQuickTags` via
+  `analysis/templatetags/user_tag_color_tags.py:render_variant_quick_tags`. They are always drawn, whether or not the
+  row already has the tag: whose a tagging is makes "already tagged" a per-proband question, and a second click is a
+  no-op (#1888).
 - A resolved tagging is hidden from the work lists: the tags node (`TagNode.include_resolved`, off by default), the
   variant page's tag list and the variant tags page (both on `UserGridConfig.show_hidden_data` under grid name
   `Variant Tags`, shown as a "Show resolved" checkbox). They all filter with
