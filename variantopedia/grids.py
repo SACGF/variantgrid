@@ -177,6 +177,20 @@ class AllVariantsGrid(AbstractVariantGrid):
     def initial_order(self) -> Optional[list]:
         return None  # every page is served in genomic order, whatever the client asks for
 
+    def paging(self, qs: QuerySet) -> QuerySet:
+        """ Take the page's pks first, then the columns for those pks.
+
+            An OFFSET deep into a filtered scan drags every row it steps over through the annotation,
+            ClinVar, gene and classification joins. Paging on pks walks variant + locus + the filter
+            joins only, and the columns are then fetched for the 10 rows on the page (#1887).
+            Both phases are built off the same ordered queryset, so genomic order is preserved. """
+        limit = min(int(self.get_query_param('length') or 10), self.max_page_length)
+        start = int(self.get_query_param('start') or 0)
+        if limit == -1:  # if pagination is disabled ("paging": false)
+            return qs
+        page_pks = list(qs.values_list("pk", flat=True)[start:start + limit])
+        return qs.filter(pk__in=page_pks)
+
     def ordering(self, qs: QuerySet) -> QuerySet:
         """ Serve every page in genomic order regardless of any order the request supplies. Emitted as
             a plain order_by so it matches the snpdb_locus(contig_id, position, ref_id) btree exactly -

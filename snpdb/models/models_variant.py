@@ -676,7 +676,7 @@ class Variant(PreviewModelMixin, models.Model):
         @see snpdb.gene_level_variants before touching anything guarded by get_gene_level_q() """
 
     REFERENCE_ALT = "="
-    _BASES = "GATC"
+    BASES = "GATC"
     _REGEX_2_PLUS_BASES = "^[GATC]{2,}$"
 
     locus = models.ForeignKey(Locus, on_delete=CASCADE)
@@ -715,15 +715,15 @@ class Variant(PreviewModelMixin, models.Model):
 
     @staticmethod
     def get_snp_q() -> Q:
-        return Q(locus__ref__seq__in=Variant._BASES) & Q(alt__seq__in=Variant._BASES)
+        return Q(locus__ref__seq__in=Variant.BASES) & Q(alt__seq__in=Variant.BASES)
 
     @staticmethod
     def get_insertion_q() -> Q:
-        return Q(locus__ref__seq__in=Variant._BASES) & Q(alt__seq__regex=Variant._REGEX_2_PLUS_BASES)
+        return Q(locus__ref__seq__in=Variant.BASES) & Q(alt__seq__regex=Variant._REGEX_2_PLUS_BASES)
 
     @staticmethod
     def get_deletion_q() -> Q:
-        return Q(locus__ref__seq__regex=Variant._REGEX_2_PLUS_BASES) & Q(alt__seq__in=Variant._BASES)
+        return Q(locus__ref__seq__regex=Variant._REGEX_2_PLUS_BASES) & Q(alt__seq__in=Variant.BASES)
 
     @staticmethod
     def get_indel_q() -> Q:

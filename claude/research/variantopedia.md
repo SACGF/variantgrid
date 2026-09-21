@@ -74,7 +74,13 @@ Categorizes classifications by AlleleOriginBucket (germline, somatic, etc.) and 
 
 ## Grids
 
-- **AllVariantsGrid** — All variants in a genome build; customizable columns; sortable by zygosity counts
+- **AllVariantsGrid** — All variants in a genome build; customizable columns; every page served in genomic
+  order, nothing user-sortable (`variantopedia/grids.py:AllVariantsGrid`). The chromosome / gene symbol /
+  variant type / min sample count controls are applied on a **Search** click - one filter save and one grid
+  request per search (`variantopedia/templates/variantopedia/variants.html`). A page is served in two phases:
+  the pks off the filtered, ordered queryset, then the columns for those pks
+  (`variantopedia/grids.py:AllVariantsGrid.paging`), and a gene filter is bounded by the locus range the
+  gene's variants span (`snpdb/variant_filters.py:get_gene_bounds_q`) so it seeks rather than scans.
 - **NearbyVariantsGrid** — Variants near a target; filter by region type (codon, exon, domain, range, genes)
 - **VariantTagsGrid** — Tag-centric (one row per tag-variant pair); filter by analysis/gene/tag
 - **TaggedVariantGrid** — Variant-centric (variants that have tags); filter by specific tag

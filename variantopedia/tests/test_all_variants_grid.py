@@ -26,13 +26,14 @@ from snpdb.models import (
     VariantCoordinate,
     VariantZygosityCountCollection,
 )
-from snpdb.views.datatable_view import datatable_response
 from snpdb.variant_filters import (
     VariantType,
     get_all_variant_types,
     get_contig_ids_for_gene_symbols,
     get_default_all_variants_filters,
+    get_variant_type_q,
 )
+from snpdb.views.datatable_view import datatable_response
 from variantopedia.grids import AllVariantsGrid, NearbyVariantsGrid
 
 
@@ -244,6 +245,115 @@ class AllVariantsGridFilterTest(TestCase):
         filters = get_default_all_variants_filters(self.genome_build)
         contig_21 = self.genome_build.standard_contigs.get(name="21")
         self.assertEqual([contig_21.pk], filters["contig_ids"])
+
+    def _create_variant(self, position: int, ref: str, alt: str) -> Variant:
+        locus = Locus.objects.create(contig=self.contig, position=position,
+                                     ref=Sequence.objects.get_or_create(seq=ref)[0])
+        return Variant.objects.create(locus=locus, alt=Sequence.objects.get_or_create(seq=alt)[0],
+                                      end=position + len(ref) - 1)
+
+    def test_types_select_by_sequence_shape(self):
+        """ SNV / indel / complex are Sequence pk comparisons rather than a join testing seq (#1887) """
+        insertion = self._create_variant(1000, "C", "CTT")
+        deletion = self._create_variant(2000, "CTT", "C")
+        complex_sub = self._create_variant(3000, "CT", "GA")
+        for variant_type, expected in [(VariantType.SNV, {self.variant.pk}),
+                                       (VariantType.INDEL, {insertion.pk, deletion.pk}),
+                                       (VariantType.COMPLEX, {complex_sub.pk})]:
+            with self.subTest(variant_type=variant_type):
+                variant_ids = self._grid_variant_ids({"contig_ids": [self.contig.pk],
+                                                      "variant_types": [variant_type]})
+                self.assertEqual(expected, variant_ids)
+
+    def test_symbolic_and_reference_alts_are_not_indels_or_complex(self):
+        """ Every alt that isn't a single base looked like the long side of an indel until the type Qs
+            started naming the reference alt and excluding anything with an SVLEN """
+        for variant_type in [VariantType.INDEL, VariantType.COMPLEX]:
+            variant_ids = set(Variant.objects.filter(get_variant_type_q(variant_type)).values_list("pk", flat=True))
+            for variant, description in [(self.reference_variant, "reference alt"),
+                                         (self.deletion_variant, "symbolic alt"),
+                                         (self.fusion_variant, "gene fusion")]:
+                with self.subTest(variant_type=variant_type, variant=description):
+                    self.assertNotIn(variant.pk, variant_ids)
+
+    def test_gene_filter_with_every_contig_and_with_none(self):
+        """ The gene's variants are found whatever the chromosome buttons say - with none ticked the
+            gene's own contigs are what bounds the scan """
+        all_contig_ids = list(self.genome_build.standard_contigs.values_list("pk", flat=True))
+        for description, contig_ids in [("all contigs", all_contig_ids), ("no contigs", [])]:
+            with self.subTest(contigs=description):
+                variant_ids = self._grid_variant_ids({"contig_ids": contig_ids,
+                                                      "gene_symbols": [self.gene_symbol.symbol]})
+                self.assertEqual({self.gene_variant.pk}, variant_ids)
+
+    def test_gene_filter_returns_fusion_on_the_gene_level_contig(self):
+        """ A fusion's locus is on the gene-level contig, outside the gene's own position bounds """
+        self._create_variant_gene_overlap(self.fusion_variant, self.gene)
+        variant_ids = self._grid_variant_ids({"gene_symbols": [self.gene_symbol.symbol]})
+        self.assertEqual({self.gene_variant.pk, self.fusion_variant.pk}, variant_ids)
+
+
+class AllVariantsGridPagingTest(TestCase):
+    """ A page's pks are taken first, then the columns for those pks - an OFFSET otherwise drags every
+        row it steps over through the annotation, ClinVar, gene and classification joins (#1887) """
+
+    PAGE_LENGTH = 2
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.user = User.objects.get_or_create(username="test_all_variants_grid_paging")[0]
+        cls.genome_build = GenomeBuild.get_name_or_alias("GRCh37")
+        get_fake_annotation_version(cls.genome_build)
+        create_fake_variants(cls.genome_build)
+        variant = Variant.objects.get(locus__contig__name='13', locus__position=95839002,
+                                      locus__ref__seq='C', alt__seq='T')
+        cls.contig = variant.locus.contig
+        for position in range(1000, 6000, 1000):
+            locus = Locus.objects.create(contig=cls.contig, position=position, ref=variant.locus.ref)
+            Variant.objects.create(locus=locus, alt=variant.alt, end=position)
+
+    def _grid(self, start: int) -> AllVariantsGrid:
+        request = FakeRequest(user=self.user)
+        request.GET = {"start": str(start), "length": str(self.PAGE_LENGTH)}
+        return AllVariantsGrid(request, self.genome_build.name, extra_filters={"contig_ids": [self.contig.pk]})
+
+    def _page_pks(self, start: int) -> list[int]:
+        grid = self._grid(start)
+        qs = grid.apply_filters(grid.get_initial_queryset())
+        return list(grid.paging(grid.ordering(qs)).values_list("pk", flat=True))
+
+    def test_pages_continue_in_genomic_order(self):
+        first_page = self._page_pks(0)
+        second_page = self._page_pks(self.PAGE_LENGTH)
+        self.assertEqual(self.PAGE_LENGTH, len(first_page))
+        self.assertEqual(self.PAGE_LENGTH, len(second_page))
+        self.assertEqual(set(), set(first_page) & set(second_page))
+
+        grid = self._grid(0)
+        qs = grid.apply_filters(grid.get_initial_queryset())
+        in_order = list(grid.ordering(qs).values_list("pk", flat=True))
+        self.assertEqual(in_order[:2 * self.PAGE_LENGTH], first_page + second_page)
+
+    def test_columns_are_fetched_for_the_page_pks_only(self):
+        grid = self._grid(self.PAGE_LENGTH)
+        with CaptureQueriesContext(connection) as queries:
+            data = datatable_response(grid)
+        page_pks = [row["id"] for row in data["data"]]
+        self.assertEqual(self.PAGE_LENGTH, len(page_pks))
+
+        offset_queries = [q["sql"] for q in queries.captured_queries if " OFFSET " in q["sql"]]
+        self.assertEqual(1, len(offset_queries), "Only the pk page walks an OFFSET")
+        self.assertTrue(offset_queries[0].startswith('SELECT "snpdb_variant"."id" AS "pk" FROM'),
+                        f"pk page should select the pk only: {offset_queries[0][:200]}")
+
+        column_queries = [q["sql"] for q in queries.captured_queries
+                          if '"snpdb_variant"."id" IN (' in q["sql"]]
+        self.assertEqual(1, len(column_queries), "One query fetches the page's columns")
+        page_query = column_queries[0]
+        for pk in page_pks:
+            self.assertIn(str(pk), page_query)
+        self.assertIn('AS "locus__position"', page_query, "The page's pks are what the columns are fetched for")
 
 
 class AllVariantsGridSortTest(TestCase):

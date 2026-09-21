@@ -5,14 +5,14 @@
 """
 import operator
 from collections.abc import Iterable
-from functools import reduce
+from functools import lru_cache, reduce
 from typing import Any, Optional
 
 from django.conf import settings
 from django.contrib.auth.models import User
-from django.db.models import Q
+from django.db.models import Max, Min, Q
 
-from annotation.models import AnnotationVersion, VariantTranscriptAnnotation
+from annotation.models import AnnotationVersion, VariantGeneOverlap, VariantTranscriptAnnotation
 from genes.models import Gene, GeneSymbol
 from library.genomics.vcf_enums import GeneLevelSymbolicAlt
 from snpdb.models.models_enums import SequenceRole
@@ -41,6 +41,66 @@ class VariantType:
 GENE_LEVEL_VARIANT_TYPES = [VariantType.FUSION, VariantType.COPY_NUMBER, VariantType.SPLICE]
 
 
+def _lookup_sequence_ids() -> dict[str, int]:
+    return Sequence.get_pk_by_seq(Q(seq__in=[*Variant.BASES, Variant.REFERENCE_ALT]))
+
+
+@lru_cache
+def _cached_sequence_ids() -> dict[str, int]:
+    return _lookup_sequence_ids()
+
+
+def _get_sequence_ids() -> dict[str, int]:
+    """ pks of the single base sequences and of the reference alt - the type filters compare these
+        against Variant.alt_id / Locus.ref_id rather than joining snpdb_sequence to test seq, which
+        collapses the planner's row estimate and costs the streaming plan (#1887).
+
+        Sequence rows are never deleted, so the pks are cached - except under test, where each
+        database builds its own (@see library.guardian_utils.admin_bot). A database that doesn't have
+        them all yet (nothing imported) is looked up again rather than cached as missing """
+    if settings.UNIT_TEST:
+        return _lookup_sequence_ids()
+    sequence_ids = _cached_sequence_ids()
+    if len(sequence_ids) <= len(Variant.BASES):
+        _cached_sequence_ids.cache_clear()
+        sequence_ids = _lookup_sequence_ids()
+    return sequence_ids
+
+
+def _base_sequence_ids() -> list[int]:
+    sequence_ids = _get_sequence_ids()
+    return [pk for seq, pk in sequence_ids.items() if seq in Variant.BASES]
+
+
+def _base_and_reference_sequence_ids() -> list[int]:
+    return list(_get_sequence_ids().values())
+
+
+def get_snv_q() -> Q:
+    base_ids = _base_sequence_ids()
+    return Q(locus__ref_id__in=base_ids, alt_id__in=base_ids)
+
+
+def _get_plain_q() -> Q:
+    """ Not symbolic and not gene-level - both of those carry an SVLEN """
+    return Q(svlen__isnull=True)
+
+
+def get_indel_q() -> Q:
+    """ One side a single base, the other a longer sequence """
+    base_ids = _base_sequence_ids()
+    other_ids = _base_and_reference_sequence_ids()
+    insertion = Q(locus__ref_id__in=base_ids) & ~Q(alt_id__in=other_ids)
+    deletion = Q(alt_id__in=base_ids) & ~Q(locus__ref_id__in=other_ids)
+    return _get_plain_q() & (insertion | deletion)
+
+
+def get_complex_substitution_q() -> Q:
+    """ Both sides longer than a single base """
+    other_ids = _base_and_reference_sequence_ids()
+    return _get_plain_q() & ~Q(locus__ref_id__in=other_ids) & ~Q(alt_id__in=other_ids)
+
+
 def _alt_in_q(q_sequence: Q) -> Q:
     """ An alt_id IN (subquery) rather than a join to Sequence - OR'd with the other types, a join
         stops Postgres using the per-branch plans and the whole-build scan goes from ~1s to ~14s """
@@ -60,9 +120,9 @@ def get_structural_variant_q() -> Q:
 
 _VARIANT_TYPE_Q_FUNCS = {
     VariantType.REFERENCE: Variant.get_reference_q,
-    VariantType.SNV: Variant.get_snp_q,
-    VariantType.INDEL: Variant.get_indel_q,
-    VariantType.COMPLEX: Variant.get_complex_subsitution_q,
+    VariantType.SNV: get_snv_q,
+    VariantType.INDEL: get_indel_q,
+    VariantType.COMPLEX: get_complex_substitution_q,
     VariantType.SYMBOLIC: get_structural_variant_q,
     VariantType.FUSION: lambda: _gene_level_kinds_q(GeneLevelSymbolicAlt.FUSION),
     VariantType.COPY_NUMBER: lambda: _gene_level_kinds_q(GeneLevelSymbolicAlt.GAIN, GeneLevelSymbolicAlt.LOSS),
@@ -160,7 +220,8 @@ def get_contigs_q(genome_build: GenomeBuild, contig_ids: Optional[Iterable[int]]
     if non_standard_contigs:
         contig_id_list.extend(get_non_standard_contig_ids(genome_build))
     if contig_id_list:
-        return Q(locus__contig_id__in=contig_id_list)
+        # A gene's contigs can arrive twice (its own and the gene-level one) - keep the IN list unique
+        return Q(locus__contig_id__in=sorted(set(contig_id_list)))
     return Variant.get_contigs_q(genome_build)
 
 
@@ -193,6 +254,23 @@ def get_gene_symbol_alias_strs(gene_symbol: GeneSymbol) -> list[str]:
     return gene_symbol.alias_meta.alias_symbol_strs
 
 
+def get_gene_bounds_q(annotation_version: AnnotationVersion, genes: Iterable[Gene]) -> Optional[Q]:
+    """ The locus range the genes' variants span, per gene and contig.
+
+        The overlap Q alone is a pk IN (subquery), so a gene filter walks the build in genomic order
+        testing every locus until it reaches the gene. AND-ing the bounds on lets the locus index seek
+        straight there - they come off the same rows the overlap Q matches, so nothing new is excluded.
+        None means the genes overlap no variants in this annotation version (#1887) """
+    qs = VariantGeneOverlap.objects.filter(version=annotation_version.variant_annotation_version, gene__in=genes)
+    bounds = qs.values("gene_id", "variant__locus__contig_id") \
+        .annotate(min_position=Min("variant__locus__position"), max_position=Max("variant__locus__position"))
+    q_list = [Q(locus__contig_id=b["variant__locus__contig_id"],
+                locus__position__range=(b["min_position"], b["max_position"])) for b in bounds]
+    if not q_list:
+        return None
+    return reduce(operator.or_, q_list)
+
+
 def get_gene_symbols_q(annotation_version: AnnotationVersion, gene_symbols: Optional[Iterable[Any]],
                        traverse_aliases: bool = True) -> Optional[Q]:
     symbols = resolve_gene_symbols(gene_symbols)
@@ -200,7 +278,12 @@ def get_gene_symbols_q(annotation_version: AnnotationVersion, gene_symbols: Opti
         return None
     genes = get_genes_for_gene_symbols(symbols, traverse_aliases=traverse_aliases)
     # pk__in form so a variant overlapping several of the genes still returns a single row
-    return VariantTranscriptAnnotation.get_overlapping_genes_q(annotation_version.variant_annotation_version, genes)
+    q_overlap = VariantTranscriptAnnotation.get_overlapping_genes_q(
+        annotation_version.variant_annotation_version, genes)
+    q_bounds = get_gene_bounds_q(annotation_version, genes)
+    if q_bounds is None:
+        return Q(pk__isnull=True)  # No variants overlap the genes - the answer is already known
+    return q_overlap & q_bounds
 
 
 def get_contig_ids_for_gene_symbols(genome_build: GenomeBuild, gene_symbols: Optional[Iterable[Any]],
@@ -223,11 +306,13 @@ def get_variant_filter_q(genome_build: GenomeBuild, annotation_version: Annotati
     """ The standard variant filters composed into a single Q """
     contig_id_list = list(contig_ids or [])
     variant_type_list = list(variant_types) if variant_types is not None else None
+    if gene_symbols:
+        # A gene selection is a contig restriction of its own - the genes' contigs (so a gene on a
+        # chromosome the user hasn't ticked still shows) plus the gene-level contig its fusions are on.
+        # Without it a gene with no chromosome chosen scans the whole build instead of the gene bounds.
+        contig_id_list.extend(get_contig_ids_for_gene_symbols(genome_build, gene_symbols))
+        contig_id_list.extend(get_gene_level_contig_ids(genome_build))
     if contig_id_list or non_standard_contigs:
-        if gene_symbols:
-            # Let the genes' contigs through, so a gene on a chromosome the user hasn't ticked still shows.
-            # The page ticks them too, but a stale saved filter set or a direct grid URL wouldn't have.
-            contig_id_list.extend(get_contig_ids_for_gene_symbols(genome_build, gene_symbols))
         contig_id_list = get_contig_ids_for_variant_types(genome_build, contig_id_list, variant_type_list)
 
     filter_list = [get_contigs_q(genome_build, contig_ids=contig_id_list,

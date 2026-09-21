@@ -2,6 +2,7 @@
 {% load ui_utils %}
 {% load ui_help %}
 {% load ui_menu_bars %}
+{% load js_tags %}
 {% load genome_build_tags %}
 {% load user_tag_color_tags %}
 {% block title %}Variants{% endblock %}
@@ -10,9 +11,11 @@
     {% render_tag_styles_and_formatter %}
     {{ gene_symbol_form.media }}
     <script>
+        // What the grid is showing - the controls only become this when Search is clicked
         let gridExtraFilters = {{ initial_filters_json | safe }};
         const setAllVariantsFilterUrl = "{% url 'set_all_variants_filter' genome_build.name %}";
         const genomeBuildName = "{{ genome_build.name }}";
+        const defaultContigId = {{ default_contig_id | jsonify }};
 
         function getBams() {
             return [];
@@ -62,9 +65,9 @@
 
         function describeFilters(filters) {
             let parts = [];
-            let contigNames = $(".contig-filter").filter(":checked").map(function() {
-                return $(this).data("contig-name");
-            }).get();
+            let contigNames = filters.contig_ids.map(function(contigId) {
+                return $(".contig-filter[value='" + contigId + "']").data("contig-name");
+            });
             if (filters.non_standard_contigs) {
                 contigNames.push("non-standard contigs");
             }
@@ -105,25 +108,41 @@
             $("#all-variants-unselective").toggle(!isSelective(filters));
         }
 
-        function updateFilters(changedInput) {
+        function applyFallbacks() {
+            // Nothing selective would show no rows, and no variant type would show every type without
+            // saying so - tick what's going to be searched, so the buttons describe the grid
             let filters = readFilters();
-            const isContigInput = changedInput
-                && (changedInput.hasClass("contig-filter") || changedInput.attr("id") === "non-standard-contigs");
-            const isTypeInput = changedInput && changedInput.hasClass("variant-type-filter");
-
-            // Deselecting the last chromosome with no genes chosen would show nothing, so put it back
-            if (isContigInput && !isSelective(filters)) {
-                setChecked(changedInput, true);
-                filters = readFilters();
+            if (!isSelective(filters) && defaultContigId !== null) {
+                setChecked($(".contig-filter[value='" + defaultContigId + "']"), true);
             }
-            // Keep at least one variant type, so the buttons always describe what's on screen
-            if (isTypeInput && !filters.variant_types.length) {
-                setChecked(changedInput, true);
-                filters = readFilters();
+            if (!filters.variant_types.length) {
+                setChecked($(".variant-type-filter"), true);
             }
+            return readFilters();
+        }
 
+        function filtersMatchGrid() {
+            const filters = readFilters();
+            const asString = (f) => JSON.stringify([
+                (f.contig_ids || []).slice().sort(), Boolean(f.non_standard_contigs),
+                (f.gene_symbols || []).slice().sort(), (f.variant_types || []).slice().sort(),
+                Number(f.min_count) || 0,
+            ]);
+            return asString(filters) === asString(gridExtraFilters);
+        }
+
+        function showPendingSearch() {
+            // A solid button while the controls differ from what the grid is showing
+            const pending = !filtersMatchGrid();
+            $("#search-button").toggleClass("btn-primary", pending)
+                               .toggleClass("btn-outline-primary", !pending);
+        }
+
+        function runSearch() {
+            const filters = applyFallbacks();
             gridExtraFilters = filters;
             showFilters(filters);
+            showPendingSearch();
             saveFilters(filters);
             filterGrid();
         }
@@ -144,9 +163,7 @@
 
         function geneSymbolsChanged() {
             const geneSymbols = $("#id_gene_symbols").val() || [];
-            $.when.apply($, geneSymbols.map(tickGeneSymbolContigs)).always(function() {
-                updateFilters(null);
-            });
+            $.when.apply($, geneSymbols.map(tickGeneSymbolContigs)).always(showPendingSearch);
         }
 
         function resetFilters() {
@@ -160,15 +177,27 @@
             });
         }
 
+        function setCheckedAll(selector, checked) {
+            setChecked($(selector), checked);
+            showPendingSearch();
+        }
+
         $(document).ready(() => {
-            $(".contig-filter, #non-standard-contigs, .variant-type-filter").change(function() {
-                updateFilters($(this));
+            $(".contig-filter, #non-standard-contigs, .variant-type-filter, #min_count").change(showPendingSearch);
+            $("#min_count").keydown(function(event) {
+                if (event.which === 13) {  // Enter searches, rather than doing nothing
+                    event.preventDefault();
+                    $("#search-button").click();
+                }
             });
             $("#id_gene_symbols").change(geneSymbolsChanged);
-            $("#filter-button").click(function() {
-                updateFilters(null);
-            });
+            $("#contig-all").click(() => setCheckedAll(".contig-filter", true));
+            $("#contig-none").click(() => setCheckedAll(".contig-filter", false));
+            $("#variant-type-all").click(() => setCheckedAll(".variant-type-filter", true));
+            $("#variant-type-none").click(() => setCheckedAll(".variant-type-filter", false));
+            $("#search-button").click(runSearch);
             showFilters(readFilters());
+            showPendingSearch();
         });
     </script>
     <style>
@@ -190,31 +219,39 @@
         <h3>Variants</h3>
             <div class="container">
                 {% labelled label="Chromosome" %}
-                    <div class="filter-button-group btn-group-toggle" data-toggle="buttons">
-                        {% for contig in standard_contigs %}
-                            <label class="btn btn-outline-primary btn-sm{% if contig.pk in initial_filters.contig_ids %} active{% endif %}">
-                                <input class="contig-filter" type="checkbox" name="contig" value="{{ contig.pk }}"
-                                       data-contig-name="{{ contig.name }}" autocomplete="off"
-                                       {% if contig.pk in initial_filters.contig_ids %}checked{% endif %}> {{ contig.name }}
+                    <div class="filter-button-group">
+                        <div class="filter-button-group btn-group-toggle" data-toggle="buttons">
+                            {% for contig in standard_contigs %}
+                                <label class="btn btn-outline-primary btn-sm{% if contig.pk in initial_filters.contig_ids %} active{% endif %}">
+                                    <input class="contig-filter" type="checkbox" name="contig" value="{{ contig.pk }}"
+                                           data-contig-name="{{ contig.name }}" autocomplete="off"
+                                           {% if contig.pk in initial_filters.contig_ids %}checked{% endif %}> {{ contig.name }}
+                                </label>
+                            {% endfor %}
+                            <label class="btn btn-outline-secondary btn-sm{% if initial_filters.non_standard_contigs %} active{% endif %}">
+                                <input id="non-standard-contigs" type="checkbox" name="non_standard_contigs" value="1"
+                                       autocomplete="off"
+                                       {% if initial_filters.non_standard_contigs %}checked{% endif %}> Non-standard contigs
                             </label>
-                        {% endfor %}
-                        <label class="btn btn-outline-secondary btn-sm{% if initial_filters.non_standard_contigs %} active{% endif %}">
-                            <input id="non-standard-contigs" type="checkbox" name="non_standard_contigs" value="1"
-                                   autocomplete="off"
-                                   {% if initial_filters.non_standard_contigs %}checked{% endif %}> Non-standard contigs
-                        </label>
+                        </div>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" id="contig-all">All</button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" id="contig-none">None</button>
                     </div>
                 {% endlabelled %}
 
                 {% labelled label="Variant Type" %}
-                    <div class="filter-button-group btn-group-toggle" data-toggle="buttons">
-                        {% for variant_type, label in variant_types %}
-                            <label class="btn btn-outline-primary btn-sm{% if variant_type in initial_filters.variant_types %} active{% endif %}">
-                                <input class="variant-type-filter" type="checkbox" name="variant_type"
-                                       value="{{ variant_type }}" autocomplete="off"
-                                       {% if variant_type in initial_filters.variant_types %}checked{% endif %}> {{ label }}
-                            </label>
-                        {% endfor %}
+                    <div class="filter-button-group">
+                        <div class="filter-button-group btn-group-toggle" data-toggle="buttons">
+                            {% for variant_type, label in variant_types %}
+                                <label class="btn btn-outline-primary btn-sm{% if variant_type in initial_filters.variant_types %} active{% endif %}">
+                                    <input class="variant-type-filter" type="checkbox" name="variant_type"
+                                           value="{{ variant_type }}" autocomplete="off"
+                                           {% if variant_type in initial_filters.variant_types %}checked{% endif %}> {{ label }}
+                                </label>
+                            {% endfor %}
+                        </div>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" id="variant-type-all">All</button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" id="variant-type-none">None</button>
                     </div>
                 {% endlabelled %}
 
@@ -230,24 +267,19 @@
                 {% endlabelled %}
 
                 {% labelled label="Min sample count" %}
-                    <div class="input-group">
-                        <input id='min_count' type='number' min='0' name='min_count' style='max-width: 200px'
-                               class="form-control" value="{{ initial_filters.min_count|default:0 }}"
-                               data-enter="#filter-button" />
-                        <span class="input-group-append">
-                            <button class="btn btn-primary" id='filter-button'>Filter</button>
-                        </span>
-                    </div>
+                    <input id='min_count' type='number' min='0' name='min_count' style='max-width: 200px'
+                           class="form-control" value="{{ initial_filters.min_count|default:0 }}" />
                     {% field_help %}
                         0 = any, including variants not observed in any sample
                     {% end_field_help %}
                 {% endlabelled %}
 
+                {% labelled label="" %}
+                    <button class="btn btn-outline-primary" id='search-button'>Search</button>
+                {% endlabelled %}
+
                 {% labelled label="Sorting" %}
-                    <p class="text-muted mb-0">
-                        Sorting is limited to Variant ID - sorting on other columns has to sort every matching
-                        variant before returning a page, which times out. Add filters to narrow the results.
-                    </p>
+                    <p class="text-muted mb-0">Rows are returned in genomic order.</p>
                 {% endlabelled %}
 
                 <p id='all-variants-unselective' class='hidden alert alert-warning mt-2'>

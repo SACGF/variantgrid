@@ -12,6 +12,9 @@ Start with:
 Patterns here:
 - Variant is build-specific, Allele is the build-independent hub. A Variant has no genome_build FK: its build comes from locus.contig via GenomeBuildContig (models/models_variant.py:Variant.genome_builds). Cross-build work goes through VariantAllele (models/models_variant.py:Allele.variant_for_build), never by comparing Variants.
 - Restrict variant querysets to a build with models/models_variant.py:Variant.get_contigs_q (an IN list on contig ids); joining through GenomeBuildContig wrecks the planner's row estimate (#1720).
+- Filter variants by type on the Sequence pk (`alt_id__in`, `locus__ref_id__in` - variant_filters.py:get_snv_q): joining
+  snpdb_sequence to test `seq` looks 4-in-97k selective on each side, so the planner drops the streaming plan off the
+  locus index and full-sorts the result set (#1887).
 - Reference variants (alt == "=", models/models_variant.py:Variant.REFERENCE_ALT) exist on purpose; exclude them with models/models_variant.py:Variant.get_no_reference_q when you mean real calls.
 - Canonicalise coordinates before lookup or insert with models/models_variant.py:VariantCoordinate.as_internal_canonical_form (alts >= settings.VARIANT_SYMBOLIC_ALT_SIZE become <DEL>/<DUP>/<INV> with svlen); models/models_variant.py:Variant.qs_from_variant_coordinate does this for you. Variant is unique on (locus, alt, svlen).
 - Bulk-insert variants through variant_pk_lookup.py:VariantPKLookup (hash to pk, COPY of unknowns in batch_check); tests/utils/vcf_testing_utils.py:slowly_create_test_variant is the one-at-a-time test version.

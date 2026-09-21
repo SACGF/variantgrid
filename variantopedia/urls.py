@@ -89,7 +89,7 @@ urlpatterns = [
          DatabaseTableView.as_view(column_class=NearbyVariantsGrid),
          name='nearby_gene_variants_grid'),
     path('all_variants/grid/<genome_build_name>/',
-         DatabaseTableView.as_view(column_class=AllVariantsGrid),
+         DatabaseTableView.as_view(column_class=AllVariantsGrid, major_operation_name="all_variants"),
          name='all_variants_grid'),
     path('tagged_variants/grid/<genome_build_name>/',
          DatabaseTableView.as_view(column_class=TaggedVariantGrid, major_operation_name="tagged_variants"),
