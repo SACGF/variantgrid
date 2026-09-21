@@ -20,8 +20,10 @@ record of its own the way a fusion has a GeneFusion, so the alt carries the gene
 caller's row rides along in INFO. DragenTSO500CombinedVariantOutputInsertTask then takes the rest of
 the file - the pair's patient chain, the seqauto links and the specimen's measures
 (@see upload.tso500.dragen_combined_variant_output_records) - which needs the Sample, so it runs once
-the data is in. A chain that cannot be made is a message on the import page rather than a failure:
-the splice calls are worth having whether or not the pair has been accessioned yet.
+the header step has made it, alongside data insertion. Most pairs have no splice call, and their
+file is still what accessions them. A chain that cannot be made is a message on the import page
+rather than a failure: the splice calls are worth having whether or not the pair has been
+accessioned yet.
 
 The file names no genome build, and the create-VCF step needs one to place the breakpoints, so it is
 declared at upload (@see upload.upload_metadata) or comes off the VCFSourceSettings row for
@@ -185,8 +187,8 @@ class DragenTSO500CombinedVariantOutputCreateVCFTask(ImportVCFStepTask):
 
 
 class DragenTSO500CombinedVariantOutputInsertTask(ImportVCFStepTask):
-    """ Runs after data insertion, so the VCF and its Sample exist - everything in the file that is
-        not a variant: the pair's patient chain, the seqauto links and the specimen's measures """
+    """ Runs once the VCF and its Sample exist - everything in the file that is not a variant: the
+        pair's patient chain, the seqauto links and the specimen's measures """
 
     def process_items(self, upload_step: UploadStep):
         upload_pipeline = upload_step.upload_pipeline

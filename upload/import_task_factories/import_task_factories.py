@@ -247,10 +247,14 @@ class DragenTSO500CombinedVariantOutputImportTaskFactory(AbstractVCFImportTaskFa
         # importer writes the CohortGenotypes by SQL COPY
         return ProcessGenotypeVCFDataTask
 
+    def get_post_vcf_header_classes(self):
+        # The rest of the file: the pair's patient chain, seqauto links and measures. It needs the
+        # Sample and none of the variants - most pairs have no splice call at all
+        return [DragenTSO500CombinedVariantOutputInsertTask]
+
     def get_post_data_insertion_classes(self):
-        # A splice event has no record of its own - the alt and INFO carry everything. The insert
-        # task is for the rest of the file: the pair's patient chain, seqauto links and measures
-        return [DragenTSO500CombinedVariantOutputInsertTask, VCFCheckAnnotationTask]
+        # A splice event has no record of its own - the alt and INFO carry everything
+        return [VCFCheckAnnotationTask]
 
     def get_finish_task_classes(self):
         return [ImportGenotypeVCFSuccessTask]

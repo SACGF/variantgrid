@@ -52,8 +52,8 @@ where the multi-stage machinery starts.
 run straight away: `upload/tasks/vcf/import_vcf_step_task.py:pipeline_start_task`, an optional `get_pre_vcf_task` (the
 fusion loader uses it to write a VCF from a CSV first), the "Create Data from VCF Header" step and the "Preprocess VCF"
 step. The second is a set of inert `upload/models/models.py:UploadStep` rows whose `pipeline_stage_dependency` names the
-stage they wait for: `CheckStartAnnotationTask` and `ScheduleMultiFileOutputTasksTask` on PRE_DATA_INSERTION, the
-factory's `get_post_data_insertion_classes` on DATA_INSERTION, and `get_finish_task_classes` on FINISH. For a genotype
+stage they wait for: `CheckStartAnnotationTask`, `ScheduleMultiFileOutputTasksTask` and the factory's
+`get_post_vcf_header_classes` on PRE_DATA_INSERTION, the factory's `get_post_data_insertion_classes` on DATA_INSERTION, and `get_finish_task_classes` on FINISH. For a genotype
 VCF (`upload/import_task_factories/import_task_factories.py:GenotypeVCFImportFactory`) the DATA_INSERTION set is
 `VCFCheckAnnotationTask`, `UpdateVariantZygosityCountsTask`, `SampleLocusCountsTask` and, when `settings.SOMALIER` is
 enabled, `SomalierVCFTask`; FINISH is whatever `settings.FINISH_IMPORT_VCF_STEP_TASKS_CLASSES` names (a deployment hook,

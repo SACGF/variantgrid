@@ -43,6 +43,12 @@ class AbstractVCFImportTaskFactory(ImportTaskFactory):
             One copy run for every UploadStepMultiFileOutput """
         pass
 
+    def get_post_vcf_header_classes(self):
+        """ Steps needing the VCF and its Samples but none of its variants. They run once the
+            PRE_DATA_INSERTION stage is done, alongside data insertion, so a VCF with no records
+            still gets them - @see ImportVCFStepTask._handle_no_vcf_records """
+        return []
+
     def get_post_data_insertion_classes(self):
         return []
 
@@ -156,6 +162,7 @@ class AbstractVCFImportTaskFactory(ImportTaskFactory):
             post_data_insertion_classes = []
 
         DEPENDENT_STAGES = {
+            VCFPipelineStage.PRE_DATA_INSERTION: self.get_post_vcf_header_classes(),
             VCFPipelineStage.DATA_INSERTION: post_data_insertion_classes,
             VCFPipelineStage.FINISH: self.get_finish_task_classes(),
         }

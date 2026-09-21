@@ -21,6 +21,10 @@ from seqauto.models import SampleFromSequencingSample, VCFFromSequencingRun
 from seqauto.tests.test_extraction_link import make_sample_sheet, make_sequencing_run
 from snpdb.gene_level_variants import GENE_LEVEL_CONTIG_NAME
 from snpdb.models import VCF, GenomeBuild, ImportSource, Sample, VCFSourceSettings
+from snpdb.models.models_enums import ProcessingStatus
+from upload.import_task_factories.import_task_factories import (
+    DragenTSO500CombinedVariantOutputImportTaskFactory,
+)
 from upload.import_task_factories.import_task_factory import get_import_task_factories
 from upload.models import (
     FileUpload,
@@ -36,6 +40,7 @@ from upload.tasks.import_dragen_tso500_combined_variant_output_task import (
     DragenTSO500CombinedVariantOutputCreateVCFTask,
     DragenTSO500CombinedVariantOutputInsertTask,
 )
+from upload.tasks.vcf.import_vcf_step_task import ImportVCFStepTask
 from upload.tso500.dragen_combined_variant_output_parser import (
     AFFECTED_EXON,
     BREAKPOINT_1,
@@ -383,7 +388,7 @@ class TestCombinedVariantOutputRecords(TestCase):
 
 
 class TestCombinedVariantOutputInsertTask(TestCase):
-    """ The step that runs once the splice variants are in - the whole of the rest of the file """
+    """ The step that runs once the Sample exists - the whole of the rest of the file """
 
     def setUp(self):
         self.user = User.objects.create_user(username="cvo_insert_user")
@@ -431,3 +436,15 @@ class TestCombinedVariantOutputInsertTask(TestCase):
                                                             sequencing_run=sequencing_run).exists())
         self.assertTrue(SampleFromSequencingSample.objects.filter(
             sample=self.sample, sequencing_sample=sequencing_samples[0]).exists())
+
+    def test_a_pair_with_no_splice_calls_still_gets_its_records(self):
+        """ Most pairs have no splice call, which is an empty VCF - and that skips every step
+            waiting on data insertion """
+        self.upload_step.delete()
+        DragenTSO500CombinedVariantOutputImportTaskFactory().create_import_task(self.upload_pipeline)
+        steps = {step.name: step for step in self.upload_pipeline.uploadstep_set.all()}
+        ImportVCFStepTask._handle_no_vcf_records(steps["Schedule Parallel VCF Processing tasks"])
+
+        statuses = dict(self.upload_pipeline.uploadstep_set.values_list("name", "status"))
+        self.assertEqual(ProcessingStatus.SKIPPED, statuses["VCFCheckAnnotationTask"])
+        self.assertEqual(ProcessingStatus.CREATED, statuses[DragenTSO500CombinedVariantOutputInsertTask.__name__])

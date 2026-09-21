@@ -25,7 +25,7 @@ Patterns here:
   launched by upload/tasks/vcf/import_vcf_step_task.py:schedule_pipeline_stage_steps once the last step of that stage
   ends (ImportVCFStepTask.check_pipeline_stage). Stages: PRE_DATA_INSERTION → DATA_INSERTION → ANNOTATION_COMPLETE →
   FINISH (upload/models/models_enums.py:VCFPipelineStage). Add a step by adding its class to the factory's
-  get_post_data_insertion_classes / get_finish_task_classes
+  get_post_vcf_header_classes / get_post_data_insertion_classes / get_finish_task_classes
   (upload/import_task_factories/abstract_vcf_import_task_factory.py:AbstractVCFImportTaskFactory), or create the
   UploadStep inside a running step and call upload/models/models.py:UploadStep.launch_task.
 - Preprocess is one shell pipe, not vt. upload/vcf/vcf_preprocess.py:_build_pipe_commands chains
@@ -74,7 +74,9 @@ Gotchas:
   the junction's label (@see genes.gene_splice); the file's fusions, small variants and copy number calls are the
   lossy copies of what the arm files carry, so they are not sources. The file declares no genome build, so one is
   declared at upload or comes off the `^DRAGEN TSO500 CombinedVariantOutput` VCFSourceSettings row.
-- The rest of that file is the pair's identity, written after data insertion by
+- The rest of that file is the pair's identity, written once the header step has made the Sample
+  (get_post_vcf_header_classes - a VCF with no records skips every DATA_INSERTION-dependent step, and most pairs have
+  no splice call) by
   tasks/import_dragen_tso500_combined_variant_output_task.py:DragenTSO500CombinedVariantOutputInsertTask
   (tso500/dragen_combined_variant_output_records.py). `[Analysis Details]` names the Patient (the code
   `settings.TSO500_PAIR_ID_PATIENT_CODE_REGEX` reads out of `Pair ID`, whose leading sequencing sample ID changes when
