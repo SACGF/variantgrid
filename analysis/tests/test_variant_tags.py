@@ -285,8 +285,13 @@ class TestVariantTagUnresolvedQ(TestCase):
         variant_tag = self._tag(resolved=timezone.now(), classification=self._classification(withdrawn=True))
         self._assert_agrees(variant_tag, expected_resolved=False)
 
-    def test_resolved_without_a_classification_stays_done(self):
-        self._assert_agrees(self._tag(resolved=timezone.now()), expected_resolved=True)
+    def test_deleted_classification_puts_the_todo_back(self):
+        classification = self._classification(withdrawn=False)
+        variant_tag = self._tag(resolved=timezone.now(), classification=classification)
+        classification.delete()
+        variant_tag.refresh_from_db()
+        self.assertIsNotNone(variant_tag.resolved)
+        self._assert_agrees(variant_tag, expected_resolved=False)
 
 
 class TestTagNodeIncludeResolved(TestCase):
@@ -296,7 +301,8 @@ class TestTagNodeIncludeResolved(TestCase):
     def setUpTestData(cls):
         super().setUpTestData()
 
-        cls.user = User.objects.get_or_create(username='testuser')[0]
+        ClassificationTestUtils.setUp()
+        lab, cls.user = ClassificationTestUtils.lab_and_user()
         cls.grch37 = GenomeBuild.get_name_or_alias("GRCh37")
         get_fake_annotation_version(cls.grch37)
         create_fake_variants(cls.grch37)
@@ -308,13 +314,17 @@ class TestTagNodeIncludeResolved(TestCase):
         cls.open_variant, cls.done_variant = no_ref_qs[:2]
         cls.tag = create_classify_queue_tag()
         cls._tag_variant(cls.open_variant)
-        cls._tag_variant(cls.done_variant, resolved=timezone.now())
+        classification = Classification.create(user=cls.user, lab=lab, lab_record_id=None, data={},
+                                               save=True, source=SubmissionSource.API,
+                                               make_fields_immutable=False)
+        cls._tag_variant(cls.done_variant, resolved=timezone.now(), classification=classification)
 
     @classmethod
-    def _tag_variant(cls, variant, resolved=None) -> VariantTag:
+    def _tag_variant(cls, variant, resolved=None, classification=None) -> VariantTag:
         return VariantTag.objects.create(genome_build=cls.grch37, analysis=cls.analysis, variant=variant,
                                          allele=create_mock_allele(variant, cls.grch37), tag=cls.tag,
-                                         user=cls.user, resolved=resolved)
+                                         user=cls.user, resolved=resolved,
+                                         resolved_classification=classification)
 
     def _create_node(self, node_input=TagNodeInput.TAGGED_VARIANTS, include_resolved=False) -> TagNode:
         return TagNode.objects.create(analysis=self.analysis, mode=TagNodeMode.THIS_ANALYSIS,
@@ -377,13 +387,23 @@ class TestVariantTagsDict(TestCase):
         cls.resolved_at = timezone.now()
         cls.proband_tagging = cls._tag_variant(cls.open_variant, sample=cls.proband)
         cls.mother_tagging = cls._tag_variant(cls.open_variant, sample=cls.mother)
-        cls.done_tagging = cls._tag_variant(cls.done_variant, resolved=cls.resolved_at)
+        cls.done_tagging = cls._tag_variant(cls.done_variant, resolved=cls.resolved_at,
+                                            classification=cls._classification(cls.done_variant))
 
     @classmethod
     def _tag_variant(cls, variant, sample=None, resolved=None, classification=None) -> VariantTag:
         return VariantTag.objects.create(genome_build=cls.grch37, analysis=cls.analysis, variant=variant,
                                          tag=cls.tag, user=cls.user, sample=sample, resolved=resolved,
                                          resolved_classification=classification)
+
+    @classmethod
+    def _classification(cls, variant, withdrawn=False) -> Classification:
+        classification = Classification.create(user=cls.user, lab=cls.lab, lab_record_id=None, data={},
+                                               save=True, source=SubmissionSource.API,
+                                               make_fields_immutable=False)
+        Classification.objects.filter(pk=classification.pk).update(variant=variant, withdrawn=withdrawn)
+        classification.refresh_from_db()
+        return classification
 
     def _render(self) -> dict:
         template = Template("{% load user_tag_color_tags %}{% render_variant_tags_dict analysis %}")
@@ -404,11 +424,7 @@ class TestVariantTagsDict(TestCase):
                                     "resolved": localtime(self.resolved_at).date().isoformat()}])
 
     def test_a_withdrawn_classification_puts_the_todo_back(self):
-        classification = Classification.create(user=self.user, lab=self.lab, lab_record_id=None, data={},
-                                               save=True, source=SubmissionSource.API,
-                                               make_fields_immutable=False)
-        Classification.objects.filter(pk=classification.pk).update(variant=self.withdrawn_variant, withdrawn=True)
-        classification.refresh_from_db()
+        classification = self._classification(self.withdrawn_variant, withdrawn=True)
         tagging = self._tag_variant(self.withdrawn_variant, resolved=self.resolved_at,
                                     classification=classification)
         entries = self._render()[str(self.withdrawn_variant.pk)]

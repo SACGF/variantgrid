@@ -72,15 +72,15 @@ class VariantTagsJSNode(template.Node):
         variant_tags = defaultdict(list)
         variant_tags_qs = VariantTag.objects.filter(analysis=analysis).values_list(
             'id', 'variant_id', 'tag_id', 'sample_id', 'patient_id', 'resolved',
-            'resolved_classification__withdrawn')
+            'resolved_classification_id', 'resolved_classification__withdrawn')
         variant_tags_qs = list(variant_tags_qs)
         # str(Patient) falls back to the code for a de-identified record, so the objects are needed
         patient_names = {p.pk: str(p) for p in
                          Patient.objects.filter(pk__in={vt[4] for vt in variant_tags_qs if vt[4]})}
-        for pk, variant_id, tag_id, sample_id, patient_id, resolved, withdrawn in variant_tags_qs:
+        for pk, variant_id, tag_id, sample_id, patient_id, resolved, classification_id, withdrawn in variant_tags_qs:
             resolved_date = None
-            # A withdrawn resolving classification puts the to-do back @see VariantTag.unresolved_q
-            if resolved and not withdrawn:
+            # A deleted or withdrawn resolving classification puts the to-do back @see VariantTag.unresolved_q
+            if resolved and classification_id and not withdrawn:
                 resolved_date = localtime(resolved).date().isoformat()
             variant_tags[variant_id].append({"id": pk, "tag": tag_id, "sample": sample_id,
                                              "patient": patient_id,

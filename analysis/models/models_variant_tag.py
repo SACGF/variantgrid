@@ -83,17 +83,17 @@ class VariantTag(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
 
     @property
     def is_resolved(self) -> bool:
-        """ Withdrawing the classification puts the to-do back
+        """ Done while the classification it was resolved against is live - deleting that record (the FK is
+            SET_NULL, `resolved` keeps its date) or withdrawing it puts the to-do back
             @see analysis.variant_tag_operations.resolve_variant_tag """
-        if self.resolved is None:
-            return False
-        return not (self.resolved_classification and self.resolved_classification.withdrawn)
+        classification = self.resolved_classification
+        return classification is not None and not classification.withdrawn
 
     @staticmethod
     def unresolved_q() -> Q:
-        """ SQL twin of is_resolved - a withdrawn resolving classification puts the to-do back.
+        """ SQL twin of is_resolved - a deleted or withdrawn resolving classification puts the to-do back.
             Every work list filters with this rather than a bare resolved__isnull=True """
-        return Q(resolved__isnull=True) | Q(resolved_classification__withdrawn=True)
+        return Q(resolved_classification__isnull=True) | Q(resolved_classification__withdrawn=True)
 
     def __str__(self):
         description = f"{self.tag_id}: {self.variant} ({self.genome_build})"

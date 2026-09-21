@@ -20,6 +20,9 @@ from annotation.models import (
 )
 from annotation.fake_annotation import create_fake_variants, get_fake_annotation_version
 from annotation.tests.test_data_fake_genes import create_fake_transcript_version, create_gata2_transcript_version
+from classification.enums import SubmissionSource
+from classification.models.classification import Classification
+from classification.tests.models.test_utils import ClassificationTestUtils
 from library.django_utils import FakeRequest
 from library.django_utils.django_partition import temporary_db_table
 from library.guardian_utils import assign_permission_to_user_and_groups
@@ -393,7 +396,8 @@ class ResolvedVariantTagsTest(TestCase):
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
-        cls.user = User.objects.get_or_create(username='resolved_variant_tags_user')[0]
+        ClassificationTestUtils.setUp()
+        lab, cls.user = ClassificationTestUtils.lab_and_user()
         cls.genome_build = GenomeBuild.get_name_or_alias("GRCh37")
         get_fake_annotation_version(cls.genome_build)
         create_fake_variants(cls.genome_build)
@@ -401,15 +405,19 @@ class ResolvedVariantTagsTest(TestCase):
         cls.tag = create_classify_queue_tag()
         cls.open_variant, cls.done_variant = list(Variant.objects.order_by("pk")[:2])
         cls._tag(cls.open_variant)
-        cls._tag(cls.done_variant, resolved=now())
+        classification = Classification.create(user=cls.user, lab=lab, lab_record_id=None, data={},
+                                               save=True, source=SubmissionSource.API,
+                                               make_fields_immutable=False)
+        cls._tag(cls.done_variant, resolved=now(), classification=classification)
 
     @classmethod
-    def _tag(cls, variant: Variant, resolved=None) -> VariantTag:
+    def _tag(cls, variant: Variant, resolved=None, classification=None) -> VariantTag:
         allele, _ = VariantAllele.objects.get_or_create(
             variant=variant, genome_build=cls.genome_build, origin=AlleleOrigin.IMPORTED_TO_DATABASE,
             defaults={"allele": Allele.objects.create()})
         return VariantTag.objects.create(variant=variant, allele=allele.allele, tag=cls.tag,
-                                         genome_build=cls.genome_build, user=cls.user, resolved=resolved)
+                                         genome_build=cls.genome_build, user=cls.user, resolved=resolved,
+                                         resolved_classification=classification)
 
     def _set_show_resolved(self, show_resolved: bool):
         config = UserGridConfig.get(self.user, VariantTagsColumns.GRID_NAME)

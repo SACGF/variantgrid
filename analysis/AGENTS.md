@@ -102,8 +102,9 @@ Patterns here:
   (`analysis/variant_tag_operations.py:resolve_variant_tag`), so it stays as the record of what was flagged. That happens
   by itself when the classification is of the tagging's own sample, when the create form was launched from the tagging
   (`analysis/variant_tag_operations.py:resolve_launching_variant_tag` - clicking its "New classification" is the scientist
-  saying whose it is), and via the queue row's "Clear tag" button otherwise. A withdrawn `resolved_classification` puts
-  the to-do back (`VariantTag.is_resolved`).
+  saying whose it is), and via the queue row's "Clear tag" button otherwise. A tagging is done only while its
+  `resolved_classification` is live - withdrawing or deleting that record puts the to-do back (`VariantTag.is_resolved`;
+  the FK is SET_NULL and `resolved` keeps its date, so never test `resolved` alone).
 - Every "New Classification" button scopes with `snpdb/models/models.py:Tag.classify_queue_qs` rather than naming a tag,
   so a lab's own queue tag is offered and resolved the same way: the tag node editor's Classifications tab
   (`analysis/views/nodes/node_views.py:TagNodeView`), the variant tags grid (`variantopedia/grids.py:VariantTagsColumns`)
