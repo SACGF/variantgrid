@@ -151,6 +151,7 @@ CELERY_IMPORTS = (
     'classification.tasks.classification_import_process_variants_task',
     'classification.tasks.classification_import_task',
     'classification.tasks.classification_candidate_search_tasks',
+    'classification.tasks.classification_create_tasks',
     'genes.tasks.gene_coverage_tasks',
     'patients.tasks.extraction_matching_tasks',
     'pedigree.models',

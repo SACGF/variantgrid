@@ -378,11 +378,15 @@ class CreateClassificationForCaseTest(ClassifyReportTestCase):
                                         SpecialEKeys.INTERPRETATION_SUMMARY: {"value": "Seen before"}})
         previous.publish_latest(self.user)
 
-        response = self.client.post(self.url, self._post_data(copy_from_vcm_id=previous.last_published_version.pk))
+        # Populated by a celery task queued once the request commits
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(self.url,
+                                        self._post_data(copy_from_vcm_id=previous.last_published_version.pk))
 
         data = json.loads(response.content)
         classification = Classification.objects.get(pk=data["classification_id"])
         self.assertEqual(classification.get(SpecialEKeys.INTERPRETATION_SUMMARY), "Seen before")
+        self.assertIsNotNone(classification.last_published_version)
 
     def test_clears_the_tagging_it_satisfied(self):
         response = self.client.post(self.url, self._post_data())
@@ -473,8 +477,9 @@ class CreateClassificationForCaseTest(ClassifyReportTestCase):
         })
         previous.publish_latest(self.user)
 
-        response = self.client.post(
-            self.url, self._post_data(copy_gene_from_vcm_id=previous.last_published_version.pk))
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(
+                self.url, self._post_data(copy_gene_from_vcm_id=previous.last_published_version.pk))
 
         classification = Classification.objects.get(pk=json.loads(response.content)["classification_id"])
         self.assertEqual(classification.get("h_summary"), "RUNX1 is a transcription factor")

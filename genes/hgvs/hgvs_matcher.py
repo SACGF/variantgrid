@@ -28,6 +28,7 @@ from genes.hgvs.hgvs_converter import (
 )
 from genes.models import (
     BadTranscript,
+    GeneAnnotationImport,
     LRGRefSeqGene,
     NoTranscript,
     Transcript,
@@ -35,7 +36,8 @@ from genes.models import (
     TranscriptVersion,
 )
 from genes.transcripts_utils import transcript_is_lrg
-from library.constants import WEEK_SECS
+from library.cache import timed_cache
+from library.constants import MINUTE_SECS, WEEK_SECS
 from library.log_utils import report_exc_info
 from snpdb.clingen_allele import (
     ClinGenAlleleAPIException,
@@ -375,11 +377,19 @@ class HGVSMatcher:
 
         return sorted(tv_and_converter_type, key=sort_key)
 
+    @timed_cache(ttl=10 * MINUTE_SECS)
     def get_latest_cdot_data_version(self) -> str:
-        """ Fallback: cdot data version from the most recently imported TranscriptVersion for this genome build """
-        return TranscriptVersion.objects.filter(
-            genome_build=self.genome_build
-        ).exclude(data__cdot=None).order_by('-pk').values_list('data__cdot', flat=True).first() or ''
+        """ Fallback: cdot data version of this genome build's most recent import
+
+            An import rewrites every TranscriptVersion in its file, so those under the build's newest
+            GeneAnnotationImport carry the latest version - and import_source is indexed, where walking
+            TranscriptVersion back by pk has to skip every build imported after this one.
+            The ttl is about the length of an import, which runs in its own process """
+        latest_import = GeneAnnotationImport.objects.filter(genome_build=self.genome_build).order_by('-pk')
+        tv_qs = TranscriptVersion.objects.filter(import_source=latest_import.values('pk')[:1])
+        # Sliced rather than first(), which would order by pk and sort the whole import
+        cdot_versions = tv_qs.exclude(data__cdot=None).values_list('data__cdot', flat=True)[:1]
+        return next(iter(cdot_versions), '')
 
     def get_variant_coordinate_and_details(self, hgvs_string: str) -> VariantCoordinateAndDetails:
         """ Returns variant_coordinate and method for HGVS resolution = """

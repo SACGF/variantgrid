@@ -171,7 +171,8 @@ def create_classification_for_case(request, case_type: str, case_id: int, varian
     case = _get_case(request.user, case_type, case_id)
     variant_tag = VariantTag.get_for_user(request.user, variant_tag_id)
 
-    classification = create_classification_object(request)
+    # Populating (autopopulate, liftover, copying) can take many seconds - the queue only needs the link
+    classification = create_classification_object(request, populate_async=True)
     if analysis := variant_tag.analysis:
         if analysis.can_write(request.user):
             AnalysisClassification.objects.create(analysis=analysis, classification=classification)

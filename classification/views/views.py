@@ -12,6 +12,7 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
+from django.db import transaction
 from django.db.models import QuerySet
 from django.http import Http404, StreamingHttpResponse
 from django.http.request import HttpRequest
@@ -31,6 +32,7 @@ from rest_framework.views import APIView
 
 from annotation.transcripts_annotation_selections import VariantTranscriptSelections
 from classification.autopopulate_evidence_keys.autopopulate_evidence_keys import (
+    classification_complete_web_create,
     create_classification_for_sample_and_variant_objects,
     generate_auto_populate_data,
 )
@@ -45,7 +47,6 @@ from classification.enums import (
     LabExternalFilter,
     ShareLevel,
     SpecialEKeys,
-    SubmissionSource,
     WithdrawReason,
 )
 from classification.forms import ClassificationAlleleOriginForm
@@ -76,6 +77,7 @@ from classification.models.classification_import_run import ClassificationImport
 from classification.models.clinical_context_models import ClinicalContext
 from classification.models.evidence_key import EvidenceKeyMap
 from classification.models.flag_types import classification_flag_types
+from classification.tasks.classification_create_tasks import populate_new_classification_task
 from classification.views.classification_dashboard_view import ClassificationDashboard
 from classification.views.classification_datatables import ClassificationColumns
 from classification.views.exports import (
@@ -403,7 +405,17 @@ def classification_created_response(request, classification: Classification, ext
     return redirect(classification.get_edit_url())
 
 
-def create_classification_object(request) -> Classification:
+def _get_copy_from(user: User, copy_from_id: Optional[str]) -> Optional[ClassificationModification]:
+    if not copy_from_id or copy_from_id == "0":
+        return None
+    copy_from = ClassificationModification.objects.get(pk=int(copy_from_id))
+    copy_from.check_can_view(user)
+    return copy_from
+
+
+def create_classification_object(request, populate_async: bool = False) -> Classification:
+    """ populate_async - return once the bare record exists, and populate it (autopopulate, allele info, publish,
+        copying) in a celery task. For callers that only need a link to the record, not its content """
     if not Classification.can_create_via_web_form(request.user):
         raise PermissionDenied('User cannot create classifications via web form')
 
@@ -413,10 +425,12 @@ def create_classification_object(request) -> Classification:
     ensembl_transcript_accession = request.POST.get("ensembl_transcript_accession")
     sample_id = request.POST.get("sample_id")
     lab_id = request.POST.get("lab")
-    copy_from_id = request.POST.get("copy_from_vcm_id")
-    copy_gene_from_id = request.POST.get("copy_gene_from_vcm_id")
+    copy_from = _get_copy_from(request.user, request.POST.get("copy_from_vcm_id"))
+    copy_gene_from = _get_copy_from(request.user, request.POST.get("copy_gene_from_vcm_id"))
 
-    evidence_json = request.POST.get("evidence_json")
+    evidence = None
+    if evidence_json := request.POST.get("evidence_json"):
+        evidence = json.loads(evidence_json)
 
     genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
 
@@ -435,32 +449,20 @@ def create_classification_object(request) -> Classification:
     if not lab.is_member(request.user, admin_check=True):
         raise PermissionDenied(f"user={request.user} is not a member of {lab=}")
 
+    if populate_async:
+        classification = Classification.create(user=request.user, lab=lab, variant=variant, sample=sample,
+                                               populate_with_defaults=True)
+        task_args = (classification.pk, genome_build.name, refseq_transcript_accession, ensembl_transcript_accession,
+                     evidence, copy_from and copy_from.pk, copy_gene_from and copy_gene_from.pk)
+        transaction.on_commit(lambda: populate_new_classification_task.si(*task_args).apply_async())
+        return classification
+
     classification = create_classification_for_sample_and_variant_objects(request.user, lab, sample,
                                                                           variant, genome_build,
                                                                           refseq_transcript_accession=refseq_transcript_accession,
                                                                           ensembl_transcript_accession=ensembl_transcript_accession)
-    if evidence_json:
-        evidence = json.loads(evidence_json)
-        classification.patch_value(
-            patch=evidence,
-            clear_all_fields=False,
-            user=request.user,
-            source=SubmissionSource.FORM,
-            leave_existing_values=True,
-            save=True,
-            make_patch_fields_immutable=False)
-
-    classification.publish_latest(request.user)
-
-    # Allele level first so it beats the gene level copy, which only ever fills what is still empty
-    for source_id, copy_scopes in [(copy_from_id, COPY_SCOPES_ALL), (copy_gene_from_id, COPY_SCOPES_GENE)]:
-        if not source_id or source_id == "0":
-            continue
-        copy_from = ClassificationModification.objects.get(pk=int(source_id))
-        copy_from.check_can_view(request.user)
-        ClassificationConsensus(modification=copy_from, copy_scopes=copy_scopes).apply_to(classification,
-                                                                                         request.user)
-
+    classification_complete_web_create(classification, request.user, evidence=evidence,
+                                       copy_from=copy_from, copy_gene_from=copy_gene_from)
     return classification
 
 

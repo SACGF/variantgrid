@@ -18,7 +18,14 @@ from classification.autopopulate_evidence_keys.evidence_from_variant import (
     get_evidence_fields_for_variant,
 )
 from classification.enums import SpecialEKeys, SubmissionSource
-from classification.models import Classification, ClassificationImport, EvidenceKey
+from classification.models import (
+    Classification,
+    ClassificationConsensus,
+    ClassificationImport,
+    ClassificationModification,
+    EvidenceKey,
+)
+from classification.models.classification import COPY_SCOPES_ALL, COPY_SCOPES_GENE
 from classification.tasks.classification_import_process_variants_task import (
     liftover_classification_import,
 )
@@ -44,6 +51,20 @@ def create_classification_for_sample_and_variant_objects(
               "populate_with_defaults": True}
 
     classification = Classification.create(**kwargs)
+    classification_populate_from_variant(classification, genome_build,
+                                         refseq_transcript_accession=refseq_transcript_accession,
+                                         ensembl_transcript_accession=ensembl_transcript_accession,
+                                         annotation_version=annotation_version)
+    return classification
+
+
+def classification_populate_from_variant(
+        classification: Classification,
+        genome_build: GenomeBuild,
+        refseq_transcript_accession: str = None,
+        ensembl_transcript_accession: str = None,
+        annotation_version: str = None):
+    """ What a new record gets from its variant - evidence from annotation, its allele info and liftover """
     classification_auto_populate_fields(classification, genome_build,
                                         refseq_transcript_accession=refseq_transcript_accession,
                                         ensembl_transcript_accession=ensembl_transcript_accession,
@@ -51,8 +72,8 @@ def create_classification_for_sample_and_variant_objects(
 
     allele_info, allele_info_created = classification.ensure_allele_info_with_created()
     if allele_info and allele_info_created:
-        vc_import = ClassificationImport.objects.create(user=user, genome_build=genome_build)
-        allele_info.set_variant_and_save(matched_variant=variant)
+        vc_import = ClassificationImport.objects.create(user=classification.user, genome_build=genome_build)
+        allele_info.set_variant_and_save(matched_variant=classification.variant)
         allele_info.classification_import = vc_import
         allele_info.save()
         liftover_classification_import(vc_import, ImportSource.WEB)
@@ -61,7 +82,31 @@ def create_classification_for_sample_and_variant_objects(
     # call this to make sure the allele gets set
     classification.apply_allele_info_to_classification()
 
-    return classification
+
+def classification_complete_web_create(
+        classification: Classification,
+        user: User,
+        evidence: Optional[dict] = None,
+        copy_from: Optional[ClassificationModification] = None,
+        copy_gene_from: Optional[ClassificationModification] = None):
+    """ After populating from the variant: the evidence the form sent, publish, then any record the curator
+        chose to copy from """
+    if evidence:
+        classification.patch_value(
+            patch=evidence,
+            clear_all_fields=False,
+            user=user,
+            source=SubmissionSource.FORM,
+            leave_existing_values=True,
+            save=True,
+            make_patch_fields_immutable=False)
+
+    classification.publish_latest(user)
+
+    # Allele level first so it beats the gene level copy, which only ever fills what is still empty
+    for source, copy_scopes in [(copy_from, COPY_SCOPES_ALL), (copy_gene_from, COPY_SCOPES_GENE)]:
+        if source:
+            ClassificationConsensus(modification=source, copy_scopes=copy_scopes).apply_to(classification, user)
 
 
 def generate_auto_populate_data(
