@@ -469,6 +469,7 @@ function viewTags() {
 
 function replaceEditorWindow(url) {
     const nodeEditorContainer = $("#node-editor-container");
+    closeSelect2Dropdowns(nodeEditorContainer);
     nodeEditorContainer.empty();
     $("#error-container").empty();
     const nodeDataContainer = $("#node-data-container");
@@ -913,6 +914,7 @@ function loadGridAndEditorForNode(nodeId, extra_filters, fromSelectNode) {
         dataContainer.attr({node_url: load_node_url, node_loading: "true"});
         removeGridLoadingOverlay();  // tear down any in-progress grid overlay from the previous node
         registerDeferredGridLoad(null);  // the pending load belonged to the node we're leaving
+        closeSelect2Dropdowns("#node-editor-container");
         $("#node-editor-container").empty();
         closeAllVariantDetailsTabs();  // they belonged to the grid we're replacing
         showNodeEditorTab(NODE_EDITOR_TAB_EDITOR);  // a node comes up on its editor, so its grid stays deferred
@@ -928,6 +930,7 @@ function loadGridAndEditorForNode(nodeId, extra_filters, fromSelectNode) {
         removeGridLoadingOverlay();
         closeNodeEditorDrawer();
         closeAllVariantDetailsTabs();
+        closeSelect2Dropdowns("#node-editor-container");
         $("#node-editor-container").html("Please select a node");
         dataContainer.empty().removeAttr("node_url").removeAttr("node_loading");
         const tipBox = analysisTipBox();

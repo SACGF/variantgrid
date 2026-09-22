@@ -840,6 +840,15 @@ const FloatingPanel = {
 };
 
 
+// select2 hangs an open dropdown off the body - emptying its select out from under it (before the
+// mousedown that did it reaches select2's close handler on the body) strands the dropdown at 0,0
+function closeSelect2Dropdowns(container) {
+    const selects = $("select.select2-hidden-accessible", container);
+    if (selects.length) {
+        selects.select2("close");
+    }
+}
+
 function deleteItemClickHandler(outerElement, innerSpan, deleteClickHandler) {
     const isExpanded = innerSpan.attr("original_width");
     let completeFunc;
