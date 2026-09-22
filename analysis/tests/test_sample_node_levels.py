@@ -491,7 +491,7 @@ class TestSampleNodeLevels(SampleNodeLevelsTestCase):
     def test_node_name_and_method_summary(self):
         node = self._extraction_node()
         self.assertIn("2600000001C", node.get_node_name())
-        self.assertIn("2 samples", node.get_node_name())
+        self.assertNotIn("samples", node.get_node_name())
         method_summary = node._get_method_summary()
         self.assertIn(str(self.snv_sample.vcf), method_summary)
         self.assertIn(str(self.cnv_sample.vcf), method_summary)

@@ -402,8 +402,8 @@ class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
         if self.is_group_level:
             if source_object := self.get_source_object():
                 name_parts.append(str(source_object))
-                if (num_samples := len(self.get_source_samples())) != 1:
-                    name_parts.append(f"\n({num_samples} samples)")
+                if not self.get_source_samples():  # Otherwise the chips show what the group holds
+                    name_parts.append("\n(no samples)")
         elif self.sample:
             name_parts.append(self.sample.name)
             if self.sample.has_genotype:
