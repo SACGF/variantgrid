@@ -1,7 +1,7 @@
 # Multi variant report: tick the assay flags from the measures
 
 Written by Claude Fable 5.1 (claude-fable-5-1), 2026-09-22
-Status: draft
+Status: in progress - phase 1 being implemented; phase 2 is [sapath#455](https://github.com/SACGF/variantgrid_sapath/issues/455)
 
 [sapath#454](https://github.com/SACGF/variantgrid_sapath/issues/454). The TSO 500 Build report form asks the scientist
 to tick seven "Assay Success" boxes and three "Caveats" by hand. Most of those answers are already in the database, or
@@ -69,7 +69,7 @@ Three settings, default `None` (no call written - an installation that has not s
 `TSO500_TMB_HIGH_MUT_PER_MB`. SA Path's values go in its env settings - Illumina's guideline is 20 sites and 20% for MSI,
 10 mut/Mb for TMB, but they are the lab's numbers to confirm.
 
-### Phase 2: library QC, so Amplifications / Variants / Fusions / Quality / Fail have a source
+### Phase 2 ([sapath#455](https://github.com/SACGF/variantgrid_sapath/issues/455)): library QC, so Amplifications / Variants / Fusions / Quality / Fail have a source
 
 DRAGEN writes one *MetricsOutput.tsv* per run beside the CombinedVariantOutput. Its `[DNA Library QC Metrics]`,
 `[... for Small Variant Calling and TMB]`, `[... for MSI]`, `[... for CNV]` and `[RNA Library QC Metrics]` sections
