@@ -72,10 +72,8 @@ def validate_variant_classification_significance(sender, patch_meta: PatchMeta, 
                 break
 
         if not has_value:
-            # TODO this test is pretty basic compared to what
-            likely_somatic = "somatic" in (patch_meta.get(SpecialEKeys.ALLELE_ORIGIN, fallback_existing=True) or "").lower()
             message: str
-            if bucket == AlleleOriginBucket.GERMLINE:
+            if bucket == AlleleOriginBucket.SOMATIC:
                 message = f"{key_map.get(SpecialEKeys.CLINICAL_SIGNIFICANCE).label} or {key_map.get(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE).label} requires a value"
             else:
                 message = f"{key_map.get(SpecialEKeys.CLINICAL_SIGNIFICANCE).label} requires a value"
