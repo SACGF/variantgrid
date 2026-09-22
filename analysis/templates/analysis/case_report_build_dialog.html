@@ -43,6 +43,10 @@
                         {% with measure=measures|get_item:field.measure %}
                             <span class="text-muted small ml-1">{% if measure %}{{ measure.value_description }}{% else %}no measure{% endif %}</span>
                         {% endwith %}
+                    {% elif field.qc %}
+                        {% with qc=library_qc|get_item:field.qc %}
+                            <span class="text-muted small ml-1">{% if qc %}{{ qc.status_description }}{% else %}no QC{% endif %}</span>
+                        {% endwith %}
                     {% endif %}
                 </div>
             {% elif field.type == "choice" %}
@@ -68,6 +72,8 @@
                     <b>{{ note.label }}</b>:
                     {% if note.measure %}
                         {{ note.measure.value_description|default:"no value" }}{% if note.rule %} &middot; {{ note.rule }}{% endif %}{% if note.measure.threshold %} &middot; policy {{ note.measure.threshold }}{% if note.measure.threshold_source %} ({{ note.measure.threshold_source }}){% endif %}{% endif %}
+                    {% elif note.qc %}
+                        {{ note.qc.metrics_description }} &middot; {{ note.qc.status_description }}{% if note.rule %} &middot; {{ note.rule }}{% endif %}
                     {% else %}
                         no measure for this case{% if note.rule %} &middot; {{ note.rule }}{% endif %}
                     {% endif %}

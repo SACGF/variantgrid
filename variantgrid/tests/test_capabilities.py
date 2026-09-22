@@ -22,6 +22,7 @@ class CapabilitiesAPITest(APITestCase):
         self.assertIn("version", data)
         self.assertIn("patients", data["features"])
         self.assertIn("dragen_tso500_combined_variant_output", data["upload_file_types"])
+        self.assertIn("dragen_tso500_metrics_output", data["upload_file_types"])
         self.assertNotIn("liftover", data["upload_file_types"])
 
     def test_anonymous_is_refused(self):

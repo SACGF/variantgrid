@@ -4,10 +4,13 @@
     classification/tests/report/; what needs a real case is here: which samples a specimen or
     extraction case is, who may act on a built report, and what finalising writes.
 """
+from datetime import timedelta
+
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.test import override_settings
 from django.urls import reverse
+from django.utils import timezone
 
 from analysis.classify_report import ClassifyReportCase, ReportCandidate
 from analysis.tests.test_classify_report import READY_EVIDENCE, ClassifyReportTestCase
@@ -25,12 +28,19 @@ from classification.models.classification_report_models import (
     case_report_finalised_signal,
 )
 from classification.report.case_report_builder import build_case_report, finalise_case_report
+from classification.report.case_report_context import specimen_library_qc
 from classification.report.default_templates import generic_case_template
 from library.case_report_delivery import CaseReportDelivery
 from library.guardian_utils import assign_permission_to_user_and_groups
 from patients.models import Extraction, Patient, Specimen, SpecimenMeasure
-from patients.models_enums import NucleicAcid, SampleSourceLevel, SpecimenMeasureType
+from patients.models_enums import (
+    NucleicAcid,
+    SampleSourceLevel,
+    SpecimenMeasureType,
+)
 from patients.sample_grouping import get_sample_group
+from seqauto.models import LibraryQC
+from seqauto.models.models_enums import LibraryQCCategory
 from snpdb.models import Sample
 
 
@@ -460,6 +470,119 @@ class CaseReportMeasureTickTest(ClassifyReportTestCase):
                             [{"key": "flag", "type": "bool", "measure": "msi",
                               "tick_when": [{"called": True}, {}]}],
                             [{"key": "flag", "type": "bool", "tick_when": {"called": True}}]):
+            with self.subTest(case_fields=case_fields):
+                template = ClassificationReportTemplate(name="bad", case_fields=case_fields)
+                with self.assertRaises(ValidationError):
+                    template.clean()
+
+
+@override_settings(CELERY_TASK_ALWAYS_EAGER=True, LIFTOVER_CLASSIFICATIONS=False,
+                   CLINGEN_ALLELE_REGISTRY_LOGIN=None)
+class CaseReportLibraryQCTickTest(ClassifyReportTestCase):
+    """ The other five assay flags: a bool case_field naming a library QC category starts ticked from
+        what DRAGEN's own QC said about that library (sapath#455) """
+
+    QC_FIELDS = [
+        {"key": "assay_success_amplifications", "label": "Amplifications", "type": "bool",
+         "default": True, "group": "assay_success", "qc": "cnv", "tick_when": {"passed": True}},
+        {"key": "assay_success_fusions", "label": "Fusions", "type": "bool", "default": True,
+         "group": "assay_success", "qc": "rna", "tick_when": {"passed": True}},
+        {"key": "caveat_fail", "label": "Fail", "type": "bool", "default": False,
+         "group": "caveats", "qc": "dna",
+         "tick_when": [{"passed": False}, {"completed": False}]},
+    ]
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.patient = Patient.objects.create(first_name="Library", last_name="QC")
+        assign_permission_to_user_and_groups(cls.user, cls.patient)
+        cls.specimen = Specimen.objects.create(reference_id="2600000005", patient=cls.patient)
+        cls.dna = Extraction.objects.create(specimen=cls.specimen, reference_id="2600000005C",
+                                            nucleic_acid_source=NucleicAcid.DNA)
+        Sample.objects.filter(pk=cls.proband.pk).update(extraction=cls.dna)
+        cls.template = ClassificationReportTemplate.objects.create(
+            name="library qc template", case_template=generic_case_template(),
+            case_fields=cls.QC_FIELDS)
+        cls.classification = Classification.create(
+            user=cls.user, lab=cls.lab, sample=cls.proband, source=SubmissionSource.VARIANT_GRID,
+            variant=cls.variant,
+            data={**READY_EVIDENCE, SpecialEKeys.GENE_SYMBOL: {"value": "RUNX1"}})
+        cls.classification.publish_latest(cls.user)
+
+    def _library_qc(self, sequencing_run_name: str, category: str, passed=True, completed=True,
+                    measured_date=None, metrics=None) -> LibraryQC:
+        return LibraryQC.objects.create(sequencing_run_name=sequencing_run_name,
+                                        pair_id="5_C0000005_ABCD_2600000005",
+                                        specimen_reference="2600000005", specimen=self.specimen,
+                                        category=category, passed=passed, completed=completed,
+                                        measured_date=measured_date, metrics=metrics or {})
+
+    def _values(self, library_qc: dict) -> dict:
+        return _case_values_for_form(self.template, [], None, {}, library_qc)
+
+    def test_the_passed_rule_starts_the_tick_from_the_librarys_qc(self):
+        library_qc = {"cnv": LibraryQC(passed=True, completed=True),
+                      "rna": LibraryQC(passed=False, completed=True),
+                      "dna": LibraryQC(passed=True, completed=True)}
+
+        values = self._values(library_qc)
+
+        self.assertTrue(values["assay_success_amplifications"])
+        self.assertFalse(values["assay_success_fusions"])
+        self.assertFalse(values["caveat_fail"])
+
+    def test_a_run_that_did_not_complete_ticks_the_fail_caveat(self):
+        """ The caveat is either half - the library failed QC, or the run never finished for it """
+        self.assertTrue(self._values({"dna": LibraryQC(passed=True, completed=False)})["caveat_fail"])
+        self.assertTrue(self._values({"dna": LibraryQC(passed=False, completed=True)})["caveat_fail"])
+
+    def test_a_category_the_case_has_no_qc_for_leaves_the_fields_default(self):
+        values = self._values({})
+
+        self.assertTrue(values["assay_success_amplifications"])
+        self.assertFalse(values["caveat_fail"])
+
+    def test_the_newest_library_is_the_specimens_qc(self):
+        """ A repeat sequencing is a new library with its own QC, and it supersedes the one it replaced """
+        self._library_qc("RUN_1", LibraryQCCategory.CNV, passed=False,
+                         measured_date=timezone.now() - timedelta(days=7))
+        latest = self._library_qc("RUN_2", LibraryQCCategory.CNV, passed=True,
+                                  measured_date=timezone.now())
+
+        library_qc = specimen_library_qc(self.specimen)
+
+        self.assertEqual(latest, library_qc["cnv"])
+        self.assertTrue(self._values(library_qc)["assay_success_amplifications"])
+
+    def test_the_dialog_shows_each_categorys_metrics_against_its_guideline(self):
+        self._library_qc("RUN_1", LibraryQCCategory.CNV, passed=True, metrics={
+            "GENE_SCALED_MAD": {"value": 0.059, "unit": "Count", "lsl": 0, "usl": 0.134, "passed": True},
+            "MEDIAN_BIN_COUNT_CNV_TARGET": {"value": 6.4, "unit": "Count", "lsl": 1, "usl": None, "passed": True},
+        })
+        self.client.force_login(self.user)
+        url = reverse("case_report_build_dialog",
+                      kwargs={"case_type": "specimen", "case_id": self.specimen.pk})
+
+        response = self.client.post(url, {
+            "report_template": self.template.pk,
+            "classification_modification_id": [self.classification.last_published_version.pk],
+        })
+
+        content = response.content.decode()
+        self.assertIn("GENE_SCALED_MAD 0.059 (&lt;= 0.134), MEDIAN_BIN_COUNT_CNV_TARGET 6.4 (&gt;= 1)", content)
+        self.assertIn("no QC", content)  # the case has no RNA or DNA library QC
+        self.assertRegex(content, r'checked[^>]*id="case_field_assay_success_amplifications"')
+        self.assertIn("ticked when the library passed QC", content)
+        self.assertIn("ticked when the library failed QC or the run did not complete for the library", content)
+
+    def test_a_field_naming_an_unknown_category_a_measure_rule_or_both_kinds_is_not_saved(self):
+        """ The JSON is hand written in admin, so a typo says so rather than ticking nothing """
+        for case_fields in ([{"key": "flag", "type": "bool", "qc": "amplifications"}],
+                            [{"key": "flag", "type": "bool", "qc": "cnv",
+                              "tick_when": {"called": True}}],
+                            [{"key": "flag", "type": "bool", "qc": "cnv", "measure": "msi",
+                              "tick_when": {"passed": True}}]):
             with self.subTest(case_fields=case_fields):
                 template = ClassificationReportTemplate(name="bad", case_fields=case_fields)
                 with self.assertRaises(ValidationError):

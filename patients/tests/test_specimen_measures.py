@@ -9,6 +9,8 @@ from rest_framework.test import APITestCase
 from library.guardian_utils import assign_permission_to_user_and_groups
 from patients.models import Extraction, Patient, Specimen, SpecimenMeasure
 from patients.models_enums import NucleicAcid, SpecimenMeasureType
+from seqauto.models import LibraryQC
+from seqauto.models.models_enums import LibraryQCCategory
 
 TMB_PAYLOAD = {"measure_type": SpecimenMeasureType.TMB, "value": 12.3, "unit": "mut/Mb",
                "call": "High", "threshold": ">=10 mut/Mb", "threshold_source": "lab policy 2026",
@@ -112,3 +114,25 @@ class SpecimenMeasureAPITest(APITestCase):
         self.assertIn("Tumour mutational burden", html)
         self.assertIn("12.3", html)
         self.assertIn("Stable", html)
+
+    def test_library_qc_shows_on_the_specimen_page(self):
+        """ What the caller's own QC said about each library sequenced off this specimen (sapath#455) """
+        LibraryQC.objects.create(pair_id="5_C0000001_FCUP_2600000001",
+                                 sequencing_run_name="260101_M02027_0001_000000000-TSO500",
+                                 specimen_reference="2600000001", specimen=self.specimen,
+                                 category=LibraryQCCategory.CNV, nucleic_acid=NucleicAcid.DNA,
+                                 passed=False, completed=True,
+                                 method="DRAGEN TSO500 MetricsOutput 2.6.2.4",
+                                 metrics={"GENE_SCALED_MAD": {"value": 0.9, "unit": "Count",
+                                                              "lsl": 0, "usl": 0.134, "passed": False}})
+        self.client.force_authenticate(user=None)
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("view_specimen", kwargs={"specimen_id": self.specimen.pk}))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        html = response.content.decode()
+        self.assertIn("Library QC", html)
+        self.assertIn("failed", html)
+        self.assertIn("260101_M02027_0001_000000000-TSO500", html)
+        self.assertIn("5_C0000001_FCUP_2600000001", html)
+        self.assertIn("GENE_SCALED_MAD 0.9 (&lt;= 0.134)", html)

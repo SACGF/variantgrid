@@ -9,6 +9,9 @@ class UploadedFileTypes(models.TextChoices):
     # The pair-level summary written beside the two arm directories - the splice calls
     # become gene-level variants, @see upload.tasks.import_dragen_tso500_combined_variant_output_task
     DRAGEN_TSO500_COMBINED_VARIANT_OUTPUT = 'C', 'DRAGEN TSO500 Combined Variant Output'
+    # Per-library QC beside the CombinedVariantOutput - one row per library per category
+    # (@see upload.tasks.import_dragen_tso500_metrics_output_task)
+    DRAGEN_TSO500_METRICS_OUTPUT = 'Q', 'DRAGEN TSO500 Metrics Output'
     GENE_LIST = 'G', 'Gene List'
     GENE_COVERAGE = 'O', 'Gene Coverage'
     LIFTOVER = 'I', 'Liftover'

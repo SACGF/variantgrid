@@ -77,6 +77,14 @@ class QCExecSummaryAdmin(ModelAdminBasics):
     pass
 
 
+@admin.register(models.LibraryQC)
+class LibraryQCAdmin(ModelAdminBasics):
+    list_display = ("id", "sequencing_run_name", "pair_id", "category", "nucleic_acid", "passed",
+                    "completed", "specimen", "specimen_match_status", "measured_date")
+    list_filter = ("category", "nucleic_acid", "passed", "completed", "specimen_match_status")
+    search_fields = ("pair_id", "specimen_reference", "sequencing_run_name")
+
+
 @admin.register(models.SequencingSample)
 class SequencingSampleAdmin(ModelAdminBasics):
     """ list_filter on extraction_match_status is the cheapest 'show me everything needing attention' """

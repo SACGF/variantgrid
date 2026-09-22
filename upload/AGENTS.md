@@ -79,13 +79,30 @@ Gotchas:
   no splice call) by
   tasks/import_dragen_tso500_combined_variant_output_task.py:DragenTSO500CombinedVariantOutputInsertTask
   (tso500/dragen_combined_variant_output_records.py). `[Analysis Details]` names the Patient (the code
-  `settings.TSO500_PAIR_ID_PATIENT_CODE_REGEX` reads out of `Pair ID`, whose leading sequencing sample ID changes when
-  the patient is re-sequenced), the Specimen
+  `settings.TSO500_PAIR_ID_PATIENT_CODE_REGEX` reads out of `Pair ID` - the lab writes that either as the whole pair
+  sample name, whose leading sequencing sample ID changes when the patient is re-sequenced, or as the bare patient
+  code, and the default regex reads both), the Specimen
   (the ten-digit accession inside each sample ID) and the two Extractions (its container suffix), created when absent;
   the DNA/RNA sample IDs are exact `Sample.vcf_sample_name` and `SequencingSample.sample_name`, which links both arms'
   samples to their extraction and the splice VCF to its sequencing run without seqauto's filename matching. `[TMB]`,
   `[MSI]` and `[GIS]` become the five patients/models.py:SpecimenMeasure rows. None of it fails the import - a chain
   that cannot be made is a SimpleVCFImportInfo message, since a splice call is worth having unaccessioned.
+- The run's MetricsOutput.tsv is a separate, single-shot import (tasks/import_dragen_tso500_metrics_output_task.py,
+  tso500/dragen_metrics_output_parser.py + _records.py): it has no variants and no coordinates, and recognises itself
+  by a banner line ending 'Metrics Output' (with the module version, as the CVO's has it). One file covers a whole run
+  - the pipeline sends Results/MetricsOutput_orig.tsv, the copy the lab's run wrapper leaves untouched - and a 2.6.2
+  column is a *pair* (the CVO's Pair ID) carrying both arms, not a sample. `sequencing_run` upload metadata is
+  required and is part of the key, since a pair column alone does not identify a pair across runs. It writes one
+  seqauto/models/models_seqauto.py:LibraryQC per (run, pair, QC category), naming the arm each category is about and judging every
+  metric of a known section by the file's own LSL/USL guideline - settings.TSO500_LIBRARY_QC_GUIDELINES overrides that
+  per (section, metric) where a lab quotes its own number, and each metric records which it was judged by. The column
+  names a Specimen by its trailing ten-digit accession and never creates one (that is the CVO's job). Each row links its
+  arm's SequencingSample where the run's current sheet carries the TSO500 Pair_ID / Sample_Type columns as
+  SequencingSampleData (seqauto/models/models_seqauto.py:sequencing_sample_for_pair). A bare-patient-code Pair ID has no
+  accession, so the run supplies it: off the linked arm's name, or on a sheet without Pair_ID data off the SequencingSample
+  whose name carries the code - the sheet's names carry the code and the accession together. A column nothing on the run is named for
+  (a control, another assay on the flowcell) keeps its rows with the claim parked saying so, and an unresolvable
+  accession parks like a VCF sample's, with reconcile_pending_extractions fired after the writes.
 - Failure is one-way: UploadStep.error_exception → upload/models/models.py:UploadPipeline.error sets ERROR, marks the
   VCF/samples ImportStatus.ERROR, logs an Event and reports to Rollbar. Later steps see status != PROCESSING and mark
   themselves SKIPPED; BulkGenotypeVCFProcessor.check_pipeline_for_failures bails mid-file. Running steps are not killed.

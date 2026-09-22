@@ -5,6 +5,7 @@ from hashlib import sha256
 from unittest.mock import patch
 from urllib.parse import quote
 
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.urls import reverse
@@ -18,6 +19,8 @@ from snpdb.models.models_enums import ImportSource, ProcessingStatus
 from snpdb.tests.utils.fake_cohort_data import create_fake_cohort
 from upload.models import FileUpload, UploadedFileTypes, UploadedVCF, UploadPipeline
 
+METRICS_OUTPUT_ORIG = os.path.join(settings.BASE_DIR, "upload", "test_data", "tso500",
+                                   "MetricsOutput_orig.tsv")
 COHORT_EXPORT_TEMPLATE_NAME = "Cohort VCF Export auto analysis"  # settings.ANALYSIS_TEMPLATES_AUTO_COHORT_EXPORT
 
 
@@ -227,6 +230,32 @@ class UploadMetadataAPITest(UploadAPITestBase):
         response = self._upload("meta_extraction_both", quote(query, safe="?=&"))
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("sample_extractions", response.json()["error"])
+
+    def _upload_metrics_output(self, marker: str, query_string: str = ""):
+        """ The run-level MetricsOutput.tsv, whose only accepted key is the run it came off """
+        with open(METRICS_OUTPUT_ORIG, "rb") as f:
+            contents = f.read()
+        self.client.force_authenticate(user=self.owner)
+        with patch("upload.views.views_json.upload_processing.process_uploaded_file"):
+            return self.client.post(
+                reverse("api_file_upload") + query_string,
+                {"file": SimpleUploadedFile(f"{marker}.tsv", contents)},
+                format="multipart",
+            )
+
+    def test_sequencing_run_accepted_on_a_metrics_output(self):
+        response = self._upload_metrics_output("meta_run", "?sequencing_run=260101_M02027_0001")
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.json())
+        file_upload = FileUpload.objects.get(pk=response.json()["file_upload_id"])
+        self._temp_upload_paths.append(file_upload.get_filename())
+        self.assertEqual(file_upload.file_type, UploadedFileTypes.DRAGEN_TSO500_METRICS_OUTPUT)
+        self.assertEqual(file_upload.metadata, {"sequencing_run": "260101_M02027_0001"})
+
+    def test_genome_build_rejected_on_a_metrics_output(self):
+        """ The file has no coordinates, so a declared build would be a silently ignored value """
+        response = self._upload_metrics_output("meta_run_build", "?genome_build=GRCh37")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("genome_build", response.json()["error"])
 
     def test_path_and_force_are_not_metadata(self):
         response = self._upload("meta_reserved", "?path=/client/x.vcf&force=1")

@@ -27,7 +27,12 @@ from classification.models.classification import ClassificationModification
 from classification.report.template_validation import validate_case_template
 from library.case_report_delivery import CaseReportDelivery
 from patients.models import Extraction, Patient, Specimen, SpecimenMeasure
-from patients.models_enums import MEASURE_CONTEXT_KEYS, SampleSourceLevel
+from patients.models_enums import (
+    MEASURE_CONTEXT_KEYS,
+    SampleSourceLevel,
+)
+from seqauto.models import LibraryQC
+from seqauto.models.models_enums import LIBRARY_QC_CONTEXT_KEYS
 from snpdb.models import Lab, Sample
 
 # A report has gone out with the case, so a deployment that files it somewhere else can now do so.
@@ -66,6 +71,12 @@ TICK_WHEN_CALL_IN = "call_in"
 TICK_WHEN_VALUE_BELOW = "value_below"
 TICK_WHEN_RULES = (TICK_WHEN_CALLED, TICK_WHEN_CALL_IN, TICK_WHEN_VALUE_BELOW)
 
+# What a bool case_field's `tick_when` can say about the library QC category it names instead -
+# 'the assay succeeded for amplifications' is DRAGEN's CNV library QC, not a measure
+TICK_WHEN_PASSED = "passed"
+TICK_WHEN_COMPLETED = "completed"
+TICK_WHEN_QC_RULES = (TICK_WHEN_PASSED, TICK_WHEN_COMPLETED)
+
 
 def _tick_when_rules(tick_when) -> list[dict]:
     return tick_when if isinstance(tick_when, list) else [tick_when]
@@ -92,6 +103,38 @@ def measure_tick(tick_when, measure: Optional[SpecimenMeasure]) -> Optional[bool
     return any(outcomes)
 
 
+def _qc_rule_holds(rule: dict, library_qc: LibraryQC) -> Optional[bool]:
+    """ None where the row cannot answer the rule - a category with no QC leaves the field's own
+        default standing rather than reading as a failure """
+    if (passed := rule.get(TICK_WHEN_PASSED)) is not None:
+        return None if library_qc.passed is None else library_qc.passed == bool(passed)
+    if (completed := rule.get(TICK_WHEN_COMPLETED)) is not None:
+        return None if library_qc.completed is None else library_qc.completed == bool(completed)
+    return None
+
+
+def library_qc_tick(tick_when, library_qc: Optional[LibraryQC]) -> Optional[bool]:
+    """ Whether the rule a case_field states holds for the case's library QC - None where the case
+        has no QC for that category, so the field's own default stands """
+    if library_qc is None:
+        return None
+    outcomes = [_qc_rule_holds(rule, library_qc) for rule in _tick_when_rules(tick_when)]
+    if all(outcome is None for outcome in outcomes):
+        return None
+    return any(outcomes)
+
+
+def tick_for(field: dict, measures: dict, library_qc: dict) -> Optional[bool]:
+    """ Where a bool case_field's tick starts - a field names either a measure or a QC category,
+        and the one it names says which of the case's rows the rule is applied to """
+    tick_when = field.get("tick_when")
+    if not tick_when:
+        return None
+    if qc_key := field.get("qc"):
+        return library_qc_tick(tick_when, library_qc.get(qc_key))
+    return measure_tick(tick_when, measures.get(field.get("measure")))
+
+
 def _describe_rule(rule: dict, unit: str) -> str:
     if (called := rule.get(TICK_WHEN_CALLED)) is not None:
         return "the measure has a call" if called else "the measure has no call"
@@ -99,6 +142,10 @@ def _describe_rule(rule: dict, unit: str) -> str:
         return "the call is " + " or ".join(str(call) for call in call_in)
     if (value_below := rule.get(TICK_WHEN_VALUE_BELOW)) is not None:
         return f"the value is below {value_below}{unit}"
+    if (passed := rule.get(TICK_WHEN_PASSED)) is not None:
+        return "the library passed QC" if passed else "the library failed QC"
+    if (completed := rule.get(TICK_WHEN_COMPLETED)) is not None:
+        return "the run completed for the library" if completed else "the run did not complete for the library"
     return ""
 
 
@@ -116,21 +163,29 @@ def validate_case_fields(case_fields: list) -> Optional[str]:
     """ What a template's JSON has to get right for a measure to reach the form - the keys are hand
         written in admin, so a typo says so at save time rather than silently ticking nothing """
     measure_keys = set(MEASURE_CONTEXT_KEYS.values())
+    qc_keys = set(LIBRARY_QC_CONTEXT_KEYS.values())
     for field in case_fields or []:
         if not isinstance(field, dict):
             return f"Each case field must be an object, not '{field}'"
         key = field.get("key") or "(no key)"
         measure = field.get("measure")
+        qc = field.get("qc")
         if measure is not None and measure not in measure_keys:
             return f"'{key}' measures '{measure}' - one of {', '.join(sorted(measure_keys))} was expected"
+        if qc is not None and qc not in qc_keys:
+            return f"'{key}' names library QC '{qc}' - one of {', '.join(sorted(qc_keys))} was expected"
+        if measure is not None and qc is not None:
+            # The rules are different and the row they judge is different, so a field is one or the other
+            return f"'{key}' names both a measure and a library QC category - it can carry one"
+        rules = TICK_WHEN_QC_RULES if qc else TICK_WHEN_RULES
         if (tick_when := field.get("tick_when")) is not None:
             for rule in _tick_when_rules(tick_when):
                 if not isinstance(rule, dict) or not rule:
-                    return f"'{key}' tick_when must be one of {', '.join(TICK_WHEN_RULES)}"
-                if unknown := set(rule) - set(TICK_WHEN_RULES):
+                    return f"'{key}' tick_when must be one of {', '.join(rules)}"
+                if unknown := set(rule) - set(rules):
                     return f"'{key}' tick_when has no rule '{', '.join(sorted(unknown))}'"
-            if measure is None:
-                return f"'{key}' has a tick_when and names no measure to apply it to"
+            if measure is None and qc is None:
+                return f"'{key}' has a tick_when and names no measure or library QC to apply it to"
     return None
 
 
@@ -148,7 +203,8 @@ class ClassificationReportTemplate(TimeStampedModel):
     # [{"key", "label", "type": "text"|"bool"|"choice", "options": [...], "default", "group",
     #   "prefill_key": the evidence key the form starts the field from,
     #   "measure": the SpecimenMeasure shown beside a bool field (a MEASURE_CONTEXT_KEYS value),
-    #   "tick_when": the rule (or list of rules, any of which) that field's tick starts from - @see measure_tick}]
+    #   "qc": the LibraryQC category shown beside a bool field instead (a LIBRARY_QC_CONTEXT_KEYS value),
+    #   "tick_when": the rule (or list of rules, any of which) that field's tick starts from - @see tick_for}]
     case_fields = models.JSONField(default=list, blank=True)
     # Which cases this template is offered for - null is every case
     allele_origin_bucket = models.CharField(max_length=1, choices=AlleleOriginBucket.choices,

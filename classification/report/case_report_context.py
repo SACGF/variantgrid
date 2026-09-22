@@ -23,6 +23,7 @@ from typing import Any, Optional
 
 from django.contrib.auth.models import User
 from django.core.exceptions import ObjectDoesNotExist
+from django.db.models import F
 from django.utils import timezone
 
 from annotation.models import VariantAnnotationVersion
@@ -35,8 +36,13 @@ from classification.models.evidence_key import EvidenceKeyMap
 from library.genomics.vcf_enums import GeneLevelSymbolicAlt, VariantClass
 from library.utils.django_utils import get_cached_project_git_hash
 from patients.models import Extraction, Patient, Specimen, SpecimenMeasure
-from patients.models_enums import MEASURE_CONTEXT_KEYS, SampleSourceLevel
+from patients.models_enums import (
+    MEASURE_CONTEXT_KEYS,
+    SampleSourceLevel,
+)
 from patients.sample_grouping import get_patient_for_source, get_sample_group
+from seqauto.models import LibraryQC
+from seqauto.models.models_enums import LIBRARY_QC_CONTEXT_KEYS
 from snpdb.models import GenomeBuild, Lab, Sample
 
 
@@ -511,6 +517,20 @@ def specimen_measures(specimen: Optional[Specimen]) -> dict[str, SpecimenMeasure
         if key := MEASURE_CONTEXT_KEYS.get(measure.measure_type):
             measures[key] = measure
     return measures
+
+
+def specimen_library_qc(specimen: Optional[Specimen]) -> dict[str, LibraryQC]:
+    """ What the caller's QC said about the specimen's libraries, by context key - the newest run
+        per category wins, since a repeat sequencing supersedes the QC of the one it replaced """
+    if specimen is None:
+        return {}
+    library_qc = {}
+    qs = LibraryQC.objects.filter(specimen=specimen) \
+        .order_by(F("measured_date").asc(nulls_first=True), "pk")
+    for qc in qs:
+        if key := LIBRARY_QC_CONTEXT_KEYS.get(qc.category):
+            library_qc[key] = qc
+    return library_qc
 
 
 def _sequencing_runs(samples: list[Sample]) -> list[str]:

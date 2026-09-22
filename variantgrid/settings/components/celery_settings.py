@@ -107,6 +107,7 @@ CELERY_TASK_ROUTES = {
     'upload.tasks.import_bedfile_task.ImportBedFileTask': WEB_WORKERS,
     'upload.tasks.import_gene_coverage_task.ImportGeneCoverageTask': WEB_WORKERS,
     'upload.tasks.import_gene_list_task.ImportGeneListTask': WEB_WORKERS,
+    'upload.tasks.import_dragen_tso500_metrics_output_task.ImportDragenTSO500MetricsOutputTask': WEB_WORKERS,
     'upload.tasks.import_patient_records_task.ImportPatientRecords': WEB_WORKERS,
     'upload.tasks.import_ped_task.ImportPedTask': WEB_WORKERS,
 
@@ -170,6 +171,7 @@ CELERY_IMPORTS = (
     'upload.tasks.import_bedfile_task',
     'upload.tasks.import_dragen_tso500_all_fusions_task',
     'upload.tasks.import_dragen_tso500_combined_variant_output_task',
+    'upload.tasks.import_dragen_tso500_metrics_output_task',
     'upload.tasks.import_gene_coverage_task',
     'upload.tasks.import_gene_level_cnv_task',
     'upload.tasks.import_gene_list_task',

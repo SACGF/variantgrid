@@ -263,11 +263,22 @@ class TestCombinedVariantOutputRecords(TestCase):
         self.assertEqual("2600000001B", self.identifiers.rna.extraction_reference)
         self.assertEqual(NucleicAcid.RNA, self.identifiers.rna.nucleic_acid)
 
-    def test_pair_id_the_regex_does_not_read_is_not_a_chain(self):
-        """ The whole pair ID is a sample name, so falling back to it would accession a patient per
-            sequencing rather than one per patient """
+    def test_a_bare_patient_code_pair_id_is_still_a_chain(self):
+        """ The lab writes the Pair ID either way - the code alone or the whole pair sample name -
+            and the accession comes off the arms' sample IDs either way """
         details = dict(self.analysis_details)
         details[PAIR_ID] = "C0000001"
+
+        identifiers = parse_pair_identifiers(details)
+
+        self.assertEqual("C0000001", identifiers.patient_code)
+        self.assertEqual("2600000001", identifiers.specimen_reference)
+
+    def test_pair_id_the_regex_does_not_read_is_not_a_chain(self):
+        """ A code the regex cannot find names a patient we cannot identify, and the whole pair ID is
+            not it - one per sequencing of the patient would leave a patient per run """
+        details = dict(self.analysis_details)
+        details[PAIR_ID] = "_"
         with self.assertRaises(CombinedVariantOutputIdentityError):
             parse_pair_identifiers(details)
 

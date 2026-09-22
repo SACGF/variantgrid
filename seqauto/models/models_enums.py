@@ -53,3 +53,26 @@ class EnrichmentKitType(models.TextChoices):
     AMPLICON = 'A', 'Amplicon'
     CAPTURE = 'C', 'Capture'
     VIRTUAL = 'V', 'Virtual'
+
+
+class LibraryQCCategory(models.TextChoices):
+    """ What a caller's library QC section vouches for. These are DRAGEN TSO500's MetricsOutput sections today
+        (upload/tso500/dragen_metrics_output_parser.py maps the headings), named for what they vouch for so another
+        caller's QC can land in the same rows """
+    DNA = 'D', 'DNA library'                      # contamination
+    SMALL_VARIANT_TMB = 'V', 'Small variants and TMB'
+    MSI = 'M', 'MSI'
+    CNV = 'C', 'CNV'
+    GIS = 'G', 'GIS'
+    RNA = 'R', 'RNA library'                      # fusions and splice variants
+
+
+# The key a report template's case_fields names a category by, as MEASURE_CONTEXT_KEYS does for measures
+LIBRARY_QC_CONTEXT_KEYS = {
+    LibraryQCCategory.DNA: "dna",
+    LibraryQCCategory.SMALL_VARIANT_TMB: "small_variant_tmb",
+    LibraryQCCategory.MSI: "msi",
+    LibraryQCCategory.CNV: "cnv",
+    LibraryQCCategory.GIS: "gis",
+    LibraryQCCategory.RNA: "rna",
+}

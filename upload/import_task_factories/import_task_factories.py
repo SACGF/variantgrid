@@ -15,6 +15,7 @@ from upload.models import (
     UploadedAnalysis,
     UploadedBed,
     UploadedClassificationImport,
+    UploadedDragenTSO500MetricsOutput,
     UploadedFileTypes,
     UploadedGeneCoverage,
     UploadedGeneList,
@@ -29,7 +30,11 @@ from upload.models import (
     UploadStepTaskType,
     VCFPipelineStage,
 )
-from upload.tso500 import dragen_all_fusions_parser, dragen_combined_variant_output_parser
+from upload.tso500 import (
+    dragen_all_fusions_parser,
+    dragen_combined_variant_output_parser,
+    dragen_metrics_output_parser,
+)
 from upload.tasks.import_analysis_task import ImportAnalysisTask
 from upload.tasks.import_bedfile_task import ImportBedFileTask
 from upload.tasks.import_gene_coverage_task import ImportGeneCoverageTask
@@ -40,6 +45,9 @@ from upload.tasks.import_dragen_tso500_all_fusions_task import (
 from upload.tasks.import_dragen_tso500_combined_variant_output_task import (
     DragenTSO500CombinedVariantOutputCreateVCFTask,
     DragenTSO500CombinedVariantOutputInsertTask,
+)
+from upload.tasks.import_dragen_tso500_metrics_output_task import (
+    ImportDragenTSO500MetricsOutputTask,
 )
 from upload.tasks import import_gene_level_cnv_task
 from upload.tasks.import_gene_level_cnv_task import (
@@ -77,7 +85,7 @@ from upload.tasks.vcf.import_vcf_tasks import (
     ProcessVCFLinkManualVariantEntrySetMaxVariantTask,
     ProcessVCFSetMaxVariantTask,
 )
-from upload.upload_metadata import VCF_METADATA_KEYS
+from upload.upload_metadata import SEQUENCING_RUN, VCF_METADATA_KEYS
 
 
 class BedImportTaskFactory(ImportTaskFactory):
@@ -258,6 +266,41 @@ class DragenTSO500CombinedVariantOutputImportTaskFactory(AbstractVCFImportTaskFa
 
     def get_finish_task_classes(self):
         return [ImportGenotypeVCFSuccessTask]
+
+
+class DragenTSO500MetricsOutputImportTaskFactory(ImportTaskFactory):
+    """ Illumina DRAGEN TSO 500's MetricsOutput.tsv - a run's per-library QC, one column per sample
+        of every pair on the run. It has no variants and no coordinates, so it is a single shot
+        import rather than a VCF pipeline (@see upload.tasks.import_dragen_tso500_metrics_output_task).
+
+        The file names the run nowhere, and its column names alone do not identify a library across
+        runs, so 'sequencing_run' is required metadata and is part of the LibraryQC key.
+
+        A tsv, so GeneListImportTaskFactory would otherwise claim it on its default ability of 1 """
+
+    @property
+    def enabled(self) -> bool:
+        return settings.VARIANT_GENE_LEVEL_ENABLED
+
+    def get_uploaded_file_type(self):
+        return UploadedFileTypes.DRAGEN_TSO500_METRICS_OUTPUT
+
+    def get_possible_extensions(self):
+        return ['tsv']
+
+    def get_metadata_keys(self):
+        return frozenset({SEQUENCING_RUN})
+
+    def get_data_classes(self):
+        return [UploadedDragenTSO500MetricsOutput]
+
+    def get_processing_ability(self, user, filename, file_extension):
+        if dragen_metrics_output_parser.can_process_file(filename):
+            return 1000
+        return 0
+
+    def create_import_task(self, upload_pipeline):
+        return ImportDragenTSO500MetricsOutputTask.si(upload_pipeline.pk)
 
 
 class GeneLevelCNVImportTaskFactory(AbstractVCFImportTaskFactory):

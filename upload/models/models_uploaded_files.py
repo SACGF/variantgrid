@@ -16,6 +16,7 @@ from genes.models import GeneCoverageCollection, GeneList
 from library.utils.file_utils import name_from_filename
 from patients.models import PatientRecords
 from pedigree.models import PedFile
+from seqauto.models import LibraryQC
 from snpdb.models import (
     GenomeBuild,
     GenomicIntervalsCollection,
@@ -98,6 +99,31 @@ def uploaded_patient_records_post_delete_handler(sender, instance, **kwargs):  #
     if instance.patient_records:
         logging.info("Deleting linked PatientRecords")
         instance.patient_records.delete()
+
+
+class UploadedDragenTSO500MetricsOutput(UploadData):
+    """ DRAGEN's MetricsOutput.tsv - the per-library QC rows it wrote (@see seqauto.models.LibraryQC).
+
+        The rows are keyed on the run and the file's pair columns rather than on this record, since a
+        re-analysis of the run replaces them; this is what makes the upload 'processed', which is what
+        the API's sha256 de-duplication keys on """
+    file_upload = models.OneToOneField(FileUpload, on_delete=CASCADE)
+
+    def get_data(self):
+        """ The first row that found its extraction - a file landing before its specimens are
+            accessioned has rows but nothing to show them against yet """
+        return LibraryQC.objects.filter(file_upload=self.file_upload,
+                                        specimen__isnull=False).order_by("pk").first()
+
+    def get_data_url(self) -> Optional[str]:
+        """ The run the file describes, which is every row's; a run seqauto has not registered falls
+            back to the first specimen the rows reached """
+        if linked := LibraryQC.objects.filter(file_upload=self.file_upload,
+                                              sequencing_run__isnull=False).first():
+            return linked.sequencing_run.get_absolute_url()
+        if library_qc := self.get_data():
+            return library_qc.specimen.get_absolute_url()
+        return None
 
 
 class UploadedGeneCoverage(UploadData):

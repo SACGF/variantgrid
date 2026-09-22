@@ -42,11 +42,12 @@ from classification.models import (
     ClassificationReportTemplate,
     get_case_report_deliveries,
 )
-from classification.models.classification_report_models import describe_tick_when, measure_tick
+from classification.models.classification_report_models import describe_tick_when, tick_for
 from classification.report.case_report_builder import build_case_report, preview_case_report_html
 from classification.report.case_report_context import (
     build_report_variants,
     case_specimen,
+    specimen_library_qc,
     specimen_measures,
 )
 from classification.views.views import classification_created_response, create_classification_object
@@ -254,11 +255,12 @@ def _flat_case_values(case_values: Optional[dict]) -> dict:
 def _case_values_for_form(template: Optional[ClassificationReportTemplate],
                           modifications: list[ClassificationModification],
                           draft: Optional[CaseReport],
-                          measures: dict) -> dict:
+                          measures: dict, library_qc: Optional[dict] = None) -> dict:
     """ What the form starts from: a draft's own answers, else each field's default, the
         prefill_key read off the case's classifications - a case level value the records already
         carry, like SA Path's clinical indication, is not worth retyping - and the tick_when rule
-        against the case's measures, which is what the scientist was working out by hand """
+        against the case's measures and library QC, which is what the scientist was working out by hand """
+    library_qc = library_qc or {}
     values = _flat_case_values(draft.case_values if draft else None)
     for field in (template.case_fields if template else None) or []:
         key = field.get("key")
@@ -270,28 +272,35 @@ def _case_values_for_form(template: Optional[ClassificationReportTemplate],
                 if prefilled := modification.get(prefill_key):
                     value = prefilled
                     break
-        if tick_when := field.get("tick_when"):
-            ticked = measure_tick(tick_when, measures.get(field.get("measure")))
-            if ticked is not None:
-                value = ticked
+        ticked = tick_for(field, measures, library_qc)
+        if ticked is not None:
+            value = ticked
         if value is not None:
             values[key] = value
     return values
 
 
-def _measure_notes(template: Optional[ClassificationReportTemplate], measures: dict) -> dict[str, list[dict]]:
-    """ Per case_field group, what each measure-backed checkbox was started from: the measure as it
-        stands, the rule, and the policy that made the call (the import records the threshold it
-        applied and the setting it came from). On the form so a scientist who disagrees with a tick
-        sees the numbers behind it and can ask for the policy to change rather than just untick """
+def _measure_notes(template: Optional[ClassificationReportTemplate], measures: dict,
+                   library_qc: Optional[dict] = None) -> dict[str, list[dict]]:
+    """ Per case_field group, what each measure or library QC backed checkbox was started from: the
+        row as it stands, the rule, and the policy that made the call - a measure records the
+        threshold it was called against and the setting it came from, and a QC category its metrics
+        against the file's own guidelines. On the form so a scientist who disagrees with a tick sees
+        the numbers behind it and can ask for the policy to change rather than just untick """
+    library_qc = library_qc or {}
     notes: dict[str, list[dict]] = {}
     for field in (template.case_fields if template else None) or []:
-        if field.get("type") != "bool" or not (measure_key := field.get("measure")):
+        if field.get("type") != "bool":
             continue
-        measure = measures.get(measure_key)
+        measure_key = field.get("measure")
+        qc_key = field.get("qc")
+        if not (measure_key or qc_key):
+            continue
+        measure = measures.get(measure_key) if measure_key else None
         notes.setdefault(field.get("group") or "", []).append({
             "label": field.get("label") or field.get("key"),
             "measure": measure,
+            "qc": library_qc.get(qc_key) if qc_key else None,
             "rule": describe_tick_when(field["tick_when"], measure.unit if measure else None)
                     if field.get("tick_when") else "",
         })
@@ -320,7 +329,9 @@ def case_report_build_dialog(request, case_type: str, case_id: int):
     template = _case_report_template(request, modifications)
 
     draft = case.latest_draft_report()
-    measures = specimen_measures(case_specimen(case.source_level, case.obj))
+    specimen = case_specimen(case.source_level, case.obj)
+    measures = specimen_measures(specimen)
+    library_qc = specimen_library_qc(specimen)
     lab, lab_error = UserSettings.get_lab_and_error(request.user)
     context = {
         "case": case,
@@ -331,9 +342,10 @@ def case_report_build_dialog(request, case_type: str, case_id: int):
             case_allele_origin_bucket(modifications)),
         "variants": build_report_variants(modifications, request.user),
         "summary": draft.summary if draft else "",
-        "case_values": _case_values_for_form(template, modifications, draft, measures),
+        "case_values": _case_values_for_form(template, modifications, draft, measures, library_qc),
         "measures": measures,
-        "measure_notes": _measure_notes(template, measures),
+        "library_qc": library_qc,
+        "measure_notes": _measure_notes(template, measures, library_qc),
         "lab": lab,
         "lab_error": lab_error,
         "lab_form": UserLabChoiceForm(user=request.user, default_lab=lab) if lab else None,

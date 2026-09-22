@@ -20,6 +20,7 @@ GENOME_BUILD = "genome_build"
 SOURCE = "source"
 EXTRACTION = "extraction"                  # one extraction for every sample in the file
 SAMPLE_EXTRACTIONS = "sample_extractions"  # VCF sample name -> extraction, for a multi-sample VCF
+SEQUENCING_RUN = "sequencing_run"          # SequencingRun.name, for a file written per run
 
 VCF_METADATA_KEYS = frozenset({GENOME_BUILD, SOURCE, EXTRACTION, SAMPLE_EXTRACTIONS})
 
@@ -48,6 +49,16 @@ def _validate_source(value) -> str:
     if not source:
         raise UploadMetadataError(f"'{SOURCE}' must not be empty")
     return source
+
+
+def _validate_sequencing_run(value) -> str:
+    """ The name only. Existence is not checked: the pipeline registers the run before it sends a
+        run-level file, and a run nothing has registered is linked by nobody rather than rejected -
+        the same ordering race patients.tasks.extraction_matching_tasks absorbs for extractions """
+    name = str(value).strip()
+    if not name:
+        raise UploadMetadataError(f"'{SEQUENCING_RUN}' must not be empty")
+    return name
 
 
 def _as_json_value(key: str, value):
@@ -89,6 +100,7 @@ _VALIDATORS = {
     SOURCE: _validate_source,
     EXTRACTION: _validate_extraction,
     SAMPLE_EXTRACTIONS: _validate_sample_extractions,
+    SEQUENCING_RUN: _validate_sequencing_run,
 }
 
 
@@ -143,6 +155,13 @@ def get_metadata_extractions(file_upload, sample_names) -> dict[str, ExternalRef
         reference = ExternalReference.from_data(declared)
         return {name: reference for name in sample_names}
     return {}
+
+
+def get_metadata_sequencing_run_name(file_upload) -> Optional[str]:
+    """ The run a run-level file came off, which its contents do not name """
+    if file_upload:
+        return (file_upload.metadata or {}).get(SEQUENCING_RUN)
+    return None
 
 
 def get_metadata_source(file_upload) -> Optional[str]:

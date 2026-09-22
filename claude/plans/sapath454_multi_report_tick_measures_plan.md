@@ -1,7 +1,7 @@
 # Multi variant report: tick the assay flags from the measures
 
 Written by Claude Fable 5.1 (claude-fable-5-1), 2026-09-22; phase 1 implemented by Claude Opus 5 (claude-opus-5), revised by Claude Fable 5.1 the same day
-Status: landed - phase 1 in core ee184f8ba (PR 1895) and sapath PR 456, with the lab's thresholds and derived Confirmed as a follow-up straight on master; phase 2 is [sapath#455](https://github.com/SACGF/variantgrid_sapath/issues/455)
+Status: landed - phase 1 in core ee184f8ba (PR 1895) and sapath PR 456, with the lab's thresholds and derived Confirmed as a follow-up straight on master; phase 2 is [sapath#455](https://github.com/SACGF/variantgrid_sapath/issues/455), planned in `claude/plans/sapath455_library_qc_metrics_output_plan.md`
 
 [sapath#454](https://github.com/SACGF/variantgrid_sapath/issues/454). The TSO 500 Build report form asks the scientist
 to tick seven "Assay Success" boxes and three "Caveats" by hand. Most of those answers are already in the database, or

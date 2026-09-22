@@ -42,6 +42,8 @@ FILE_TYPE_ICONS: dict[UploadedFileTypes, FileTypeIcon] = {
     UploadedFileTypes.CLINVAR: FileTypeIcon(fa="fa-solid fa-earth-americas"),
     UploadedFileTypes.DRAGEN_TSO500_ALL_FUSIONS: FileTypeIcon(symbol="file-icon-fusion"),
     UploadedFileTypes.DRAGEN_TSO500_COMBINED_VARIANT_OUTPUT: FileTypeIcon(symbol="file-icon-splice"),
+    UploadedFileTypes.DRAGEN_TSO500_METRICS_OUTPUT: FileTypeIcon(fa="fa-solid fa-clipboard-check",
+                                                                 css="file-type-icon-muted"),
     UploadedFileTypes.GENE_LIST: FileTypeIcon(symbol="file-icon-list", css="file-type-icon-muted", badge=_GENE_LIST_G),
     UploadedFileTypes.GENE_COVERAGE: FileTypeIcon(symbol="file-icon-gene-coverage"),
     UploadedFileTypes.LIFTOVER: FileTypeIcon(symbol="file-icon-liftover"),

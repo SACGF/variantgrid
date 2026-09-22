@@ -96,6 +96,30 @@
         {% endif %}
 
         <hr/>
+        <h4>Library QC</h4>
+        {% if library_qc %}
+            <table class="table">
+                <thead><tr><th>Run<th>Pair<th>Arm<th>Category<th>QC<th>Metrics<th>Method<th>Measured</tr></thead>
+                <tbody>
+                {% for qc in library_qc %}
+                    <tr>
+                        <td>{% if qc.sequencing_run_id %}<a href="{{ qc.sequencing_run.get_absolute_url }}">{{ qc.sequencing_run_name }}</a>{% else %}{{ qc.sequencing_run_name }}{% endif %}
+                        <td>{{ qc.pair_id }}
+                        <td>{{ qc.get_nucleic_acid_display }}
+                        <td>{{ qc.get_category_display }}
+                        <td>{{ qc.status_description }}
+                        <td class="small">{{ qc.metrics_description }}
+                        <td>{{ qc.method|default:"-" }}
+                        <td>{{ qc.measured_date|default_if_none:"-" }}
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p>No library QC recorded for this specimen.</p>
+        {% endif %}
+
+        <hr/>
         <h4>Create analysis</h4>
         {% load related_analyses_tags %}
         {% analysis_templates_for_sample_source "P" specimen %}

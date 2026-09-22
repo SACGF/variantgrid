@@ -24,7 +24,7 @@ from patients.models import (
     Specimen,
 )
 from patients.models_enums import MatchStatus
-from seqauto.models import SequencingSample
+from seqauto.models import LibraryQC, SequencingSample
 from snpdb.models import Sample
 from uicore.utils.form_helpers import form_helper_horizontal
 
@@ -199,6 +199,10 @@ def view_specimen(request, specimen_id):
                "create_extraction_field": CREATE_EXTRACTION,
                "extractions": specimen.extraction_set.order_by("pk").prefetch_related(visible_samples),
                "measures": specimen.specimenmeasure_set.order_by("measure_type", "-measured_date"),
+               # What the caller's own QC said about each library sequenced off this specimen
+               "library_qc": LibraryQC.objects.filter(specimen=specimen)
+                                              .select_related("sequencing_run")
+                                              .order_by("sequencing_run_name", "pair_id", "category"),
                "has_write_permission": has_write_permission}
     return render(request, 'patients/view_specimen.html', context)
 

@@ -4,6 +4,7 @@ Illumina TruSight Oncology 500 output — DRAGEN TSO 500 v2.6.2, pipeline 2.6.2.
 sequenced as a DNA arm and an RNA arm.
 
 ```
+MetricsOutput_orig.tsv                run-level: one column per pair on the run, both arms
 ExampleSample_2600000001/
 ├── ..._CombinedVariantOutput.tsv     the pair's reportable calls + TMB/MSI/GIS
 ├── ..._MetricsOutput.tsv             run QC, analysis status and library QC per extraction
@@ -27,10 +28,12 @@ and the `GL000*` decoys, with `chrM` at 16569 (rCRS, not hg19's 16571).
 The names are synthetic but keep the shape a loader has to parse. `2600000001` is a ten-digit lab
 accession identifying the specimen, and the trailing `C` and `B` are container suffixes naming the
 two nucleic-acid extractions taken from it — so the two arm directories are the specimen's DNA and
-RNA extractions. The pair is **the patient**, not the specimen: in a real run the pair ID is the
-Omico C-number (`Patient.patient_code`), and the sample IDs are `SA-<C-number>-<accession><container>-<D|R>`,
-eg `SA-C23755-2535115161C-D`. A patient re-analysed later comes back under the same C-number with a
-new accession, so one pair ID spans specimens. The test files keep the older synthetic sample names
+RNA extractions. The pair is **the patient**, not the specimen: the pair ID carries the Omico C-number
+(`Patient.patient_code`), written either as the whole pair sample name (`5_C0000001_FCUP_2600000001`) or
+as the C-number on its own (`C0000001`) - the lab's pipeline chooses inconsistently, so both forms turn up
+in the same feed and `settings.TSO500_PAIR_ID_PATIENT_CODE_REGEX` reads either. The sample IDs are
+`SA-<C-number>-<accession><container>-<D|R>`, eg `SA-C23755-2535115161C-D`. A patient re-analysed later
+comes back under the same C-number with a new accession, so one pair ID spans specimens. The test files keep the older synthetic sample names
 because a CVO's DNA/RNA Sample IDs have to equal the VCF sample names they link to; the pair ID
 (`C0000001`) has the real shape.
 
@@ -109,12 +112,33 @@ Note `MEDIAN_INSERT_SIZE` appears in both the DNA small-variant and the RNA sect
 unique within its section. The lab's file pads every line with tabs to the widest row; a 2.6.2 file
 seen in the wild does not, so the padding is not to be relied on either way.
 
-The identifiers, dates and every value were replaced. Sample columns are the CVO's `DNA Sample ID` and
-`RNA Sample ID`; the file the lab supplied had been hand-anonymised down to a single column, so the two-
-column shape here follows DRAGEN's own output rather than that copy. The values are plausible and made up,
-kept within the guidelines so the file agrees with the CVO (a completed run with calls in every category);
-`USABLE_MSI_SITES` equals the CVO's `Usable MSI Sites`. The run QC metrics are populated, as the lab starts
-analysis from BCLs, not FASTQs (see `[Notes]`).
+The identifiers, dates and every value were replaced. Its two columns are the CVO's `DNA Sample ID` and
+`RNA Sample ID` - a shape DRAGEN 2.1.1 wrote and 2.6.2 does not, kept here as a parser case, since a
+section's sample columns are read the same way whichever the file names. The values are plausible and made
+up, kept within the guidelines so the file agrees with the CVO (a completed run with calls in every
+category); `USABLE_MSI_SITES` equals the CVO's `Usable MSI Sites`. The run QC metrics are populated, as the
+lab starts analysis from BCLs, not FASTQs (see `[Notes]`).
+
+**`MetricsOutput_orig.tsv` is the run-level 2.6.2 file, and is what gets imported.** The lab's run wrapper
+rewrites every `MetricsOutput.tsv` in place - inserting a sex metrics block, padding `[Analysis Status]`
+rows and stripping the research-use text - before the results reach us; the one untouched DRAGEN copy it
+keeps is `Results/MetricsOutput_orig.tsv`, so that is what the pipeline sends, once per sequencing run. A
+column here is a **pair**, named by the CVO's `Pair ID` and carrying *both* of its arms - the DNA sections
+and the RNA sections have values in the same column - so a column names a specimen (its trailing ten-digit
+accession) rather than an extraction. The four columns are `5_C0000001_FCUP_2600000001` (the `ExampleSample`
+pair, every metric within guideline and `USABLE_MSI_SITES` agreeing with its CVO),
+`7_C0000002_ABCD_2600000002` (`MEDIAN_EXON_COVERAGE` 92 against a guideline of 150, so its Small Variants /
+TMB category fails, and `COMPLETED_ALL_STEPS` `FALSE` with a `FAILED_STEPS` entry), `9_0PRI_2600000003` (a
+pair with no patient C-number, as controls and research samples are named, all within guideline),
+`C0000004` (the bare form the lab also writes, so the accession has to come off the run's sample sheet -
+`1_TSO_DNAHRD_C0000004_2600000004C_B4`) and `11_NTC`, which nothing on a run is named for, so its rows
+are kept with the claim parked. 2.6.2 adds `PCT_CHIMERIC_READS` to the
+small-variant section and `EXCESSIVE_TF` to GIS, and its `TOTAL_ON_TARGET_READS` guideline is 2,500,000
+where the lab's methods paragraph says 9M - which is what `settings.TSO500_LIBRARY_QC_GUIDELINES` is for.
+The file names the run nowhere, and a pair column alone does not identify a pair across runs, so the run
+comes in as upload metadata and is part of the `LibraryQC` key. The file names no sample either: each
+row's arm is linked to its `SequencingSample` through the sheet's `Pair_ID` and `Sample_Type` columns,
+which the pipeline posts per sample.
 
 **Run dates and site paths in the caller command lines are neutralised.** Software versions,
 vendor `resource_bundle/…` paths and caller arguments are real — a loader may want the pipeline
@@ -125,15 +149,15 @@ version out of them.
 Two facts these files don't reliably carry are supplied at upload instead, as `genome_build` and
 `source` (`upload/upload_metadata.py`; API query params, or `import_vcf --genome-build/--source`).
 
-| File | `genome_build` | `source` |
-|---|---|---|
-| `hard-filtered.vcf` | from header contigs | `DRAGEN TSO500 SmallVariant` |
-| `cnv.vcf` | from header contigs | `DRAGEN TSO500 CNV` |
-| `_DragenExonCNV.vcf` | **`GRCh37` — required**, the header has no contigs and an unresolvable `##reference` | from header (`LrCalculator 1.0.0.11`) |
-| `SpliceVariants.vcf` | from header contigs | from header (`SpliceGirl 1.0.0.614`) |
-| `AllFusions.csv` | **`GRCh37` — required** on a multi-build deployment, the file carries no build at all | from its own `# Source =` line (`FusionProcessor 1.0.0.614`) |
-| `CombinedVariantOutput.tsv` | **`GRCh37` — required**, no build in the file | from `Module Version` (`DRAGEN TSO500 CombinedVariantOutput 2.1.1`) |
-| `MetricsOutput.tsv` | not needed, the file has no coordinates | from `Workflow Version` (`2.1.1.4`) |
+| File | `genome_build` | `source` | `sequencing_run` |
+|---|---|---|---|
+| `hard-filtered.vcf` | from header contigs | `DRAGEN TSO500 SmallVariant` | — |
+| `cnv.vcf` | from header contigs | `DRAGEN TSO500 CNV` | — |
+| `_DragenExonCNV.vcf` | **`GRCh37` — required**, the header has no contigs and an unresolvable `##reference` | from header (`LrCalculator 1.0.0.11`) | — |
+| `SpliceVariants.vcf` | from header contigs | from header (`SpliceGirl 1.0.0.614`) | — |
+| `AllFusions.csv` | **`GRCh37` — required** on a multi-build deployment, the file carries no build at all | from its own `# Source =` line (`FusionProcessor 1.0.0.614`) | — |
+| `CombinedVariantOutput.tsv` | **`GRCh37` — required**, no build in the file | from `Module Version` (`DRAGEN TSO500 CombinedVariantOutput 2.1.1`) | — |
+| `MetricsOutput_orig.tsv` | **none accepted** - the file has no coordinates | from `Workflow Version` (`2.1.1.4`) | **required** - the only key it takes |
 
 Send a build's **own name** (`GRCh37`), not an alias (`hg19`). These files are GRCh37 with a `chr`
 prefix and `chrM` at 16569, and their `##reference` says `hg19_decoy` — which is exactly the confusion
@@ -163,6 +187,9 @@ field mapping comes off the header and the copy-neutral skip is a general rule.
 - `MetricsOutput.tsv` — the `[Analysis Status]` header row starts with an empty cell; `[Run QC Metrics]`
   has a `Value` column where the others have samples; `NA` as a guideline (no bound), as a value (arm not
   sequenced) and as a `(UOM)`; a metric name repeated across sections; tab padding on every line.
+- `MetricsOutput_orig.tsv` — the same, run-level and 2.6.2: a column per pair carrying both arms, a pair
+  with no C-number, a pair ID in the bare C-number form, a column naming nothing at all, a metric outside
+  its guideline, a pair whose run did not complete, and a banner line carrying the module version.
 - `AllFusions.csv` — multi-gene partners (`RP11-458D21.5;NOTCH2NL`, `ROS1;GOPC`), a gene pair
   written with a slash (`PPARG/AC016683.6`), `SEPT14` (renamed `SEPTIN14` by HGNC, and
   date-mangled by spreadsheets), two callers, long semicolon-joined filter strings.

@@ -17,6 +17,7 @@ from django.db.models.deletion import CASCADE, PROTECT, SET_NULL
 from django.db.models.signals import pre_delete
 from django.dispatch.dispatcher import receiver
 from django.urls.base import reverse
+from django.utils import timezone
 from django.utils.timezone import make_aware
 from django_extensions.db.models import TimeStampedModel
 
@@ -37,9 +38,11 @@ from library.genomics.vcf_utils import get_variant_caller_and_version_from_vcf
 from library.preview_request import PreviewModelMixin
 from library.utils import sorted_nicely
 from library.utils.file_utils import name_from_filename
-from patients.models import ExtractionMatchMixin, FakeData, Patient
+from patients.external_references import ResolvedReference
+from patients.models import ExtractionMatchMixin, FakeData, Patient, Specimen
+from patients.models_enums import MatchStatus, NucleicAcid
 from seqauto.illumina.illumina_sequencers import SEQUENCING_RUN_REGEX
-from seqauto.models.models_enums import DataGeneration, PairedEnd, SequencerRead
+from seqauto.models.models_enums import DataGeneration, LibraryQCCategory, PairedEnd, SequencerRead
 from seqauto.models.models_sequencing import EnrichmentKit, Experiment, Sequencer
 from seqauto.models.models_software import Aligner, VariantCaller
 from seqauto.signals.signals_list import sequencing_run_sample_sheet_created_signal
@@ -992,6 +995,151 @@ class GoldCoverageSummary(models.Model):
     def filter_for_kit_and_gene_symbols(enrichment_kit, gene_symbols):
         return GoldCoverageSummary.objects.filter(gene_symbol__in=gene_symbols,
                                                   gold_reference__enrichment_kit=enrichment_kit)
+
+
+class LibraryQC(TimeStampedModel):
+    """ One QC category of one sequenced pair, as the caller judged it - what 'the assay succeeded for X' means.
+        A category is about one of the pair's arms (nucleic_acid), so a pair on both arms has six rows: the five
+        DNA categories linked to its DNA SequencingSample, RNA to its RNA one.
+
+        DRAGEN writes one MetricsOutput per run, with a column per pair carrying both of its arms, so a row is
+        keyed on (run, pair, category). The run is part of the key because the column alone does not identify a
+        pair across runs - the lab's pair IDs carry a leading sequencing number, and nothing promises a
+        re-sequenced pair is renamed. The SequencingRun is linked where seqauto has registered it and left null
+        where it has not, the way the CombinedVariantOutput's link_to_sequencing_run tolerates a missing sample
+        sheet; a nullable FK cannot be the key, since Postgres treats nulls as distinct, so the run's name is
+        stored too.
+
+        The pair claims a Specimen by the accession inside its ID and never creates one - the
+        CombinedVariantOutput is what accessions a case, and QC that arrives first parks its claim
+        (@see patients.tasks.extraction_matching_tasks). Each row is about one arm, and that arm's row on the
+        run's current sample sheet is linked where the sheet says which it is: a TSO500 sheet's Pair_ID and
+        Sample_Type columns, kept as SequencingSampleData, are the one place the pair and its arms are written
+        together (sequencing_sample_for_pair). Left null until the sheet is registered and reconciled after. """
+    sequencing_run_name = models.TextField()    # the upload's 'sequencing_run' metadata - a SequencingRun.name
+    pair_id = models.TextField()                # the file's column - the CVO's 'Pair ID'
+    specimen_reference = models.TextField()     # the ten-digit accession inside the pair ID
+    specimen = models.ForeignKey(Specimen, null=True, blank=True, on_delete=SET_NULL)
+    specimen_match_status = models.CharField(max_length=1, choices=MatchStatus.choices,
+                                             null=True, blank=True)
+    specimen_match_error = models.TextField(null=True, blank=True)
+    specimen_match_date = models.DateTimeField(null=True, blank=True)
+    sequencing_run = models.ForeignKey(SequencingRun, null=True, blank=True, on_delete=SET_NULL)
+    sequencing_sample = models.ForeignKey(SequencingSample, null=True, blank=True, on_delete=SET_NULL)  # the arm's sheet row
+    category = models.CharField(max_length=1, choices=LibraryQCCategory.choices)
+    nucleic_acid = models.CharField(max_length=1, choices=NucleicAcid.choices)  # the arm the category is about
+    passed = models.BooleanField(null=True)     # every metric within its guideline; None where the section is all NA for this arm
+    completed = models.BooleanField(null=True)  # [Analysis Status] COMPLETED_ALL_STEPS for the pair, the same on each of its rows
+    metrics = models.JSONField(default=dict)    # {metric: {"value", "unit", "lsl", "usl", "passed", "guideline_source"}} - the section, so 'which number' stays answerable
+    method = models.TextField(blank=True)       # 'DRAGEN TSO500 MetricsOutput 2.6.2.4' off [Header]
+    measured_date = models.DateTimeField(null=True, blank=True)
+    # Provenance, as SpecimenMeasure keeps source_payload. String reference - upload depends on seqauto
+    file_upload = models.ForeignKey("upload.FileUpload", null=True, on_delete=SET_NULL)
+    user = models.ForeignKey(User, null=True, on_delete=SET_NULL)
+
+    class Meta:
+        # A re-analysis of the same run replaces its rows; the same pair on a later run is a new one
+        unique_together = ("sequencing_run_name", "pair_id", "category")
+
+    def __str__(self):
+        return f"{self.pair_id} {self.get_category_display()}: {self.status_description}"
+
+    def apply_specimen_match(self, resolved: ResolvedReference, save=True):
+        """ Leaves a settled link alone, so a matched row never flaps back. As ExtractionMatchMixin
+            does for an extraction, a new claim starts the clock and re-resolving the same one leaves
+            it where it was, so an unresolvable reference ages past the pending window """
+        if self.specimen_id:
+            return
+        if self.specimen_match_date is None or resolved.reference.reference_id != self.specimen_reference:
+            self.specimen_match_date = timezone.now()
+        self.specimen_reference = resolved.reference.reference_id
+        self.specimen_match_status = resolved.status
+        self.specimen_match_error = resolved.error
+        if resolved.matched:
+            self.specimen = resolved.obj
+        if save:
+            self.save()
+
+    def park_specimen_claim(self, error: str, save=True):
+        """ Nothing the file or its run names a specimen with - the QC is still worth keeping, and
+            the message says why it is not attached to anything """
+        if self.specimen_id:
+            return
+        if self.specimen_match_date is None:
+            self.specimen_match_date = timezone.now()
+        self.specimen_match_status = MatchStatus.PENDING
+        self.specimen_match_error = error
+        if save:
+            self.save()
+
+    @property
+    def status_description(self) -> str:
+        """ The call in one word, as the build form and the specimen page show it """
+        if self.completed is False:
+            return "run did not complete"
+        if self.passed is None:
+            return "no QC"
+        return "passed" if self.passed else "failed"
+
+    @property
+    def metrics_description(self) -> str:
+        """ Each metric against the guideline it was judged by - 'GENE_SCALED_MAD 0.059 (<= 0.134)' - so a
+            scientist looking at a failed category can see which number failed rather than just that it did """
+        parts = []
+        for name, metric in self.metrics.items():
+            described = f"{name} {_number_text(metric.get('value'))}"
+            # 'Count' is what DRAGEN writes for a metric with no unit at all, so it is not shown
+            unit = metric.get("unit") or ""
+            if unit == "%":
+                described += unit
+            elif unit not in ("", "Count"):
+                described += f" {unit}"
+            if guideline := library_qc_guideline(metric.get("lsl"), metric.get("usl")):
+                described = f"{described} ({guideline})"
+            parts.append(described)
+        return ", ".join(parts)
+
+
+# The TSO500 sample sheet columns the pipeline posts per sample as SequencingSampleData - the pair each row
+# belongs to and which arm it is ('DNA' / 'RNA', NucleicAcid's labels)
+SAMPLE_SHEET_PAIR_ID_COLUMN = "Pair_ID"
+SAMPLE_SHEET_SAMPLE_TYPE_COLUMN = "Sample_Type"
+
+
+def sequencing_sample_for_pair(sequencing_run: Optional[SequencingRun], pair_id: str,
+                               nucleic_acid: str) -> Optional[SequencingSample]:
+    """ The arm's row on the run's current sample sheet, by the sheet's own Pair_ID / Sample_Type data.
+        None where the run is not registered or its sheet was posted without those columns """
+    if sequencing_run is None:
+        return None
+    # Two filter() calls so each column/value pair joins its own SequencingSampleData row
+    return SequencingSample.get_current().filter(
+        sample_sheet__sequencing_run=sequencing_run,
+        sequencingsampledata__column=SAMPLE_SHEET_PAIR_ID_COLUMN,
+        sequencingsampledata__value=pair_id,
+    ).filter(
+        sequencingsampledata__column=SAMPLE_SHEET_SAMPLE_TYPE_COLUMN,
+        sequencingsampledata__value=NucleicAcid(nucleic_acid).label,
+    ).order_by("-pk").first()
+
+
+def _number_text(value) -> str:
+    """ A metric's number as the file wrote it - 184, not 184.0 """
+    return f"{value:g}" if isinstance(value, (int, float)) else "no value"
+
+
+def library_qc_guideline(lsl, usl) -> str:
+    """ A metric's guideline in words. A zero lower bound is no bound in practice - none of these
+        metrics can go negative - so it is left off rather than read as policy """
+    lower = f"{lsl:g}" if lsl else None
+    upper = f"{usl:g}" if usl is not None else None
+    if lower and upper:
+        return f"{lower} - {upper}"
+    if lower:
+        return f">= {lower}"
+    if upper:
+        return f"<= {upper}"
+    return ""
 
 
 class QCType(models.Model):
