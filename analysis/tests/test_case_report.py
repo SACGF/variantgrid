@@ -10,8 +10,8 @@ from django.test import override_settings
 from django.urls import reverse
 
 from analysis.classify_report import ClassifyReportCase, ReportCandidate
-from analysis.views.views_classify_report import _case_values_for_form
 from analysis.tests.test_classify_report import READY_EVIDENCE, ClassifyReportTestCase
+from analysis.views.views_classify_report import _case_values_for_form
 from classification.enums import SpecialEKeys, SubmissionSource
 from classification.models import (
     CaseReport,
@@ -363,7 +363,7 @@ class CaseReportMeasureTickTest(ClassifyReportTestCase):
          "group": "assay_success", "measure": "tmb", "tick_when": {"called": True}},
         {"key": "caveat_purity", "label": "Purity", "type": "bool", "default": False,
          "group": "caveats", "measure": "tumour_fraction",
-         "tick_when": {"call_in": ["Insufficient", "No tumour"]}},
+         "tick_when": [{"call_in": ["Insufficient", "No tumour"]}, {"value_below": 20}]},
         {"key": "caveat_low_gis", "label": "GIS", "type": "bool", "default": False,
          "group": "caveats", "measure": "gis", "tick_when": {"value_below": 42}},
     ]
@@ -405,6 +405,13 @@ class CaseReportMeasureTickTest(ClassifyReportTestCase):
         self.assertTrue(values["caveat_purity"])       # call_in
         self.assertTrue(values["caveat_low_gis"])      # value_below
 
+    def test_a_list_of_rules_ticks_when_any_holds(self):
+        """ Purity is the pathologist's call from Mocha or the number off the pipeline, whichever the
+            case has - a call with no number, a number under 20% with no call, and a number over it """
+        self.assertTrue(self._values(self._measures(tumour_fraction=(None, "%", "No tumour")))["caveat_purity"])
+        self.assertTrue(self._values(self._measures(tumour_fraction=(15.0, "%", None)))["caveat_purity"])
+        self.assertFalse(self._values(self._measures(tumour_fraction=(60.0, "%", None)))["caveat_purity"])
+
     def test_a_measure_the_case_lacks_leaves_the_fields_default(self):
         values = self._values({})
 
@@ -424,7 +431,9 @@ class CaseReportMeasureTickTest(ClassifyReportTestCase):
 
     def test_the_dialog_shows_each_measure_beside_its_checkbox(self):
         SpecimenMeasure.objects.create(specimen=self.specimen, measure_type=SpecimenMeasureType.MSI,
-                                       value=2.48, unit="%", call="Stable")
+                                       value=2.48, unit="%", call="MSS",
+                                       threshold="MSI-High >= 30%, MSI-Low >= 10%, MSS < 10% unstable sites",
+                                       threshold_source="settings.TSO500_MSI_CALL_BANDS")
         self.client.force_login(self.user)
         url = reverse("case_report_build_dialog",
                       kwargs={"case_type": "specimen", "case_id": self.specimen.pk})
@@ -435,15 +444,21 @@ class CaseReportMeasureTickTest(ClassifyReportTestCase):
         })
 
         content = response.content.decode()
-        self.assertIn("2.48% (Stable)", content)
+        self.assertIn("2.48% (MSS)", content)
         self.assertIn("no measure", content)  # the case has no TMB, tumour fraction or GIS
         self.assertRegex(content, r'checked[^>]*id="case_field_assay_success_msi"')
+        # The policy behind the tick is on the form, so a scientist can ask for it to change
+        self.assertIn("ticked when the measure has a call", content)
+        self.assertIn("policy MSI-High &gt;= 30%, MSI-Low &gt;= 10%, MSS &lt; 10% unstable sites (settings.TSO500_MSI_CALL_BANDS)", content)
+        self.assertIn("ticked when the call is Insufficient or No tumour or the value is below 20", content)
 
     def test_a_field_naming_an_unknown_measure_or_rule_is_not_saved(self):
         """ The JSON is hand written in admin, so a typo says so rather than ticking nothing """
         for case_fields in ([{"key": "flag", "type": "bool", "measure": "msi_status"}],
                             [{"key": "flag", "type": "bool", "measure": "msi",
                               "tick_when": {"call_is": "Stable"}}],
+                            [{"key": "flag", "type": "bool", "measure": "msi",
+                              "tick_when": [{"called": True}, {}]}],
                             [{"key": "flag", "type": "bool", "tick_when": {"called": True}}]):
             with self.subTest(case_fields=case_fields):
                 template = ClassificationReportTemplate(name="bad", case_fields=case_fields)

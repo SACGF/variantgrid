@@ -160,7 +160,10 @@ Gotchas:
   first classification that has one (SA Path's clinical indication), and its `default` otherwise.
 - A bool `case_field` can also carry `measure` (a `patients/models_enums.py:MEASURE_CONTEXT_KEYS` value) and `tick_when`:
   the form shows that `SpecimenMeasure` beside the checkbox and starts the tick from the rule - `{"called": true}`,
-  `{"call_in": [...]}` or `{"value_below": n}` (`classification/models/classification_report_models.py:measure_tick`).
+  `{"call_in": [...]}`, `{"value_below": n}`, or a list of those that ticks when any holds
+  (`classification/models/classification_report_models.py:measure_tick`). Under each group the form lists the rule in
+  words (`describe_tick_when`) and the measure's `threshold` / `threshold_source`, which the TSO 500 import fills from
+  the `TSO500_*_CALL_BANDS` settings - the policy is on the form so a scientist who disagrees can ask for it to change.
   A case with no such measure falls back to `default`, and a draft's own answer wins over both. The keys are hand
   written in admin, so `validate_case_fields` fails the save on an unknown measure or rule.
 - report/__init__.py stays empty on purpose: models/classification_report_models.py imports report/template_validation.py

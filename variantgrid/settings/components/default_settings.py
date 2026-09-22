@@ -459,10 +459,12 @@ PATIENT_EXTRACTION_SAMPLE_NAME_REGEX = None  # eg r"(?P<extraction>\d{10}[A-Z])$
 TSO500_PAIR_ID_PATIENT_CODE_REGEX = r"^\d+_(?P<patient_code>[^_]+)_"
 # Turning a pair's MSI and TMB numbers into a call is lab policy rather than vendor output - DRAGEN
 # writes the numbers and no call. None leaves the call blank, so a deployment that has not set its
-# policy reports the measure as not able to be determined, as it does today
-TSO500_MSI_MIN_USABLE_SITES = None   # fewer usable sites than this and MSI cannot be called
-TSO500_MSI_UNSTABLE_PERCENT = None   # 'Percent Unstable MSI Sites' at or over this is Unstable
-TSO500_TMB_HIGH_MUT_PER_MB = None    # 'Total TMB' at or over this is High
+# policy reports the measure as not able to be determined, as it does today. A band list is
+# [(lower bound, call), ...], the call being the first whose lower bound the number reaches - the
+# words are the lab's too (SA Path: MSI-High / MSI-Low / MSS), and go into the Omico JSON as written
+TSO500_MSI_MIN_USABLE_SITES = None   # fewer 'Usable MSI Sites' than this and MSI cannot be called
+TSO500_MSI_CALL_BANDS = None         # over 'Percent Unstable MSI Sites', eg [(30, "MSI-High"), (10, "MSI-Low"), (0, "MSS")]
+TSO500_TMB_CALL_BANDS = None         # over 'Total TMB' in mut/Mb, eg [(10, "High"), (0, "Low")]
 # An external_manager the API doesn't recognise is a typo on an intranet deployment, where the set of
 # tracking systems is known - so only a superuser creates one via the API. A public server taking
 # records from systems it has never seen would set this False

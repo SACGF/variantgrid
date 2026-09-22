@@ -6,6 +6,7 @@ sequenced as a DNA arm and an RNA arm.
 ```
 ExampleSample_2600000001/
 ├── ..._CombinedVariantOutput.tsv     the pair's reportable calls + TMB/MSI/GIS
+├── ..._MetricsOutput.tsv             run QC, analysis status and library QC per extraction
 ├── ExampleSample_DNA_2600000001C/
 │   ├── ....hard-filtered.vcf         small variants     93 records
 │   ├── ....cnv.vcf                   gene-level CNV     25
@@ -93,6 +94,28 @@ replaced, so:
   provisional until a real one is seen. Note also that the CombinedVariantOutput reports these as
   `<LOSS>` where the VCF header declares `<DEL>`.
 
+**`MetricsOutput.tsv` is a lab file with its identifiers and values replaced.** DRAGEN writes one per run
+beside the CombinedVariantOutput; the lab's pipeline copies it under the pair's name. The layout is a real
+2.1.1 file's: `[Header]`, `[Run QC Metrics]` (one `Value` column, run-level), `[Analysis Status]`, then a
+`[... QC Metrics]` section per category with `Metric (UOM)`, `LSL Guideline`, `USL Guideline` and one column
+per sample, and two `[... Expanded Metrics]` sections with no guidelines. Every sample is a column in every
+section - a DNA library has `NA` down the RNA sections and vice versa, so the RNA extraction's rows in
+`[DNA Library QC Metrics]` are `NA` here and the DNA extraction's in `[RNA Library QC Metrics]` are too.
+A metric passes when `LSL <= value <= USL`, an `NA` guideline being no bound; a sample whose column is all
+`NA` in a section simply has no library of that kind. Section names and metric lists differ between
+versions (2.6 adds `PCT_CHIMERIC_READS` to the small-variant section and `EXCESSIVE_TF` to GIS, and drops
+`PCT_PF_UQ_READS`), so a loader keys on section and metric names and tolerates ones it does not know.
+Note `MEDIAN_INSERT_SIZE` appears in both the DNA small-variant and the RNA sections, so a metric is only
+unique within its section. The lab's file pads every line with tabs to the widest row; a 2.6.2 file
+seen in the wild does not, so the padding is not to be relied on either way.
+
+The identifiers, dates and every value were replaced. Sample columns are the CVO's `DNA Sample ID` and
+`RNA Sample ID`; the file the lab supplied had been hand-anonymised down to a single column, so the two-
+column shape here follows DRAGEN's own output rather than that copy. The values are plausible and made up,
+kept within the guidelines so the file agrees with the CVO (a completed run with calls in every category);
+`USABLE_MSI_SITES` equals the CVO's `Usable MSI Sites`. The run QC metrics are populated, as the lab starts
+analysis from BCLs, not FASTQs (see `[Notes]`).
+
 **Run dates and site paths in the caller command lines are neutralised.** Software versions,
 vendor `resource_bundle/…` paths and caller arguments are real — a loader may want the pipeline
 version out of them.
@@ -110,6 +133,7 @@ Two facts these files don't reliably carry are supplied at upload instead, as `g
 | `SpliceVariants.vcf` | from header contigs | from header (`SpliceGirl 1.0.0.614`) |
 | `AllFusions.csv` | **`GRCh37` — required** on a multi-build deployment, the file carries no build at all | from its own `# Source =` line (`FusionProcessor 1.0.0.614`) |
 | `CombinedVariantOutput.tsv` | **`GRCh37` — required**, no build in the file | from `Module Version` (`DRAGEN TSO500 CombinedVariantOutput 2.1.1`) |
+| `MetricsOutput.tsv` | not needed, the file has no coordinates | from `Workflow Version` (`2.1.1.4`) |
 
 Send a build's **own name** (`GRCh37`), not an alias (`hg19`). These files are GRCh37 with a `chr`
 prefix and `chrM` at 16569, and their `##reference` says `hg19_decoy` — which is exactly the confusion
@@ -136,6 +160,9 @@ field mapping comes off the header and the copy-neutral skip is a general rule.
   with one (`14`) and a range (`2-7`); a gene pair whose 5' side is written with a slash
   (`PPARG/AC016683.6-PAX8`) and one whose 3' side is a semicolon list (`CD74-ROS1;GOPC`); `NA`
   sections (`[Sequencing Run Details]`, both exon-level CNV genes); tab padding on every line.
+- `MetricsOutput.tsv` — the `[Analysis Status]` header row starts with an empty cell; `[Run QC Metrics]`
+  has a `Value` column where the others have samples; `NA` as a guideline (no bound), as a value (arm not
+  sequenced) and as a `(UOM)`; a metric name repeated across sections; tab padding on every line.
 - `AllFusions.csv` — multi-gene partners (`RP11-458D21.5;NOTCH2NL`, `ROS1;GOPC`), a gene pair
   written with a slash (`PPARG/AC016683.6`), `SEPT14` (renamed `SEPTIN14` by HGNC, and
   date-mangled by spreadsheets), two callers, long semicolon-joined filter strings.

@@ -136,12 +136,6 @@ class MeasureSource:
     call: Optional[Callable[[dict], Optional[MeasureCall]]] = None
 
 
-MSI_STABLE = "Stable"
-MSI_UNSTABLE = "Unstable"
-TMB_HIGH = "High"
-TMB_LOW = "Low"
-
-
 def _value(values: dict, key: str) -> Optional[float]:
     try:
         return float(values[key])
@@ -149,36 +143,55 @@ def _value(values: dict, key: str) -> Optional[float]:
         return None
 
 
+def band_call(value: float, bands: list) -> Optional[str]:
+    """ The call whose lower bound the value reaches, off a setting's [(lower bound, call), ...] -
+        SA Path's MSI is MSI-High >= 30%, MSI-Low >= 10%, MSS below that """
+    for lower_bound, call in sorted(bands, key=lambda band: band[0], reverse=True):
+        if value >= lower_bound:
+            return call
+    return None
+
+
+def describe_bands(bands: list, unit: str) -> str:
+    """ The policy in words, as the measure's threshold and the build form show it -
+        'MSI-High >= 30%, MSI-Low >= 10%, MSS < 10%' """
+    ordered = sorted(bands, key=lambda band: band[0], reverse=True)
+    parts = [f"{call} >= {lower_bound:g}{unit}" for lower_bound, call in ordered[:-1]]
+    if ordered:
+        lowest = ordered[-1]
+        parts.append(f"{lowest[1]} < {ordered[-2][0]:g}{unit}" if len(ordered) > 1 else lowest[1])
+    return ", ".join(parts)
+
+
 def msi_call(section_values: dict) -> Optional[MeasureCall]:
-    """ Stable / Unstable off the percent of unstable sites, where the pair has enough usable sites
-        for the percentage to mean anything. Both numbers are the lab's policy, not vendor output,
-        so an installation that has not set them gets the value and no call """
+    """ The lab's MSI category off the percent of unstable sites, where the pair has enough usable
+        sites for the percentage to mean anything. Both are the lab's policy, not vendor output, so
+        an installation that has not set them gets the value and no call """
     min_usable_sites = settings.TSO500_MSI_MIN_USABLE_SITES
-    unstable_percent = settings.TSO500_MSI_UNSTABLE_PERCENT
-    if min_usable_sites is None or unstable_percent is None:
+    bands = settings.TSO500_MSI_CALL_BANDS
+    if min_usable_sites is None or not bands:
         return None
     percent = _value(section_values, PERCENT_UNSTABLE_MSI_SITES)
     if percent is None:
         return None
-    threshold = f">= {min_usable_sites} usable sites, >= {unstable_percent}% unstable"
-    source = "settings.TSO500_MSI_MIN_USABLE_SITES / settings.TSO500_MSI_UNSTABLE_PERCENT"
+    threshold = f"{describe_bands(bands, '%')} unstable sites, needs >= {min_usable_sites} usable sites"
+    source = "settings.TSO500_MSI_CALL_BANDS / settings.TSO500_MSI_MIN_USABLE_SITES"
     usable_sites = _value(section_values, USABLE_MSI_SITES)
     if usable_sites is None or usable_sites < min_usable_sites:
         return MeasureCall(None, threshold, source)
-    call = MSI_UNSTABLE if percent >= unstable_percent else MSI_STABLE
-    return MeasureCall(call, threshold, source)
+    return MeasureCall(band_call(percent, bands), threshold, source)
 
 
 def tmb_call(section_values: dict) -> Optional[MeasureCall]:
-    """ High / Low off the mutations per megabase, against the lab's cutoff """
-    high_mut_per_mb = settings.TSO500_TMB_HIGH_MUT_PER_MB
-    if high_mut_per_mb is None:
+    """ High / Low off the mutations per megabase, against the lab's bands """
+    bands = settings.TSO500_TMB_CALL_BANDS
+    if not bands:
         return None
     value = _value(section_values, TOTAL_TMB)
     if value is None:
         return None
-    call = TMB_HIGH if value >= high_mut_per_mb else TMB_LOW
-    return MeasureCall(call, f">= {high_mut_per_mb} mut/Mb", "settings.TSO500_TMB_HIGH_MUT_PER_MB")
+    return MeasureCall(band_call(value, bands), describe_bands(bands, " mut/Mb"),
+                       "settings.TSO500_TMB_CALL_BANDS")
 
 
 # The five scalars the pair-level sections carry. '[GIS]' holds three: the score, and the tumour

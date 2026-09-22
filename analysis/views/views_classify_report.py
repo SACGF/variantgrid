@@ -42,7 +42,7 @@ from classification.models import (
     ClassificationReportTemplate,
     get_case_report_deliveries,
 )
-from classification.models.classification_report_models import measure_tick
+from classification.models.classification_report_models import describe_tick_when, measure_tick
 from classification.report.case_report_builder import build_case_report, preview_case_report_html
 from classification.report.case_report_context import (
     build_report_variants,
@@ -279,6 +279,25 @@ def _case_values_for_form(template: Optional[ClassificationReportTemplate],
     return values
 
 
+def _measure_notes(template: Optional[ClassificationReportTemplate], measures: dict) -> dict[str, list[dict]]:
+    """ Per case_field group, what each measure-backed checkbox was started from: the measure as it
+        stands, the rule, and the policy that made the call (the import records the threshold it
+        applied and the setting it came from). On the form so a scientist who disagrees with a tick
+        sees the numbers behind it and can ask for the policy to change rather than just untick """
+    notes: dict[str, list[dict]] = {}
+    for field in (template.case_fields if template else None) or []:
+        if field.get("type") != "bool" or not (measure_key := field.get("measure")):
+            continue
+        measure = measures.get(measure_key)
+        notes.setdefault(field.get("group") or "", []).append({
+            "label": field.get("label") or field.get("key"),
+            "measure": measure,
+            "rule": describe_tick_when(field["tick_when"], measure.unit if measure else None)
+                    if field.get("tick_when") else "",
+        })
+    return notes
+
+
 def _report_lab(request, user) -> Lab:
     """ Whose report it is - the report is the lab's document, so the lab decides who may finalise it """
     if lab_id := request.POST.get("lab"):
@@ -314,6 +333,7 @@ def case_report_build_dialog(request, case_type: str, case_id: int):
         "summary": draft.summary if draft else "",
         "case_values": _case_values_for_form(template, modifications, draft, measures),
         "measures": measures,
+        "measure_notes": _measure_notes(template, measures),
         "lab": lab,
         "lab_error": lab_error,
         "lab_form": UserLabChoiceForm(user=request.user, default_lab=lab) if lab else None,

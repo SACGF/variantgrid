@@ -60,6 +60,22 @@
                 {% endlabelled %}
             {% endif %}
         {% endfor %}
+        {% with notes=measure_notes|get_item:group.name %}
+        {% if notes %}
+            <ul class="list-unstyled text-muted small mt-1 mb-2 measure-notes">
+            {% for note in notes %}
+                <li>
+                    <b>{{ note.label }}</b>:
+                    {% if note.measure %}
+                        {{ note.measure.value_description|default:"no value" }}{% if note.rule %} &middot; {{ note.rule }}{% endif %}{% if note.measure.threshold %} &middot; policy {{ note.measure.threshold }}{% if note.measure.threshold_source %} ({{ note.measure.threshold_source }}){% endif %}{% endif %}
+                    {% else %}
+                        no measure for this case{% if note.rule %} &middot; {{ note.rule }}{% endif %}
+                    {% endif %}
+                </li>
+            {% endfor %}
+            </ul>
+        {% endif %}
+        {% endwith %}
     {% endfor %}
 
     {% labelled label="Summary interpretation" hint="the case level paragraph the report opens with" %}

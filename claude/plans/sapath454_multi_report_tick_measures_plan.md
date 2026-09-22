@@ -1,7 +1,7 @@
 # Multi variant report: tick the assay flags from the measures
 
-Written by Claude Fable 5.1 (claude-fable-5-1), 2026-09-22
-Status: landed 064f46202, sapath 730c38a - phase 1; phase 2 is [sapath#455](https://github.com/SACGF/variantgrid_sapath/issues/455)
+Written by Claude Fable 5.1 (claude-fable-5-1), 2026-09-22; phase 1 implemented by Claude Opus 5 (claude-opus-5), revised by Claude Fable 5.1 the same day
+Status: landed - phase 1 in core ee184f8ba (PR 1895) and sapath PR 456, with the lab's thresholds and derived Confirmed as a follow-up straight on master; phase 2 is [sapath#455](https://github.com/SACGF/variantgrid_sapath/issues/455)
 
 [sapath#454](https://github.com/SACGF/variantgrid_sapath/issues/454). The TSO 500 Build report form asks the scientist
 to tick seven "Assay Success" boxes and three "Caveats" by hand. Most of those answers are already in the database, or
@@ -135,8 +135,25 @@ lab wants those five flags derived rather than asserted.
    unaffected (the JSON reads the answers, not the rules).
 7. **Docs.** `classification/AGENTS.md` case report section: the two keys and the rule vocabulary; `scripts/vg docs check`.
 
-## Open with the lab
+## What the lab's own reports say (found after phase 1 landed)
 
-- The three thresholds, and whether the MSI call vocabulary is `Stable` / `Unstable` or `MSS` / `MSI-H`.
-- What `Confirmed` asserts, and whether `Deletions` should exist given the report's own limitations paragraph.
-- Whether they want phase 2 (a MetricsOutput.tsv to build from).
+The legacy PDF parser in *../tso500_reports* and its `documents/reporting_method.md` answered most of the questions
+phase 1 left open, and the follow-up on master applied them:
+
+- **Thresholds** (the report's methods paragraph): MSI High >= 30% sites unstable, MSI Low >= 10% and < 30%,
+  MS Stable < 10%, off > 40 usable MSI sites; TMB high >= 10 mutations/Mb; minimum tumour content 20%. The
+  vocabulary is `MSS` / `MSI-Low` / `MSI-High`. The settings are now band lists (`TSO500_MSI_CALL_BANDS`,
+  `TSO500_TMB_CALL_BANDS`, `TSO500_MSI_MIN_USABLE_SITES`) so the words and the cut points are both the lab's.
+- **Confirmed** is every other Assay Success flag being true (`parse_assay_success`), so the JSON derives it and
+  the form no longer asks.
+- **Deletions** was never false in any issued report; it stays a plain checkbox.
+- **Purity caveat** ticks off the pathologist's call or a tumour content under 20% (`tick_when` takes a list).
+- **The policy is on the form**: under each group the build form lists the measure, the rule in words and the
+  threshold the import applied with the setting it came from, so a scientist who disagrees asks for the setting
+  to change rather than silently unticking.
+
+For phase 2 (#455), the same paragraph gives the QC minimums the flags mean: DNA median exon coverage >150x, median
+insert size >70bp, % exon 50x >90%, >40 usable MSI sites, gene scaled MAD <=0.134, contamination score <=1457; RNA
+median CV <93% for genes with median coverage >500x, >9M on target reads, median insert size >80bp. And the legacy's
+derivations: Fusions false on "Gene Fusions Fail"; Quality caveat on RNA QC not met or reduced sensitivity; Fail
+caveat on "sequencing failed for this specimen", which also sets every Assay Success flag false.

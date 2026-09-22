@@ -59,25 +59,57 @@ def get_case_report_deliveries(case_reports: list['CaseReport']) -> dict[int, li
 
 
 # What a bool case_field's `tick_when` can say about the measure it names. The form starts the tick
-# from the rule and the scientist adjusts it - the answer the report goes out with is still theirs
+# from the rule and the scientist adjusts it - the answer the report goes out with is still theirs.
+# A list of rules ticks when any one holds (a purity caveat off the pathologist's call or the number)
 TICK_WHEN_CALLED = "called"
 TICK_WHEN_CALL_IN = "call_in"
 TICK_WHEN_VALUE_BELOW = "value_below"
 TICK_WHEN_RULES = (TICK_WHEN_CALLED, TICK_WHEN_CALL_IN, TICK_WHEN_VALUE_BELOW)
 
 
-def measure_tick(tick_when: dict, measure: Optional[SpecimenMeasure]) -> Optional[bool]:
+def _tick_when_rules(tick_when) -> list[dict]:
+    return tick_when if isinstance(tick_when, list) else [tick_when]
+
+
+def _rule_holds(rule: dict, measure: SpecimenMeasure) -> Optional[bool]:
+    if (called := rule.get(TICK_WHEN_CALLED)) is not None:
+        return bool(measure.call) == bool(called)
+    if (call_in := rule.get(TICK_WHEN_CALL_IN)) is not None:
+        return measure.call in call_in
+    if (value_below := rule.get(TICK_WHEN_VALUE_BELOW)) is not None:
+        return measure.value is not None and measure.value < value_below
+    return None
+
+
+def measure_tick(tick_when, measure: Optional[SpecimenMeasure]) -> Optional[bool]:
     """ Whether the rule a case_field states holds for the case's measure - None where the case has
         no such measure, so the field's own default stands and the form says there is none """
     if measure is None:
         return None
-    if (called := tick_when.get(TICK_WHEN_CALLED)) is not None:
-        return bool(measure.call) == bool(called)
-    if (call_in := tick_when.get(TICK_WHEN_CALL_IN)) is not None:
-        return measure.call in call_in
-    if (value_below := tick_when.get(TICK_WHEN_VALUE_BELOW)) is not None:
-        return measure.value is not None and measure.value < value_below
-    return None
+    outcomes = [_rule_holds(rule, measure) for rule in _tick_when_rules(tick_when)]
+    if all(outcome is None for outcome in outcomes):
+        return None
+    return any(outcomes)
+
+
+def _describe_rule(rule: dict, unit: str) -> str:
+    if (called := rule.get(TICK_WHEN_CALLED)) is not None:
+        return "the measure has a call" if called else "the measure has no call"
+    if (call_in := rule.get(TICK_WHEN_CALL_IN)) is not None:
+        return "the call is " + " or ".join(str(call) for call in call_in)
+    if (value_below := rule.get(TICK_WHEN_VALUE_BELOW)) is not None:
+        return f"the value is below {value_below}{unit}"
+    return ""
+
+
+def describe_tick_when(tick_when, unit: Optional[str] = None) -> str:
+    """ The rule in words, shown beside the checkbox so a scientist who disagrees with a starting
+        tick can see the policy behind it and ask for it to change - 'ticked when the value is below 20%' """
+    unit = unit or ""
+    if unit not in ("", "%"):
+        unit = f" {unit}"
+    described = [text for text in (_describe_rule(rule, unit) for rule in _tick_when_rules(tick_when)) if text]
+    return "ticked when " + " or ".join(described) if described else ""
 
 
 def validate_case_fields(case_fields: list) -> Optional[str]:
@@ -92,10 +124,11 @@ def validate_case_fields(case_fields: list) -> Optional[str]:
         if measure is not None and measure not in measure_keys:
             return f"'{key}' measures '{measure}' - one of {', '.join(sorted(measure_keys))} was expected"
         if (tick_when := field.get("tick_when")) is not None:
-            if not isinstance(tick_when, dict) or not tick_when:
-                return f"'{key}' tick_when must be one of {', '.join(TICK_WHEN_RULES)}"
-            if unknown := set(tick_when) - set(TICK_WHEN_RULES):
-                return f"'{key}' tick_when has no rule '{', '.join(sorted(unknown))}'"
+            for rule in _tick_when_rules(tick_when):
+                if not isinstance(rule, dict) or not rule:
+                    return f"'{key}' tick_when must be one of {', '.join(TICK_WHEN_RULES)}"
+                if unknown := set(rule) - set(TICK_WHEN_RULES):
+                    return f"'{key}' tick_when has no rule '{', '.join(sorted(unknown))}'"
             if measure is None:
                 return f"'{key}' has a tick_when and names no measure to apply it to"
     return None
@@ -115,7 +148,7 @@ class ClassificationReportTemplate(TimeStampedModel):
     # [{"key", "label", "type": "text"|"bool"|"choice", "options": [...], "default", "group",
     #   "prefill_key": the evidence key the form starts the field from,
     #   "measure": the SpecimenMeasure shown beside a bool field (a MEASURE_CONTEXT_KEYS value),
-    #   "tick_when": the rule that field's tick starts from - @see measure_tick}]
+    #   "tick_when": the rule (or list of rules, any of which) that field's tick starts from - @see measure_tick}]
     case_fields = models.JSONField(default=list, blank=True)
     # Which cases this template is offered for - null is every case
     allele_origin_bucket = models.CharField(max_length=1, choices=AlleleOriginBucket.choices,

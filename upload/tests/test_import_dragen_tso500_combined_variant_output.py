@@ -56,6 +56,7 @@ from upload.tso500.dragen_combined_variant_output_parser import (
 )
 from upload.tso500.dragen_combined_variant_output_records import (
     CombinedVariantOutputIdentityError,
+    band_call,
     link_samples_to_extractions,
     link_to_sequencing_run,
     measured_date,
@@ -234,6 +235,11 @@ class TestSpliceVariantVCF(TestCase):
         self.assertFalse(vcf.has_genotype)
 
 
+# The bands SA Path reports against, as its settings state them
+MSI_BANDS = [(30, "MSI-High"), (10, "MSI-Low"), (0, "MSS")]
+TMB_BANDS = [(10, "High"), (0, "Low")]
+
+
 class TestCombinedVariantOutputRecords(TestCase):
     """ The rest of the file - the pair's patient chain, the seqauto links and the measures """
 
@@ -384,28 +390,35 @@ class TestCombinedVariantOutputRecords(TestCase):
                                            method="DRAGEN TSO500 CombinedVariantOutput 2.1.1")
         return {m.measure_type: m for m in measures}
 
-    @override_settings(TSO500_MSI_MIN_USABLE_SITES=20, TSO500_MSI_UNSTABLE_PERCENT=20,
-                       TSO500_TMB_HIGH_MUT_PER_MB=10)
-    def test_msi_and_tmb_are_called_against_the_labs_thresholds(self):
-        """ 121 usable sites is enough to call MSI, and 2.48% unstable is Stable; 7.1 mut/Mb is Low """
+    @override_settings(TSO500_MSI_MIN_USABLE_SITES=40, TSO500_MSI_CALL_BANDS=MSI_BANDS,
+                       TSO500_TMB_CALL_BANDS=TMB_BANDS)
+    def test_msi_and_tmb_are_called_against_the_labs_bands(self):
+        """ 121 usable sites is enough to call MSI, and 2.48% unstable is MSS; 7.1 mut/Mb is Low """
         by_type = self._write_measures()
 
         msi = by_type[SpecimenMeasureType.MSI]
-        self.assertEqual("Stable", msi.call)
-        self.assertEqual(">= 20 usable sites, >= 20% unstable", msi.threshold)
+        self.assertEqual("MSS", msi.call)
+        self.assertEqual("MSI-High >= 30%, MSI-Low >= 10%, MSS < 10% unstable sites, needs >= 40 usable sites",
+                         msi.threshold)
         self.assertEqual("Low", by_type[SpecimenMeasureType.TMB].call)
-        self.assertEqual(">= 10 mut/Mb", by_type[SpecimenMeasureType.TMB].threshold)
+        self.assertEqual("High >= 10 mut/Mb, Low < 10 mut/Mb", by_type[SpecimenMeasureType.TMB].threshold)
         # The measures the lab has no policy for are the number alone
         self.assertIsNone(by_type[SpecimenMeasureType.GIS].call)
 
-    @override_settings(TSO500_MSI_MIN_USABLE_SITES=200, TSO500_MSI_UNSTABLE_PERCENT=20)
+    def test_band_call_is_the_first_lower_bound_reached(self):
+        self.assertEqual("MSI-High", band_call(30, MSI_BANDS))
+        self.assertEqual("MSI-Low", band_call(29.9, MSI_BANDS))
+        self.assertEqual("MSS", band_call(0, MSI_BANDS))
+        self.assertEqual("High", band_call(10, TMB_BANDS))
+
+    @override_settings(TSO500_MSI_MIN_USABLE_SITES=200, TSO500_MSI_CALL_BANDS=MSI_BANDS)
     def test_too_few_usable_msi_sites_cannot_be_called(self):
         """ The percentage means nothing off 121 sites when the lab wants 200 - the threshold that
             was applied is still recorded, so 'why is there no call' stays answerable """
         msi = self._write_measures()[SpecimenMeasureType.MSI]
 
         self.assertIsNone(msi.call)
-        self.assertEqual(">= 200 usable sites, >= 20% unstable", msi.threshold)
+        self.assertIn("needs >= 200 usable sites", msi.threshold)
 
     def test_thresholds_unset_writes_the_value_and_no_call(self):
         """ The policy is the lab's - an installation without one sends the measure as it always did """
