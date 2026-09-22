@@ -11,6 +11,7 @@ from guardian.shortcuts import assign_perm
 from threadlocals.threadlocals import set_thread_variable
 
 from analysis.models import Analysis, VariantTag
+from annotation.fake_annotation import create_fake_variants, get_fake_annotation_version
 from annotation.models import (
     AnnotationRangeLock,
     AnnotationRun,
@@ -18,8 +19,10 @@ from annotation.models import (
     VariantAnnotation,
     VariantAnnotationVersion,
 )
-from annotation.fake_annotation import create_fake_variants, get_fake_annotation_version
-from annotation.tests.test_data_fake_genes import create_fake_transcript_version, create_gata2_transcript_version
+from annotation.tests.test_data_fake_genes import (
+    create_fake_transcript_version,
+    create_gata2_transcript_version,
+)
 from classification.enums import SubmissionSource
 from classification.models.classification import Classification
 from classification.tests.models.test_utils import ClassificationTestUtils
@@ -362,6 +365,7 @@ class VariantTagsGridQueryTest(TestCase):
         other_analysis = Analysis.objects.create(genome_build=self.genome_build, user=self.user)
         self._tag(self.other_variant, analysis=analysis)
         self._tag(self.other_variant, analysis=other_analysis)
+        self._rows()  # Re-warm - what the new rows/analysis invalidate is a one-off, not a per-row cost
         with CaptureQueriesContext(connection) as three_rows:
             rows = self._rows()
 
