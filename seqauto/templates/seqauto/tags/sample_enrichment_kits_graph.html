@@ -11,8 +11,9 @@ $(document).ready(function() {
     // Inside a carousel the inactive slide is display:none, so measure the nearest visible ancestor
     let width = $(`#${container}`).closest(':visible').width();
 
-    showStackedBar(container, title, width, 500, enrichment_kits_over_time, enrichment_kit_labels, series_colors)
+    showStackedBar(container, title, width, $(`#${container}`).height(), enrichment_kits_over_time, enrichment_kit_labels, series_colors)
 });
 </script>
-<div id='enrichment_kits-by-time-{{ uuid }}'></div>
+<!-- Plotly sets height:100% on its inner .plot-container, so the div needs the graph's size -->
+<div id='enrichment_kits-by-time-{{ uuid }}' style="height: 500px"></div>
 {% if collapsed_help %}<div class="text-muted small text-center">{{ collapsed_help }}</div>{% endif %}
