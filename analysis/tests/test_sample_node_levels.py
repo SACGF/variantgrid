@@ -905,7 +905,7 @@ class VariantTagPatientTest(SampleNodeLevelsTestCase):
     def test_the_grids_tag_dict_names_the_patient(self):
         self._add_tag(self.patient_node)
 
-        rendered = Template("{% load user_tag_color_tags %}"
+        rendered = Template("{% load tag_config_tags %}"
                             "{% render_variant_tags_dict analysis %}").render(
             Context({"analysis": self.analysis}))
 

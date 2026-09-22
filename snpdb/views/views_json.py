@@ -14,7 +14,7 @@ from snpdb.models import (
     Cohort,
     CustomColumnsCollection,
     Sample,
-    TagColorsCollection,
+    TagConfigCollection,
 )
 from snpdb.tasks.clingen_tasks import populate_clingen_alleles_from_vcf
 from snpdb.tasks.cohort_genotype_tasks import create_cohort_genotype_and_launch_task
@@ -129,7 +129,7 @@ def clone_custom_columns(request, custom_columns_collection_id):
 
 
 @require_POST
-def clone_tag_colors_collection(request, tag_colors_collection_id):
-    tcc = TagColorsCollection.get_for_user(request.user, tag_colors_collection_id)
+def clone_tag_config_collection(request, tag_config_collection_id):
+    tcc = TagConfigCollection.get_for_user(request.user, tag_config_collection_id)
     cloned_tcc = tcc.clone_for_user(request.user)
     return JsonResponse({"pk": cloned_tcc.pk})

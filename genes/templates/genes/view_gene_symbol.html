@@ -7,7 +7,7 @@
 {% load static %}
 {% load tz %}
 {% load js_tags %}
-{% load user_tag_color_tags %}
+{% load tag_config_tags %}
 {% load wiki_tags %}
 {% load datatable_tags %}
 {% load gene_disease_tags %}
@@ -42,7 +42,7 @@
         .filter-message {
             margin-right: 10px;
         }
-        {% render_node_count_colors_css %}
+        {% render_node_count_styles %}
     </style>
     <script>
         window.ANALYSIS_SETTINGS = {

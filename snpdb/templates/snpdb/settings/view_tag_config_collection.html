@@ -1,7 +1,7 @@
 {% extends menu_settings_base %}
 {% load static %}
 
-{% block title %}VariantGrid Tag Colors Collection{% endblock %}
+{% block title %}VariantGrid Tag Config{% endblock %}
 
 {% block head %}
 {{ block.super }}
@@ -17,27 +17,27 @@
 {% endif %}
 </style>
 <script>
-	function cloneTagColorsCollection() {
+	function cloneTagConfigCollection() {
 		$(this).prop("disabled", true);
 
-		const cccId = {{ tag_colors_collection.pk }};
+		const cccId = {{ tag_config_collection.pk }};
 		$.ajax({
 			type: "POST",
-			url: Urls.clone_tag_colors_collection(cccId),
+			url: Urls.clone_tag_config_collection(cccId),
 			success: function (data) {
-				window.location = Urls.view_tag_colors_collection(data["pk"]);
+				window.location = Urls.view_tag_config_collection(data["pk"]);
 			},
 		});
 	}
 
 	$(document).ready(function() {
-		$("#clone-button").click(cloneTagColorsCollection);
+		$("#clone-button").click(cloneTagConfigCollection);
 
         const picker = $('.tag-colorpicker').colorPicker();
 
 	{% if has_write_permission %}
         picker.change(function() {
-            const SET_TAG_COLORS_URL = "{% url 'set_tag_color' tag_colors_collection.pk %}";
+            const SET_TAG_COLORS_URL = "{% url 'set_tag_color' tag_config_collection.pk %}";
             const tagId = this.attributes['tag_id'].value;
             const rgb = this.value;
 
@@ -54,6 +54,23 @@
                 data: data,
                 success: changeTagColor,
                 url: SET_TAG_COLORS_URL,
+            });
+        });
+
+        $("#variant-tag-stale-days").change(function() {
+            const msgBox = $("#save-stale-days-message");
+            msgBox.empty();
+            $.ajax({
+                type: "POST",
+                data: "variant_tag_stale_days=" + encodeURIComponent($(this).val()),
+                url: "{{ request.path }}",
+                success: function() {
+                    msgBox.append(`<li class='alert-info'>Staleness saved successfully</li>`);
+                    msgBox.fadeIn().delay(2000).fadeOut(1000);
+                },
+                error: function() {
+                    msgBox.append(`<li class='error'>Could not save staleness</li>`);
+                }
             });
         });
 
@@ -84,7 +101,7 @@
 		});
 
         $("button#change-name-button").click(function() {
-            let nameInput = $("#tag-colors-collection-name");
+            let nameInput = $("#tag-config-collection-name");
             let name = nameInput.val();
             let msgBox = $("#save-name-message");
             msgBox.empty();
@@ -111,36 +128,53 @@
 {% endblock %}
 
 {% block submenu_page_content %}
-<h3>Tag Colors Collection</h3>
+<h3>Tag Config</h3>
 
 {% if has_write_permission %}
-    <div id="tag-colors-collection-tabs">
+    <div id="tag-config-collection-tabs">
         <ul class="nav nav-tabs mb-4" role="tablist">
             <li class="nav-item"><a class="nav-link show active" data-toggle="tab" role="tab" href="#name">Name</a></li>
-	        <li class="nav-item"><a class="nav-link" data-toggle="tab" role="tab" href="#tag-colors-collection-permissions" data-href="{% url 'group_permissions' 'snpdb.models.TagColorsCollection' tag_colors_collection.pk %}">Sharing / Permissions</a></li>
+	        <li class="nav-item"><a class="nav-link" data-toggle="tab" role="tab" href="#tag-config-collection-permissions" data-href="{% url 'group_permissions' 'snpdb.models.TagConfigCollection' tag_config_collection.pk %}">Sharing / Permissions</a></li>
 		</ul>
         <div class="tab-content">
         <div class="tab-pane show active" role="tabpanel" id="name">
-			<form id="tag-colors-collection-form" method="post">
+			<form id="tag-config-collection-form" method="post">
 				{% csrf_token %}
-				<label for="tag-colors-collection-name">Name:</label>
-				<input id="tag-colors-collection-name" size="50" value="{{ tag_colors_collection.name }}" />
+				<label for="tag-config-collection-name">Name:</label>
+				<input id="tag-config-collection-name" size="50" value="{{ tag_config_collection.name }}" />
 				<button id='change-name-button' type="button" class="btn btn-primary">Change Name</button>
-				<button id='clone-button' title="Create a new copy of these tag colors" type="button" class="btn btn-primary">Clone these tag colors...</button>
+				<button id='clone-button' title="Create a new copy of this tag config" type="button" class="btn btn-primary">Clone this tag config...</button>
 				<ul id="save-name-message" class="messages">
 				</ul>
 			</form>
 		</div>
-        <div class="tab-pane" role="tabpanel" id="tag-colors-collection-permissions"></div>
+        <div class="tab-pane" role="tabpanel" id="tag-config-collection-permissions"></div>
 		</div>
 	</div>
 
 {% else %}
-	<label for="tag-colors-collection-name">Name:</label>
-	<input id="tag-colors-collection-name" size="50" readonly="readonly" value="{{ tag_colors_collection.name }}" />
+	<label for="tag-config-collection-name">Name:</label>
+	<input id="tag-config-collection-name" size="50" readonly="readonly" value="{{ tag_config_collection.name }}" />
 
-	<button id='clone-button' title="Create a new copy of these columns that you can edit" type="button" class="btn btn-primary">Clone these columns</button>
+	<button id='clone-button' title="Create a new copy of this tag config that you can edit" type="button" class="btn btn-primary">Clone this tag config</button>
 {% endif %}
+
+    <div class="row mb-4">
+        <div class="col-md-6 offset-md-3">
+            <label for="variant-tag-stale-days">Variant tags stale after:</label>
+            <select id="variant-tag-stale-days" {% if not has_write_permission %}disabled="disabled"{% endif %}>
+                <option value=""{% if not tag_config_collection.variant_tag_stale_days %} selected{% endif %}>(never - staleness off)</option>
+            {% for days, label in variant_tag_stale_days_choices %}
+                <option value="{{ days }}"{% if days == tag_config_collection.variant_tag_stale_days %} selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+            </select>
+            <ul id="save-stale-days-message" class="messages"></ul>
+            <p class="text-muted">
+            Tag events older than this are considered stale: grids show fresh vs total counts and mark
+            tags whose most recent event is older.
+            </p>
+        </div>
+    </div>
 
     <h3>Tag Colors</h3>
     <p>

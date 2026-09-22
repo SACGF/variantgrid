@@ -13,14 +13,16 @@ from library.django_utils import (
     add_save_message,
     require_superuser,
 )
+from library.utils import empty_to_none
 from snpdb import forms
 from snpdb.forms import (
     TagForm,
 )
 from snpdb.models import (
     TAG_ALLELE_ORIGIN_CHOICES,
+    VARIANT_TAG_STALE_DAYS_CHOICES,
     Tag,
-    TagColorsCollection,
+    TagConfigCollection,
     UserSettings,
 )
 from snpdb.tag_operations import (
@@ -37,7 +39,6 @@ from snpdb.tag_operations import (
     set_tag_requires_classification,
 )
 from snpdb.utils import get_tag_styles_and_colors
-
 
 TAG_OPERATION_HISTORY_LIMIT = 50
 
@@ -78,11 +79,11 @@ def tag_settings(request):
         add_save_message(request, valid, name, created=True)
 
     user_settings = UserSettings.get_for_user(request.user)
-    user_settings_tag_colors = user_settings.tag_colors
-    user_tag_styles, user_tag_colors = get_tag_styles_and_colors(request.user, user_settings_tag_colors)
+    user_settings_tag_config = user_settings.tag_config
+    user_tag_styles, user_tag_colors = get_tag_styles_and_colors(request.user, user_settings_tag_config)
     context_dict = {
         'form': form,
-        "user_settings_tag_colors": user_settings_tag_colors,
+        "user_settings_tag_config": user_settings_tag_config,
         'user_tag_styles': user_tag_styles,
         'user_tag_colors': user_tag_colors,
         'tag_summaries': _get_tag_summaries(),
@@ -179,50 +180,59 @@ def tag_reinstate(request, tag_id):
     return redirect('tag_settings')
 
 
-def view_tag_colors_collection(request, tag_colors_collection_id):
-    tag_colors_collection = TagColorsCollection.get_for_user(request.user, pk=tag_colors_collection_id)
-    has_write_permission = tag_colors_collection.can_write(request.user)
+def view_tag_config_collection(request, tag_config_collection_id):
+    tag_config_collection = TagConfigCollection.get_for_user(request.user, pk=tag_config_collection_id)
+    has_write_permission = tag_config_collection.can_write(request.user)
     if not has_write_permission:
-        msg = "You do not have permission to edit these columns. " \
-              "If you wish to customise them, click 'clone' and modify the copy"
+        msg = "You do not have permission to edit this tag config. " \
+              "If you wish to customise it, click 'clone' and modify the copy"
         messages.add_message(request, messages.WARNING, msg)
 
     if request.method == "POST":
-        tag_colors_collection.check_can_write(request.user)
+        tag_config_collection.check_can_write(request.user)
         if name := request.POST.get("name"):
-            tag_colors_collection.name = name
-            tag_colors_collection.save()
+            tag_config_collection.name = name
+            tag_config_collection.save()
         elif tag_order_str := request.POST.get("tag_order"):
             valid_tag_ids = set(Tag.objects.values_list("pk", flat=True))
             for i, tag_id in enumerate(tag_order_str.split(",")):
                 if tag_id in valid_tag_ids:
-                    tag_colors_collection.tagcolor_set.update_or_create(tag_id=tag_id,
+                    tag_config_collection.tagconfig_set.update_or_create(tag_id=tag_id,
                                                                         defaults={"sort_order": i})
         elif quick_tag_id := request.POST.get("quick_tag"):
             # A row can exist purely to hold this, the same way one can exist purely to hold sort_order
             if Tag.objects.filter(pk=quick_tag_id).exists():
                 quick_tag = request.POST.get("value") == "true"
-                tag_colors_collection.tagcolor_set.update_or_create(tag_id=quick_tag_id,
+                tag_config_collection.tagconfig_set.update_or_create(tag_id=quick_tag_id,
                                                                     defaults={"quick_tag": quick_tag})
+        elif "variant_tag_stale_days" in request.POST:
+            stale_days = empty_to_none(request.POST["variant_tag_stale_days"])
+            if stale_days is not None:
+                stale_days = int(stale_days)
+                if stale_days not in dict(VARIANT_TAG_STALE_DAYS_CHOICES):
+                    raise ValueError(f"Unknown variant_tag_stale_days: {stale_days}")
+            tag_config_collection.variant_tag_stale_days = stale_days
+            tag_config_collection.increment_version()  # Saves, and expires the node caches showing staleness
         return HttpResponse()  # Nobody ever looks at this
 
-    user_tag_styles, user_tag_colors = get_tag_styles_and_colors(request.user, tag_colors_collection)
+    user_tag_styles, user_tag_colors = get_tag_styles_and_colors(request.user, tag_config_collection)
     context = {
-        "tag_colors_collection": tag_colors_collection,
+        "tag_config_collection": tag_config_collection,
         "has_write_permission": has_write_permission,
         'user_tag_styles': user_tag_styles,
         'user_tag_colors': user_tag_colors,
-        'quick_tags': tag_colors_collection.get_quick_tags(),
+        'quick_tags': tag_config_collection.get_quick_tags(),
+        'variant_tag_stale_days_choices': VARIANT_TAG_STALE_DAYS_CHOICES,
     }
-    return render(request, 'snpdb/settings/view_tag_colors_collection.html', context)
+    return render(request, 'snpdb/settings/view_tag_config_collection.html', context)
 
 
 @require_POST
-def set_tag_color(request, tag_colors_collection_id):
-    tcc = TagColorsCollection.get_for_user(request.user, pk=tag_colors_collection_id)
+def set_tag_color(request, tag_config_collection_id):
+    tcc = TagConfigCollection.get_for_user(request.user, pk=tag_config_collection_id)
     tag = request.POST['tag']
     rgb = request.POST['rgb']
-    tc = tcc.tagcolor_set.get_or_create(tag_id=tag)[0]
+    tc = tcc.tagconfig_set.get_or_create(tag_id=tag)[0]
     tc.rgb = rgb
     tc.save()
     logging.info("set_tag_color: saved %s", tc)

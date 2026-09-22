@@ -1,4 +1,5 @@
 import unittest
+from datetime import timedelta
 
 from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
@@ -28,6 +29,7 @@ from snpdb.models import (
     GenomeBuild,
     ImportStatus,
     Sample,
+    TagConfigCollection,
     UserSettingsOverride,
 )
 
@@ -57,16 +59,29 @@ class AnalysisModelTestCase(TestCase):
         self.assertTrue(analysis.can_write(self.admin_user))
         self.assertFalse(analysis.can_write(self.non_owner_user))
 
-    def test_defaults_from_user_settings(self):
-        """ variant_tag_stale_days is copied from user settings on creation, so the analysis
-            renders consistently for all users - #1433 """
+    def test_tag_config_from_user_settings(self):
+        """ The tag config collection is copied from user settings on creation, so everyone opening
+            the analysis sees the same colours, order, quick tags and staleness - #1892 """
+        collection = TagConfigCollection.objects.create(name="owner's tags", user=self.owner_user)
         user_settings_override = UserSettingsOverride.objects.get_or_create(user=self.owner_user)[0]
-        user_settings_override.variant_tag_stale_days = 730
+        user_settings_override.tag_config = collection
         user_settings_override.save()
 
         analysis = Analysis(genome_build=self.grch37)
         analysis.set_defaults_and_save(self.owner_user)
-        self.assertEqual(analysis.variant_tag_stale_days, 730)
+        self.assertEqual(analysis.tag_config_collection, collection)
+
+    def test_variant_tag_stale_date(self):
+        """ Staleness comes off the analysis' collection (no collection = staleness off) - #1433, #1892 """
+        analysis = Analysis(genome_build=self.grch37)
+        analysis.set_defaults_and_save(self.owner_user)
+        analysis.tag_config_collection = None
+        self.assertIsNone(analysis.variant_tag_stale_date)
+
+        analysis.tag_config_collection = TagConfigCollection.objects.create(
+            name="2 years", user=self.owner_user, variant_tag_stale_days=730)
+        expected = timezone.now() - timedelta(days=730)
+        self.assertAlmostEqual(analysis.variant_tag_stale_date.timestamp(), expected.timestamp(), delta=60)
 
     def test_horizontal_mode_from_user_settings(self):
         """ New analyses take the user's preferred orientation """

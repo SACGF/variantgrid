@@ -33,7 +33,12 @@
         const columnsUrl = "{% url 'custom_columns' %}";
         const columnsLink = $(`<span><a target='_blank' href='${columnsUrl}'>Manage Custom Columns</a> (opens in new window)</span>`);
         columnsSelect.after(columnsLink);
-        
+
+        const tagConfigSelect = $('#id_tag_config_collection', '#analysis-form');
+        const tagConfigUrl = "{% url 'tag_settings' %}";
+        const tagConfigLink = $(`<span><a target='_blank' href='${tagConfigUrl}'>Manage Tag Config</a> (opens in new window)</span>`);
+        tagConfigSelect.after(tagConfigLink);
+
         $('#id_annotation_version').change(function() {
             const warningId = 'annotation-version-warning';
             const messages = $('.messages', analysisForm);

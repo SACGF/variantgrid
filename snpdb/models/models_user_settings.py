@@ -1,7 +1,7 @@
 """
 Per-user preferences and their layering: SettingsOverride rows at Global, Organization, Lab and
 User level are merged by `UserSettings.get_for_user` (later wins) into the UserSettings dataclass -
-default build, columns, initial permission groups, tag colours, node count settings. Also the
+default build, columns, initial permission groups, tag config, node count settings. Also the
 small per-user state models (UserGridConfig, UserPageAck, AllVariantsFilter, UserContact) and
 UserPreview / AvatarDetails for display. Read preferences through get_for_user, never the override
 rows directly.
@@ -64,10 +64,34 @@ class UserDataPrefix(models.Model):
         return replace_dict
 
 
-class TagColorsCollection(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
+# Preset windows (stored in days) rather than a free integer - staleness is fuzzy, and shared
+# values mean users share warm cache entries wherever the window keys a cache
+VARIANT_TAG_STALE_DAYS_CHOICES = [
+    (180, "6 months"),
+    (365, "1 year"),
+    (545, "18 months"),
+    (730, "2 years"),
+    (1825, "5 years"),
+]
+
+
+class TagConfigCollection(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
+    """ How a lab uses tags: colour, sort order, 1-click and staleness. An analysis points at one so
+        everyone opening it sees the same thing @see analysis.models.Analysis.tag_config_collection """
     user = models.ForeignKey(User, null=True, blank=True, on_delete=CASCADE)
     name = models.TextField()
     version_id = models.IntegerField(null=False, default=0)
+    variant_tag_stale_days = models.IntegerField(
+        null=True, blank=True, choices=VARIANT_TAG_STALE_DAYS_CHOICES,
+        help_text="Tag events older than this are considered stale: grids show fresh vs total counts "
+                  "and mark tags whose most recent event is older. Blank disables staleness.")
+
+    @property
+    def variant_tag_stale_date(self) -> Optional[datetime]:
+        """ Tag events before this are considered stale (None = staleness disabled) """
+        if self.variant_tag_stale_days is None:
+            return None
+        return timezone.now() - timedelta(days=self.variant_tag_stale_days)
 
     def increment_version(self):
         self.version_id += 1
@@ -76,7 +100,7 @@ class TagColorsCollection(GuardianPermissionsAutoInitialSaveMixin, TimeStampedMo
     def get_user_colors_by_tag(self) -> dict[str, dict]:
         user_colors_by_tag = {}
         # Rows can exist purely to store sort_order - they have no color set
-        for tag_id, rgb in self.tagcolor_set.exclude(rgb='').values_list('tag', 'rgb'):
+        for tag_id, rgb in self.tagconfig_set.exclude(rgb='').values_list('tag', 'rgb'):
             user_colors_by_tag[tag_id] = {
                 "background-color": rgb,
                 "color": rgb_contrasting_text(rgb)
@@ -84,21 +108,21 @@ class TagColorsCollection(GuardianPermissionsAutoInitialSaveMixin, TimeStampedMo
         return user_colors_by_tag
 
     def get_sort_order_by_tag(self) -> dict[str, int]:
-        return dict(self.tagcolor_set.filter(sort_order__isnull=False).values_list('tag', 'sort_order'))
+        return dict(self.tagconfig_set.filter(sort_order__isnull=False).values_list('tag', 'sort_order'))
 
     def get_quick_tags(self) -> list[str]:
         """ Tags drawn as their own (+) in the analysis grid, in the order the pills sort in (#1888).
             A retired tag is dropped rather than unticked, so reinstating brings its button back """
-        quick_tags = self.tagcolor_set.filter(quick_tag=True, tag__in=Tag.live_qs())
+        quick_tags = self.tagconfig_set.filter(quick_tag=True, tag__in=Tag.live_qs())
         tag_ids_and_sort_order = quick_tags.values_list('tag', 'sort_order')
         return [tag_id for tag_id, _ in sorted(tag_ids_and_sort_order, key=lambda t: (t[1] or 0, t[0]))]
 
     def clone_for_user(self, user):
         name = f"{user}'s copy of {self.name}"
-        clone_tcc = TagColorsCollection(name=name, user=user)
+        clone_tcc = TagConfigCollection(name=name, user=user)
         clone_tcc.save()
 
-        for cc in self.tagcolor_set.all():
+        for cc in self.tagconfig_set.all():
             cc.pk = None
             cc.collection = clone_tcc
             cc.save()
@@ -106,15 +130,15 @@ class TagColorsCollection(GuardianPermissionsAutoInitialSaveMixin, TimeStampedMo
         return clone_tcc
 
     def get_absolute_url(self):
-        return reverse('view_tag_colors_collection', kwargs={'tag_colors_collection_id': self.pk})
+        return reverse('view_tag_config_collection', kwargs={'tag_config_collection_id': self.pk})
 
     def __str__(self):
         who = self.user or 'global'
         return f"({who}): {self.name}"
 
 
-class TagColor(TimeStampedModel):
-    collection = models.ForeignKey(TagColorsCollection, null=True, on_delete=CASCADE)
+class TagConfig(TimeStampedModel):
+    collection = models.ForeignKey(TagConfigCollection, null=True, on_delete=CASCADE)
     tag = models.ForeignKey(Tag, on_delete=CASCADE)
     rgb = models.CharField(max_length=7)  # '#rrggbb' - '' when the row only holds sort_order / quick_tag
     sort_order = models.IntegerField(null=True, blank=True)  # Tags w/o value sort as 0, ties broken by tag name
@@ -236,8 +260,10 @@ class SettingsOverride(models.Model):
                                                help_text="Default value to sort analysis grids (can be changed per analysis)")
     grid_sample_label_template = models.TextField(null=True, blank=True,
                                                   help_text="Python string template, eg: '%(patient)s (%(sample)s/%(specimen_id)s)||%(patient)s (%(sample)s)||%(sample)s'. Multiple values separated by '||', the first one to succeed will be used. Variables: sample_id, sample (name), patient_id, patient_code, patient (full name), specimen_id, specimen (name).")
-    tag_colors = models.ForeignKey(TagColorsCollection, on_delete=SET_NULL, null=True, blank=True,
-                                   help_text="Set of colours assigned to tags (modify/create these in 'Tag settings')")
+    tag_config = models.ForeignKey(TagConfigCollection, on_delete=SET_NULL, null=True, blank=True,
+                                   help_text="Tag colours, sort order, 1-click tags and staleness "
+                                             "(modify/create these in 'Tag settings'). "
+                                             "Initial tag config when creating an analysis")
     variant_link_in_analysis_opens_new_tab = models.BooleanField(null=True,
                                                                  help_text="Whether left click by default opens up variant details in new tab. No is to open details in the node editor location. It's always possible to right click and select 'open in new tab'")
     tool_tips = models.BooleanField(null=True, blank=True,
@@ -282,20 +308,6 @@ class SettingsOverride(models.Model):
         help_text="Analysis nodes with at least this many variants don't auto-load "
                   "their grid — the user clicks 'Load variants' to run the row query. "
                   "Blank inherits the next level up.")
-    # Preset windows (stored in days) rather than a free integer - staleness is fuzzy, and shared
-    # values mean users share warm cache entries wherever the window keys a cache
-    VARIANT_TAG_STALE_DAYS_CHOICES = [
-        (180, "6 months"),
-        (365, "1 year"),
-        (545, "18 months"),
-        (730, "2 years"),
-        (1825, "5 years"),
-    ]
-    variant_tag_stale_days = models.IntegerField(
-        null=True, blank=True, choices=VARIANT_TAG_STALE_DAYS_CHOICES,
-        help_text="Tag events older than this are considered stale: grids show "
-                  "fresh vs total counts and mark tags whose most recent event is older. "
-                  "Blank inherits the next level up / disables.")
     show_user_awards = models.BooleanField(null=True, blank=True,
                                            help_text="Decorate users currently holding a title (crown, medal, "
                                                      "trophy) on grids and in user labels")
@@ -493,7 +505,7 @@ class UserSettings:
     columns: CustomColumnsCollection
     default_sort_by_column: CustomColumn
     grid_sample_label_template: str
-    tag_colors: TagColorsCollection
+    tag_config: TagConfigCollection
     variant_link_in_analysis_opens_new_tab: bool
     tool_tips: bool
     node_debug_tab: bool
@@ -511,15 +523,14 @@ class UserSettings:
     initially_show_zygosity_table: bool
     variant_grid_two_line_rows: bool
     node_grid_auto_load_max_variants: Optional[int]
-    variant_tag_stale_days: Optional[int]
     show_user_awards: bool
 
     @property
     def variant_tag_stale_date(self) -> Optional[datetime]:
         """ Tag events before this are considered stale (None = staleness disabled) """
-        if self.variant_tag_stale_days is None:
+        if self.tag_config is None:
             return None
-        return timezone.now() - timedelta(days=self.variant_tag_stale_days)
+        return self.tag_config.variant_tag_stale_date
 
     @staticmethod
     def parse_value(field_name: str, value: Any) -> Any:

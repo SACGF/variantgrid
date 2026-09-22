@@ -119,9 +119,9 @@ def get_node_count_colors(css_property):
     return node_count_colors
 
 
-def get_tag_node_count_colors(user, css_property):
-    """ Tag node counts are drawn in the user's tag colours - same shape as get_node_count_colors() """
-    _, user_tag_colors = get_tag_styles_and_colors(user)
+def get_tag_node_count_colors(user, css_property, tag_config_collection=None):
+    """ Tag node counts are drawn in the resolved tag config's colours - same shape as get_node_count_colors() """
+    _, user_tag_colors = get_tag_styles_and_colors(user, tag_config_collection=tag_config_collection)
     return [(TagFilter.label(tag_id), {css_property: color or DEFAULT_TAG_NODE_COUNT_COLOR})
             for tag_id, color in user_tag_colors.items()]
 

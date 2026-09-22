@@ -42,7 +42,7 @@ from snpdb.models import (
     Quad,
     Sample,
     SuperPopulationCode,
-    TagColorsCollection,
+    TagConfigCollection,
     Trio,
     UserGridConfig,
     UserSettings,
@@ -764,8 +764,8 @@ class AbstractVariantGrid(DatatableConfig[Variant]):
     def _get_q(self) -> Optional[Q]:
         return None
 
-class TagColorsCollectionColumns(NamedCollectionColumns[TagColorsCollection]):
-    MODEL = TagColorsCollection
+class TagConfigCollectionColumns(NamedCollectionColumns[TagConfigCollection]):
+    MODEL = TagConfigCollection
 
 
 class LiftoverRunColumns(DatatableConfig[LiftoverRun]):

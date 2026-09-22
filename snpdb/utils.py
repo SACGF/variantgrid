@@ -8,7 +8,7 @@ from django.http import Http404
 from email_manager.models import EmailLog
 from library.log_utils import NotificationBuilder, send_notification
 from library.utils import empty_to_none
-from snpdb.models import GenomeBuild, Lab, Tag, TagColorsCollection, UserSettings
+from snpdb.models import GenomeBuild, Lab, Tag, TagConfigCollection, UserSettings
 
 
 def get_genome_build_or_404(build_name) -> GenomeBuild:
@@ -87,42 +87,42 @@ class LabNotificationBuilder(NotificationBuilder):
         return self.lab.slack_webhook
 
 
-def _resolve_tag_colors_collection(user, tag_colors_collection=None) -> Optional[TagColorsCollection]:
-    if tag_colors_collection is None:
+def _resolve_tag_config_collection(user, tag_config_collection=None) -> Optional[TagConfigCollection]:
+    if tag_config_collection is None:
         user_settings = UserSettings.get_for_user(user)
-        tag_colors_collection = user_settings.tag_colors
-    return tag_colors_collection
+        tag_config_collection = user_settings.tag_config
+    return tag_config_collection
 
 
-def get_tag_sort_order_by_tag(user, tag_colors_collection=None) -> dict[str, int]:
+def get_tag_sort_order_by_tag(user, tag_config_collection=None) -> dict[str, int]:
     """ Custom tag ordering from the tag colors page (issue #343). Tags without an entry sort as 0 """
-    tag_colors_collection = _resolve_tag_colors_collection(user, tag_colors_collection)
+    tag_config_collection = _resolve_tag_config_collection(user, tag_config_collection)
     sort_order_by_tag = {}
-    if tag_colors_collection:
-        sort_order_by_tag = tag_colors_collection.get_sort_order_by_tag()
+    if tag_config_collection:
+        sort_order_by_tag = tag_config_collection.get_sort_order_by_tag()
     return sort_order_by_tag
 
 
-def get_tag_quick_tags(user, tag_colors_collection=None) -> list[str]:
+def get_tag_quick_tags(user, tag_config_collection=None) -> list[str]:
     """ Tags the analysis grid draws as their own (+), in the order the pills sort in (issue #1888) """
-    tag_colors_collection = _resolve_tag_colors_collection(user, tag_colors_collection)
+    tag_config_collection = _resolve_tag_config_collection(user, tag_config_collection)
     quick_tags = []
-    if tag_colors_collection:
-        quick_tags = tag_colors_collection.get_quick_tags()
+    if tag_config_collection:
+        quick_tags = tag_config_collection.get_quick_tags()
     return quick_tags
 
 
-def get_all_tags_and_user_colors(user, tag_colors_collection=None):
+def get_all_tags_and_user_colors(user, tag_config_collection=None):
     """ Returns Hash of { tag_name : color }
         with color being None if not set for user """
 
-    tag_colors_collection = _resolve_tag_colors_collection(user, tag_colors_collection)
+    tag_config_collection = _resolve_tag_config_collection(user, tag_config_collection)
 
     user_colors_by_tag = {}
     sort_order_by_tag = {}
-    if tag_colors_collection:
-        user_colors_by_tag = tag_colors_collection.get_user_colors_by_tag()
-        sort_order_by_tag = tag_colors_collection.get_sort_order_by_tag()
+    if tag_config_collection:
+        user_colors_by_tag = tag_config_collection.get_user_colors_by_tag()
+        sort_order_by_tag = tag_config_collection.get_sort_order_by_tag()
 
     user_tag_colors = {}
     for tag in sorted(Tag.objects.all(), key=lambda t: (sort_order_by_tag.get(t.pk, 0), t.pk)):
@@ -130,11 +130,11 @@ def get_all_tags_and_user_colors(user, tag_colors_collection=None):
     return user_tag_colors
 
 
-def get_tag_styles_and_colors(user, tag_colors_collection: TagColorsCollection = None):
+def get_tag_styles_and_colors(user, tag_config_collection: TagConfigCollection = None):
     user_tag_styles = []
     user_tag_colors = {}
 
-    for tag, style in get_all_tags_and_user_colors(user, tag_colors_collection=tag_colors_collection).items():
+    for tag, style in get_all_tags_and_user_colors(user, tag_config_collection=tag_config_collection).items():
         user_tag_styles.append((tag.id, style))
         rgb = None
         if style:

@@ -6,7 +6,7 @@ from annotation.fake_annotation import get_fake_annotation_version
 from annotation.tests.test_data_fake_genes import create_fake_transcript_version
 from library.django_utils.unittest_utils import URLTestCase, prevent_request_warnings
 from library.guardian_utils import assign_permission_to_user_and_groups
-from snpdb.models import Duo, TagColorsCollection, UserAward
+from snpdb.models import Duo, TagConfigCollection, UserAward
 from snpdb.models.models_cohort import Cohort
 from snpdb.models.models_columns import CustomColumnsCollection
 from snpdb.models.models_enums import (
@@ -62,7 +62,7 @@ class Test(URLTestCase):
         transcript_version = create_fake_transcript_version(grch37)
         gene_symbol = transcript_version.gene_version.gene_symbol
 
-        cls.test_tag = TagColorsCollection.objects.create(user=cls.user_owner, name="TagA", version_id=1)
+        cls.test_tag = TagConfigCollection.objects.create(user=cls.user_owner, name="TagA", version_id=1)
         cls.custom_columns_collection = CustomColumnsCollection.objects.create(name="Test Column Collections", user=cls.user_owner, version_id=1)
         # Award cabinet on the user pages (#1819)
         UserAward.objects.create(user=cls.user_owner, kind=UserAwardKind.TITLE, definition_key="top_tagger",
@@ -110,7 +110,7 @@ class Test(URLTestCase):
         cls.PRIVATE_DATATABLES_GRID_LIST_URLS = [
             ("vcfs_datatable", {}, cls.vcf),
             ("samples_list_datatable", {}, cls.sample),
-            ("tag_color_collections_datatable", {}, cls.test_tag),
+            ("tag_config_collections_datatable", {}, cls.test_tag),
             ("custom_columns_collections_datatable", {}, cls.custom_columns_collection),
             ("cohort_datatable", {}, cls.cohort2),
             ("trio_datatable", {}, cls.trio),
@@ -148,7 +148,7 @@ class Test(URLTestCase):
 
     def testDataGridUrls(self):
         DATATABLE_GRID_LIST_URLS = [
-            ("tag_color_collections_datatable", {}, 200),
+            ("tag_config_collections_datatable", {}, 200),
             ("custom_columns_collections_datatable", {}, 200)
         ]
         self._test_datatable_urls(DATATABLE_GRID_LIST_URLS, self.user_owner)

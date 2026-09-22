@@ -49,7 +49,7 @@ NODE_EXCLUDE = ["created", "modified", "version", "appearance_version", "ready",
                 "errors", "status", "load_seconds"]
 
 ANALYSIS_EXCLUDE = ["id", "created", "modified", "user", "default_sort_by_column",
-                    "custom_columns_collection", "canonical_transcript_collection",
+                    "custom_columns_collection", "tag_config_collection", "canonical_transcript_collection",
                     "visible", "annotation_version"]
 
 

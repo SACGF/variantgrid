@@ -1,5 +1,6 @@
 import json
 from collections import defaultdict
+from typing import Optional
 
 from django import template
 from django.utils.safestring import mark_safe
@@ -13,7 +14,7 @@ from library.django_utils import get_field_counts
 from patients.models import Patient
 from snpdb.models import GenomeBuild
 from snpdb.models.models_enums import TagFilter
-from snpdb.models.models_user_settings import UserSettings
+from snpdb.models.models_user_settings import TagConfigCollection, UserSettings
 from snpdb.utils import get_tag_quick_tags, get_tag_sort_order_by_tag, get_tag_styles_and_colors
 from snpdb.variant_queries import get_variant_queryset_for_gene_symbol
 
@@ -26,7 +27,7 @@ def _json_for_script(value) -> str:
 
 
 def render_user_tag_styles(prefix, user_tag_style):
-    """ CSS rules for UserTagColor - .<prefix><tag> > .user-tag-colored """
+    """ CSS rules for TagConfig - .<prefix><tag> > .user-tag-colored """
     css_string = ''
     for tag, data in user_tag_style:
         if data:
@@ -45,7 +46,7 @@ def render_user_tag_styles(prefix, user_tag_style):
 
 
 class VariableCSSRGBNode(template.Node):
-    """ Renders CSS rules for UserTagColor """
+    """ Renders CSS rules for TagConfig """
 
     def __init__(self, prefix, user_tag_style):
         self.prefix = template.Variable(prefix)
@@ -94,13 +95,22 @@ def render_rgb_css(_parser, token):
     return VariableCSSRGBNode(*tag_utils.get_passed_objects(token))
 
 
+def _analysis_tag_config_collection(analysis) -> Optional[TagConfigCollection]:
+    """ Inside an analysis everyone sees the analysis' tag config; elsewhere (None) the viewer's own """
+    if analysis:
+        return analysis.tag_config_collection
+    return None
+
+
 @register.simple_tag(takes_context=True)
-def render_node_count_colors_css(context):
-    """ Legend swatch colours - the built in filters, plus one per tag in the user's tag colours """
+def render_node_count_styles(context, analysis=None):
+    """ Legend swatch colours - the built in filters, plus one per tag in the resolved tag config """
     prefix = 'node-count-legend-'
     user = context["user"]
+    tag_config_collection = _analysis_tag_config_collection(analysis)
     css = render_user_tag_styles(prefix, get_node_count_colors("background-color"))
-    css += render_user_tag_styles(prefix, get_tag_node_count_colors(user, "background-color"))
+    css += render_user_tag_styles(prefix, get_tag_node_count_colors(user, "background-color",
+                                                                    tag_config_collection=tag_config_collection))
     return mark_safe(css)
 
 
@@ -116,32 +126,42 @@ def render_analysis_samples_dict(analysis):
 
 
 @register.simple_tag(takes_context=True)
-def render_variant_tag_order(context):
+def render_variant_tag_order(context, analysis=None):
     """ {tag_id: sort_order} for JS tag sorting - see sortVariantTags in grid.js """
-    return mark_safe(_json_for_script(get_tag_sort_order_by_tag(context["user"])))
+    tag_config_collection = _analysis_tag_config_collection(analysis)
+    sort_order_by_tag = get_tag_sort_order_by_tag(context["user"], tag_config_collection=tag_config_collection)
+    return mark_safe(_json_for_script(sort_order_by_tag))
 
 
 @register.simple_tag(takes_context=True)
-def render_variant_quick_tags(context):
+def render_variant_quick_tags(context, analysis=None):
     """ [tag_id] for the one-click (+) buttons - see VariantGridFormat.tags """
-    return mark_safe(_json_for_script(get_tag_quick_tags(context["user"])))
+    tag_config_collection = _analysis_tag_config_collection(analysis)
+    quick_tags = get_tag_quick_tags(context["user"], tag_config_collection=tag_config_collection)
+    return mark_safe(_json_for_script(quick_tags))
 
 
 @register.inclusion_tag("analysis/tags/render_tag_styles_and_formatter.html", takes_context=True)
-def render_tag_styles_and_formatter(context, tag_colors_collection=None):
+def render_tag_styles_and_formatter(context, analysis=None, tag_config_collection=None):
     """ Also relies on global.js being included """
     user = context["user"]
-    user_tag_styles, _ = get_tag_styles_and_colors(user, tag_colors_collection=tag_colors_collection)
+    if tag_config_collection is None:
+        tag_config_collection = _analysis_tag_config_collection(analysis)
+    user_tag_styles, _ = get_tag_styles_and_colors(user, tag_config_collection=tag_config_collection)
 
     return {"user_tag_styles": user_tag_styles,
             "url_name_visible": context["url_name_visible"]}
 
 
-@register.inclusion_tag("analysis/tags/tag_colors_collection_link.html", takes_context=True)
-def tag_colors_collection_link(context):
-    """ Explains where tag colours/sort order come from, linking to where they can be changed """
-    user_settings = UserSettings.get_for_user(context["user"])
-    return {"tag_colors_collection": user_settings.tag_colors}
+@register.inclusion_tag("analysis/tags/tag_config_collection_link.html", takes_context=True)
+def tag_config_collection_link(context, analysis=None):
+    """ Explains where the tag config comes from, linking to where it can be changed. Pass the analysis
+        when the page draws with its config rather than the viewer's (@see _analysis_tag_config_collection) """
+    tag_config_collection = _analysis_tag_config_collection(analysis)
+    if tag_config_collection is None:
+        analysis = None
+        tag_config_collection = UserSettings.get_for_user(context["user"]).tag_config
+    return {"tag_config_collection": tag_config_collection, "analysis": analysis}
 
 
 @register.inclusion_tag("analysis/tags/tag_counts_summary.html", takes_context=True)

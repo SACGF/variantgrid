@@ -130,8 +130,8 @@ Patterns here:
   sample's comes from `render_analysis_samples_dict` (@see `render_variant_tags_dict`, `VariantGridFormat.tags`,
   `variantTaggingPillOptions` in `grid.js`).
 - Beside the tags column's (+) the grid draws one coloured (+) per quick tag - the tags ticked "1-click" on the tag
-  colours collection (`snpdb/models/models_user_settings.py:TagColor`), reaching the page as `variantQuickTags` via
-  `analysis/templatetags/user_tag_color_tags.py:render_variant_quick_tags`. They are always drawn, whether or not the
+  config collection (`snpdb/models/models_user_settings.py:TagConfig`), reaching the page as `variantQuickTags` via
+  `analysis/templatetags/tag_config_tags.py:render_variant_quick_tags`. They are always drawn, whether or not the
   row already has the tag: whose a tagging is makes "already tagged" a per-proband question, and a second click is a
   no-op (#1888).
 - A resolved tagging is hidden from the work lists: the tags node (`TagNode.include_resolved`, off by default), the
@@ -194,7 +194,11 @@ Gotchas:
   (`analysis/models/nodes/sources/trio_node.py:TrioNode.get_zygosity_table_data`), so it cannot see a field's live
   value - anything that depends on one ships as a `{placeholder}` the editor's `updateZygosityTable()` substitutes
   (the mosaic thresholds, #1830). A member with no `other_filters_<member>` key renders a blank cell.
-- Changing `Analysis.VERSION_BUMP_FIELDS` (custom columns, default sort) must bump `Analysis.version`
+- Tag colours, sort order, 1-click tags and staleness in an analysis come from its own
+  `Analysis.tag_config_collection` (copied from the creator's `UserSettings.tag_config`), so everyone opening it sees
+  the same thing. Pass the analysis to `render_tag_styles_and_formatter` / `render_variant_tag_order` /
+  `render_variant_quick_tags` / `render_node_count_styles` - with no analysis they fall back to the viewer's own.
+- Changing `Analysis.VERSION_BUMP_FIELDS` (custom columns, default sort, tag config) must bump `Analysis.version`
   (`analysis/forms/forms.py:AnalysisForm`): node grids and editors are `cache_page`d under the analysis version in the
   URL (`analysis/views/views_node.py:node_view`).
 - A worker that dies mid-LOADING perma-fails the node on the next sweep (`lease_ready_nodes`) on the assumption it OOM'd

@@ -11,7 +11,7 @@ from annotation.fake_annotation import create_fake_variants
 from classification.enums import AlleleOriginBucket
 from library.django_utils.unittest_utils import prevent_request_warnings
 from snpdb.forms import CreateTagForm
-from snpdb.models import GenomeBuild, Tag, TagColor, TagColorsCollection, Variant
+from snpdb.models import GenomeBuild, Tag, TagConfig, TagConfigCollection, Variant
 from snpdb.tag_operations import (
     TagOperation,
     get_case_collision_groups,
@@ -108,15 +108,15 @@ class TagMergeTest(VariantTagTestCase):
         self.assertIn("Artefact", tag_node.name)
 
     def test_merge_keeps_surviving_tag_color(self):
-        collection = TagColorsCollection.objects.create(name="test colors", user=self.user)
-        TagColor.objects.create(collection=collection, tag=self.surviving_tag, rgb="#ff0000")
-        TagColor.objects.create(collection=collection, tag=self.dying_tag, rgb="#00ff00")
+        collection = TagConfigCollection.objects.create(name="test colors", user=self.user)
+        TagConfig.objects.create(collection=collection, tag=self.surviving_tag, rgb="#ff0000")
+        TagConfig.objects.create(collection=collection, tag=self.dying_tag, rgb="#00ff00")
 
         merge_tag(self.dying_tag, self.surviving_tag, self.user)
 
-        tag_colors = TagColor.objects.filter(collection=collection)
-        self.assertEqual(tag_colors.count(), 1)
-        self.assertEqual(tag_colors.get().rgb, "#ff0000")
+        tag_config = TagConfig.objects.filter(collection=collection)
+        self.assertEqual(tag_config.count(), 1)
+        self.assertEqual(tag_config.get().rgb, "#ff0000")
 
     def test_merge_into_self_raises(self):
         with self.assertRaises(ValueError):

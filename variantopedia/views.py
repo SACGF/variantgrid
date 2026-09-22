@@ -459,7 +459,7 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
         # A splice event is called by its name ("AR-V7 splice variant"), not by a c.HGVS it has none of
         "variant_short_label": splice_event_variant.display if splice_event_variant else
             (variant_annotation.get_short_label() if variant_annotation else hgvs_g or str(variant)),
-        "variant_tag_stale_days": user_settings.variant_tag_stale_days,
+        "variant_tag_stale_days": user_settings.tag_config.variant_tag_stale_days if user_settings.tag_config else None,
         "visible_fields": variant_annotation.visible_columns if variant_annotation else frozenset(),
         "vts": vts,
     }

@@ -25,7 +25,7 @@
 	</script>
 
     <style>
-        {% load user_tag_color_tags %}
+        {% load tag_config_tags %}
         {% render_rgb_css 'tagged-' user_tag_styles %}
     </style>
 {% endblock %}
@@ -55,9 +55,9 @@
             <h3>Existing Tags</h3>
 
             <p>
-                Tags coloured below using tag colours
-                {% if user_settings_tag_colors %}
-                    <a href="{{ user_settings_tag_colors.get_absolute_url }}">{{ user_settings_tag_colors }}</a>
+                Tags coloured below using tag config
+                {% if user_settings_tag_config %}
+                    <a href="{{ user_settings_tag_config.get_absolute_url }}">{{ user_settings_tag_config }}</a>
                 {% endif %}
                 set in your <a href="{% url 'view_user_settings' %}">User Settings</a>
             </p>
@@ -130,11 +130,12 @@
             </table>
         </div>
 
-        <h3>Tag colours &amp; sorting</h3>
+        <h3>Tag config</h3>
 
-        <p>Collections below set tag colours and sort order — click one to view or change it</p>
+        <p>Collections below set tag colours, sort order, 1-click tags and how long before a tag
+           counts as stale — click one to view or change it</p>
 
-        <table id="tag-color-collections-datatable" data-datatable-url="{% url 'tag_color_collections_datatable' %}" class="sticky-header responsive"></table>
+        <table id="tag-config-collections-datatable" data-datatable-url="{% url 'tag_config_collections_datatable' %}" class="sticky-header responsive"></table>
 
         {% if retired_tags %}
             <div>

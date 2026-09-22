@@ -406,7 +406,7 @@ class TestVariantTagsDict(TestCase):
         return classification
 
     def _render(self) -> dict:
-        template = Template("{% load user_tag_color_tags %}{% render_variant_tags_dict analysis %}")
+        template = Template("{% load tag_config_tags %}{% render_variant_tags_dict analysis %}")
         return json.loads(template.render(Context({"analysis": self.analysis})))
 
     def test_one_entry_per_tagging_with_its_sample(self):
@@ -432,7 +432,7 @@ class TestVariantTagsDict(TestCase):
                                     "patient_name": None, "resolved": None}])
 
     def test_analysis_samples_names_every_sample_a_pill_can_be_about(self):
-        template = Template("{% load user_tag_color_tags %}{% render_analysis_samples_dict analysis %}")
+        template = Template("{% load tag_config_tags %}{% render_analysis_samples_dict analysis %}")
         samples = json.loads(template.render(Context({"analysis": self.analysis})))
         self.assertEqual(samples, {str(s.pk): str(s) for s in self.cohort.get_samples()})
 

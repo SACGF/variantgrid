@@ -35,8 +35,8 @@ from snpdb.models import (
     AlleleOrigin,
     GenomeBuild,
     Tag,
-    TagColor,
-    TagColorsCollection,
+    TagConfig,
+    TagConfigCollection,
     UserGridConfig,
     UserSettingsOverride,
     Variant,
@@ -244,10 +244,10 @@ class TaggedVariantGridTest(TestCase):
         """ The variant page tag table follows the sort order from the user's tag colours collection """
         self.assertEqual(self._variant_tag_counts_tags(), ["Artefact", "Reportable"])
 
-        collection = TagColorsCollection.objects.create(name="sort test colors", user=self.user)
-        TagColor.objects.create(collection=collection, tag=self.artefact, rgb="", sort_order=10)
+        collection = TagConfigCollection.objects.create(name="sort test colors", user=self.user)
+        TagConfig.objects.create(collection=collection, tag=self.artefact, rgb="", sort_order=10)
         user_settings_override, _ = UserSettingsOverride.objects.get_or_create(user=self.user)
-        user_settings_override.tag_colors = collection
+        user_settings_override.tag_config = collection
         user_settings_override.save()
 
         self.assertEqual(self._variant_tag_counts_tags(), ["Reportable", "Artefact"])

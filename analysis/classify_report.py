@@ -384,6 +384,15 @@ def outstanding_tag_count(rows: list[ClassifyQueueRow]) -> int:
     return sum(1 for row in rows if not row.done)
 
 
+def tag_config_analysis(rows: list[ClassifyQueueRow]) -> Optional[Analysis]:
+    """ The analysis whose tag config the tab draws its tags with - the one every tagging came from. A case
+        tagged across several analyses (or only outside one) has no single config, so the viewer's applies """
+    analyses = {row.variant_tag.analysis for row in rows if row.variant_tag.analysis_id}
+    if len(analyses) == 1:
+        return analyses.pop()
+    return None
+
+
 def tag_summary(rows: list[ClassifyQueueRow]) -> list[tuple[Tag, int]]:
     """ Outstanding work broken down by tag, for the funnel at the top of the tab """
     counts = defaultdict(int)

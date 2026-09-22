@@ -77,11 +77,11 @@
     }
 
 
-    {% load user_tag_color_tags %}
-    {% render_node_count_colors_css %}
+    {% load tag_config_tags %}
+    {% render_node_count_styles analysis %}
 
 </style>
-{% render_tag_styles_and_formatter %}
+{% render_tag_styles_and_formatter analysis %}
 <script type="text/javascript" src="{% static 'js/lib/html5sortable/html5sortable.min.js' %}"></script>
 <script>
 	DIV_TO_RELOAD = '#analysis-settings-node-counts-tab';

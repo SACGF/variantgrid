@@ -5,7 +5,7 @@ from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
-from analysis.classify_report import ClassifyReportCase
+from analysis.classify_report import ClassifyReportCase, tag_config_analysis
 from analysis.models import Analysis, VariantTag
 from analysis.models.nodes.analysis_node import AnalysisNode
 from analysis.models.nodes.filters.filter_node import FilterNode
@@ -29,7 +29,6 @@ from patients.models import Patient
 from snpdb.models import Country, GenomeBuild, Lab, Organization, Sample, Tag, Variant
 from snpdb.tests.utils.fake_cohort_data import create_fake_cohort, create_fake_trio
 from snpdb.tests.utils.tag_testing_utils import create_classify_queue_tag
-
 
 # The mandatory keys - a record missing any of them has errors, so the form will not submit it
 READY_EVIDENCE = {
@@ -175,6 +174,16 @@ class ClassifyQueueTest(ClassifyReportTestCase):
 
     def _queue_variant_tags(self, sample=None) -> list[VariantTag]:
         return [row.variant_tag for row in self._queue_rows(sample)]
+
+    def test_tab_draws_with_the_one_analysis_the_taggings_came_from(self):
+        analysis = self._create_cohort_analysis()
+        self._create_variant_tag(analysis=analysis)
+        self._create_variant_tag(analysis=analysis, variant=self.no_genotype_variant)
+        self._create_variant_tag(sample=self.proband, variant=self.shared_variant)  # Tagged outside any analysis
+        self.assertEqual(tag_config_analysis(self._queue_rows()), analysis)
+
+        self._create_variant_tag(analysis=self._create_cohort_analysis())
+        self.assertIsNone(tag_config_analysis(self._queue_rows()), "Two analyses - the viewer's config applies")
 
     def test_tag_with_sample_is_in_that_sample_queue(self):
         variant_tag = self._create_variant_tag(sample=self.proband)

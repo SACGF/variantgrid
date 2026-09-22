@@ -4,7 +4,7 @@
 {% load ui_menu_bars %}
 {% load js_tags %}
 {% load genome_build_tags %}
-{% load user_tag_color_tags %}
+{% load tag_config_tags %}
 {% block title %}Variants{% endblock %}
 {% block head %}
     {{ block.super }}
@@ -201,7 +201,7 @@
         });
     </script>
     <style>
-        {% render_node_count_colors_css %}
+        {% render_node_count_styles %}
 
         .filter-button-group {
             display: flex;

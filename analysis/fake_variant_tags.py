@@ -28,11 +28,22 @@ from analysis.models import VariantTag
 from analysis.models.enums import TagLocation
 from annotation.fake_data import get_variant_ids_by_gene, zipf_weight
 from library.guardian_utils import all_users_group
-from snpdb.models import Allele, AlleleConversionTool, AlleleOrigin, GenomeBuild, GlobalSettings, Lab, Organization, \
-    Tag, TagColor, TagColorsCollection, VariantAllele
+from snpdb.models import (
+    Allele,
+    AlleleConversionTool,
+    AlleleOrigin,
+    GenomeBuild,
+    GlobalSettings,
+    Lab,
+    Organization,
+    Tag,
+    TagConfig,
+    TagConfigCollection,
+    VariantAllele,
+)
 
 FAKE_PREFIX = "fake"
-FAKE_TAG_COLORS = "Fake demo tag colors"
+FAKE_TAG_CONFIG = "Fake demo tag colors"  # DB name of the collection - kept as-is so existing fake data still cleans up
 SOMATIC = "somatic"
 GERMLINE = "germline"
 BOTH = "both"
@@ -210,10 +221,10 @@ class FakeVariantTags:
         return users
 
     def _create_tags(self):
-        collection = _tag_colors_collection()
+        collection = _fake_tag_config_collection()
         for fake_tag in FAKE_TAGS:
             tag, _ = Tag.objects.get_or_create(pk=fake_tag.tag_id)
-            TagColor.objects.update_or_create(collection=collection, tag=tag, defaults={"rgb": fake_tag.rgb})
+            TagConfig.objects.update_or_create(collection=collection, tag=tag, defaults={"rgb": fake_tag.rgb})
 
     def _pick_variants(self, genome_build: GenomeBuild, group: str, genes: list[str],
                        num_variants: int) -> list[FakeVariant]:
@@ -293,8 +304,8 @@ class FakeVariantTags:
         VariantAllele.objects.filter(allele__in=alleles_qs, genome_build=genome_build).delete()
         deleted_alleles, _ = alleles_qs.delete()
 
-        Tag.objects.filter(pk__in=tag_ids).delete()  # Cascades to TagColor
-        TagColorsCollection.objects.filter(name=FAKE_TAG_COLORS).delete()
+        Tag.objects.filter(pk__in=tag_ids).delete()  # Cascades to TagConfig
+        TagConfigCollection.objects.filter(name=FAKE_TAG_CONFIG).delete()
         User.objects.filter(username__in=[fu.username for fu in FAKE_USERS]).delete()
         Lab.objects.filter(group_name__in=[fl.group_name for fl in FAKE_LABS.values()]).delete()
         Organization.objects.filter(group_name=f"{FAKE_PREFIX}_health").delete()
@@ -317,17 +328,17 @@ def _keeping_our_timestamps():
         modified.auto_now = True
 
 
-def _tag_colors_collection() -> TagColorsCollection:
+def _fake_tag_config_collection() -> TagConfigCollection:
     global_settings = GlobalSettings.objects.first()
-    if global_settings and global_settings.tag_colors:
-        return global_settings.tag_colors
+    if global_settings and global_settings.tag_config:
+        return global_settings.tag_config
 
-    collection = TagColorsCollection.objects.filter(name=FAKE_TAG_COLORS).first()
+    collection = TagConfigCollection.objects.filter(name=FAKE_TAG_CONFIG).first()
     if collection is None:
-        collection = TagColorsCollection(name=FAKE_TAG_COLORS)
+        collection = TagConfigCollection(name=FAKE_TAG_CONFIG)
         collection.save(assign_permissions=False)  # Global collection - no user to assign to
     if global_settings:
-        global_settings.tag_colors = collection
+        global_settings.tag_config = collection
         global_settings.save()
     return collection
 

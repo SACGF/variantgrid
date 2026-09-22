@@ -14,15 +14,15 @@ the tag's colour and in sort order, that tags on a single click.
 ## Data
 
 Quick tags are a property of a tag colours collection, next to colour and sort order. That is where tags are already
-customised per user, lab or deployment: `snpdb/models/models_user_settings.py:TagColorsCollection` resolves through
+customised per user, lab or deployment: `snpdb/models/models_user_settings.py:TagConfigCollection` resolves through
 user settings (user → lab → organization → global), is shareable via guardian permissions, and is cloned to be
 customised. A somatic lab's collection marks its three tags; a germline lab's marks its own; someone working both
-sides picks the collection. A `TagColor` row already exists purely to hold `sort_order` with no colour set, so a row
+sides picks the collection. A `TagConfig` row already exists purely to hold `sort_order` with no colour set, so a row
 that exists purely to hold `quick_tag` follows the same rule.
 
 ```python
-class TagColor(TimeStampedModel):
-    collection = models.ForeignKey(TagColorsCollection, null=True, on_delete=CASCADE)
+class TagConfig(TimeStampedModel):
+    collection = models.ForeignKey(TagConfigCollection, null=True, on_delete=CASCADE)
     tag = models.ForeignKey(Tag, on_delete=CASCADE)
     rgb = models.CharField(max_length=7)  # '#rrggbb', '' when the row only holds sort_order / quick_tag
     sort_order = models.IntegerField(null=True, blank=True)
@@ -36,22 +36,22 @@ class TagColor(TimeStampedModel):
 Migration: snpdb/migrations/0272_tagcolor_quick_tag.py (new), an `AddField` with the default. No data migration - nothing
 is quick until someone ticks it.
 
-A merged-away tag's `TagColor` rows are deleted by `snpdb/tag_operations.py` (`TagForeignKey("tag colour settings", ...)`
+A merged-away tag's `TagConfig` rows are deleted by `snpdb/tag_operations.py` (`TagForeignKey("tag colour settings", ...)`
 is unique with the collection so cannot be repointed), so a quick flag dies with the tag it was on; the survivor is
 ticked again by hand if wanted. A retired tag is excluded when the list is built (below), so its button disappears
 without touching the row - reinstating brings it back.
 
 ## What reaches the grid
 
-`TagColorsCollection.get_quick_tags() -> list[str]`: the collection's tag ids with `quick_tag=True` whose tag is
+`TagConfigCollection.get_quick_tags() -> list[str]`: the collection's tag ids with `quick_tag=True` whose tag is
 live (`Tag.live_qs()`), ordered by `(sort_order or 0, tag id)` - the same rule `snpdb/utils.py:get_all_tags_and_user_colors`
 and `sortVariantTags` in `variantgrid/static_files/default_static/js/grid.js` use, so the buttons sit in the same order
 the pills do.
 
-`snpdb/utils.py:get_tag_quick_tags(user, tag_colors_collection=None) -> list[str]` beside
+`snpdb/utils.py:get_tag_quick_tags(user, tag_config_collection=None) -> list[str]` beside
 `snpdb/utils.py:get_tag_sort_order_by_tag`, resolving the collection the same way and returning `[]` with no collection.
 
-A new template tag `render_variant_quick_tags` in `analysis/templatetags/user_tag_color_tags.py`, the twin of
+A new template tag `render_variant_quick_tags` in `analysis/templatetags/tag_config_tags.py`, the twin of
 `render_variant_tag_order`, emitting the JSON list. `analysis/templates/analysis/analysis.html` sets
 `variantQuickTags = {% render_variant_quick_tags %};` next to `variantTagOrder`. The sample variants tab
 (`snpdb/templates/snpdb/data/sample_variants_tab.html`) is read only, so it gets nothing - the formatter draws no
@@ -96,10 +96,10 @@ whose buttons come and go would shift the pills about. The cost is one more clic
 
 ## Tag colours page
 
-`snpdb/templates/snpdb/settings/view_tag_colors_collection.html` gets a third column, "1-click", a checkbox per tag
+`snpdb/templates/snpdb/settings/view_tag_config_collection.html` gets a third column, "1-click", a checkbox per tag
 row (disabled without write permission, like the colour picker). Ticking posts `quick_tag=<tag>&value=true|false` to
-the page's own URL; `snpdb/views/views_tag.py:view_tag_colors_collection` gains a branch beside `name` and `tag_order`
-that `update_or_create`s the `TagColor` row with `defaults={"quick_tag": ...}`, ignoring an unknown tag the same way
+the page's own URL; `snpdb/views/views_tag.py:view_tag_config_collection` gains a branch beside `name` and `tag_order`
+that `update_or_create`s the `TagConfig` row with `defaults={"quick_tag": ...}`, ignoring an unknown tag the same way
 `tag_order` does. The page text below the heading says what the column does: "Tick 1-click to draw the tag as its own
 (+) in the analysis grid, so tagging with it takes one click".
 

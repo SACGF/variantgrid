@@ -1,6 +1,6 @@
 {% load settings_tags %}
 {% load ui_utils %}
-{% load user_tag_color_tags %}
+{% load tag_config_tags %}
 {% labelled label="Codon"  id="nearby_codon" %}{{ codon_summary }}{% tag_counts codon_tag_counts %}{% endlabelled %}
 {% labelled label="Exon"   id="nearby_exon" %}{{ exon_summary }}{% tag_counts exon_tag_counts %}{% endlabelled %}
 {% labelled label="Domain" id="nearby_domain" %}{{ domain_summary }}{% tag_counts domain_tag_counts %}{% endlabelled %}

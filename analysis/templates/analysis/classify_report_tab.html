@@ -1,7 +1,7 @@
 {% load ui_utils %}
 {% load classification_tags %}
-{% load user_tag_color_tags %}
-{% render_tag_styles_and_formatter %}
+{% load tag_config_tags %}
+{% render_tag_styles_and_formatter analysis=tag_config_analysis %}
 <div id="classify-report" data-tab-url="{{ request.path }}" data-populating="{{ populating_classifications|length }}">
     <style>
         /* Where unshared records are faded (CLASSIFICATION_GRID_FADE_NON_SHARED) - here what matters is ready for the report */
@@ -301,6 +301,7 @@
                         <div class="text-muted small">
                             {% for tag, count in tag_summary %}{% if not forloop.first %} &middot; {% endif %}{{ count }} <span class="grid-tag tagged-{{ tag }}"><span class="user-tag-colored">{{ tag }}</span></span>{% empty %}nothing outstanding{% endfor %}
                         </div>
+                        <div class="text-muted small mt-1">{% tag_config_collection_link analysis=tag_config_analysis %}</div>
                     </div>
                 </div>
             </div>

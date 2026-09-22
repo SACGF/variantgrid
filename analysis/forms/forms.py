@@ -45,7 +45,13 @@ from library.guardian_utils import assign_permission_to_user_and_groups
 from patients.models_enums import SampleSourceLevel, Sex
 from seqauto.models import EnrichmentKit
 from snpdb.forms import GenomeBuildAutocompleteForwardMixin, UserSettingsGenomeBuildMixin
-from snpdb.models import CustomColumnsCollection, Trio, UserSettings, VariantGridColumn
+from snpdb.models import (
+    CustomColumnsCollection,
+    TagConfigCollection,
+    Trio,
+    UserSettings,
+    VariantGridColumn,
+)
 from uicore.utils.form_helpers import form_helper_horizontal
 from uicore.widgets.date_widget import NativeDateInput
 
@@ -238,7 +244,7 @@ class AnalysisForm(forms.ModelForm, ROFormMixin):
         fields = ("user", 'genome_build',
                   "name", "description", "analysis_type",
                   "custom_columns_collection", "default_sort_by_column", "canonical_transcript_collection",
-                  "grid_sample_label_template", "variant_tag_stale_days",
+                  "grid_sample_label_template", "tag_config_collection",
                   "show_igv_links", "analysis_horizontal_mode", "annotation_version", "lock_input_sources",
                   "node_queryset_filter_contigs")
         read_only = ('genome_build', )
@@ -268,6 +274,11 @@ class AnalysisForm(forms.ModelForm, ROFormMixin):
             annotation_version_qs |= AnnotationVersion.objects.filter(pk=annotation_version_id)
         self.fields['annotation_version'].queryset = annotation_version_qs.order_by("-pk")
         self.fields['custom_columns_collection'].queryset = CustomColumnsCollection.filter_for_user(user)
+        tag_config_qs = TagConfigCollection.filter_for_user(user)
+        if tag_config_collection_id := self.instance.tag_config_collection_id:
+            # Keep what it's set to selectable, otherwise saving any other setting clears it
+            tag_config_qs |= TagConfigCollection.objects.filter(pk=tag_config_collection_id)
+        self.fields['tag_config_collection'].queryset = tag_config_qs
 
     def clean_custom_columns_collection(self):
         ccc = self.cleaned_data["custom_columns_collection"]

@@ -3,7 +3,7 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from snpdb.models import GlobalSettings, Tag, TagColor, TagColorsCollection, UserSettings
+from snpdb.models import GlobalSettings, Tag, TagConfig, TagConfigCollection, UserSettings
 from snpdb.utils import get_all_tags_and_user_colors, get_tag_quick_tags
 
 TEST_TAG_IDS = {"aaaSortTest", "bbbSortTest", "cccSortTest"}
@@ -19,7 +19,7 @@ class TagSortOrderTest(TestCase):
         cls.tag_a = Tag.objects.create(pk="aaaSortTest")
         cls.tag_b = Tag.objects.create(pk="bbbSortTest")
         cls.tag_c = Tag.objects.create(pk="cccSortTest")
-        cls.collection = TagColorsCollection.objects.create(name="test sort colors", user=cls.user)
+        cls.collection = TagConfigCollection.objects.create(name="test sort colors", user=cls.user)
 
     def _test_tag_ids_in_order(self):
         user_tag_colors = get_all_tags_and_user_colors(self.user, self.collection)
@@ -30,16 +30,16 @@ class TagSortOrderTest(TestCase):
 
     def test_custom_sort_order_with_unset_tags_first(self):
         # Tags without sort_order sort as 0, so a positive value pushes a tag past them
-        TagColor.objects.create(collection=self.collection, tag=self.tag_a, rgb="", sort_order=10)
+        TagConfig.objects.create(collection=self.collection, tag=self.tag_a, rgb="", sort_order=10)
         self.assertEqual(self._test_tag_ids_in_order(), ["bbbSortTest", "cccSortTest", "aaaSortTest"])
 
     def test_sort_order_only_rows_emit_no_color(self):
-        TagColor.objects.create(collection=self.collection, tag=self.tag_a, rgb="", sort_order=10)
+        TagConfig.objects.create(collection=self.collection, tag=self.tag_a, rgb="", sort_order=10)
         self.assertEqual(self.collection.get_user_colors_by_tag(), {})
 
     def test_save_tag_order_via_view(self):
         self.client.force_login(self.user)
-        url = reverse("view_tag_colors_collection", kwargs={"tag_colors_collection_id": self.collection.pk})
+        url = reverse("view_tag_config_collection", kwargs={"tag_config_collection_id": self.collection.pk})
         response = self.client.post(url, {"tag_order": "cccSortTest,aaaSortTest,bbbSortTest,notARealTag"})
         self.assertEqual(response.status_code, 200)
         self.assertEqual(self.collection.get_sort_order_by_tag(),
@@ -48,7 +48,7 @@ class TagSortOrderTest(TestCase):
 
     def test_save_name_via_view(self):
         self.client.force_login(self.user)
-        url = reverse("view_tag_colors_collection", kwargs={"tag_colors_collection_id": self.collection.pk})
+        url = reverse("view_tag_config_collection", kwargs={"tag_config_collection_id": self.collection.pk})
         self.client.post(url, {"name": "renamed colors"})
         self.collection.refresh_from_db()
         self.assertEqual(self.collection.name, "renamed colors")
@@ -64,22 +64,22 @@ class TagQuickTagTest(TestCase):
         cls.tag_a = Tag.objects.create(pk="aaaQuickTest")
         cls.tag_b = Tag.objects.create(pk="bbbQuickTest")
         cls.tag_c = Tag.objects.create(pk="cccQuickTest")
-        cls.collection = TagColorsCollection.objects.create(name="test quick tags", user=cls.user)
+        cls.collection = TagConfigCollection.objects.create(name="test quick tags", user=cls.user)
 
     def _post_quick_tag(self, tag_id, value):
         self.client.force_login(self.user)
-        url = reverse("view_tag_colors_collection", kwargs={"tag_colors_collection_id": self.collection.pk})
+        url = reverse("view_tag_config_collection", kwargs={"tag_config_collection_id": self.collection.pk})
         return self.client.post(url, {"quick_tag": tag_id, "value": value})
 
     def test_only_ticked_tags_in_sort_order_then_name(self):
-        TagColor.objects.create(collection=self.collection, tag=self.tag_c, rgb="", quick_tag=True)
-        TagColor.objects.create(collection=self.collection, tag=self.tag_b, rgb="", quick_tag=True, sort_order=-1)
-        TagColor.objects.create(collection=self.collection, tag=self.tag_a, rgb="")
+        TagConfig.objects.create(collection=self.collection, tag=self.tag_c, rgb="", quick_tag=True)
+        TagConfig.objects.create(collection=self.collection, tag=self.tag_b, rgb="", quick_tag=True, sort_order=-1)
+        TagConfig.objects.create(collection=self.collection, tag=self.tag_a, rgb="")
         self.assertEqual(self.collection.get_quick_tags(), ["bbbQuickTest", "cccQuickTest"])
 
     def test_retired_tag_is_dropped(self):
-        TagColor.objects.create(collection=self.collection, tag=self.tag_a, rgb="", quick_tag=True)
-        TagColor.objects.create(collection=self.collection, tag=self.tag_b, rgb="", quick_tag=True)
+        TagConfig.objects.create(collection=self.collection, tag=self.tag_a, rgb="", quick_tag=True)
+        TagConfig.objects.create(collection=self.collection, tag=self.tag_b, rgb="", quick_tag=True)
         self.tag_a.retired = timezone.now()
         self.tag_a.save()
         self.assertEqual(self.collection.get_quick_tags(), ["bbbQuickTest"])
@@ -96,10 +96,10 @@ class TagQuickTagTest(TestCase):
 
     def test_unknown_tag_is_ignored(self):
         self._post_quick_tag("notARealTag", "true")
-        self.assertFalse(self.collection.tagcolor_set.exists())
+        self.assertFalse(self.collection.tagconfig_set.exists())
 
     def test_no_collection_has_no_quick_tags(self):
-        GlobalSettings.objects.update(tag_colors=None)
+        GlobalSettings.objects.update(tag_config=None)
         user_settings = UserSettings.get_for_user(self.user)
-        self.assertIsNone(user_settings.tag_colors, "Settings resolve to no tag colors collection")
+        self.assertIsNone(user_settings.tag_config, "Settings resolve to no tag colors collection")
         self.assertEqual(get_tag_quick_tags(self.user), [])

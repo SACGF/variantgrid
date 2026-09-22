@@ -30,7 +30,7 @@ from django.utils import timezone
 from analysis.models import VariantTag
 from analysis.models.nodes.filters.tag_node import TagNode, TagNodeTag
 from classification.enums import AlleleOriginBucket
-from snpdb.models import TAG_ALLELE_ORIGIN_CHOICES, Tag, TagColor
+from snpdb.models import TAG_ALLELE_ORIGIN_CHOICES, Tag, TagConfig
 
 MERGE_SUGGESTION_MAX_DISTANCE = 1
 
@@ -101,7 +101,7 @@ class TagForeignKey:
 TAG_FOREIGN_KEYS = [
     TagForeignKey("variant tags", VariantTag),
     TagForeignKey("analysis tag nodes", TagNodeTag, unique_with="tag_node_id"),
-    TagForeignKey("tag colour settings", TagColor, unique_with="collection_id"),
+    TagForeignKey("tag config", TagConfig, unique_with="collection_id"),
 ]
 
 

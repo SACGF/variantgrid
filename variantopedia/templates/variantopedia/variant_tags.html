@@ -3,7 +3,7 @@
 {% load crispy_forms_tags %}
 {% load genome_build_tags %}
 {% load datatable_tags %}
-{% load user_tag_color_tags %}
+{% load tag_config_tags %}
 {% load js_tags %}
 
 {% block title %}Variant Tags{% endblock title %}
@@ -89,7 +89,7 @@
 
 </script>
 <style>
-{% render_node_count_colors_css %}
+{% render_node_count_styles %}
 </style>
 {% endblock head %}
 

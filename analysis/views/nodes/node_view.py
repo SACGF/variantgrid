@@ -27,7 +27,9 @@ class NodeView(UpdateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         extra_filters = self.kwargs.get("extra_filters")
-        user_tag_colors = get_all_tags_and_user_colors(self.request.user)
+        # Tag colours in a node editor are the analysis' - the same ones its grid draws
+        user_tag_colors = get_all_tags_and_user_colors(
+            self.request.user, tag_config_collection=self.object.analysis.tag_config_collection)
         context.update({
             "node": self.object,
             "node_id": self.object.pk,

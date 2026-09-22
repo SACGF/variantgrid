@@ -6,7 +6,7 @@ AnalysisTemplateRun records a run and its arguments, and Sample/CohortAnalysisTe
 AutoLaunchAnalysisTemplate drive the auto-analyses on import. Nodes are in nodes/analysis_node.py.
 """
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime
 from functools import cached_property
 from typing import Optional, Union
 
@@ -38,7 +38,7 @@ from snpdb.models import (
     CustomColumn,
     CustomColumnsCollection,
     Sample,
-    SettingsOverride,
+    TagConfigCollection,
     UserSettings,
 )
 from snpdb.models.models_enums import BuiltInFilters
@@ -47,7 +47,7 @@ from snpdb.models.models_genome import GenomeBuild
 
 class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel, PreviewModelMixin):
     # Changing some analysis settings alters node editors/grids - and we need to increment version to expire node cache
-    VERSION_BUMP_FIELDS = ["custom_columns_collection", "default_sort_by_column"]
+    VERSION_BUMP_FIELDS = ["custom_columns_collection", "default_sort_by_column", "tag_config_collection"]
 
     genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)
     version = models.IntegerField(default=0)  # By bumping this we can invalidate node caches
@@ -61,11 +61,9 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel, Previe
                                                   default=CustomColumnsCollection.get_system_default_id,
                                                   on_delete=SET_DEFAULT)
     default_sort_by_column = models.ForeignKey(CustomColumn, null=True, blank=True, on_delete=SET_NULL)
-    variant_tag_stale_days = models.IntegerField(
-        null=True, blank=True, choices=SettingsOverride.VARIANT_TAG_STALE_DAYS_CHOICES,
-        help_text="Tag events older than this are considered stale: grids show "
-                  "fresh vs total counts and mark tags whose most recent event is older. "
-                  "Blank disables staleness.")
+    tag_config_collection = models.ForeignKey(
+        TagConfigCollection, null=True, blank=True, on_delete=SET_NULL,
+        help_text="Tag colours, sort order, 1-click tags and staleness everyone opening this analysis sees")
     canonical_transcript_collection = models.ForeignKey(CanonicalTranscriptCollection, null=True, blank=True, on_delete=SET_NULL)
     show_igv_links = models.BooleanField(default=True)
     analysis_panel_fraction = models.FloatField(default=0.25)
@@ -166,9 +164,9 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel, Previe
     @property
     def variant_tag_stale_date(self) -> Optional[datetime]:
         """ Tag events before this are considered stale (None = staleness disabled) """
-        if self.variant_tag_stale_days is None:
+        if self.tag_config_collection is None:
             return None
-        return timezone.now() - timedelta(days=self.variant_tag_stale_days)
+        return self.tag_config_collection.variant_tag_stale_date
 
     @classmethod
     def get_listing_url(cls):
@@ -244,7 +242,7 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel, Previe
         self.custom_columns_collection = user_settings.columns
         self.default_sort_by_column = user_settings.default_sort_by_column
         self.grid_sample_label_template = user_settings.grid_sample_label_template
-        self.variant_tag_stale_days = user_settings.variant_tag_stale_days
+        self.tag_config_collection = user_settings.tag_config
         self.analysis_horizontal_mode = bool(user_settings.analysis_horizontal_mode)
         self.save()
 

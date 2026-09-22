@@ -1,0 +1,12 @@
+<p>
+    Tags coloured and sorted using tag config
+    {% if analysis %}
+        <a href="{{ tag_config_collection.get_absolute_url }}">{{ tag_config_collection }}</a>
+        from analysis <a href="{{ analysis.get_absolute_url }}">{{ analysis }}</a>
+    {% else %}
+        {% if tag_config_collection %}
+            <a href="{{ tag_config_collection.get_absolute_url }}">{{ tag_config_collection }}</a>
+        {% endif %}
+        set in your <a href="{% url 'view_user_settings' %}">User Settings</a>
+    {% endif %}
+</p>

@@ -21,6 +21,7 @@ from analysis.classify_report import (
     ClassifyReportCase,
     case_allele_origin_bucket,
     outstanding_tag_count,
+    tag_config_analysis,
     tag_summary,
 )
 from analysis.models import VariantTag
@@ -80,6 +81,7 @@ def _classify_report_context(case: ClassifyReportCase, case_type: str, case_id: 
         "outstanding": outstanding_tag_count(rows),
         "unclassified": sum(1 for row in rows if row.needs_classification),
         "tag_summary": tag_summary(rows),
+        "tag_config_analysis": tag_config_analysis(rows),
         "classification_modifications": modifications,
         "report_candidates": report_candidates,
         "populating_classifications": list(case.populating_classifications()),

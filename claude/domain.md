@@ -179,6 +179,13 @@ cohort (`AnalysisTemplateRun`); auto-analyses on import use them.
 Candidate…). Repeats heavily - the same artefact is re-tagged in every analysis it appears in - so aggregate in SQL
 ([operations.md#scale](guides/operations.md#scale)).
 
+**TagConfigCollection / TagConfig** - `snpdb/models/models_user_settings.py:TagConfigCollection` and its
+`snpdb/models/models_user_settings.py:TagConfig` rows: how a lab uses tags - colour, sort order, the "1-click"
+flag and the staleness window (`variant_tag_stale_days`). A user points at one through their settings
+(`UserSettings.tag_config`), and an analysis owns one (`analysis/models/models_analysis.py:Analysis.tag_config_collection`,
+copied from the creator's settings) so everyone opening it sees the same tags. Resolution order on any page: the
+analysis' collection when there is one, else the viewer's.
+
 **Classify-queue tag** - a live `snpdb/models/models.py:Tag` with `requires_classification` set: tagging a variant with one
 is asking for it to be classified, and classifying resolves the tagging rather than deleting it. A lab flags its own on the
 tag settings page; `settings.TAG_REQUIRES_CLASSIFICATION` only names the one a fresh install is seeded with. A queue tag is

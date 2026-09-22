@@ -555,7 +555,7 @@ class SettingsOverrideForm(BaseModelForm):
             "email_discordance_updates": "Email Discordance Updates",
             "variant_link_in_analysis_opens_new_tab": "Variant Link in Analysis Opens New Tab",
             "tool_tips": "Tooltips",
-            "tag_colors": "Tag Colours",
+            "tag_config": "Tag Config",
             "node_debug_tab": "Node Debug Tab",
             "analysis_horizontal_mode": "Analysis Horizontal Mode",
             "import_messages": "Import Messages",
@@ -571,7 +571,6 @@ class SettingsOverrideForm(BaseModelForm):
             "initially_show_zygosity_table": "Initially Show Duo/Trio/Quad Zygosity Table",
             "variant_grid_two_line_rows": "Variant Grid Two Line Rows",
             "node_grid_auto_load_max_variants": "Node Grid Auto Load Max Variants",
-            "variant_tag_stale_days": "Variant Tags Stale After",
             "show_user_awards": "Show User Awards",
         }
 
@@ -620,7 +619,7 @@ class SettingsOverrideForm(BaseModelForm):
             "tool_tips": settings_config.analysis_enabled,
             "node_debug_tab": settings_config.analysis_enabled,
             "analysis_horizontal_mode": settings_config.analysis_horizontal_mode,
-            "tag_colors": settings_config.analysis_enabled,
+            "tag_config": settings_config.analysis_enabled,
             "import_messages": settings_config.upload_enabled,
             "igv_port": settings_config.igv_links_enabled,
             "grid_sample_label_template": settings_config.analysis_enabled,
@@ -630,7 +629,6 @@ class SettingsOverrideForm(BaseModelForm):
             "initially_show_zygosity_table": settings_config.analysis_enabled,
             "variant_grid_two_line_rows": settings_config.analysis_enabled,
             "node_grid_auto_load_max_variants": settings_config.analysis_enabled,
-            "variant_tag_stale_days": settings_config.analysis_enabled,
             "show_user_awards": settings.USER_AWARDS_ENABLED,
         }
 

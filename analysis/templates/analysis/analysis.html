@@ -3,7 +3,7 @@
 {% load tz %}
 {% load analysis_node_tags %}
 {% load js_tags %}
-{% load user_tag_color_tags %}
+{% load tag_config_tags %}
 {% load settings_tags %}
 
 {% block title %}Analysis: {{ analysis.name }}{% endblock title %}
@@ -143,9 +143,9 @@
     }
 
 	{% render_rgb_css 'node-count-' node_count_colors %}
-    {% render_node_count_colors_css %}
+    {% render_node_count_styles analysis %}
 </style>
-{% render_tag_styles_and_formatter %}
+{% render_tag_styles_and_formatter analysis %}
 <script>
     // noinspection JSAnnotator
     const ANALYSIS_ID = {{ analysis.pk }};
@@ -185,8 +185,8 @@
 
     variantTags = {% render_variant_tags_dict analysis %};
     analysisSamples = {% render_analysis_samples_dict analysis %};
-    variantTagOrder = {% render_variant_tag_order %};
-    variantQuickTags = {% render_variant_quick_tags %};
+    variantTagOrder = {% render_variant_tag_order analysis %};
+    variantQuickTags = {% render_variant_quick_tags analysis %};
     variantTagsReadOnly = !{{ has_write_permission|jsonify }};
     variantTagStaleDays = ANALYSIS_SETTINGS.variant_tag_stale_days;
     selectedVariants = {% render_node_variant_dict analysis %};

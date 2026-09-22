@@ -4,7 +4,7 @@
 {% load ui_utils %}
 {% load ui_menu_bars %}
 {% load js_tags %}
-{% load user_tag_color_tags %}
+{% load tag_config_tags %}
 {% block submenu %}{% menu_bar_variants %}{% endblock %}
 
 {% block title %}Nearby to {{ variant }}{% endblock title %}
@@ -13,7 +13,7 @@
     {{ block.super }}
     {% render_tag_styles_and_formatter %}
     <style>
-    {% render_node_count_colors_css %}
+    {% render_node_count_styles %}
     </style>
     <script>
         window.ANALYSIS_SETTINGS = {

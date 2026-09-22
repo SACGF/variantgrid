@@ -9,7 +9,7 @@
 {% load ui_help %}
 {% load settings_tags %}
 {% load datatable_tags %}
-{% load user_tag_color_tags %}
+{% load tag_config_tags %}
 {% load settings_tags %}
 {% load clinvar_tags %}
 {% load pathogenicity_tags %}
@@ -38,7 +38,7 @@ function analysisLinkRenderer(data, type, row) {
     return data;
 }
 
-// User's variant_tag_stale_days setting (null = staleness off)
+// The viewer's tag config staleness window (null = staleness off)
 // var not const - the analysis editor loads this page's scripts into the same document each time
 var VARIANT_TAG_STALE_DAYS = {{ variant_tag_stale_days|jsonify }};
 
@@ -590,7 +590,7 @@ function applyVariantValues() {
         <h4>Tags</h4>
 
         <div id="variant-tags-datatable-wrapper" class="{% if not has_tags %}hidden{% endif %}">
-            {% tag_colors_collection_link %}
+            {% tag_config_collection_link %}
             {% datatable_user_data_filter 'variant-tags-datatable' 'Variant Tags' group_data=False hidden_data=True hidden_label="Show resolved" %}
             <table id="variant-tags-datatable" class="sticky-header" data-datatable-responsive="true" data-datatable-url="{% url 'variant_tag_counts_datatable' variant.pk %}"></table>
         </div>

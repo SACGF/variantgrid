@@ -18,7 +18,6 @@ from django.views.decorators.http import require_POST
 
 from analysis import forms
 from analysis.analysis_import_export import analysis_export_to_dict
-from analysis.grids import AnalysesListColumns
 from analysis.analysis_templates import (
     get_auto_launch_analysis_template_matches,
     populate_analysis_from_template_run,
@@ -33,6 +32,7 @@ from analysis.forms import (
     AutoLaunchFormSet,
     SelectGridColumnForm,
 )
+from analysis.grids import AnalysesListColumns
 from analysis.models import (
     AnalysisNode,
     AnalysisTemplate,
@@ -47,8 +47,14 @@ from analysis.models.mutational_signatures import MutationalSignature
 from analysis.models.nodes import node_utils
 from analysis.models.nodes.analysis_node import AnalysisClassification
 from analysis.models.nodes.node_counts import get_node_count_colors, get_tag_node_count_colors
-from analysis.models.nodes.node_types import get_node_display_data_by_class_name, get_node_types_hash
-from analysis.variant_tag_operations import resolve_launching_variant_tag, resolve_requires_classification_tags
+from analysis.models.nodes.node_types import (
+    get_node_display_data_by_class_name,
+    get_node_types_hash,
+)
+from analysis.variant_tag_operations import (
+    resolve_launching_variant_tag,
+    resolve_requires_classification_tags,
+)
 from analysis.views.analysis_permissions import get_analysis_or_404
 from annotation.models.models import MutationalSignatureInfo
 from classification.views.views import (
@@ -144,12 +150,14 @@ def get_analysis_settings(user, analysis):
     else:
         canonical_transcript_collection = ""
 
+    tag_config_collection = analysis.tag_config_collection
     analysis_settings = {
         "annotation_version": analysis.annotation_version_id,
         "node_count_types": analysis.get_node_count_types(),
         "canonical_transcript_collection": canonical_transcript_collection,
         "grid_sample_label_template": analysis.grid_sample_label_template,
-        "variant_tag_stale_days": analysis.variant_tag_stale_days,
+        # The JS reads this off ANALYSIS_SETTINGS - it comes from the analysis' tag config collection
+        "variant_tag_stale_days": tag_config_collection.variant_tag_stale_days if tag_config_collection else None,
         "show_igv_links": analysis.show_igv_links,
         "igv_data": igv_data,
         "open_variant_details_in_new_window": user_settings.variant_link_in_analysis_opens_new_tab,
