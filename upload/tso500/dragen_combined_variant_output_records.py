@@ -26,8 +26,9 @@ patient has been accessioned yet.
 """
 import logging
 import re
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Optional
+from typing import NamedTuple, Optional
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -66,6 +67,7 @@ from upload.tso500.dragen_combined_variant_output_parser import (
     TMB,
     TOTAL_TMB,
     TUMOR_FRACTION,
+    USABLE_MSI_SITES,
     CombinedVariantOutputSection,
     get_section_values,
 )
@@ -115,20 +117,76 @@ class ResolvedPair:
         return None
 
 
+class MeasureCall(NamedTuple):
+    """ The lab's call on one measure and the policy that produced it. The call is None where the
+        policy is set but the numbers cannot answer it - too few usable MSI sites - so the threshold
+        that was applied is still recorded against the measure """
+    call: Optional[str]
+    threshold: str
+    threshold_source: str
+
+
 @dataclass(frozen=True)
 class MeasureSource:
-    """ Where one SpecimenMeasure is written in the file """
+    """ Where one SpecimenMeasure is written in the file, and what turns it into a call """
     measure_type: str
     section: str
     key: str
     unit: Optional[str] = None
+    call: Optional[Callable[[dict], Optional[MeasureCall]]] = None
+
+
+MSI_STABLE = "Stable"
+MSI_UNSTABLE = "Unstable"
+TMB_HIGH = "High"
+TMB_LOW = "Low"
+
+
+def _value(values: dict, key: str) -> Optional[float]:
+    try:
+        return float(values[key])
+    except (KeyError, TypeError, ValueError):
+        return None
+
+
+def msi_call(section_values: dict) -> Optional[MeasureCall]:
+    """ Stable / Unstable off the percent of unstable sites, where the pair has enough usable sites
+        for the percentage to mean anything. Both numbers are the lab's policy, not vendor output,
+        so an installation that has not set them gets the value and no call """
+    min_usable_sites = settings.TSO500_MSI_MIN_USABLE_SITES
+    unstable_percent = settings.TSO500_MSI_UNSTABLE_PERCENT
+    if min_usable_sites is None or unstable_percent is None:
+        return None
+    percent = _value(section_values, PERCENT_UNSTABLE_MSI_SITES)
+    if percent is None:
+        return None
+    threshold = f">= {min_usable_sites} usable sites, >= {unstable_percent}% unstable"
+    source = "settings.TSO500_MSI_MIN_USABLE_SITES / settings.TSO500_MSI_UNSTABLE_PERCENT"
+    usable_sites = _value(section_values, USABLE_MSI_SITES)
+    if usable_sites is None or usable_sites < min_usable_sites:
+        return MeasureCall(None, threshold, source)
+    call = MSI_UNSTABLE if percent >= unstable_percent else MSI_STABLE
+    return MeasureCall(call, threshold, source)
+
+
+def tmb_call(section_values: dict) -> Optional[MeasureCall]:
+    """ High / Low off the mutations per megabase, against the lab's cutoff """
+    high_mut_per_mb = settings.TSO500_TMB_HIGH_MUT_PER_MB
+    if high_mut_per_mb is None:
+        return None
+    value = _value(section_values, TOTAL_TMB)
+    if value is None:
+        return None
+    call = TMB_HIGH if value >= high_mut_per_mb else TMB_LOW
+    return MeasureCall(call, f">= {high_mut_per_mb} mut/Mb", "settings.TSO500_TMB_HIGH_MUT_PER_MB")
 
 
 # The five scalars the pair-level sections carry. '[GIS]' holds three: the score, and the tumour
-# fraction and ploidy the caller estimated it from
+# fraction and ploidy the caller estimated it from. MSI and TMB are the two the lab has a policy
+# for - the rest are a number the report quotes and a pathologist reads
 MEASURE_SOURCES = (
-    MeasureSource(SpecimenMeasureType.TMB, TMB, TOTAL_TMB, "mut/Mb"),
-    MeasureSource(SpecimenMeasureType.MSI, MSI, PERCENT_UNSTABLE_MSI_SITES, "%"),
+    MeasureSource(SpecimenMeasureType.TMB, TMB, TOTAL_TMB, "mut/Mb", call=tmb_call),
+    MeasureSource(SpecimenMeasureType.MSI, MSI, PERCENT_UNSTABLE_MSI_SITES, "%", call=msi_call),
     MeasureSource(SpecimenMeasureType.GIS, GIS, GENOMIC_INSTABILITY_SCORE),
     MeasureSource(SpecimenMeasureType.TUMOUR_FRACTION, GIS, TUMOR_FRACTION),
     MeasureSource(SpecimenMeasureType.PLOIDY, GIS, PLOIDY),
@@ -265,13 +323,6 @@ def measured_date(analysis_details: dict):
     return value
 
 
-def _value(values: dict, key: str) -> Optional[float]:
-    try:
-        return float(values[key])
-    except (KeyError, TypeError, ValueError):
-        return None
-
-
 def write_specimen_measures(sections: dict[str, CombinedVariantOutputSection],
                             resolved: ResolvedPair, identifiers: PairIdentifiers,
                             user: User, method: str, date=None) -> list[SpecimenMeasure]:
@@ -285,11 +336,15 @@ def write_specimen_measures(sections: dict[str, CombinedVariantOutputSection],
         value = _value(section_values, measure_source.key)
         if value is None:
             continue
+        measure_call = measure_source.call(section_values) if measure_source.call else None
         data = {
             "extraction": extraction,
             "measure_type": measure_source.measure_type,
             "value": value,
             "unit": measure_source.unit,
+            "call": measure_call.call if measure_call else None,
+            "threshold": measure_call.threshold if measure_call else None,
+            "threshold_source": measure_call.threshold_source if measure_call else None,
             # The whole section, so which numbers this came off stays answerable
             "source_payload": section_values,
             "method": method,

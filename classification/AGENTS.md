@@ -153,6 +153,11 @@ Gotchas:
   deliberately never writes for one.
 - A `case_field` can carry `prefill_key`: the build form starts that field from the named evidence key on the case's
   first classification that has one (SA Path's clinical indication), and its `default` otherwise.
+- A bool `case_field` can also carry `measure` (a `patients/models_enums.py:MEASURE_CONTEXT_KEYS` value) and `tick_when`:
+  the form shows that `SpecimenMeasure` beside the checkbox and starts the tick from the rule - `{"called": true}`,
+  `{"call_in": [...]}` or `{"value_below": n}` (`classification/models/classification_report_models.py:measure_tick`).
+  A case with no such measure falls back to `default`, and a draft's own answer wins over both. The keys are hand
+  written in admin, so `validate_case_fields` fails the save on an unknown measure or rule.
 - report/__init__.py stays empty on purpose: models/classification_report_models.py imports report/template_validation.py
   for the save-time fixture render, so a package __init__ that reached into classification.models would be a cycle. For
   the same reason template_validation.FIXTURE_CONTEXT is hand written rather than built from ReportContext -

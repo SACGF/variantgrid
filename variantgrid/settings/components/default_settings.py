@@ -457,6 +457,12 @@ PATIENT_EXTRACTION_SAMPLE_NAME_REGEX = None  # eg r"(?P<extraction>\d{10}[A-Z])$
 # re-sequencing while the code stays. A lab naming pairs some other way sets its own; None takes the
 # whole Pair ID as the code, and a Pair ID the regex doesn't match accessions no patient
 TSO500_PAIR_ID_PATIENT_CODE_REGEX = r"^\d+_(?P<patient_code>[^_]+)_"
+# Turning a pair's MSI and TMB numbers into a call is lab policy rather than vendor output - DRAGEN
+# writes the numbers and no call. None leaves the call blank, so a deployment that has not set its
+# policy reports the measure as not able to be determined, as it does today
+TSO500_MSI_MIN_USABLE_SITES = None   # fewer usable sites than this and MSI cannot be called
+TSO500_MSI_UNSTABLE_PERCENT = None   # 'Percent Unstable MSI Sites' at or over this is Unstable
+TSO500_TMB_HIGH_MUT_PER_MB = None    # 'Total TMB' at or over this is High
 # An external_manager the API doesn't recognise is a typo on an intranet deployment, where the set of
 # tracking systems is known - so only a superuser creates one via the API. A public server taking
 # records from systems it has never seen would set this False
