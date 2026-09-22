@@ -54,6 +54,7 @@ from analysis.models.nodes.node_types import (
 from analysis.variant_tag_operations import (
     resolve_launching_variant_tag,
     resolve_requires_classification_tags,
+    sample_carries_variant,
 )
 from analysis.views.analysis_permissions import get_analysis_or_404
 from annotation.models.models import MutationalSignatureInfo
@@ -444,39 +445,39 @@ class CreateClassificationForVariantTagView(CreateClassificationForVariantView):
                 return patients.pop()
         return None
 
-    def _get_sample_form(self):
-        # The tagging's patient narrows the dropdown to their samples. Otherwise the node's input samples,
-        # then all samples in the analysis, as the queryset the POST is validated against.
-        # Otherwise fall back on default (all samples in DB visible to user)
+    def _candidate_samples(self) -> list[Sample]:
+        """ The tagging's patient's samples, otherwise the node's input samples, then all samples in the analysis """
         if patient := self._tag_patient():
-            # A restricted queryset only validates the POST - the options the user picks from come from
-            # SampleAutocompleteView, so the patient is forwarded to it the same way the specimen
-            # autocomplete is narrowed (@see patients/forms.py:patient_extraction_formset_factory)
-            form = SampleChoiceForm(genome_build=self._get_genome_build())
-            form.fields['sample'].required = False
-            form.fields['sample'].queryset = Sample.objects.filter(pk__in=patient.get_samples())
-            form.fields['sample'].widget.forward.append(forward.Const(patient.pk, "patient"))
-            form.fields['sample'].initial = self.variant_tag.sample_id
-            return form
-
+            return list(patient.get_samples())
         samples = None
         if self.variant_tag.analysis:
             if self.variant_tag.node:
                 samples = self.variant_tag.node.get_subclass().get_samples()
-
             if not samples:
                 samples = self.variant_tag.analysis.get_samples()
+        return list(samples or [])
 
-        if samples:
-            form = SampleChoiceForm()
-            form.fields['sample'].required = False
-            form.fields['sample'].queryset = Sample.objects.filter(pk__in=[s.pk for s in samples])
-            # Start on whoever the tagging is about - the record is only linked to the case, and only
-            # reaches the case's report, when it has their sample on it
-            if self.variant_tag.sample_id in {s.pk for s in samples}:
-                form.fields['sample'].initial = self.variant_tag.sample_id
-        else:
-            form = super()._get_sample_form()
+    def _get_sample_form(self):
+        # Of the candidates, only the samples that called the variant - a classification takes its zygosity
+        # from its sample. All of them if none did (eg archived), else the default (every sample visible to user)
+        candidates = self._candidate_samples()
+        if not candidates:
+            return super()._get_sample_form()
+
+        carriers = [s for s in candidates if sample_carries_variant(s, self.variant_tag)]
+        sample_ids = [s.pk for s in carriers or candidates]
+        form = SampleChoiceForm(genome_build=self._get_genome_build())
+        form.fields['sample'].required = False
+        # A restricted queryset only validates the POST - the options the user picks from come from
+        # SampleAutocompleteView, so the same samples are forwarded to it
+        form.fields['sample'].queryset = Sample.objects.filter(pk__in=sample_ids)
+        form.fields['sample'].widget.forward.append(forward.Const(sample_ids, "sample_ids"))
+        # Start on whoever the tagging is about - the record is only linked to the case, and only
+        # reaches the case's report, when it has their sample on it
+        if self.variant_tag.sample_id in sample_ids:
+            form.fields['sample'].initial = self.variant_tag.sample_id
+        elif len(carriers) == 1:
+            form.fields['sample'].initial = carriers[0].pk
         return form
 
     @cached_property

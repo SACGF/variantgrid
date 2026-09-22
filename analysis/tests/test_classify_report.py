@@ -26,6 +26,7 @@ from classification.enums import AlleleOriginBucket, ShareLevel, SpecialEKeys, S
 from classification.models import Classification, ClassificationReportTemplate, ReportNames
 from library.guardian_utils import all_users_group, assign_permission_to_user_and_groups
 from patients.models import Patient
+from patients.models_enums import SampleSourceLevel
 from snpdb.models import Country, GenomeBuild, Lab, Organization, Sample, Tag, Variant
 from snpdb.tests.utils.fake_cohort_data import create_fake_cohort, create_fake_trio
 from snpdb.tests.utils.tag_testing_utils import create_classify_queue_tag
@@ -317,6 +318,22 @@ class ClassifyQueuePatientTest(ClassifyReportTestCase):
             ambiguous, so the row waits on "Clear tag" rather than resolving itself """
         classification = self._classify(self.proband)
         self.assertFalse(classification_resolves_tag(self.variant_tag, classification))
+
+
+class ClassifyDialogSampleTest(ClassifyReportTestCase):
+    """ A tagging made above sample level leaves which sample open - the dialog must not quietly pick one """
+
+    def _selected(self, variant) -> list[Sample]:
+        case = ClassifyReportCase(self.user, self.cohort, [self.father, self.mother, self.proband],
+                                  SampleSourceLevel.PATIENT)
+        row = case.queue_row(self._create_variant_tag(analysis=self._create_cohort_analysis(), variant=variant))
+        return [option.sample for option in case.sample_options(row) if option.selected]
+
+    def test_starts_on_the_only_sample_that_called_the_variant(self):
+        self.assertEqual(self._selected(self.variant), [self.proband])
+
+    def test_several_carriers_leave_the_choice_to_the_scientist(self):
+        self.assertEqual(self._selected(self.shared_variant), [])
 
 
 class ResolveClassifyQueueTagsForSamplesTest(ClassifyReportTestCase):
@@ -630,6 +647,16 @@ class CreateClassificationFromVariantTagTest(ClassifyReportTestCase):
 
         self.assertContains(response, f'<option value="{self.proband.pk}" selected>{self.proband}</option>',
                             html=True)
+
+    def test_the_create_page_offers_only_the_samples_that_called_the_variant(self):
+        variant_tag = self._create_variant_tag(analysis=self._create_cohort_analysis(), variant=self.shared_variant)
+
+        response = self.client.get(reverse("create_classification_for_variant_tag",
+                                           kwargs={"variant_tag_id": variant_tag.pk}))
+
+        sample_field = response.context["variant_sample_autocomplete_form"].fields["sample"]
+        self.assertEqual(set(sample_field.queryset), {self.mother, self.father})
+        self.assertIsNone(sample_field.initial)
 
 
 @override_settings(CELERY_TASK_ALWAYS_EAGER=True, LIFTOVER_CLASSIFICATIONS=False,

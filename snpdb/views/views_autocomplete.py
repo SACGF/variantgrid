@@ -138,6 +138,8 @@ class SampleAutocompleteView(GenomeBuildAutocompleteView):
         # Completes the Patient -> Specimen -> Extraction -> Sample chain the patients autocompletes start
         if extraction := self.forwarded.get('extraction'):
             sample_qs = sample_qs.filter(extraction=extraction)
+        if sample_ids := self.forwarded.get('sample_ids'):
+            sample_qs = sample_qs.filter(pk__in=sample_ids)
         if patient := self.forwarded.get('patient'):
             # Both ways a sample reaches a patient - the same union as Patient.get_samples(), which the VCF
             # import and the patient CSV each populate only one side of
