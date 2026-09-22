@@ -1,0 +1,79 @@
+DRAGEN TruSight Oncology 500 Analysis Software - Metrics Output				
+				
+				
+[Header]				
+Output Date	2026-01-01			
+Output Time	00:00:00			
+Workflow Version	2.1.1.4			
+				
+[Run QC Metrics]				
+Metric (UOM)	LSL Guideline	USL Guideline	Value	
+PCT_PF_READS (%)	80	NA	88	
+PCT_Q30_R1 (%)	80	NA	93.1	
+PCT_Q30_R2 (%)	80	NA	91.9	
+				
+[Analysis Status]				
+	ExampleSample_DNA_2600000001C	ExampleSample_RNA_2600000001B		
+COMPLETED_ALL_STEPS	TRUE	TRUE		
+FAILED_STEPS	NA	NA		
+STEPS_NOT_EXECUTED	NA	NA		
+				
+[DNA Library QC Metrics]				
+Metric (UOM)	LSL Guideline	USL Guideline	ExampleSample_DNA_2600000001C	ExampleSample_RNA_2600000001B
+CONTAMINATION_SCORE (NA)	0	1457	184	NA
+				
+[DNA Library QC Metrics for Small Variant Calling and TMB]				
+Metric (UOM)	LSL Guideline	USL Guideline	ExampleSample_DNA_2600000001C	ExampleSample_RNA_2600000001B
+MEDIAN_INSERT_SIZE (bp)	70	NA	103	NA
+MEDIAN_EXON_COVERAGE (Count)	150	NA	455	NA
+PCT_EXON_50X (%)	90	NA	99.1	NA
+				
+[DNA Library QC Metrics for MSI]				
+Metric (UOM)	LSL Guideline	USL Guideline	ExampleSample_DNA_2600000001C	ExampleSample_RNA_2600000001B
+USABLE_MSI_SITES (Count)	40	NA	121	NA
+				
+[DNA Library QC Metrics for CNV]				
+Metric (UOM)	LSL Guideline	USL Guideline	ExampleSample_DNA_2600000001C	ExampleSample_RNA_2600000001B
+GENE_SCALED_MAD (Count)	0	0.134	0.059	NA
+MEDIAN_BIN_COUNT_CNV_TARGET (Count)	1	NA	6.4	NA
+				
+[DNA Library QC Metrics for GIS]				
+Metric (UOM)	LSL Guideline	USL Guideline	ExampleSample_DNA_2600000001C	ExampleSample_RNA_2600000001B
+PCT_TARGET_HRD_50X (%)	50	NA	99.8	NA
+				
+[RNA Library QC Metrics]				
+Metric (UOM)	LSL Guideline	USL Guideline	ExampleSample_DNA_2600000001C	ExampleSample_RNA_2600000001B
+MEDIAN_CV_GENE_500X (NA)	0	0.93	NA	0.68
+TOTAL_ON_TARGET_READS (Count)	9000000	NA	NA	17364215
+MEDIAN_INSERT_SIZE (Count)	80	NA	NA	111
+				
+[DNA Expanded Metrics]				
+Metric (UOM)	LSL Guideline	USL Guideline	ExampleSample_DNA_2600000001C	ExampleSample_RNA_2600000001B
+TOTAL_PF_READS (Count)	NA	NA	98413552	NA
+MEAN_FAMILY_SIZE (Count)	NA	NA	2.9	NA
+MEDIAN_TARGET_COVERAGE (Count)	NA	NA	437	NA
+PCT_CHIMERIC_READS (%)	NA	NA	1.62	NA
+PCT_EXON_100X (%)	NA	NA	98.4	NA
+PCT_READ_ENRICHMENT (%)	NA	NA	63.7	NA
+PCT_USABLE_UMI_READS (%)	NA	NA	99.8	NA
+MEAN_TARGET_COVERAGE (Count)	NA	NA	433.2	NA
+PCT_ALIGNED_READS (%)	NA	NA	99.1	NA
+PCT_CONTAMINATION_EST (%)	NA	NA	2.4	NA
+PCT_PF_UQ_READS (%)	NA	NA	100	NA
+PCT_TARGET_0.4X_MEAN (%)	NA	NA	95.9	NA
+PCT_TARGET_100X (%)	NA	NA	97.8	NA
+PCT_TARGET_250X (%)	NA	NA	89.6	NA
+ALLELE_DOSAGE_RATIO (NA)	NA	NA	3.712	NA
+MEDIAN_TARGET_HRD_COVERAGE (Count)	NA	NA	219	NA
+				
+[RNA Expanded Metrics]				
+Metric (UOM)	LSL Guideline	USL Guideline	ExampleSample_DNA_2600000001C	ExampleSample_RNA_2600000001B
+PCT_CHIMERIC_READS (%)	NA	NA	NA	0.73
+PCT_ON_TARGET_READS (%)	NA	NA	NA	95.1
+SCALED_MEDIAN_GENE_COVERAGE (Count)	NA	NA	NA	2711.6
+TOTAL_PF_READS (Count)	NA	NA	NA	18262390
+GENE_MEDIAN_COVERAGE (Count)	NA	NA	NA	94.12
+GENE_ABOVE_MEDIAN_CUTOFF (Count)	NA	NA	NA	38
+				
+[Notes]				
+Run Metrics	Run Metrics are not generated and values are reported as NA when starting analysis from FASTQ files.			
