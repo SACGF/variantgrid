@@ -4,9 +4,6 @@
 {% load settings_tags %}
 {% load ui_utils %}
 {% load tag_config_tags %}
-{% block node_editor_not_visible_tab_links %}
-    <li class="nav-item"><a class="nav-link" data-toggle="tab" role="tab" href="#tag-classification">Classifications</a></li>
-{% endblock node_editor_not_visible_tab_links %}
 
 {% block content %}
 <style>
@@ -17,22 +14,9 @@
     }
 </style>
 <script>
-function classificationFilter(data, type) {
-    data.analysis_id = "{{ node.analysis_id }}";
-}
-
 $(document).ready(function() {
     const tagNodeForm = $("form#tag-node-form");
     ajaxForm(tagNodeForm);
-
-    {% if not node.analysis.analysisclassification_set.exists %}
-        $("#node-editor-tabs > ul.nav-tabs > li > a").eq(1).addClass("disabled").removeAttr("data-toggle");
-    {% endif %}
-
-    let vcDatatable = $('#tag-datatable');
-    vcDatatable.on('draw.dt', () => {
-        Flags.instance.init({userId: '{{user.id}}'});
-    });
 
     {% if has_write_permission %}
         // The pills are the node's tag picker - a toggle lands in the form's hidden inputs
@@ -96,17 +80,3 @@ $(document).ready(function() {
 </form>
 {% endblock content %}
 
-{% block node_editor_not_visible_tab %}
-<div class="tab-pane" role="tabpanel" id='tag-classification'>
-
-    {% if node.analysis.analysisclassification_set.exists %}
-        <div class="editor-section-title">Classifications for this analysis</div>
-        <table id="tag-datatable"
-               data-datatable-url="{% url 'classification_datatables' %}"
-               data-datatable-data="classificationFilter"
-               data-datatable-filter-count="hide"
-               class="classification-table"></table>
-    {% endif %}
-
-</div>
-{% endblock node_editor_not_visible_tab %}

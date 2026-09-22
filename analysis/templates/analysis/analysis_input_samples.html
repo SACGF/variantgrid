@@ -55,6 +55,19 @@
             border-color: #9fb0c3;
             text-decoration: none;
         }
+        #analysis-input-samples .sample-pill a {
+            color: inherit;
+            text-decoration: none;
+        }
+        #analysis-input-samples .sample-pill .sample-classifications {
+            margin-left: 4px;
+            padding-left: 8px;
+            border-left: 1px solid #c6cdd6;
+            color: #3d4550;
+        }
+        #analysis-input-samples .sample-pill .sample-classifications.none {
+            color: #9aa3ad;
+        }
     </style>
 
     <h3>
@@ -77,10 +90,17 @@
                 {% endif %}
             </div>
             <div class="input-node-samples">
-                {% for s in ni.samples %}
-                    <a class="sample-pill" target="_blank" href="{{ s.get_absolute_url }}">
-                        <i class="fa-solid fa-microscope"></i>{{ s.name }}
-                    </a>
+                {% for s, num_classifications in ni.samples %}
+                    <span class="sample-pill">
+                        <a target="_blank" href="{{ s.get_absolute_url }}"><i class="fa-solid fa-microscope"></i> {{ s.name }}</a>
+                        {% if url_name_visible.sample_classify_report_tab %}
+                            <a class="sample-classifications{% if not num_classifications %} none{% endif %}" target="_blank"
+                               href="{{ s.get_absolute_url }}#sample-classify-report"
+                               title="{{ num_classifications }} classification{{ num_classifications|pluralize }} - open Classify &amp; Report">
+                                <i class="fa-solid fa-file-medical"></i> {{ num_classifications }}
+                            </a>
+                        {% endif %}
+                    </span>
                 {% endfor %}
             </div>
         </div>

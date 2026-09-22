@@ -132,6 +132,11 @@ $(document).ready(function() {
         return false;
     });
 
+    // Links from elsewhere can land on a tab, eg the analysis Input Samples pills open Classify & Report
+    if (window.location.hash) {
+        $("#sample-tabs .nav-tabs a").filter((i, a) => $(a).attr("href") === window.location.hash).tab('show');
+    }
+
     const sampleForm = $("#sample-form");
     const patientSelect = $("#id_patient", sampleForm);
     setPatientPhenotype();

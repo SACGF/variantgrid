@@ -461,9 +461,6 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
             # Join through allele so it works across genome builds
             filters.append(Q(classification__allele__variantallele__variant__in=variant_qs))
 
-        if analysis_id := self.get_query_json("analysis_id"):
-            filters.append(Q(classification__analysisclassification__analysis_id=analysis_id))
-
         if ontology_terms := self.get_query_param("ontology_term_id"):
             terms = []
             for term_id in ontology_terms.split(","):

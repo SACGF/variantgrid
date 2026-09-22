@@ -6,6 +6,7 @@ from auditlog.models import LogEntry
 from django.contrib import messages
 from django.contrib.auth.decorators import user_passes_test
 from django.core.exceptions import PermissionDenied
+from django.db.models import Count
 from django.http.response import JsonResponse
 from django.shortcuts import redirect, render
 from django.utils import timezone
@@ -19,6 +20,7 @@ from analysis.models.nodes.analysis_node import NodeVersion
 from analysis.models.nodes.node_counts import get_node_counts_mine_and_available
 from analysis.views.analysis_permissions import get_analysis_or_404
 from analysis.views.views import get_analysis_settings
+from classification.models import ClassificationModification
 from library.django_utils import add_save_message, set_form_read_only
 from library.guardian_utils import is_superuser
 from library.utils import defaultdict_to_dict
@@ -259,6 +261,15 @@ def analysis_input_samples(request, analysis_id):
                     break
 
             node_inputs.append(node_input_data)
+
+    # Same records as each sample's Classify & Report tab, which the pill links to
+    classification_qs = ClassificationModification.latest_for_user(request.user, published=True,
+                                                                   classification__sample__in=all_samples)
+    sample_classification_counts = dict(classification_qs.order_by().values_list("classification__sample")
+                                        .annotate(Count("pk")))
+    for node_input_data in node_inputs:
+        node_input_data["samples"] = [(sample, sample_classification_counts.get(sample.pk, 0))
+                                      for sample in node_input_data["samples"]]
 
     context = {"analysis": analysis,
                "node_inputs": node_inputs,
