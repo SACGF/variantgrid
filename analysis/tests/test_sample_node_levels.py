@@ -16,6 +16,7 @@ variant, CNV, exon CNV), so these build a patient with two specimens and pin:
 """
 import csv
 import json
+import pickle
 from unittest.mock import patch
 
 from django.contrib.auth.models import User
@@ -239,10 +240,19 @@ class TestSampleNodeLevels(SampleNodeLevelsTestCase):
         self.assertEqual(self._pks(node), {self.v_snv.pk, self.v_cnv.pk, self.v_both.pk})
 
     def test_group_query_needs_no_distinct(self):
-        """ pk__in subqueries don't fan out rows the way joins do """
+        """ The per-sample subqueries are UNIONed rather than joined, so v_both - called by both
+            VCFs - comes back once (#1894) """
         node = self._extraction_node()
         self.assertFalse(node.queryset_requires_distinct)
-        self.assertEqual(node.get_queryset().count(), 3)
+        pks = list(node.get_queryset().values_list("pk", flat=True))
+        self.assertEqual(sorted(pks), sorted([self.v_snv.pk, self.v_cnv.pk, self.v_both.pk]))
+
+    def test_group_query_survives_the_q_cache(self):
+        """ The Q cache pickles arg_q_dict - the subqueries have to be SQL, not live querysets """
+        node = self._extraction_node()
+        arg_q_dict = pickle.loads(pickle.dumps(node.get_arg_q_dict()))
+        pks = set(node.get_queryset(arg_q_dict=arg_q_dict).values_list("pk", flat=True))
+        self.assertEqual(pks, {self.v_snv.pk, self.v_cnv.pk, self.v_both.pk})
 
     def test_single_sample_group_short_circuits_to_alias_path(self):
         """ An extraction with one sample produces the query a sample level node produces """
@@ -1092,8 +1102,10 @@ class FilterNodePatientScopeTest(SampleNodeLevelsTestCase):
     def test_exclude_is_applied_inside_each_samples_filter(self):
         parent = self._extraction_node(zygosity_ref=True)
         node = self._child(ZygosityNode, parent, zygosity=Zygosity.HET, exclude=True)
-        # Each caller's rows that aren't HET - the other caller's HET rows are not dragged back in
-        self.assertEqual(self._pks(node), {self.v_both.pk, self.v_ref.pk})
+        # Each caller's rows that aren't HET - the other caller's HET rows are not dragged back in,
+        # and v_both (HOM_ALT in both callers) comes back once
+        pks = list(node.get_queryset().values_list("pk", flat=True))
+        self.assertEqual(sorted(pks), sorted([self.v_both.pk, self.v_ref.pk]))
 
     def test_the_patients_other_samples_are_only_in_reach_at_patient_level(self):
         extraction_node = self._child(ZygosityNode, self._extraction_node(), zygosity=Zygosity.HET)

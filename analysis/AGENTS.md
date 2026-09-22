@@ -146,14 +146,18 @@ Patterns here:
   `analysis/forms/forms_nodes.py:AncestorSampleSourceMixin`). `handle_ancestor_input_samples_changed` sets
   the proband sample where there is one, else the proband patient - which is what a group level SampleNode gives it
   (#1855). In patient mode `get_filter_samples()` is every ancestor sample of that patient, so the source node decides
-  the reach, and `AncestorSampleMixin._get_filter_samples_arg_q_dict` ORs one `pk IN (subquery)` per sample
-  (`analysis/models/nodes/cohort_mixin.py:get_sample_pk_in_q`, the same helper SampleNode's group levels use) - a Q keyed
+  the reach, and `AncestorSampleMixin._get_filter_samples_arg_q_dict` UNIONs one subquery per sample
+  (`analysis/models/nodes/cohort_mixin.py:get_samples_pk_q`, the same helper SampleNode's group levels use) - a Q keyed
   on an alias runs as soon as that alias is annotated, so an OR across two samples' aliases has nowhere to hang. A sample
   with nothing to filter on (no GT, no AF) contributes its rows unfiltered rather than emptying the node.
 - Load nodes with `AnalysisNode.objects.get_subclass(pk=...)` / `.select_subclasses()` (`analysis/models/nodes/analysis_node.py:NodeInheritanceManager`);
   in views use `analysis/views/analysis_permissions.py:get_node_subclass_or_404`, which enforces
   `analysis/models/models_analysis.py:Analysis.can_write` (locked analyses and template snapshots are read-only).
 Gotchas:
+- Several subqueries combine as `pk = ANY(ARRAY(<a> UNION <b>))`
+  (`analysis/models/nodes/analysis_node.py:querysets_to_pk_any_array_q`), never an OR of `pk IN (subquery)` - Postgres
+  can't index an OR of IN-subqueries and walks all of snpdb_variant (#1894). Plain `pk IN (<union>)` fixes count() but
+  the planner misestimates the union and sorted grid pages get slower.
 - Never call `node.save()` inside a celery task — use `analysis/models/nodes/analysis_node.py:AnalysisNode.update`, a
   conditional UPDATE on (pk, version) that raises `analysis/exceptions.py:NodeOutOfDateException` if the user bumped the
   node meanwhile; `update_node_task` treats that as "exit quietly, a newer version is coming".

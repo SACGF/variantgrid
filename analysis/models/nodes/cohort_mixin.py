@@ -5,7 +5,7 @@ from functools import cached_property, reduce
 from typing import Optional
 
 import simplejson
-from django.db.models import Q
+from django.db.models import Q, QuerySet
 
 from analysis.models.enums import GroupOperation
 from analysis.models.models_analysis import Analysis
@@ -14,6 +14,7 @@ from analysis.models.nodes.analysis_node import (
     NodeVCFFilter,
     annotate_and_filter_queryset,
     queryset_to_pk_in_q,
+    querysets_to_pk_any_array_q,
 )
 from library.genomics.vcf_writer import percent_decode_info_value
 from patients.models import Patient
@@ -56,15 +57,29 @@ def get_sample_annotation_kwargs(sample: Sample, **kwargs) -> dict:
     return annotation_kwargs
 
 
-def get_sample_pk_in_q(node, sample: Sample, arg_q_dict: dict[Optional[str], dict[str, Q]]) -> Q:
-    """ One sample's variants as pk IN (subquery). Annotated with only its own VCF's genotype join,
-        so the subquery doesn't drag the other samples' outer joins through with it """
+def get_sample_queryset(node, sample: Sample, arg_q_dict: dict[Optional[str], dict[str, Q]]) -> QuerySet:
+    """ One sample's variants, annotated with only its own VCF's genotype join, so a subquery built
+        from it doesn't drag the other samples' outer joins through with it """
     qs = node._get_model_queryset()  # pylint: disable=protected-access
     a_kwargs = get_sample_annotation_kwargs(sample)
     qs, q_list = annotate_and_filter_queryset(qs, a_kwargs, arg_q_dict)
     if q_list:
         qs = qs.filter(reduce(operator.and_, q_list))
-    return queryset_to_pk_in_q(qs)
+    return qs
+
+
+def get_sample_pk_in_q(node, sample: Sample, arg_q_dict: dict[Optional[str], dict[str, Q]]) -> Q:
+    """ One sample's variants as pk IN (subquery) """
+    return queryset_to_pk_in_q(get_sample_queryset(node, sample, arg_q_dict))
+
+
+def get_samples_pk_q(node, sample_arg_q_dicts: list[tuple[Sample, dict[Optional[str], dict[str, Q]]]]) -> Q:
+    """ The variants of any of the samples - each (sample, arg_q_dict) is filtered in its own subquery
+        and the subqueries are UNIONed (@see analysis_node.querysets_to_pk_any_array_q) """
+    if len(sample_arg_q_dicts) == 1:
+        return get_sample_pk_in_q(node, *sample_arg_q_dicts[0])
+    return querysets_to_pk_any_array_q([get_sample_queryset(node, sample, arg_q_dict)
+                                        for sample, arg_q_dict in sample_arg_q_dicts])
 
 
 def get_sample_any_zygosity_arg_q_dict(sample: Sample) -> dict[Optional[str], dict[str, Q]]:
@@ -530,19 +545,19 @@ class AncestorSampleMixin(SampleMixin):
         return []
 
     def _get_filter_samples_arg_q_dict(self, per_sample) -> dict[Optional[str], dict[str, Q]]:
-        """ The one place the per-sample OR is built. per_sample(sample) returns that sample's
+        """ The one place the per-sample union is built. per_sample(sample) returns that sample's
             arg_q_dict, keyed on its own alias.
 
-            Sample mode returns it as is. Patient mode wraps each sample's filters in a pk__in
-            subquery annotated with only that sample's genotype join - a Q keyed on an alias runs as
-            soon as that alias is annotated (@see analysis_node.annotate_and_filter_queryset), so an
-            OR across two aliases has nowhere to hang until both are """
+            Sample mode returns it as is. Patient mode wraps each sample's filters in a subquery
+            annotated with only that sample's genotype join - a Q keyed on an alias runs as soon as
+            that alias is annotated (@see analysis_node.annotate_and_filter_queryset), so an OR across
+            two aliases has nowhere to hang until both are """
         samples = self.get_filter_samples()
         if not samples:
             return {}
         if self.sample:
             return per_sample(samples[0])
-        q = reduce(operator.or_, [get_sample_pk_in_q(self, sample, per_sample(sample)) for sample in samples])
+        q = get_samples_pk_q(self, [(sample, per_sample(sample)) for sample in samples])
         return {None: {self._get_node_q_hash(): q}}
 
     def _get_cohorts_and_sample_visibility_for_node(self):
