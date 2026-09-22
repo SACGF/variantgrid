@@ -631,13 +631,21 @@ class SpecimenMeasure(GuardianPermissionsMixin, TimeStampedModel):
     def _filter_from_permission_object_qs(cls, queryset):
         return cls.objects.filter(specimen__patient__in=queryset)
 
-    def __str__(self):
-        description = self.get_measure_type_display()
+    @property
+    def value_description(self) -> str:
+        """ The number and the lab's call, worded the one way - the specimen grid lists it after the
+            measure's name, the case report build form shows it beside that measure's checkbox """
+        description = ""
         if self.value is not None:
-            description += f" {self.value}{self.unit or ''}"
+            unit = self.unit or ""
+            separator = "" if unit in ("", "%") else " "
+            description = f"{self.value}{separator}{unit}"
         if self.call:
-            description += f" ({self.call})"
+            description = f"{description} ({self.call})".strip()
         return description
+
+    def __str__(self):
+        return " ".join(filter(None, [self.get_measure_type_display(), self.value_description]))
 
 
 class PatientAttachment(TimeStampedModel):

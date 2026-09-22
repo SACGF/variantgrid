@@ -378,6 +378,43 @@ class TestCombinedVariantOutputRecords(TestCase):
         self.assertEqual("mut/Mb", tmb.unit)
         self.assertEqual("1.27", tmb.source_payload["Coding Region Size in Megabases"])
 
+    def _write_measures(self) -> dict:
+        resolved = resolve_pair(self.identifiers, self.user)
+        measures = write_specimen_measures(self.sections, resolved, self.identifiers, self.user,
+                                           method="DRAGEN TSO500 CombinedVariantOutput 2.1.1")
+        return {m.measure_type: m for m in measures}
+
+    @override_settings(TSO500_MSI_MIN_USABLE_SITES=20, TSO500_MSI_UNSTABLE_PERCENT=20,
+                       TSO500_TMB_HIGH_MUT_PER_MB=10)
+    def test_msi_and_tmb_are_called_against_the_labs_thresholds(self):
+        """ 121 usable sites is enough to call MSI, and 2.48% unstable is Stable; 7.1 mut/Mb is Low """
+        by_type = self._write_measures()
+
+        msi = by_type[SpecimenMeasureType.MSI]
+        self.assertEqual("Stable", msi.call)
+        self.assertEqual(">= 20 usable sites, >= 20% unstable", msi.threshold)
+        self.assertEqual("Low", by_type[SpecimenMeasureType.TMB].call)
+        self.assertEqual(">= 10 mut/Mb", by_type[SpecimenMeasureType.TMB].threshold)
+        # The measures the lab has no policy for are the number alone
+        self.assertIsNone(by_type[SpecimenMeasureType.GIS].call)
+
+    @override_settings(TSO500_MSI_MIN_USABLE_SITES=200, TSO500_MSI_UNSTABLE_PERCENT=20)
+    def test_too_few_usable_msi_sites_cannot_be_called(self):
+        """ The percentage means nothing off 121 sites when the lab wants 200 - the threshold that
+            was applied is still recorded, so 'why is there no call' stays answerable """
+        msi = self._write_measures()[SpecimenMeasureType.MSI]
+
+        self.assertIsNone(msi.call)
+        self.assertEqual(">= 200 usable sites, >= 20% unstable", msi.threshold)
+
+    def test_thresholds_unset_writes_the_value_and_no_call(self):
+        """ The policy is the lab's - an installation without one sends the measure as it always did """
+        by_type = self._write_measures()
+
+        self.assertIsNone(by_type[SpecimenMeasureType.MSI].call)
+        self.assertIsNone(by_type[SpecimenMeasureType.TMB].call)
+        self.assertIsNone(by_type[SpecimenMeasureType.TMB].threshold)
+
     def test_re_analysis_replaces_the_measures(self):
         """ One current value per measure - the report wants a single TMB, not a history """
         resolved = resolve_pair(self.identifiers, self.user)

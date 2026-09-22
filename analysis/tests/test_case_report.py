@@ -5,10 +5,12 @@
     extraction case is, who may act on a built report, and what finalising writes.
 """
 from django.contrib.auth.models import User
+from django.core.exceptions import ValidationError
 from django.test import override_settings
 from django.urls import reverse
 
 from analysis.classify_report import ClassifyReportCase, ReportCandidate
+from analysis.views.views_classify_report import _case_values_for_form
 from analysis.tests.test_classify_report import READY_EVIDENCE, ClassifyReportTestCase
 from classification.enums import SpecialEKeys, SubmissionSource
 from classification.models import (
@@ -26,8 +28,8 @@ from classification.report.case_report_builder import build_case_report, finalis
 from classification.report.default_templates import generic_case_template
 from library.case_report_delivery import CaseReportDelivery
 from library.guardian_utils import assign_permission_to_user_and_groups
-from patients.models import Extraction, Patient, Specimen
-from patients.models_enums import NucleicAcid, SampleSourceLevel
+from patients.models import Extraction, Patient, Specimen, SpecimenMeasure
+from patients.models_enums import NucleicAcid, SampleSourceLevel, SpecimenMeasureType
 from patients.sample_grouping import get_sample_group
 from snpdb.models import Sample
 
@@ -346,3 +348,104 @@ class CaseReportBuildFormTest(ClassifyReportTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "RUNX1")
         self.assertFalse(CaseReport.objects.exists())
+
+
+@override_settings(CELERY_TASK_ALWAYS_EAGER=True, LIFTOVER_CLASSIFICATIONS=False,
+                   CLINGEN_ALLELE_REGISTRY_LOGIN=None)
+class CaseReportMeasureTickTest(ClassifyReportTestCase):
+    """ The assay flags the scientist used to answer by hand: a bool case_field naming a measure and
+        a tick_when rule starts ticked from what the case was measured at (sapath#454) """
+
+    MEASURE_FIELDS = [
+        {"key": "assay_success_msi", "label": "MSI", "type": "bool", "default": True,
+         "group": "assay_success", "measure": "msi", "tick_when": {"called": True}},
+        {"key": "assay_success_tmb", "label": "TMB", "type": "bool", "default": True,
+         "group": "assay_success", "measure": "tmb", "tick_when": {"called": True}},
+        {"key": "caveat_purity", "label": "Purity", "type": "bool", "default": False,
+         "group": "caveats", "measure": "tumour_fraction",
+         "tick_when": {"call_in": ["Insufficient", "No tumour"]}},
+        {"key": "caveat_low_gis", "label": "GIS", "type": "bool", "default": False,
+         "group": "caveats", "measure": "gis", "tick_when": {"value_below": 42}},
+    ]
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.patient = Patient.objects.create(first_name="Measure", last_name="Tick")
+        assign_permission_to_user_and_groups(cls.user, cls.patient)
+        cls.specimen = Specimen.objects.create(reference_id="2600000004", patient=cls.patient)
+        cls.dna = Extraction.objects.create(specimen=cls.specimen, reference_id="2600000004C",
+                                            nucleic_acid_source=NucleicAcid.DNA)
+        Sample.objects.filter(pk=cls.proband.pk).update(extraction=cls.dna)
+        cls.template = ClassificationReportTemplate.objects.create(
+            name="measure tick template", case_template=generic_case_template(),
+            case_fields=cls.MEASURE_FIELDS)
+        cls.classification = Classification.create(
+            user=cls.user, lab=cls.lab, sample=cls.proband, source=SubmissionSource.VARIANT_GRID,
+            variant=cls.variant,
+            data={**READY_EVIDENCE, SpecialEKeys.GENE_SYMBOL: {"value": "RUNX1"}})
+        cls.classification.publish_latest(cls.user)
+
+    @staticmethod
+    def _measures(**by_key) -> dict:
+        return {key: SpecimenMeasure(value=value, unit=unit, call=call)
+                for key, (value, unit, call) in by_key.items()}
+
+    def _values(self, measures: dict, draft=None) -> dict:
+        return _case_values_for_form(self.template, [], draft, measures)
+
+    def test_each_rule_starts_its_tick_from_the_measure(self):
+        measures = self._measures(msi=(2.48, "%", "Stable"), tmb=(7.1, "mut/Mb", None),
+                                  tumour_fraction=(0.05, None, "Insufficient"), gis=(31.0, None, None))
+
+        values = self._values(measures)
+
+        self.assertTrue(values["assay_success_msi"])   # called
+        self.assertFalse(values["assay_success_tmb"])  # the import left it uncalled
+        self.assertTrue(values["caveat_purity"])       # call_in
+        self.assertTrue(values["caveat_low_gis"])      # value_below
+
+    def test_a_measure_the_case_lacks_leaves_the_fields_default(self):
+        values = self._values({})
+
+        self.assertTrue(values["assay_success_msi"])
+        self.assertFalse(values["caveat_purity"])
+
+    def test_a_drafts_own_answer_wins_over_the_rule(self):
+        """ The scientist's adjustment is the answer - a rule that disagrees does not undo it """
+        draft = CaseReport.objects.create(template=self.template, lab=self.lab, user=self.user,
+                                          case_values={"assay_success": {"assay_success_msi": False}},
+                                          **CaseReport.source_kwargs(SampleSourceLevel.SPECIMEN,
+                                                                     self.specimen))
+
+        values = self._values(self._measures(msi=(2.48, "%", "Stable")), draft=draft)
+
+        self.assertFalse(values["assay_success_msi"])
+
+    def test_the_dialog_shows_each_measure_beside_its_checkbox(self):
+        SpecimenMeasure.objects.create(specimen=self.specimen, measure_type=SpecimenMeasureType.MSI,
+                                       value=2.48, unit="%", call="Stable")
+        self.client.force_login(self.user)
+        url = reverse("case_report_build_dialog",
+                      kwargs={"case_type": "specimen", "case_id": self.specimen.pk})
+
+        response = self.client.post(url, {
+            "report_template": self.template.pk,
+            "classification_modification_id": [self.classification.last_published_version.pk],
+        })
+
+        content = response.content.decode()
+        self.assertIn("2.48% (Stable)", content)
+        self.assertIn("no measure", content)  # the case has no TMB, tumour fraction or GIS
+        self.assertRegex(content, r'checked[^>]*id="case_field_assay_success_msi"')
+
+    def test_a_field_naming_an_unknown_measure_or_rule_is_not_saved(self):
+        """ The JSON is hand written in admin, so a typo says so rather than ticking nothing """
+        for case_fields in ([{"key": "flag", "type": "bool", "measure": "msi_status"}],
+                            [{"key": "flag", "type": "bool", "measure": "msi",
+                              "tick_when": {"call_is": "Stable"}}],
+                            [{"key": "flag", "type": "bool", "tick_when": {"called": True}}]):
+            with self.subTest(case_fields=case_fields):
+                template = ClassificationReportTemplate(name="bad", case_fields=case_fields)
+                with self.assertRaises(ValidationError):
+                    template.clean()

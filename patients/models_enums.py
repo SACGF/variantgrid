@@ -51,6 +51,17 @@ class SpecimenMeasureType(models.TextChoices):
     PLOIDY = 'P', 'Ploidy'
 
 
+# What each measure is called outside the database - the key a report context and a report template's
+# case_fields name it by, since a template's JSON is written by the lab rather than generated
+MEASURE_CONTEXT_KEYS = {
+    SpecimenMeasureType.TMB: "tmb",
+    SpecimenMeasureType.MSI: "msi",
+    SpecimenMeasureType.GIS: "gis",
+    SpecimenMeasureType.TUMOUR_FRACTION: "tumour_fraction",
+    SpecimenMeasureType.PLOIDY: "ploidy",
+}
+
+
 class SimpleZygosity(models.TextChoices):
     NON_REF_CALL = 'A', 'Het or Hom Alt'
     ANY_CALL = 'Z', 'Any zygosity call'

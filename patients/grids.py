@@ -15,12 +15,18 @@ from library.utils import JsonDataType
 from ontology.grids import AbstractOntologyGenesConfig
 from ontology.models import OntologyService, OntologyTerm
 from patients.external_references import ExternalReference
-from patients.models import Extraction, Patient, PatientRecord, PatientRecords, Specimen
+from patients.models import (
+    Extraction,
+    Patient,
+    PatientRecord,
+    PatientRecords,
+    Specimen,
+    SpecimenMeasure,
+)
 from patients.models_enums import (
     MatchStatus,
     NucleicAcid,
     PatientRecordMatchType,
-    SpecimenMeasureType,
     TissueStatus,
 )
 from seqauto.models import SequencingSample
@@ -225,17 +231,10 @@ class SpecimenColumns(DatatableConfig[Specimen]):
 
     @staticmethod
     def render_measures(row: CellData) -> str:
-        descriptions = []
-        for measure in sorted(row.value or [], key=lambda m: m["measure_type"]):
-            description = SpecimenMeasureType(measure["measure_type"]).label
-            if measure["value"] is not None:
-                unit = measure["unit"] or ""
-                separator = "" if unit in ("", "%") else " "
-                description += f" {measure['value']}{separator}{unit}"
-            if measure["call"]:
-                description += f" ({measure['call']})"
-            descriptions.append(description)
-        return ", ".join(descriptions)
+        # The aggregated columns are the fields SpecimenMeasure words itself from, so an unsaved one
+        # gives the grid and the report form the same wording
+        measures = [SpecimenMeasure(**measure) for measure in row.value or []]
+        return ", ".join(str(m) for m in sorted(measures, key=lambda m: m.measure_type))
 
     def get_initial_queryset(self) -> QuerySet[Specimen]:
         qs = Specimen.filter_for_user(self.user)

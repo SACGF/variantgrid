@@ -35,7 +35,7 @@ from classification.models.evidence_key import EvidenceKeyMap
 from library.genomics.vcf_enums import GeneLevelSymbolicAlt, VariantClass
 from library.utils.django_utils import get_cached_project_git_hash
 from patients.models import Extraction, Patient, Specimen, SpecimenMeasure
-from patients.models_enums import SampleSourceLevel, SpecimenMeasureType
+from patients.models_enums import MEASURE_CONTEXT_KEYS, SampleSourceLevel
 from patients.sample_grouping import get_patient_for_source, get_sample_group
 from snpdb.models import GenomeBuild, Lab, Sample
 
@@ -100,14 +100,6 @@ TIER_GROUP_ORDER = [SomaticClinicalSignificance.TIER_1,
                     SomaticClinicalSignificance.TIER_4]
 UNTIERED = ""
 UNTIERED_LABEL = "Not tiered"
-
-MEASURE_CONTEXT_KEYS = {
-    SpecimenMeasureType.TMB: "tmb",
-    SpecimenMeasureType.MSI: "msi",
-    SpecimenMeasureType.GIS: "gis",
-    SpecimenMeasureType.TUMOUR_FRACTION: "tumour_fraction",
-    SpecimenMeasureType.PLOIDY: "ploidy",
-}
 
 # The value of variant_reported that means "seen, not on the report"
 NOT_REPORTED = "not_included"
@@ -499,7 +491,19 @@ def build_tier_groups(variants: list[ReportVariant]) -> list[TierGroup]:
     return tier_groups
 
 
-def _specimen_measures(specimen: Optional[Specimen]) -> dict[str, SpecimenMeasure]:
+def case_specimen(source_level: str, source) -> Optional[Specimen]:
+    """ The specimen a case is about - the level it is reported from, or the one its arm came off.
+        A patient or sample case has none, so it is reported without measures """
+    if source_level == SampleSourceLevel.SPECIMEN:
+        return source
+    if source_level == SampleSourceLevel.EXTRACTION:
+        return source.specimen
+    return None
+
+
+def specimen_measures(specimen: Optional[Specimen]) -> dict[str, SpecimenMeasure]:
+    """ The specimen's measures by context key - what the report prints, and what the build form
+        starts its assay flags from """
     if specimen is None:
         return {}
     measures = {}
@@ -559,9 +563,7 @@ def build_report_context(user: User, source_level: str, source,
     variants = build_report_variants(modifications, user, reported_by_pk=reported_by_pk)
     samples = get_sample_group(user, source_level, source).samples
     patient = get_patient_for_source(source_level, source)
-    specimen = source if source_level == SampleSourceLevel.SPECIMEN else None
-    if specimen is None and source_level == SampleSourceLevel.EXTRACTION:
-        specimen = source.specimen
+    specimen = case_specimen(source_level, source)
     extractions = []
     if source_level == SampleSourceLevel.EXTRACTION:
         extractions = [source]
@@ -582,7 +584,7 @@ def build_report_context(user: User, source_level: str, source,
         extractions=extractions,
         samples=samples,
         sequencing_runs=_sequencing_runs(samples),
-        measures=_specimen_measures(specimen),
+        measures=specimen_measures(specimen),
         summary=summary,
         splice_note=build_splice_note(variants),
         case_values=case_values or {},

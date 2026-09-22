@@ -39,6 +39,11 @@
                            name="case_field_{{ field.key }}"
                            {% if case_values|get_item:field.key %}checked{% endif %} />
                     <label class="form-check-label" for="case_field_{{ field.key }}">{{ field.label|default:field.key }}</label>
+                    {% if field.measure %}
+                        {% with measure=measures|get_item:field.measure %}
+                            <span class="text-muted small ml-1">{% if measure %}{{ measure.value_description }}{% else %}no measure{% endif %}</span>
+                        {% endwith %}
+                    {% endif %}
                 </div>
             {% elif field.type == "choice" %}
                 {% labelled label=field.label|default:field.key %}

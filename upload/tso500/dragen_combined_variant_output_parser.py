@@ -41,6 +41,7 @@ MODULE_VERSION = "Module Version"
 # The key/value sections holding the pair's measures - what each is written as is
 # upload.tso500.dragen_combined_variant_output_records
 TOTAL_TMB = "Total TMB"
+USABLE_MSI_SITES = "Usable MSI Sites"
 PERCENT_UNSTABLE_MSI_SITES = "Percent Unstable MSI Sites"
 GENOMIC_INSTABILITY_SCORE = "Genomic Instability Score"
 TUMOR_FRACTION = "Tumor Fraction"

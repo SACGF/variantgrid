@@ -42,8 +42,13 @@ from classification.models import (
     ClassificationReportTemplate,
     get_case_report_deliveries,
 )
+from classification.models.classification_report_models import measure_tick
 from classification.report.case_report_builder import build_case_report, preview_case_report_html
-from classification.report.case_report_context import build_report_variants
+from classification.report.case_report_context import (
+    build_report_variants,
+    case_specimen,
+    specimen_measures,
+)
 from classification.views.views import classification_created_response, create_classification_object
 from patients.models import Extraction, Patient, Specimen
 from patients.models_enums import Zygosity
@@ -248,10 +253,12 @@ def _flat_case_values(case_values: Optional[dict]) -> dict:
 
 def _case_values_for_form(template: Optional[ClassificationReportTemplate],
                           modifications: list[ClassificationModification],
-                          draft: Optional[CaseReport]) -> dict:
-    """ What the form starts from: a draft's own answers, else each field's default and its
+                          draft: Optional[CaseReport],
+                          measures: dict) -> dict:
+    """ What the form starts from: a draft's own answers, else each field's default, the
         prefill_key read off the case's classifications - a case level value the records already
-        carry, like SA Path's clinical indication, is not worth retyping """
+        carry, like SA Path's clinical indication, is not worth retyping - and the tick_when rule
+        against the case's measures, which is what the scientist was working out by hand """
     values = _flat_case_values(draft.case_values if draft else None)
     for field in (template.case_fields if template else None) or []:
         key = field.get("key")
@@ -263,6 +270,10 @@ def _case_values_for_form(template: Optional[ClassificationReportTemplate],
                 if prefilled := modification.get(prefill_key):
                     value = prefilled
                     break
+        if tick_when := field.get("tick_when"):
+            ticked = measure_tick(tick_when, measures.get(field.get("measure")))
+            if ticked is not None:
+                value = ticked
         if value is not None:
             values[key] = value
     return values
@@ -290,6 +301,7 @@ def case_report_build_dialog(request, case_type: str, case_id: int):
     template = _case_report_template(request, modifications)
 
     draft = case.latest_draft_report()
+    measures = specimen_measures(case_specimen(case.source_level, case.obj))
     lab, lab_error = UserSettings.get_lab_and_error(request.user)
     context = {
         "case": case,
@@ -300,7 +312,8 @@ def case_report_build_dialog(request, case_type: str, case_id: int):
             case_allele_origin_bucket(modifications)),
         "variants": build_report_variants(modifications, request.user),
         "summary": draft.summary if draft else "",
-        "case_values": _case_values_for_form(template, modifications, draft),
+        "case_values": _case_values_for_form(template, modifications, draft, measures),
+        "measures": measures,
         "lab": lab,
         "lab_error": lab_error,
         "lab_form": UserLabChoiceForm(user=request.user, default_lab=lab) if lab else None,

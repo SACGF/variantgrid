@@ -26,8 +26,8 @@ from classification.enums import AlleleOriginBucket
 from classification.models.classification import ClassificationModification
 from classification.report.template_validation import validate_case_template
 from library.case_report_delivery import CaseReportDelivery
-from patients.models import Extraction, Patient, Specimen
-from patients.models_enums import SampleSourceLevel
+from patients.models import Extraction, Patient, Specimen, SpecimenMeasure
+from patients.models_enums import MEASURE_CONTEXT_KEYS, SampleSourceLevel
 from snpdb.models import Lab, Sample
 
 # A report has gone out with the case, so a deployment that files it somewhere else can now do so.
@@ -58,6 +58,49 @@ def get_case_report_deliveries(case_reports: list['CaseReport']) -> dict[int, li
     return deliveries
 
 
+# What a bool case_field's `tick_when` can say about the measure it names. The form starts the tick
+# from the rule and the scientist adjusts it - the answer the report goes out with is still theirs
+TICK_WHEN_CALLED = "called"
+TICK_WHEN_CALL_IN = "call_in"
+TICK_WHEN_VALUE_BELOW = "value_below"
+TICK_WHEN_RULES = (TICK_WHEN_CALLED, TICK_WHEN_CALL_IN, TICK_WHEN_VALUE_BELOW)
+
+
+def measure_tick(tick_when: dict, measure: Optional[SpecimenMeasure]) -> Optional[bool]:
+    """ Whether the rule a case_field states holds for the case's measure - None where the case has
+        no such measure, so the field's own default stands and the form says there is none """
+    if measure is None:
+        return None
+    if (called := tick_when.get(TICK_WHEN_CALLED)) is not None:
+        return bool(measure.call) == bool(called)
+    if (call_in := tick_when.get(TICK_WHEN_CALL_IN)) is not None:
+        return measure.call in call_in
+    if (value_below := tick_when.get(TICK_WHEN_VALUE_BELOW)) is not None:
+        return measure.value is not None and measure.value < value_below
+    return None
+
+
+def validate_case_fields(case_fields: list) -> Optional[str]:
+    """ What a template's JSON has to get right for a measure to reach the form - the keys are hand
+        written in admin, so a typo says so at save time rather than silently ticking nothing """
+    measure_keys = set(MEASURE_CONTEXT_KEYS.values())
+    for field in case_fields or []:
+        if not isinstance(field, dict):
+            return f"Each case field must be an object, not '{field}'"
+        key = field.get("key") or "(no key)"
+        measure = field.get("measure")
+        if measure is not None and measure not in measure_keys:
+            return f"'{key}' measures '{measure}' - one of {', '.join(sorted(measure_keys))} was expected"
+        if (tick_when := field.get("tick_when")) is not None:
+            if not isinstance(tick_when, dict) or not tick_when:
+                return f"'{key}' tick_when must be one of {', '.join(TICK_WHEN_RULES)}"
+            if unknown := set(tick_when) - set(TICK_WHEN_RULES):
+                return f"'{key}' tick_when has no rule '{', '.join(sorted(unknown))}'"
+            if measure is None:
+                return f"'{key}' has a tick_when and names no measure to apply it to"
+    return None
+
+
 class ReportNames:
     DEFAULT_REPORT = "default_report"
     DEFAULT_CASE_REPORT = "default_case_report"
@@ -70,7 +113,9 @@ class ClassificationReportTemplate(TimeStampedModel):
     case_template = models.TextField(null=False, blank=True, default="")
     # Case level inputs the build form asks for, so a deployment adds them without a schema change:
     # [{"key", "label", "type": "text"|"bool"|"choice", "options": [...], "default", "group",
-    #   "prefill_key": the evidence key the form starts the field from}]
+    #   "prefill_key": the evidence key the form starts the field from,
+    #   "measure": the SpecimenMeasure shown beside a bool field (a MEASURE_CONTEXT_KEYS value),
+    #   "tick_when": the rule that field's tick starts from - @see measure_tick}]
     case_fields = models.JSONField(default=list, blank=True)
     # Which cases this template is offered for - null is every case
     allele_origin_bucket = models.CharField(max_length=1, choices=AlleleOriginBucket.choices,
@@ -121,6 +166,8 @@ class ClassificationReportTemplate(TimeStampedModel):
         if self.case_template:
             if message := validate_case_template(self.case_template):
                 errors["case_template"] = message
+        if message := validate_case_fields(self.case_fields):
+            errors["case_fields"] = message
         if errors:
             raise ValidationError(errors)
 
