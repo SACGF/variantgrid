@@ -11,6 +11,15 @@
         #classify-report .report-candidate.not-ready td:not(.report-status) {
             opacity: 0.4;
         }
+        #classify-report.hide-classified .classify-queue-row.classified {
+            display: none;
+        }
+        #classify-report .all-classified-row {
+            display: none;
+        }
+        #classify-report.hide-classified.all-classified .all-classified-row {
+            display: table-row;
+        }
     </style>
     <script>
         $(document).ready(function() {
@@ -41,6 +50,22 @@
                     return $(this).data("variantTagId");
                 }).get();
             }
+
+            // Classified rows drop out of the queue as they're done. Kept on the tab pane so it survives reloadTab()
+            // but not a page load
+            function updateHideClassified() {
+                const hide = tabPane.data("showClassified") !== true;
+                const rows = $(".classify-queue-row", container);
+                $("#hide-classified", container).prop("checked", hide);
+                container.toggleClass("hide-classified", hide);
+                container.toggleClass("all-classified", rows.length > 0 && rows.not(".classified").length === 0);
+            }
+
+            container.on("change", "#hide-classified", function() {
+                tabPane.data("showClassified", !$(this).is(":checked"));
+                updateHideClassified();
+            });
+            updateHideClassified();
 
             function openClassifyDialog(variantTagId) {
                 const row = $(`.classify-queue-row[data-variant-tag-id='${variantTagId}']`, container);
@@ -78,6 +103,7 @@
                 // Made for a sample other than the tagging's own, it stays outstanding until someone says this is the person
                 if (data.resolved) {
                     row.addClass("classified table-success");
+                    updateHideClassified();
                 } else {
                     action.append($("<button>", {
                         type: "button", class: "btn btn-outline-success btn-sm ml-2 resolve-tag",
@@ -133,6 +159,7 @@
                 $.post($(".classify-action", row).data("resolveUrl"), function() {
                     button.remove();
                     row.addClass("classified table-success");
+                    updateHideClassified();
                     reloadWhenDone = true;
                 }).fail(function() {
                     button.prop("disabled", false);
@@ -329,9 +356,17 @@
             <div class="card-header d-flex align-items-center">
                 <span>Tags awaiting classification</span>
                 <span class="text-muted small ml-2">classifying clears the tag when the record is for the tag's own sample - otherwise clear it yourself</span>
-                {% if can_create_classifications and unclassified %}
-                    <button type="button" class="btn btn-outline-primary btn-sm ml-auto" id="classify-all">Classify all (wizard)</button>
-                {% endif %}
+                <div class="ml-auto d-flex align-items-center">
+                    {% if rows %}
+                        <div class="custom-control custom-checkbox small">
+                            <input type="checkbox" class="custom-control-input" id="hide-classified" checked />
+                            <label class="custom-control-label" for="hide-classified">Hide classified</label>
+                        </div>
+                    {% endif %}
+                    {% if can_create_classifications and unclassified %}
+                        <button type="button" class="btn btn-outline-primary btn-sm ml-3" id="classify-all">Classify all (wizard)</button>
+                    {% endif %}
+                </div>
             </div>
             <table class="table table-sm mb-0">
                 <thead>
@@ -386,6 +421,7 @@
                 {% empty %}
                     <tr><td colspan="6" class="text-muted text-center py-3">No tags are waiting on a classification for this case</td></tr>
                 {% endfor %}
+                    <tr class="all-classified-row"><td colspan="6" class="text-muted text-center py-3">All tags are classified &ndash; untick "Hide classified" to see them</td></tr>
                 </tbody>
             </table>
         </div>
