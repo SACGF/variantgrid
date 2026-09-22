@@ -189,6 +189,11 @@ confirm with the user before proceeding - do not include them in the commit.
 ### GitHub comments
 Preface any comment on a GitHub issue or pull request with 🤖 Written by Claude. Do NOT close GitHub issues.
 
+Suggest issues when you find something worth tracking (e.g. a related problem found while working on another), but don't
+raise them on your own without permission. Draft the title/summary in chat and ask first. Only create an issue when
+explicitly asked to. Before proposing a new one, check for an existing issue that already covers it and suggest
+commenting there instead.
+
 ### Plans and implementation prompts
 Plans live in `claude/plans/<issue>_<slug>_plan.md`; the format (model line, `Status:`, models first) and how to draft a
 prompt for an agent to implement one are in `claude/plans/AGENTS.md`.
