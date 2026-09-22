@@ -80,6 +80,7 @@ from classification.models.evidence_key import (
     VCDataCell,
     VCDataDict,
     WipeMode,
+    resolve_default_value,
 )
 from classification.models.evidence_mixin import EvidenceMixin, VCPatch
 from classification.models.evidence_mixin_summary_cache import (
@@ -1046,7 +1047,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         if populate_with_defaults:
             for e_key in record.evidence_keys.all_keys:
                 if e_key.default_value is not None and e_key.key not in data:
-                    data[e_key.key] = e_key.default_value
+                    data[e_key.key] = resolve_default_value(e_key.default_value, user)
 
         response = record.patch_value(data,
                                       user=user,

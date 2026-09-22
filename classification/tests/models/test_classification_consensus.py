@@ -1,3 +1,6 @@
+from datetime import date
+
+from django.contrib.auth.models import User
 from django.test import TestCase
 
 from annotation.tests.test_data_fake_genes import _create_fake_gene_version
@@ -8,6 +11,10 @@ from classification.models import (
     ClassificationModification,
 )
 from classification.models.classification import COPY_SCOPES_GENE
+from classification.models.classification_variant_fields_validation import (
+    apply_somatic_tier_from_amp_level,
+)
+from classification.models.evidence_key import resolve_default_value
 from classification.tests.models.test_utils import ClassificationTestUtils
 from genes.models_enums import AnnotationConsortium
 from snpdb.models import GenomeBuild
@@ -106,3 +113,89 @@ class GeneConsensusGroupsTestCase(TestCase):
     def test_a_record_with_no_gene_content_is_not_a_candidate(self):
         self._classify("no_gene_content", "somatic", "", "2024-01-01")
         self.assertEqual(self._groups(), [])
+
+
+class ResolveDefaultValueTestCase(TestCase):
+    """ The tokens a lab's classification_config can use for an evidence key's default_value """
+
+    def test_tokens_resolve_and_anything_else_is_left_alone(self):
+        user = User(username='defaulty')
+        self.assertEqual(resolve_default_value("$user", user), "defaulty")
+
+        user.first_name = "Dave"
+        user.last_name = "Lawrence"
+        self.assertEqual(resolve_default_value("$user", user), "Dave Lawrence")
+
+        self.assertEqual(resolve_default_value("$today", user), date.today().isoformat())
+        self.assertEqual(resolve_default_value("Labby curation", user), "Labby curation")
+
+
+class CreateWithDefaultsTestCase(TestCase):
+    """ What a web created record starts with when the lab's config gives a key a default_value """
+
+    def setUp(self):
+        ClassificationTestUtils.setUp()
+        self.lab, self.user = ClassificationTestUtils.lab_and_user()
+        self.user.first_name = "Dave"
+        self.user.last_name = "Lawrence"
+        self.user.save()
+        self.lab.classification_config = {
+            SpecialEKeys.CURATED_BY: {"mandatory": True, "default_value": "$user"},
+            SpecialEKeys.CURATION_DATE: {"mandatory": True, "default_value": "$today"}
+        }
+        self.lab.save()
+
+    def _create(self, **kwargs) -> Classification:
+        return Classification.create(
+            user=self.user, lab=self.lab, lab_record_id="defaults", source=SubmissionSource.VARIANT_GRID,
+            data={SpecialEKeys.ALLELE_ORIGIN: "somatic"}, **kwargs)
+
+    def test_defaults_fill_the_mandatory_fields(self):
+        classification = self._create(populate_with_defaults=True)
+        self.assertEqual(classification.get(SpecialEKeys.CURATED_BY), "Dave Lawrence")
+        self.assertEqual(classification.get(SpecialEKeys.CURATION_DATE), date.today().isoformat())
+
+    def test_a_record_made_without_defaults_starts_empty(self):
+        """ The API, file imports and sync create records without defaults """
+        classification = self._create()
+        self.assertIsNone(classification.get(SpecialEKeys.CURATED_BY))
+        self.assertIsNone(classification.get(SpecialEKeys.CURATION_DATE))
+
+
+class SomaticTierFromAmpLevelTestCase(TestCase):
+    """ The tier a new somatic record starts at, from the AMP levels a copy brought with it """
+
+    def setUp(self):
+        ClassificationTestUtils.setUp()
+        self.lab, self.user = ClassificationTestUtils.lab_and_user()
+
+    def _classify(self, lab_record_id: str, **data) -> Classification:
+        return Classification.create(
+            user=self.user, lab=self.lab, lab_record_id=lab_record_id, source=SubmissionSource.VARIANT_GRID,
+            data={SpecialEKeys.ALLELE_ORIGIN: "somatic", **data})
+
+    def test_level_d_starts_at_tier_2(self):
+        classification = self._classify("level_d", **{"amp:level_d": "therapeutic"})
+        apply_somatic_tier_from_amp_level(classification, self.user)
+        self.assertEqual(classification.get(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE), "tier_2")
+
+    def test_the_highest_level_decides_the_tier(self):
+        classification = self._classify("level_a_and_d", **{"amp:level_a": "therapeutic", "amp:level_d": "prognostic"})
+        apply_somatic_tier_from_amp_level(classification, self.user)
+        self.assertEqual(classification.get(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE), "tier_1")
+
+    def test_a_tier_the_curator_already_has_is_kept(self):
+        classification = self._classify("already_tiered", **{
+            "amp:level_d": "therapeutic",
+            SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE: "tier_3"
+        })
+        apply_somatic_tier_from_amp_level(classification, self.user)
+        self.assertEqual(classification.get(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE), "tier_3")
+
+    def test_a_record_with_no_levels_is_left_alone(self):
+        classification = self._classify("no_levels")
+        modifications = ClassificationModification.objects.filter(classification=classification).count()
+        apply_somatic_tier_from_amp_level(classification, self.user)
+        self.assertIsNone(classification.get(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE))
+        self.assertEqual(ClassificationModification.objects.filter(classification=classification).count(),
+                         modifications)

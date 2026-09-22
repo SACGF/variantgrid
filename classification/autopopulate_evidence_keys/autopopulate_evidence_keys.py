@@ -26,6 +26,9 @@ from classification.models import (
     EvidenceKey,
 )
 from classification.models.classification import COPY_SCOPES_ALL, COPY_SCOPES_GENE
+from classification.models.classification_variant_fields_validation import (
+    apply_somatic_tier_from_amp_level,
+)
 from classification.tasks.classification_import_process_variants_task import (
     liftover_classification_import,
 )
@@ -107,6 +110,8 @@ def classification_complete_web_create(
     for source, copy_scopes in [(copy_from, COPY_SCOPES_ALL), (copy_gene_from, COPY_SCOPES_GENE)]:
         if source:
             ClassificationConsensus(modification=source, copy_scopes=copy_scopes).apply_to(classification, user)
+
+    apply_somatic_tier_from_amp_level(classification, user)
 
 
 def generate_auto_populate_data(
