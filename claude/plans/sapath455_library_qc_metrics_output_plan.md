@@ -1,7 +1,7 @@
 # Library QC from DRAGEN's MetricsOutput.tsv: Amplifications / Variants / Fusions / Quality / Fail have a source
 
 Written by Claude Fable 5.1 (claude-fable-5-1), 2026-09-22
-Status: in progress - steps 1-5, 7 and 8, the run-level revision below (including its 2.6.2 amendment), the move to seqauto and the per-arm SequencingSample link landed uncommitted on master (2026-09-22); sapath step 6 and the commit remain, and the pipeline half is planned in ../NGS-pipelines. Client side done: variantgrid_api 1.8.0 (SACGF/variantgrid_api#24)
+Status: landed 181b8df16 - sapath settings and the NGS-pipelines plan alongside; the sapath report-template step 6 remains
 
 [sapath#455](https://github.com/SACGF/variantgrid_sapath/issues/455), phase 2 of #454
 (`claude/plans/sapath454_multi_report_tick_measures_plan.md`, landed). Phase 1 put the measure behind the TMB, MSI and
