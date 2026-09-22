@@ -14,19 +14,19 @@
     }
 
     /* Bootstrap's carousel controls are white for photos - invert them, and keep them clear of the graph */
-    #sequencing-graphs {
+    #dashboard-graphs {
         padding-bottom: 30px;
     }
-    #sequencing-graphs .carousel-inner {
+    #dashboard-graphs .carousel-inner {
         padding: 0 40px;
     }
-    #sequencing-graphs .carousel-control-prev,
-    #sequencing-graphs .carousel-control-next {
+    #dashboard-graphs .carousel-control-prev,
+    #dashboard-graphs .carousel-control-next {
         width: 40px;
     }
-    #sequencing-graphs .carousel-control-prev,
-    #sequencing-graphs .carousel-control-next,
-    #sequencing-graphs .carousel-indicators {
+    #dashboard-graphs .carousel-control-prev,
+    #dashboard-graphs .carousel-control-next,
+    #dashboard-graphs .carousel-indicators {
         filter: invert(100%);
     }
 
@@ -62,34 +62,87 @@
         {% endif %}
     {% endif %}
 
+    {% comment %}
+    One slide per graph, each with its own link to the fuller stats page. The indicators are built from the
+    slides' data-title so the conditional slides don't need hand numbered data-slide-to attributes.
+    {% endcomment %}
+    <div id="dashboard-graphs" class="carousel slide" data-ride="carousel" data-interval="10000">
+        <ol class="carousel-indicators"></ol>
+        <div class="carousel-inner">
     {% if seqauto_enabled %}
         {% load seqauto_graph_tags %}
-        <div id="sequencing-graphs" class="carousel slide" data-ride="carousel" data-interval="10000">
-            <ol class="carousel-indicators">
-                <li data-target="#sequencing-graphs" data-slide-to="0" class="active" title="By enrichment kit"></li>
-                <li data-target="#sequencing-graphs" data-slide-to="1" title="Germline vs somatic"></li>
-            </ol>
-            <div class="carousel-inner">
-                <div class="carousel-item active">
-                    {% sample_enrichment_kits_graph sample_enrichment_kits_df 'Sequencing Samples By Month' "month_offset" max_years=3 %}
-                </div>
-                <div class="carousel-item">
-                    {% sample_variants_type_graph sample_enrichment_kits_df 'Germline / Somatic Samples By Month' "month_offset" max_years=3 %}
-                </div>
+            <div class="carousel-item active" data-title="By enrichment kit">
+                {% sample_enrichment_kits_graph sample_enrichment_kits_df 'Sequencing Samples By Month' "month_offset" max_years=3 %}
+                {% if url_name_visible.sequencing_stats %}
+                <a href="{% url 'sequencing_stats' %}">More sequencing stats</a>
+                {% endif %}
             </div>
-            <a class="carousel-control-prev" href="#sequencing-graphs" role="button" data-slide="prev">
-                <span class="carousel-control-prev-icon" aria-hidden="true"></span>
-                <span class="sr-only">Previous</span>
-            </a>
-            <a class="carousel-control-next" href="#sequencing-graphs" role="button" data-slide="next">
-                <span class="carousel-control-next-icon" aria-hidden="true"></span>
-                <span class="sr-only">Next</span>
-            </a>
+            <div class="carousel-item" data-title="Germline vs somatic">
+                {% sample_variants_type_graph sample_enrichment_kits_df 'Germline / Somatic Samples By Month' "month_offset" max_years=3 %}
+                {% if url_name_visible.sequencing_stats %}
+                <a href="{% url 'sequencing_stats' %}">More sequencing stats</a>
+                {% endif %}
+            </div>
+    {% else %}
+        {% load sample_graph_tags %}
+            <div class="carousel-item active" data-title="Cumulative samples">
+                {% samples_by_month_graph %}
+            </div>
+    {% endif %}
+    {% if url_name_visible.tag_stats %}
+            <div class="carousel-item" data-title="Tag events">
+                <script>
+                $(document).ready(function() {
+                    // Same endpoint as the tag stats page (cached per user); trimmed to the sequencing graphs' window
+                    const MAX_YEARS = 3;
+                    const container = "tag-events-by-month";
+                    $.getJSON("{% url 'tag_stats_over_time' %}").done(function(data) {
+                        const cutoff = new Date();
+                        cutoff.setFullYear(cutoff.getFullYear() - MAX_YEARS);
+                        const keep = data.months.map(m => new Date(m + "-01") >= cutoff);
+                        const months = data.months.filter((_, i) => keep[i]);
+                        const namedData = data.series.map(s => [s.name, s.counts.filter((_, i) => keep[i])]);
+                        // Inside a carousel the inactive slide is display:none, so measure the nearest visible ancestor
+                        const width = $("#" + container).closest(":visible").width();
+                        showStackedBar(container, "Tag Events By Month (last " + MAX_YEARS + " years)", width, $("#" + container).height(), namedData, months);
+                    });
+                });
+                </script>
+                <!-- Plotly sets height:100% on its inner .plot-container, so the div needs the graph's size -->
+                <div id="tag-events-by-month" style="height: 500px"></div>
+                <a href="{% url 'tag_stats' %}">More tag stats</a>
+            </div>
+    {% endif %}
         </div>
-        {% if url_name_visible.sequencing_stats %}
-        <a href="{% url 'sequencing_stats' %}">More sequencing graphs</a>
-        {% endif %}
+        <a class="carousel-control-prev" href="#dashboard-graphs" role="button" data-slide="prev">
+            <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+            <span class="sr-only">Previous</span>
+        </a>
+        <a class="carousel-control-next" href="#dashboard-graphs" role="button" data-slide="next">
+            <span class="carousel-control-next-icon" aria-hidden="true"></span>
+            <span class="sr-only">Next</span>
+        </a>
+    </div>
+    <script>
+    $(document).ready(function() {
+        const carousel = $("#dashboard-graphs");
+        // A graph tag renders nothing when the user has no data - don't cycle through a blank slide
+        carousel.find(".carousel-item").filter((_, slide) => $(slide).children().length === 0).remove();
+        const slides = carousel.find(".carousel-item");
+        slides.first().addClass("active");
+        if (slides.length < 2) {
+            carousel.find(".carousel-control-prev, .carousel-control-next").remove();
+            return;
+        }
+        const indicators = carousel.find(".carousel-indicators");
+        slides.each(function(i, slide) {
+            $("<li>", {"data-target": "#dashboard-graphs", "data-slide-to": i, title: $(slide).data("title")})
+                .toggleClass("active", i === 0).appendTo(indicators);
+        });
+    });
+    </script>
 
+    {% if seqauto_enabled %}
         {% if latest_sequencing_vcfs %}
             <h4>Recently Uploaded Sequencing Data</h4>
             <table class="table">
@@ -142,11 +195,6 @@
             </table>        
         {% endif %}
 
-    {% else %}
-        <div>
-        {% load sample_graph_tags %}
-        {% samples_by_month_graph %}
-        </div>
     {% endif %}
 
         <P>
