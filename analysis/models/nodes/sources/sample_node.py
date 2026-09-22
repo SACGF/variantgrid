@@ -19,7 +19,7 @@ from analysis.models.nodes.analysis_node import (
 from analysis.models.nodes.cohort_mixin import (
     SampleMixin,
     get_sample_annotation_kwargs,
-    get_sample_pk_in_q,
+    get_samples_pk_q,
 )
 from analysis.models.nodes.node_display import NodeChip, NodeIcon
 from analysis.models.nodes.stats_cache import (
@@ -332,9 +332,9 @@ class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
             self.merge_arg_q_dicts(arg_q_dict, self._get_qc_gene_list_arg_q_dict())
             return arg_q_dict
 
-        # pk__in subqueries don't fan out rows the way joins do, so no distinct() is needed
-        q = reduce(operator.or_, [get_sample_pk_in_q(self, sample, self._get_sample_arg_q_dict(sample))
-                                  for sample in samples])
+        # A subquery doesn't fan out rows the way a join does, and UNION dedupes a variant called in
+        # more than one VCF, so no distinct() is needed
+        q = get_samples_pk_q(self, [(sample, self._get_sample_arg_q_dict(sample)) for sample in samples])
         return {None: {self._get_node_q_hash(): q}}
 
     # ── VCF FILTER - one node level selection, resolved per VCF ───────────────

@@ -22,7 +22,7 @@ from django.contrib.postgres.fields import ArrayField
 from django.core.cache import cache
 from django.core.exceptions import FieldError
 from django.db import connection, models, transaction
-from django.db.models import IntegerField, QuerySet, Value
+from django.db.models import BooleanField, F, Func, IntegerField, QuerySet, Value
 from django.db.models.aggregates import Count
 from django.db.models.deletion import CASCADE, SET_NULL
 from django.db.models.expressions import RawSQL
@@ -116,6 +116,28 @@ def queryset_to_pk_in_q(qs: QuerySet) -> Q:
     pk_qs = qs.values_list("pk", flat=True)
     sql, params = pk_qs.query.sql_with_params()
     return Q(pk__in=RawSQL(sql, params))
+
+
+def querysets_to_pk_any_array_q(querysets: list[QuerySet]) -> Q:
+    """ The union of several querysets as pk = ANY(ARRAY(<qs1> UNION <qs2> ...)), rendered to RawSQL as
+        queryset_to_pk_in_q does. UNION also dedupes a pk more than one queryset returns.
+
+        An OR of pk IN (subquery) has no index to use, so Postgres walks the whole pkey index checking
+        every row against each hashed subplan (#1894). pk IN (<union>) fixes count() but the planner
+        misestimates the union's size and hash joins every variant for a sorted page. ARRAY() runs the
+        union once as an InitPlan, so the plan drives from the pkey. The pk is a Django column rather
+        than SQL text, so it's relabelled when this Q ends up inside a subquery (U0) """
+    sql_list = []
+    params = []
+    for qs in querysets:
+        sql, qs_params = qs.values_list("pk", flat=True).query.sql_with_params()
+        sql_list.append(f"({sql})")
+        params.extend(qs_params)
+    union = RawSQL(" UNION ".join(sql_list), params)
+    # Not Q(pk=...) - the exact lookup wraps its rhs in parentheses and "= (ANY(...))" isn't valid SQL
+    pk_any_array = Func(F("pk"), union, arg_joiner=" = ANY(ARRAY", template="%(expressions)s)",
+                        output_field=BooleanField())
+    return Q(pk_any_array)
 
 
 def annotate_and_filter_queryset(qs: QuerySet, a_kwargs: dict, arg_q_dict: dict) -> tuple[QuerySet, list[Q]]:
