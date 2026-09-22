@@ -38,6 +38,11 @@ Patterns here:
   classification_revalidate_signal, variants_classification_changed_signal). Receivers live in signals/ and are imported by
   apps.py:ClassificationConfig.ready; annotation/apps.py and snpdb/signals/common_variants_classification_changed.py subscribe
   from outside the app.
+- A lab's `classification_config` can give an evidence key a `default_value`, which a record created from the web
+  form starts that key with (`models/classification.py:Classification.create_with_response` with
+  `populate_with_defaults=True` - the API, file imports and sync never see one). `$user` and `$today` resolve at create
+  time through `models/evidence_key.py:resolve_default_value`, so a lab that makes `curated_by` / `curation_date`
+  mandatory can say what they start as.
 - The case report (#444) is one Django template per lab rendered server side: report/case_report_context.py builds
   ReportVariant / ReportContext (ordering, amp_tier, kinds, measures), report/renderers.py turns one HTML into the PDF
   (xhtml2pdf) and DOCX (html2docx), and the JSON comes off the same context. ClassificationReport.context() builds its

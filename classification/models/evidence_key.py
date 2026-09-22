@@ -10,12 +10,14 @@ import re
 from collections import defaultdict
 from collections.abc import Iterable, Mapping
 from copy import deepcopy
+from datetime import date
 from enum import Enum
 from functools import cached_property
 from typing import Any, Optional, TypedDict, Union, cast
 
 import pydantic
 from django.conf import settings
+from django.contrib.auth.models import User
 from django.db import models
 from django.db.models.deletion import SET_NULL
 from django_extensions.db.models import TimeStampedModel
@@ -101,6 +103,14 @@ class EvidenceKeyOverrides(pydantic.BaseModel):
 
         If there's a key called "namespaces" it's expected to be a list of strings
         these strings should match the namespace of some evidence keys
+
+        "default_value" is the value a web created record starts that key with (see
+        Classification.create_with_response), and understands two tokens resolved at create time:
+        "$user" the full name of the user creating the record (falling back to their username) and
+        "$today" today's date as YYYY-MM-DD. Any other value is used as it stands, e.g.
+
+        {"curated_by": {"mandatory": true, "default_value": "$user"},
+         "curation_date": {"mandatory": true, "default_value": "$today"}}
         :param config_dict: A diction of evidence key overrides and namespaces
         :return: A well-structured EvidenceKeyOverrides
         """
@@ -150,6 +160,22 @@ class EvidenceKeyOverrides(pydantic.BaseModel):
             evidence_key_config=evidence_key_config,
             namespaces=namespaces
         )
+
+
+DEFAULT_VALUE_USER = "$user"
+DEFAULT_VALUE_TODAY = "$today"
+
+
+def resolve_default_value(default_value: Any, user: User) -> Any:
+    """
+    Resolves the tokens a lab's classification_config can use for an evidence key's default_value
+    (see EvidenceKeyOverrides.from_dict), leaving any other value as it stands.
+    """
+    if default_value == DEFAULT_VALUE_USER:
+        return user.get_full_name() or user.username
+    if default_value == DEFAULT_VALUE_TODAY:
+        return date.today().isoformat()
+    return default_value
 
 
 class EvidenceKey(TimeStampedModel):

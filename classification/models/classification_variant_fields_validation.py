@@ -3,14 +3,16 @@ from re import RegexFlag
 from typing import Optional
 
 from django.conf import settings
+from django.contrib.auth.models import User
 from django.dispatch.dispatcher import receiver
 
-from classification.enums import AlleleOriginBucket, SpecialEKeys, ValidationCode
+from classification.enums import AlleleOriginBucket, SpecialEKeys, SubmissionSource, ValidationCode
 from classification.models import EvidenceKeyMap, PatchMeta
 from classification.models.classification import Classification, classification_validation_signal
 from classification.models.classification_utils import ValidationMerger
 from genes.hgvs import HGVSMatcher
 from genes.models import NoTranscript
+from library.utils import first
 from snpdb.models import GenomeBuild, Variant, VariantCoordinate
 
 __AT_LEAST_ONE_SET = {SpecialEKeys.CLINICAL_SIGNIFICANCE, SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE}
@@ -88,7 +90,7 @@ def validate_variant_classification_significance(sender, patch_meta: PatchMeta, 
 
 
 __LEVELS_AND_TIER = set(list(SpecialEKeys.AMP_LEVELS_TO_LEVEL.keys()) + [SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE])
-__LEVELS_TO_TIER = {
+LEVELS_TO_TIER = {
     "A": "1",
     "B": "1",
     "C": "2",
@@ -100,6 +102,37 @@ __TIER_TO_ROMAN = {
     "3": "III",
     "4": "IV"
 }
+
+
+def apply_somatic_tier_from_amp_level(classification: Classification, user: User):
+    """
+    Starts a blank somatic clinical significance off at the tier the record's highest AMP level implies -
+    the value validate_letter_to_tier would otherwise ask the curator for. Once set it is theirs to change.
+    """
+    if classification.get(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE):
+        return
+
+    max_level: Optional[str] = None
+    for level_key, level in SpecialEKeys.AMP_LEVELS_TO_LEVEL.items():
+        if classification.get(level_key):
+            max_level = level
+            break
+
+    if not (max_level_tier := LEVELS_TO_TIER.get(max_level)):
+        return
+
+    e_key_somatic_clin_sig = EvidenceKeyMap.cached_key(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE)
+    tier_options = e_key_somatic_clin_sig.option_dictionary_property("tier")
+    if somatic_clin_sig := first(key for key, tier in tier_options.items() if tier == max_level_tier):
+        classification.patch_value(
+            patch={SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE: somatic_clin_sig},
+            clear_all_fields=False,
+            user=user,
+            source=SubmissionSource.CONSENSUS,
+            leave_existing_values=True,
+            save=True,
+            make_patch_fields_immutable=False)
+        classification.publish_latest(user)
 
 
 @receiver(classification_validation_signal, sender=Classification)
@@ -122,7 +155,7 @@ def validate_letter_to_tier(sender, patch_meta: PatchMeta, key_map: EvidenceKeyM
                 break
 
         e_key_somatic_clin_sig = key_map.get(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE)
-        max_level_tier = __LEVELS_TO_TIER.get(max_level)
+        max_level_tier = LEVELS_TO_TIER.get(max_level)
         somatic_clin_sig = patch_meta.get(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE, fallback_existing=True)
         if max_level_tier:
             if somatic_clin_sig:
