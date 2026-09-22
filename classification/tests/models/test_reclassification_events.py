@@ -1,7 +1,7 @@
 from datetime import date, datetime, timezone
 
 from django.contrib.auth.models import User
-from django.test import RequestFactory, TestCase
+from django.test import RequestFactory, TestCase, override_settings
 from django.urls import reverse
 from django.utils.timezone import localdate
 
@@ -316,6 +316,20 @@ class ReclassificationAnalyticsViewTestCase(TestCase):
     def test_external_labs_filter_excludes_internal_records(self):
         analytics = self._analytics(lab_external=LabExternalFilter.EXTERNAL.value)
         self.assertEqual(0, analytics.reclassification_count)
+
+    @override_settings(CLASSIFICATION_RECLASSIFICATION_ANALYTICS_INTERNAL_ONLY=True)
+    def test_internal_only_ignores_the_external_labs_filter(self):
+        analytics = self._analytics(lab_external=LabExternalFilter.EXTERNAL.value)
+        self.assertEqual(LabExternalFilter.INTERNAL, analytics.lab_external)
+        self.assertEqual(2, analytics.reclassification_count)
+
+    def test_non_admin_needs_the_setting(self):
+        _, user = ClassificationTestUtils.lab_and_user()
+        self.client.force_login(user)
+        url = reverse('classification_reclassification_analytics')
+        self.assertEqual(403, self.client.get(url).status_code)
+        with self.settings(CLASSIFICATION_RECLASSIFICATION_ANALYTICS_NON_ADMIN=True):
+            self.assertEqual(200, self.client.get(url).status_code)
 
     def test_significance_flow_moves_towards_benign(self):
         flow = self._analytics().significance_flow

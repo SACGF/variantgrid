@@ -9,7 +9,9 @@ from typing import Any, Optional
 
 from dateutil.relativedelta import relativedelta
 
+from django.conf import settings
 from django.core.cache import cache
+from django.core.exceptions import PermissionDenied
 from django.db import connection
 from django.db.models import Count, Min, OuterRef, QuerySet, Subquery
 from django.db.models.functions import ExtractYear
@@ -32,7 +34,6 @@ from classification.models import (
 )
 from classification.tasks.classification_reclassification_tasks import reclassification_events_update
 from flags.models import Flag
-from library.django_utils import require_superuser
 from snpdb.models import Lab, Organization
 
 # top to bottom / left to right on every chart and table
@@ -380,7 +381,9 @@ class ReclassificationAnalytics:
                 organization = lab.organization
 
         lab_external = LabExternalFilter.ALL
-        if raw_lab_external := request.GET.get('lab_external'):
+        if settings.CLASSIFICATION_RECLASSIFICATION_ANALYTICS_INTERNAL_ONLY:
+            lab_external = LabExternalFilter.INTERNAL
+        elif raw_lab_external := request.GET.get('lab_external'):
             if raw_lab_external in LabExternalFilter.values:
                 lab_external = LabExternalFilter(raw_lab_external)
 
@@ -459,6 +462,8 @@ class ReclassificationAnalytics:
     @cached_property
     def labs(self) -> QuerySet[Lab]:
         qs = Lab.objects.filter(organization=self.organization) if self.organization else Lab.objects.all()
+        if self.lab_external == LabExternalFilter.INTERNAL:
+            qs = qs.filter(external=False)
         return qs.order_by('organization__name', 'name')
 
     @cached_property
@@ -470,7 +475,10 @@ class ReclassificationAnalytics:
 
     @cached_property
     def organizations(self) -> QuerySet[Organization]:
-        return Organization.objects.filter(active=True).order_by('name')
+        qs = Organization.objects.filter(active=True)
+        if self.lab_external == LabExternalFilter.INTERNAL:
+            qs = qs.filter(lab__external=False).distinct()
+        return qs.order_by('name')
 
     # -- 1. Sankey ------------------------------------------------------------------------------
 
@@ -1190,8 +1198,9 @@ def _timelines_up_to_date() -> ReclassificationBuildResult:
     return build_result
 
 
-@require_superuser
 def view_reclassification_analytics(request: HttpRequest) -> HttpResponseBase:
+    if not (request.user.is_superuser or settings.CLASSIFICATION_RECLASSIFICATION_ANALYTICS_NON_ADMIN):
+        raise PermissionDenied("You must be a super user to view this page")
     build_result = _timelines_up_to_date()
     analytics = ReclassificationAnalytics.from_request(request)
     return render(request, "classification/classification_reclassification_analytics.html", {

@@ -9,6 +9,7 @@
 {% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
 {% block content %}
 {% settings_value 'CLASSIFICATION_GRID_EXTERNAL_LAB_FILTER' as CLASSIFICATION_GRID_EXTERNAL_LAB_FILTER %}
+{% settings_value 'CLASSIFICATION_RECLASSIFICATION_ANALYTICS_INTERNAL_ONLY' as CLASSIFICATION_RECLASSIFICATION_ANALYTICS_INTERNAL_ONLY %}
 <script type="text/javascript" src="{% static 'js/lib/plotly-custom-3.7.0.min.js' %}"></script>
 <script type="text/javascript" src="{% static 'js/plotly_helper.js' %}"></script>
 <style>
@@ -61,7 +62,7 @@
             {% endfor %}
         </select>
 
-        {% if CLASSIFICATION_GRID_EXTERNAL_LAB_FILTER %}
+        {% if CLASSIFICATION_GRID_EXTERNAL_LAB_FILTER and not CLASSIFICATION_RECLASSIFICATION_ANALYTICS_INTERNAL_ONLY %}
         <div class="mr-3">
             <label class="mr-2">Labs</label>
             <div id="lab-external-toggle" class="btn-group btn-group-toggle" data-toggle="buttons">
