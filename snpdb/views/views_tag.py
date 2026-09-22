@@ -198,6 +198,12 @@ def view_tag_colors_collection(request, tag_colors_collection_id):
                 if tag_id in valid_tag_ids:
                     tag_colors_collection.tagcolor_set.update_or_create(tag_id=tag_id,
                                                                         defaults={"sort_order": i})
+        elif quick_tag_id := request.POST.get("quick_tag"):
+            # A row can exist purely to hold this, the same way one can exist purely to hold sort_order
+            if Tag.objects.filter(pk=quick_tag_id).exists():
+                quick_tag = request.POST.get("value") == "true"
+                tag_colors_collection.tagcolor_set.update_or_create(tag_id=quick_tag_id,
+                                                                    defaults={"quick_tag": quick_tag})
         return HttpResponse()  # Nobody ever looks at this
 
     user_tag_styles, user_tag_colors = get_tag_styles_and_colors(request.user, tag_colors_collection)
@@ -206,6 +212,7 @@ def view_tag_colors_collection(request, tag_colors_collection_id):
         "has_write_permission": has_write_permission,
         'user_tag_styles': user_tag_styles,
         'user_tag_colors': user_tag_colors,
+        'quick_tags': tag_colors_collection.get_quick_tags(),
     }
     return render(request, 'snpdb/settings/view_tag_colors_collection.html', context)
 

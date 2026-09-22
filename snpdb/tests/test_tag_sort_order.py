@@ -1,9 +1,10 @@
 from django.contrib.auth.models import User
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
 
-from snpdb.models import Tag, TagColor, TagColorsCollection
-from snpdb.utils import get_all_tags_and_user_colors
+from snpdb.models import GlobalSettings, Tag, TagColor, TagColorsCollection, UserSettings
+from snpdb.utils import get_all_tags_and_user_colors, get_tag_quick_tags
 
 TEST_TAG_IDS = {"aaaSortTest", "bbbSortTest", "cccSortTest"}
 
@@ -51,3 +52,54 @@ class TagSortOrderTest(TestCase):
         self.client.post(url, {"name": "renamed colors"})
         self.collection.refresh_from_db()
         self.assertEqual(self.collection.name, "renamed colors")
+
+
+class TagQuickTagTest(TestCase):
+    """ One-click tagging for the tags a lab uses most - issue #1888 """
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.user = User.objects.create_user("quick_tag_user")
+        cls.tag_a = Tag.objects.create(pk="aaaQuickTest")
+        cls.tag_b = Tag.objects.create(pk="bbbQuickTest")
+        cls.tag_c = Tag.objects.create(pk="cccQuickTest")
+        cls.collection = TagColorsCollection.objects.create(name="test quick tags", user=cls.user)
+
+    def _post_quick_tag(self, tag_id, value):
+        self.client.force_login(self.user)
+        url = reverse("view_tag_colors_collection", kwargs={"tag_colors_collection_id": self.collection.pk})
+        return self.client.post(url, {"quick_tag": tag_id, "value": value})
+
+    def test_only_ticked_tags_in_sort_order_then_name(self):
+        TagColor.objects.create(collection=self.collection, tag=self.tag_c, rgb="", quick_tag=True)
+        TagColor.objects.create(collection=self.collection, tag=self.tag_b, rgb="", quick_tag=True, sort_order=-1)
+        TagColor.objects.create(collection=self.collection, tag=self.tag_a, rgb="")
+        self.assertEqual(self.collection.get_quick_tags(), ["bbbQuickTest", "cccQuickTest"])
+
+    def test_retired_tag_is_dropped(self):
+        TagColor.objects.create(collection=self.collection, tag=self.tag_a, rgb="", quick_tag=True)
+        TagColor.objects.create(collection=self.collection, tag=self.tag_b, rgb="", quick_tag=True)
+        self.tag_a.retired = timezone.now()
+        self.tag_a.save()
+        self.assertEqual(self.collection.get_quick_tags(), ["bbbQuickTest"])
+
+    def test_save_quick_tag_via_view(self):
+        response = self._post_quick_tag("aaaQuickTest", "true")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self.collection.get_quick_tags(), ["aaaQuickTest"])
+        # A row that exists purely to hold quick_tag has no color to emit
+        self.assertEqual(self.collection.get_user_colors_by_tag(), {})
+
+        self._post_quick_tag("aaaQuickTest", "false")
+        self.assertEqual(self.collection.get_quick_tags(), [])
+
+    def test_unknown_tag_is_ignored(self):
+        self._post_quick_tag("notARealTag", "true")
+        self.assertFalse(self.collection.tagcolor_set.exists())
+
+    def test_no_collection_has_no_quick_tags(self):
+        GlobalSettings.objects.update(tag_colors=None)
+        user_settings = UserSettings.get_for_user(self.user)
+        self.assertIsNone(user_settings.tag_colors, "Settings resolve to no tag colors collection")
+        self.assertEqual(get_tag_quick_tags(self.user), [])

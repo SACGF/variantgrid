@@ -349,17 +349,7 @@ function showTagAutocomplete(variantId) {
             const tag = $(this).val();
             if (tag) {
                 const successFunc = function (response) {
-                    // The click lands on this node's proband's tagging - a new pill only where a row was made
-                    if (response && response.created) {
-                        const tagging = response.variant_tag;
-                        // setVariantTag has already recorded the sample's name by the time this runs
-                        const options = variantTaggingPillOptions(tagging, getAnalysisWindow().analysisSamples || {},
-                                                                  false);
-                        options.variantTagId = tagging.id;
-                        const newTag = $(getVariantTagHtml(variantId, tag, false, options));
-                        newTag.click(tagClickHandler);
-                        cell.append(newTag);
-                    }
+                    appendVariantTaggingPill(cell, variantId, tag, response);
                     FloatingPanel.hide();
                 };
                 addVariantTag(variantId, nodeId, tag, successFunc);
@@ -372,6 +362,37 @@ function showTagAutocomplete(variantId) {
                 tagSelect.select2("open").trigger("focus");
             }
         });
+    });
+}
+
+
+/* The pill a tagging leaves in the cell, whether it came from the autocomplete or a quick tag's (+).
+   The click lands on this node's proband's tagging, so a pill is only drawn where a row was made */
+function appendVariantTaggingPill(cell, variantId, tag, response) {
+    if (!(response && response.created)) {
+        return;
+    }
+    const tagging = response.variant_tag;
+    // setVariantTag has already recorded the sample's name by the time this runs
+    const options = variantTaggingPillOptions(tagging, getAnalysisWindow().analysisSamples || {}, false);
+    options.variantTagId = tagging.id;
+    const newTag = $(getVariantTagHtml(variantId, tag, false, options));
+    newTag.click(tagClickHandler);
+    cell.append(newTag);
+}
+
+
+/* One of the tags colours page's quick tags - tagging with it takes the single click (#1888).
+   @see VariantGridFormat.tags for the buttons, render_variant_quick_tags for which tags get one */
+function quickTagClickHandler() {
+    const button = $(this);
+    const variantId = button.attr("variant_id");
+    const tag = button.attr("tag_id");
+    // The grid the + was clicked in is the node the tagging is about - @see showTagAutocomplete
+    const nodeId = button.closest("table.grid").attr("node_id");
+    const cell = button.parent();
+    addVariantTag(variantId, nodeId, tag, function(response) {
+        appendVariantTaggingPill(cell, variantId, tag, response);
     });
 }
 
@@ -541,6 +562,7 @@ function gridCompleteExtra() {
     const aWin = getAnalysisWindow();
     if (!aWin.variantTagsReadOnly) {
         $(".grid-tag-deletable").click(tagClickHandler);
+        $(".quick-tag").click(quickTagClickHandler);
         // Namespaced + off first as this runs after every draw
         $(document).off("click.gridTagDisarm").on("click.gridTagDisarm", function(event) {
             if (!$(event.target).closest(".grid-tag").length) {
