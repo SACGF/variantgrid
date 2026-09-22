@@ -36,6 +36,8 @@ class FamilyGroupMixin:
     proband: CohortSample
     proband_sex: Optional[str]
     pedigree_icon_members: tuple[str, ...]
+    # The CohortSample FKs, to find the groups a sample is in
+    MEMBER_FIELDS: tuple[str, ...]
     preview_with: Callable[..., PreviewData]
 
     @classmethod
@@ -124,6 +126,7 @@ class Trio(ParentsMixin, FamilyGroupMixin, GuardianPermissionsAutoInitialSaveMix
     proband_sex = models.CharField(max_length=1, choices=Sex.choices, null=True, blank=True)
 
     preview_icon_symbol = "node-icon-trio"  # TrioNode wears this too - see get_node_class_icon
+    MEMBER_FIELDS = ("mother", "father", "proband")
 
     @classmethod
     def preview_if_url_visible(cls) -> str:
@@ -162,6 +165,7 @@ class Quad(ParentsMixin, FamilyGroupMixin, GuardianPermissionsAutoInitialSaveMix
 
     preview_icon_symbol = "node-icon-quad"  # QuadNode wears this too - see get_node_class_icon
     pedigree_icon_members = ("mother", "father", "sibling")
+    MEMBER_FIELDS = ("mother", "father", "proband", "sibling")
 
     @classmethod
     def preview_if_url_visible(cls) -> str:
@@ -203,6 +207,7 @@ class Duo(FamilyGroupMixin, GuardianPermissionsAutoInitialSaveMixin, SvgSymbolPr
 
     preview_icon_symbol = "node-icon-duo"  # DuoNode wears this too - see get_node_class_icon
     pedigree_icon_members = ("relative",)
+    MEMBER_FIELDS = ("proband", "relative")
 
     @classmethod
     def preview_if_url_visible(cls) -> str:

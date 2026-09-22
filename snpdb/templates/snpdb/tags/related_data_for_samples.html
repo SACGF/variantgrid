@@ -40,6 +40,32 @@
 {% endif %}
 
 
+{% if quads_and_samples %}
+<div id='related-quads' class="mt-4">
+    <h3>Quads</h3>
+    {% for quad, samples in quads_and_samples %}
+        <div>
+            {% preview_icon quad %}
+            <a href="{{ quad.get_absolute_url }}">{{ quad }}</a>{% if samples %} - {{ samples }}{% endif %}
+        </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+
+{% if duos_and_samples %}
+<div id='related-duos' class="mt-4">
+    <h3>Duos</h3>
+    {% for duo, samples in duos_and_samples %}
+        <div>
+            {% preview_icon duo %}
+            <a href="{{ duo.get_absolute_url }}">{{ duo }}</a>{% if samples %} - {{ samples }}{% endif %}
+        </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+
 {% if pedigrees_and_samples %}
 <div id='related-pedigrees'>
     <h3>Pedigrees</h3>

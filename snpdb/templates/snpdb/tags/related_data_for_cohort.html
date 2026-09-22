@@ -26,6 +26,30 @@
     </div>
     {% endif %}
 
+    {% if quads %}
+    <div id='related-quads'>
+        <h3>Quads</h3>
+        {% for quad in quads %}
+            <div>
+                {% preview_icon quad %}
+                <a href="{{ quad.get_absolute_url }}">{{ quad }}</a>
+            </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if duos %}
+    <div id='related-duos'>
+        <h3>Duos</h3>
+        {% for duo in duos %}
+            <div>
+                {% preview_icon duo %}
+                <a href="{{ duo.get_absolute_url }}">{{ duo }}</a>
+            </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
     {% if pedigrees %}
     <div id='related-pedigrees'>
         <h3>Pedigrees</h3>

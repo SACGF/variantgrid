@@ -12,6 +12,7 @@ variant, CNV, exon CNV), so these build a patient with two specimens and pin:
   * samples the group leaves out being reported rather than silently dropped
   * the card saying what the node is and what it reaches
   * the grid knowing which VCF each row came from
+  * the analysis listed as related on the page of each sample the node reaches (#1889)
 """
 import csv
 import json
@@ -45,6 +46,7 @@ from analysis.models.enums import NodeStatus, TagLocation
 from analysis.models.nodes.analysis_node import NodeVCFFilter
 from analysis.models.nodes.filters.merge_node import MergeNode
 from analysis.models.nodes.sources.sample_node import SampleNode
+from analysis.related_analyses import get_related_analysis_details_for_samples
 from analysis.templatetags.related_analyses_tags import analysis_templates_tag
 from analysis.views.views import CreateClassificationForVariantTagView
 from annotation.fake_annotation import get_fake_annotation_version
@@ -1207,3 +1209,32 @@ class FilterNodePatientScopeTest(SampleNodeLevelsTestCase):
                            accordion_panel=GeneListNode.SAMPLE_GENE_LIST)
         self.assertIsNone(node.sample_gene_list)
         self.assertEqual(node.get_gene_lists(), gene_lists)
+
+
+class TestRelatedAnalysesForGroupLevels(SampleNodeLevelsTestCase):
+    """ A group level node leaves sample null - the sample and patient pages still list its analysis """
+
+    def _related(self, sample) -> dict[Analysis, str]:
+        return dict(get_related_analysis_details_for_samples(self.user, [sample]))
+
+    def _group_node(self, level, source) -> SampleNode:
+        analysis = Analysis(genome_build=self.grch37)
+        analysis.set_defaults_and_save(self.user)
+        field = SampleNode.SOURCE_LEVEL_FIELDS[level]
+        return SampleNode.objects.create(analysis=analysis, source_level=level, **{field: source})
+
+    def test_patient_node_relates_through_both_patient_paths(self):
+        node = self._group_node(SampleSourceLevel.PATIENT, self.patient)
+        for sample in [self.snv_sample, self.unlinked_sample]:
+            self.assertEqual(self._related(sample), {node.analysis: f"Patient: {self.patient}"})
+
+    def test_specimen_node_relates_only_to_its_own_specimens_samples(self):
+        node = self._group_node(SampleSourceLevel.SPECIMEN, self.blood_specimen)
+        self.assertIn(node.analysis, self._related(self.blood_sample))
+        self.assertNotIn(node.analysis, self._related(self.snv_sample))
+
+    def test_sample_and_group_nodes_in_one_analysis_are_labelled_by_level(self):
+        node = self._group_node(SampleSourceLevel.EXTRACTION, self.extraction)
+        SampleNode.objects.create(analysis=node.analysis, sample=self.snv_sample)
+        expected = f"Sample: {self.snv_sample.name}, Extraction: {self.extraction}"
+        self.assertEqual(self._related(self.snv_sample), {node.analysis: expected})
