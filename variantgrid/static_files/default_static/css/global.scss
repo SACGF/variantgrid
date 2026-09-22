@@ -3568,6 +3568,11 @@ li.help-item {
 	box-shadow: 0 2px 8px rgba(0, 0, 0, .2);
 }
 
+// select2 draws its dropdown on the body at z-index 1051, under the FloatingPanel (2000) holding its select
+body > .select2-container .select2-dropdown {
+	z-index: 2001;
+}
+
 // The composite header sort menus, floated on the body by FloatingPanel so the DataTables scroll
 // head can't clip them. @see setupSortMenus
 .dt-sort-menu-items {
