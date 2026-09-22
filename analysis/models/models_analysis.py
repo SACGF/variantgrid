@@ -61,9 +61,7 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel, Previe
                                                   default=CustomColumnsCollection.get_system_default_id,
                                                   on_delete=SET_DEFAULT)
     default_sort_by_column = models.ForeignKey(CustomColumn, null=True, blank=True, on_delete=SET_NULL)
-    tag_config_collection = models.ForeignKey(
-        TagConfigCollection, null=True, blank=True, on_delete=SET_NULL,
-        help_text="Tag colours, sort order, 1-click tags and staleness everyone opening this analysis sees")
+    tag_config_collection = models.ForeignKey(TagConfigCollection, null=True, blank=True, on_delete=SET_NULL)
     canonical_transcript_collection = models.ForeignKey(CanonicalTranscriptCollection, null=True, blank=True, on_delete=SET_NULL)
     show_igv_links = models.BooleanField(default=True)
     analysis_panel_fraction = models.FloatField(default=0.25)
