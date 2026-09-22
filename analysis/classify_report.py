@@ -27,7 +27,11 @@ from django.db.models import Q, QuerySet
 from django.urls import reverse
 
 from analysis.models import Analysis, VariantTag
-from analysis.variant_tag_operations import sample_carries_variant
+from analysis.variant_tag_operations import (
+    genotype_is_carrier,
+    get_sample_genotype_for_variant_tag,
+    sample_carries_variant,
+)
 from classification.enums import AlleleOriginBucket, SpecialEKeys
 from classification.models import (
     CaseReport,
@@ -36,9 +40,9 @@ from classification.models import (
     ClassificationModification,
 )
 from patients.models import Extraction, Patient, Specimen
-from patients.models_enums import SampleSourceLevel
+from patients.models_enums import SampleSourceLevel, Zygosity
 from patients.sample_grouping import get_patient_for_source, get_sample_group
-from snpdb.models import Lab, Sample, Tag
+from snpdb.models import Lab, Sample, SampleGenotype, Tag
 
 
 @dataclass(frozen=True)
@@ -116,6 +120,28 @@ class ClassifyQueueRow:
         """ The bucket a classification made from this tagging goes into - the tag says which work it is
             part of, and nothing germline is ever copied into a somatic record or the other way round """
         return tag_allele_origin_bucket(self.variant_tag.tag)
+
+
+@dataclass(frozen=True)
+class SampleOption:
+    """ One of the case's samples in the classify dialog's Sample choice, with what it called for the variant -
+        the classification takes its zygosity from whichever sample is picked """
+    sample: Sample
+    sample_genotype: Optional[SampleGenotype]
+    carries: bool
+    selected: bool
+
+    @property
+    def label(self) -> str:
+        if not self.sample_genotype:
+            return f"{self.sample.name} - not called"
+        if not self.sample.has_genotype:
+            call = "called"  # a caller with no GT (eg TSO 500 fusions) only writes rows for what it called
+        else:
+            call = Zygosity.display(self.sample_genotype.zygosity)
+        if vaf := self.sample_genotype.allele_frequency:
+            call += f", VAF {vaf:.3f}"
+        return f"{self.sample.name} - {call}"
 
 
 @dataclass
@@ -255,6 +281,21 @@ class ClassifyReportCase:
                 break
         return ClassifyQueueRow(variant_tag=variant_tag, sample=sample, classification=classification,
                                 previous=self._previous_by_tag([variant_tag]).get(variant_tag.pk, []))
+
+    def sample_options(self, row: ClassifyQueueRow) -> list[SampleOption]:
+        """ The dialog's Sample choice. A tagging made above sample level leaves which sample open, so it starts
+            on the only sample that carries the variant - with none or several, nothing, and the scientist picks """
+        genotypes = {sample.pk: get_sample_genotype_for_variant_tag(sample, row.variant_tag) for sample in self.samples}
+        carriers = {sample.pk for sample in self.samples if genotype_is_carrier(sample, genotypes[sample.pk])}
+        if row.sample:
+            selected_id = row.sample.pk
+        elif len(carriers) == 1:
+            selected_id = next(iter(carriers))
+        else:
+            selected_id = None
+        return [SampleOption(sample=sample, sample_genotype=genotypes[sample.pk], carries=sample.pk in carriers,
+                             selected=sample.pk == selected_id)
+                for sample in sorted(self.samples, key=lambda s: s.pk)]
 
     def variant_tags(self) -> list[tuple[VariantTag, Optional[Sample]]]:
         """ The case's taggings, each with the sample it is about where the tagging knows """

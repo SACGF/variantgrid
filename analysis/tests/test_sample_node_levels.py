@@ -983,19 +983,19 @@ class VariantTagPatientTest(SampleNodeLevelsTestCase):
     def _forwarded(self, form) -> dict:
         return {f.dst: f.val for f in form.fields["sample"].widget.forward}
 
-    def test_the_classify_form_offers_only_the_taggings_patients_samples(self):
-        _, other_sample = self._other_patient()
+    def test_the_classify_form_offers_only_the_patients_samples_that_called_the_variant(self):
+        """ The RNA, CNV and blood arms don't have the SNV - picking one leaves the record without a zygosity """
+        self._other_patient()
         variant_tag = self._old_tagging(node=self.patient_node)
         variant_tag.patient = self.patient
         variant_tag.save()
 
         form = self._sample_form(variant_tag)
 
-        samples = set(form.fields["sample"].queryset)
-        self.assertEqual(samples, set(self.patient.get_samples()))
-        self.assertNotIn(other_sample, samples)
-        # The options the user picks from come from the autocomplete, so it is forwarded the patient
-        self.assertEqual(self._forwarded(form)["patient"], self.patient.pk)
+        self.assertEqual(set(form.fields["sample"].queryset), {self.snv_sample})
+        self.assertEqual(form.fields["sample"].initial, self.snv_sample.pk)
+        # The options the user picks from come from the autocomplete, so it is forwarded the samples
+        self.assertEqual(self._forwarded(form)["sample_ids"], [self.snv_sample.pk])
 
     def test_a_tagging_from_before_the_backfill_takes_its_samples_patient(self):
         """ The tagging's own sample is who it is about, whatever the graph looks like now """
@@ -1003,16 +1003,14 @@ class VariantTagPatientTest(SampleNodeLevelsTestCase):
 
         form = self._sample_form(variant_tag)
 
-        self.assertEqual(set(form.fields["sample"].queryset), set(self.patient.get_samples()))
-        self.assertEqual(self._forwarded(form)["patient"], self.patient.pk)
+        self.assertEqual(set(form.fields["sample"].queryset), {self.snv_sample})
 
     def test_a_tagging_whose_node_was_deleted_falls_back_to_the_analysis_patient(self):
         variant_tag = self._old_tagging()
 
         form = self._sample_form(variant_tag)
 
-        self.assertEqual(set(form.fields["sample"].queryset), set(self.patient.get_samples()))
-        self.assertEqual(self._forwarded(form)["patient"], self.patient.pk)
+        self.assertEqual(set(form.fields["sample"].queryset), {self.snv_sample})
 
     def test_the_autocomplete_only_serves_the_forwarded_patients_samples(self):
         _, other_sample = self._other_patient()

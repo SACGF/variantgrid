@@ -15,11 +15,13 @@
 
         {% labelled label="Variant" %}{{ variant_tag.canonical_c_hgvs|default:variant_tag.variant }}{% endlabelled %}
         {% labelled label="Transcript" %}{{ refseq_transcript_accession|default:ensembl_transcript_accession|default:"None - set on the classification form" }}{% endlabelled %}
-        {% labelled label="Zygosity" %}{% if sample_genotype %}{{ zygosity_display }}{% if sample_genotype.allele_frequency %} (VAF {{ sample_genotype.allele_frequency|floatformat:3 }}){% endif %}{% else %}<span class="no-value">unknown</span>{% endif %}{% endlabelled %}
         {% labelled label="Sample" %}
             <select class="form-control form-control-sm" name="sample_id">
-                {% for sample in case.samples %}
-                    <option value="{{ sample.pk }}" {% if sample.pk == row.sample.pk %}selected{% endif %}>{{ sample.name }}</option>
+                {% if not selected_sample_option %}
+                    <option value="" selected>Choose the sample the variant was called in&hellip;</option>
+                {% endif %}
+                {% for option in sample_options %}
+                    <option value="{{ option.sample.pk }}" {% if option.selected %}selected{% endif %}>{{ option.label }}</option>
                 {% endfor %}
             </select>
         {% endlabelled %}

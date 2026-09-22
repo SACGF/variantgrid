@@ -28,7 +28,6 @@ from analysis.models import VariantTag
 from analysis.models.nodes.analysis_node import AnalysisClassification
 from analysis.variant_tag_operations import (
     classification_is_of_another_person,
-    get_sample_genotype_for_variant_tag,
     resolve_launching_variant_tag,
     resolve_requires_classification_tags_for_samples,
     resolve_variant_tag,
@@ -52,7 +51,6 @@ from classification.report.case_report_context import (
 )
 from classification.views.views import classification_created_response, create_classification_object
 from patients.models import Extraction, Patient, Specimen
-from patients.models_enums import Zygosity
 from snpdb.forms import UserLabChoiceForm
 from snpdb.models import Lab, Sample, UserSettings
 
@@ -138,6 +136,7 @@ def classify_report_tag_dialog(request, case_type: str, case_id: int, variant_ta
     case = _get_case(request.user, case_type, case_id)
     variant_tag = VariantTag.get_for_user(request.user, variant_tag_id)
     row = case.queue_row(variant_tag)
+    sample_options = case.sample_options(row)
 
     genome_build = variant_tag.genome_build
     vts = VariantTranscriptSelections(variant_tag.variant, genome_build)
@@ -145,8 +144,6 @@ def classify_report_tag_dialog(request, case_type: str, case_id: int, variant_ta
 
     lab, lab_error = UserSettings.get_lab_and_error(request.user)
     lab_form = UserLabChoiceForm(user=request.user, default_lab=lab) if lab else None
-
-    sample_genotype = get_sample_genotype_for_variant_tag(row.sample, variant_tag) if row.sample else None
 
     # Gene content is what's left to reuse when the lab has never seen this variant before - same
     # deduplicated rows as the create-from-variant page, so the two can't drift
@@ -167,8 +164,8 @@ def classify_report_tag_dialog(request, case_type: str, case_id: int, variant_ta
         "lab": lab,
         "lab_error": lab_error,
         "lab_form": lab_form,
-        "sample_genotype": sample_genotype,
-        "zygosity_display": Zygosity.display(sample_genotype.zygosity) if sample_genotype else None,
+        "sample_options": sample_options,
+        "selected_sample_option": next((option for option in sample_options if option.selected), None),
         "gene_groups": gene_groups,
     }
     return render(request, 'analysis/classify_report_tag_dialog.html', context)

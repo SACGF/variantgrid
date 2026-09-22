@@ -60,7 +60,11 @@ def get_sample_genotype_for_variant_tag(sample: Sample, variant_tag: VariantTag)
 
 def sample_carries_variant(sample: Sample, variant_tag: VariantTag) -> bool:
     """ Shown on the classify dialog as zygosity - it is not what decides whose tagging this is """
-    if sample_genotype := get_sample_genotype_for_variant_tag(sample, variant_tag):
+    return genotype_is_carrier(sample, get_sample_genotype_for_variant_tag(sample, variant_tag))
+
+
+def genotype_is_carrier(sample: Sample, sample_genotype: Optional[SampleGenotype]) -> bool:
+    if sample_genotype:
         if not sample.has_genotype:
             # A caller that reports read support instead of a GT (eg TSO 500 fusions) leaves every
             # zygosity unknown - it only writes a row for what it called in the sample
