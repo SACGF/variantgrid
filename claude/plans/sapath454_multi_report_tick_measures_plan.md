@@ -71,9 +71,26 @@ Three settings, default `None` (no call written - an installation that has not s
 
 ### Phase 2 ([sapath#455](https://github.com/SACGF/variantgrid_sapath/issues/455)): library QC, so Amplifications / Variants / Fusions / Quality / Fail have a source
 
-DRAGEN writes one *MetricsOutput.tsv* per run beside the CombinedVariantOutput. Its `[DNA Library QC Metrics]`,
-`[... for Small Variant Calling and TMB]`, `[... for MSI]`, `[... for CNV]` and `[RNA Library QC Metrics]` sections
-carry each metric per sample with its LSL/USL guideline; a category passes when every metric is within guideline.
+DRAGEN writes *MetricsOutput.tsv* beside the CombinedVariantOutput. The fixture is in - `upload/test_data/tso500/ExampleSample_2600000001/ExampleSample_2600000001_MetricsOutput.tsv`
+(quirks in `upload/test_data/tso500/README.md`) - and it shows exactly what there is to store:
+
+| Section | Shape | Use |
+|---|---|---|
+| `[Header]` | key/value: Output Date / Time, Workflow Version | `measured_date`, `method` - as `measured_date()` reads the CVO's `[Analysis Details]` |
+| `[Run QC Metrics]` | metric, LSL, USL, one `Value` column | the run's, not a library's - out of scope here (NA when analysis started from FASTQ) |
+| `[Analysis Status]` | one column per sample: `COMPLETED_ALL_STEPS`, `FAILED_STEPS`, `STEPS_NOT_EXECUTED` | a sample whose steps failed is the **Fail** caveat |
+| `[DNA Library QC Metrics]` | `CONTAMINATION_SCORE` USL 1457 | category `DNA` |
+| `[... for Small Variant Calling and TMB]` | `MEDIAN_INSERT_SIZE` >=70, `MEDIAN_EXON_COVERAGE` >=150, `PCT_EXON_50X` >=90 | category `SMALL_VARIANT_TMB` - the **Variants** and **TMB** flags |
+| `[... for MSI]` | `USABLE_MSI_SITES` >=40 | category `MSI` - the same number `TSO500_MSI_MIN_USABLE_SITES` gates the call on |
+| `[... for CNV]` | `GENE_SCALED_MAD` <=0.134, `MEDIAN_BIN_COUNT_CNV_TARGET` >=1 | category `CNV` - the **Amplifications** flag |
+| `[... for GIS]` | `PCT_TARGET_HRD_50X` >=50 | category `GIS` - not a flag today, but the HRD block's reliability |
+| `[RNA Library QC Metrics]` | `MEDIAN_CV_GENE_500X` <=0.93, `TOTAL_ON_TARGET_READS` >=9M, `MEDIAN_INSERT_SIZE` >=80 | category `RNA` - the **Fusions** flag and the **Quality** caveat |
+| `[DNA Expanded Metrics]`, `[RNA Expanded Metrics]` | no guidelines | kept in the row's `metrics` for the record, judged by nothing |
+
+The guideline columns are the file's own LSL/USL and match the lab's methods paragraph (40 sites, 1457, 0.134, 150x,
+70bp, 90%; RNA 0.93, 9M, 80bp), so `passed` is "every metric in the section within the file's guideline": `NA` as a
+guideline is no bound, `NA` as a value is an arm the section does not apply to (the RNA column of a DNA section) and
+counts as neither. Every library QC section carries a column per sample, so one file writes rows for both arms.
 
 ```python
 class LibraryQCCategory(models.TextChoices):
@@ -81,6 +98,7 @@ class LibraryQCCategory(models.TextChoices):
     SMALL_VARIANT_TMB = 'V', 'Small variants and TMB'
     MSI = 'M', 'MSI'
     CNV = 'C', 'CNV'
+    GIS = 'G', 'GIS'
     RNA = 'R', 'RNA library'                  # fusions and splice variants
 
 
@@ -88,9 +106,10 @@ class LibraryQC(GuardianPermissionsMixin, TimeStampedModel):
     """ One DRAGEN QC category for one sequenced library - what 'the assay succeeded for X' means """
     extraction = models.ForeignKey(Extraction, on_delete=CASCADE)
     category = models.CharField(max_length=1, choices=LibraryQCCategory.choices)
-    passed = models.BooleanField()
-    metrics = models.JSONField(default=dict)   # {metric: {"value", "lsl", "usl"}} - the section, so 'why' stays answerable
-    method = models.TextField(blank=True)      # module / pipeline version off [Header]
+    passed = models.BooleanField(null=True)    # None: no metric in the section applied to this arm
+    completed = models.BooleanField(null=True)  # [Analysis Status] COMPLETED_ALL_STEPS for the arm, same on every row
+    metrics = models.JSONField(default=dict)   # {metric: {"value", "unit", "lsl", "usl"}} - the section, so 'why' stays answerable
+    method = models.TextField(blank=True)      # Workflow Version off [Header]
     measured_date = models.DateTimeField(null=True, blank=True)
     user = models.ForeignKey(User, null=True, on_delete=SET_NULL)
 
@@ -98,10 +117,23 @@ class LibraryQC(GuardianPermissionsMixin, TimeStampedModel):
         unique_together = ("extraction", "category")   # a re-analysis replaces, as SpecimenMeasure does
 ```
 
-A case_field then says `"qc": "msi"` (a `LibraryQCCategory` name) and ticks when that category passed on any of the
-case's extractions; the Quality and Fail caveats tick when one failed. Phase 2 needs a real *MetricsOutput.tsv* from the
-lab under `upload/test_data/tso500/` and a pipeline change so *vg_api_full.py* uploads it - it is not started until the
-lab wants those five flags derived rather than asserted.
+Implementation, when the lab wants the five flags derived:
+
+1. **Parser.** The file is the CVO's layout (banner line, `[Section]`, tab padding), so the section reader in
+   `upload/tso500/dragen_combined_variant_output_parser.py` is shared and a `dragen_metrics_output_parser.py` reads the
+   sections above by name; `can_process_file` off the banner "Metrics Output". A new `UploadedFileTypes` value and task
+   beside `upload/tasks/import_dragen_tso500_combined_variant_output_task.py`.
+2. **Records.** The sample columns are the CVO's DNA / RNA Sample IDs, so each resolves to its extraction the way
+   `upload/tso500/dragen_combined_variant_output_records.py:resolve_pair` does (the sample ID's accession and container
+   suffix); a column naming no extraction is the same needs-attention path as a CVO arm that names none. One
+   `LibraryQC` per (extraction, category), upserted.
+3. **Form.** A case_field says `"qc": "CNV"` (a `LibraryQCCategory` name) and ticks when that category passed on any
+   of the case's extractions; `"qc_failed": ...` for the Quality and Fail caveats. The note under the group lists
+   the category's metrics against their guideline the way phase 1 lists the measure's threshold, so a scientist
+   sees which number failed.
+4. **sapath.** Amplifications → CNV, Variants → SMALL_VARIANT_TMB, Fusions → RNA, Quality → RNA failed,
+   Fail → DNA failed or not `completed`; a migration updating the template row.
+5. **Pipeline.** *vg_api_full.py* (../NGS-pipelines) uploads the file with the run, as #443 wired the CVO.
 
 ## Phase 1 implementation
 
