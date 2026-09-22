@@ -1,9 +1,13 @@
+import json
+
 from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
+from django.urls import reverse
 
 from analysis.models import (
     AlleleFrequencyNode,
     Analysis,
+    AnalysisNode,
     AnalysisNodeCountConfiguration,
     CohortNode,
     CohortNodeZygosityFiltersCollection,
@@ -227,3 +231,30 @@ class TestCloneAnalysisNodeCounts(AnalysisSetupMixin, TestCase):
         AnalysisNodeCountConfiguration.objects.filter(analysis=self.analysis).delete()
         expected = AbstractNodeCountSettings.get_types_from_labels(BuiltInFilters.DEFAULT_NODE_COUNT_FILTERS)
         self.assertEqual(self._clone_and_get_node_count_types(), expected)
+
+
+class TestNodesCopy(AnalysisSetupMixin, TestCase):
+    """ nodes_copy connects each copy to its parents - copied ones swapped for their copies (#362) """
+
+    def setUp(self):
+        self.parent = TrioNode.objects.create(analysis=self.analysis)
+        self.child = FilterNode.objects.create(analysis=self.analysis)
+        self.parent.add_child(self.child)
+        self.client.force_login(self.analysis.user)
+
+    def _copy(self, *nodes) -> dict[int, AnalysisNode]:
+        url = reverse('nodes_copy', kwargs={"analysis_id": self.analysis.pk})
+        response = self.client.post(url, {"nodes": json.dumps([n.pk for n in nodes])})
+        self.assertEqual(200, response.status_code)
+        copy_ids = [n["attributes"]["node_id"] for n in response.json()["nodes"]]
+        return {c.cloned_from.node_id: c for c in AnalysisNode.objects.filter(pk__in=copy_ids)}
+
+    def test_copy_keeps_uncopied_parent(self):
+        child_copy = self._copy(self.child)[self.child.pk]
+        self.assertEqual([self.parent.pk], [p.pk for p in child_copy.parents()])
+
+    def test_copy_with_parent_connects_to_parent_copy(self):
+        copies = self._copy(self.parent, self.child)
+        child_copy = copies[self.child.pk]
+        self.assertEqual([copies[self.parent.pk].pk], [p.pk for p in child_copy.parents()])
+        self.assertEqual([self.child.pk], [c.pk for c in self.parent.children.all()])

@@ -182,33 +182,33 @@ def nodes_copy(request, analysis_id):
     nodes_qs = analysis.analysisnode_set.filter(id__in=node_ids).select_subclasses()
     topo_sorted = get_toposorted_nodes(nodes_qs)
 
-    # Nudge the copy clear of the original - along the flow in horizontal mode, so it reads as the next node
-    copy_x_offset = 80 if analysis.analysis_horizontal_mode else 10
+    # The copy keeps its parents, so it sits beside the original - across the flow, clear of the shared edges
+    if analysis.analysis_horizontal_mode:
+        copy_x_offset, copy_y_offset = 10, 80
+    else:
+        copy_x_offset, copy_y_offset = 80, 10
 
     old_new_map = {}
     for group in topo_sorted:
         for node in group:
-            if analysis_id is None:
-                analysis_id = node.analysis_id
-
             template_node = get_node_subclass_or_404(request.user, node.id)
-            parents = template_node.analysisnode_ptr.parents().filter(id__in=old_new_map).values_list('id', flat=True)
+            parents = list(template_node.analysisnode_ptr.parents())
 
             clone_node = template_node.save_clone()
             clone_node.x += copy_x_offset
-            clone_node.y += 10
+            clone_node.y += copy_y_offset
             clone_node.status = NodeStatus.DIRTY
             clone_node.save()
             old_new_map[node.id] = clone_node
 
             clone_node.adjust_cloned_parents(old_new_map)
 
-            for parent_id in parents:
-                new_parent = old_new_map[parent_id]
+            # Parents copied alongside are swapped for their copies, the rest are shared with the original.
+            # Connecting via add_child leaves parents_changed alone, so the clone keeps cloned_from and its counts
+            for parent in parents:
+                new_parent = old_new_map.get(parent.pk, parent)
                 new_parent.add_child(clone_node)
-
-                edge = clone_node.get_connection_data(new_parent)
-                edges.append(edge)
+                edges.append(clone_node.get_connection_data(new_parent))
 
             if not clone_node.is_valid:
                 clone_node.count = None
