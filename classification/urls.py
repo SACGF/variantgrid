@@ -222,10 +222,6 @@ urlpatterns = [
     # discordance reports just redirects to overlaps now, path kept here so old links work
     path('discordance_reports', discordance_reports_view, name='discordance_reports'),
 
-    # path('discordance_reports/<str:lab_id>', discordance_reports_view, name='discordance_reports'),
-    # path('discordance_reports/<str:lab_id>/history_detail', discordance_reports_history_detail, name='discordance_reports_history_detail'),
-    # path('discordance_reports/<str:lab_id>/active_detail', discordance_reports_active_detail, name='discordance_reports_active_detail'),
-    # path('discrodance_reports/<str:lab_id>/download', discordance_reports_download, name='discordance_reports_download'),
     # 'classification' is redundant but there'll be other references to these URLs, so keep the URLs valid
     path('classification/discordance_report/<int:discordance_report_id>', discordance_report_view, name='discordance_report_deprecated'),
     path('classification/discordance_report/<int:discordance_report_id>/review', discordance_report_review, name='discordance_report_review'),
