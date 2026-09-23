@@ -1,6 +1,7 @@
 """Splice event identity - the canonical label, the alt encoding, and how a junction gets its name."""
 from django.test import TestCase
 
+from annotation.fake_annotation import get_fake_annotation_version
 from genes.gene_splice import (
     SPLICE_STRING_PATTERN,
     SpliceEventResolver,
@@ -13,13 +14,14 @@ from genes.gene_splice import (
 )
 from genes.models import HGNC, GeneLevelId, GeneSymbol, HGNCImport, SpliceEvent
 from genes.models_enums import HGNCStatus
-from genes.tests.gene_level_test_utils import create_splice_event_variant
+from genes.tests.gene_level_test_utils import create_splice_event_variant, make_release_gene
 from library.genomics.vcf_enums import GeneIdNamespace, GeneLevelSymbolicAlt
 from snpdb.models import GenomeBuild, Variant, VariantCoordinate
 
 AR_HGNC_ID = 644
 EGFR_HGNC_ID = 3236
 MET_HGNC_ID = 7029
+NOTCH2_HGNC_ID = 7882
 
 
 class SpliceAltTest(TestCase):
@@ -162,6 +164,64 @@ class SpliceEventResolutionTest(TestCase):
     def test_a_junction_we_have_no_name_for_displays_its_label(self):
         SpliceEvent.objects.filter(label="v_7").delete()
         self.assertEqual("AR-V7 splice", create_splice_event_variant("AR", "V7").display)
+
+
+class SpliceJunctionResolutionTest(TestCase):
+    """ A junction whose caller names no gene - SpliceGirl's <DEL> from POS to END """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.genome_build = GenomeBuild.grch37()
+        hgnc_import = HGNCImport.objects.create()
+        for pk, symbol in [(AR_HGNC_ID, "AR"), (NOTCH2_HGNC_ID, "NOTCH2"), (900, "OVER_A"), (901, "OVER_B")]:
+            GeneSymbol.objects.get_or_create(symbol=symbol)
+            HGNC.objects.create(pk=pk, gene_symbol_id=symbol, hgnc_import=hgnc_import,
+                                status=HGNCStatus.APPROVED, approved_name=f"{symbol} approved name")
+
+        annotation_version = get_fake_annotation_version(cls.genome_build)
+        release = annotation_version.variant_annotation_version.gene_annotation_release
+        cls.notch2_gene = make_release_gene(cls.genome_build, release, "ENSG00000134250", "NOTCH2",
+                                            "ENST00000256646.1", "1", 120_460_000, hgnc_id=NOTCH2_HGNC_ID)
+        # Overlapping genes: 150,005,000-150,010,000 is in both, 150,010,001-150,015,000 only in OVER_B
+        make_release_gene(cls.genome_build, release, "ENSG00000000011", "OVER_A",
+                          "ENST00000000011.1", "1", 150_000_000, hgnc_id=900)
+        make_release_gene(cls.genome_build, release, "ENSG00000000012", "OVER_B",
+                          "ENST00000000012.1", "1", 150_005_000, hgnc_id=901)
+
+    def setUp(self):
+        self.resolver = SpliceEventResolver(self.genome_build)
+
+    def test_seeded_junction_needs_no_gene_name(self):
+        resolved = self.resolver.resolve_junction("chrX", 66905968, 66914514)
+        self.assertEqual(f"<SPLICE:HGNC:{AR_HGNC_ID}:V_7>", resolved.alt)
+
+    def test_breakpoints_are_taken_in_genomic_order(self):
+        self.assertEqual(self.resolver.resolve_junction("chrX", 66905968, 66914514),
+                         self.resolver.resolve_junction("chrX", 66914514, 66905968))
+
+    def test_unnamed_junction_takes_the_gene_at_its_donor(self):
+        resolved = self.resolver.resolve_junction("chr1", 120464432, 120465258)
+        contig = self.genome_build.chrom_contig_mappings["chr1"]
+        self.assertEqual(NOTCH2_HGNC_ID, resolved.gene.pk)
+        self.assertEqual(coordinate_label(self.genome_build, contig, 120464432, 120465258), resolved.label)
+        self.assertEqual({self.notch2_gene.pk}, set(resolved.gene.genes.values_list("pk", flat=True)))
+
+    def test_no_gene_at_the_junction_is_unresolved(self):
+        self.assertIsNone(self.resolver.resolve_junction("chr1", 1000, 2000))
+
+    def test_overlapping_genes_are_decided_by_the_acceptor(self):
+        resolved = self.resolver.resolve_junction("chr1", 150_006_000, 150_012_000)
+        self.assertEqual(901, resolved.gene.pk)
+        self.assertIsNone(self.resolver.resolve_junction("chr1", 150_006_000, 150_008_000),
+                          "both genes span the whole junction - picking one would be a guess")
+
+    def test_a_del_expanded_to_sequence_resolves_like_the_symbolic_one(self):
+        """ VG3 wrote the sub-1 kb <DEL>s out as explicit sequence, so the END comes off the ref """
+        symbolic = VariantCoordinate(chrom="X", position=66905968, ref="T", alt="<DEL>", svlen=-8546)
+        explicit = VariantCoordinate(chrom="X", position=66905968, ref="T" * 8547, alt="T")
+        expected = self.resolver.resolve_junction("X", 66905968, 66914514)
+        self.assertEqual(expected, self.resolver.resolve_variant_coordinate(symbolic))
+        self.assertEqual(expected, self.resolver.resolve_variant_coordinate(explicit))
 
 
 class SpliceStringResolutionTest(TestCase):

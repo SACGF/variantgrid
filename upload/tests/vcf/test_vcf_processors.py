@@ -132,24 +132,6 @@ class TestVCFProcessors(TestCase):
         self.assertEqual("SpliceGirl", vcf.source)
         self.assertIn("SpliceGirl 1.0.0.614", vcf.header, "Header text is kept either way")
 
-    def test_splicegirl_sample_field_overrides(self):
-        """ SpliceGirl reuses AD for splice-supporting reads and DP for *reference* reads, so binding
-            them by name gives empty allele depth, no VAF and a read depth column showing ref counts.
-            The ^SpliceGirl VCFSourceSettings row remaps them, making VAF = AD / (AD + DP) - which in
-            this caller's files is exactly INFO/ALTDEDUP / (ALTDEDUP + REFDEDUP). """
-
-        vcf_filename = os.path.join(self.TSO500_RNA_DIR, "ExampleSample_RNA_2600000001B_SpliceVariants.vcf")
-        fast_vcf_reader = cyvcf2.VCF(vcf_filename)
-        _upload_step, uploaded_vcf = self._create_fake_upload_step_and_vcf(vcf_filename, fast_vcf_reader)
-        vcf = uploaded_vcf.vcf
-
-        self.assertEqual("SpliceGirl 1.0.0.614", vcf.source)
-        self.assertIsNone(vcf.allele_depth_field, "AD isn't the packed ref,alt array cyvcf2 expects")
-        self.assertEqual("AD", vcf.alt_depth_field)
-        self.assertEqual("DP", vcf.ref_depth_field)
-        self.assertIsNone(vcf.read_depth_field, "DP here is reference reads, not total depth")
-        self.assertIsNone(vcf.allele_frequency_field, "VAF is derived, not read")
-
     @override_settings(VARIANT_SYMBOLIC_ALT_SIZE=1)
     def _process_splice_vcf(self):
         """ Runs every record through the processor, returning its (chrom, pos) list alongside it.
@@ -178,41 +160,12 @@ class TestVCFProcessors(TestCase):
     def _vaf(cohort_genotype, index) -> float:
         return float(cohort_genotype[index].strip("{}"))
 
-    def test_splicegirl_derived_vaf(self):
-        positions, processor = self._process_splice_vcf()
-        self.assertEqual(18, len(positions), "All 18 splice records processed")
-        self.assertEqual(18, len(processor.cohort_genotypes))
-
-        vaf_index = processor.cohort_gt_vaf_index
-        vaf_by_position = {}
-        for position, cohort_genotype in zip(positions, processor.cohort_genotypes):
-            vaf_by_position.setdefault(position, []).append(self._vaf(cohort_genotype, vaf_index))
-
-        # EGFRvIII: ALTDEDUP=64, REFDEDUP=1
-        self.assertAlmostEqual(64 / 65, vaf_by_position[("chr7", 55087058)][0], places=3)
-        # MET exon 14 skipping: ALTDEDUP=91, REFDEDUP=1
-        self.assertAlmostEqual(91 / 92, vaf_by_position[("chr7", 116411708)][0], places=3)
-        # AR-V7: ALTDEDUP=27, REFDEDUP=573 - the junction ratio of a real call, well under any VAF cutoff
-        self.assertAlmostEqual(27 / 600, vaf_by_position[("chrX", 66905968)][0], places=3)
-        # Background call: ALTDEDUP=1, REFDEDUP=80
-        self.assertAlmostEqual(1 / 81, vaf_by_position[("chr1", 120464432)][0], places=3)
-
-    def test_splicegirl_allele_depth_is_alt_reads(self):
-        positions, processor = self._process_splice_vcf()
-        allele_depth_index = COHORT_GENOTYPE_HEADER.index("samples_allele_depth") \
-            - BulkGenotypeVCFProcessor.COHORT_GT_NUM_ADDED_FIELDS
-        read_depth_index = COHORT_GENOTYPE_HEADER.index("samples_read_depth") \
-            - BulkGenotypeVCFProcessor.COHORT_GT_NUM_ADDED_FIELDS
-
-        by_position = dict(zip(positions, processor.cohort_genotypes))
-        egfr = by_position[("chr7", 55087058)]
-        self.assertEqual("{64}", egfr[allele_depth_index], "Allele depth is AD (alt reads)")
-        self.assertIsNone(egfr[read_depth_index], "Read depth not populated from DP (reference reads)")
-
-    def test_splicegirl_shared_locus_is_recorded(self):
-        """ chr2:47637511 appears twice with different END. process_entry keys the locus on
-            (CHROM, POS, ref), so both join one locus and their depths sum - each record's VAF comes
-            out 1/182 rather than 1/91. Accepted, but recorded so it stays reconstructable. """
+    def test_shared_locus_is_recorded(self):
+        """ SpliceGirl's chr2:47637511 appears twice with different END. Read as a plain VCF,
+            process_entry keys the locus on (CHROM, POS, ref), so both join one locus and their depths
+            sum - each record's VAF comes out 1/182 rather than 1/91. Recorded so it stays
+            reconstructable. (A SpliceGirl upload is claimed by upload.tasks.import_splicegirl_vcf_task,
+            where they are two junctions) """
 
         positions, processor = self._process_splice_vcf()
         vaf_index = processor.cohort_gt_vaf_index

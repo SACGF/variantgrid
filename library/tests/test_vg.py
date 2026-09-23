@@ -9,7 +9,7 @@ from pathlib import Path
 
 from django.test import SimpleTestCase
 
-from library.vg import docs
+from library.vg import css, docs
 from library.vg import inspect as inspect_pkg
 from library.vg.import_graph import (
     ImportGraph,
@@ -304,3 +304,41 @@ class InspectRenderTest(SimpleTestCase):
     def test_unknown_kind_is_a_lookup_error(self):
         with self.assertRaises(LookupError):
             inspect_pkg.inspect("planet", "1")
+
+
+class CssUnusedTest(SimpleTestCase):
+    """ `vg css unused`: which selectors a stylesheet declares and what counts as naming one (library/vg/css.py) """
+
+    def test_selectors_come_from_rule_openers_and_continuations_not_values_or_comments(self):
+        with tempfile.NamedTemporaryFile("w", suffix=".scss", dir=REPO_ROOT / "library", delete=False) as f:
+            f.write("""
+                // .commented-out { }
+                /* .block-commented,
+                   .still-commented { } */
+                .card, #main > .body,
+                .continued { color: #fff; background: url(x.png); }
+                table.grid { .cell { &:hover { .inner-hover { } } } }
+                $var: .not-a-selector;
+                @media (max-width: 600px) { .narrow { } }
+            """)
+        self.addCleanup(Path(f.name).unlink)
+        found = css.selectors_in(Path(f.name))
+        self.assertEqual(sorted(name for _, name in found), ["body", "card", "cell", "continued", "grid", "inner-hover", "main", "narrow"])
+        self.assertEqual(found[("class", "continued")].locations[0][1], 6)
+
+    def test_whole_token_match_dynamic_prefix_and_library_owned(self):
+        self.assertEqual(css.classify("cs-r", {"cs-report"}), "unused")  # a substring of cs-report is not a mention
+        tokens = {"cs-", "crit-strength-", "used", "flag-classification_"}
+        self.assertEqual(css.classify("used", tokens), "used")
+        self.assertEqual(css.classify("cs-vus_a", tokens), "dynamic")
+        self.assertEqual(css.classify("crit-strength-3", tokens), "dynamic")
+        self.assertEqual(css.classify("flag-classification_withdrawn", tokens), "dynamic")
+        self.assertEqual(css.classify("errorlist", tokens), "library")
+        self.assertEqual(css.classify("hiseq-2000", tokens), "unused")
+
+    def test_tokens_include_the_stem_of_a_built_up_name(self):
+        with tempfile.NamedTemporaryFile("w", suffix=".html", dir=REPO_ROOT / "library", delete=False) as f:
+            f.write('<span class="cs-{{ status }} crit-strength-${n} {{ "share-level-" + level }}">')
+        self.addCleanup(Path(f.name).unlink)
+        tokens = css.source_tokens([Path(f.name)])
+        self.assertTrue({"cs-", "crit-strength-", "share-level-"} <= tokens)

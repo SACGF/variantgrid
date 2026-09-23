@@ -212,9 +212,6 @@ URLS_NAME_REGISTER.update({  # Disable selected snpdb urls
     "api_specimen-detail": False,
     "api_extraction-list": False,
     "api_extraction-detail": False,
-    "api_specimen_measure-list": False,
-    "api_specimen_measure-detail": False,
-    "api_specimen_measure_bulk_create": False,
 
     "gene_lists": False,
     "genes": False,

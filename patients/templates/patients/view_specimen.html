@@ -75,10 +75,10 @@
         {% endif %}
 
         <hr/>
-        <h4>Measures</h4>
+        <h4>Pathology</h4>
         {% if measures %}
             <table class="table">
-                <thead><tr><th>Measure<th>Value<th>Call<th>Method<th>Measured</tr></thead>
+                <thead><tr><th>Measure<th>Value<th>Call<th>Method<th>Updated</tr></thead>
                 <tbody>
                 {% for measure in measures %}
                     <tr>
@@ -86,13 +86,21 @@
                         <td>{{ measure.value|default_if_none:"-" }} {{ measure.unit|default:"" }}
                         <td>{{ measure.call|default:"-" }}
                         <td>{{ measure.method|default:"-" }}
-                        <td>{{ measure.measured_date|default_if_none:"-" }}
+                        <td>{{ measure.modified }}
                     </tr>
                 {% endfor %}
                 </tbody>
             </table>
         {% else %}
-            <p>No measures recorded for this specimen.</p>
+            <p>No pathology measures recorded for this specimen.</p>
+        {% endif %}
+
+        <hr/>
+        <h4>Sequencing analyses</h4>
+        {% if combined_variant_outputs %}
+            {% include "seqauto/combined_variant_output_table.html" %}
+        {% else %}
+            <p>No DRAGEN CombinedVariantOutput recorded for this specimen.</p>
         {% endif %}
 
         <hr/>

@@ -45,9 +45,10 @@ from classification.models.classification_report_models import describe_tick_whe
 from classification.report.case_report_builder import build_case_report, preview_case_report_html
 from classification.report.case_report_context import (
     build_report_variants,
+    case_combined_variant_output,
+    case_measures,
     case_specimen,
     specimen_library_qc,
-    specimen_measures,
 )
 from classification.views.views import classification_created_response, create_classification_object
 from patients.models import Extraction, Patient, Specimen
@@ -327,7 +328,7 @@ def case_report_build_dialog(request, case_type: str, case_id: int):
 
     draft = case.latest_draft_report()
     specimen = case_specimen(case.source_level, case.obj)
-    measures = specimen_measures(specimen)
+    measures = case_measures(case_combined_variant_output(case.samples, specimen), specimen)
     library_qc = specimen_library_qc(specimen)
     lab, lab_error = UserSettings.get_lab_and_error(request.user)
     context = {

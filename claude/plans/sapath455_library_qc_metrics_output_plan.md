@@ -4,7 +4,7 @@ Written by Claude Fable 5.1 (claude-fable-5-1), 2026-09-22
 Status: landed 181b8df16 - sapath settings and the NGS-pipelines plan alongside; the sapath report-template step 6 remains
 
 [sapath#455](https://github.com/SACGF/variantgrid_sapath/issues/455), phase 2 of #454
-(`claude/plans/sapath454_multi_report_tick_measures_plan.md`, landed). Phase 1 put the measure behind the TMB, MSI and
+(landed). Phase 1 put the measure behind the TMB, MSI and
 Purity checkboxes on the TSO 500 Build report form. The other five flags mean "did DRAGEN's library QC pass for that
 category", which lives in a file we do not import: *MetricsOutput.tsv*, written per pair beside the
 CombinedVariantOutput. This plan imports it, stores one row per library per QC category, and lets a `case_field`

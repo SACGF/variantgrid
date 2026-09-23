@@ -85,6 +85,14 @@ class LibraryQCAdmin(ModelAdminBasics):
     search_fields = ("pair_id", "specimen_reference", "sequencing_run_name")
 
 
+@admin.register(models.DragenTSO500CombinedVariantOutput)
+class DragenTSO500CombinedVariantOutputAdmin(ModelAdminBasics):
+    list_display = ("id", "sequencing_run_name", "pair_id", "total_tmb", "percent_unstable_msi_sites",
+                    "genomic_instability_score", "specimen", "specimen_match_status", "output_datetime")
+    list_filter = ("specimen_match_status", "module_version")
+    search_fields = ("pair_id", "dna_sample_name", "rna_sample_name", "specimen_reference", "sequencing_run_name")
+
+
 @admin.register(models.SequencingSample)
 class SequencingSampleAdmin(ModelAdminBasics):
     """ list_filter on extraction_match_status is the cheapest 'show me everything needing attention' """

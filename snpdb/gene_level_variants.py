@@ -17,6 +17,18 @@ fusion turns up with different breakpoints in different reads of the same sample
 number call is the same shape (#1836): "EGFR amplification" is the gene and the direction, and the
 segment a caller writes is the panel's target window rather than the event.
 
+A splice call (#1903) is the odd one: it *has* coordinates - SpliceGirl writes each junction as a <DEL>
+from one exon boundary to the next - yet it is gene-level too, because the event is an RNA isoform
+("AR-V7", "MET exon 14 skipping"), not a change to the genome between those positions. Stored as the
+<DEL> it would be a genomic deletion to everything that reads a Variant honestly - VEP consequences,
+an autopopulated c.HGVS, a Shariant upload - and "this deletion is really an RNA junction" would be an
+exception threaded through the report, the classification form, search and the sync, keyed on which
+VCF the sample came from. Gene-level puts the kind in the alt, where get_gene_level_q already guards
+everything for fusions and copy number calls. The breakpoints are observation data and ride along in
+the record's INFO; their real costs are no IGV view of the junction, and a junction in no gene (or
+ambiguously in two) is skipped by the loader. That trade-off was weighed against keeping the <DEL>
+and converting at report time, and decided for gene-level (SACGF/variantgrid_sapath#458).
+
 
 ## Why they are stored as Variants anyway
 

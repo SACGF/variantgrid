@@ -12,6 +12,7 @@ issued. @see classification/report/case_report_context.py for what the templates
 """
 import logging
 import os
+from dataclasses import dataclass
 from typing import Optional
 
 import django.dispatch
@@ -26,13 +27,13 @@ from classification.enums import AlleleOriginBucket
 from classification.models.classification import ClassificationModification
 from classification.report.template_validation import validate_case_template
 from library.case_report_delivery import CaseReportDelivery
-from patients.models import Extraction, Patient, Specimen, SpecimenMeasure
+from patients.models import Extraction, Patient, Specimen, measure_value_description
 from patients.models_enums import (
     MEASURE_CONTEXT_KEYS,
     SampleSourceLevel,
 )
 from seqauto.models import LibraryQC
-from seqauto.models.models_enums import LIBRARY_QC_CONTEXT_KEYS
+from seqauto.models.models_enums import CVO_MEASURE_CONTEXT_KEYS, LIBRARY_QC_CONTEXT_KEYS
 from snpdb.models import Lab, Sample
 
 # A report has gone out with the case, so a deployment that files it somewhere else can now do so.
@@ -63,6 +64,26 @@ def get_case_report_deliveries(case_reports: list['CaseReport']) -> dict[int, li
     return deliveries
 
 
+@dataclass(frozen=True)
+class Measure:
+    """ One number a case report prints and a build form ticks from, whatever it came off - a sequencing
+        analysis' TMB or the pathologist's tumour content (@see case_report_context.case_measures) """
+    value: Optional[float]
+    unit: Optional[str]
+    call: Optional[str]
+    threshold: Optional[str]         # the policy in words, describe_bands(...)
+    threshold_source: Optional[str]  # whose policy - the settings that set it
+    method: str
+
+    @property
+    def value_description(self) -> str:
+        return measure_value_description(self.value, self.unit, self.call)
+
+
+# Every key a case_field's `measure` can name
+MEASURE_KEYS = frozenset(CVO_MEASURE_CONTEXT_KEYS) | frozenset(MEASURE_CONTEXT_KEYS.values())
+
+
 # What a bool case_field's `tick_when` can say about the measure it names. The form starts the tick
 # from the rule and the scientist adjusts it - the answer the report goes out with is still theirs.
 # A list of rules ticks when any one holds (a purity caveat off the pathologist's call or the number)
@@ -82,7 +103,7 @@ def _tick_when_rules(tick_when) -> list[dict]:
     return tick_when if isinstance(tick_when, list) else [tick_when]
 
 
-def _rule_holds(rule: dict, measure: SpecimenMeasure) -> Optional[bool]:
+def _rule_holds(rule: dict, measure: Measure) -> Optional[bool]:
     if (called := rule.get(TICK_WHEN_CALLED)) is not None:
         return bool(measure.call) == bool(called)
     if (call_in := rule.get(TICK_WHEN_CALL_IN)) is not None:
@@ -92,7 +113,7 @@ def _rule_holds(rule: dict, measure: SpecimenMeasure) -> Optional[bool]:
     return None
 
 
-def measure_tick(tick_when, measure: Optional[SpecimenMeasure]) -> Optional[bool]:
+def measure_tick(tick_when, measure: Optional[Measure]) -> Optional[bool]:
     """ Whether the rule a case_field states holds for the case's measure - None where the case has
         no such measure, so the field's own default stands and the form says there is none """
     if measure is None:
@@ -162,7 +183,7 @@ def describe_tick_when(tick_when, unit: Optional[str] = None) -> str:
 def validate_case_fields(case_fields: list) -> Optional[str]:
     """ What a template's JSON has to get right for a measure to reach the form - the keys are hand
         written in admin, so a typo says so at save time rather than silently ticking nothing """
-    measure_keys = set(MEASURE_CONTEXT_KEYS.values())
+    measure_keys = MEASURE_KEYS
     qc_keys = set(LIBRARY_QC_CONTEXT_KEYS.values())
     for field in case_fields or []:
         if not isinstance(field, dict):
@@ -202,7 +223,7 @@ class ClassificationReportTemplate(TimeStampedModel):
     # Case level inputs the build form asks for, so a deployment adds them without a schema change:
     # [{"key", "label", "type": "text"|"bool"|"choice", "options": [...], "default", "group",
     #   "prefill_key": the evidence key the form starts the field from,
-    #   "measure": the SpecimenMeasure shown beside a bool field (a MEASURE_CONTEXT_KEYS value),
+    #   "measure": the Measure shown beside a bool field (a MEASURE_KEYS value),
     #   "qc": the LibraryQC category shown beside a bool field instead (a LIBRARY_QC_CONTEXT_KEYS value),
     #   "tick_when": the rule (or list of rules, any of which) that field's tick starts from - @see tick_for}]
     case_fields = models.JSONField(default=list, blank=True)
@@ -310,8 +331,8 @@ class CaseReport(TimeStampedModel):
         with a DNA and an RNA arm is reported from the specimen the measures hang off.
 
         Everything the templates saw is kept in context_snapshot, so the documents can be re-rendered
-        after a template fix and the report's numbers stay answerable even though a SpecimenMeasure
-        resend replaces the row they came from. """
+        after a template fix and the report's numbers stay answerable even though the pathologist's
+        tumour content can be re-sent over the row it came from. """
     template = models.ForeignKey(ClassificationReportTemplate, on_delete=PROTECT)
     lab = models.ForeignKey(Lab, on_delete=CASCADE)
     user = models.ForeignKey(User, on_delete=PROTECT)

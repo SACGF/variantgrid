@@ -19,7 +19,7 @@ from library.genomics.vcf_utils import (
 from snpdb.gene_level_variants import GENE_LEVEL_CONTIG_NAME
 from snpdb.models import CohortGenotype, GenomeBuild, ImportSource, Variant
 from snpdb.tests.utils.fake_cohort_data import create_fake_cohort
-from upload.import_task_factories.import_task_factory import get_import_task_factories
+from upload.import_task_factories.import_task_factory import get_import_task_factory_from_extension
 from upload.models import (
     FileUpload,
     ModifiedImportedVariant,
@@ -48,13 +48,12 @@ GENE_LEVEL_CNV_VCF = os.path.join(settings.BASE_DIR, "upload", "test_data", "vcf
 
 class TestGeneLevelCNVFactory(TestCase):
 
-    def test_claims_a_segment_field_vcf_over_a_plain_one(self):
-        factories = {type(f).__name__: f for f in get_import_task_factories()}
-        gene_level = factories["GeneLevelCNVImportTaskFactory"]
-        genotype = factories["GenotypeVCFImportFactory"]
+    def test_upload_picks_the_cnv_loader_off_the_segment_field(self):
+        """ The pipeline and the upload page both send it as a plain VCF - the segment field in the
+            header is what routes it """
         user = User.objects.get_or_create(username='testuser')[0]
-        self.assertGreater(gene_level.get_processing_ability(user, TSO500_CNV_VCF, "vcf"),
-                           genotype.get_processing_ability(user, TSO500_CNV_VCF, "vcf"))
+        factory = get_import_task_factory_from_extension(user, TSO500_CNV_VCF, "vcf")
+        self.assertEqual(UploadedFileTypes.GENE_LEVEL_CNV_VCF, factory.get_uploaded_file_type())
 
     def test_a_gene_named_on_exon_level_calls_is_not_a_segment(self):
         """ DragenExonCNV writes GENE=BRCA1 on partial-gene calls - those stay coordinate SVs """

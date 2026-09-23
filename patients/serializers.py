@@ -21,12 +21,11 @@ from patients.external_references import (
     resolve_reference,
 )
 from patients.models import (
-    Extraction,
     ExternalModelManager,
     ExternalPK,
+    Extraction,
     Patient,
     Specimen,
-    SpecimenMeasure,
 )
 
 
@@ -216,69 +215,3 @@ class ExtractionSerializer(ExternallyManagedModelSerializer):
         if reference_id := validated_data.get("reference_id"):
             return Q(specimen=validated_data["specimen"], reference_id=reference_id)
         return None
-
-
-class SpecimenMeasureFieldsSerializer(serializers.ModelSerializer):
-    """ A measure without its specimen - the bulk call names that once, for the whole list """
-    extraction = ExternalReferenceField(required=False)
-
-    class Meta:
-        model = SpecimenMeasure
-        fields = ("id", "extraction", "measure_type", "value", "unit", "call", "threshold",
-                  "threshold_source", "method", "source_payload", "measured_date")
-        read_only_fields = ("id",)
-
-    def validate_extraction(self, reference: ExternalReference) -> Extraction:
-        return resolve_or_raise(Extraction, reference, self.context["request"].user)
-
-
-class SpecimenMeasureSerializer(SpecimenMeasureFieldsSerializer):
-    """ #1559 - a scalar measured on the material, transcribed by the client out of vendor output """
-    specimen = ExternalReferenceField()
-
-    class Meta(SpecimenMeasureFieldsSerializer.Meta):
-        fields = ("specimen",) + SpecimenMeasureFieldsSerializer.Meta.fields
-
-    def validate_specimen(self, reference: ExternalReference) -> Specimen:
-        return resolve_or_raise(Specimen, reference, self.context["request"].user)
-
-    def create(self, validated_data):
-        """ A measure has no row to live on without its specimen, so an unresolvable one is a 400 -
-            unlike a VCF naming an extraction, which parks on the sample it already created.
-
-            A re-post replaces: there is one current MSI for a specimen, and the report wants that
-            rather than a history to choose from. TimeStampedModel.modified records when it changed """
-        return upsert_specimen_measure(validated_data.pop("specimen"), validated_data,
-                                       self.context["request"].user)
-
-    def update(self, instance, validated_data):
-        instance.specimen.check_can_write(self.context["request"].user)
-        validated_data["user"] = self.context["request"].user
-        return super().update(instance, validated_data)
-
-
-def upsert_specimen_measure(specimen: Specimen, validated_data: dict, user) -> SpecimenMeasure:
-    specimen.check_can_write(user)
-    defaults = {**validated_data, "specimen": specimen, "user": user}
-    measure, _ = SpecimenMeasure.objects.update_or_create(specimen=specimen,
-                                                          measure_type=validated_data["measure_type"],
-                                                          defaults=defaults)
-    return measure
-
-
-class SpecimenMeasureBulkCreateSerializer(serializers.Serializer):
-    """ A run's TMB, MSI, GIS, tumour fraction and ploidy post in one call, all against one specimen """
-    specimen = ExternalReferenceField()
-    measures = SpecimenMeasureFieldsSerializer(many=True)
-
-    def validate_specimen(self, reference: ExternalReference) -> Specimen:
-        return resolve_or_raise(Specimen, reference, self.context["request"].user)
-
-    def create(self, validated_data):
-        specimen = validated_data["specimen"]
-        user = self.context["request"].user
-        measures = []
-        with transaction.atomic():
-            for measure_data in validated_data["measures"]:
-                measures.append(upsert_specimen_measure(specimen, measure_data, user))
-        return {"specimen": specimen, "measures": measures}

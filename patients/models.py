@@ -593,31 +593,38 @@ class ExtractionMatchMixin(models.Model):
         return True
 
 
-class SpecimenMeasure(GuardianPermissionsMixin, TimeStampedModel):
-    """ A scalar measured on the material rather than on any one variant - TMB, MSI, GIS.
+def measure_value_description(value: Optional[float], unit: Optional[str], call: Optional[str]) -> str:
+    """ A number and the lab's call, worded the one way - the specimen grid lists it after the
+        measure's name, the case report build form shows it beside that measure's checkbox """
+    description = ""
+    if value is not None:
+        unit = unit or ""
+        separator = "" if unit in ("", "%") else " "
+        description = f"{value}{separator}{unit}"
+    if call:
+        description = f"{description} ({call})".strip()
+    return description
 
-        Both the score and the call are stored. HRD gives a genomic instability score and no
-        positive/negative call: the threshold that turns it into one is lab policy, not vendor output,
-        so without the raw value plus the threshold applied and by whom a later re-interpretation is
-        unreconstructable. Mirrors somatic:tmb_value beside somatic:tmb_status in the evidence keys. """
+
+class SpecimenMeasure(GuardianPermissionsMixin, TimeStampedModel):
+    """ A scalar measured on the material itself rather than by sequencing it - the pathologist's tumour
+        content. A sequencing analysis' numbers are that analysis' own record
+        (seqauto.models.DragenTSO500CombinedVariantOutput), since a re-analysis changes them.
+
+        Written by whatever holds the lab's pathology (SA Path's Mocha sync), with the source's own
+        record in source_payload so 'which report' stays answerable. """
     specimen = models.ForeignKey(Specimen, on_delete=CASCADE)
-    # Which arm produced the number - enrichment, since the measure describes the specimen
-    extraction = models.ForeignKey(Extraction, null=True, blank=True, on_delete=SET_NULL)
     measure_type = models.CharField(max_length=1, choices=SpecimenMeasureType.choices)
     value = models.FloatField(null=True, blank=True)
-    unit = models.TextField(null=True, blank=True)      # eg 'mut/Mb', '%'
-    call = models.TextField(null=True, blank=True)      # the lab's call - 'High', 'Stable'
-    threshold = models.TextField(null=True, blank=True)  # the threshold that produced the call
-    threshold_source = models.TextField(null=True, blank=True)  # whose policy set it
-    method = models.TextField(blank=True)               # tool and version the client transcribed from
-    source_payload = models.JSONField(default=dict, blank=True)  # raw, so 'which file' stays answerable
-    measured_date = models.DateTimeField(null=True, blank=True)
+    unit = models.TextField(null=True, blank=True)      # eg '%'
+    call = models.TextField(null=True, blank=True)      # the pathologist's call - 'No tumour'
+    method = models.TextField(blank=True)               # where it came from - 'Mocha'
+    source_payload = models.JSONField(default=dict, blank=True)  # the source's record, as sent
     user = models.ForeignKey(User, null=True, on_delete=SET_NULL)
 
     class Meta:
-        # One current value per measure - the report pulls these together and wants a single MSI, so a
-        # resend replaces rather than accumulating. Not keyed on the nullable extraction FK: Postgres
-        # treats nulls as distinct, so that would let a resend duplicate instead of updating
+        # One current value per measure - the report wants a single tumour content, so a resend
+        # replaces rather than accumulating
         unique_together = ("specimen", "measure_type")
 
     @classmethod
@@ -633,16 +640,7 @@ class SpecimenMeasure(GuardianPermissionsMixin, TimeStampedModel):
 
     @property
     def value_description(self) -> str:
-        """ The number and the lab's call, worded the one way - the specimen grid lists it after the
-            measure's name, the case report build form shows it beside that measure's checkbox """
-        description = ""
-        if self.value is not None:
-            unit = self.unit or ""
-            separator = "" if unit in ("", "%") else " "
-            description = f"{self.value}{separator}{unit}"
-        if self.call:
-            description = f"{description} ({self.call})".strip()
-        return description
+        return measure_value_description(self.value, self.unit, self.call)
 
     def __str__(self):
         return " ".join(filter(None, [self.get_measure_type_display(), self.value_description]))

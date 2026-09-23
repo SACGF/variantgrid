@@ -1,4 +1,4 @@
-"""Import of CombinedVariantOutput.tsv - the splice VCF the loader writes from it."""
+"""Import of CombinedVariantOutput.tsv - the pair's chain, its seqauto links and the analysis' record."""
 import os
 import tempfile
 
@@ -15,9 +15,15 @@ from genes.models_enums import HGNCStatus
 from library.genomics.vcf_enums import GeneIdNamespace, GeneLevelSymbolicAlt
 from library.genomics.vcf_writer import percent_decode_info_value
 from library.guardian_utils import assign_permission_to_user_and_groups
-from patients.models import Extraction, Patient, Specimen, SpecimenMeasure
-from patients.models_enums import MatchStatus, NucleicAcid, SpecimenMeasureType
-from seqauto.models import SampleFromSequencingSample, VCFFromSequencingRun
+from patients.models import Extraction, Patient, Specimen
+from patients.models_enums import MatchStatus, NucleicAcid
+from patients.tasks.extraction_matching_tasks import link_combined_variant_outputs
+from seqauto.models import (
+    DragenTSO500CombinedVariantOutput,
+    SampleFromSequencingSample,
+    VCFFromSequencingRun,
+    band_call,
+)
 from seqauto.tests.test_extraction_link import make_sample_sheet, make_sequencing_run
 from snpdb.gene_level_variants import GENE_LEVEL_CONTIG_NAME
 from snpdb.models import VCF, GenomeBuild, ImportSource, Sample, VCFSourceSettings
@@ -56,14 +62,13 @@ from upload.tso500.dragen_combined_variant_output_parser import (
 )
 from upload.tso500.dragen_combined_variant_output_records import (
     CombinedVariantOutputIdentityError,
-    band_call,
     link_samples_to_extractions,
     link_to_sequencing_run,
-    measured_date,
     parse_pair_identifiers,
     resolve_pair,
-    write_specimen_measures,
+    write_combined_variant_output,
 )
+from upload.upload_metadata import SEQUENCING_RUN
 
 TSO500_PAIR_DIR = os.path.join(settings.BASE_DIR, "upload", "test_data", "tso500",
                                "ExampleSample_2600000001")
@@ -130,109 +135,28 @@ class TestCombinedVariantOutputParser(TestCase):
                                                        "fake_kit.GeneTable.tsv")))
 
 
-class TestSpliceVariantVCF(TestCase):
-    """ The VCF the loader writes - what the standard insert pipeline then consumes """
+class TestSampleVCF(TestCase):
+    """ The VCF the loader writes - no variants, only the RNA arm's Sample for the rest of the file """
 
-    @classmethod
-    def setUpTestData(cls):
-        cls.genome_build = GenomeBuild.grch37()
-        hgnc_import = HGNCImport.objects.create()
-        cls.hgnc_ids = {}
-        for pk, symbol in [(644, "AR"), (3236, "EGFR"), (7029, "MET")]:
-            GeneSymbol.objects.get_or_create(symbol=symbol)
-            HGNC.objects.create(pk=pk, gene_symbol_id=symbol, hgnc_import=hgnc_import,
-                                status=HGNCStatus.APPROVED, approved_name=f"{symbol} approved name")
-            cls.hgnc_ids[symbol] = pk
-
-    def setUp(self):
-        self.user = User.objects.get_or_create(username='testuser')[0]
-        self.vcf_filename = os.path.join(settings.PRIVATE_DATA_ROOT, "splice_variants.vcf")
-        self.records = self._process()
-
-    def _process(self) -> list:
+    def test_names_the_rna_sample_and_the_module_and_has_no_records(self):
+        user = User.objects.get_or_create(username='testuser')[0]
+        vcf_filename = os.path.join(settings.PRIVATE_DATA_ROOT, "combined_variant_output.vcf")
         file_upload = FileUpload.objects.create(path=COMBINED_VARIANT_OUTPUT,
                                                 import_source=ImportSource.COMMAND_LINE,
-                                                user=self.user,
+                                                user=user,
                                                 name="ExampleSample_2600000001_CombinedVariantOutput.tsv",
-                                                file_type=UploadedFileTypes.DRAGEN_TSO500_COMBINED_VARIANT_OUTPUT,
-                                                metadata={"genome_build": "GRCh37"})
+                                                file_type=UploadedFileTypes.DRAGEN_TSO500_COMBINED_VARIANT_OUTPUT)
         upload_pipeline = UploadPipeline.objects.create(file_upload=file_upload)
         upload_step = UploadStep.objects.create(upload_pipeline=upload_pipeline,
-                                                name="Create Splice Variant VCF", sort_order=0,
+                                                name="Create Sample VCF", sort_order=0,
                                                 input_filename=COMBINED_VARIANT_OUTPUT,
-                                                output_filename=self.vcf_filename)
-        rows = DragenTSO500CombinedVariantOutputCreateVCFTask.process_items(upload_step)
-        self.assertEqual(EXPECTED_SPLICE_ROWS, rows)
-        self.reader = cyvcf2.VCF(self.vcf_filename)
-        return list(self.reader)
+                                                output_filename=vcf_filename)
+        DragenTSO500CombinedVariantOutputCreateVCFTask.process_items(upload_step)
 
-    def test_header_names_the_rna_sample_and_the_module(self):
-        """ The splice caller runs on the RNA arm, and '##source' is what VCFSourceSettings match """
-        self.assertEqual(["ExampleSample_RNA_2600000001B"], self.reader.samples)
-        self.assertIn("DRAGEN TSO500 CombinedVariantOutput 2.1.1", self.reader.raw_header)
-
-    def test_records_are_gene_level_splice_alts(self):
-        self.assertEqual(EXPECTED_SPLICE_ROWS, len(self.records))
-        for record in self.records:
-            self.assertEqual(GENE_LEVEL_CONTIG_NAME, record.CHROM)
-            kind, namespace, _gene_id, label = GeneLevelSymbolicAlt.parse(record.ALT[0])
-            self.assertEqual(GeneLevelSymbolicAlt.SPLICE, kind)
-            self.assertEqual(GeneIdNamespace.HGNC, namespace)
-            self.assertTrue(label)
-
-    def test_seeded_junctions_get_their_label(self):
-        """ The canonical label, upper-cased on the alt as a Sequence is """
-        alts = {record.ALT[0] for record in self.records}
-        self.assertEqual({f"<SPLICE:HGNC:{self.hgnc_ids['AR']}:V_7>",
-                          f"<SPLICE:HGNC:{self.hgnc_ids['EGFR']}:V_III>",
-                          f"<SPLICE:HGNC:{self.hgnc_ids['MET']}:EXON_14_SKIPPING>"}, alts)
-
-    def _by_splice(self) -> dict:
-        """ INFO values are stored as the VCF wrote them - a space is percent encoded, so decode """
-        return {percent_decode_info_value(record.INFO.get(SPLICE_INFO)): record
-                for record in self.records}
-
-    def test_position_is_the_gene(self):
-        self.assertEqual(self.hgnc_ids["AR"], self._by_splice()["AR-V7 splice"].POS)
-
-    def test_read_support_is_the_junction_and_the_reference_transcript(self):
-        """ A caller asserts the junction is present, so there is no GT - the sample column holds
-            how many reads crossed it and how many crossed the reference transcript """
-        support = {}
-        for splice, record in self._by_splice().items():
-            self.assertEqual([ALT_READS_FORMAT, REF_READS_FORMAT], record.FORMAT)
-            support[splice] = (int(record.format(ALT_READS_FORMAT).flatten()[0]),
-                               int(record.format(REF_READS_FORMAT).flatten()[0]))
-        self.assertEqual({"AR-V7 splice": (27, 573), "EGFRvIII splice": (64, 1), "MET exon 14 skipping": (91, 1)}, support)
-
-    def test_the_callers_row_rides_along_in_info(self):
-        encoded = self._by_splice()["MET exon 14 skipping"].INFO.get(SPLICE_OBSERVATION_INFO)
-        observation = simplejson.loads(percent_decode_info_value(encoded))
-        self.assertEqual("chr7:116411708", observation[BREAKPOINT_1])
-        self.assertEqual("14", observation[AFFECTED_EXON])
-
-    def test_unnamed_junction_is_labelled_with_its_breakpoints(self):
-        """ A junction no SpliceEvent names still imports - the label is its breakpoints in the
-            build they were called in, which reads as raw coordinates on a report """
-        splice_event = SpliceEvent.objects.get(genome_build=self.genome_build, label="v_7")
-        contig = splice_event.contig
-        splice_event.delete()
-
-        records = self._process()
-        expected = coordinate_label(self.genome_build, contig, 66905968, 66914514)
-        self.assertIn(f"<SPLICE:HGNC:{self.hgnc_ids['AR']}:{expected.upper()}>",
-                      {record.ALT[0] for record in records})
-
-    def test_source_settings_bind_read_support_as_depth(self):
-        """ The ^DRAGEN TSO500 CombinedVariantOutput row makes ALT_READS/REF_READS the depths the
-            sample node and VAF use, and with no GT in the header nothing binds a genotype """
-        vcf = VCF(source="DRAGEN TSO500 CombinedVariantOutput 2.1.1", genotype_samples=1)
-        for vss in VCFSourceSettings.get_for_source(vcf.source):
-            vss.apply_sample_field_overrides(vcf)
-        self.assertEqual(ALT_READS_FORMAT, vcf.alt_depth_field)
-        self.assertEqual(REF_READS_FORMAT, vcf.ref_depth_field)
-        self.assertTrue(vcf.has_depth)
-        self.assertFalse(vcf.has_genotype)
+        reader = cyvcf2.VCF(vcf_filename)
+        self.assertEqual(["ExampleSample_RNA_2600000001B"], reader.samples)
+        self.assertIn("DRAGEN TSO500 CombinedVariantOutput 2.1.1", reader.raw_header)
+        self.assertEqual([], list(reader), "the splice calls come from SpliceVariants.vcf (#1903)")
 
 
 # The bands SA Path reports against, as its settings state them
@@ -379,42 +303,88 @@ class TestCombinedVariantOutputRecords(TestCase):
         self.assertIsNone(link_to_sequencing_run(sample.vcf, sample, self.identifiers.rna.sample_id))
         self.assertFalse(VCFFromSequencingRun.objects.filter(vcf=sample.vcf).exists())
 
-    def test_the_pairs_measures_are_written_against_specimen_and_dna_arm(self):
-        resolved = resolve_pair(self.identifiers, self.user)
-        measures = write_specimen_measures(self.sections, resolved, self.identifiers, self.user,
-                                           method="DRAGEN TSO500 CombinedVariantOutput 2.1.1",
-                                           date=measured_date(self.analysis_details))
-        by_type = {m.measure_type: m for m in measures}
-        self.assertEqual({SpecimenMeasureType.TMB: 7.1, SpecimenMeasureType.MSI: 2.48,
-                          SpecimenMeasureType.GIS: 31.0, SpecimenMeasureType.TUMOUR_FRACTION: 0.62,
-                          SpecimenMeasureType.PLOIDY: 2.10},
-                         {measure_type: m.value for measure_type, m in by_type.items()})
-        tmb = by_type[SpecimenMeasureType.TMB]
-        self.assertEqual(resolved.specimen, tmb.specimen)
-        self.assertEqual(resolved.extractions[self.identifiers.dna.sample_id], tmb.extraction)
-        self.assertEqual("mut/Mb", tmb.unit)
-        self.assertEqual("1.27", tmb.source_payload["Coding Region Size in Megabases"])
+    def _write(self, sequencing_run_name="TSO500_CVO", sequencing_run=None, resolve=True):
+        resolved = resolve_pair(self.identifiers, self.user) if resolve else None
+        return write_combined_variant_output(self.sections, self.identifiers.pair_id, sequencing_run,
+                                             sequencing_run_name, self.user, resolved=resolved,
+                                             specimen_reference=self.identifiers.specimen_reference,
+                                             parked_error=None if resolve else "not accessioned")
 
-    def _write_measures(self) -> dict:
-        resolved = resolve_pair(self.identifiers, self.user)
-        measures = write_specimen_measures(self.sections, resolved, self.identifiers, self.user,
-                                           method="DRAGEN TSO500 CombinedVariantOutput 2.1.1")
-        return {m.measure_type: m for m in measures}
+    def test_the_analysis_is_recorded_with_its_specimen(self):
+        cvo = self._write()
+
+        self.assertEqual("5_C0000001_FCUP_2600000001", cvo.pair_id)
+        self.assertEqual(self.identifiers.dna.sample_id, cvo.dna_sample_name)
+        self.assertEqual("ruo-2.1.1.4", cvo.pipeline_version)
+        self.assertEqual("DRAGEN TSO500 CombinedVariantOutput 2.1.1", cvo.method)
+        self.assertEqual(2026, cvo.output_datetime.year)
+        self.assertEqual((7.1, 1.27, 9), (cvo.total_tmb, cvo.coding_region_size_mb, cvo.passing_eligible_variants))
+        self.assertEqual((121, 3, 2.48), (cvo.usable_msi_sites, cvo.total_msi_sites_unstable,
+                                          cvo.percent_unstable_msi_sites))
+        self.assertEqual((31.0, 0.62, 2.10), (cvo.genomic_instability_score, cvo.tumor_fraction, cvo.ploidy))
+        self.assertEqual("2600000001", cvo.specimen.reference_id)
+        self.assertEqual(MatchStatus.MATCHED, cvo.specimen_match_status)
+
+    def test_re_analysis_of_a_run_replaces_its_row_and_a_new_run_adds_one(self):
+        first = self._write("RUN_1")
+        self.assertEqual(first.pk, self._write("RUN_1").pk)
+        self._write("RUN_2")
+        self.assertEqual(2, DragenTSO500CombinedVariantOutput.objects.filter(pair_id=first.pair_id).count())
+
+    def test_a_chain_that_cannot_be_made_parks_the_claim(self):
+        """ The numbers are still the analysis' - reconcile_pending_extractions attaches them later """
+        cvo = self._write(resolve=False)
+
+        self.assertIsNone(cvo.specimen)
+        self.assertEqual("2600000001", cvo.specimen_reference)
+        self.assertEqual(MatchStatus.PENDING, cvo.specimen_match_status)
+
+    def test_arms_already_there_are_linked_on_write(self):
+        sequencing_run = make_sequencing_run("TSO500_CVO")
+        _sample_sheet, (dna_ss, rna_ss) = make_sample_sheet(sequencing_run, [self.identifiers.dna.sample_id,
+                                                                             self.identifiers.rna.sample_id])
+        dna_sample = self._make_sample(self.identifiers.dna.sample_id)
+
+        cvo = self._write(sequencing_run=sequencing_run)
+
+        self.assertEqual((dna_ss, rna_ss), (cvo.dna_sequencing_sample, cvo.rna_sequencing_sample))
+        self.assertEqual(dna_sample, cvo.dna_sample)
+        self.assertIsNone(cvo.rna_sample)
+
+    def test_run_sheet_and_arms_arriving_after_the_file_are_reconciled(self):
+        cvo = self._write()
+        sequencing_run = make_sequencing_run("TSO500_CVO")
+        _sample_sheet, (dna_ss, _rna_ss) = make_sample_sheet(sequencing_run, [self.identifiers.dna.sample_id,
+                                                                              self.identifiers.rna.sample_id])
+        dna_sample = self._make_sample(self.identifiers.dna.sample_id)
+
+        self.assertEqual(1, link_combined_variant_outputs())
+
+        cvo.refresh_from_db()
+        self.assertEqual(sequencing_run, cvo.sequencing_run)
+        self.assertEqual(dna_ss, cvo.dna_sequencing_sample)
+        self.assertEqual(dna_sample, cvo.dna_sample)
+
+    def test_an_arm_vcf_seqauto_links_later_fills_the_waiting_row(self):
+        sequencing_run = make_sequencing_run("TSO500_CVO")
+        cvo = self._write(sequencing_run=sequencing_run)
+        rna_sample = self._make_sample(self.identifiers.rna.sample_id)
+
+        self.assertEqual(1, DragenTSO500CombinedVariantOutput.link_arm_sample(rna_sample, sequencing_run))
+        cvo.refresh_from_db()
+        self.assertEqual(rna_sample, cvo.rna_sample)
 
     @override_settings(TSO500_MSI_MIN_USABLE_SITES=40, TSO500_MSI_CALL_BANDS=MSI_BANDS,
                        TSO500_TMB_CALL_BANDS=TMB_BANDS)
     def test_msi_and_tmb_are_called_against_the_labs_bands(self):
         """ 121 usable sites is enough to call MSI, and 2.48% unstable is MSS; 7.1 mut/Mb is Low """
-        by_type = self._write_measures()
+        cvo = self._write()
 
-        msi = by_type[SpecimenMeasureType.MSI]
-        self.assertEqual("MSS", msi.call)
+        self.assertEqual("MSS", cvo.msi_call.call)
         self.assertEqual("MSI-High >= 30%, MSI-Low >= 10%, MSS < 10% unstable sites, needs >= 40 usable sites",
-                         msi.threshold)
-        self.assertEqual("Low", by_type[SpecimenMeasureType.TMB].call)
-        self.assertEqual("High >= 10 mut/Mb, Low < 10 mut/Mb", by_type[SpecimenMeasureType.TMB].threshold)
-        # The measures the lab has no policy for are the number alone
-        self.assertIsNone(by_type[SpecimenMeasureType.GIS].call)
+                         cvo.msi_call.threshold)
+        self.assertEqual("Low", cvo.tmb_call.call)
+        self.assertEqual("High >= 10 mut/Mb, Low < 10 mut/Mb", cvo.tmb_call.threshold)
 
     def test_band_call_is_the_first_lower_bound_reached(self):
         self.assertEqual("MSI-High", band_call(30, MSI_BANDS))
@@ -425,27 +395,18 @@ class TestCombinedVariantOutputRecords(TestCase):
     @override_settings(TSO500_MSI_MIN_USABLE_SITES=200, TSO500_MSI_CALL_BANDS=MSI_BANDS)
     def test_too_few_usable_msi_sites_cannot_be_called(self):
         """ The percentage means nothing off 121 sites when the lab wants 200 - the threshold that
-            was applied is still recorded, so 'why is there no call' stays answerable """
-        msi = self._write_measures()[SpecimenMeasureType.MSI]
+            was applied is still shown, so 'why is there no call' stays answerable """
+        msi_call = self._write().msi_call
 
-        self.assertIsNone(msi.call)
-        self.assertIn("needs >= 200 usable sites", msi.threshold)
+        self.assertIsNone(msi_call.call)
+        self.assertIn("needs >= 200 usable sites", msi_call.threshold)
 
-    def test_thresholds_unset_writes_the_value_and_no_call(self):
-        """ The policy is the lab's - an installation without one sends the measure as it always did """
-        by_type = self._write_measures()
+    def test_thresholds_unset_is_the_value_and_no_call(self):
+        """ The policy is the lab's - an installation without one gets the number alone """
+        cvo = self._write()
 
-        self.assertIsNone(by_type[SpecimenMeasureType.MSI].call)
-        self.assertIsNone(by_type[SpecimenMeasureType.TMB].call)
-        self.assertIsNone(by_type[SpecimenMeasureType.TMB].threshold)
-
-    def test_re_analysis_replaces_the_measures(self):
-        """ One current value per measure - the report wants a single TMB, not a history """
-        resolved = resolve_pair(self.identifiers, self.user)
-        for _ in range(2):
-            write_specimen_measures(self.sections, resolved, self.identifiers, self.user,
-                                    method="DRAGEN TSO500 CombinedVariantOutput 2.1.1")
-        self.assertEqual(5, SpecimenMeasure.objects.filter(specimen=resolved.specimen).count())
+        self.assertIsNone(cvo.msi_call)
+        self.assertIsNone(cvo.tmb_call)
 
 
 class TestCombinedVariantOutputInsertTask(TestCase):
@@ -471,22 +432,41 @@ class TestCombinedVariantOutputInsertTask(TestCase):
                                                      name="CombinedVariantOutput records",
                                                      sort_order=1)
 
-    def test_the_pair_lands_with_its_sample_and_measures(self):
-        measures = DragenTSO500CombinedVariantOutputInsertTask.process_items(self.upload_step)
-        self.assertEqual(5, measures)
+    def _set_sequencing_run_metadata(self, sequencing_run_name: str):
+        file_upload = self.upload_pipeline.file_upload
+        file_upload.metadata = {SEQUENCING_RUN: sequencing_run_name}
+        file_upload.save()
+
+    def test_the_pair_lands_with_its_sample_and_analysis(self):
+        self._set_sequencing_run_metadata("TSO500_INSERT")
+        self.assertEqual(1, DragenTSO500CombinedVariantOutputInsertTask.process_items(self.upload_step))
 
         patient = Patient.objects.get(patient_code="C0000001")
         specimen = Specimen.objects.get(patient=patient, reference_id="2600000001")
         self.sample.refresh_from_db()
         self.assertEqual("2600000001B", self.sample.extraction.reference_id)
         self.assertEqual(specimen, self.sample.extraction.specimen)
-        self.assertEqual(5, SpecimenMeasure.objects.filter(specimen=specimen).count())
+        cvo = DragenTSO500CombinedVariantOutput.objects.get(specimen=specimen)
+        self.assertEqual("TSO500_INSERT", cvo.sequencing_run_name)
+        self.assertEqual(self.upload_pipeline.file_upload, cvo.file_upload)
+        self.assertIsNone(cvo.rna_sample, "the CVO's own record-less VCF is not the RNA arm's calls")
+
+    def test_without_metadata_the_run_is_the_one_whose_sheet_names_the_pair(self):
+        sequencing_run = make_sequencing_run("TSO500_INSERT")
+        make_sample_sheet(sequencing_run, [self.rna_sample_id])
+
+        DragenTSO500CombinedVariantOutputInsertTask.process_items(self.upload_step)
+        self.assertEqual(sequencing_run, DragenTSO500CombinedVariantOutput.objects.get().sequencing_run)
 
     def test_an_unregistered_sequencing_sample_is_a_message_not_a_failure(self):
+        """ Nor is a pair no run names - the analysis cannot be keyed, and the page says so """
         DragenTSO500CombinedVariantOutputInsertTask.process_items(self.upload_step)
-        messages = SimpleVCFImportInfo.objects.filter(upload_step__upload_pipeline=self.upload_pipeline)
-        self.assertIn(self.rna_sample_id, "\n".join(m.message for m in messages))
+        messages = "\n".join(m.message for m in SimpleVCFImportInfo.objects.filter(
+            upload_step__upload_pipeline=self.upload_pipeline))
+        self.assertIn(self.rna_sample_id, messages)
+        self.assertIn("TMB, MSI and GIS are not recorded", messages)
         self.assertFalse(VCFFromSequencingRun.objects.exists())
+        self.assertFalse(DragenTSO500CombinedVariantOutput.objects.exists())
 
     def test_the_seqauto_rows_are_written_for_the_rna_arm(self):
         sequencing_run = make_sequencing_run("TSO500_INSERT")

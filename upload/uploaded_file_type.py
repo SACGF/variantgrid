@@ -1,49 +1,14 @@
 import logging
-from collections import defaultdict
-from operator import itemgetter
 from typing import Optional
 
 from library.utils.file_utils import get_extension_without_gzip
-from upload.import_task_factories.import_task_factory import get_import_task_factories
+from upload.import_task_factories.import_task_factory import (
+    get_import_task_factories,
+    get_import_task_factory_from_extension,
+)
 from upload.models import UploadData, UploadedVCF
 from upload.tasks.vcf.genotype_vcf_tasks import reload_vcf_task
 from upload.upload_processing import process_upload_pipeline
-
-
-def get_import_tasks_by_extension():
-    possible_tasks = defaultdict(list)
-    for itf in get_import_task_factories():
-        for ext in itf.get_possible_extensions():
-            possible_tasks[ext].append(itf)
-    return possible_tasks
-
-
-def get_import_task_factory_from_extension(user, filename, file_extension):
-    possible_tasks = get_import_tasks_by_extension()
-    possible_for_extension = possible_tasks[file_extension]
-
-    tasks = []
-    for possible in possible_for_extension:
-        processing_ability = possible.get_processing_ability(user, filename, file_extension)
-        if processing_ability:
-            tasks.append((int(processing_ability), possible))
-
-    if tasks:
-        logging.debug("tasks: %s", tasks)
-        tasks = sorted(tasks, key=itemgetter(0), reverse=True)
-        last_pa = None
-        for pa, _ in tasks:
-            if last_pa is not None:
-                if pa == last_pa:
-                    logging.warning("Task for extension %s had 2 processors with equal ability - can't decide!", file_extension)
-                    return None
-            else:
-                last_pa = pa
-
-        return tasks[0][1]
-
-    logging.warning("No tasks found for %s", tasks)
-    return None
 
 
 def get_uploaded_file_type(file_upload, original_filename):

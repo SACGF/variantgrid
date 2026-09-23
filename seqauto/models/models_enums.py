@@ -67,7 +67,7 @@ class LibraryQCCategory(models.TextChoices):
     RNA = 'R', 'RNA library'                      # fusions and splice variants
 
 
-# The key a report template's case_fields names a category by, as MEASURE_CONTEXT_KEYS does for measures
+# The key a report template's case_fields names a category by, as CVO_MEASURE_CONTEXT_KEYS does for measures
 LIBRARY_QC_CONTEXT_KEYS = {
     LibraryQCCategory.DNA: "dna",
     LibraryQCCategory.SMALL_VARIANT_TMB: "small_variant_tmb",
@@ -75,4 +75,16 @@ LIBRARY_QC_CONTEXT_KEYS = {
     LibraryQCCategory.CNV: "cnv",
     LibraryQCCategory.GIS: "gis",
     LibraryQCCategory.RNA: "rna",
+}
+
+
+# What each of a DragenTSO500CombinedVariantOutput's numbers is called outside the database - the key a report
+# context and a report template's case_fields name it by - with its column and unit. 'tumour_fraction' is the
+# pathologist's estimate (patients.models_enums.MEASURE_CONTEXT_KEYS), so the caller's is its own key
+CVO_MEASURE_CONTEXT_KEYS = {
+    "tmb": ("total_tmb", "mut/Mb"),
+    "msi": ("percent_unstable_msi_sites", "%"),
+    "gis": ("genomic_instability_score", None),
+    "ploidy": ("ploidy", None),
+    "tumour_fraction_sequencing": ("tumor_fraction", "fraction"),
 }

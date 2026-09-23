@@ -8,6 +8,7 @@ produces. Fusions build on this in gene_fusion_test_utils.
 """
 from django.db import transaction
 
+from annotation.tests.test_data_fake_genes import _create_fake_gene_version, _insert_transcript_data
 from genes.gene_copy_number import (
     ResolvedGeneCopyNumberEvent,
     create_gene_copy_number_events_for_variants,
@@ -18,7 +19,8 @@ from genes.gene_splice import (
     SpliceEventVariant,
     canonical_splice_label,
 )
-from genes.models import GeneCopyNumberEvent, GeneCopyNumberEventKind
+from genes.models import GeneCopyNumberEvent, GeneCopyNumberEventKind, ReleaseTranscriptVersion
+from genes.models_enums import AnnotationConsortium
 from library.utils import sha256sum_str
 from snpdb.gene_level_variants import GENE_LEVEL_SVLEN
 from snpdb.models import Contig, Locus, Sequence, Variant, VariantCoordinate
@@ -72,3 +74,30 @@ def create_splice_event_variant(gene_name: str, label: str,
     event = ResolvedSpliceEvent(gene=resolved_gene.gene_level_id, label=canonical)
     variant = create_gene_level_variant(event.variant_coordinate)
     return SpliceEventVariant(variant=variant, gene=event.gene, label=canonical)
+
+
+def make_release_gene(genome_build, release, gene_id, gene_symbol, transcript_id, contig, start,
+                      hgnc_id=None):
+    """ A gene of the release with one 10 kb transcript from start, so a position inside it resolves """
+    gene_version = _create_fake_gene_version(genome_build, gene_id, gene_symbol,
+                                             AnnotationConsortium.ENSEMBL)
+    gene_version.hgnc_id = hgnc_id
+    gene_version.save()
+    data = {
+        "id": transcript_id,
+        "gene_name": gene_symbol,
+        "biotype": [],
+        "genome_builds": {
+            genome_build.name: {
+                "url": "fake",
+                "exons": [[start, start + 10_000, 0, 1, 10_001, None]],
+                "contig": contig,
+                "strand": "+",
+                "cds_end": start + 10_000,
+                "cds_start": start,
+            }
+        },
+    }
+    transcript_version = _insert_transcript_data(genome_build, data, gene_version, release)
+    ReleaseTranscriptVersion.objects.get_or_create(release=release, transcript_version=transcript_version)
+    return gene_version.gene

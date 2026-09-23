@@ -1,0 +1,24 @@
+{# DragenTSO500CombinedVariantOutput rows - the specimen page and the sequencing run page list them #}
+<table class="table">
+    <thead><tr>{% if show_specimen %}<th>Specimen{% else %}<th>Run{% endif %}<th>Pair<th>Arms<th>TMB<th>MSI<th>GIS<th>Tumour fraction<th>Ploidy<th>Version<th>Output</tr></thead>
+    <tbody>
+    {% for cvo in combined_variant_outputs %}
+        <tr>
+            {% if show_specimen %}
+                <td>{% if cvo.specimen_id %}<a href="{{ cvo.specimen.get_absolute_url }}">{{ cvo.specimen }}</a>{% else %}<span title="{{ cvo.specimen_match_error|default:'' }}">{{ cvo.specimen_reference|default:"-" }} ({{ cvo.get_specimen_match_status_display|default:"unmatched" }})</span>{% endif %}
+            {% else %}
+                <td>{% if cvo.sequencing_run_id %}<a href="{{ cvo.sequencing_run.get_absolute_url }}">{{ cvo.sequencing_run_name }}</a>{% else %}{{ cvo.sequencing_run_name }}{% endif %}
+            {% endif %}
+            <td>{{ cvo.pair_id }}
+            <td class="small">{{ cvo.dna_sample_name|default:"" }}{% if cvo.dna_sample_name and cvo.rna_sample_name %}<br/>{% endif %}{{ cvo.rna_sample_name|default:"" }}
+            <td>{{ cvo.total_tmb|default_if_none:"-" }}{% if cvo.total_tmb != None %} mut/Mb{% endif %}{% if cvo.tmb_call.call %} ({{ cvo.tmb_call.call }}){% endif %}
+            <td>{{ cvo.percent_unstable_msi_sites|default_if_none:"-" }}{% if cvo.percent_unstable_msi_sites != None %}%{% endif %}{% if cvo.msi_call.call %} ({{ cvo.msi_call.call }}){% endif %}
+            <td>{{ cvo.genomic_instability_score|default_if_none:"-" }}
+            <td>{{ cvo.tumor_fraction|default_if_none:"-" }}
+            <td>{{ cvo.ploidy|default_if_none:"-" }}
+            <td>{{ cvo.method }}
+            <td>{{ cvo.output_datetime|default_if_none:"-" }}
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>

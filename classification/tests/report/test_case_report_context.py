@@ -160,7 +160,8 @@ class SpliceCallTest(TestCase):
         self.assertEqual(splice.alteration, Alteration.SPLICE)
 
     def test_a_call_off_the_splice_caller_vcf_is_a_small_variant(self):
-        """ A SpliceGirl VCF imports as coordinate <DEL> variants, which print as small variants """
+        """ A coordinate <DEL> off a SpliceGirl VCF imported before #1903 - the kind is the alt's, not
+            the caller's, so it prints as a small variant """
         dna = fake_report_variant("MET", sample=fake_sample("SpliceGirl 1.0.0.614"))
         self.assertEqual(dna.kind, ReportVariantKind.SMALL_VARIANT)
         self.assertEqual(dna.alteration, Alteration.VARIANT)

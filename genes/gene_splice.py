@@ -1,8 +1,9 @@
 """
 Splice calls - "AR-V7", "MET exon 14 skipping" - as gene-level variants.
 
-@see snpdb.gene_level_variants for why one of these is a Variant, and genes.gene_level_resolver for
-turning the caller's gene name into the identity it is stored under.
+@see snpdb.gene_level_variants for why one of these is a Variant rather than the <DEL> the caller
+writes, and genes.gene_level_resolver for turning the caller's gene name into the identity it is
+stored under.
 
 Identity is the gene plus the junction's label, so two events in one gene are two variants. The
 label is the lab's own name for the junction, canonicalised (canonical_splice_label): lower-case
@@ -14,6 +15,12 @@ registered ahead of time still mints its Variant.
 display_splice_label formats a label back for a human (AR-V7 splice, EGFRvIVa splice, MET exon 14 skipping).
 genes.models.models_splice_event.SpliceEvent is consulted only where a row's own wording should win
 - the junctions the TSO 500 panel reports - and is never asked whether a name is real.
+
+The written-label grammar (SPLICE_STRING_PATTERN: V7 / vIVa / ex14skip with any spacing) is the part of
+this that costs upkeep - free-text names drift, and canonicalising them has needed a pass over stored
+labels before (classification/migrations/0185_one_off_canonicalise_splice_labels.py). If it needs
+simplifying, the direction is fewer accepted written forms with SpliceEvent rows as the names, not a
+different identity.
 
 The alt is a Sequence, so the label on it is upper-cased (<SPLICE:HGNC:7029:EXON_14_SKIPPING>) -
 that is the storage form only, and GeneLevelSymbolicAlt.parse lowers it back to the canonical label.
@@ -28,8 +35,10 @@ from dataclasses import dataclass
 from typing import Optional
 
 from genes.gene_level_resolver import (
+    GeneCandidate,
     GeneLevelNameResolver,
     GeneLevelResolution,
+    GenePositionResolver,
     unknown_gene_reason,
 )
 from genes.models import GeneLevelId
@@ -186,11 +195,12 @@ class ResolvedSpliceEvent:
 
 
 class SpliceEventResolver:
-    """ Holds the symbol caches and the build's contigs, so build one per file rather than one per row """
+    """ Holds the symbol caches, transcript trees and the build's contigs, so build one per file
+        rather than one per row """
 
-    def __init__(self, genome_build: GenomeBuild, name_resolver: GeneLevelNameResolver = None):
+    def __init__(self, genome_build: GenomeBuild, name_resolver: GenePositionResolver = None):
         self.genome_build = genome_build
-        self.name_resolver = name_resolver or GeneLevelNameResolver()
+        self.name_resolver = name_resolver or GenePositionResolver()
 
     def get_splice_event(self, contig: Contig, donor: int, acceptor: int) -> Optional[SpliceEvent]:
         return SpliceEvent.objects.filter(genome_build=self.genome_build, contig=contig,
@@ -216,6 +226,46 @@ class SpliceEventResolver:
             label = coordinate_label(self.genome_build, contig, donor, acceptor)
         return ResolvedSpliceEvent(gene=resolved_gene.gene_level_id, label=label,
                                    splice_event=splice_event)
+
+    def resolve_junction(self, chrom: str, position: int, end: int) -> Optional[ResolvedSpliceEvent]:
+        """ The identity of a junction whose caller names no gene - SpliceGirl writes each one as a
+            <DEL> from POS to INFO/END. The gene is the SpliceEvent row's at those coordinates, else
+            the one gene a transcript of the build puts at the donor; None where no gene, or more
+            than one, is there. The breakpoints are taken in genomic order, as the rows are keyed """
+
+        contig = self.genome_build.chrom_contig_mappings.get(chrom)
+        if contig is None:
+            return None
+
+        donor, acceptor = sorted((position, end))
+        if splice_event := self.get_splice_event(contig, donor, acceptor):
+            if resolved_gene := self.name_resolver.resolve_gene(splice_event.gene_symbol_id):
+                return ResolvedSpliceEvent(gene=resolved_gene.gene_level_id, label=splice_event.label,
+                                           splice_event=splice_event)
+            return None
+
+        if candidate := self._junction_gene(chrom, donor, acceptor):
+            return ResolvedSpliceEvent(gene=self.name_resolver.identity_for_candidate(candidate),
+                                       label=coordinate_label(self.genome_build, contig, donor, acceptor))
+        return None
+
+    def resolve_variant_coordinate(self, variant_coordinate: VariantCoordinate) -> Optional[ResolvedSpliceEvent]:
+        """ A coordinate splice call already stored as a Variant, whether the <DEL> kept its symbolic
+            alt or was expanded to explicit sequence - VariantCoordinate.end is INFO/END either way """
+        return self.resolve_junction(variant_coordinate.chrom, variant_coordinate.position,
+                                     variant_coordinate.end)
+
+    def _junction_gene(self, chrom: str, donor: int, acceptor: int) -> Optional[GeneCandidate]:
+        """ The gene at the donor. Where genes overlap there, the one the acceptor is also in - a
+            splice junction joins two parts of one gene's transcript """
+        candidates = self.name_resolver.candidates_at(self.genome_build, chrom, donor)
+        if len(candidates) > 1:
+            at_acceptor = self.name_resolver.candidates_at(self.genome_build, chrom, acceptor)
+            acceptor_keys = {(c.hgnc_id, c.symbol) for c in at_acceptor}
+            candidates = [c for c in candidates if (c.hgnc_id, c.symbol) in acceptor_keys]
+        if len(candidates) == 1:
+            return candidates[0]
+        return None
 
 
 @dataclass(frozen=True)

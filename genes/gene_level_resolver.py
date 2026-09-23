@@ -13,15 +13,20 @@ alias resolution and then picks its best candidate.
 
 Names HGNC doesn't carry - clone-based identifiers are routine fusion partners - still get an
 identity, via GeneLevelId's local id space, so every call the caller made becomes a Variant.
+
+Where a caller gives a position, GenePositionResolver finds the gene there instead - a fusion
+breakpoint, or a splice junction whose caller names no gene at all (@see genes.gene_splice).
 """
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import cached_property
 from typing import Any, Optional
 
 from genes.gene_matching import GeneSymbolMatcher
-from genes.models import HGNC, GeneLevelId
+from genes.gene_overlaps import GeneOverlap, SVGeneOverlapResolver
+from genes.models import HGNC, GeneAnnotationRelease, GeneLevelId
 from genes.models_enums import HGNCStatus
+from snpdb.models import GenomeBuild
 
 # Within one cell - a hyphen can't separate, as clone-based identifiers contain them (RP11-458D21.5)
 GENE_LIST_SEPARATOR = re.compile(r"[;/]")
@@ -190,3 +195,74 @@ class GeneLevelNameResolver:
         symbol_str = first_known_symbol or names[0]
         gene_level_id = GeneLevelId.get_or_create_for_symbol(symbol_str, first_known_symbol, None)
         return ResolvedGeneLevelGene(written=cell, gene_level_id=gene_level_id)
+
+
+@dataclass
+class GeneCandidate:
+    """ The genes at a position that are all one gene - the same gene in a RefSeq and an Ensembl
+        release is two Gene rows, and every release of a build is consulted """
+    hgnc_id: Optional[int]
+    symbol: Optional[str]
+    gene_ids: set[str] = field(default_factory=set)
+
+
+def _candidate_key(gene_overlap: GeneOverlap):
+    """ What makes two genes from different releases one candidate. A gene with neither an HGNC nor
+        a symbol names nothing an identity could be minted under, so it is no candidate at all """
+    if gene_overlap.hgnc_id is not None:
+        return "hgnc", gene_overlap.hgnc_id
+    if gene_overlap.symbol:
+        return "symbol", gene_overlap.symbol.upper()
+    return None
+
+
+class GenePositionResolver(GeneLevelNameResolver):
+    """ The name resolver plus the genes at a position. Holds the per-contig transcript trees as well
+        as the symbol caches, so build one per file rather than one per row """
+
+    def __init__(self, gene_matcher: GeneSymbolMatcher = None):
+        super().__init__(gene_matcher)
+        self._overlap_resolvers: dict[int, list[SVGeneOverlapResolver]] = {}
+
+    def _gene_overlap_resolvers(self, genome_build: GenomeBuild) -> list[SVGeneOverlapResolver]:
+        """ One per GeneAnnotationRelease of the build - a RefSeq release gives the gene its Entrez
+            id and an Ensembl one its ENSG, and annotation resolves against whichever it was built
+            on. The trees behind these are per contig and built on first use, so a file pays for the
+            chromosomes its positions are actually on """
+        resolvers = self._overlap_resolvers.get(genome_build.pk)
+        if resolvers is None:
+            resolvers = [SVGeneOverlapResolver(release)
+                         for release in GeneAnnotationRelease.objects.filter(genome_build=genome_build)]
+            self._overlap_resolvers[genome_build.pk] = resolvers
+        return resolvers
+
+    def candidates_at(self, genome_build: Optional[GenomeBuild], chrom: str, position: int) -> list[GeneCandidate]:
+        """ The distinct genes overlapping the position, grouped by HGNC where they have one """
+        if genome_build is None:
+            return []
+
+        by_key: dict = {}
+        for resolver in self._gene_overlap_resolvers(genome_build):
+            for gene_overlap in resolver.get_gene_overlaps(chrom, position):
+                if (key := _candidate_key(gene_overlap)) is None:
+                    continue
+                candidate = by_key.get(key)
+                if candidate is None:
+                    candidate = GeneCandidate(hgnc_id=gene_overlap.hgnc_id, symbol=gene_overlap.symbol)
+                    by_key[key] = candidate
+                candidate.gene_ids.add(gene_overlap.gene_id)
+        return list(by_key.values())
+
+    def identity_for_candidate(self, candidate: GeneCandidate) -> GeneLevelId:
+        """ Genes found by position are recorded on the GeneLevelId so annotation can reach them
+            without going back through the symbol (@see annotation.gene_level_annotation) """
+        hgnc = HGNC.objects.filter(pk=candidate.hgnc_id).first() if candidate.hgnc_id else None
+        if hgnc is not None:
+            symbol_str = hgnc.gene_symbol_id
+            gene_symbol_id = hgnc.gene_symbol_id
+        else:
+            symbol_str = candidate.symbol
+            gene_symbol_id = candidate.symbol
+        gene_level_id = GeneLevelId.get_or_create_for_symbol(symbol_str, gene_symbol_id, hgnc)
+        gene_level_id.genes.add(*candidate.gene_ids)
+        return gene_level_id

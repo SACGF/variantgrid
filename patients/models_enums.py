@@ -43,22 +43,16 @@ class MatchStatus(models.TextChoices):
 
 
 class SpecimenMeasureType(models.TextChoices):
-    """ Vendor-neutral - other panels push the same shape """
-    TMB = 'T', 'Tumour mutational burden'
-    MSI = 'M', 'Microsatellite instability'
-    GIS = 'G', 'Genomic instability score'
-    TUMOUR_FRACTION = 'F', 'Tumour fraction'
-    PLOIDY = 'P', 'Ploidy'
+    """ What is measured on the material itself. A sequencing analysis' numbers (TMB, MSI, GIS, the caller's
+        tumour fraction) are results of that analysis - seqauto.models.DragenTSO500CombinedVariantOutput """
+    TUMOUR_FRACTION = 'F', 'Tumour content (pathology)'
 
 
 # What each measure is called outside the database - the key a report context and a report template's
-# case_fields name it by, since a template's JSON is written by the lab rather than generated
+# case_fields name it by, since a template's JSON is written by the lab rather than generated. A sequencing
+# analysis' keys are seqauto.models.models_enums.CVO_MEASURE_CONTEXT_KEYS
 MEASURE_CONTEXT_KEYS = {
-    SpecimenMeasureType.TMB: "tmb",
-    SpecimenMeasureType.MSI: "msi",
-    SpecimenMeasureType.GIS: "gis",
     SpecimenMeasureType.TUMOUR_FRACTION: "tumour_fraction",
-    SpecimenMeasureType.PLOIDY: "ploidy",
 }
 
 

@@ -33,6 +33,7 @@ from patients.external_references import ExternalReference, resolve_reference
 from patients.models import Extraction
 from patients.models_enums import MatchStatus
 from seqauto.models import (
+    DragenTSO500CombinedVariantOutput,
     JointCalledVCF,
     QCGeneList,
     SampleFromSequencingSample,
@@ -624,6 +625,8 @@ def link_samples_and_vcfs_to_sequencing(backend_vcf, replace_existing=False, upl
             except SampleFromSequencingSample.DoesNotExist:
                 SampleFromSequencingSample.objects.create(sample=sample,
                                                           sequencing_sample=sequencing_sample)
+
+            DragenTSO500CombinedVariantOutput.link_arm_sample(sample, sequencing_run)
 
             # Link any QCGeneLists
             for qcgl in QCGeneList.objects.filter(qc__bam_file__sequencing_sample=sequencing_sample,

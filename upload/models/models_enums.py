@@ -6,8 +6,8 @@ class UploadedFileTypes(models.TextChoices):
     BED = 'B', 'BED'
     CLINVAR = 'L', 'Clinvar'
     DRAGEN_TSO500_ALL_FUSIONS = 'F', 'DRAGEN TSO500 AllFusions'
-    # The pair-level summary written beside the two arm directories - the splice calls
-    # become gene-level variants, @see upload.tasks.import_dragen_tso500_combined_variant_output_task
+    # The pair-level summary written beside the two arm directories - the pair's patient chain and
+    # measures, @see upload.tasks.import_dragen_tso500_combined_variant_output_task
     DRAGEN_TSO500_COMBINED_VARIANT_OUTPUT = 'C', 'DRAGEN TSO500 Combined Variant Output'
     # Per-library QC beside the CombinedVariantOutput - one row per library per category
     # (@see upload.tasks.import_dragen_tso500_metrics_output_task)
@@ -27,6 +27,8 @@ class UploadedFileTypes(models.TextChoices):
     GENE_LEVEL_INSERT_VARIANTS_ONLY = 'y', 'VCF - Insert gene-level variants only'
     # A CNV caller's VCF of whole-gene calls - the records name a gene, not a coordinate
     GENE_LEVEL_CNV_VCF = 'c', 'VCF - Gene-level copy number'
+    # SpliceGirl's splice calls, written as <DEL>s - @see upload.tasks.import_splicegirl_vcf_task
+    GENE_LEVEL_SPLICE_VCF = 's', 'VCF - Gene-level splice'
     # Need to separate these as Variant needs to be imported using VCF (for normalization etc)
     WIKI_GENE = "w", "Gene Wiki records"
     WIKI_VARIANT = "W", "Variant Wiki records"

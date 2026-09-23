@@ -341,6 +341,11 @@
             {% empty %}
                 <p class="text-muted">No data.</p>
             {% endfor %}
+
+            {% if combined_variant_outputs %}
+                <h5>DRAGEN CombinedVariantOutput</h5>
+                {% include "seqauto/combined_variant_output_table.html" with show_specimen=True %}
+            {% endif %}
         </div>
 
 

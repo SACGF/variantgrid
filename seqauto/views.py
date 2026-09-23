@@ -20,6 +20,7 @@ from seqauto.illumina.run_parameters import get_run_parameters
 from seqauto.models import (
     QC,
     BamFile,
+    DragenTSO500CombinedVariantOutput,
     EnrichmentKit,
     Experiment,
     FastQC,
@@ -243,6 +244,8 @@ def view_sequencing_run(request, sequencing_run_id, tab=None):
         "sequencing_run": sequencing_run,
         "sequencing_run_form": sequencing_run_form,
         'tab': tab,
+        "combined_variant_outputs": DragenTSO500CombinedVariantOutput.objects.filter(
+            sequencing_run_name=sequencing_run.name).select_related("specimen").order_by("pair_id"),
     }
 
     try:  # May not have sample sheet and die

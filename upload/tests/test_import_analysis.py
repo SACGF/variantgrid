@@ -11,9 +11,9 @@ from annotation.fake_annotation import get_fake_annotation_version
 from snpdb.models import GenomeBuild
 from snpdb.models.models_enums import ImportSource
 from upload.import_task_factories.import_task_factories import AnalysisImportTaskFactory
+from upload.import_task_factories.import_task_factory import get_import_task_factory_from_extension
 from upload.models import FileUpload, UploadedAnalysis, UploadedFileTypes
 from upload.tasks.import_analysis_task import ImportAnalysisTask
-from upload.uploaded_file_type import get_import_task_factory_from_extension
 
 
 @override_settings(ANALYSIS_NODE_CACHE_Q=False)
