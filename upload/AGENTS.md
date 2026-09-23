@@ -100,6 +100,9 @@ Gotchas:
   `sequencing_run` metadata as the MetricsOutput is (the file names its run 'NA'); a CVO sent without it takes the run
   whose current sheet names one of its sample IDs, and one no registered run names is not recorded. None of it fails
   the import - a chain that cannot be made parks the row's specimen claim and is a SimpleVCFImportInfo message.
+  The record-less VCF exists only to make the RNA arm's Sample for the patient chain: once the chain no longer needs it
+  (#1903 step 3), the factory becomes a single-shot ImportTask like the MetricsOutput's, with an
+  `UploadedDragenTSO500CombinedVariantOutput` UploadData one-to-one with the row.
 - The run's MetricsOutput.tsv is a separate, single-shot import (tasks/import_dragen_tso500_metrics_output_task.py,
   tso500/dragen_metrics_output_parser.py + _records.py): it has no variants and no coordinates, and recognises itself
   by a banner line ending 'Metrics Output' (with the module version, as the CVO's has it). One file covers a whole run
