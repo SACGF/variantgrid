@@ -22,11 +22,11 @@ than the path it is built for.
 
 The same two sample IDs are the join to everything else: DRAGEN writes them from the SampleSheet's
 Sample_ID, so each is exactly a Sample.vcf_sample_name and exactly a SequencingSample.sample_name.
-That is what links both arms' samples to their extraction and the splice VCF to its sequencing run,
-in place of the filename matching seqauto does for a VCF it found on disk.
+That is what links both arms' samples to their extraction, in place of the filename matching seqauto
+does for a VCF it found on disk.
 
 Nothing here fails an import: a chain that cannot be made still writes the analysis, with its specimen
-claim parked, and says why on the import page (@see the caller).
+claim parked saying why, which the pair's page shows (@see seqauto.views.view_tso500_pair).
 """
 import logging
 import re
@@ -50,12 +50,10 @@ from patients.models import Extraction, Patient, Specimen
 from patients.models_enums import MatchStatus, NucleicAcid
 from seqauto.models import (
     DragenTSO500CombinedVariantOutput,
-    SampleFromSequencingSample,
     SequencingRun,
     SequencingSample,
-    VCFFromSequencingRun,
 )
-from snpdb.models import VCF, Sample
+from snpdb.models import Sample
 from upload.tso500.dragen_combined_variant_output_parser import (
     CODING_REGION_SIZE,
     DNA_SAMPLE_ID,
@@ -227,21 +225,6 @@ def link_samples_to_extractions(resolved: ResolvedPair, user: User) -> int:
             if sample.apply_extraction_match(match):
                 linked += 1
     return linked
-
-
-def link_to_sequencing_run(vcf: VCF, sample: Sample, sample_id: str) -> Optional[SequencingRun]:
-    """ The rows seqauto writes for a VCF it matched by path (@see
-        upload.vcf.vcf_import.link_samples_and_vcfs_to_sequencing), against the arm the calls came
-        off. A sample sheet that has not registered this sample yet means no link rows """
-    sequencing_sample = SequencingSample.get_current().filter(sample_name=sample_id).order_by("-pk").first()
-    if sequencing_sample is None:
-        return None
-
-    sequencing_run = sequencing_sample.sample_sheet.sequencing_run
-    VCFFromSequencingRun.objects.update_or_create(vcf=vcf, defaults={"sequencing_run": sequencing_run})
-    SampleFromSequencingSample.objects.update_or_create(sample=sample,
-                                                        defaults={"sequencing_sample": sequencing_sample})
-    return sequencing_run
 
 
 def parse_output_datetime(analysis_details: dict):

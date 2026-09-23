@@ -1,0 +1,25 @@
+{# LibraryQC summarised per (run, pair, arm) - the specimen page and the sequencing run page list them,
+   and the pair's page has the metrics. @see seqauto.qc.library_qc_summary #}
+<table class="table">
+    <thead><tr>{% if show_specimen %}<th>Specimen{% else %}<th>Run{% endif %}<th>Pair<th>Arm<th>QC<th>Categories<th>Method<th>Measured</tr></thead>
+    <tbody>
+    {% for summary in library_qc_summaries %}
+        <tr>
+            {% if show_specimen %}
+                <td>{% if summary.specimen %}<a href="{{ summary.specimen.get_absolute_url }}">{{ summary.specimen }}</a>{% else %}-{% endif %}
+            {% else %}
+                <td>{% if summary.sequencing_run %}<a href="{{ summary.sequencing_run.get_absolute_url }}">{{ summary.sequencing_run_name }}</a>{% else %}{{ summary.sequencing_run_name }}{% endif %}
+            {% endif %}
+            <td><a href="{{ summary.url }}">{{ summary.pair_id }}</a>
+            <td>{{ summary.nucleic_acid }}
+            <td>{% if summary.completed == False %}run did not complete{% elif summary.passed == None %}no QC{% elif summary.passed %}passed{% else %}<span class="text-danger">failed</span>{% endif %}
+            <td class="small">
+                {% for qc in summary.rows %}
+                    {{ qc.get_category_display }}: {% if qc.passed == False %}<span class="text-danger">{{ qc.status_description }}</span>{% else %}{{ qc.status_description }}{% endif %}{% if not forloop.last %}<br/>{% endif %}
+                {% endfor %}
+            <td>{{ summary.method|default:"-" }}
+            <td>{{ summary.measured_date|default_if_none:"-" }}
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>

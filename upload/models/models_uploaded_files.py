@@ -16,7 +16,7 @@ from genes.models import GeneCoverageCollection, GeneList
 from library.utils.file_utils import name_from_filename
 from patients.models import PatientRecords
 from pedigree.models import PedFile
-from seqauto.models import LibraryQC
+from seqauto.models import DragenTSO500CombinedVariantOutput, LibraryQC
 from snpdb.models import (
     GenomeBuild,
     GenomicIntervalsCollection,
@@ -124,6 +124,20 @@ class UploadedDragenTSO500MetricsOutput(UploadData):
         if library_qc := self.get_data():
             return library_qc.specimen.get_absolute_url()
         return None
+
+
+class UploadedDragenTSO500CombinedVariantOutput(UploadData):
+    """ DRAGEN's CombinedVariantOutput.tsv - the pair's analysis row it wrote
+        (@see seqauto.models.DragenTSO500CombinedVariantOutput).
+
+        The row is keyed on (run, pair) rather than on this record, since a re-analysis of the run
+        replaces it; this is what makes the upload 'processed', which is what the API's sha256
+        de-duplication keys on """
+    file_upload = models.OneToOneField(FileUpload, on_delete=CASCADE)
+
+    def get_data(self):
+        """ The row this file wrote - None where the file named no run to key one against """
+        return DragenTSO500CombinedVariantOutput.objects.filter(file_upload=self.file_upload).first()
 
 
 class UploadedGeneCoverage(UploadData):

@@ -81,28 +81,26 @@ Gotchas:
   no gene, or ambiguously in two, is skipped and counted on the import page. The header keeps `##source`, so the
   `^SpliceGirl` VCFSourceSettings row still binds AD/DP as alt/ref depth.
 - A TSO 500 pair's CombinedVariantOutput tsv is no variant source (#1903) - its `[Splice Variants]` are the VCF's PASS
-  calls on EGFR, MET and AR (import_task_factories/import_task_factories.py:DragenTSO500CombinedVariantOutputImportTaskFactory,
-  tasks/import_dragen_tso500_combined_variant_output_task.py). It writes a VCF of no records, whose one sample is the RNA
-  arm, and the file declares no genome build, so one is declared at upload or comes off the
-  `^DRAGEN TSO500 CombinedVariantOutput` VCFSourceSettings row.
-- What that file is for is the pair's identity, written once the header step has made the Sample
-  (get_post_vcf_header_classes - a VCF with no records skips every DATA_INSERTION-dependent step) by
-  tasks/import_dragen_tso500_combined_variant_output_task.py:DragenTSO500CombinedVariantOutputInsertTask
-  (tso500/dragen_combined_variant_output_records.py). `[Analysis Details]` names the Patient (the code
+  calls on EGFR, MET and AR - and has no coordinates, so it is a single-shot import rather than a VCF pipeline
+  (import_task_factories/import_task_factories.py:DragenTSO500CombinedVariantOutputImportTaskFactory,
+  tasks/import_dragen_tso500_combined_variant_output_task.py:ImportDragenTSO500CombinedVariantOutputTask, with an
+  `UploadedDragenTSO500CombinedVariantOutput` UploadData one-to-one with the file). It writes no VCF and takes no
+  `genome_build`; `sequencing_run` is its only metadata key.
+- What that file is for is the pair's identity (tso500/dragen_combined_variant_output_records.py).
+  `[Analysis Details]` names the Patient (the code
   `settings.TSO500_PAIR_ID_PATIENT_CODE_REGEX` reads out of `Pair ID` - the lab writes that either as the whole pair
   sample name, whose leading sequencing sample ID changes when the patient is re-sequenced, or as the bare patient
   code, and the default regex reads both), the Specimen
   (the ten-digit accession inside each sample ID) and the two Extractions (its container suffix), created when absent;
   the DNA/RNA sample IDs are exact `Sample.vcf_sample_name` and `SequencingSample.sample_name`, which links both arms'
-  samples to their extraction and the CVO's VCF to its sequencing run without seqauto's filename matching. The
+  samples to their extraction without seqauto's filename matching. The
   analysis itself - `[Analysis Details]` and the `[TMB]`, `[MSI]`, `[GIS]` scalars - is one
   seqauto/models/models_seqauto.py:DragenTSO500CombinedVariantOutput per (run, pair) (#1904), keyed on the upload's
   `sequencing_run` metadata as the MetricsOutput is (the file names its run 'NA'); a CVO sent without it takes the run
-  whose current sheet names one of its sample IDs, and one no registered run names is not recorded. None of it fails
-  the import - a chain that cannot be made parks the row's specimen claim and is a SimpleVCFImportInfo message.
-  The record-less VCF exists only to make the RNA arm's Sample for the patient chain: once the chain no longer needs it
-  (#1903 step 3), the factory becomes a single-shot ImportTask like the MetricsOutput's, with an
-  `UploadedDragenTSO500CombinedVariantOutput` UploadData one-to-one with the row.
+  whose current sheet names one of its sample IDs. The run is half the row's key, so a pair no registered run names
+  fails the import saying so, as does one naming no `Pair ID`. A chain that cannot be made does not fail it: the row
+  is still written with its specimen claim parked saying why, which the pair's page shows
+  (seqauto/views.py:view_tso500_pair).
 - The run's MetricsOutput.tsv is a separate, single-shot import (tasks/import_dragen_tso500_metrics_output_task.py,
   tso500/dragen_metrics_output_parser.py + _records.py): it has no variants and no coordinates, and recognises itself
   by a banner line ending 'Metrics Output' (with the module version, as the CVO's has it). One file covers a whole run

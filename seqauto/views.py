@@ -5,6 +5,7 @@ from typing import Optional, Union
 
 from django.conf import settings
 from django.core.exceptions import PermissionDenied
+from django.http import Http404
 from django.http.response import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
@@ -14,6 +15,7 @@ from eventlog.models import create_event
 from genes.models import CanonicalTranscriptCollection
 from library.log_utils import log_traceback
 from patients.models import Extraction, Patient
+from patients.models_enums import NucleicAcid
 from seqauto import forms
 from seqauto.forms import AllEnrichmentKitForm, AutocompleteSequencingRunForm, SequencingRunForm
 from seqauto.illumina.run_parameters import get_run_parameters
@@ -28,6 +30,7 @@ from seqauto.models import (
     GoldGeneCoverageCollection,
     GoldReference,
     JointCalledVCF,
+    LibraryQC,
     QCGeneCoverage,
     QCType,
     SequencingRun,
@@ -36,6 +39,7 @@ from seqauto.models import (
     UnalignedReads,
 )
 from seqauto.models.models_enums import QCCompareType
+from seqauto.qc.library_qc_summary import summarise_library_qc
 from seqauto.qc.sequencing_run_utils import SEQUENCING_RUN_QC_COLUMNS
 from seqauto.sequencing_files.sample_sheet import (
     assign_old_sample_sheet_data_to_current_sample_sheet,
@@ -96,7 +100,7 @@ def get_illumina_qc_and_show_stats_for_sample_sheet(sample_sheet):
 @dataclass
 class RunVCF:
     """ A VCF made from a run: the seqauto record of the file on disk (None when it was uploaded
-        and linked afterwards, eg DRAGEN TSO500 CombinedVariantOutput) next to the imported snpdb VCF """
+        and linked afterwards, eg the RNA arm's SpliceGirl VCF) next to the imported snpdb VCF """
     record: Optional[Union[SingleSampleVCF, JointCalledVCF]]
     vcf: Optional[VCF]
     can_view: bool
@@ -246,6 +250,10 @@ def view_sequencing_run(request, sequencing_run_id, tab=None):
         'tab': tab,
         "combined_variant_outputs": DragenTSO500CombinedVariantOutput.objects.filter(
             sequencing_run_name=sequencing_run.name).select_related("specimen").order_by("pair_id"),
+        "library_qc_summaries": summarise_library_qc(
+            LibraryQC.objects.filter(sequencing_run_name=sequencing_run.name)
+                             .select_related("specimen")
+                             .order_by("pair_id", "nucleic_acid", "category")),
     }
 
     try:  # May not have sample sheet and die
@@ -269,6 +277,82 @@ def view_sequencing_run(request, sequencing_run_id, tab=None):
         tab = "patients" if context.get("run_patients") else "data"
     context['active_tab'] = tab
     return render(request, 'seqauto/view_sequencing_run.html', context)
+
+
+@dataclass
+class TSO500PairArm:
+    """ One nucleic acid arm of a TSO 500 pair, as far as each feed has reached it: the file's sample
+        name, the run's sheet row, the imported Sample and the QC categories about that arm """
+    nucleic_acid: str
+    sample_name: str
+    sequencing_sample: Optional[SequencingSample]
+    sample: Optional[Sample]
+    library_qc: list[LibraryQC]
+
+
+def _tso500_pair_arms(cvo: Optional[DragenTSO500CombinedVariantOutput],
+                      library_qc: list[LibraryQC], user) -> list[TSO500PairArm]:
+    """ A row per arm the pair has, from whichever of the two records landed - the analysis names both
+        arms' sample IDs, and each QC category names the arm it is about """
+    arms = []
+    for nucleic_acid in (NucleicAcid.DNA, NucleicAcid.RNA):
+        arm_qc = [qc for qc in library_qc if qc.nucleic_acid == nucleic_acid]
+        sample_name = ""
+        sequencing_sample = None
+        sample = None
+        if cvo:
+            prefix = "dna" if nucleic_acid == NucleicAcid.DNA else "rna"
+            sample_name = getattr(cvo, f"{prefix}_sample_name")
+            sequencing_sample = getattr(cvo, f"{prefix}_sequencing_sample")
+            sample = getattr(cvo, f"{prefix}_sample")
+        if sequencing_sample is None and arm_qc:
+            sequencing_sample = next((qc.sequencing_sample for qc in arm_qc if qc.sequencing_sample), None)
+        if not (sample_name or sequencing_sample or arm_qc):
+            continue
+        if sample and not sample.can_view(user):
+            sample = None
+        arms.append(TSO500PairArm(nucleic_acid=NucleicAcid(nucleic_acid).label,
+                                  sample_name=sample_name or (sequencing_sample.sample_name if sequencing_sample else ""),
+                                  sequencing_sample=sequencing_sample, sample=sample, library_qc=arm_qc))
+    return arms
+
+
+def view_tso500_pair(request, sequencing_run_name, pair_id):
+    """ One sequenced TSO 500 pair on one run: the DRAGEN analysis of it and the library QC of its arms,
+        which are keyed the same way and are the two halves of what a scientist asks about a case """
+    cvo = DragenTSO500CombinedVariantOutput.objects.filter(sequencing_run_name=sequencing_run_name,
+                                                           pair_id=pair_id) \
+        .select_related("sequencing_run", "specimen__patient", "file_upload").first()
+    library_qc = list(LibraryQC.objects.filter(sequencing_run_name=sequencing_run_name, pair_id=pair_id)
+                      .select_related("sequencing_run", "specimen__patient", "sequencing_sample", "file_upload")
+                      .order_by("nucleic_acid", "category"))
+    if cvo is None and not library_qc:
+        raise Http404(f"No DRAGEN TSO500 records for pair '{pair_id}' on run '{sequencing_run_name}'")
+
+    records = [cvo, *library_qc] if cvo else library_qc
+    sequencing_run = next((r.sequencing_run for r in records if r.sequencing_run_id), None)
+    if specimen := next((r.specimen for r in records if r.specimen_id), None):
+        specimen.check_can_view(request.user)
+    elif sequencing_run is None and not request.user.is_superuser:
+        # Nothing to read it through - the pair claims no specimen and names no run we have registered
+        raise PermissionDenied(f"'{pair_id}' is attached to no specimen or sequencing run")
+
+    context = {
+        "sequencing_run_name": sequencing_run_name,
+        "pair_id": pair_id,
+        "sequencing_run": sequencing_run,
+        "specimen": specimen,
+        "specimen_match_error": next((r.specimen_match_error for r in records if r.specimen_match_error), None),
+        "specimen_reference": next((r.specimen_reference for r in records if r.specimen_reference), ""),
+        "cvo": cvo,
+        "cvo_file_upload": cvo.file_upload if cvo and cvo.file_upload and
+                           cvo.file_upload.can_view(request.user) else None,
+        "qc_file_upload": next((qc.file_upload for qc in library_qc
+                                if qc.file_upload and qc.file_upload.can_view(request.user)), None),
+        "has_library_qc": bool(library_qc),
+        "arms": _tso500_pair_arms(cvo, library_qc, request.user),
+    }
+    return render(request, 'seqauto/view_tso500_pair.html', context)
 
 
 def view_sequencing_run_stats_tab(request, sequencing_run_id):

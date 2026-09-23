@@ -12,7 +12,7 @@ from django.contrib.postgres.fields import DecimalRangeField
 from django.core.cache import cache
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import models
-from django.db.models import Max
+from django.db.models import Max, Q
 from django.db.models.deletion import CASCADE, PROTECT, SET_NULL
 from django.db.models.signals import pre_delete
 from django.dispatch.dispatcher import receiver
@@ -35,7 +35,7 @@ from genes.models import (
 )
 from library.constants import DAY_SECS
 from library.genomics.vcf_utils import get_variant_caller_and_version_from_vcf
-from library.preview_request import PreviewModelMixin
+from library.preview_request import PreviewData, PreviewKeyValue, PreviewModelMixin
 from library.utils import sorted_nicely
 from library.utils.file_utils import name_from_filename
 from patients.external_references import ResolvedReference
@@ -1040,7 +1040,45 @@ class SpecimenClaimMixin(models.Model):
             self.save()
 
 
-class LibraryQC(SpecimenClaimMixin, TimeStampedModel):
+def _number_text(value) -> str:
+    """ A metric's number as the file wrote it - 184, not 184.0 """
+    return f"{value:g}" if isinstance(value, (int, float)) else "no value"
+
+
+def library_qc_guideline(lsl, usl) -> str:
+    """ A metric's guideline in words. A zero lower bound is no bound in practice - none of these
+        metrics can go negative - so it is left off rather than read as policy """
+    lower = f"{lsl:g}" if lsl else None
+    upper = f"{usl:g}" if usl is not None else None
+    if lower and upper:
+        return f"{lower} - {upper}"
+    if lower:
+        return f">= {lower}"
+    if upper:
+        return f"<= {upper}"
+    return ""
+
+
+class LibraryQCMetric(NamedTuple):
+    """ One metric out of a LibraryQC's metrics JSON, as the pair page tabulates it """
+    name: str
+    value: Optional[float]
+    unit: str
+    lsl: Optional[float]
+    usl: Optional[float]
+    passed: Optional[bool]
+    guideline_source: str
+
+    @property
+    def value_text(self) -> str:
+        return _number_text(self.value)
+
+    @property
+    def guideline(self) -> str:
+        return library_qc_guideline(self.lsl, self.usl)
+
+
+class LibraryQC(PreviewModelMixin, SpecimenClaimMixin, TimeStampedModel):
     """ One QC category of one sequenced pair, as the caller judged it - what 'the assay succeeded for X' means.
         A category is about one of the pair's arms (nucleic_acid), so a pair on both arms has six rows: the five
         DNA categories linked to its DNA SequencingSample, RNA to its RNA one.
@@ -1081,6 +1119,31 @@ class LibraryQC(SpecimenClaimMixin, TimeStampedModel):
     def __str__(self):
         return f"{self.pair_id} {self.get_category_display()}: {self.status_description}"
 
+    def get_absolute_url(self) -> str:
+        """ The pair's page - the analysis and every category of its QC together """
+        return reverse("view_tso500_pair", kwargs={"sequencing_run_name": self.sequencing_run_name,
+                                                   "pair_id": self.pair_id})
+
+    @classmethod
+    def preview_category(cls) -> str:
+        return "Library QC"
+
+    @classmethod
+    def preview_icon(cls) -> str:
+        return "fa-solid fa-flask-vial"
+
+    @classmethod
+    def preview_enabled(cls) -> bool:
+        return settings.VARIANT_GENE_LEVEL_ENABLED
+
+    @property
+    def preview(self) -> PreviewData:
+        parts = [PreviewKeyValue(key="Arm", value=self.get_nucleic_acid_display()),
+                 PreviewKeyValue(key="Category", value=self.get_category_display()),
+                 PreviewKeyValue(key="QC", value=self.status_description)]
+        return self.preview_with(identifier=self.pair_id, title=self.sequencing_run_name,
+                                 summary_extra=parts)
+
     @property
     def status_description(self) -> str:
         """ The call in one word, as the build form and the specimen page show it """
@@ -1089,6 +1152,15 @@ class LibraryQC(SpecimenClaimMixin, TimeStampedModel):
         if self.passed is None:
             return "no QC"
         return "passed" if self.passed else "failed"
+
+    @property
+    def metric_rows(self) -> list['LibraryQCMetric']:
+        """ The metrics JSON as rows, for the pair page's table - the same numbers
+            metrics_description flattens into a sentence """
+        return [LibraryQCMetric(name=name, value=metric.get("value"), unit=metric.get("unit") or "",
+                                lsl=metric.get("lsl"), usl=metric.get("usl"), passed=metric.get("passed"),
+                                guideline_source=metric.get("guideline_source") or "")
+                for name, metric in self.metrics.items()]
 
     @property
     def metrics_description(self) -> str:
@@ -1160,7 +1232,7 @@ def describe_bands(bands: list, unit: str) -> str:
     return ", ".join(parts)
 
 
-class DragenTSO500CombinedVariantOutput(SpecimenClaimMixin, TimeStampedModel):
+class DragenTSO500CombinedVariantOutput(PreviewModelMixin, SpecimenClaimMixin, TimeStampedModel):
     """ One DRAGEN TSO 500 analysis of one sequenced pair - its CombinedVariantOutput's '[Analysis Details]' and
         the scalars of its '[TMB]', '[MSI]' and '[GIS]' sections. These are results of the analysis, not
         properties of the specimen: a re-sequence or a re-analysis gives new numbers, and the case report
@@ -1214,6 +1286,41 @@ class DragenTSO500CombinedVariantOutput(SpecimenClaimMixin, TimeStampedModel):
     def __str__(self):
         return f"{self.pair_id} ({self.sequencing_run_name})"
 
+    def get_absolute_url(self) -> str:
+        """ The pair's page - the analysis and its library QC together """
+        return reverse("view_tso500_pair", kwargs={"sequencing_run_name": self.sequencing_run_name,
+                                                   "pair_id": self.pair_id})
+
+    @classmethod
+    def preview_category(cls) -> str:
+        return "TSO500 analysis"
+
+    @classmethod
+    def preview_icon(cls) -> str:
+        return "fa-solid fa-microscope"
+
+    @classmethod
+    def preview_enabled(cls) -> bool:
+        return settings.VARIANT_GENE_LEVEL_ENABLED
+
+    @property
+    def preview(self) -> PreviewData:
+        parts = []
+        if self.total_tmb is not None:
+            tmb = f"{self.total_tmb:g} mut/Mb"
+            if self.tmb_call and self.tmb_call.call:
+                tmb = f"{tmb} ({self.tmb_call.call})"
+            parts.append(PreviewKeyValue(key="TMB", value=tmb))
+        if self.percent_unstable_msi_sites is not None:
+            msi = f"{self.percent_unstable_msi_sites:g}% unstable MSI sites"
+            if self.msi_call and self.msi_call.call:
+                msi = f"{msi} ({self.msi_call.call})"
+            parts.append(PreviewKeyValue(key="MSI", value=msi))
+        if self.genomic_instability_score is not None:
+            parts.append(PreviewKeyValue(key="GIS", value=f"{self.genomic_instability_score:g}"))
+        return self.preview_with(identifier=self.pair_id, title=self.sequencing_run_name,
+                                 summary_extra=parts)
+
     @property
     def method(self) -> str:
         """ 'DRAGEN TSO500 CombinedVariantOutput 2.1.1' - the software that wrote the numbers """
@@ -1260,16 +1367,20 @@ class DragenTSO500CombinedVariantOutput(SpecimenClaimMixin, TimeStampedModel):
 
     def link_samples(self) -> bool:
         """ Each arm's Sample, where one has been imported. An arm has a VCF per caller, all of whose samples
-            carry the sample ID, so one linked to this run wins, then the newest. Returns whether any link changed """
+            carry the sample ID - bar a single-sample VCF that names its one sample something of its own
+            (SpliceGirl's is 'SAMPLE'), which seqauto matched to the arm's SequencingSample by filename. One
+            linked to this run wins, then the newest. Returns whether any link changed """
         changed = False
         for nucleic_acid, sample_id in self.arm_sample_names.items():
             field = "dna_sample" if nucleic_acid == NucleicAcid.DNA else "rna_sample"
             if getattr(self, f"{field}_id"):
                 continue
-            samples = Sample.objects.filter(vcf_sample_name=sample_id)
-            if self.file_upload_id:
-                # The CVO's own record-less VCF is named for the RNA arm and holds no calls
-                samples = samples.exclude(vcf__uploadedvcf__file_upload=self.file_upload_id)
+            arm_q = Q(vcf_sample_name=sample_id)
+            sequencing_sample_field = "dna_sequencing_sample" if nucleic_acid == NucleicAcid.DNA \
+                else "rna_sequencing_sample"
+            if sequencing_sample_id := getattr(self, f"{sequencing_sample_field}_id"):
+                arm_q |= Q(samplefromsequencingsample__sequencing_sample=sequencing_sample_id)
+            samples = Sample.objects.filter(arm_q).exclude(import_status__in=ImportStatus.DELETION_STATES)
             if self.sequencing_run_id:
                 on_run = samples.filter(vcf__vcffromsequencingrun__sequencing_run=self.sequencing_run_id)
                 samples = on_run if on_run.exists() else samples
@@ -1280,10 +1391,20 @@ class DragenTSO500CombinedVariantOutput(SpecimenClaimMixin, TimeStampedModel):
 
     @classmethod
     def link_arm_sample(cls, sample: Sample, sequencing_run: SequencingRun) -> int:
-        """ A run's arm VCF landing after the CVO - the rows on that run waiting on the arm the sample is """
+        """ A run's arm VCF landing after the CVO - the rows on that run waiting on the arm the sample is,
+            which is the sample's name, or the SequencingSample seqauto just matched it to """
         rows = cls.objects.filter(sequencing_run_name=sequencing_run.name)
-        return rows.filter(dna_sample__isnull=True, dna_sample_name=sample.vcf_sample_name).update(dna_sample=sample) + \
-            rows.filter(rna_sample__isnull=True, rna_sample_name=sample.vcf_sample_name).update(rna_sample=sample)
+        sfss = SampleFromSequencingSample.objects.filter(sample=sample).first()
+        linked = 0
+        for arm in ("dna", "rna"):
+            arm_q = Q()
+            if sample.vcf_sample_name:
+                arm_q |= Q(**{f"{arm}_sample_name": sample.vcf_sample_name})
+            if sfss:
+                arm_q |= Q(**{f"{arm}_sequencing_sample": sfss.sequencing_sample})
+            if arm_q:
+                linked += rows.filter(arm_q, **{f"{arm}_sample__isnull": True}).update(**{f"{arm}_sample": sample})
+        return linked
 
     def link_sequencing_samples(self) -> bool:
         """ Each arm's row on the run's current sheet - by the sheet's Pair_ID / Sample_Type data, else by
@@ -1303,25 +1424,6 @@ class DragenTSO500CombinedVariantOutput(SpecimenClaimMixin, TimeStampedModel):
                 setattr(self, field, sequencing_sample)
                 changed = True
         return changed
-
-
-def _number_text(value) -> str:
-    """ A metric's number as the file wrote it - 184, not 184.0 """
-    return f"{value:g}" if isinstance(value, (int, float)) else "no value"
-
-
-def library_qc_guideline(lsl, usl) -> str:
-    """ A metric's guideline in words. A zero lower bound is no bound in practice - none of these
-        metrics can go negative - so it is left off rather than read as policy """
-    lower = f"{lsl:g}" if lsl else None
-    upper = f"{usl:g}" if usl is not None else None
-    if lower and upper:
-        return f"{lower} - {upper}"
-    if lower:
-        return f">= {lower}"
-    if upper:
-        return f"<= {upper}"
-    return ""
 
 
 class QCType(models.Model):

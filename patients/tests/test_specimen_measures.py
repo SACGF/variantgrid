@@ -58,4 +58,8 @@ class SpecimenPageMeasuresTest(TestCase):
         self.assertIn("failed", html)
         self.assertIn("260101_M02027_0001_000000000-TSO500", html)
         self.assertIn("5_C0000001_FCUP_2600000001", html)
-        self.assertIn("GENE_SCALED_MAD 0.9 (&lt;= 0.134)", html)
+        self.assertIn("CNV", html)
+        # The metrics themselves are on the pair's page, which the summary links to
+        self.assertIn(reverse("view_tso500_pair",
+                              kwargs={"sequencing_run_name": "260101_M02027_0001_000000000-TSO500",
+                                      "pair_id": "5_C0000001_FCUP_2600000001"}), html)

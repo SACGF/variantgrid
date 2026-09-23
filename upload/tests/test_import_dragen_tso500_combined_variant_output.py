@@ -2,18 +2,11 @@
 import os
 import tempfile
 
-import cyvcf2
-import simplejson
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 from django.utils import timezone
 
-from genes.gene_splice import coordinate_label
-from genes.models import HGNC, GeneSymbol, HGNCImport, SpliceEvent
-from genes.models_enums import HGNCStatus
-from library.genomics.vcf_enums import GeneIdNamespace, GeneLevelSymbolicAlt
-from library.genomics.vcf_writer import percent_decode_info_value
 from library.guardian_utils import assign_permission_to_user_and_groups
 from patients.models import Extraction, Patient, Specimen
 from patients.models_enums import MatchStatus, NucleicAcid
@@ -21,40 +14,27 @@ from patients.tasks.extraction_matching_tasks import link_combined_variant_outpu
 from seqauto.models import (
     DragenTSO500CombinedVariantOutput,
     SampleFromSequencingSample,
-    VCFFromSequencingRun,
     band_call,
 )
 from seqauto.tests.test_extraction_link import make_sample_sheet, make_sequencing_run
-from snpdb.gene_level_variants import GENE_LEVEL_CONTIG_NAME
-from snpdb.models import VCF, GenomeBuild, ImportSource, Sample, VCFSourceSettings
-from snpdb.models.models_enums import ProcessingStatus
-from upload.import_task_factories.import_task_factories import (
-    DragenTSO500CombinedVariantOutputImportTaskFactory,
-)
+from snpdb.models import VCF, GenomeBuild, ImportSource, Sample
 from upload.import_task_factories.import_task_factory import get_import_task_factories
 from upload.models import (
     FileUpload,
-    SimpleVCFImportInfo,
+    UploadedDragenTSO500CombinedVariantOutput,
     UploadedFileTypes,
     UploadedVCF,
     UploadPipeline,
-    UploadStep,
 )
 from upload.tasks.import_dragen_tso500_combined_variant_output_task import (
-    ALT_READS_FORMAT,
-    REF_READS_FORMAT,
-    DragenTSO500CombinedVariantOutputCreateVCFTask,
-    DragenTSO500CombinedVariantOutputInsertTask,
+    ImportDragenTSO500CombinedVariantOutputTask,
 )
-from upload.tasks.vcf.import_vcf_step_task import ImportVCFStepTask
 from upload.tso500.dragen_combined_variant_output_parser import (
     AFFECTED_EXON,
     BREAKPOINT_1,
     DNA_SAMPLE_ID,
     PAIR_ID,
     RNA_SAMPLE_ID,
-    SPLICE_INFO,
-    SPLICE_OBSERVATION_INFO,
     can_process_file,
     get_analysis_details,
     get_splice_rows,
@@ -63,7 +43,6 @@ from upload.tso500.dragen_combined_variant_output_parser import (
 from upload.tso500.dragen_combined_variant_output_records import (
     CombinedVariantOutputIdentityError,
     link_samples_to_extractions,
-    link_to_sequencing_run,
     parse_pair_identifiers,
     resolve_pair,
     write_combined_variant_output,
@@ -133,30 +112,6 @@ class TestCombinedVariantOutputParser(TestCase):
         self.assertFalse(can_process_file(os.path.join(settings.BASE_DIR, "seqauto", "test_data",
                                                        "reference_data", "canonical",
                                                        "fake_kit.GeneTable.tsv")))
-
-
-class TestSampleVCF(TestCase):
-    """ The VCF the loader writes - no variants, only the RNA arm's Sample for the rest of the file """
-
-    def test_names_the_rna_sample_and_the_module_and_has_no_records(self):
-        user = User.objects.get_or_create(username='testuser')[0]
-        vcf_filename = os.path.join(settings.PRIVATE_DATA_ROOT, "combined_variant_output.vcf")
-        file_upload = FileUpload.objects.create(path=COMBINED_VARIANT_OUTPUT,
-                                                import_source=ImportSource.COMMAND_LINE,
-                                                user=user,
-                                                name="ExampleSample_2600000001_CombinedVariantOutput.tsv",
-                                                file_type=UploadedFileTypes.DRAGEN_TSO500_COMBINED_VARIANT_OUTPUT)
-        upload_pipeline = UploadPipeline.objects.create(file_upload=file_upload)
-        upload_step = UploadStep.objects.create(upload_pipeline=upload_pipeline,
-                                                name="Create Sample VCF", sort_order=0,
-                                                input_filename=COMBINED_VARIANT_OUTPUT,
-                                                output_filename=vcf_filename)
-        DragenTSO500CombinedVariantOutputCreateVCFTask.process_items(upload_step)
-
-        reader = cyvcf2.VCF(vcf_filename)
-        self.assertEqual(["ExampleSample_RNA_2600000001B"], reader.samples)
-        self.assertIn("DRAGEN TSO500 CombinedVariantOutput 2.1.1", reader.raw_header)
-        self.assertEqual([], list(reader), "the splice calls come from SpliceVariants.vcf (#1903)")
 
 
 # The bands SA Path reports against, as its settings state them
@@ -285,24 +240,6 @@ class TestCombinedVariantOutputRecords(TestCase):
             self.assertEqual(resolved.extractions[sample_id], sample.extraction)
             self.assertEqual(MatchStatus.MATCHED, sample.extraction_match_status)
 
-    def test_the_rna_arm_links_the_vcf_to_its_sequencing_run(self):
-        rna_sample_id = self.identifiers.rna.sample_id
-        sequencing_run = make_sequencing_run("TSO500_CVO")
-        _sample_sheet, sequencing_samples = make_sample_sheet(sequencing_run, [rna_sample_id])
-        sample = self._make_sample(rna_sample_id)
-
-        self.assertEqual(sequencing_run, link_to_sequencing_run(sample.vcf, sample, rna_sample_id))
-        self.assertTrue(VCFFromSequencingRun.objects.filter(vcf=sample.vcf,
-                                                            sequencing_run=sequencing_run).exists())
-        self.assertTrue(SampleFromSequencingSample.objects.filter(
-            sample=sample, sequencing_sample=sequencing_samples[0]).exists())
-
-    def test_a_sample_sheet_without_the_arm_leaves_no_link_rows(self):
-        sample = self._make_sample(self.identifiers.rna.sample_id)
-        make_sample_sheet(make_sequencing_run("TSO500_OTHER"), ["SOMETHING_ELSE"])
-        self.assertIsNone(link_to_sequencing_run(sample.vcf, sample, self.identifiers.rna.sample_id))
-        self.assertFalse(VCFFromSequencingRun.objects.filter(vcf=sample.vcf).exists())
-
     def _write(self, sequencing_run_name="TSO500_CVO", sequencing_run=None, resolve=True):
         resolved = resolve_pair(self.identifiers, self.user) if resolve else None
         return write_combined_variant_output(self.sections, self.identifiers.pair_id, sequencing_run,
@@ -409,83 +346,90 @@ class TestCombinedVariantOutputRecords(TestCase):
         self.assertIsNone(cvo.tmb_call)
 
 
-class TestCombinedVariantOutputInsertTask(TestCase):
-    """ The step that runs once the Sample exists - the whole of the rest of the file """
+
+    def test_a_splicegirl_arm_vcf_landing_later_fills_the_waiting_row(self):
+        """ The RNA arm's SpliceVariants.vcf names its one sample 'SAMPLE', so the arm it is comes off
+            the SequencingSample seqauto matched it to by filename rather than the name """
+        sequencing_run = make_sequencing_run("TSO500_CVO")
+        _sample_sheet, (_dna_ss, rna_ss) = make_sample_sheet(sequencing_run,
+                                                             [self.identifiers.dna.sample_id,
+                                                              self.identifiers.rna.sample_id])
+        cvo = self._write(sequencing_run=sequencing_run)
+        splice_sample = self._make_sample("SAMPLE")
+        SampleFromSequencingSample.objects.create(sample=splice_sample, sequencing_sample=rna_ss)
+
+        self.assertEqual(1, DragenTSO500CombinedVariantOutput.link_arm_sample(splice_sample, sequencing_run))
+        cvo.refresh_from_db()
+        self.assertEqual(splice_sample, cvo.rna_sample)
+
+
+class TestCombinedVariantOutputImportTask(TestCase):
+    """ The single shot import - the file has no variants and no coordinates, so there is no VCF """
 
     def setUp(self):
-        self.user = User.objects.create_user(username="cvo_insert_user")
+        self.user = User.objects.create_user(username="cvo_import_user")
         self.rna_sample_id = "ExampleSample_RNA_2600000001B"
-        vcf = VCF.objects.create(name=self.rna_sample_id, date=timezone.now(), user=self.user,
-                                 genotype_samples=1, genome_build=GenomeBuild.grch37())
-        assign_permission_to_user_and_groups(self.user, vcf)
-        self.sample = Sample.objects.create(vcf=vcf, name=self.rna_sample_id,
-                                            vcf_sample_name=self.rna_sample_id)
+
+    def _file_upload(self, metadata=None) -> FileUpload:
         file_upload = FileUpload.objects.create(path=COMBINED_VARIANT_OUTPUT,
                                                 import_source=ImportSource.COMMAND_LINE,
                                                 user=self.user,
                                                 name="ExampleSample_2600000001_CombinedVariantOutput.tsv",
-                                                file_type=UploadedFileTypes.DRAGEN_TSO500_COMBINED_VARIANT_OUTPUT)
-        self.upload_pipeline = UploadPipeline.objects.create(file_upload=file_upload)
-        UploadedVCF.objects.create(file_upload=file_upload, upload_pipeline=self.upload_pipeline,
-                                   vcf=vcf)
-        self.upload_step = UploadStep.objects.create(upload_pipeline=self.upload_pipeline,
-                                                     name="CombinedVariantOutput records",
-                                                     sort_order=1)
+                                                file_type=UploadedFileTypes.DRAGEN_TSO500_COMBINED_VARIANT_OUTPUT,
+                                                metadata=metadata or {})
+        UploadPipeline.objects.create(file_upload=file_upload)
+        return file_upload
 
-    def _set_sequencing_run_metadata(self, sequencing_run_name: str):
-        file_upload = self.upload_pipeline.file_upload
-        file_upload.metadata = {SEQUENCING_RUN: sequencing_run_name}
-        file_upload.save()
+    def _make_sample(self, sample_name: str) -> Sample:
+        vcf = VCF.objects.create(name=sample_name, date=timezone.now(), user=self.user,
+                                 genotype_samples=1, genome_build=GenomeBuild.grch37())
+        assign_permission_to_user_and_groups(self.user, vcf)
+        return Sample.objects.create(vcf=vcf, name=sample_name, vcf_sample_name=sample_name)
 
-    def test_the_pair_lands_with_its_sample_and_analysis(self):
-        self._set_sequencing_run_metadata("TSO500_INSERT")
-        self.assertEqual(1, DragenTSO500CombinedVariantOutputInsertTask.process_items(self.upload_step))
+    def test_the_pair_lands_with_its_chain_and_analysis(self):
+        file_upload = self._file_upload({SEQUENCING_RUN: "TSO500_IMPORT"})
+        sample = self._make_sample(self.rna_sample_id)
+
+        self.assertEqual(1, ImportDragenTSO500CombinedVariantOutputTask.process_items(file_upload))
 
         patient = Patient.objects.get(patient_code="C0000001")
         specimen = Specimen.objects.get(patient=patient, reference_id="2600000001")
-        self.sample.refresh_from_db()
-        self.assertEqual("2600000001B", self.sample.extraction.reference_id)
-        self.assertEqual(specimen, self.sample.extraction.specimen)
+        sample.refresh_from_db()
+        self.assertEqual("2600000001B", sample.extraction.reference_id)
+        self.assertEqual(specimen, sample.extraction.specimen)
         cvo = DragenTSO500CombinedVariantOutput.objects.get(specimen=specimen)
-        self.assertEqual("TSO500_INSERT", cvo.sequencing_run_name)
-        self.assertEqual(self.upload_pipeline.file_upload, cvo.file_upload)
-        self.assertIsNone(cvo.rna_sample, "the CVO's own record-less VCF is not the RNA arm's calls")
+        self.assertEqual("TSO500_IMPORT", cvo.sequencing_run_name)
+        self.assertEqual(file_upload, cvo.file_upload)
+        self.assertEqual(sample, cvo.rna_sample)
+        self.assertTrue(UploadedDragenTSO500CombinedVariantOutput.objects.filter(
+            file_upload=file_upload).exists())
+        self.assertFalse(UploadedVCF.objects.filter(file_upload=file_upload).exists())
 
     def test_without_metadata_the_run_is_the_one_whose_sheet_names_the_pair(self):
-        sequencing_run = make_sequencing_run("TSO500_INSERT")
+        sequencing_run = make_sequencing_run("TSO500_IMPORT")
         make_sample_sheet(sequencing_run, [self.rna_sample_id])
 
-        DragenTSO500CombinedVariantOutputInsertTask.process_items(self.upload_step)
+        ImportDragenTSO500CombinedVariantOutputTask.process_items(self._file_upload())
         self.assertEqual(sequencing_run, DragenTSO500CombinedVariantOutput.objects.get().sequencing_run)
 
-    def test_an_unregistered_sequencing_sample_is_a_message_not_a_failure(self):
-        """ Nor is a pair no run names - the analysis cannot be keyed, and the page says so """
-        DragenTSO500CombinedVariantOutputInsertTask.process_items(self.upload_step)
-        messages = "\n".join(m.message for m in SimpleVCFImportInfo.objects.filter(
-            upload_step__upload_pipeline=self.upload_pipeline))
-        self.assertIn(self.rna_sample_id, messages)
-        self.assertIn("TMB, MSI and GIS are not recorded", messages)
-        self.assertFalse(VCFFromSequencingRun.objects.exists())
+    def test_a_pair_no_run_names_fails_the_import_saying_so(self):
+        """ The run is half the row's key, so there is nowhere to put the analysis """
+        file_upload = self._file_upload()
+
+        with self.assertRaises(ValueError) as cm:
+            ImportDragenTSO500CombinedVariantOutputTask.process_items(file_upload)
+
+        self.assertIn(SEQUENCING_RUN, str(cm.exception))
         self.assertFalse(DragenTSO500CombinedVariantOutput.objects.exists())
 
-    def test_the_seqauto_rows_are_written_for_the_rna_arm(self):
-        sequencing_run = make_sequencing_run("TSO500_INSERT")
-        _sample_sheet, sequencing_samples = make_sample_sheet(sequencing_run, [self.rna_sample_id])
+    def test_a_splicegirl_sample_is_the_rna_arm(self):
+        """ SpliceGirl's one sample is called 'SAMPLE', so the arm comes off its sequencing sample """
+        sequencing_run = make_sequencing_run("TSO500_IMPORT")
+        _sample_sheet, (rna_ss,) = make_sample_sheet(sequencing_run, [self.rna_sample_id])
+        splice_sample = self._make_sample("SAMPLE")
+        SampleFromSequencingSample.objects.create(sample=splice_sample, sequencing_sample=rna_ss)
 
-        DragenTSO500CombinedVariantOutputInsertTask.process_items(self.upload_step)
-        self.assertTrue(VCFFromSequencingRun.objects.filter(vcf=self.sample.vcf,
-                                                            sequencing_run=sequencing_run).exists())
-        self.assertTrue(SampleFromSequencingSample.objects.filter(
-            sample=self.sample, sequencing_sample=sequencing_samples[0]).exists())
+        ImportDragenTSO500CombinedVariantOutputTask.process_items(
+            self._file_upload({SEQUENCING_RUN: "TSO500_IMPORT"}))
 
-    def test_a_pair_with_no_splice_calls_still_gets_its_records(self):
-        """ Most pairs have no splice call, which is an empty VCF - and that skips every step
-            waiting on data insertion """
-        self.upload_step.delete()
-        DragenTSO500CombinedVariantOutputImportTaskFactory().create_import_task(self.upload_pipeline)
-        steps = {step.name: step for step in self.upload_pipeline.uploadstep_set.all()}
-        ImportVCFStepTask._handle_no_vcf_records(steps["Schedule Parallel VCF Processing tasks"])
-
-        statuses = dict(self.upload_pipeline.uploadstep_set.values_list("name", "status"))
-        self.assertEqual(ProcessingStatus.SKIPPED, statuses["VCFCheckAnnotationTask"])
-        self.assertEqual(ProcessingStatus.CREATED, statuses[DragenTSO500CombinedVariantOutputInsertTask.__name__])
+        self.assertEqual(splice_sample, DragenTSO500CombinedVariantOutput.objects.get().rna_sample)

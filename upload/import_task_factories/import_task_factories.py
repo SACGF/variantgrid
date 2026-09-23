@@ -15,6 +15,7 @@ from upload.models import (
     UploadedAnalysis,
     UploadedBed,
     UploadedClassificationImport,
+    UploadedDragenTSO500CombinedVariantOutput,
     UploadedDragenTSO500MetricsOutput,
     UploadedFileTypes,
     UploadedGeneCoverage,
@@ -43,8 +44,7 @@ from upload.tasks.import_dragen_tso500_all_fusions_task import (
     DragenTSO500AllFusionsInsertTask,
 )
 from upload.tasks.import_dragen_tso500_combined_variant_output_task import (
-    DragenTSO500CombinedVariantOutputCreateVCFTask,
-    DragenTSO500CombinedVariantOutputInsertTask,
+    ImportDragenTSO500CombinedVariantOutputTask,
 )
 from upload.tasks.import_dragen_tso500_metrics_output_task import (
     ImportDragenTSO500MetricsOutputTask,
@@ -195,13 +195,16 @@ class DragenTSO500AllFusionsImportTaskFactory(AbstractVCFImportTaskFactory):
         return [ImportGenotypeVCFSuccessTask]
 
 
-class DragenTSO500CombinedVariantOutputImportTaskFactory(AbstractVCFImportTaskFactory):
+class DragenTSO500CombinedVariantOutputImportTaskFactory(ImportTaskFactory):
     """ Illumina DRAGEN TSO 500's CombinedVariantOutput.tsv - one vendor's format, not a standard.
 
         No variants come from it (the splice calls come from SpliceVariants.vcf, @see
         SpliceGirlImportTaskFactory): it is the pair's patient chain, seqauto links and TMB/MSI/GIS,
-        written against the RNA arm's Sample, which a VCF of no records makes through the normal
-        header step. @see upload.tasks.import_dragen_tso500_combined_variant_output_task
+        which have no coordinates, so it is a single shot import rather than a VCF pipeline
+        (@see upload.tasks.import_dragen_tso500_combined_variant_output_task).
+
+        The file names its run 'NA', and that run keys the DragenTSO500CombinedVariantOutput row, so
+        'sequencing_run' metadata is taken where the run cannot be found from the pair's sample IDs.
 
         A tsv full of gene symbols, so GeneListImportTaskFactory would otherwise claim it on its
         default ability of 1 """
@@ -216,57 +219,19 @@ class DragenTSO500CombinedVariantOutputImportTaskFactory(AbstractVCFImportTaskFa
     def get_possible_extensions(self):
         return ['tsv']
 
-    def get_data_classes(self):
-        return [UploadedVCF]
-
     def get_metadata_keys(self):
-        # Becomes a VCF with a sample, so it takes the same keys a VCF does - including genome_build,
-        # which the file itself declares nowhere - and the run, which it names 'NA' and which keys the
-        # DragenTSO500CombinedVariantOutput row
-        return VCF_METADATA_KEYS | {SEQUENCING_RUN}
+        return frozenset({SEQUENCING_RUN})
+
+    def get_data_classes(self):
+        return [UploadedDragenTSO500CombinedVariantOutput]
 
     def get_processing_ability(self, user, filename, file_extension):
         if dragen_combined_variant_output_parser.can_process_file(filename):
             return 1000
         return 0
 
-    def _get_vcf_filename(self, upload_pipeline) -> str:
-        return get_import_processing_filename(upload_pipeline.pk,
-                                              "dragen_tso500_combined_variant_output.vcf")
-
-    def get_pre_vcf_task(self, upload_pipeline):
-        """ Write the VCF that makes the RNA arm's Sample """
-        upload_step = UploadStep.objects.create(upload_pipeline=upload_pipeline,
-                                                name="Create DRAGEN TSO500 CombinedVariantOutput Sample VCF",
-                                                sort_order=self.get_sort_order(),
-                                                task_type=UploadStepTaskType.CELERY,
-                                                pipeline_stage=VCFPipelineStage.PRE_DATA_INSERTION,
-                                                script=full_class_name(DragenTSO500CombinedVariantOutputCreateVCFTask),
-                                                input_filename=upload_pipeline.file_upload.get_filename(),
-                                                output_filename=self._get_vcf_filename(upload_pipeline))
-        return DragenTSO500CombinedVariantOutputCreateVCFTask.si(upload_step.pk, 0)
-
-    def get_create_data_from_vcf_header_task_class(self):
-        # The VCF we wrote declares its sample and source, so the standard header path makes the
-        # VCF/Sample/Cohort/CohortGenotypeCollection the way it does for a lab's VCF
-        return ImportCreateVCFModelForGenotypeVCFTask
-
-    def _get_preprocess_class(self) -> type:
-        return GeneLevelPreprocessVCFTask
-
-    def get_known_variants_parallel_vcf_processing_task_class(self):
-        return ProcessGenotypeVCFDataTask
-
-    def get_post_vcf_header_classes(self):
-        # The rest of the file: the pair's patient chain, seqauto links and TMB/MSI/GIS. It needs only
-        # the Sample - the VCF has no records, which skips every step waiting on data insertion
-        return [DragenTSO500CombinedVariantOutputInsertTask]
-
-    def get_post_data_insertion_classes(self):
-        return [VCFCheckAnnotationTask]
-
-    def get_finish_task_classes(self):
-        return [ImportGenotypeVCFSuccessTask]
+    def create_import_task(self, upload_pipeline):
+        return ImportDragenTSO500CombinedVariantOutputTask.si(upload_pipeline.pk)
 
 
 class DragenTSO500MetricsOutputImportTaskFactory(ImportTaskFactory):

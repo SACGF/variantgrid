@@ -1,0 +1,142 @@
+{% extends "seqauto/menu_sequencing_data_base.html" %}
+{% load ui_utils %}
+{% block title %}{{ pair_id }} ({{ sequencing_run_name }}){% endblock %}
+{% block submenu_page_content %}
+    {# One TSO 500 pair on one run - the DRAGEN analysis of it and the library QC of its arms #}
+    <div class="container">
+        <h3>TSO 500 pair: {{ pair_id }}</h3>
+
+        {% labelled label="Sequencing run" %}
+            {% if sequencing_run %}<a href="{{ sequencing_run.get_absolute_url }}">{{ sequencing_run_name }}</a>
+            {% else %}{{ sequencing_run_name }} <span class="text-muted">(not registered)</span>{% endif %}
+        {% endlabelled %}
+        {% labelled label="Specimen" %}
+            {% if specimen %}
+                <a href="{{ specimen.get_absolute_url }}">{{ specimen.reference_id }}</a>
+                (<a href="{% url 'view_patient' specimen.patient_id %}">{{ specimen.patient }}</a>)
+            {% else %}
+                {{ specimen_reference|default:"-" }} <span class="text-muted">(unmatched)</span>
+                {% if specimen_match_error %}<div class="text-danger small">{{ specimen_match_error }}</div>{% endif %}
+            {% endif %}
+        {% endlabelled %}
+
+        <hr/>
+        <h4>Arms</h4>
+        <table class="table">
+            <thead><tr><th>Arm<th>Sample ID<th>Sequencing sample<th>Sample<th>Library QC</tr></thead>
+            <tbody>
+            {% for arm in arms %}
+                <tr>
+                    <td>{{ arm.nucleic_acid }}
+                    <td>{{ arm.sample_name|default:"-" }}
+                    <td>{% if arm.sequencing_sample %}{{ arm.sequencing_sample.sample_name }}{% else %}<span class="text-muted">waiting on the run's sample sheet</span>{% endif %}
+                    <td>{% if arm.sample %}<a href="{% url 'view_sample' arm.sample.pk %}">{{ arm.sample.name }}</a>{% else %}<span class="text-muted">waiting on the arm's VCF</span>{% endif %}
+                    <td>{% if arm.library_qc %}{{ arm.library_qc|length }} categor{{ arm.library_qc|length|pluralize:"y,ies" }}{% else %}-{% endif %}
+                </tr>
+            {% empty %}
+                <tr><td colspan="5">Neither arm of this pair is named yet.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+
+        <hr/>
+        <h4>DRAGEN analysis</h4>
+        {% if cvo %}
+            <h5>Analysis details</h5>
+            {% labelled label="Pair ID" %}{{ cvo.pair_id }}{% endlabelled %}
+            {% labelled label="DNA sample ID" %}{{ cvo.dna_sample_name|default:"-" }}{% endlabelled %}
+            {% labelled label="RNA sample ID" %}{{ cvo.rna_sample_name|default:"-" }}{% endlabelled %}
+            {% labelled label="Output" %}{{ cvo.output_datetime|default_if_none:"-" }}{% endlabelled %}
+            {% labelled label="Module version" %}{{ cvo.module_version|default:"-" }}{% endlabelled %}
+            {% labelled label="Pipeline version" %}{{ cvo.pipeline_version|default:"-" }}{% endlabelled %}
+
+            <h5>TMB</h5>
+            {% labelled label="Total TMB" %}
+                {{ cvo.total_tmb|default_if_none:"-" }}{% if cvo.total_tmb != None %} mut/Mb{% endif %}
+                {% if cvo.tmb_call %}
+                    {% if cvo.tmb_call.call %}<b>{{ cvo.tmb_call.call }}</b>{% endif %}
+                    <div class="text-muted small">{{ cvo.tmb_call.threshold }} ({{ cvo.tmb_call.threshold_source }})</div>
+                {% endif %}
+            {% endlabelled %}
+            {% labelled label="Coding region size" %}{{ cvo.coding_region_size_mb|default_if_none:"-" }}{% if cvo.coding_region_size_mb != None %} Mb{% endif %}{% endlabelled %}
+            {% labelled label="Passing eligible variants" %}{{ cvo.passing_eligible_variants|default_if_none:"-" }}{% endlabelled %}
+
+            <h5>MSI</h5>
+            {% labelled label="Unstable MSI sites" %}
+                {{ cvo.percent_unstable_msi_sites|default_if_none:"-" }}{% if cvo.percent_unstable_msi_sites != None %}%{% endif %}
+                {% if cvo.msi_call %}
+                    {% if cvo.msi_call.call %}<b>{{ cvo.msi_call.call }}</b>{% endif %}
+                    <div class="text-muted small">{{ cvo.msi_call.threshold }} ({{ cvo.msi_call.threshold_source }})</div>
+                {% endif %}
+            {% endlabelled %}
+            {% labelled label="Usable MSI sites" %}{{ cvo.usable_msi_sites|default_if_none:"-" }}{% endlabelled %}
+            {% labelled label="Total MSI sites unstable" %}{{ cvo.total_msi_sites_unstable|default_if_none:"-" }}{% endlabelled %}
+
+            <h5>GIS</h5>
+            {% labelled label="Genomic instability score" %}{{ cvo.genomic_instability_score|default_if_none:"-" }}{% endlabelled %}
+            {% labelled label="Tumour fraction" %}{{ cvo.tumor_fraction|default_if_none:"-" }}{% endlabelled %}
+            {% labelled label="Ploidy" %}{{ cvo.ploidy|default_if_none:"-" }}{% endlabelled %}
+
+            {% labelled label="Method" %}{{ cvo.method }}{% endlabelled %}
+            {% if cvo_file_upload %}
+                {% labelled label="Uploaded file" %}
+                    <a href="{% url 'view_uploaded_file' cvo_file_upload.pk %}">{{ cvo_file_upload.name }}</a>
+                {% endlabelled %}
+            {% endif %}
+        {% else %}
+            <p>No CombinedVariantOutput has been uploaded for this pair.</p>
+        {% endif %}
+
+        <hr/>
+        <h4>Library QC</h4>
+        {% for arm in arms %}
+            {% if arm.library_qc %}
+                <h5>{{ arm.nucleic_acid }}</h5>
+                <table class="table">
+                    <thead><tr><th>Category<th>QC<th>Run completed<th>Metrics<th>Measured</tr></thead>
+                    <tbody>
+                    {% for qc in arm.library_qc %}
+                        <tr>
+                            <td>{{ qc.get_category_display }}
+                            <td>{{ qc.status_description }}
+                            <td>{{ qc.completed|default_if_none:"-" }}
+                            <td>
+                                {% if qc.metric_rows %}
+                                    <a data-toggle="collapse" href="#metrics-{{ qc.pk }}">{{ qc.metric_rows|length }} metric{{ qc.metric_rows|length|pluralize }}</a>
+                                    <div class="collapse" id="metrics-{{ qc.pk }}">
+                                        <table class="table table-sm">
+                                            <thead><tr><th>Metric<th>Value<th>Unit<th>LSL<th>USL<th>Guideline<th>Source<th>QC</tr></thead>
+                                            <tbody>
+                                            {% for metric in qc.metric_rows %}
+                                                <tr>
+                                                    <td>{{ metric.name }}
+                                                    <td>{{ metric.value_text }}
+                                                    <td>{{ metric.unit|default:"-" }}
+                                                    <td>{{ metric.lsl|default_if_none:"-" }}
+                                                    <td>{{ metric.usl|default_if_none:"-" }}
+                                                    <td>{{ metric.guideline|default:"-" }}
+                                                    <td class="small">{{ metric.guideline_source|default:"-" }}
+                                                    <td>{% if metric.passed == None %}-{% elif metric.passed %}passed{% else %}<span class="text-danger">failed</span>{% endif %}
+                                                </tr>
+                                            {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                {% else %}-{% endif %}
+                            <td>{{ qc.measured_date|default_if_none:"-" }}
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            {% endif %}
+        {% endfor %}
+        {% if qc_file_upload %}
+            {% labelled label="Uploaded file" %}
+                <a href="{% url 'view_uploaded_file' qc_file_upload.pk %}">{{ qc_file_upload.name }}</a>
+            {% endlabelled %}
+        {% endif %}
+        {% if not has_library_qc %}
+            <p>No MetricsOutput has been uploaded for this pair.</p>
+        {% endif %}
+    </div>
+{% endblock %}

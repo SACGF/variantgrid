@@ -29,6 +29,10 @@
                 {% endfor %}
             </div>
         {% endif %}
+        {% if combined_variant_outputs %}
+            <h5>Sequencing analyses</h5>
+            {% include "seqauto/combined_variant_output_table.html" with show_specimen=True %}
+        {% endif %}
         <form id="patient-specimens-form" method="post" action="{% url 'view_patient_specimens' patient.pk %}">
             {% csrf_token %}
             {% crispy specimen_formset form_helper.horizontal %}

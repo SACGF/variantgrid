@@ -16,5 +16,6 @@ class SeqautoConfig(AppConfig):
             experiment_search,
             seqauto_integration_status,
             sequencing_run_search,
+            tso500_pair_search,
         )
         # pylint: enable=import-outside-toplevel,unused-import

@@ -9,7 +9,7 @@
             {% else %}
                 <td>{% if cvo.sequencing_run_id %}<a href="{{ cvo.sequencing_run.get_absolute_url }}">{{ cvo.sequencing_run_name }}</a>{% else %}{{ cvo.sequencing_run_name }}{% endif %}
             {% endif %}
-            <td>{{ cvo.pair_id }}
+            <td><a href="{{ cvo.get_absolute_url }}">{{ cvo.pair_id }}</a>
             <td class="small">{{ cvo.dna_sample_name|default:"" }}{% if cvo.dna_sample_name and cvo.rna_sample_name %}<br/>{% endif %}{{ cvo.rna_sample_name|default:"" }}
             <td>{{ cvo.total_tmb|default_if_none:"-" }}{% if cvo.total_tmb != None %} mut/Mb{% endif %}{% if cvo.tmb_call.call %} ({{ cvo.tmb_call.call }}){% endif %}
             <td>{{ cvo.percent_unstable_msi_sites|default_if_none:"-" }}{% if cvo.percent_unstable_msi_sites != None %}%{% endif %}{% if cvo.msi_call.call %} ({{ cvo.msi_call.call }}){% endif %}

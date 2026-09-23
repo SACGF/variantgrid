@@ -25,6 +25,7 @@ from patients.models import (
 )
 from patients.models_enums import MatchStatus
 from seqauto.models import DragenTSO500CombinedVariantOutput, LibraryQC, SequencingSample
+from seqauto.qc.library_qc_summary import summarise_library_qc
 from snpdb.models import Sample
 from uicore.utils.form_helpers import form_helper_horizontal
 
@@ -94,6 +95,11 @@ def view_patient_specimens(request, patient_id):
     context = {"patient": patient,
                "num_specimens": patient.num_specimens,
                "specimen_formset": specimen_formset,
+               # Each sequencing analysis of the patient's specimens, so a pair is one click from here
+               "combined_variant_outputs": DragenTSO500CombinedVariantOutput.objects
+                                               .filter(specimen__patient=patient)
+                                               .select_related("sequencing_run", "specimen")
+                                               .order_by("-output_datetime", "-pk"),
                "has_write_permission": patient.can_write(request.user)}
     return render(request, 'patients/view_patient_specimens.html', context)
 
@@ -203,10 +209,12 @@ def view_specimen(request, specimen_id):
                "combined_variant_outputs": DragenTSO500CombinedVariantOutput.objects.filter(specimen=specimen)
                                                       .select_related("sequencing_run")
                                                       .order_by("-output_datetime", "-pk"),
-               # What the caller's own QC said about each library sequenced off this specimen
-               "library_qc": LibraryQC.objects.filter(specimen=specimen)
-                                              .select_related("sequencing_run")
-                                              .order_by("sequencing_run_name", "pair_id", "category"),
+               # What the caller's own QC said about each library sequenced off this specimen, a line
+               # per arm - the pair's page has the metrics
+               "library_qc_summaries": summarise_library_qc(
+                   LibraryQC.objects.filter(specimen=specimen)
+                                    .select_related("sequencing_run")
+                                    .order_by("sequencing_run_name", "pair_id", "nucleic_acid", "category")),
                "has_write_permission": has_write_permission}
     return render(request, 'patients/view_specimen.html', context)
 

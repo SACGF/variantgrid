@@ -346,6 +346,11 @@
                 <h5>DRAGEN CombinedVariantOutput</h5>
                 {% include "seqauto/combined_variant_output_table.html" with show_specimen=True %}
             {% endif %}
+
+            {% if library_qc_summaries %}
+                <h5>Library QC</h5>
+                {% include "seqauto/library_qc_table.html" with show_specimen=True %}
+            {% endif %}
         </div>
 
 

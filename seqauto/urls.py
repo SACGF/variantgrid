@@ -91,6 +91,7 @@ urlpatterns = [
     path('view_sequencing_run/<sequencing_run_id>/tab/<str:tab>', views.view_sequencing_run, name='view_sequencing_run_tab'),
     path('view_sequencing_run_stats_tab/<sequencing_run_id>', views.view_sequencing_run_stats_tab, name='view_sequencing_run_stats_tab'),
     path('view_sequencing_run/<sequencing_run_id>', views.view_sequencing_run, name='view_sequencing_run'),
+    path('view_tso500_pair/<str:sequencing_run_name>/<str:pair_id>', views.view_tso500_pair, name='view_tso500_pair'),
     path('sequencing_run/reload_experiment_name/<sequencing_run_id>', views.reload_experiment_name, name='reload_experiment_name'),
     path('sequencing_run/delete/<sequencing_run_id>', views.delete_sequencing_run, name='delete_sequencing_run'),
     path('sequencing_run/assign_data_to_current_sample_sheet/<sequencing_run_id>', views.assign_data_to_current_sample_sheet, name='assign_data_to_current_sample_sheet'),

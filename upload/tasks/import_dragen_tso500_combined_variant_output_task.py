@@ -20,29 +20,28 @@ every record with its FILTER (#1903).
 
 What the file is imported for is the pair: its patient chain, the seqauto links and the analysis
 itself - one seqauto.models.DragenTSO500CombinedVariantOutput per (run, pair), holding its TMB, MSI and
-GIS (@see upload.tso500.dragen_combined_variant_output_records). The patient chain hangs off a VCF and
-Sample like every other arm file's, so DragenTSO500CombinedVariantOutputCreateVCFTask writes a VCF of no
-records whose one sample is the RNA arm, and DragenTSO500CombinedVariantOutputInsertTask takes the rest
-of the file once the header step has made the Sample. A chain that cannot be made is a message on the
-import page rather than a failure.
+GIS (@see upload.tso500.dragen_combined_variant_output_records).
 
-The run is the upload's 'sequencing_run' metadata, as it is for the MetricsOutput - the file names its
-run 'NA'. Without it the run whose current sample sheet names the pair's sample IDs is used, and a pair
-no registered run names is recorded nowhere, which the import page says.
+Entry point is ImportDragenTSO500CombinedVariantOutputTask, a single-shot ImportTask (the file has no
+variants and no coordinates, so there is no VCF pipeline) returning the number of rows written, as the
+run's MetricsOutput does (@see upload.tasks.import_dragen_tso500_metrics_output_task).
 
-The file names no genome build, so one is declared at upload (@see upload.upload_metadata) or comes
-off the VCFSourceSettings row for '^DRAGEN TSO500 CombinedVariantOutput'.
+The run is the upload's 'sequencing_run' metadata - the file names its run 'NA'. Without it the run
+whose current sample sheet names the pair's sample IDs is used, and a pair no registered run names
+cannot be keyed, so it fails the import saying so.
+
+A chain that cannot be made is not a failure: the row is still the analysis', with its specimen claim
+parked saying why, which the pair's page shows. reconcile_pending_extractions is fired afterwards so a
+claim that only became resolvable with this file attaches straight away.
 """
 import logging
 
-from library.genomics.vcf_writer import VCFWriter, build_header_lines
+from patients.tasks.extraction_matching_tasks import reconcile_pending_extractions
 from seqauto.models import SequencingRun
-from snpdb.gene_level_variants import GENE_LEVEL_CONTIG_LENGTH, GENE_LEVEL_CONTIG_NAME
-from upload.models import SimpleVCFImportInfo, UploadStep
-from upload.tasks.vcf.import_vcf_step_task import ImportVCFStepTask
+from upload.models import UploadedDragenTSO500CombinedVariantOutput
+from upload.tasks.import_task import ImportTask
 from upload.tso500.dragen_combined_variant_output_parser import (
     DNA_SAMPLE_ID,
-    MODULE_VERSION,
     PAIR_ID,
     RNA_SAMPLE_ID,
     get_analysis_details,
@@ -51,7 +50,6 @@ from upload.tso500.dragen_combined_variant_output_parser import (
 from upload.tso500.dragen_combined_variant_output_records import (
     CombinedVariantOutputIdentityError,
     link_samples_to_extractions,
-    link_to_sequencing_run,
     parse_pair_identifiers,
     resolve_pair,
     sequencing_run_for_sample_ids,
@@ -60,72 +58,31 @@ from upload.tso500.dragen_combined_variant_output_records import (
 from upload.upload_metadata import SEQUENCING_RUN, get_metadata_sequencing_run_name
 from variantgrid.celery import app
 
-# The sample's FORMAT fields - read support rather than a genotype, bound by the
-# '^DRAGEN TSO500 CombinedVariantOutput' VCFSourceSettings row. A header with no FORMAT has no sample
-# columns, and the Sample would be named after the file rather than the RNA arm
-ALT_READS_FORMAT = "ALT_READS"
-REF_READS_FORMAT = "REF_READS"
 
-# What '##source' says, so VCFSourceSettings can speak for this file type
-SOURCE_PREFIX = "DRAGEN TSO500 CombinedVariantOutput"
+class ImportDragenTSO500CombinedVariantOutputTask(ImportTask):
 
-
-def source_from_analysis_details(analysis_details: dict) -> str:
-    """ 'DRAGEN TSO500 CombinedVariantOutput 2.1.1' - the software that wrote the file, which is
-        what '##source' gives every other import """
-    if module_version := analysis_details.get(MODULE_VERSION):
-        return f"{SOURCE_PREFIX} {module_version}"
-    return SOURCE_PREFIX
-
-
-def _sample_name(analysis_details: dict, file_upload) -> str:
-    """ The RNA arm, which is what links the pair to its sequencing run """
-    return analysis_details.get(RNA_SAMPLE_ID) or file_upload.name
-
-
-def _write_sample_vcf(filename: str, sample_name: str, source: str):
-    """ A VCF of no records - only the Sample the rest of the file is written against """
-
-    header_lines = build_header_lines(
-        meta_lines=[f"##source={source}"] if source else [],
-        formats=[
-            f'##FORMAT=<ID={ALT_READS_FORMAT},Number=1,Type=Integer,'
-            f'Description="Reads supporting the splice junction">',
-            f'##FORMAT=<ID={REF_READS_FORMAT},Number=1,Type=Integer,'
-            f'Description="Reads across the reference transcript at the junction">',
-        ],
-        contig_lines=[f"##contig=<ID={GENE_LEVEL_CONTIG_NAME},length={GENE_LEVEL_CONTIG_LENGTH}>"],
-        samples=[sample_name],
-    )
-    with open(filename, "w") as f:
-        VCFWriter(f, header_lines)
-
-
-class DragenTSO500CombinedVariantOutputCreateVCFTask(ImportVCFStepTask):
-    """ Write the VCF that makes the RNA arm's Sample, for the insert step to accession """
-
-    def process_items(self, upload_step):
-        sections = read_combined_variant_output(upload_step.input_filename)
-        analysis_details = get_analysis_details(sections)
-        file_upload = upload_step.upload_pipeline.file_upload
-        _write_sample_vcf(upload_step.output_filename,
-                          sample_name=_sample_name(analysis_details, file_upload),
-                          source=source_from_analysis_details(analysis_details))
-        return 0
-
-
-class DragenTSO500CombinedVariantOutputInsertTask(ImportVCFStepTask):
-    """ Runs once the VCF and its Sample exist - everything in the file that is not a variant: the
-        pair's patient chain, the seqauto links and the analysis' record """
-
-    def process_items(self, upload_step: UploadStep):
-        upload_pipeline = upload_step.upload_pipeline
-        vcf = upload_pipeline.uploadedvcf.vcf
-        file_upload = upload_pipeline.file_upload
+    def process_items(self, file_upload):
         user = file_upload.user
-
         sections = read_combined_variant_output(file_upload.get_filename())
         analysis_details = get_analysis_details(sections)
+
+        pair_id = analysis_details.get(PAIR_ID)
+        if not pair_id:
+            raise ValueError(f"{file_upload} names no 'Pair ID' - there is no pair to record the "
+                             f"analysis against")
+
+        sample_ids = [sample_id for sample_id in (analysis_details.get(DNA_SAMPLE_ID),
+                                                  analysis_details.get(RNA_SAMPLE_ID)) if sample_id]
+        if sequencing_run_name := get_metadata_sequencing_run_name(file_upload):
+            sequencing_run = SequencingRun.objects.filter(name=sequencing_run_name).first()
+        elif sequencing_run := sequencing_run_for_sample_ids(sample_ids):
+            sequencing_run_name = sequencing_run.name
+        else:
+            raise ValueError(f"CombinedVariantOutput.tsv names its run 'NA' and no sequencing run "
+                             f"names {', '.join(sample_ids)} - upload it with '{SEQUENCING_RUN}' "
+                             f"metadata naming the run it came off")
+        UploadedDragenTSO500CombinedVariantOutput.objects.get_or_create(file_upload=file_upload)
+
         identifiers = None
         resolved = None
         chain_error = None
@@ -137,45 +94,20 @@ class DragenTSO500CombinedVariantOutputInsertTask(ImportVCFStepTask):
                 logging.info(chain_error)
         except CombinedVariantOutputIdentityError as e:
             chain_error = str(e)
-            SimpleVCFImportInfo.add_message_count(1, chain_error, upload_step)
             logging.warning("%s: %s", file_upload, e)
 
         if resolved:
             linked = link_samples_to_extractions(resolved, user)
             logging.info("%s: linked %d sample(s) to %s", file_upload, linked, resolved.specimen)
 
-            # This VCF's one sample is the RNA arm's
-            if identifiers.rna and (sample := vcf.sample_set.first()):
-                if sequencing_run := link_to_sequencing_run(vcf, sample, identifiers.rna.sample_id):
-                    logging.info("%s: linked %s to %s", file_upload, sample, sequencing_run)
-                else:
-                    message = f"No sequencing sample named '{identifiers.rna.sample_id}' - " \
-                              f"VCF not linked to a sequencing run"
-                    SimpleVCFImportInfo.add_message_count(1, message, upload_step)
-
-        if not (pair_id := analysis_details.get(PAIR_ID)):
-            return 0
-        sample_ids = [sample_id for sample_id in (analysis_details.get(DNA_SAMPLE_ID),
-                                                  analysis_details.get(RNA_SAMPLE_ID)) if sample_id]
-        if sequencing_run_name := get_metadata_sequencing_run_name(file_upload):
-            sequencing_run = SequencingRun.objects.filter(name=sequencing_run_name).first()
-        elif sequencing_run := sequencing_run_for_sample_ids(sample_ids):
-            sequencing_run_name = sequencing_run.name
-        else:
-            message = f"No '{SEQUENCING_RUN}' metadata and no sequencing run names {', '.join(sample_ids)} - " \
-                      f"the pair's TMB, MSI and GIS are not recorded"
-            SimpleVCFImportInfo.add_message_count(1, message, upload_step)
-            return 0
-
         cvo = write_combined_variant_output(sections, pair_id, sequencing_run, sequencing_run_name, user,
                                             resolved=resolved,
                                             specimen_reference=identifiers.specimen_reference if identifiers else None,
                                             parked_error=chain_error, file_upload=file_upload)
         logging.info("%s: recorded %s", file_upload, cvo)
+        reconcile_pending_extractions.delay()
         return 1
 
 
-DragenTSO500CombinedVariantOutputCreateVCFTask = app.register_task(
-    DragenTSO500CombinedVariantOutputCreateVCFTask())
-DragenTSO500CombinedVariantOutputInsertTask = app.register_task(
-    DragenTSO500CombinedVariantOutputInsertTask())
+ImportDragenTSO500CombinedVariantOutputTask = app.register_task(
+    ImportDragenTSO500CombinedVariantOutputTask())  # @UndefinedVariable
