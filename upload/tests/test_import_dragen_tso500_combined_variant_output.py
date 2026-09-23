@@ -130,109 +130,28 @@ class TestCombinedVariantOutputParser(TestCase):
                                                        "fake_kit.GeneTable.tsv")))
 
 
-class TestSpliceVariantVCF(TestCase):
-    """ The VCF the loader writes - what the standard insert pipeline then consumes """
+class TestSampleVCF(TestCase):
+    """ The VCF the loader writes - no variants, only the RNA arm's Sample for the rest of the file """
 
-    @classmethod
-    def setUpTestData(cls):
-        cls.genome_build = GenomeBuild.grch37()
-        hgnc_import = HGNCImport.objects.create()
-        cls.hgnc_ids = {}
-        for pk, symbol in [(644, "AR"), (3236, "EGFR"), (7029, "MET")]:
-            GeneSymbol.objects.get_or_create(symbol=symbol)
-            HGNC.objects.create(pk=pk, gene_symbol_id=symbol, hgnc_import=hgnc_import,
-                                status=HGNCStatus.APPROVED, approved_name=f"{symbol} approved name")
-            cls.hgnc_ids[symbol] = pk
-
-    def setUp(self):
-        self.user = User.objects.get_or_create(username='testuser')[0]
-        self.vcf_filename = os.path.join(settings.PRIVATE_DATA_ROOT, "splice_variants.vcf")
-        self.records = self._process()
-
-    def _process(self) -> list:
+    def test_names_the_rna_sample_and_the_module_and_has_no_records(self):
+        user = User.objects.get_or_create(username='testuser')[0]
+        vcf_filename = os.path.join(settings.PRIVATE_DATA_ROOT, "combined_variant_output.vcf")
         file_upload = FileUpload.objects.create(path=COMBINED_VARIANT_OUTPUT,
                                                 import_source=ImportSource.COMMAND_LINE,
-                                                user=self.user,
+                                                user=user,
                                                 name="ExampleSample_2600000001_CombinedVariantOutput.tsv",
-                                                file_type=UploadedFileTypes.DRAGEN_TSO500_COMBINED_VARIANT_OUTPUT,
-                                                metadata={"genome_build": "GRCh37"})
+                                                file_type=UploadedFileTypes.DRAGEN_TSO500_COMBINED_VARIANT_OUTPUT)
         upload_pipeline = UploadPipeline.objects.create(file_upload=file_upload)
         upload_step = UploadStep.objects.create(upload_pipeline=upload_pipeline,
-                                                name="Create Splice Variant VCF", sort_order=0,
+                                                name="Create Sample VCF", sort_order=0,
                                                 input_filename=COMBINED_VARIANT_OUTPUT,
-                                                output_filename=self.vcf_filename)
-        rows = DragenTSO500CombinedVariantOutputCreateVCFTask.process_items(upload_step)
-        self.assertEqual(EXPECTED_SPLICE_ROWS, rows)
-        self.reader = cyvcf2.VCF(self.vcf_filename)
-        return list(self.reader)
+                                                output_filename=vcf_filename)
+        DragenTSO500CombinedVariantOutputCreateVCFTask.process_items(upload_step)
 
-    def test_header_names_the_rna_sample_and_the_module(self):
-        """ The splice caller runs on the RNA arm, and '##source' is what VCFSourceSettings match """
-        self.assertEqual(["ExampleSample_RNA_2600000001B"], self.reader.samples)
-        self.assertIn("DRAGEN TSO500 CombinedVariantOutput 2.1.1", self.reader.raw_header)
-
-    def test_records_are_gene_level_splice_alts(self):
-        self.assertEqual(EXPECTED_SPLICE_ROWS, len(self.records))
-        for record in self.records:
-            self.assertEqual(GENE_LEVEL_CONTIG_NAME, record.CHROM)
-            kind, namespace, _gene_id, label = GeneLevelSymbolicAlt.parse(record.ALT[0])
-            self.assertEqual(GeneLevelSymbolicAlt.SPLICE, kind)
-            self.assertEqual(GeneIdNamespace.HGNC, namespace)
-            self.assertTrue(label)
-
-    def test_seeded_junctions_get_their_label(self):
-        """ The canonical label, upper-cased on the alt as a Sequence is """
-        alts = {record.ALT[0] for record in self.records}
-        self.assertEqual({f"<SPLICE:HGNC:{self.hgnc_ids['AR']}:V_7>",
-                          f"<SPLICE:HGNC:{self.hgnc_ids['EGFR']}:V_III>",
-                          f"<SPLICE:HGNC:{self.hgnc_ids['MET']}:EXON_14_SKIPPING>"}, alts)
-
-    def _by_splice(self) -> dict:
-        """ INFO values are stored as the VCF wrote them - a space is percent encoded, so decode """
-        return {percent_decode_info_value(record.INFO.get(SPLICE_INFO)): record
-                for record in self.records}
-
-    def test_position_is_the_gene(self):
-        self.assertEqual(self.hgnc_ids["AR"], self._by_splice()["AR-V7 splice"].POS)
-
-    def test_read_support_is_the_junction_and_the_reference_transcript(self):
-        """ A caller asserts the junction is present, so there is no GT - the sample column holds
-            how many reads crossed it and how many crossed the reference transcript """
-        support = {}
-        for splice, record in self._by_splice().items():
-            self.assertEqual([ALT_READS_FORMAT, REF_READS_FORMAT], record.FORMAT)
-            support[splice] = (int(record.format(ALT_READS_FORMAT).flatten()[0]),
-                               int(record.format(REF_READS_FORMAT).flatten()[0]))
-        self.assertEqual({"AR-V7 splice": (27, 573), "EGFRvIII splice": (64, 1), "MET exon 14 skipping": (91, 1)}, support)
-
-    def test_the_callers_row_rides_along_in_info(self):
-        encoded = self._by_splice()["MET exon 14 skipping"].INFO.get(SPLICE_OBSERVATION_INFO)
-        observation = simplejson.loads(percent_decode_info_value(encoded))
-        self.assertEqual("chr7:116411708", observation[BREAKPOINT_1])
-        self.assertEqual("14", observation[AFFECTED_EXON])
-
-    def test_unnamed_junction_is_labelled_with_its_breakpoints(self):
-        """ A junction no SpliceEvent names still imports - the label is its breakpoints in the
-            build they were called in, which reads as raw coordinates on a report """
-        splice_event = SpliceEvent.objects.get(genome_build=self.genome_build, label="v_7")
-        contig = splice_event.contig
-        splice_event.delete()
-
-        records = self._process()
-        expected = coordinate_label(self.genome_build, contig, 66905968, 66914514)
-        self.assertIn(f"<SPLICE:HGNC:{self.hgnc_ids['AR']}:{expected.upper()}>",
-                      {record.ALT[0] for record in records})
-
-    def test_source_settings_bind_read_support_as_depth(self):
-        """ The ^DRAGEN TSO500 CombinedVariantOutput row makes ALT_READS/REF_READS the depths the
-            sample node and VAF use, and with no GT in the header nothing binds a genotype """
-        vcf = VCF(source="DRAGEN TSO500 CombinedVariantOutput 2.1.1", genotype_samples=1)
-        for vss in VCFSourceSettings.get_for_source(vcf.source):
-            vss.apply_sample_field_overrides(vcf)
-        self.assertEqual(ALT_READS_FORMAT, vcf.alt_depth_field)
-        self.assertEqual(REF_READS_FORMAT, vcf.ref_depth_field)
-        self.assertTrue(vcf.has_depth)
-        self.assertFalse(vcf.has_genotype)
+        reader = cyvcf2.VCF(vcf_filename)
+        self.assertEqual(["ExampleSample_RNA_2600000001B"], reader.samples)
+        self.assertIn("DRAGEN TSO500 CombinedVariantOutput 2.1.1", reader.raw_header)
+        self.assertEqual([], list(reader), "the splice calls come from SpliceVariants.vcf (#1903)")
 
 
 # The bands SA Path reports against, as its settings state them

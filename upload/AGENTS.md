@@ -8,7 +8,11 @@ Start with:
 - file_type_icons.py — the icon each UploadedFileTypes value wears on the upload pages (FILE_TYPE_ICONS); a new
   type needs an entry there, test_file_type_icons checks. Drawn ones are file-icon-* in uicore's svg_icon_sprite.html.
 - upload_processing.py — process_uploaded_file / process_upload_pipeline (retry) / process_vcf_file: entry points
-  that pick a factory and fire the celery chain.
+  that pick a factory and fire the celery chain. A file's type comes off its contents on every entry point
+  (import_task_factories/import_task_factory.py:get_import_task_factory_from_extension - the upload page and API through
+  uploaded_file_type.py:get_uploaded_file_type, `import_vcf` and seqauto through
+  upload_processing.py:get_vcf_file_type), so a SpliceGirl or gene-level CNV VCF takes its own path however it comes
+  in. Only a VCF we wrote ourselves (ClinVar) passes an explicit file_type.
 - import_task_factories/abstract_vcf_import_task_factory.py — AbstractVCFImportTaskFactory.create_import_task builds
   the step graph; import_task_factories.py has the per-type factories (GenotypeVCFImportFactory = plain VCF).
 - tasks/vcf/import_vcf_step_task.py — ImportVCFStepTask (base of every VCF step) and schedule_pipeline_stage_steps.
@@ -66,17 +70,23 @@ Gotchas:
   on partial calls (DragenExonCNV's `GENE=`) is not a segment field and keeps importing as coordinate SVs.
 - A file type gated by a setting overrides `import_task_factories/import_task_factory.py:ImportTaskFactory.enabled`;
   a disabled factory is left out of `get_import_task_factories`, so it is neither picked for an upload nor listed by the
-  capabilities endpoint. The four gene-level factories return `settings.VARIANT_GENE_LEVEL_ENABLED`, and with it off a
-  `SEGID` CNV VCF imports as an ordinary VCF on its written coordinates.
-- A TSO 500 pair's CombinedVariantOutput tsv is the only variant source for its `[Splice Variants]` section
-  (import_task_factories/import_task_factories.py:DragenTSO500CombinedVariantOutputImportTaskFactory,
-  tasks/import_dragen_tso500_combined_variant_output_task.py). Each row becomes a gene-level Variant whose alt carries
-  the junction's label (@see genes.gene_splice); the file's fusions, small variants and copy number calls are the
-  lossy copies of what the arm files carry, so they are not sources. The file declares no genome build, so one is
-  declared at upload or comes off the `^DRAGEN TSO500 CombinedVariantOutput` VCFSourceSettings row.
-- The rest of that file is the pair's identity, written once the header step has made the Sample
-  (get_post_vcf_header_classes - a VCF with no records skips every DATA_INSERTION-dependent step, and most pairs have
-  no splice call) by
+  capabilities endpoint. The five gene-level factories return `settings.VARIANT_GENE_LEVEL_ENABLED`, and with it off a
+  `SEGID` CNV VCF or a SpliceGirl VCF imports as an ordinary VCF on its written coordinates.
+- A SpliceGirl VCF (the TSO 500 RNA arm's SpliceVariants.vcf, recognised by its `##source=SpliceGirl` header line -
+  the pipeline sends it as a plain VCF) is claimed by
+  import_task_factories/import_task_factories.py:SpliceGirlImportTaskFactory and each `<DEL>` junction rewritten as a
+  gene-level splice Variant, every record with its FILTER (tasks/import_splicegirl_vcf_task.py). The record names no
+  gene: it comes from the SpliceEvent row at the breakpoints, else the one gene a transcript puts at the donor
+  (genes/gene_splice.py:SpliceEventResolver.resolve_junction, which also takes a stored coordinate Variant). A junction in
+  no gene, or ambiguously in two, is skipped and counted on the import page. The header keeps `##source`, so the
+  `^SpliceGirl` VCFSourceSettings row still binds AD/DP as alt/ref depth.
+- A TSO 500 pair's CombinedVariantOutput tsv is no variant source (#1903) - its `[Splice Variants]` are the VCF's PASS
+  calls on EGFR, MET and AR (import_task_factories/import_task_factories.py:DragenTSO500CombinedVariantOutputImportTaskFactory,
+  tasks/import_dragen_tso500_combined_variant_output_task.py). It writes a VCF of no records, whose one sample is the RNA
+  arm, and the file declares no genome build, so one is declared at upload or comes off the
+  `^DRAGEN TSO500 CombinedVariantOutput` VCFSourceSettings row.
+- What that file is for is the pair's identity, written once the header step has made the Sample
+  (get_post_vcf_header_classes - a VCF with no records skips every DATA_INSERTION-dependent step) by
   tasks/import_dragen_tso500_combined_variant_output_task.py:DragenTSO500CombinedVariantOutputInsertTask
   (tso500/dragen_combined_variant_output_records.py). `[Analysis Details]` names the Patient (the code
   `settings.TSO500_PAIR_ID_PATIENT_CODE_REGEX` reads out of `Pair ID` - the lab writes that either as the whole pair
@@ -84,9 +94,9 @@ Gotchas:
   code, and the default regex reads both), the Specimen
   (the ten-digit accession inside each sample ID) and the two Extractions (its container suffix), created when absent;
   the DNA/RNA sample IDs are exact `Sample.vcf_sample_name` and `SequencingSample.sample_name`, which links both arms'
-  samples to their extraction and the splice VCF to its sequencing run without seqauto's filename matching. `[TMB]`,
+  samples to their extraction and the CVO's VCF to its sequencing run without seqauto's filename matching. `[TMB]`,
   `[MSI]` and `[GIS]` become the five patients/models.py:SpecimenMeasure rows. None of it fails the import - a chain
-  that cannot be made is a SimpleVCFImportInfo message, since a splice call is worth having unaccessioned.
+  that cannot be made is a SimpleVCFImportInfo message.
 - The run's MetricsOutput.tsv is a separate, single-shot import (tasks/import_dragen_tso500_metrics_output_task.py,
   tso500/dragen_metrics_output_parser.py + _records.py): it has no variants and no coordinates, and recognises itself
   by a banner line ending 'Metrics Output' (with the module version, as the CVO's has it). One file covers a whole run

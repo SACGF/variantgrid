@@ -17,8 +17,9 @@ ExampleSample_2600000001/
     └── ..._AllFusions.csv            fusions            33
 ```
 
-The VCFs go through the normal VCF import. `AllFusions.csv` has a parser of its own (the format is
-DRAGEN TSO 500's, not a standard) which writes the rows as a VCF of gene-level variants. That VCF then
+The VCFs go through the normal VCF import, the CNV and splice ones rewritten as gene-level records
+first. `AllFusions.csv` has a parser of its own (the format is DRAGEN TSO 500's, not a standard) which
+writes the rows as a VCF of gene-level variants. That VCF then
 goes through the normal import too - only the bcftools stages are skipped, as a gene-level locus has no
 reference base to check against.
 
@@ -65,8 +66,10 @@ replaced, so:
   CE3 is not an annotated exon. SpliceGirl's `REF` is not the base at `POS`: in every real record it
   is the base at `POS+2`, the second base of the intron's donor dinucleotide - `T` for a GT intron,
   `C` for the GC-AG intron at `chr2:42485683` (EML4) - and the three `PASS` records follow that.
-  `bcftools norm --check-ref=s` does not touch a symbolic `<DEL>`, so the `<DEL>` import makes its
-  Locus with the caller's base.
+  `bcftools norm --check-ref=s` does not touch a symbolic `<DEL>`, so a plain VCF import makes its
+  Locus with the caller's base - one reason the file is imported as gene-level splice junctions
+  instead (`upload/tasks/import_splicegirl_vcf_task.py`, #1903), and the section here is not a
+  variant source.
   Illumina's rule for the section is passing calls on EGFR, MET and
   AR only - a gene filter over `FILTER=PASS`, not a junction whitelist - so a `PASS` call in any other
   gene would be in the VCF and not here; this file has none, so it cannot tell the two rules apart

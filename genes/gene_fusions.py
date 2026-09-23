@@ -16,19 +16,19 @@ where nothing does. Genes found this way are recorded on the GeneLevelId so anno
 them without going back through the symbol (@see annotation.gene_level_annotation).
 """
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Optional
 
 from django.db.models import Q
 
 from genes.gene_level_resolver import (
-    GeneLevelNameResolver,
+    GeneCandidate,
     GeneLevelResolution,
+    GenePositionResolver,
     ResolvedGeneLevelGene,
     unknown_gene_reason,
 )
-from genes.gene_overlaps import GeneOverlap, SVGeneOverlapResolver
-from genes.models import HGNC, GeneAnnotationRelease, GeneFusion, GeneLevelId, fusion_canonical_str
+from genes.models import HGNC, GeneFusion, GeneLevelId, fusion_canonical_str
 from library.genomics.vcf_enums import GeneLevelSymbolicAlt
 from snpdb.clingen_allele import get_variant_allele_for_variant
 from snpdb.gene_level_variants import (
@@ -54,21 +54,8 @@ def parse_breakpoint(breakpoint: Optional[str]) -> Optional[tuple[str, int]]:
     return None
 
 
-@dataclass
-class _GeneCandidate:
-    """ The genes at a breakpoint that are all one gene - the same gene in a RefSeq and an Ensembl
-        release is two Gene rows, and every release of a build is consulted """
-    hgnc_id: Optional[int]
-    symbol: Optional[str]
-    gene_ids: set[str] = field(default_factory=set)
-
-
-class GeneFusionResolver(GeneLevelNameResolver):
-    """ Holds the symbol caches, so build one per file rather than one per row """
-
-    def __init__(self, gene_matcher=None):
-        super().__init__(gene_matcher)
-        self._overlap_resolvers: dict[int, list[SVGeneOverlapResolver]] = {}
+class GeneFusionResolver(GenePositionResolver):
+    """ Holds the symbol caches and transcript trees, so build one per file rather than one per row """
 
     @staticmethod
     def split_fusion_string(fusion_string: str) -> Optional[tuple[str, str]]:
@@ -83,41 +70,16 @@ class GeneFusionResolver(GeneLevelNameResolver):
                 return gene_a, gene_b
         return None
 
-    def _gene_overlap_resolvers(self, genome_build: GenomeBuild) -> list[SVGeneOverlapResolver]:
-        """ One per GeneAnnotationRelease of the build - a RefSeq release gives the gene its Entrez
-            id and an Ensembl one its ENSG, and annotation resolves against whichever it was built
-            on. The trees behind these are per contig and built on first use, so a file pays for the
-            chromosomes its breakpoints are actually on """
-        resolvers = self._overlap_resolvers.get(genome_build.pk)
-        if resolvers is None:
-            resolvers = [SVGeneOverlapResolver(release)
-                         for release in GeneAnnotationRelease.objects.filter(genome_build=genome_build)]
-            self._overlap_resolvers[genome_build.pk] = resolvers
-        return resolvers
-
     def _candidates_at_breakpoint(self, breakpoint: Optional[str],
-                                  genome_build: Optional[GenomeBuild]) -> list[_GeneCandidate]:
-        """ The distinct genes overlapping the breakpoint, grouped by HGNC where they have one """
-        position = parse_breakpoint(breakpoint)
-        if position is None or genome_build is None:
-            return []
-
-        chrom, pos = position
-        by_key: dict = {}
-        for resolver in self._gene_overlap_resolvers(genome_build):
-            for gene_overlap in resolver.get_gene_overlaps(chrom, pos):
-                if (key := _candidate_key(gene_overlap)) is None:
-                    continue
-                candidate = by_key.get(key)
-                if candidate is None:
-                    candidate = _GeneCandidate(hgnc_id=gene_overlap.hgnc_id, symbol=gene_overlap.symbol)
-                    by_key[key] = candidate
-                candidate.gene_ids.add(gene_overlap.gene_id)
-        return list(by_key.values())
+                                  genome_build: Optional[GenomeBuild]) -> list[GeneCandidate]:
+        if position := parse_breakpoint(breakpoint):
+            chrom, pos = position
+            return self.candidates_at(genome_build, chrom, pos)
+        return []
 
     def _breakpoint_candidate(self, breakpoint: Optional[str], genome_build: Optional[GenomeBuild],
                               resolved_names: list[tuple[Optional[str], Optional[HGNC]]]) \
-            -> Optional[_GeneCandidate]:
+            -> Optional[GeneCandidate]:
         """ Which gene at the breakpoint this side is. The name written decides between genes that
             overlap the same position; with nothing to decide on, one candidate stands alone and
             several mean we don't know, so the name is left to answer it """
@@ -138,18 +100,6 @@ class GeneFusionResolver(GeneLevelNameResolver):
             return candidates[0]
         return None
 
-    def _identity_for_candidate(self, candidate: _GeneCandidate) -> GeneLevelId:
-        hgnc = HGNC.objects.filter(pk=candidate.hgnc_id).first() if candidate.hgnc_id else None
-        if hgnc is not None:
-            symbol_str = hgnc.gene_symbol_id
-            gene_symbol_id = hgnc.gene_symbol_id
-        else:
-            symbol_str = candidate.symbol
-            gene_symbol_id = candidate.symbol
-        gene_level_id = GeneLevelId.get_or_create_for_symbol(symbol_str, gene_symbol_id, hgnc)
-        gene_level_id.genes.add(*candidate.gene_ids)
-        return gene_level_id
-
     def resolve_side(self, cell: str, allow_unknown: bool = True, breakpoint: Optional[str] = None,
                      genome_build: Optional[GenomeBuild] = None) -> Optional[ResolvedGeneLevelGene]:
         """ Picks the identity for one side of a fusion.
@@ -164,7 +114,7 @@ class GeneFusionResolver(GeneLevelNameResolver):
 
         resolved_names = [self.resolve_name(name) for name in names]
         if candidate := self._breakpoint_candidate(breakpoint, genome_build, resolved_names):
-            return ResolvedGeneLevelGene(written=cell, gene_level_id=self._identity_for_candidate(candidate))
+            return ResolvedGeneLevelGene(written=cell, gene_level_id=self.identity_for_candidate(candidate))
         return self._resolve_from_names(cell, names, resolved_names, allow_unknown)
 
     def resolve_fusion(self, gene_a: Optional[ResolvedGeneLevelGene], gene_b: Optional[ResolvedGeneLevelGene],
@@ -205,16 +155,6 @@ class ResolvedFusion:
     def canonical_str(self) -> str:
         """ The same string GeneFusion.canonical_str gives, before the Variant exists """
         return fusion_canonical_str(self.anchor, self.partner)
-
-
-def _candidate_key(gene_overlap: GeneOverlap):
-    """ What makes two genes from different releases one candidate. A gene with neither an HGNC nor
-        a symbol names nothing an identity could be minted under, so it is no candidate at all """
-    if gene_overlap.hgnc_id is not None:
-        return "hgnc", gene_overlap.hgnc_id
-    if gene_overlap.symbol:
-        return "symbol", gene_overlap.symbol.upper()
-    return None
 
 
 def _order_partners(gene_a: Optional[ResolvedGeneLevelGene], gene_b: Optional[ResolvedGeneLevelGene],

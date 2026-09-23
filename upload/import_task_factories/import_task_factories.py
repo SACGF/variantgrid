@@ -57,6 +57,8 @@ from upload.tasks.import_gene_level_cnv_task import (
 from upload.tasks.import_gene_list_task import ImportGeneListTask
 from upload.tasks.import_patient_records_task import ImportPatientRecords
 from upload.tasks.import_ped_task import ImportPedTask
+from upload.tasks import import_splicegirl_vcf_task
+from upload.tasks.import_splicegirl_vcf_task import SpliceGirlCreateVCFTask
 from upload.tasks.import_variant_tags_task import VariantTagsCreateVCFTask, VariantTagsInsertTask
 from upload.tasks.import_wiki_task import (
     ImportGeneWikiCollection,
@@ -195,10 +197,10 @@ class DragenTSO500AllFusionsImportTaskFactory(AbstractVCFImportTaskFactory):
 class DragenTSO500CombinedVariantOutputImportTaskFactory(AbstractVCFImportTaskFactory):
     """ Illumina DRAGEN TSO 500's CombinedVariantOutput.tsv - one vendor's format, not a standard.
 
-        Its '[Splice Variants]' rows become gene-level variants, written as a VCF so they go through
-        the normal insert pipeline. Only the bcftools stages are skipped - they all need a reference
-        base a gene-level locus does not have.
-        @see upload.tasks.import_dragen_tso500_combined_variant_output_task
+        No variants come from it (the splice calls come from SpliceVariants.vcf, @see
+        SpliceGirlImportTaskFactory): it is the pair's patient chain, seqauto links and measures,
+        written against the RNA arm's Sample, which a VCF of no records makes through the normal
+        header step. @see upload.tasks.import_dragen_tso500_combined_variant_output_task
 
         A tsv full of gene symbols, so GeneListImportTaskFactory would otherwise claim it on its
         default ability of 1 """
@@ -231,9 +233,9 @@ class DragenTSO500CombinedVariantOutputImportTaskFactory(AbstractVCFImportTaskFa
                                               "dragen_tso500_combined_variant_output.vcf")
 
     def get_pre_vcf_task(self, upload_pipeline):
-        """ Write the splice variants as a VCF for the pipeline to insert """
+        """ Write the VCF that makes the RNA arm's Sample """
         upload_step = UploadStep.objects.create(upload_pipeline=upload_pipeline,
-                                                name="Create DRAGEN TSO500 CombinedVariantOutput Variant VCF",
+                                                name="Create DRAGEN TSO500 CombinedVariantOutput Sample VCF",
                                                 sort_order=self.get_sort_order(),
                                                 task_type=UploadStepTaskType.CELERY,
                                                 pipeline_stage=VCFPipelineStage.PRE_DATA_INSERTION,
@@ -251,17 +253,14 @@ class DragenTSO500CombinedVariantOutputImportTaskFactory(AbstractVCFImportTaskFa
         return GeneLevelPreprocessVCFTask
 
     def get_known_variants_parallel_vcf_processing_task_class(self):
-        # Each row carries its read support and the caller's row in INFO, so the standard bulk
-        # importer writes the CohortGenotypes by SQL COPY
         return ProcessGenotypeVCFDataTask
 
     def get_post_vcf_header_classes(self):
-        # The rest of the file: the pair's patient chain, seqauto links and measures. It needs the
-        # Sample and none of the variants - most pairs have no splice call at all
+        # The rest of the file: the pair's patient chain, seqauto links and measures. It needs only
+        # the Sample - the VCF has no records, which skips every step waiting on data insertion
         return [DragenTSO500CombinedVariantOutputInsertTask]
 
     def get_post_data_insertion_classes(self):
-        # A splice event has no record of its own - the alt and INFO carry everything
         return [VCFCheckAnnotationTask]
 
     def get_finish_task_classes(self):
@@ -366,6 +365,71 @@ class GeneLevelCNVImportTaskFactory(AbstractVCFImportTaskFactory):
     def get_finish_task_classes(self):
         # pipeline_success_task closes the pipeline off the end of the FINISH chain, so nothing here
         # takes it out of PROCESSING before ImportGenotypeVCFSuccessTask releases the VCF
+        return [ImportGenotypeVCFSuccessTask]
+
+
+class SpliceGirlImportTaskFactory(AbstractVCFImportTaskFactory):
+    """ SpliceGirl's SpliceVariants.vcf - the TSO 500 RNA arm's splice calls, each written as a <DEL>
+        from one breakpoint to the other. What says so is the '##source=SpliceGirl' header line.
+
+        The records are rewritten as gene-level splice events and inserted by the normal pipeline;
+        only the bcftools stages are skipped, as they need a reference base a gene-level locus does
+        not have. @see upload.tasks.import_splicegirl_vcf_task
+
+        An ordinary VCF, so GenotypeVCFImportFactory would otherwise claim it and store each junction
+        as a genomic deletion. """
+
+    @property
+    def enabled(self) -> bool:
+        return settings.VARIANT_GENE_LEVEL_ENABLED
+
+    def get_uploaded_file_type(self):
+        return UploadedFileTypes.GENE_LEVEL_SPLICE_VCF
+
+    def get_data_classes(self):
+        return [UploadedVCF]
+
+    def get_metadata_keys(self):
+        return VCF_METADATA_KEYS
+
+    def get_processing_ability(self, user, filename, file_extension):
+        if import_splicegirl_vcf_task.can_process_file(filename):
+            return 1000
+        return 0
+
+    def _get_vcf_filename(self, upload_pipeline) -> str:
+        return get_import_processing_filename(upload_pipeline.pk, "gene_level_splice.vcf")
+
+    def get_pre_vcf_task(self, upload_pipeline):
+        """ Rewrite the caller's junctions as gene-level records for the pipeline to insert """
+        upload_step = UploadStep.objects.create(upload_pipeline=upload_pipeline,
+                                                name="Create Gene-Level Splice VCF",
+                                                sort_order=self.get_sort_order(),
+                                                task_type=UploadStepTaskType.CELERY,
+                                                pipeline_stage=VCFPipelineStage.PRE_DATA_INSERTION,
+                                                script=full_class_name(SpliceGirlCreateVCFTask),
+                                                input_filename=upload_pipeline.file_upload.get_filename(),
+                                                output_filename=self._get_vcf_filename(upload_pipeline))
+        return SpliceGirlCreateVCFTask.si(upload_step.pk, 0)
+
+    def get_create_data_from_vcf_header_task_class(self):
+        # The VCF we wrote keeps the caller's sample, source, contigs and FORMAT lines, so the standard
+        # header path makes the VCF/Sample/Cohort/CohortGenotypeCollection it would have made anyway
+        return ImportCreateVCFModelForGenotypeVCFTask
+
+    def _get_preprocess_class(self) -> type:
+        return GeneLevelPreprocessVCFTask
+
+    def get_known_variants_parallel_vcf_processing_task_class(self):
+        # Each record carries the sample's read support, so the standard bulk importer writes the
+        # CohortGenotypes by SQL COPY
+        return ProcessGenotypeVCFDataTask
+
+    def get_post_data_insertion_classes(self):
+        # A splice event has no record of its own - the alt and INFO carry everything
+        return [VCFCheckAnnotationTask]
+
+    def get_finish_task_classes(self):
         return [ImportGenotypeVCFSuccessTask]
 
 

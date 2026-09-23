@@ -16,6 +16,7 @@ from django_downloadview import PathDownloadView
 from annotation.views import get_build_contigs
 from library.utils.django_utils import render_ajax_view
 from upload import forms, upload_stats
+from upload.import_task_factories.import_task_factory import get_import_tasks_by_extension
 from upload.models import (
     FileUpload,
     ModifiedImportedVariant,
@@ -26,11 +27,7 @@ from upload.models import (
     UploadStep,
     VCFSkippedContigs,
 )
-from upload.uploaded_file_type import (
-    get_import_tasks_by_extension,
-    get_upload_data_for_uploaded_file,
-    retry_upload_pipeline,
-)
+from upload.uploaded_file_type import get_upload_data_for_uploaded_file, retry_upload_pipeline
 from upload.views.views_json import _get_basic_uploaded_file_context, get_file_dicts_list
 
 UPLOADED_FILE_CONTEXT = {UploadedFileTypes.VCF: "uploaded_vcf",

@@ -132,8 +132,9 @@ Gotchas:
   library/genomics/vcf_enums.py:VCFConstant.COPY_NUMBER_FIELD_IS_RATIO, so a record may hold either or both.
 - What kind of event the case report prints a record as comes off its gene-level alt
   (`classification/report/case_report_context.py:_kind_and_alteration`) - a fusion, a copy number call or a splice
-  junction. A SpliceGirl VCF's own `<DEL>` records still read as small variants; a splice call is what the TSO 500
-  CombinedVariantOutput loaded. The printed name of the event ("MET exon 14 skipping") is the `splice_label` evidence
+  junction. A SpliceGirl VCF imports as gene-level splice junctions (`upload/tasks/import_splicegirl_vcf_task.py`);
+  the coordinate `<DEL>`s it made before #1903 still read as small variants - the kind is the alt's, not the caller's.
+  The printed name of the event ("MET exon 14 skipping") is the `splice_label` evidence
   key, autopopulated from the junction's label through `genes/gene_splice.py:display_splice_label` - the panel's own
   wording where a `genes/models/models_splice_event.py:SpliceEvent` names it, and the breakpoints written out
   ("AR GRCh37 X:66905968-66914514") where nothing does, which is the prompt for the scientist to name it.

@@ -5,7 +5,6 @@ from django.core.exceptions import ValidationError
 from django.test import TestCase
 
 from annotation.fake_annotation import get_fake_annotation_version
-from annotation.tests.test_data_fake_genes import _create_fake_gene_version, _insert_transcript_data
 from genes.gene_fusions import (
     GeneFusionResolver,
     find_gene_fusions_for_string,
@@ -18,39 +17,12 @@ from genes.models import (
     GeneSymbol,
     GeneSymbolAlias,
     HGNCImport,
-    ReleaseTranscriptVersion,
 )
-from genes.models_enums import AnnotationConsortium, GeneSymbolAliasSource, HGNCStatus
+from genes.models_enums import GeneSymbolAliasSource, HGNCStatus
 from genes.tests.gene_fusion_test_utils import create_gene_fusion
+from genes.tests.gene_level_test_utils import make_release_gene
 from library.genomics.vcf_enums import GeneIdNamespace, GeneLevelSymbolicAlt
 from snpdb.models import Contig, GenomeBuild, SequenceRole
-
-
-def _make_release_gene(genome_build, release, gene_id, gene_symbol, transcript_id, contig, start,
-                       hgnc_id=None):
-    """ A gene of the release with one transcript, so a breakpoint inside it resolves """
-    gene_version = _create_fake_gene_version(genome_build, gene_id, gene_symbol,
-                                             AnnotationConsortium.ENSEMBL)
-    gene_version.hgnc_id = hgnc_id
-    gene_version.save()
-    data = {
-        "id": transcript_id,
-        "gene_name": gene_symbol,
-        "biotype": [],
-        "genome_builds": {
-            genome_build.name: {
-                "url": "fake",
-                "exons": [[start, start + 10_000, 0, 1, 10_001, None]],
-                "contig": contig,
-                "strand": "+",
-                "cds_end": start + 10_000,
-                "cds_start": start,
-            }
-        },
-    }
-    transcript_version = _insert_transcript_data(genome_build, data, gene_version, release)
-    ReleaseTranscriptVersion.objects.get_or_create(release=release, transcript_version=transcript_version)
-    return gene_version.gene
 
 
 class GeneFusionTestCase(TestCase):
@@ -281,13 +253,13 @@ class TestBreakpointResolution(TestCase):
                                 status=HGNCStatus.APPROVED, approved_name=f"{symbol} approved name")
             cls.hgnc_ids[symbol] = pk
 
-        cls.acp3_gene = _make_release_gene(cls.genome_build, cls.release, "ENSG00000000010", "ACP3",
-                                           "ENST00000000010.1", "3", 132_000_000, hgnc_id=125)
+        cls.acp3_gene = make_release_gene(cls.genome_build, cls.release, "ENSG00000000010", "ACP3",
+                                          "ENST00000000010.1", "3", 132_000_000, hgnc_id=125)
         # Two genes over one position: the name written is all there is to choose between them
-        cls.over_a_gene = _make_release_gene(cls.genome_build, cls.release, "ENSG00000000011", "OVER_A",
-                                             "ENST00000000011.1", "3", 140_000_000, hgnc_id=900)
-        cls.over_b_gene = _make_release_gene(cls.genome_build, cls.release, "ENSG00000000012", "OVER_B",
-                                             "ENST00000000012.1", "3", 140_000_000, hgnc_id=901)
+        cls.over_a_gene = make_release_gene(cls.genome_build, cls.release, "ENSG00000000011", "OVER_A",
+                                            "ENST00000000011.1", "3", 140_000_000, hgnc_id=900)
+        cls.over_b_gene = make_release_gene(cls.genome_build, cls.release, "ENSG00000000012", "OVER_B",
+                                            "ENST00000000012.1", "3", 140_000_000, hgnc_id=901)
 
     def setUp(self):
         self.resolver = GeneFusionResolver()

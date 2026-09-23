@@ -59,6 +59,7 @@ FILE_TYPE_ICONS: dict[UploadedFileTypes, FileTypeIcon] = {
     UploadedFileTypes.GENE_LEVEL_INSERT_VARIANTS_ONLY: FileTypeIcon(symbol=_VCF.symbol,
                                                                     badge=FileTypeIcon(fa="fa-solid fa-dna", css="file-type-badge-gene")),
     UploadedFileTypes.GENE_LEVEL_CNV_VCF: FileTypeIcon(symbol="file-icon-copy-number"),
+    UploadedFileTypes.GENE_LEVEL_SPLICE_VCF: FileTypeIcon(symbol="file-icon-splice"),
     UploadedFileTypes.WIKI_GENE: FileTypeIcon(fa="fa-brands fa-wikipedia-w"),
     UploadedFileTypes.WIKI_VARIANT: FileTypeIcon(fa="fa-brands fa-wikipedia-w"),
 }

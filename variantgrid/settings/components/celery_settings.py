@@ -174,6 +174,7 @@ CELERY_IMPORTS = (
     'upload.tasks.import_dragen_tso500_metrics_output_task',
     'upload.tasks.import_gene_coverage_task',
     'upload.tasks.import_gene_level_cnv_task',
+    'upload.tasks.import_splicegirl_vcf_task',
     'upload.tasks.import_gene_list_task',
     'upload.tasks.import_patient_records_task',
     'upload.tasks.import_ped_task',

@@ -3,7 +3,10 @@ import logging
 from celery.result import AsyncResult
 
 from eventlog.models import create_event
-from upload.import_task_factories.import_task_factory import get_import_task_factories
+from upload.import_task_factories.import_task_factory import (
+    get_import_task_factories,
+    get_import_task_factory_from_extension,
+)
 from upload.models import (
     FileUpload,
     ProcessingStatus,
@@ -86,9 +89,21 @@ def process_upload_pipeline(upload_pipeline: UploadPipeline,
     return upload_pipeline, result
 
 
-def process_vcf_file(vcf_filename, name, user, import_source, run_async=True, file_type=UploadedFileTypes.VCF,
+def get_vcf_file_type(user, vcf_filename) -> str:
+    """ The file type a VCF is imported as, picked off its contents the way the upload page and API pick
+        it - so a SpliceGirl or gene-level CNV VCF takes its own path however it comes in. The filename
+        may not end in .vcf, so the extension is taken as given """
+    if factory := get_import_task_factory_from_extension(user, vcf_filename, "vcf"):
+        return factory.get_uploaded_file_type()
+    return UploadedFileTypes.VCF
+
+
+def process_vcf_file(vcf_filename, name, user, import_source, run_async=True, file_type=None,
                      metadata=None) -> tuple[UploadPipeline, AsyncResult]:
+    """ file_type is for a VCF we wrote ourselves (eg ClinVar) - a lab's VCF leaves it to be detected """
     logging.info("process_vcf_file, path=%s", vcf_filename)
+    if file_type is None:
+        file_type = get_vcf_file_type(user, vcf_filename)
     metadata = validate_upload_metadata(metadata, get_metadata_keys_for_file_type(file_type))
     file_upload = FileUpload.objects.create(path=vcf_filename,
                                             import_source=import_source,
