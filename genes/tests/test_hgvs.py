@@ -1,7 +1,9 @@
 """
     The biocommons hgvs library has its own testing, this is specific to our code.
 """
+from types import SimpleNamespace
 from unittest import skip
+from unittest.mock import patch
 
 from django.conf import settings
 from django.test import TestCase, override_settings
@@ -370,3 +372,13 @@ class TestSymbolicHGVS(TestCase):
             matcher.variant_coordinate_to_g_hgvs(vc)
         with self.assertRaises(HGVSNoRepresentationException):
             matcher.variant_coordinate_to_hgvs_variant(vc, "NM_001145661.2")
+
+    def test_no_hgvs_representation_is_not_reported(self):
+        """ The lenient c.HGVS path returns None for a variant with no HGVS form instead of paging Rollbar """
+        matcher = HGVSMatcher(self.genome_build, clingen_resolution=False)
+        variant = SimpleNamespace(coordinate=self._symbolic_coordinate('3', 128200000, '<CNV>', 1000))
+        with patch("genes.hgvs.hgvs_matcher.report_exc_info") as mock_report:
+            self.assertIsNone(matcher.variant_to_c_hgvs_parts(variant, "NM_001145661.2"))
+        mock_report.assert_not_called()
+        with self.assertRaises(HGVSNoRepresentationException):
+            matcher.variant_to_c_hgvs_parts(variant, "NM_001145661.2", throw_on_issue=True)

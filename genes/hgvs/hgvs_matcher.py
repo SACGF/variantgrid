@@ -684,6 +684,10 @@ class HGVSMatcher:
             hgvs_variant = self.variant_to_hgvs_variant(variant, transcript)
             if hgvs_variant:
                 return HGVSComponents(hgvs_variant.format(), transcript)
+        except HGVSNoRepresentationException:
+            # Symbolic <CNV>/<INS> and gene-level alts have no HGVS to write - expected, not reportable (#1574)
+            if throw_on_issue:
+                raise
         except Exception:
             if throw_on_issue:
                 raise
