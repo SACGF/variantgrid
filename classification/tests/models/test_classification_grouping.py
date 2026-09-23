@@ -4,7 +4,6 @@ from django.test import TestCase
 
 from classification.enums import AlleleOriginBucket, ShareLevel, SubmissionSource
 from classification.models import (
-    AlleleGrouping,
     AlleleOriginGrouping,
     Classification,
     ClassificationGrouping,
@@ -25,7 +24,7 @@ class ClassificationGroupingCountsTestCase(TestCase):
     def _grouping(self, clinical_significance: Optional[str]) -> ClassificationGrouping:
         self.record_count += 1
         allele_origin_grouping = AlleleOriginGrouping.objects.create(
-            allele_grouping=AlleleGrouping.objects.create(allele=Allele.objects.create()),
+            allele=Allele.objects.create(),
             allele_origin_bucket=AlleleOriginBucket.GERMLINE
         )
         classification = Classification.objects.create(
@@ -43,7 +42,6 @@ class ClassificationGroupingCountsTestCase(TestCase):
         return ClassificationGrouping.objects.create(
             allele_origin_grouping=allele_origin_grouping,
             lab=self.lab,
-            allele_origin_bucket=AlleleOriginBucket.GERMLINE,
             share_level=ShareLevel.ALL_USERS,
             latest_classification_modification=modification
         )

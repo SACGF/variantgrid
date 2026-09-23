@@ -65,6 +65,7 @@ def view_allele(request, allele_id: int):
         # "show_overall_diff": show_overall_diff,
         "allele_card": AlleleCard(user=request.user, allele=allele),
         "allele": allele,
+        "allele_short_label": get_allele_short_label(allele, user_settings.default_genome_build),
         "edit_clinical_groupings": request.GET.get('edit_clinical_groupings') == 'True'
     }
     if request.user.is_superuser:

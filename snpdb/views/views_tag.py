@@ -213,6 +213,9 @@ def view_tag_config_collection(request, tag_config_collection_id):
                     raise ValueError(f"Unknown variant_tag_stale_days: {stale_days}")
             tag_config_collection.variant_tag_stale_days = stale_days
             tag_config_collection.increment_version()  # Saves, and expires the node caches showing staleness
+        elif "show_resolved_variant_tags" in request.POST:
+            tag_config_collection.show_resolved_variant_tags = request.POST["show_resolved_variant_tags"] == "true"
+            tag_config_collection.save()
         return HttpResponse()  # Nobody ever looks at this
 
     user_tag_styles, user_tag_colors = get_tag_styles_and_colors(request.user, tag_config_collection)
