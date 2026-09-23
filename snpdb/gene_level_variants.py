@@ -25,9 +25,11 @@ an autopopulated c.HGVS, a Shariant upload - and "this deletion is really an RNA
 exception threaded through the report, the classification form, search and the sync, keyed on which
 VCF the sample came from. Gene-level puts the kind in the alt, where get_gene_level_q already guards
 everything for fusions and copy number calls. The breakpoints are observation data and ride along in
-the record's INFO; their real costs are no IGV view of the junction, and a junction in no gene (or
-ambiguously in two) is skipped by the loader. That trade-off was weighed against keeping the <DEL>
-and converting at report time, and decided for gene-level (SACGF/variantgrid_sapath#458).
+the record's INFO; its real cost is that a junction in no gene (or ambiguously in two) is skipped by
+the loader. That trade-off was weighed against keeping the <DEL> and converting at report time, and
+decided for gene-level (SACGF/variantgrid_sapath#458). The IGV view it first cost was given back off
+those breakpoints (#1908): per sample from the observation, and on the variant page from the
+SpliceEvent row or the coordinate label (@see genes.gene_splice.SpliceEventVariant.junction_locus).
 
 
 ## Why they are stored as Variants anyway

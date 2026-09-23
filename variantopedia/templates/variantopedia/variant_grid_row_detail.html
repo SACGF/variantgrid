@@ -11,7 +11,7 @@
     {% if variant_annotation.hgvs_g %}<tr><th>Genomic</th><td class="mono">{{ variant_annotation.hgvs_g }}</td></tr>{% endif %}
     {% if gene_fusion %}<tr><th>Fusion</th><td>{% gene_fusion gene_fusion %}</td></tr>{% endif %}
     {% if gene_copy_number_event %}<tr><th>Copy number</th><td>{% gene_copy_number gene_copy_number_event %}</td></tr>{% endif %}
-    {% if splice_event_variant %}<tr><th>Splice</th><td>{% splice_event splice_event_variant %}</td></tr>{% endif %}
+    {% if splice_event_variant %}<tr><th>Splice</th><td>{% splice_event splice_event_variant genome_build %}</td></tr>{% endif %}
     {% if overlapping_symbols %}<tr><th>Genes</th><td>{{ overlapping_symbols }}</td></tr>{% endif %}
     {% for build_variant in build_variants %}
       <tr><th>{{ build_variant.any_genome_build }}</th><td class="mono">{{ build_variant.full_string }}</td></tr>

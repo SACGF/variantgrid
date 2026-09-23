@@ -808,6 +808,38 @@ VariantGridFormat.fusionCalls = (calls) => {
 };
 
 
+// The caller's row for a splice junction, plus an IGV link across it. A gene-level splice Variant has
+// no coordinate of its own, so the breakpoints the caller wrote are the only thing an RNA BAM can be
+// opened at, and they're per (sample, variant) - which is where a BAM link belongs anyway.
+// @see SPLICE_OBS in upload/tso500/dragen_combined_variant_output_parser.py
+const SPLICE_BREAKPOINT_SEPARATOR = "→";  // what format_splice_observation joins them with
+
+// 'chrX:66905968→chrX:66914514 exon 3 (12 reads)' -> 'chrX:66905968-66914514'. The breakpoints lead
+// the formatted call and a junction is within the one gene, so one locus spans it
+function _spliceJunctionLocus(text) {
+    const breakpoints = text.split(" ")[0].split(SPLICE_BREAKPOINT_SEPARATOR);
+    if (breakpoints.length !== 2) {
+        return null;
+    }
+    const [donor, acceptor] = breakpoints.map(b => b.split(":"));
+    if (donor.length !== 2 || acceptor.length !== 2 || donor[0] !== acceptor[0]) {
+        return null;
+    }
+    return `${donor[0]}:${donor[1]}-${acceptor[1]}`;
+}
+
+VariantGridFormat.spliceCalls = (call) => {
+    if (!call) {
+        return '';
+    }
+    const text = String(call);
+    const locus = _spliceJunctionLocus(text);
+    // '' unless the analysis shows IGV links
+    const igvLink = locus ? create_igv_link(locus, 'getBams') : '';
+    return igvLink + escapeHtml(text);
+};
+
+
 // hgvs_c / hgvs_p / hgvs_g are "ACCESSION:change" or "ACCESSION(SYMBOL):change". The change has to
 // start with an HGVS kind so gene-level fusion nomenclature ("BCR::ABL1") isn't split as one
 const HGVS_REGEX = /^([^:(]+)(?:\(([^)]+)\))?:([cgmnopr]\..+)$/;

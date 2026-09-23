@@ -394,6 +394,9 @@ function variantDetailsShowTagAutocomplete() {
 $(document).ready(function() {
 	$("#variant_sample_information").load('{% url 'variant_sample_information' variant.id genome_build.pk %}');
 
+    // A splice event's junction is the one coordinate a gene-level variant has - @see splice_event.html
+    renderIgvLocusLinks(document);
+
     let variantAllele = {{ variant_allele | jsonify }};
     if (variantAllele) {
         populateVariantAllele(variantAllele);
@@ -527,7 +530,7 @@ function applyVariantValues() {
                 {% elif gene_copy_number_event %}
                     {% labelled label="Copy number" %}{% gene_copy_number gene_copy_number_event %}{% endlabelled %}
                 {% elif splice_event_variant %}
-                    {% labelled label="Splice" %}{% splice_event splice_event_variant %}{% endlabelled %}
+                    {% labelled label="Splice" %}{% splice_event splice_event_variant genome_build %}{% endlabelled %}
                 {% else %}
                     {% labelled id="variant_coordinate" label="Variant Coordinate" value_css="variant-coordinate variant_coordinate" %}Loading...{% endlabelled %}
                 {% endif %}

@@ -166,6 +166,43 @@ class SpliceEventResolutionTest(TestCase):
         self.assertEqual("AR-V7 splice", create_splice_event_variant("AR", "V7").display)
 
 
+class SpliceJunctionLocusTest(TestCase):
+    """ The coordinates an IGV link off the variant page is built from (#1908) """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.genome_build = GenomeBuild.grch37()
+        cls.other_build = GenomeBuild.grch38()
+        hgnc_import = HGNCImport.objects.create()
+        GeneSymbol.objects.get_or_create(symbol="AR")
+        HGNC.objects.create(pk=AR_HGNC_ID, gene_symbol_id="AR", hgnc_import=hgnc_import,
+                            status=HGNCStatus.APPROVED, approved_name="AR approved name")
+
+    def test_a_named_junction_takes_the_builds_splice_event_row(self):
+        splice_event_variant = create_splice_event_variant("AR", "V7")
+        self.assertEqual("X:66905968-66914514",
+                         splice_event_variant.junction_locus(self.genome_build))
+
+    def test_a_named_junction_has_a_locus_per_build(self):
+        splice_event_variant = create_splice_event_variant("AR", "V7")
+        self.assertNotEqual(splice_event_variant.junction_locus(self.genome_build),
+                            splice_event_variant.junction_locus(self.other_build),
+                            "the same junction is different coordinates in each build")
+
+    def test_a_junction_named_by_its_breakpoints_reads_them_off_its_label(self):
+        contig = self.genome_build.chrom_contig_mappings["chrX"]
+        label = coordinate_label(self.genome_build, contig, 66905968, 66999999)
+        splice_event_variant = create_splice_event_variant("AR", label)
+        self.assertEqual("X:66905968-66999999",
+                         splice_event_variant.junction_locus(self.genome_build))
+        self.assertIsNone(splice_event_variant.junction_locus(self.other_build),
+                          "breakpoints mean nothing in a build they weren't called in")
+
+    def test_a_junction_with_no_coordinates_anywhere(self):
+        SpliceEvent.objects.filter(label="v_7").delete()
+        self.assertIsNone(create_splice_event_variant("AR", "V7").junction_locus(self.genome_build))
+
+
 class SpliceJunctionResolutionTest(TestCase):
     """ A junction whose caller names no gene - SpliceGirl's <DEL> from POS to END """
 

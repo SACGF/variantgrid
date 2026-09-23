@@ -163,6 +163,12 @@ def coordinate_label(genome_build: GenomeBuild, contig: Contig, donor: int, acce
     return f"{genome_build_token(genome_build)}_{contig_name.lower()}_{donor}_{acceptor}"
 
 
+def format_junction_locus(contig: Contig, donor: int, acceptor: int) -> str:
+    """ The junction as a genome browser takes it - one locus spanning both breakpoints, which is
+        the view a reader wants of a junction """
+    return f"{contig.name}:{donor}-{acceptor}"
+
+
 @dataclass(frozen=True)
 class ResolvedSpliceEvent:
     """ A splice event's identity, before it has a Variant. The gene is the Locus.position and the
@@ -299,6 +305,23 @@ class SpliceEventVariant:
             unique per build, and a label means the same event in every build """
         return SpliceEvent.objects.filter(gene_symbol=self.gene.gene_symbol_id,
                                           label=self.label).first()
+
+    def junction_locus(self, genome_build: GenomeBuild) -> Optional[str]:
+        """ The junction as a locus in a build - 'X:66905968-66914514' - which is all an IGV link
+            needs, and the only coordinate a splice Variant has away from a sample's observation
+            (@see upload.tso500.dragen_combined_variant_output_parser). A registered junction has a
+            SpliceEvent row per build; one named by its breakpoints carries them in its own label,
+            for the build it was called in, and means nothing in another. """
+
+        splice_event = SpliceEvent.objects.filter(gene_symbol=self.gene.gene_symbol_id,
+                                                  label=self.label, genome_build=genome_build).first()
+        if splice_event:
+            return format_junction_locus(splice_event.contig, splice_event.donor, splice_event.acceptor)
+        if m := CANONICAL_COORDINATE_PATTERN.match(self.label):
+            if m.group("build") == genome_build_token(genome_build):
+                if contig := genome_build.chrom_contig_mappings.get(m.group("contig").upper()):
+                    return format_junction_locus(contig, int(m.group("donor")), int(m.group("acceptor")))
+        return None
 
     @property
     def display(self) -> str:

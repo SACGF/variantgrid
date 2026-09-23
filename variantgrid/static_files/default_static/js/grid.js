@@ -108,6 +108,17 @@ function load_variant_details(variant_id) {
     editorContainer.load(variant_details_url);
 }
 
+const GENE_LEVEL_CONTIG_NAME = "GENE_LEVEL";  // @see snpdb/gene_level_variants.py
+
+// Fills the server rendered IGV placeholders in a fragment - '<span class="igv-locus"
+// data-locus="chrX:66905968-66914514"></span>'. The link is built here rather than in the template
+// so it follows ANALYSIS_SETTINGS.show_igv_links wherever the fragment was dropped in
+function renderIgvLocusLinks(container) {
+    $(".igv-locus", container || document).each(function() {
+        $(this).html(create_igv_link($(this).data("locus"), 'getBams'));
+    });
+}
+
 // Expand renderer for the variant grids (@see AbstractVariantGrid.get_expand_client_renderer). The
 // identifiers come from the server for the grid's annotation version; the actions are built here so
 // IGV follows ANALYSIS_SETTINGS.show_igv_links like the rest of the page
@@ -115,14 +126,18 @@ function variantGridRowDetail(annotationVersionId, rowData) {
     const variantId = rowData["id"];
     const detail = $('<div>', {class: 'variant-row-detail'});
     const fragment = $('<div>', {class: 'variant-row-detail-fragment', text: 'Loading...'});
-    loadAjaxBlock(fragment, Urls.variant_grid_row_detail(variantId, annotationVersionId));
+    loadAjaxBlock(fragment, Urls.variant_grid_row_detail(variantId, annotationVersionId))
+        .done(() => renderIgvLocusLinks(fragment));
 
     const actions = $('<div>', {class: 'variant-row-detail-actions'});
     actions.append($('<a>', {href: `javascript:load_variant_details(${variantId});`, text: 'Details'}));
     actions.append($('<a>', {href: Urls.view_variant(variantId), target: '_blank', text: 'Open in new tab'}));
     const chrom = rowData["locus__contig__name"];
     const position = rowData["locus__position"];
-    if (chrom != null && position != null) {
+    // A gene-level row's locus is a gene ID on a fake contig, not a coordinate, so there is nothing
+    // to open - a splice junction's own IGV link comes off its breakpoints instead
+    // (@see VariantGridFormat.spliceCalls, snpdb/gene_level_variants.py)
+    if (chrom != null && position != null && chrom !== GENE_LEVEL_CONTIG_NAME) {
         const igvUrl = createIgvUrl(`${chrom}:${position}`, 'getBams');  // null unless the analysis shows IGV links
         if (igvUrl) {
             actions.append($('<a>', {href: igvUrl, text: 'IGV'}));

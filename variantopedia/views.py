@@ -179,6 +179,7 @@ def variant_grid_row_detail(request, variant_id: int, annotation_version_id: int
         "gene_fusion": _get_gene_fusion(variant),
         "gene_copy_number_event": _get_gene_copy_number_event(variant),
         "splice_event_variant": _get_splice_event_variant(variant),
+        "genome_build": vav.genome_build,
     }
     return render(request, "variantopedia/variant_grid_row_detail.html", context)
 

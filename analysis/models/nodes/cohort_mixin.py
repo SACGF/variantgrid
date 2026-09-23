@@ -422,7 +422,10 @@ class CohortMixin:
                 key=f"{cgc.cohortgenotype_alias}__info__{SPLICE_OBSERVATION_INFO}",
                 label=label, width=90,
                 orderable=False, search=False, include_in_csv=True,
-                renderer=_render_splice_calls, csv_rendered=True))
+                renderer=_render_splice_calls, csv_rendered=True,
+                # The cell adds an IGV link across the junction - the caller's breakpoints are the
+                # only coordinate a gene-level splice variant has. @see VariantGridFormat.spliceCalls
+                client_renderer='VariantGridFormat.spliceCalls'))
         return extra_columns
 
     def _get_fusion_calls_cohort_genotype_collections(self) -> list:
