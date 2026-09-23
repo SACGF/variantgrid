@@ -609,6 +609,7 @@ types-pyyaml==6.0.12.20260906
     #   djangorestframework-stubs
 typing-extensions==4.16.0
     # via
+    #   -r requirements.in
     #   aiohttp
     #   aiosignal
     #   beautifulsoup4

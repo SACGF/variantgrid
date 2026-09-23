@@ -1,3 +1,5 @@
+from contextlib import nullcontext
+
 from django.core.management import BaseCommand
 from django.db.models import Subquery, Exists
 
@@ -10,6 +12,7 @@ from classification.models.classification_grouping import (
     AlleleOriginGrouping,
     ClassificationGrouping,
 )
+from classification.services.overlaps_services import OverlapServices
 
 
 class Command(BaseCommand):
@@ -30,6 +33,12 @@ class Command(BaseCommand):
         if not any((summary, all, dirty, refresh)):
             raise ValueError("Must provide one or more of summary, all, dirty, refresh")
 
+        # a full rebuild would otherwise notify labs of every existing discordance
+        with OverlapServices.discordance_notifications_suppressed() if (all or refresh) else nullcontext():
+            self._rebuild(summary=summary, all=all, dirty=dirty, refresh=refresh)
+
+    @staticmethod
+    def _rebuild(summary: bool, all: bool, dirty: bool, refresh: bool):
         if all or summary:
             for index, cm in enumerate(ClassificationModification.objects.filter(is_last_published=True).select_related("classification").iterator()):
                 classification = cm.classification

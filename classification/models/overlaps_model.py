@@ -410,8 +410,12 @@ class Overlap(TimeStampedModel, ReviewableModelMixin, PreviewModelMixin):
 
     class Meta:
         indexes = [models.Index(fields=['overlap_type']), models.Index(fields=['value_type']), models.Index(fields=['allele'])]
-        # TODO, we could put lab back in for ClinVar type so we can have this unique
-        # unique_together = ('overlap_type', 'allele', 'value_type', 'testing_contexts', 'tumor_type_category', 'lab')
+        constraints = [
+            # cross context overlaps have null testing context and tumor type category
+            models.UniqueConstraint(fields=["overlap_type", "value_type", "allele", "testing_context_bucket", "tumor_type_category"],
+                                    nulls_distinct=False,
+                                    name="overlap_unique"),
+        ]
 
     @property
     def scope_description(self):
@@ -567,6 +571,9 @@ class OverlapContributionNextStep(TimeStampedModel):
     overlap = models.ForeignKey(Overlap, on_delete=CASCADE)
     contribution = models.ForeignKey(OverlapContribution, on_delete=CASCADE)
     next_step = IntegerFieldChoices(choices_type=TriageNextStep, default=TriageNextStep.PENDING_CALCULATION)
+
+    class Meta(TimeStampedModel.Meta):
+        unique_together = ("overlap", "contribution")
 
     def __str__(self):
         return f"{self.contribution} ({self.next_step.name})"
