@@ -33,4 +33,5 @@
     }
 </script>
 
-<table id="variant-tag-detail-datatable" class="sticky-header" data-datatable-responsive="true" data-datatable-url="{% url 'variant_tag_detail_datatable' variant.pk tag %}"></table>
+<table id="variant-tag-detail-datatable" class="sticky-header" data-datatable-responsive="true" data-datatable-url="{% url 'variant_tag_detail_datatable' variant.pk tag %}"
+       data-datatable-data="variantTagsShowResolvedFilter"></table>
