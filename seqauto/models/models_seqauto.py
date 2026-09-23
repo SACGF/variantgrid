@@ -1357,17 +1357,21 @@ def get_samples_by_sequencing_sample(sequencing_samples, vcf):
         sequencing_samples_by_cleaned_name[f"{cleaned_name}_S{ss.sample_number}"] = ss
 
     samples = list(vcf.sample_set.all())
-    potential_samples_by_name = {
-        s.name: s for s in samples
-    }
-    # If there is a single sample, use VCF name (work around SpliceGirls samples called "SAMPLE")
-    if len(samples) == 1:
-        potential_samples_by_name[vcf.name] = samples[0]
-
     samples_by_sequencing_sample = {}
-    for sample_name, sample in potential_samples_by_name.items():
-        if sequencing_sample := sequencing_samples_by_cleaned_name.get(clean_sample_name(sample_name)):
+    for sample in samples:
+        if sequencing_sample := sequencing_samples_by_cleaned_name.get(clean_sample_name(sample.name)):
             samples_by_sequencing_sample[sequencing_sample] = sample
+
+    # A single-sample VCF whose sample isn't named for the sequencing sample (SpliceGirl calls its one
+    # sample "SAMPLE") is matched on the filename instead: the sequencing sample name, or that with a
+    # suffix after a separator, eg "<sample>_SpliceVariants.vcf" or "<sample>.gatk.hg38.vcf.gz"
+    if not samples_by_sequencing_sample and len(samples) == 1:
+        vcf_name = clean_sample_name(os.path.basename(vcf.name))
+        matches = [(cleaned_name, ss) for cleaned_name, ss in sequencing_samples_by_cleaned_name.items()
+                   if vcf_name == cleaned_name or vcf_name.startswith((f"{cleaned_name}_", f"{cleaned_name}."))]
+        if matches:
+            _, sequencing_sample = max(matches, key=lambda m: len(m[0]))
+            samples_by_sequencing_sample[sequencing_sample] = samples[0]
     return samples_by_sequencing_sample
 
 

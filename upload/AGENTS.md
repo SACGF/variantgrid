@@ -124,7 +124,9 @@ Gotchas:
   themselves SKIPPED; BulkGenotypeVCFProcessor.check_pipeline_for_failures bails mid-file. Running steps are not killed.
 - Retry (upload/upload_processing.py:process_upload_pipeline, upload/tasks/vcf/genotype_vcf_tasks.py:reload_vcf_task)
   deletes only steps with origin IMPORT_TASK_FACTORY and resets the rest (USER_ADDITION steps re-run as is), so the
-  create-data-from-header tasks must stay idempotent.
+  create-data-from-header tasks must stay idempotent. A retry finds the VCF the first attempt created and skips
+  create_vcf_from_vcf, so the sequencing link (upload/vcf/vcf_import.py:link_uploaded_vcf_to_sequencing) is re-run
+  on that path too - it is where a sample the sheet doesn't name fails, and without it the retry imports unlinked.
 - A VCF whose build cannot be resolved gets ImportStatus.REQUIRES_USER_INPUT and the pipeline TERMINATED_EARLY
   (upload/tasks/vcf/genotype_vcf_tasks.py:ImportCreateVCFModelForGenotypeVCFTask); declare genome_build/source as
   upload metadata (upload/upload_metadata.py:validate_upload_metadata).

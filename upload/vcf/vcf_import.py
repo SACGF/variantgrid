@@ -258,15 +258,19 @@ def create_vcf_from_vcf(upload_step, vcf_reader) -> VCF:
     vcf.genome_build = resolve_genome_build(vcf_reader, file_upload)
 
     configure_vcf_from_header(vcf, vcf_reader)
+    link_uploaded_vcf_to_sequencing(uploaded_vcf, upload_step)
+    assign_sample_extractions(vcf, upload_step)
+    return vcf
 
+
+def link_uploaded_vcf_to_sequencing(uploaded_vcf, upload_step=None):
+    """ Also run when a pipeline is reloaded with its VCF already created, as the link is where a
+        first attempt fails when the samples don't match the sheet """
     backend_vcf = create_backend_vcf_links(uploaded_vcf)
     if backend_vcf:
         logging.info("Handle backend VCF")
         link_samples_and_vcfs_to_sequencing(backend_vcf, upload_step=upload_step)
         backend_vcf_import_start_signal.send(sender=os.path.basename(__file__), backend_vcf=backend_vcf)
-
-    assign_sample_extractions(vcf, upload_step)
-    return vcf
 
 
 def assign_sample_extractions(vcf: VCF, upload_step=None):

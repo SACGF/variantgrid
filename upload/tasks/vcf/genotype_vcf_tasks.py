@@ -2,6 +2,7 @@ import logging
 import os
 
 import celery
+import cyvcf2
 
 from analysis.tasks.mutational_signatures_task import calculate_mutational_signature
 from annotation.models.models import AnnotationVersion, VCFAnnotationStats
@@ -22,6 +23,7 @@ from upload.models import (
     ModifiedImportedVariants,
     SimpleVCFImportInfo,
     SkipUploadStepException,
+    UploadedVCF,
     UploadedVCFPendingAnnotation,
     UploadPipeline,
     UploadStep,
@@ -31,6 +33,15 @@ from upload.models import (
 from upload.signals.signals import vcf_import_success_signal
 from upload.tasks.vcf.import_vcf_step_task import ImportVCFStepTask
 from upload.upload_processing import process_upload_pipeline
+from upload.vcf.vcf_import import (
+    configure_vcf_from_header,
+    create_cohort_genotype_collection_from_vcf,
+    create_import_success_message,
+    create_vcf_from_vcf,
+    genotype_vcf_processor_factory,
+    import_vcf_file,
+    link_uploaded_vcf_to_sequencing,
+)
 from variantgrid.celery import app
 
 
@@ -38,25 +49,19 @@ class ImportCreateVCFModelForGenotypeVCFTask(ImportVCFStepTask):
     """ Create VCF model from header """
 
     def process_items(self, upload_step):
-        from upload.vcf.vcf_import import (
-            configure_vcf_from_header,
-            create_cohort_genotype_collection_from_vcf,
-            create_vcf_from_vcf,
-        )
-
         vcf_filename = upload_step.input_filename
         upload_pipeline = upload_step.upload_pipeline
-
-        import cyvcf2
         vcf_reader = cyvcf2.VCF(vcf_filename)
 
         try:
-            vcf = upload_pipeline.uploadedvcf.vcf
+            uploaded_vcf = upload_pipeline.uploadedvcf
+            vcf = uploaded_vcf.vcf
             _ = vcf.pk  # Throws exception if VCF is None
             logging.info("VCF already existed - reusing!")
             # Maybe reloading really old VCF - need to re-detect format fields etc
             configure_vcf_from_header(vcf, vcf_reader)
-        except AttributeError:
+            link_uploaded_vcf_to_sequencing(uploaded_vcf, upload_step)
+        except (AttributeError, UploadedVCF.DoesNotExist):
             vcf = create_vcf_from_vcf(upload_step, vcf_reader)
 
         # If build not set, end
@@ -117,7 +122,6 @@ class ProcessGenotypeVCFDataTask(ImportVCFStepTask):
         (ie via ImportGenotypeVCFTask) - this can run in parallel """
 
     def process_items(self, upload_step):
-        from upload.vcf.vcf_import import genotype_vcf_processor_factory, import_vcf_file
 
         upload_pipeline = upload_step.upload_pipeline
         uploaded_vcf = upload_pipeline.uploadedvcf
@@ -184,7 +188,6 @@ class ImportGenotypeVCFSuccessTask(ImportVCFStepTask):
 
     def process_items(self, upload_step):
         from eventlog.models import create_event
-        from upload.vcf.vcf_import import create_import_success_message
 
         uploaded_vcf = upload_step.get_uploaded_vcf()
         vcf = uploaded_vcf.vcf

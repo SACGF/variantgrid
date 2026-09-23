@@ -54,9 +54,23 @@ class GetSamplesBySequencingSampleTests(TestCase):
         vcf, _ = self._make_vcf("RUN_001", ["ABC1_extra"])
         self.assertEqual(get_samples_by_sequencing_sample(sequencing_samples, vcf), {})
 
-    def test_single_sample_falls_back_to_vcf_name(self):
-        """ SpliceGirls VCFs name their only sample "SAMPLE" """
-        sequencing_samples = self._make_sequencing_samples(["ABC-1"])
-        vcf, samples = self._make_vcf("ABC_1", ["SAMPLE"])
+    def test_single_sample_falls_back_to_vcf_filename(self):
+        """ SpliceGirl VCFs name their only sample "SAMPLE" - the file is named for the sequencing sample """
+        sequencing_samples = self._make_sequencing_samples(["ABC-1", "ABC-1-EXTRA"])
+        for name in ["ABC_1", "ABC_1_SpliceVariants.vcf", "/data/RUN_001/ABC-1_S1.gatk.hg38.vcf.gz"]:
+            vcf, samples = self._make_vcf(name, ["SAMPLE"])
+            self.assertEqual(get_samples_by_sequencing_sample(sequencing_samples, vcf),
+                             {sequencing_samples[0]: samples[0]}, name)
+
+    def test_single_sample_filename_prefers_longest_sequencing_sample(self):
+        sequencing_samples = self._make_sequencing_samples(["ABC-1", "ABC-1-EXTRA"])
+        vcf, samples = self._make_vcf("ABC_1_EXTRA_SpliceVariants.vcf", ["SAMPLE"])
         self.assertEqual(get_samples_by_sequencing_sample(sequencing_samples, vcf),
-                         {sequencing_samples[0]: samples[0]})
+                         {sequencing_samples[1]: samples[0]})
+
+    def test_single_sample_filename_not_matched_when_sample_name_matches(self):
+        """ The filename fallback is only for a sample the sheet doesn't name """
+        sequencing_samples = self._make_sequencing_samples(["ABC-1", "ABC-2"])
+        vcf, samples = self._make_vcf("ABC_1.vcf", ["ABC-2"])
+        self.assertEqual(get_samples_by_sequencing_sample(sequencing_samples, vcf),
+                         {sequencing_samples[1]: samples[0]})
