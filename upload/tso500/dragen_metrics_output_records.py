@@ -46,7 +46,7 @@ from upload.tso500.dragen_combined_variant_output_parser import (
 from upload.tso500.dragen_combined_variant_output_records import (
     SAMPLE_ID_ACCESSION_PATTERN,
     CombinedVariantOutputIdentityError,
-    measured_date,
+    parse_output_datetime,
     parse_patient_code,
 )
 from upload.tso500.dragen_metrics_output_parser import (
@@ -64,7 +64,7 @@ PAIR_ID_ACCESSION_PATTERN = re.compile(r"(?P<specimen>\d{10})$")
 
 
 def metrics_method(sections) -> str:
-    """ The tool and version that judged the library, as SpecimenMeasure.method words it """
+    """ The tool and version that judged the library - 'DRAGEN TSO500 MetricsOutput 2.6.2.4' """
     version = get_workflow_version(sections)
     return f"{METHOD} {version}" if version else METHOD
 
@@ -73,7 +73,7 @@ def metrics_measured_date(sections):
     """ When the module wrote the file - '[Header]' spells Output Date / Time as the CVO does """
     if section := sections.get(HEADER):
         values = section.values
-        return measured_date({OUTPUT_DATE: values.get(OUTPUT_DATE),
+        return parse_output_datetime({OUTPUT_DATE: values.get(OUTPUT_DATE),
                               OUTPUT_TIME: values.get(OUTPUT_TIME)})
     return None
 

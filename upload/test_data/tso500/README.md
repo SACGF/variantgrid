@@ -168,7 +168,7 @@ Two facts these files don't reliably carry are supplied at upload instead, as `g
 | `_DragenExonCNV.vcf` | **`GRCh37` — required**, the header has no contigs and an unresolvable `##reference` | from header (`LrCalculator 1.0.0.11`) | — |
 | `SpliceVariants.vcf` | from header contigs | from header (`SpliceGirl 1.0.0.614`) | — |
 | `AllFusions.csv` | **`GRCh37` — required** on a multi-build deployment, the file carries no build at all | from its own `# Source =` line (`FusionProcessor 1.0.0.614`) | — |
-| `CombinedVariantOutput.tsv` | **`GRCh37` — required**, no build in the file | from `Module Version` (`DRAGEN TSO500 CombinedVariantOutput 2.1.1`) | — |
+| `CombinedVariantOutput.tsv` | **`GRCh37` — required**, no build in the file | from `Module Version` (`DRAGEN TSO500 CombinedVariantOutput 2.1.1`) | send it - keys the pair's TMB/MSI/GIS record; without it, the run whose sheet names the pair |
 | `MetricsOutput_orig.tsv` | **none accepted** - the file has no coordinates | from `Workflow Version` (`2.1.1.4`) | **required** - the only key it takes |
 
 Send a build's **own name** (`GRCh37`), not an alias (`hg19`). These files are GRCh37 with a `chr`

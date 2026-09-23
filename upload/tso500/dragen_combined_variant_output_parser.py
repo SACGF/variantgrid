@@ -37,11 +37,15 @@ RNA_SAMPLE_ID = "RNA Sample ID"
 OUTPUT_DATE = "Output Date"
 OUTPUT_TIME = "Output Time"
 MODULE_VERSION = "Module Version"
+PIPELINE_VERSION = "Pipeline Version"
 
 # The key/value sections holding the pair's measures - what each is written as is
 # upload.tso500.dragen_combined_variant_output_records
 TOTAL_TMB = "Total TMB"
+CODING_REGION_SIZE = "Coding Region Size in Megabases"
+PASSING_ELIGIBLE_VARIANTS = "Number of Passing Eligible Variants"
 USABLE_MSI_SITES = "Usable MSI Sites"
+TOTAL_MSI_SITES_UNSTABLE = "Total MSI Sites Unstable"
 PERCENT_UNSTABLE_MSI_SITES = "Percent Unstable MSI Sites"
 GENOMIC_INSTABILITY_SCORE = "Genomic Instability Score"
 TUMOR_FRACTION = "Tumor Fraction"

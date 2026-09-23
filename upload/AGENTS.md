@@ -94,9 +94,12 @@ Gotchas:
   code, and the default regex reads both), the Specimen
   (the ten-digit accession inside each sample ID) and the two Extractions (its container suffix), created when absent;
   the DNA/RNA sample IDs are exact `Sample.vcf_sample_name` and `SequencingSample.sample_name`, which links both arms'
-  samples to their extraction and the CVO's VCF to its sequencing run without seqauto's filename matching. `[TMB]`,
-  `[MSI]` and `[GIS]` become the five patients/models.py:SpecimenMeasure rows. None of it fails the import - a chain
-  that cannot be made is a SimpleVCFImportInfo message.
+  samples to their extraction and the CVO's VCF to its sequencing run without seqauto's filename matching. The
+  analysis itself - `[Analysis Details]` and the `[TMB]`, `[MSI]`, `[GIS]` scalars - is one
+  seqauto/models/models_seqauto.py:DragenTSO500CombinedVariantOutput per (run, pair) (#1904), keyed on the upload's
+  `sequencing_run` metadata as the MetricsOutput is (the file names its run 'NA'); a CVO sent without it takes the run
+  whose current sheet names one of its sample IDs, and one no registered run names is not recorded. None of it fails
+  the import - a chain that cannot be made parks the row's specimen claim and is a SimpleVCFImportInfo message.
 - The run's MetricsOutput.tsv is a separate, single-shot import (tasks/import_dragen_tso500_metrics_output_task.py,
   tso500/dragen_metrics_output_parser.py + _records.py): it has no variants and no coordinates, and recognises itself
   by a banner line ending 'Metrics Output' (with the module version, as the CVO's has it). One file covers a whole run

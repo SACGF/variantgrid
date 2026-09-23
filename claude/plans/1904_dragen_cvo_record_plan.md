@@ -1,10 +1,10 @@
 # Store the DRAGEN TSO500 CombinedVariantOutput as a seqauto record
 
-Written by Claude Fable 5.1 (claude-fable-5-1), 2026-09-23
-Status: draft
+Written by Claude Fable 5.1 (claude-fable-5-1), 2026-09-23; revised in implementation by Claude Opus 5.5 (claude-opus-5-5), 2026-09-23
+Status: in progress (implemented, uncommitted)
 
 [#1904](https://github.com/SACGF/variantgrid/issues/1904). TMB, MSI, GIS, tumour fraction and ploidy are results of one
-DRAGEN analysis of one sequenced pair. Today `upload/tso500/dragen_combined_variant_output_records.py:write_specimen_measures`
+DRAGEN analysis of one sequenced pair. Today `write_specimen_measures` (in `upload/tso500/dragen_combined_variant_output_records.py`)
 writes them as `patients/models.py:SpecimenMeasure` rows keyed on (specimen, measure type), replaced on resend, so which
 analysis produced a report's TMB is not recorded, two analyses of one specimen cannot coexist, and Mocha's pathology
 tumour percent (`sapath/models/sapath_mocha_vg_sync.py` in variantgrid_sapath) and DRAGEN's `Tumor Fraction` overwrite
@@ -16,7 +16,8 @@ typed columns for the file's scalars, the standard nullable claims on the seqaut
 reading the row for its own samples. `SpecimenMeasure` keeps only what is genuinely of the specimen.
 
 It assumes #1903 step 3 has landed: the CVO import writes no VCF, so it becomes a single-shot import like MetricsOutput.
-Until then the row is written from the existing post-header task and the VCF pipeline stays.
+It had not when this was implemented (the CVO still writes a record-less VCF for the RNA arm's Sample), so the row is
+written from the existing post-header task, the VCF pipeline stays, and the `UploadData` record below waits for step 3.
 
 ## Data
 
@@ -32,8 +33,8 @@ class DragenTSO500CombinedVariantOutput(TimeStampedModel):
     sequencing_run_name = models.TextField()
     pair_id = models.TextField()                  # [Analysis Details] Pair ID
     # [Analysis Details]
-    dna_sample_id = models.TextField(blank=True)  # a Sample.vcf_sample_name and a SequencingSample.sample_name
-    rna_sample_id = models.TextField(blank=True)
+    dna_sample_name = models.TextField(blank=True)  # a Sample.vcf_sample_name and a SequencingSample.sample_name
+    rna_sample_name = models.TextField(blank=True)  # (not *_sample_id - that is the dna_sample FK's column)
     output_datetime = models.DateTimeField(null=True, blank=True)   # Output Date + Output Time, made aware
     module_version = models.TextField(blank=True)
     pipeline_version = models.TextField(blank=True)
@@ -85,13 +86,15 @@ survived the row being overwritten; this row is never overwritten by a later ana
 
 ### `SpecimenMeasure` - what is of the specimen
 
-`patients/models.py:SpecimenMeasure` keeps its fields. `patients/models_enums.py:SpecimenMeasureType` loses TMB, MSI, GIS
+`patients/models.py:SpecimenMeasure` drops the columns only the DRAGEN import wrote - `extraction`, `threshold`,
+`threshold_source`, `measured_date` (patients 0019) - and stays in core for other pathology-side numbers. `patients/models_enums.py:SpecimenMeasureType` loses TMB, MSI, GIS
 and PLOIDY; `TUMOUR_FRACTION` ('F') stays with the label "Tumour content (pathology)" so Mocha's rows, its sync and the
 sapath template's `tumour_fraction` measure key are untouched. The DRAGEN rows are deleted by the migration below.
 
 ### `Measure` - what the report and the build form see
 
-`classification/report/case_report_context.py` gains a frozen dataclass so the case-field `measure` / `tick_when`
+`classification/models/classification_report_models.py` gains a frozen dataclass (there rather than in
+`classification/report/case_report_context.py`, which imports that module) so the case-field `measure` / `tick_when`
 machinery, the templates and sapath's `_measure(context, key)` keep reading `context["measures"][key]` with the same
 fields whatever the number came from:
 
@@ -102,6 +105,7 @@ class Measure:
     unit: Optional[str]
     call: Optional[str]
     threshold: Optional[str]      # the policy in words, describe_bands(...)
+    threshold_source: Optional[str]  # the settings that set it - the build form shows it
     method: str
 ```
 
@@ -119,7 +123,7 @@ plus the one pathology key):
 
 `measure_tick` and `_rule_holds` take a `Measure`; `validate_case_fields` validates a `measure` key against the union.
 
-### `UploadedDragenTSO500CombinedVariantOutput`
+### `UploadedDragenTSO500CombinedVariantOutput` (after #1903 step 3)
 
 `upload/models/models_uploaded_files.py`, mirroring `UploadedDragenTSO500MetricsOutput`:
 
@@ -131,7 +135,10 @@ class UploadedDragenTSO500CombinedVariantOutput(UploadData):
 
 ## Import
 
-1. **Factory.** `upload/import_task_factories/import_task_factories.py:DragenTSO500CombinedVariantOutputImportTaskFactory`
+1. **Factory.** Until #1903 step 3 it stays a VCF factory and accepts `sequencing_run` beside the VCF keys; a CVO sent
+   without it takes the run whose current sheet names one of its sample IDs, and one no registered run names is a
+   message on the import page. After step 3,
+   `upload/import_task_factories/import_task_factories.py:DragenTSO500CombinedVariantOutputImportTaskFactory`
    becomes an `ImportTaskFactory` like `DragenTSO500MetricsOutputImportTaskFactory`: metadata keys
    `{SEQUENCING_RUN}` (required, part of the key), data class the new `UploadData`, one celery task. The pipeline
    already sends `sequencing_run` with the MetricsOutput, so the client and NGS-pipelines changes are the same one
@@ -184,7 +191,7 @@ already use.
 
 - seqauto 0049 (new): the model, the mixin refactor of `LibraryQC` (no
   column change).
-- upload 0048 (new): the `UploadData` record.
+- upload (after #1903 step 3): the `UploadData` record.
 - patients 0019 (new): `RunPython` deleting `SpecimenMeasure` rows whose
   `measure_type` is not TUMOUR_FRACTION or whose `method` starts with `DRAGEN` (the CVO import's `method`), then the
   choices change. Existing rows are recreated by re-sending the CVOs through the pipeline rather than by re-parsing

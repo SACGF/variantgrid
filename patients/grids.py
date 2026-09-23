@@ -223,7 +223,6 @@ class SpecimenColumns(DatatableConfig[Specimen]):
             RichColumn('external_pk__code', label='External ID', orderable=True),
             RichColumn('extraction_count', label='# Extractions', orderable=True, search=False,
                        css_class='num'),
-            RichColumn('measure_count', label='# Measures', orderable=True, search=False, css_class='num'),
             RichColumn('measures', label='Measures', search=False, renderer=self.render_measures),
             RichColumn('modified', orderable=True, search=False, default_sort=SortOrder.DESC,
                        client_renderer='TableFormat.timestamp'),
@@ -241,7 +240,6 @@ class SpecimenColumns(DatatableConfig[Specimen]):
         measure = JSONObject(measure_type="specimenmeasure__measure_type", value="specimenmeasure__value",
                              unit="specimenmeasure__unit", call="specimenmeasure__call")
         return qs.annotate(extraction_count=Count("extraction", distinct=True),
-                           measure_count=Count("specimenmeasure", distinct=True),
                            measures=ArrayAgg(measure, distinct=True,
                                              filter=Q(specimenmeasure__isnull=False)))
 

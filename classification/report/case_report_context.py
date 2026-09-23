@@ -23,7 +23,7 @@ from typing import Any, Optional
 
 from django.contrib.auth.models import User
 from django.core.exceptions import ObjectDoesNotExist
-from django.db.models import F
+from django.db.models import F, Q
 from django.utils import timezone
 
 from annotation.models import VariantAnnotationVersion
@@ -31,7 +31,7 @@ from classification.enums import SpecialEKeys
 from classification.enums.classification_enums import SomaticClinicalSignificance
 from classification.models.classification import Classification, ClassificationModification
 from classification.models.classification_json import ClassificationJsonParams
-from classification.models.classification_report_models import CaseReportStatus
+from classification.models.classification_report_models import CaseReportStatus, Measure
 from classification.models.evidence_key import EvidenceKeyMap
 from library.genomics.vcf_enums import GeneLevelSymbolicAlt, VariantClass
 from library.utils.django_utils import get_cached_project_git_hash
@@ -41,8 +41,8 @@ from patients.models_enums import (
     SampleSourceLevel,
 )
 from patients.sample_grouping import get_patient_for_source, get_sample_group
-from seqauto.models import LibraryQC
-from seqauto.models.models_enums import LIBRARY_QC_CONTEXT_KEYS
+from seqauto.models import DragenTSO500CombinedVariantOutput, LibraryQC
+from seqauto.models.models_enums import CVO_MEASURE_CONTEXT_KEYS, LIBRARY_QC_CONTEXT_KEYS
 from snpdb.models import GenomeBuild, Lab, Sample
 
 
@@ -378,7 +378,8 @@ class ReportContext:
     extractions: list[Extraction] = field(default_factory=list)
     samples: list[Sample] = field(default_factory=list)
     sequencing_runs: list[str] = field(default_factory=list)
-    measures: dict[str, SpecimenMeasure] = field(default_factory=dict)
+    combined_variant_output: Optional[DragenTSO500CombinedVariantOutput] = None
+    measures: dict[str, Measure] = field(default_factory=dict)
     summary: str = ""
     splice_note: Optional[str] = None
     case_values: dict = field(default_factory=dict)
@@ -507,15 +508,46 @@ def case_specimen(source_level: str, source) -> Optional[Specimen]:
     return None
 
 
-def specimen_measures(specimen: Optional[Specimen]) -> dict[str, SpecimenMeasure]:
-    """ The specimen's measures by context key - what the report prints, and what the build form
-        starts its assay flags from """
+def case_combined_variant_output(samples: list[Sample],
+                                 specimen: Optional[Specimen]) -> Optional[DragenTSO500CombinedVariantOutput]:
+    """ The one analysis a case's TMB, MSI and GIS come off - the one whose arm is one of the case's samples,
+        directly or through the sequencing sample it came off. Where none is linked yet, the newest
+        analysis claiming the specimen, as specimen_library_qc picks """
+    by_output = [F("output_datetime").desc(nulls_last=True), "-pk"]
+    if samples:
+        arm_q = Q()
+        for arm in ("dna", "rna"):
+            arm_q |= Q(**{f"{arm}_sample__in": samples})
+            arm_q |= Q(**{f"{arm}_sequencing_sample__samplefromsequencingsample__sample__in": samples})
+        if cvo := DragenTSO500CombinedVariantOutput.objects.filter(arm_q).distinct().order_by(*by_output).first():
+            return cvo
     if specimen is None:
-        return {}
+        return None
+    return DragenTSO500CombinedVariantOutput.objects.filter(specimen=specimen).order_by(*by_output).first()
+
+
+def case_measures(cvo: Optional[DragenTSO500CombinedVariantOutput],
+                  specimen: Optional[Specimen]) -> dict[str, Measure]:
+    """ The case's measures by context key - what the report prints, and what the build form starts its
+        assay flags from: the analysis' numbers, and the pathologist's tumour content off the specimen """
     measures = {}
-    for measure in SpecimenMeasure.objects.filter(specimen=specimen):
-        if key := MEASURE_CONTEXT_KEYS.get(measure.measure_type):
-            measures[key] = measure
+    if cvo:
+        for key, (column, unit) in CVO_MEASURE_CONTEXT_KEYS.items():
+            value = getattr(cvo, column)
+            if value is None:
+                continue
+            measure_call = cvo.measure_call(key)
+            measures[key] = Measure(value=value, unit=unit,
+                                    call=measure_call.call if measure_call else None,
+                                    threshold=measure_call.threshold if measure_call else None,
+                                    threshold_source=measure_call.threshold_source if measure_call else None,
+                                    method=cvo.method)
+    if specimen:
+        for specimen_measure in SpecimenMeasure.objects.filter(specimen=specimen):
+            if key := MEASURE_CONTEXT_KEYS.get(specimen_measure.measure_type):
+                measures[key] = Measure(value=specimen_measure.value, unit=specimen_measure.unit,
+                                        call=specimen_measure.call, threshold=None, threshold_source=None,
+                                        method=specimen_measure.method)
     return measures
 
 
@@ -584,6 +616,7 @@ def build_report_context(user: User, source_level: str, source,
     samples = get_sample_group(user, source_level, source).samples
     patient = get_patient_for_source(source_level, source)
     specimen = case_specimen(source_level, source)
+    combined_variant_output = case_combined_variant_output(samples, specimen)
     extractions = []
     if source_level == SampleSourceLevel.EXTRACTION:
         extractions = [source]
@@ -604,7 +637,8 @@ def build_report_context(user: User, source_level: str, source,
         extractions=extractions,
         samples=samples,
         sequencing_runs=_sequencing_runs(samples),
-        measures=specimen_measures(specimen),
+        combined_variant_output=combined_variant_output,
+        measures=case_measures(combined_variant_output, specimen),
         summary=summary,
         splice_note=build_splice_note(variants),
         case_values=case_values or {},
@@ -672,6 +706,12 @@ def _gene_group_as_dict(gene_group: GeneGroup) -> dict:
     }
 
 
+def _combined_variant_output_as_dict(cvo: Optional[DragenTSO500CombinedVariantOutput]) -> Optional[dict]:
+    """ Which analysis the report's TMB, MSI and GIS came off """
+    return _model_as_dict(cvo, ["sequencing_run_name", "pair_id", "dna_sample_name", "rna_sample_name",
+                                "output_datetime", "module_version", "pipeline_version"])
+
+
 def context_as_dict(report_context: ReportContext) -> dict:
     """ What the templates render over, and what CaseReport.context_snapshot stores - so a report
         can be re-rendered later without re-deriving numbers whose source rows may have changed """
@@ -686,7 +726,10 @@ def context_as_dict(report_context: ReportContext) -> dict:
                         for e in report_context.extractions],
         "samples": [_model_as_dict(s, ["name"]) for s in report_context.samples],
         "sequencing_runs": report_context.sequencing_runs,
-        "measures": {key: _model_as_dict(measure, ["value", "unit", "call", "threshold", "method"])
+        "analysis": _combined_variant_output_as_dict(report_context.combined_variant_output),
+        "measures": {key: {"value": measure.value, "unit": measure.unit, "call": measure.call,
+                           "threshold": measure.threshold, "method": measure.method,
+                           "str": measure.value_description}
                      for key, measure in report_context.measures.items()},
         "variants": [_variant_as_dict(v) for v in report_context.variants],
         "kind_groups": [{"kind": kg.kind, "label": kg.label,

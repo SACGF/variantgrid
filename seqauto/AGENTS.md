@@ -8,6 +8,14 @@ JointCalledVCF), QC models, EnrichmentKit and gold coverage, and the seqauto RES
   (`seqauto/models/models_seqauto.py:sequencing_sample_for_pair`); a sheet posted without them leaves the link null
   and `patients/tasks/extraction_matching_tasks.py:link_library_qc_to_sequencing_samples` fills it later. Reports
   read it by specimen (`classification/report/case_report_context.py:specimen_library_qc`).
+- `DragenTSO500CombinedVariantOutput` is one DRAGEN analysis of one pair (#1904) - TMB, MSI, GIS, the caller's tumour
+  fraction and ploidy - keyed on (run name, pair) like `LibraryQC`, sharing its specimen claim
+  (`seqauto/models/models_seqauto.py:SpecimenClaimMixin`). Its arms link to their `SequencingSample` and to the `Sample`
+  whose `vcf_sample_name` is the arm's sample name, each filled later where it lands after the file
+  (`patients/tasks/extraction_matching_tasks.py:link_combined_variant_outputs`, and `link_arm_sample` from
+  `upload/vcf/vcf_import.py:link_samples_and_vcfs_to_sequencing`). The lab's MSI / TMB calls are properties over the
+  `TSO500_*_CALL_BANDS` settings, not columns. The case report picks the row for its samples
+  (`classification/report/case_report_context.py:case_combined_variant_output`).
 API:
 - A client-visible API change needs a name in `variantgrid/views_rest.py:API_FEATURES` (see
   claude/guides/operations.md#authentication-surface).

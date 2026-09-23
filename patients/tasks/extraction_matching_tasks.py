@@ -4,8 +4,10 @@ accession it a day later. A row whose extraction cannot be resolved yet is parke
 and this re-resolves the parked ones - on a schedule, and again whenever new extractions land.
 
 Entry point is reconcile_pending_extractions, over every ExtractionMatchMixin model that parks a claim
-(SequencingSample, Sample) and over LibraryQC, whose claim is on the Specimen its pair was taken from
-and whose arm is linked to its sample sheet row once the run's sheet is registered.
+(SequencingSample, Sample) and over the DRAGEN pair-level results - LibraryQC and
+DragenTSO500CombinedVariantOutput - whose claim is on the Specimen their pair was taken from and whose
+arms are linked to their sample sheet rows once the run's sheet is registered (and, for a CVO, to the
+arms' Samples once they are imported).
 """
 from datetime import timedelta
 
@@ -19,6 +21,7 @@ from patients.models import Extraction, Specimen
 from patients.models_enums import MatchStatus
 from seqauto.models import (
     SAMPLE_SHEET_PAIR_ID_COLUMN,
+    DragenTSO500CombinedVariantOutput,
     LibraryQC,
     SequencingRun,
     SequencingSample,
@@ -38,7 +41,7 @@ _COUNT_KEYS = {
 @celery.shared_task(queue='db_workers')
 def reconcile_pending_extractions() -> dict:
     counts = {"matched": 0, "still_pending": 0, "needs_attention": 0, "from_sequencing_sample": 0,
-              "library_qc_linked": 0}
+              "library_qc_linked": 0, "combined_variant_output_linked": 0}
 
     for model in (SequencingSample, Sample):
         qs = model.objects.filter(extraction__isnull=True,
@@ -54,18 +57,21 @@ def reconcile_pending_extractions() -> dict:
             row.apply_extraction_match(resolved)
             counts[_COUNT_KEYS[resolved.status]] += 1
 
-    # A MetricsOutput can land before the CombinedVariantOutput accessions the case it describes
-    library_qc = LibraryQC.objects.filter(specimen__isnull=True,
-                                          specimen_match_status__in=PENDING_STATES).exclude(specimen_reference="")
-    for row in library_qc.iterator():
-        reference = ExternalReference(reference_id=row.specimen_reference)
-        resolved = resolve_reference(Specimen, reference, row.user)
-        if resolved.status == MatchStatus.PENDING and _past_pending_window(row.specimen_match_date):
-            resolved.status = MatchStatus.NEEDS_ATTENTION
-        row.apply_specimen_match(resolved)
-        counts[_COUNT_KEYS[resolved.status]] += 1
+    # A MetricsOutput can land before the CombinedVariantOutput accessions the case it describes, and a
+    # CombinedVariantOutput whose chain could not be made parks its claim the same way
+    for model in (LibraryQC, DragenTSO500CombinedVariantOutput):
+        qs = model.objects.filter(specimen__isnull=True,
+                                  specimen_match_status__in=PENDING_STATES).exclude(specimen_reference="")
+        for row in qs.iterator():
+            reference = ExternalReference(reference_id=row.specimen_reference)
+            resolved = resolve_reference(Specimen, reference, row.user)
+            if resolved.status == MatchStatus.PENDING and _past_pending_window(row.specimen_match_date):
+                resolved.status = MatchStatus.NEEDS_ATTENTION
+            row.apply_specimen_match(resolved)
+            counts[_COUNT_KEYS[resolved.status]] += 1
 
     counts["library_qc_linked"] = link_library_qc_to_sequencing_samples()
+    counts["combined_variant_output_linked"] = link_combined_variant_outputs()
 
     # Route 1 arriving after the VCF: the link call set SequencingSample.extraction, but
     # link_samples_and_vcfs_to_sequencing had already run and had nothing to carry down
@@ -104,6 +110,35 @@ def link_library_qc_to_sequencing_samples() -> int:
         linked += 1
     return linked
 
+
+def _unlinked_arm_q(sample_name_field: str, sequencing_sample_field: str, sample_field: str) -> Q:
+    """ An arm the row names with its sequencing sample or Sample still missing, or its sequencing sample
+        off a superseded sheet """
+    return ~Q(**{sample_name_field: ""}) & (
+        Q(**{f"{sequencing_sample_field}__isnull": True}) |
+        Q(**{f"{sequencing_sample_field}__sample_sheet__sequencingruncurrentsamplesheet__isnull": True}) |
+        Q(**{f"{sample_field}__isnull": True}))
+
+
+def link_combined_variant_outputs() -> int:
+    """ A CombinedVariantOutput can land before its run is registered, before its run's sheet, and before
+        its arms' VCFs: rows missing any of those links are looked up again """
+    unlinked = DragenTSO500CombinedVariantOutput.objects.filter(
+        Q(sequencing_run__isnull=True, sequencing_run_name__in=SequencingRun.objects.values("name")) |
+        _unlinked_arm_q("dna_sample_name", "dna_sequencing_sample", "dna_sample") |
+        _unlinked_arm_q("rna_sample_name", "rna_sequencing_sample", "rna_sample"))
+    linked = 0
+    for row in unlinked.iterator():
+        changed = False
+        if row.sequencing_run_id is None:
+            row.sequencing_run = SequencingRun.objects.filter(name=row.sequencing_run_name).first()
+            changed = row.sequencing_run is not None
+        changed |= row.link_sequencing_samples()
+        changed |= row.link_samples()
+        if changed:
+            row.save()
+            linked += 1
+    return linked
 
 def _row_user(row):
     """ Who the claim is re-resolved as - the row's own uploader where it has one, else the owner of

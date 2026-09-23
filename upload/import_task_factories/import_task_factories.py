@@ -149,8 +149,9 @@ class DragenTSO500AllFusionsImportTaskFactory(AbstractVCFImportTaskFactory):
 
     def get_metadata_keys(self):
         # Becomes a VCF with a sample, so it takes the same keys a VCF does - including genome_build,
-        # which the file itself declares nowhere
-        return VCF_METADATA_KEYS
+        # which the file itself declares nowhere - and the run, which it names 'NA' and which keys the
+        # DragenTSO500CombinedVariantOutput row
+        return VCF_METADATA_KEYS | {SEQUENCING_RUN}
 
     def get_processing_ability(self, user, filename, file_extension):
         if dragen_all_fusions_parser.can_process_file(filename):
@@ -198,7 +199,7 @@ class DragenTSO500CombinedVariantOutputImportTaskFactory(AbstractVCFImportTaskFa
     """ Illumina DRAGEN TSO 500's CombinedVariantOutput.tsv - one vendor's format, not a standard.
 
         No variants come from it (the splice calls come from SpliceVariants.vcf, @see
-        SpliceGirlImportTaskFactory): it is the pair's patient chain, seqauto links and measures,
+        SpliceGirlImportTaskFactory): it is the pair's patient chain, seqauto links and TMB/MSI/GIS,
         written against the RNA arm's Sample, which a VCF of no records makes through the normal
         header step. @see upload.tasks.import_dragen_tso500_combined_variant_output_task
 
@@ -220,8 +221,9 @@ class DragenTSO500CombinedVariantOutputImportTaskFactory(AbstractVCFImportTaskFa
 
     def get_metadata_keys(self):
         # Becomes a VCF with a sample, so it takes the same keys a VCF does - including genome_build,
-        # which the file itself declares nowhere
-        return VCF_METADATA_KEYS
+        # which the file itself declares nowhere - and the run, which it names 'NA' and which keys the
+        # DragenTSO500CombinedVariantOutput row
+        return VCF_METADATA_KEYS | {SEQUENCING_RUN}
 
     def get_processing_ability(self, user, filename, file_extension):
         if dragen_combined_variant_output_parser.can_process_file(filename):
@@ -256,7 +258,7 @@ class DragenTSO500CombinedVariantOutputImportTaskFactory(AbstractVCFImportTaskFa
         return ProcessGenotypeVCFDataTask
 
     def get_post_vcf_header_classes(self):
-        # The rest of the file: the pair's patient chain, seqauto links and measures. It needs only
+        # The rest of the file: the pair's patient chain, seqauto links and TMB/MSI/GIS. It needs only
         # the Sample - the VCF has no records, which skips every step waiting on data insertion
         return [DragenTSO500CombinedVariantOutputInsertTask]
 

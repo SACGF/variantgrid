@@ -110,8 +110,6 @@ class Test(URLTestCase):
             ("api_patient-list", {}, 200),
             ("api_specimen-list", {}, 200),
             ("api_extraction-list", {}, 200),
-            ("api_specimen_measure-list", {}, 200),
-            ("api_specimen_measure_bulk_create", {}, 405),  # POST only
         ]
         self._test_urls(URL_NAMES_AND_KWARGS, self.user_non_owner)
 

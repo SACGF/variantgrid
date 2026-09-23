@@ -1,7 +1,12 @@
 """
 The database side of a TSO 500 pair's CombinedVariantOutput - everything in the file that is not a
-variant. The file itself is read by upload.tso500.dragen_combined_variant_output_parser and its
-splice calls become Variants in upload.tasks.import_dragen_tso500_combined_variant_output_task.
+variant. The file itself is read by upload.tso500.dragen_combined_variant_output_parser and the import
+step is upload.tasks.import_dragen_tso500_combined_variant_output_task.
+
+The analysis itself - '[Analysis Details]' and the '[TMB]', '[MSI]' and '[GIS]' scalars - is one
+seqauto.models.DragenTSO500CombinedVariantOutput row per (run, pair), written by
+write_combined_variant_output. The run is the upload's 'sequencing_run' metadata, falling back to the
+run whose current sample sheet names one of the pair's sample IDs.
 
 '[Analysis Details]' names the whole chain. 'Pair ID' is the pair's sample name, whose second
 underscore-separated field is the patient's code (the lab's C-number) - the sequencing sample ID
@@ -20,15 +25,13 @@ Sample_ID, so each is exactly a Sample.vcf_sample_name and exactly a SequencingS
 That is what links both arms' samples to their extraction and the splice VCF to its sequencing run,
 in place of the filename matching seqauto does for a VCF it found on disk.
 
-Nothing here fails an import: a chain that cannot be made leaves the variants and says why on the
-import page (@see the caller), because a splice call is worth having whether or not the pair's
-patient has been accessioned yet.
+Nothing here fails an import: a chain that cannot be made still writes the analysis, with its specimen
+claim parked, and says why on the import page (@see the caller).
 """
 import logging
 import re
-from collections.abc import Callable
 from dataclasses import dataclass
-from typing import NamedTuple, Optional
+from typing import Optional
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -43,10 +46,10 @@ from patients.external_references import (
     ResolvedReference,
     resolve_reference,
 )
-from patients.models import Extraction, Patient, Specimen, SpecimenMeasure
-from patients.models_enums import MatchStatus, NucleicAcid, SpecimenMeasureType
-from patients.serializers import upsert_specimen_measure
+from patients.models import Extraction, Patient, Specimen
+from patients.models_enums import MatchStatus, NucleicAcid
 from seqauto.models import (
+    DragenTSO500CombinedVariantOutput,
     SampleFromSequencingSample,
     SequencingRun,
     SequencingSample,
@@ -54,21 +57,27 @@ from seqauto.models import (
 )
 from snpdb.models import VCF, Sample
 from upload.tso500.dragen_combined_variant_output_parser import (
+    CODING_REGION_SIZE,
     DNA_SAMPLE_ID,
     GENOMIC_INSTABILITY_SCORE,
     GIS,
+    MODULE_VERSION,
     MSI,
     OUTPUT_DATE,
     OUTPUT_TIME,
     PAIR_ID,
+    PASSING_ELIGIBLE_VARIANTS,
     PERCENT_UNSTABLE_MSI_SITES,
+    PIPELINE_VERSION,
     PLOIDY,
     RNA_SAMPLE_ID,
     TMB,
+    TOTAL_MSI_SITES_UNSTABLE,
     TOTAL_TMB,
     TUMOR_FRACTION,
     USABLE_MSI_SITES,
     CombinedVariantOutputSection,
+    get_analysis_details,
     get_section_values,
 )
 
@@ -115,95 +124,6 @@ class ResolvedPair:
         if arm:
             return self.extractions.get(arm.sample_id)
         return None
-
-
-class MeasureCall(NamedTuple):
-    """ The lab's call on one measure and the policy that produced it. The call is None where the
-        policy is set but the numbers cannot answer it - too few usable MSI sites - so the threshold
-        that was applied is still recorded against the measure """
-    call: Optional[str]
-    threshold: str
-    threshold_source: str
-
-
-@dataclass(frozen=True)
-class MeasureSource:
-    """ Where one SpecimenMeasure is written in the file, and what turns it into a call """
-    measure_type: str
-    section: str
-    key: str
-    unit: Optional[str] = None
-    call: Optional[Callable[[dict], Optional[MeasureCall]]] = None
-
-
-def _value(values: dict, key: str) -> Optional[float]:
-    try:
-        return float(values[key])
-    except (KeyError, TypeError, ValueError):
-        return None
-
-
-def band_call(value: float, bands: list) -> Optional[str]:
-    """ The call whose lower bound the value reaches, off a setting's [(lower bound, call), ...] -
-        SA Path's MSI is MSI-High >= 30%, MSI-Low >= 10%, MSS below that """
-    for lower_bound, call in sorted(bands, key=lambda band: band[0], reverse=True):
-        if value >= lower_bound:
-            return call
-    return None
-
-
-def describe_bands(bands: list, unit: str) -> str:
-    """ The policy in words, as the measure's threshold and the build form show it -
-        'MSI-High >= 30%, MSI-Low >= 10%, MSS < 10%' """
-    ordered = sorted(bands, key=lambda band: band[0], reverse=True)
-    parts = [f"{call} >= {lower_bound:g}{unit}" for lower_bound, call in ordered[:-1]]
-    if ordered:
-        lowest = ordered[-1]
-        parts.append(f"{lowest[1]} < {ordered[-2][0]:g}{unit}" if len(ordered) > 1 else lowest[1])
-    return ", ".join(parts)
-
-
-def msi_call(section_values: dict) -> Optional[MeasureCall]:
-    """ The lab's MSI category off the percent of unstable sites, where the pair has enough usable
-        sites for the percentage to mean anything. Both are the lab's policy, not vendor output, so
-        an installation that has not set them gets the value and no call """
-    min_usable_sites = settings.TSO500_MSI_MIN_USABLE_SITES
-    bands = settings.TSO500_MSI_CALL_BANDS
-    if min_usable_sites is None or not bands:
-        return None
-    percent = _value(section_values, PERCENT_UNSTABLE_MSI_SITES)
-    if percent is None:
-        return None
-    threshold = f"{describe_bands(bands, '%')} unstable sites, needs >= {min_usable_sites} usable sites"
-    source = "settings.TSO500_MSI_CALL_BANDS / settings.TSO500_MSI_MIN_USABLE_SITES"
-    usable_sites = _value(section_values, USABLE_MSI_SITES)
-    if usable_sites is None or usable_sites < min_usable_sites:
-        return MeasureCall(None, threshold, source)
-    return MeasureCall(band_call(percent, bands), threshold, source)
-
-
-def tmb_call(section_values: dict) -> Optional[MeasureCall]:
-    """ High / Low off the mutations per megabase, against the lab's bands """
-    bands = settings.TSO500_TMB_CALL_BANDS
-    if not bands:
-        return None
-    value = _value(section_values, TOTAL_TMB)
-    if value is None:
-        return None
-    return MeasureCall(band_call(value, bands), describe_bands(bands, " mut/Mb"),
-                       "settings.TSO500_TMB_CALL_BANDS")
-
-
-# The five scalars the pair-level sections carry. '[GIS]' holds three: the score, and the tumour
-# fraction and ploidy the caller estimated it from. MSI and TMB are the two the lab has a policy
-# for - the rest are a number the report quotes and a pathologist reads
-MEASURE_SOURCES = (
-    MeasureSource(SpecimenMeasureType.TMB, TMB, TOTAL_TMB, "mut/Mb", call=tmb_call),
-    MeasureSource(SpecimenMeasureType.MSI, MSI, PERCENT_UNSTABLE_MSI_SITES, "%", call=msi_call),
-    MeasureSource(SpecimenMeasureType.GIS, GIS, GENOMIC_INSTABILITY_SCORE),
-    MeasureSource(SpecimenMeasureType.TUMOUR_FRACTION, GIS, TUMOR_FRACTION),
-    MeasureSource(SpecimenMeasureType.PLOIDY, GIS, PLOIDY),
-)
 
 
 def parse_patient_code(pair_id: str) -> str:
@@ -324,7 +244,7 @@ def link_to_sequencing_run(vcf: VCF, sample: Sample, sample_id: str) -> Optional
     return sequencing_run
 
 
-def measured_date(analysis_details: dict):
+def parse_output_datetime(analysis_details: dict):
     """ When the module wrote the file - the closest thing it carries to when the pair was measured """
     output_date = analysis_details.get(OUTPUT_DATE)
     if not output_date:
@@ -336,32 +256,76 @@ def measured_date(analysis_details: dict):
     return value
 
 
-def write_specimen_measures(sections: dict[str, CombinedVariantOutputSection],
-                            resolved: ResolvedPair, identifiers: PairIdentifiers,
-                            user: User, method: str, date=None) -> list[SpecimenMeasure]:
-    """ The pair's TMB, MSI, GIS, tumour fraction and ploidy. They describe the specimen, and the DNA
-        arm is what produced them, so each is written against both. A re-analysis of the same
-        specimen replaces the values rather than accumulating them (@see SpecimenMeasure.Meta) """
-    extraction = resolved.arm_extraction(identifiers.dna)
-    measures = []
-    for measure_source in MEASURE_SOURCES:
-        section_values = get_section_values(sections, measure_source.section)
-        value = _value(section_values, measure_source.key)
-        if value is None:
-            continue
-        measure_call = measure_source.call(section_values) if measure_source.call else None
-        data = {
-            "extraction": extraction,
-            "measure_type": measure_source.measure_type,
-            "value": value,
-            "unit": measure_source.unit,
-            "call": measure_call.call if measure_call else None,
-            "threshold": measure_call.threshold if measure_call else None,
-            "threshold_source": measure_call.threshold_source if measure_call else None,
-            # The whole section, so which numbers this came off stays answerable
-            "source_payload": section_values,
-            "method": method,
-            "measured_date": date,
-        }
-        measures.append(upsert_specimen_measure(resolved.specimen, data, user))
-    return measures
+def sequencing_run_for_sample_ids(sample_ids: list[str]) -> Optional[SequencingRun]:
+    """ The run whose current sample sheet names one of the pair's sample IDs - the run a CVO sent without
+        'sequencing_run' metadata came off """
+    for sample_id in sample_ids:
+        sequencing_sample = SequencingSample.get_current().filter(sample_name=sample_id).order_by("-pk").first()
+        if sequencing_sample:
+            return sequencing_sample.sample_sheet.sequencing_run
+    return None
+
+
+def _float(values: dict, key: str) -> Optional[float]:
+    try:
+        return float(values[key])
+    except (KeyError, TypeError, ValueError):
+        return None
+
+
+def _int(values: dict, key: str) -> Optional[int]:
+    value = _float(values, key)
+    return None if value is None else int(value)
+
+
+def combined_variant_output_values(sections: dict[str, CombinedVariantOutputSection]) -> dict:
+    """ The row's columns off the file, bar its key and links """
+    analysis_details = get_analysis_details(sections)
+    tmb = get_section_values(sections, TMB)
+    msi = get_section_values(sections, MSI)
+    gis = get_section_values(sections, GIS)
+    return {
+        "dna_sample_name": analysis_details.get(DNA_SAMPLE_ID) or "",
+        "rna_sample_name": analysis_details.get(RNA_SAMPLE_ID) or "",
+        "output_datetime": parse_output_datetime(analysis_details),
+        "module_version": analysis_details.get(MODULE_VERSION) or "",
+        "pipeline_version": analysis_details.get(PIPELINE_VERSION) or "",
+        "total_tmb": _float(tmb, TOTAL_TMB),
+        "coding_region_size_mb": _float(tmb, CODING_REGION_SIZE),
+        "passing_eligible_variants": _int(tmb, PASSING_ELIGIBLE_VARIANTS),
+        "usable_msi_sites": _int(msi, USABLE_MSI_SITES),
+        "total_msi_sites_unstable": _int(msi, TOTAL_MSI_SITES_UNSTABLE),
+        "percent_unstable_msi_sites": _float(msi, PERCENT_UNSTABLE_MSI_SITES),
+        "genomic_instability_score": _float(gis, GENOMIC_INSTABILITY_SCORE),
+        "tumor_fraction": _float(gis, TUMOR_FRACTION),
+        "ploidy": _float(gis, PLOIDY),
+    }
+
+
+def write_combined_variant_output(sections: dict[str, CombinedVariantOutputSection], pair_id: str,
+                                  sequencing_run: Optional[SequencingRun], sequencing_run_name: str,
+                                  user: User, resolved: Optional[ResolvedPair] = None,
+                                  specimen_reference: Optional[str] = None,
+                                  parked_error: Optional[str] = None,
+                                  file_upload=None) -> DragenTSO500CombinedVariantOutput:
+    """ The pair's analysis on this run - a re-analysis of the run replaces it. It claims the specimen
+        resolve_pair made, or parks the claim with why there is none """
+    cvo, _ = DragenTSO500CombinedVariantOutput.objects.update_or_create(
+        sequencing_run_name=sequencing_run_name, pair_id=pair_id,
+        defaults={
+            **combined_variant_output_values(sections),
+            "sequencing_run": sequencing_run,
+            "specimen_reference": specimen_reference or "",
+            "file_upload": file_upload,
+            "user": user,
+        })
+    cvo.link_sequencing_samples()
+    cvo.link_samples()
+    if resolved:
+        reference = ExternalReference(reference_id=resolved.specimen.reference_id)
+        cvo.apply_specimen_match(ResolvedReference(reference, MatchStatus.MATCHED, obj=resolved.specimen),
+                                 save=False)
+    else:
+        cvo.park_specimen_claim(parked_error or f"'{pair_id}' names no specimen", save=False)
+    cvo.save()
+    return cvo

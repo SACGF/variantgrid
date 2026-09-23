@@ -3,7 +3,7 @@ import os
 import re
 from datetime import datetime
 from functools import cached_property
-from typing import Optional
+from typing import NamedTuple, Optional
 
 from cache_memoize import cache_memoize
 from django.conf import settings
@@ -997,7 +997,50 @@ class GoldCoverageSummary(models.Model):
                                                   gold_reference__enrichment_kit=enrichment_kit)
 
 
-class LibraryQC(TimeStampedModel):
+class SpecimenClaimMixin(models.Model):
+    """ A DRAGEN pair-level result's claim on the Specimen its pair was taken from - by the accession inside
+        the pair's identifiers, never creating one, and parked until the specimen lands
+        (@see patients.tasks.extraction_matching_tasks) """
+    specimen_reference = models.TextField()     # the ten-digit accession inside the pair's identifiers
+    specimen = models.ForeignKey(Specimen, null=True, blank=True, on_delete=SET_NULL)
+    specimen_match_status = models.CharField(max_length=1, choices=MatchStatus.choices,
+                                             null=True, blank=True)
+    specimen_match_error = models.TextField(null=True, blank=True)
+    specimen_match_date = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        abstract = True
+
+    def apply_specimen_match(self, resolved: ResolvedReference, save=True):
+        """ Leaves a settled link alone, so a matched row never flaps back. As ExtractionMatchMixin
+            does for an extraction, a new claim starts the clock and re-resolving the same one leaves
+            it where it was, so an unresolvable reference ages past the pending window """
+        if self.specimen_id:
+            return
+        if self.specimen_match_date is None or resolved.reference.reference_id != self.specimen_reference:
+            self.specimen_match_date = timezone.now()
+        self.specimen_reference = resolved.reference.reference_id
+        self.specimen_match_status = resolved.status
+        self.specimen_match_error = resolved.error
+        if resolved.matched:
+            self.specimen = resolved.obj
+        if save:
+            self.save()
+
+    def park_specimen_claim(self, error: str, save=True):
+        """ Nothing the file or its run names a specimen with - the result is still worth keeping, and
+            the message says why it is not attached to anything """
+        if self.specimen_id:
+            return
+        if self.specimen_match_date is None:
+            self.specimen_match_date = timezone.now()
+        self.specimen_match_status = MatchStatus.PENDING
+        self.specimen_match_error = error
+        if save:
+            self.save()
+
+
+class LibraryQC(SpecimenClaimMixin, TimeStampedModel):
     """ One QC category of one sequenced pair, as the caller judged it - what 'the assay succeeded for X' means.
         A category is about one of the pair's arms (nucleic_acid), so a pair on both arms has six rows: the five
         DNA categories linked to its DNA SequencingSample, RNA to its RNA one.
@@ -1018,12 +1061,6 @@ class LibraryQC(TimeStampedModel):
         together (sequencing_sample_for_pair). Left null until the sheet is registered and reconciled after. """
     sequencing_run_name = models.TextField()    # the upload's 'sequencing_run' metadata - a SequencingRun.name
     pair_id = models.TextField()                # the file's column - the CVO's 'Pair ID'
-    specimen_reference = models.TextField()     # the ten-digit accession inside the pair ID
-    specimen = models.ForeignKey(Specimen, null=True, blank=True, on_delete=SET_NULL)
-    specimen_match_status = models.CharField(max_length=1, choices=MatchStatus.choices,
-                                             null=True, blank=True)
-    specimen_match_error = models.TextField(null=True, blank=True)
-    specimen_match_date = models.DateTimeField(null=True, blank=True)
     sequencing_run = models.ForeignKey(SequencingRun, null=True, blank=True, on_delete=SET_NULL)
     sequencing_sample = models.ForeignKey(SequencingSample, null=True, blank=True, on_delete=SET_NULL)  # the arm's sheet row
     category = models.CharField(max_length=1, choices=LibraryQCCategory.choices)
@@ -1043,34 +1080,6 @@ class LibraryQC(TimeStampedModel):
 
     def __str__(self):
         return f"{self.pair_id} {self.get_category_display()}: {self.status_description}"
-
-    def apply_specimen_match(self, resolved: ResolvedReference, save=True):
-        """ Leaves a settled link alone, so a matched row never flaps back. As ExtractionMatchMixin
-            does for an extraction, a new claim starts the clock and re-resolving the same one leaves
-            it where it was, so an unresolvable reference ages past the pending window """
-        if self.specimen_id:
-            return
-        if self.specimen_match_date is None or resolved.reference.reference_id != self.specimen_reference:
-            self.specimen_match_date = timezone.now()
-        self.specimen_reference = resolved.reference.reference_id
-        self.specimen_match_status = resolved.status
-        self.specimen_match_error = resolved.error
-        if resolved.matched:
-            self.specimen = resolved.obj
-        if save:
-            self.save()
-
-    def park_specimen_claim(self, error: str, save=True):
-        """ Nothing the file or its run names a specimen with - the QC is still worth keeping, and
-            the message says why it is not attached to anything """
-        if self.specimen_id:
-            return
-        if self.specimen_match_date is None:
-            self.specimen_match_date = timezone.now()
-        self.specimen_match_status = MatchStatus.PENDING
-        self.specimen_match_error = error
-        if save:
-            self.save()
 
     @property
     def status_description(self) -> str:
@@ -1121,6 +1130,179 @@ def sequencing_sample_for_pair(sequencing_run: Optional[SequencingRun], pair_id:
         sequencingsampledata__column=SAMPLE_SHEET_SAMPLE_TYPE_COLUMN,
         sequencingsampledata__value=NucleicAcid(nucleic_acid).label,
     ).order_by("-pk").first()
+
+
+class MeasureCall(NamedTuple):
+    """ The lab's call on one measure and the policy that produced it. The call is None where the
+        policy is set but the numbers cannot answer it - too few usable MSI sites - so the threshold
+        that was applied can still be shown beside the number """
+    call: Optional[str]
+    threshold: str
+    threshold_source: str
+
+
+def band_call(value: float, bands: list) -> Optional[str]:
+    """ The call whose lower bound the value reaches, off a setting's [(lower bound, call), ...] -
+        SA Path's MSI is MSI-High >= 30%, MSI-Low >= 10%, MSS below that """
+    for lower_bound, call in sorted(bands, key=lambda band: band[0], reverse=True):
+        if value >= lower_bound:
+            return call
+    return None
+
+
+def describe_bands(bands: list, unit: str) -> str:
+    """ The policy in words, as the build form shows it - 'MSI-High >= 30%, MSI-Low >= 10%, MSS < 10%' """
+    ordered = sorted(bands, key=lambda band: band[0], reverse=True)
+    parts = [f"{call} >= {lower_bound:g}{unit}" for lower_bound, call in ordered[:-1]]
+    if ordered:
+        lowest = ordered[-1]
+        parts.append(f"{lowest[1]} < {ordered[-2][0]:g}{unit}" if len(ordered) > 1 else lowest[1])
+    return ", ".join(parts)
+
+
+class DragenTSO500CombinedVariantOutput(SpecimenClaimMixin, TimeStampedModel):
+    """ One DRAGEN TSO 500 analysis of one sequenced pair - its CombinedVariantOutput's '[Analysis Details]' and
+        the scalars of its '[TMB]', '[MSI]' and '[GIS]' sections. These are results of the analysis, not
+        properties of the specimen: a re-sequence or a re-analysis gives new numbers, and the case report
+        prints the ones for its own samples (classification.report.case_report_context.case_combined_variant_output).
+
+        Keyed on (run, pair) like LibraryQC, and for the same reason - the file names its run 'NA', so the
+        run comes in as upload metadata. The pair's arms are linked as the SequencingSample on the run's
+        sheet and as the Sample whose vcf_sample_name is the arm's sample ID - DRAGEN writes both from the
+        sheet's Sample_ID - each left null until it exists and reconciled after. The specimen is claimed
+        by the accession inside the sample IDs.
+
+        The lab's MSI / TMB calls are computed from the TSO500_*_CALL_BANDS settings when read rather than
+        stored: this row is never overwritten by a later analysis, and a CaseReport snapshots what it printed. """
+    sequencing_run_name = models.TextField()        # the upload's 'sequencing_run' metadata - a SequencingRun.name
+    pair_id = models.TextField()                    # [Analysis Details] Pair ID
+    # [Analysis Details]
+    dna_sample_name = models.TextField(blank=True)  # a Sample.vcf_sample_name and a SequencingSample.sample_name
+    rna_sample_name = models.TextField(blank=True)
+    output_datetime = models.DateTimeField(null=True, blank=True)  # Output Date + Output Time
+    module_version = models.TextField(blank=True)
+    pipeline_version = models.TextField(blank=True)
+    # [TMB]
+    total_tmb = models.FloatField(null=True, blank=True)  # mut/Mb
+    coding_region_size_mb = models.FloatField(null=True, blank=True)
+    passing_eligible_variants = models.IntegerField(null=True, blank=True)
+    # [MSI]
+    usable_msi_sites = models.IntegerField(null=True, blank=True)
+    total_msi_sites_unstable = models.IntegerField(null=True, blank=True)
+    percent_unstable_msi_sites = models.FloatField(null=True, blank=True)
+    # [GIS]
+    genomic_instability_score = models.FloatField(null=True, blank=True)
+    tumor_fraction = models.FloatField(null=True, blank=True)  # a fraction, 0.62 - the pathologist's is a percent
+    ploidy = models.FloatField(null=True, blank=True)
+    sequencing_run = models.ForeignKey(SequencingRun, null=True, blank=True, on_delete=SET_NULL)
+    dna_sequencing_sample = models.ForeignKey(SequencingSample, null=True, blank=True, on_delete=SET_NULL,
+                                              related_name="cvo_dna_set")
+    rna_sequencing_sample = models.ForeignKey(SequencingSample, null=True, blank=True, on_delete=SET_NULL,
+                                              related_name="cvo_rna_set")
+    dna_sample = models.ForeignKey(Sample, null=True, blank=True, on_delete=SET_NULL, related_name="cvo_dna_set")
+    rna_sample = models.ForeignKey(Sample, null=True, blank=True, on_delete=SET_NULL, related_name="cvo_rna_set")
+    # Provenance. String reference - upload depends on seqauto
+    file_upload = models.ForeignKey("upload.FileUpload", null=True, on_delete=SET_NULL)
+    user = models.ForeignKey(User, null=True, on_delete=SET_NULL)
+
+    class Meta:
+        # A re-analysis of the same run replaces its row; the same pair on a later run is a new one
+        unique_together = ("sequencing_run_name", "pair_id")
+
+    METHOD = "DRAGEN TSO500 CombinedVariantOutput"
+
+    def __str__(self):
+        return f"{self.pair_id} ({self.sequencing_run_name})"
+
+    @property
+    def method(self) -> str:
+        """ 'DRAGEN TSO500 CombinedVariantOutput 2.1.1' - the software that wrote the numbers """
+        return f"{self.METHOD} {self.module_version}" if self.module_version else self.METHOD
+
+    @property
+    def arm_sample_names(self) -> dict[str, str]:
+        """ {NucleicAcid: sample name} for the arms the pair has """
+        return {nucleic_acid: sample_id for nucleic_acid, sample_id in ((NucleicAcid.DNA, self.dna_sample_name),
+                                                                        (NucleicAcid.RNA, self.rna_sample_name))
+                if sample_id}
+
+    @property
+    def msi_call(self) -> Optional[MeasureCall]:
+        """ The lab's MSI category off the percent of unstable sites, where the pair has enough usable
+            sites for the percentage to mean anything. Both are the lab's policy, not vendor output, so
+            an installation that has not set them gets the value and no call """
+        min_usable_sites = settings.TSO500_MSI_MIN_USABLE_SITES
+        bands = settings.TSO500_MSI_CALL_BANDS
+        if min_usable_sites is None or not bands or self.percent_unstable_msi_sites is None:
+            return None
+        threshold = f"{describe_bands(bands, '%')} unstable sites, needs >= {min_usable_sites} usable sites"
+        source = "settings.TSO500_MSI_CALL_BANDS / settings.TSO500_MSI_MIN_USABLE_SITES"
+        if self.usable_msi_sites is None or self.usable_msi_sites < min_usable_sites:
+            return MeasureCall(None, threshold, source)
+        return MeasureCall(band_call(self.percent_unstable_msi_sites, bands), threshold, source)
+
+    @property
+    def tmb_call(self) -> Optional[MeasureCall]:
+        """ High / Low off the mutations per megabase, against the lab's bands """
+        bands = settings.TSO500_TMB_CALL_BANDS
+        if not bands or self.total_tmb is None:
+            return None
+        return MeasureCall(band_call(self.total_tmb, bands), describe_bands(bands, " mut/Mb"),
+                           "settings.TSO500_TMB_CALL_BANDS")
+
+    def measure_call(self, context_key: str) -> Optional[MeasureCall]:
+        """ The call for a CVO_MEASURE_CONTEXT_KEYS key - MSI and TMB are the two the lab has a policy for """
+        if context_key == "msi":
+            return self.msi_call
+        if context_key == "tmb":
+            return self.tmb_call
+        return None
+
+    def link_samples(self) -> bool:
+        """ Each arm's Sample, where one has been imported. An arm has a VCF per caller, all of whose samples
+            carry the sample ID, so one linked to this run wins, then the newest. Returns whether any link changed """
+        changed = False
+        for nucleic_acid, sample_id in self.arm_sample_names.items():
+            field = "dna_sample" if nucleic_acid == NucleicAcid.DNA else "rna_sample"
+            if getattr(self, f"{field}_id"):
+                continue
+            samples = Sample.objects.filter(vcf_sample_name=sample_id)
+            if self.file_upload_id:
+                # The CVO's own record-less VCF is named for the RNA arm and holds no calls
+                samples = samples.exclude(vcf__uploadedvcf__file_upload=self.file_upload_id)
+            if self.sequencing_run_id:
+                on_run = samples.filter(vcf__vcffromsequencingrun__sequencing_run=self.sequencing_run_id)
+                samples = on_run if on_run.exists() else samples
+            if sample := samples.order_by("-pk").first():
+                setattr(self, field, sample)
+                changed = True
+        return changed
+
+    @classmethod
+    def link_arm_sample(cls, sample: Sample, sequencing_run: SequencingRun) -> int:
+        """ A run's arm VCF landing after the CVO - the rows on that run waiting on the arm the sample is """
+        rows = cls.objects.filter(sequencing_run_name=sequencing_run.name)
+        return rows.filter(dna_sample__isnull=True, dna_sample_name=sample.vcf_sample_name).update(dna_sample=sample) + \
+            rows.filter(rna_sample__isnull=True, rna_sample_name=sample.vcf_sample_name).update(rna_sample=sample)
+
+    def link_sequencing_samples(self) -> bool:
+        """ Each arm's row on the run's current sheet - by the sheet's Pair_ID / Sample_Type data, else by
+            the sample ID, which DRAGEN writes from the sheet's Sample_ID. Returns whether any link changed """
+        if self.sequencing_run_id is None:
+            return False
+        changed = False
+        for nucleic_acid, sample_id in self.arm_sample_names.items():
+            field = "dna_sequencing_sample" if nucleic_acid == NucleicAcid.DNA else "rna_sequencing_sample"
+            current = getattr(self, field)
+            if current and SequencingSample.get_current().filter(pk=current.pk).exists():
+                continue
+            sequencing_sample = sequencing_sample_for_pair(self.sequencing_run, self.pair_id, nucleic_acid) or \
+                SequencingSample.get_current().filter(sample_sheet__sequencing_run=self.sequencing_run,
+                                                      sample_name=sample_id).order_by("-pk").first()
+            if sequencing_sample and sequencing_sample != current:
+                setattr(self, field, sequencing_sample)
+                changed = True
+        return changed
 
 
 def _number_text(value) -> str:

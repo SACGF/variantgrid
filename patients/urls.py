@@ -15,8 +15,6 @@ from patients.grids import (
 from patients.views_rest import (
     ExtractionViewSet,
     PatientViewSet,
-    SpecimenMeasureBulkCreateView,
-    SpecimenMeasureViewSet,
     SpecimenViewSet,
 )
 from snpdb.views.datatable_view import DatabaseTableView
@@ -95,11 +93,5 @@ router = routers.DefaultRouter()
 router.register(r'api/v1/patient', PatientViewSet, basename='api_patient')
 router.register(r'api/v1/specimen', SpecimenViewSet, basename='api_specimen')
 router.register(r'api/v1/extraction', ExtractionViewSet, basename='api_extraction')
-router.register(r'api/v1/specimen_measure', SpecimenMeasureViewSet, basename='api_specimen_measure')
 
-urlpatterns += [
-    # Ahead of the router, whose detail route would otherwise read 'bulk_create' as a primary key
-    path('api/v1/specimen_measure/bulk_create', SpecimenMeasureBulkCreateView.as_view(),
-         name='api_specimen_measure_bulk_create'),
-]
 urlpatterns += router_urls(router)

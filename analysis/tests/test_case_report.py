@@ -24,11 +24,17 @@ from classification.models import (
     ClassificationReportTemplate,
 )
 from classification.models.classification_report_models import (
+    Measure,
     case_report_deliveries_signal,
     case_report_finalised_signal,
 )
 from classification.report.case_report_builder import build_case_report, finalise_case_report
-from classification.report.case_report_context import specimen_library_qc
+from classification.report.case_report_context import (
+    build_report_context,
+    case_combined_variant_output,
+    context_as_dict,
+    specimen_library_qc,
+)
 from classification.report.default_templates import generic_case_template
 from library.case_report_delivery import CaseReportDelivery
 from library.guardian_utils import assign_permission_to_user_and_groups
@@ -39,7 +45,7 @@ from patients.models_enums import (
     SpecimenMeasureType,
 )
 from patients.sample_grouping import get_sample_group
-from seqauto.models import LibraryQC
+from seqauto.models import DragenTSO500CombinedVariantOutput, LibraryQC
 from seqauto.models.models_enums import LibraryQCCategory
 from snpdb.models import Sample
 
@@ -398,7 +404,8 @@ class CaseReportMeasureTickTest(ClassifyReportTestCase):
 
     @staticmethod
     def _measures(**by_key) -> dict:
-        return {key: SpecimenMeasure(value=value, unit=unit, call=call)
+        return {key: Measure(value=value, unit=unit, call=call, threshold=None, threshold_source=None,
+                             method="")
                 for key, (value, unit, call) in by_key.items()}
 
     def _values(self, measures: dict, draft=None) -> dict:
@@ -439,11 +446,11 @@ class CaseReportMeasureTickTest(ClassifyReportTestCase):
 
         self.assertFalse(values["assay_success_msi"])
 
+    @override_settings(TSO500_MSI_MIN_USABLE_SITES=40, TSO500_MSI_CALL_BANDS=[(30, "MSI-High"), (10, "MSI-Low"), (0, "MSS")])
     def test_the_dialog_shows_each_measure_beside_its_checkbox(self):
-        SpecimenMeasure.objects.create(specimen=self.specimen, measure_type=SpecimenMeasureType.MSI,
-                                       value=2.48, unit="%", call="MSS",
-                                       threshold="MSI-High >= 30%, MSI-Low >= 10%, MSS < 10% unstable sites",
-                                       threshold_source="settings.TSO500_MSI_CALL_BANDS")
+        DragenTSO500CombinedVariantOutput.objects.create(sequencing_run_name="RUN_1", pair_id="PAIR_1",
+                                                         specimen_reference="2600000004", specimen=self.specimen,
+                                                         percent_unstable_msi_sites=2.48, usable_msi_sites=121)
         self.client.force_login(self.user)
         url = reverse("case_report_build_dialog",
                       kwargs={"case_type": "specimen", "case_id": self.specimen.pk})
@@ -459,7 +466,8 @@ class CaseReportMeasureTickTest(ClassifyReportTestCase):
         self.assertRegex(content, r'checked[^>]*id="case_field_assay_success_msi"')
         # The policy behind the tick is on the form, so a scientist can ask for it to change
         self.assertIn("ticked when the measure has a call", content)
-        self.assertIn("policy MSI-High &gt;= 30%, MSI-Low &gt;= 10%, MSS &lt; 10% unstable sites (settings.TSO500_MSI_CALL_BANDS)", content)
+        self.assertIn("policy MSI-High &gt;= 30%, MSI-Low &gt;= 10%, MSS &lt; 10% unstable sites, needs &gt;= 40 usable sites "
+                      "(settings.TSO500_MSI_CALL_BANDS / settings.TSO500_MSI_MIN_USABLE_SITES)", content)
         self.assertIn("ticked when the call is Insufficient or No tumour or the value is below 20", content)
 
     def test_a_field_naming_an_unknown_measure_or_rule_is_not_saved(self):
@@ -474,6 +482,56 @@ class CaseReportMeasureTickTest(ClassifyReportTestCase):
                 template = ClassificationReportTemplate(name="bad", case_fields=case_fields)
                 with self.assertRaises(ValidationError):
                     template.clean()
+
+
+@override_settings(CELERY_TASK_ALWAYS_EAGER=True, LIFTOVER_CLASSIFICATIONS=False,
+                   CLINGEN_ALLELE_REGISTRY_LOGIN=None)
+class CaseReportCombinedVariantOutputTest(ClassifyReportTestCase):
+    """ A case's TMB, MSI and GIS come off one analysis - the one for its own samples (#1904) """
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.patient = Patient.objects.create(first_name="Combined", last_name="Output")
+        assign_permission_to_user_and_groups(cls.user, cls.patient)
+        cls.specimen = Specimen.objects.create(reference_id="2600000006", patient=cls.patient)
+        cls.dna = Extraction.objects.create(specimen=cls.specimen, reference_id="2600000006C",
+                                            nucleic_acid_source=NucleicAcid.DNA)
+        Sample.objects.filter(pk=cls.proband.pk).update(extraction=cls.dna)
+
+    def _cvo(self, sequencing_run_name: str, days_ago: int, **kwargs) -> DragenTSO500CombinedVariantOutput:
+        return DragenTSO500CombinedVariantOutput.objects.create(
+            sequencing_run_name=sequencing_run_name, pair_id="5_C0000006_ABCD_2600000006",
+            specimen_reference="2600000006", specimen=self.specimen, module_version="2.1.1",
+            output_datetime=timezone.now() - timedelta(days=days_ago), **kwargs)
+
+    def test_the_analysis_of_the_cases_samples_wins_over_a_newer_one_of_the_specimen(self):
+        """ A later re-sequence of the specimen has its own numbers, which are not this case's """
+        own = self._cvo("RUN_1", days_ago=7, dna_sample=self.proband, total_tmb=7.1)
+        self._cvo("RUN_2", days_ago=0, total_tmb=12.0)
+
+        self.assertEqual(own, case_combined_variant_output([self.proband], self.specimen))
+
+    def test_a_case_with_no_linked_analysis_takes_the_specimens_newest(self):
+        self._cvo("RUN_1", days_ago=7)
+        newest = self._cvo("RUN_2", days_ago=0)
+
+        self.assertEqual(newest, case_combined_variant_output([self.proband], self.specimen))
+
+    def test_the_context_names_the_analysis_and_keeps_the_pathologists_tumour_content(self):
+        """ DRAGEN's tumour fraction is its own key, so the purity caveat still reads the pathologist's """
+        self._cvo("RUN_1", days_ago=0, dna_sample=self.proband, total_tmb=7.1, tumor_fraction=0.62)
+        SpecimenMeasure.objects.create(specimen=self.specimen, measure_type=SpecimenMeasureType.TUMOUR_FRACTION,
+                                       value=60.0, unit="%", method="Mocha")
+
+        context = context_as_dict(build_report_context(self.user, SampleSourceLevel.SPECIMEN, self.specimen, []))
+
+        self.assertEqual("RUN_1", context["analysis"]["sequencing_run_name"])
+        self.assertEqual({"tmb", "tumour_fraction_sequencing", "tumour_fraction"}, set(context["measures"]))
+        self.assertEqual(7.1, context["measures"]["tmb"]["value"])
+        self.assertEqual("DRAGEN TSO500 CombinedVariantOutput 2.1.1", context["measures"]["tmb"]["method"])
+        self.assertEqual(0.62, context["measures"]["tumour_fraction_sequencing"]["value"])
+        self.assertEqual(60.0, context["measures"]["tumour_fraction"]["value"])
 
 
 @override_settings(CELERY_TASK_ALWAYS_EAGER=True, LIFTOVER_CLASSIFICATIONS=False,

@@ -160,11 +160,13 @@ Gotchas:
   deliberately never writes for one.
 - A `case_field` can carry `prefill_key`: the build form starts that field from the named evidence key on the case's
   first classification that has one (SA Path's clinical indication), and its `default` otherwise.
-- A bool `case_field` can also carry `measure` (a `patients/models_enums.py:MEASURE_CONTEXT_KEYS` value) and `tick_when`:
-  the form shows that `SpecimenMeasure` beside the checkbox and starts the tick from the rule - `{"called": true}`,
+- A bool `case_field` can also carry `measure` (a `classification/models/classification_report_models.py:MEASURE_KEYS`
+  value - the case's DRAGEN analysis' `tmb`, `msi`, `gis`, `ploidy`, `tumour_fraction_sequencing`, or the pathologist's
+  `tumour_fraction`, @see `classification/report/case_report_context.py:case_measures`) and `tick_when`:
+  the form shows that `Measure` beside the checkbox and starts the tick from the rule - `{"called": true}`,
   `{"call_in": [...]}`, `{"value_below": n}`, or a list of those that ticks when any holds
   (`classification/models/classification_report_models.py:measure_tick`). Under each group the form lists the rule in
-  words (`describe_tick_when`) and the measure's `threshold` / `threshold_source`, which the TSO 500 import fills from
+  words (`describe_tick_when`) and the measure's `threshold` / `threshold_source`, which the MSI / TMB calls take from
   the `TSO500_*_CALL_BANDS` settings - the policy is on the form so a scientist who disagrees can ask for it to change.
   A case with no such measure falls back to `default`, and a draft's own answer wins over both. The keys are hand
   written in admin, so `validate_case_fields` fails the save on an unknown measure or rule.

@@ -18,12 +18,17 @@ much as vIII, and a PASS call in any other panel gene is in the VCF but never he
 on whether they work from the filtered or unfiltered set, so the splice calls come from the VCF,
 every record with its FILTER (#1903).
 
-What the file is imported for is the pair: its patient chain, the seqauto links and the specimen's
-measures (@see upload.tso500.dragen_combined_variant_output_records). That hangs off a VCF and Sample
-like every other arm file's, so DragenTSO500CombinedVariantOutputCreateVCFTask writes a VCF of no
+What the file is imported for is the pair: its patient chain, the seqauto links and the analysis
+itself - one seqauto.models.DragenTSO500CombinedVariantOutput per (run, pair), holding its TMB, MSI and
+GIS (@see upload.tso500.dragen_combined_variant_output_records). The patient chain hangs off a VCF and
+Sample like every other arm file's, so DragenTSO500CombinedVariantOutputCreateVCFTask writes a VCF of no
 records whose one sample is the RNA arm, and DragenTSO500CombinedVariantOutputInsertTask takes the rest
 of the file once the header step has made the Sample. A chain that cannot be made is a message on the
 import page rather than a failure.
+
+The run is the upload's 'sequencing_run' metadata, as it is for the MetricsOutput - the file names its
+run 'NA'. Without it the run whose current sample sheet names the pair's sample IDs is used, and a pair
+no registered run names is recorded nowhere, which the import page says.
 
 The file names no genome build, so one is declared at upload (@see upload.upload_metadata) or comes
 off the VCFSourceSettings row for '^DRAGEN TSO500 CombinedVariantOutput'.
@@ -31,11 +36,14 @@ off the VCFSourceSettings row for '^DRAGEN TSO500 CombinedVariantOutput'.
 import logging
 
 from library.genomics.vcf_writer import VCFWriter, build_header_lines
+from seqauto.models import SequencingRun
 from snpdb.gene_level_variants import GENE_LEVEL_CONTIG_LENGTH, GENE_LEVEL_CONTIG_NAME
 from upload.models import SimpleVCFImportInfo, UploadStep
 from upload.tasks.vcf.import_vcf_step_task import ImportVCFStepTask
 from upload.tso500.dragen_combined_variant_output_parser import (
+    DNA_SAMPLE_ID,
     MODULE_VERSION,
+    PAIR_ID,
     RNA_SAMPLE_ID,
     get_analysis_details,
     read_combined_variant_output,
@@ -44,11 +52,12 @@ from upload.tso500.dragen_combined_variant_output_records import (
     CombinedVariantOutputIdentityError,
     link_samples_to_extractions,
     link_to_sequencing_run,
-    measured_date,
     parse_pair_identifiers,
     resolve_pair,
-    write_specimen_measures,
+    sequencing_run_for_sample_ids,
+    write_combined_variant_output,
 )
+from upload.upload_metadata import SEQUENCING_RUN, get_metadata_sequencing_run_name
 from variantgrid.celery import app
 
 # The sample's FORMAT fields - read support rather than a genotype, bound by the
@@ -107,7 +116,7 @@ class DragenTSO500CombinedVariantOutputCreateVCFTask(ImportVCFStepTask):
 
 class DragenTSO500CombinedVariantOutputInsertTask(ImportVCFStepTask):
     """ Runs once the VCF and its Sample exist - everything in the file that is not a variant: the
-        pair's patient chain, the seqauto links and the specimen's measures """
+        pair's patient chain, the seqauto links and the analysis' record """
 
     def process_items(self, upload_step: UploadStep):
         upload_pipeline = upload_step.upload_pipeline
@@ -117,33 +126,53 @@ class DragenTSO500CombinedVariantOutputInsertTask(ImportVCFStepTask):
 
         sections = read_combined_variant_output(file_upload.get_filename())
         analysis_details = get_analysis_details(sections)
+        identifiers = None
+        resolved = None
+        chain_error = None
         try:
-            identifiers = parse_pair_identifiers(analysis_details)
-            if identifiers is None:
-                logging.info("%s names no pair to accession", file_upload)
-                return 0
-            resolved = resolve_pair(identifiers, user)
+            if identifiers := parse_pair_identifiers(analysis_details):
+                resolved = resolve_pair(identifiers, user)
+            else:
+                chain_error = f"{file_upload} names no pair and specimen to accession"
+                logging.info(chain_error)
         except CombinedVariantOutputIdentityError as e:
-            SimpleVCFImportInfo.add_message_count(1, str(e), upload_step)
+            chain_error = str(e)
+            SimpleVCFImportInfo.add_message_count(1, chain_error, upload_step)
             logging.warning("%s: %s", file_upload, e)
+
+        if resolved:
+            linked = link_samples_to_extractions(resolved, user)
+            logging.info("%s: linked %d sample(s) to %s", file_upload, linked, resolved.specimen)
+
+            # This VCF's one sample is the RNA arm's
+            if identifiers.rna and (sample := vcf.sample_set.first()):
+                if sequencing_run := link_to_sequencing_run(vcf, sample, identifiers.rna.sample_id):
+                    logging.info("%s: linked %s to %s", file_upload, sample, sequencing_run)
+                else:
+                    message = f"No sequencing sample named '{identifiers.rna.sample_id}' - " \
+                              f"VCF not linked to a sequencing run"
+                    SimpleVCFImportInfo.add_message_count(1, message, upload_step)
+
+        if not (pair_id := analysis_details.get(PAIR_ID)):
+            return 0
+        sample_ids = [sample_id for sample_id in (analysis_details.get(DNA_SAMPLE_ID),
+                                                  analysis_details.get(RNA_SAMPLE_ID)) if sample_id]
+        if sequencing_run_name := get_metadata_sequencing_run_name(file_upload):
+            sequencing_run = SequencingRun.objects.filter(name=sequencing_run_name).first()
+        elif sequencing_run := sequencing_run_for_sample_ids(sample_ids):
+            sequencing_run_name = sequencing_run.name
+        else:
+            message = f"No '{SEQUENCING_RUN}' metadata and no sequencing run names {', '.join(sample_ids)} - " \
+                      f"the pair's TMB, MSI and GIS are not recorded"
+            SimpleVCFImportInfo.add_message_count(1, message, upload_step)
             return 0
 
-        linked = link_samples_to_extractions(resolved, user)
-        logging.info("%s: linked %d sample(s) to %s", file_upload, linked, resolved.specimen)
-
-        # This VCF's one sample is the RNA arm's
-        if identifiers.rna and (sample := vcf.sample_set.first()):
-            if sequencing_run := link_to_sequencing_run(vcf, sample, identifiers.rna.sample_id):
-                logging.info("%s: linked %s to %s", file_upload, sample, sequencing_run)
-            else:
-                message = f"No sequencing sample named '{identifiers.rna.sample_id}' - " \
-                          f"VCF not linked to a sequencing run"
-                SimpleVCFImportInfo.add_message_count(1, message, upload_step)
-
-        measures = write_specimen_measures(sections, resolved, identifiers, user,
-                                           method=source_from_analysis_details(analysis_details),
-                                           date=measured_date(analysis_details))
-        return len(measures)
+        cvo = write_combined_variant_output(sections, pair_id, sequencing_run, sequencing_run_name, user,
+                                            resolved=resolved,
+                                            specimen_reference=identifiers.specimen_reference if identifiers else None,
+                                            parked_error=chain_error, file_upload=file_upload)
+        logging.info("%s: recorded %s", file_upload, cvo)
+        return 1
 
 
 DragenTSO500CombinedVariantOutputCreateVCFTask = app.register_task(

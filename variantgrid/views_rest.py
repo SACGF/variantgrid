@@ -12,7 +12,6 @@ from upload.models import UploadedFileTypes
 # change as a client-visible feature, and keep it while this endpoint exists.
 API_FEATURES = (
     "patients",
-    "specimen_measures",
     "link_extraction",
     "upload_status",
     "joint_called_vcf_cross_run",
