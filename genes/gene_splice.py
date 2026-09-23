@@ -1,8 +1,9 @@
 """
 Splice calls - "AR-V7", "MET exon 14 skipping" - as gene-level variants.
 
-@see snpdb.gene_level_variants for why one of these is a Variant, and genes.gene_level_resolver for
-turning the caller's gene name into the identity it is stored under.
+@see snpdb.gene_level_variants for why one of these is a Variant rather than the <DEL> the caller
+writes, and genes.gene_level_resolver for turning the caller's gene name into the identity it is
+stored under.
 
 Identity is the gene plus the junction's label, so two events in one gene are two variants. The
 label is the lab's own name for the junction, canonicalised (canonical_splice_label): lower-case
@@ -14,6 +15,12 @@ registered ahead of time still mints its Variant.
 display_splice_label formats a label back for a human (AR-V7 splice, EGFRvIVa splice, MET exon 14 skipping).
 genes.models.models_splice_event.SpliceEvent is consulted only where a row's own wording should win
 - the junctions the TSO 500 panel reports - and is never asked whether a name is real.
+
+The written-label grammar (SPLICE_STRING_PATTERN: V7 / vIVa / ex14skip with any spacing) is the part of
+this that costs upkeep - free-text names drift, and canonicalising them has needed a pass over stored
+labels before (classification/migrations/0185_one_off_canonicalise_splice_labels.py). If it needs
+simplifying, the direction is fewer accepted written forms with SpliceEvent rows as the names, not a
+different identity.
 
 The alt is a Sequence, so the label on it is upper-cased (<SPLICE:HGNC:7029:EXON_14_SKIPPING>) -
 that is the storage form only, and GeneLevelSymbolicAlt.parse lowers it back to the canonical label.
