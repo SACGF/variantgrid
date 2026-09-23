@@ -21,7 +21,7 @@ from classification.enums import SubmissionSource
 from classification.models.classification import Classification
 from classification.tests.models.test_utils import ClassificationTestUtils
 from library.guardian_utils import assign_permission_to_user_and_groups
-from snpdb.models import GenomeBuild, Tag, Variant, TagConfigCollection
+from snpdb.models import GenomeBuild, Tag, TagConfigCollection, Variant
 from snpdb.tests.utils.fake_cohort_data import create_fake_cohort
 from snpdb.tests.utils.tag_testing_utils import create_classify_queue_tag
 from snpdb.tests.utils.vcf_testing_utils import create_mock_allele
