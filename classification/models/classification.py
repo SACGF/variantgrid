@@ -28,6 +28,8 @@ from typing import (
     Union,
 )
 
+from typing_extensions import deprecated
+
 import django.dispatch
 from datetimeutc.fields import DateTimeUTCField
 from dateutil.tz import gettz
@@ -262,10 +264,8 @@ class ConditionResolvedReferenceDict(TypedDict):
     count: Optional[int]  # assumed to be 1 if not provided
 
 
+@deprecated("Use ConditionResolvedReferenceDict")
 class ConditionResolvedTermDict(TypedDict, total=False):
-    """
-    DEPRECATED, please use ConditionResolvedReferenceDict instead
-    """
     term_id: str
     name: str
 

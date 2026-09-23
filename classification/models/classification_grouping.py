@@ -126,7 +126,12 @@ class AlleleOriginGrouping(TimeStampedModel):
         return AlleleOriginBucket(self.allele_origin_bucket)
 
     class Meta:
-        unique_together = ("allele", "allele_origin_bucket", "testing_context_bucket", "tumor_type_category")
+        constraints = [
+            # tumor_type_category is usually null, and nulls would otherwise never collide
+            models.UniqueConstraint(fields=["allele", "allele_origin_bucket", "testing_context_bucket", "tumor_type_category"],
+                                    nulls_distinct=False,
+                                    name="allele_origin_grouping_unique"),
+        ]
 
     def __lt__(self, other: Self):
         if id_diff := self.allele.pk - other.allele.pk:

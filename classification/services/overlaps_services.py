@@ -1,4 +1,6 @@
 from collections import defaultdict
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from functools import cached_property
@@ -30,11 +32,26 @@ from snpdb.lab_picker import LabPickerData
 from snpdb.models import Lab, LabLike, UserSettings
 from snpdb.utils import LabNotificationBuilder
 
+_discordance_notifications_suppressed: ContextVar[bool] = ContextVar("discordance_notifications_suppressed", default=False)
+
 
 class OverlapServices:
     """
     Service that performs most of the calculations for connecting Contributions to Overlaps and calculating hte Overlap's status
     """
+
+    @staticmethod
+    @contextmanager
+    def discordance_notifications_suppressed():
+        """
+        For bulk rebuilds (e.g. deploying Overlaps), where every existing discordance would otherwise look newly
+        discordant. Overlap states are still recorded, so later changes are compared against the rebuilt state.
+        """
+        token = _discordance_notifications_suppressed.set(True)
+        try:
+            yield
+        finally:
+            _discordance_notifications_suppressed.reset(token)
 
     @staticmethod
     def update_classification_grouping_overlap_contribution(
@@ -155,18 +172,18 @@ class OverlapServices:
             with set_extra_data(extra_data):
                 contribution, created = OverlapContribution.objects.update_or_create(
                     source=OverlapEntrySourceTextChoices.CLINVAR,
-                    scv=expert_panel.record_id,
                     allele=clinvar_record_collection.allele,
                     classification_grouping=None,
                     value_type=ClassificationResultValue.ONC_PATH,
-                    contribution_status=contribution_enum,
                     testing_context_bucket=TestingContextBucket.GERMLINE,
                     tumor_type_category=None,
                     defaults={
+                        "scv": expert_panel.record_id,
                         "value": value,
+                        "contribution_status": contribution_enum,
                         "effective_date": effective_date.to_dict(),
-                    },
-                    triage_state=TriageState(status=TriageStatus.NON_INTERACTIVE_THIRD_PARTY).to_dict()
+                        "triage_state": TriageState(status=TriageStatus.NON_INTERACTIVE_THIRD_PARTY).to_dict()
+                    }
                 )
 
                 OverlapServices._link_overlap_contribution(contribution)
@@ -364,7 +381,7 @@ class OverlapServices:
         :param old_state: The overlap's state just prior
         :param new_state: The overlap's state now
         """
-        if not settings.DISCORDANCE_ENABLED:
+        if not settings.DISCORDANCE_ENABLED or _discordance_notifications_suppressed.get():
             return
 
         if overlap.overlap_type == OverlapType.CROSS_CONTEXT:

@@ -38,7 +38,9 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         if options["full_reset"]:
-            self.full_reset(args, options)
+            # rebuilding from scratch makes every existing discordance look new
+            with OverlapServices.discordance_notifications_suppressed():
+                self.full_reset(args, options)
             return
 
         if options['flags']:
@@ -280,7 +282,7 @@ class Command(BaseCommand):
                                     contribution_status=contribution_status,
                                     effective_date=this_curation_date.to_dict()
                                 )
-                                OverlapServices.link_overlap_contribution(overlap_contribution)
+                                OverlapServices._link_overlap_contribution(overlap_contribution)
                             else:
                                 overlap_contribution.value = this_value
                                 overlap_contribution.contribution_status = contribution_status
