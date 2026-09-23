@@ -3013,6 +3013,10 @@ li.help-item :last-child {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
+body > .select2-container .select2-dropdown {
+  z-index: 2001;
+}
+
 .dt-sort-menu-items {
   font-size: 12px;
   min-width: 0;
