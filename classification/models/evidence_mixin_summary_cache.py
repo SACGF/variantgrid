@@ -237,7 +237,7 @@ class ClassificationSummaryCalculator:
 def clinical_significance_pills(summary: ClassificationSummaryCacheObj, allele_origin_bucket: str) -> list[dict]:
     from classification.models import EvidenceKeyMap
     """ Label/CSS class for the c-pill spans - rendered server side by the clinical_significance_values
-        tag, and client side by the variant details samples grid. CSS is .c-pill.cs-* / .c-pill.scs-* """
+        tag, and client side by the variant details samples grid. CSS is .c-pill.cs-* """
     pathogenicity = summary.pathogenicity
     somatic = summary.somatic
 
@@ -263,6 +263,6 @@ def clinical_significance_pills(summary: ClassificationSummaryCacheObj, allele_o
         pills.append({
             "title": somatic_key.pretty_label,
             "label": label,
-            "css_class": f"scs scs-{value.lower() if value else 'none'}",
+            "css_class": f"scs cs-{value.lower() if value else 'none'}",
         })
     return pills

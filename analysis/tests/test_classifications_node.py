@@ -213,7 +213,7 @@ class ClassificationsNodeEditorTest(AnalysisSetupMixin, TestCase):
         content = response.content.decode()
         self.assertIn("allele-origin-toggle", content)
         self.assertIn("germline-significances", content)
-        self.assertIn("scs-tier_1", content)
+        self.assertIn("cs-tier_1", content)
         self.assertEqual(content.count('name="allele_origin"'), 3)
 
 

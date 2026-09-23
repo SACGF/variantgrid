@@ -601,7 +601,7 @@ class DatatableConfig(Generic[DC]):
         if columns is None:
             columns = self.export_columns()
         for row in rows:
-            yield {rc.name: self.render_cell(row, rc) if rc.csv_rendered else sanitize_value(row.get(rc.key))
+            yield {rc.name: self.render_cell(CellData(all_data=row, key=rc.key), rc) if rc.csv_rendered else sanitize_value(row.get(rc.key))
                    for rc in columns}
 
     def iter_export_rows(self, qs: QuerySet[DC]) -> Iterator[dict]:
@@ -773,9 +773,8 @@ class DatatableConfig(Generic[DC]):
         data = []
 
         if self.server_calculate_mode == DatatableConfigQuerySetMode.COLUMNS:
-            # select out all columns but only send down data for enabled columns
-            all_columns = self.value_columns()
-            for row in qs.values(*all_columns):
+            # rows selected out all columns, but only send down data for enabled columns
+            for row in rows:
                 row_json = {}
                 for rc in self.enabled_columns:
                     value = self.render_cell(row=CellData(all_data=row, key=rc.key), column=rc)
@@ -988,11 +987,8 @@ class DatabaseTableView(Generic[DC], MajorOperationViewMixin, JSONResponseView):
     def filter_queryset(self, qs: QuerySet[DC]) -> QuerySet[DC]:
         return self.config.apply_filters(qs)
 
-    # def prepare_results(self, qs: QuerySet[DC]):
-    #     # select out all columns but only send down data for enabled columns
-    #     rows = list(qs.values(*self.config.value_columns()))
-    #     self.config.pre_render(qs, rows)
-    #     return list(self.config.render_rows(rows))
+    def prepare_results(self, qs: QuerySet[DC]):
+        return self.config.prepare_results(qs)
 
     def handle_exception(self, e: BaseException):
         report_exc_info()

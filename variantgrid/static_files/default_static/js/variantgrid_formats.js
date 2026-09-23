@@ -84,7 +84,7 @@ const SOMATIC_CLASSIFICATION_BOXES = {
     'U': {display: '', label: 'No tier'},
 };
 
-// Chip text and .cs-*/.scs-* colour class (global.scss) per classification code
+// Chip text and .cs-* colour class (global.scss) per classification code
 const GERMLINE_CLASSIFICATION_CHIPS = {
     '0': {text: 'O', css: 'cs-none'},
     '1': {text: 'B', css: 'cs-b'},
@@ -95,11 +95,11 @@ const GERMLINE_CLASSIFICATION_CHIPS = {
 };
 
 const SOMATIC_CLASSIFICATION_CHIPS = {
-    'tier_1': {text: 'Tier I', css: 'scs-tier_1'},
-    'tier_1_or_2': {text: 'Tier I/II', css: 'scs-tier_1_or_2'},
-    'tier_2': {text: 'Tier II', css: 'scs-tier_2'},
-    'tier_3': {text: 'Tier III', css: 'scs-tier_3'},
-    'tier_4': {text: 'Tier IV', css: 'scs-tier_4'},
+    'tier_1': {text: 'Tier I', css: 'cs-tier_1'},
+    'tier_1_or_2': {text: 'Tier I/II', css: 'cs-tier_1_or_2'},
+    'tier_2': {text: 'Tier II', css: 'cs-tier_2'},
+    'tier_3': {text: 'Tier III', css: 'cs-tier_3'},
+    'tier_4': {text: 'Tier IV', css: 'cs-tier_4'},
 };
 
 const CLINVAR_PATHOGENICITY_CHIPS = {  // ClinVar.highest_pathogenicity (ClinVarPathogenicity)
@@ -122,11 +122,11 @@ const CLINVAR_ONCOGENICITY_CHIPS = {  // ClinVar.highest_oncogenicity (ClinVarOn
 // ClinVar.somatic_tier (SomaticClinicalSignificance) - the AMP tier, in the short form the chip has
 // room for. It's a choice field, so unlike the internal tiers above the row carries the label
 const CLINVAR_SOMATIC_TIER_CHIPS = {
-    'Tier I': {text: 'I', css: 'scs-tier_1'},
-    'Tier I/II': {text: 'I/II', css: 'scs-tier_1_or_2'},
-    'Tier II': {text: 'II', css: 'scs-tier_2'},
-    'Tier III': {text: 'III', css: 'scs-tier_3'},
-    'Tier IV': {text: 'IV', css: 'scs-tier_4'},
+    'Tier I': {text: 'I', css: 'cs-tier_1'},
+    'Tier I/II': {text: 'I/II', css: 'cs-tier_1_or_2'},
+    'Tier II': {text: 'II', css: 'cs-tier_2'},
+    'Tier III': {text: 'III', css: 'cs-tier_3'},
+    'Tier IV': {text: 'IV', css: 'cs-tier_4'},
 };
 
 // Each chip sits in a fixed slot (global.scss) so the four origins line up down the column - a

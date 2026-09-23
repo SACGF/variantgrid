@@ -936,11 +936,6 @@ li.error::before {
 // GRIDS
 ////////////////////////
 
-.jqgrid-container .ui-corner-top {
-	border-top-right-radius: 0;
-	border-top-left-radius: 0;
-}
-
 .grid-link {
 	float: left;
 	border: 0px !important;
@@ -2252,10 +2247,6 @@ div.readonly {
 	font-style: italic;
 }
 
-.ui-tabs .ui-tabs-nav li.ui-tabs-active {
-	padding-bottom: 0 !important;
-}
-
 .debug {
 	padding: 4px;
 	margin-left: auto;
@@ -2594,10 +2585,6 @@ span.select2-container {
 			}
 		}
 	}
-}
-
-.ui-jqgrid>.ui-jqgrid-pager {
-	height: 38px !important;
 }
 
 hr {
@@ -2963,7 +2950,8 @@ nav ol.breadcrumb .breadcrumb-item a:hover,
 .hp,
 .hpo,
 .omim,
-.mondo .hgnc {
+.mondo,
+.hgnc {
 	border: 3px solid white;
 	margin: 0 4px 0 4px;
 	border-radius: 3px;

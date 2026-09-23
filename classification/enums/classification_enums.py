@@ -675,10 +675,10 @@ class SomaticClinicalSignificance:
 
     @staticmethod
     def css_class(somatic_clinical_significance: Optional[str]) -> str:
-        """ Class for the .c-pill.scs-* rules in global.scss """
+        """ Class for the .cs-* rules in global.scss """
         if somatic_clinical_significance in SomaticClinicalSignificance.LABELS:
-            return f"scs-{somatic_clinical_significance}"
-        return "scs-none"
+            return f"cs-{somatic_clinical_significance}"
+        return "cs-none"
 
 
 class CriteriaEvaluation:

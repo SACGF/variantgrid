@@ -34,7 +34,7 @@
                     {% endif %}
                 {% endif %}
                 {% if lab_summ.somatic_clinical_significance or lab_summ.allele_origin_bucket == "S" %}
-                    <div title="Somatic Clinical Significance" class="flex-grow-1 d-inline-block py-2 c-pill scs scs-{{ lab_summ.somatic_clinical_significance }}" style="flex-basis: 0">
+                    <div title="Somatic Clinical Significance" class="flex-grow-1 d-inline-block py-2 c-pill scs cs-{{ lab_summ.somatic_clinical_significance }}" style="flex-basis: 0">
                         {% if not lab_summ.somatic_clinical_significance %}<span class="no-value">No Data</span>
                         {% else %}{{ lab_summ.somatic_clinical_significance|ekey:'somatic:clinical_significance' }}
                         {% endif %}
