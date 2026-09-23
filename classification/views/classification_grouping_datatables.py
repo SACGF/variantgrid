@@ -51,26 +51,6 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
     e.g. allele origin filter
     """
 
-    # FIXME
-    # def pre_render(self, qs: QuerySet[ClassificationGrouping]):
-    #     # Keep a set of classification_grouping, lab to indicate these having pending changes
-    #     conflict_ids = set()
-    #     conflict_lab_tuples = list()
-    #     for cl in ConflictLab.objects.filter(classification_grouping__in=qs, active=True).values_list(
-    #             "conflict_id",
-    #             "classification_grouping_id",
-    #             "lab_id",
-    #             "status",
-    #             "conflict__conflict_type"
-    #     ):
-    #         conflict_ids.add(cl[0])
-    #         conflict_lab_tuples.append(cl)
-    #
-    #     major_conflicts = set(Conflict.objects.filter(pk__in=conflict_ids, severity__gte=ConflictSeverity.MAJOR).values_list("pk", flat=True))
-    #     self.pending_conflict_labs_onc_path = {(c[1], c[2]): c[3] for c in conflict_lab_tuples if c[0] in major_conflicts and c[4] == ConflictType.ONCPATH}
-    #     self.pending_conflict_labs_clin_sig = {(c[1], c[2]): c[3] for c in conflict_lab_tuples if c[0] in major_conflicts and c[4] == ConflictType.CLIN_SIG}
-
-
     def render_row_header(self, row: CellData) -> JsonDataType:
 
         matches: Optional[dict[str, str]] = None
@@ -424,8 +404,6 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
         genome_build_preferred = first(self.genome_build_prefs)
 
         self.grouping_value_type_overlaps = {}
-        # self.pending_conflict_labs_onc_path: dict[Tuple[int, int], DiscordanceReportTriageStatus] = {}
-        # self.pending_conflict_labs_clin_sig: dict[Tuple[int, int], DiscordanceReportTriageStatus] = {}
         self.expand_client_renderer = DatatableConfig._row_expand_ajax('classification_grouping_detail',
                                                                        expected_height=108)
         self.rich_columns = [

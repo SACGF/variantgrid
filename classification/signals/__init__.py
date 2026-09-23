@@ -1,7 +1,6 @@
 # noinspection PyUnresolvedReferences
 from classification.signals.classification_health_checks import *   # so we load the receivers
 from classification.signals.classification_hooks_assign_owner import *   # so we load the receivers
-from classification.signals.classification_hooks_discordance_notifications import *
 from classification.signals.classification_hooks_discordance_status import *  # so we load the receivers
 from classification.signals.classification_hooks_share_flags import *  # so we load the receivers
 from classification.signals.classification_hooks_significant_change import *  # so we load the receivers
@@ -14,7 +13,6 @@ from classification.signals.discordance_report_search import *  # so we load the
 from classification.signals.classification_liftover import *  # so we load the receivers
 from classification.signals.classification_hooks_grouping import *  # so we load the receivers
 from classification.signals.classification_hooks_grouping_search_terms import *  # so we load the receivers
-from classification.signals.classification_hooks_pending_flags import *  # so we load the receivers
 from classification.signals.classification_import_integration_status import *  # so we load the receivers
 from classification.signals.clinvar_export_integration_status import *  # so we load the receivers
 from classification.signals.classification_hooks_allele_merge import *  # so we load the receivers

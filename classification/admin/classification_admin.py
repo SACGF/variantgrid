@@ -603,12 +603,8 @@ class ClinicalContextAdmin(ModelAdminBasics):
     def has_add_permission(self, request):
         return False
 
-    # @admin_action("Recalculate Status")
-    # def recalculate(self, request, queryset):
-    #     for dc in queryset:
-    #         dc.recalc_and_save(cause='Admin recalculation',
-    #                            cause_code=ClinicalContextRecalcTrigger.ADMIN)  # cause of None should change to Unknown, which is accurate if this was required
-    #     self.message_user(request, f'Recalculated {queryset.count()} statuses')
+    # note recalculate status has been removed as ClinicalContext calculations have been removed
+    # in favor of Overlaps
 
 
 class EvidenceKeySectionFilter(admin.SimpleListFilter):
@@ -1058,13 +1054,6 @@ class DiscordanceReportAdmin(ModelAdminBasics):
 
     def has_add_permission(self, request):
         return False
-
-    # @admin_action("Re-calculate latest")
-    # def re_calculate(self, request, queryset):
-    #     ds: DiscordanceReport
-    #     for ds in queryset:
-    #         ds.clinical_context.recalc_and_save(cause="Admin recalculation",
-    #                                             cause_code=ClinicalContextRecalcTrigger.ADMIN)
 
     @admin_action("Export Admin Report CSV")
     def export_admin_report(self, request, queryset: QuerySet[DiscordanceReport]):

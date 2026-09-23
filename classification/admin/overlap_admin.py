@@ -1,31 +1,14 @@
-from typing import Iterable
-
 from auditlog.mixins import AuditlogHistoryAdminMixin
-from django.contrib.admin import TabularInline, ModelAdmin
+from django.contrib.admin import ModelAdmin
 from django.db.models import QuerySet
 from django.http import HttpRequest
-
 from classification.enums import OverlapStatus
 from classification.models import Overlap, OverlapContribution, OverlapContributionNextStep
 from classification.services.overlaps_services import OverlapServices
 from snpdb.admin_utils import ModelAdminBasics, admin_action, admin_list_column
 from django.contrib import admin
+from snpdb.models import Lab
 
-from snpdb.models import AlleleOrigin, Allele, Lab
-
-
-# class OverlapContributionInline(admin.TabularInline):
-#     model = OverlapContribution
-#     fields = ['source', 'classification_grouping', 'value', 'effective_date']
-#
-#     def has_add_permission(self, request, obj):
-#         return False
-#
-#     def has_change_permission(self, request, obj=None):
-#         return False
-#
-#     def has_delete_permission(self, request, obj=None):
-#         return False
 
 class OverlapContributionSpecial(admin.SimpleListFilter):
     title = 'Special'
