@@ -1,0 +1,15 @@
+{% load ui_utils %}
+{% labelled label="Lab Name" %}{{ lab.name }}{% endlabelled %}
+{% labelled label="Location" %}{{ lab.state }} {{ lab.city }}{% endlabelled %}
+{% if lab.url %}
+    {% labelled label="Website" %}<a href="{{ lab.url }}">{{ lab.url }}</a>{% endlabelled %}
+{% endif %}
+{% if lab.contact_name %}
+    {% labelled label="Contact Name" %}{{ contact_name }}{% endlabelled %}
+{% endif %}
+{% if lab.contact_phone %}
+    {% labelled label="Phone" %}<a href="tel:{{ lab.contact_phone }}">{{ lab.contact_phone }}</a>{% endlabelled %}
+{% endif %}
+{% if lab.contact_email %}
+    {% labelled label="Email" %}<a href="mailto:{{ lab.contact_email }}?subject={{ subject }}">{{ lab.contact_email }}</a>{% endlabelled %}
+{% endif %}

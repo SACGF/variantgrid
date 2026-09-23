@@ -85,10 +85,6 @@ class TagConfigCollection(GuardianPermissionsAutoInitialSaveMixin, TimeStampedMo
         null=True, blank=True, choices=VARIANT_TAG_STALE_DAYS_CHOICES,
         help_text="Tag events older than this are considered stale: grids show fresh vs total counts "
                   "and mark tags whose most recent event is older. Blank disables staleness.")
-    show_resolved_variant_tags = models.BooleanField(
-        default=False,
-        help_text="Tag work lists (variant page, variant tags page) keep taggings a classification has resolved, "
-                  "and new tag nodes start with 'include resolved' ticked.")
 
     @property
     def variant_tag_stale_date(self) -> Optional[datetime]:
@@ -611,7 +607,7 @@ class UserSettings:
         return settings_overrides
 
     @staticmethod
-    def get_for(user: Optional[User] = None, lab: Optional[Lab] = None, organization: Optional[Organization] = None):
+    def get_for(user: Optional[User] = None, lab: Optional[Lab] = None, organization: Optional[Organization] = None) -> 'UserSettings':
         override_fields = [s.name for s in dataclasses.fields(UserSettings)]
         kwargs = dict.fromkeys(override_fields)  # Need to pass all params
         settings_overrides = UserSettings.get_settings_overrides(user=user, lab=lab, organization=organization)

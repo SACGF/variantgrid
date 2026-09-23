@@ -41,34 +41,30 @@ from snpdb.variant_filters import get_all_variants_filters, get_variant_filter_q
 from snpdb.views.datatable_view import CellData, DatatableConfig, FilterField, RichColumn, SortOrder
 from variantopedia.interesting_nearby import get_nearby_qs
 
-# Sent by a page to flip the tag config's show_resolved_variant_tags for a look - never stored
-SHOW_RESOLVED_PARAM = "show_resolved"
+# One setting for every tag work list - the variant page and the variant tags page share it, so the
+# choice follows the user between them
+VARIANT_TAGS_GRID_NAME = 'Variant Tags'
 
 
-def show_resolved_variant_tags(request: HttpRequest) -> bool:
-    """ Whether the tag work lists show taggings a classification has already satisfied - set on the
-        user's tag config (like tag colours) so a lab sets it once for everyone, unless the page overrides it """
-    show_resolved = request.POST.get(SHOW_RESOLVED_PARAM, request.GET.get(SHOW_RESOLVED_PARAM))
-    if show_resolved is not None:
-        return show_resolved == "true"
-    tag_config = UserSettings.get_for_user(request.user).tag_config
-    return bool(tag_config and tag_config.show_resolved_variant_tags)
+def show_resolved_variant_tags(user) -> bool:
+    """ Whether the tag work lists show taggings a classification has already satisfied """
+    return UserGridConfig.get(user, VARIANT_TAGS_GRID_NAME).show_hidden_data
 
 
-def filter_unresolved_variant_tags(qs: QuerySet[VariantTag], request: HttpRequest) -> QuerySet[VariantTag]:
-    """ Drop the taggings that are done, unless they're being shown """
-    if show_resolved_variant_tags(request):
+def filter_unresolved_variant_tags(qs: QuerySet[VariantTag], user) -> QuerySet[VariantTag]:
+    """ Drop the taggings that are done, unless this user asked to see them """
+    if show_resolved_variant_tags(user):
         return qs
     return qs.filter(VariantTag.unresolved_q())
 
 
-def variant_tags_for_user(variant: Variant, request: HttpRequest) -> QuerySet[VariantTag]:
+def variant_tags_for_user(variant: Variant, user) -> QuerySet[VariantTag]:
     """ The taggings the variant page shows for a variant: any build of its allele, visible to this user,
-        and not yet resolved unless they're being shown. """
+        and not yet resolved unless the user asked to see those. """
     genome_build = variant.any_genome_build
     qs = VariantTag.get_for_build(genome_build, variant_qs=variant.equivalent_variants)
-    qs = VariantTag.filter_for_user(request.user, queryset=qs)
-    return filter_unresolved_variant_tags(qs, request)
+    qs = VariantTag.filter_for_user(user, queryset=qs)
+    return filter_unresolved_variant_tags(qs, user)
 
 
 def _format_approx_count(n: int) -> str:
@@ -326,7 +322,7 @@ class VariantTagCaseColumnsMixin:
 
 class VariantTagsColumns(VariantTagCaseColumnsMixin, DatatableConfig[VariantTag]):
     """ List VariantTags (Tag-centric) - @see variant_tags.html and base_related_analyses.html """
-    GRID_NAME = 'Variant Tags'
+    GRID_NAME = VARIANT_TAGS_GRID_NAME
     # The initial queryset is every tag in the build - a DISTINCT over a dozen joins - and recordsTotal
     # only feeds the "(filtered from N total)" text, so it isn't worth a second count of it
     count_unfiltered = False
@@ -459,7 +455,7 @@ class VariantTagsColumns(VariantTagCaseColumnsMixin, DatatableConfig[VariantTag]
             qs = VariantTag.filter_for_user(self.user, queryset=qs)
         else:
             qs = qs.filter(user=self.user)
-        return filter_unresolved_variant_tags(qs, self.request)
+        return filter_unresolved_variant_tags(qs, self.user)
 
 
 class TaggedVariantGrid(AbstractVariantGrid):
@@ -526,7 +522,7 @@ class TaggedVariantGrid(AbstractVariantGrid):
     def _get_grid_only_annotation_kwargs(self):
         """ How many times this variant has been tagged - sort on it to find the most re-tagged variants """
         a_kwargs = super()._get_grid_only_annotation_kwargs()
-        tag_count_qs = filter_unresolved_variant_tags(VariantTag.filter_for_user(self.user), self.request).filter(
+        tag_count_qs = filter_unresolved_variant_tags(VariantTag.filter_for_user(self.user), self.user).filter(
             allele__variantallele__variant_id=OuterRef("id")).values("allele").annotate(
             tag_count=Count("pk")).values_list("tag_count")
         a_kwargs["tag_count"] = Subquery(tag_count_qs[:1])
@@ -542,7 +538,7 @@ class TaggedVariantGrid(AbstractVariantGrid):
         genome_build = self.annotation_version.genome_build
         user_grid_config = UserGridConfig.get(self.user, self.grid_name)
         # The tag work list setting is shared with the tags grid beside this one, so the two agree
-        tags_qs = filter_unresolved_variant_tags(VariantTag.filter_for_user(self.user), self.request)
+        tags_qs = filter_unresolved_variant_tags(VariantTag.filter_for_user(self.user), self.user)
         if self.filter_user_id:
             # An explicit user filter overrides show_group_data - still permission checked
             tags_qs = tags_qs.filter(user_id=self.filter_user_id)
@@ -582,7 +578,7 @@ class VariantTagCountsColumns(DatatableConfig[VariantTag]):
     def get_initial_queryset(self) -> QuerySet[VariantTag]:
         variant_id = self.get_query_param('variant_id')
         variant = Variant.objects.get(pk=variant_id)
-        qs = variant_tags_for_user(variant, self.request).values("tag") \
+        qs = variant_tags_for_user(variant, self.user).values("tag") \
             .annotate(count=Count("id"), last_created=Max("created")).order_by("tag")
         if self.tag_stale_date:
             qs = qs.annotate(fresh_count=Count("id", filter=Q(created__gte=self.tag_stale_date)))
@@ -622,4 +618,4 @@ class VariantTagDetailColumns(VariantTagCaseColumnsMixin, DatatableConfig[Varian
 
         variant = Variant.objects.get(pk=variant_id)
         tag = Tag.objects.get(pk=tag_name)
-        return self.annotate_patient_identity(variant_tags_for_user(variant, self.request).filter(tag=tag))
+        return self.annotate_patient_identity(variant_tags_for_user(variant, self.user).filter(tag=tag))

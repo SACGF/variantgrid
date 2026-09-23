@@ -11,14 +11,16 @@ ClassificationConsensus and CuratedDate. classification/AGENTS.md has the rules.
 import copy
 import json
 import logging
+import operator
 import re
 import uuid
-from collections import Counter, defaultdict, namedtuple
+import pydantic
+from collections import Counter, namedtuple, defaultdict
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
-from enum import Enum, StrEnum
-from functools import cached_property
+from enum import Enum
+from functools import cached_property, reduce
 from typing import (
     Any,
     Optional,
@@ -45,19 +47,19 @@ from django.utils import timezone as django_timezone
 from django_extensions.db.models import TimeStampedModel
 from guardian.shortcuts import assign_perm, get_objects_for_user
 
+from annotation.models.data_enums import ClassificationDate, ClassificationDateType, EffectiveDate, EffectiveDateType
 from annotation.models.models import AnnotationVersion, VariantAnnotation, VariantAnnotationVersion
 from annotation.regexes import DbRegexes, db_ref_regexes
 from classification.enums import (
     CRITERIA_NOT_MET,
     AlleleOriginBucket,
     ClinicalSignificance,
-    CopyScope,
     CriteriaEvaluation,
     ShareLevel,
     SpecialEKeys,
     SubmissionSource,
     ValidationCode,
-    WithdrawReason,
+    WithdrawReason, TestingContextBucket, CopyScope,
 )
 from classification.models.classification_import_run import ClassificationImportRun
 from classification.models.classification_patcher import patch_fuzzy_age
@@ -65,8 +67,7 @@ from classification.models.classification_utils import (
     ClassificationJsonParams,
     ClassificationPatchResponse,
     PatchMeta,
-    ValidationMerger,
-    classification_gene_symbol_filter,
+    ValidationMerger, classification_gene_symbol_filter,
 )
 from classification.models.classification_variant_info_models import (
     ImportedAlleleInfo,
@@ -85,7 +86,6 @@ from classification.models.evidence_key import (
 )
 from classification.models.evidence_mixin import EvidenceMixin, VCPatch
 from classification.models.evidence_mixin_summary_cache import (
-    ClassificationSummaryCacheDict,
     ClassificationSummaryCalculator,
 )
 from classification.models.flag_types import classification_flag_types
@@ -98,7 +98,7 @@ from flags.models.models import (
     flag_collection_extra_info_signal,
 )
 from genes.hgvs import HGVSComponents, HGVSDisplay, HGVSMatcher
-from genes.models import Gene, GeneSymbol, NoTranscript
+from genes.models import Gene, NoTranscript, GeneSymbol
 from library.cache import clear_cached_property
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
 from library.guardian_utils import clear_permissions
@@ -149,8 +149,8 @@ class VCBlobKeys(Enum):
 
 class ClassificationProcessError(Exception):
     """
-    Use to report critical errors that an API user should be able to see
-    e.g. referring to a non-existent lab
+    Use to report critical errors that an API user should be able to see.
+    e.g., referring to a non-existent lab
     """
 
 
@@ -199,7 +199,7 @@ class AllClassificationsAlleleSource(TimeStampedModel, AlleleSource):
 
     def get_variants_qs(self) -> QuerySet[Variant]:
         # Note: This deliberately only gets classifications where the submitting variant was against this genome build
-        # ie we don't use Classification.get_variant_q_from_classification_qs() to get liftovers
+        # i.e., we don't use Classification.get_variant_q_from_classification_qs() to get liftovers
         contigs_q = Variant.get_contigs_q(self.genome_build)
         return Variant.objects.filter(contigs_q, importedalleleinfo__isnull=False)
 
@@ -207,7 +207,7 @@ class AllClassificationsAlleleSource(TimeStampedModel, AlleleSource):
 @receiver(flag_collection_extra_info_signal, sender=FlagCollection)
 def get_extra_info(flag_infos: FlagInfos, user: User, **kwargs) -> None:  # pylint: disable=unused-argument
     """
-    Allows us to provide extra info for FlagCollections attached to Classification
+    Allows us to provide extra info for FlagCollections attached to Classification.
     e.g. linking to the appropriate allele page, discordance report etc.
     :param flag_infos: Information on the flag collections being displayed to the user.
     Populates this with the extra info
@@ -256,37 +256,124 @@ def get_extra_info(flag_infos: FlagInfos, user: User, **kwargs) -> None:  # pyli
         flag_infos.set_extra_info(vc.flag_collection_id, context, source_object=vc)
 
 
-class ConditionResolvedTermDict(TypedDict):
+class ConditionResolvedReferenceDict(TypedDict):
+    term_id: Optional[str]
+    name: str  # name of the term if term_id is provided, otherwise from a plain text condition
+    count: Optional[int]  # assumed to be 1 if not provided
+
+
+class ConditionResolvedTermDict(TypedDict, total=False):
+    """
+    DEPRECATED, please use ConditionResolvedReferenceDict instead
+    """
     term_id: str
     name: str
 
 
 class ConditionResolvedDict(TypedDict, total=False):
     """
-    Structure of data used to cached resolved condition text again a classification
+    Structure of data used to cached resolved condition text again a classification.
+    Used to use "resolved_terms" and "plain_text_terms" to store matched OntologyIDs and plain text conditions
+    respectively, but now both those are bundled into references.
+    Fields are still defined for reading pre-existing JSON.
     """
     display_text: str  # plain text to show to users if not in a position to render links
     sort_text: str  # lower case representation of description
     resolved_terms: list[ConditionResolvedTermDict]
+    """
+    DEPRECATED, please use references instead
+    """
+
     plain_text_terms: list[str]  # A full list of unresolved plain text conditions
+    """
+    DEPRECATED, please use references instead
+    """
+
     resolved_join: str
+
+    references: list[ConditionResolvedReferenceDict]  # new method of saving counts
+
+
+@pydantic.dataclasses.dataclass(frozen=True, config=pydantic.ConfigDict(arbitrary_types_allowed=True))
+class ConditionReference:
+    """
+    Represents an OntologyTerm (just provide the OntologyTerm) or
+    Free condition text (just provide name)
+    as well as a count of how many times they've appeared.
+    Count will be more meaningful when looking at a group of records rather than individual.
+    """
+
+    term: Optional[OntologyTerm] = None
+    name: Optional[str] = None
+    count: int = 1
+
+    @property
+    def full_text(self) -> str:
+        if term := self.term:
+            return f"{term.pk} {self.name}"
+        else:
+            return self.name
+
+    def to_json(self) -> ConditionResolvedReferenceDict:
+        result: ConditionResolvedReferenceDict = {}
+        if term := self.term:
+            result["term_id"] = term.id
+            result["name"] = term.name
+        else:
+            result["name"] = self.name
+        if count := self.count:
+            result["count"] = count
+        return result
+
+    def __lt__(self, other) -> bool:
+        if self.term and other.term:
+            return self.term < other.term
+        if not self.term and not other.term:
+            return self.name < other.name
+        if self.term:
+            return False
+        return True
 
 
 @dataclass(frozen=True)
 class ConditionResolved:
-    terms: list[OntologyTerm]
-    plain_text_terms: list[str] = None
+    # terms: list[OntologyTerm]
+    # plain_text_terms: list[str] = None
+    references: list[ConditionReference]
     join: Optional['MultiCondition'] = None
     plain_text: Optional[str] = None  # fallback, not populated in all contexts
 
-    def __hash__(self):
-        hash_total = 0
-        if terms := self.terms:
-            for t in terms:
-                hash_total += hash(t)
-        hash_total += hash(self.join, )
-        hash_total += hash(self.plain_text)
-        return hash_total
+    def __hash__(self) -> int:
+        hash_value = 34543
+        if join := self.join:
+            hash_value += hash(join)
+        if references := self.references:
+            hash_value += reduce(operator.add, map(hash, references))
+        return hash_value
+
+    @property
+    def terms(self) -> list[OntologyTerm]:
+        return [t.term for t in self.references if t.term is not None]
+
+    @property
+    def plain_text_terms(self) -> list[str]:
+        # TODO used to return None where it now returns []
+        # but some code puts this directly into JSON
+        return [t.name for t in self.references if t.term is None]
+
+    @staticmethod
+    def from_uncounted_terms(
+            terms: list[OntologyTerm] = None,
+            plain_text_terms: list[str] = None,
+            join: Optional['MultiCondition'] = None,
+            plain_text: Optional[str] = None
+    ) -> 'ConditionResolved':
+        references: list[ConditionReference] = []
+        if terms:
+            references += [ConditionReference(term=term) for term in terms]
+        if plain_text_terms:
+            references += [ConditionReference(name=plain_text_term) for plain_text_term in plain_text_terms]
+        return ConditionResolved(references=references, join=join, plain_text=plain_text)
 
     @property
     def summary(self) -> str:
@@ -301,22 +388,43 @@ class ConditionResolved:
 
     @staticmethod
     def from_dict(condition_dict: ConditionResolvedDict) -> 'ConditionResolved':
-        terms = [OntologyTerm.get_or_stub_cached(term.get("term_id")) for term in condition_dict.get("resolved_terms")]
-        join = None
-        if len(terms) > 1:
-            from classification.models import MultiCondition
-            join = MultiCondition(condition_dict.get("resolved_join"))
+        if not condition_dict:
+            return ConditionResolved(references=[])
 
-        terms.sort()
-        return ConditionResolved(
-            terms=terms,
-            plain_text_terms=condition_dict.get("plain_text_terms"),
-            join=join
-        )
+        join: Optional['MultiCondition'] = None
+        plain_text = condition_dict.get("display_text")
+
+        if resolved_join_text := condition_dict.get("resolved_join"):
+            from classification.models import MultiCondition
+            join = MultiCondition(resolved_join_text)
+
+        if references_list := condition_dict.get("references"):
+            references: list[ConditionReference] = []
+            reference_dict: ConditionResolvedReferenceDict
+            for reference_dict in references_list:
+                term: Optional[OntologyTerm] = None
+                if term_id := reference_dict.get("term_id"):
+                    term = OntologyTerm.get_or_stub_cached(term_id)
+
+                references.append(ConditionReference(
+                    term=term,
+                    name=reference_dict.get("name"),
+                    count=reference_dict.get("count")
+                ))
+            references.sort()
+            return ConditionResolved(references=references, join=join, plain_text=plain_text)
+        else:
+            # old format with resolved terms and plain_text_terms
+            if resolved_terms := condition_dict.get("resolved_terms"):
+                terms = list(sorted(OntologyTerm.get_or_stub_cached(term_dict.get("term_id")) for term_dict in resolved_terms))
+            else:
+                terms = []
+            plain_text_terms = condition_dict.get("plain_text_terms")
+            return ConditionResolved.from_uncounted_terms(terms=terms, plain_text_terms=plain_text_terms, join=join, plain_text=plain_text)
 
     @property
     def is_multi_condition(self) -> bool:
-        return len(self.terms) > 1
+        return len(self.references) > 1
 
     @property
     def single_term(self) -> Optional[OntologyTerm]:
@@ -334,11 +442,17 @@ class ConditionResolved:
 
     def as_mondo_if_possible(self) -> 'ConditionResolved':
         if mondo_term := self.mondo_term:
-            return ConditionResolved(terms=[mondo_term])
+            return ConditionResolved.from_uncounted_terms(terms=[mondo_term])
         else:
             return self
 
     def is_same_or_more_specific(self, other: 'ConditionGroup') -> bool:
+        """
+        Returns the number of steps to go from this condition to the specific other condition
+        Returns None if self doesn't appear to be a descendant of other
+        :param other:
+        :return:
+        """
         if self.is_multi_condition or other.is_multi_condition:
             # when looking at multiple conditions, do not attempt merging unless we're the exact same
             return self.terms == other.terms and self.join == other.join
@@ -347,6 +461,8 @@ class ConditionResolved:
         else:
             if other_mondo := other.mondo_term:
                 if self_mondo := self.mondo_term:
+                    if other_mondo.index == 1:
+                        return 99  # MOND:000001 is always going to be an ancestor
                     descendant_relationships = OntologySnake.check_if_ancestor(descendant=self_mondo,
                                                                                ancestor=other_mondo)
                     return bool(descendant_relationships)
@@ -368,7 +484,7 @@ class ConditionResolved:
             if not more_general.is_multi_condition and \
                     resolved_1.single_term.ontology_service != resolved_2.single_term.ontology_service:
                 if mondo_term := more_general.mondo_term:
-                    more_general = ConditionResolved(terms=[mondo_term])
+                    more_general = ConditionResolved.from_uncounted_terms(terms=[mondo_term])
             return more_general
 
         return None
@@ -426,6 +542,7 @@ class ConditionResolved:
                 "sort_text": ", ".join(pt.lower() for pt in self.plain_text) if self.plain_text else None
             }
         return jsoned
+
 
     @cached_property
     def join_text(self) -> Optional[str]:
@@ -553,14 +670,14 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                                             default=AlleleOriginBucket.GERMLINE)
     """ Used to cache if we consider this classification germline or somatic """
 
-    condition_resolution = models.JSONField(null=True, blank=True)  # of type ConditionProcessedDict
+    condition_resolution = models.JSONField(null=True, blank=True)  # of type ConditionResolvedDict
 
     summary = models.JSONField(null=False, blank=True, default=dict)  # useful for overall classification details
-    """ Will be a ClassificationSummaryCacheDict """
 
     @property
-    def summary_typed(self) -> ClassificationSummaryCacheDict:
-        return self.summary
+    def summary_obj(self) -> 'ClassificationSummaryCacheObj':
+        from classification.models import ClassificationSummaryCacheObj
+        return ClassificationSummaryCacheObj.from_dict_safe(self.summary)
 
     last_source_id = models.TextField(blank=True, null=True)
     last_import_run = models.ForeignKey(ClassificationImportRun, null=True, blank=True, on_delete=SET_NULL)
@@ -574,7 +691,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             models.Index(fields=["modified"]),
             models.Index(models.F("summary__pathogenicity__sort"), name="summary__p_sort_idx"),
             models.Index(models.F("summary__somatic__sort"), name="summary__s_sort_idx"),
-            models.Index(models.F("summary__date__value"), name="summary__d_sort_idx")
+            models.Index(models.F("summary__date__date"), name="summary__d_sort_idx")
         ]
 
     @classmethod
@@ -611,6 +728,27 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             title=title,
             summary_extra=extras
         )
+
+    @property
+    def testing_context_bucket(self) -> TestingContextBucket:
+        """
+        Runs off the ClassificationSummary
+        """
+        from classification.models import ClassificationSummaryCacheObj
+        summary_obj: ClassificationSummaryCacheObj = self.summary_obj
+        if bucket := summary_obj.somatic.testing_context_bucket:
+            return TestingContextBucket(bucket)
+        else:
+            return TestingContextBucket.GERMLINE
+
+    @property
+    def tumor_type_category(self) -> Optional[str]:
+        """
+        Runs off the ClassificationSummary
+        """
+        from classification.models import ClassificationSummaryCacheObj
+        summary_obj: ClassificationSummaryCacheObj = self.summary_obj
+        return summary_obj.somatic.tumor_type_category
 
     @staticmethod
     def is_supported_transcript(transcript_or_hgvs: str):
@@ -790,8 +928,8 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         if self.can_write(user):
             return FlagPermissionLevel.OWNER
 
-        # view permission is on the modification (not the variant classification)
-        # but maybe it should be on both ?
+        # view permission is on the modification (not the classification)
+        # but maybe it should be on both?
         lp = self.last_published_version
         if lp and lp.can_view(user):
             return FlagPermissionLevel.USERS
@@ -969,16 +1107,13 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
     def filter_for_user(cls, user: User, queryset: Optional[QuerySet] = None, **kwargs) -> QuerySet:
         """ Classification only has write permission, View is based on a version in a point at time
             see ClassificationModification's read permission """
-        if not (user and user.is_authenticated):
-            return cls.objects.none()
+        klass = queryset if queryset is not None else cls
 
-        # Off the bare model - Guardian embeds a queryset it is handed into both permission lookups
-        # (@see GuardianPermissionsMixin._permitted_for_user_qs)
-        permitted_qs = get_objects_for_user(user, cls.get_write_perm(), klass=cls, accept_global_perms=True)
-        if queryset is None:
-            return permitted_qs
-        if permitted_qs.query.has_filters():
-            return queryset.filter(pk__in=permitted_qs.values("pk"))
+        if user and user.is_authenticated:
+            queryset = get_objects_for_user(user, cls.get_write_perm(), klass=klass, accept_global_perms=True)
+        else:
+            queryset = cls.objects.none()
+
         return queryset
 
     @staticmethod
@@ -1057,7 +1192,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                                       initial_data=True,
                                       # revalidate all - so validations that only occur when specific fields change will still fire
                                       # even if no values are provided for that field, handy if there's validation that requires
-                                      # at least 1 of 2 fields to be present for example
+                                      # at least 1 of 2 fields to be present for the example
                                       revalidate_all=True)
         if save:
             try:
@@ -1221,7 +1356,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
     @cached_property
     def evidence_keys(self) -> EvidenceKeyMap:
         # note that this should be invalidated if the config changes (which would happen if
-        # assertion method is updated for example)
+        # assertion method is updated for the example)
         return EvidenceKeyMap.instance().with_overrides(self.evidence_key_overrides)
 
     def process_entry(self, cell: VCDataCell, source: str):
@@ -1270,7 +1405,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 # if the array is empty, treat that as a null value
                 value = None
             elif e_key.value_type != EvidenceKeyValueType.MULTISELECT and len(value) == 1:
-                # if we're not a multi-select key, and we have an array with 1 value in it
+                # if we're not a multi-select key, and we have an array with 1 value in it.
                 # use that 1 value
                 value = value[0]
 
@@ -1295,7 +1430,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 else:
                     pass
 
-            # normalise booleans if it's un-ambiguous what the value is meant to be
+            # normalise booleans if it's unambiguous what the value is meant to be,
             # otherwise leave the value as is to be caught by validation
             elif e_key.value_type == EvidenceKeyValueType.BOOLEAN:
                 if isinstance(value, list) and len(value) == 1:
@@ -1580,7 +1715,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         key_dict: EvidenceKeyMap = self.evidence_keys
 
         use_evidence = VCDataDict(copy.deepcopy(self.evidence),
-                                  evidence_keys=self.evidence_keys)  # deep copy so don't accidentally mutate the data
+                                  evidence_keys=self.evidence_keys)  # deep copy so we don't accidentally mutate the data
 
         patch = VCDataDict(data=EvidenceMixin.to_patch(patch),
                            evidence_keys=self.evidence_keys)  # the patch we're going to apply on-top of the evidence
@@ -1641,7 +1776,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                         gene_symbol_cell.value = gene_symbol
 
                     elif not gene_symbol and gene_symbol_cell.value:
-                        # if gene symbol provided (but not in c.hgvs) inject it into it
+                        # if gene symbol provided (but not in c.HGVS) inject it into it
                         c_parts = c_parts.with_gene_symbol(gene_symbol_cell.value)
                         c_parts_cell.value = c_parts.full_hgvs
 
@@ -1659,7 +1794,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             for key in use_evidence.keys():
                 if key not in patch:
                     patch[key].wipe(WipeMode.SET_NONE)
-            # when making a new classification ensure we trigger mandatory fields
+            # when making a new classification record, ensure we trigger mandatory fields
             for e_key in key_dict.mandatory():
                 if e_key not in patch:
                     patch[e_key].wipe(WipeMode.SET_EMPTY)
@@ -1929,6 +2064,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 if validations is not None:
                     if not isinstance(validations, list):
                         validations = [validations]  # just required to not blow up on legacy
+                    validations: list[dict]
                     for validation in validations:
                         if validation.get('severity') == 'error':
                             return True
@@ -2101,20 +2237,10 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
 
     @staticmethod
     def get_classifications_qs(user: User, clinical_significance_list: Iterable[str] = None,
-                               lab_list: Iterable[Lab] = None,
-                               somatic_clinical_significance_list: Iterable[str] = None,
-                               allele_origin_buckets: Optional[set[AlleleOriginBucket]] = None) -> QuerySet:
-        """ clinical_significance_list / somatic_clinical_significance_list are ORed together - a
-            record matches if either its germline or somatic clinical significance is in its list """
-        cm_qs = ClassificationModification.latest_for_user(user, published=True,
-                                                           allele_origin_buckets=allele_origin_buckets)
-        cs_q = Q()
+                               lab_list: Iterable[Lab] = None) -> QuerySet:
+        cm_qs = ClassificationModification.latest_for_user(user, published=True)
         if clinical_significance_list:
-            cs_q |= Q(clinical_significance__in=clinical_significance_list)
-        if somatic_clinical_significance_list:
-            cs_q |= Q(classification__summary__somatic__clinical_significance__in=list(somatic_clinical_significance_list))
-        if cs_q:
-            cm_qs = cm_qs.filter(cs_q)
+            cm_qs = cm_qs.filter(clinical_significance__in=clinical_significance_list)
         qs = Classification.objects.filter(pk__in=cm_qs.values('classification'))
         if lab_list:
             qs = qs.filter(lab__in=lab_list)
@@ -2123,14 +2249,10 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
     @staticmethod
     def get_variant_q(user: User, genome_build: GenomeBuild,
                       clinical_significance_list: Iterable[str] = None,
-                      lab_list: Iterable[Lab] = None,
-                      somatic_clinical_significance_list: Iterable[str] = None,
-                      allele_origin_buckets: Optional[set[AlleleOriginBucket]] = None) -> Q:
+                      lab_list: Iterable[Lab] = None) -> Q:
         """ returns a Q object filtering variants to those with a PUBLISHED classification
             (optionally classification in clinical_significance_list """
-        vc_qs = Classification.get_classifications_qs(user, clinical_significance_list, lab_list,
-                                                      somatic_clinical_significance_list=somatic_clinical_significance_list,
-                                                      allele_origin_buckets=allele_origin_buckets)
+        vc_qs = Classification.get_classifications_qs(user, clinical_significance_list, lab_list)
         return Classification.get_variant_q_from_classification_qs(vc_qs, genome_build)
 
     @staticmethod
@@ -2315,6 +2437,7 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
             except ValueError:
                 pass
             return HGVSDisplay.parse(c_hgvs, genome_build=genome_build)
+        return None
 
     @property
     def allele_origin_bucket_obj(self) -> AlleleOriginBucket:
@@ -2341,7 +2464,7 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
         if cr_obj := self.classification.condition_resolution_obj:
             return cr_obj
         else:
-            return ConditionResolved(terms=[], plain_text=self.get(SpecialEKeys.CONDITION))
+            return ConditionResolved.from_uncounted_terms(terms=[], plain_text_terms=[self.get(SpecialEKeys.CONDITION)])
 
     @staticmethod
     def column_name_for_build(genome_build: GenomeBuild, suffix: str = 'c_hgvs'):
@@ -2872,44 +2995,6 @@ class ClassificationConsensus:
         return patch
 
 
-class ClassificationDateType(StrEnum):
-    CURATION = ""  # default
-    VERIFIED = "Verified"
-    SAMPLE_DATE = "Sample Date"
-    CREATED = "Created"
-
-
-@dataclass(frozen=True)
-class ClassificationDate:
-    date_type: ClassificationDateType
-    datetime: Optional[datetime] = None
-    date: Optional[date] = None
-
-    def __post_init__(self):
-        if not self.date and not self.datetime:
-            raise ValueError("Either datetime or date must be provided")
-
-    @property
-    def name(self):
-        return self.date_type.value
-
-    @property
-    def value(self) -> Union[date, datetime]:
-        if self.date:
-            return self.date
-        return self.datetime
-
-    @property
-    def date_str(self) -> str:
-        return Classification.to_date_str(self.value)
-
-    def __lt__(self, other: 'ClassificationDate'):
-        if self.datetime and other.datetime:
-            return self.datetime < other.datetime
-        else:
-            return (self.date or date.min) < (other.date or date.min)
-
-
 CLASSIFICATION_DATE_REGEX = re.compile(r"(?P<year>[0-9]{4})-(?P<month>[0-9]{2})-(?P<day>[0-9]{2})")
 
 
@@ -2923,33 +3008,49 @@ class CuratedDate:
     def __init__(self, modification: ClassificationModification):
         self._modification = modification
 
+    @property
+    def to_effective_date(self):
+        return EffectiveDate(
+            date=self.relevant_date.date_str,
+            date_type=EffectiveDateType.from_classification_date_type(self.relevant_date.date_type)
+        )
+
     @cached_property
     def timezone(self):
         return gettz(settings.TIME_ZONE)
 
     def convert_date(self, evidence_key) -> Optional[date]:
         if date_str := self._modification.get(evidence_key):
-            if m := CLASSIFICATION_DATE_REGEX.match(date_str):
-                try:
-                    return date(year=int(m.group("year")), month=int(m.group("month")), day=int(m.group("day")))
-                except ValueError:
-                    # an invalid date should already cause a warning on the classification form
-                    pass
+            return CuratedDate.convert_classification_date_str(date_str)
+        return None
+
+    @staticmethod
+    def convert_classification_date_str(date_str: str) -> Optional[date]:
+        if m := CLASSIFICATION_DATE_REGEX.match(date_str):
+            try:
+                return date(year=int(m.group("year")), month=int(m.group("month")), day=int(m.group("day")))
+            except ValueError:
+                # an invalid date should already cause a warning on the classification form
+                pass
+        return None
 
     @cached_property
     def curation_date(self) -> Optional[ClassificationDate]:
         if date_val := self.convert_date(SpecialEKeys.CURATION_DATE):
             return ClassificationDate(date_type=ClassificationDateType.CURATION, date=date_val)
+        return None
 
     @cached_property
     def curated_verified_date(self) -> Optional[ClassificationDate]:
         if date_val := self.convert_date(SpecialEKeys.CURATION_VERIFIED_DATE):
             return ClassificationDate(date_type=ClassificationDateType.VERIFIED, date=date_val)
+        return None
 
     @cached_property
     def sample_date(self) -> Optional[ClassificationDate]:
         if date_val := self.convert_date(SpecialEKeys.SAMPLE_DATE):
             return ClassificationDate(date_type=ClassificationDateType.SAMPLE_DATE, date=date_val)
+        return None
 
     @cached_property
     def created_date(self) -> ClassificationDate:

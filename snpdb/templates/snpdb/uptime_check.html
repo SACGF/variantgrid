@@ -15,7 +15,7 @@
                 {% for uptime_check in uptime_response.uptime_checks %}
                     <tr>
                         <td>{{ uptime_check.name }}</td>
-                        <td>{{ uptime_check.status.severity | severity_icon }}{{ uptime_check.status.pretty_label }}</td>
+                        <td>{{ uptime_check.status.severity | severity_icon }}{{ uptime_check.status.pretty_label }} {% if uptime_check.note %} - {{ uptime_check.note }}{% endif %}</td>
                     </tr>
                 {% endfor %}
                 </tbody>

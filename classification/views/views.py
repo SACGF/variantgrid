@@ -20,6 +20,7 @@ from django.http.response import HttpResponse, HttpResponseBase, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.timezone import now
+from django.views.decorators.cache import cache_page
 from django.views.decorators.http import require_http_methods, require_POST
 from django.views.generic import TemplateView
 from drf_spectacular.types import OpenApiTypes
@@ -47,11 +48,10 @@ from classification.enums import (
     LabExternalFilter,
     ShareLevel,
     SpecialEKeys,
-    WithdrawReason,
+    WithdrawReason, OverlapStatus, OverlapType, TestingContextBucket,
 )
 from classification.forms import ClassificationAlleleOriginForm
 from classification.models import (
-    AlleleGrouping,
     AlleleOriginGrouping,
     Classification,
     ClassificationAttachment,
@@ -66,7 +66,7 @@ from classification.models import (
     GeneConsensusGroup,
     ImportedAlleleInfo,
     ImportedAlleleInfoStatus,
-    ReportNames,
+    ReportNames, OverlapContribution, OverlapContributionNextStep, Overlap,
 )
 from classification.models.classification import (
     COPY_SCOPES_ALL,
@@ -77,7 +77,11 @@ from classification.models.classification_import_run import ClassificationImport
 from classification.models.clinical_context_models import ClinicalContext
 from classification.models.evidence_key import EvidenceKeyMap
 from classification.models.flag_types import classification_flag_types
+from classification.services.public_summary_data import ClassificationPublicSummaryData
 from classification.tasks.classification_create_tasks import populate_new_classification_task
+from classification.services.public_summary_data import ClassificationPublicSummaryData
+from classification.tasks.classification_create_tasks import populate_new_classification_task
+from classification.services.public_summary_data import ClassificationPublicSummaryData
 from classification.views.classification_dashboard_view import ClassificationDashboard
 from classification.views.classification_datatables import ClassificationColumns
 from classification.views.exports import (
@@ -527,6 +531,9 @@ def view_classification(request: HttpRequest, classification_id: str):
 
     vc: Classification = ref.record
 
+    # see if there are pending values
+    # classification_grouping = ClassificationGroupingEntry.grouping_for(vc)
+
     context = {
         'vc': vc,
         'record': record,
@@ -583,11 +590,13 @@ def view_classification_diff(request):
         if vc.can_write(request.user) and vc.last_published_version.id != vc.last_edited_version.id:
             records.insert(0, vc.last_edited_version)
 
+    # TODO remove this once new discordance is in place
     elif clinical_context_str := request.GET.get('clinical_context'):
         cc = ClinicalContext.objects.get(pk=clinical_context_str)
         records = cc.classification_modifications
         records.sort(key=lambda cm: cm.curated_date_check, reverse=True)
 
+    # TODO remove this once new discordance is in place
     elif discordance_report_str := request.GET.get('discordance_report'):
         dr = DiscordanceReport.objects.get(pk=discordance_report_str)
         dr.check_can_view(request.user)
@@ -604,9 +613,14 @@ def view_classification_diff(request):
 
     elif allele_id_str := request.GET.get('allele'):
         allele_id = int(allele_id_str)
+        allele_origin_grouping = ClassificationGrouping.objects.filter(allele_origin_grouping__allele=allele_id)
+        if allele_origin_str := request.GET.get('allele_origin'):
+            allele_origin_grouping = allele_origin_grouping.filter(allele_origin_grouping__allele_origin_bucket=AlleleOriginBucket(allele_origin_str))
+        if testing_context_str := request.GET.get('testing_context'):
+            allele_origin_grouping = allele_origin_grouping.filter(allele_origin_grouping__testing_context_bucket=TestingContextBucket(testing_context_str))
+
+        allele_origin_grouping = ClassificationGrouping.filter_for_user(user=request.user, qs=allele_origin_grouping)
         if request.GET.get('latest'):
-            allele_origin_grouping = ClassificationGrouping.objects.filter(allele_origin_grouping__allele_grouping__allele=allele_id)
-            allele_origin_grouping = ClassificationGrouping.filter_for_user(user=request.user, qs=allele_origin_grouping)
             record_ids = allele_origin_grouping.values_list(
                 "latest_classification_modification", flat=True
             )
@@ -614,9 +628,10 @@ def view_classification_diff(request):
             records.sort(key=lambda cm: cm.curated_date_check, reverse=True)  # probably sorting by lab or allele origin makes more sense here
 
         else:
-            compare_all = list(ClassificationModification.latest_for_user(user=request.user, allele=Allele.objects.get(pk=allele_id), published=True))
-            compare_all.sort(key=lambda cm: cm.curated_date_check, reverse=True)
-            records = compare_all
+            records = []
+            for allele_origin_group in allele_origin_grouping:
+                records.extend(allele_origin_group.classification_modifications)
+            records.sort(key=lambda cm: cm.curated_date_check, reverse=True)
 
     elif allele_origin_grouping_str := request.GET.get("allele_origin_grouping"):
         allele_origin_grouping = AlleleOriginGrouping.objects.get(pk=int(allele_origin_grouping_str))
@@ -626,6 +641,10 @@ def view_classification_diff(request):
             "latest_classification_modification", flat=True
         )
         records = ClassificationModification.objects.filter(pk__in=record_ids)
+
+    elif overlap_str := request.GET.get("overlap"):
+        overlap = Overlap.objects.get(pk=int(overlap_str))
+        records = [oc.classification_grouping.latest_classification_modification for oc in overlap.contributions.filter(classification_grouping__isnull=False).select_related('classification_grouping')]
 
     elif cids := request.GET.get('cids'):
         records = [ClassificationModification.latest_for_user(user=request.user, classification=cid, published=True).first() for cid in [cid.strip() for cid in cids.split(',')]]
@@ -1082,19 +1101,24 @@ def clin_sig_change_data(request):
     return response
 
 
-def allele_groupings(request, lab_id: Optional[Union[str, int]] = None):
-    lab_picker = LabPickerData.from_request(request, lab_id, 'allele_groupings_lab')
-    return render(request, 'classification/allele_groupings.html', {
-        "dlab": ClassificationDashboard(lab_picker=lab_picker)
-    })
-
-
 def view_classification_grouping_detail(request, classification_grouping_id: int):
     grouping = get_object_or_404(ClassificationGrouping.objects.select_related('latest_allele_info'),
                                  pk=classification_grouping_id)
     grouping.check_can_view(request.user)
+
+    contributions = OverlapContribution.objects.filter(classification_grouping=grouping)
+    skews = OverlapContributionNextStep.objects.filter(contribution__in=contributions)
+    # not showing cross context overlaps as that's just confusing
+    overlaps = list(sorted(Overlap.objects.filter(
+        valid=True,
+        overlap_status__gt=OverlapStatus.SINGLE_SUBMITTER,
+        overlap_type=OverlapType.SINGLE_CONTEXT,
+        pk__in=skews.values_list('overlap')
+    )))
+
     return render_ajax_view(request, 'classification/classification_grouping_detail.html', {
-        "classification_grouping": grouping
+        "classification_grouping": grouping,
+        "overlaps": overlaps
     })
 
 
@@ -1107,39 +1131,10 @@ def view_classification_grouping_records_detail(request, classification_grouping
     })
 
 
-@dataclass(frozen=True)
-class AlleleOriginGroupingVisible:
-    allele_origin_grouping: list[AlleleOriginGrouping]
-    classification_groupings: list[ClassificationGrouping]
-    discordance_reports: list[DiscordanceReport]
-
-    @staticmethod
-    def from_grouping(allele_grouping: AlleleGrouping, user: User) -> list['AlleleOriginGroupingVisible']:
-        # FIXME add security checks to filter out
-
-        visible_groups: list[AlleleOriginGroupingVisible] = []
-        for bucket in [AlleleOriginBucket.GERMLINE, AlleleOriginBucket.SOMATIC, AlleleOriginBucket.UNKNOWN]:
-            if allele_origin_grouping := allele_grouping.allele_origin_dict.get(bucket):
-
-                discordance_reports = list(DiscordanceReport.objects.filter(
-                    clinical_context__in=ClinicalContext.objects.filter(allele=allele_grouping.allele,
-                                                                        allele_origin_bucket=bucket)
-                ).order_by('-report_started_date'))
-
-                visible_groups.append(
-                    AlleleOriginGroupingVisible(
-                        allele_origin_grouping=allele_origin_grouping,
-                        classification_groupings=sorted(allele_origin_grouping.classificationgrouping_set.all()),
-                        discordance_reports=discordance_reports
-                    )
-                )
-        return visible_groups
-
-
-def view_allele_grouping_detail(request, allele_grouping_id: int):
-    allele_grouping = AlleleGrouping.objects.get(pk=allele_grouping_id)
-
-    return render_ajax_view(request, 'classification/allele_grouping_detail.html', {
-        "allele_grouping": allele_grouping,
-        "groupings": AlleleOriginGroupingVisible.from_grouping(allele_grouping=allele_grouping, user=request.user)
+@login_not_required
+@cache_page(60 * 60)
+def view_public_info(request):
+    return render(request, 'classification/public_summary_data.html', {
+        "data": ClassificationPublicSummaryData(),
+        "contributors": request.GET.get("contributors") != "False"
     })

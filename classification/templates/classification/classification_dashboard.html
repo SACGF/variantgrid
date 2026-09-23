@@ -19,7 +19,8 @@
 <script>
     // for showing issues
     function classificationReviews(data) {
-        data.flags = JSON.stringify(['classification_pending_changes', 'classification_internal_review', 'classification_suggestion']);
+        // data.flags = JSON.stringify(['classification_pending_changes', 'classification_internal_review', 'classification_suggestion']);
+        data.pending = "true";
         data.labs = {{ dlab.lab_ids_str | jsonify }};
     }
 
@@ -112,6 +113,30 @@
         {% endlabelled %}
     {% endif %}
 
+    {% if 'overlaps'|is_view_enabled %}
+        {% page_help_embedded title="Discordant Overlaps Awaiting Triage" %}
+            <p>Below are the overlaps where your lab has a triage pending.</p>
+        {% end_page_help_embedded %}
+        <p><a href="{% url 'overlaps' %}" class="hover-link">Click here</a> to see all overlaps your lab is involved in.</p>
+
+        <script>
+        function overlapsGroupingFilter(data) {
+            data.skew_status = 'TT';
+            data.lab_selection = {{ dlab.lab_picker.selection | jsonify }};
+        }
+        </script>
+
+        <table
+           data-datatable-data='overlapsGroupingFilter'
+           data-datatable-url="{% url 'overlaps_datatables' %}"
+           class="sticky-header thick-border"
+           id="overlaps-table"
+           data-adjust-columns="false">
+        </table>
+        
+    {% endif %}
+
+    {% comment %}
     {% if 'discordance_report'|is_view_enabled %}
         {% page_help_embedded title="Discordance Reports Awaiting Triage" %}
             <p>Below is a sample of discordances where your lab has a triage pending.</p>
@@ -120,7 +145,7 @@
             <div class="loading-message" style="height:381px">Loading...</div>
         </div>
     {% endif %}
-
+    {% endcomment %}
 
     {% page_help_embedded title="Flagged Classification Records" %}
         <p>
@@ -133,7 +158,6 @@
     {% end_page_help_embedded %}
 
     {% labelled hint="tiny" label="Records with Pending Changes" %}{{ dlab.counts.pending_changes | number:'W' }}{% endlabelled %}
-    {% labelled hint="tiny" label="Records in Internal Review" %}{{ dlab.counts.internal_review | number:'W' }}{% endlabelled %}
     {% labelled hint="tiny" label="Records with Outstanding Assertion Changes" %}{{ dlab.counts.significance_change | number:'W' }}{% endlabelled %}
     {% labelled hint="tiny" label="Records Excluded from ClinVar" %}{{ dlab.counts.clinvar_exclude | number }}{% endlabelled %}
     <hr/>

@@ -135,10 +135,8 @@ Patterns here:
   row already has the tag: whose a tagging is makes "already tagged" a per-proband question, and a second click is a
   no-op (#1888).
 - A resolved tagging is hidden from the work lists: the tags node (`TagNode.include_resolved`, off by default), the
-  variant page's tag list and the variant tags page. `TagConfigCollection.show_resolved_variant_tags` shows them - read
-  from the user's tag config like tag colours (`variantopedia/grids.py:show_resolved_variant_tags`), which a page's
-  "Show resolved" checkbox flips for a look via the `show_resolved` param (never stored); a tag node copies it only
-  when created, so existing nodes keep their setting (#1901). They all filter with
+  variant page's tag list and the variant tags page (both on `UserGridConfig.show_hidden_data` under grid name
+  `Variant Tags`, shown as a "Show resolved" checkbox). They all filter with
   `analysis/models/models_variant_tag.py:VariantTag.unresolved_q` - the SQL twin of `is_resolved` - never a bare
   `resolved__isnull=True`. The analysis grid keeps the pill, since clicking it is how a tag is removed, and draws it
   as done. Tag stats and the analyses list pills are history and count everything.

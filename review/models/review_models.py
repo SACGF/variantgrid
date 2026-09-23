@@ -1,8 +1,8 @@
 import logging
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Union
-
+from typing import Union, Type
+import json
 import django.dispatch
 from django.contrib.auth.models import Group, User
 from django.core.exceptions import PermissionDenied
@@ -142,7 +142,7 @@ class ReviewedObject(TimeStampedModel):
 
         # ._source_object could be set either via getting FlagInfo (via a hook)
         # or by us directly going through the
-        foreign_sets = [m for m in dir(self) if m.endswith('_set') and not m.startswith('reviews') and not m.startswith("_")]
+        foreign_sets = [m for m in dir(self) if m.endswith('_set') and m != "review_set" and not m.startswith("_")]
         for foreign_set in foreign_sets:
             try:
                 source_object = getattr(self, foreign_set).first()
@@ -154,6 +154,9 @@ class ReviewedObject(TimeStampedModel):
         logging.warning('Could not find source object for Review %s', self.id)
 
         raise ValueError(f"Review {self.pk} does not appear to be attached to an object")
+
+    def __str__(self) -> str:
+        return f"Reviewing {self.source_object}"
 
 
 @dataclass
@@ -251,6 +254,7 @@ class Review(TimeStampedModel):
     def post_review_data_formatted(self) -> str:
         for caller, result in review_detail_signal.send(sender=self.reviewing.source_object.__class__, instance=self):
             return result
+        return json.dumps(self.post_review_data)
 
     def complete_with_data_and_save(self, data: dict):
         self.post_review_data = data
@@ -286,9 +290,15 @@ class ReviewableModelMixin(models.Model):
 
     def reviews_all(self) -> QuerySet[Review]:
         if reviews := self.reviews:
-            return reviews.review_set.order_by('-review_date').all()
+            return reviews.review_set.order_by('review_date', 'created').all()
         else:
             return Review.objects.none()
+
+    @cached_property
+    def has_reviews(self) -> bool:
+        if reviews := self.reviews:
+            return reviews.review_set.exists()
+        return False
 
     @property
     def is_review_locked(self) -> bool:

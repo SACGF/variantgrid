@@ -66,6 +66,9 @@ nav.navbar a.nav-link {
     }
 }
 .nav-side-bar a.nav-link {
+    line-height: 1.3rem !important;
+    margin-top: 5px;
+    margin-bottom: 5px;
     color: #444 !important;
     &:hover {
         color: #000 !important;

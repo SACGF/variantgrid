@@ -13,7 +13,7 @@ from django.http.response import HttpResponse, HttpResponseBase
 from django.shortcuts import redirect, render
 from django.urls import reverse
 
-from classification.enums import SpecialEKeys
+from classification.enums import SpecialEKeys, TestingContextBucket, ClassificationResultValue
 from classification.enums.discordance_enums import (
     ContinuedDiscordanceReason,
     DiscordanceReportResolution,
@@ -25,9 +25,9 @@ from classification.models import (
     ClinicalContextChangeData,
     ClinicalContextRecalcTrigger,
     DiscordanceReportClassification,
-    EvidenceKeyMap,
+    ClassificationFlagTypes, ClinicalContextChangeData, ClinicalContextRecalcTrigger, Overlap, OverlapType, \
     classification_flag_types,
-    discordance_change_signal,
+    discordance_change_signal, EvidenceKeyMap,
 )
 from classification.models.classification_groups import (
     ClassificationGroups,
@@ -52,21 +52,7 @@ from uicore.views.ajax_form_view import LazyRender
 
 
 def discordance_reports_view(request: HttpRequest, lab_id: Optional[str] = None) -> HttpResponseBase:
-    lab_picker = LabPickerData.from_request(request=request, selection=lab_id, view_name='discordance_reports')
-    if redirect_response := lab_picker.check_redirect():
-        return redirect_response
-
-    return render(request, "classification/discordance_reports.html", {
-        "dlab": ClassificationDashboard(lab_picker=lab_picker)
-    })
-
-
-def discordance_reports_active_detail(request: HttpRequest, lab_id: Optional[str] = None) -> HttpResponseBase:
-    lab_picker = LabPickerData.from_request(request=request, selection=lab_id)
-
-    return render(request, "classification/discordance_reports_active_detail.html", {
-        "dlab": ClassificationDashboard(lab_picker=lab_picker)
-    })
+    return redirect(reverse('overlaps'))
 
 
 def discordance_reports_history_detail(request: HttpRequest, lab_id: Optional[str] = None) -> HttpResponseBase:
@@ -145,7 +131,9 @@ class DiscordanceReportTemplateData:
 
     @property
     def is_user_editable(self):
-        return self.report.can_view(self.user) and self.latest_for_allele_if_not_this is None
+        # DISCORDANCE-DEPRECATION
+        return False
+        # return self.report.can_view(self.user) and self.latest_for_allele_if_not_this is None
 
     @property
     def clinical_context(self) -> ClinicalContext:
@@ -360,6 +348,16 @@ def discordance_report_view(request: HttpRequest, discordance_report_id: int) ->
         "data": data,
         "buckets": EvidenceKeyMap.clinical_significance_to_bucket()
     }
+
+    # migration to overlaps
+    overlap = Overlap.objects.filter(
+        overlap_type=OverlapType.SINGLE_CONTEXT,
+        value_type=ClassificationResultValue.ONC_PATH,
+        allele=data.report.clinical_context.allele,
+        testing_context_bucket=TestingContextBucket.GERMLINE
+    ).first()
+    context["overlap"] = overlap
+    #
 
     return render(request, "classification/discordance_report.html", context)
 

@@ -62,7 +62,6 @@ from variantopedia import forms
 from variantopedia.grids import (
     VariantTagsColumns,
     filter_unresolved_variant_tags,
-    show_resolved_variant_tags,
     variant_tags_for_user,
 )
 from variantopedia.interesting_nearby import (
@@ -124,7 +123,7 @@ def variant_tag_detail(request, variant_id, tag):
     variant = get_object_or_404(Variant, pk=variant_id)
     tag = get_object_or_404(Tag, pk=tag)
     # Same taggings as the counts grid this expands from - the tag may sit on another build of the allele
-    if not variant_tags_for_user(variant, request).filter(tag=tag).exists():
+    if not variant_tags_for_user(variant, request.user).filter(tag=tag).exists():
         raise PermissionDenied
     context = {
         "variant": variant,
@@ -257,7 +256,7 @@ def view_variant_annotation_history(request, variant_id):
 def variant_tags(request, genome_build_name=None):
     genome_build = UserSettings.get_genome_build_or_default(request.user, genome_build_name)
     # The counts and the grids below are one work list, so they hide resolved to-dos together
-    tags_qs = filter_unresolved_variant_tags(VariantTag.objects.all(), request)
+    tags_qs = filter_unresolved_variant_tags(VariantTag.objects.all(), request.user)
     variant_tags_qs = VariantTag.get_for_build(genome_build, tags_qs=tags_qs)
     tag_counts = sorted(get_field_counts(variant_tags_qs, "tag").items())
     month_ago = localtime() - timedelta(days=30)
@@ -283,7 +282,6 @@ def variant_tags(request, genome_build_name=None):
                "initial_tags": request.GET.getlist("tag"),
                # User to start the grids filtered on - @see user page tags card
                "filter_user": filter_user,
-               "show_resolved_tags": show_resolved_variant_tags(request),
                "user_form": UserSelectForm()}
     return render(request, 'variantopedia/variant_tags.html', context)
 
@@ -444,7 +442,6 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
         "genes_canonical_transcripts": genes_canonical_transcripts,
         "genome_build": genome_build,
         "has_tags": has_tags,
-        "show_resolved_tags": show_resolved_variant_tags(request),
         "hgvs_g": hgvs_g,
         "latest_annotation_version": latest_annotation_version,
         "modified_normalised_variants": modified_normalised_variants,

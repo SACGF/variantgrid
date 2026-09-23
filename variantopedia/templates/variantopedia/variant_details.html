@@ -22,16 +22,8 @@
 {% render_tag_styles_and_formatter %}
 <script type="text/javascript">
 
-// Starts from the tag config, the checkbox above the tags grid flips it for this page only
-// var not const - the analysis editor loads this page's scripts into the same document each time
-var SHOW_RESOLVED_TAGS = {{ show_resolved_tags|jsonify }};
-
-function variantTagsShowResolvedFilter(data) {
-    data["show_resolved"] = SHOW_RESOLVED_TAGS;
-}
-
 function viewTagDetail(tag) {
-    return Urls.variant_tag_detail({{ variant.pk }}, tag) + "?show_resolved=" + SHOW_RESOLVED_TAGS;
+    return Urls.variant_tag_detail({{ variant.pk }}, tag);
 }
 
 
@@ -599,21 +591,8 @@ function applyVariantValues() {
 
         <div id="variant-tags-datatable-wrapper" class="{% if not has_tags %}hidden{% endif %}">
             {% tag_config_collection_link %}
-            <div class="form-check m-2">
-                <label class="form-check-label">
-                    <input id="show-resolved-variant-tags" class="form-check-input" type="checkbox"
-                           {% if show_resolved_tags %}checked{% endif %} />
-                    Show resolved
-                </label>
-            </div>
-            <script>
-                $("#show-resolved-variant-tags").change(function() {
-                    SHOW_RESOLVED_TAGS = $(this).is(":checked");
-                    $('#variant-tags-datatable').DataTable().ajax.reload();
-                });
-            </script>
-            <table id="variant-tags-datatable" class="sticky-header" data-datatable-responsive="true" data-datatable-url="{% url 'variant_tag_counts_datatable' variant.pk %}"
-                   data-datatable-data="variantTagsShowResolvedFilter"></table>
+            {% datatable_user_data_filter 'variant-tags-datatable' 'Variant Tags' group_data=False hidden_data=True hidden_label="Show resolved" %}
+            <table id="variant-tags-datatable" class="sticky-header" data-datatable-responsive="true" data-datatable-url="{% url 'variant_tag_counts_datatable' variant.pk %}"></table>
         </div>
 
         {% if view_variant %}

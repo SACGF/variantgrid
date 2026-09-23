@@ -28,7 +28,7 @@ from classification.models import (
     EvidenceKeyMap,
     classification_flag_types,
     classification_post_publish_signal,
-    flag_types,
+    flag_types, ConditionReference,
 )
 from classification.models.condition_text_search import condition_text_search
 from flags.models import Flag, FlagComment, FlagResolution, flag_comment_action
@@ -458,7 +458,10 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
         """
         if terms := self.condition_xref_terms:
 
-            condition_resolved_obj = ConditionResolved(terms=_sort_terms(terms), join=None if len(terms) <= 1 else MultiCondition(self.condition_multi_operation))
+            condition_resolved_obj = ConditionResolved(
+                references=[ConditionReference(term) for term in _sort_terms(terms)],
+                join=None if len(terms) <= 1 else MultiCondition(self.condition_multi_operation)
+            )
             return condition_resolved_obj.to_json()
 
         return None

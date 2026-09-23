@@ -154,7 +154,7 @@ def classifications_needing_rehoming(classification_qs: QuerySet[Classification]
     if classification_qs is None:
         classification_qs = Classification.objects.all()
 
-    grouping_allele = "classificationgroupingentry__grouping__allele_origin_grouping__allele_grouping__allele"
+    grouping_allele = "classificationgroupingentry__grouping__allele_origin_grouping__allele"
     wrong_clinical_context = Q(clinical_context__isnull=False) & ~Q(clinical_context__allele=F("allele"))
     wrong_grouping = Q(classificationgroupingentry__isnull=False) & ~Q(**{grouping_allele: F("allele")})
     return classification_qs.filter(allele__isnull=False) \

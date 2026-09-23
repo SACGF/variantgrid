@@ -13,7 +13,7 @@
             <label class="form-check-label">
                 <input class="form-check-input" type="checkbox" data-filter-level="hidden"
                        {% if user_grid_config.show_hidden_data %}checked{% endif %} />
-                Show Hidden Data
+                {{ hidden_label }}
             </label>
         </div>
     {% endif %}
@@ -28,7 +28,13 @@
                 url: "{% url 'set_user_data_grid_config' %}",
                 headers: {"X-CSRFToken": Cookies.get("csrftoken")},
                 success: function() {
-                    $("#{{ table_id }}").DataTable().ajax.reload(null, false);
+                    // A page whose server-rendered summary counts the same rows reloads whole
+                    const table = $("#{{ table_id }}");
+                    if (table.is("[data-filter-reloads-page]")) {
+                        window.location.reload();
+                    } else {
+                        table.DataTable().ajax.reload(null, false);
+                    }
                 }
             });
         });

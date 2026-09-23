@@ -15,6 +15,7 @@ import operator
 from collections.abc import Callable, Iterable, Iterator
 from dataclasses import dataclass, field
 from datetime import datetime
+from enum import auto
 from functools import cached_property, reduce
 from typing import Any, Generic, Optional, TypeVar, Union
 
@@ -68,14 +69,28 @@ class FilterField:
         return data
 
 
+RDC = TypeVar('RDC', bound=models.Model)  # Row Data Class (should match the DatatableConfig but only required if using Objects mode)
+
+
 @dataclass(frozen=True)
-class CellData:
+class CellData(Generic[RDC]):
     """
     Parameter to be passed to server side renders,
     call .value to get the single column, otherwise can inspect columns
     """
     all_data: dict[str, Any]
     key: Optional[str]
+    obj: Optional[RDC] = None
+
+    def obj_sure(self) -> RDC:
+        if obj := self.obj:
+            return obj
+        raise ValueError("No obj provided")
+
+    @cached_property
+    def transient(self) -> dict[Any, Any]:
+        # if you want to calculate data for a row, shared between renderers
+        return dict()
 
     @property
     def value(self):
@@ -92,8 +107,9 @@ class CellData:
     def get_nested_json(self, key, sub_key):
         if data := self.all_data.get(key):
             return data.get(sub_key)
+        return None
 
-    def get(self, key: Any, default: Optional[Any] = None) -> Any:
+    def get(self, key: Any, default: Optional[RDC] = None) -> Any:
         return self.all_data.get(key, default)
 
 
@@ -225,7 +241,7 @@ class RichColumn:
         if "." in self.name:
             # This will be treated as nested objects in JS, which is not what we want to do passing literal strings
             # @see https://datatables.net/reference/option/columns.data#string
-            raise ValueError("Cannot create a RichColumn with '.' (dot) in name")
+            raise ValueError("Cannot create a RichColumn with '.' (dot) in name, maybe using label would be more appropriate")
         self.label = label
         if not label:
             self.label = self.name
@@ -312,6 +328,11 @@ class RichColumn:
 DC = TypeVar('DC', bound=models.Model)  # Data Class
 
 
+class DatatableConfigQuerySetMode(enum.IntEnum):
+    COLUMNS = auto()
+    OBJECTS = auto()
+
+
 class DatatableConfig(Generic[DC]):
     """
     This class both determines how the client side table should be defined (via tags)
@@ -329,6 +350,7 @@ class DatatableConfig(Generic[DC]):
     rich_columns: list[RichColumn]  # columns for display
     expand_client_renderer: Optional[str] = None  # if provided, will expand rows and render content with this JavaScript method
     scroll_x = False
+    server_calculate_mode = DatatableConfigQuerySetMode.COLUMNS
     # Set to opt in to rows per page persisting per user (in UserGridConfig, keyed on this name)
     # rather than in the browser's localStorage
     grid_name: Optional[str] = None
@@ -392,15 +414,25 @@ class DatatableConfig(Generic[DC]):
         """
         return []
 
+    def map_object(self, obj: DC) -> Any:
+        """
+        This method is only invoked if server_calculate_mode=DatatableConfigQuerySetMode.OBJECTS
+        Allows you to wrap the object with something else
+        :param obj: Input object from the queryset
+        :return: A mapped object
+        """
+        return obj
+
     def value_columns(self) -> list[str]:
         column_names = list(itertools.chain(*[rc.value_columns for rc in self.rich_columns if rc.enabled]))
         if row_columns := self.row_columns():
             column_names += row_columns
         return list(set(column_names))
 
-    def __init__(self, request: HttpRequest):
+    def __init__(self, request: HttpRequest, hardcoded_params: Optional[dict] = None):
         self.request: HttpRequest = request
         self.user: User = request.user
+        self.hardcoded_params = hardcoded_params
         self._page_rows: list[dict] = []
         self._page_writable_pks: Optional[set] = None
         self._user_labels: dict[int, str] = {}
@@ -520,23 +552,32 @@ class DatatableConfig(Generic[DC]):
         """ Called after known_count - the "~N" the pager shows in place of an exact count """
         return None
 
-    def render_cell(self, row: dict, column: RichColumn) -> JsonDataType:
+    def render_cell(self, row: CellData, column: RichColumn) -> JsonDataType:
         """ Renders a column on a row """
+        data: Any
+        if row.obj and not column.renderer:
+            if key := row.key:
+                try:
+                    return getattr(row.obj, key)
+                except AttributeError:
+                    pass
+            raise ValueError("RichColumns must have a sever renderer, or a key that matches an attribute if in object mode")
+
         if column.renderer:
-            return limit_value_size(column.renderer(CellData(all_data=row, key=column.key)))
+            return limit_value_size(column.renderer(row))
         if column.extra_columns:
             return {col: limit_value_size(sanitize_value(row.get(col))) for col in column.value_columns}
         if column.key:
             return limit_value_size(sanitize_value(row.get(column.key)))
         return None
 
-    def render_rows(self, rows: Iterable[dict]) -> Iterator[dict]:
-        """ Raw .values() rows -> {column name: rendered value} """
-        for row in rows:
-            row_json = {rc.name: self.render_cell(row, rc) for rc in self.enabled_columns}
-            if row_css := self.row_css(row):
-                row_json["row_css"] = row_css
-            yield row_json
+    # def render_rows(self, rows: Iterable[CellData]) -> Iterator[dict]:
+    #     """ Raw .values() rows -> {column name: rendered value} """
+    #     for row in rows:
+    #         row_json = {rc.name: self.render_cell(row, rc) for rc in self.enabled_columns}
+    #         if row_css := self.row_css(row):
+    #             row_json["row_css"] = row_css
+    #         yield row_json
 
     def export_columns(self) -> list[RichColumn]:
         """ The columns the CSV/VCF export writes. Two columns writing the same raw value collapse to
@@ -622,6 +663,10 @@ class DatatableConfig(Generic[DC]):
         :param param: the key of the param
         :return: the value of the param
         """
+        if hardcoded_params := self.hardcoded_params:
+            if param in hardcoded_params:
+                return hardcoded_params.get(param)
+
         if (resolver_match := self.request.resolver_match) and param in resolver_match.kwargs:
             return resolver_match.kwargs[param]
 
@@ -722,6 +767,35 @@ class DatatableConfig(Generic[DC]):
             self._page_writable_pks = set(writable_qs.values_list("pk", flat=True))
         return self._page_writable_pks
 
+    def prepare_results(self, qs: QuerySet[DC]) -> list[JsonDataType]:
+        rows = list(qs.values(*self.value_columns()))
+        self.pre_render(qs, rows)
+        data = []
+
+        if self.server_calculate_mode == DatatableConfigQuerySetMode.COLUMNS:
+            # select out all columns but only send down data for enabled columns
+            all_columns = self.value_columns()
+            for row in qs.values(*all_columns):
+                row_json = {}
+                for rc in self.enabled_columns:
+                    value = self.render_cell(row=CellData(all_data=row, key=rc.key), column=rc)
+                    row_json[rc.name] = value
+                if row_css := self.row_css(row):
+                    row_json["row_css"] = row_css
+                data.append(row_json)
+        elif self.server_calculate_mode == DatatableConfigQuerySetMode.OBJECTS:
+            for row_obj in qs:
+                mapped_obj = self.map_object(row_obj)
+                row_json = {}
+                for rc in self.enabled_columns:
+                    value = self.render_cell(row=CellData(all_data=None, obj=mapped_obj, key=rc.key), column=rc)
+                    row_json[rc.name] = value
+                data.append(row_json)
+        else:
+            raise ValueError(f"Unexpected QuerySet mode {self.server_calculate_mode}")
+
+        return data
+
 
 def datatable_response(config: DatatableConfig, draw: Optional[str] = None) -> JsonObjType:
     """ One page of a config's rows in the DataTables envelope. Shared by DatabaseTableView and the
@@ -742,13 +816,15 @@ def datatable_response(config: DatatableConfig, draw: Optional[str] = None) -> J
         total_records = total_display_records
 
     page_qs = config.paging(config.ordering(filtered_qs))
-    rows = list(page_qs.values(*config.value_columns()))
-    config.pre_render(page_qs, rows)
+    # rows = list(page_qs.values(*config.value_columns()))
+    # config.pre_render(page_qs, rows)
+
+    rows = config.prepare_results(page_qs)
 
     data: JsonObjType = {
         'recordsTotal': total_records,
         'recordsFiltered': total_display_records,
-        'data': list(config.render_rows(rows)),
+        'data': rows,
     }
     if approximate_records := config.approximate_count(filtered_qs):
         # An estimate rather than a COUNT(*) - the pager shows it as "~N"
@@ -844,7 +920,6 @@ class DatabaseTableView(Generic[DC], MajorOperationViewMixin, JSONResponseView):
     # bare NaN token and breaking JSON.parse in the browser
     json_allow_nan = False
     config: DatatableConfig
-
     column_class: type[DC] = None
 
     def config_for_request(self, request: HttpRequest, **kwargs) -> DatatableConfig[DC]:
@@ -889,7 +964,7 @@ class DatabaseTableView(Generic[DC], MajorOperationViewMixin, JSONResponseView):
     def limit_value_size(value: Any) -> Any:
         return limit_value_size(value)
 
-    def render_cell(self, row: dict, column: RichColumn) -> JsonDataType:
+    def render_cell(self, row: CellData, column: RichColumn) -> JsonDataType:
         return self.config.render_cell(row, column)
 
     def ordering(self, qs: QuerySet[DC]):
@@ -913,11 +988,11 @@ class DatabaseTableView(Generic[DC], MajorOperationViewMixin, JSONResponseView):
     def filter_queryset(self, qs: QuerySet[DC]) -> QuerySet[DC]:
         return self.config.apply_filters(qs)
 
-    def prepare_results(self, qs: QuerySet[DC]):
-        # select out all columns but only send down data for enabled columns
-        rows = list(qs.values(*self.config.value_columns()))
-        self.config.pre_render(qs, rows)
-        return list(self.config.render_rows(rows))
+    # def prepare_results(self, qs: QuerySet[DC]):
+    #     # select out all columns but only send down data for enabled columns
+    #     rows = list(qs.values(*self.config.value_columns()))
+    #     self.config.pre_render(qs, rows)
+    #     return list(self.config.render_rows(rows))
 
     def handle_exception(self, e: BaseException):
         report_exc_info()

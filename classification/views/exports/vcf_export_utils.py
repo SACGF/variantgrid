@@ -113,7 +113,7 @@ class VCFHeader:
 
     def format_info_value(self, result: Any) -> Optional[str]:
         """
-        Assuming the VCFHeader is an INFO field, this will fomrat the value e.g. "classification=3,4"
+        Assuming the VCFHeader is an INFO field, this will format the value e.g. "classification=3,4"
         Result type, and number thereof is validated
         :param result: a list or single value
         :return: text to be placed directly into the VCF info cell
@@ -316,3 +316,4 @@ class ExportVCF:
 
             info_str = ";".join(str(info_cell) for info_cell in info)
             return "\t".join([chrom, str(pos), self.get_variant_id(), ref, alt, qual, filter_val, info_str])
+        return None

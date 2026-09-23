@@ -435,6 +435,40 @@ a {
 	background-image: url(/static/icons/view-details-black.png);
 }
 
+.filter-link {
+	color: #4444bb !important;
+	text-decoration: none;
+
+	&:hover {
+		cursor: pointer;
+		text-decoration: underline;
+	}
+	&:after {
+		content:'\f0b0';
+		position: relative;
+		right: -4px;
+		font-family: 'Font Awesome 6 Free', 'FontAwesome';
+		font-weight: 900;
+	}
+}
+.filter-item {
+	cursor: pointer;
+	display: inline-block;
+	padding: 4px 8px 4px 8px;
+	border: 1px solid #aaaaee;
+	border-radius: 12px;
+	&:hover {
+		text-decoration: none;
+	}
+	&:after {
+		position: relative;
+		right: -4px;
+		content: '\f057';
+		font-family: 'Font Awesome 6 Free', 'FontAwesome';
+		font-weight: 900;
+	}
+}
+
 .hover-link {
 	color: #4444bb !important;
 	text-decoration: none;
@@ -902,6 +936,11 @@ li.error::before {
 // GRIDS
 ////////////////////////
 
+.jqgrid-container .ui-corner-top {
+	border-top-right-radius: 0;
+	border-top-left-radius: 0;
+}
+
 .grid-link {
 	float: left;
 	border: 0px !important;
@@ -971,7 +1010,6 @@ li.error::before {
 
 .click-to-delete-button {
 	color: #c02b2b;
-
 	&::before {
 		content: "\f057";
 	}
@@ -979,7 +1017,6 @@ li.error::before {
 
 .click-to-add-button {
 	color: #3f9a5e;
-
 	&::before {
 		content: "\f055";
 	}
@@ -1903,8 +1940,7 @@ table.dataTable {
 			padding-top: 0;
 
 			>*> {
-				label,
-				.field-label {
+				label {
 					width: 100px;
 				}
 
@@ -2029,13 +2065,16 @@ table.datatable.expandable tr {
 }
 
 /* be able to show alerts in tables without them making the row giant */
-
+/* the below worked when we're in a table table cell, but screws up formatting if
+ we just so happen to be in a table (maybe an expanded row) */
+/*
 .table .alert {
 	margin-bottom: 1px;
 	height: 20px;
 	line-height: 16px;
 	padding: 0px 15px 3px 15px;
 }
+ */
 
 .dtrg-start td {
 	background-color: #efefef;
@@ -2151,6 +2190,16 @@ h3.admin {
 		}
 	}
 }
+.tiny-pill {
+	font-size: 0.8rem;
+	padding: 2px 4px 0px 4px;
+	background-color: #fefefe;
+	border: 1px solid #aaccaa;
+	border-radius: 8px;
+	display: inline-block;
+	color: #448844;
+	text-decoration: none;
+}
 
 .chunk {
 	margin-top: 12px;
@@ -2200,6 +2249,10 @@ h3.admin {
 div.readonly {
 	color: #8888AA;
 	font-style: italic;
+}
+
+.ui-tabs .ui-tabs-nav li.ui-tabs-active {
+	padding-bottom: 0 !important;
 }
 
 .debug {
@@ -2363,7 +2416,6 @@ select[disabled] {
 	}
 }
 
-////////////////////////
 // Custom columns arrange page. A composite is what a reader drags; the columns it draws are still
 // in the catalogue (filter nodes and evidence keys key on them) but stay out of the way until the
 // "show columns already inside a composite" checkbox asks for them
@@ -2400,7 +2452,7 @@ select[disabled] {
 	font-size: 12px;
 }
 
-
+////////////////////////
 // CARDS, HEADERS, CONTENT LAYOUT
 ////////////////////////
 
@@ -2541,6 +2593,10 @@ span.select2-container {
 			}
 		}
 	}
+}
+
+.ui-jqgrid>.ui-jqgrid-pager {
+	height: 38px !important;
 }
 
 hr {
@@ -2906,8 +2962,7 @@ nav ol.breadcrumb .breadcrumb-item a:hover,
 .hp,
 .hpo,
 .omim,
-.mondo,
-.hgnc {
+.mondo .hgnc {
 	border: 3px solid white;
 	margin: 0 4px 0 4px;
 	border-radius: 3px;
@@ -3417,111 +3472,6 @@ li.help-item {
 	margin-right: 2px;
 }
 
-/* Icons drawn from the sprite rather than FontAwesome - see SvgSymbolPreviewIconMixin. Sized to sit on
-   the text baseline like a glyph; the symbols are currentColor so they pick up the surrounding colour */
-.svg-symbol-icon {
-	width: 1.25em;
-	height: 1em;
-	vertical-align: -0.125em;
-}
-
-/* Uploaded file type icons on the upload pages - see upload/file_type_icons.py. FontAwesome or a sprite symbol at
-   40px, with a round badge in front for the VCF sub-types (V for variants only, a pen for manual entry, the gene
-   for gene-level) and the gene list's G */
-.file-type-icon {
-	position: relative;
-	float: left;
-	width: 40px;
-	height: 40px;
-	font-size: 30px;
-	line-height: 40px;
-	text-align: center;
-	color: #3455a4;
-
-	> .svg-symbol-icon {
-		width: 40px;
-		height: 40px;
-		vertical-align: top;
-	}
-}
-
-.file-type-icon-bed {
-	color: #8a6d3b;  /* .IntersectionNode's --node-accent-color, which is scoped to the node card */
-}
-
-.file-type-icon-muted {
-	color: #9aa3b2;
-}
-
-.file-type-badge {
-	position: absolute;
-	left: -7px;
-	bottom: -3px;
-	width: 26px;
-	height: 26px;
-	border-radius: 50%;
-	border: 2px solid #fff;
-	box-sizing: border-box;
-	color: #fff;
-	font-size: 12px;
-	line-height: 22px;
-	text-align: center;
-
-	> .svg-symbol-icon {
-		width: 16px;
-		height: 16px;
-		vertical-align: -3px;
-	}
-}
-
-.file-type-badge-variant {
-	background-color: #343a40;
-}
-
-.file-type-badge-manual {
-	background-color: #0e7a4a;
-}
-
-.file-type-badge-gene, .file-type-badge-gene-list {
-	background-color: #6b3fa0;  /* .GeneListNode's --node-accent-color */
-}
-
-/* Blackens a member of the Duo/Trio/Quad pedigree symbols - see --pedigree-*-fill in
-   uicore/tags/svg_icon_sprite.html. Set on the <svg> by the page, or by Duo/Trio/Quad's
-   get_preview_icon_css_class() so a listed trio wears its affected status */
-.mother-affected {
-	--pedigree-mother-fill: currentColor;
-}
-
-.father-affected {
-	--pedigree-father-fill: currentColor;
-}
-
-.sibling-affected {
-	--pedigree-sibling-fill: currentColor;
-}
-
-.relative-affected {
-	--pedigree-relative-fill: currentColor;
-}
-
-/* node-icon-duo draws a parent above the proband and a sibling beside them - the relationship class
-   picks the half that shows, and for a parent which of its two shapes the sex rules out */
-.duo-mother {
-	--pedigree-duo-square-fill: none;
-	--pedigree-duo-square-stroke: none;
-}
-
-.duo-father {
-	--pedigree-duo-circle-fill: none;
-	--pedigree-duo-circle-stroke: none;
-}
-
-.duo-sibling {
-	--pedigree-duo-parent-display: none;
-	--pedigree-duo-sibling-display: inline;
-}
-
 .preview-data {
 	.preview-category,
 	.preview-title {
@@ -3566,11 +3516,6 @@ li.help-item {
 	border: 1px solid #ccc;
 	border-radius: 4px;
 	box-shadow: 0 2px 8px rgba(0, 0, 0, .2);
-}
-
-// select2 draws its dropdown on the body at z-index 1051, under the FloatingPanel (2000) holding its select
-body > .select2-container .select2-dropdown {
-	z-index: 2001;
 }
 
 // The composite header sort menus, floated on the body by FloatingPanel so the DataTables scroll
@@ -3775,8 +3720,7 @@ body.dt-col-resizing {
 	background-color: #5cb85c;
 }
 
-.gnomad-filtered,
-.gnomad-flagged {
+.gnomad-filtered, .gnomad-flagged {
 	background-color: #f0ad4e;
 }
 
@@ -3929,6 +3873,7 @@ a.clinical-context {
 .gene-list-icon {
 	background-image: url("/static/images/node_icons/filter_list.png");
 }
+
 
 .show-grid-icon {
 	background-image: url(/static/icons/noun_Datatable_935839.png);
@@ -4212,6 +4157,110 @@ a.clinical-context {
 	}
 }
 
+.overlap-source {
+	font-size: 8pt;
+    text-align: center;
+	border-radius: 2px;
+    display: inline-block;
+    position: relative;
+    width: 80px;
+    background-color: #888888;
+	font-weight: bold;
+	color: #FFF;
+}
+
+.testing-context-box {
+    font-size: 8pt;
+    text-align: center;
+    display: inline-block;
+    position: relative;
+    width: 80px;
+	padding: 4px;
+	border-radius: 6px;
+    background-color: #ddbbdd;
+
+    /*
+    all testing contexts other than Germline are somatic
+
+    NON_CANCER = "N", "Non-Cancer Somatic"
+    HAEMATOLOGY = "H", "Haematology"
+    SOLID_TUMOR = "S", "Solid Tumour"
+    OTHER = "O", "Other" # FIXME Somatic Other
+    GERMLINE = "G", "Germline"
+    UNKNOWN = "U", "Unknown"
+     */
+
+    color: #FFF;
+    font-weight: bold;
+    &.testing-context-G {
+        color: #444;
+        background-color: #aaeeaa;
+    }
+}
+
+.testing-context-text-G {
+	color: #44cc22;
+	font-weight: bold;
+}
+.testing-context-text-S {
+	color: #aa33aa;
+	font-weight: bold;
+}
+.testing-context-text-H {
+	color: #aa3399;
+	font-weight: bold;
+}
+.testing-context-text-N {
+	color: #aa3388;
+	font-weight: bold;
+}
+
+.testing-context-G {
+	background-color: #ddeedd;
+}
+
+.testing-context-S {
+	background-color: #ffc6ff;
+}
+.testing-context-H {
+	background-color: #ffccff;
+}
+.testing-context-N {
+	background-color: #ffbbff;
+}
+
+.testing-context-table {
+	.testing-context-S {
+		background-color: #ffe8ff;
+	}
+
+	.testing-context-H {
+		background-color: #ffddff;
+	}
+
+	.testing-context-N {
+		background-color: #ffccff;
+	}
+}
+td.allele-origin-G {
+	background-color: #ddffdd;
+}
+.testing-context-C {
+	// C for cross context
+	background-color: #eeeeee;
+	opacity: 0.7;
+	color: #444444;
+}
+td.allele-origin-S {
+	background-color: #ffdcff;
+}
+.testing-context-table {
+	tbody tr td {
+		border-top-width: 0;
+	}
+}
+
+
 a .c-hgvs-body {
 
 	.c-hgvs-transcript,
@@ -4289,8 +4338,8 @@ a .c-hgvs-body {
 	border-radius: 6px;
 	width: 130px;
 	text-align: center;
-	border: 1px solid rgba(255,255,255, 0.4);
-	color: #555;
+	border: 1px solid rgba(255, 255, 255, 0.4);
+	// color: #555;
 	font-weight: 600;
 
 	.amp-level {
@@ -4300,73 +4349,78 @@ a .c-hgvs-body {
 		//	padding-right: 2px;
 		//}
 	}
+
 }
 
-// Clinical significance colours - shared by classification pills, analysis node chips and grid chips
-.c-pill, .node-chip, .cs-chip {
-	&.scs-none, &.cs-none {
-		border: none !important;
-		background-color: #eeeeee;
-	}
+// master branch had this in a .c-pill, .node-chip, .cs-chip wrapper
+// but somatic branch removed the scs prefix to just be cs as well for simplicity
 
-	&.scs-tier_1 {
-		background-color: #ffcccc;
-	}
+.cs-none {
+	border: none !important;
+	background-color: #eeeeee;
+}
 
-	&.scs-tier_1_or_2 {
-		background-color: #ffd5d5;
-	}
+.cs-tier_1 {
+	background-color: #ffcccc;
+}
 
-	&.scs-tier_2 {
-		background-color: #ffdddd;
-	}
+.cs-tier_1_or_2 {
+	background-color: #ffd5d5;
+}
 
-	&.scs-tier_3 {
-		background-color: #dddddd;
-	}
+.cs-tier_2 {
+	background-color: #ffdddd;
+}
 
-	&.scs-tier_4 {
-		background-color: #ccccff;
-	}
+.cs-tier_3 {
+	background-color: #dddddd;
+}
 
-	&.cs-b {
-		background-color: #ccccff;
-	}
+.cs-tier_4 {
+	background-color: #ccccff;
+}
 
-	&.cs-lb {
-		background-color: #ddddff;
-	}
+.cs-b {
+	background-color: #ccccff;
+}
 
-	&.cs-r, cs-dr {
-		background-color: #eeeeee;
-	}
+.cs-lb {
+	background-color: #ddddff;
+}
 
-	&.cs-vus,
-	&.cs-vus_a,
-	&.cs-vus_b,
-	&.cs-vus_c {
-		background-color: #dddddd;
-	}
+.cs-r, cs-dr {
+	background-color: #eeeeee;
+}
 
-	&.cs-lp, &.cs-lo {
-		background-color: #ffdddd;
-	}
+.cs-vus,
+.cs-vus_a,
+.cs-vus_b,
+.cs-vus_c {
+	background-color: #dddddd;
+}
 
-	&.cs-p, &.cs-o {
-		background-color: #ffcccc;
-	}
+.cs-lp, .cs-lo {
+	background-color: #ffdddd;
+}
 
-	//.cs- {
-	//	background-color: #f0f0f0;
-	//}
+.cs-p, .cs-o {
+	background-color: #ffcccc;
+}
 
-	&.cs-pending {
-		background: repeating-linear-gradient(-45deg, #ddd, #ddd 10px, #eee 10px, #eee 20px);
-	}
+//.cs- {
+//	background-color: #f0f0f0;
+//}
 
-	&.cs-withdrawn {
-		opacity: 0.5;
-	}
+.cs-pending {
+	background: repeating-linear-gradient(-45deg, #ddd, #ddd 10px, #eee 10px, #eee 20px);
+}
+
+.cs-withdrawn {
+	opacity: 0.5;
+}
+.cs-in-review {
+	opacity: 0.8;
+	background-color: #eee;
 }
 
 // Clinical significance counts above a classification grouping grid
@@ -4434,6 +4488,14 @@ a .c-hgvs-body {
 	}
 }
 
+.cs-dot {
+	min-width: 16px;
+	border-radius: 6px;
+	padding: 6px;
+	text-align: center;
+	display: inline-block;
+}
+
 .cs-card {
 	text-align: center;
 	padding: 0 10px 16px 10px;
@@ -4479,6 +4541,47 @@ a .c-hgvs-body {
 	time.ago {
 		color: black;
 		background: black;
+	}
+}
+
+.comment {
+	padding: 8px 8px 8px 0;
+	color: #888;
+
+	&:before {
+		content: '\f27a';
+		font-family: 'Font Awesome 6 Free', 'FontAwesome';
+		font-weight: 900;
+		padding-right: 8px;
+	}
+}
+
+table.overlap-summary {
+	th.overlap-lab {
+		width: 250px;
+	}
+	th.overlap-value {
+		width: 200px;
+	}
+	th.overlap-condition {
+		width: 200px;
+	}
+	th.overlap-curated {
+		width: 100px;
+	}
+	th.overlap-triage {
+		width: 300px;
+	}
+	tr.users-row {
+		background-color: #eeeeee;
+	}
+	tr.cross-context-row {
+		opacity: 0.6;
+		background-color: #f4f4f4;
+	}
+	.overlap-criteria {
+		padding: 3px 0 3px 0;
+		color: #444;
 	}
 }
 

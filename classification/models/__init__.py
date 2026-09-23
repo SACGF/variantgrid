@@ -19,4 +19,5 @@ from classification.models.clinvar_export_exclude_utils import *  # so we load t
 from classification.models.classification_lab_summaries import *
 from classification.models.flag_types import *
 from classification.models.classification_grouping import *
+from classification.models.overlaps_model import *
 from classification.models.classification_reclassification_models import *

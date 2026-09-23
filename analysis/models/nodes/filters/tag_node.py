@@ -26,12 +26,6 @@ class TagNode(AnalysisNode):
     # A resolved to-do tagging (VariantTag.resolved) is done, so it is left out unless asked for
     include_resolved = models.BooleanField(default=False)
 
-    def save(self, *args, **kwargs):
-        # A new node starts from the lab's tag config, then keeps its own setting (clones aren't adding)
-        if self._state.adding and (tag_config := self.analysis.tag_config_collection):
-            self.include_resolved = self.include_resolved or tag_config.show_resolved_variant_tags
-        return super().save(*args, **kwargs)
-
     def modifies_parents(self):
         return True
 

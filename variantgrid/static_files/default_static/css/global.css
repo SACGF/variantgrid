@@ -377,6 +377,40 @@ a.no-link-style {
   background-image: url(/static/icons/view-details-black.png);
 }
 
+.filter-link {
+  color: #4444bb !important;
+  text-decoration: none;
+}
+.filter-link:hover {
+  cursor: pointer;
+  text-decoration: underline;
+}
+.filter-link:after {
+  content: '\f0b0';
+  position: relative;
+  right: -4px;
+  font-family: 'Font Awesome 6 Free', 'FontAwesome';
+  font-weight: 900;
+}
+
+.filter-item {
+  cursor: pointer;
+  display: inline-block;
+  padding: 4px 8px 4px 8px;
+  border: 1px solid #aaaaee;
+  border-radius: 12px;
+}
+.filter-item:hover {
+  text-decoration: none;
+}
+.filter-item:after {
+  position: relative;
+  right: -4px;
+  content: '\f057';
+  font-family: 'Font Awesome 6 Free', 'FontAwesome';
+  font-weight: 900;
+}
+
 .hover-link {
   color: #4444bb !important;
   text-decoration: none;
@@ -780,6 +814,11 @@ li.error::before {
   margin-right: 4px;
 }
 
+.jqgrid-container .ui-corner-top {
+  border-top-right-radius: 0;
+  border-top-left-radius: 0;
+}
+
 .grid-link {
   float: left;
   border: 0px !important;
@@ -894,6 +933,64 @@ table.as_table td {
   text-overflow: ellipsis;
 }
 
+.rv-gene {
+  font-weight: 600;
+}
+
+.rv-hgvs {
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 11px;
+}
+
+.rv-hgvs-p,
+.rv-sub {
+  color: #777;
+  font-size: 11px;
+}
+
+.rv-line2 {
+  display: none;
+}
+
+.rv-kind {
+  flex: none;
+  padding: 0 4px;
+  border-radius: 3px;
+  background: #eceff1;
+  color: #546e7a;
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 10px;
+}
+
+.rv-kind-del,
+.rv-kind-loss {
+  background: #fdecea;
+  color: #b3261e;
+}
+
+.rv-kind-dup,
+.rv-kind-cnv,
+.rv-kind-gain {
+  background: #e8f0fe;
+  color: #1a56b8;
+}
+
+.rv-kind-ins,
+.rv-kind-inv {
+  background: #fff4e5;
+  color: #a15c00;
+}
+
+.rv-kind-fusion {
+  background: #ede7f6;
+  color: #5e35b1;
+}
+
+.rv-kind-splice {
+  background: #e0f2f1;
+  color: #00695c;
+}
+
 table.variantgrid-datatable {
   table-layout: fixed;
   width: auto;
@@ -934,6 +1031,12 @@ table.variantgrid-datatable.two-line-rows .variant_id-container a.rv-label {
 table.variantgrid-datatable.two-line-rows .impact-consequence {
   display: inline-block;
 }
+table.variantgrid-datatable th .dt-sort-menu .dt-sort-menu-toggle {
+  margin-left: 4px;
+  color: #888;
+  text-decoration: none;
+  font-size: 10px;
+}
 table.variantgrid-datatable th {
   position: relative;
 }
@@ -949,12 +1052,6 @@ table.variantgrid-datatable th .dt-col-resize {
 table.variantgrid-datatable th .dt-col-resize:hover {
   background: #ccc;
 }
-table.variantgrid-datatable th .dt-sort-menu .dt-sort-menu-toggle {
-  margin-left: 4px;
-  color: #888;
-  text-decoration: none;
-  font-size: 10px;
-}
 table.variantgrid-datatable .variant_id-container {
   display: inline-flex;
   align-items: center;
@@ -968,60 +1065,12 @@ table.variantgrid-datatable .variant_id-container a.rv-label {
   white-space: nowrap;
   text-decoration: none;
 }
-.rv-gene {
-  font-weight: 600;
-}
-.rv-hgvs {
-  font-family: ui-monospace, Menlo, Consolas, monospace;
-  font-size: 11px;
-}
-.rv-hgvs-p,
-.rv-sub {
-  color: #777;
-  font-size: 11px;
-}
 table.variantgrid-datatable .fusion-calls {
   padding: 0 4px;
   border-radius: 3px;
   background: #ede7f6;
   color: #5e35b1;
   font-size: 11px;
-}
-.rv-line2 {
-  display: none;
-}
-.rv-kind {
-  flex: none;
-  padding: 0 4px;
-  border-radius: 3px;
-  background: #eceff1;
-  color: #546e7a;
-  font-family: ui-monospace, Menlo, Consolas, monospace;
-  font-size: 10px;
-}
-.rv-kind-del,
-.rv-kind-loss {
-  background: #fdecea;
-  color: #b3261e;
-}
-.rv-kind-dup,
-.rv-kind-cnv,
-.rv-kind-gain {
-  background: #e8f0fe;
-  color: #1a56b8;
-}
-.rv-kind-ins,
-.rv-kind-inv {
-  background: #fff4e5;
-  color: #a15c00;
-}
-.rv-kind-fusion {
-  background: #ede7f6;
-  color: #5e35b1;
-}
-.rv-kind-splice {
-  background: #e0f2f1;
-  color: #00695c;
 }
 table.variantgrid-datatable .cs-chips {
   display: grid;
@@ -1064,7 +1113,7 @@ table.variantgrid-datatable .cs-chip.allele-origin-S {
 }
 table.variantgrid-datatable .cs-chip .cs-chip-src {
   font-size: 9px;
-  opacity: 0.6;
+  opacity: .6;
   margin-right: 2px;
 }
 table.variantgrid-datatable .cs-chip .cs-chip-stars {
@@ -1210,7 +1259,6 @@ table.variantgrid-datatable .aloft-low-confidence {
 table.variantgrid-datatable .aloft-low-confidence .aloft-dot {
   opacity: .45;
 }
-
 table.variantgrid-datatable .predictions {
   display: inline-flex;
   align-items: center;
@@ -1447,8 +1495,7 @@ table.variantgrid-datatable .variant-row-detail .variant-row-detail-columns {
 table.variantgrid-datatable .variant-row-detail .variant-row-detail-table {
   max-width: 420px;
 }
-table.variantgrid-datatable .variant-row-detail .variant-row-detail-table th,
-table.variantgrid-datatable .variant-row-detail .variant-row-detail-table td {
+table.variantgrid-datatable .variant-row-detail .variant-row-detail-table th, table.variantgrid-datatable .variant-row-detail .variant-row-detail-table td {
   overflow: visible;
   text-overflow: clip;
 }
@@ -1486,8 +1533,7 @@ table.variantgrid-datatable.dataTable thead > tr > th {
 table.variantgrid-datatable.dataTable thead > tr > th.sorting_disabled {
   padding-right: 4px !important;
 }
-table.variantgrid-datatable.dataTable thead > tr > th::before,
-table.variantgrid-datatable.dataTable thead > tr > th::after {
+table.variantgrid-datatable.dataTable thead > tr > th::before, table.variantgrid-datatable.dataTable thead > tr > th::after {
   right: 2px !important;
 }
 
@@ -1579,8 +1625,7 @@ table.dataTable tr.child td.child {
 table.dataTable tr.child td.child fieldset.form-fields {
   padding-top: 0;
 }
-table.dataTable tr.child td.child fieldset.form-fields > * > label,
-table.dataTable tr.child td.child fieldset.form-fields > * > .field-label {
+table.dataTable tr.child td.child fieldset.form-fields > * > label {
   width: 100px;
 }
 table.dataTable tr.child td.child fieldset.form-fields > * > *:nth-child(2) {
@@ -1621,6 +1666,11 @@ table.datatable.expandable tr.even, table.datatable.expandable tr.odd {
   cursor: pointer;
 }
 
+.dataTables_wrapper {
+  /* The variant grids trade control chrome for rows: default Bootstrap sizing puts ~60px under the
+     table (the info and length lines stack, on top of 32px pager buttons), which is three rows the
+     user can't see. @see compactControls in the definition */
+}
 .dataTables_wrapper .toolbar {
   display: flex;
   align-items: baseline;
@@ -1675,13 +1725,16 @@ table.datatable.expandable tr.even, table.datatable.expandable tr.odd {
 }
 
 /* be able to show alerts in tables without them making the row giant */
+/* the below worked when we're in a table table cell, but screws up formatting if
+ we just so happen to be in a table (maybe an expanded row) */
+/*
 .table .alert {
-  margin-bottom: 1px;
-  height: 20px;
-  line-height: 16px;
-  padding: 0px 15px 3px 15px;
+	margin-bottom: 1px;
+	height: 20px;
+	line-height: 16px;
+	padding: 0px 15px 3px 15px;
 }
-
+ */
 .dtrg-start td {
   background-color: #efefef;
 }
@@ -1778,6 +1831,17 @@ h3.admin:before {
   font-weight: bold;
 }
 
+.tiny-pill {
+  font-size: 0.8rem;
+  padding: 2px 4px 0px 4px;
+  background-color: #fefefe;
+  border: 1px solid #aaccaa;
+  border-radius: 8px;
+  display: inline-block;
+  color: #448844;
+  text-decoration: none;
+}
+
 .chunk {
   margin-top: 12px;
   padding: 2px;
@@ -1825,6 +1889,10 @@ h3.admin:before {
 div.readonly {
   color: #8888AA;
   font-style: italic;
+}
+
+.ui-tabs .ui-tabs-nav li.ui-tabs-active {
+  padding-bottom: 0 !important;
 }
 
 .debug {
@@ -1970,7 +2038,7 @@ select[disabled] {
   font-size: 11px;
 }
 #columns-widget li.composite-column .column-name:before {
-  content: "composite";
+  content: 'composite';
   margin-right: 5px;
   padding: 0 4px;
   border-radius: 2px;
@@ -2117,6 +2185,10 @@ span.select2-container {
 }
 .card-body-list .list-group .list-group-item:last-child {
   border-bottom: none !important;
+}
+
+.ui-jqgrid > .ui-jqgrid-pager {
+  height: 38px !important;
 }
 
 hr {
@@ -2443,8 +2515,7 @@ nav ol.breadcrumb .breadcrumb-item a:hover,
 .hp,
 .hpo,
 .omim,
-.mondo,
-.hgnc {
+.mondo .hgnc {
   border: 3px solid white;
   margin: 0 4px 0 4px;
   border-radius: 3px;
@@ -2903,107 +2974,6 @@ li.help-item :last-child {
   margin-right: 2px;
 }
 
-/* Icons drawn from the sprite rather than FontAwesome - see SvgSymbolPreviewIconMixin. Sized to sit on
-   the text baseline like a glyph; the symbols are currentColor so they pick up the surrounding colour */
-.svg-symbol-icon {
-  width: 1.25em;
-  height: 1em;
-  vertical-align: -0.125em;
-}
-
-/* Uploaded file type icons on the upload pages - see upload/file_type_icons.py. FontAwesome or a sprite symbol at
-   40px, with a round badge in front for the VCF sub-types (V for variants only, a pen for manual entry, the gene
-   for gene-level) and the gene list's G */
-.file-type-icon {
-  position: relative;
-  float: left;
-  width: 40px;
-  height: 40px;
-  font-size: 30px;
-  line-height: 40px;
-  text-align: center;
-  color: #3455a4;
-}
-.file-type-icon > .svg-symbol-icon {
-  width: 40px;
-  height: 40px;
-  vertical-align: top;
-}
-
-.file-type-icon-bed {
-  color: #8a6d3b; /* .IntersectionNode's --node-accent-color, which is scoped to the node card */
-}
-
-.file-type-icon-muted {
-  color: #9aa3b2;
-}
-
-.file-type-badge {
-  position: absolute;
-  left: -7px;
-  bottom: -3px;
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  border: 2px solid #fff;
-  box-sizing: border-box;
-  color: #fff;
-  font-size: 12px;
-  line-height: 22px;
-  text-align: center;
-}
-.file-type-badge > .svg-symbol-icon {
-  width: 16px;
-  height: 16px;
-  vertical-align: -3px;
-}
-
-.file-type-badge-variant {
-  background-color: #343a40;
-}
-
-.file-type-badge-manual {
-  background-color: #0e7a4a;
-}
-
-.file-type-badge-gene, .file-type-badge-gene-list {
-  background-color: #6b3fa0; /* .GeneListNode's --node-accent-color */
-}
-
-/* Blackens a member of the Trio/Quad pedigree symbols - see --pedigree-*-fill in
-   uicore/tags/svg_icon_sprite.html. Set on the <svg> by the page, or by Trio/Quad's
-   get_preview_icon_css_class() so a listed trio wears its affected status */
-.mother-affected {
-  --pedigree-mother-fill: currentColor;
-}
-
-.father-affected {
-  --pedigree-father-fill: currentColor;
-}
-
-.sibling-affected {
-  --pedigree-sibling-fill: currentColor;
-}
-
-.relative-affected {
-  --pedigree-relative-fill: currentColor;
-}
-
-.duo-mother {
-  --pedigree-duo-square-fill: none;
-  --pedigree-duo-square-stroke: none;
-}
-
-.duo-father {
-  --pedigree-duo-circle-fill: none;
-  --pedigree-duo-circle-stroke: none;
-}
-
-.duo-sibling {
-  --pedigree-duo-parent-display: none;
-  --pedigree-duo-sibling-display: inline;
-}
-
 .preview-data .preview-category,
 .preview-data .preview-title {
   font-weight: 500;
@@ -3040,11 +3010,7 @@ li.help-item :last-child {
   background: white;
   border: 1px solid #ccc;
   border-radius: 4px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, .2);
-}
-
-body > .select2-container .select2-dropdown {
-  z-index: 2001;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
 .dt-sort-menu-items {
@@ -3089,7 +3055,7 @@ body.dt-col-resizing {
   background: white;
   border: 1px solid #ccc;
   border-radius: 4px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, .2);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 .conservation-detail th {
   padding: 1px 10px 1px 0;
@@ -3197,7 +3163,6 @@ body.dt-col-resizing {
   background-color: #B8860B;
 }
 
-
 .gnomad-link {
   text-decoration: none;
 }
@@ -3216,8 +3181,7 @@ body.dt-col-resizing {
   background-color: #5cb85c;
 }
 
-.gnomad-filtered,
-.gnomad-flagged {
+.gnomad-filtered, .gnomad-flagged {
   background-color: #f0ad4e;
 }
 
@@ -3598,6 +3562,109 @@ a.clinical-context {
   bottom: -28px;
 }
 
+.overlap-source {
+  font-size: 8pt;
+  text-align: center;
+  border-radius: 2px;
+  display: inline-block;
+  position: relative;
+  width: 80px;
+  background-color: #888888;
+  font-weight: bold;
+  color: #FFF;
+}
+
+.testing-context-box {
+  font-size: 8pt;
+  text-align: center;
+  display: inline-block;
+  position: relative;
+  width: 80px;
+  padding: 4px;
+  border-radius: 6px;
+  background-color: #ddbbdd;
+    /*
+    all testing contexts other than Germline are somatic
+
+    NON_CANCER = "N", "Non-Cancer Somatic"
+    HAEMATOLOGY = "H", "Haematology"
+    SOLID_TUMOR = "S", "Solid Tumour"
+    OTHER = "O", "Other" # FIXME Somatic Other
+    GERMLINE = "G", "Germline"
+    UNKNOWN = "U", "Unknown"
+     */
+  color: #FFF;
+  font-weight: bold;
+}
+.testing-context-box.testing-context-G {
+  color: #444;
+  background-color: #aaeeaa;
+}
+
+.testing-context-text-G {
+  color: #44cc22;
+  font-weight: bold;
+}
+
+.testing-context-text-S {
+  color: #aa33aa;
+  font-weight: bold;
+}
+
+.testing-context-text-H {
+  color: #aa3399;
+  font-weight: bold;
+}
+
+.testing-context-text-N {
+  color: #aa3388;
+  font-weight: bold;
+}
+
+.testing-context-G {
+  background-color: #ddeedd;
+}
+
+.testing-context-S {
+  background-color: #ffc6ff;
+}
+
+.testing-context-H {
+  background-color: #ffccff;
+}
+
+.testing-context-N {
+  background-color: #ffbbff;
+}
+
+.testing-context-table .testing-context-S {
+  background-color: #ffe8ff;
+}
+.testing-context-table .testing-context-H {
+  background-color: #ffddff;
+}
+.testing-context-table .testing-context-N {
+  background-color: #ffccff;
+}
+
+td.allele-origin-G {
+  background-color: #ddffdd;
+}
+
+.testing-context-C {
+  background-color: #eeeeee;
+  opacity: 0.7;
+  color: #444444;
+}
+
+td.allele-origin-S {
+  background-color: #ffdcff;
+}
+
+.testing-context-table tbody tr td {
+  border-top-width: 0;
+}
+
 a .c-hgvs-body .c-hgvs-transcript,
 a .c-hgvs-body .c-hgvs-nomen {
   color: #444488 !important;
@@ -3659,51 +3726,72 @@ a .c-hgvs-body .c-hgvs-nomen {
   width: 130px;
   text-align: center;
   border: 1px solid rgba(255, 255, 255, 0.4);
-  color: #555;
   font-weight: 600;
 }
-.c-pill.scs-none, .node-chip.scs-none, .cs-chip.scs-none, .c-pill.cs-none, .node-chip.cs-none, .cs-chip.cs-none {
+
+.cs-none {
   border: none !important;
   background-color: #eeeeee;
 }
-.c-pill.scs-tier_1, .node-chip.scs-tier_1, .cs-chip.scs-tier_1 {
+
+.cs-tier_1 {
   background-color: #ffcccc;
 }
-.c-pill.scs-tier_1_or_2, .node-chip.scs-tier_1_or_2, .cs-chip.scs-tier_1_or_2 {
+
+.cs-tier_1_or_2 {
   background-color: #ffd5d5;
 }
-.c-pill.scs-tier_2, .node-chip.scs-tier_2, .cs-chip.scs-tier_2 {
+
+.cs-tier_2 {
   background-color: #ffdddd;
 }
-.c-pill.scs-tier_3, .node-chip.scs-tier_3, .cs-chip.scs-tier_3 {
+
+.cs-tier_3 {
   background-color: #dddddd;
 }
-.c-pill.scs-tier_4, .node-chip.scs-tier_4, .cs-chip.scs-tier_4 {
+
+.cs-tier_4 {
   background-color: #ccccff;
 }
-.c-pill.cs-b, .node-chip.cs-b, .cs-chip.cs-b {
+
+.cs-b {
   background-color: #ccccff;
 }
-.c-pill.cs-lb, .node-chip.cs-lb, .cs-chip.cs-lb {
+
+.cs-lb {
   background-color: #ddddff;
 }
-.c-pill.cs-r, .node-chip.cs-r, .cs-chip.cs-r, .c-pill cs-dr, .node-chip cs-dr, .cs-chip cs-dr {
+
+.cs-r, cs-dr {
   background-color: #eeeeee;
 }
-.c-pill.cs-vus, .node-chip.cs-vus, .cs-chip.cs-vus, .c-pill.cs-vus_a, .node-chip.cs-vus_a, .cs-chip.cs-vus_a, .c-pill.cs-vus_b, .node-chip.cs-vus_b, .cs-chip.cs-vus_b, .c-pill.cs-vus_c, .node-chip.cs-vus_c, .cs-chip.cs-vus_c {
+
+.cs-vus,
+.cs-vus_a,
+.cs-vus_b,
+.cs-vus_c {
   background-color: #dddddd;
 }
-.c-pill.cs-lp, .node-chip.cs-lp, .cs-chip.cs-lp, .c-pill.cs-lo, .node-chip.cs-lo, .cs-chip.cs-lo {
+
+.cs-lp, .cs-lo {
   background-color: #ffdddd;
 }
-.c-pill.cs-p, .node-chip.cs-p, .cs-chip.cs-p, .c-pill.cs-o, .node-chip.cs-o, .cs-chip.cs-o {
+
+.cs-p, .cs-o {
   background-color: #ffcccc;
 }
-.c-pill.cs-pending, .node-chip.cs-pending, .cs-chip.cs-pending {
+
+.cs-pending {
   background: repeating-linear-gradient(-45deg, #ddd, #ddd 10px, #eee 10px, #eee 20px);
 }
-.c-pill.cs-withdrawn, .node-chip.cs-withdrawn, .cs-chip.cs-withdrawn {
+
+.cs-withdrawn {
   opacity: 0.5;
+}
+
+.cs-in-review {
+  opacity: 0.8;
+  background-color: #eee;
 }
 
 .summary-counts {
@@ -3757,6 +3845,14 @@ a .c-hgvs-body .c-hgvs-nomen {
   font-size: 11px;
 }
 
+.cs-dot {
+  min-width: 16px;
+  border-radius: 6px;
+  padding: 6px;
+  text-align: center;
+  display: inline-block;
+}
+
 .cs-card {
   text-align: center;
   padding: 0 10px 16px 10px;
@@ -3791,6 +3887,44 @@ a .c-hgvs-body .c-hgvs-nomen {
 .screenshot-mode time.ago {
   color: black;
   background: black;
+}
+
+.comment {
+  padding: 8px 8px 8px 0;
+  color: #888;
+}
+.comment:before {
+  content: '\f27a';
+  font-family: 'Font Awesome 6 Free', 'FontAwesome';
+  font-weight: 900;
+  padding-right: 8px;
+}
+
+table.overlap-summary th.overlap-lab {
+  width: 250px;
+}
+table.overlap-summary th.overlap-value {
+  width: 200px;
+}
+table.overlap-summary th.overlap-condition {
+  width: 200px;
+}
+table.overlap-summary th.overlap-curated {
+  width: 100px;
+}
+table.overlap-summary th.overlap-triage {
+  width: 300px;
+}
+table.overlap-summary tr.users-row {
+  background-color: #eeeeee;
+}
+table.overlap-summary tr.cross-context-row {
+  opacity: 0.6;
+  background-color: #f4f4f4;
+}
+table.overlap-summary .overlap-criteria {
+  padding: 3px 0 3px 0;
+  color: #444;
 }
 
 /* Feature tips (see variantgrid/tips.py) - sits over a grid loading overlay or under a page
@@ -3833,8 +3967,8 @@ a .c-hgvs-body .c-hgvs-nomen {
   font-style: italic;
 }
 
-/*# sourceMappingURL=global.css.map */
-
 .btn.new-classification-button {
   margin-left: 6px;
 }
+
+/*# sourceMappingURL=global.css.map */

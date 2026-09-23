@@ -190,30 +190,39 @@ def get_decorated_methods(cls, categories: Optional[dict[Any, Any]], attribute: 
         def passes_filter(export_method) -> bool:
             nonlocal categories
             # FIXME, some non-NONE but falsey values could get confused here, e.g. 0 and False
+            if not export_method.categories:
+                return True
+
             decorated_values = export_method.categories or {}
-            # for every requirement of categories
-            for key, value in categories.items():
-                # get the decorated value
-                value_set: set
+
+            # for every requirement of the export method
+            for key, value in decorated_values.items():
+                required_set: set
                 if isinstance(value, (set, tuple, list)):
-                    value_set = set(value)
+                    required_set = set(value)
                 else:
-                    value_set = {value}
+                    required_set = {value}
 
-                if decorated_value := decorated_values.get(key):
-                    decorated_set: set
-                    if isinstance(decorated_value, (set, tuple, list)):
-                        decorated_set = set(decorated_value)
+                if provided_value := categories.get(key):
+                    provided_set: set
+                    if isinstance(provided_value, (set, tuple, list)):
+                        provided_set = set(provided_value)
                     else:
-                        decorated_set = {decorated_value}
-                    return bool(value_set.intersection(decorated_set))
+                        provided_set = {provided_value}
 
-                    # handle decorated value being a collection (and matching a single value in that collection)
-                # if the requirement for the category is None and there's no value at all in the decorator
-                # it passes the test
-                elif value is not None:
-                    return False
+                    # if just one of the values in categories of the method
+                    # matches one of the values in the provided categories, the export is in
+                    # allows you to say categories={"tsv", "json"} on a method and then have
+                    # categories="tsv" pass that
+                    if not provided_set.intersection(required_set):
+                        return False
 
+                else:
+                    if False not in required_set:
+                        # can require something to be False, which passes it through if there
+                        # are no other values
+                        return False
+            # either there was no requirements, or they were all met
             return True
 
         export_methods = [em for em in export_methods if passes_filter(em)]
@@ -228,24 +237,32 @@ class ExportRow:
         return get_decorated_methods(cls, categories=export_tweak.categories, attribute="is_export")
 
     @classmethod
-    def _data_generator(cls: type, data: Iterable[Any]) -> Iterator[Any]:
+    def _data_generator(cls: type, data: Iterable[Any], transformer: Optional[Callable] = None) -> Iterator[Any]:
         for row_data in data:
             if row_data is None:
                 continue
-            if not isinstance(row_data, cls):
+            if transformer:
+                row_data = transformer(row_data)
+            elif not isinstance(row_data, cls):
                 # it's expected that the class can be initiated with each "row" in data
                 row_data = cls(row_data)
             yield row_data
 
     @classmethod
-    def csv_generator(cls, data: Iterable[Any], delimiter=',', include_header=True, export_tweak: ExportTweak = ExportTweak.DEFAULT, export_settings: Optional[ExportSettings] = None) -> Iterator[str]:
+    def csv_generator(cls,
+                      data: Iterable[Any],
+                      delimiter=',', include_header=True,
+                      export_tweak: ExportTweak = ExportTweak.DEFAULT,
+                      export_settings: Optional[ExportSettings] = None,
+                      transformer: Optional[Callable] = None,
+                      **kwargs) -> Iterator[str]:
         if not export_settings:
             export_settings = ExportSettings.get_for_request()
         try:
             if include_header:
-                yield delimited_row(cls.csv_header(export_tweak=export_tweak, export_settings=export_settings), delimiter=delimiter)
-            for row_data in cls._data_generator(data):
-                yield delimited_row(row_data.to_csv(export_tweak=export_tweak, export_settings=export_settings), delimiter=delimiter)
+                yield delimited_row(cls.csv_header(export_tweak=export_tweak, export_settings=export_settings), delimiter=delimiter, **kwargs)
+            for row_data in cls._data_generator(data, transformer=transformer):
+                yield delimited_row(row_data.to_csv(export_tweak=export_tweak, export_settings=export_settings), delimiter=delimiter, **kwargs)
         except:
             from library.log_utils import report_exc_info
             report_exc_info(extra_data={"activity": "Exporting"})
@@ -314,7 +331,7 @@ class ExportRow:
                 row.add_cell(label)
         return row.get_row()
 
-    def to_csv(self, export_tweak: ExportTweak = ExportTweak.DEFAULT, export_settings: Optional[ExportSettings] = None) -> list[str]:
+    def to_csv(self,export_tweak: ExportTweak = ExportTweak.DEFAULT, export_settings: Optional[ExportSettings] = None) -> list[str]:
         if not export_settings:
             export_settings = ExportSettings.get_for_request()
 
@@ -365,10 +382,10 @@ class ExportRow:
             return cls.streaming_csv(data, filename, export_tweak=export_tweak)
 
     @classmethod
-    def streaming_csv(cls, data: Iterable[Any], filename: str, export_tweak: ExportTweak = ExportTweak.DEFAULT):
+    def streaming_csv(cls, data: Iterable[Any], filename: str, export_tweak: ExportTweak = ExportTweak.DEFAULT, transformer: Optional[Callable] = None):
         date_str = local_date_string()
 
-        response = StreamingHttpResponse(cls.csv_generator(data, export_tweak=export_tweak), content_type='text/csv')
+        response = StreamingHttpResponse(cls.csv_generator(data, export_tweak=export_tweak, transformer=transformer), content_type='text/csv')
         response['Content-Disposition'] = f'attachment; filename="{filename}_{settings.SITE_NAME}_{date_str}.csv"'
         return response
 

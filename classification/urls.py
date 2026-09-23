@@ -10,7 +10,6 @@ from classification.views import (
     views,
     views_autocomplete,
 )
-from classification.views.allele_grouping_datatables import AlleleGroupingColumns
 from classification.views.classification_dashboard_view import issues_download
 from classification.views.classification_datatables import ClassificationColumns
 from classification.views.classification_email_view import (
@@ -21,12 +20,6 @@ from classification.views.classification_export_view import ClassificationApiExp
 from classification.views.classification_grouping_datatables import (
     ClassificationGroupingColumns,
     ClassificationGroupingCountsView,
-)
-from classification.views.classification_overlaps_view import (
-    post_clinical_context,
-    view_clinical_context,
-    view_overlaps,
-    view_overlaps_detail,
 )
 from classification.views.classification_overlaps_vus_view import (
     view_overlaps_vus,
@@ -66,9 +59,6 @@ from classification.views.discordance_report_views import (
     action_discordance_report_review,
     discordance_report_review,
     discordance_report_view,
-    discordance_reports_active_detail,
-    discordance_reports_download,
-    discordance_reports_history_detail,
     discordance_reports_view,
     export_discordance_report,
 )
@@ -76,12 +66,15 @@ from classification.views.evidence_keys_view import EvidenceKeysView
 from classification.views.exports.classification_export_formatter_redcap import (
     redcap_data_dictionary,
 )
+from classification.views.exports_grouping.classification_grouping_export_view import \
+    view_classification_grouping_export, serve_export
 from classification.views.imported_allele_info_view import (
     ImportedAlleleInfoColumns,
-    download_allele_info,
-    view_imported_allele_info,
-    view_imported_allele_info_detail,
+    download_allele_info, view_imported_allele_info, view_imported_allele_info_detail
 )
+from classification.views.overlaps_datatables import OverlapColumns
+from classification.views.overlaps_view import view_overlaps, view_overlap_history, overlap_report_review, \
+    action_overlap_review, discordance_calculator, TriageView, view_overlap, download_overlaps
 from classification.views.views import AutopopulateView, classification_import_tool
 from classification.views.views_gene_consensus import gene_consensus_panel
 from classification.views.views_hgvs_resolution_tool import hgvs_resolution_tool
@@ -107,12 +100,12 @@ urlpatterns = [
     path('classifications', views.classifications, name='classifications'),
 
     path('groupings', views.classification_groupings, name='classification_groupings'),
+    path('groupings/export_config', view_classification_grouping_export, name='classification_grouping_export_config'),
+    path('groupings/export', serve_export, name='classification_grouping_export'),
     path('groupings/<int:classification_grouping_id>', views.view_classification_grouping_detail, name='classification_grouping_detail'),
     path('groupings/<int:classification_grouping_id>/records', views.view_classification_grouping_records_detail,
          name='classification_grouping_records_detail'),
-    path('allele_groupings', views.allele_groupings, name='allele_groupings'),
-    path('allele_groupings/<str:lab_id>', views.allele_groupings, name='allele_groupings_lab'),
-    path('allele_grouping/<allele_grouping_id>', views.view_allele_grouping_detail, name='allele_grouping_detail'),
+
 
     path('create_for_variant/<int:variant_id>/<genome_build_name>', views.CreateClassificationForVariantView.as_view(),
          name='create_classification_for_variant'),
@@ -175,7 +168,6 @@ urlpatterns = [
 
     path('condition_matchings', condition_matchings_view, name='condition_matchings'),
     path('condition_matchings/<str:lab_id>', condition_matchings_view, name='condition_matchings_lab'),
-    path('condition_matchings/<str:lab_id>', condition_matchings_view, name='condition_matchings_lab'),
     path('condition_matching/datatable/<str:lab_id>', DatabaseTableView.as_view(column_class=ConditionTextColumns), name='condition_text_datatable'),
     path('condition_matching/<int:pk>', condition_matching_view, name='condition_matching'),
 
@@ -227,11 +219,13 @@ urlpatterns = [
 
     path('accumulation_data', classification_accumulation_graph.download_report, name="classification_accumulation_data"),
 
+    # discordance reports just redirects to overlaps now, path kept here so old links work
     path('discordance_reports', discordance_reports_view, name='discordance_reports'),
-    path('discordance_reports/<str:lab_id>', discordance_reports_view, name='discordance_reports'),
-    path('discordance_reports/<str:lab_id>/history_detail', discordance_reports_history_detail, name='discordance_reports_history_detail'),
-    path('discordance_reports/<str:lab_id>/active_detail', discordance_reports_active_detail, name='discordance_reports_active_detail'),
-    path('discrodance_reports/<str:lab_id>/download', discordance_reports_download, name='discordance_reports_download'),
+
+    # path('discordance_reports/<str:lab_id>', discordance_reports_view, name='discordance_reports'),
+    # path('discordance_reports/<str:lab_id>/history_detail', discordance_reports_history_detail, name='discordance_reports_history_detail'),
+    # path('discordance_reports/<str:lab_id>/active_detail', discordance_reports_active_detail, name='discordance_reports_active_detail'),
+    # path('discrodance_reports/<str:lab_id>/download', discordance_reports_download, name='discordance_reports_download'),
     # 'classification' is redundant but there'll be other references to these URLs, so keep the URLs valid
     path('classification/discordance_report/<int:discordance_report_id>', discordance_report_view, name='discordance_report_deprecated'),
     path('classification/discordance_report/<int:discordance_report_id>/review', discordance_report_review, name='discordance_report_review'),
@@ -251,14 +245,22 @@ urlpatterns = [
 
     path('hgvs_resolution_tool', hgvs_resolution_tool, name='hgvs_resolution_tool'),
 
-    path('clinical_context', post_clinical_context, name='clinical_context'),
-    path('overlaps', view_overlaps, name='overlaps'),
+    path('overlaps/calc', discordance_calculator, name='overlap_calc'),
+    path('overlaps/triage/<int:triage_id>', TriageView.as_view(), name='triage'),
+    path('overlaps/overlap/<int:overlap_id>/history', view_overlap_history, name='overlap_history'),
+    path('overlaps/overlap/<int:overlap_id>', view_overlap, name='overlap'),
+    path('overlaps/datatables', DatabaseTableView.as_view(column_class=OverlapColumns), name='overlaps_datatables'),
     path('overlaps/<str:lab_id>', view_overlaps, name='overlaps'),
-    path('overlaps_detail/<str:lab_id>', view_overlaps_detail, name='overlaps_detail'),
+    path('overlaps/<str:lab_id>/download', download_overlaps, name='overlaps_download'),
+    path('overlaps', view_overlaps, name='overlaps'),
+
+    path('overlaps/overlap/<int:overlap_id>/review', overlap_report_review, name='overlap_report_review'),
+    path('overlap_review_action/<int:review_id>', action_overlap_review, name='action_overlap_review'),
+
     path('vus', view_overlaps_vus, name='vus'),
     path('vus/<str:lab_id>', view_overlaps_vus, name='vus'),
     path('vus_detail/<str:lab_id>', view_overlaps_vus_detail, name='vus_detail'),
-    path('clinical_context/<int:pk>', view_clinical_context, name='clinical_context'),
+    # path('clinical_context/<int:pk>', view_clinical_context, name='clinical_context'),
 
     path('imported_allele_info', view_imported_allele_info, name='view_imported_allele_info'),
     path('imported_allele_info/<int:allele_info_id>', view_imported_allele_info_detail, name='view_imported_allele_info_detail'),
@@ -268,6 +270,8 @@ urlpatterns = [
     path('lab_gene_classification_counts', views.lab_gene_classification_counts, name='lab_gene_classification_counts'),
     path('clinical_significance_change_data', views.clin_sig_change_data, name='clinical_significance_change_data'),
     path('autocomplete/EvidenceKey/', views_autocomplete.EvidenceKeyAutocompleteView.as_view(), name='evidence_key_autocomplete'),
+
+    path('public_info', views.view_public_info, name='classification_public_info'),
 
     path('api/imported_allele_info/datatables/', DatabaseTableView.as_view(column_class=ImportedAlleleInfoColumns), name='imported_allele_info_datatables'),
 
@@ -291,7 +295,7 @@ urlpatterns = [
     path('api/classifications/datatables/', DatabaseTableView.as_view(column_class=ClassificationColumns), name='classification_datatables'),
     path('api/classification/groups/datatables/', DatabaseTableView.as_view(column_class=ClassificationGroupingColumns), name='classification_grouping_datatables'),
     path('api/classification/groups/counts/', ClassificationGroupingCountsView.as_view(), name='classification_grouping_counts'),
-    path('api/classification/allele_groups/datatables/<str:lab_id>', DatabaseTableView.as_view(column_class=AlleleGroupingColumns), name='allele_grouping_datatables'),
+    #path('api/classification/allele_groups/datatables/<str:lab_id>', DatabaseTableView.as_view(column_class=AlleleGroupingColumns), name='allele_grouping_datatables'),
 
     path('api/classifications/gene_counts/<lab_id>', LabGeneClassificationCountsView.as_view(),
          name='lab_gene_classification_counts_api'),

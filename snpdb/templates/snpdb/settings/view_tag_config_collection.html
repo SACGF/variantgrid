@@ -74,23 +74,6 @@
             });
         });
 
-        $("#show-resolved-variant-tags").change(function() {
-            const msgBox = $("#save-show-resolved-message");
-            msgBox.empty();
-            $.ajax({
-                type: "POST",
-                data: "show_resolved_variant_tags=" + $(this).prop("checked"),
-                url: "{{ request.path }}",
-                success: function() {
-                    msgBox.append(`<li class='alert-info'>Show resolved saved successfully</li>`);
-                    msgBox.fadeIn().delay(2000).fadeOut(1000);
-                },
-                error: function() {
-                    msgBox.append(`<li class='error'>Could not save show resolved</li>`);
-                }
-            });
-        });
-
         $(".tag-quick-tag").change(function() {
             const checkbox = $(this);
             const data = 'quick_tag=' + checkbox.attr("tag_id") + '&value=' + checkbox.prop("checked");
@@ -189,17 +172,6 @@
             <p class="text-muted">
             Tag events older than this are considered stale: grids show fresh vs total counts and mark
             tags whose most recent event is older.
-            </p>
-
-            <label for="show-resolved-variant-tags">Show resolved variant tags:</label>
-            <input type="checkbox" id="show-resolved-variant-tags"
-                   {% if tag_config_collection.show_resolved_variant_tags %}checked="checked"{% endif %}
-                   {% if not has_write_permission %}disabled="disabled"{% endif %} />
-            <ul id="save-show-resolved-message" class="messages"></ul>
-            <p class="text-muted">
-            A tag that requires classification is resolved once the variant is classified. Tick to keep resolved
-            tags on the variant page and variant tags page for everyone using this tag config, and to start new
-            tag nodes with "Include resolved" ticked.
             </p>
         </div>
     </div>

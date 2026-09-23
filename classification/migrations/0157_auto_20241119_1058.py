@@ -6,8 +6,8 @@ from classification.evidence_key_rename import EvidenceKeyRenamer, OptionUpdator
 
 
 def _migrate_testing_context(apps, _schema):
-    EvidenceKeyRenamer.rename(apps, old_key="somatic:testing_context", new_key="testing_context")
-    e_key = apps.get_model('classification', 'EvidenceKey').objects.get(key="testing_context")
+    EvidenceKeyRenamer.rename(apps, old_key="somatic:testing_context_bucket", new_key="testing_context_bucket")
+    e_key = apps.get_model('classification', 'EvidenceKey').objects.get(key="testing_context_bucket")
     e_key.sub_label = None
     e_key.save()
     options = OptionUpdator(e_key=e_key)
@@ -21,8 +21,8 @@ def _migrate_testing_context(apps, _schema):
 
 
 def _reverse_migrate_testing_context(apps, _schema):
-    EvidenceKeyRenamer.rename(apps, old_key="testing_context", new_key="somatic:testing_context")
-    e_key = apps.get_model('classification', 'EvidenceKey').objects.get(key="somatic:testing_context")
+    EvidenceKeyRenamer.rename(apps, old_key="testing_context_bucket", new_key="somatic:testing_context_bucket")
+    e_key = apps.get_model('classification', 'EvidenceKey').objects.get(key="somatic:testing_context_bucket")
     e_key.sub_label = "Somatic"
     e_key.save()
     options = OptionUpdator(e_key=e_key)

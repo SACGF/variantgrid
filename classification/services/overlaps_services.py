@@ -1,0 +1,863 @@
+from collections import defaultdict
+from dataclasses import dataclass
+from datetime import datetime, timedelta
+from functools import cached_property
+from json import JSONDecodeError
+from typing import Optional, Any, Self
+
+from auditlog.context import set_extra_data
+from auditlog.models import LogEntry
+from django.conf import settings
+from django.contrib.auth.models import User
+from django.db import transaction
+from django.db.models import QuerySet, Q, Subquery, OuterRef
+from django.db.models.aggregates import Max
+from django.utils.timezone import now
+
+from annotation.models import ClinVarRecordCollection, ClinVarRecord
+from classification.enums import TestingContextBucket, OverlapStatus, OverlapState
+from classification.models import ClassificationGrouping, ClassificationResultValue, OverlapContributionStatus, \
+    OverlapContribution, OverlapEntrySourceTextChoices, Overlap, OverlapType, OverlapContributionNextStep, \
+    TriageNextStep, TriageState, EffectiveDate, TriageComment, EffectiveDateType, OverlapDiscordanceNotification, \
+    DiscordanceReport, ClassificationImportRun, EvidenceKeyMap
+from classification.enums.overlaps_enums import TriageStatus
+from classification.services.overlap_calculator import overlap_calculator_for_value_type, OVERLAP_CLIN_SIG_ENABLED
+import json
+from library.django_utils import get_url_from_view_path
+from library.log_utils import NotificationBuilder
+from review.models import Review
+from snpdb.lab_picker import LabPickerData
+from snpdb.models import Lab, LabLike, UserSettings
+from snpdb.utils import LabNotificationBuilder
+
+
+class OverlapServices:
+    """
+    Service that performs most of the calculations for connecting Contributions to Overlaps and calculating hte Overlap's status
+    """
+
+    @staticmethod
+    def update_classification_grouping_overlap_contribution(
+            classification_grouping: ClassificationGrouping,
+            migration: bool = False,
+            recalc_overlaps: bool = True):
+        """
+        Assigns the classification grouping to an Overlap (if the grouping should belong to an overlap).
+        No need to call save() after
+        :param classification_grouping: The classification grouping to assign to an overlap
+        :param migration: Are we doing this as a migration and need to calculate some history, otherwise acts live
+        :param recalc_overlaps: If true update the overlaps right after this update
+        """
+
+        if classification_grouping.testing_context in {TestingContextBucket.OTHER, TestingContextBucket.UNKNOWN}:
+            # Don't make overlaps for Other or Unknown, treat them as just not being put in a group properly yet
+            return
+
+        value_types: list[ClassificationResultValue] = [ClassificationResultValue.ONC_PATH]
+        if classification_grouping.testing_context != TestingContextBucket.GERMLINE:
+            # Germline only looks on Pathogenicity, but Somatic will look at Oncogenicity and Somatic Clinical Significance (e.g. Tier I, Tier II)
+            value_types.append(ClassificationResultValue.SOMATIC_CLINICAL_SIGNIFICANCE)
+
+        for value_type in value_types:
+            calc = overlap_calculator_for_value_type(value_type)
+            value = calc.value_from_summary(classification_grouping.latest_cached_summary_obj)
+            is_comparable = calc.is_comparable_value(value)
+            is_shared = classification_grouping.share_level_obj.is_discordant_level
+
+            contribution: OverlapContributionStatus
+            if value is None:
+                contribution = OverlapContributionStatus.NO_VALUE
+            elif not is_shared:
+                contribution = OverlapContributionStatus.NOT_SHARED
+            elif not is_comparable:
+                contribution = OverlapContributionStatus.NON_COMPARABLE_VALUE
+            else:
+                contribution = OverlapContributionStatus.CONTRIBUTING
+
+            effective_date = EffectiveDate(None, EffectiveDateType.UNKNOWN)
+            if lastest_modification := classification_grouping.latest_classification_modification:
+                effective_date = lastest_modification.curated_date_check.to_effective_date
+
+            audit_context = {}
+            if migration:
+                audit_context["migration"] = True
+                # TODO migrate the full set of historical values not just from this latest classification
+
+                if lastest_modification := classification_grouping.latest_classification_modification:
+                    # use the last publish date of the latest classification grouping (not accurate, but gives us something)
+                    # audit trail acts as if this entry happened
+                    audit_context["timestamp"] = lastest_modification.created
+
+            overlap_contribution: OverlapContribution
+            created: bool
+            with set_extra_data(audit_context):
+                overlap_contribution, created = OverlapContribution.objects.update_or_create(
+                    source=OverlapEntrySourceTextChoices.CLASSIFICATION,
+                    allele=classification_grouping.allele,
+                    classification_grouping=classification_grouping,
+                    testing_context_bucket=classification_grouping.testing_context,
+                    tumor_type_category=classification_grouping.tumor_type_category,
+                    value_type=value_type,
+                    defaults={
+                        "value": value,
+                        "contribution_status": contribution,
+                        "effective_date": effective_date.to_dict()
+                    }
+                )
+            if created:
+                OverlapServices._link_overlap_contribution(overlap_contribution)
+                # make sure this is added to or creates the relevant overlaps
+                overlap_contribution.refresh_from_db()
+
+            if recalc_overlaps:
+                # now update status of any created overlaps or existing linked overlaps
+                for overlap in overlap_contribution.overlaps:
+                    # FIXME, should mark the overlap as dirty instead so overlap can be batch
+                    OverlapServices.update_next_steps(overlap)
+                    OverlapServices.recalc_overlap(overlap)
+
+    @staticmethod
+    def update_clinvar_overlap_contribution(
+            clinvar_record_collection: ClinVarRecordCollection,
+            migration: bool = False,
+            recalc_overlaps=True):
+        """
+        Assigns a clinvar record collection to an Overlap (if the clinvar collection should belong to an overlap).
+        No need to call save() after
+        :param clinvar_record_collection: The clinvar grouping to assign to an overlap, should be an expert panel (and for now Germline).
+        :param migration: True if doing this as a migration and need to calculate some history, otherwise acts live.
+        :param recalc_overlaps: If true update the overlaps right after this update.
+        """
+
+        # TODO - code assumes that ClinVarRecordCollection is just for Germline
+        # need to fix that when we get other expert panels
+
+        if clinvar_record_collection.allele is None:
+            return
+
+        expert_panel: ClinVarRecord
+        if expert_panel := clinvar_record_collection.expert_panel:
+
+            value = expert_panel.clinical_significance
+            is_relevant_value = EvidenceKeyMap.clinical_significance_to_bucket().get(value) is not None
+            contribution_enum = OverlapContributionStatus.CONTRIBUTING if is_relevant_value else OverlapContributionStatus.NON_COMPARABLE_VALUE
+            effective_date = EffectiveDate.from_datetime(
+                expert_panel.date_last_evaluated or expert_panel.date_clinvar_updated, EffectiveDateType.CURATED)
+
+            extra_data = {}
+            if migration:
+                # if we're migrating, pretend this entry was created when the expert panel itself occurred
+                extra_data = {
+                    "timestamp": expert_panel.created,
+                    "migration": True
+                }
+
+            with set_extra_data(extra_data):
+                contribution, created = OverlapContribution.objects.update_or_create(
+                    source=OverlapEntrySourceTextChoices.CLINVAR,
+                    scv=expert_panel.record_id,
+                    allele=clinvar_record_collection.allele,
+                    classification_grouping=None,
+                    value_type=ClassificationResultValue.ONC_PATH,
+                    contribution_status=contribution_enum,
+                    testing_context_bucket=TestingContextBucket.GERMLINE,
+                    tumor_type_category=None,
+                    defaults={
+                        "value": value,
+                        "effective_date": effective_date.to_dict(),
+                    },
+                    triage_state=TriageState(status=TriageStatus.NON_INTERACTIVE_THIRD_PARTY).to_dict()
+                )
+
+                OverlapServices._link_overlap_contribution(contribution)
+                if recalc_overlaps:
+                    overlaps = set()
+                    for skew in contribution.overlapcontributionnextstep_set.select_related('overlap').all():
+                        overlaps.add(skew.overlap)
+                    for overlap in overlaps:
+                        OverlapServices.recalc_overlap(overlap)
+        else:
+            # there's a chance an ExpertPanel has been removed, but extremely unlikely
+            # but if so, delete the contribution and recalculate the overlap
+            if once_expert := OverlapContribution.objects.filter(allele=clinvar_record_collection.allele,
+                                                                 scv__isnull=False).first():
+                overlaps = list(once_expert.overlaps)
+                once_expert.delete()
+                for overlap in overlaps:
+                    OverlapServices.recalc_overlap(overlap)
+
+    @staticmethod
+    def _link_overlap_contribution(overlap_contribution: OverlapContribution):
+        """
+        Called after linking a classification_grouping or clinvar expert panel to an OverlapContribution,
+        now link that OverlapContribution to Overlap(s) and ensure proper OverlapSkews
+        Will connect to both direct same context, and cross context overlaps
+        :param overlap_contribution: The overlap_contribution to link to an Overlap
+        """
+        single_context_overlap, created = Overlap.objects.get_or_create(
+            overlap_type=OverlapType.SINGLE_CONTEXT,
+            value_type=overlap_contribution.value_type,
+            allele=overlap_contribution.allele,
+            testing_context_bucket=overlap_contribution.testing_context_bucket,
+            tumor_type_category=overlap_contribution.tumor_type_category,
+            defaults={
+                "overlap_status": OverlapStatus.NO_CONTRIBUTIONS,
+                "valid": False
+            }
+        )
+
+        OverlapContributionNextStep.objects.get_or_create(
+            overlap=single_context_overlap,
+            contribution=overlap_contribution
+        )
+
+        cross_context_overlap, created = Overlap.objects.get_or_create(
+            overlap_type=OverlapType.CROSS_CONTEXT,
+            value_type=overlap_contribution.value_type,
+            allele=overlap_contribution.allele,
+            testing_context_bucket=None,
+            tumor_type_category=None,
+            defaults={
+                "overlap_status": OverlapStatus.NO_CONTRIBUTIONS,
+                "valid": False
+            }
+        )
+
+        OverlapContributionNextStep.objects.get_or_create(
+            overlap=cross_context_overlap,
+            contribution=overlap_contribution
+        )
+
+    @staticmethod
+    def update_next_steps(overlap: Overlap):
+        """
+        Skews determine if from a lab's PoV an Overlap is waiting on them, waiting on another lab etc.
+        So grab all the OverlapContributions, check their TriageStatus, link those to the Skews
+        Then update the Skew's next steps
+        """
+
+        status_buckets: defaultdict[TriageStatus, list[OverlapContributionNextStep]] = defaultdict(list)
+        all_interactive_next_steps: list[OverlapContributionNextStep] = []
+        for skew in overlap.overlapcontributionnextstep_set.all():
+            status_buckets[skew.contribution.triage_state_obj.status].append(skew)
+            if skew.contribution.triage_state_obj.status != TriageStatus.NON_INTERACTIVE_THIRD_PARTY:
+                all_interactive_next_steps.append(skew)
+
+        pending = status_buckets[TriageStatus.PENDING]
+        reviewed_will_change = status_buckets[TriageStatus.REVIEWED_WILL_FIX]
+        reviewed_will_discuss = status_buckets[TriageStatus.REVIEWED_WILL_DISCUSS]
+        # treat amended the same as confident (as the value has changed to something you're confident in, in theory)
+        # note that Review Will Fix is turned into Amended when the value is actually updated
+        reviewed_confident = status_buckets[TriageStatus.REVIEWED_SATISFACTORY] + status_buckets[TriageStatus.AMENDED]
+        reviewed_complex = status_buckets[TriageStatus.COMPLEX]
+        # note we ignore non-interactive 3rd party... since they're non-interactive
+
+        # mark everything as Pending Calculation (then if we don't replace pending later with a real value
+        for entry in all_interactive_next_steps:
+            entry.next_step = TriageNextStep.PENDING_CALCULATION
+
+        had_pending_or_changing = False
+
+        # If your triage is pending, your task is always to triage
+        if pending:
+            had_pending_or_changing = True
+
+            partially_triaged = False
+            # now while there are pending, if there are others that have already done something
+            # they get changed into waiting on others
+            for not_pending in reviewed_will_discuss + reviewed_confident + reviewed_complex:
+                not_pending.next_step = TriageNextStep.AWAITING_OTHER_LAB
+                partially_triaged = True
+
+            for pend in pending:
+                if partially_triaged:
+                    # you're still pending but others have triaged (labs don't want to leave other labs hanging)
+                    pend.next_step = TriageNextStep.AWAITING_YOUR_TRIAGE_OTHERS_TRIAGED
+                else:
+                    pend.next_step = TriageNextStep.AWAITING_YOUR_TRIAGE
+
+        if reviewed_will_change:
+            had_pending_or_changing = True
+            for change in reviewed_will_change:
+                # if you've said you're going to amend the value, then we're waiting on your amending
+                change.next_step = TriageNextStep.AWAITING_YOUR_AMEND
+            for not_pending in reviewed_will_discuss + reviewed_confident + reviewed_complex:
+                # another lab has said they'll amend
+                not_pending.next_step = TriageNextStep.AWAITING_OTHER_LAB
+
+        if not had_pending_or_changing:
+            # below no one is pending or has an outstanding change, so it's just a matter of working out clashing statuses
+            if reviewed_will_discuss:
+                # everyone has a status, and at least 1 person said reviewed will discuss, so we're all discussing it now
+                for lets_chat in reviewed_will_discuss + reviewed_confident + reviewed_complex:
+                    lets_chat.next_step = TriageNextStep.TO_DISCUSS
+
+            elif reviewed_confident:
+                # no one said discuss, but everyone has a different opinion so time to discuss
+                for lets_chat in reviewed_complex + reviewed_confident:
+                    lets_chat.next_step = TriageNextStep.TO_DISCUSS
+
+            elif reviewed_complex:
+                # Everyone said it's complex
+                for r_complex in reviewed_complex:
+                    # Note, if everyone says complex the overlap will also be set to OverlapOverrideStatus.COMPLEX
+                    r_complex.next_step = TriageNextStep.UNANIMOUSLY_COMPLEX
+
+        # the above should have updated every skew perspective, check below
+        for entry in all_interactive_next_steps:
+            if entry.next_step == TriageNextStep.PENDING_CALCULATION:
+                raise ValueError("Failed to assign each skew a status")
+
+        OverlapContributionNextStep.objects.bulk_update(
+            objs=all_interactive_next_steps,
+            fields=['next_step']
+        )
+
+    @staticmethod
+    def recalc_overlap(overlap: Overlap):
+        """
+        Recalculates the overlap status based on contributions and triage status (no need to call save after)
+        :param overlap: The overlap to recalculate
+        """
+        calculator = overlap_calculator_for_value_type(overlap.value_type)
+
+        overlap_status_calculation = calculator.calculate_entries(overlap.contributions_list)
+        cached_state = overlap.cached_overlap_state_obj
+
+        overlap_status_changed = False
+        overlap_valid_changed = False
+        if overlap_status_calculation != cached_state:
+            # see if either overlap status or pending overlap status are changing
+            overlap.overlap_status = overlap_status_calculation.status
+            overlap.has_pending_values = overlap_status_calculation.has_pending_values
+            overlap.overlap_max_ever_status = max(overlap.overlap_max_ever_status, overlap_status_calculation.status)
+            overlap.overlap_override_status = overlap_status_calculation.override_status
+            overlap.all_vus = overlap_status_calculation.all_vus
+            overlap.cached_overlap_state_obj = overlap_status_calculation
+
+            overlap.overlap_status_change_timestamp = now()
+            overlap_status_changed = True
+
+        if overlap.overlap_type == OverlapType.SINGLE_CONTEXT:
+            # a single context Overlap is always "valid" (though it can have an OverlapStatus of NO Contributions)
+            if not overlap.valid:
+                overlap.valid = True
+                overlap_valid_changed = True
+        elif overlap.overlap_type == OverlapType.CROSS_CONTEXT:
+            # cross contexts need at least 2 different contexts to be considered valid
+            # Rather than a whole valid bool, could this be better done as just the status of REQUIRES_MULTIPLE_CONTEXTS?
+            valid = len(overlap.testing_contexts_objs) > 1
+            if overlap.valid != valid:
+                overlap.valid = valid
+                overlap_valid_changed = True
+
+        if overlap_valid_changed or overlap_status_changed:
+            overlap.save()
+            if overlap_status_changed:
+                OverlapServices._overlap_status_changed(overlap, cached_state, overlap_status_calculation)
+
+    @staticmethod
+    def _overlap_status_changed(overlap: Overlap, old_state: OverlapState, new_state: OverlapState):
+        """
+        Called when important factors of an Overlap change that might require a discordance notification to be prepared
+        :param overlap: The overlap object (typically reflecting the new state)
+        :param old_state: The overlap's state just prior
+        :param new_state: The overlap's state now
+        """
+        if not settings.DISCORDANCE_ENABLED:
+            return
+
+        if overlap.overlap_type == OverlapType.CROSS_CONTEXT:
+            return  # don't notify when cross context become discordant
+
+        if not OVERLAP_CLIN_SIG_ENABLED and overlap.value_type == ClassificationResultValue.SOMATIC_CLINICAL_SIGNIFICANCE:
+            return  # don't notify clin sig discordances until we have proper logic for that
+
+        # see if it's worth notifying anyone
+        odn: OverlapDiscordanceNotification
+        created: bool = False
+        if not OverlapState.is_notify_relevant(old_state, new_state):
+            # change isn't worth notifying, but if we were already notifying (with a previous state), update that notification
+            # so find the existing notification (if one exists) and update it, but don't create one
+            odn = OverlapDiscordanceNotification.objects.filter(overlap=overlap, notification_sent_date__isnull=True).first()
+        else:
+            # change is worth notifying, so find the existing notification if one exists and update it, or create a new one
+            odn, created = OverlapDiscordanceNotification.objects.get_or_create(
+                overlap=overlap,
+                notification_sent_date=None,
+                defaults={
+                    "old_state": old_state.to_dict(),
+                    "new_state": new_state.to_dict()
+                }
+            )
+
+        if odn and not created:
+            odn.new_state_obj = new_state
+            odn.save()
+
+        if odn:
+            # this will send emails right away if we're not in an import, otherwise at the end of an import
+            OverlapServices.send_prepared_discordance_notifications()
+
+    @staticmethod
+    def send_prepared_discordance_notifications(
+            outstanding_notifications: Optional[QuerySet[OverlapDiscordanceNotification]] = None) -> bool:
+        """
+        Sends discordance notifications to labs if .is_still_relevant and fills in their send date
+        Deletes discordance notifications that are marked as not .is_still_relevant
+        Also sends an overall notification to admins about the discordances
+        :param outstanding_notifications: which notifications to send, if blank then inspect all unsent notifications
+        :return: True if all notifications were sent
+        """
+
+        if ClassificationImportRun.ongoing_imports():
+            # don't send notifications while an import is ongoing
+            return False
+
+        if outstanding_notifications is None:
+            outstanding_notifications = OverlapDiscordanceNotification.objects.filter(
+                notification_sent_date__isnull=True).order_by('pk')
+
+        if not outstanding_notifications.exists():
+            return False
+
+        outstanding_notifications = outstanding_notifications.select_related("overlap")
+        with transaction.atomic():
+            outstanding_notifications = outstanding_notifications.select_for_update()
+
+            current_date = now()
+            relevant_notifications: list[OverlapDiscordanceNotification] = []
+            notifications_by_lab: dict[Lab, list[OverlapDiscordanceNotification]] = defaultdict(list)
+
+            # send relevant notifications to the admins
+            # and build up a dictionary of which notifications each lab should get
+            for notification in outstanding_notifications:
+                if not notification.is_still_relevant:
+                    # the old/new status of an Overlap can be updated multiple times
+                    # possible that the end result is the Overlap after status changes to something and then back again
+                    notification.delete()
+                else:
+                    # send one notification per discordance so we don't try to send a single message too big for slack
+                    overall_admin_notification = NotificationBuilder("Discordance notification").add_markdown(
+                        ":email: Sending Discordance Notification")
+                    notification.notification_sent_date = current_date
+                    relevant_notifications.append(notification)
+
+                    # we could also contact labs that were once part of the Overlap but are no longer
+                    # though currently not possible to tell if they were part of the allele from years back or from minutes ago and just withdrew
+                    # so for now only support notifying when new labs add to the Overlap
+
+                    labs: set[Lab] = set()
+                    for contribution in notification.overlap.contributions.filter(
+                            contribution_status=OverlapContributionStatus.CONTRIBUTING):
+                        if lab := contribution.lab:
+                            labs.add(lab)
+                            notifications_by_lab[lab].append(notification)
+
+                    sorted_lab_str = "\n".join(str(lab) for lab in sorted(labs))
+
+                    overlap = notification.overlap
+                    discordance_status_icon = ":no_good:" if notification.new_state_obj.is_active_discordance else ":handshake:"
+                    overlap_description = f"{overlap.scope_description} {overlap.value_type_label}"
+
+                    overlap_change = []
+                    if notification.old_state_obj.label != notification.new_state_obj.label:
+                        overlap_change.append(
+                            f"{notification.old_state_obj.label} -> {notification.new_state_obj.label} {discordance_status_icon}")
+                    else:
+                        overlap_change.append(f"{notification.new_state_obj.label}")
+
+                    if new_lab_groups := set(notification.new_state_obj.lab_groups).difference(
+                            notification.old_state_obj.lab_groups):
+                        new_labs = list(sorted(Lab.objects.filter(group_name__in=new_lab_groups).all()))
+                        for lab in new_labs:
+                            overlap_change.append(f"{lab} is now part of this overlap")
+
+                    overall_admin_notification.add_field("Overlap",
+                                                         f"<{get_url_from_view_path(notification.overlap.get_absolute_url())}|Overlap_{notification.overlap_id}> {overlap_description}")
+                    overall_admin_notification.add_field("Involved Labs", sorted_lab_str)
+                    overall_admin_notification.add_field("Change", "\n".join(overlap_change))
+                    overall_admin_notification.send()
+
+            # now notify the labs
+            for lab, notifications in notifications_by_lab.items():
+                notifications_list = list(sorted(notifications))
+                notification_count = len(notifications)
+                if notification_count > 6:
+                    subject = f"Discordance Update for {notification_count} Discordances"
+                else:
+                    subject = "Discordance Update for (" + ", ".join(
+                        [f"OV_{notification.overlap_id}" for notification in notifications_list]) + ")"
+
+                lab_notification = LabNotificationBuilder(lab=lab, message=subject)
+
+                for index, notification in enumerate(notifications):
+                    if not index == 0:
+                        lab_notification.add_divider()
+
+                    overlap = notification.overlap
+
+                    report_url = get_url_from_view_path(notification.overlap.get_absolute_url())
+                    # report_summary = DiscordanceReportRowData(discordance_report=dr, perspective=user_perspective)
+                    lab_notification.add_markdown(
+                        f"The below overlap is now marked as *{notification.new_state_obj.label}*")
+                    # notification.add_markdown(f"The labs {all_lab_names} are involved in the following discordance:")
+
+                    lab_notification.add_field(label="Overlap", value=f"<{report_url}|OV_{notification.overlap_id}>")
+                    # can't say when discordance detected on as overlap_status_change_timestamp would have been updated
+                    lab_notification.add_field(label="c.HGVS", value=str(overlap.c_hgvs(lab)))
+
+                    # now each lab's contribution
+                    for contribution in overlap.contributions_list:
+                        lab_notification.add_field(label=str(contribution.lab_like), value=contribution.pretty_value)
+
+                lab_notification.send()
+
+            OverlapDiscordanceNotification.objects.bulk_update(relevant_notifications,
+                                                               fields=['notification_sent_date'])
+        return True
+
+
+@dataclass
+class FieldChange:
+    field: str
+    old_value: str
+    new_value: str
+
+    def __lt__(self, other):
+        return self.field < other.field
+
+
+@dataclass
+class ChangeRow:
+    overlap_contribution: OverlapContribution
+    user: Optional[User]
+    changes: list[FieldChange]
+    comment: Optional[str]
+    timestamp: datetime
+    is_new_record: bool
+    is_withdrawn: bool = False
+    is_unwithdrawn: bool = False
+
+    def __lt__(self, other):
+        return self.timestamp < other.timestamp
+
+
+@dataclass(frozen=True)
+class OverlapContributionPerspective:
+    """
+    Used to make rows on a table for how an Overlap looks for the current user
+    """
+    overlap: Overlap
+    overlap_contribution: OverlapContribution
+    is_cross_context: bool = False
+    is_user_lab: bool = False
+    is_admin: bool = False
+
+    @cached_property
+    def email_subject(self):
+        return f"{settings.SITE_NAME} overlap for {self.overlap.c_hgvs(lab=self.overlap_contribution.lab)}"
+
+    @property
+    def _sort_index(self):
+        return self.is_cross_context, self.is_user_lab, self.overlap_contribution
+
+    @property
+    def is_editable(self):
+        return self.overlap_contribution.classification_grouping is not None and (self.is_user_lab or self.is_admin)
+
+    def __lt__(self, other: Self):
+        return self._sort_index < other._sort_index
+
+
+@dataclass(frozen=True)
+class LabContext:
+    lab: LabLike
+    contact_subject: Optional[str]
+
+
+@dataclass(frozen=True)
+class OverlapPageDetails:
+    """
+    Used to process data that appears on the overlap detail page
+    """
+
+    overlap: Overlap
+    user: User
+
+    @cached_property
+    def next_steps(self) -> list[OverlapContributionNextStep]:
+        relevant_next_steps = list(
+            self.overlap.overlapcontributionnextstep_set.filter(
+                contribution__contribution_status=OverlapContributionStatus.CONTRIBUTING,
+                contribution__classification_grouping__lab__in=Lab.valid_labs_qs(self.user, admin_check=True))
+        )
+        sorted_by_lab = list(sorted(relevant_next_steps, key=lambda ocs: ocs.contribution.classification_grouping.lab))
+        return sorted_by_lab
+
+    @cached_property
+    def other_relevant_overlaps(self) -> list[Overlap]:
+        if allele_id := self.overlap.allele_id:
+            return list(sorted(Overlap.objects.filter(allele_id=allele_id, valid=True, overlap_status__gte=OverlapStatus.SINGLE_SUBMITTER).exclude(pk=self.overlap.pk).all()))
+        return []
+
+    @cached_property
+    def involved_labs(self) -> list[LabContext]:
+        labs: set[LabContext] = set()
+        for overlap_contribution in self.overlap.contributions:
+            subject = None
+            if lab := overlap_contribution.lab:
+                genome_build = UserSettings.get_for(lab=lab).default_genome_build
+                subject = f"{settings.SITE_NAME} record : {self.overlap.c_hgvs(lab=lab, genome_build=genome_build)}"
+
+            labs.add(
+                LabContext(
+                    lab=overlap_contribution.lab_like,
+                    contact_subject=subject
+                )
+            )
+        return list(sorted(labs, key=lambda x: x.lab))
+
+    @cached_property
+    def rows(self) -> list[OverlapContributionPerspective]:
+        perspectives = []
+
+        user_labs = Lab.valid_labs_qs(self.user)
+        for overlap_contribution in self.overlap.contributions:
+            lab = None
+            if cg := overlap_contribution.classification_grouping:
+                lab = cg.lab
+
+            perspectives.append(OverlapContributionPerspective(
+                overlap=self.overlap,
+                overlap_contribution=overlap_contribution,
+                is_cross_context=False,
+                is_user_lab=not self.user.is_superuser and lab in user_labs,
+                is_admin=self.user.is_superuser
+            ))
+
+        if allele_id := self.overlap.allele_id:
+            if cross_context := Overlap.objects.filter(allele_id=allele_id, overlap_type=OverlapType.CROSS_CONTEXT, valid=True).first():
+                cross_context_contributions = set(cross_context.contributions) - set(self.overlap.contributions_list)
+                for overlap_contribution in list(sorted(cross_context_contributions)):
+                    perspectives.append(OverlapContributionPerspective(
+                        overlap=self.overlap,
+                        overlap_contribution=overlap_contribution,
+                        is_cross_context=True,
+                        is_user_lab=not self.user.is_superuser and overlap_contribution.lab in user_labs,
+                        is_admin=self.user.is_superuser
+                    ))
+
+        return list(sorted(perspectives))
+
+    @cached_property
+    def discordance_reports(self) -> list[DiscordanceReport]:
+        if self.overlap.testing_context_bucket != TestingContextBucket.GERMLINE:
+            return []
+        return list(DiscordanceReport.objects.filter(clinical_context__allele=self.overlap.allele).order_by('-created'))
+
+    @cached_property
+    def legacy_reviews(self) -> list[Review]:
+        reviews = []
+        for dr in self.discordance_reports:
+            reviews.extend(list(dr.reviews_all()))
+        return reviews
+
+    @property
+    def value_type(self) -> ClassificationResultValue:
+        return self.overlap.value_type
+
+    @staticmethod
+    def tidy_change(overlap_contribution: OverlapContribution, field_name: str, value: Any):
+        # just used for the changelog
+
+        def to_json(thing: Any):
+            if isinstance(thing, str):
+                # sometimes json is double encoded in audit
+                thing = json.loads(thing)
+                if isinstance(thing, str):
+                    thing = json.loads(thing)
+            return thing
+
+        if value == "None":
+            return None
+        try:
+            match field_name:
+                case "triage_state":
+                    return TriageState.from_dict(to_json(value))
+                case "effective_date":
+                    return EffectiveDate.from_dict(to_json(value))
+                case "comment":
+                    return TriageComment.from_dict(to_json(value))
+                case "value":
+                    return OverlapContribution.pretty_value_for(value, overlap_contribution.value_type)
+        except JSONDecodeError:
+            return f"Decoding Error: {value}"
+        return value
+
+    def _to_value_dict(self, buffer: list[LogEntry], overlap_contribution: OverlapContribution, is_new_record: bool = False) -> Optional[ChangeRow]:
+        comment: Optional[str] = None
+        field_changes: list[FieldChange] = []
+        for key in "effective_date", "triage_status", "value", "comment":
+            # get new value
+            old_value = None
+            new_value = None
+            found_value = False
+            is_withdrawn = False
+            for entry in reversed(buffer):
+                if value_list := entry.changes_dict.get(key):
+                    if new_value_test := OverlapPageDetails.tidy_change(overlap_contribution, key, value_list[1]):
+                        new_value = new_value_test
+                        found_value = True
+                        break
+            for entry in buffer:
+                if value_list := entry.changes_dict.get(key):
+                    if old_value_test := OverlapPageDetails.tidy_change(overlap_contribution, key, value_list[0]):
+                        old_value = old_value_test
+                        found_value = True
+                        break
+            for entry in reversed(buffer):
+                if contribution_status_change := entry.changes_dict.get("contribution_status"):
+                    if contribution_status_change[1] == OverlapContributionStatus.NO_VALUE:
+                        is_withdrawn = True
+                    break
+
+            if found_value:
+                if key == "comment":
+                    comment = new_value
+                else:
+                    field_changes.append(FieldChange(field=key, old_value=old_value, new_value=new_value))
+
+        if field_changes or comment:
+            reference_entry = buffer[-1]
+            return ChangeRow(
+                overlap_contribution=overlap_contribution,
+                user=reference_entry.actor,
+                changes=field_changes,
+                comment=comment,
+                timestamp=reference_entry.timestamp,
+                is_new_record=is_new_record,
+                is_withdrawn=is_withdrawn
+            )
+        else:
+            return None
+
+    @cached_property
+    def change_log(self) -> list[ChangeRow]:
+        merge_buffer = timedelta(seconds=1)
+        change_rows: list[ChangeRow] = []
+
+        for contribution in self.overlap.contributions_all:
+            if classification_grouping := contribution.classification_grouping:
+                if not classification_grouping.share_level_obj.is_discordant_level:
+                    continue
+
+            contribution_log: list[LogEntry] = list(LogEntry.objects.get_for_object(contribution).order_by('timestamp').all())
+
+            is_new_record = True
+            just_withdrawn = False
+            buffer: list[LogEntry] = []
+
+            def handle_buffer():
+                nonlocal buffer
+                nonlocal contribution
+                nonlocal is_new_record
+                nonlocal change_rows
+                nonlocal just_withdrawn
+
+                if change_row := self._to_value_dict(buffer, contribution, is_new_record):
+                    if change_row.is_withdrawn:
+                        just_withdrawn = True
+                    elif just_withdrawn:
+                        change_row.is_unwithdrawn = True
+                        just_withdrawn = False
+                    is_new_record = False
+                    change_rows.append(change_row)
+                buffer.clear()
+
+            amend_next = False
+            for index, entry in enumerate(contribution_log):
+                contribution_status_no_value = False
+                if cs := entry.changes_dict.get("contribution_status"):
+                    contribution_status_no_value = cs[1] == OverlapContributionStatus.NO_VALUE
+
+                if amend_next:
+                    buffer.append(entry)
+                    amend_next = False
+                elif not buffer:
+                    buffer.append(entry)
+                elif entry.timestamp - buffer[0].timestamp < merge_buffer:
+                    buffer.append(entry)
+                else:
+                    handle_buffer()
+                    buffer.append(entry)
+
+                if is_new_record and contribution_status_no_value:
+                    amend_next = True
+
+            if buffer:
+                handle_buffer()
+        return list(sorted(change_rows))
+
+
+@dataclass(frozen=True)
+class OverlapCounts:
+    """
+    Used for reporting counts on summary emails
+    """
+    overall_total: int
+    overall_medical: int
+    awaiting_triage_no_triage: int
+    awaiting_triage_others_have_triaged: int
+    ready_for_discussion: int
+
+    @property
+    def awaiting_triage_any(self):
+        return self.awaiting_triage_no_triage + self.awaiting_triage_others_have_triaged
+
+
+class OverlapsSummary:
+    """
+    Used for reporting counts on summary emails
+    """
+
+    def __init__(self, perspective: LabPickerData):
+        self.perspective = perspective
+
+    @cached_property
+    def base_qs(self):
+        qs = Overlap.objects.filter(valid=True)
+        qs = qs.filter(overlap_type=OverlapType.SINGLE_CONTEXT)
+        # only ONC PATH for now
+        if not OVERLAP_CLIN_SIG_ENABLED:
+            qs = qs.filter(value_type=ClassificationResultValue.ONC_PATH)
+        qs = qs.filter(overlap_status__gte=OverlapStatus.TIER_1_VS_TIER_2_DIFFERENCES)
+
+        lab_filter_q = Q(contribution__classification_grouping__lab__in=self.perspective.lab_ids) & Q(
+            contribution__contribution_status=OverlapContributionStatus.CONTRIBUTING)
+
+        qs = qs.annotate(skew_status=Subquery(
+                OverlapContributionNextStep.objects.filter(lab_filter_q).filter(
+                    overlap=OuterRef('pk')
+                ).annotate(max_status=Max('next_step')).values_list('max_status')[:1]
+            ))
+        qs = qs.filter(skew_status__isnull=False)
+
+        return qs
+
+    def awaiting_triage_medical_overlaps(self) -> QuerySet[Overlap]:
+        return self.base_qs.filter(overlap_status__gte=OverlapStatus.MEDICALLY_SIGNIFICANT, skew_status__in=(TriageNextStep.AWAITING_YOUR_TRIAGE, TriageNextStep.AWAITING_YOUR_TRIAGE_OTHERS_TRIAGED)).order_by('-overlap_status_change_timestamp')[0:100]
+
+    @cached_property
+    def counts(self):
+        return OverlapCounts(
+            overall_total=self.base_qs.count(),
+            overall_medical=self.base_qs.filter(overlap_status__gte=OverlapStatus.MEDICALLY_SIGNIFICANT).count(),
+            awaiting_triage_no_triage=self.base_qs.filter(skew_status=TriageNextStep.AWAITING_YOUR_TRIAGE).count(),
+            awaiting_triage_others_have_triaged=self.base_qs.filter(skew_status=TriageNextStep.AWAITING_YOUR_TRIAGE_OTHERS_TRIAGED).count(),
+            ready_for_discussion=self.base_qs.filter(skew_status=TriageNextStep.TO_DISCUSS).count()
+        )
+
+    def overlaps_awaiting_triage(self):
+        awaiting_triage_qs = self.base_qs.filter(skew_status__in=(TriageNextStep.AWAITING_YOUR_TRIAGE, TriageNextStep.AWAITING_YOUR_TRIAGE_OTHERS_TRIAGED))
+        return awaiting_triage_qs.order_by('-overlap_status_change_timestamp')

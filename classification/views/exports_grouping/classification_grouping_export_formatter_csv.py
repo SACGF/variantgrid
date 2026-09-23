@@ -1,0 +1,163 @@
+from dataclasses import dataclass
+from functools import cached_property
+from typing import Iterator
+
+from classification.enums import ClassificationResultValue, TriageStatus
+from classification.models import EvidenceKeyMap, ClassificationGrouping, OverlapContribution
+from classification.views.classification_export_utils import UsedKeyTracker, KeyValueFormatter
+from classification.views.exports.classification_export_formatter_csv import CSVCellFormatting
+from classification.views.exports.classification_export_utils import CitationCounter
+from classification.views.exports_grouping.classification_grouping_export_filter import \
+    ClassificationGroupingExportFormat, ClassificationGroupingExportFormatProperties, \
+    ClassificationGroupingExportFilter
+from library.django_utils import get_url_from_view_path
+from library.utils import delimited_row, ExportRow, export_column, ExportTweak
+from snpdb.models import GenomeBuild
+
+
+@dataclass(frozen=True)
+class CSVFormatDetails:
+    full_detail: bool = False
+    html_handling: CSVCellFormatting = CSVCellFormatting.PURE_TEXT
+    html_links: bool = False  # was only True for the sake of Franklin (which now has its own proper export)
+
+
+@dataclass(frozen=True)
+class CSVNonEvidence(ExportRow):
+    classification_grouping: ClassificationGrouping
+    date_str: str
+    formatter: CSVFormatDetails
+
+    @export_column(label="URL")
+    def url(self):
+        base_link = get_url_from_view_path(self.classification_grouping.get_absolute_url())
+        if self.formatter.html_links:
+            return f"<a href=\"{base_link}\"?refer=csv&seen={self.date_str}\">{base_link}</a>"
+        else:
+            return f"{base_link}?refer=csv&seen={self.date_str}"
+
+    @export_column(label="Lab")
+    def lab(self):
+        return str(self.classification_grouping.lab)
+
+    @export_column(label="Resolved GRCh37 c.HGVS", categories={"GRCh37": True})
+    def grch37_hgvs(self):
+        if allele_info := self.classification_grouping.latest_allele_info:
+            if grch := allele_info.grch37:
+                return grch.c_hgvs
+        return None
+
+    @export_column(label="Resolved GRCh38 c.HGVS", categories={"GRCh38": True})
+    def grch38_hgvs(self):
+        if allele_info := self.classification_grouping.latest_allele_info:
+            if grch := allele_info.grch38:
+                return grch.c_hgvs
+        return None
+
+    @export_column(label="Resolved ClinGen Allele")
+    def clingen_allele(self):
+        return self.classification_grouping.allele.clingen_allele
+
+    @export_column(label="Allele Origin Bucket")
+    def allele_origin_bucket(self):
+        return self.classification_grouping.allele_origin_grouping.allele_origin_bucket_obj.label
+
+    @export_column(label="Testing Context Bucket")
+    def testing_context_bucket(self):
+        return self.classification_grouping.allele_origin_grouping.testing_context_bucket_obj.label
+
+    @export_column(label="Resolved Condition")
+    def resolved_condition(self) -> str:
+        return self.classification_grouping.latest_classification_modification.condition_resolution_obj_fallback.as_plain_text
+
+    @export_column(label="Classification Count")
+    def record_count(self):
+        return self.classification_grouping.classification_count
+
+    @export_column(label="Onc-Path Triage")
+    def classification(self):
+        contribution: OverlapContribution
+        if contribution := self.classification_grouping.onc_path_contribution:
+            if triage := contribution.triage_state_obj:
+                if triage.status != TriageStatus.PENDING:
+                    return str(triage)
+        return None
+
+    @export_column(label="Somatic Clin Sig Value")
+    def somatic_clin_sig(self):
+        contribution: OverlapContribution
+        if contribution := self.classification_grouping.somatic_clin_sig_contribution:
+            if triage := contribution.triage_state_obj:
+                if triage.status != TriageStatus.PENDING:
+                    return str(triage)
+        return None
+
+    @export_column(label="Citations")
+    def citations(self):
+        cc = CitationCounter()
+        cc.reference_citations(self.classification_grouping.latest_classification_modification)
+        return ', '.join(cc.citation_ids())
+
+
+class ClassificationGroupingExportFormatterCSV(ClassificationGroupingExportFormat):
+
+    @classmethod
+    def format_properties(cls) -> ClassificationGroupingExportFormatProperties:
+        return ClassificationGroupingExportFormatProperties(
+            http_content_type="text/csv",
+            extension="csv"
+        )
+
+    def __init__(self,
+                 classification_grouping_filter: ClassificationGroupingExportFilter,
+                 csv_format_details: CSVFormatDetails = CSVFormatDetails()):
+        self.csv_format_details = csv_format_details
+        super().__init__(classification_grouping_filter)
+
+    @cached_property
+    def export_tweak(self):
+        return ExportTweak(
+            categories={
+                "GRCh37": GenomeBuild.grch37().enabled,
+                "GRCh38": GenomeBuild.grch38().enabled
+            }
+        )
+
+    @cached_property
+    def used_keys(self) -> UsedKeyTracker:
+        e_keys = EvidenceKeyMap.cached()
+        consider_only = None
+        if not self.csv_format_details.full_detail:
+            consider_only = [e_key.key for e_key in e_keys.vital()]
+
+        used_keys = UsedKeyTracker(
+            user=self.classification_grouping_filter.user,
+            ekeys=e_keys,
+            key_value_formatter=KeyValueFormatter(),
+            pretty_headers=True,
+            pretty_values=False,
+            cell_formatter=self.csv_format_details.html_handling.format,
+            # ignore_evidence_keys=self.csv_format_details.ignore_evidence_keys,
+            include_only_evidence_keys=consider_only,
+            include_explains_and_notes=self.csv_format_details.full_detail
+        )
+        if self.csv_format_details.full_detail:
+            # This is significantly quicker than the attempt to use an aggregate
+            for evidence in self.queryset().values_list('latest_classification_modification__published_evidence', flat=True).iterator(chunk_size=1000):
+                used_keys.check_evidence(evidence)
+        else:
+            used_keys.check_evidence_enable_all_considered()
+
+        return used_keys
+
+    def header(self) -> list[str]:
+        return [delimited_row(CSVNonEvidence.csv_header(export_tweak=self.export_tweak) + self.used_keys.header(), include_new_line=False)]
+
+    def single_row_generator(self) -> Iterator[str]:
+        queryset = self.queryset().prefetch_related("overlapcontribution_set")
+        for row in queryset.iterator(chunk_size=4000):
+            cm = row.latest_classification_modification
+            row_data = []
+            row_data.extend(CSVNonEvidence(row, date_str=self.classification_grouping_filter.date_str, formatter=self.csv_format_details).to_csv(export_tweak=self.export_tweak))
+            row_data.extend(self.used_keys.row(cm, formatter=self.csv_format_details.html_handling.format))
+            yield delimited_row(row_data, include_new_line=False)

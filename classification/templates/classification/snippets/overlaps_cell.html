@@ -1,0 +1,66 @@
+{% load classification_tags %}
+{% load ui_utils %}
+{% load js_tags %}
+
+{% for overlap_grouping in overlap_groupings %}
+    {% if overlap_grouping.single_context_overlap.overlap_status.is_attention or overlap_grouping.cross_context_overlap.overlap_status.is_attention or True %}
+        <table class="table contribution-table" style="table-layout: fixed; width:100%">
+
+            <tbody>
+                <tr class="users-contribution">
+                    <td class="overlap-summary" rowspan={{ overlap_grouping.contribution_count }}>
+                        <label style="color:#666; font-weight:bold" class="mb-1">{{ overlap_grouping.value_type.label }}</label>
+                        <br/>{{ overlap_grouping.user_contribution.testing_context_bucket_obj.label }}
+
+                        <div class="my-1"><span class="{% if overlap_grouping.single_context_overlap.overlap_status.is_attention %}text-danger{% else %}text-success{% endif %}">{{ overlap_grouping.single_context_overlap.overlap_status_label }}</span></div>
+                        {% if overlap_grouping.single_context_overlap.overlap_status.is_attention %}
+                            <br/>
+                            {% if overlap_grouping.user_next_step_single_context.user_should_action %}
+                            <span>{{ overlap_grouping.user_next_step_single_context.icon }}{{ overlap_grouping.user_next_step_single_context.label }}</span>
+                            {% else %}
+                            <span class="no-value">{{ overlap_grouping.user_next_step_single_context.label }}</span>
+                            {% endif %}
+                        {% else %}
+                            <br/><span class="no-value">No action required</span>
+                        {% endif %}
+
+                        {% if overlap_grouping.cross_context_overlap.overlap_status.is_attention %}
+                            <div style="opacity:0.6">
+                            <br/><br/>Cross Contexts<br/><span class="text-warning">{{ overlap_grouping.cross_context_overlap.overlap_status_label }}</span>
+                            <br/><span>{{ overlap_grouping.user_next_step_cross_context.label }}</span>
+                            </div>
+                        {% endif %}
+
+                        <div class="my-3">
+                            <div><label>Your Triage Status</label></div>
+                            <div class="my-1">{% triage overlap_grouping.user_triage show_icon=True show_link=True show_label=True %}</div>
+                        </div>
+                    </td>
+
+                    {% if multi_context %}
+                        <td style="text-align:center; width:70px" class="testing-context-{{ overlap_grouping.user_contribution.testing_context_bucket_obj.value }}">{{ overlap_grouping.user_contribution.testing_context_bucket_obj.name | pretty_label:"lower" }}</td>
+                    {% endif %}
+                    <td class="cs-{{overlap_grouping.user_contribution.value}}"><b>{{  overlap_grouping.user_contribution.pretty_value }}</b>
+                        <div class="mt-1"><span style="font-weight:normal">{% triage overlap_grouping.user_triage show_link=False show_label=True %}</span></div>
+                    </td>
+                    <td>{% condition overlap_grouping.user_contribution.conditions %}</td>
+                    <td>{{ overlap_grouping.user_contribution.lab }}</td>
+                    <td class="date-column">{% timestamp overlap_grouping.user_contribution.effective_date time_ago=True %}</td>
+                </tr>
+
+                {% for overlap_comparison in overlap_grouping.comparisons %}
+                    <tr {% if overlap_comparison.is_cross_context %}style="opacity:0.7"{% endif %}>
+                    {% if multi_context %}
+                        <td style="text-align:center; width:70px" class="testing-context-{{ overlap_comparison.entry_2.testing_context_bucket_obj.value }}">{{ overlap_comparison.entry_2.testing_context_bucket_obj.name | pretty_label:"lower" }}</td>
+                    {% endif %}
+                        <td class="cs-{{overlap_comparison.entry_2.value }}"><b>{{ overlap_comparison.entry_2.pretty_value }}</b>{% if overlap_comparison.triage %}<div class="mt-1">{% triage overlap_comparison.triage show_label=True %}</div>{% endif %}</td>
+                    <td>{% condition overlap_comparison.entry_2.conditions %}</td>
+                    <td>{% if overlap_comparison.entry_2.scv %}ClinVar Expert Panel<br/>{{ overlap_comparison.entry_2.scv }}{% else %}{{ overlap_comparison.entry_2.lab }}{% endif %}</td>
+                    <td class="date-column">{% timestamp overlap_comparison.entry_2.effective_date time_ago=True %}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+
+        </table>
+    {% endif %}
+{% endfor %}

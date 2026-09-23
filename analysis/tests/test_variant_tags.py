@@ -21,7 +21,7 @@ from classification.enums import SubmissionSource
 from classification.models.classification import Classification
 from classification.tests.models.test_utils import ClassificationTestUtils
 from library.guardian_utils import assign_permission_to_user_and_groups
-from snpdb.models import GenomeBuild, Tag, TagConfigCollection, Variant
+from snpdb.models import GenomeBuild, Tag, Variant
 from snpdb.tests.utils.fake_cohort_data import create_fake_cohort
 from snpdb.tests.utils.tag_testing_utils import create_classify_queue_tag
 from snpdb.tests.utils.vcf_testing_utils import create_mock_allele
@@ -342,20 +342,6 @@ class TestTagNodeIncludeResolved(TestCase):
         variant_ids = self._node_variant_ids(self._create_node(include_resolved=True))
         self.assertIn(self.open_variant.pk, variant_ids)
         self.assertIn(self.done_variant.pk, variant_ids)
-
-    def test_new_node_includes_resolved_from_the_tag_config_and_keeps_it(self):
-        """ The lab default applies at creation only, so changing the tag config leaves existing nodes alone """
-        collection = TagConfigCollection.objects.create(name="show resolved", user=self.user,
-                                                        show_resolved_variant_tags=True)
-        Analysis.objects.filter(pk=self.analysis.pk).update(tag_config_collection=collection)
-        self.analysis.refresh_from_db()
-        node = self._create_node()
-        self.assertTrue(node.include_resolved)
-
-        node.include_resolved = False
-        node.save()
-        node.refresh_from_db()
-        self.assertFalse(node.include_resolved)
 
     def test_editor_pill_counts_what_is_left_to_do(self):
         self.assertEqual(self._create_node().get_tag_counts(), {self.tag.pk: 1})

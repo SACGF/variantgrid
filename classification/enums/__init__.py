@@ -4,3 +4,4 @@ write `from classification.enums import ShareLevel, SpecialEKeys, AlleleOriginBu
 """
 from classification.enums.classification_enums import *
 from classification.enums.clinical_context_enums import *
+from classification.enums.overlaps_enums import *
