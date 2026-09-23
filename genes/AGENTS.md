@@ -38,8 +38,9 @@ Gotchas:
   Duplicates are prevented by canonicalisation, not by a table - gene_splice.py:canonical_splice_label turns every
   written form of one junction (`AR-V7`, `ARV7`, `AR-V7 splice variant`) into one label, lower-case tokens joined by
   underscores (`v_7`, `v_iii`, `v_iva`, `exon_14_skipping`), and gene_splice.py:display_splice_label writes it back out
-  (`AR-V7`, `EGFRvIVa`). A junction named by its breakpoints carries the build, since a gene-level Variant sits on the
-  contig every build shares (`grch37_x_66905968_66914514` -> `AR GRCh37 X:66905968-66914514`).
+  with the word `splice` so the string says what it is wherever it stands alone (`AR-V7 splice`, `EGFRvIVa splice`;
+  `MET exon 14 skipping` already does). A junction named by its breakpoints carries the build, since a gene-level
+  Variant sits on the contig every build shares (`grch37_x_66905968_66914514` -> `AR GRCh37 X:66905968-66914514 splice`).
   models/models_splice_event.py:SpliceEvent has one job left: gene_splice.py:SpliceEventResolver turns the TSO 500
   caller's breakpoints into the label a classification for the same junction arrives under (seeded in
   genes/migrations/0093_seed_splice_events.py, canonicalised in 0095), and its `display` is the wording a report gets.

@@ -132,6 +132,6 @@ class GeneLevelGeneSymbolTest(TestCase):
     def test_a_junction_we_have_no_name_for_is_printed_as_its_breakpoints(self):
         """ Which reads as raw coordinates on a report, and is the prompt for the scientist to
             replace it with a name """
-        self.assertEqual("AR GRCh37 X:1-2",
+        self.assertEqual("AR GRCh37 X:1-2 splice",
                          self._autopopulated(self.unnamed_splice_variant, SpecialEKeys.SPLICE_LABEL))
         self.assertTrue(SpliceEvent.objects.exists(), "the seeded junctions are still there")

@@ -598,7 +598,7 @@ class SpliceEventClassificationTest(TestCase):
 
         splice_event_variant = create_splice_event_variant("AR", "V7")
         allele_info.set_variant_and_save(matched_variant=splice_event_variant.variant)
-        self.assertEqual("AR-V7", allele_info.gene_level_event.canonical_str)
+        self.assertEqual("AR-V7 splice", allele_info.gene_level_event.canonical_str)
         resolved = allele_info[self.genome_build]
         self.assertIsNone(resolved.c_hgvs, "a splice event sits on no transcript")
         self.assertEqual("AR", resolved.gene_symbol_id)

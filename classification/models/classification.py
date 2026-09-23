@@ -71,6 +71,7 @@ from classification.models.classification_utils import (
 from classification.models.classification_variant_info_models import (
     ImportedAlleleInfo,
     ImportedAlleleInfoStatus,
+    tidy_hgvs_whitespace,
 )
 from classification.models.evidence_key import (
     EvidenceKey,
@@ -769,9 +770,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
     @property
     def imported_c_hgvs(self) -> str:
         if c_hgvs := self.get(SpecialEKeys.C_HGVS):
-            # remove any white space inside the c.HGVS
-            c_hgvs = re.sub(r'\s+', '', c_hgvs)
-            return c_hgvs
+            return tidy_hgvs_whitespace(c_hgvs)
 
     @property
     def imported_g_hgvs(self):
@@ -1606,12 +1605,10 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 if isinstance(gene_symbol, str) and gene_symbol != gene_symbol.upper():
                     gene_symbol_cell.value = gene_symbol.upper()
 
-        # remove all whitespace from c.HGVS
         if SpecialEKeys.C_HGVS in patch:
             c_parts_cell = patch[SpecialEKeys.C_HGVS]
             if c_hgvs := c_parts_cell.value:
-                c_hgvs = re.sub(r'\s+', '', c_hgvs)
-                c_parts_cell.value = c_hgvs
+                c_parts_cell.value = tidy_hgvs_whitespace(c_hgvs)
 
         if initial_data:
             # if c.hgvs contains other values (such as
@@ -2311,8 +2308,7 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
     @property
     def imported_c_hgvs_obj(self) -> HGVSDisplay:
         if c_hgvs := self.get(SpecialEKeys.C_HGVS):
-            # remove any white space inside the c.HGVS
-            c_hgvs = re.sub(r'\s+', '', c_hgvs)
+            c_hgvs = tidy_hgvs_whitespace(c_hgvs)
             genome_build = None
             try:
                 genome_build = self.get_genome_build()

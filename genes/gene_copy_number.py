@@ -46,9 +46,9 @@ COPY_NUMBER_KIND_WORDS = {
     "del": GeneCopyNumberEventKind.LOSS,
 }
 # 'EGFR amplification' - one gene then one word. Longest word first so 'amp' doesn't shadow
-# 'amplification', and the space between them is optional because a classification's imported c.HGVS
-# reaches us with its spaces removed (@see ImportedAlleleInfo._tidy_input_value). A gene that has to
-# resolve is what keeps that from claiming ordinary strings - 'CAMP' asks for a gene named 'C'.
+# 'amplification', and the space between them is optional ('EGFRamp', and the classifications imported
+# before gene-level values kept their spaces). A gene that has to resolve is what keeps that from
+# claiming ordinary strings - 'CAMP' asks for a gene named 'C'.
 COPY_NUMBER_STRING_PATTERN = re.compile(
     rf"^\s*([A-Za-z0-9.\-]+?)\s*({'|'.join(sorted(COPY_NUMBER_KIND_WORDS, key=len, reverse=True))})\s*$",
     re.IGNORECASE)

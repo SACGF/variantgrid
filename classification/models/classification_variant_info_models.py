@@ -7,6 +7,7 @@ This is the only link from a classification to an Allele; HGVSConverterVersion r
 converter produced it.
 """
 import logging
+import re
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any, Literal, Optional, TypedDict
@@ -473,6 +474,15 @@ class CalculatedVariantCoordinate:
     @property
     def is_valid(self) -> bool:
         return self.variant_coordinate is not None
+
+
+def tidy_hgvs_whitespace(value: str) -> str:
+    """ Whitespace inside an HGVS is junk, so it all goes. A gene-level value arrives in the same
+        field and its words are the value ('EGFR amplification', 'AR-V7 splice'), so it keeps one
+        space between them - the canonical form annotation writes, so c.HGVS and g.HGVS agree """
+    if looks_gene_level(value):
+        return re.sub(r'\s+', ' ', value).strip()
+    return re.sub(r'\s+', '', value)
 
 
 class ImportedAlleleInfo(TimeStampedModel):
@@ -1053,9 +1063,8 @@ class ImportedAlleleInfo(TimeStampedModel):
 
     @staticmethod
     def _tidy_input_value(key: str, value: str) -> str:
-        # try to do only very safe tidying up of c.HGVS values, e.g. removing random spaces
         if key in ("imported_c_hgvs", "imported_g_hgvs") and isinstance(value, str):
-            value = value.replace(' ', '')
+            value = tidy_hgvs_whitespace(value)
         return value
 
     @staticmethod

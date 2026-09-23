@@ -139,8 +139,9 @@ Gotchas:
   ("AR GRCh37 X:66905968-66914514") where nothing does, which is the prompt for the scientist to name it.
 - A gene-level classification target is named rather than given as HGVS: `models/classification_variant_info_models.py:ImportedAlleleInfo.resolve_gene_level`
   runs the fusion, whole-gene copy number and splice string resolvers through `genes/gene_level_strings.py:resolve_gene_level_string`
-  before any HGVS conversion, and the value reaches them with its spaces already removed
-  (`ImportedAlleleInfo._tidy_input_value`), so `AR V7` arrives as `ARV7`. What takes that path is the *shape* of the
+  before any HGVS conversion. A gene-level value keeps its spaces - `tidy_hgvs_whitespace` strips them from an HGVS
+  only, so `EGFR amplification` reads the same in c.HGVS as in the g.HGVS annotation writes; records imported before
+  that hold `EGFRamplification`, which `gene_level_strings_respace` puts right. What takes that path is the *shape* of the
   value (`genes/gene_level_strings.py:looks_gene_level`), so one whose gene turned out to be a typo fails as a
   gene-level record - `gene_level_unresolved`, with the resolver's reason as its message - rather than as a broken
   HGVS. A splice label shape has to be in `genes/gene_splice.py:SPLICE_STRING_PATTERN` to be recognised at all;

@@ -11,7 +11,7 @@ breakpoints, grch37_x_66905968_66914514. Every written form of one junction cano
 label, so duplicates are prevented by canonicalisation rather than by a table, and a name nobody
 registered ahead of time still mints its Variant.
 
-display_splice_label formats a label back for a human (AR-V7, EGFRvIVa, MET exon 14 skipping).
+display_splice_label formats a label back for a human (AR-V7 splice, EGFRvIVa splice, MET exon 14 skipping).
 genes.models.models_splice_event.SpliceEvent is consulted only where a row's own wording should win
 - the junctions the TSO 500 panel reports - and is never asked whether a name is real.
 
@@ -57,9 +57,8 @@ SPLICE_LABEL_PATTERN = rf"(?:{_NUMBERED_LABEL}|{_ROMAN_LABEL}|{_EXON_SKIPPING_LA
 # 'splice variant' - what a report adds after the label, and a lab leaves on
 _SPLICE_SUFFIX = r"(?:\s*splice(?:\s*variant)?)?"
 # 'AR V7', 'AR-V7 splice variant', 'MET exon 14 skipping'. The space between gene and label is
-# optional because a classification's imported c.HGVS reaches us with its spaces removed
-# (@see ImportedAlleleInfo._tidy_input_value); a gene that has to resolve is what keeps this from
-# claiming ordinary words.
+# optional ('ARV7', and the classifications imported before gene-level values kept their spaces);
+# a gene that has to resolve is what keeps this from claiming ordinary words.
 SPLICE_STRING_PATTERN = re.compile(
     rf"^\s*(?P<gene>[A-Za-z0-9.]+?)\s*[-_]?\s*{SPLICE_LABEL_PATTERN}{_SPLICE_SUFFIX}\s*$",
     re.IGNORECASE)
@@ -75,6 +74,9 @@ CANONICAL_ROMAN_PATTERN = re.compile(r"^v_(?P<roman>[ivx]+)(?P<roman_suffix>[a-z
 CANONICAL_EXON_SKIPPING_PATTERN = re.compile(r"^exon_(?P<exon>[0-9]+)_skipping$")
 _CANONICAL_PATTERNS = (CANONICAL_NUMBERED_PATTERN, CANONICAL_ROMAN_PATTERN,
                        CANONICAL_EXON_SKIPPING_PATTERN, CANONICAL_COORDINATE_PATTERN)
+# What display_splice_label ends a string with, so a label alone says what it is wherever it turns
+# up - an annotation column, a log line. Exon skipping already says so and takes none
+SPLICE_DISPLAY_SUFFIX = " splice"
 
 
 def genome_build_token(genome_build: GenomeBuild) -> str:
@@ -118,21 +120,22 @@ def _canonical_from_match(m: re.Match, genome_build: Optional[GenomeBuild]) -> O
 
 
 def display_splice_label(gene: GeneLevelId, label: str) -> str:
-    """ 'v_iva' -> 'EGFRvIVa' - the canonical label written the way the literature writes it, which
-        is the form to display and to send anywhere off this deployment (@see GeneLevelId). A
-        SpliceEvent row's own display wins where we have one (@see SpliceEventVariant.display). """
+    """ 'v_iva' -> 'EGFRvIVa splice' - the canonical label written the way the literature writes it
+        plus SPLICE_DISPLAY_SUFFIX, which is the form to display and to send anywhere off this
+        deployment (@see GeneLevelId). A SpliceEvent row's own display wins where we have one
+        (@see SpliceEventVariant.display). """
 
     symbol = gene.symbol_str
     if m := CANONICAL_NUMBERED_PATTERN.match(label or ""):
-        return f"{symbol}-V{m.group('number')}"
+        return f"{symbol}-V{m.group('number')}{SPLICE_DISPLAY_SUFFIX}"
     if m := CANONICAL_ROMAN_PATTERN.match(label or ""):
-        return f"{symbol}v{m.group('roman').upper()}{m.group('roman_suffix')}"
+        return f"{symbol}v{m.group('roman').upper()}{m.group('roman_suffix')}{SPLICE_DISPLAY_SUFFIX}"
     if m := CANONICAL_EXON_SKIPPING_PATTERN.match(label or ""):
         return f"{symbol} exon {m.group('exon')} skipping"
     if m := CANONICAL_COORDINATE_PATTERN.match(label or ""):
         build = _genome_build_display(m.group("build"))
-        return f"{symbol} {build} {m.group('contig').upper()}:{m.group('donor')}-{m.group('acceptor')}"
-    return f"{symbol} {label}"
+        return f"{symbol} {build} {m.group('contig').upper()}:{m.group('donor')}-{m.group('acceptor')}{SPLICE_DISPLAY_SUFFIX}"
+    return f"{symbol} {label}{SPLICE_DISPLAY_SUFFIX}"
 
 
 def _genome_build_display(build_token: str) -> str:

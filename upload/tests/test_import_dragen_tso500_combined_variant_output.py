@@ -193,7 +193,7 @@ class TestSpliceVariantVCF(TestCase):
                 for record in self.records}
 
     def test_position_is_the_gene(self):
-        self.assertEqual(self.hgnc_ids["AR"], self._by_splice()["AR-V7"].POS)
+        self.assertEqual(self.hgnc_ids["AR"], self._by_splice()["AR-V7 splice"].POS)
 
     def test_read_support_is_the_junction_and_the_reference_transcript(self):
         """ A caller asserts the junction is present, so there is no GT - the sample column holds
@@ -203,7 +203,7 @@ class TestSpliceVariantVCF(TestCase):
             self.assertEqual([ALT_READS_FORMAT, REF_READS_FORMAT], record.FORMAT)
             support[splice] = (int(record.format(ALT_READS_FORMAT).flatten()[0]),
                                int(record.format(REF_READS_FORMAT).flatten()[0]))
-        self.assertEqual({"AR-V7": (27, 573), "EGFRvIII": (64, 1), "MET exon 14 skipping": (91, 1)}, support)
+        self.assertEqual({"AR-V7 splice": (27, 573), "EGFRvIII splice": (64, 1), "MET exon 14 skipping": (91, 1)}, support)
 
     def test_the_callers_row_rides_along_in_info(self):
         encoded = self._by_splice()["MET exon 14 skipping"].INFO.get(SPLICE_OBSERVATION_INFO)

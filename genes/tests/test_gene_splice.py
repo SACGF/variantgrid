@@ -95,16 +95,17 @@ class DisplaySpliceLabelTest(TestCase):
         cls.gene = GeneLevelId.objects.create(symbol_str="AR", hgnc_id=AR_HGNC_ID)
 
     def test_each_shape_displays(self):
-        for label, display in [("v_7", "AR-V7"),
-                               ("v_iii", "ARvIII"),
-                               ("v_iva", "ARvIVa"),
+        for label, display in [("v_7", "AR-V7 splice"),
+                               ("v_iii", "ARvIII splice"),
+                               ("v_iva", "ARvIVa splice"),
                                ("exon_14_skipping", "AR exon 14 skipping"),
-                               ("grch37_x_66905968_66914514", "AR GRCh37 X:66905968-66914514")]:
+                               ("grch37_x_66905968_66914514", "AR GRCh37 X:66905968-66914514 splice")]:
             self.assertEqual(display, display_splice_label(self.gene, label))
 
     def test_a_display_resolves_back_to_its_label(self):
-        """ What a report writes is what a lab writes back as a classification target """
-        for label, written in [("v_7", "-V7"), ("v_iii", "vIII"), ("v_iva", "vIVa"),
+        """ What a report writes, and what we display, is what a lab writes back as a classification target """
+        for label, written in [("v_7", "-V7"), ("v_7", "-V7 splice"), ("v_iii", "vIII"),
+                               ("v_iva", "vIVa"), ("v_iva", "vIVa splice"),
                                ("exon_14_skipping", " exon 14 skipping")]:
             self.assertEqual(label, canonical_splice_label(written), written)
 
@@ -131,7 +132,7 @@ class SpliceEventResolutionTest(TestCase):
         resolved = SpliceEventResolver(self.genome_build).resolve("AR", "chrX", 66905968, 66999999)
         contig = self.genome_build.chrom_contig_mappings["chrX"]
         self.assertEqual(coordinate_label(self.genome_build, contig, 66905968, 66999999), resolved.label)
-        self.assertEqual("AR GRCh37 X:66905968-66999999", resolved.display,
+        self.assertEqual("AR GRCh37 X:66905968-66999999 splice", resolved.display,
                          "reads as raw coordinates, which is the prompt to name it")
 
     def test_two_events_in_one_gene_are_two_variants(self):
@@ -145,7 +146,7 @@ class SpliceEventResolutionTest(TestCase):
         read_back = get_splice_event_variant(splice_event_variant.variant)
         self.assertEqual("v_7", read_back.label)
         self.assertEqual("AR", read_back.gene.symbol_str)
-        self.assertEqual("AR-V7", read_back.canonical_str)
+        self.assertEqual("AR-V7 splice", read_back.canonical_str)
         self.assertEqual("AR-V7 splice variant", read_back.display,
                          "the seeded wording, found on gene symbol and label")
 
@@ -160,7 +161,7 @@ class SpliceEventResolutionTest(TestCase):
 
     def test_a_junction_we_have_no_name_for_displays_its_label(self):
         SpliceEvent.objects.filter(label="v_7").delete()
-        self.assertEqual("AR-V7", create_splice_event_variant("AR", "V7").display)
+        self.assertEqual("AR-V7 splice", create_splice_event_variant("AR", "V7").display)
 
 
 class SpliceStringResolutionTest(TestCase):
@@ -176,7 +177,7 @@ class SpliceStringResolutionTest(TestCase):
                                 status=HGNCStatus.APPROVED, approved_name=f"{symbol} approved name")
 
     def test_every_written_form_reaches_one_alt(self):
-        """ Including with the spaces removed, which is how an imported c.HGVS arrives """
+        """ Including with the spaces removed, as the classifications imported before #1875 hold it """
         for written in ["AR V7", "ARV7", "ar v7", "AR-V7 splice variant", "AR-V7splicevariant"]:
             self.assertEqual(f"<SPLICE:HGNC:{AR_HGNC_ID}:V_7>",
                              resolve_splice_string(written).resolved.alt, written)
@@ -186,7 +187,7 @@ class SpliceStringResolutionTest(TestCase):
         resolved = resolve_splice_string("EGFRvIVa").resolved
         self.assertEqual(f"<SPLICE:HGNC:{EGFR_HGNC_ID}:V_IVA>", resolved.alt)
         self.assertIsNone(resolved.splice_event)
-        self.assertEqual("EGFRvIVa", resolved.display)
+        self.assertEqual("EGFRvIVa splice", resolved.display)
 
     def test_the_report_and_the_caller_reach_one_alt(self):
         """ A classification target and the loader put the same coordinate through the pipeline """

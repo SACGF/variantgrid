@@ -78,8 +78,9 @@ own, so a gene-level event enters the database through the same insert pipeline 
 kind that recognised the string refused it, which becomes the record's message and its `gene_level_unresolved`
 validation tag. Which values take this path at all is the shape of the string
 (`genes/gene_level_strings.py:looks_gene_level`), so one naming a gene we don't know never reaches the HGVS converter.
-The imported value arrives with its spaces already removed (`ImportedAlleleInfo._tidy_input_value`), which is why the
-splice forms accept no space between gene and label.
+A gene-level value keeps its spaces (`classification/models/classification_variant_info_models.py:tidy_hgvs_whitespace`
+strips them from an HGVS only), so `EGFR amplification` is stored and displayed as written; the splice and copy number
+forms still accept no space between gene and label, since records imported before that had theirs removed.
 
 That task runs `classification/classification_import.py:process_classification_import`: known coordinates are matched in
 bulk through `VariantPKLookup`; unknown ones are written to a synthetic VCF and pushed through the ordinary upload
