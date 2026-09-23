@@ -78,6 +78,7 @@ scripts/vg outline <file.py> [--min-lines N]      # classes/functions with line 
 scripts/vg outline --coverage                     # module docstring coverage per package (the ratchet)
 scripts/vg tests --explain [--run]                # only the test modules a change puts at risk
 scripts/vg docs check [doc.md]                    # every path / path:Symbol citation in the docs resolves; CI runs it
+scripts/vg css unused [--dynamic]                 # scss class/id selectors nothing in templates, JS or Python names
 python3 manage.py vg page /variantopedia/dashboard --queries   # render a page as claude_agent: status, outline, N+1s
 scripts/vg map                                    # regenerate claude/maps/*.md (gitignored; the session hook does this)
 python3 manage.py test --keepdb [label]           # --keepdb always; whole suite: --parallel 4 (~2 min)
