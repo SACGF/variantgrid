@@ -13,7 +13,7 @@ ExampleSample_2600000001/
 │   ├── ....cnv.vcf                   gene-level CNV     25
 │   └── ..._DragenExonCNV.vcf         BRCA1/2 exon CNV    2
 └── ExampleSample_RNA_2600000001B/
-    ├── ..._SpliceVariants.vcf        splice calls       17
+    ├── ..._SpliceVariants.vcf        splice calls       18
     └── ..._AllFusions.csv            fusions            33
 ```
 
@@ -55,12 +55,22 @@ call, every line padded with tabs to the widest section (11 columns). The layout
 file's; the rows are this sample's. The real file's identifiers, dates and per-sample metrics were
 replaced, so:
 
-- `[Splice Variants]` has three rows. The `AR` row is real and is what the other two are shaped on:
+- `[Splice Variants]` has three rows, and they are the three `PASS` calls of `SpliceVariants.vcf`
+  written the way the CVO writes them (`Breakpoint 1` = `POS`, `Breakpoint 2` = `END`,
+  `Splice Supporting Reads` = `ALTDEDUP`, `Reference Reads Transcript` = `REFDEDUP`, `Affected Exon` =
+  the exons skipped). The `AR` row and its VCF record are a real pair's, with the duplicate-inclusive
+  counts changed (SACGF/variantgrid_sapath#457), and are what the other two are shaped on:
   `chrX:66905968` is the last base of AR exon 3 in GRCh37 (NM_000044.6) and `chrX:66914514` is in
   intron 3 at cryptic exon 3 — exon 3 spliced to CE3 is AR-V7, and `Affected Exon` is blank because
-  CE3 is not an annotated exon. The `EGFR` and `MET` rows are the two `PASS` calls of
-  `SpliceVariants.vcf` written the way the CVO writes them (`Splice Supporting Reads` = `ALTDEDUP`,
-  `Reference Reads Transcript` = `REFDEDUP`, `Affected Exon` = the exons skipped).
+  CE3 is not an annotated exon. SpliceGirl's `REF` is not the base at `POS`: in every real record it
+  is the base at `POS+2`, the second base of the intron's donor dinucleotide - `T` for a GT intron,
+  `C` for the GC-AG intron at `chr2:42485683` (EML4) - and the three `PASS` records follow that.
+  `bcftools norm --check-ref=s` does not touch a symbolic `<DEL>`, so the `<DEL>` import makes its
+  Locus with the caller's base.
+  Illumina's rule for the section is passing calls on EGFR, MET and
+  AR only - a gene filter over `FILTER=PASS`, not a junction whitelist - so a `PASS` call in any other
+  gene would be in the VCF and not here; this file has none, so it cannot tell the two rules apart
+  (source cited in `upload/tasks/import_dragen_tso500_combined_variant_output_task.py`).
 - `[Fusions]` is every `KeepFusion = True` row of `AllFusions.csv`: gene pair joined with `-` where
   the caller knew the direction, supporting reads as `upload/tso500/dragen_all_fusions_parser.py`
   sums them, and `Ref A Dedup` / `Ref B Dedup` as the two reference counts.
@@ -85,8 +95,7 @@ replaced, so:
   oncology set (EML4-ALK, KIF5B-RET, CD74-ROS1, ETV6-NTRK3, TMPRSS2-ERG, FGFR3-TACC3 …) plus EGFR
   exons 2-7 (EGFRvIII) and MET exon 14 skipping. Gene pairs, breakpoints and read counts are as
   published, and each Gene A/Gene B split was checked against the gene's locus. Columns the source
-  format does not carry (`Score`, contig/alignment fields) are `N/A`; the grafted splice REF bases
-  were read from the FASTA.
+  format does not carry (`Score`, contig/alignment fields) are `N/A`.
 - Both `DragenExonCNV.vcf` records are constructed. This run had no large rearrangement, and none
   of the published TSO500 outputs contain one either — they all report `BRCA1 NA` / `BRCA2 NA`.
   The records use only the fields the file's own header declares (`END`, `GENE`, `SVTYPE`,

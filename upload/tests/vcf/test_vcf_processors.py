@@ -180,8 +180,8 @@ class TestVCFProcessors(TestCase):
 
     def test_splicegirl_derived_vaf(self):
         positions, processor = self._process_splice_vcf()
-        self.assertEqual(17, len(positions), "All 17 splice records processed")
-        self.assertEqual(17, len(processor.cohort_genotypes))
+        self.assertEqual(18, len(positions), "All 18 splice records processed")
+        self.assertEqual(18, len(processor.cohort_genotypes))
 
         vaf_index = processor.cohort_gt_vaf_index
         vaf_by_position = {}
@@ -192,6 +192,8 @@ class TestVCFProcessors(TestCase):
         self.assertAlmostEqual(64 / 65, vaf_by_position[("chr7", 55087058)][0], places=3)
         # MET exon 14 skipping: ALTDEDUP=91, REFDEDUP=1
         self.assertAlmostEqual(91 / 92, vaf_by_position[("chr7", 116411708)][0], places=3)
+        # AR-V7: ALTDEDUP=27, REFDEDUP=573 - the junction ratio of a real call, well under any VAF cutoff
+        self.assertAlmostEqual(27 / 600, vaf_by_position[("chrX", 66905968)][0], places=3)
         # Background call: ALTDEDUP=1, REFDEDUP=80
         self.assertAlmostEqual(1 / 81, vaf_by_position[("chr1", 120464432)][0], places=3)
 

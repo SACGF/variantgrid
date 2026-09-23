@@ -1,9 +1,10 @@
 from django.db import migrations
 
 # SACGF/variantgrid#1875 - the splice junctions DRAGEN TSO 500 writes into a CombinedVariantOutput.
-# Illumina only reports splice calls on AR, EGFR and MET, so these three name every junction the
-# panel can produce. A junction with no row here still imports, labelled with its own coordinates
-# (@see genes.gene_splice).
+# The CombinedVariantOutput keeps passing calls on EGFR, MET and AR only (Illumina's stated rule -
+# @see upload.tasks.import_dragen_tso500_combined_variant_output_task), so these are the junctions
+# it names; the caller itself runs across the RNA panel. A junction with no row here still imports,
+# labelled with its own coordinates (@see genes.gene_splice).
 #
 # The caller writes breakpoint 1 as the last base of the 5' exon and breakpoint 2 as the 3' exon's
 # start exactly as cdot stores it (0-based), so both builds' numbers are exon boundaries of the

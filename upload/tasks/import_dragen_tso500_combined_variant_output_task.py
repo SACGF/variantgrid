@@ -3,11 +3,21 @@ Loader for Illumina DRAGEN TSO 500's CombinedVariantOutput.tsv - one vendor's fo
 Anything here that reads a named section or column belongs to that format; the splice identity it
 resolves to does not (@see genes.gene_splice).
 
-Only the '[Splice Variants]' section is a variant source. It is what a scientist reports a splice call from -
-Illumina writes only passing calls on AR, EGFR and MET into it - and it names the gene and the two
-breakpoints rather than pretending to be a deletion. The other sections are carried better elsewhere:
-small variants and copy number on their own VCFs, and fusions on AllFusions.csv, which keeps the
-caller, score, filters and split/pair breakdown this file drops.
+Only the '[Splice Variants]' section is a variant source. It is what a scientist reports a splice call from,
+and it names the gene and the two breakpoints rather than pretending to be a deletion. The other
+sections are carried better elsewhere: small variants and copy number on their own VCFs, and fusions
+on AllFusions.csv, which keeps the caller, score, filters and split/pair breakdown this file drops.
+
+The section is a filtered view of the RNA arm's SpliceVariants.vcf (SpliceGirl), row for row:
+Breakpoint 1 = POS, Breakpoint 2 = INFO/END, Splice Supporting Reads = ALTDEDUP (FORMAT AD) and
+Reference Reads Transcript = REFDEDUP (FORMAT DP), no off-by-one - confirmed on a real pair
+(SACGF/variantgrid_sapath#457). What Illumina keeps is "passing splice variants that are contained
+on genes EGFR, MET, and AR" (DRAGEN TSO 500 v2.5 Combined Variant Output,
+https://help.tso500software.illumina.com/dragen-tso-500-guides/dragen-tso-500-v2.5/analysis-output/combined-variant-output):
+a gene filter on top of FILTER=PASS, not a whitelist of junctions, so EGFRvII or vIVa qualify as
+much as vIII, and a PASS call in any other panel gene is in the VCF but never here. So far every
+call SA Pathology has signed out is in one of the three (SACGF/variantgrid#1875), but nothing
+stops SpliceGirl passing one elsewhere.
 
 The rows become a VCF of gene-level variants which goes through the normal VCF import pipeline, so
 the VCF/Sample/Cohort come from the header the way every other import's do, and the CohortGenotype
