@@ -395,7 +395,8 @@ class VariantTagsGridQueryTest(TestCase):
 
 class ResolvedVariantTagsTest(TestCase):
     """ The tags page and the variant page are work lists, so a to-do a classification has satisfied
-        drops out of them until the user asks for it - @see VariantTag.unresolved_q """
+        drops out of them unless the user's tag config shows it, or the page asks for a look
+        - @see VariantTag.unresolved_q """
 
     @classmethod
     def setUpTestData(cls):
@@ -424,41 +425,48 @@ class ResolvedVariantTagsTest(TestCase):
                                          resolved_classification=classification)
 
     def _set_show_resolved(self, show_resolved: bool):
-        config = UserGridConfig.get(self.user, VariantTagsColumns.GRID_NAME)
-        config.show_hidden_data = show_resolved
-        config.save()
+        collection = TagConfigCollection.objects.create(name="show resolved", user=self.user,
+                                                        show_resolved_variant_tags=show_resolved)
+        UserSettingsOverride.objects.update_or_create(user=self.user, defaults={"tag_config": collection})
 
-    def _tags_grid_variant_ids(self) -> set[int]:
+    def _tags_grid_variant_ids(self, **params) -> set[int]:
         url = reverse('variant_tags_datatable', kwargs={"genome_build_name": self.genome_build.name})
-        request = RequestFactory().get(url)
+        request = RequestFactory().post(url, params)
         request.resolver_match = resolve(url)
         request.user = self.user
         config = VariantTagsColumns(request)
         qs = config.filter_queryset(config.get_initial_queryset())
         return set(qs.values_list("variant__id", flat=True))
 
-    def _variant_tags_page_tag_events(self) -> int:
+    def _variant_tags_page_tag_events(self, **params) -> int:
         self.client.force_login(self.user)
         url = reverse('genome_build_variant_tags', kwargs={"genome_build_name": self.genome_build.name})
-        response = self.client.get(url)
+        response = self.client.get(url, params)
         self.assertEqual(response.status_code, 200)
         return response.context["tag_events"]
 
     def test_tags_grid_hides_resolved_by_default(self):
         self.assertEqual(self._tags_grid_variant_ids(), {self.open_variant.pk})
 
-    def test_tags_grid_shows_resolved_when_asked(self):
+    def test_tags_grid_shows_resolved_when_the_tag_config_says(self):
         self._set_show_resolved(True)
         self.assertEqual(self._tags_grid_variant_ids(), {self.open_variant.pk, self.done_variant.pk})
+
+    def test_page_flips_the_tag_config_for_a_look(self):
+        self.assertEqual(self._tags_grid_variant_ids(show_resolved="true"),
+                         {self.open_variant.pk, self.done_variant.pk})
+        self._set_show_resolved(True)
+        self.assertEqual(self._tags_grid_variant_ids(show_resolved="false"), {self.open_variant.pk})
 
     def test_variant_tags_page_counts_follow_the_same_setting(self):
         """ The pill counts are server rendered, so they have to agree with the grids below them """
         self.assertEqual(self._variant_tags_page_tag_events(), 1)
+        self.assertEqual(self._variant_tags_page_tag_events(show_resolved="true"), 2)
         self._set_show_resolved(True)
         self.assertEqual(self._variant_tags_page_tag_events(), 2)
 
     def test_variant_page_tag_counts_follow_the_same_setting(self):
-        """ One setting, shared with the tags page, so the choice follows the user between them """
+        """ The same tag config setting as the tags page """
         url = reverse('variant_tag_counts_datatable', kwargs={"variant_id": self.done_variant.pk})
         request = RequestFactory().get(url, {"variant_id": self.done_variant.pk})
         request.resolver_match = resolve(url)

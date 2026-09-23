@@ -81,16 +81,6 @@ def classification_significance_sort_key(clin_sig: Optional[str]) -> tuple[bool,
     option_index = (e_key.option_indexes or {}).get(clin_sig, 0)
     return significance is None, -(significance or 0), option_index
 
-#
-# class OverlapStatus(IntegerChoices):
-#     NO_SHARED_RECORDS = 0, "No Shared Records"
-#     SINGLE_SUBMITTER = 10, "Single Shared Submitter"
-#     NOT_COMPARABLE_OVERLAP = 20, "Multiple Submitters"  # e.g., no method to work out discordance
-#     AGREEMENT = 30, "Agreement"
-#     CONFIDENCE = 40, "Confidence"
-#     DISCORDANCE = 50, "Discordance"
-#     DISCORDANCE_MEDICALLY_SIGNIFICANT = 60, "Discordance"
-
 
 class AlleleOriginGrouping(TimeStampedModel):
     allele = models.ForeignKey(Allele, on_delete=models.CASCADE)

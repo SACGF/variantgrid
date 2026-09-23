@@ -658,6 +658,8 @@ class Lab(models.Model, PreviewModelMixin, LabLike):
         ordering = ['name']
         base_manager_name = 'objects'
 
+    # LabLike provided __lt__ implementation
+
     @classmethod
     def preview_category(cls) -> str:
         return "Organisation Lab"
