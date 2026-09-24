@@ -222,6 +222,34 @@ def create_patient(patient_import, first_name, last_name, sex, date_of_birth, us
     return patient
 
 
+def _patient_details(patient, include_pk=True) -> str:
+    """ The two patients in a clash often share name and sex, so add what else Patient.match compared """
+    dob = patient.date_of_birth.strftime("%Y-%m-%d") if patient.date_of_birth else "blank"
+    details = f"DOB: {dob}"
+    if include_pk:
+        details = f"Patient:{patient.pk}, {details}"
+    return f"{patient} [{details}]"
+
+
+def specimen_patient_clash_message(specimen, patient, patient_match_type, user) -> str:
+    """ A specimen belongs to one patient. The specimen lookup isn't restricted to the user's patients,
+        so the owner is only described when they can view it """
+    owner = specimen.patient
+    if owner.can_view(user):
+        owner_description = _patient_details(owner)
+    else:
+        owner_description = f"a patient you don't have access to (Patient:{owner.pk})"
+
+    if patient_match_type == PatientRecordMatchType.CREATED:
+        # The failed row is rolled back, so this patient's pk won't exist
+        row_patient = "matched no existing patient on name, sex and DOB, so would have created new patient " \
+                      f"{_patient_details(patient, include_pk=False)}"
+    else:
+        row_patient = f"matched patient {_patient_details(patient)}"
+    return f"Specimen '{specimen.reference_id}' belongs to {owner_description}. This row {row_patient}. " \
+           "A specimen can only belong to one patient."
+
+
 def set_fields_if_blank(obj, field_values):
     """ returns true if change """
     changed = False
@@ -374,8 +402,7 @@ def process_record(patient_records, record_id, row):
         else:
             other_patients_specimen = Specimen.objects.filter(reference_id=specimen_reference_id).first()
             if other_patients_specimen:
-                msg = f"{other_patients_specimen} has patient {other_patients_specimen.patient}, " \
-                      f"tried to assign to patient {patient}"
+                msg = specimen_patient_clash_message(other_patients_specimen, patient, patient_match_type, user)
                 raise InvalidPatientRecord(msg)
             specimen = Specimen.objects.create(reference_id=specimen_reference_id,
                                                patient=patient)
