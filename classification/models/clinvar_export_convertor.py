@@ -498,8 +498,9 @@ class ClinVarExportConverter:
                 else:
                     hgvs_errors += JsonMessages.error(f"ClinVar only accepts transcripts starting with one of {CLINVAR_ACCEPTED_TRANSCRIPTS}")
 
+                # the resolved c.HGVS carries the preferred symbol, which ClinVar expects over the lab's imported one
                 gene_symbols = []
-                if gene_symbol := self.value(SpecialEKeys.GENE_SYMBOL):
+                if gene_symbol := c_hgvs_obj.gene_symbol or self.value(SpecialEKeys.GENE_SYMBOL):
                     gene_symbols.append({"symbol": gene_symbol})
                 else:
                     gene_symbols = ValidatedJson([], JsonMessages.error("No gene symbol provided"))
