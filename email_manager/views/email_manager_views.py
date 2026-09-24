@@ -6,7 +6,7 @@ from django.shortcuts import render
 
 from email_manager.models import EmailLog
 from library.django_utils import require_superuser
-from library.utils.django_utils import render_ajax_view
+from library.django_utils.view_utils import render_ajax_view
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
 
 

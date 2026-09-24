@@ -15,9 +15,10 @@ from django.db.models import Model, Q
 from django.utils.html import format_html
 from django.utils.timezone import localtime
 
+from library.django_utils.model_utils import model_has_field
 from library.log_utils import NotificationBuilder
 from library.preview_request import PreviewData
-from library.utils import flatten_nested_lists, limit_str, model_has_field
+from library.utils import flatten_nested_lists, limit_str
 
 """
 HealthChecks are generated nightly and posted in Slack.

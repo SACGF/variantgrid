@@ -48,7 +48,7 @@ from library.cache import timed_cache
 from library.django_utils.django_object_managers import ObjectManagerCachingRequest
 from library.log_utils import report_exc_info
 from library.utils import IconWithTooltip, md5sum_str, pretty_label
-from library.utils.django_utils import get_cached_project_git_hash
+from library.django_utils import get_cached_project_git_hash
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import Allele, GenomeBuild, GenomeBuildPatchVersion, Variant, VariantCoordinate
 

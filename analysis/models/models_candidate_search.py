@@ -20,9 +20,8 @@ from model_utils.models import TimeStampedModel
 from analysis.models.models_analysis import Analysis
 from annotation.models import AnnotationVersion, ClinVar
 from classification.models import Classification
-from library.django_utils import count_values_qs
+from library.django_utils import count_values_qs, get_cached_project_git_hash
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsAutoInitialSaveMixin
-from library.utils.django_utils import get_cached_project_git_hash
 from patients.models_enums import Zygosity
 from snpdb.models import ProcessingStatus, Sample, Variant
 

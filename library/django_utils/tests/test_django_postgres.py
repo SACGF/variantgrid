@@ -3,7 +3,7 @@ from django.test import TestCase
 
 from library.django_utils.django_postgres import copy_from_file, get_backend_pid, model_to_insert_sql
 from library.utils.file_utils import IteratorFile
-from library.utils.database_utils import run_sql
+from library.django_utils.database_utils import run_sql
 from snpdb.models.models_clingen_allele import ClinGenAllele
 
 

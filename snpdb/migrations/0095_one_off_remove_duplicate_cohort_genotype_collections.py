@@ -4,7 +4,7 @@ import logging
 from django.db import migrations, ProgrammingError
 from django.db.models import Max
 
-from library.utils.database_utils import run_sql
+from library.django_utils.database_utils import run_sql
 
 
 def _one_off_remove_duplicate_cohort_genotype_collections(apps, schema_editor):

@@ -36,17 +36,19 @@ Patterns here:
   plus a lower `statement_timeout`), handling `TooManyMajorOperationsError`; grids use `MajorOperationViewMixin`.
 - Grid column filters and FilterNode share one vocabulary: `library/django_utils/filter_rules.py:FILTER_OPERATIONS`
   and `rules_to_q`; streaming CSV downloads go through `library/django_utils/grid_export.py:grid_export_csv`.
-- Before writing a helper, check `library/utils/`: `collection_utils.py` (`batch_iterator`, `group_by_key`, `first`,
-  `get_single_element`, `sorted_nicely`, `invert_dict`, `LazyAttribute`) · `database_utils.py` (`queryset_to_sql`,
-  `dictfetchall`, `sql_delete_qs`) · `text_utils.py` (`pretty_label`, `limit_str`, `format_percent`) ·
-  `html_utils.py` (`html_id_safe`, `sanitize_html`, `html_to_text`) · `json_utils.py` (`force_json`, `strip_json`,
-  `JsonDiffs`) · `hash_utils.py` (`md5sum_str`, `sha256sum_str`, `stable_dict_hash`) · `file_utils.py`
-  (`open_handle_gzip`, `mk_path_for_file`, `name_from_filename`) · `date_utils.py` (`calculate_age`, `parse_yymm`) ·
-  `diff_utils.py` (`diff_text`, `MultiDiff`) · `export_utils.py` (`ExportRow`, `export_column`) · `model_utils.py`
-  (`ArrayLength`, `model_has_field`) · `django_utils.py` (`is_ajax`, `render_ajax_view`, `refresh_for_update`) ·
-  `class_utils.py` (`import_class`, `get_all_subclasses`) · `os_utils.py` (`execute_cmd`) · `timer_utils.py`
-  (`get_timer`) · `misc_utils.py` (`empty_to_none`, `ChoicesEnum`, `iter_http_lines`) · `xml_utils.py` (`XmlParser`);
-  plus `library/django_utils/__init__.py:require_superuser` and `library/django_utils/django_postgres.py:copy_from_file`.
+- `library/utils/` (the `library.utils` facade) holds plain-Python helpers; anything built on Django's ORM, models or
+  views lives in `library/django_utils/`. Before writing a helper, check `library/utils/`: `collection_utils.py`
+  (`batch_iterator`, `group_by_key`, `first`, `get_single_element`, `sorted_nicely`, `invert_dict`, `LazyAttribute`) ·
+  `text_utils.py` (`pretty_label`, `limit_str`, `format_percent`) · `html_utils.py` (`html_id_safe`, `sanitize_html`,
+  `html_to_text`) · `json_utils.py` (`force_json`, `strip_json`, `JsonDiffs`) · `hash_utils.py` (`md5sum_str`,
+  `sha256sum_str`, `stable_dict_hash`) · `file_utils.py` (`open_handle_gzip`, `mk_path_for_file`, `name_from_filename`) ·
+  `date_utils.py` (`calculate_age`, `parse_yymm`) · `diff_utils.py` (`diff_text`, `MultiDiff`) · `export_utils.py`
+  (`ExportRow`, `export_column`) · `class_utils.py` (`import_class`, `get_all_subclasses`) · `os_utils.py`
+  (`execute_cmd`) · `timer_utils.py` (`get_timer`) · `misc_utils.py` (`empty_to_none`, `ChoicesEnum`, `iter_http_lines`)
+  · `xml_utils.py` (`XmlParser`); then `library/django_utils/`: `database_utils.py` (`queryset_to_sql`, `dictfetchall`,
+  `sql_delete_qs`, `IntegerFieldChoices`/`TextFieldChoices`) · `model_utils.py` (`ArrayLength`, `model_has_field`,
+  `refresh_for_update`, `AuditUtils`) · `view_utils.py` (`is_ajax`, `render_ajax_view`) · `__init__.py`
+  (`require_superuser`, `get_cached_project_git_hash`) · `django_postgres.py` (`copy_from_file`).
 Gotchas:
 - `library/django_utils/django_object_managers.py:ObjectManagerCachingImmutable` caches `.get()` results
   process-wide forever and `ObjectManagerCachingRequest` per request; both are plain managers under

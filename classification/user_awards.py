@@ -7,7 +7,7 @@ from typing import Optional
 from django.db.models import Count, F, OuterRef, Subquery
 
 from classification.models import Classification, ClassificationModification, ConditionTextMatch
-from library.utils import ArrayLength
+from library.django_utils.model_utils import ArrayLength
 from snpdb.models.models_enums import AwardPeriod, UserAwardKind
 from snpdb.user_awards import AwardCounts, AwardDefinition, counts_by_user, register_award
 

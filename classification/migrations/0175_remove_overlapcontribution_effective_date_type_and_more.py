@@ -2,7 +2,7 @@
 
 import classification.enums.overlaps_enums
 import classification.models.overlaps_model
-import library.utils.database_utils
+import library.django_utils.database_utils
 from django.db import migrations
 
 from annotation.models.data_enums import EffectiveDate
@@ -31,17 +31,17 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='overlapcontribution',
             name='comment',
-            field=library.utils.database_utils.JSONDataclassField(dataclass_type=TriageComment, default=TriageComment.default_json, illegal_value_result=None),
+            field=library.django_utils.database_utils.JSONDataclassField(dataclass_type=TriageComment, default=TriageComment.default_json, illegal_value_result=None),
         ),
         migrations.AddField(
             model_name='overlapcontribution',
             name='triage_state',
-            field=library.utils.database_utils.JSONDataclassField(dataclass_type=TriageState, default=TriageState.default_json, illegal_value_result=None),
+            field=library.django_utils.database_utils.JSONDataclassField(dataclass_type=TriageState, default=TriageState.default_json, illegal_value_result=None),
         ),
         migrations.AlterField(
             model_name='overlapcontribution',
             name='contribution_status',
-            field=library.utils.database_utils.TextFieldChoices(choices=[('P', 'Pending Calculation'), ('C', 'Contributing'), ('N', 'Not-shared'), ('X', 'No value'), ('Z', 'Non-comparable value')], choices_type=classification.enums.overlaps_enums.OverlapContributionStatus),
+            field=library.django_utils.database_utils.TextFieldChoices(choices=[('P', 'Pending Calculation'), ('C', 'Contributing'), ('N', 'Not-shared'), ('X', 'No value'), ('Z', 'Non-comparable value')], choices_type=classification.enums.overlaps_enums.OverlapContributionStatus),
         ),
         migrations.RemoveField(
             model_name='overlapcontribution',
@@ -50,6 +50,6 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='overlapcontribution',
             name='effective_date',
-            field=library.utils.database_utils.JSONDataclassField(dataclass_type=EffectiveDate, default=EffectiveDate.default_json, illegal_value_result=None),
+            field=library.django_utils.database_utils.JSONDataclassField(dataclass_type=EffectiveDate, default=EffectiveDate.default_json, illegal_value_result=None),
         ),
     ]

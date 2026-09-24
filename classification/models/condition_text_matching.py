@@ -35,9 +35,10 @@ from classification.models.flag_types import classification_flag_types
 from flags.models import Flag, FlagComment, FlagResolution, flag_comment_action
 from genes.models import GeneSymbol, GeneSymbolAlias
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
+from library.django_utils.model_utils import ArrayLength
 from library.guardian_utils import admin_bot
 from library.log_utils import report_exc_info
-from library.utils import ArrayLength, get_timer
+from library.utils import get_timer
 from ontology.models import (
     OntologyRelation,
     OntologyService,

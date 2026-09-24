@@ -7,7 +7,7 @@ from django.utils import timezone
 
 from library.django_utils import bulk_insert_class_data
 from library.utils import single_quote
-from library.utils.database_utils import run_sql
+from library.django_utils.database_utils import run_sql
 from snpdb.genome import reference_contigs
 from snpdb.genome.reference_contigs import create_build_and_contigs
 

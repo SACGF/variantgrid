@@ -60,8 +60,8 @@ from library.django_utils.django_postgres import get_backend_pid
 from library.django_utils.major_operation import planner_join_collapse_limit
 from library.log_utils import log_traceback
 from library.utils import add_exception_note, format_percent
-from library.utils.database_utils import queryset_to_sql
-from library.utils.django_utils import get_model_content_type_dict
+from library.django_utils.database_utils import queryset_to_sql
+from library.django_utils.model_utils import get_model_content_type_dict
 from patients.models import Patient
 from patients.models_enums import SampleSourceLevel
 from patients.sample_grouping import get_patient_for_source

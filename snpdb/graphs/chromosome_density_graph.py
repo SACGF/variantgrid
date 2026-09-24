@@ -4,10 +4,10 @@ from collections import defaultdict
 import numpy as np
 from django.db import connection
 
+from library.django_utils.database_utils import get_queryset_select_from_where_parts
 from library.genomics import get_genomic_size_description
 from library.graphs.chromosomes_graph import plot_chromosome_bin_values, plot_chromosomes
 from library.utils import sha256sum_str
-from library.utils.database_utils import get_queryset_select_from_where_parts
 from patients.models_enums import Zygosity
 from snpdb.graphs.graphcache import CacheableGraph
 from snpdb.models import Sample, Variant

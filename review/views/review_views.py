@@ -6,8 +6,8 @@ from django.forms import BoundField, DateField, Form
 from django.shortcuts import redirect, render
 from django.utils import timezone
 
+from library.django_utils.view_utils import render_ajax_view
 from library.log_utils import log_admin_change
-from library.utils.django_utils import render_ajax_view
 from review.models import (
     Review,
     ReviewableModelMixin,

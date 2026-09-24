@@ -13,15 +13,16 @@ from django.db import IntegrityError
 from django.db.models import Max
 
 from library.django_utils import thread_safe_unique_together_get_or_create
+from library.django_utils.database_utils import postgres_arrays
 from library.django_utils.django_file_utils import get_import_processing_filename
+from library.django_utils.model_utils import AsciiValue
 from library.genomics.vcf_enums import (
     UNDECLARED_FILTERS_INFO,
     UNDECLARED_FILTERS_SEPARATOR,
     VCFConstant,
 )
 from library.git import Git
-from library.utils import AsciiValue, double_quote, json_default_converter
-from library.utils.database_utils import postgres_arrays
+from library.utils import double_quote, json_default_converter
 from patients.models_enums import Zygosity
 from snpdb.common_variants import get_classified_high_frequency_variants_qs
 from snpdb.models import CohortGenotype, VariantCoordinate, VCFFilter

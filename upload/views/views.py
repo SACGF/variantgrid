@@ -14,7 +14,7 @@ from django.views.decorators.http import require_POST
 from django_downloadview import PathDownloadView
 
 from annotation.views import get_build_contigs
-from library.utils.django_utils import render_ajax_view
+from library.django_utils.view_utils import render_ajax_view
 from upload import forms, upload_stats
 from upload.import_task_factories.import_task_factory import get_import_tasks_by_extension
 from upload.models import (

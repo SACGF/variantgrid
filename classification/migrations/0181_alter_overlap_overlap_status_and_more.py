@@ -3,7 +3,7 @@
 import classification.enums.classification_enums
 import django.db.models.deletion
 import django_extensions.db.fields
-import library.utils.database_utils
+import library.django_utils.database_utils
 from django.db import migrations, models
 
 
@@ -18,7 +18,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='overlap',
             name='overlap_status',
-            field=library.utils.database_utils.IntegerFieldChoices(choices=[(0, 'No contributions'), (10, 'No counting contributions'), (20, 'Single submitter'), (30, 'Exact agreement'), (40, 'Terminology differences'), (50, 'Resolution differences'), (60, 'Minor differences'), (70, 'Tier 1 vs Tier 2 differences'), (80, 'Discordance'), (90, 'Medically significant discordance')], choices_type=classification.enums.classification_enums.OverlapStatus, default=0),
+            field=library.django_utils.database_utils.IntegerFieldChoices(choices=[(0, 'No contributions'), (10, 'No counting contributions'), (20, 'Single submitter'), (30, 'Exact agreement'), (40, 'Terminology differences'), (50, 'Resolution differences'), (60, 'Minor differences'), (70, 'Tier 1 vs Tier 2 differences'), (80, 'Discordance'), (90, 'Medically significant discordance')], choices_type=classification.enums.classification_enums.OverlapStatus, default=0),
         ),
         migrations.CreateModel(
             name='OverlapDiscordanceNotification',
@@ -26,7 +26,7 @@ class Migration(migrations.Migration):
                 ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('created', django_extensions.db.fields.CreationDateTimeField(auto_now_add=True, verbose_name='created')),
                 ('modified', django_extensions.db.fields.ModificationDateTimeField(auto_now=True, verbose_name='modified')),
-                ('old_status', library.utils.database_utils.IntegerFieldChoices(choices=[(0, 'No contributions'), (10, 'No counting contributions'), (20, 'Single submitter'), (30, 'Exact agreement'), (40, 'Terminology differences'), (50, 'Resolution differences'), (60, 'Minor differences'), (70, 'Tier 1 vs Tier 2 differences'), (80, 'Discordance'), (90, 'Medically significant discordance')], choices_type=classification.enums.classification_enums.OverlapStatus)),
+                ('old_status', library.django_utils.database_utils.IntegerFieldChoices(choices=[(0, 'No contributions'), (10, 'No counting contributions'), (20, 'Single submitter'), (30, 'Exact agreement'), (40, 'Terminology differences'), (50, 'Resolution differences'), (60, 'Minor differences'), (70, 'Tier 1 vs Tier 2 differences'), (80, 'Discordance'), (90, 'Medically significant discordance')], choices_type=classification.enums.classification_enums.OverlapStatus)),
                 ('notification_sent_date', models.DateTimeField(blank=True, null=True)),
                 ('lab', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='snpdb.lab')),
                 ('overlap', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='classification.overlap')),

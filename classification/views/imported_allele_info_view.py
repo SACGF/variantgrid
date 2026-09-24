@@ -19,8 +19,8 @@ from classification.models.classification_variant_info_models import ImportedAll
 from genes.hgvs import HGVSDiff, HGVSDisplay, hgvs_diff_description
 from library.django_utils import get_url_from_view_path, require_superuser
 from library.django_utils.admin_utils import get_admin_url
+from library.django_utils.view_utils import render_ajax_view
 from library.utils import ExportRow, MultiDiff, MultiDiffInput, export_column
-from library.utils.django_utils import render_ajax_view
 from snpdb.models import GenomeBuild, Lab
 from snpdb.views.datatable_view import CellData, DatatableConfig, RichColumn, SortOrder
 

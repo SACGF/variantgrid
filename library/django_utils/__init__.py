@@ -2,7 +2,7 @@
 Small Django helpers with no model of their own: `require_superuser` / RequireSuperUserView, field
 and choice display formatting (get_choices_formatter), Q helpers for name
 searches, timezone and form read-only utilities, `thread_safe_unique_together_get_or_create`,
-related-object introspection (related_objects, object_relations) and the SortMetaOrderingMixin /
+`get_cached_project_git_hash`, related-object introspection (related_objects, object_relations) and the SortMetaOrderingMixin /
 SortByPKMixin that let model instances sort like their querysets. Permission checks live in
 guardian_permissions_mixin.py, partitioning in django_partition.py, test bases in unittest_utils.py.
 """
@@ -14,6 +14,7 @@ from functools import wraps, partial
 from typing import Any
 
 import nameparser
+from cache_memoize import cache_memoize
 from dateutil import parser
 from django.conf import settings
 from django.contrib import messages
@@ -33,7 +34,13 @@ from django.views import View
 from redis import Redis
 from threadlocals.threadlocals import get_current_request
 
+from library.git import Git
 from library.utils import invert_dict
+
+
+@cache_memoize(30)
+def get_cached_project_git_hash() -> str:
+    return Git(settings.BASE_DIR).hash
 
 
 def get_url_from_view_path(view_path):

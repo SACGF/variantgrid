@@ -28,10 +28,10 @@ from classification.models.clinical_context_models import (
 )
 from classification.models.flag_types import classification_flag_types
 from genes.hgvs import HGVSDisplay
+from library.django_utils.model_utils import refresh_for_update
 from library.guardian_utils import admin_bot
 from library.preview_request import PreviewData, PreviewKeyValue, PreviewModelMixin
 from library.utils import invalidate_cached_property
-from library.utils.django_utils import refresh_for_update
 from review.models import Review, ReviewableModelMixin
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import GenomeBuild, Lab

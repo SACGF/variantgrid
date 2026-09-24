@@ -20,7 +20,7 @@ from django.urls.resolvers import URLPattern, get_resolver
 
 from library.cache import timed_cache
 from library.django_utils import require_superuser
-from library.utils.django_utils import view_to_string
+from library.django_utils.view_utils import view_to_string
 
 
 def _perm_path(route, view, path_func, **kwargs):

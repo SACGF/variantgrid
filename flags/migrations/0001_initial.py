@@ -6,6 +6,7 @@ from django.conf import settings
 from django.db import migrations, models
 
 import library.django_utils.guardian_permissions_mixin
+import library.django_utils.model_utils
 
 
 class Migration(migrations.Migration):
@@ -45,7 +46,7 @@ class Migration(migrations.Migration):
                 'get_latest_by': 'modified',
                 'abstract': False,
             },
-            bases=(models.Model, library.utils.ModelUtilsMixin),
+            bases=(models.Model, library.django_utils.model_utils.ModelUtilsMixin),
         ),
         migrations.CreateModel(
             name='FlagTypeContext',
@@ -53,7 +54,7 @@ class Migration(migrations.Migration):
                 ('id', models.TextField(primary_key=True, serialize=False)),
                 ('label', models.TextField()),
             ],
-            bases=(models.Model, library.utils.ModelUtilsMixin),
+            bases=(models.Model, library.django_utils.model_utils.ModelUtilsMixin),
         ),
         migrations.CreateModel(
             name='FlagType',
@@ -76,7 +77,7 @@ class Migration(migrations.Migration):
                 'get_latest_by': 'modified',
                 'abstract': False,
             },
-            bases=(models.Model, library.utils.ModelUtilsMixin),
+            bases=(models.Model, library.django_utils.model_utils.ModelUtilsMixin),
         ),
         migrations.CreateModel(
             name='FlagComment',

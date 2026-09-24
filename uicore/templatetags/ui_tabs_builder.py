@@ -9,7 +9,7 @@ from django.http import HttpRequest
 from django.template.base import FilterExpression
 from django.utils.text import slugify
 
-from library.utils.django_utils import is_ajax
+from library.django_utils.view_utils import is_ajax
 from uicore.templatetags.ui_utils import TagUtils, parse_tag
 
 register = template.Library()

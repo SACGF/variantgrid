@@ -40,6 +40,7 @@ from library.django_utils import (
     get_url_from_view_path,
     require_superuser,
 )
+from library.django_utils.view_utils import render_ajax_view
 from library.utils import (
     ExportDataType,
     ExportRow,
@@ -48,7 +49,6 @@ from library.utils import (
     html_to_text,
     local_date_string,
 )
-from library.utils.django_utils import render_ajax_view
 from ontology.models import AncestorCalculator, OntologyTerm, OntologyTermRelation
 from snpdb.lab_picker import LabPickerData
 from snpdb.models import Allele, ClinVarKey, GenomeBuild, Lab

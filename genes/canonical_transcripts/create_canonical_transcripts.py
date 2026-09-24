@@ -4,8 +4,8 @@ import pandas as pd
 
 from genes.gene_matching import GeneSymbolMatcher
 from genes.models import CanonicalTranscript, CanonicalTranscriptCollection, TranscriptVersion
+from library.django_utils.database_utils import sql_delete_qs
 from library.utils import file_sha256sum
-from library.utils.database_utils import sql_delete_qs
 from snpdb.models import GenomeBuild
 
 DELETE_IN_PARTS = False

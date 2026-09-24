@@ -99,7 +99,7 @@ from library.django_utils import get_url_from_view_path, require_superuser
 from library.django_utils.file_uploads import filepond_process_response, filepond_upload_receive
 from library.log_utils import log_traceback
 from library.utils import delimited_row
-from library.utils.django_utils import render_ajax_view
+from library.django_utils.view_utils import render_ajax_view
 from library.utils.file_utils import rm_if_exists
 from snpdb.forms import (
     LabMultiSelectForm,

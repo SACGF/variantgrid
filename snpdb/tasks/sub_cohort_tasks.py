@@ -4,8 +4,8 @@ from typing import Optional
 import celery
 from django.db.models.expressions import F, OuterRef, Subquery
 
+from library.django_utils.database_utils import run_sql
 from library.log_utils import log_traceback
-from library.utils.database_utils import run_sql
 from patients.models_enums import Zygosity
 from snpdb.archive import DataArchivedError
 from snpdb.models import (

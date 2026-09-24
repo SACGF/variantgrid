@@ -36,9 +36,10 @@ from classification.models.classification import ConditionResolved
 from classification.models.classification_grouping import ClassificationGrouping
 from classification.models.evidence_key import EvidenceKeyMap
 from genes.hgvs import HGVSComponents, HGVSDisplay
+from library.django_utils.database_utils import IntegerFieldChoices, TextFieldChoices
+from library.django_utils.model_utils import AuditSingleChange, AuditUtils
 from library.preview_request import PreviewKeyValue, PreviewModelMixin
-from library.utils import AuditSingleChange, AuditUtils, first
-from library.utils.database_utils import IntegerFieldChoices, TextFieldChoices
+from library.utils import first
 from ontology.models import OntologyTerm
 from review.models import Review, ReviewableModelMixin
 from snpdb.lab_picker import LabPickerData, LabSelection

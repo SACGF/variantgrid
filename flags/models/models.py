@@ -18,8 +18,9 @@ from django_extensions.db.models import TimeStampedModel
 from flags.models.enums import FlagStatus
 from library.django_utils.django_object_managers import ObjectManagerCachingImmutable
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
+from library.django_utils.model_utils import ModelUtilsMixin
 from library.guardian_utils import admin_bot
-from library.utils import ChoicesEnum, ModelUtilsMixin
+from library.utils import ChoicesEnum
 
 flag_collection_extra_info_signal = django.dispatch.Signal()  # args: "flag_infos", "user"
 

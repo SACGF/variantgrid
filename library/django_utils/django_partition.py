@@ -14,9 +14,9 @@ from django.db import connection, models, transaction
 from django.db.utils import ProgrammingError
 from django.utils.text import slugify
 
+from library.django_utils.database_utils import run_sql
 from library.log_utils import log_traceback
 from library.utils import double_quote, single_quote
-from library.utils.database_utils import run_sql
 
 
 def _get_id_sequence(base_table_name: str) -> str:

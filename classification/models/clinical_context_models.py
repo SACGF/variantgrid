@@ -21,7 +21,7 @@ from flags.models.models import FlagsMixin, FlagTypeContext
 from library.django_utils import get_url_from_view_path
 from library.log_utils import NotificationBuilder
 from library.utils import invalidate_cached_property
-from library.utils.database_utils import TextFieldChoices, IntegerFieldChoices
+from library.django_utils.database_utils import TextFieldChoices, IntegerFieldChoices
 from snpdb.models import Lab
 from snpdb.models.models_variant import Allele
 

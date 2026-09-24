@@ -1,7 +1,7 @@
 from django.core.exceptions import EmptyResultSet
 from django.test import TestCase
 
-from library.utils.database_utils import queryset_to_sql, render_empty_result_set_sql
+from library.django_utils.database_utils import queryset_to_sql, render_empty_result_set_sql
 from snpdb.models import GenomeBuild
 
 

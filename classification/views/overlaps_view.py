@@ -20,7 +20,7 @@ from classification.views.overlaps_datatables import OverlapColumns
 from library.django_utils import get_url_from_view_path
 from library.log_utils import log_admin_change
 from library.utils import empty_to_none, ExportRow, export_column, ExportDataType, ExportTweak
-from library.utils.django_utils import render_ajax_view
+from library.django_utils.view_utils import render_ajax_view
 from review.models import Review
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.lab_picker import LabPickerData

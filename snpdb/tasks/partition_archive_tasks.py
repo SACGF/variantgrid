@@ -16,7 +16,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from eventlog.models import create_event
-from library.utils.database_utils import run_sql
+from library.django_utils.database_utils import run_sql
 from snpdb.models.models_partition_archive import PartitionArchive
 
 

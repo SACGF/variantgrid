@@ -1,9 +1,17 @@
+"""
+Model-level helpers: ModelUtilsMixin (accept an instance or its pk), the ArrayLength / AsciiValue SQL
+functions, model_has_field, refresh_for_update (re-read a row under SELECT FOR UPDATE),
+get_model_content_type_dict, and AuditUtils.last_change_for (a field's latest value from django-auditlog).
+"""
+import json
 from dataclasses import dataclass
-from typing import Type, Callable, Optional, TypeVar, Generic, Union
+from typing import Callable, Generic, Optional, TypeVar, Union
+
+from auditlog.models import LogEntry
+from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import FieldDoesNotExist
 from django.db import models
 from django.db.models import Model
-import json
 
 
 class ModelUtilsMixin:
@@ -49,13 +57,28 @@ def model_has_field(model: type[Model], field_name: str) -> bool:
     return False
 
 
+ModelT = TypeVar("ModelT", bound=Model)
+
+
+def refresh_for_update(obj: ModelT) -> ModelT:
+    return type(obj).objects.filter(pk=obj.pk).select_for_update().get()
+
+
+def get_model_content_type_dict(model):
+    content_type = ContentType.objects.get_for_model(model)
+    return {
+        'app_label': content_type.app_label,
+        'model': content_type.model
+    }
+
+
 T = TypeVar("T")
 
 
 @dataclass
 class AuditSingleChange(Generic[T]):
     value: T
-    log_entry: 'LogEntry'
+    log_entry: LogEntry
 
     @property
     def user(self):
@@ -70,8 +93,6 @@ class AuditUtils:
 
     @staticmethod
     def last_change_for(model_instance: Model, field: str, is_json: bool = False, parser: Optional[Callable[[Union[str, dict]], T]] = None) -> AuditSingleChange[T]:
-        from auditlog.models import LogEntry
-
         # order_by = '-timestamp'
         # because we've done some wonky things with timestamp, use the more objective count index for getting the most recent comment
         order_by = '-pk'

@@ -321,7 +321,7 @@ legacy path, (c) the union of each arm's standalone PK set.
 Prove the structural win deterministically rather than by wall-clock timing (timing is flaky in CI):
 
 18. **Join-count assertion.** Render the merged queryset SQL (`str(qs.query)` or
-    `library.utils.database_utils.queryset_to_sql`) and assert the cohortgenotype partition / `cohortgenotype_
+    `library.django_utils.database_utils.queryset_to_sql`) and assert the cohortgenotype partition / `cohortgenotype_
     <cgc>` join appears **exactly once** for a same-cohort multi-arm merge on the new path, versus **once per
     arm** (or a `pk IN` per arm) on the legacy path. This is the direct, stable proxy for "single pass".
 19. **No `pk IN (large list)` on the new path.** Assert the new-path SQL for same-cohort arms contains the
