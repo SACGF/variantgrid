@@ -1,17 +1,99 @@
 {% extends "uicore/page/base.html" %}
 {% load ui_menu_bars %}
 {% load ui_help %}
+{% load ui_utils %}
+{% load js_tags %}
 {% load lab_tags %}
 {% block title %}Overlaps{% endblock %}
 {% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
 {% block content %}
+<style>
+    .overlaps tbody tr td {
+        height: 70px;
+    }
+    .dt-classification {
+        width: 280px;
+    }
+    .dt-testing_context {
+        width: 100px;
+    }
+    .dt-summary {
+        width: 400px;
+    }
+</style>
 <div class="container">
-    {% page_help page_id='classification/overlaps_help' title='Classification Record Overlaps' %}
+    <script>
+        function groupingFilter(data) {
+            let selectedMode = $('[name=triage_status_filter]:checked').val();
+            if (selectedMode === "SCS") {
+                $('#clin-sig-warning').show();
+            } else {
+                $('#clin-sig-warning').hide();
+            }
+            data.skew_status = selectedMode;
+            data.lab_selection = {{ lab_picker_data.selection | jsonify }};
+        }
+        function filterGrid() {
+            $('#overlaps-table').DataTable().ajax.reload();
+        }
+        $(document).ready(() => {
+            $('#triage_status_filter').change(() => {
+                filterGrid();
+            });
+        });
+    </script>
+
+    {% page_help_embedded title="Overlaps and Discordances" %}
+        <p>
+        An overlap is defined as an allele where two or more different labs provide records within the same testing context.<br/>
+        Testing contexts include Germline, Non-Cancer Somatic, Haematology, Solid Tumour.<br/>
+        When an overlap is discordant, labs can triage their submissions from this page.
+        </p>
+            <div><label>Awaiting Triage</label> : overlaps that are discordant where your lab(s) records have not yet been triaged.</div>
+            <div><label>Ready to Discuss</label> : all relevant labs have triaged but not come to a concordance.</div>
+            <div><label>Awaiting Amendment</label> : if during a previous triage you agreed to change a value, the changes will be listed here.</div>
+            <div><label>Waiting on Other Lab</label> : your lab(s) have triaged, but another lab still needs to triage.</div>
+            <div><label>VUS</label> : shows all overlaps where every involved lab has provided VUS (or VUS-A,B,C). No action is required here.</div>
+            <div><label>Solved</label> : shows overlaps your lab(s) contribute towards that were once actively discordant.</div>
+            <div><label>All Overlaps</label> : shows every instance where you and another lab contribute to the same overlap, regardless of agreement/disagreement.</div>
+            <div><label>Somatic Clin Sig</label> : only relevant for somatic labs, shows all overlaps where two or more labs have provided somatic clinical significance.</div>
+    {% end_page_help_embedded %}
+
     {% lab_picker data=lab_picker_data %}
 
-    <div data-toggle="ajax" href="{% url 'overlaps_detail' lab_picker_data.selection %}">
-        <div class="loading-message">Loading Overlaps, this may take a while.</div>
+    <div>
+    <a class="hover-link download-link pipe-sep" href="{% url 'overlaps_download' lab_picker_data.selection %}">Download Outstanding</a>
+    <a class="hover-link download-link pipe-sep" href="{% url 'overlaps_download' lab_picker_data.selection %}?mode=solved">Download Solved</a>
     </div>
+
+    <div id="triage_status_filter" class="my-4">
+        <div class="btn-group btn-group-toggle" data-toggle="buttons">
+            <label class="btn btn-outline-danger"><input type="radio" name="triage_status_filter" id="triage_status_filter-t" value="TT" {% if tab == "TT" %}checked="checked"{% endif %}>Awaiting Triage {{ counts.TT | badge }}</label>
+            <label class="btn btn-outline-success"><input type="radio" name="triage_status_filter" id="triage_status_filter-d" value="7" {% if tab == "D" %}checked="checked"{% endif %}>Ready to Discuss {{ counts.7 | badge }}</label>
+            <label class="btn btn-outline-warning"><input type="radio" name="triage_status_filter" id="triage_status_filter-a" value="5" {% if tab == "AA" %}checked="checked"{% endif %}>Awaiting Amendment {{ counts.5 | badge }}</label>
+            <label class="btn btn-outline-secondary"><input type="radio" name="triage_status_filter" id="triage_status_filter-o" value="2" {% if tab == "O" %}checked="checked"{% endif %}>Waiting on Other Lab {{ counts.2 | badge }}</label>
+            <label class="btn btn-outline-success"><input type="radio" name="triage_status_filter" id="triage_status_filter-v" value="V" {% if tab == "S" %}checked="checked"{% endif %}>VUS {{ counts.V | badge }}</label>
+            <label class="btn btn-outline-success"><input type="radio" name="triage_status_filter" id="triage_status_filter-s" value="S" {% if tab == "S" %}checked="checked"{% endif %}>Solved {{ counts.S | badge }}</label>
+            <label class="btn btn-outline-success"><input type="radio" name="triage_status_filter" id="triage_status_filter-c" value="X" {% if tab == "A" %}checked="checked"{% endif %}>All Overlaps</label>
+            {% if counts.SCS %}
+            <label class="btn btn-outline-secondary"><input type="radio" name="triage_status_filter" id="triage_status_filter-scs" value="SCS" {% if tab == "SCS" %}checked="checked"{% endif %}>Somatic Clin Sig {{ counts.SCS | badge }}</label>
+            {% endif %}
+        </div>
+    </div>
+
+    <div id="clin-sig-warning" class="text-info" style="display:none">
+        Discordances for Somatic Clinical Significance aren't yet supported<br/>
+        Solid Tumour overlaps are not yet sub-divided by cancer type.<br/>
+        These Somatic Clinical Significance overlaps are provided for your manual review if you find them useful.
+    </div>
+
+    <table
+           data-datatable-data='groupingFilter'
+           data-datatable-url="{% url 'overlaps_datatables' %}"
+           class="sticky-header thick-border overlaps"
+           id="overlaps-table"
+           data-adjust-columns="false">
+    </table>
 
 </div>
 {% endblock %}

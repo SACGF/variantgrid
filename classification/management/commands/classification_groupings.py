@@ -1,4 +1,7 @@
+from contextlib import nullcontext
+
 from django.core.management import BaseCommand
+from django.db.models import Subquery, Exists
 
 from classification.models import (
     Classification,
@@ -9,6 +12,7 @@ from classification.models.classification_grouping import (
     AlleleOriginGrouping,
     ClassificationGrouping,
 )
+from classification.services.overlaps_services import OverlapServices
 
 
 class Command(BaseCommand):
@@ -29,7 +33,13 @@ class Command(BaseCommand):
         if not any((summary, all, dirty, refresh)):
             raise ValueError("Must provide one or more of summary, all, dirty, refresh")
 
-        if summary:
+        # a full rebuild would otherwise notify labs of every existing discordance
+        with OverlapServices.discordance_notifications_suppressed() if (all or refresh) else nullcontext():
+            self._rebuild(summary=summary, all=all, dirty=dirty, refresh=refresh)
+
+    @staticmethod
+    def _rebuild(summary: bool, all: bool, dirty: bool, refresh: bool):
+        if all or summary:
             for index, cm in enumerate(ClassificationModification.objects.filter(is_last_published=True).select_related("classification").iterator()):
                 classification = cm.classification
                 classification.summary = ClassificationSummaryCalculator(cm).cache_dict()
@@ -57,8 +67,3 @@ class Command(BaseCommand):
                     print(f"Updating {index} classification groupings")
             print(f"Updated {index+1} classification groupings")
 
-            for index, dirty in enumerate(AlleleOriginGrouping.objects.filter(dirty=True).iterator()):
-                dirty.update()
-                if index % 1000 == 0 and index:
-                    print(f"Updating {index} allele groupings")
-            print(f"Updated {index+1} allele groupings")

@@ -139,22 +139,13 @@ def update_clinical_contexts(
         dc.recalc_and_save()
 
 
-def update_clinical_context(
-        classification: Classification,
-        force_recalc_text: Optional[str] = None):
-    """
-    Convenience method for only recalculating a single classification's clinical context
-    """
-    update_clinical_contexts([classification], force_recalc_text)
-
-
 def classifications_needing_rehoming(classification_qs: QuerySet[Classification] = None) -> QuerySet[Classification]:
     """ Classifications whose derived records sit under a different Allele than the classification itself -
         both are moved lazily on publish, so a bulk allele change (a merge, or the #1361 dedupe) strands them """
     if classification_qs is None:
         classification_qs = Classification.objects.all()
 
-    grouping_allele = "classificationgroupingentry__grouping__allele_origin_grouping__allele_grouping__allele"
+    grouping_allele = "classificationgroupingentry__grouping__allele_origin_grouping__allele"
     wrong_clinical_context = Q(clinical_context__isnull=False) & ~Q(clinical_context__allele=F("allele"))
     wrong_grouping = Q(classificationgroupingentry__isnull=False) & ~Q(**{grouping_allele: F("allele")})
     return classification_qs.filter(allele__isnull=False) \
@@ -167,7 +158,7 @@ def rehome_classifications(classifications: Iterable[Classification], force_reca
     if not classifications:
         return 0
 
-    update_clinical_contexts(classifications, force_recalc_text=force_recalc_text)
+    #update_clinical_contexts(classifications, force_recalc_text=force_recalc_text)
     for classification in classifications:
         ClassificationGrouping.assign_grouping_for_classification(classification)
     ClassificationGrouping.update_all_dirty()

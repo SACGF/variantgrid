@@ -1010,6 +1010,17 @@ const VCForm = (function() {
 
 
             appendLabelHeadingForKey(SpecialEKeys.CLINICAL_SIGNIFICANCE, true, 'Class.');
+            const oncoPathTriage = this.record.triages.O;
+            if (oncoPathTriage) {
+                if (oncoPathTriage.status === "F") {
+                    let label = "TBD";
+                    if (oncoPathTriage.amend_value) {
+                        const eKey = eKeys.key(SpecialEKeys.CLINICAL_SIGNIFICANCE);
+                        label = eKey.prettyValue(oncoPathTriage.amend_value).val;
+                    }
+                    appendLabelHeading("Pending", label);
+                }
+            }
 
             if (this.value(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE)) {
                 let extra = null;
@@ -1021,6 +1032,18 @@ const VCForm = (function() {
                     }
                 }
                 appendLabelHeadingForKey(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE, true, 'Somatic Sig', extra);
+
+                const clinSigTriage = this.record.triages.S;
+                if (clinSigTriage) {
+                    if (clinSigTriage.status === "F") {
+                        let label = "TBD";
+                        if (clinSigTriage.amend_value) {
+                            const eKey = eKeys.key(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE);
+                            label = eKey.prettyValue(clinSigTriage.amend_value).val;
+                        }
+                        appendLabelHeading("Pending", label);
+                    }
+                }
             }
 
             if (this.record.sample_id) {
@@ -2521,105 +2544,86 @@ VCTable.somatic_clinical_significance = (data, type, row) => {
     } else {
         value = data;
     }
-
+    const pendingVal = value["pending"];
     const scs = value["clinical_significance"];
-    const diff = value["diff"];
-    let diffHtml = "";
-    if (diff) {
-        diffHtml = ' <i class="fa-solid fa-asterisk" title="Multiple values have been recorded - showing latest"></i>';
-    }
 
     if (scs) {
         const scsKey = EKeys.cachedKeys.key(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE);
         const scsLabel = scsKey.prettyValue(scs);
-        const dom = ($('<span>', {text: scsLabel.val, 'class': `c-pill scs scs-${scs}`}));
+        const pendingClass = pendingVal ? 'strike' : '';
+        const dom = ($('<span>', {text: scsLabel.val, 'class': `c-pill cs cs-${scs} ${pendingClass}`}));
 
         const highest_level = value["amp_level"];
         if (highest_level) {
             dom.append(`<span class="amp-level">${highest_level}</span>`);
         }
-        dom.append(diffHtml);
+        if (value["diff"]) {
+            dom.append('<i class="fa-solid fa-asterisk ml-1" title="Multiple values have been recorded - showing latest"></i>');
+        }
+        if (pendingVal) {
+            const domParts = [dom];
+            if (pendingVal == 'in-review') {
+                domParts.push($('<div>', {
+                    class: `cs c-pill cs-in-review`,
+                    html: "In-Review"
+                }));
+            } else {
+                domParts.push($('<div>', {
+                    class: `cs c-pill cs-${pendingVal.toLowerCase()}`,
+                    html: scsKey.prettyValue(pendingVal).val
+                }));
+            }
+            return $('<div>', {html: domParts});
+        }
+
         return dom;
     } else {
-        return $('<div>', {class: 'c-pill scs-none no-value', html: 'No Data' + diffHtml});
+        // FIXME can still have different values with no-value
+        return $('<div>', {class: 'c-pill cs-none no-value', html: 'No Data'});
     }
 };
 
 VCTable.classification = (data, type, row) => {
+    // as in render the "classification" known as clinical_significance value
     if (data === null) {
         return ""; // support for dirty groups still processing
     }
-    const cs = data;
-    let csVal = cs;
-    let diff = 0;
-    let is_pending = false;
-    let old = null;
-    let oldLabel = null;
-    let newValue = null;
+    let value = data;
+    if (typeof(data) == "string") {
+        value = {"classification": data};
+    }
+
     const csKey = EKeys.cachedKeys.key(SpecialEKeys.CLINICAL_SIGNIFICANCE);
+    const csVal = value["classification"] || value[SpecialEKeys.CLINICAL_SIGNIFICANCE];
+    const pendingVal = value["pending"];
 
-    if (typeof(cs) !== "string") {
-        csVal = cs["classification"] || cs[SpecialEKeys.CLINICAL_SIGNIFICANCE];
-        newValue = cs["new"];
-        const pending = cs["pending"];
-        if (pending) {
-            old = csVal;
-            csVal = pending;
-            is_pending = true;
-        } else {
-            old = cs["old"];
-        }
-        diff = cs["diff"];
-        if (old) {
-            oldLabel = csKey.prettyValue(old).val;
-        }
-    }
+    const domParts = [];
+    let dom;
 
-    const label = csKey.prettyValue(csVal).val;
-    const csClass = `cs-` + (csVal || '').toLowerCase();
-    let diffHtml = "";
-    if (diff) {
-        diffHtml = ' <i class="fa-solid fa-asterisk" title="Multiple values have been recorded - showing latest"></i>';
-    }
-    let pendingHtml = "";
-    if (is_pending) {
-        pendingHtml = ' <i class="fa-solid fa-clock" title="Some or all of these classifications have been marked as having pending changes to classification to the value shown"></i>';
-    }
-    let newHtml = "";
-
-    // {% if group.clinical_significance_old %}
-    //         <div><del>{% if group.clinical_significance_old %}{{ group.clinical_significance_old | ekey:"clinical_significance" }}{% else %}No Data{% endif %}</del></div>
-    //     {% endif %}
-    //     {% if group.clinical_significance_pending %}
-    //         <div title="Some or all of these classifications have been marked as having pending changes to classification" data-toggle="tooltip">
-    //             <div>
-    //                 <del>{% if group.clinical_significance %}{{ group.clinical_significance | ekey:"clinical_significance" }}{% else %}No Data{% endif %}</del>
-    //             </div>
-    //             <div class="c-pill cs cs-{{ group.clinical_significance }}">
-    //                 <div class="mb-1">{{ group.clinical_significance_pending | ekey:"clinical_significance" }}</div>
-    //                 <div class="flag flag-classification_pending_changes hover-detail mx-1"></div>
-    //             </div>
-    //         </div>
-    //     {% else %}
-
-    const fullDom = $('<div>');
-    if (old) {
-        fullDom.append($('<div>', {html: $('<del>', {class: 'c-pill cs cs-none no-value', text: oldLabel})}));
-    }
-
-    if (csVal && csVal.length) {
-        fullDom.append($('<span>', {class: `c-pill cs ${csClass}`, html:label + diffHtml + pendingHtml + newHtml}));
+    if (!csVal || !csVal.length) {
+        dom = $('<div>', {class: 'c-pill cs-none no-value', html: 'No Data'});
     } else {
-        fullDom.append($('<span>', {class: 'c-pill cs-none no-value', html: 'No Data' + diffHtml + pendingHtml + newHtml}));
+        const pendingClass = pendingVal ? 'strike' : '';
+        dom = $('<div>', {class: `cs c-pill cs-${csVal.toLowerCase()} ${pendingClass}`, html: csKey.prettyValue(csVal).val});
     }
-
-    if (newValue) {
-        const newLabel = csKey.prettyValue(newValue).val;
-        newHtml = `<span class="c-pill cs" title="This is the classification value at the time the discordance was resolved. This record is now ${newLabel}">Updated <i class="fa-solid fa-circle-exclamation"></i></span>`;
-        fullDom.append(newHtml);
+    domParts.push(dom);
+    if (value["diff"]) {
+        dom.append(' <i class="fa-solid fa-asterisk ml-1" title="Multiple values have been recorded - showing latest"></i>');
     }
-
-    return fullDom;
+    if (pendingVal) {
+        if (pendingVal == 'in-review') {
+            domParts.push($('<div>', {
+                class: `cs c-pill cs-in-review`,
+                html: "In-Review"
+            }));
+        } else {
+            domParts.push($('<div>', {
+                class: `cs c-pill cs-${pendingVal.toLowerCase()}`,
+                html: csKey.prettyValue(pendingVal).val
+            }));
+        }
+    }
+    return $('<div>', {html: domParts});
 };
 
 VCTable.evidence_key = (key_name, data, type, row) => {
@@ -2691,6 +2695,10 @@ VCTable.groupIdentifier = (data, type, row) => {
         labLine.push($('<span>', {class: 'badge badge-info ml-1', title: 'Research lab', text: `${research_icon} Research`}));
     }
     const dom = $('<div>', {html: labLine});
+
+    if (allele_origin_bucket === "S") {
+        dom.append($('<div>', {class:'testing-context', text: data.testing_context_bucket_label}));
+    }
 
     if (dirty) {
         dom.append($("<div class='mt-2'><i class=\"fa-solid fa-clock\"></i> Data is currently being updated</div>"));

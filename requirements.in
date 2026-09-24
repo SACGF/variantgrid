@@ -82,6 +82,7 @@ simplejson
 sqlparse>=0.6.0
 tblib  # picklable tracebacks for manage.py test --parallel
 toposort
+typing-extensions  # @deprecated until Python 3.13 (warnings.deprecated)
 Unidecode
 xhtml2pdf
 # below are only required for environments directly integrating with s3
@@ -94,6 +95,8 @@ pydantic>=2.4.0
 deepdiff
 
 # --- linting & type checking (dev only) ---
+dataclasses-json==0.6.7
+# required for omniimporter
 # Run: mypy --config-file mypy.ini snpdb   (or any app)
 # Lint: ./scripts/linting/run_pylint.sh   |   ruff check
 ruff
@@ -102,3 +105,4 @@ django-stubs
 djangorestframework-stubs
 pylint
 pylint-django
+openpyxl

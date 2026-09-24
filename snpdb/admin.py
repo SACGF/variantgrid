@@ -7,6 +7,8 @@ from django.forms import ModelForm
 from martor.widgets import AdminMartorWidget
 from unidecode import unidecode
 
+from classification.models import Overlap
+from classification.services.overlaps_services import OverlapServices
 from snpdb import models
 from snpdb.admin_partition_archive_mixin import ArchivePartitionDataAdminMixin
 from snpdb.admin_utils import (
@@ -91,6 +93,12 @@ class AlleleAdmin(ModelAdminBasics):
         liftover_alleles(allele_qs=queryset, user=request.user,
                          retry_conversion_tools=list(AlleleConversionTool))
         self.message_user(request, message='Liftover queued', level=messages.INFO)
+
+    @admin_action("Re-calc Overlaps")
+    def recalc_overlaps(self, request, queryset: QuerySet[Allele]):
+        for overlap in Overlap.objects.filter(allele__in=queryset).iterator():
+            OverlapServices.recalc_overlap(overlap)
+            OverlapServices.update_next_steps(overlap)
 
 
 class DefaultBuildFilter(admin.SimpleListFilter):

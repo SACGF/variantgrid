@@ -30,7 +30,6 @@ from classification.enums.classification_enums import (
     SubmissionSource,
 )
 from classification.models import (
-    AlleleGrouping,
     AlleleOriginGrouping,
     CaseReport,
     CaseReportClassification,
@@ -53,7 +52,7 @@ from classification.models import (
     ReclassificationEventBuildState,
     UploadedClassificationsUnmapped,
     classification_flag_types,
-    ensure_discordance_report_triages_bulk,
+    ensure_discordance_report_triages_bulk, OverlapDiscordanceNotification, ClassificationSummaryCalculator,
 )
 from classification.models.classification import Classification
 from classification.models.classification_import_run import (
@@ -68,10 +67,9 @@ from classification.models.clinical_context_models import (
     ClinicalContextRecalcTrigger,
     DiscordanceNotification,
 )
-from classification.models.clinical_context_utils import update_clinical_contexts
 from classification.models.discordance_lab_summaries import DiscordanceLabSummary
 from classification.models.discordance_models_utils import DiscordanceReportRowDataTriagesRowData
-from classification.signals import send_prepared_discordance_notifications
+from classification.services.overlaps_services import OverlapServices
 from classification.tasks.classification_import_map_and_insert_task import (
     ClassificationImportMapInsertTask,
 )
@@ -406,9 +404,9 @@ class ClassificationAdmin(ModelAdminBasics):
         for c in queryset:
             c.fix_permissions(fix_modifications=True)
 
-    @admin_action("Fixes: Clinical Context Germline/Somatic")
-    def fix_clinical_context(self, request, queryset: QuerySet[Classification]):
-        update_clinical_contexts(list(queryset.all()))
+    # @admin_action("Fixes: Clinical Context Germline/Somatic")
+    # def fix_clinical_context(self, request, queryset: QuerySet[Classification]):
+    #     update_clinical_contexts(list(queryset.all()))
 
     @admin_action("Fixes: Revalidate")
     def revalidate(self, request, queryset):
@@ -417,11 +415,25 @@ class ClassificationAdmin(ModelAdminBasics):
             vc.revalidate(request.user)
         self.message_user(request, str(qs_count) + " records revalidated")
 
+    @admin_action("Fixes: Update Summary")
+    def update_summary(self, request, queryset: QuerySet[Classification]):
+        for cm in queryset:
+            latest = cm.last_published_version
+            cm.summary = ClassificationSummaryCalculator(latest).cache_dict()
+            cm.save(update_fields=["summary"])
+            ClassificationGrouping.assign_grouping_for_classification(cm, force_dirty_up=True)
+        if ClassificationImportRun.ongoing_imports():
+            pass
+        else:
+            ClassificationGrouping.update_all_dirty()
+
     @admin_action("Fixes: Assign Classification Grouping")
     def assign_classification_grouping(self, request, queryset: QuerySet[Classification]):
         qs_count = queryset.count()
         changed_count = 0
         for vc in queryset:
+            vc.summary = ClassificationSummaryCalculator(vc.last_published_version).cache_dict()
+            vc.save(update_fields=["summary"])
             changed_group = ClassificationGrouping.assign_grouping_for_classification(vc)
             if changed_group:
                 changed_count += 1
@@ -591,12 +603,8 @@ class ClinicalContextAdmin(ModelAdminBasics):
     def has_add_permission(self, request):
         return False
 
-    @admin_action("Recalculate Status")
-    def recalculate(self, request, queryset):
-        for dc in queryset:
-            dc.recalc_and_save(cause='Admin recalculation',
-                               cause_code=ClinicalContextRecalcTrigger.ADMIN)  # cause of None should change to Unknown, which is accurate if this was required
-        self.message_user(request, f'Recalculated {queryset.count()} statuses')
+    # note recalculate status has been removed as ClinicalContext calculations have been removed
+    # in favor of Overlaps
 
 
 class EvidenceKeySectionFilter(admin.SimpleListFilter):
@@ -1047,13 +1055,6 @@ class DiscordanceReportAdmin(ModelAdminBasics):
     def has_add_permission(self, request):
         return False
 
-    @admin_action("Re-calculate latest")
-    def re_calculate(self, request, queryset):
-        ds: DiscordanceReport
-        for ds in queryset:
-            ds.clinical_context.recalc_and_save(cause="Admin recalculation",
-                                                cause_code=ClinicalContextRecalcTrigger.ADMIN)
-
     @admin_action("Export Admin Report CSV")
     def export_admin_report(self, request, queryset: QuerySet[DiscordanceReport]):
         perspective = LabPickerData.for_user(request.user)
@@ -1121,9 +1122,15 @@ class DiscordanceNotificationAdmin(ModelAdminBasics):
     def has_delete_permission(self, request, obj=None):
         return False
 
-    @admin_action("Send Notification")
-    def send_lab_discordance_notification(self, request, queryset):
-        send_prepared_discordance_notifications(queryset)
+
+@admin.register(OverlapDiscordanceNotification)
+class OverlapDiscordanceNotificationAdmin(ModelAdminBasics):
+    list_display = ("overlap", "old_state", "new_state", "notification_sent_date")
+    #list_filter = (('notification_sent_date', DateFieldListFilter))
+
+    @admin_action("Resend Notifications")
+    def resend_notifications(self, request, queryset: QuerySet[OverlapDiscordanceNotification]):
+        OverlapServices.send_prepared_discordance_notifications(outstanding_notifications=queryset)
 
 
 @admin.register(UploadedClassificationsUnmapped)
@@ -1449,11 +1456,28 @@ class ClassificationGroupingSearchTermAdmin(admin.TabularInline):
         return False
 
 
+class ClassificationGroupingClassificationCounts(admin.SimpleListFilter):
+    title = 'variant match status'
+    parameter_name = 'matched'
+    default_value = None
+
+    def lookups(self, request, model_admin):
+        return [('0', 'None'), ('1', 'Single'), ('2+', '2+'), ('5+', '5+')]
+
+    def queryset(self, request, queryset: QuerySet[ClassificationGrouping]):
+        match self.value():
+            case '0': return queryset.filter(classification_count=0)
+            case '1': return queryset.filter(classification_count=1)
+            case '2+': return queryset.filter(classification_count__gte=2)
+            case '5+': return queryset.filter(classification_count__gte=5)
+            case _: return queryset
+
+
 @admin.register(ClassificationGrouping)
 class ClassificationGroupingAdmin(ModelAdminBasics):
     inlines = (ClassificationGroupingEntryAdmin, ClassificationGroupingSearchTermAdmin)
-    list_display = ("pk", "classification_count", "allele", "lab", "allele_origin_bucket", "pathogenic_difference", "somatic_difference", "dirty")
-    list_filter = ("lab", "allele_origin_bucket", "pathogenic_difference", "somatic_difference", "dirty")
+    list_display = ("pk", "classification_count", "allele", "lab", "pathogenic_difference", "somatic_difference", "dirty")
+    list_filter = (ClassificationGroupingClassificationCounts, "pathogenic_difference", "somatic_difference", "dirty", "lab")
 
     # @admin_list_column("gene_symbols")
     # def gene_symbols(self, obj: ClassificationGrouping):
@@ -1494,7 +1518,7 @@ class ClassificationGroupingTabularAdmin(TabularInline):
 
 @admin.register(AlleleOriginGrouping)
 class AlleleOriginGroupingAdmin(ModelAdminBasics):
-    list_display = ("allele_grouping", "dirty")
+    list_display = ("allele",)
     inlines = (ClassificationGroupingTabularAdmin,)
 
     @admin_model_action(url_slug="refresh_all/", short_description="Refresh All", icon="fa-solid fa-arrows-rotate")
@@ -1514,11 +1538,6 @@ class AlleleOriginGroupingTabularAdmin(TabularInline):
 
     def has_change_permission(self, request, obj=None):
         return False
-
-
-@admin.register(AlleleGrouping)
-class AlleleGroupingAdmin(ModelAdminBasics):
-    inlines = (AlleleOriginGroupingTabularAdmin,)
 
 
 @admin.register(ReclassificationEventBuildState)

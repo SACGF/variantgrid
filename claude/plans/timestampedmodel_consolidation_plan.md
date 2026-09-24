@@ -103,7 +103,7 @@ Each becomes `Classification.objects.filter(pk=<obj>.pk).update(<field>=<obj>.<f
 | `classification/models/classification.py:1494` (`patch_history`) | `self.save(update_fields=['evidence'])` | `evidence=self.evidence` |
 | `classification/models/condition_text_matching.py:1170` | `classification.save(update_fields=['condition_resolution'])` | `condition_resolution=classification.condition_resolution` |
 | `classification/models/clinical_context_utils.py:99` | `classification.save(update_fields=['clinical_context'])` | `clinical_context=classification.clinical_context` |
-| `classification/signals/classification_hooks_pending_flags.py:13` | `c.save(update_fields=["summary"])` | `summary=c.summary` |
+| `c.save(update_fields=["summary"])` | `summary=c.summary` |
 | `classification/evidence_key_rename.py:227` | `vc.save(update_fields=["evidence"])` | `evidence=vc.evidence` |
 
 Management commands (one-off; convert so re-runs stay behaviour-identical):

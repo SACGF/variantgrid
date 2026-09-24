@@ -1,0 +1,73 @@
+from dataclasses import dataclass
+from functools import cached_property
+from typing import Iterator
+from django.conf import settings
+from classification.models import ClassificationJsonParams
+from classification.views.exports_grouping.classification_grouping_export_filter import \
+    ClassificationGroupingExportFormat, ClassificationGroupingExportFormatProperties, ClassificationGroupingExportFilter
+import json
+
+
+@dataclass(frozen=True)
+class JSONFormatDetails:
+    full_detail = False
+
+
+class ClassificationGroupingExportFormatterJSON(ClassificationGroupingExportFormat):
+
+    @classmethod
+    def format_properties(cls) -> ClassificationGroupingExportFormatProperties:
+        return ClassificationGroupingExportFormatProperties(
+            http_content_type="text/json",
+            extension="json",
+            delimiter_for_row=",\n"
+        )
+
+    def __init__(self,
+                 classification_grouping_filter: ClassificationGroupingExportFilter,
+                 json_format_details: JSONFormatDetails = JSONFormatDetails()):
+        self.json_format_details = json_format_details
+        super().__init__(classification_grouping_filter)
+
+    def header(self) -> list[str]:
+        return ['{"records":[']
+
+    @cached_property
+    def json_params(self):
+        include_data: tuple[bool, set[str]]
+        populate_literature_with_citations = False
+        if self.json_format_details.full_detail:
+            include_data = True
+        else:
+            include_data = [e_key.key for e_key in self.e_keys.all_keys if e_key.is_vital_key]
+            populate_literature_with_citations = settings.CLASSIFICATION_DOWNLOADABLE_JSON_LITERATURE_CITATIONS
+
+        return ClassificationJsonParams(
+            current_user=self.classification_grouping_filter.user,
+            api_version=2,
+            include_data=include_data,
+            populate_literature_with_citations=populate_literature_with_citations
+        )
+
+    def single_row_generator(self) -> Iterator[str]:
+        # classification export looks at a lot of relationships dangling of the latest_classification_modification
+        # so select related for records branching off that
+        queryset = self.queryset().select_related(
+            "allele_origin_grouping",
+            "allele_origin_grouping__allele",
+            "allele_origin_grouping__allele__clingen_allele",
+            "latest_allele_info__grch37",
+            "latest_allele_info__grch38",
+            "latest_classification_modification__classification__lab__organization",
+            "latest_classification_modification__classification__allele",
+            "latest_classification_modification__classification__allele_info",
+            "latest_classification_modification__classification__clinical_context"
+        ).prefetch_related("overlapcontribution_set")
+
+        for cg in queryset.iterator(chunk_size=4000):
+            yield json.dumps(cg.latest_classification_modification.as_json(
+                self.json_params
+            ))
+
+    def footer(self) -> list[str]:
+        return [']}']

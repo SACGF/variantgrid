@@ -88,9 +88,12 @@ def menu_item(
         url = reverse(url_name, args=args)
 
     current_url_name: Optional[str] = None
+    is_active = False
     if rm := context.request.resolver_match:
         current_url_name = rm.url_name
-    is_active = url_name == current_url_name
+        current_url_route = "/" + rm.route
+        is_active = url_name == current_url_name or current_url_route.startswith(url)
+
     if not is_active and other_urls:
         other_url_parts = other_urls.split(',')
         current_url = context.request.path

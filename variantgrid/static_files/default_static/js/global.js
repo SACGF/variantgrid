@@ -125,7 +125,6 @@ function enhanceAndMonitor() {
 
         {test: '[data-replace]', func: (node) => {
             const selector = node.attr('data-replace');
-            console.log(`Found replace for ${selector}`);
             node.detach();
            $(selector).html(node);
            node.fadeIn();
@@ -375,19 +374,21 @@ function enhanceAndMonitor() {
         // checked is the opposite of that, the checkbox will be toggled to the other state (firing any change listeners)
         {test: 'input[type=checkbox][data-cookie]',
             func: (node) => {
-                const $node = $(node);
-                const cookieName = $node.attr('data-cookie') || $node.attr('id') || $node.attr('name');
+                if (typeof Cookies !== 'undefined') {
+                    const $node = $(node);
+                    const cookieName = $node.attr('data-cookie') || $node.attr('id') || $node.attr('name');
 
-                $node.change(() => {
-                   const checked = !!$node.prop('checked');
-                   Cookies.set(cookieName, checked ? 'true' : 'false', {sameSite: 'strict'});
-                });
+                    $node.change(() => {
+                        const checked = !!$node.prop('checked');
+                        Cookies.set(cookieName, checked ? 'true' : 'false', {sameSite: 'strict'});
+                    });
 
-                const checked = !!$node.prop('checked') ? 'true' : 'false';
-                const existingCookie = Cookies.get(cookieName);
+                    const checked = !!$node.prop('checked') ? 'true' : 'false';
+                    const existingCookie = Cookies.get(cookieName);
 
-                if (existingCookie && existingCookie != checked) {
-                    $node.click();
+                    if (existingCookie && existingCookie != checked) {
+                        $node.click();
+                    }
                 }
             }
         },
@@ -471,15 +472,24 @@ function enhanceAndMonitor() {
 
     // run the processors, and check recursively
     function checkNode(node, recursive) {
+        if (node.attr('data-p')) {
+            return;
+        }
+        let matched = false;
         for (const processor of processors) {
             if (node.is(processor.test)) {
                 if (processor.func) {
                     const element = node[0];
                     processor.func(node);
+                    matched = true;
                 } else {
                     return; // no function means it's some weird element type we should stay away from
                 }
             }
+        }
+        if (matched) {
+            // only add data-p to elements that matched a test (as adding them to all elements would be messy)
+            node.attr('data-p', '1');
         }
         // check recursively
         if (recursive) {
@@ -545,9 +555,7 @@ function enhanceAndMonitor() {
 function cardToModal(content) {
     const modalContentDiv = content.closest('.modal-content');
     if (modalContentDiv.length) {
-        console.log("Looking to convert card to modal");
         if (content.find('.card .modalable')) {
-            console.log("Converting to card to modal");
             content.find('.card').removeClass('card');
             const cardHeader = content.find(".card-header");
             const h5 = $("<h5>", {"class": "modal-title"}).append(cardHeader.contents());
@@ -589,7 +597,7 @@ function setupModalAnimationForWebTesting(modalContent) {
 
 function loadAjaxModal(linkDom, size) {
     const url = linkDom.attr('data-href') || linkDom.attr('href');
-    const useId = url.replace('/', '_');
+    const useId = url.replaceAll(/[^a-zA-Z0-9]/g, '');
     const modalContent = createModalShell(useId, linkDom.attr('data-title') || linkDom.text(), size);
     const modalContentDiv = modalContent.find('.modal-content');
     const body = modalContent.find('.modal-body');
@@ -719,7 +727,9 @@ function globalSetup() {
     tweakAjax();
     configureTimestamps();
     // stops there being a popup to the user
-    $.fn.DataTable.ext.errMode = 'none';
+    if ($.fn.DataTable) {
+        $.fn.DataTable.ext.errMode = 'none';
+    }
 
     // applies many tweaks and functionality (such as ajax blocks)
     // as well as applying them to dynamically added elements
@@ -1033,26 +1043,28 @@ const JS_DATE_FORMAT_SCIENTIFIC = 'YYYY-MM-DD HH:mm';
 const JS_DATE_FORMAT = 'YYYY-MM-DD HH:mm'; //'lll';
 const JS_DATE_ONLY_FORMAT = 'YYYY-MM-DD';
 function configureTimestamps() {
-    $.timeago.settings.allowFuture = true;
-    $.timeago.settings.strings = {
-        prefixAgo: null,
-        prefixFromNow: null,
-        suffixAgo: "ago",
-        suffixFromNow: "from now",
-        seconds: "<1 min",
-        minute: "1 min",
-        minutes: "%d mins",
-        hour: "1 hour",
-        hours: "%d hours",
-        day: "1 day",
-        days: "%d days",
-        month: "1 month",
-        months: "%d months",
-        year: "1 year",
-        years: "%d years",
-        wordSeparator: " ",
-        numbers: []
-    };
+    if ($.timeago) {
+        $.timeago.settings.allowFuture = true;
+        $.timeago.settings.strings = {
+            prefixAgo: null,
+            prefixFromNow: null,
+            suffixAgo: "ago",
+            suffixFromNow: "from now",
+            seconds: "<1 min",
+            minute: "1 min",
+            minutes: "%d mins",
+            hour: "1 hour",
+            hours: "%d hours",
+            day: "1 day",
+            days: "%d days",
+            month: "1 month",
+            months: "%d months",
+            year: "1 year",
+            years: "%d years",
+            wordSeparator: " ",
+            numbers: []
+        };
+    }
 }
 
 function convertTimestampDom(elem) {
@@ -1077,7 +1089,7 @@ function convertTimestampDom(elem) {
             case 0: finalText = "Today"; break;
             case 1: finalText = "Tomorrow"; break;
             case 2: finalText = "2 days from now"; break;
-            default: console.log(`Date Diff = ${daysDiff}`);
+            // default: console.log(`Date Diff = ${daysDiff}`);
         }
         if (finalText) {
             let text = m.format("YYYY-MM-DD");

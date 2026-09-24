@@ -18,6 +18,7 @@ from datetime import date, datetime, time
 from functools import cached_property
 from typing import Optional
 
+import django
 from Bio.Data.IUPACData import protein_letters_1to3
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -417,6 +418,12 @@ class ClinVar(models.Model):
         return f"ClinVar: variant: {self.variant}, path: {self.highest_pathogenicity}"
 
 
+clinvar_record_collection_refreshed = django.dispatch.Signal()
+"""
+Takers ClinVarRecordCollection as sender, and the instance of a ClinVarRecordCollection that has just been refreshed
+as the 2nd parameter
+"""
+
 class ClinVarRecordCollection(TimeStampedModel):
     """
     Stores data about when we've retrieved individual ClinVar records for a clinvar variation id.
@@ -456,10 +463,16 @@ class ClinVarRecordCollection(TimeStampedModel):
 
     def update_with_records_and_save(self, records: list['ClinVarRecord']):
         records = sorted(records, reverse=True)
-        self.clinvarrecord_set.all().delete()
+        self.clinvarrecord_set.exclude(record_id__in={r.record_id for r in records}).delete()
         for record in records:
             record.clinvar_record_collection = self
-        ClinVarRecord.objects.bulk_create(records)
+
+        # since the primary key of a ClinVarRecord is the record_id, we should just be able to upsert
+        # If these newly created "ClinVarRecord"s have a record_id that matches a record already in the DB
+        # it should just update anyway
+        all_field_names = [field.name for field in ClinVarRecord._meta.concrete_fields if field.name != "record_id"]
+
+        ClinVarRecord.objects.bulk_create(records, update_conflicts=True, unique_fields=["record_id"], update_fields=all_field_names)
         self.expert_panel = None
         self.max_stars = None
         if best_record := first(records):
@@ -467,6 +480,7 @@ class ClinVarRecordCollection(TimeStampedModel):
             if best_record.is_expert_panel_or_greater:
                 self.expert_panel = best_record
         self.save()
+        clinvar_record_collection_refreshed.send(ClinVarRecordCollection, instance=self)
 
 
 class ClinVarRecord(TimeStampedModel):

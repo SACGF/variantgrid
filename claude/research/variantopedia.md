@@ -104,10 +104,6 @@ Categorizes classifications by AlleleOriginBucket (germline, somatic, etc.) and 
 
 ## Key Data Structures
 
-**AlleleOriginGroupingDescription** (dataclass):
-- Properties: allele_origin_grouping, discordance_report, overlap_status, shared_counts, unshared_counts, should_show_diffs
-- Static method: `describe()` — performs overlap analysis
-
 **ShareLevelRecordCounts** (dataclass): Classification share level statistics with lab_count.
 
 ---
