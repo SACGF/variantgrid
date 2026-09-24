@@ -1,35 +1,49 @@
 import operator
-from collections import Counter
-from collections import defaultdict
+from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from functools import cached_property, reduce
 from typing import Optional, Self
+
 import django
 from django.contrib.auth.models import User
 from django.contrib.postgres.fields import ArrayField
 from django.core.exceptions import PermissionDenied
-from django.db.models import CASCADE, SET_NULL, IntegerChoices, Q, QuerySet, TextChoices, F, OuterRef, Count
+from django.db import models, transaction
+from django.db.models import (
+    CASCADE,
+    SET_NULL,
+    Count,
+    F,
+    IntegerChoices,
+    OuterRef,
+    Q,
+    QuerySet,
+    TextChoices,
+)
 from django.db.models.signals import pre_delete
 from django.dispatch import receiver
-from django.db import models, transaction
-from django.db.models import CASCADE, SET_NULL, Count, IntegerChoices, Q, QuerySet, TextChoices
 from django.urls import reverse
 from django_extensions.db.models import TimeStampedModel
 from frozendict import frozendict
 from more_itertools import last
-from classification.enums import TestingContextBucket, TestingContextFull, ClassificationResultValue
-from django.db import models, transaction
-from classification.enums import AlleleOriginBucket, ShareLevel, SpecialEKeys
-from classification.models import (
+
+from classification.enums import (
+    AlleleOriginBucket,
+    ClassificationResultValue,
+    ShareLevel,
+    SpecialEKeys,
+    TestingContextBucket,
+    TestingContextFull,
+)
+from classification.models.classification import (
     Classification,
     ClassificationModification,
+    ConditionReference,
     ConditionResolved,
-    EvidenceKeyMap,
-    ImportedAlleleInfo, ConditionReference,
 )
-from classification.models.evidence_mixin_summary_cache import (
-    ClassificationSummaryCacheObj
-)
+from classification.models.classification_variant_info_models import ImportedAlleleInfo
+from classification.models.evidence_key import EvidenceKeyMap
+from classification.models.evidence_mixin_summary_cache import ClassificationSummaryCacheObj
 from genes.models import GeneSymbol
 from library.utils import JsonDataType, strip_json
 from snpdb.models import Allele, Lab

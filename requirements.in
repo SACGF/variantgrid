@@ -100,4 +100,6 @@ django-stubs
 djangorestframework-stubs
 pylint
 pylint-django
+# Import contracts: lint-imports (reads .importlinter)
+import-linter
 openpyxl

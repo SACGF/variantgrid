@@ -2,8 +2,8 @@ from django.contrib import admin
 from django.contrib.admin import TabularInline
 from django.contrib.admin.widgets import AdminTextInputWidget
 
+from library.django_utils.admin_utils import ModelAdminBasics
 from review.models import Review, ReviewQuestion, ReviewTopic
-from snpdb.admin_utils import ModelAdminBasics
 
 
 class ReviewQuestionInline(TabularInline):

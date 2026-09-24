@@ -8,7 +8,7 @@ from django.db.models import CASCADE
 from django.db.models.signals import post_delete
 from django.dispatch import receiver
 
-from analysis.models import Analysis
+from analysis.models.models_analysis import Analysis
 from analysis.models.models_variant_tag import VariantTagsImport
 from annotation.models.models import ClinVarVersion, ManualVariantEntryCollection
 from classification.models import ClassificationImport
@@ -26,7 +26,7 @@ from snpdb.models import (
 )
 from snpdb.models.models_variant import LiftoverRun
 from upload.bed_file_processing import process_bed_file
-from upload.models import FileUpload, UploadData
+from upload.models.models import FileUpload, UploadData
 
 
 class UploadedAnalysis(UploadData):

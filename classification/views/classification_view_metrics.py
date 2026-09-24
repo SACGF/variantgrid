@@ -17,7 +17,7 @@ from classification.models import Classification, DiscordanceReport
 from eventlog.models import ViewEvent
 from genes.models import GeneSymbol
 from library.django_utils import require_superuser
-from snpdb.admin_utils import get_admin_model_url
+from library.django_utils.admin_utils import get_admin_model_url
 from snpdb.models import Allele
 
 T = TypeVar("T")

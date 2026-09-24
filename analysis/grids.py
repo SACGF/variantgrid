@@ -50,7 +50,6 @@ from annotation.models import HumanProteinAtlasAnnotation
 from classification.models import Classification
 from genes.grids import GeneListGenesColumns
 from genes.models import HGNC, GeneList
-from library.django_utils.datatable_dataframe import DataFrameDatatableConfig
 from library.unit_percent import get_allele_frequency_formatter
 from library.utils import (
     JsonDataType,
@@ -81,6 +80,7 @@ from snpdb.models import (
 )
 from snpdb.models.models_enums import SequenceRole
 from snpdb.models.models_genome import GenomeBuild
+from snpdb.views.datatable_dataframe import DataFrameDatatableConfig
 from snpdb.views.datatable_view import CellData, DatatableConfig, NullOrder, RichColumn, SortOrder
 
 

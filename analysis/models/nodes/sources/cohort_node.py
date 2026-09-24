@@ -8,15 +8,16 @@ from django.db.models.deletion import CASCADE, SET_NULL
 from django.db.models.expressions import F, Value
 from django.db.models.functions import Concat, Length, Replace, Substr
 
-from analysis.models import AnalysisNode, GroupOperation
+from analysis.models.enums import GroupOperation
+from analysis.models.nodes.analysis_node import AnalysisNode
 from analysis.models.nodes.cohort_mixin import CohortMixin
+from analysis.models.nodes.node_display import NodeIcon
 from analysis.models.nodes.stats_cache import (
     UNCACHEABLE,
     get_cached_label_count_for_cohort,
     get_handler_for_node,
 )
 from analysis.models.nodes.zygosity_count_node import AbstractZygosityCountNode
-from analysis.models.nodes.node_display import NodeIcon
 from patients.models_enums import SimpleZygosity, Zygosity
 from snpdb.models import Cohort, CohortGenotypeCollection, CohortSample, VariantsType
 from snpdb.views.datatable_view import NullOrder, RichColumn

@@ -1,6 +1,5 @@
 from rest_framework import routers
 
-from library.django_utils.datatable_dataframe import DataFrameTableView
 from seqauto import views, views_admin, views_autocomplete, views_qc_graphs, views_rest
 from seqauto.grids.qc_data_grids import (
     FastQCColumns,
@@ -60,6 +59,7 @@ from seqauto.views_rest import (
     SingleSampleVCFViewSet,
     VariantCallerViewSet,
 )
+from snpdb.views.datatable_dataframe import DataFrameTableView
 from snpdb.views.datatable_view import DatabaseTableView
 from variantgrid.perm_path import path, router_urls
 

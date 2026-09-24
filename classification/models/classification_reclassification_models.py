@@ -10,10 +10,19 @@ from django.db.models.fields.json import KeyTextTransform
 from django.db.models.functions import Coalesce, RowNumber
 from django.utils.timezone import localdate, now
 
-from classification.enums import (AlleleOriginBucket, ClinicalSignificance, CriteriaEvaluation,
-                                  ReclassificationEventType, SpecialEKeys)
-from classification.models import (CLASSIFICATION_DATE_REGEX, Classification, ClassificationModification,
-                                  EvidenceKeyMap)
+from classification.enums import (
+    AlleleOriginBucket,
+    ClinicalSignificance,
+    CriteriaEvaluation,
+    ReclassificationEventType,
+    SpecialEKeys,
+)
+from classification.models.classification import (
+    CLASSIFICATION_DATE_REGEX,
+    Classification,
+    ClassificationModification,
+)
+from classification.models.evidence_key import EvidenceKeyMap
 from genes.models import GeneSymbol
 from snpdb.models import Lab
 

@@ -167,6 +167,6 @@ uicore does not define its own URL patterns — URLs registered by including app
 
 | App | Integration |
 |-----|-------------|
-| library | log_utils (log_level_to_bootstrap, report_message), health_check signals, preview_request (PreviewModelMixin), django_utils (get_url_from_view_path, is_ajax, require_superuser), utils (html_id_safe, emoji_to_unicode, diff_text, pretty_label) |
-| snpdb | admin_utils (get_admin_url), user_settings_manager (timezone), perm_path (get_visible_url_names) |
+| library | admin_utils (get_admin_url), log_utils (log_level_to_bootstrap, report_message), health_check signals, preview_request (PreviewModelMixin), django_utils (get_url_from_view_path, is_ajax, require_superuser), utils (html_id_safe, emoji_to_unicode, diff_text, pretty_label) |
+| snpdb | user_settings_manager (timezone), perm_path (get_visible_url_names) |
 | Django | Template system, forms, FormHelper, Http |

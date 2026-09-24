@@ -11,7 +11,7 @@ from django.db.models import QuerySet
 from classification.models.classification import ClassificationModification
 from library.oauth import ServerAuth
 from library.utils import parse_http_header_date
-from sync.models import SyncStatus
+from sync.models.enums import SyncStatus
 from sync.models.models import SyncDestination, SyncRun
 
 

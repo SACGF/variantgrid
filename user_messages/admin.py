@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from snpdb.admin_utils import ModelAdminBasics
+from library.django_utils.admin_utils import ModelAdminBasics
 from user_messages.models import Message
 
 

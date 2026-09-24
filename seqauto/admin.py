@@ -1,7 +1,7 @@
 from django.contrib import admin
 
+from library.django_utils.admin_utils import ModelAdminBasics
 from seqauto import models
-from snpdb.admin_utils import ModelAdminBasics
 
 
 @admin.register(models.EnrichmentKit)

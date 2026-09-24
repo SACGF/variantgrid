@@ -26,7 +26,7 @@ from analysis.views import (
     views_node,
     views_wizard,
 )
-from library.django_utils.datatable_dataframe import DataFrameTableView
+from snpdb.views.datatable_dataframe import DataFrameTableView
 from snpdb.views.datatable_view import DatabaseTableView
 from variantgrid.perm_path import path
 

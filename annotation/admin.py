@@ -21,8 +21,13 @@ from annotation.models import (
     VariantAnnotation,
     VariantAnnotationVersion,
 )
+from library.django_utils.admin_utils import (
+    ModelAdminBasics,
+    admin_action,
+    admin_list_column,
+    get_admin_url,
+)
 from snpdb.admin_partition_archive_mixin import ArchivePartitionDataAdminMixin
-from snpdb.admin_utils import ModelAdminBasics, admin_action, admin_list_column, get_admin_url
 
 admin.site.register(models.AnnotationVersion)
 admin.site.register(models.CachedWebResource)

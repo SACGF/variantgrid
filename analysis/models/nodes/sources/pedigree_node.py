@@ -5,8 +5,8 @@ from django.db import models
 from django.db.models import Q
 from django.db.models.deletion import SET_NULL
 
-from analysis.models.nodes.sources import AbstractCohortBasedNode
 from analysis.models.nodes.node_display import NodeIcon
+from analysis.models.nodes.sources.cohort_node import AbstractCohortBasedNode
 from patients.models_enums import Zygosity
 from pedigree.models import CohortSamplePedFileRecord, Pedigree, PedigreeInheritance
 

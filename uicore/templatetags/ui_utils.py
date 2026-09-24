@@ -14,11 +14,11 @@ from django.template.base import FilterExpression, kwarg_re
 from django.utils import html
 from django.utils.safestring import SafeString
 
+from library.django_utils.admin_utils import get_admin_url
 from library.enums.log_level import LogLevel
 from library.log_utils import log_level_to_bootstrap
 from library.preview_request import PreviewData, PreviewModelMixin, preview_coordinator_icon_html
 from library.utils import diff_text, emoji_to_unicode, format_diff_text, html_id_safe, pretty_label
-from snpdb.admin_utils import get_admin_url
 from uicore.views.ajax_form_view import LazyRender
 from variantgrid.perm_path import get_visible_url_names
 

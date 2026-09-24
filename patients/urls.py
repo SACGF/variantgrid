@@ -1,6 +1,5 @@
 from rest_framework import routers
 
-from library.django_utils.datatable_dataframe import DataFrameTableView
 from patients import views, views_autocomplete, views_json
 from patients.grids import (
     ExtractionColumns,
@@ -17,6 +16,7 @@ from patients.views_rest import (
     PatientViewSet,
     SpecimenViewSet,
 )
+from snpdb.views.datatable_dataframe import DataFrameTableView
 from snpdb.views.datatable_view import DatabaseTableView
 from variantgrid.perm_path import path, router_urls
 

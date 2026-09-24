@@ -3,8 +3,8 @@ from collections import defaultdict
 
 import pandas as pd
 
-from library.django_utils.datatable_dataframe import DataFrameDatatableConfig
 from ontology.models import OntologyTerm, OntologyVersion
+from snpdb.views.datatable_dataframe import DataFrameDatatableConfig
 
 
 class AbstractOntologyGenesConfig(DataFrameDatatableConfig, abc.ABC):

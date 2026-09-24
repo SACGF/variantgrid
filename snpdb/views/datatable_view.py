@@ -28,13 +28,13 @@ from django.http import HttpRequest, QueryDict, StreamingHttpResponse
 from django.urls import reverse
 from kombu.utils import json
 
+from library.django_utils.datatable_mixins import JSONResponseView
 from library.django_utils.filter_rules import filter_operations_json, parse_filters, rules_to_q
 from library.django_utils.grid_export import csv_streaming_response, grid_export_csv
 from library.django_utils.major_operation import MajorOperationViewMixin
 from library.log_utils import report_exc_info
 from library.utils import JsonDataType, JsonObjType, full_class_name, nice_class_name, pretty_label
 from snpdb.models import AvatarDetails, UserGridConfig, UserSettings
-from snpdb.views.datatable_mixins import JSONResponseView
 
 logger = logging.getLogger(__name__)
 

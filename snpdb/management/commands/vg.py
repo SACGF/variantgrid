@@ -10,6 +10,7 @@ manage.py vg — introspection for driving VariantGrid from an agent or a termin
     vg settings [NAME] [--diff] [--json]
     vg docs check [doc.md|dir ...] [--all-plans]
     vg css unused [file.scss ...] [--dynamic] [--rendered [--max-pages N] [--per-name N] [--as USER]]
+    vg imports cycles
     vg inspect <kind> <id> [--depth N] [--json]
 
 All logic lives in library/vg/; this file only parses arguments. See claude/plans/agent_system.md §4.2.
@@ -29,6 +30,7 @@ from library.vg import maps
 from library.vg.css import find_unused, render_unused_report
 from library.vg.css_rendered import crawl_rendered_classes, render_rendered_report
 from library.vg.docs import check_docs, render_report
+from library.vg.import_graph import build_import_graph, import_cycles, render_cycles
 from library.vg.inspect import KINDS, inspect, render_inspection
 from library.vg.outline import outline, render_coverage, render_outline
 from library.vg.page import AgentUserMissing, create_agent_user, render_page
@@ -102,6 +104,9 @@ class Command(BaseCommand):
         css_parser.add_argument("--max-pages", type=int, default=500)
         css_parser.add_argument("--per-name", type=int, default=2, help="Pages rendered per URL name")
         css_parser.add_argument("--as", dest="username", help="Crawl as this user instead of claude_agent")
+
+        imports_parser = subparsers.add_parser("imports", help="Import cycles among the imports that run at module load")
+        imports_parser.add_argument("action", choices=["cycles"])
 
         inspect_parser = subparsers.add_parser("inspect", help="An object's whole graph by domain kind: " + ", ".join(KINDS))
         inspect_parser.add_argument("kind", choices=list(KINDS))
@@ -233,6 +238,15 @@ class Command(BaseCommand):
             self.stdout.write("\n" + render_rendered_report(report, crawl))
         if not report.ok:
             raise CommandError(f"{len(report.unused)} unused selector(s)")
+
+    # --- imports ---
+
+    def handle_imports(self, **_):
+        graph = build_import_graph(module_load_only=True)
+        cycles = import_cycles(graph)
+        self.stdout.write(render_cycles(graph, cycles))
+        if cycles:
+            raise CommandError(f"{len(cycles)} import cycle(s)")
 
     # --- inspect ---
 

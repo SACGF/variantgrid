@@ -1,6 +1,6 @@
 from django.test import TestCase
 
-from library.genomics.vcf_utils import vcf_header_filter_ids
+from snpdb.vcf_utils import vcf_header_filter_ids
 
 
 class TestVCFHeaderFilterIds(TestCase):

@@ -33,10 +33,9 @@ from library.django_utils.avatar import SpaceThemedAvatarProvider
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsAutoInitialSaveMixin
 from library.preview_request import PreviewData, PreviewKeyValue, PreviewModelMixin
 from library.utils import rgb_contrasting_text, string_deterministic_hash
-from snpdb.models import AlleleOriginFilterDefault, UserAward, UserAwards
-from snpdb.models.models import Lab, Organization, Tag
+from snpdb.models.models import Lab, Organization, Tag, UserAward, UserAwards
 from snpdb.models.models_columns import CustomColumn, CustomColumnsCollection
-from snpdb.models.models_enums import BuiltInFilters, TagFilter
+from snpdb.models.models_enums import AlleleOriginFilterDefault, BuiltInFilters, TagFilter
 from snpdb.models.models_genome import GenomeBuild
 
 

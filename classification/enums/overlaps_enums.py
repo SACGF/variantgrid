@@ -1,10 +1,15 @@
 from dataclasses import dataclass, field
 from typing import Optional
+
 from dataclasses_json import DataClassJsonMixin
 from django.db.models import TextChoices
 from django.utils.safestring import mark_safe
 
-from classification.enums import SpecialEKeys, OverlapStatus, OverlapOverrideStatus
+from classification.enums.classification_enums import (
+    OverlapOverrideStatus,
+    OverlapStatus,
+    SpecialEKeys,
+)
 
 
 class OverlapType(TextChoices):

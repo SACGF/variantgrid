@@ -4,8 +4,8 @@ from typing import Optional
 from django.conf import settings
 from django.dispatch import receiver
 
-from library.keycloak import Keycloak
 from library.uptime_check import UptimeCheckResponse, UptimeCheckStatus, uptime_check_signal
+from snpdb.keycloak import Keycloak
 
 
 @receiver(signal=uptime_check_signal)

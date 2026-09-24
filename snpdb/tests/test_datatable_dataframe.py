@@ -4,7 +4,7 @@ import pandas as pd
 from django.contrib.auth.models import User
 from django.test import RequestFactory, TestCase
 
-from library.django_utils.datatable_dataframe import (
+from snpdb.views.datatable_dataframe import (
     INDEX_COLUMN_KEY,
     DataFrameDatatableConfig,
     DataFrameTableView,

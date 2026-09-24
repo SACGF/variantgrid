@@ -9,7 +9,7 @@ from django_extensions.db.models import TimeStampedModel
 
 from library.django_utils.data_archive_mixin import DataArchiveMixin
 from library.django_utils.django_partition import RelatedModelsPartitionModel
-from snpdb.models import Variant
+from snpdb.models.models_variant import Variant
 from snpdb.models.models_vcf import VCF, Sample
 
 

@@ -1,7 +1,7 @@
 from django.contrib import admin
 
+from library.django_utils.admin_utils import ModelAdminBasics
 from ontology.models import OntologyImport, OntologyTerm, OntologyTermRelation
-from snpdb.admin_utils import ModelAdminBasics
 
 
 @admin.register(OntologyTerm)

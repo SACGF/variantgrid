@@ -17,15 +17,18 @@ from django.core.cache import cache
 from django.db.models import Max, Min
 from django.utils.timezone import now
 
-from genes.hgvs import (HGVSComponents, HGVSImplementationException, HGVSNoRepresentationException,
-                       HGVSNomenclatureException, HGVSVariant)
 from genes.hgvs.biocommons_hgvs.data_provider import DjangoTranscriptDataProvider
 from genes.hgvs.biocommons_hgvs.hgvs_converter_biocommons import BioCommonsHGVSConverter
+from genes.hgvs.hgvs import HGVSComponents
 from genes.hgvs.hgvs_converter import (
     HGVSConverterType,
+    HGVSImplementationException,
     HgvsMatchRefAllele,
+    HGVSNomenclatureException,
+    HGVSNoRepresentationException,
     HgvsOriginallyNormalized,
 )
+from genes.hgvs.hgvs_variant import HGVSVariant
 from genes.models import (
     BadTranscript,
     GeneAnnotationImport,

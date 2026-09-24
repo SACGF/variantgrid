@@ -22,11 +22,6 @@ from django.urls.base import reverse
 from django.utils import timezone
 
 from library.genomics.vcf_enums import VCFConstant
-from library.genomics.vcf_utils import (
-    cyvcf2_get_contig_lengths_dict,
-    cyvcf2_header_get,
-    cyvcf2_header_types,
-)
 from library.guardian_utils import assign_permission_to_user_and_groups
 from library.utils import get_single_element, invert_dict
 from patients.external_references import ExternalReference, resolve_reference
@@ -58,6 +53,11 @@ from snpdb.models import (
 from snpdb.models.models_enums import ImportSource, SampleFileType, VariantsType, VCFInfoTypes
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.tasks.cohort_genotype_tasks import create_cohort_genotype_collection
+from snpdb.vcf_utils import (
+    cyvcf2_get_contig_lengths_dict,
+    cyvcf2_header_get,
+    cyvcf2_header_types,
+)
 from upload.models import (
     BackendVCF,
     FileUpload,

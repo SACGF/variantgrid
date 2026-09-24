@@ -6,7 +6,7 @@ from annotation.tasks.import_clinvar_vcf_task import (
     ProcessClinVarVCFDataTask,
 )
 from annotation.vcf_files.import_clinvar_vcf import check_can_import_clinvar
-from library.genomics.vcf_utils import cyvcf2_header_get
+from snpdb.vcf_utils import cyvcf2_header_get
 from upload.import_task_factories.abstract_vcf_import_task_factory import (
     AbstractVCFImportTaskFactory,
 )

@@ -10,10 +10,10 @@ from annotation.tasks.process_manual_variants_task import (
     get_manual_variant_coordinates,
 )
 from library.django_utils.django_file_utils import get_import_processing_dir
-from library.genomics.vcf_utils import write_vcf_from_variant_coordinates
 from library.utils import full_class_name
 from snpdb.models.models_enums import ImportSource
 from snpdb.models.models_genome import GenomeBuild
+from snpdb.vcf_utils import write_vcf_from_variant_coordinates
 from upload.models import (
     FileUpload,
     UploadedManualVariantEntryCollection,

@@ -6,6 +6,8 @@ name: Agent maps
 # a warning, not a gate: a dead citation means a doc has drifted behind the code, which is for whoever
 # next works in that app to fix, not a reason to redden a build. It needs Django importable but no
 # database, so it runs on every push - including the docs-only pushes that django-tests.yml skips.
+# The import checks are gates: `lint-imports` holds the contracts in .importlinter and `vg imports cycles`
+# fails on any cycle among module-load imports.
 
 on:
   push:
@@ -49,3 +51,9 @@ jobs:
       - name: Check doc citations resolve
         continue-on-error: true
         run: .venv/bin/python scripts/vg docs check
+
+      - name: Check import contracts
+        run: .venv/bin/lint-imports --config .importlinter
+
+      - name: Check for import cycles
+        run: .venv/bin/python scripts/vg imports cycles

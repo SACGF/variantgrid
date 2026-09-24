@@ -6,6 +6,10 @@ Start with: `guardian_utils.py` (DjangoPermission, group getters, assign_permiss
 report_exc_info) · `preview_request.py` (PreviewModelMixin, PreviewData, the preview signals) ·
 `django_utils/unittest_utils.py` (URLTestCase, query profiling) · `django_utils/django_object_managers.py`
 Patterns here:
+- `library` sits below the apps: `.importlinter` (checked in CI by `lint-imports`) forbids it importing one. Code that
+  needs an app's models belongs in that app (`snpdb/vcf_utils.py`, `snpdb/keycloak.py`, `snpdb/views/datatable_dataframe.py`
+  moved out for this); the contract's `ignore_imports` lists the remaining exceptions, and an entry nothing matches fails
+  the check, so delete it when you remove the import.
 - Give a new user-owned model permissions by inheriting
   `library/django_utils/guardian_permissions_mixin.py:GuardianPermissionsAutoInitialSaveMixin` before `models.Model`;
   it needs a `user` field and calls `library/guardian_utils.py:assign_permission_to_user_and_groups` on first save,

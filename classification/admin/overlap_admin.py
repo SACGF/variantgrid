@@ -1,12 +1,13 @@
 from auditlog.mixins import AuditlogHistoryAdminMixin
+from django.contrib import admin
 from django.contrib.admin import ModelAdmin
 from django.db.models import QuerySet
 from django.http import HttpRequest
+
 from classification.enums import OverlapStatus
 from classification.models import Overlap, OverlapContribution, OverlapContributionNextStep
 from classification.services.overlaps_services import OverlapServices
-from snpdb.admin_utils import ModelAdminBasics, admin_action, admin_list_column
-from django.contrib import admin
+from library.django_utils.admin_utils import ModelAdminBasics, admin_action, admin_list_column
 from snpdb.models import Lab
 
 

@@ -7,7 +7,7 @@ Shared low-level VCF writing:
     destination (a bgzip stream, a raw pipe) wrap it in ``io.TextIOWrapper`` first, so the
     text/bytes concern stays at the handle, not in the writer.
 
-Parsing / header-rewriting of existing VCFs lives in ``library.genomics.vcf_utils``.
+Parsing / header-rewriting of existing VCFs lives in ``snpdb.vcf_utils``.
 """
 import re
 from collections.abc import Iterable

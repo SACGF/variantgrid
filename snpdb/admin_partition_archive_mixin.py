@@ -1,6 +1,6 @@
 from django.contrib import messages
 
-from snpdb.admin_utils import admin_action
+from library.django_utils.admin_utils import admin_action
 from snpdb.partition_archive import (
     PartitionArchivePreconditionError,
     archive_partitioned_model,

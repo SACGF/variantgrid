@@ -1,7 +1,7 @@
 from django.contrib import admin
 
+from library.django_utils.admin_utils import ModelAdminBasics
 from manual.models import ManualMigrationAttempt, ManualMigrationRequired
-from snpdb.admin_utils import ModelAdminBasics
 
 
 @admin.register(ManualMigrationAttempt)

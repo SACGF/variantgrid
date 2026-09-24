@@ -10,9 +10,9 @@ from django.db.models import Max
 from annotation.annotation_version_querysets import pipeline_type_variant_q
 from annotation.pipelines import blocking_pipeline_types
 from library.django_utils.django_file_utils import get_import_processing_filename
-from library.genomics.vcf_utils import vcf_get_ref_alt_svlen_and_modification
 from snpdb.models import Variant, VariantCoordinate
 from snpdb.variant_pk_lookup import VariantPKLookup
+from snpdb.vcf_utils import vcf_get_ref_alt_svlen_and_modification
 from upload.models import (
     ModifiedImportedVariant,
     ModifiedImportedVariantOperation,

@@ -3,7 +3,7 @@ from django.contrib.admin import RelatedFieldListFilter, TabularInline
 
 from flags.models import Flag, FlagCollection, FlagComment
 from flags.models.models import FlagType
-from snpdb.admin_utils import AllValuesChoicesFieldListFilter, ModelAdminBasics
+from library.django_utils.admin_utils import AllValuesChoicesFieldListFilter, ModelAdminBasics
 
 
 class FlagCommentAdminTabular(TabularInline):

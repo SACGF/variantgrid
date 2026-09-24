@@ -3,7 +3,7 @@ import tempfile
 
 from django.test import TestCase
 
-from library.genomics.vcf_utils import get_variant_caller_and_version_from_vcf
+from snpdb.vcf_utils import get_variant_caller_and_version_from_vcf
 
 COLUMN_HEADER = "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\n"
 

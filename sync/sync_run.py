@@ -2,10 +2,8 @@ import logging
 import time
 from typing import Optional
 
-from sync.alissa import *  # to get decorators to register
 from sync.models import SyncStatus
 from sync.models.models import SyncDestination, SyncRun
-from sync.shariant import *  # to get decorators to register
 from sync.sync_runner import SyncRunInstance, sync_runner_for_destination
 
 

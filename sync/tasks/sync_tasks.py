@@ -3,6 +3,7 @@ import logging
 import celery
 
 from sync.models.models import SyncDestination
+from sync.sync_run import run_sync
 
 
 @celery.shared_task
@@ -15,4 +16,4 @@ def sync_all():
     logging.info("sync_all: %d enabled destination(s): %s",
                  len(destinations), ", ".join(str(sd) for sd in destinations))
     for sync_dest in destinations:
-        sync_dest.run()
+        run_sync(sync_dest)

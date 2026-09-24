@@ -15,8 +15,8 @@ from library.genomics.vcf_enums import (
     UNDECLARED_FILTERS_INFO,
     UNDECLARED_FILTERS_SEPARATOR,
 )
-from library.genomics.vcf_utils import write_cleaned_vcf_header
 from library.utils.file_utils import name_from_filename
+from snpdb.vcf_utils import write_cleaned_vcf_header
 from upload.models import (
     ModifiedImportedVariant,
     ModifiedImportedVariants,

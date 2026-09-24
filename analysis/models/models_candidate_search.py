@@ -17,7 +17,7 @@ from django.db.models.deletion import SET_NULL
 from django.urls import reverse
 from model_utils.models import TimeStampedModel
 
-from analysis.models import Analysis
+from analysis.models.models_analysis import Analysis
 from annotation.models import AnnotationVersion, ClinVar
 from classification.models import Classification
 from library.django_utils import count_values_qs

@@ -7,9 +7,9 @@ from django.contrib.auth.models import User
 from django.dispatch.dispatcher import receiver
 
 from classification.enums import AlleleOriginBucket, SpecialEKeys, SubmissionSource, ValidationCode
-from classification.models import EvidenceKeyMap, PatchMeta
 from classification.models.classification import Classification, classification_validation_signal
-from classification.models.classification_utils import ValidationMerger
+from classification.models.classification_utils import PatchMeta, ValidationMerger
+from classification.models.evidence_key import EvidenceKeyMap
 from genes.hgvs import HGVSMatcher
 from genes.models import NoTranscript
 from library.utils import first

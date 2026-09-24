@@ -14,7 +14,9 @@ from library.vg import css, css_rendered, docs
 from library.vg import inspect as inspect_pkg
 from library.vg.import_graph import (
     ImportGraph,
+    import_cycles,
     iter_import_statements,
+    iter_module_load_imports,
     relative_base,
     resolve_from_import,
 )
@@ -59,6 +61,20 @@ class ImportGraphTest(SimpleTestCase):
         tree = ast.parse("import a\ndef f():\n    from b import c\ntry:\n    import d\nexcept ImportError:\n    import e\n")
         names = sorted(getattr(n, "module", None) or n.names[0].name for n in iter_import_statements(tree))
         self.assertEqual(names, ["a", "b", "d", "e"])
+
+    def test_module_load_imports_skip_function_bodies_and_type_checking(self):
+        tree = ast.parse("import a\ndef f():\n    import b\nclass C:\n    import c\n"
+                         "if TYPE_CHECKING:\n    import d\nelse:\n    import e\n")
+        names = sorted(n.names[0].name for n in iter_module_load_imports(tree))
+        self.assertEqual(names, ["a", "c", "e"])
+
+    def test_import_cycles_ignore_tests_and_migrations(self):
+        graph = _graph({
+            "app.models": ["app.models.models_a"], "app.models.models_a": ["app.models"],  # aggregator cycle
+            "app.views": ["app.tests.test_views"], "app.tests.test_views": ["app.views"],
+            "app.forms": ["app.models"],
+        })
+        self.assertEqual(import_cycles(graph), [["app.models", "app.models.models_a"]])
 
     def test_dependents_are_transitive(self):
         graph = _graph({"app.tests.test_x": ["app.views"], "app.views": ["app.models"], "other": ["app.views"]})

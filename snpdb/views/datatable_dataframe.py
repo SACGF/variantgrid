@@ -12,11 +12,11 @@ from typing import Any, Optional
 import pandas as pd
 from django.http import HttpRequest, QueryDict, StreamingHttpResponse
 
+from library.django_utils.datatable_mixins import JSONResponseView
 from library.django_utils.grid_export import csv_streaming_response, grid_export_csv
 from library.pandas_utils import df_nan_to_none
 from library.utils import JsonObjType, nice_class_name
 from snpdb.models import UserGridConfig
-from snpdb.views.datatable_mixins import JSONResponseView
 from snpdb.views.datatable_view import DATATABLE_CSV_PARAM, SortOrder
 
 logger = logging.getLogger(__name__)

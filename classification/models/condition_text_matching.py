@@ -20,17 +20,18 @@ from model_utils.models import TimeStampedModel
 
 from annotation.regexes import db_ref_regexes
 from classification.enums import ShareLevel, SpecialEKeys
-from classification.models import (
+from classification.models import flag_types
+from classification.models.classification import (
     Classification,
     ClassificationModification,
+    ConditionReference,
     ConditionResolved,
     ConditionResolvedDict,
-    EvidenceKeyMap,
-    classification_flag_types,
     classification_post_publish_signal,
-    flag_types, ConditionReference,
 )
 from classification.models.condition_text_search import condition_text_search
+from classification.models.evidence_key import EvidenceKeyMap
+from classification.models.flag_types import classification_flag_types
 from flags.models import Flag, FlagComment, FlagResolution, flag_comment_action
 from genes.models import GeneSymbol, GeneSymbolAlias
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin

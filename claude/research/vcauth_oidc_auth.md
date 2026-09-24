@@ -115,7 +115,7 @@ Extends Django's `UserAdmin`. Registered by unregistering the default User admin
 |-----|-------------|
 | Keycloak | OIDC provider and admin API |
 | Django Auth | User model and permissions |
-| Library | Keycloak uptime check signal receiver, library.keycloak.Keycloak |
+| Library | Keycloak uptime check signal receiver, snpdb.keycloak.Keycloak |
 | snpdb | UserSettingsOverride stores OAuth metadata |
 | Django Groups | Syncs Keycloak groups to Django groups |
 

@@ -35,7 +35,6 @@ import simplejson
 
 from genes.gene_splice import ResolvedSpliceEvent, SpliceEventResolver
 from library.genomics.vcf_enums import VCFColumns, VCFSymbolicAllele
-from library.genomics.vcf_utils import vcf_header_filter_ids
 from library.genomics.vcf_writer import (
     VCFInfoHeader,
     VCFWriter,
@@ -44,6 +43,7 @@ from library.genomics.vcf_writer import (
 )
 from snpdb.gene_level_variants import GENE_LEVEL_CONTIG_LENGTH, GENE_LEVEL_CONTIG_NAME
 from snpdb.models import GenomeBuild
+from snpdb.vcf_utils import vcf_header_filter_ids
 from upload.models import SimpleVCFImportInfo, UploadStep
 from upload.tasks.vcf.import_vcf_step_task import ImportVCFStepTask
 from upload.tso500.dragen_combined_variant_output_parser import (

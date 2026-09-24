@@ -9,11 +9,14 @@ from django.db.models import QuerySet
 from django.http.response import Http404
 
 from classification.enums import SubmissionSource
-from classification.models import ClassificationJsonParams, ClassificationPatchResponse
 from classification.models.classification import (
     Classification,
     ClassificationModification,
     ClassificationProcessError,
+)
+from classification.models.classification_utils import (
+    ClassificationJsonParams,
+    ClassificationPatchResponse,
 )
 from library.utils import empty_to_none, utc_from_timestamp
 from snpdb.models import Lab

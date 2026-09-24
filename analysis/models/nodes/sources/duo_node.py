@@ -10,7 +10,6 @@ from django.db.models.deletion import SET_NULL
 from django.db.models.query_utils import Q
 
 from analysis.models.enums import DuoInheritance
-from analysis.models.nodes.sources import AbstractCohortBasedNode
 from analysis.models.nodes.family_inheritance import (
     MOSAIC_EVIDENCE_TEMPLATE,
     AbstractCompHetInheritance,
@@ -25,6 +24,7 @@ from analysis.models.nodes.family_inheritance import (
     mosaic_parent_warnings,
 )
 from analysis.models.nodes.node_display import NodeIcon
+from analysis.models.nodes.sources.cohort_node import AbstractCohortBasedNode
 from patients.models_enums import Zygosity
 from snpdb.models import Contig, Duo, DuoRelationship, Sample
 

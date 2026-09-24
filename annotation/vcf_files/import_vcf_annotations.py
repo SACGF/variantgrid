@@ -26,7 +26,7 @@ def import_vcf_annotations(
         delete_temp_files: Optional[bool] = None):
     import cyvcf2
 
-    from library.genomics.vcf_utils import cyvcf2_header_types
+    from snpdb.vcf_utils import cyvcf2_header_types
 
     if delete_temp_files is None:
         delete_temp_files = settings.IMPORT_PROCESSING_DELETE_TEMP_FILES_ON_SUCCESS

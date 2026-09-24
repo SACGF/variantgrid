@@ -24,13 +24,13 @@ from library.genomics.vcf_enums import (
     UNDECLARED_FILTERS_SEPARATOR,
     VCFColumns,
 )
-from library.genomics.vcf_utils import (
+from snpdb.models import GenomeBuild, GenomeFasta
+from snpdb.vcf_utils import (
     UnsortedVCFError,
     VCFSortChecker,
     parse_vcf_info_column,
     vcf_header_filter_ids,
 )
-from snpdb.models import GenomeBuild, GenomeFasta
 
 REFERENCE_SPAN_SKIP_REASON = "reference call over a span (ALT='.' with END)"
 

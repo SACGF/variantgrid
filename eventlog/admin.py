@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.contrib.auth.models import Group
 
 from eventlog.models import ViewEvent
-from snpdb.admin_utils import ModelAdminBasics
+from library.django_utils.admin_utils import ModelAdminBasics
 from snpdb.models import Lab, Organization
 
 

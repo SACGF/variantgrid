@@ -14,11 +14,11 @@ from genes.models import GeneFusion, GeneLevelId
 from genes.tests.gene_fusion_test_utils import create_gene_fusion
 from genes.tests.test_gene_fusions import GeneFusionTestCase
 from library.genomics.vcf_enums import GeneLevelSymbolicAlt
-from library.genomics.vcf_utils import vcf_get_ref_alt_svlen_and_modification
 from library.genomics.vcf_writer import percent_decode_info_value
 from snpdb.gene_level_variants import GENE_LEVEL_CONTIG_NAME
 from snpdb.models import VCF, GenomeBuild, ImportSource, Variant, VCFSourceSettings
 from snpdb.variant_pk_lookup import VariantPKLookup
+from snpdb.vcf_utils import vcf_get_ref_alt_svlen_and_modification
 from upload.import_task_factories.import_task_factory import get_import_task_factories
 from upload.models import (
     FileUpload,

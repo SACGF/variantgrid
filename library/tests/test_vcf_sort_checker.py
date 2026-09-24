@@ -1,6 +1,6 @@
 from django.test import TestCase
 
-from library.genomics.vcf_utils import UnsortedVCFError, VCFSortChecker
+from snpdb.vcf_utils import UnsortedVCFError, VCFSortChecker
 
 
 def _check_all(records):

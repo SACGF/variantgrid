@@ -79,6 +79,7 @@ scripts/vg outline --coverage                     # module docstring coverage pe
 scripts/vg tests --explain [--run]                # only the test modules a change puts at risk
 scripts/vg docs check [doc.md]                    # every path / path:Symbol citation in the docs resolves; CI warns
 scripts/vg css unused [--dynamic]                 # scss class/id selectors nothing in templates, JS or Python names
+scripts/vg imports cycles                         # import cycles among module-load imports; CI fails on any
 python3 manage.py vg page /variantopedia/dashboard --queries   # render a page as claude_agent: status, outline, N+1s
 scripts/vg map                                    # regenerate claude/maps/*.md (gitignored; the session hook does this)
 python3 manage.py test --keepdb [label]           # --keepdb always; whole suite: --parallel 4 (~2 min)
@@ -111,6 +112,9 @@ for "lazy loading", not to keep a function self-contained, not because the impor
 legitimate reason to inline an import is to break a genuine circular import cycle, and even then you must stop, flag the
 cycle to the user, and ask whether to refactor the code instead of papering over it with an inline import. If you are
 about to write `from … import …` anywhere except the top of the file, go back and add it to the top-level import block.
+Inside a package, import a name from the module that defines it (`from snpdb.models.models_vcf import VCF`), not
+through the package `__init__` that re-exports it - that is the usual cause of a cycle. `scripts/vg imports cycles`
+and `lint-imports` (`.importlinter`: `library` never imports an app) both gate CI.
 
 ### Code comments
 Write comments as if you were a senior developer who knows the codebase, and have it match the surrounding code. Don't

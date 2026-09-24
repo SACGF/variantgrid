@@ -8,7 +8,7 @@ from typing import Any, Optional
 
 from django.utils.safestring import SafeString
 
-from library.utils import first
+from library.utils.collection_utils import first
 
 
 def format_diff_text(text: str) -> SafeString:

@@ -1,5 +1,5 @@
-from library.genomics.vcf_utils import get_contigs_header_lines
 from library.genomics.vcf_writer import VCFInfoHeader, build_header_lines
+from snpdb.vcf_utils import get_contigs_header_lines
 
 
 def get_vcf_header_lines(top_lines=None, info_dict=None, formats=None, contig_lines=None, samples=None):

@@ -1,7 +1,7 @@
 from analysis.forms import SampleNodeForm
 from analysis.forms.forms_nodes import SampleFiltersMixin, VCFLocusFiltersMixin
 from analysis.models.nodes.sources.sample_node import SampleNode
-from analysis.views.nodes import GeneCoverageNodeView
+from analysis.views.nodes.gene_coverage_node_view import GeneCoverageNodeView
 from patients.models_enums import SampleSourceLevel, Zygosity
 
 

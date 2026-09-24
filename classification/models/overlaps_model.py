@@ -1,32 +1,48 @@
-from collections import defaultdict
-from functools import reduce, cached_property
+from functools import cached_property, reduce
 from typing import Any, Optional
+
 from auditlog.models import AuditlogHistoryField
 from auditlog.registry import auditlog
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
-from django.db.models import CASCADE, QuerySet, SET_NULL, JSONField
 from django.db import models
+from django.db.models import CASCADE, SET_NULL, JSONField, QuerySet
 from django.db.models.enums import IntegerChoices
 from django.urls import reverse
 from django.utils.safestring import mark_safe
 from django_extensions.db.models import TimeStampedModel
-from annotation.models import ClinVarRecord
+
 from annotation.models.data_enums import EffectiveDate
-from classification.enums import OverlapStatus, TestingContextBucket, SpecialEKeys, TestingContextFull, TriageStatus, \
-    OverlapOverrideStatus, OverlapState
-from classification.models import ClassificationGrouping, EvidenceKeyMap, ConditionResolved, ClassificationResultValue
-from classification.enums.overlaps_enums import OverlapType, OverlapContributionStatus, OverlapEntrySourceTextChoices, \
-    TriageState, TriageComment
+from annotation.models.models import ClinVarRecord
+from classification.enums import (
+    OverlapOverrideStatus,
+    OverlapState,
+    OverlapStatus,
+    SpecialEKeys,
+    TestingContextBucket,
+    TestingContextFull,
+    TriageStatus,
+)
+from classification.enums.overlaps_enums import (
+    ClassificationResultValue,
+    OverlapContributionStatus,
+    OverlapEntrySourceTextChoices,
+    OverlapType,
+    TriageComment,
+    TriageState,
+)
+from classification.models.classification import ConditionResolved
+from classification.models.classification_grouping import ClassificationGrouping
+from classification.models.evidence_key import EvidenceKeyMap
 from genes.hgvs import HGVSComponents, HGVSDisplay
-from library.preview_request import PreviewModelMixin, PreviewKeyValue
-from library.utils import first, AuditUtils, AuditSingleChange
-from library.utils.database_utils import TextFieldChoices, IntegerFieldChoices
+from library.preview_request import PreviewKeyValue, PreviewModelMixin
+from library.utils import AuditSingleChange, AuditUtils, first
+from library.utils.database_utils import IntegerFieldChoices, TextFieldChoices
 from ontology.models import OntologyTerm
-from review.models import ReviewableModelMixin, Review
+from review.models import Review, ReviewableModelMixin
 from snpdb.lab_picker import LabPickerData, LabSelection
-from snpdb.models import Allele, Lab, GenomeBuild, LabLike, CLINVAR_EXPERT_PANEL_LAB
+from snpdb.models import CLINVAR_EXPERT_PANEL_LAB, Allele, GenomeBuild, Lab, LabLike
 
 IN_REVIEW_VALUE = "in-review"
 

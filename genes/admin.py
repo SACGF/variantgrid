@@ -6,7 +6,7 @@ from guardian.admin import GuardedModelAdmin
 
 from genes import models
 from genes.models import GeneCoverageCollection, GeneSymbol
-from snpdb.admin_utils import ModelAdminBasics, admin_action, admin_list_column
+from library.django_utils.admin_utils import ModelAdminBasics, admin_action, admin_list_column
 from snpdb.archive import ArchivePreconditionError
 
 

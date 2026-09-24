@@ -22,12 +22,14 @@ from classification.models import EvidenceKeyMap
 from classification.models.classification import ClassificationModification
 from classification.models.classification_ref import ClassificationRef
 from classification.views.classification_export_report import ClassificationReport
-from classification.views.exports import ClassificationExportFormatterCSV
 from classification.views.exports.classification_export_filter import (
     ClassificationFilter,
     classification_export_user_strings_to_q,
 )
-from classification.views.exports.classification_export_formatter_csv import FormatDetailsCSV
+from classification.views.exports.classification_export_formatter_csv import (
+    ClassificationExportFormatterCSV,
+    FormatDetailsCSV,
+)
 from classification.views.exports.classification_export_formatter_redcap import (
     export_redcap_definition,
 )

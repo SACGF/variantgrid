@@ -8,9 +8,9 @@ from django.core.management.base import BaseCommand
 from django.db.models import QuerySet
 from django.db.models.query_utils import Q
 
-from library.genomics.vcf_utils import cyvcf2_header_types
 from library.utils.file_utils import mk_path
 from snpdb.models import VCF
+from snpdb.vcf_utils import cyvcf2_header_types
 from upload.vcf.vcf_import import create_vcf_format, create_vcf_info
 
 

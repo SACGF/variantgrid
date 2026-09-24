@@ -20,7 +20,6 @@ from classification.models import Classification
 from library.django_utils import (
     add_save_message,
 )
-from library.keycloak import Keycloak
 from snpdb import forms
 from snpdb.forms import (
     SettingsInitialGroupPermissionForm,
@@ -28,6 +27,7 @@ from snpdb.forms import (
     UserForm,
     UserSettingsOverrideForm,
 )
+from snpdb.keycloak import Keycloak
 from snpdb.models import (
     VCF,
     AbstractNodeCountSettings,

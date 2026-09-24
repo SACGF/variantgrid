@@ -8,11 +8,11 @@ from django.shortcuts import get_object_or_404
 from django.urls import reverse
 
 from genes.models import GeneCoverageCanonicalTranscript
-from library.django_utils.datatable_dataframe import DataFrameDatatableConfig
 from library.pandas_utils import nan_to_none
 from library.utils import JsonDataType, pretty_label
 from seqauto.models import EnrichmentKit, GoldCoverageSummary, GoldReference, SequencingSample
 from seqauto.seqauto_stats import get_sample_enrichment_kits_df, group_enrichment_kits_df
+from snpdb.views.datatable_dataframe import DataFrameDatatableConfig
 from snpdb.views.datatable_view import CellData, DatatableConfig, RichColumn, SortOrder
 
 

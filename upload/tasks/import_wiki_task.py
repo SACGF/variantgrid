@@ -8,9 +8,9 @@ from genes.gene_matching import GeneSymbolMatcher
 from genes.hgvs import HGVSMatcher
 from genes.models import GeneSymbolWiki
 from library.django_utils import UserMatcher
-from library.genomics.vcf_utils import write_vcf_from_variant_coordinates
 from library.pandas_utils import df_nan_to_none
 from snpdb.models import GenomeBuild, ImportedWiki, ImportedWikiCollection, Variant, VariantWiki
+from snpdb.vcf_utils import write_vcf_from_variant_coordinates
 from upload.models import UploadedWikiCollection, UploadStep
 from upload.tasks.import_task import ImportTask
 from upload.tasks.vcf.import_vcf_step_task import ImportVCFStepTask

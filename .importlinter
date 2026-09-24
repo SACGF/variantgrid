@@ -1,0 +1,78 @@
+; Import contracts, checked by `lint-imports` (CI: .github/workflows/agent-maps.yml).
+; Cycles among module-load imports are checked separately by `scripts/vg imports cycles`: import-linter
+; also counts imports inside functions, which is how a genuine cycle is meant to be broken.
+
+[importlinter]
+root_packages =
+    analysis
+    annotation
+    beacon
+    classification
+    email_manager
+    eventlog
+    flags
+    genes
+    library
+    manual
+    mme
+    oidc_auth
+    ontology
+    pathtests
+    patients
+    pedigree
+    review
+    seqauto
+    snpdb
+    sync
+    uicore
+    upload
+    user_messages
+    variantgrid
+    variantopedia
+exclude_type_checking_imports = True
+
+[importlinter:contract:library-is-a-base-layer]
+name = library does not import the apps
+type = forbidden
+source_modules =
+    library
+forbidden_modules =
+    analysis
+    annotation
+    beacon
+    classification
+    email_manager
+    eventlog
+    flags
+    genes
+    manual
+    mme
+    oidc_auth
+    ontology
+    pathtests
+    patients
+    pedigree
+    review
+    seqauto
+    snpdb
+    sync
+    uicore
+    upload
+    user_messages
+    variantgrid
+    variantopedia
+ignore_imports =
+    ; manage.py vg: introspection over every app, run from scripts/vg without Django where it can be
+    library.vg.** -> **
+    ; tests build fixtures from app models
+    library.**.tests.** -> **
+    library.tests.** -> **
+    ; NotificationBuilder records each notification as an Event, and AdminNotificationBuilder emails it
+    library.log_utils -> eventlog.models
+    library.log_utils -> email_manager.models
+    ; inside a function to break a cycle: snpdb.models imports these modules
+    library.guardian_utils -> snpdb.models
+    library.utils.export_utils -> snpdb.user_settings_manager
+    library.django_utils.django_partition -> snpdb.models.models_partition_archive
+    library.preview_request -> genes.models_enums
+    library.preview_request -> variantgrid.perm_path

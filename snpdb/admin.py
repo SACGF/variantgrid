@@ -9,14 +9,14 @@ from unidecode import unidecode
 
 from classification.models import Overlap
 from classification.services.overlaps_services import OverlapServices
-from snpdb import models
-from snpdb.admin_partition_archive_mixin import ArchivePartitionDataAdminMixin
-from snpdb.admin_utils import (
+from library.django_utils.admin_utils import (
     GuardedModelAdminBasics,
     ModelAdminBasics,
     admin_action,
     admin_list_column,
 )
+from snpdb import models
+from snpdb.admin_partition_archive_mixin import ArchivePartitionDataAdminMixin
 from snpdb.liftover import liftover_alleles
 from snpdb.models import (
     Allele,

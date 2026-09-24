@@ -3,7 +3,7 @@ import subprocess
 from dataclasses import dataclass
 from typing import Optional
 
-from library.utils import FormerTuple
+from library.utils.collection_utils import FormerTuple
 
 
 @dataclass(frozen=True)

@@ -7,7 +7,7 @@ from django_extensions.db.models import TimeStampedModel
 from requests import request
 
 from library.constants import MINUTE_SECS
-from snpdb.models import GenomeBuild
+from snpdb.models.models_genome import GenomeBuild
 
 DBSNP_PATTERN = re.compile(r"^rs(\d+)$", re.IGNORECASE)
 

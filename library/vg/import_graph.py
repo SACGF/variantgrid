@@ -1,6 +1,7 @@
 """
 First-party import graph built from the AST, without importing anything. Used by test selection
-(which test modules transitively import a changed module) and by `vg map` to rank fan-in.
+(which test modules transitively import a changed module), by `vg map` to rank fan-in, and by
+`vg imports cycles`, which fails on any cycle among the imports that run at module load.
 
 `from a.b import c` resolves to the module `a.b.c` when that module exists, otherwise to `a.b` (c is a
 symbol). Relative imports are resolved against the importing package. Third-party imports are dropped.
@@ -58,14 +59,31 @@ def iter_import_statements(node):
                 yield from iter_import_statements(child)
 
 
-def _raw_imports(path: Path) -> list[list]:
+def iter_module_load_imports(node):
+    """ Import statements that run when the module is imported: not those inside a function body
+        (the sanctioned way to break a cycle) or under `if TYPE_CHECKING:` """
+    for attr in _BODY_ATTRS:
+        for child in getattr(node, attr, ()) or ():
+            if isinstance(child, (ast.Import, ast.ImportFrom)):
+                yield child
+            elif isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                continue
+            elif isinstance(child, ast.If) and "TYPE_CHECKING" in ast.unparse(child.test):
+                for orelse_child in child.orelse:
+                    yield from iter_module_load_imports(ast.Module(body=[orelse_child], type_ignores=[]))
+            elif isinstance(child, (ast.stmt, ast.ExceptHandler)):
+                yield from iter_module_load_imports(child)
+
+
+def _raw_imports(path: Path, module_load_only: bool = False) -> list[list]:
     """ [["import", "a.b"], ["from", level, base_or_None, [names]]] for one file """
     try:
         tree = ast.parse(path.read_bytes(), filename=str(path))
     except (SyntaxError, ValueError):
         return []
     raw = []
-    for node in iter_import_statements(tree):
+    walker = iter_module_load_imports if module_load_only else iter_import_statements
+    for node in walker(tree):
         if isinstance(node, ast.Import):
             raw.extend(["import", alias.name] for alias in node.names)
         else:
@@ -110,7 +128,8 @@ def relative_base(importer: str, is_package: bool, level: int, module: str | Non
     return ".".join(parts)
 
 
-def build_import_graph() -> ImportGraph:
+def build_import_graph(module_load_only: bool = False) -> ImportGraph:
+    """ module_load_only: just the imports that run at import time (uncached - the cache holds every import) """
     graph = ImportGraph()
     for module, path in iter_python_files():
         if module:
@@ -124,10 +143,13 @@ def build_import_graph() -> ImportGraph:
         stat = path.stat()
         key = str(path.relative_to(REPO_ROOT))
         stamp = [stat.st_mtime_ns, stat.st_size]
-        entry = cache.get(key)
-        if not entry or entry["stamp"] != stamp:
-            entry = {"stamp": stamp, "imports": _raw_imports(path)}
-        fresh_cache[key] = entry
+        if module_load_only:
+            entry = {"imports": _raw_imports(path, module_load_only=True)}
+        else:
+            entry = cache.get(key)
+            if not entry or entry["stamp"] != stamp:
+                entry = {"stamp": stamp, "imports": _raw_imports(path)}
+            fresh_cache[key] = entry
 
         is_package = path.name == "__init__.py"
         for raw in entry["imports"]:
@@ -149,6 +171,71 @@ def build_import_graph() -> ImportGraph:
                     if target:
                         graph.add_edge(module, target)
 
-    if fresh_cache != cache:
+    if not module_load_only and fresh_cache != cache:
         _save_cache(fresh_cache)
     return graph
+
+
+def _is_production_module(module: str) -> bool:
+    """ Tests are leaves nothing imports and migrations are frozen, so neither can be part of a cycle worth fixing """
+    parts = module.split(".")
+    return not any(part in ("tests", "migrations") or part.startswith("test_") for part in parts)
+
+
+def import_cycles(graph: ImportGraph) -> list[list[str]]:
+    """ Strongly connected components of more than one module (Tarjan, iterative), largest first """
+    edges = {module: sorted(t for t in targets if _is_production_module(t))
+             for module, targets in graph.imports.items() if _is_production_module(module)}
+    index: dict[str, int] = {}
+    lowlink: dict[str, int] = {}
+    on_stack: set[str] = set()
+    stack: list[str] = []
+    cycles = []
+    for root in sorted(edges):
+        if root in index:
+            continue
+        work = [(root, iter(edges.get(root, ())))]
+        index[root] = lowlink[root] = len(index)
+        stack.append(root)
+        on_stack.add(root)
+        while work:
+            node, children = work[-1]
+            child = next(children, None)
+            if child is not None:
+                if child not in index:
+                    index[child] = lowlink[child] = len(index)
+                    stack.append(child)
+                    on_stack.add(child)
+                    work.append((child, iter(edges.get(child, ()))))
+                elif child in on_stack:
+                    lowlink[node] = min(lowlink[node], index[child])
+                continue
+            work.pop()
+            if work:
+                parent = work[-1][0]
+                lowlink[parent] = min(lowlink[parent], lowlink[node])
+            if lowlink[node] == index[node]:
+                component = []
+                while True:
+                    member = stack.pop()
+                    on_stack.discard(member)
+                    component.append(member)
+                    if member == node:
+                        break
+                if len(component) > 1:
+                    cycles.append(sorted(component))
+    return sorted(cycles, key=lambda c: (-len(c), c))
+
+
+def render_cycles(graph: ImportGraph, cycles: list[list[str]]) -> str:
+    if not cycles:
+        return "No import cycles among module-load imports."
+    lines = [f"{len(cycles)} import cycle(s) among module-load imports. Import each name from the module that "
+             "defines it rather than through a package __init__, or move the import into the function that needs it:"]
+    for cycle in cycles:
+        members = set(cycle)
+        lines.append("")
+        for module in cycle:
+            for target in sorted(graph.imports.get(module, ()) & members):
+                lines.append(f"  {module} -> {target}")
+    return "\n".join(lines)

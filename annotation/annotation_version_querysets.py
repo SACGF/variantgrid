@@ -17,7 +17,8 @@ from typing import Optional, TypeVar
 from django.db.models import Model, QuerySet
 from django.db.models.query_utils import Q
 
-from annotation.models import AnnotationVersion, VariantAnnotation, VariantAnnotationPipelineType
+from annotation.models.models import AnnotationVersion, VariantAnnotation
+from annotation.models.models_enums import VariantAnnotationPipelineType
 from library.django_utils.django_queryset_sql_transformer import get_queryset_with_transformer_hook
 from snpdb.archive import DataArchivedError
 from snpdb.models import GenomeBuild, Variant

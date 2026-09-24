@@ -16,7 +16,7 @@ from classification.models import (
     ClinVarExportSubmission,
 )
 from classification.models.clinvar_export_sync import ClinVarRequestException, clinvar_export_sync
-from snpdb.admin_utils import (
+from library.django_utils.admin_utils import (
     AllValuesChoicesFieldListFilter,
     ModelAdminBasics,
     admin_action,

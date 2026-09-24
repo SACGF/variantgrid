@@ -3,7 +3,7 @@ from django.contrib.auth.models import User
 from guardian.admin import GuardedModelAdmin
 
 from analysis import models
-from snpdb.admin_utils import ModelAdminBasics
+from library.django_utils.admin_utils import ModelAdminBasics
 
 
 class AnalysisUserFilter(admin.SimpleListFilter):

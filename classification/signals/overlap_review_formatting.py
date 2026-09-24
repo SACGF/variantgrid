@@ -1,4 +1,3 @@
-import json
 from typing import Optional
 
 from django.dispatch.dispatcher import receiver
@@ -7,8 +6,8 @@ from django.utils.safestring import SafeString
 
 from classification.enums import OverlapStatus
 from classification.models import Overlap
-from classification.signals import PendingChange
-from review.models import review_detail_signal, Review
+from classification.signals.discordance_report_review_detail import PendingChange
+from review.models import Review, review_detail_signal
 
 
 @receiver(review_detail_signal, sender=Overlap)

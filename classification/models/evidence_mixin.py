@@ -6,11 +6,10 @@ from typing import Any, Optional, TypedDict, Union
 
 from django.conf import settings
 
-from annotation.models import CitationFetchRequest
-from annotation.models.models_citations import CitationFetchResponse
+from annotation.models.models_citations import CitationFetchRequest, CitationFetchResponse
 from classification.criteria_strengths import CriteriaStrength, CriteriaStrengths
 from classification.enums import AlleleOriginBucket, CriteriaEvaluation, SpecialEKeys
-from genes.hgvs import HGVSComponents, PHGVS
+from genes.hgvs import PHGVS, HGVSComponents
 from library.log_utils import report_message
 from library.utils import empty_to_none
 from snpdb.models import GenomeBuild, GenomeBuildPatchVersion

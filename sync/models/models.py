@@ -22,10 +22,6 @@ class SyncDestination(models.Model):
     config = models.JSONField(null=False, blank=True, default=dict)
     enabled = models.BooleanField(null=False, blank=True, default=True)
 
-    def run(self, full_sync: bool = False, max_rows: Optional[int] = None):
-        from sync.sync_run import run_sync
-        run_sync(self, full_sync=full_sync, max_rows=max_rows)
-
     @property
     def sync_details(self) -> dict:
         key = self.config["sync_details"]

@@ -19,6 +19,7 @@ from django.utils.html import format_html
 from django.utils.safestring import SafeString
 from threadlocals.threadlocals import get_current_user
 
+from genes.models_enums import AnnotationConsortium
 from library.log_utils import report_message
 from library.utils import pretty_label
 from variantgrid.perm_path import get_visible_url_names
@@ -302,7 +303,6 @@ class PreviewData:
         if annotation_consortia:
             def convert_consortium(obj_c: Any):
                 if isinstance(obj_c, str):
-                    from genes.models_enums import AnnotationConsortium
                     return AnnotationConsortium(obj_c)
                 else:
                     return obj_c

@@ -15,7 +15,6 @@ from django.db.models import Prefetch, QuerySet
 
 from genes.hgvs import HGVSMatcher
 from library.django_utils.django_file_utils import get_import_processing_dir
-from library.genomics.vcf_utils import get_contigs_header_lines, write_vcf_from_variant_coordinates
 from library.guardian_utils import admin_bot
 from snpdb.bcftools_liftover import bcftools_pre_liftover_error_check
 from snpdb.clingen_allele import populate_clingen_alleles_for_variants
@@ -34,6 +33,7 @@ from snpdb.models.models_variant import (
     VariantAllele,
     VariantCoordinate,
 )
+from snpdb.vcf_utils import get_contigs_header_lines, write_vcf_from_variant_coordinates
 from upload.models import FileUpload, UploadedFileTypes, UploadedLiftover, UploadPipeline
 from upload.upload_processing import process_upload_pipeline
 

@@ -12,13 +12,13 @@ from genes.models import GeneCopyNumberEvent, GeneCopyNumberEventKind, GeneLevel
 from genes.tests.gene_level_test_utils import create_gene_copy_number_event
 from genes.tests.test_gene_fusions import GeneFusionTestCase
 from library.genomics.vcf_enums import GeneLevelSymbolicAlt
-from library.genomics.vcf_utils import (
-    cyvcf2_header_types,
-    vcf_get_ref_alt_svlen_and_modification,
-)
 from snpdb.gene_level_variants import GENE_LEVEL_CONTIG_NAME
 from snpdb.models import CohortGenotype, GenomeBuild, ImportSource, Variant
 from snpdb.tests.utils.fake_cohort_data import create_fake_cohort
+from snpdb.vcf_utils import (
+    cyvcf2_header_types,
+    vcf_get_ref_alt_svlen_and_modification,
+)
 from upload.import_task_factories.import_task_factory import get_import_task_factory_from_extension
 from upload.models import (
     FileUpload,

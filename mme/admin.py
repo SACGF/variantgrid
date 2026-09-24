@@ -1,7 +1,7 @@
 from django.contrib import admin
 
+from library.django_utils.admin_utils import ModelAdminBasics
 from mme.models import MMEInboundMatch, MMEInboundQuery, MMEMatchResult, MMESubmission
-from snpdb.admin_utils import ModelAdminBasics
 
 
 @admin.register(MMESubmission)

@@ -9,7 +9,6 @@ from django.db import models
 from django.db.models import CASCADE, SET_NULL
 from django.db.models.query_utils import Q
 
-from analysis.models import GeneCoverageMixin
 from analysis.models.nodes.analysis_node import (
     AnalysisNode,
     NodeAlleleFrequencyFilter,
@@ -21,6 +20,7 @@ from analysis.models.nodes.cohort_mixin import (
     get_sample_annotation_kwargs,
     get_samples_pk_q,
 )
+from analysis.models.nodes.gene_coverage_mixin import GeneCoverageMixin
 from analysis.models.nodes.node_display import NodeChip, NodeIcon
 from analysis.models.nodes.stats_cache import (
     get_cached_label_count_for_cohort,

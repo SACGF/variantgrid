@@ -7,11 +7,11 @@ import cyvcf2
 from django.conf import settings
 from django.core.cache import cache
 
-from library.genomics.vcf_utils import vcf_get_ref_alt_svlen_and_modification
 from library.utils.file_utils import mk_path, name_from_filename
 from snpdb import variant_collection
 from snpdb.models import VariantCoordinate
 from snpdb.variant_pk_lookup import VariantPKLookup
+from snpdb.vcf_utils import vcf_get_ref_alt_svlen_and_modification
 from upload.models import ModifiedImportedVariant, UploadStep, UploadStepTaskType, VCFPipelineStage
 from upload.tasks.vcf.import_vcf_step_task import ImportVCFStepTask
 from upload.vcf import sql_copy_files
