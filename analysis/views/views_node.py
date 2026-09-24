@@ -3,7 +3,6 @@ import inspect
 import logging
 
 import pandas as pd
-from celery.contrib.abortable import AbortableAsyncResult
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.exceptions import EmptyResultSet
@@ -26,6 +25,7 @@ from analysis.models import AnalysisNode, NodeGraphType
 from analysis.models.enums import NodeStatus, SNPMatrix
 from analysis.models.nodes.analysis_node import NodeTask, NodeVCFFilter
 from analysis.models.nodes.node_counts import get_extra_filters_count, is_extra_filter
+from analysis.models.nodes.node_utils import cancel_node_tasks
 from analysis.models.nodes.sources.cohort_node import (
     CohortNodeZygosityFilter,
     CohortNodeZygosityFiltersCollection,
@@ -42,13 +42,11 @@ from library.django_utils import set_form_read_only
 from library.django_utils.database_utils import (
     queryset_to_sql,
     render_empty_result_set_sql,
-    run_sql,
 )
 from library.utils import full_class_name
 from pedigree.models import Pedigree
 from snpdb.graphs import graphcache
 from snpdb.models import VCF, Cohort, CohortSample, UserSettings, Variant
-from variantgrid.celery import app
 
 
 def get_node_views_by_class():
@@ -390,18 +388,9 @@ def node_load(request, analysis_id, node_id):
 @require_POST
 def node_cancel_load(request, analysis_id, node_id):
     node = get_node_subclass_or_404(request.user, node_id)
-    if node_task := NodeTask.objects.filter(node_version__node=node, node_version__version=node.version).first():
-        if node_task.celery_task:
-            logging.debug("TODO: Cancelling task %s", node_task.celery_task)
-            app.control.revoke(node_task.celery_task, terminate=True)  # @UndefinedVariable
-
-            result = AbortableAsyncResult(node_task.celery_task)
-            result.abort()
-
-        if node_task.db_pid:
-            run_sql("select pg_cancel_backend(%s)", [node_task.db_pid])
-    else:
-        logging.error("No task set for node %s", node_id)
+    node_task_qs = NodeTask.objects.filter(node_version__node=node, node_version__version=node.version)
+    if not cancel_node_tasks(node_task_qs):
+        logging.error("No running task for node %s", node_id)
 
     node.status = NodeStatus.CANCELLED
     node.save()

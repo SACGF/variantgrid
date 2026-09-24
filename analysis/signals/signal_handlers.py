@@ -3,6 +3,8 @@ import logging
 import celery
 from django.db import transaction
 
+from analysis.models.nodes.analysis_node import NodeTask
+from analysis.models.nodes.node_utils import cancel_node_tasks
 from analysis.tasks.auto_analysis_tasks import (
     auto_run_analyses_for_sample,
     auto_run_analyses_for_vcf,
@@ -35,6 +37,16 @@ def variant_tag_delete(sender, instance, **kwargs):
         # want to be as quick as we can so do analysis reload + liftover async
         celery_task = variant_tag_deleted_in_analysis_task.si(instance.analysis_id, instance.tag_id)
         transaction.on_commit(lambda: celery_task.apply_async())
+
+
+def analysis_pre_delete(sender, instance, **kwargs):  # pylint: disable=unused-argument
+    """ Deleting an analysis cascades into NodeCache, and post_delete_node_cache drops that node's
+        VariantCollection partition (AccessExclusiveLock). A node mid-load holds AccessShareLock on
+        it, so the delete blocks behind the load in the web request, or the two deadlock - stop the
+        loads first. Registered from apps.ready() rather than beside the model: models_analysis is
+        imported by analysis_node, which is where NodeTask lives. SACGF/variantgrid_com#2 """
+    node_task_qs = NodeTask.objects.filter(node_version__node__analysis=instance, celery_task__isnull=False)
+    cancel_node_tasks(node_task_qs)
 
 
 def handle_vcf_import_success(*args, **kwargs):

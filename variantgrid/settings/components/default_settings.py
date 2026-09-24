@@ -620,6 +620,11 @@ ANALYSIS_GRID_SORT_MAX_ROWS = 10_000
 # statement_timeout. Node queries run under this limit instead (@see node_query_planner_settings); it
 # is not set server-wide as the extra planning time regressed unrelated queries. None = server default.
 ANALYSIS_NODE_QUERY_JOIN_COLLAPSE_LIMIT = 32
+# pg_cancel_backend only signals the backend, so after cancelling a node's load we poll
+# pg_stat_activity for up to this long waiting for those queries to actually stop - a caller that
+# cancelled so it could drop partitions (analysis delete, version bump) would otherwise queue
+# behind the locks it just asked to be released
+ANALYSIS_NODE_CANCEL_WAIT_SECONDS = 5
 # Node exports are cached per (node, version, user, filter set, export type) so accumulate much faster
 # than the cohort/sample ones - a beat task drops the CachedGeneratedFile rows (and files) older than this
 ANALYSIS_NODE_EXPORT_CACHE_DAYS = 7
